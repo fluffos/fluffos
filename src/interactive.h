@@ -35,16 +35,16 @@
 #define HANDSHAKE_COMPLETE 0x20000 /* websocket connected */
 #define USING_COMPRESS 0x40000     /* we've negotiated compress */
 #define USING_MSP 0x80000          /* we've negotiated msp */
-#define USING_MSDP 0x100000 /* we've negotiated msdp */
+#define USING_MSDP 0x100000        /* we've negotiated msdp */
 
 // from ICU
 struct UConverter;
 
 struct interactive_t {
-  struct object_t *ob; /* points to the associated object         */
+  struct object_t* ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
-  struct sentence_t *input_to; /* to be called with next input line       */
-  struct svalue_t *carryover;  /* points to args for input_to             */
+  struct sentence_t* input_to; /* to be called with next input line       */
+  struct svalue_t* carryover;  /* points to args for input_to             */
   int num_carry;               /* number of args for input_to             */
 #endif
   int connection_type;          /* the type of connection this is          */
@@ -53,40 +53,40 @@ struct interactive_t {
   ev_socklen_t addrlen;
   int local_port;      /* which of our ports they connected to    */
   int external_port;   /* external port index for connection      */
-  const char *prompt;  /* prompt string for interactive object    */
+  const char* prompt;  /* prompt string for interactive object    */
   char text[MAX_TEXT]; /* input buffer for interactive object     */
   int text_end;        /* first free char in buffer               */
   int text_start;      /* where we are up to in user command buffer */
   time_t last_time;    /* time of last command executed           */
 #ifndef NO_SNOOP
-  struct object_t *snooped_by;
+  struct object_t* snooped_by;
 #endif
 #ifndef NO_ADD_ACTION
   /* this or What ? is printed when error    */
   union string_or_func default_err_message;
 #endif
   int trace_level;          /* debug flags -- 0 means no debugging     */
-  const char *trace_prefix; /* trace only object which has this as name  */
+  const char* trace_prefix; /* trace only object which has this as name  */
 #ifdef OLD_ED
-  struct ed_buffer_s *ed_buffer; /* local ed                        */
+  struct ed_buffer_s* ed_buffer; /* local ed                        */
 #endif
   unsigned int iflags; /* interactive flags */
 
   // iconv handle
-  UConverter *trans;
+  UConverter* trans;
 
   // libtelnet handle
-  struct telnet_t *telnet;
+  struct telnet_t* telnet;
 
   // libevent event handle.
-  struct bufferevent *ev_buffer;
-  struct event *ev_command;
+  struct bufferevent* ev_buffer;
+  struct event* ev_command;
 
   // libwebsocket handle
-  struct lws *lws;
+  struct lws* lws;
 
   // TLS context
-  SSL *ssl;
+  SSL* ssl;
 };
 
 #endif /* INTERACTIVE_H */

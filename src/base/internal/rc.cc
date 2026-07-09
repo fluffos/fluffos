@@ -23,9 +23,9 @@
 #include "base/internal/strutils.h"
 #include "log.h"
 
-char *config_str[NUM_CONFIG_STRS];
+char* config_str[NUM_CONFIG_STRS];
 int config_int[NUM_CONFIG_INTS];
-char *external_cmd[g_num_external_cmds];
+char* external_cmd[g_num_external_cmds];
 
 namespace {
 
@@ -61,13 +61,15 @@ struct FlagEntry {
 
 const FlagEntry INT_FLAGS[] = {
     {"time to clean up", __TIME_TO_CLEAN_UP__, 600, 0, INT_MAX, "Timing & Lifecycle",
-     "Seconds an object may be idle before clean_up() is called on it; should be well above 'time to swap'."},
+     "Seconds an object may be idle before clean_up() is called on it; should be well above 'time "
+     "to swap'."},
     {"time to reset", __TIME_TO_RESET__, 900, 0, INT_MAX, "Timing & Lifecycle",
      "Seconds between successive reset() calls on an object."},
     {"time to swap", __TIME_TO_SWAP__, 300, 0, INT_MAX, "Timing & Lifecycle",
      "Seconds an unused object stays in memory before being swapped out; 0 disables swapping."},
 
-    {"evaluator stack size", __EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE, 0, INT_MAX, "Limits",
+    {"evaluator stack size", __EVALUATOR_STACK_SIZE__, CFG_EVALUATOR_STACK_SIZE, 0, INT_MAX,
+     "Limits",
      "Maximum size of the evaluator stack, which holds all local variables and call arguments."},
     {"inherit chain size", __INHERIT_CHAIN_SIZE__, 30, 0, INT_MAX, "Limits",
      "Maximum depth of an object's inheritance chain."},
@@ -94,7 +96,8 @@ const FlagEntry INT_FLAGS[] = {
      "Maximum size, in bytes, of a file that read_file() may read."},
 
     {"hash table size", __SHARED_STRING_HASH_TABLE_SIZE__, 65536, 7001, INT_MAX, "Hash Tables",
-     "Size of the shared-string hash table; should be prime, roughly 1/5 of the number of distinct strings."},
+     "Size of the shared-string hash table; should be prime, roughly 1/5 of the number of distinct "
+     "strings."},
     {"object table size", __OBJECT_HASH_TABLE_SIZE__, 4096, 1024, INT_MAX, "Hash Tables",
      "Size of the object hash table; roughly 1/4 of the number of objects in the game."},
     {"living hash table size", __LIVING_HASH_TABLE_SIZE__, 256, 256, INT_MAX, "Hash Tables",
@@ -102,11 +105,12 @@ const FlagEntry INT_FLAGS[] = {
 
     {"gametick msec", __RC_GAMETICK_MSEC__, 1000, 0, INT_MAX, "Timing & Lifecycle",
      "Granularity of in-game time in milliseconds (the shortest visible time interval)."},
-    {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000, 0, INT_MAX, "Timing & Lifecycle",
-     "Heartbeat interval in milliseconds."},
+    {"heartbeat interval msec", __RC_HEARTBEAT_INTERVAL_MSEC__, 1000, 0, INT_MAX,
+     "Timing & Lifecycle", "Heartbeat interval in milliseconds."},
     {"sane explode string", __RC_SANE_EXPLODE_STRING__, 1, 0, INT_MAX, "Language Behavior",
      "explode() strips at most one leading delimiter (and still one trailing delimiter)."},
-    {"reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0, 0, INT_MAX, "Language Behavior",
+    {"reversible explode string", __RC_REVERSIBLE_EXPLODE_STRING__, 0, 0, INT_MAX,
+     "Language Behavior",
      "Make implode(explode(x, y), y) always equal x; overrides 'sane explode string'."},
     {"sane sorting", __RC_SANE_SORTING__, 1, 0, INT_MAX, "Language Behavior",
      "Use a well-defined, stable ordering for the driver's sorting operations."},
@@ -115,7 +119,8 @@ const FlagEntry INT_FLAGS[] = {
     {"call other warn", __RC_CALL_OTHER_WARN__, 0, 0, INT_MAX, "Type Checking",
      "Emit warnings instead of errors for call_other() type mismatches."},
     {"mudlib error handler", __RC_MUDLIB_ERROR_HANDLER__, 1, 0, INT_MAX, "Error Handling",
-     "Pass runtime errors to the master object's error_handler() instead of handling them in the driver."},
+     "Pass runtime errors to the master object's error_handler() instead of handling them in the "
+     "driver."},
     {"no resets", __RC_NO_RESETS__, 0, 0, INT_MAX, "Reset Behavior",
      "Completely disable the periodic calling of reset()."},
     {"lazy resets", __RC_LAZY_RESETS__, 0, 0, INT_MAX, "Reset Behavior",
@@ -123,9 +128,11 @@ const FlagEntry INT_FLAGS[] = {
     {"randomized resets", __RC_RANDOMIZED_RESETS__, 1, 0, INT_MAX, "Reset Behavior",
      "Spread reset() calls over a randomized interval rather than firing them all at once."},
     {"no ansi", __RC_NO_ANSI__, 1, 0, INT_MAX, "Player I/O",
-     "Replace ANSI escape characters (ASCII 27) in user input with a space before add_actions run."},
+     "Replace ANSI escape characters (ASCII 27) in user input with a space before add_actions "
+     "run."},
     {"strip before process input", __RC_STRIP_BEFORE_PROCESS_INPUT__, 1, 0, INT_MAX, "Player I/O",
-     "Strip ANSI before process_input() sees the input, rather than only before add_actions are called."},
+     "Strip ANSI before process_input() sees the input, rather than only before add_actions are "
+     "called."},
     {"this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1, 0, INT_MAX, "Language Behavior",
      "Make this_player() usable from within call_out() callbacks."},
     {"trace", __RC_TRACE__, 1, 0, INT_MAX, "Diagnostics",
@@ -143,9 +150,11 @@ const FlagEntry INT_FLAGS[] = {
     {"has console", __RC_HAS_CONSOLE__, 1, 0, INT_MAX, "Diagnostics",
      "Allow the driver's interactive console via the -C command-line argument."},
     {"noninteractive stderr write", __RC_NONINTERACTIVE_STDERR_WRITE__, 0, 0, INT_MAX, "Player I/O",
-     "Write tells/messages sent to non-interactive objects to stderr, prefixed with ']' (legacy behavior)."},
+     "Write tells/messages sent to non-interactive objects to stderr, prefixed with ']' (legacy "
+     "behavior)."},
     {"trap crashes", __RC_TRAP_CRASHES__, 1, 0, INT_MAX, "Error Handling",
-     "Call crash() in the master object and shut down cleanly on signals that would otherwise crash the driver."},
+     "Call crash() in the master object and shut down cleanly on signals that would otherwise "
+     "crash the driver."},
     {"old type behavior", __RC_OLD_TYPE_BEHAVIOR__, 0, 0, INT_MAX, "Type Checking",
      "Reintroduce a legacy type-checking bug for backwards compatibility."},
     {"old range behavior", __RC_OLD_RANGE_BEHAVIOR__, 0, 0, INT_MAX, "Language Behavior",
@@ -154,12 +163,13 @@ const FlagEntry INT_FLAGS[] = {
      "Warn when code relies on 'old range behavior'."},
     {"suppress argument warnings", __RC_SUPPRESS_ARGUMENT_WARNINGS__, 1, 0, INT_MAX, "Diagnostics",
      "Suppress unused-argument warnings, warning only about unused local variables."},
-    {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1, 0, INT_MAX, "Language Behavior",
-     "Call init() in an object when enable_commands() is invoked on it."},
-    {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1, 0, INT_MAX,
-     "Language Behavior",
+    {"enable_commands call init", __RC_ENABLE_COMMANDS_CALL_INIT__, 1, 0, INT_MAX,
+     "Language Behavior", "Call init() in an object when enable_commands() is invoked on it."},
+    {"sprintf add_justified ignore ANSI colors", __RC_SPRINTF_ADD_JUSTFIED_IGNORE_ANSI_COLORS__, 1,
+     0, INT_MAX, "Language Behavior",
      "Make sprintf() column justification ignore ANSI color codes when computing field width."},
-    {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000, 0, INT_MAX, "Language Behavior",
+    {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000, 0, INT_MAX,
+     "Language Behavior",
      "Maximum nesting level for chains of call_out(0) within a single backend cycle."},
     {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0, 0, INT_MAX, "Diagnostics",
      "Record LPC execution context for tracing and debugging."},
@@ -213,12 +223,12 @@ struct StrFlagEntry {
 };
 
 const StrFlagEntry STR_FLAGS[] = {
-    {"name", __MUD_NAME__, kMustHave, "config file: mn", "Identity & Network",
-     "Name of this MUD."},
+    {"name", __MUD_NAME__, kMustHave, "config file: mn", "Identity & Network", "Name of this MUD."},
     {"mudlib directory", __MUD_LIB_DIR__, kMustHave, "config file: mld", "Directory Structure",
      "Absolute path to the mudlib root (this path is not relative to the mudlib)."},
     {"log directory", __LOG_DIR__, kMustHave, "config file: ld", "Directory Structure",
-     "Filesystem directory for debug.log and stats files, resolved relative to the driver's working directory (leading slashes are stripped); not a mudlib virtual path."},
+     "Filesystem directory for debug.log and stats files, resolved relative to the driver's "
+     "working directory (leading slashes are stripped); not a mudlib virtual path."},
     {"include directories", __INCLUDE_DIRS__, kMustHave, "config file: id", "Directory Structure",
      "Colon-separated list of directories searched by `#include <...>`."},
     {"master file", __MASTER_FILE__, kMustHave, "config file: mf", "Core Files",
@@ -227,21 +237,23 @@ const StrFlagEntry STR_FLAGS[] = {
      "Path to the object that defines global simulated efuns."},
     {"debug log file", __DEBUG_LOG_FILE__, kWarnMissing, "config file: dlf", "Logging",
      "Filename (within the log directory) for the driver's debug log."},
-    {"default error message", __DEFAULT_ERROR_MESSAGE__, kOptional, "config file: dem", "Error Handling",
-     "Message shown to players when error() occurs."},
+    {"default error message", __DEFAULT_ERROR_MESSAGE__, kOptional, "config file: dem",
+     "Error Handling", "Message shown to players when error() occurs."},
     {"mud ip", __MUD_IP__, kOptional, "config file: mi", "Identity & Network",
      "IP address to bind to; useful on hosts with multiple network addresses."},
     {"ffi allowed libraries", __FFI_ALLOWED_LIBRARIES__, kOptional, "config file: fal", "Security",
-     "Colon-separated allow-list of shared-library paths that ffi_load() may open (package_ffi). Empty means the driver imposes no path restriction and defers entirely to the master apply valid_ffi(); every ffi_load/symbol/prepare/callback is gated by that apply regardless."},
+     "Colon-separated allow-list of shared-library paths that ffi_load() may open (package_ffi). "
+     "Empty means the driver imposes no path restriction and defers entirely to the master apply "
+     "valid_ffi(); every ffi_load/symbol/prepare/callback is gated by that apply regardless."},
 };
 
-bool scan_config_line(const char *fmt, void *dest, int required) {
+bool scan_config_line(const char* fmt, void* dest, int required) {
   /* zero the destination.  It is either a pointer to an int or a char
    buffer, so this will work */
-  *(reinterpret_cast<int *>(dest)) = 0;
+  *(reinterpret_cast<int*>(dest)) = 0;
 
   bool found = false;
-  for (const auto &line : config_lines) {
+  for (const auto& line : config_lines) {
     if (sscanf(line.c_str(), fmt, dest) == 1) {
       found = true;
       break;
@@ -294,12 +306,12 @@ void config_init() {
   }
 
   // populate default value for int flags.
-  for (const auto &flag : INT_FLAGS) {
+  for (const auto& flag : INT_FLAGS) {
     CONFIG_INT(flag.pos) = flag.defaultValue;
   }
 }
 
-void read_config(const char *filename) {
+void read_config(const char* filename) {
   config_init();
 
   debug_message("Processing config file: %s\n", filename);
@@ -350,7 +362,7 @@ void read_config(const char *filename) {
   }
 
   // Process the simple string options from the STR_FLAGS table.
-  for (const auto &flag : STR_FLAGS) {
+  for (const auto& flag : STR_FLAGS) {
     char buf[256];
     sprintf(buf, "%s : %%[^\n]", flag.key.c_str());
     scan_config_line(buf, tmp, flag.required);
@@ -468,14 +480,14 @@ void read_config(const char *filename) {
   scan_config_line("warn tab : %d\n", tmp, K_WARN_FOUND);
 
   // Give all obsolete (thus untouched) config strings a value.
-  for (auto &i : config_str) {
+  for (auto& i : config_str) {
     if (i == nullptr) {
       i = alloc_cstring("", "rc_obsolete");
     }
   }
 
   // process int flags
-  for (const auto &flag : INT_FLAGS) {
+  for (const auto& flag : INT_FLAGS) {
     int value = 0;
     char buf[256];
     sprintf(buf, "%s : %%d\n", flag.key.c_str());
@@ -496,7 +508,7 @@ void read_config(const char *filename) {
 }
 
 void print_rc_table() {
-  for (const auto &flag : INT_FLAGS) {
+  for (const auto& flag : INT_FLAGS) {
     auto val = CONFIG_INT(flag.pos);
     if (val != flag.defaultValue) {
       debug_message("%s : %d # default: %d\n", flag.key.c_str(), val, flag.defaultValue);
@@ -513,7 +525,7 @@ namespace {
 // Print `text` as one or more "# ..." comment lines, wrapped on whitespace.
 // The config parser drops any line >= K_MAX_CONFIG_LINE_LENGTH chars (it trips
 // failbit and stops reading the file), so comment lines must stay short.
-void print_comment(const std::string &text) {
+void print_comment(const std::string& text) {
   const size_t width = 76;
   std::istringstream words(text);
   std::string word, line;
@@ -529,7 +541,7 @@ void print_comment(const std::string &text) {
   }
 }
 
-std::string template_str_value(const std::string &key) {
+std::string template_str_value(const std::string& key) {
   if (key == "name") return "CHANGE_ME";
   if (key == "mudlib directory") return "/path/to/your/mudlib";
   if (key == "log directory") return "log";
@@ -543,11 +555,11 @@ std::string template_str_value(const std::string &key) {
 }  // namespace
 
 void print_config_template() {
-  static const char *const CATEGORY_ORDER[] = {
-      "Identity & Network", "Directory Structure", "Core Files",    "Logging",
-      "Error Handling",     "Timing & Lifecycle",  "Limits",        "Hash Tables",
-      "Reset Behavior",     "Language Behavior",    "Type Checking", "Player I/O",
-      "Diagnostics",        "Performance",          "Protocol Support",
+  static const char* const CATEGORY_ORDER[] = {
+      "Identity & Network", "Directory Structure", "Core Files",       "Logging",
+      "Error Handling",     "Timing & Lifecycle",  "Limits",           "Hash Tables",
+      "Reset Behavior",     "Language Behavior",   "Type Checking",    "Player I/O",
+      "Diagnostics",        "Performance",         "Protocol Support",
   };
 
   printf(
@@ -560,7 +572,7 @@ void print_config_template() {
       "# external commands) are commented out -- uncomment and edit to enable them.\n"
       "###############################################################################\n\n");
 
-  for (const auto *category : CATEGORY_ORDER) {
+  for (const auto* category : CATEGORY_ORDER) {
     bool header_printed = false;
     auto ensure_header = [&]() {
       if (!header_printed) {
@@ -569,12 +581,12 @@ void print_config_template() {
       }
     };
 
-    for (const auto &s : STR_FLAGS) {
+    for (const auto& s : STR_FLAGS) {
       if (s.category != category) {
         continue;
       }
       ensure_header();
-      const char *tag = s.required == kMustHave      ? " (required)"
+      const char* tag = s.required == kMustHave      ? " (required)"
                         : s.required == kWarnMissing ? " (recommended)"
                                                      : " (optional)";
       print_comment(s.description + tag);
@@ -586,7 +598,7 @@ void print_config_template() {
       }
     }
 
-    for (const auto &f : INT_FLAGS) {
+    for (const auto& f : INT_FLAGS) {
       if (f.category != category) {
         continue;
       }

@@ -48,7 +48,7 @@
 #include "net/telnet.h"  // Telnet related stuff
 
 // trace.cc
-extern struct array_t *get_svalue_trace();
+extern struct array_t* get_svalue_trace();
 
 // Tracing support
 #include "base/internal/tracing.h"

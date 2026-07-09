@@ -22,7 +22,7 @@
 #define FFI_UINT32 6
 #define FFI_INT64 7
 #define FFI_UINT64 8
-#define FFI_FLOAT 9  /* C float  <-> LPC float */
+#define FFI_FLOAT 9   /* C float  <-> LPC float */
 #define FFI_DOUBLE 10 /* C double <-> LPC float */
 /*
  * A pointer. As an ARGUMENT: pass a buffer; the native pointer is the

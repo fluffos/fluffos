@@ -47,7 +47,7 @@ struct rusage {
   long ru_nivcsw;
 };
 
-int getrusage(int who, struct rusage *usage_p);
+int getrusage(int who, struct rusage* usage_p);
 #endif
 
 #endif  // BASE_INTERNAL_RUSAGE_H

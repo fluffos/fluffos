@@ -17,6 +17,6 @@
 //                              bytecode when combined with dump_prog)
 //
 // Returns false if the stream failed to load.
-bool lpc_dump_stage_tokens(int fd, const char *name, bool pp_form, FILE *out);
+bool lpc_dump_stage_tokens(int fd, const char* name, bool pp_form, FILE* out);
 
 #endif

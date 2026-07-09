@@ -37,8 +37,7 @@ ScratchVector<ScratchString> collect_args(std::string_view text, size_t& i);
 // supplies the macro-expanded form used for every OTHER parameter
 // reference (C's argument pre-expansion); null = raw everywhere (the
 // textual directive-side path, which pre-expands before calling).
-ScratchString substitute(std::string_view body,
-                         const std::vector<std::string>& params,
+ScratchString substitute(std::string_view body, const std::vector<std::string>& params,
                          const ScratchVector<ScratchString>& args,
                          const ScratchVector<ScratchString>* expanded_args = nullptr);
 
@@ -53,7 +52,6 @@ ScratchString substitute(std::string_view body,
 // returns 0.
 long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
 
-
 // There is NO session object. The preprocessor state lives directly in
 // g_compile: `macros` holds USER #defines only (predefines are immutable
 // -- redefining or #undef'ing one is an error -- so they never enter the
@@ -67,7 +65,7 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
 
 // Unified macro lookup: user table first, then the predefine table.
 // Returned pointer is valid until the next #define/#undef.
-const PpMacro *pp_find_macro(std::string_view name);
+const PpMacro* pp_find_macro(std::string_view name);
 // True when `name` names a predefine (or __FILE__/__LINE__/__DIR__).
 bool pp_is_predefined(std::string_view name);
 
@@ -103,7 +101,7 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
 // that buffer runs dry. Defined in lexer_utils.cc, next to the include
 // stack it manipulates. Preconditions documented at the definition. Also
 // used by start_new_file() for the configured __GLOBAL_INCLUDE_FILE__.
-bool lpc_lex_handle_include(std::string_view rest, void *yyscanner);
+bool lpc_lex_handle_include(std::string_view rest, void* yyscanner);
 
 // Textual macro expansion (object-like and function-like, with `guard`
 // carrying the names currently being expanded for self-reference
@@ -124,4 +122,4 @@ ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<Scratch
 // current_file lacks the leading '/').
 bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out);
 
-#endif // LEXER_RULES_PP_H
+#endif  // LEXER_RULES_PP_H

@@ -34,7 +34,7 @@ namespace {
 
 // Prevent the optimizer from discarding a result.
 template <class T>
-inline void escape(T &&v) {
+inline void escape(T&& v) {
   asm volatile("" : : "g"(&v) : "memory");
 }
 
@@ -53,14 +53,14 @@ double run_timed(int reps, void (*fn)(int)) {
   return best;
 }
 
-void report(const char *name, int ops, double scratch_ns, double heap_ns) {
-  printf("%-12s %12.1f ns/op scratch %12.1f ns/op heap   speedup %5.2fx\n", name,
-         scratch_ns / ops, heap_ns / ops, heap_ns / scratch_ns);
+void report(const char* name, int ops, double scratch_ns, double heap_ns) {
+  printf("%-12s %12.1f ns/op scratch %12.1f ns/op heap   speedup %5.2fx\n", name, scratch_ns / ops,
+         heap_ns / ops, heap_ns / scratch_ns);
 }
 
 // --- tokens ----------------------------------------------------------------
 constexpr int kTokensPerCompile = 2000;
-const char *token_text(int i, char *buf) {
+const char* token_text(int i, char* buf) {
   snprintf(buf, 32, "ident_%d_%d", i, i * 7);
   return buf;
 }
@@ -69,7 +69,7 @@ void tokens_scratch(int reps) {
   char buf[32];
   for (int r = 0; r < reps; r++) {
     for (int i = 0; i < kTokensPerCompile; i++) {
-      ScratchString *s = scratch_new_string(token_text(i, buf));
+      ScratchString* s = scratch_new_string(token_text(i, buf));
       escape(s);
     }
     scratch_destroy();
@@ -104,7 +104,7 @@ void accum_scratch(int reps) {
       for (int i = 0; i < kAccumAppends; i++) {
         accum += "0123456789abcdef";
       }
-      ScratchString *tok = scratch_new_string(accum);
+      ScratchString* tok = scratch_new_string(accum);
       escape(tok);
     }
     accum = ScratchString();  // per-compile reset (lpc_lex_reset_context)
@@ -142,7 +142,7 @@ void macro_args_scratch(int reps) {
       }
       ScratchVector<ScratchString> expanded;
       expanded.reserve(args.size());
-      for (const auto &a : args) {
+      for (const auto& a : args) {
         expanded.emplace_back(a);
         expanded.back() += "_expanded";
       }
@@ -162,7 +162,7 @@ void macro_args_heap(int reps) {
       }
       std::vector<std::string> expanded;
       expanded.reserve(args.size());
-      for (const auto &a : args) {
+      for (const auto& a : args) {
         expanded.emplace_back(a);
         expanded.back() += "_expanded";
       }
@@ -217,7 +217,7 @@ void mix_heap(int reps) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   int reps = (argc > 1) ? atoi(argv[1]) : 200;
   printf("scratchpad vs heap, %d simulated compiles per workload (best of 3)\n\n", reps);
 

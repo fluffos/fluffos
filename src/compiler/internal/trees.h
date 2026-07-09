@@ -58,7 +58,7 @@ enum control_jump_type { CJ_BREAK_SWITCH = 2, CJ_BREAK = 0, CJ_CONTINUE = 1 };
 union parse_value {
   LPC_INT number;
   LPC_FLOAT real;
-  struct parse_node_t *expr;
+  struct parse_node_t* expr;
 };
 
 struct parse_node_t {
@@ -73,7 +73,7 @@ struct parse_node_t {
 };
 
 typedef struct parse_node_block_s {
-  struct parse_node_block_s *next;
+  struct parse_node_block_s* next;
   parse_node_t nodes[NODES_PER_BLOCK];
 } parse_node_block_t;
 
@@ -114,11 +114,11 @@ typedef struct parse_node_block_s {
 #define CREATE_LAND_LOR(vn, op, x, y)                                                        \
   SAFE((vn) = new_node(); (vn)->kind = NODE_LAND_LOR; (vn)->v.number = op; (vn)->l.expr = x; \
        (vn)->r.expr = y; (vn)->type = ((x->type == y->type) ? x->type : TYPE_ANY);)
-#define CREATE_NULLISH(vn, x, y)                                                             \
-  SAFE((vn) = new_node(); (vn)->kind = NODE_NULLISH; (vn)->l.expr = x; (vn)->r.expr = y;   \
+#define CREATE_NULLISH(vn, x, y)                                                         \
+  SAFE((vn) = new_node(); (vn)->kind = NODE_NULLISH; (vn)->l.expr = x; (vn)->r.expr = y; \
        (vn)->type = TYPE_ANY;)
-#define CREATE_LOGICAL_ASSIGN(vn, op, lv, rv)                                               \
-  SAFE((vn) = new_node(); (vn)->kind = NODE_LOGICAL_ASSIGN; (vn)->v.number = op;            \
+#define CREATE_LOGICAL_ASSIGN(vn, op, lv, rv)                                    \
+  SAFE((vn) = new_node(); (vn)->kind = NODE_LOGICAL_ASSIGN; (vn)->v.number = op; \
        (vn)->l.expr = lv; (vn)->r.expr = rv; (vn)->type = lv->type;)
 #define CREATE_CALL(vn, op, t, el)                                                              \
   SAFE((vn) = el; (vn)->kind = NODE_CALL; (vn)->l.number = (vn)->v.number; (vn)->v.number = op; \
@@ -155,17 +155,13 @@ typedef struct parse_node_block_s {
   SAFE((vn) = new_node_no_line(); (vn)->kind = NODE_NUMBER; \
        (vn)->type = (val ? TYPE_NUMBER : TYPE_ANY); (vn)->v.number = val;)
 #define CREATE_STRING(vn, val)                                                        \
-  SAFE((vn) = new_node_no_line();                                                     \
-       (vn)->kind = NODE_STRING; (vn)->type = TYPE_STRING;                            \
+  SAFE((vn) = new_node_no_line(); (vn)->kind = NODE_STRING; (vn)->type = TYPE_STRING; \
        (vn)->v.number = store_prog_string(val);)
-#define CREATE_EXPR_LIST(vn, pn)                                                  \
-  SAFE((vn) = new_node();                                                         \
-       (vn)->v.number = (pn ? ((parse_node_t *)pn)->kind : 0);                    \
-       (vn)->l.expr = (pn ? ((parse_node_t *)pn)->l.expr : (vn));                 \
-       (vn)->r.expr = pn;)
+#define CREATE_EXPR_LIST(vn, pn)                                                 \
+  SAFE((vn) = new_node(); (vn)->v.number = (pn ? ((parse_node_t*)pn)->kind : 0); \
+       (vn)->l.expr = (pn ? ((parse_node_t*)pn)->l.expr : (vn)); (vn)->r.expr = pn;)
 #define CREATE_EXPR_NODE(vn, pn, f)                                                       \
-  SAFE((vn) = new_node_no_line();                                                         \
-       (vn)->v.expr = pn; (vn)->l.expr = vn; (vn)->r.expr = 0;                            \
+  SAFE((vn) = new_node_no_line(); (vn)->v.expr = pn; (vn)->l.expr = vn; (vn)->r.expr = 0; \
        (vn)->type = f;)
 #define CREATE_CATCH(vn, pn) \
   SAFE((vn) = new_node(); (vn)->kind = NODE_CATCH; (vn)->type = TYPE_ANY; (vn)->r.expr = pn;)
@@ -181,15 +177,15 @@ void release_tree(void);
 void lock_expressions(void);
 void unlock_expressions(void);
 /* node functions */
-parse_node_t *new_node(void);
-parse_node_t *new_node_no_line(void);
-parse_node_t *make_branched_node(short, char, parse_node_t *, parse_node_t *);
+parse_node_t* new_node(void);
+parse_node_t* new_node_no_line(void);
+parse_node_t* make_branched_node(short, char, parse_node_t*, parse_node_t*);
 /* parser grammar functions */
-parse_node_t *binary_int_op(parse_node_t *, parse_node_t *, char, const char *);
-parse_node_t *make_range_node(int, parse_node_t *, parse_node_t *, parse_node_t *);
-parse_node_t *insert_pop_value(parse_node_t *);
-parse_node_t *pop_value(parse_node_t *);
-parse_node_t *optimize_loop_test(parse_node_t *);
-int is_boolean(parse_node_t *);
+parse_node_t* binary_int_op(parse_node_t*, parse_node_t*, char, const char*);
+parse_node_t* make_range_node(int, parse_node_t*, parse_node_t*, parse_node_t*);
+parse_node_t* insert_pop_value(parse_node_t*);
+parse_node_t* pop_value(parse_node_t*);
+parse_node_t* optimize_loop_test(parse_node_t*);
+int is_boolean(parse_node_t*);
 
 #endif

@@ -14,18 +14,18 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
 
-struct object_t *master_ob = nullptr;
-struct function_lookup_info_t *master_applies = nullptr;
+struct object_t* master_ob = nullptr;
+struct function_lookup_info_t* master_applies = nullptr;
 
 /* Note that now, once the master object loads once, there is ALWAYS a
  * master object, so the only way this can fail is if the master object
  * hasn't loaded yet.  In that case, we return (svalue_t *)-1, and the
  * calling routine should let the check succeed.
  */
-svalue_t *apply_master_ob(int fun, int num_arg) {
+svalue_t* apply_master_ob(int fun, int num_arg) {
   if (!master_ob) {
     pop_n_elems(num_arg);
-    return (svalue_t *)-1;
+    return (svalue_t*)-1;
   }
 
   if (master_applies[fun].func) {
@@ -40,17 +40,17 @@ svalue_t *apply_master_ob(int fun, int num_arg) {
 }
 
 /* Hmm, need something like a safe_call_direct() to do this one */
-svalue_t *safe_apply_master_ob(int fun, int num_arg) {
+svalue_t* safe_apply_master_ob(int fun, int num_arg) {
   if (!master_ob) {
     pop_n_elems(num_arg);
-    return (svalue_t *)-1;
+    return (svalue_t*)-1;
   }
   return safe_apply(applies_table[fun], master_ob, num_arg, ORIGIN_DRIVER);
 }
 
-void init_master(const char *master_file) {
+void init_master(const char* master_file) {
   char buf[512];
-  object_t *new_ob;
+  object_t* new_ob;
 
   if (!filename_to_obname(master_file, buf, sizeof buf)) {
     error("Illegal master file name '%s'\n", master_file);
@@ -66,18 +66,18 @@ void init_master(const char *master_file) {
   set_master(new_ob);
 }
 
-static void get_master_applies(object_t *ob) {
+static void get_master_applies(object_t* ob) {
   int i;
 
   /* master_applies will be allocated if we're recompiling master_ob */
   if (master_applies) {
     FREE(master_applies);
   }
-  master_applies = reinterpret_cast<function_lookup_info_t *>(DCALLOC(
+  master_applies = reinterpret_cast<function_lookup_info_t*>(DCALLOC(
       NUM_MASTER_APPLIES, sizeof(function_lookup_info_t), TAG_SIMULS, "get_master_applies"));
 
   for (i = 0; i < NUM_MASTER_APPLIES; i++) {
-    const char *name = applies_table[i];
+    const char* name = applies_table[i];
     auto result = apply_cache_lookup(name, ob->prog);
     if (result.funp) {
       master_applies[i].func = result.funp;
@@ -88,11 +88,11 @@ static void get_master_applies(object_t *ob) {
   }
 }
 
-void set_master(object_t *ob) {
+void set_master(object_t* ob) {
 #if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
   int first_load = (!master_ob);
 #endif
-  svalue_t *ret;
+  svalue_t* ret;
 
   get_master_applies(ob);
   master_ob = ob;  // from here on apply_master_ob returns -1 only as return from the apply

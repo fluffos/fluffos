@@ -1,10 +1,10 @@
 #include "base/package_api.h"
 
 // from add_action.h
-extern object_t *find_living_object(const char *, int);
+extern object_t* find_living_object(const char*, int);
 
 /* Hideous mangling of C code by Taffyd. */
-void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int quiet, int dark,
+void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int quiet, int dark,
                           int num_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char m[] = "$M$";
@@ -17,16 +17,16 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
   int const seplen = strlen(separator);
   int const andlen = strlen(andsep);
 
-  array_t *arr = arg->u.arr;
-  svalue_t *sv;
-  svalue_t *v;
+  array_t* arr = arg->u.arr;
+  svalue_t* sv;
+  svalue_t* v;
   int const size = arr->size;
   int i;
   int len;
   int total_len;
   char *str, *res;
-  object_t *ob;
-  char *fun;
+  object_t* ob;
+  char* fun;
 
   if (!size) {
     str = new_string(0, "f_query_multiple_short");
@@ -235,8 +235,8 @@ void query_multiple_short(svalue_t *arg, const char *type, int no_dollars, int q
 } /* query_multiple_short() */
 
 void f_query_multiple_short() {
-  svalue_t *sv = sp - st_num_arg + 1;
-  const char *type = nullptr;
+  svalue_t* sv = sp - st_num_arg + 1;
+  const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
   if (st_num_arg > 4) {
@@ -275,15 +275,15 @@ void f_query_multiple_short() {
 
 int _in_reference_allowed = 0;
 
-int reference_allowed(object_t *referee, object_t *referrer_obj, const char *referrer_name) {
+int reference_allowed(object_t* referee, object_t* referrer_obj, const char* referrer_name) {
   int invis = 0;
   int referee_creator = 0;
-  svalue_t *v;
-  svalue_t *item;
-  array_t *vec;
-  const char *referee_name = nullptr;
-  object_t *playtester_handler = nullptr;
-  object_t *player_handler = nullptr;
+  svalue_t* v;
+  svalue_t* item;
+  array_t* vec;
+  const char* referee_name = nullptr;
+  object_t* playtester_handler = nullptr;
+  object_t* player_handler = nullptr;
   int referrer_playtester = 0;
   int referrer_match = 0;
   int playtester_match = 0;
@@ -444,10 +444,10 @@ int reference_allowed(object_t *referee, object_t *referrer_obj, const char *ref
 }
 
 void f_reference_allowed() {
-  svalue_t *sv = sp - st_num_arg + 1;
-  object_t *referee = nullptr;
-  object_t *referrer_obj = command_giver; /* Default to this_player(). */
-  const char *referrer_name = nullptr;
+  svalue_t* sv = sp - st_num_arg + 1;
+  object_t* referee = nullptr;
+  object_t* referrer_obj = command_giver; /* Default to this_player(). */
+  const char* referrer_name = nullptr;
   int result = 0;
   int const num_arg = st_num_arg;
 
@@ -473,7 +473,7 @@ void f_reference_allowed() {
       referrer_obj = find_living_object(sv[1].u.string, 1);
 #else
       if (simul_efun_ob) {
-        svalue_t *v;
+        svalue_t* v;
         push_svalue(&sv[1]);
         v = apply("find_player", simul_efun_ob, 1, ORIGIN_EFUN);
 
@@ -506,9 +506,9 @@ void f_reference_allowed() {
 
 void f_add_a() {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  const char *str = sp->u.string;
-  char *ret;
-  char *p;
+  const char* str = sp->u.string;
+  char* ret;
+  char* p;
   char first;
   int len;
   int an;
@@ -602,12 +602,12 @@ void f_vowel() {
 }
 
 void f_replace() {
-  svalue_t *arg2 = sp - st_num_arg + 2;
+  svalue_t* arg2 = sp - st_num_arg + 2;
   if (arg2->type == T_STRING && st_num_arg == 3) {
     return f_replace_string();
   }
   if (st_num_arg == 2 && arg2->type != T_STRING) {
-    array_t *arr = arg2->u.arr;
+    array_t* arr = arg2->u.arr;
     int i = 0;
     if (arr->size & 1) {
       error("Wrong array size for replace.\n");
@@ -634,9 +634,9 @@ void f_replace() {
 void replace_mxp_html(int html, int mxp) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  char *dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
-  const char *src = sp->u.string;
-  char *dst2 = dst;
+  char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
+  const char* src = sp->u.string;
+  char* dst2 = dst;
   while (*src && dst2 - dst < max_string_length) {
     switch (*src) {
       case '&':
@@ -682,10 +682,10 @@ void f_replace_mxp() { replace_mxp_html(0, 1); }
 
 void f_roulette_wheel() {
   long num;
-  mapping_t *m = sp->u.map;
+  mapping_t* m = sp->u.map;
   int j, found;
   mapping_node_t *elt, **a = m->table;
-  svalue_t *val;
+  svalue_t* val;
 
   // Loop through the mapping, adding up the weights.
   j = m->table_size;
@@ -732,13 +732,13 @@ void f_roulette_wheel() {
 }
 
 svalue_t replace_tmp = {T_NUMBER};
-svalue_t *replace_objects(svalue_t *thing) {
+svalue_t* replace_objects(svalue_t* thing) {
   int i;
   switch (thing->type) {
     case T_OBJECT: {
       char buf[2000];
       strcpy(buf, thing->u.ob->obname);
-      svalue_t *tmp = nullptr;
+      svalue_t* tmp = nullptr;
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
         push_object(thing->u.ob);
         tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
@@ -757,8 +757,8 @@ svalue_t *replace_objects(svalue_t *thing) {
     }
     case T_ARRAY:
     case T_CLASS: {
-      array_t *ar = thing->u.arr;
-      array_t *nar = allocate_array(ar->size);
+      array_t* ar = thing->u.arr;
+      array_t* nar = allocate_array(ar->size);
       push_refed_array(nar);
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
@@ -773,8 +773,8 @@ svalue_t *replace_objects(svalue_t *thing) {
       push_refed_mapping(allocate_mapping(thing->u.map->table_size));
       push_number(0);
       for (i = 0; i < (sp - 2)->u.arr->size; i++) {
-        svalue_t *key = sp;
-        svalue_t *tmp = find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
+        svalue_t* key = sp;
+        svalue_t* tmp = find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
         assign_svalue(key, replace_objects(&(sp - 2)->u.arr->item[i]));
         assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1), replace_objects(tmp));
         if ((sp - 1)->u.map->count - i != 1) {
@@ -795,10 +795,10 @@ void f_replace_objects() { assign_svalue(sp, replace_objects(sp)); }
 void f_replace_dollars() {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  char *newstr;
-  const char *oldstr = (sp - 1)->u.string;
-  char *currentnew;
-  const char *currentold = oldstr;
+  char* newstr;
+  const char* oldstr = (sp - 1)->u.string;
+  char* currentnew;
+  const char* currentold = oldstr;
   int i;
   if (sp->u.arr->size & 1) {
     error("wrong array length for replace_dollars()");
@@ -813,9 +813,9 @@ void f_replace_dollars() {
     if (oldstr[i] == '$') {
       int j;
       for (j = 0; j < sp->u.arr->size; j += 2) {
-        const char *one = sp->u.arr->item[j].u.string;
+        const char* one = sp->u.arr->item[j].u.string;
         if (!strncmp(one, oldstr + i, COUNTED_STRLEN(one))) {
-          const char *two = sp->u.arr->item[j + 1].u.string;
+          const char* two = sp->u.arr->item[j + 1].u.string;
           int const len = i - (currentold - oldstr);
           if (currentnew + len - newstr > max_string_length) {
             FREE_MSTR(newstr);

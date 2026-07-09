@@ -4,7 +4,7 @@
 
 #ifdef F_SYS_NETWORK_PORTS
 void f_sys_network_ports() {
-  array_t *info;
+  array_t* info;
   int i = 0, p = 0;
 
   for (i = 0; i < 5; i++) {
@@ -20,7 +20,7 @@ void f_sys_network_ports() {
     if (!external_port[i].port) {
       continue;
     }
-    array_t *pInfo = allocate_empty_array(4);
+    array_t* pInfo = allocate_empty_array(4);
 
     pInfo->item[0].type = T_NUMBER;
     pInfo->item[0].subtype = 0;
@@ -57,7 +57,7 @@ void f_sys_reload_tls() {
   if (port_index < 0 || port_index > sizeof(external_port)) {
     error("Invalid port index: %d\n", port_index_display);
   }
-  auto *port = &external_port[port_index];
+  auto* port = &external_port[port_index];
   if (port->kind == PORT_TYPE_UNDEFINED) {
     error("Invalid port index: %d\n", port_index_display);
   }
@@ -67,12 +67,12 @@ void f_sys_reload_tls() {
     if (port->ssl == nullptr) {
       error("Port %d is not TLS enabled\n", port_index_display);
     }
-    auto *ctx = tls_server_init(port->tls_cert, port->tls_key);
+    auto* ctx = tls_server_init(port->tls_cert, port->tls_key);
     if (ctx == nullptr) {
       error("Failed to reload TLS context for port %d\n", port->port);
     }
     // no race condition here since connection listener operates on main thread(), as all EFUNs do
-    auto *old_ctx = port->ssl;
+    auto* old_ctx = port->ssl;
     tls_server_close(old_ctx);
     port->ssl = ctx;
     debug_message("Reloading TLS config for port %d.\n", port->port);

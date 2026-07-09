@@ -9,8 +9,8 @@
 #define rotateleft(x, n) ((x) << (n) | ((x) >> (32 - (n))))
 
 #ifdef F_SHA1
-static inline void sha1_hash_block(const unsigned char *block, uint32_t *h0, uint32_t *h1,
-                                   uint32_t *h2, uint32_t *h3, uint32_t *h4) {
+static inline void sha1_hash_block(const unsigned char* block, uint32_t* h0, uint32_t* h1,
+                                   uint32_t* h2, uint32_t* h3, uint32_t* h4) {
   uint32_t a = *h0, b = *h1, c = *h2, d = *h3, e = *h4, tmp;
   uint32_t word[80];
   int i, f, k;
@@ -56,15 +56,15 @@ static inline void sha1_hash_block(const unsigned char *block, uint32_t *h0, uin
 
 void f_sha1() {
   uint32_t h0, h1, h2, h3, h4;
-  const unsigned char *str;
+  const unsigned char* str;
   unsigned char final[128] = {0};
   int input_length, final_length, i;
 
   if (sp->type == T_BUFFER) {
-    str = (const unsigned char *)sp->u.buf->item;
+    str = (const unsigned char*)sp->u.buf->item;
     input_length = sp->u.buf->size;
   } else {
-    str = reinterpret_cast<const unsigned char *>(sp->u.string);
+    str = reinterpret_cast<const unsigned char*>(sp->u.string);
     input_length = SVALUE_STRLEN(sp);
   }
 
@@ -109,8 +109,8 @@ void f_sha1() {
     sha1_hash_block(final + 64, &h0, &h1, &h2, &h3, &h4);
   }
 
-  sprintf(reinterpret_cast<char *>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
+  sprintf(reinterpret_cast<char*>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
   pop_stack();
-  push_malloced_string(string_copy((char *) final, "f_sha1"));
+  push_malloced_string(string_copy((char*) final, "f_sha1"));
 }
 #endif

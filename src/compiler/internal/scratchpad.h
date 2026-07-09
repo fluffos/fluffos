@@ -47,9 +47,9 @@
  */
 
 // Bump-allocate `bytes` with `align` alignment (power of two).
-void *scratch_raw_allocate(std::size_t bytes, std::size_t align);
+void* scratch_raw_allocate(std::size_t bytes, std::size_t align);
 // No-op (monotonic arena); exists so allocator-aware containers work.
-inline void scratch_raw_deallocate(void * /*p*/) noexcept {}
+inline void scratch_raw_deallocate(void* /*p*/) noexcept {}
 
 // Stateless allocator over the one compile arena: allocator-aware
 // containers construct with no argument.
@@ -58,17 +58,17 @@ struct ScratchAllocator {
   using value_type = T;
   ScratchAllocator() noexcept = default;
   template <class U>
-  ScratchAllocator(const ScratchAllocator<U> &) noexcept {}
-  T *allocate(std::size_t n) {
-    return static_cast<T *>(scratch_raw_allocate(n * sizeof(T), alignof(T)));
+  ScratchAllocator(const ScratchAllocator<U>&) noexcept {}
+  T* allocate(std::size_t n) {
+    return static_cast<T*>(scratch_raw_allocate(n * sizeof(T), alignof(T)));
   }
-  void deallocate(T *p, std::size_t /*n*/) noexcept { scratch_raw_deallocate(p); }
+  void deallocate(T* p, std::size_t /*n*/) noexcept { scratch_raw_deallocate(p); }
   template <class U>
-  bool operator==(const ScratchAllocator<U> &) const noexcept {
+  bool operator==(const ScratchAllocator<U>&) const noexcept {
     return true;
   }
   template <class U>
-  bool operator!=(const ScratchAllocator<U> &) const noexcept {
+  bool operator!=(const ScratchAllocator<U>&) const noexcept {
     return false;
   }
 };
@@ -84,7 +84,7 @@ using ScratchVector = std::vector<T, ScratchAllocator<T>>;
 // to it. The object (and its buffer) live in the arena and are NEVER
 // individually destructed -- bulk-freed at scratch_destroy. This is what
 // the Bison value stack's `string` member holds for string tokens.
-ScratchString *scratch_new_string(std::string_view sv);
+ScratchString* scratch_new_string(std::string_view sv);
 
 // Free every arena allocation (bulk reset at compile end). The first
 // chunk is persistent, and standard-size chunks are RETAINED in a
@@ -108,7 +108,7 @@ ScratchStats scratch_stats();
 // mud_status() reporting line(s); returns retained heap bytes.
 #include <cstdint>
 struct outbuffer_t;
-uint64_t scratchpad_status(struct outbuffer_t *out, int verbose);
+uint64_t scratchpad_status(struct outbuffer_t* out, int verbose);
 
 // Test/bench knob: force a chunk payload size (e.g. 400 bytes) to observe
 // worst-case behavior; drops retained chunks and resets the arena.

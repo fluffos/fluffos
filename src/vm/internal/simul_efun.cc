@@ -27,16 +27,16 @@
  */
 
 struct simul_entry {
-  const char *name;
+  const char* name;
   short index;
 };
 
-simul_entry *simul_names = nullptr;
-function_lookup_info_t *simuls = nullptr;
+simul_entry* simul_names = nullptr;
+function_lookup_info_t* simuls = nullptr;
 int num_simul_efun = 0;
-object_t *simul_efun_ob;
+object_t* simul_efun_ob;
 
-static void find_or_add_simul_efun(function_t * /*funp*/, int /*runtime_index*/);
+static void find_or_add_simul_efun(function_t* /*funp*/, int /*runtime_index*/);
 static void remove_simuls(void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -53,9 +53,9 @@ void mark_simuls() {
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
  */
-void init_simul_efun(const char *file) {
+void init_simul_efun(const char* file) {
   char buf[512];
-  object_t *new_ob;
+  object_t* new_ob;
 
   if (!file || !file[0]) {
     debug_message("No simul_efun\n");
@@ -77,7 +77,7 @@ void init_simul_efun(const char *file) {
 
 static void remove_simuls() {
   int i;
-  ident_hash_elem_t *ihe;
+  ident_hash_elem_t* ihe;
   /* inactivate all old simul_efuns */
   for (i = 0; i < num_simul_efun; i++) {
     simuls[i].index = 0;
@@ -95,7 +95,7 @@ static void remove_simuls() {
   }
 }
 
-static void get_simul_efuns(program_t *prog) {
+static void get_simul_efuns(program_t* prog) {
   int i;
   int num_new = prog->num_functions_defined + prog->last_inherited;
 
@@ -114,9 +114,9 @@ static void get_simul_efuns(program_t *prog) {
     }
   } else {
     if (num_new) {
-      simul_names = reinterpret_cast<simul_entry *>(
+      simul_names = reinterpret_cast<simul_entry*>(
           DCALLOC(num_new, sizeof(simul_entry), TAG_SIMULS, "get_simul_efuns"));
-      simuls = reinterpret_cast<function_lookup_info_t *>(
+      simuls = reinterpret_cast<function_lookup_info_t*>(
           DCALLOC(num_new, sizeof(function_lookup_info_t), TAG_SIMULS, "get_simul_efuns: 2"));
     }
   }
@@ -138,8 +138,8 @@ static void get_simul_efuns(program_t *prog) {
 /*
  * Define a new simul_efun
  */
-static void find_or_add_simul_efun(function_t *funp, int runtime_index) {
-  ident_hash_elem_t *ihe;
+static void find_or_add_simul_efun(function_t* funp, int runtime_index) {
+  ident_hash_elem_t* ihe;
   int first = 0;
   int last = num_simul_efun - 1;
   int i, j;
@@ -176,7 +176,7 @@ static void find_or_add_simul_efun(function_t *funp, int runtime_index) {
   ref_string(funp->funcname);
 }
 
-void set_simul_efun(object_t *ob) {
+void set_simul_efun(object_t* ob) {
   get_simul_efuns(ob->prog);
 
   simul_efun_ob = ob;
@@ -184,7 +184,7 @@ void set_simul_efun(object_t *ob) {
 }
 
 void call_simul_efun(unsigned short index, int num_arg) {
-  extern object_t *simul_efun_ob;
+  extern object_t* simul_efun_ob;
 
   if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
     pop_n_elems(num_arg);

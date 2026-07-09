@@ -23,14 +23,14 @@ std::string get_compiler_type_name_trimmed(int type) {
 int main() {
   nlohmann::json j;
 
-  for (int i=0; i< size_of_predefs; i++) {
-    auto &efun = predefs[i];
+  for (int i = 0; i < size_of_predefs; i++) {
+    auto& efun = predefs[i];
     auto return_type = get_compiler_type_name_trimmed(efun.ret_type);
     std::vector<nlohmann::json> args;
-    auto *argp = &efun_arg_types[efun.arg_index];
+    auto* argp = &efun_arg_types[efun.arg_index];
 
     int max_args = std::max(efun.min_args, efun.max_args == -1 ? (short)0 : efun.max_args);
-    for(int i = 0; i < max_args; i++) {
+    for (int i = 0; i < max_args; i++) {
       std::vector<std::string> arg_types;
       while (*argp != 0) {
         arg_types.push_back(get_compiler_type_name_trimmed(*argp));
@@ -39,7 +39,6 @@ int main() {
       argp++;
       args.emplace_back(arg_types);
     }
-
 
     j.push_back({
         {"name", efun.word},

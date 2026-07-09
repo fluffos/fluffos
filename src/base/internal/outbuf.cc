@@ -8,12 +8,12 @@
 #include "base/internal/log.h"       // for DEBUG_*
 #include "base/internal/stralloc.h"  // for MSTR_*
 
-void outbuf_zero(outbuffer_t *outbuf) {
+void outbuf_zero(outbuffer_t* outbuf) {
   outbuf->real_size = 0;
   outbuf->buffer = nullptr;
 }
 
-int outbuf_extend(outbuffer_t *outbuf, int l) {
+int outbuf_extend(outbuffer_t* outbuf, int l) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int limit;
@@ -45,7 +45,7 @@ int outbuf_extend(outbuffer_t *outbuf, int l) {
   return l;
 }
 
-void outbuf_add(outbuffer_t *outbuf, const char *str) {
+void outbuf_add(outbuffer_t* outbuf, const char* str) {
   int l, limit;
 
   if (!outbuf) {
@@ -59,14 +59,14 @@ void outbuf_add(outbuffer_t *outbuf, const char *str) {
   }
 }
 
-void outbuf_addchar(outbuffer_t *outbuf, char c) {
+void outbuf_addchar(outbuffer_t* outbuf, char c) {
   if (outbuf && (outbuf_extend(outbuf, 1) > 0)) {
     *(outbuf->buffer + outbuf->real_size++) = c;
     *(outbuf->buffer + outbuf->real_size) = 0;
   }
 }
 
-void outbuf_addv(outbuffer_t *outbuf, const char *format, ...) {
+void outbuf_addv(outbuffer_t* outbuf, const char* format, ...) {
   char buf[LARGEST_PRINTABLE_STRING + 1];
   va_list args;
 
@@ -81,7 +81,7 @@ void outbuf_addv(outbuffer_t *outbuf, const char *format, ...) {
   outbuf_add(outbuf, buf);
 }
 
-void outbuf_fix(outbuffer_t *outbuf) {
+void outbuf_fix(outbuffer_t* outbuf) {
   if (outbuf && outbuf->buffer) {
     outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
   }

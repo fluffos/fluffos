@@ -2,7 +2,7 @@
 
 #ifdef F_EXPLODE
 void f_explode() {
-  array_t *vec;
+  array_t* vec;
 
   int const len = SVALUE_STRLEN(sp - 1);
 
@@ -16,7 +16,7 @@ void f_explode() {
 
 #ifdef F_EXPLODE_REVERSIBLE
 void f_explode_reversible() {
-  array_t *vec;
+  array_t* vec;
 
   int const len = SVALUE_STRLEN(sp - 1);
 
@@ -29,9 +29,9 @@ void f_explode_reversible() {
 
 #ifdef F_IMPLODE
 void f_implode() {
-  array_t *arr;
+  array_t* arr;
   int flag;
-  svalue_t *args;
+  svalue_t* args;
 
   if (st_num_arg == 3) {
     args = (sp - 2);
@@ -50,14 +50,14 @@ void f_implode() {
 
   if (args[1].type == T_STRING) {
     /* st_num_arg == 2 here */
-    char *str;
+    char* str;
 
     str = implode_string(arr, sp->u.string, SVALUE_STRLEN(sp));
     free_string_svalue(sp--);
     free_array(arr);
     put_malloced_string(str);
   } else { /* function */
-    funptr_t *funp = args[1].u.fp;
+    funptr_t* funp = args[1].u.fp;
 
     /* this pulls the extra arg off the stack if it exists */
     implode_array(funp, arr, args, flag);

@@ -5,11 +5,11 @@
  * simul_efun.c
  */
 
-extern struct object_t *simul_efun_ob;
-extern struct function_lookup_info_t *simuls;
+extern struct object_t* simul_efun_ob;
+extern struct function_lookup_info_t* simuls;
 
-void init_simul_efun(const char *);
-void set_simul_efun(struct object_t *);
+void init_simul_efun(const char*);
+void set_simul_efun(struct object_t*);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_simuls(void);

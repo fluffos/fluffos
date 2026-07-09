@@ -28,7 +28,7 @@
 
 /* Written by Bruno Haible, 2012.  */
 
-int getrusage(int who, struct rusage *usage_p) {
+int getrusage(int who, struct rusage* usage_p) {
   if (who == RUSAGE_SELF || who == RUSAGE_CHILDREN) {
     /* Clear all unsupported members of 'struct rusage'.  */
     memset(usage_p, '\0', sizeof(struct rusage));

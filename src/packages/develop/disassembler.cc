@@ -8,10 +8,10 @@
 
 #ifdef F_DUMP_PROG
 void f_dump_prog() {
-  program_t *prog;
-  const char *where;
+  program_t* prog;
+  const char* where;
   int d;
-  object_t *ob;
+  object_t* ob;
   int const narg = st_num_arg;
 
   if (st_num_arg == 2) {
@@ -47,8 +47,8 @@ void f_dump_prog() {
       where = "/PROG_DUMP";
     }
 
-    const char *fname;
-    FILE *f;
+    const char* fname;
+    FILE* f;
 
     fname = check_valid_path(where, current_object, "dumpallobj", 1);
 

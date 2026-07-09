@@ -38,17 +38,17 @@
 #endif
 
 // FIXME: rewrite other part so this could become static.
-struct event_base *g_event_base = nullptr;
+struct event_base* g_event_base = nullptr;
 
 namespace {
-void libevent_log(int severity, const char *msg) {
+void libevent_log(int severity, const char* msg) {
   if (severity == EVENT_LOG_ERR) {
     debug(all, "libevent:%d:%s\n", severity, msg);
   } else {
     debug(event, "libevent:%d:%s\n", severity, msg);
   }
 }
-void libevent_dns_log(int severity, const char *msg) {
+void libevent_dns_log(int severity, const char* msg) {
   if (severity == EVENT_LOG_ERR) {
     debug(all, "libevent dns:%d:%s\n", severity, msg);
   } else {
@@ -57,7 +57,7 @@ void libevent_dns_log(int severity, const char *msg) {
 }
 }  // namespace
 // Initialize backend
-event_base *init_backend() {
+event_base* init_backend() {
   event_set_log_callback(libevent_log);
   evdns_set_log_fn(libevent_dns_log);
 #ifdef DEBUG
@@ -89,7 +89,7 @@ std::chrono::milliseconds gametick_to_time(int ticks) {
 namespace {
 // TODO: remove the need for this
 // Global variable for game ticket event handle.
-struct event *g_ev_tick = nullptr;
+struct event* g_ev_tick = nullptr;
 
 inline struct timeval gametick_timeval() {
   static struct timeval const val{
@@ -100,7 +100,7 @@ inline struct timeval gametick_timeval() {
 }
 
 // Global structure to holding all events to be executed on gameticks.
-using TickQueue = std::multimap<decltype(g_current_gametick), TickEvent *, std::less<>>;
+using TickQueue = std::multimap<decltype(g_current_gametick), TickEvent*, std::less<>>;
 TickQueue g_tick_queue;
 
 // Call all events for current tick
@@ -115,7 +115,7 @@ inline void call_tick_events() {
   // callback, We need to keep looping until there isn't any eligible events
   // left.
   while (true) {
-    std::deque<TickEvent *> all_events;
+    std::deque<TickEvent*> all_events;
     auto iter_end = g_tick_queue.upper_bound(g_current_gametick);
     // No more eligible events.
     if (iter_end == g_tick_queue.begin()) {
@@ -132,7 +132,7 @@ inline void call_tick_events() {
 
     // TODO: randomly shuffle the events
 
-    for (auto *event : all_events) {
+    for (auto* event : all_events) {
       if (event->valid) {
         event->callback();
       }
@@ -141,26 +141,26 @@ inline void call_tick_events() {
   }
 }
 
-void on_game_tick(evutil_socket_t /*fd*/, short /*what*/, void *arg) {
+void on_game_tick(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
   call_tick_events();
   g_current_gametick++;
 
-  auto *ev = *(reinterpret_cast<struct event **>(arg));
+  auto* ev = *(reinterpret_cast<struct event**>(arg));
   auto t = gametick_timeval();
   event_add(ev, &t);
 }
 
 }  // namespace
 
-TickEvent *add_gametick_event(int delay_ticks, TickEvent::callback_type callback) {
-  auto *event = new TickEvent(callback);
+TickEvent* add_gametick_event(int delay_ticks, TickEvent::callback_type callback) {
+  auto* event = new TickEvent(callback);
   g_tick_queue.insert(TickQueue::value_type(g_current_gametick + delay_ticks, event));
   return event;
 }
 
 namespace {
-void on_walltime_event(evutil_socket_t /*fd*/, short /*what*/, void *arg) {
-  auto *event = reinterpret_cast<TickEvent *>(arg);
+void on_walltime_event(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
+  auto* event = reinterpret_cast<TickEvent*>(arg);
   if (event->valid) {
     event->callback();
   }
@@ -169,13 +169,14 @@ void on_walltime_event(evutil_socket_t /*fd*/, short /*what*/, void *arg) {
 }  // namespace
 
 // Schedule a immediate event on main loop.
-TickEvent *add_walltime_event(std::chrono::milliseconds delay_msecs,
+TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
                               TickEvent::callback_type callback) {
-  auto *event = new TickEvent(callback);
-  struct timeval val {
-    (int)(delay_msecs.count() / 1000), (int)(delay_msecs.count() % 1000 * 1000),
+  auto* event = new TickEvent(callback);
+  struct timeval val{
+      (int)(delay_msecs.count() / 1000),
+      (int)(delay_msecs.count() % 1000 * 1000),
   };
-  struct timeval *delay_ptr = nullptr;
+  struct timeval* delay_ptr = nullptr;
   if (delay_msecs.count() != 0) {
     delay_ptr = &val;
   }
@@ -186,7 +187,7 @@ TickEvent *add_walltime_event(std::chrono::milliseconds delay_msecs,
 void clear_tick_events() {
   int i = 0;
   if (!g_tick_queue.empty()) {
-    for (auto &iter : g_tick_queue) {
+    for (auto& iter : g_tick_queue) {
       delete iter.second;
       i++;
     }
@@ -208,7 +209,7 @@ void call_remove_destructed_objects() {
 /*
  * This is the backend. We will stay here for ever (almost).
  */
-void backend(struct event_base *base) {
+void backend(struct event_base* base) {
   clear_state();
   g_current_gametick = 0;
 
@@ -276,14 +277,14 @@ void look_for_objects_to_swap() {
   next_ob = obj_list;
   last_good_ob = obj_list;
   while (true) {
-    while ((ob = (object_t *)next_ob)) {
+    while ((ob = (object_t*)next_ob)) {
       int ready_for_clean_up = 0;
 
       if (ob->flags & O_DESTRUCTED) {
         if (last_good_ob->flags & O_DESTRUCTED) {
           ob = obj_list; /* restart */
         } else {
-          ob = (object_t *)last_good_ob;
+          ob = (object_t*)last_good_ob;
         }
       }
       next_ob = ob->next_all;
@@ -343,7 +344,7 @@ void look_for_objects_to_swap() {
 
           push_number(ob->flags & (O_CLONE) ? 0 : ob->prog->ref);
           set_eval(max_eval_cost);
-          auto *svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
+          auto* svp = safe_apply(APPLY_CLEAN_UP, ob, 1, ORIGIN_DRIVER);
           if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
             ob->flags &= ~O_WILL_CLEAN_UP;
           }
@@ -413,7 +414,7 @@ void update_compile_av(int lines) {
   acc = 0;
 } /* update_compile_av() */
 
-char *query_load_av() {
+char* query_load_av() {
   static char buff[100];
 
   sprintf(buff, "%.2f cmds/s, %.2f comp lines/s", load_av, compile_av);

@@ -4,7 +4,7 @@
  * Utilises the OpenSSL crypto library to provide various message digest hashes
  * via a hash() efun.  It works in almost the same manner as the hash function
  * from php, and provides legacy hashes (md4, md5, sha1, ripemd160),
- * SHA-2 family (sha224, sha256, sha384, sha512), and modern hashes 
+ * SHA-2 family (sha224, sha256, sha384, sha512), and modern hashes
  * (sha3-224, sha3-256, sha3-384, sha3-512, blake2s256, blake2b512, sm3).
  * You must link against the ssl crypto library (add -lssl -lcrypto to system_libs).
  *
@@ -43,7 +43,7 @@
 #endif
 
 #ifdef F_HASH
-static char *hexdump(const unsigned char *data, int len) {
+static char* hexdump(const unsigned char* data, int len) {
   const char hexchars[] = "0123456789abcdef";
   char *result, *p;
 
@@ -60,21 +60,21 @@ static char *hexdump(const unsigned char *data, int len) {
 }
 
 /* Modern EVP-based hash function for newer algorithms (Copilot assisted)
- * 
+ *
  * Uses OpenSSL's EVP interface to support modern hash algorithms like SHA-3,
  * BLAKE2, and other algorithms not available through direct function calls.
  * The EVP interface is the recommended approach for new algorithms in OpenSSL.
- * 
+ *
  * This function provides graceful fallback behavior for older OpenSSL versions:
  * - Returns nullptr if the algorithm is not supported in the current OpenSSL build
  * - The calling code will then show an appropriate error message to the user
  */
-static char *evp_hash(const char *algo, const unsigned char *data, int data_len) {
-  const EVP_MD *md;
-  EVP_MD_CTX *ctx;
+static char* evp_hash(const char* algo, const unsigned char* data, int data_len) {
+  const EVP_MD* md;
+  EVP_MD_CTX* ctx;
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
-  char *result = nullptr;
+  char* result = nullptr;
 
   // Get the message digest algorithm by name (e.g., "sha3-256")
   md = EVP_get_digestbyname(algo);
@@ -110,7 +110,7 @@ static char *evp_hash(const char *algo, const unsigned char *data, int data_len)
 
   // Clean up the digest context
   EVP_MD_CTX_free(ctx);
-  
+
   // Convert binary hash to hexadecimal string representation
   result = hexdump(hash, hash_len);
   return result;
@@ -118,25 +118,25 @@ static char *evp_hash(const char *algo, const unsigned char *data, int data_len)
 
 void f_hash() {
   const char *algo, *data;
-  char *result = nullptr;
+  char* result = nullptr;
   int data_len;
 
   algo = (sp - 1)->u.string;
   data = sp->u.string;
   data_len = SVALUE_STRLEN(sp);
 
-#define DO_HASH_IF(id, func, hash_size)        \
-  SAFE(if (strcasecmp(algo, id) == 0) {        \
-    unsigned char md[hash_size];               \
-    func((unsigned char *)data, data_len, md); \
-    result = hexdump(md, hash_size);           \
-    goto result;                               \
+#define DO_HASH_IF(id, func, hash_size)       \
+  SAFE(if (strcasecmp(algo, id) == 0) {       \
+    unsigned char md[hash_size];              \
+    func((unsigned char*)data, data_len, md); \
+    result = hexdump(md, hash_size);          \
+    goto result;                              \
   })
 
-#define DO_EVP_HASH_IF(id)                     \
-  SAFE(if (strcasecmp(algo, id) == 0) {        \
-    result = evp_hash(id, (unsigned char *)data, data_len); \
-    goto result;                               \
+#define DO_EVP_HASH_IF(id)                                 \
+  SAFE(if (strcasecmp(algo, id) == 0) {                    \
+    result = evp_hash(id, (unsigned char*)data, data_len); \
+    goto result;                                           \
   })
 
   /* Legacy hash algorithms using direct functions */
@@ -176,7 +176,7 @@ void f_hash() {
 
   /* Modern hash algorithms using EVP interface */
   /* These algorithms require OpenSSL 1.1.1+ and will gracefully fail on older versions */
-  
+
   /* SHA-3 family (FIPS 202 standard) - requires OpenSSL 1.1.1+ */
   DO_EVP_HASH_IF("sha3-224");
   DO_EVP_HASH_IF("sha3-256");

@@ -31,21 +31,26 @@ int main(int argc, char** argv) {
   //   -O0       compile with the tree optimizer off -> the dump_prog
   //             output is PRE-optimization bytecode
   bool flag_pp = false, flag_tokens = false, flag_ast = false, flag_noopt = false;
-  const char *pos[3] = {argv[0], nullptr, nullptr};
+  const char* pos[3] = {argv[0], nullptr, nullptr};
   int npos = 1;
   for (int i = 1; i < argc; i++) {
     std::string_view a = argv[i];
-    if (a == "-E") flag_pp = true;
-    else if (a == "--tokens") flag_tokens = true;
-    else if (a == "--ast") flag_ast = true;
-    else if (a == "-O0") flag_noopt = true;
-    else if (npos < 3) pos[npos++] = argv[i];
+    if (a == "-E")
+      flag_pp = true;
+    else if (a == "--tokens")
+      flag_tokens = true;
+    else if (a == "--ast")
+      flag_ast = true;
+    else if (a == "-O0")
+      flag_noopt = true;
+    else if (npos < 3)
+      pos[npos++] = argv[i];
   }
   if (npos != 3) {
     std::cerr << "Usage: lpcc [-E|--tokens|--ast|-O0] config_file lpc_file" << std::endl;
     return 1;
   }
-  argv = const_cast<char **>(pos);
+  argv = const_cast<char**>(pos);
   argc = 3;
 
   Tracer::begin("init_main", EventCategory::DEFAULT);

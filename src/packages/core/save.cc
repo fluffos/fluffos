@@ -27,7 +27,7 @@ void f_save_object() {
     put_number(flag);
   } else {
     pop_n_elems(st_num_arg);
-    char *saved = new_string(max_string_length, "save_object_str");
+    char* saved = new_string(max_string_length, "save_object_str");
     push_malloced_string(saved);
     int const left = max_string_length;
     flag = save_object_str(current_object, flag, saved, left);
@@ -48,7 +48,7 @@ void f_save_object() {
  * return a string representing an svalue in the form that save_object()
  * would write it.
  */
-char *save_variable(svalue_t *var) {
+char* save_variable(svalue_t* var) {
   int the_size;
   char *new_str, *p;
 
@@ -64,7 +64,7 @@ char *save_variable(svalue_t *var) {
 
 #ifdef F_SAVE_VARIABLE
 void f_save_variable() {
-  char *p;
+  char* p;
 
   p = save_variable(sp);
   pop_stack();
@@ -93,7 +93,7 @@ void f_restore_variable() {
   v.type = T_NUMBER;
 
   // unlinked string
-  restore_variable(&v, const_cast<char *>(sp->u.string));
+  restore_variable(&v, const_cast<char*>(sp->u.string));
   FREE_MSTR(sp->u.string);
   *sp = v;
 }

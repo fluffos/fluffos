@@ -2,7 +2,7 @@
 
 #include "hash.h"
 
-unsigned int whashstr(const char *s) {
+unsigned int whashstr(const char* s) {
   int i = 0;
   unsigned long h = 0;
   for (; *s && i++ < 100; ++s) {

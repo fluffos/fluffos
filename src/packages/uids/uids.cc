@@ -15,7 +15,7 @@
 
 #include <set>
 
-static object_t *ob;
+static object_t* ob;
 
 #ifdef F_EXPORT_UID
 
@@ -51,7 +51,7 @@ void f_geteuid() {
     return;
 
   } else if (sp->type & T_FUNCTION) {
-    funptr_t *fp;
+    funptr_t* fp;
     if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
       put_constant_string(fp->hdr.owner->euid->name);
       free_funp(fp);
@@ -82,8 +82,8 @@ void f_getuid() {
 #ifdef F_SETEUID
 
 void f_seteuid() {
-  svalue_t *arg;
-  svalue_t *ret;
+  svalue_t* arg;
+  svalue_t* ret;
 
   if (sp->type & T_NUMBER) {
     if (sp->u.number) {
@@ -110,23 +110,23 @@ void f_seteuid() {
 #endif
 
 /* Support functions */
-static auto comp = [](userid_t *uid1, userid_t *uid2) { return uid1->name < uid2->name; };
-static auto uids = std::set<userid_t *, decltype(comp)>(comp);
+static auto comp = [](userid_t* uid1, userid_t* uid2) { return uid1->name < uid2->name; };
+static auto uids = std::set<userid_t*, decltype(comp)>(comp);
 
 // static tree *uids = NULL;
-userid_t *backbone_uid = nullptr;
-userid_t *root_uid = nullptr;
+userid_t* backbone_uid = nullptr;
+userid_t* root_uid = nullptr;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_all_uid_nodes() {
-  for (auto *i : uids) {
+  for (auto* i : uids) {
     ++EXTRA_REF(BLOCK(i->name));
   }
 }
 #endif
 
-userid_t *add_uid(const char *name) {
-  userid_t *uid;
+userid_t* add_uid(const char* name) {
+  userid_t* uid;
   userid_t t_uid;
 
   t_uid.name = make_shared_string(name);
@@ -135,13 +135,13 @@ userid_t *add_uid(const char *name) {
     free_string(t_uid.name);
     return *i;
   }
-  uid = reinterpret_cast<userid_t *>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
+  uid = reinterpret_cast<userid_t*>(DMALLOC(sizeof(userid_t), TAG_UID, "add_uid"));
   uid->name = t_uid.name;
   uids.insert(uid);
   return uid;
 }
 
-userid_t *set_root_uid(const char *name) {
+userid_t* set_root_uid(const char* name) {
   if (!root_uid) {
     return root_uid = add_uid(name);
   }
@@ -152,7 +152,7 @@ userid_t *set_root_uid(const char *name) {
   return root_uid;
 }
 
-userid_t *set_backbone_uid(const char *name) {
+userid_t* set_backbone_uid(const char* name) {
   if (!backbone_uid) {
     return backbone_uid = add_uid(name);
   }

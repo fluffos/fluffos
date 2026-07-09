@@ -84,14 +84,14 @@
 
 typedef struct ed_line_s {
   int l_stat; /* empty, mark */
-  struct ed_line_s *l_prev;
-  struct ed_line_s *l_next;
+  struct ed_line_s* l_prev;
+  struct ed_line_s* l_next;
   char l_buff[1];
 } ed_line_t;
 
 struct strlst {
-  char *screen;
-  struct strlst *next;
+  char* screen;
+  struct strlst* next;
 };
 
 typedef struct ed_buffer_s {
@@ -102,24 +102,24 @@ typedef struct ed_buffer_s {
   int fchanged; /* file-changed? flag */
   int nofname;
   int mark['z' - 'a' + 1];
-  struct regexp *oldpat;
+  struct regexp* oldpat;
 
   ed_line_t Line0;
   int CurLn;
-  ed_line_t *CurPtr; /* CurLn and CurPtr must be kept in step */
+  ed_line_t* CurPtr; /* CurLn and CurPtr must be kept in step */
   int LastLn;
   int Line1, Line2, nlines;
   int flags;
   int appending;
   int moring;             /* used for the wait line of help */
-  struct strlst *helpout; /* help output linked list */
+  struct strlst* helpout; /* help output linked list */
 #ifdef OLD_ED
-  char *exit_fn;     /* Function to be called when user exits */
-  char *write_fn;    /* Function to be called when user writes */
-  object_t *exit_ob; /* in this object */
+  char* exit_fn;     /* Function to be called when user exits */
+  char* write_fn;    /* Function to be called when user writes */
+  object_t* exit_ob; /* in this object */
 #else
-  object_t *owner;
-  struct ed_buffer_s *next_ed_buf;
+  object_t* owner;
+  struct ed_buffer_s* next_ed_buf;
 #endif
   int shiftwidth;
   int leading_blanks;
@@ -131,9 +131,9 @@ typedef struct ed_buffer_s {
 /*
  * ed.c
  */
-void ed_start(const char *, const char *, const char *, int, struct object_t *, int);
-void ed_cmd(char *);
-void save_ed_buffer(struct object_t *);
+void ed_start(const char*, const char*, const char*, int, struct object_t*, int);
+void ed_cmd(char*);
+void save_ed_buffer(struct object_t*);
 
 #ifdef OLD_ED
 #define ED_OUTPUT(x, y) add_message(x, y, strlen(y))
@@ -146,13 +146,13 @@ void save_ed_buffer(struct object_t *);
 #endif
 
 #ifndef OLD_ED
-char *object_ed_cmd(struct object_t *, const char *);
-char *object_ed_start(struct object_t *, const char *, int, int);
-int object_ed_mode(struct object_t *);
-void object_save_ed_buffer(struct object_t *);
-ed_buffer_t *find_ed_buffer(struct object_t *);
-void object_ed_output(char *);
-void object_ed_outputv(char *, ...);
+char* object_ed_cmd(struct object_t*, const char*);
+char* object_ed_start(struct object_t*, const char*, int, int);
+int object_ed_mode(struct object_t*);
+void object_save_ed_buffer(struct object_t*);
+ed_buffer_t* find_ed_buffer(struct object_t*);
+void object_ed_output(char*);
+void object_ed_outputv(char*, ...);
 
 extern outbuffer_t current_ed_results;
 #endif

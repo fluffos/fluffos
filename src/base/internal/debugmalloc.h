@@ -18,18 +18,18 @@
 
 // FIXME: remove this
 #define RESIZE(ptr, num, type, tag, desc) \
-  ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
+  ((type*)DREALLOC((void*)ptr, sizeof(type) * (num), tag, desc))
 
-void *debugmalloc(int, int, const char *);
-void *debugrealloc(void *, int, int, const char *);
-void *debugcalloc(int, int, int, const char *);
-void debugfree(void *);
+void* debugmalloc(int, int, const char*);
+void* debugrealloc(void*, int, int, const char*);
+void* debugcalloc(int, int, int, const char*);
+void debugfree(void*);
 
 void debugmalloc_init(void);
-void dump_malloc_data(struct outbuffer_t *);
+void dump_malloc_data(struct outbuffer_t*);
 
 void set_malloc_mask(int);
-char *dump_debugmalloc(const char *, int);
+char* dump_debugmalloc(const char*, int);
 
 /* tags */
 // NOTE: the digit after + must be unique, range is 0-255.
