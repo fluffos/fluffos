@@ -24,6 +24,10 @@ title: strings / strsrch
     The  integer  offset  of  the  first  (last)  match is returned.  -1 is
     returned if there was no match, or an error occurred (bad args, etc).
 
+    The offset is measured in UTF-8 characters (grapheme clusters), the
+    same unit used by strlen(3) and string indexing/ranges, and matches
+    are only found at character boundaries.
+
 ### SEE ALSO
 
     explode(3), sscanf(3), replace_string(3), regexp(3)
