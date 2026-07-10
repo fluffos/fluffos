@@ -478,6 +478,12 @@ size_t u8_width(const char* src, int len) {
     if (c == 0x200d || prev == 0x200d) {  // zwj, skip the next character
       continue;
     }
+    // An emoji (skin tone) modifier U+1F3FB..U+1F3FF merges into the
+    // preceding emoji base and adds no visible width of its own
+    // (issue #1007).
+    if (c >= 0x1F3FB && c <= 0x1F3FF && prev != 0) {
+      continue;
+    }
 
     // ignoring ANSI codes when calculating display width
     // https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
