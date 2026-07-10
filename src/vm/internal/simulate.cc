@@ -1970,6 +1970,16 @@ void _error_handler(char* err) {
 #endif
   num_objects_this_thread = 0; /* reset the count */
 
+  if (!current_error_context) {
+    // Nothing set up a recovery point on this driver path (see issue
+    // #1047 for one such path); there is nothing to unwind to, so report
+    // the error and shut down cleanly instead of dereferencing null.
+    debug_message("Driver BUG: error() with no error context: ");
+    debug_message_with_location(err);
+    dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    fatal("error() without a context: %s", err + 1);
+  }
+
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
     /* user catches this error */
     /* This is added so that catches generate messages in the log file. */
