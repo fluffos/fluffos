@@ -1,4 +1,5 @@
 ---
+layout: doc
 title: driver / config
 ---
 <!-- ===========================================================================
@@ -167,6 +168,7 @@ they always match the options it actually recognizes.
 | `suppress argument warnings` | int | 1 | Suppress unused-argument warnings, warning only about unused local variables. |
 | `trace lpc execution context` | int | 0 | Record LPC execution context for tracing and debugging. |
 | `trace lpc instructions` | int | 0 | Trace individual LPC instructions for debugging. |
+| `display preload progress` | int | 1 | Print each file name to the debug log while preload files are loaded at boot. |
 
 ### Protocol Support
 
