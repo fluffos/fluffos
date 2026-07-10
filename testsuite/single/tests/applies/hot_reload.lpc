@@ -5,8 +5,8 @@
 // feed it the full compile-time dependency graph (which files each
 // program's bytecode was built from). Its poller -- armed by enable(),
 // driven here synchronously via check_now() for determinism -- stats
-// those files and destructs+reloads any watched blueprint whose
-// dependency closure changed on disk.
+// those files and destructs+reloads any watched program's master copy
+// whose dependency closure changed on disk.
 //
 // The fixture chain is written at runtime under /data/hot:
 //   widget.lpc  inherits  base.lpc  which includes  color.h
@@ -59,7 +59,7 @@ void do_tests() {
   ASSERT(objectp(widget));
   ASSERT_EQ("a red widget", widget->describe());
 
-  // Nothing changed on disk: no reload, same blueprint object.
+  // Nothing changed on disk: no reload, same master-copy object.
   ASSERT_EQ(0, d->check_now());
   ASSERT(find_object(DIR + "/widget") == widget);
 

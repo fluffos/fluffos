@@ -35,7 +35,7 @@ void do_tests() {
 
   // 2. Inline source: "/clone/ip_synth" has no file either; the hook
   //    returns the program's source as an array of strings. The
-  //    blueprint materializes under the inherit statement's name.
+  //    master copy materializes under the inherit statement's name.
   hook->set_inherit_rule("/clone/ip_synth", ({ "int synth_fn() { return 21; }" }));
   ob = load_object("/clone/ip_child_inline");
   ASSERT_EQ(42, ob->child_fn());

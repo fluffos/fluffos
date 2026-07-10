@@ -1,5 +1,5 @@
-// Hot-reload daemon: automatically reloads blueprints when any source
-// file they were compiled from changes on disk.
+// Hot-reload daemon: automatically reloads the master copy of watched
+// programs when any source file they were compiled from changes on disk.
 //
 // The driver's inherit_program / include_file master applies (delegated
 // here through master::set_compile_hooks) report, during every compile,
@@ -8,8 +8,8 @@
 // ANY of them means the program on disk no longer matches the loaded
 // one. This daemon records that dependency graph, snapshots the files'
 // size+mtime, and -- from a call_out poller (enable()) or on demand
-// (check_now()) -- destructs and reloads any watched blueprint whose
-// dependency closure changed. Reloading recompiles through the same
+// (check_now()) -- destructs and reloads any watched program's master
+// copy whose dependency closure changed. Reloading recompiles through the same
 // applies, so the graph and snapshots refresh themselves.
 //
 // Only programs compiled while the daemon is registered have complete
@@ -176,7 +176,7 @@ private void forget(string prog) {
 }
 
 private void reload(string prog) {
-  // A changed ancestor's blueprint must go away first: recompiling prog
+  // A changed ancestor's master copy must go away first: recompiling prog
   // finds already-loaded parent programs by name, so a stale parent
   // would be inherited as-is.
   foreach (string a in ancestors(prog, ([]))) {

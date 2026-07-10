@@ -31,7 +31,7 @@ title: master / inherit_program
       `path` unchanged keeps the default behavior.
     - an *array of strings*: the source code of the inherited file
       itself, one element per line. The program is compiled from that
-      text and its blueprint materializes under `path`'s name, with no
+      text and its master copy materializes under `path`'s name, with no
       backing file. Note that if an object named `path` is already
       loaded, it is inherited directly and the supplied source is not
       consulted, and that such inline programs may themselves only

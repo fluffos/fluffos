@@ -6,7 +6,7 @@ title: general / hot_reload
 FluffOS can tell the mudlib, at compile time, exactly which files every
 program is built from. That is the missing piece for **auto hot-reload**:
 a daemon that watches source files on disk and automatically destructs
-and reloads the affected blueprints when anything changes, so developers
+and reloads the affected master copies when anything changes, so developers
 see their edits take effect without manually running an `update` command.
 
 This page explains the driver mechanism and walks through a complete
@@ -175,15 +175,15 @@ private mixed *stat_file(string f) {
 ```
 
 The one subtlety is reload *order*. Recompiling a child finds
-already-loaded parent programs by name, so a changed parent's blueprint
-must be destructed **first** or the fresh child compile would inherit
+already-loaded parent programs by name, so a changed parent's master
+copy must be destructed **first** or the fresh child compile would inherit
 the stale in-memory parent:
 
 ```c
 private void reload(string prog) {
     foreach (string a in ancestors(prog))     // inherit closure, prog excluded
         if (self_changed(a))                  // a's own source/includes changed
-            forget(a);                        // destruct blueprint, drop records
+            forget(a);                        // destruct master copy, drop records
     forget(prog);
     load_object(prog);       // recompiles; the applies rebuild the records
     snapshot_program(prog);  // fresh size/mtime baseline
@@ -198,7 +198,7 @@ public int check_now() {
 }
 ```
 
-Destructing the parent blueprint is safe even while other programs
+Destructing the parent's master copy is safe even while other programs
 still use its code: compiled programs are reference counted, so
 existing inheritors keep the old program until they are themselves
 reloaded.
@@ -240,8 +240,8 @@ d->watch("/obj/widget");      // widget inherits /std/base, which includes color
 // ... edit /std/colors.h on disk ...
 
 // within a poll interval the daemon notices: colors.h is in widget's
-// dependency closure through /std/base -> destructs the stale base
-// blueprint and widget, reloads /obj/widget, and the next
+// dependency closure through /std/base -> destructs the stale master
+// copies of base and widget, reloads /obj/widget, and the next
 // "/obj/widget"->describe() runs the new code.
 ```
 
@@ -251,10 +251,11 @@ This exact flow — including the deepest case, editing an include of an
 
 ## Semantics and caveats
 
-* **What reloads is the blueprint.** Existing clones keep the old
+* **What reloads is the master copy** (the object loaded from the
+  file, as opposed to its clones). Existing clones keep the old
   program until they are re-created; anything fetched via
   `"/path/name"->func()` or fresh `find_object()`/`new()` after the
-  reload gets the new code. Blueprint global variables reset to their
+  reload gets the new code. The master copy's global variables reset to their
   initializers on reload — daemons that must keep state across reloads
   need to save/restore it themselves.
 * **Only programs compiled while the daemon was registered have
