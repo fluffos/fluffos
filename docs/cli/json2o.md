@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: cli / json2o
 ---
 

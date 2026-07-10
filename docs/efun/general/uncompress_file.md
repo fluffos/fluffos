@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / uncompress_file
 ---
 # uncompress_file

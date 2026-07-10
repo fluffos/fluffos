@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / store_class_member.pre
 ---
 # store_class_member

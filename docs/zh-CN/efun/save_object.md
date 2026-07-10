@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / save_object
 ---
 # save_object

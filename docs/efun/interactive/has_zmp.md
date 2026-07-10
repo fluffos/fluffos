@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / has_zmp
 ---
 # has_zmp

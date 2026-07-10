@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: buffers / write_buffer
 ---
 # write_buffer

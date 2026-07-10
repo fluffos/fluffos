@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / dump_jemalloc
 ---
 # dump_jemalloc

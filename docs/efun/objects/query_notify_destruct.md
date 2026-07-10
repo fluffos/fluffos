@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / query_notify_destruct
 ---
 # query_notify_destruct

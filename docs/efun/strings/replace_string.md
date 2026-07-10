@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / replace_string
 ---
 # replace_string

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / domain_file
 ---
 # domain_file

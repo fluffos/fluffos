@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ffi / ffi_struct_layout
 ---
 # ffi_struct_layout

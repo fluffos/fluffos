@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / msp_enable
 ---
 # msp_enable

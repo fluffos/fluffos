@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: cli / generate_keywords
 ---
 # cli / generate_keywords

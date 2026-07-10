@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: buffers / buffer_transcode
 ---
 # buffer_transcode

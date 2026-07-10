@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / query_multiple_short
 ---
 # query_multiple_short

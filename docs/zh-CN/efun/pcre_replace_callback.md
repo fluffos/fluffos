@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: pcre / pcre_replace_callback
 ---
 # pcre_replace_callback

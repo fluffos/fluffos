@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mudlib / export_uid
 ---
 # export_uid

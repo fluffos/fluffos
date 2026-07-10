@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: filesystem / read_file
 ---
 # read_file

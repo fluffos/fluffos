@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: async / async_read
 ---
 # async_read

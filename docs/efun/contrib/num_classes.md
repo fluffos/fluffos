@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / num_classes.pre
 ---
 # num_classes

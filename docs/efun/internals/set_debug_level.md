@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / set_debug_level
 ---
 # set_debug_level

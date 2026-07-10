@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / rotate_z
 ---
 # rotate_z

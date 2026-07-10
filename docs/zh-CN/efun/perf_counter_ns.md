@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / perf_counter_ns
 ---
 # perf_counter_ns

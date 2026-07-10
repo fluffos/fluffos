@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / element_of.pre
 ---
 # element_of

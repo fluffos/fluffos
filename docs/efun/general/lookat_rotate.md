@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / lookat_rotate
 ---
 # lookat_rotate

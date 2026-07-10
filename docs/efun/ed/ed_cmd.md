@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ed / ed_cmd
 ---
 # ed_cmd

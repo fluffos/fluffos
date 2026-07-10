@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / telnet_msp_oob
 ---
 # telnet_msp_oob

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / add_a
 ---
 # add_a

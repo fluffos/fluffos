@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / program_info.pre
 ---
 # program_info

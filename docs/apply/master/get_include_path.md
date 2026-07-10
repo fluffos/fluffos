@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / get_include_path
 ---
 # get_include_path

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: stdlib / break_string
 ---
 # break_string

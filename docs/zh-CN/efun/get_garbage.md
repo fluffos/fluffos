@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / get_garbage.pre
 ---
 # get_garbage

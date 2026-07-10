@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / telnet_nop
 ---
 # telnet_nop

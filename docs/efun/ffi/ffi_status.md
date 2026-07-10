@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ffi / ffi_status
 ---
 # ffi_status

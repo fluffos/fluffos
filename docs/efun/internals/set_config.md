@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / set_config
 ---
 # set_config

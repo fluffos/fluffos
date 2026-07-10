@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / set_this_user
 ---
 # set_this_user

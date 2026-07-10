@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / next_bit
 ---
 # next_bit

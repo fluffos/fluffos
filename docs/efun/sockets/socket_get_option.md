@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: sockets / socket_get_option
 ---
 # socket_get_option

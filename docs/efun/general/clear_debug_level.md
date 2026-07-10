@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / clear_debug_level
 ---
 # clear_debug_level

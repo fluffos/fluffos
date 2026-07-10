@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / net_dead
 ---
 # net_dead

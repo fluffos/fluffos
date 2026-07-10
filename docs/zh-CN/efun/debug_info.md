@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / debug_info
 ---
 # debug_info

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / dump_prog
 ---
 # dump_prog

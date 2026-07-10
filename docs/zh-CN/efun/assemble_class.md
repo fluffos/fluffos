@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / assemble_class.pre
 ---
 # assemble_class

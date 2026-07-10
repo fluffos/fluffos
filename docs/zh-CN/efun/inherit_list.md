@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / inherit_list
 ---
 # inherit_list

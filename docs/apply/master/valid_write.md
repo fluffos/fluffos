@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / valid_write
 ---
 # valid_write

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / reg_assoc
 ---
 # reg_assoc

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: arrays / member_array
 ---
 # member_array

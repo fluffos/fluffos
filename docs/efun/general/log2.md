@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / log2
 ---
 # log2

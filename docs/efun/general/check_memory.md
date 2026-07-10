@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / check_memory
 ---
 # check_memory

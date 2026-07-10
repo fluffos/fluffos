@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / add_action
 ---
 # add_action

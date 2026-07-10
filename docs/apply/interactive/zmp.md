@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / zmp
 ---
 # zmp_command

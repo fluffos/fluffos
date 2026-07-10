@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / malloc_status
 ---
 # malloc_status

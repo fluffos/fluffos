@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / sys_network_ports
 ---
 # sys_network_ports

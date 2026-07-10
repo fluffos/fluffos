@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / query_host_name
 ---
 # query_host_name

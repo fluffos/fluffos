@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / deep_inherit_list
 ---
 # deep_inherit_list

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: object / __INIT
 ---
 # __INIT

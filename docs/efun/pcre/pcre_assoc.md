@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: pcre / pcre_assoc
 ---
 # pcre_assoc

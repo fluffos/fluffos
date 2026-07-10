@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / replace_objects
 ---
 # replace_objects

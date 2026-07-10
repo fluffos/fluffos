@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / find_object
 ---
 # find_object

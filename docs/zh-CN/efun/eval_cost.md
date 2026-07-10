@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / eval_cost
 ---
 # eval_cost

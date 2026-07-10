@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / parse_my_rules
 ---
 # parse_my_rules

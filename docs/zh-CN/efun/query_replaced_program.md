@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / query_replaced_program.pre
 ---
 # query_replaced_program

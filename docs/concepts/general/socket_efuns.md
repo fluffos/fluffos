@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / socket_efuns
 ---
 # socket_efuns

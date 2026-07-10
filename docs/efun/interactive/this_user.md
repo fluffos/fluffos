@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / this_user
 ---
 # this_user

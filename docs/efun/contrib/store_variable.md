@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / store_variable.pre
 ---
 # store_variable

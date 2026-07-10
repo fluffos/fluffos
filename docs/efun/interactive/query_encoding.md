@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / query_encoding
 ---
 # query_encoding

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / memory_summary.pre
 ---
 # memory_summary

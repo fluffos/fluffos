@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / send_zmp
 ---
 # send_zmp

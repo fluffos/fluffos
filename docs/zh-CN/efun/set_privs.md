@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mudlib / set_privs
 ---
 # set_privs

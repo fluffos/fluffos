@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / objectp
 ---
 # objectp

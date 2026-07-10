@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / function_exists
 ---
 # function_exists

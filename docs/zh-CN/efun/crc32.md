@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: buffers / crc32
 ---
 # crc32

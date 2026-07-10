@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / time_expression
 ---
 # time_expression

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / all_previous_objects
 ---
 # all_previous_objects

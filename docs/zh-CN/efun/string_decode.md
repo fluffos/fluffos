@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / string_decode
 ---
 # string_decode

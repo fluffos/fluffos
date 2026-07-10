@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / roulette_wheel
 ---
 # roulette_wheel

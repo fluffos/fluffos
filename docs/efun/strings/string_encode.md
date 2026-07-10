@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / string_encode
 ---
 # string_encode

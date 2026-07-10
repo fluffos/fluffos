@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / test_bit
 ---
 # test_bit

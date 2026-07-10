@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / receive_ed
 ---
 # receive_ed

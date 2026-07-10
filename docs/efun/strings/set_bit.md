@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / set_bit
 ---
 # set_bit

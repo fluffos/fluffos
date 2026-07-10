@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: floats / to_int
 ---
 # to_int

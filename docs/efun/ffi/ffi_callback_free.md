@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ffi / ffi_callback_free
 ---
 # ffi_callback_free
