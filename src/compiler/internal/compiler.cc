@@ -2299,6 +2299,11 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
    * causing the possibility of arriving here again.
    */
   if (guard || current_file) {
+    // A nested compile_file_fd() already stashed its fd; drop the stash
+    // before unwinding, or a later string-source compile would consume
+    // the stale flag and read from a closed (possibly reused) fd.
+    prolog_source_is_fd = false;
+    prolog_source_fd = -1;
     error("Object cannot be loaded during compilation.\n");
   }
   guard = 1;
