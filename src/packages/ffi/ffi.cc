@@ -541,6 +541,8 @@ void f_ffi_call() {
   std::vector<void*> avalues(nargs);
   for (int i = 0; i < nargs; i++) {
     lpc_to_slot(fn->arg_codes[i], &args->item[i], &slots[i]);
+    // coverity[wrapper_escape] - slots outlives every use of avalues (both die
+    // together at function exit; ffi_call below is the only consumer).
     avalues[i] = &slots[i];
   }
 

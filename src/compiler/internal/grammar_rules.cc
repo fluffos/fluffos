@@ -219,7 +219,8 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
           if (local.funcptr_default) {
             have_default_args = true;
             if (i > default_args_limit || argument.num_arg > default_args_limit) {
-              yyerror("Functions with default arguments can only have %d args", default_args_limit);
+              yyerror("Functions with default arguments can only have %d args",
+                      static_cast<int>(default_args_limit));
               return;
             }
             FUNCTION_DEF(fun)->min_arg--;

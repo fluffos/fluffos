@@ -968,6 +968,9 @@ int lpc_lex_buffer_extents(void *yyscanner, int i, const char **base, const char
 void lpc_lex_set_source(char *base, size_t size, void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   yyensure_buffer_stack(yyscanner);
+  if (yyg->yy_buffer_stack == NULL) {
+    lpc_lex_fatal("lpc_lex_set_source: buffer stack allocation failed");
+  }
   if (YY_CURRENT_BUFFER) {
     yy_delete_buffer(YY_CURRENT_BUFFER, yyscanner);
     YY_CURRENT_BUFFER_LVALUE = NULL;
