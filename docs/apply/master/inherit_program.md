@@ -69,3 +69,6 @@ title: master / inherit_program
 
     include_file(4), compile_object(4), valid_override(4),
     get_include_path(4)
+
+The [hot reload guide](../../concepts/general/hot_reload.md) shows how
+to build mudlib auto-reloading on top of this apply.
