@@ -1,0 +1,8 @@
+// Middle program: includes the prototype header itself and inherits the
+// definer among several siblings that only carry the prototype.
+#include "proto_decl.h"
+
+inherit "/single/tests/compiler/helper/proto_carrier1";
+inherit "/single/tests/compiler/helper/proto_carrier2";
+inherit "/single/tests/compiler/helper/proto_base";
+inherit "/single/tests/compiler/helper/proto_carrier3";
