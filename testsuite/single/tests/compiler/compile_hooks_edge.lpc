@@ -5,7 +5,7 @@
 #define MASTER "/single/master"
 #define HOOK "/clone/adv_hook"
 
-void do_tests() {
+private void run_checks() {
   object hook;
   string err;
 
@@ -64,5 +64,13 @@ void do_tests() {
   hook->set_include_rule("globals.h", "globals.h");
   ASSERT_EQ(1, load_object("/clone/adv_globals_deny")->f());
 
+}
+
+void do_tests() {
+  // Run the checks, but ALWAYS unhook: a thrown check must not leave
+  // the hook registered for the rest of the randomized run.
+  string err = catch(run_checks());
+
   MASTER->set_compile_hooks(0);
+  if (err) error(err);
 }

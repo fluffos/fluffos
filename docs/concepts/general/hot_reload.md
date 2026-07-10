@@ -191,8 +191,18 @@ private void reload(string prog) {
 
 public int check_now() {
     int n = 0;
-    foreach (string prog in keys(watched)) {
-        if (closure_changed(prog)) { reload(prog); n++; }
+    // Collect the stale set BEFORE reloading anything: a reload
+    // refreshes the snapshots of its whole closure, which would hide a
+    // shared dependency's change from other watched programs in the
+    // same pass.
+    string *stale = filter(keys(watched), (: closure_changed($1) :));
+
+    foreach (string prog in stale) {
+        // A failed recompile (a syntax error mid-edit) must not abort
+        // the pass: the snapshot stays stale, so the next pass retries
+        // and self-heals once the file is fixed.
+        if (catch(reload(prog))) continue;
+        n++;
     }
     return n;
 }
@@ -219,8 +229,9 @@ public int watch(string prog) {
 }
 
 protected void poll() {
-    check_now();
+    // Re-arm first: a throw out of the pass must not kill the poller.
     if (poll_interval) call_out("poll", poll_interval);
+    check_now();
 }
 
 public void enable(int interval) {

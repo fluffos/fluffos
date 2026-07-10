@@ -153,6 +153,10 @@ private int self_changed(string prog) {
 }
 
 private int closure_changed(string prog) {
+  // Not loaded means a reload already failed (forget() ran, the fresh
+  // compile threw, and the dep records are gone): always stale, so the
+  // next pass retries the load once the source compiles again.
+  if (!find_object(prog)) return 1;
   foreach (string f in keys(closure_files(prog, ([])))) {
     if (file_changed(f)) return 1;
   }
@@ -183,8 +187,8 @@ private void reload(string prog) {
     if (self_changed(a)) forget(a);
   }
   forget(prog);
-  reload_count++;
   load_object(prog);  // recompiles; the applies rebuild the dep records
+  reload_count++;
   snapshot_program(prog);
 }
 
@@ -205,19 +209,27 @@ public void unwatch(string prog) { map_delete(watched, program_of(prog)); }
 // changed on disk. Returns the number of programs reloaded.
 public int check_now() {
   int n = 0;
+  // Collect the stale set BEFORE reloading anything: reloading one
+  // program refreshes the snapshots of its whole closure, which would
+  // otherwise erase the change evidence for other watched programs
+  // sharing a dependency (e.g. a common header, or a watched parent
+  // reloading before its watched child).
+  string *stale = filter(keys(watched), (: closure_changed($1) :));
 
-  foreach (string prog in keys(watched)) {
-    if (closure_changed(prog)) {
-      reload(prog);
-      n++;
-    }
+  foreach (string prog in stale) {
+    // A failed recompile (e.g. a syntax error mid-edit) must not abort
+    // the pass: the snapshot stays stale, so the next pass retries and
+    // the reload self-heals once the file is fixed.
+    if (catch(reload(prog))) continue;
+    n++;
   }
   return n;
 }
 
 protected void poll() {
-  check_now();
+  // Re-arm first: a throw out of the pass must not kill the poller.
   if (poll_interval) call_out("poll", poll_interval);
+  check_now();
 }
 
 // Register as the master's compile hooks and start the change poller.

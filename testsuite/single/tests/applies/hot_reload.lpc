@@ -34,7 +34,7 @@ private void cleanup(object d) {
   rmdir(DIR);
 }
 
-void do_tests() {
+private void run_checks() {
   object d, widget;
 
   ASSERT(mkdir(DIR) || file_size(DIR) == -2);
@@ -83,9 +83,43 @@ void do_tests() {
   // Stable again.
   ASSERT_EQ(0, d->check_now());
 
+  // A shared dependency must reload EVERY watched program in one pass:
+  // watch the parent too, then change the include both depend on. The
+  // stale set is collected before any reload, so refreshing the shared
+  // snapshot during the first reload must not hide the change from the
+  // second.
+  ASSERT(d->watch(DIR + "/base"));
+  write_src(DIR + "/color.h", "#define COLOR \"blue\"\n");
+  ASSERT_EQ(2, d->check_now());
+  ASSERT_EQ("one very blue widget", (DIR + "/widget")->describe());
+  ASSERT_EQ("blue", (DIR + "/base")->color());
+  ASSERT_EQ(0, d->check_now());
+
+  // A broken edit must not kill the daemon or the poller: the failed
+  // reloads are retried -- and self-heal -- once the file compiles
+  // again (a destructed watched program counts as stale).
+  write_src(DIR + "/base.lpc", "this does not compile\n");
+  ASSERT_EQ(0, d->check_now());
+  ASSERT(d->query_polling());
+  write_src(DIR + "/base.lpc",
+            "#include \"" + DIR + "/color.h\"\n" +
+            "string color() { return \"fixed \" + COLOR; }\n");
+  ASSERT_EQ(2, d->check_now());
+  ASSERT_EQ("fixed blue", (DIR + "/base")->color());
+  ASSERT_EQ("one very fixed blue widget", (DIR + "/widget")->describe());
+
   d->disable();
   ASSERT(!d->query_polling());
   ASSERT(!"/single/master"->query_compile_hooks());
+}
 
-  cleanup(d);
+void do_tests() {
+  // Run the checks, but ALWAYS tear down: the daemon must not stay
+  // registered as the master's compile hooks (or keep its poller
+  // armed) for the rest of the randomized run if a check throws.
+  string err = catch(run_checks());
+
+  cleanup(find_object(DAEMON));
+  "/single/master"->set_compile_hooks(0);
+  if (err) error(err);
 }

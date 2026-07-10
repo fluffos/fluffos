@@ -13,7 +13,7 @@
 #define MASTER "/single/master"
 #define HOOK "/clone/compile_hook"
 
-void do_tests() {
+private void run_checks() {
   object hook, ob;
   mixed *calls;
 
@@ -47,5 +47,13 @@ void do_tests() {
   ASSERT(sizeof(calls) > 0);
   ASSERT_EQ("/clone/if_outer.h", calls[<1][1]);
 
+}
+
+void do_tests() {
+  // Run the checks, but ALWAYS unhook: a thrown check must not leave
+  // the hook registered for the rest of the randomized run.
+  string err = catch(run_checks());
+
   MASTER->set_compile_hooks(0);
+  if (err) error(err);
 }
