@@ -1,0 +1,2 @@
+// Fixture: exists on disk, but the compile hook denies inheriting it.
+int forbidden() { return 1; }

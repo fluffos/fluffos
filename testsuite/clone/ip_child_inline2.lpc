@@ -1,0 +1,5 @@
+// Fixture: inherits inline source that ITSELF inherits an on-disk
+// program that is not loaded yet (/clone/ip_real2).
+inherit "/clone/ip_synth2";
+
+int child_fn2() { return synth2() + real2(); }

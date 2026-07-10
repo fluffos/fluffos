@@ -1,0 +1,3 @@
+// Fixture for /single/tests/compiler/inherit_program.lpc: the real
+// program that "/clone/ip_magic" inherits get redirected to.
+int parent_fn() { return 10; }

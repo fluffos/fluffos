@@ -15,6 +15,8 @@ title: master
 * [get_mud_stats](get_mud_stats)
 * [get_root_uid](get_root_uid)
 * [get_save_file_name](get_save_file_name)
+* [include_file](include_file)
+* [inherit_program](inherit_program)
 * [log_error](log_error)
 * [make_path_absolute](make_path_absolute)
 * [object_name](object_name)

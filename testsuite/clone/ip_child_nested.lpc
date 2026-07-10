@@ -1,0 +1,5 @@
+// Fixture: two levels of master-supplied inline source
+// (ip_synth_outer inherits ip_synth_inner, both synthesized).
+inherit "/clone/ip_synth_outer";
+
+int total() { return outer() + 1; }

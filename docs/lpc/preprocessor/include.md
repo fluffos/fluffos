@@ -25,6 +25,12 @@ file. Names may contain subdirectories (`<sys/net.h>`), but `..` is
 not allowed. Every candidate path is subject to the master's
 `valid_read` check.
 
+The master apply `include_file(compiled, from, path)` is consulted for
+every directive before resolution: it can translate the include to
+another path, supply the included text itself (an array-of-strings
+return), or deny the inclusion. Returning `path` unchanged keeps the
+behavior described above.
+
 ## Directive line details
 
 Text after the closing `"` or `>` is ignored, so trailing comments are

@@ -17,6 +17,12 @@ an explicit `.lpc` or `.c` extension names that exact file (see
 [source files](../source-files)). `inherit_list()` reports the real
 file names, extension included.
 
+The master apply `inherit_program(from, path, priv)` is consulted for
+every inherit statement before resolution: it can redirect the
+inheritance to another file, supply the inherited program's source
+itself (an array-of-strings return), or deny it. Returning `path`
+unchanged keeps the behavior described above.
+
 The 'inherit' statement provides the inheritance capability (a concept from
 object-oriented programming) to LPC objects. Inheritance lets an object
 inherit functions and variables from other objects. Because the FluffOS driver

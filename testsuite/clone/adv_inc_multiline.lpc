@@ -1,0 +1,2 @@
+#include "adv_multiline.h"
+int fn() { return C; }

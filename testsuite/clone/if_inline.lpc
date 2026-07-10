@@ -1,0 +1,5 @@
+// Fixture: "if_synth.h" does not exist; the test's compile hook
+// supplies the included text inline (array-of-strings return).
+#include "if_synth.h"
+
+int fn() { return SYNTH; }

@@ -545,5 +545,9 @@ char* allocate_in_mem_block(int, int);
 
 // FIXME: 'inherit_file' is used as a flag.
 extern char* inherit_file;
+// Inline source for 'inherit_file' supplied by master::inherit_program
+// (empty = load the file from disk). Set with inherit_file, consumed
+// with it by load_object().
+extern std::string inherit_file_source;
 
 #endif

@@ -1,0 +1,59 @@
+// master::include_file(string compiled, string from, string path)
+//
+// Called by the compiler for every #include directive: `path` (which
+// might not exist) is about to be included by `from` during the
+// compilation of `compiled`. A string return is the translated path of
+// the include file (resolved absolute from the mudlib root or relative
+// to the includer); an array-of-strings return is the included text
+// itself; any other return prevents the inclusion. Returning `path`
+// unchanged (what /single/master does with no hook registered) keeps
+// stock behavior, including <...> search semantics. Fixtures live in
+// /clone/if_*; the scriptable hook is /clone/compile_hook.
+
+#define MASTER "/single/master"
+#define HOOK "/clone/compile_hook"
+
+private void run_checks() {
+  object hook, ob;
+  mixed *calls;
+
+  hook = load_object(HOOK);
+  MASTER->set_compile_hooks(hook);
+
+  // 1. Translated path: "if_magic.h" has no file on disk; the hook
+  //    translates the include to /clone/if_real.h (#define MAGIC 7).
+  hook->set_include_rule("if_magic.h", "/clone/if_real.h");
+  ob = load_object("/clone/if_redirect");
+  ASSERT_EQ(7, ob->fn());
+
+  // 2. Inline content: the hook supplies the included text itself.
+  hook->set_include_rule("if_synth.h", ({ "#define SYNTH 99" }));
+  ob = load_object("/clone/if_inline");
+  ASSERT_EQ(99, ob->fn());
+
+  // 3. Denied: the header exists on disk, but the hook returns 0 --
+  //    the including file must fail to load.
+  hook->set_include_rule("if_blocked.h", 0);
+  ASSERT(stringp(catch(load_object("/clone/if_denied"))));
+  ASSERT(!find_object("/clone/if_denied"));
+
+  // 4. Argument shape on a nested include: if_nested.lpc includes
+  //    if_outer.h, which includes if_magic.h -- the apply must report
+  //    compiled=the main file, from=the header doing the include.
+  ob = load_object("/clone/if_nested");
+  ASSERT_EQ(7, ob->fn());
+  calls = filter(hook->query_include_calls(),
+                 (: $1[2] == "if_magic.h" && $1[0] == "/clone/if_nested.lpc" :));
+  ASSERT(sizeof(calls) > 0);
+  ASSERT_EQ("/clone/if_outer.h", calls[<1][1]);
+
+}
+
+void do_tests() {
+  // Run the checks, but ALWAYS unhook: a thrown check must not leave
+  // the hook registered for the rest of the randomized run.
+  string err = catch(run_checks());
+
+  MASTER->set_compile_hooks(0);
+  if (err) error(err);
+}

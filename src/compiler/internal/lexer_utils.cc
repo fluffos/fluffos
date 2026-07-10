@@ -2046,7 +2046,79 @@ bool lpc_lex_handle_include(std::string_view rest, void* yyscanner) {
       return false;
     }
 
-    auto [fd, resolved] = inc_open(filename, delim == '"');
+    /* master::include_file(compiled, from, path) -- the master may
+       translate the include to another path (string return), supply the
+       included text itself (array-of-strings return), or deny the
+       inclusion (any other return). No return value / a missing apply /
+       no master keeps the default behavior; so does returning `path`
+       unchanged, which preserves the "..."-vs-<...> search semantics.
+       Same mid-compile master-apply precedent as get_include_path: the
+       master's implementation must not trigger a compile. */
+    bool check_local = delim == '"';
+    std::string inline_source;
+    bool have_inline_source = false;
+    if (compiler_vm_context && master_ob) {
+      push_malloced_string(add_slash(main_file_name()));
+      push_malloced_string(add_slash(current_file));
+      push_malloced_string(string_copy(filename.c_str(), "include_file"));
+      svalue_t* ret = safe_apply_master_ob(APPLY_INCLUDE_FILE, 3);
+      if (ret && ret != reinterpret_cast<svalue_t*>(-1)) {
+        if (ret->type == T_STRING) {
+          if (filename != ret->u.string) {
+            // A translated path resolves like a quoted include: absolute
+            // from the mudlib root, or relative to the including file,
+            // with the configured include dirs as fallback.
+            filename = ret->u.string;
+            check_local = true;
+          }
+        } else if (ret->type == T_ARRAY) {
+          array_t* arr = ret->u.arr;
+          for (int i = 0; i < arr->size; i++) {
+            if (arr->item[i].type != T_STRING) {
+              lexerror(("master::include_file: content for '" + filename +
+                        "' must be an array of strings")
+                           .c_str());
+              return false;
+            }
+            inline_source += arr->item[i].u.string;
+            inline_source += '\n';
+          }
+          have_inline_source = true;
+        } else {
+          lexerror(("#include of '" + filename + "' denied by master::include_file").c_str());
+          return false;
+        }
+      }
+    }
+
+    if (have_inline_source) {
+      // Same file-identity/line bookkeeping as the on-disk branch below,
+      // with the include spelling standing in for the resolved path; the
+      // master-supplied text is copied to an arena block shaped for
+      // in-place scanning (trailing newline + the two flex sentinels).
+      size_t body = inline_source.size();
+      bool add_nl = body == 0 || inline_source.back() != '\n';
+      if (add_nl) body++;
+      char* base = static_cast<char*>(scratch_raw_allocate(body + 2, 1));
+      if (!inline_source.empty()) memcpy(base, inline_source.data(), inline_source.size());
+      if (add_nl) base[inline_source.size()] = '\n';
+      base[body] = 0;
+      base[body + 1] = 0;
+
+      int resume_line = current_line;
+      inc_stack.push_back(IncState{resume_line, current_file, current_file_id});
+
+      int directive_line = resume_line - 1;
+      save_file_info(current_file_id, directive_line - current_line_saved);
+      current_line_base += directive_line;
+      current_line_saved = 0;
+      current_file = make_shared_string(filename.c_str());
+      current_file_id = add_program_file(filename.c_str(), 0);
+      lpc_lex_push_prepared_buffer(base, body + 2, LPC_BUF_INCLUDE, yyscanner);
+      return true;
+    }
+
+    auto [fd, resolved] = inc_open(filename, check_local);
     if (fd != -1) {
       // Slurp the whole file and push it as a Flex buffer: the parent's
       // resume position (base ring or an outer include's buffer) is kept

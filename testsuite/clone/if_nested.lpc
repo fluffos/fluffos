@@ -1,0 +1,5 @@
+// Fixture: nested include -- if_outer.h includes if_magic.h, which the
+// compile hook translates to /clone/if_real.h.
+#include "if_outer.h"
+
+int fn() { return MAGIC; }

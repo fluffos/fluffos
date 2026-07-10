@@ -1,0 +1,253 @@
+// Hot-reload daemon: automatically reloads the master copy of watched
+// programs when any source file they were compiled from changes on disk.
+//
+// The driver's inherit_program / include_file master applies (delegated
+// here through master::set_compile_hooks) report, during every compile,
+// which files feed which program: #include'd files and inherited
+// programs both become part of the compiled bytecode, so a change to
+// ANY of them means the program on disk no longer matches the loaded
+// one. This daemon records that dependency graph, snapshots the files'
+// size+mtime, and -- from a call_out poller (enable()) or on demand
+// (check_now()) -- destructs and reloads any watched program's master
+// copy whose dependency closure changed. Reloading recompiles through the same
+// applies, so the graph and snapshots refresh themselves.
+//
+// Only programs compiled while the daemon is registered have complete
+// include/inherit records; watch() therefore loads its target itself.
+
+#include <globals.h>
+
+#define MASTER "/single/master"
+#define DEFAULT_INTERVAL 2
+
+// program name (no extension) -> ([ source path : 1 ]) - own source and
+// every file it #includes, recorded at compile time
+private mapping file_deps = ([]);
+// program name -> ([ inherited program name : 1 ])
+private mapping inherit_deps = ([]);
+// programs registered for auto reload
+private mapping watched = ([]);
+// source path -> ({ size, mtime }) at the last (re)load
+private mapping snapshot = ([]);
+
+private int poll_interval = 0;
+private int reload_count = 0;
+
+private string program_of(string file) {
+  if (strlen(file) > 4 && file[<4..] == ".lpc") return file[0..<5];
+  if (strlen(file) > 2 && file[<2..] == ".c") return file[0..<3];
+  return file;
+}
+
+// The on-disk source of a program name, matching the driver's
+// resolution order (.lpc preferred, .c fallback).
+private string source_of(string prog) {
+  if (file_size(prog + ".lpc") >= 0) return prog + ".lpc";
+  if (file_size(prog + ".c") >= 0) return prog + ".c";
+  return 0;
+}
+
+// Resolve an include spelling the way the compiler will: absolute from
+// the mudlib root, else relative to the including file, else the
+// configured include dirs (/include here).
+private string resolve_include(string from, string path) {
+  string *candidates;
+
+  if (path[0] == '/') {
+    candidates = ({ path });
+  } else {
+    int slash = strsrch(from, '/', -1);
+    string dir = slash > 0 ? from[0..slash - 1] : "";
+    candidates = ({ dir + "/" + path, "/include/" + path });
+  }
+  foreach (string c in candidates) {
+    if (file_size(c) >= 0) return c;
+  }
+  return 0;
+}
+
+// --- compile hooks (called by the master's applies) ----------------------
+
+mixed include_file(string compiled, string from, string path) {
+  string prog = program_of(compiled);
+  string dep = resolve_include(from, path);
+
+  if (dep) {
+    if (!file_deps[prog]) file_deps[prog] = ([]);
+    file_deps[prog][dep] = 1;
+  }
+  return path;
+}
+
+mixed inherit_program(string from, string path, int priv) {
+  string prog = program_of(from);
+
+  if (!inherit_deps[prog]) inherit_deps[prog] = ([]);
+  inherit_deps[prog][program_of(path)] = 1;
+  return path;
+}
+
+// --- dependency closure ---------------------------------------------------
+
+// Every source file prog's bytecode was built from: its own source, its
+// includes, and (recursively) those of every inherited program.
+private mapping closure_files(string prog, mapping seen) {
+  mapping out = ([]);
+  string src;
+
+  if (seen[prog]) return out;
+  seen[prog] = 1;
+
+  src = source_of(prog);
+  if (src) out[src] = 1;
+  if (file_deps[prog]) out += file_deps[prog];
+  if (inherit_deps[prog]) {
+    foreach (string parent in keys(inherit_deps[prog])) {
+      out += closure_files(parent, seen);
+    }
+  }
+  return out;
+}
+
+// All programs in prog's inherit closure, excluding prog itself.
+private string *ancestors(string prog, mapping seen) {
+  string *out = ({ });
+
+  if (!inherit_deps[prog]) return out;
+  foreach (string parent in keys(inherit_deps[prog])) {
+    if (seen[parent]) continue;
+    seen[parent] = 1;
+    out += ({ parent }) + ancestors(parent, seen);
+  }
+  return out;
+}
+
+// --- change detection ------------------------------------------------------
+
+private mixed *stat_file(string f) {
+  mixed *info = get_dir(f, -1);
+  if (!sizeof(info)) return 0;
+  return ({ info[0][1], info[0][2] });  // size, mtime
+}
+
+private int file_changed(string f) {
+  mixed *now = stat_file(f);
+  mixed *old = snapshot[f];
+
+  if (!old) return now != 0;
+  return !now || now[0] != old[0] || now[1] != old[1];
+}
+
+// Did prog's OWN files (source + direct includes) change - ignoring
+// inherited programs, which are checked as programs of their own.
+private int self_changed(string prog) {
+  string src = source_of(prog);
+
+  if (src && file_changed(src)) return 1;
+  if (file_deps[prog]) {
+    foreach (string f in keys(file_deps[prog])) {
+      if (file_changed(f)) return 1;
+    }
+  }
+  return 0;
+}
+
+private int closure_changed(string prog) {
+  // Not loaded means a reload already failed (forget() ran, the fresh
+  // compile threw, and the dep records are gone): always stale, so the
+  // next pass retries the load once the source compiles again.
+  if (!find_object(prog)) return 1;
+  foreach (string f in keys(closure_files(prog, ([])))) {
+    if (file_changed(f)) return 1;
+  }
+  return 0;
+}
+
+private void snapshot_program(string prog) {
+  foreach (string f in keys(closure_files(prog, ([])))) {
+    snapshot[f] = stat_file(f);
+  }
+}
+
+// --- reload ----------------------------------------------------------------
+
+private void forget(string prog) {
+  object ob = find_object(prog);
+
+  if (ob) destruct(ob);
+  map_delete(file_deps, prog);
+  map_delete(inherit_deps, prog);
+}
+
+private void reload(string prog) {
+  // A changed ancestor's master copy must go away first: recompiling prog
+  // finds already-loaded parent programs by name, so a stale parent
+  // would be inherited as-is.
+  foreach (string a in ancestors(prog, ([]))) {
+    if (self_changed(a)) forget(a);
+  }
+  forget(prog);
+  load_object(prog);  // recompiles; the applies rebuild the dep records
+  reload_count++;
+  snapshot_program(prog);
+}
+
+// --- public interface -------------------------------------------------------
+
+// Track a program (and everything its compile touches) for hot reload.
+public int watch(string prog) {
+  prog = program_of(prog);
+  if (!find_object(prog)) load_object(prog);
+  watched[prog] = 1;
+  snapshot_program(prog);
+  return 1;
+}
+
+public void unwatch(string prog) { map_delete(watched, program_of(prog)); }
+
+// One poll pass: reload every watched program whose dependency closure
+// changed on disk. Returns the number of programs reloaded.
+public int check_now() {
+  int n = 0;
+  // Collect the stale set BEFORE reloading anything: reloading one
+  // program refreshes the snapshots of its whole closure, which would
+  // otherwise erase the change evidence for other watched programs
+  // sharing a dependency (e.g. a common header, or a watched parent
+  // reloading before its watched child).
+  string *stale = filter(keys(watched), (: closure_changed($1) :));
+
+  foreach (string prog in stale) {
+    // A failed recompile (e.g. a syntax error mid-edit) must not abort
+    // the pass: the snapshot stays stale, so the next pass retries and
+    // the reload self-heals once the file is fixed.
+    if (catch(reload(prog))) continue;
+    n++;
+  }
+  return n;
+}
+
+protected void poll() {
+  // Re-arm first: a throw out of the pass must not kill the poller.
+  if (poll_interval) call_out("poll", poll_interval);
+  check_now();
+}
+
+// Register as the master's compile hooks and start the change poller.
+public void enable(int interval) {
+  poll_interval = interval ? interval : DEFAULT_INTERVAL;
+  MASTER->set_compile_hooks(this_object());
+  if (find_call_out("poll") == -1) call_out("poll", poll_interval);
+}
+
+public void disable() {
+  poll_interval = 0;
+  while (remove_call_out("poll") != -1) {
+  }
+  if (MASTER->query_compile_hooks() == this_object()) {
+    MASTER->set_compile_hooks(0);
+  }
+}
+
+public int query_polling() { return find_call_out("poll") != -1; }
+
+public int query_reload_count() { return reload_count; }

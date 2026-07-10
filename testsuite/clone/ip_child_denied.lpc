@@ -1,0 +1,5 @@
+// Fixture: inherits a file that exists, but the compile hook returns 0
+// from inherit_program -- the load must fail.
+inherit "/clone/ip_forbidden";
+
+int never() { return 1; }
