@@ -915,6 +915,7 @@ static int SQLite3_connect(dbconn_t* c, const char* host, const char* database,
 static int SQLite3_close(dbconn_t* c) {
   if (c->SQLite3.results) {
     sqlite3_finalize(c->SQLite3.results);
+    c->SQLite3.results = 0;
   }
 
   sqlite3_close(c->SQLite3.handle);
@@ -958,6 +959,12 @@ static int SQLite3_execute(dbconn_t* c, const char* s) {
                           NULL) != SQLITE_OK) {
       sqlite3_free_table(result);
       sqlite3_finalize(c->SQLite3.results);
+      // Clear the handle, or the next cleanup/close finalizes it a second
+      // time and crashes inside sqlite3_finalize (issue #1036).
+      c->SQLite3.results = 0;
+      c->SQLite3.nrows = 0;
+      c->SQLite3.last_row = 0;
+      c->SQLite3.step_res = 0;
       return 0;
     }
 
