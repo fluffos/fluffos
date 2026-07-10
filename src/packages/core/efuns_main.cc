@@ -1057,7 +1057,18 @@ void f_member_array() {
       if (flag & 2) {
         tmp = size - tmp - 1;
       }
-      switch (find->type | (sv = v->item + tmp)->type) {
+      sv = v->item + tmp;
+      if ((flag & 4) && find->type == T_FUNCTION) {
+        // Predicate search (issue #900): return the first index whose
+        // element makes the function return truthy.
+        push_svalue(sv);
+        svalue_t* ret = call_function_pointer(find->u.fp, 1);
+        if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
+          break;
+        }
+        continue;
+      }
+      switch (find->type | sv->type) {
         case T_STRING:
           if (flag & 1) {
             if (flen && (sv->subtype & STRING_COUNTED) && flen > MSTR_SIZE(sv->u.string)) {
@@ -1138,7 +1149,8 @@ void f_member_array() {
     free_svalue(find, "f_member_array");
     sp--;
   }
-  if (flag & 2) {
+  if (i != -1 && (flag & 2)) {
+    /* not-found used to be "reversed" too, returning size instead of -1 */
     i = size - i - 1;
   }
   put_number(i);
