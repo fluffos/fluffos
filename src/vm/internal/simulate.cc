@@ -16,6 +16,7 @@
 #endif
 
 #include "base/internal/tracing.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"
 
 #include "applies_table.autogen.h"
 #include "backend.h"      // for clear_tick_events , FIXME
@@ -508,13 +509,17 @@ object_t* load_object(const char* lname, int callcreate) {
     error("Could not read the file '/%s'.\n", real_name);
   }
   save_command_giver(command_giver);
-  // Zero-copy load: compile_file_fd reads the file straight into the
-  // arena block the scanner reads in place -- no intermediate string.
-  prog = compile_file_fd(f, obname);
+  {
+    // An error() during the compile unwinds past this frame; guard the fd
+    // or every failed compile leaks one descriptor (issue #162).
+    DEFER { close(f); };
+    // Zero-copy load: compile_file_fd reads the file straight into the
+    // arena block the scanner reads in place -- no intermediate string.
+    prog = compile_file_fd(f, obname);
+  }
   restore_command_giver();
   update_compile_av(total_lines);
   total_lines = 0;
-  close(f);
 
   /* Sorry, can't handle objects without programs yet. */
   if (inherit_file == nullptr && (num_parse_error > 0 || prog == nullptr)) {
