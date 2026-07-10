@@ -643,26 +643,78 @@ object_t* load_object(const char* lname, int callcreate) {
 
 // Compile+load an object entirely in memory, with no backing .c file on
 // disk -- for tools (lpcshell) that need to run a snippet of LPC source
-// without writing it to the mudlib first. Deliberately a stripped-down
-// sibling of load_object() above, not a code path load_object() itself
-// takes: skips the on-disk existence check, the virtual-object fallback,
-// and the iterative "#inherit an unloaded file" reload dance (an
-// in-memory object has no filename for that dance to reload from --
-// #inherit is simply unsupported here).
+// without writing it to the mudlib first, and for inherited programs
+// whose source master::inherit_program supplies inline. Deliberately a
+// stripped-down sibling of load_object() above, not a code path
+// load_object() itself takes: it skips the on-disk existence check and
+// the virtual-object fallback. The iterative "inherit an unloaded
+// file" dance IS supported -- the source string is in hand, so when a
+// compile aborts on an unloaded parent we load that parent (from disk,
+// or from inline source if the master supplies one for it too) and
+// recompile the same string. Without this, inline inherit source could
+// only inherit programs that happened to be loaded already.
 object_t* load_object_from_source(const std::string& source, const char* virtual_name,
                                   int callcreate) {
-  save_command_giver(command_giver);
-  program_t* prog = compile_file(source, virtual_name);
-  restore_command_giver();
+  auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
+  program_t* prog = nullptr;
 
-  if (inherit_file) {
+  for (int rounds = 0;; rounds++) {
+    save_command_giver(command_giver);
+    prog = compile_file(source, virtual_name);
+    restore_command_giver();
+
+    if (!inherit_file) {
+      break;
+    }
+
+    object_t* existing;
+    char inhbuf[MAX_OBJECT_NAME_SIZE];
+    char inhraw[MAX_OBJECT_NAME_SIZE];
+    // The nested inherit may itself come with master-supplied source.
+    std::string inh_source = std::move(inherit_file_source);
+    inherit_file_source.clear();
+
+    if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
+      strcpy(inhbuf, inherit_file);
+    }
+    strncpy(inhraw, inherit_file, sizeof inhraw - 1);
+    inhraw[sizeof inhraw - 1] = 0;
     FREE(inherit_file);
     inherit_file = nullptr;
-    inherit_file_source.clear();
+
     if (prog) {
       free_prog(&prog);
+      prog = nullptr;
     }
-    error("#inherit is not supported when compiling from in-memory source.\n");
+    if (strcmp(inhbuf, virtual_name) == 0) {
+      error("Illegal to inherit self.\n");
+    }
+    // Backstop against a master apply that redirects to a fresh unloaded
+    // name on every recompile of this same source.
+    if (rounds >= inherit_chain_size) {
+      error("Inherit chain too deep: > %d when compiling in-memory source for '/%s'.\n",
+            inherit_chain_size, virtual_name);
+    }
+
+    if (!ObjectTable::instance().find(inhbuf)) {
+      object_t* inh_obj;
+      compiler_next_load_reason =
+          std::string("while loading '/") + inhbuf + "' inherited by '/" + virtual_name + "'";
+      if (!inh_source.empty()) {
+        inh_obj = load_object_from_source(inh_source, inhbuf, 1);
+      } else {
+        inh_obj = load_object(inhraw, 1);
+      }
+      if (!inh_obj) {
+        error("Inherited file '/%s' does not exist!\n", inhbuf);
+      }
+    }
+    // Loading the parent ran arbitrary LPC that may already have
+    // materialized an object under our name -- mirror load_object()'s
+    // duplicate guard rather than compiling a colliding twin.
+    if ((existing = ObjectTable::instance().find(virtual_name))) {
+      return existing;
+    }
   }
 
   if (num_parse_error > 0 || prog == nullptr) {

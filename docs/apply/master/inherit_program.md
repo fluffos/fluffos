@@ -34,8 +34,9 @@ title: master / inherit_program
       text and its master copy materializes under `path`'s name, with no
       backing file. Note that if an object named `path` is already
       loaded, it is inherited directly and the supplied source is not
-      consulted, and that such inline programs may themselves only
-      inherit programs that are already loaded.
+      consulted. Inherit statements inside the supplied source resolve
+      as usual: an unloaded parent is loaded from disk, or from further
+      inline source if this apply supplies one for it too.
     - *any other value* prevents inheritance of the file `path`: the
       compile fails with an error.
 

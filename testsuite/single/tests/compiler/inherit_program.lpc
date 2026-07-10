@@ -57,6 +57,26 @@ private void run_checks() {
   ASSERT_EQ("/clone/ip_child_priv.lpc", calls[<1][0]);
   ASSERT_EQ(1, calls[<1][2]);
 
+  // 5. Inline source may itself inherit: an unloaded on-disk parent is
+  //    loaded through the same retry dance, recompiling the supplied
+  //    source...
+  ASSERT(!find_object("/clone/ip_real2"));
+  hook->set_inherit_rule("/clone/ip_synth2",
+                         ({ "inherit \"/clone/ip_real2\";",
+                            "int synth2() { return real2() * 2; }" }));
+  ob = load_object("/clone/ip_child_inline2");
+  ASSERT_EQ(21, ob->child_fn2());
+  ASSERT(objectp(find_object("/clone/ip_real2")));
+
+  //    ... and so may nested inline source (synthesized inheriting
+  //    synthesized).
+  hook->set_inherit_rule("/clone/ip_synth_outer",
+                         ({ "inherit \"/clone/ip_synth_inner\";",
+                            "int outer() { return inner() + 1; }" }));
+  hook->set_inherit_rule("/clone/ip_synth_inner", ({ "int inner() { return 40; }" }));
+  ob = load_object("/clone/ip_child_nested");
+  ASSERT_EQ(42, ob->total());
+  ASSERT(objectp(find_object("/clone/ip_synth_inner")));
 }
 
 void do_tests() {
