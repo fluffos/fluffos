@@ -8,7 +8,8 @@
 #include <sstream>
 
 #include "base/internal/debugmalloc.h"
-#include "base/internal/hash.h"
+#include <functional>
+#include <string_view>
 #include "base/internal/log.h"
 #include "base/internal/outbuf.h"
 #include "base/internal/rc.h"
@@ -70,7 +71,7 @@ uint64_t allocd_bytes = 0;
 uint64_t search_len = 0;
 uint64_t num_str_searches = 0;
 
-#define StrHash(s) (whashstr((s)) & (htable_size_minus_one))
+#define StrHash(s) (std::hash<std::string_view>{}(std::string_view(s)) & (htable_size_minus_one))
 
 #define hfindblock(s, h) sfindblock(s, (h) = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))

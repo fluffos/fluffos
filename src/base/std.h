@@ -160,7 +160,6 @@
 
 #include "base/internal/file.h"
 
-#include "base/internal/hash.h"
 
 #include "base/internal/log.h"
 
