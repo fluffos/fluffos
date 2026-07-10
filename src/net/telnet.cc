@@ -72,13 +72,16 @@ static inline void on_telnet_data(const char* buffer, unsigned long size, intera
 }
 
 static inline void on_telnet_send(const char* buffer, unsigned long size, interactive_t* ip) {
-  // no need to test if binary as only binary enables telnet
+  // This is libtelnet's final wire output: IAC-escaped, NVT-translated and,
+  // once COMPRESS2 has been negotiated, a deflate stream. It must reach the
+  // socket byte-for-byte — no charset transcoding here (game text is already
+  // transcoded in add_message() before it enters libtelnet; transcoding again
+  // would corrupt protocol bytes and any MCCP-compressed data).
   if (ip->connection_type == PORT_TYPE_WEBSOCKET) {
-    auto transdata = u8_convert_encoding(ip->trans, buffer, size);
-    auto result = transdata.empty() ? std::string_view(buffer, size) : transdata;
-    websocket_send_text(ip->lws, result.data(), result.size());
-  } else
+    websocket_send_text(ip->lws, buffer, size);
+  } else {
     bufferevent_write(ip->ev_buffer, buffer, size);
+  }
 }
 
 static inline void on_telnet_iac(unsigned char cmd, interactive_t* ip) {
