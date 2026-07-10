@@ -314,7 +314,11 @@ int remove_call_out_by_handle(object_t* ob, LPC_INT handle) {
   DBG_CALLOUT("remove_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P ".\n", ob->obname,
               handle);
 
-  if (handle == 0 || handle < unique) {
+  // 0 is the common mistake of passing an uninitialized variable (real
+  // handles start at 1); anything else is settled by the map lookup below.
+  // Comparing against the allocation counter here is wrong: it grows past
+  // older-but-still-pending handles as new call_outs are created.
+  if (handle == 0) {
     DBG_CALLOUT("  invalid handle, ignored.\n");
     return -1;
   }
@@ -338,7 +342,8 @@ int find_call_out_by_handle(object_t* ob, LPC_INT handle) {
   DBG_CALLOUT("find_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P "\n", ob->obname,
               handle);
 
-  if (handle == 0 || handle < unique) {
+  // See remove_call_out_by_handle for why only 0 is pre-filtered.
+  if (handle == 0) {
     DBG_CALLOUT("  invalid handle, ignored.\n");
     return -1;
   }
@@ -346,7 +351,10 @@ int find_call_out_by_handle(object_t* ob, LPC_INT handle) {
   auto iter = g_callout_handle_map.find(handle);
   if (iter != g_callout_handle_map.end()) {
     auto* cop = iter->second;
-    if (cop->handle == handle && (cop->ob == ob || cop->function.f->hdr.owner == ob)) {
+    // function is a union: function.f is only valid when ob is null
+    // (string-named callouts store function.s).
+    object_t* owner = cop->ob ? cop->ob : cop->function.f->hdr.owner;
+    if (owner == ob) {
       auto remaining_time = time_left(cop);
       DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
       return remaining_time;
