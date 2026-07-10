@@ -1,0 +1,4 @@
+// Carries only the prototype (mixin designed to be inherited alongside
+// proto_base) -- does NOT inherit the definer itself.
+#include "proto_decl.h"
+int sib1_marker() { return proto_fn() + 1; }
