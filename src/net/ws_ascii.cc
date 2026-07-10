@@ -137,12 +137,17 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
       static unsigned char buf[LWS_PRE + 2048];
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
-        auto new_numbytes = u8_truncate(&buf[LWS_PRE], numbytes);
-        if (new_numbytes != numbytes) {
-          auto rest = new_numbytes - numbytes;
-          evbuffer_prepend(pss->buffer, &buf[LWS_PRE + new_numbytes], rest);
-          numbytes = new_numbytes;
+        // Hold back a trailing incomplete UTF-8 sequence so a codepoint is
+        // never split across ws messages. evbuffer_copyout() does not drain,
+        // so the held-back bytes stay at the front of pss->buffer and go out
+        // with the next write.
+        auto new_numbytes = static_cast<ev_ssize_t>(u8_truncate(&buf[LWS_PRE], numbytes));
+        if (new_numbytes == 0) {
+          // Only an incomplete codepoint is buffered; wait for the rest of it
+          // instead of re-arming the writeable callback in a busy loop.
+          break;
         }
+        numbytes = new_numbytes;
 #ifdef DEBUG
         if (!u8_validate(&buf[LWS_PRE], numbytes)) {
           char buf1[sizeof(buf) + 1] = {};

@@ -11,6 +11,7 @@
 #include "net/ws_telnet.h"
 #include "interactive.h"
 #include "net/telnet.h"
+#include "net/sys_telnet.h"  // IAC / SB / SE / WILL / DONT
 
 // from comm.cc
 interactive_t* new_user(port_def_t* port, evutil_socket_t fd, sockaddr* addr, socklen_t addrlen);
@@ -30,6 +31,54 @@ struct per_vhost_data {
 
   ws_telnet_session* pss_list; /* linked-list of live pss*/
 };
+
+// Find how many bytes of an outgoing telnet window can be sent without
+// splitting an IAC sequence (command, option negotiation, or subnegotiation)
+// across websocket messages. A subnegotiation larger than a full window has
+// to be split to make progress; in that case (window_full) cut inside it, on
+// an IAC-pair boundary.
+size_t telnet_truncate(const unsigned char* data, size_t len, bool window_full) {
+  size_t safe = 0;
+  size_t i = 0;
+  while (i < len) {
+    if (data[i] != IAC) {
+      safe = ++i;
+      continue;
+    }
+    if (i + 1 >= len) break;  // trailing lone IAC
+    auto cmd = data[i + 1];
+    if (cmd == SB) {
+      // subnegotiation runs until IAC SE; IAC IAC inside is escaped data
+      size_t j = i + 2;
+      size_t end = 0;
+      while (j < len) {
+        if (data[j] != IAC) {
+          j++;
+          continue;
+        }
+        if (j + 1 >= len) break;  // trailing lone IAC inside the subnegotiation
+        if (data[j + 1] == SE) {
+          end = j + 2;
+          break;
+        }
+        j += 2;  // IAC IAC escape (or any other IAC pair)
+      }
+      if (!end) {
+        if (safe == 0 && window_full) {
+          safe = j;
+        }
+        break;
+      }
+      safe = i = end;
+    } else if (cmd >= WILL && cmd <= DONT) {
+      if (i + 2 >= len) break;  // option byte not in the window yet
+      safe = i += 3;
+    } else {
+      safe = i += 2;  // two-byte command, including the IAC IAC escape
+    }
+  }
+  return safe;
+}
 
 }  // namespace
 
@@ -140,6 +189,22 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
       static unsigned char buf[LWS_PRE + 2048];
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
+        // Hold back a trailing incomplete telnet IAC sequence so a command,
+        // negotiation, or subnegotiation is never split across ws messages.
+        // evbuffer_copyout() does not drain, so the held-back bytes stay at
+        // the front of pss->buffer and go out with the next write. Once MCCP
+        // (COMPRESS2) is active the stream is deflated binary, not telnet
+        // framing: it must go out verbatim, without IAC scanning or hold-back.
+        if (pss->user && !(pss->user->iflags & USING_COMPRESS)) {
+          auto new_numbytes = static_cast<ev_ssize_t>(telnet_truncate(
+              &buf[LWS_PRE], numbytes, numbytes == static_cast<ev_ssize_t>(sizeof(buf) - LWS_PRE)));
+          if (new_numbytes == 0) {
+            // Only an incomplete sequence is buffered; wait for the rest of it
+            // instead of re-arming the writeable callback in a busy loop.
+            break;
+          }
+          numbytes = new_numbytes;
+        }
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
         // Per lws docs, a return less than the requested length means the
         // connection has failed. On success lws consumed the entire payload

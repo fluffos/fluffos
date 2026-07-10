@@ -33,11 +33,32 @@ static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TEL
                                              {TELNET_TELOPT_MSDP, TELNET_WILL, TELNET_DO},
                                              {-1, 0, 0}};
 
+// Websocket connections: same table, but refuse MCCP (COMPRESS2). The
+// websocket layer has its own compression (permessage-deflate), so MCCP would
+// only re-wrap the stream in a second deflate and hide the telnet framing
+// from the ws message-boundary logic.
+static const telnet_telopt_t my_telopts_ws[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_NAWS, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_LINEMODE, TELNET_WONT, TELNET_DO},
+                                                {TELNET_TELOPT_ECHO, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_TTYPE, TELNET_WONT, TELNET_DO},
+                                                {TELNET_TELOPT_NEW_ENVIRON, TELNET_WONT, TELNET_DO},
+                                                {TELNET_TELOPT_COMPRESS2, TELNET_WONT, TELNET_DONT},
+                                                {TELNET_TELOPT_ZMP, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_MSSP, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_GMCP, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_CHARSET, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_MSP, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_BINARY, TELNET_WILL, TELNET_DO},
+                                                {TELNET_TELOPT_MSDP, TELNET_WILL, TELNET_DO},
+                                                {-1, 0, 0}};
+
 // Telnet event handler
 static void telnet_event_handler(telnet_t* /*telnet*/, telnet_event_t* /*ev*/, void* /*user_data*/);
 
 struct telnet_t* net_telnet_init(interactive_t* user) {
-  return telnet_init(my_telopts, telnet_event_handler, 0, user);
+  return telnet_init(user->lws ? my_telopts_ws : my_telopts, telnet_event_handler, 0, user);
 }
 
 static inline void on_telnet_data(const char* buffer, unsigned long size, interactive_t* ip) {
@@ -250,7 +271,12 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
       ip->iflags |= USING_ZMP;
       break;
     case TELNET_TELOPT_COMPRESS2:
-      telnet_begin_compress2(ip->telnet);
+      // MCCP is refused on websocket connections (see my_telopts_ws);
+      // libtelnet answers WONT for them and this event never fires, but
+      // guard anyway so compression can't start on a ws stream.
+      if (!ip->lws) {
+        telnet_begin_compress2(ip->telnet);
+      }
       break;
     case TELNET_TELOPT_MSP:
       on_telnet_do_msp(ip);
@@ -519,9 +545,12 @@ void send_initial_telnet_negotiations(struct interactive_t* user) {
   // Also newenv
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
 
-/* We support COMPRESS2 */
+/* We support COMPRESS2, but not on websocket connections: the websocket
+ * layer compresses on its own (permessage-deflate). */
 #ifdef HAVE_ZLIB  // come from libtelnet
-  telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
+  if (!user->lws) {
+    telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
+  }
 #endif
 
   // Ask them if they support mxp.
