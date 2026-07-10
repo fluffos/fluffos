@@ -303,7 +303,7 @@ cd testsuite
 - **`src/compiler/`**: LPC parsing engine (`grammar.y`, `lex.cc`, `generate.cc`).
 - **`src/packages/`**: Modular efun features (math, db, crypto, sockets, etc.).
 - **`testsuite/`**: Official testsuite containing LPC tests and configurations.
-- **`docs/`**: Markdown documentation.
+- **`docs/`**: Documentation site (Markdown, built with Docusaurus — see [docs/README.md](docs/README.md)).
 
 ---
 

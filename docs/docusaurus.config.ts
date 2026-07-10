@@ -41,6 +41,7 @@ const config: Config = {
             '**/forum_posts/**',
             '_layouts/**',
             'CLAUDE.md',
+            'README.md',
           ],
         },
         blog: false,
@@ -48,6 +49,24 @@ const config: Config = {
           customCss: './src/css/custom.css',
         },
       } satisfies Preset.Options,
+    ],
+  ],
+
+  themes: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        // offline/local search — no external service required
+        hashed: true,
+        indexBlog: false,
+        // docs live in this directory and are served from the site root
+        docsDir: '.',
+        docsRouteBasePath: '/',
+        // English docs plus the zh-CN pages
+        language: ['en', 'zh'],
+        highlightSearchTermsOnTargetPage: true,
+        explicitSearchResultPath: true,
+      },
     ],
   ],
 
