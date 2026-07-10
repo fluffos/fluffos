@@ -433,6 +433,7 @@ title: EFUN
 * [replace_program](system/replace_program)
 * [reset_eval_cost](system/reset_eval_cost)
 * [set_eval_limit](system/set_eval_limit)
+* [request_clean_up](system/request_clean_up)
 * [set_reset](system/set_reset)
 * [shutdown](system/shutdown)
 * [strftime](system/strftime)

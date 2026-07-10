@@ -20,6 +20,7 @@ title: system
 * [replace_program](replace_program)
 * [reset_eval_cost](reset_eval_cost)
 * [set_eval_limit](set_eval_limit)
+* [request_clean_up](request_clean_up)
 * [set_reset](set_reset)
 * [shutdown](shutdown)
 * [strftime](strftime)
