@@ -24,6 +24,9 @@ static void int_add_instr_name(const char* name, int n, short t) {
 void init_instrs() {
   unsigned int i, n;
 
+  static_assert(NUM_OPCODES <= MAX_INSTRS,
+                "instrs[] cannot hold every generated opcode; raise MAX_INSTRS");
+
   // operators
   for (i = 0; i < EFUN_BASE; i++) {
     instrs[i].name = operator_names[i];
@@ -35,6 +38,9 @@ void init_instrs() {
     if (n & F_ALIAS_FLAG) {
       predefs[i].token ^= F_ALIAS_FLAG;
     } else {
+      if (n >= MAX_INSTRS) {
+        fatal("init_instrs: efun token %u out of instrs[] bounds", n);
+      }
       instrs[n].min_arg = predefs[i].min_args;
       instrs[n].max_arg = predefs[i].max_args;
       instrs[n].name = predefs[i].word;
