@@ -1,0 +1,45 @@
+// Pins the UTF-8 string semantics documented in docs/lpc/types/strings.md
+// ("UTF-8 Native Strings"). If this file starts failing, update the doc.
+
+void do_tests() {
+    string s;
+    int cp;
+
+    // Lengths count extended grapheme clusters, not bytes or code points.
+    ASSERT_EQ(3, strlen("abc"));
+    ASSERT_EQ(2, strlen("你好"));
+    ASSERT_EQ(1, strlen("👍🏽"));  // base emoji + skin tone modifier
+    ASSERT_EQ(2, sizeof("你好"));
+    ASSERT_EQ(strlen("你好"), sizeof("你好"));
+
+    // Indexing yields the code point as an int.
+    ASSERT_EQ('a', "abc"[0]);
+    ASSERT_EQ(20320, "你好"[0]);  // U+4F60
+
+    // Indexing a multi-code-point grapheme cluster is an error...
+    s = "👍🏽";
+    ASSERT(catch(cp = s[0]));
+    // ...but a one-character range extracts it as a string.
+    ASSERT_EQ("👍🏽", s[0..0]);
+
+    // Ranges use character indices and never split a character.
+    s = "naïve 👍🏽 text";
+    ASSERT_EQ("naïve", s[0..4]);
+    ASSERT_EQ("👍🏽", s[6..6]);
+    ASSERT_EQ("text", s[8..]);
+
+    // Display width differs from length (UAX #11).
+    ASSERT_EQ(2, strlen("你好"));
+    ASSERT_EQ(4, strwidth("你好"));
+
+    // \uXXXX escape and surrogate-pair escape.
+    ASSERT_EQ("€", "€");
+    ASSERT_EQ("😀", "😀");
+    ASSERT_EQ(1, strlen("😀"));
+
+    // Round trip through a legacy encoding.
+    ASSERT_EQ("你好", string_decode(string_encode("你好", "GBK"), "GBK"));
+
+    // Character-boundary search.
+    ASSERT_EQ(6, strsrch(s, "👍🏽"));
+}

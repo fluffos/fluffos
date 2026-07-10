@@ -18,6 +18,10 @@ title: general / sizeof
     'var'.  If 'var' is not an array, mapping, string, or buffer, then zero
     (0) is returned.
 
+    For a string, the element count is the number of UTF-8 characters
+    (extended grapheme clusters), exactly like strlen(3) — not the number
+    of bytes. For a buffer it is the number of bytes.
+
 ### SEE ALSO
 
     allocate(3), allocate_mapping(3), strlen(3)
