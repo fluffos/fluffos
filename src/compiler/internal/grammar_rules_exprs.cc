@@ -866,8 +866,8 @@ void rule_primary_expr_functional_2(parse_node_t** result, LPC_INT val,
       int* argp;
       int f = val >> 8;
       int num = opt_arg_list->kind;
-      int max_arg = predefs[f].max_args;
       if (f != -1) {
+        int max_arg = predefs[f].max_args;
         if (num > max_arg && max_arg != -1) {
           parse_node_t* pn = opt_arg_list;
           while (pn) {
@@ -975,7 +975,7 @@ void rule_function_call_new(parse_node_t** result, parse_node_t* opt_arg_list,
   context = saved_context;
   ihe = lookup_ident("clone_object");
 
-  if ((f = ihe->dn.simul_num) != -1) {
+  if (ihe != nullptr && (f = ihe->dn.simul_num) != -1) {
     *result = opt_arg_list;
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;

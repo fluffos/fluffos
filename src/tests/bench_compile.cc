@@ -118,7 +118,7 @@ double avg(const std::vector<double>& v, size_t from, size_t to) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
   int rounds = (argc > 1) ? atoi(argv[1]) : 2000;
   long chunk = (argc > 2) ? atol(argv[2]) : 0;  // e.g. 400: worst-case geometry
 
@@ -165,4 +165,7 @@ int main(int argc, char** argv) {
   printf("last-10%% / first-10%% ratio: %.3f (>1.10 would indicate lifetime degradation)\n",
          degradation);
   return degradation > 1.10 ? 1 : 0;
+} catch (const std::exception& e) {
+  fprintf(stderr, "bench_compile: fatal: %s\n", e.what());
+  return 1;
 }
