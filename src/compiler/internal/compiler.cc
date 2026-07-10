@@ -2844,6 +2844,21 @@ static program_t* epilog(void) {
     // debug_message("Function table %d: %s\n", i, prog->function_table[i].funcname);
   }
 
+  // Entries sorted past num_func were excluded from the program table
+  // (undefined prototypes and replaced overloads, address == ADDRESS_MAX).
+  // Nothing takes over their funcname refs, so release them here or every
+  // unresolved prototype leaks one shared-string ref per compile.
+  {
+    int const total_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
+    for (i = num_func; i < total_func; i++) {
+      function_t* dead = FUNC(func_index_map[i]);
+      if (dead->funcname) {
+        free_string(dead->funcname);
+        dead->funcname = nullptr;
+      }
+    }
+  }
+
   // Fixup the default argument function index
   for (int i = 0; i < num_func; i++) {
     auto* func = &prog->function_table[i];
@@ -2867,8 +2882,12 @@ static program_t* epilog(void) {
     }
   }
 
-  if (num_func) {
+  // Guard on the pointer, not num_func: handle_functions() decrements
+  // num_func past trailing prototypes, so a program whose functions are
+  // ALL prototypes reaches here with num_func == 0 but the array live.
+  if (comp_sorted_funcs) {
     FREE((char*)comp_sorted_funcs);
+    comp_sorted_funcs = nullptr;
   }
 
   p += align(sizeof(function_t) * num_func);
@@ -3003,6 +3022,7 @@ static bool prolog(std::string_view source, const char* name, void* scanner) {
   }
   prog_flags = nullptr;
   func_index_map = nullptr;
+  comp_sorted_funcs = nullptr;
   comp_def_index_map = nullptr;
 
   memset(string_tags, 0, sizeof(string_tags));
@@ -3094,6 +3114,10 @@ static void clean_parser() {
   }
   if (func_index_map) {
     FREE((char*)func_index_map);
+  }
+  if (comp_sorted_funcs) {
+    FREE((char*)comp_sorted_funcs);
+    comp_sorted_funcs = nullptr;
   }
   if (prog_flags) {
     FREE((char*)prog_flags);
