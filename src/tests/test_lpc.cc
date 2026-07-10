@@ -165,7 +165,8 @@ TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
   FREE_MSTR(joined);
   free_array(v);
 
-  // Non-reversible behavior is unchanged: no fields at all.
+  // Non-reversible behavior is unchanged: no fields at all. (The result
+  // is the static the_null_array; nothing to free.)
   v = explode_string("a", 1, "a", 1, false);
   EXPECT_EQ(v->size, 0);
 }
