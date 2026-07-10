@@ -2773,7 +2773,10 @@ void eval_instruction(char* p) {
           STACK_INC;
           sp->type = T_NUMBER;
           sp->u.lvalue = (sp - 1)->u.arr->item;
-          sp->subtype = (sp - 1)->u.arr->size;
+          // The remaining-iterations bound lives as a pointer comparison in
+          // F_NEXT_FOREACH: subtype is an unsigned short and silently
+          // truncates sizes > 65535 (issue #1127).
+          sp->subtype = 0;
 
           STACK_INC;
           sp->type = T_LVALUE;
@@ -2800,7 +2803,7 @@ void eval_instruction(char* p) {
           STACK_INC;
           sp->type = T_NUMBER;
           sp->u.lvalue = (sp - 1)->u.arr->item;
-          sp->subtype = (sp - 1)->u.arr->size;
+          sp->subtype = 0;
         }
 
         if (flags & FOREACH_RIGHT_GLOBAL) {
@@ -2837,7 +2840,7 @@ void eval_instruction(char* p) {
       case F_NEXT_FOREACH:
         if ((sp - 1)->type == T_LVALUE) {
           /* mapping */
-          if ((sp - 2)->subtype--) {
+          if ((sp - 2)->u.lvalue < (sp - 3)->u.arr->item + (sp - 3)->u.arr->size) {
             svalue_t* key = (sp - 2)->u.lvalue++;
             svalue_t* value = find_in_mapping((sp - 4)->u.map, *key);
 
@@ -2876,7 +2879,7 @@ void eval_instruction(char* p) {
             break;
           }
         } else { /* array */
-          if ((sp - 1)->subtype--) {
+          if ((sp - 1)->u.lvalue < (sp - 2)->u.arr->item + (sp - 2)->u.arr->size) {
             if (sp->type == T_REF) {
               sp->u.ref->lvalue = (sp - 1)->u.lvalue;
             } else {
