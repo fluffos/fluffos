@@ -44,6 +44,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <unistd.h>
 #include <regex>
@@ -285,10 +286,12 @@ std::string StripTrailingSemicolon(std::string s) {
   return s;
 }
 
-void Eval(Session* session, std::string stmt) {
+// Returns false when the statement failed to compile or errored at
+// runtime, so script mode (issue #921) can report a nonzero exit status.
+bool Eval(Session* session, std::string stmt) {
   // Trim trailing newline the REPL loop always appends.
   while (!stmt.empty() && (stmt.back() == '\n' || stmt.back() == '\r')) stmt.pop_back();
-  if (stmt.find_first_not_of(" \t") == std::string::npos) return;
+  if (stmt.find_first_not_of(" \t") == std::string::npos) return true;
 
   std::string decl_name, rewritten;
   if (MatchSingleDeclaration(stmt, &decl_name, &rewritten)) {
@@ -313,7 +316,7 @@ void Eval(Session* session, std::string stmt) {
     std::string expr_body = "return (" + StripTrailingSemicolon(stmt) + ");";
     if (RunAttempt(session, expr_body, /*want_result=*/true, &result, &error_message)) {
       std::cout << result << "\n";
-      return;
+      return true;
     }
     // Trial failed silently (compiles run with compiler_diags_quiet); the
     // statement-form retry below clears compiler_diags via its own
@@ -327,7 +330,7 @@ void Eval(Session* session, std::string stmt) {
     for (const auto& d : compiler_diags) {
       if (d.is_warning) std::cout << render_diagnostic(d, isatty(1)) << "\n";
     }
-    return;
+    return true;
   }
 
   // Both attempts failed. Render the FINAL attempt's structured
@@ -345,31 +348,54 @@ void Eval(Session* session, std::string stmt) {
     // No compile diagnostics: the failure was at runtime (the driver's
     // own error logging already reported it to the console).
   }
+  return false;
 }
 
 }  // namespace
 
 int main(int argc, char** argv) try {
-  if (argc != 2) {
-    std::cerr << "Usage: lpcshell config_file" << std::endl;
+  if (argc != 2 && argc != 3) {
+    std::cerr << "Usage: lpcshell config_file [script_file]" << std::endl;
     return 1;
   }
+
+  // Script mode (issue #921): with a script file argument -- or when stdin
+  // is a pipe rather than a terminal -- run without banner or prompts and
+  // exit nonzero if any statement failed, so lpcshell can drive LPC as a
+  // scripting-language interpreter.
+  std::ifstream script;
+  if (argc == 3) {
+    script.open(argv[2]);
+    if (!script) {
+      std::cerr << "lpcshell: cannot open script file: " << argv[2] << std::endl;
+      return 1;
+    }
+  }
+  std::istream& in = (argc == 3) ? static_cast<std::istream&>(script) : std::cin;
+  bool const interactive = (argc == 2) && isatty(0);
 
   auto config = get_argument(0, argc, argv);
   init_main(config);
   vm_start();
   current_object = master_ob;
 
-  std::cout << "lpcshell -- interactive LPC REPL. Ctrl-D to exit.\n";
+  if (interactive) {
+    std::cout << "lpcshell -- interactive LPC REPL. Ctrl-D to exit.\n";
+  }
 
   Session session;
   std::string pending;
   bool continuation = false;
   std::string line;
+  int failures = 0;
   for (;;) {
-    std::cout << (continuation ? "... " : ">>> ") << std::flush;
-    if (!std::getline(std::cin, line)) {
-      std::cout << "\n";
+    if (interactive) {
+      std::cout << (continuation ? "... " : ">>> ") << std::flush;
+    }
+    if (!std::getline(in, line)) {
+      if (interactive) {
+        std::cout << "\n";
+      }
       break;
     }
     pending += line;
@@ -379,12 +405,20 @@ int main(int argc, char** argv) try {
       continue;
     }
     continuation = false;
-    Eval(&session, pending);
+    if (!Eval(&session, pending)) {
+      failures++;
+    }
     pending.clear();
+  }
+  // Leftover unbalanced input at EOF is a failure in script mode.
+  if (!pending.empty() && pending.find_first_not_of(" \t\r\n") != std::string::npos) {
+    if (!Eval(&session, pending)) {
+      failures++;
+    }
   }
 
   clear_state();
-  return 0;
+  return failures ? 1 : 0;
 } catch (const std::exception& e) {
   std::cerr << "lpcshell: fatal: " << e.what() << std::endl;
   return 1;
