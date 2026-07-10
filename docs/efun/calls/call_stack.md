@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: calls / call_stack
 ---
 # call_stack

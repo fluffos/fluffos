@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: WebSocket Support
 ---
 # WebSocket Support

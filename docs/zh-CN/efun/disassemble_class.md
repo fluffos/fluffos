@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / disassemble_class.pre
 ---
 # disassemble_class

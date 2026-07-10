@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: object / is_living
 ---
 # is_living

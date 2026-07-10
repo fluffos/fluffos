@@ -1,6 +1,5 @@
 ---
-layout: doc
-title: APPLY
+title: efun
 ---
 * [abs](abs)
 * [acos](acos)

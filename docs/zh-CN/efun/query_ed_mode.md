@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ed / query_ed_mode
 ---
 # query_ed_mode

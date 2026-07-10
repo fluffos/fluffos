@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / copy.pre
 ---
 # copy

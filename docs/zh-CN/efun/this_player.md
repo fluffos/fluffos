@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / this_player
 ---
 # this_player

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / trace_end
 ---
 # trace_end

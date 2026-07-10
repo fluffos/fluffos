@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / id_matrix
 ---
 # id_matrix

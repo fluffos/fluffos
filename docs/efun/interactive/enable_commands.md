@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / enable_commands
 ---
 # enable_commands

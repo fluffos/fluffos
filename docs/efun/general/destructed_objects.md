@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / destructed_objects
 ---
 # destructed_objects

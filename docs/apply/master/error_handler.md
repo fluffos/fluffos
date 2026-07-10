@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / error_handler
 ---
 # error_handler

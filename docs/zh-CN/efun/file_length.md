@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / file_length.pre
 ---
 # file_length

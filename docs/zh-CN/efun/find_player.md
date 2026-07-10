@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / find_player
 ---
 # find_player

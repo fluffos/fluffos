@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / disable_wizard
 ---
 # disable_wizard

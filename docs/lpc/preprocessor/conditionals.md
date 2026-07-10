@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: preprocessor / conditionals
 ---
 # Conditional compilation

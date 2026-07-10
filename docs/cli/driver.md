@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: cli / driver
 ---
 # cli / driver

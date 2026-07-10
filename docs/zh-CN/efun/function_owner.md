@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / function_owner.pre
 ---
 # function_owner

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / fetch_variable.pre
 ---
 # fetch_variable

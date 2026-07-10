@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / disable_commands
 ---
 # disable_commands

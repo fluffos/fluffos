@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / replace_program
 ---
 # replace_program

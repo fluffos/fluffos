@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: lpc
 ---
 # The LPC language

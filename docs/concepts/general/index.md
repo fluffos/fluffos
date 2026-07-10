@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general
 ---
 * [fluffos_driver](fluffos_driver)

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / zonetime.pre
 ---
 # zonetime

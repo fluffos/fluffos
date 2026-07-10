@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / call_into_vm
 ---
 # call_into_vm

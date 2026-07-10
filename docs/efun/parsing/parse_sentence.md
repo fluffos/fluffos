@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: parsing / parse_sentence
 ---
 

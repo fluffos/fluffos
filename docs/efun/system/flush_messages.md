@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / flush_messages
 ---
 # flush_messages

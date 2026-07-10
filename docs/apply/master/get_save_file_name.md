@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / get_save_file_name
 ---
 # get_save_file_name

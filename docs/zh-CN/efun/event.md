@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / event.pre
 ---
 # event

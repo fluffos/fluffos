@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: apply / interactive / receive_environ
 ---
 # receive_environ

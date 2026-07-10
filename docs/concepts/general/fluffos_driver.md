@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / FluffOS driver
 ---
 # The FluffOS driver

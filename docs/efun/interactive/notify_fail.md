@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / notify_fail
 ---
 # notify_fail

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: calls / previous_object
 ---
 # previous_object

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ed / ed_start
 ---
 # ed_start

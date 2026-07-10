@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / send_gmcp
 ---
 # send_gmcp

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mappings / map_mapping
 ---
 # map_mapping

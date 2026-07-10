@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / valid_link
 ---
 # valid_link

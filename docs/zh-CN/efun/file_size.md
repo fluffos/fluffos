@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: filesystem / file_size
 ---
 # file_size

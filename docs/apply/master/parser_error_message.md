@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / parser_error_message
 ---
 # parser_error_message

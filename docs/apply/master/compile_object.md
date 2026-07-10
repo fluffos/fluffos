@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / compile_object
 ---
 # compile_object

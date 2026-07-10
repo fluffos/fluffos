@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: stdlib / percent_of
 ---
 # percent_of

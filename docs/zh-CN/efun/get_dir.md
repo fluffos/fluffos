@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: filesystem / get_dir
 ---
 # get_dir

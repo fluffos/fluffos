@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: compiler diagnostics
 ---
 # Reading compiler diagnostics

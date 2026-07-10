@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / next_inventory
 ---
 # next_inventory

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / parse_remove
 ---
 # parse_remove

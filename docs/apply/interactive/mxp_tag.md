@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / mxp_tag
 ---
 # mxp_tag

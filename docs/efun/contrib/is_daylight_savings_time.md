@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / is_daylight_savings_time.pre
 ---
 # is_daylight_savings_time

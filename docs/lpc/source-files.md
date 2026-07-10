@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: source files & object names
 ---
 # Source files and object names

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: numbers
 ---
 * [array_sum](array_sum)

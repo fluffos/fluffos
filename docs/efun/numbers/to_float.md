@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: numbers / to_float
 ---
 # to_float

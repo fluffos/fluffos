@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: floats / log
 ---
 # log

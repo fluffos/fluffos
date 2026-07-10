@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / mxp_enable
 ---
 # mxp_enable

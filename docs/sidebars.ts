@@ -25,11 +25,15 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'CLI',
+      link: { type: 'doc', id: 'cli/index' },
       items: [
         'cli/driver',
         'cli/lpcc',
         'cli/o2json',
         'cli/json2o',
+        'cli/portbind',
+        'cli/symbol',
+        'cli/generate_keywords',
       ],
     },
     {
@@ -99,6 +103,7 @@ const sidebars: SidebarsConfig = {
           ],
         },
         { type: 'doc', id: 'efun/index', label: 'EFUN' },
+        { type: 'doc', id: 'stdlib/index', label: 'STDLIB' },
         {
           type: 'category',
           label: 'Concepts',

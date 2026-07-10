@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / reset_eval_cost
 ---
 # reset_eval_cost

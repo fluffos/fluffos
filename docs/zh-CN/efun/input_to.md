@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / input_to
 ---
 # input_to

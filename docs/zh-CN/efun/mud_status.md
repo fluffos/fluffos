@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / mud_status
 ---
 # mud_status

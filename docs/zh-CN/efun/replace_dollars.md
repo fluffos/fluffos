@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / replace_dollars
 ---
 # replace_dollars

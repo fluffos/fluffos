@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / query_load_average
 ---
 # query_load_average

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / get_char
 ---
 # get_char

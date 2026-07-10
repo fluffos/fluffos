@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: driver / FFI package plan
 ---
 # `package_ffi` — a foreign-function interface for LPC

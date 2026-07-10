@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / has_msdp
 ---
 # has_msdp

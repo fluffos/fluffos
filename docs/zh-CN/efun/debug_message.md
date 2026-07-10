@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / debug_message
 ---
 # debug_message

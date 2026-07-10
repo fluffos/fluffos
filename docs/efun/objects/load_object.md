@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / load_object
 ---
 # load_object

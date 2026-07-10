@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mappings / unique_mapping
 ---
 # unique_mapping

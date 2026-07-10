@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / has_gmcp
 ---
 # has_gmcp

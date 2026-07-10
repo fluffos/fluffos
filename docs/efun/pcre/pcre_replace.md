@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: pcre / pcre_replace
 ---
 # pcre_replace

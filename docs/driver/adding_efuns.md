@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / adding_efuns
 ---
 # adding_efuns

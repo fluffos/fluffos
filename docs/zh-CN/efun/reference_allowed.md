@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / reference_allowed
 ---
 # reference_allowed

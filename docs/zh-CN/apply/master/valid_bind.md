@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / valid_bind
 ---
 # valid_bind

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / telnet_suboption
 ---
 # telnet_suboption

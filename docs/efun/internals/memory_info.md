@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / memory_info
 ---
 # memory_info

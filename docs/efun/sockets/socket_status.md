@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: sockets / socket_status
 ---
 # socket_status

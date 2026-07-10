@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: db / db_status
 ---
 # db_status

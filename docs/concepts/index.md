@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: concepts
 ---
 ## general

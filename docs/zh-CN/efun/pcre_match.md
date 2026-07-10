@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: pcre / pcre_match
 ---
 # pcre_match

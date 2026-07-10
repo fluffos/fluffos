@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: efuns / strings / strlen
 ---
 # strlen

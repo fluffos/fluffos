@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: ffi / ffi_callback_addr
 ---
 # ffi_callback_addr

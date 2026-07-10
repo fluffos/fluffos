@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / crash
 ---
 # crash

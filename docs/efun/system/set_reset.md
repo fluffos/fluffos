@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / set_reset
 ---
 # set_reset

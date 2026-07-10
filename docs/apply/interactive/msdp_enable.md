@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / msdp_enable
 ---
 # msdp_enable

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / sys_reload_tls
 ---
 # sys_reload_tls

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / has_mxp
 ---
 # has_mxp

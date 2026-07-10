@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / restore_object
 ---
 # restore_object

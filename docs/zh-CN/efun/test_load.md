@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / test_load.pre
 ---
 # test_load

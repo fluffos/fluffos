@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / author_file
 ---
 # author_file

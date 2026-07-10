@@ -40,7 +40,6 @@ Applies are callback functions that the driver calls on LPC objects in response 
 **Apply Documentation Template:**
 ```markdown
 ---
-layout: doc
 title: category / apply_name
 ---
 # apply_name
@@ -116,7 +115,6 @@ Efuns (external functions) are built-in C/C++ functions callable from LPC code.
 **Efun Documentation Template:**
 ```markdown
 ---
-layout: doc
 title: category / efun_name
 ---
 # efun_name
@@ -183,7 +181,6 @@ Command-line tools included with FluffOS.
 **CLI Documentation Template:**
 ```markdown
 ---
-layout: doc
 title: cli / tool_name
 ---
 # cli / tool_name
@@ -371,7 +368,6 @@ done
 **Front Matter:**
 ```yaml
 ---
-layout: doc
 title: category / name
 ---
 ```
@@ -512,7 +508,7 @@ npm run dev
 # Visit http://localhost:3000
 ```
 
-> **Note**: The `.vitepress/` directory is a leftover from a previous framework and can be ignored.
+> **Note**: Leftovers from previous frameworks (VitePress `.vitepress/`, Jekyll `_layouts/` and `css/`) have been removed — everything is Docusaurus now.
 
 ### Sidebar Format
 
