@@ -175,6 +175,8 @@ const FlagEntry INT_FLAGS[] = {
      "Record LPC execution context for tracing and debugging."},
     {"trace lpc instructions", __RC_TRACE_INSTR__, 0, 0, INT_MAX, "Diagnostics",
      "Trace individual LPC instructions for debugging."},
+    {"display preload progress", __RC_DISPLAY_PRELOAD_PROGRESS__, 1, 0, INT_MAX, "Diagnostics",
+     "Print each file name to the debug log while preload files are loaded at boot."},
     {"enable mxp", __RC_ENABLE_MXP__, 0, 0, INT_MAX, "Protocol Support",
      "Advertise and enable the MXP telnet protocol."},
     {"enable gmcp", __RC_ENABLE_GMCP__, 0, 0, INT_MAX, "Protocol Support",
