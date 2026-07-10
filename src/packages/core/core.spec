@@ -79,7 +79,7 @@ void move_object(object | string);
 void add_action(string | function, string | string *, void | int);
 string query_verb();
 int command(string);
-int remove_action(string, string);
+int remove_action(string | function, string);
 int living(object default: F__THIS_OBJECT);
 mixed *commands();
 void disable_commands();

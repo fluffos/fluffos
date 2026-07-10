@@ -585,7 +585,7 @@ static void add_action(svalue_t* str, const char* cmd, int flag) {
  * if success.  If command_giver, remove his action, otherwise
  * remove current_object's action.
  */
-static int remove_action(const char* act, const char* verb) {
+static int remove_action(svalue_t* act, const char* verb) {
   object_t* ob;
   sentence_t** s;
 
@@ -597,11 +597,19 @@ static int remove_action(const char* act, const char* verb) {
 
   if (ob) {
     for (s = &ob->sent; *s; s = &((*s)->next)) {
-      sentence_t* tmp;
+      sentence_t* tmp = *s;
+      int match;
 
-      if (((*s)->ob == current_object) && (!((*s)->flags & V_FUNCTION)) &&
-          !strcmp((*s)->function.s, act) && !strcmp((*s)->verb, verb)) {
-        tmp = *s;
+      if (tmp->ob != current_object || strcmp(tmp->verb, verb)) {
+        continue;
+      }
+      if (act->type == T_STRING) {
+        match = !(tmp->flags & V_FUNCTION) && !strcmp(tmp->function.s, act->u.string);
+      } else {
+        /* actions added as function pointers match by identity (issue #992) */
+        match = (tmp->flags & V_FUNCTION) && tmp->function.f == act->u.fp;
+      }
+      if (match) {
         *s = tmp->next;
         free_sentence(tmp);
         illegal_sentence_action = 1;
@@ -805,9 +813,9 @@ void f_query_verb() {
 void f_remove_action() {
   LPC_INT success;
 
-  success = remove_action((sp - 1)->u.string, sp->u.string);
+  success = remove_action(sp - 1, sp->u.string);
   free_string_svalue(sp--);
-  free_string_svalue(sp);
+  free_svalue(sp, "f_remove_action");
   put_number(success);
 }
 #endif
