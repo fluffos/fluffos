@@ -538,6 +538,11 @@ object_t* load_object(const char* lname, int callcreate) {
     char inhbuf[MAX_OBJECT_NAME_SIZE];
     char inhraw[MAX_OBJECT_NAME_SIZE];
 
+    // master::inherit_program may have supplied the inherited program's
+    // source inline; consume it together with inherit_file.
+    std::string inh_source = std::move(inherit_file_source);
+    inherit_file_source.clear();
+
     if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
       strcpy(inhbuf, inherit_file);
     }
@@ -565,7 +570,14 @@ object_t* load_object(const char* lname, int callcreate) {
       // '/child' inherited by '/parent'" (consumed by start_new_file).
       compiler_next_load_reason =
           std::string("while loading '/") + inhbuf + "' inherited by '/" + name + "'";
-      inh_obj = load_object(inhraw, 1);
+      if (!inh_source.empty()) {
+        // The master supplied the inherited program's source itself; the
+        // object materializes under the inherit statement's name with no
+        // backing file.
+        inh_obj = load_object_from_source(inh_source, inhbuf, 1);
+      } else {
+        inh_obj = load_object(inhraw, 1);
+      }
     }
     if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);
 
@@ -646,6 +658,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   if (inherit_file) {
     FREE(inherit_file);
     inherit_file = nullptr;
+    inherit_file_source.clear();
     if (prog) {
       free_prog(&prog);
     }

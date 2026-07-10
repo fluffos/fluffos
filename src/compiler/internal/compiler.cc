@@ -42,6 +42,15 @@
  */
 char* inherit_file;
 
+/*
+ * When master::inherit_program returns the inherited program's source
+ * inline (an array of strings), rule_inheritence() joins it here,
+ * alongside setting 'inherit_file'. load_object() consumes both
+ * together: a non-empty source compiles via load_object_from_source()
+ * under the 'inherit_file' name instead of reading the file from disk.
+ */
+std::string inherit_file_source;
+
 // FIXME: this is defined in vm/internal/simul_efun.cc
 extern object_t* simul_efun_ob;
 // FIXME: This is used by smart_log().cc

@@ -1,0 +1,31 @@
+// Scriptable master compile-hook used by the inherit_program /
+// include_file apply tests (registered via master::set_compile_hooks).
+// A rule maps an exact `path` argument to the value the apply should
+// return, wrapped in an array so a stored 0 (deny) is distinguishable
+// from "no rule"; without a rule the path is returned unchanged (stock
+// behavior). Every call is recorded for the tests to inspect.
+
+private mapping inherit_rules = ([]);
+private mapping include_rules = ([]);
+private mixed *inherit_calls = ({ });
+private mixed *include_calls = ({ });
+
+void set_inherit_rule(string path, mixed result) { inherit_rules[path] = ({ result }); }
+
+void set_include_rule(string path, mixed result) { include_rules[path] = ({ result }); }
+
+mixed *query_inherit_calls() { return inherit_calls; }
+
+mixed *query_include_calls() { return include_calls; }
+
+mixed inherit_program(string from, string path, int priv) {
+  inherit_calls += ({ ({ from, path, priv }) });
+  if (arrayp(inherit_rules[path])) return inherit_rules[path][0];
+  return path;
+}
+
+mixed include_file(string compiled, string from, string path) {
+  include_calls += ({ ({ compiled, from, path }) });
+  if (arrayp(include_rules[path])) return include_rules[path][0];
+  return path;
+}

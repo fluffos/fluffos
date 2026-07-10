@@ -332,6 +332,39 @@ staticf void error_handler(mapping map, int flag) {
   if (!flag && ob) tell_object(ob, str);
 }
 
+// ---------------------------------------------------------------------------
+// Compile-time applies: inherit_program / include_file.
+//
+// The driver consults these for every `inherit "path";` statement and
+// every #include directive. Returning the path unchanged keeps the
+// default behavior; a different string redirects the inherit/include to
+// that path; an array of strings supplies the inherited program's /
+// included file's source text itself; any other value denies it.
+//
+// The testsuite master delegates to a registered hook object so
+// individual tests (and the /single/hot_reload daemon) can observe or
+// rewrite compiles while they run; with no hook registered the applies
+// return the path unchanged, i.e. stock behavior. NOTE: these run in
+// the middle of a compile -- a hook must never trigger another compile
+// (no load_object/clone_object of unloaded files).
+// ---------------------------------------------------------------------------
+
+private object compile_hooks;
+
+public void set_compile_hooks(object ob) { compile_hooks = ob; }
+
+public object query_compile_hooks() { return compile_hooks; }
+
+mixed inherit_program(string from, string path, int priv) {
+  if (compile_hooks) return compile_hooks->inherit_program(from, path, priv);
+  return path;
+}
+
+mixed include_file(string compiled, string from, string path) {
+  if (compile_hooks) return compile_hooks->include_file(compiled, from, path);
+  return path;
+}
+
 mixed get_include_path(string file)
 {
   switch(file)

@@ -1,0 +1,91 @@
+// Auto hot-reload on file changes, demonstrated end to end.
+//
+// The /single/hot_reload daemon registers itself as the master's
+// compile hooks, so the driver's inherit_program / include_file applies
+// feed it the full compile-time dependency graph (which files each
+// program's bytecode was built from). Its poller -- armed by enable(),
+// driven here synchronously via check_now() for determinism -- stats
+// those files and destructs+reloads any watched blueprint whose
+// dependency closure changed on disk.
+//
+// The fixture chain is written at runtime under /data/hot:
+//   widget.lpc  inherits  base.lpc  which includes  color.h
+// so a change to the deepest dependency (an include of the INHERITED
+// program) must reload the watched top-level program.
+
+#define DIR "/data/hot"
+#define DAEMON "/single/hot_reload"
+
+private void write_src(string file, string body) {
+  ASSERT2(write_file(file, body, 1), "write " + file);
+}
+
+private void cleanup(object d) {
+  foreach (string prog in ({ DIR + "/widget", DIR + "/base" })) {
+    if (find_object(prog)) destruct(find_object(prog));
+  }
+  if (d) {
+    d->disable();
+    destruct(d);
+  }
+  foreach (string f in ({ "/color.h", "/base.lpc", "/widget.lpc" })) {
+    rm(DIR + f);
+  }
+  rmdir(DIR);
+}
+
+void do_tests() {
+  object d, widget;
+
+  ASSERT(mkdir(DIR) || file_size(DIR) == -2);
+
+  write_src(DIR + "/color.h", "#define COLOR \"red\"\n");
+  write_src(DIR + "/base.lpc",
+            "#include \"" + DIR + "/color.h\"\n" +
+            "string color() { return COLOR; }\n");
+  write_src(DIR + "/widget.lpc",
+            "inherit \"" + DIR + "/base\";\n" +
+            "string describe() { return \"a \" + color() + \" widget\"; }\n");
+
+  d = load_object(DAEMON);
+  // enable() registers the compile hooks AND arms the change poller --
+  // that call_out is the "auto" in auto hot-reload. The test drives the
+  // same pass synchronously through check_now() so it needs no timing.
+  d->enable(1);
+  ASSERT(d->query_polling());
+
+  ASSERT(d->watch(DIR + "/widget"));
+  widget = find_object(DIR + "/widget");
+  ASSERT(objectp(widget));
+  ASSERT_EQ("a red widget", widget->describe());
+
+  // Nothing changed on disk: no reload, same blueprint object.
+  ASSERT_EQ(0, d->check_now());
+  ASSERT(find_object(DIR + "/widget") == widget);
+
+  // Change the DEEPEST dependency: an include of the inherited program.
+  // The daemon must reload both the stale parent and the watched child.
+  write_src(DIR + "/color.h", "#define COLOR \"green\"\n");
+  ASSERT_EQ(1, d->check_now());
+  widget = find_object(DIR + "/widget");
+  ASSERT(objectp(widget));
+  ASSERT_EQ("a green widget", widget->describe());
+  ASSERT_EQ(1, d->query_reload_count());
+
+  // Change the watched program's own source.
+  write_src(DIR + "/widget.lpc",
+            "inherit \"" + DIR + "/base\";\n" +
+            "string describe() { return \"one very \" + color() + \" widget\"; }\n");
+  ASSERT_EQ(1, d->check_now());
+  ASSERT_EQ("one very green widget", (DIR + "/widget")->describe());
+  ASSERT_EQ(2, d->query_reload_count());
+
+  // Stable again.
+  ASSERT_EQ(0, d->check_now());
+
+  d->disable();
+  ASSERT(!d->query_polling());
+  ASSERT(!"/single/master"->query_compile_hooks());
+
+  cleanup(d);
+}

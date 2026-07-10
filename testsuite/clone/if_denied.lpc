@@ -1,0 +1,5 @@
+// Fixture: includes a header that exists, but the compile hook returns
+// 0 from include_file -- the load must fail.
+#include "if_blocked.h"
+
+int never() { return BLOCKED; }

@@ -1,0 +1,5 @@
+// Fixture: "/clone/ip_synth" does not exist on disk; the test's
+// compile hook supplies its source inline (array-of-strings return).
+inherit "/clone/ip_synth";
+
+int child_fn() { return synth_fn() * 2; }

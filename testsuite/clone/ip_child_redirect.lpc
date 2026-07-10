@@ -1,0 +1,5 @@
+// Fixture: "/clone/ip_magic" does not exist on disk; the test's
+// compile hook redirects the inheritance to /clone/ip_real.
+inherit "/clone/ip_magic";
+
+int child_fn() { return parent_fn() + 1; }

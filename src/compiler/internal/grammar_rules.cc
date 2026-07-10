@@ -45,11 +45,56 @@ bool rule_inheritence(parse_node_t** result_node, int type_mod,
   if (var_defined) {
     yyerror("Illegal to inherit after defining global variables.");
     inherit_file = 0;
+    inherit_file_source.clear();
     return true;
   }
-  ob = find_object2(inherit_file_name->c_str());
+
+  /* master::inherit_program(from, path, priv) -- the master may redirect
+     the inheritance to another file (string return), supply the inherited
+     program's source itself (array-of-strings return), or deny it (any
+     other return). No return value / a missing apply / no master keeps
+     the default behavior. Same mid-compile master-apply precedent as
+     valid_override and get_include_path: the master's implementation
+     must not trigger a compile (the compiler is non-reentrant). */
+  ScratchString inherit_path(*inherit_file_name);
+  std::string inline_source;
+  bool have_inline_source = false;
+  if (compiler_vm_context && master_ob) {
+    push_malloced_string(add_slash(main_file_name()));
+    push_malloced_string(string_copy(inherit_path.c_str(), "inherit_program"));
+    push_number((type_mod & DECL_PRIVATE) ? 1 : 0);
+    svalue_t* ret = safe_apply_master_ob(APPLY_INHERIT_PROGRAM, 3);
+    if (ret && ret != reinterpret_cast<svalue_t*>(-1)) {
+      if (ret->type == T_STRING) {
+        inherit_path = ScratchString(ret->u.string);
+      } else if (ret->type == T_ARRAY) {
+        array_t* arr = ret->u.arr;
+        for (int i = 0; i < arr->size; i++) {
+          if (arr->item[i].type != T_STRING) {
+            yyerror("master::%s: source for '%s' must be an array of strings",
+                    applies_table[APPLY_INHERIT_PROGRAM], inherit_path.c_str());
+            inherit_file = 0;
+            inherit_file_source.clear();
+            return true;
+          }
+          inline_source += arr->item[i].u.string;
+          inline_source += '\n';
+        }
+        have_inline_source = true;
+      } else {
+        yyerror("Inheritance of '%s' denied by master::%s", inherit_path.c_str(),
+                applies_table[APPLY_INHERIT_PROGRAM]);
+        inherit_file = 0;
+        inherit_file_source.clear();
+        return true;
+      }
+    }
+  }
+
+  ob = find_object2(inherit_path.c_str());
   if (ob == 0) {
-    inherit_file = alloc_cstring(inherit_file_name->c_str(), "inherit");
+    inherit_file = alloc_cstring(inherit_path.c_str(), "inherit");
+    inherit_file_source = have_inline_source ? std::move(inline_source) : std::string();
     /* Return back to load_object() */
     return true;
   }
