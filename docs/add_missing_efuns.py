@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
+"""Generate stub docs under efun/general/ for efuns that have no doc page.
 
-# find all existing efuns through keywords.json, then generate doc under efun/general/
+Usage: add_missing_efuns.py path/to/keywords.json
 
-import os
+keywords.json is produced by the generate_keywords tool from a compiled
+driver (run it in your build directory). Run this script from docs/.
+"""
+
 import json
-
-EFUNS_DOCS = set()
+import os
+import sys
 
 
 def generate_signature(efun):
@@ -17,7 +21,6 @@ def generate_signature(efun):
 
 def generate_doc(efun):
     return f"""---
-layout: doc
 title: general / {efun["name"]}
 ---
 # {efun["name"]}
@@ -38,27 +41,26 @@ title: general / {efun["name"]}
 
 
 def main():
+    if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
+        sys.exit(__doc__.strip().splitlines()[2])  # the Usage line
+
+    documented = set()
     for root, dirs, files in os.walk("./efun"):
         for file in files:
-            if file.endswith(".md"):
-                if file == "index.md":
-                    continue
-                EFUNS_DOCS.add(file[:-3])
-    print("EFUNS with docs: " + str(len(EFUNS_DOCS)))
+            if file.endswith(".md") and file != "index.md":
+                documented.add(file[:-3])
+    print(f"EFUNS with docs: {len(documented)}")
 
-    keywords = json.load(open("./keywords.json"))
+    keywords = json.load(open(sys.argv[1]))
     all_efuns = {keyword["name"]: keyword for keyword in keywords}
-    print("ALL EFUNS: " + str(len(all_efuns)))
+    print(f"ALL EFUNS: {len(all_efuns)}")
 
-    for efun in all_efuns:
-        if efun.startswith("_"):
+    for name, efun in all_efuns.items():
+        if name.startswith("_") or name in documented:
             continue
-        if efun in EFUNS_DOCS:
-            continue
-        print(f"Generating doc for {efun}")
-        content = generate_doc(all_efuns[efun])
-        with open(f"./efun/general/{efun}.md", "w") as f:
-            f.write(content)
+        print(f"Generating doc for {name}")
+        with open(f"./efun/general/{name}.md", "w") as f:
+            f.write(generate_doc(efun))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals
 ---
 * [cache_stats](cache_stats)

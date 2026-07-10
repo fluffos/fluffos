@@ -51,13 +51,25 @@ Notes:
 | `docusaurus.config.ts` | Site config: navbar, footer, docs plugin, search theme |
 | `sidebars.ts` | Sidebar navigation tree (Docusaurus `SidebarsConfig` format) |
 | `src/css/custom.css` | Infima CSS variable overrides |
+| `static/` | Files copied verbatim to the site root (`CNAME`, Google site verification) |
 | `apply/` | Driver-to-LPC callback (apply) reference |
 | `efun/` | Built-in function (efun) reference, by category |
+| `stdlib/` | LPC standard-library reference |
 | `driver/` | Driver internals & configuration |
 | `lpc/` | LPC language reference |
 | `concepts/` | High-level LPC / MUD concepts |
 | `cli/` | Command-line tool docs |
 | `zh-CN/` | Chinese documentation |
+| `archive/` | Historical MudOS-era documents (not published) |
+
+### Maintenance scripts
+
+| Script | Purpose |
+|--------|---------|
+| `update_index.sh` | Regenerates all generated `index.md` listing pages (calls `gen_index.py`) |
+| `gen_index.py` | Writes an `index.md` for one doc tree (e.g. `./gen_index.py efun EFUN`) |
+| `gen_config_docs.py` | Regenerates `driver/config.md` from `src/base/internal/rc.cc` |
+| `add_missing_efuns.py` | Creates stub pages under `efun/general/` for undocumented efuns (needs a `keywords.json` from the `generate_keywords` tool) |
 
 ## Conventions & Gotchas
 
@@ -67,7 +79,11 @@ Notes:
   `{...}` in prose is still parsed as a JSX expression and breaks the build — escape it as
   `\{...\}` outside fenced code blocks.
 - Sidebar entries in `sidebars.ts` use doc IDs (relative path without extension), not URLs.
-- The `.vitepress/` directory is a leftover from the previous framework and is ignored.
+- Generated `index.md` listing pages (efun/apply/stdlib/cli/concepts/driver/zh-CN) are
+  rewritten by `./update_index.sh` — regenerate rather than hand-edit them.
+  `lpc/index.md` is hand-written and deliberately not regenerated.
+- `onBrokenLinks` is set to `'throw'`: a broken internal link fails the build (and the
+  Pages deploy) instead of shipping a 404.
 
 See [`CLAUDE.md`](CLAUDE.md) for detailed documentation templates (applies, efuns, CLI
 tools) and the full contribution workflow.

@@ -1,8 +1,10 @@
 ---
-layout: doc
 title: zh-CN
 ---
 ## apply
+* [interactive](apply/interactive/)
+* [master](apply/master/)
+* [object](apply/object/)
 ## build
 * [build](build/build)
 ## efun

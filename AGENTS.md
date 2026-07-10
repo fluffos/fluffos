@@ -159,7 +159,7 @@ The FluffOS documentation site lives in the `docs/` directory and is built with 
 
 ### Framework & Build
 
-* **Framework**: Docusaurus 3 (`@docusaurus/preset-classic`). Do **not** confuse with VitePress — the site was migrated from VitePress and `.vitepress/` is a dead directory that can be ignored.
+* **Framework**: Docusaurus 3 (`@docusaurus/preset-classic`). Do **not** confuse with VitePress or Jekyll — the site was migrated from those frameworks and their leftover directories (`.vitepress/`, `_layouts/`, `css/`) have been removed.
 * **Node**: Use NVM. The active version is managed via `~/.nvm`. Always `source "$NVM_DIR/nvm.sh"` before running npm commands.
 * **Key config files**:
   - `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin path

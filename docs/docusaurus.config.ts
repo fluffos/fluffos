@@ -10,7 +10,7 @@ const config: Config = {
   baseUrl: '/',
   organizationName: 'fluffos',
   projectName: 'fluffos',
-  onBrokenLinks: 'warn',
+  onBrokenLinks: 'throw',
 
   i18n: {
     defaultLocale: 'en',
@@ -36,10 +36,7 @@ const config: Config = {
           editUrl: 'https://github.com/fluffos/fluffos/edit/master/docs/',
           exclude: [
             '**/node_modules/**',
-            '**/.vitepress/**',
             '**/archive/**',
-            '**/forum_posts/**',
-            '_layouts/**',
             'CLAUDE.md',
             'README.md',
           ],

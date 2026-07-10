@@ -1,37 +1,18 @@
 #!/bin/bash
+# Regenerate the index.md files for the generated reference doc trees.
+# Run from the docs/ directory: ./update_index.sh
+#
+# NOTE: lpc/index.md is hand-written — do not add lpc here.
 
-TAG=$(git describe --tags --always --dirty)
-echo "Using commit $TAG..."
+set -e
+cd "$(dirname "$0")"
 
-# Generate EFUN doc
+./gen_index.py efun EFUN
+./gen_index.py apply APPLY
+./gen_index.py stdlib STDLIB
+./gen_index.py cli cli
+./gen_index.py concepts concepts
+./gen_index.py driver driver
 
-TARGET_DIR=./efun
-./gen_index.py $TARGET_DIR EFUN $TAG
-
-# Generate APPLY doc
-
-TARGET_DIR=./apply
-./gen_index.py $TARGET_DIR APPLY $TAG
-
-TARGET_DIR=./stdlib
-./gen_index.py $TARGET_DIR STDLIB $TAG
-
-# Generate zh-CN docs
-
-TARGET_DIR=./zh-CN
-./gen_index.py $TARGET_DIR zh-CN $TAG
-
-TARGET_DIR=./zh-CN/apply
-./gen_index.py $TARGET_DIR APPLY $TAG
-
-TARGET_DIR=./zh-CN/efun
-./gen_index.py $TARGET_DIR APPLY $TAG
-
-TARGET_DIR=./zh-CN/build
-./gen_index.py $TARGET_DIR APPLY $TAG
-
-# Copy rest of docs
-for topic in concepts driver lpc; do
-  TARGET_DIR=./$topic
-  ./gen_index.py $TARGET_DIR $topic $TAG
-done
+# Chinese docs (recurses into zh-CN/apply, zh-CN/efun, zh-CN/build)
+./gen_index.py zh-CN zh-CN

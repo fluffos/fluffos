@@ -1,53 +1,76 @@
 #!/usr/bin/env python3
+"""Regenerate index.md files for the reference doc trees (efun/, apply/, ...).
 
-import time
-import os
-import sys
-from typing import Dict, List
+Usage: gen_index.py DIR [TITLE]
 
+Writes DIR/index.md listing every doc page in DIR, grouped by subdirectory,
+then recurses into each subdirectory. Links are extension-less relative URLs
+(Docusaurus resolves `arrays/allocate` against the index page's route).
 
-def main(basedir, title, version):
-    header = f"""---
-layout: doc
-title: {title}
----
+Driven by update_index.sh; do NOT run it on hand-written index pages
+(e.g. lpc/index.md).
 """
 
-    cats = sorted(os.listdir("./%s" % basedir))
+import os
+import sys
 
-    if 'index.md' in cats:
-        cats.remove('index.md')
+# Directory entries that are never documentation content.
+SKIP_DIRS = {"node_modules"}
 
-    all_md_files = [x for x in cats if x.endswith('.md')]
 
-    # if all files are .md files, then we are in a category page directory
-    if len(all_md_files) == len(cats):
-        with open(f"./{basedir}/index.md", 'w') as f:
-            f.write(header)
-            for cat in cats:
-                f.write(f"* [{cat[:-3]}]({cat[:-3]}.html)" + "\n")
-        return
+def list_entries(path):
+    """Return (md_files, subdirs) for a directory, sorted and filtered.
 
-    category_efun_map: Dict[str, List[str]] = {}
+    md_files are page names without the .md extension (index excluded);
+    subdirs are documentation subdirectories.
+    """
+    files = []
+    subdirs = []
+    for entry in sorted(os.listdir(path)):
+        if entry.startswith(".") or entry in SKIP_DIRS:
+            continue
+        full = os.path.join(path, entry)
+        if os.path.isdir(full):
+            subdirs.append(entry)
+        elif entry.endswith(".md") and entry != "index.md":
+            files.append(entry[:-3])
+    return files, subdirs
 
-    for cat in cats:
-        if not '.md' in cat:
-            category_efun_map[cat] = os.listdir('./%s/%s' % (basedir, cat))
 
-    with open(f"./{basedir}/index.md", 'w') as f:
-        f.write(header)
-        for cat in sorted(category_efun_map.keys()):
-            f.write(f"## {cat}" + "\n")
+def write_index(path, title):
+    files, subdirs = list_entries(path)
 
-            # remove ".md" suffix
-            items = sorted([x[:-3] for x in category_efun_map[cat] if x.endswith('.md')])
-            for item in items:
-                if item != 'index':
-                    f.write(f"* [{item}]({cat}/{item}.html)" + "\n")
+    lines = ["---", f"title: {title}", "---"]
 
-        # build index.md for subdir
-        for cat in sorted(category_efun_map.keys()):
-            main(basedir + "/" + cat, cat, version)
+    # Loose pages directly in this directory.
+    for name in files:
+        lines.append(f"* [{name}]({name})")
 
-if __name__ == '__main__':
-    main(*sys.argv[1:])
+    # One section per subdirectory.
+    for sub in subdirs:
+        lines.append(f"## {sub}")
+        sub_files, sub_subdirs = list_entries(os.path.join(path, sub))
+        for nested in sub_subdirs:
+            lines.append(f"* [{nested}]({sub}/{nested}/)")
+        for name in sub_files:
+            lines.append(f"* [{name}]({sub}/{name})")
+
+    with open(os.path.join(path, "index.md"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+    for sub in subdirs:
+        write_index(os.path.join(path, sub), sub)
+
+
+def main(argv):
+    if len(argv) < 1 or not os.path.isdir(argv[0]):
+        sys.exit(__doc__.strip().splitlines()[2])  # the Usage line
+    path = argv[0].rstrip("/")
+    if os.path.realpath(path) == os.path.dirname(os.path.realpath(__file__)):
+        sys.exit("refusing to run on the docs root; pass a doc tree like efun/ or apply/")
+    title = argv[1] if len(argv) > 1 else os.path.basename(path)
+    write_index(path, title)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,5 +1,4 @@
 ---
-layout: doc
-title: APPLY
+title: build
 ---
 * [build](build)

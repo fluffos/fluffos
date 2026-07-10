@@ -1,6 +1,5 @@
 ---
-layout: doc
-title: APPLY
+title: apply
 ---
 ## interactive
 * [catch_tell](interactive/catch_tell)
