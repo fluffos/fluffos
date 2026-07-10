@@ -50,6 +50,17 @@ void do_tests() {
     res = db_fetch(conn, 3);
     ASSERT_EQ(({ "largeint", MAX_INT }), res);
 
+    // Issue #808: a direct fetch of row N (without fetching rows 1..N-1
+    // first) must return row N, not the row after the last one fetched.
+    rows = db_exec(conn, "select * from tbl1;");
+    ASSERT_EQ(3, rows);
+    res = db_fetch(conn, 3);
+    ASSERT_EQ(({ "largeint", MAX_INT }), res);
+    res = db_fetch(conn, 1); // rewinding still works
+    ASSERT_EQ(({ "hello!", 10 }), res);
+    res = db_fetch(conn, 2);
+    ASSERT_EQ(({ "goodbye", 20 }), res);
+
     rows = db_exec(conn, "drop table tbl1;");
     ASSERT_EQ(0, rows);
 
