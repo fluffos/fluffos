@@ -1301,6 +1301,12 @@ static char* pluralize(const char* str) {
       if (!strcasecmp(rel + 1, "ech")) {
         found = PLURAL_SUFFIX;
         suffix = "s";
+        break;
+      }
+      if (!strcasecmp(rel + 1, "arquis")) {
+        /* not the Latin -is -> -es chop (issue #936) */
+        found = PLURAL_SUFFIX;
+        suffix = "es";
       }
       break;
     case 'O':
@@ -1314,6 +1320,12 @@ static char* pluralize(const char* str) {
     case 'p':
       if (!strcasecmp(rel + 1, "ants")) {
         found = PLURAL_SAME;
+        break;
+      }
+      if (!strcasecmp(rel + 1, "enis")) {
+        /* not the Latin -is -> -es chop (issue #936) */
+        found = PLURAL_SUFFIX;
+        suffix = "es";
       }
       break;
     case 'Q':
@@ -1445,10 +1457,12 @@ static char* pluralize(const char* str) {
         if ((end - pre) > 1 && (end[-2] == 'e' || end[-2] == 'E')) {
           break;
         }
-        found = PLURAL_CHOP + 1;
         if ((end - pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
-          found++;
+          /* words ending in -ff normally just take -s (bluffs, cliffs);
+           * staff -> staves lives in the exception table (issue #936) */
+          break;
         }
+        found = PLURAL_CHOP + 1;
         suffix = "ves";
         break;
       case 'H':
