@@ -22,13 +22,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Ubuntu - GCC
+          # Ubuntu - GCC (also builds the optional dwlib package so it can't
+          # silently bit-rot again)
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: gcc
             cc: gcc
             cxx: g++
             build: Debug
+            cmake_flags: -DPACKAGE_DWLIB=ON
             packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
@@ -36,6 +38,7 @@ jobs:
             cc: gcc
             cxx: g++
             build: RelWithDebInfo
+            cmake_flags: -DPACKAGE_DWLIB=ON
             packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libffi-dev
 
           # Ubuntu - Clang

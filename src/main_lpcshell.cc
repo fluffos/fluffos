@@ -410,15 +410,19 @@ int main(int argc, char** argv) try {
     }
     pending.clear();
   }
-  // Leftover unbalanced input at EOF is a failure in script mode.
-  if (!pending.empty() && pending.find_first_not_of(" \t\r\n") != std::string::npos) {
+  // Leftover unbalanced input at EOF is a failure in script mode; an
+  // interactive Ctrl-D mid-continuation just exits like it always did.
+  if (!interactive && !pending.empty() &&
+      pending.find_first_not_of(" \t\r\n") != std::string::npos) {
     if (!Eval(&session, pending)) {
       failures++;
     }
   }
 
   clear_state();
-  return failures ? 1 : 0;
+  // Only script/pipe runs report failure through the exit code; an
+  // interactive session that had a typo still exits 0 on Ctrl-D.
+  return (!interactive && failures) ? 1 : 0;
 } catch (const std::exception& e) {
   std::cerr << "lpcshell: fatal: " << e.what() << std::endl;
   return 1;

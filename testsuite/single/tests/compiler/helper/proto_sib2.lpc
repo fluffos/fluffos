@@ -1,2 +1,0 @@
-#include "proto_decl.h"
-int sib2_marker() { return proto_fn() + 2; }

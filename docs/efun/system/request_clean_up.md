@@ -9,7 +9,7 @@ title: system / request_clean_up
 
 ### SYNOPSIS
 
-    int request_clean_up( object ob );
+    int request_clean_up( void | object ob );
 
 ### DESCRIPTION
 
