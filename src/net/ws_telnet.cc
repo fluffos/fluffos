@@ -141,12 +141,18 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
       auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
       if (numbytes > 0) {
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
-        if (m < 0) {
+        // Per lws docs, a return less than the requested length means the
+        // connection has failed. On success lws consumed the entire payload
+        // (truncated sends are buffered and flushed internally), and the
+        // return can exceed numbytes under encapsulation (TLS), so it must
+        // NOT be used as a drain count: doing so silently drops the start
+        // of the next chunk on wss connections.
+        if (m < static_cast<int>(numbytes)) {
           lwsl_warn("ERROR %d writing to ws socket.\n", m);
           return -1;
         }
-        evbuffer_drain(pss->buffer, m);
-        total -= m;
+        evbuffer_drain(pss->buffer, numbytes);
+        total -= numbytes;
         // May have more text to write.
         if (total > 0) {
           lws_callback_on_writable(wsi);
