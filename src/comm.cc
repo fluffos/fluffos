@@ -1522,19 +1522,31 @@ static void print_prompt(interactive_t* ip) {
   if (!ip || !ip->ob || !IP_VALID(ip, ip->ob)) {
     return;
   }
-  /* give user object a chance to write its own prompt */
-  if (!(ip->iflags & HAS_WRITE_PROMPT)) {
-    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-  }
+  // With "interactive catch tell" enabled, tell_object() below runs the
+  // catch_tell apply, and this driver-initiated path has no surrounding
+  // recovery point -- an error() in it (e.g. out of eval cost) used to
+  // reach error_handler() with no error context and crash (issue #1047).
+  // Contain prompt errors here the same way safe_apply() does.
+  error_context_t econ;
+  save_context(&econ);
+  try {
+    /* give user object a chance to write its own prompt */
+    if (!(ip->iflags & HAS_WRITE_PROMPT)) {
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    }
 #ifdef OLD_ED
-  else if (ip->ed_buffer) {
-    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
-  }
+    else if (ip->ed_buffer) {
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    }
 #endif
-  else if (!safe_apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
-    ip->iflags &= ~HAS_WRITE_PROMPT;
-    tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    else if (!safe_apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
+      ip->iflags &= ~HAS_WRITE_PROMPT;
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    }
+  } catch (const char*) {
+    restore_context(&econ);
   }
+  pop_context(&econ);
 } /* print_prompt() */
 
 #ifndef NO_SNOOP
