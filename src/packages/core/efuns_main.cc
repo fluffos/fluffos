@@ -3214,6 +3214,22 @@ void f_query_shadowing() {
 }
 #endif
 
+#ifdef F_REQUEST_CLEAN_UP
+void f_request_clean_up() {
+  object_t* ob = sp->u.ob;
+  int success = 0;
+
+  // Same condition as at load/clone time: only objects that actually
+  // define clean_up() are put back on the sweep's query list (issue #917).
+  if (!(ob->flags & O_DESTRUCTED) && function_exists(APPLY_CLEAN_UP, ob, 1)) {
+    ob->flags |= O_WILL_CLEAN_UP;
+    success = 1;
+  }
+  free_object(&sp->u.ob, "f_request_clean_up");
+  put_number(success);
+}
+#endif
+
 #ifdef F_SET_RESET
 void f_set_reset() {
   const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
