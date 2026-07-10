@@ -219,6 +219,8 @@ bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
   // render compiler_diags ourselves, only for the attempt that mattered.
   compiler_diags_quiet = true;
   try {
+    // coverity[wrapper_escape] - the callee copies the name (shared string);
+    // the c_str() pointer is not retained past this call.
     ob = load_object_from_source(src, name.c_str(), 1);
   } catch (const char* e) {
     compiler_diags_quiet = false;
@@ -293,7 +295,7 @@ void Eval(Session* session, std::string stmt) {
     bool known = false;
     for (const auto& n : session->var_names) known |= (n == decl_name);
     if (!known) {
-      session->var_names.push_back(decl_name);
+      session->var_names.push_back(std::move(decl_name));
       session->saved_values.emplace_back();
     }
     stmt = rewritten;
@@ -320,8 +322,7 @@ void Eval(Session* session, std::string stmt) {
 
   // Fall back to statement form (e.g. `if (x) write(...)`, assignments,
   // loops -- anything that isn't itself an expression).
-  std::string stmt_body = stmt;
-  if (RunAttempt(session, stmt_body, /*want_result=*/false, &result, &error_message)) {
+  if (RunAttempt(session, stmt, /*want_result=*/false, &result, &error_message)) {
     // Success may still have produced warnings worth showing.
     for (const auto& d : compiler_diags) {
       if (d.is_warning) std::cout << render_diagnostic(d, isatty(1)) << "\n";
@@ -348,7 +349,7 @@ void Eval(Session* session, std::string stmt) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
   if (argc != 2) {
     std::cerr << "Usage: lpcshell config_file" << std::endl;
     return 1;
@@ -384,4 +385,7 @@ int main(int argc, char** argv) {
 
   clear_state();
   return 0;
+} catch (const std::exception& e) {
+  std::cerr << "lpcshell: fatal: " << e.what() << std::endl;
+  return 1;
 }

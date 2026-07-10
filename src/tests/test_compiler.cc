@@ -258,7 +258,7 @@ static std::vector<Token> TokenizeSession(bool keep_macros, const std::string& s
     ctx.is_char_literal = false;
     t.is_template = ctx.is_template;
     ctx.is_template = false;
-    toks.push_back(t);
+    toks.push_back(std::move(t));
   }
 
   yylex_destroy(scanner);
@@ -396,7 +396,7 @@ class LpcPreprocessor {
         result += t.text;
       }
     }
-    return NormalizedString{result};
+    return NormalizedString{std::move(result)};
   }
 
   const std::vector<std::string>& errors() const { return errors_; }
@@ -2018,6 +2018,8 @@ static void ensure_compile_env() {
 // Portable source-on-an-fd helper: tmpfile() works on every CI platform
 // (no /tmp, no mkstemp, auto-deleted).
 static FILE* source_as_file(const char* src) {
+  // coverity[secure_temp] - tmpfile() opens O_EXCL and unlinks immediately;
+  // there is no pathname window to exploit. Kept for Windows-CI portability.
   FILE* f = tmpfile();
   EXPECT_NE(f, nullptr);
   EXPECT_EQ(fwrite(src, 1, strlen(src), f), strlen(src));
@@ -2240,6 +2242,7 @@ TEST(CompileEntry, IncludeDepthLimitCleanError) {
 static std::string run_stage_dump(const char* src, bool pp_form) {
   ensure_compile_env();
   FILE* in = source_as_file(src);
+  // coverity[secure_temp] - see source_as_file.
   FILE* out = tmpfile();  // portable capture (open_memstream is not)
   EXPECT_NE(out, nullptr);
   bool ok = lpc_dump_stage_tokens(fileno(in), "/stage_test", pp_form, out);
@@ -2273,6 +2276,7 @@ TEST(StageOutput, TokensFormOnePerLineWithPositions) {
 
 TEST(StageOutput, LoadFailureReturnsFalseAndCleansUp) {
   ensure_compile_env();
+  // coverity[secure_temp] - see source_as_file.
   FILE* out = tmpfile();
   ASSERT_NE(out, nullptr);
   EXPECT_FALSE(lpc_dump_stage_tokens(-1, "/nope", true, out));

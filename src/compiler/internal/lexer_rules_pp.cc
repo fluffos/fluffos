@@ -760,7 +760,7 @@ ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<Scratch
         if (!m.is_function_like) {
           auto g2 = guard;
           g2.emplace_back(id);
-          result += lpc_lex_expand_string(m.body, g2);
+          result += lpc_lex_expand_string(m.body, std::move(g2));
         } else {
           size_t j = i;
           while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
@@ -774,7 +774,7 @@ ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<Scratch
             // Argument pre-expansion deliberately passes no
             for (const auto& a : args) expanded_args.push_back(lpc_lex_expand_string(a, guard));
             ScratchString subst = substitute(m.body, m.params, expanded_args);
-            result += lpc_lex_expand_string(subst, g2);
+            result += lpc_lex_expand_string(subst, std::move(g2));
           } else {
             // Function-like macro name with no argument list in
             // this text: left literal and NOT counted -- if its
