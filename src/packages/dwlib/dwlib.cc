@@ -774,7 +774,7 @@ svalue_t* replace_objects(svalue_t* thing) {
       push_number(0);
       for (i = 0; i < (sp - 2)->u.arr->size; i++) {
         svalue_t* key = sp;
-        svalue_t* tmp = find_in_mapping(thing->u.map, &(sp - 2)->u.arr->item[i]);
+        svalue_t* tmp = find_in_mapping(thing->u.map, (sp - 2)->u.arr->item[i]);
         assign_svalue(key, replace_objects(&(sp - 2)->u.arr->item[i]));
         assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1), replace_objects(tmp));
         if ((sp - 1)->u.map->count - i != 1) {

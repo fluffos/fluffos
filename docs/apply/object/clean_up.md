@@ -15,17 +15,25 @@ title: object / clean_up
 
     The  clean_up()  function is called by the driver on a regular basis in
     all objects  that  have  been  inactive  for  the  time  specified  for
-    clean_up()  in  the  runtime configuration file.  One flag is passed to
-    the function, specifying whether or not the object has been  inheritted
-    by anything. The inherited passed as argument will be 0 for clone objects,
-    1 for a simple loaded object, and greater when the object is cloned or 
-    inherited by some existing object. It is recommended not to self_destruct 
-    the object when the reference count is greater than one.
-    
-    If clean_up() returns 0, clean_up() will never be called
-    again on that object.  If it returns 1, it will be  called  again  when
-    the object remains inactive for the specified clean_up() delay.
+    clean_up()  in  the  runtime configuration file.
+
+    The argument is 0 for clones. For blueprints it is the program's
+    current reference count: 1 for a plain loaded object nothing else
+    uses, and greater when clones of it exist, other programs inherit it,
+    or the driver's function-call cache still holds a reference to it.
+    Treat values above 1 as a hint that the program is (or was recently)
+    in use, not as an exact inheritance count, and avoid destructing in
+    that case.
+
+    If clean_up() returns 0, clean_up() will never be called again on that
+    object unless the object asks for it again with request_clean_up().
+    If it returns 1, it will be called again when the object remains
+    inactive for the specified clean_up() delay.
 
     One  thing that might be commonly done by an object in this function is
     destructing itself to conserve memory.
+
+### SEE ALSO
+
+    request_clean_up(3)
 

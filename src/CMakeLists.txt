@@ -29,6 +29,7 @@ option(PACKAGE_TRIM "trim package" ON)
 option(PACKAGE_UIDS "uids package" ON)
 option(PACKAGE_EXTERNAL "external package" ON)
 option(PACKAGE_FFI "foreign function interface package (libffi)" ON)
+option(PACKAGE_DWLIB "discworld mudlib support package" OFF)
 option(DEBUG OFF)
 option(DEBUGMALLOC ${DEBUG})
 # End of list of compile options.
@@ -307,7 +308,10 @@ find_program(BASH_EXECUTABLE bash REQUIRED)
 add_custom_command(
   OUTPUT "packages.fullspec"
   COMMAND "${BASH_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
+  # packages.autogen.h carries the enabled-package set: without this
+  # dependency, toggling a package option left a stale efun table.
   DEPENDS "tools/build_packages_genfiles.sh" "base/internal/options_incl.h"
+          "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
 )
 file(GLOB ALL_SPEC_FILES files "packages/*/*.spec")
 foreach (file ${ALL_SPEC_FILES})
