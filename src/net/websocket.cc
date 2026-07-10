@@ -127,6 +127,7 @@ struct lws* init_user_websocket(struct lws_context* context, evutil_socket_t fd)
 }
 
 void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
+  inet_volume += len;
   switch (lws_get_protocol(wsi)->id) {
     case WS_TELNET:
       ws_telnet_send(wsi, data, len);
