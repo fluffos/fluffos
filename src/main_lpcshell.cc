@@ -219,8 +219,9 @@ bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
   // render compiler_diags ourselves, only for the attempt that mattered.
   compiler_diags_quiet = true;
   try {
-    // coverity[wrapper_escape] - the callee copies the name (shared string);
-    // the c_str() pointer is not retained past this call.
+    // The callee copies the name into a shared string; the c_str() pointer
+    // is not retained past this call.
+    // coverity[escape]
     ob = load_object_from_source(src, name.c_str(), 1);
   } catch (const char* e) {
     compiler_diags_quiet = false;
