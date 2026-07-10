@@ -144,3 +144,28 @@ TEST_F(DriverTest, TestLPC_FunctionInherit) {
   }
   pop_context(&econ);
 }
+
+// issue #968: with "reversible explode string" semantics, a string made
+// entirely of delimiters must still split into n+1 empty fields so that
+// implode(explode(s, d), d) == s.
+TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
+  array_t* v = explode_string("a", 1, "a", 1, true);
+  ASSERT_EQ(v->size, 2);
+  EXPECT_STREQ(v->item[0].u.string, "");
+  EXPECT_STREQ(v->item[1].u.string, "");
+  char* joined = implode_string(v, "a", 1);
+  EXPECT_STREQ(joined, "a");
+  FREE_MSTR(joined);
+  free_array(v);
+
+  v = explode_string("abab", 4, "ab", 2, true);
+  ASSERT_EQ(v->size, 3);
+  joined = implode_string(v, "ab", 2);
+  EXPECT_STREQ(joined, "abab");
+  FREE_MSTR(joined);
+  free_array(v);
+
+  // Non-reversible behavior is unchanged: no fields at all.
+  v = explode_string("a", 1, "a", 1, false);
+  EXPECT_EQ(v->size, 0);
+}

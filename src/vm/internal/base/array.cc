@@ -299,6 +299,24 @@ array_t* explode_string(const char* str, int slen, const char* del, int dellen, 
   }
 
   if (!sourcelen || source[0] == '\0') {
+    // In reversible mode the leading pass may have consumed the entire
+    // string: n delimiters still split into n+1 empty fields so that
+    // implode(explode(s, d), d) == s holds (issue #968).
+    if (reversible && num_leading) {
+      auto num = num_leading + 1;
+      if (num > max_array_size) {
+        num = max_array_size;
+      }
+      auto* ret = int_allocate_empty_array(num);
+      for (int i = 0; i < num; i++) {
+        ret->item[i].type = T_STRING;
+        ret->item[i].subtype = STRING_MALLOC;
+        auto* dest = new_string(0, "explode_string: empty field");
+        dest[0] = '\0';
+        ret->item[i].u.string = dest;
+      }
+      return ret;
+    }
     return &the_null_array;
   }
 
