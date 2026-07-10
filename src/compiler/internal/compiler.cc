@@ -1339,10 +1339,10 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
       /* This should be changed to catch two prototypes which disagree */
       if (funtype != TYPE_UNKNOWN) {
         if (funp->num_arg != num_arg && !((flags | funflags) & FUNC_VARARGS)) {
-          yywarn("Number of arguments disagrees with previous definition.");
+          yywarn("Number of arguments to '%s' disagrees with previous definition.", name);
         }
         if (!(funflags & FUNC_STRICT_TYPES)) {
-          yywarn("Called function not compiled with type testing.");
+          yywarn("Called function '%s' not compiled with type testing.", name);
         }
 
         /* Now check that argument types wasn't changed. */
