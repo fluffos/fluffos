@@ -120,6 +120,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     "-Wno-unknown-warning-option"
     "-Wno-char-subscripts"
     "-Wno-sign-compare"
+    "-Wno-trigraphs"
     "-Wno-unused-function"
     "-Wno-unused-parameter"
     "-Wno-unused-variable"
@@ -132,7 +133,8 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     "-fmessage-length=0"
     # Less undefined behavior
     "-fsigned-char"
-    "-fwrapv")
+    "-fwrapv"
+  )
 endif ()
 
 # LTO on release builds
