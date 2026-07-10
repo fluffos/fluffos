@@ -575,20 +575,19 @@ void add_message(object_t* who, const char* data, int len) {
     } break;
     case PORT_TYPE_WEBSOCKET: {
       if (ip->iflags & HANDSHAKE_COMPLETE) {
+        auto transdata = u8_convert_encoding(ip->trans, data, len);
+        auto result = transdata.empty() ? std::string_view(data, len) : transdata;
+        inet_volume += result.size();
         if (ip->telnet != nullptr) {
           // telnet subprotocol: all output must flow through libtelnet, same as
           // PORT_TYPE_TELNET, so that IAC escaping, NVT translation and MCCP
           // compression apply to the entire stream. libtelnet hands the wire
           // bytes back through TELNET_EV_SEND -> on_telnet_send(), which writes
           // them to the websocket.
-          auto transdata = u8_convert_encoding(ip->trans, data, len);
-          auto result = transdata.empty() ? std::string_view(data, len) : transdata;
-          inet_volume += result.size();
           telnet_send_text(ip->telnet, result.data(), result.size());
         } else {
-          // ascii subprotocol: no telnet layer, write UTF-8 text directly.
-          inet_volume += len;
-          websocket_send_text(ip->lws, data, len);
+          // ascii subprotocol: no telnet layer, write directly.
+          websocket_send_text(ip->lws, result.data(), result.size());
         }
       } else {
         debug_message("User hasn't completed websocket upgrade! can't send message.\n");
