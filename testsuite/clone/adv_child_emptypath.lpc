@@ -1,0 +1,2 @@
+inherit "/clone/adv_empty_path";
+int f() { return 1; }

@@ -1,0 +1,68 @@
+// Edge cases for the inherit_program / include_file master applies:
+// unusual return values must produce clean LPC errors (or the
+// documented behavior), never a driver crash. Fixtures are /clone/adv_*;
+// the throwing hook is /clone/adv_hook.
+#define MASTER "/single/master"
+#define HOOK "/clone/adv_hook"
+
+void do_tests() {
+  object hook;
+  string err;
+
+  hook = load_object(HOOK);
+  MASTER->set_compile_hooks(hook);
+
+  // P1: empty array for inherit_program -> clean compile error (empty
+  // program has no code), never a crash.
+  hook->set_inherit_rule("/clone/adv_empty_parent", ({ }));
+  err = catch(load_object("/clone/adv_child_empty"));
+  ASSERT2(stringp(err), "empty-array inherit must fail cleanly, got: " + sprintf("%O", err));
+
+  // P2: inline source ignored when the object is already loaded.
+  load_object("/clone/ip_real");
+  hook->set_inherit_rule("/clone/ip_real", ({ "int parent_fn() { return 999; }" }));
+  ASSERT_EQ(15, load_object("/clone/adv_child_loaded")->child_fn());
+  hook->set_inherit_rule("/clone/ip_real", "/clone/ip_real");  // restore passthrough
+
+  // P3: redirect to self -> "Illegal to inherit self" error, no crash.
+  hook->set_inherit_rule("/clone/adv_self_target", "/clone/adv_child_self");
+  err = catch(load_object("/clone/adv_child_self"));
+  ASSERT2(stringp(err), "self-redirect must fail cleanly");
+
+  // P4: non-string array element for both applies -> clean error.
+  hook->set_inherit_rule("/clone/adv_badarr_parent", ({ 1 }));
+  err = catch(load_object("/clone/adv_child_badarr"));
+  ASSERT2(stringp(err), "non-string inherit source must fail cleanly");
+  hook->set_include_rule("adv_badarr.h", ({ 1 }));
+  err = catch(load_object("/clone/adv_inc_badarr"));
+  ASSERT2(stringp(err), "non-string include content must fail cleanly");
+
+  // P5: empty-string redirect -> clean failure.
+  hook->set_inherit_rule("/clone/adv_empty_path", "");
+  err = catch(load_object("/clone/adv_child_emptypath"));
+  ASSERT2(stringp(err), "empty-string redirect must fail cleanly");
+
+  // P6: include content with embedded newlines in ONE element.
+  hook->set_include_rule("adv_multiline.h",
+                         ({ "#define A 1\n#define B 2", "#define C (A+B)" }));
+  ASSERT_EQ(3, load_object("/clone/adv_inc_multiline")->fn());
+
+  // P7: apply throwing a runtime error mid-compile -> safe_apply
+  // catches; compile falls back to default behavior (file exists).
+  ASSERT_EQ(5, load_object("/clone/adv_inc_throw")->fn());
+
+  // P8: redirect with explicit .lpc extension spelling.
+  hook->set_inherit_rule("/clone/adv_ext_target", "/clone/ip_real.lpc");
+  ASSERT_EQ(10, load_object("/clone/adv_child_ext")->parent_probe());
+
+  // P9: denying the config's auto-included global include file
+  // (<globals.h>) fails that compile cleanly and recovers once the
+  // rule is lifted.
+  hook->set_include_rule("globals.h", 0);
+  err = catch(load_object("/clone/adv_globals_deny"));
+  ASSERT2(stringp(err), "denied global include must fail cleanly");
+  hook->set_include_rule("globals.h", "globals.h");
+  ASSERT_EQ(1, load_object("/clone/adv_globals_deny")->f());
+
+  MASTER->set_compile_hooks(0);
+}

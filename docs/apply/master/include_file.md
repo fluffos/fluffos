@@ -51,7 +51,10 @@ title: master / include_file
     ```c
     mixed include_file(string compiled, string from, string path) {
         // record the dependency graph for a hot-reload daemon
-        HOT_RELOAD_D->note_include(compiled, from, path);
+        // (find_object never loads -- a path call_other could trigger
+        // a compile, which is forbidden here)
+        object d = find_object(HOT_RELOAD_D);
+        if (d) d->note_include(compiled, from, path);
 
         // per-domain config header
         if (path == "domain.h")

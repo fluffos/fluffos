@@ -1,0 +1,2 @@
+inherit "/clone/adv_self_target";
+int f() { return 1; }

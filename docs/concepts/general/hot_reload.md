@@ -181,7 +181,7 @@ the stale in-memory parent:
 
 ```c
 private void reload(string prog) {
-    foreach (string a in ancestors(prog))     // inherit closure, prog excluded
+    foreach (string a in ancestors(prog, ([]))) // inherit closure, prog excluded
         if (self_changed(a))                  // a's own source/includes changed
             forget(a);                        // destruct master copy, drop records
     forget(prog);

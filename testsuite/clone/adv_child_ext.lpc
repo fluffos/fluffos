@@ -1,0 +1,2 @@
+inherit "/clone/adv_ext_target";
+int parent_probe() { return parent_fn(); }

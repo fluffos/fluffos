@@ -51,7 +51,10 @@ title: master / inherit_program
     ```c
     mixed inherit_program(string from, string path, int priv) {
         // record the dependency graph for a hot-reload daemon
-        HOT_RELOAD_D->note_inherit(from, path, priv);
+        // (find_object never loads -- a path call_other could trigger
+        // a compile, which is forbidden here)
+        object d = find_object(HOT_RELOAD_D);
+        if (d) d->note_inherit(from, path, priv);
 
         // map a versioned library namespace
         if (sscanf(path, "/lib/v1/%*s"))
