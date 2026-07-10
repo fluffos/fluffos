@@ -7,7 +7,11 @@
 
 #define DEFMAX 65536  // at least 4 times MAXLINE
 #define MAXLINE 4096
-#define MAX_INSTRS 512
+// Must cover NUM_OPCODES from efuns.autogen.h (asserted in
+// compiler_utils.cc): overflowing instrs[] silently corrupted
+// neighboring globals once optional packages pushed the efun count
+// past the old limit of 512.
+#define MAX_INSTRS 1024
 
 // Preprocessing is part of the lexer's own single scan now (see
 // lexer_rules_pp.h and lexer.l's directive rule) -- there is no separate

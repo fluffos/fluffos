@@ -790,7 +790,14 @@ svalue_t* replace_objects(svalue_t* thing) {
   }
 }
 
-void f_replace_objects() { assign_svalue(sp, replace_objects(sp)); }
+void f_replace_objects() {
+  assign_svalue(sp, replace_objects(sp));
+  // replace_tmp is a module-global scratch slot; drop its lingering ref
+  // once the result is on the stack so nothing stays unaccounted between
+  // calls (flagged by the Debug leak checker).
+  free_svalue(&replace_tmp, "f_replace_objects");
+  replace_tmp = const0;
+}
 
 void f_replace_dollars() {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
