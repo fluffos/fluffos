@@ -1315,7 +1315,7 @@ const char* main_file_name() { return main_filename ? main_filename : current_fi
 
 /* identifier hash table stuff, size must be an even power of two */
 #define IDENT_HASH_SIZE 1024
-#define IdentHash(s) (whashstr((s)) & (IDENT_HASH_SIZE - 1))
+#define IdentHash(s) (std::hash<std::string_view>{}(std::string_view(s)) & (IDENT_HASH_SIZE - 1))
 
 /* The identifier table is hashed for speed.  The hash chains are circular
  * linked lists, so that we can rotate them, since identifier lookup is

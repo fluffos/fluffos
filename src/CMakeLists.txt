@@ -432,7 +432,6 @@ set(SRC
   "base/internal/debugmalloc.cc"
   "base/internal/external_port.cc"
   "base/internal/file.cc"
-  "base/internal/hash.cc"
   "base/internal/log.cc"
   "base/internal/md.cc"
   "base/internal/outbuf.cc"

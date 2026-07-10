@@ -76,7 +76,8 @@ void clear_notify(object_t* ob) {
 }
 
 static int hash_living_name(const char* str) {
-  return whashstr(str) & (CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) - 1);
+  return std::hash<std::string_view>{}(std::string_view(str)) &
+         (CONFIG_INT(__LIVING_HASH_TABLE_SIZE__) - 1);
 }
 
 object_t* find_living_object(const char* str, int user) {
