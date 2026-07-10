@@ -2845,9 +2845,10 @@ static program_t* epilog(void) {
   }
 
   // Entries sorted past num_func were excluded from the program table
-  // (undefined prototypes and replaced overloads, address == ADDRESS_MAX).
-  // Nothing takes over their funcname refs, so release them here or every
-  // unresolved prototype leaks one shared-string ref per compile.
+  // (address == ADDRESS_MAX: local prototypes/undefineds superseded by an
+  // inherited definition). Nothing takes over their funcname refs, so
+  // release them here or each such entry leaks one shared-string ref per
+  // compile.
   {
     int const total_func = mem_block[A_FUNCTIONS].current_size / sizeof(function_t);
     for (i = num_func; i < total_func; i++) {
@@ -2883,8 +2884,9 @@ static program_t* epilog(void) {
   }
 
   // Guard on the pointer, not num_func: handle_functions() decrements
-  // num_func past trailing prototypes, so a program whose functions are
-  // ALL prototypes reaches here with num_func == 0 but the array live.
+  // num_func past trailing ADDRESS_MAX entries (locals superseded by an
+  // inherited definition), so a program whose entries are ALL superseded
+  // reaches here with num_func == 0 but the array live.
   if (comp_sorted_funcs) {
     FREE((char*)comp_sorted_funcs);
     comp_sorted_funcs = nullptr;
