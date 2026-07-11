@@ -557,7 +557,8 @@ void reclaim_call_outs() {
     while (iter != g_callout_handle_map.end()) {
       auto* cop = iter->second;
       if ((cop->ob && (cop->ob->flags & O_DESTRUCTED)) ||
-          (!cop->ob && (cop->function.f->hdr.owner->flags & O_DESTRUCTED))) {
+          (!cop->ob && (!cop->function.f->hdr.owner ||
+                        (cop->function.f->hdr.owner->flags & O_DESTRUCTED)))) {
         free_call(cop);
         iter = g_callout_handle_map.erase(iter);
         i++;
