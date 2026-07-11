@@ -743,7 +743,11 @@ void f_terminal_colour() {
     // Look it up in the mapping.
     repused = 0;
     copy_and_push_string(parts[i]);
-    svalue_t* reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+    // safe_apply: a raw apply that error()s here would longjmp past the
+    // FREE(parts)/FREE(lens)/FREE_MSTR(savestr) at the end of this efun,
+    // leaking them. On error safe_apply returns null -> treated as no
+    // replacement, which is the desired robust behavior anyway.
+    svalue_t* reptmp = safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
       rep = reinterpret_cast<char*>(alloca(SVALUE_STRLEN(reptmp) + 1));
       strcpy(rep, reptmp->u.string);
@@ -1680,12 +1684,11 @@ void f_replaceable() {
   } else {
     if (st_num_arg == 2) {
       numignore = sp->u.arr->size;
-      if (numignore) {
-        ignore = reinterpret_cast<const char**>(
-            DCALLOC(numignore + 2, sizeof(char*), TAG_TEMPORARY, "replaceable"));
-      } else {
-        ignore = nullptr;
-      }
+      // Always allocate the 2 built-in slots (create/__INIT) plus one per
+      // ignore entry -- an empty ignore array must not leave ignore == NULL
+      // before the unconditional ignore[0]/ignore[1] writes below.
+      ignore = reinterpret_cast<const char**>(
+          DCALLOC(numignore + 2, sizeof(char*), TAG_TEMPORARY, "replaceable"));
       ignore[0] = findstring(APPLY_CREATE);
       ignore[1] = findstring(APPLY___INIT);
       for (i = 0; i < numignore; i++) {

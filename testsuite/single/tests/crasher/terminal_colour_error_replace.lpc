@@ -1,0 +1,17 @@
+// terminal_colour() leaked its parts/lens/savestr buffers if the
+// terminal_colour_replace apply error()ed (longjmp past the frees). The efun
+// now uses safe_apply, so an erroring replace is caught and treated as no
+// replacement -- no leak (the per-file leak gate would catch a regression).
+
+string terminal_colour_replace(string s) {
+    error("boom from terminal_colour_replace");
+}
+
+void do_tests() {
+#ifdef __PACKAGE_CONTRIB__
+    mapping codes = ([ "RED" : "<r>", "RESET" : "<0>" ]);
+    // The replace apply errors on every part; must not leak or propagate.
+    ASSERT_EQ(0, catch(terminal_colour("%^RED%^hello world%^RESET%^", codes)));
+#endif
+    ASSERT(1);
+}
