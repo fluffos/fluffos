@@ -195,7 +195,6 @@ jobs:
       # these. The emsdk itself tracks 'latest' (native wasm exceptions and
       # friends); the resolved compiler version feeds the cache key.
       ICU_VER: 74-2
-      ZLIB_VER: 1.3.1
       WASM_DEPS_PREFIX: /opt/wasm-deps
     steps:
       - name: Checkout
@@ -214,7 +213,7 @@ jobs:
       - name: Install native dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential bison flex libssl-dev libicu-dev zlib1g-dev
+          sudo apt install -y build-essential bison flex libssl-dev libicu-dev
 
       # The deps prefix must exist and be runner-writable BEFORE the cache
       # step: on a cache hit, actions/cache restores into it directly.
@@ -223,19 +222,19 @@ jobs:
           sudo mkdir -p "$WASM_DEPS_PREFIX"
           sudo chown "$USER" "$WASM_DEPS_PREFIX"
 
-      # ICU + zlib cross-built for wasm32; ~10 minutes on a miss, so cache
+      # ICU cross-built for wasm32; ~10 minutes on a miss, so cache
       # on the resolved emsdk + upstream versions (bump -v1 to invalidate).
-      - name: Cache wasm dependencies (ICU, zlib)
+      - name: Cache wasm dependencies (ICU)
         id: wasm-deps
         uses: actions/cache@v4
         with:
           path: /opt/wasm-deps
-          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-zlib${{ env.ZLIB_VER }}-v1
+          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-v3
 
       - name: Build wasm dependencies
         if: steps.wasm-deps.outputs.cache-hit != 'true'
         run: |
-          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" ZLIB_VER="$ZLIB_VER" \
+          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" \
             tools/wasm/build-deps.sh
 
       - name: Build driver (native tools + wasm) and package testsuite

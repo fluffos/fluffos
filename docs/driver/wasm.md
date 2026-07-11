@@ -285,4 +285,9 @@ node, `fetch_text` could read files or call services instead.
   (~100 gameticks), so long-suspended tabs resume near real time rather
   than replaying hours.
 * Packages needing sockets/processes/native libs (sockets, external,
-  db, ffi, pcre, crypto, async) are off; their efuns don't exist there.
+  db, ffi, pcre, crypto, async, compress) are off; their efuns don't
+  exist there. zlib isn't linked at all: compressed `save_object`
+  degrades to a plain save and `.gz` files aren't auto-decompressed.
+* **UTF-8 world**: only algorithmic charsets ship (UTF-8/UTF-16/UTF-32,
+  Latin-1, ASCII) — table charsets like GBK raise an error. `__WASM__`
+  is predefined for LPC so a mudlib can adapt.

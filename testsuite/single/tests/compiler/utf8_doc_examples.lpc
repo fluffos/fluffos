@@ -37,8 +37,11 @@ void do_tests() {
     ASSERT_EQ("😀", "😀");
     ASSERT_EQ(1, strlen("😀"));
 
-    // Round trip through a legacy encoding.
+    // Round trip through a legacy encoding. (Table charsets don't exist
+    // on the wasm target -- its ICU data is trimmed to break iteration.)
+#ifndef __WASM__
     ASSERT_EQ("你好", string_decode(string_encode("你好", "GBK"), "GBK"));
+#endif
 
     // Character-boundary search.
     ASSERT_EQ(6, strsrch(s, "👍🏽"));
