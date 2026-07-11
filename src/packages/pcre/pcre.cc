@@ -921,8 +921,6 @@ static array_t* pcre_get_substrings(pcre_t* run, bool include_names) {
 }
 
 static char* pcre_get_replace(pcre_t* run, array_t* replacements) {
-  const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-
   unsigned int ret_pos = 0, i;
   size_t ret_sz;
   char* ret;
@@ -946,46 +944,67 @@ static char* pcre_get_replace(pcre_t* run, array_t* replacements) {
   ret = new_string((ret_sz), "pcre get replace");
   // printf("ret_sz:%d\n", ret_sz);
 
-  /* Copy start of subject up until first match */
-  if (run->rc > 1) {
-    strncpy(ret, run->subject, run->ovector[2]);
-    ret_pos = run->ovector[2];
-  } else {
+  if (run->rc <= 1) {
     strncpy(ret, run->subject, ret_sz);
+    *(ret + ret_sz) = '\0';
+    return ret;
+  }
+
+  // Copy the subject, replacing each SELECTED capture group with its
+  // replacement. The selection MUST match the size loop above exactly
+  // (a group is selected only when it starts at/after the end of the last
+  // selected group -- i.e. non-nested/non-overlapping); otherwise the copied
+  // length diverges from ret_sz and overflows ret. Every write is also
+  // clamped to the remaining space as defense in depth.
+  prev = run->ovector[2];  // reuse: gate -- next selected group must start >= this
+  int last_end = run->ovector[2];
+  ret_pos = 0;
+
+  // Copy the subject prefix up to the first potential group start.
+  {
+    size_t n = (size_t)run->ovector[2];
+    if (n > ret_sz - ret_pos) n = ret_sz - ret_pos;
+    strncpy(ret + ret_pos, run->subject, n);
+    ret_pos += n;
   }
 
   for (i = 1; i <= (run->rc - 1); i++) {
-    unsigned int end, len_nxt;
-    const char* rep;
-    size_t rep_sz;
+    int gstart = run->ovector[2 * i];
+    int gend = run->ovector[2 * i + 1];
 
-    end = run->ovector[2 * i + 1];
-
-    if (i == (run->rc - 1)) {
-      len_nxt = run->s_length - end;
-    } else {
-      len_nxt = run->ovector[2 * i + 2] - end;
+    if (gstart < prev) {
+      continue;  // nested/overlapping group -- skipped by the size loop too
     }
 
-    if (len_nxt > max_string_length) {
-      continue;  // nested ()s
+    const char* rep = replacements->item[i - 1].u.string;
+    size_t rep_sz = SVALUE_STRLEN(&replacements->item[i - 1]);
+
+    // Gap of subject text between the previous selected group and this one.
+    if (gstart > last_end) {
+      size_t gap = (size_t)(gstart - last_end);
+      if (gap > ret_sz - ret_pos) gap = ret_sz - ret_pos;
+      strncpy(ret + ret_pos, run->subject + last_end, gap);
+      ret_pos += gap;
     }
 
-    rep = replacements->item[i - 1].u.string;
-    rep_sz = SVALUE_STRLEN(&replacements->item[i - 1]);
-
-    /* Copy first substring into return variable */
+    // The replacement for this group.
+    if (rep_sz > ret_sz - ret_pos) rep_sz = ret_sz - ret_pos;
     strncpy(ret + ret_pos, rep, rep_sz);
-
-    /* increment position in return variable by replacement size */
     ret_pos += rep_sz;
 
-    strncpy(ret + ret_pos, run->subject + end, len_nxt);
-
-    ret_pos += len_nxt;
+    last_end = gend;
+    prev = gend;
   }
 
-  *(ret + ret_sz) = '\0';
+  // Copy the trailing subject text after the last selected group.
+  if ((size_t)last_end < run->s_length) {
+    size_t tail = run->s_length - (size_t)last_end;
+    if (tail > ret_sz - ret_pos) tail = ret_sz - ret_pos;
+    strncpy(ret + ret_pos, run->subject + last_end, tail);
+    ret_pos += tail;
+  }
+
+  *(ret + ret_pos) = '\0';
 
   return ret;
 }
