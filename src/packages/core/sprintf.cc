@@ -1325,10 +1325,14 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
           }
           cheat[i] = '\0';
 
+          // The precision clamp above bounds only the fraction digits, not the
+          // integer part or sign, so a large-magnitude value with a big
+          // precision (e.g. sprintf("%.1077f", 1e300)) would overrun the fixed
+          // temp buffer. snprintf truncates instead of overflowing.
           if (carg->type == T_REAL) {
-            sprintf(temp, cheat, carg->u.real);
+            snprintf(temp, sizeof(temp), cheat, carg->u.real);
           } else {
-            sprintf(temp, cheat, carg->u.number);
+            snprintf(temp, sizeof(temp), cheat, carg->u.number);
           }
           {
             int const tmpl = strlen(temp);

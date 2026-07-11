@@ -317,4 +317,13 @@ TEXT;
     ASSERT_EQ("123", sprintf("%d", 123.0));
     ASSERT_EQ("123", sprintf("%d", 123.123)); // truncates
     ASSERT_EQ("123.000000", sprintf("%f", 123));
+
+    // Huge user-controlled precision must not overflow the internal print
+    // buffer (it is clamped/truncated, not written past the end). Before the
+    // fix these overran a fixed static buffer. We only assert they run and
+    // produce a plausibly-long string without crashing.
+    ASSERT(strlen(sprintf("%.1077f", 0.0)) > 1000);
+    ASSERT(strlen(sprintf("%.2000f", 1.0e300)) > 1000);
+    ASSERT(strlen(sprintf("%.5000f", -1.0)) > 1000);
+    ASSERT(strlen(sprintf("%.5000d", -1)) > 0);
 }
