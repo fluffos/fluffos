@@ -678,14 +678,16 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
         pc += stable;
         if (ttype == 0) {
           i = 0;
-          while (pc < aptr + etable - 4) {
+          // The table ends with a sizeof(LPC_INT)-wide minval (LPC_INT is
+          // 64-bit); stop the short-offset walk before it, not 4 bytes before.
+          while (pc < aptr + etable - (int)sizeof(LPC_INT)) {
             COPY_SHORT(&sarg, pc);
             fprintf(f, "\t%2d: %04x\n", i++, addr + sarg);
             pc += 2;
           }
           COPY_INT(&iarg, pc);
           fprintf(f, "\tminval = %" LPC_INT_FMTSTR_P "\n", iarg);
-          pc += 4;
+          pc += sizeof(LPC_INT);
         } else {
           while (pc < aptr + etable) {
             COPY_PTR(&parg, pc);
