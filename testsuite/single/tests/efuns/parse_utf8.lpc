@@ -1,0 +1,42 @@
+// Issue #660: the parser package tokenizer used to strip all non-ASCII
+// bytes, so UTF-8 words never reached STR rules or OBJ id matching.
+
+string said;
+
+string* parse_command_id_list() {
+  return ({ "bag", "сумка" });
+}
+
+void create() {
+  parse_init();
+
+  if (clonep()) {
+    move_object(__FILE__);
+  }
+}
+
+can_say_str() { return 1; }
+direct_say_str() { return 1; }
+do_say_str(string s) { said = s; return 1; }
+
+can_look_wrd_obj() { return 1; }
+direct_look_wrd_obj() { return 1; }
+do_look_wrd_obj() { return 1; }
+
+void do_tests() {
+#ifndef __PACKAGE_PARSER__
+  write("no package parser, skipped.\n");
+  return;
+#else
+  clone_object(__FILE__);
+  parse_add_rule("say", "STR");
+  parse_add_rule("look", "WRD OBJ");
+
+  // A Cyrillic STR argument survives tokenization intact.
+  ASSERT_EQ(1, parse_sentence("say привет мир", 2, all_inventory()));
+  ASSERT_EQ("привет мир", said);
+
+  // A UTF-8 object id matches.
+  ASSERT_EQ(1, parse_sentence("look in сумка", 2, all_inventory()));
+#endif
+}
