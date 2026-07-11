@@ -4,7 +4,9 @@
 // (/clone/ffi_genmath, generated from a C header) compiles and its
 // wrappers call real native functions.
 private int near(float a, float b) { return (a>b?a-b:b-a) < 1e-9; }
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     object m;
     if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
     m = load_object("/clone/ffi_genmath");

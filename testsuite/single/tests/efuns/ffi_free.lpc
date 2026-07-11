@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     buffer b = ffi_alloc(8);
     ffi_write(b, 0, FFI_INT32, 0x41424344);
     ASSERT(ffi_read(b, 0, FFI_INT32) != 0);

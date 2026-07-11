@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     buffer b = ffi_alloc(16);
     ASSERT(bufferp(b));
     ASSERT_EQ(16, sizeof(b));

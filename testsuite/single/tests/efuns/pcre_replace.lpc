@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_PCRE__
 void do_tests() {
     // Replacements substitute the CAPTURE GROUPS of the first match,
     // one replacement string per group.
@@ -5,3 +6,4 @@ void do_tests() {
     // Group count and replacement count must agree.
     ASSERT(catch(pcre_replace("a1", "[a-z][0-9]", ({ "X", "Y" }))));
 }
+#endif

@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
 #include <socket_err.h>
 void rcb(int fd) { }
@@ -8,3 +9,4 @@ void do_tests() {
     ASSERT(socket_bind(fd, 0) < 0);                 // already bound
     socket_close(fd);
 }
+#endif

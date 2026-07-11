@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FluffOS — WebAssembly driver</title>
+<style>
+  :root {
+    --bg: #0b0e14; --fg: #d5dbe5; --dim: #6b7484; --accent: #7aa2f7;
+    --panel: #11151f; --border: #232a38;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 14px/1.45 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    display: flex; flex-direction: column;
+  }
+  header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: var(--panel); display: flex; align-items: baseline; gap: 12px;
+  }
+  header h1 { font-size: 15px; margin: 0; color: var(--accent); font-weight: 600; }
+  header #status { color: var(--dim); font-size: 12px; }
+  #term {
+    flex: 1; overflow-y: auto; padding: 12px 16px; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #term .log { color: var(--dim); }
+  #inputbar {
+    display: flex; border-top: 1px solid var(--border); background: var(--panel);
+  }
+  #jscanvas {
+    display: none; position: fixed; right: 16px; top: 56px;
+    border: 1px solid var(--border); border-radius: 6px; background: #04060a;
+  }
+  #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
+  #cmd {
+    flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
+    font: inherit; padding: 10px 16px 10px 8px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>FluffOS / WebAssembly</h1>
+  <div id="status">loading wasm…</div>
+</header>
+<div id="term"></div>
+<canvas id="jscanvas" width="300" height="130"></canvas>
+<div id="inputbar">
+  <span class="prompt">&gt;</span>
+  <input id="cmd" autocomplete="off" spellcheck="false" autofocus
+         placeholder="loading…" disabled>
+</div>
+
+<script>
+  // Mudlib image (created by emscripten's file_packager, see
+  // tools/wasm/pack-mudlib.sh) attaches itself to this global before
+  // the runtime factory consumes it.
+  var Module = {
+    print: (s) => Terminal.log(s),
+    printErr: (s) => Terminal.log(s),
+    locateFile: (f) => f,
+  };
+</script>
+<script src="fluffos-boot.js"></script>
+<script src="mudlib.js"></script>
+<script src="fluffos.js"></script>
+<script>
+'use strict';
+
+const Terminal = (() => {
+  const el = document.getElementById('term');
+  const append = (text, cls) => {
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.textContent = text;
+    el.appendChild(span);
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  };
+  return {
+    write: (text) => append(text, null),
+    log: (text) => append(text + '\n', 'log'),
+  };
+})();
+
+// --- Minimal telnet client ---------------------------------------------
+// The wasm driver speaks real telnet. We refuse every option except ECHO
+// (used for password prompts) and decode the rest as UTF-8 text.
+const IAC = 255, DONT = 254, DO = 253, WONT = 252, WILL = 251, SB = 250, SE = 240;
+const OPT_ECHO = 1;
+
+class TelnetClient {
+  constructor(sendBytes) {
+    this.sendBytes = sendBytes;
+    this.state = 'data';
+    this.decoder = new TextDecoder('utf-8');
+    this.onText = () => {};
+    this.onEcho = () => {};
+  }
+  receive(bytes) {
+    const text = [];
+    for (const b of bytes) {
+      switch (this.state) {
+        case 'data':
+          if (b === IAC) this.state = 'iac';
+          else if (b !== 0) text.push(b);
+          break;
+        case 'iac':
+          if (b === IAC) { text.push(b); this.state = 'data'; }
+          else if (b === WILL || b === WONT || b === DO || b === DONT) {
+            this.verb = b; this.state = 'opt';
+          } else if (b === SB) this.state = 'sb';
+          else this.state = 'data'; // GA, NOP, ...
+          break;
+        case 'opt': {
+          if (this.verb === WILL) {
+            if (b === OPT_ECHO) { this.onEcho(true); this.sendBytes([IAC, DO, b]); }
+            else this.sendBytes([IAC, DONT, b]);
+          } else if (this.verb === WONT) {
+            if (b === OPT_ECHO) this.onEcho(false);
+            this.sendBytes([IAC, DONT, b]);
+          } else if (this.verb === DO) {
+            this.sendBytes([IAC, WONT, b]);
+          }
+          this.state = 'data';
+          break;
+        }
+        case 'sb':
+          if (b === IAC) this.state = 'sb-iac';
+          break;
+        case 'sb-iac':
+          this.state = (b === SE) ? 'data' : 'sb';
+          break;
+      }
+    }
+    if (text.length) {
+      this.onText(this.decoder.decode(new Uint8Array(text), { stream: true }));
+    }
+  }
+}
+
+// --- Boot ---------------------------------------------------------------
+const status = document.getElementById('status');
+const input = document.getElementById('cmd');
+
+// Mount point + config file, written by the packer (fluffos-boot.js).
+if (!window.FLUFFOS_BOOT) {
+  Terminal.log('warning: fluffos-boot.js missing (bundle not built by the ' +
+               'packer?) — falling back to the testsuite defaults');
+}
+const BOOT = window.FLUFFOS_BOOT || { mount: '/testsuite', config: 'etc/config.test' };
+
+createFluffOS(Module).then((M) => {
+  status.textContent = 'booting driver…';
+  M.FS.chdir(BOOT.mount);
+
+  // Output arrives synchronously while fluffos_connect() is still running
+  // (telnet negotiation, the logon banner), i.e. before we know our
+  // connection id -- buffer both directions until it is known.
+  const connId = { value: -1 };
+  const pendingIn = [];   // driver -> page, before id is known
+  const pendingOut = [];  // page -> driver (negotiation replies)
+  const telnet = new TelnetClient((bytes) => {
+    if (connId.value >= 0) {
+      M.ccall('fluffos_input', null, ['number', 'array', 'number'],
+              [connId.value, bytes, bytes.length]);
+    } else {
+      pendingOut.push(bytes);
+    }
+  });
+  telnet.onText = (t) => Terminal.write(t.replace(/\r/g, ''));
+  telnet.onEcho = (serverEchoes) => { input.type = serverEchoes ? 'password' : 'text'; };
+
+  M.fluffos = {
+    onOutput: (id, bytes) => {
+      if (connId.value === -1) pendingIn.push(bytes);
+      else if (id === connId.value) telnet.receive(bytes);
+    },
+    onDisconnect: (id) => {
+      if (id === connId.value) {
+        Terminal.log('*** disconnected ***');
+        input.disabled = true;
+        status.textContent = 'disconnected';
+      }
+    },
+    // JS handlers callable from LPC through the jsbridge package:
+    //   js_call("fetch_text", ({ url }), (: callback :))
+    //   js_call("canvas_draw", ({ "circle", x, y, r }))
+    // Try it in the terminal: jsdemo fetch /index.html · jsdemo canvas
+    handlers: {
+      fetch_text: async (url) => (await fetch(url)).text(),
+      canvas_draw: (op, ...a) => {
+        const canvas = document.getElementById('jscanvas');
+        canvas.style.display = 'block';
+        const g = canvas.getContext('2d');
+        switch (op) {
+          case 'clear':
+            g.clearRect(0, 0, canvas.width, canvas.height);
+            break;
+          case 'circle':
+            g.beginPath();
+            g.arc(+a[0], +a[1], +a[2], 0, 2 * Math.PI);
+            g.fillStyle = 'hsl(' + ((+a[0] * 3) % 360) + ' 70% 60%)';
+            g.fill();
+            break;
+          case 'text':
+            g.fillStyle = '#d5dbe5';
+            g.font = '13px monospace';
+            g.fillText(a.slice(2).join(' '), +a[0], +a[1]);
+            break;
+          default:
+            throw new Error('unknown canvas op: ' + op);
+        }
+        return op;
+      },
+    },
+  };
+
+  // The reverse direction: call LPC functions the mudlib registered with
+  // js_export(). Returns a Promise of the (string) return value.
+  //   lpc: js_export("add", (: ... :));
+  //   js:  await fluffos.callLPC("add", "2", "3")   // -> "5"
+  M.fluffos.callLPC = (name, ...args) => new Promise((resolve, reject) => {
+    const id = M.ccall('fluffos_lpc_call', 'number', ['string', 'string'],
+                       [name, JSON.stringify(args.map(String))]);
+    if (id < 0) return reject(new Error('no such LPC export: ' + name));
+    const pending = (M.fluffos._lpcPending = M.fluffos._lpcPending || {});
+    pending[id] = { resolve, reject };
+  });
+  // Console convenience: `await fluffos.callLPC(...)` in devtools.
+  window.fluffos = M.fluffos;
+
+  const rc = M.ccall('fluffos_boot', 'number', ['string'], [BOOT.config]);
+  if (rc !== 0) { status.textContent = 'boot failed (' + rc + ')'; return; }
+
+  // Drive the game loop: heartbeats, call_outs and buffered commands all
+  // run inside fluffos_tick().
+  setInterval(() => {
+    M.ccall('fluffos_tick', 'number', ['number'], [performance.now()]);
+  }, 50);
+
+  connId.value = M.ccall('fluffos_connect', 'number', [], []);
+  for (const bytes of pendingIn.splice(0)) telnet.receive(bytes);
+  for (const bytes of pendingOut.splice(0)) {
+    M.ccall('fluffos_input', null, ['number', 'array', 'number'],
+            [connId.value, bytes, bytes.length]);
+  }
+  status.textContent = 'connected (conn ' + connId.value + ')';
+  input.disabled = false;
+  input.placeholder = 'type a command — try: eval return 1+1, tests, who';
+  input.focus();
+
+  const encoder = new TextEncoder();
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter') return;
+    const line = input.value;
+    input.value = '';
+    if (input.type !== 'password') Terminal.write(line + '\n');
+    const bytes = Array.from(encoder.encode(line + '\r\n'));
+    M.ccall('fluffos_input', null, ['number', 'array', 'number'],
+            [connId.value, bytes, bytes.length]);
+  });
+}).catch((e) => {
+  status.textContent = 'failed to load: ' + e;
+});
+</script>
+</body>
+</html>

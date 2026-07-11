@@ -13,6 +13,8 @@
 #include <cinttypes>
 #include <event2/event.h>
 #include <event2/util.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 #include <deque>
 #include <string>
 #include <unistd.h>  // for close

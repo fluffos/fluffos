@@ -29,10 +29,46 @@ option(PACKAGE_TRIM "trim package" ON)
 option(PACKAGE_UIDS "uids package" ON)
 option(PACKAGE_EXTERNAL "external package" ON)
 option(PACKAGE_FFI "foreign function interface package (libffi)" ON)
+# The JS bridge only exists on the Emscripten/WASM target (LPC <-> page
+# JavaScript); default it off everywhere else.
+if (EMSCRIPTEN)
+  set(_PACKAGE_JSBRIDGE_DEFAULT ON)
+else ()
+  set(_PACKAGE_JSBRIDGE_DEFAULT OFF)
+endif ()
+option(PACKAGE_JSBRIDGE "LPC <-> JavaScript bridge (Emscripten/WASM builds only)" ${_PACKAGE_JSBRIDGE_DEFAULT})
 option(PACKAGE_DWLIB "discworld mudlib support package" OFF)
 option(DEBUG OFF)
 option(DEBUGMALLOC ${DEBUG})
 # End of list of compile options.
+
+# Emscripten/WASM target (see wasm/README.md): no sockets, no processes,
+# no threads. Packages that hard-require those (or system libraries that
+# have not been cross-built) are forced off; everything else -- compiler,
+# VM, all core efuns, the telnet protocol layer -- builds unchanged.
+if (EMSCRIPTEN)
+  set(PACKAGE_ASYNC OFF)     # worker threads
+  set(PACKAGE_CRYPTO OFF)    # OpenSSL
+  set(PACKAGE_DB OFF)        # MySQL/SQLite/Postgres clients
+  set(PACKAGE_EXTERNAL OFF)  # posix_spawn + socketpair
+  set(PACKAGE_FFI OFF)       # libffi/dlopen
+  set(PACKAGE_SOCKETS OFF)   # BSD sockets
+  set(PACKAGE_PCRE OFF)      # libpcre not cross-built (yet)
+  set(MARCH_NATIVE OFF)
+  set(USE_JEMALLOC OFF)
+  set(STATIC OFF)
+
+  # Cross-built static ICU + zlib (see tools/wasm/build-deps.sh).
+  set(FLUFFOS_WASM_DEPS "/opt/wasm-deps" CACHE PATH
+      "Prefix containing wasm-built static ICU and zlib")
+  list(APPEND CMAKE_FIND_ROOT_PATH "${FLUFFOS_WASM_DEPS}")
+  if (NOT ICU_ROOT)
+    set(ICU_ROOT "${FLUFFOS_WASM_DEPS}")
+  endif ()
+  if (NOT ZLIB_ROOT)
+    set(ZLIB_ROOT "${FLUFFOS_WASM_DEPS}")
+  endif ()
+endif ()
 
 # Globally enforce CXX17 and C11
 set(CMAKE_CXX_STANDARD 17)
@@ -90,7 +126,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
   endif ()
 
   if (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    if (NOT ENABLE_SANITIZER)
+    if (NOT ENABLE_SANITIZER AND NOT EMSCRIPTEN)
       add_compile_options(
         "-fstack-protector-strong"
         "-Wstack-protector"
@@ -100,7 +136,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
       endif () # WIN32
     endif ()
   else ()
-    if (NOT ENABLE_SANITIZER)
+    if (NOT ENABLE_SANITIZER AND NOT EMSCRIPTEN)
       add_compile_options(
         "-fstack-protector-all"
         "-Wstack-protector"
@@ -138,8 +174,23 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
   )
 endif ()
 
+if (EMSCRIPTEN)
+  # The driver relies on C++ exceptions for LPC error handling; Emscripten
+  # disables catching by default. On a modern emsdk use native WebAssembly
+  # exceptions (wasm EH) -- much faster than the legacy JS-based unwinding
+  # and supported by every current browser and node >= 18. Older toolchains
+  # (e.g. distro-packaged 3.1.x) fall back to the JS-based scheme.
+  if (EMSCRIPTEN_VERSION VERSION_GREATER_EQUAL "3.1.57")
+    add_compile_options("-fwasm-exceptions")
+    add_link_options("-fwasm-exceptions")
+  else ()
+    add_compile_options("-sDISABLE_EXCEPTION_CATCHING=0")
+    add_link_options("-sDISABLE_EXCEPTION_CATCHING=0")
+  endif ()
+endif ()
+
 # LTO on release builds
-if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "Debug" AND NOT EMSCRIPTEN)
   include(CheckIPOSupported)
   check_ipo_supported(RESULT result)
   if (result)
@@ -152,7 +203,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-fPIE" SUPPORT_PIE)
-if (SUPPORT_PIE)
+if (SUPPORT_PIE AND NOT EMSCRIPTEN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pie")
 endif()
 
@@ -203,8 +254,10 @@ if (HAVE_TIME_H AND HAVE_SYS_TIME_H)
 endif ()
 
 # System Libraries
-find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
-include_directories(AFTER SYSTEM ${OPENSSL_INCLUDE_DIR})
+if (NOT EMSCRIPTEN)
+  find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
+  include_directories(AFTER SYSTEM ${OPENSSL_INCLUDE_DIR})
+endif ()
 
 set(ICU_DEBUG ON)
 find_package(ICU REQUIRED COMPONENTS uc dt)
@@ -218,16 +271,18 @@ ENDIF()
 include_directories(AFTER SYSTEM ${ICU_INCLUDE_DIRS})
 
 # Bundled libraries
-set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
-set(EVENT__DISABLE_MBEDTLS ON CACHE BOOL "" FORCE)
-set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
-set(EVENT__DISABLE_TESTS ON CACHE BOOL "" FORCE)
-set(EVENT__DISABLE_REGRESS ON CACHE BOOL "" FORCE)
-set(EVENT__DISABLE_SAMPLES ON CACHE BOOL "" FORCE)
-set(EVENT__DISABLE_MM_REPLACEMENT ON CACHE BOOL "" FORCE)
-include_directories(SYSETEM ${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libevent/include)
-include_directories(SYSETEM thirdparty/libevent/include)
-add_subdirectory(thirdparty/libevent EXCLUDE_FROM_ALL)
+if (NOT EMSCRIPTEN)
+  set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
+  set(EVENT__DISABLE_MBEDTLS ON CACHE BOOL "" FORCE)
+  set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "" FORCE)
+  set(EVENT__DISABLE_TESTS ON CACHE BOOL "" FORCE)
+  set(EVENT__DISABLE_REGRESS ON CACHE BOOL "" FORCE)
+  set(EVENT__DISABLE_SAMPLES ON CACHE BOOL "" FORCE)
+  set(EVENT__DISABLE_MM_REPLACEMENT ON CACHE BOOL "" FORCE)
+  include_directories(SYSETEM ${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libevent/include)
+  include_directories(SYSETEM thirdparty/libevent/include)
+  add_subdirectory(thirdparty/libevent EXCLUDE_FROM_ALL)
+endif ()
 
 add_subdirectory(thirdparty/crypt EXCLUDE_FROM_ALL)
 add_subdirectory(thirdparty/libtelnet EXCLUDE_FROM_ALL)
@@ -238,9 +293,13 @@ include_directories(thirdparty/filesystem/include)
 add_subdirectory(thirdparty/fmt EXCLUDE_FROM_ALL)
 include_directories(thirdparty/fmt/include)
 include_directories(AFTER SYSTEM thirdparty/json/include)
-add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+if (NOT EMSCRIPTEN)
+  # backward-cpp (crash backtraces) needs native unwind support.
+  add_subdirectory(thirdparty/backward-cpp EXCLUDE_FROM_ALL)
+endif ()
 include_directories(AFTER SYSTEM thirdparty/argparse/include)
 
+if (NOT EMSCRIPTEN)
 set(DISABLE_WERROR ON CACHE BOOL "" FORCE)
 set(LWS_WITH_SHARED OFF CACHE BOOL "" FORCE)
 set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
@@ -267,6 +326,7 @@ set(LIBEVENT_LIBRARIES "event_core_static")
 add_subdirectory(thirdparty/libwebsockets EXCLUDE_FROM_ALL)
 include_directories("thirdparty/libwebsockets/include" SYSTEM)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/thirdparty/libwebsockets")
+endif () # NOT EMSCRIPTEN (libwebsockets)
 
 # Build phase
 
@@ -276,7 +336,26 @@ set(GENERATED_HEADERS
         )
 
 # Tools
-add_subdirectory(tools)
+#
+# The codegen tools (make_func, build_applies, make_options_defs) run at
+# BUILD time, so when cross-compiling (Emscripten) they must come from a
+# previously-built native tree: pass -DFLUFFOS_HOST_TOOLS_DIR=<dir>
+# pointing at a native build's src/tools directory (see wasm/README.md
+# and tools/wasm/build.sh).
+if (CMAKE_CROSSCOMPILING)
+  set(FLUFFOS_HOST_TOOLS_DIR "" CACHE PATH "Directory with native make_func/build_applies/make_options_defs binaries")
+  if (NOT FLUFFOS_HOST_TOOLS_DIR)
+    message(FATAL_ERROR "Cross-compiling requires -DFLUFFOS_HOST_TOOLS_DIR=<native build>/src/tools")
+  endif ()
+  set(TOOL_MAKE_FUNC "${FLUFFOS_HOST_TOOLS_DIR}/make_func")
+  set(TOOL_BUILD_APPLIES "${FLUFFOS_HOST_TOOLS_DIR}/build_applies")
+  set(TOOL_MAKE_OPTIONS_DEFS "${FLUFFOS_HOST_TOOLS_DIR}/make_options_defs")
+else ()
+  add_subdirectory(tools)
+  set(TOOL_MAKE_FUNC make_func)
+  set(TOOL_BUILD_APPLIES build_applies)
+  set(TOOL_MAKE_OPTIONS_DEFS make_options_defs)
+endif ()
 
 # Generated sources
 
@@ -300,8 +379,8 @@ set(GENERATRED_DOCS
 
 add_custom_command(
   OUTPUT "applies_table.autogen.cc" "applies_table.autogen.h"
-  COMMAND "build_applies" "${CMAKE_CURRENT_SOURCE_DIR}"
-  DEPENDS "vm/internal/applies" "build_applies"
+  COMMAND "${TOOL_BUILD_APPLIES}" "${CMAKE_CURRENT_SOURCE_DIR}"
+  DEPENDS "vm/internal/applies" "${TOOL_BUILD_APPLIES}"
 )
 
 find_program(BASH_EXECUTABLE bash REQUIRED)
@@ -321,21 +400,28 @@ endforeach ()
 
 add_custom_command(
   OUTPUT "efuns.autogen.cc" "efuns.autogen.h"
-  COMMAND "make_func" "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
-  DEPENDS "make_func" "packages.fullspec"
+  COMMAND "${TOOL_MAKE_FUNC}" "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
+  DEPENDS "${TOOL_MAKE_FUNC}" "packages.fullspec"
 )
 
 add_custom_command(
   OUTPUT "options.autogen.h"
-  COMMAND "make_options_defs" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
+  COMMAND "${TOOL_MAKE_OPTIONS_DEFS}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
+  # options_incl.h includes the generated package list and config.h; the
+  # LPC __PACKAGE_*__ predefines go stale if those change without this
+  # command re-running (e.g. toggling a package in an existing build dir).
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/base/internal/options_incl.h"
+          "${CMAKE_CURRENT_BINARY_DIR}/packages/packages.autogen.h"
+          "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 )
 
+if (NOT CMAKE_CROSSCOMPILING)
 add_custom_command(
   OUTPUT "keywords.json"
   COMMAND "generate_keywords"
   DEPENDS "generate_keywords" "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.h"
 )
+endif ()
 
 find_package(BISON 3.8)
 if (${BISON_FOUND})
@@ -428,11 +514,7 @@ set(SRC
   "symbol.cc"
   "ofile.cc"
   "net/msp.cc"
-  "net/tls.cc"
   "net/telnet.cc"
-  "net/websocket.cc"
-  "net/ws_ascii.cc"
-  "net/ws_telnet.cc"
   "base/internal/debugmalloc.cc"
   "base/internal/external_port.cc"
   "base/internal/file.cc"
@@ -487,6 +569,28 @@ set(SRC
   "vm/internal/vm.cc"
   )
 
+# Per-target implementations (link-time dispatch): the event loop, the
+# connection transports, TLS and crash handling each have a native and a
+# WASM implementation of the same interface.
+if (EMSCRIPTEN)
+  list(APPEND SRC
+    "wasm/backend_wasm.cc"        # host-driven tick loop
+    "wasm/comm_wasm.cc"           # JS byte transport (the page is the peer)
+    "wasm/crash_handler_wasm.cc"  # traps reported by the JS host
+    "net/tls_stub.cc"             # no TLS endpoint to terminate
+    )
+else ()
+  list(APPEND SRC
+    "backend_libevent.cc"
+    "net/transport_libevent.cc"
+    "net/tls.cc"
+    "net/websocket.cc"
+    "net/ws_ascii.cc"
+    "net/ws_telnet.cc"
+    "base/internal/crash_handler.cc"
+    )
+endif ()
+
 set(TEST_SRC
   "vm/internal/otable_test.cc"
   )
@@ -500,7 +604,9 @@ set_source_files_properties(${GENERATED_HEADERS} ${GENERATRED_SOURCE}
 
 add_library(autogen ${GENERATED_HEADERS} ${GENERATRED_SOURCE}
   ${GENERATRED_GRAMMAR_FILES})
-add_dependencies(autogen make_options_defs)
+if (NOT CMAKE_CROSSCOMPILING)
+  add_dependencies(autogen make_options_defs)
+endif ()
 
 add_library(libdriver
   ${SRC} ${SRC_HEADER}
@@ -548,18 +654,24 @@ foreach (PACKAGE ${FLUFFOS_PACKAGES})
 endforeach ()
 
 
-target_link_libraries(libdriver PRIVATE event_core_static event_extra_static event_openssl_static)
-if (NOT WIN32)
-  target_link_libraries(libdriver PRIVATE event_pthreads_static)
-endif()
+if (NOT EMSCRIPTEN)
+  target_link_libraries(libdriver PRIVATE event_core_static event_extra_static event_openssl_static)
+  if (NOT WIN32)
+    target_link_libraries(libdriver PRIVATE event_pthreads_static)
+  endif()
+  target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
+endif ()
 target_link_libraries(libdriver PRIVATE crypt)
-target_link_libraries(libdriver PUBLIC ${LIBWEBSOCKETS_LIBRARIES_STATIC})
 target_link_libraries(libdriver PUBLIC libtelnet)
-target_link_libraries(libdriver PUBLIC ${BACKWARD_ENABLE})
-add_backward(libdriver)
+if (NOT EMSCRIPTEN)
+  target_link_libraries(libdriver PUBLIC ${BACKWARD_ENABLE})
+  add_backward(libdriver)
+endif ()
 
 # System libraries
-target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
+if (NOT EMSCRIPTEN)
+  target_link_libraries(libdriver PUBLIC OpenSSL::SSL)
+endif ()
 target_link_libraries(libdriver PUBLIC ${ICU_LIBRARIES})
 
 # Platform Libraries
@@ -569,7 +681,7 @@ IF (WIN32)
   target_link_libraries(libdriver PUBLIC ws2_32)
 ENDIF ()
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT EMSCRIPTEN)
   find_package(Threads REQUIRED)
   target_link_libraries(libdriver PUBLIC Threads::Threads)
 endif()
@@ -593,32 +705,67 @@ else()
   set(FLUFFOS_LINK -Wl,--start-group ${FLUFFOS_LIBRARIES} -Wl,--end-group)
 endif()
 
-add_executable(driver "main.cc")
-target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
+if (EMSCRIPTEN)
+  # The web driver: a MODULARIZE'd JS+wasm pair. The page instantiates it
+  # with createFluffOS(), mounts a mudlib into MEMFS, and drives the
+  # exported fluffos_* entry points (see wasm/main_wasm.cc).
+  add_executable(driver-web "wasm/main_wasm.cc")
+  target_link_libraries(driver-web PUBLIC ${FLUFFOS_LINK})
+  set_target_properties(driver-web PROPERTIES OUTPUT_NAME "fluffos" SUFFIX ".js")
+  # TOTAL_STACK was renamed STACK_SIZE in emscripten 3.1.27.
+  if (EMSCRIPTEN_VERSION VERSION_GREATER_EQUAL "3.1.27")
+    set(FLUFFOS_WASM_STACK_FLAG "SHELL:-s STACK_SIZE=16MB")
+  else ()
+    set(FLUFFOS_WASM_STACK_FLAG "SHELL:-s TOTAL_STACK=16MB")
+  endif ()
+  target_link_options(driver-web PRIVATE
+    "SHELL:-s MODULARIZE=1"
+    "SHELL:-s EXPORT_NAME=createFluffOS"
+    "SHELL:-s ALLOW_MEMORY_GROWTH=1"
+    # ICU's static data (~30MB) lives in the wasm data segment.
+    "SHELL:-s INITIAL_MEMORY=128MB"
+    "${FLUFFOS_WASM_STACK_FLAG}"
+    "SHELL:-s FORCE_FILESYSTEM=1"
+    "SHELL:-s EXPORTED_FUNCTIONS=_fluffos_boot,_fluffos_flag,_fluffos_tick,_fluffos_connect,_fluffos_input,_fluffos_disconnect,_fluffos_shutdown,_malloc,_free"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,FS,UTF8ToString,stringToUTF8,lengthBytesUTF8"
+    "--no-entry"
+    # binaryen's wasm-opt cannot update full DWARF at -O2/-O3 (it asserts in
+    # wasm-debug.cpp, notably with wasm EH enabled), and RelWithDebInfo's -g
+    # would feed it DWARF. Drop DWARF at link and keep the function-name
+    # section instead -- readable browser/node stack traces, no crash, and a
+    # much smaller fluffos.wasm.
+    "-g0"
+    "--profiling-funcs"
+  )
+else ()
+  add_executable(driver "main.cc")
+  target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})
 
-add_executable(lpcc "main_lpcc.cc")
-target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
+  add_executable(lpcc "main_lpcc.cc")
+  target_link_libraries(lpcc PUBLIC ${FLUFFOS_LINK})
 
-add_executable(lpcshell "main_lpcshell.cc")
-target_link_libraries(lpcshell PUBLIC ${FLUFFOS_LINK})
+  add_executable(lpcshell "main_lpcshell.cc")
+  target_link_libraries(lpcshell PUBLIC ${FLUFFOS_LINK})
 
-add_executable(symbol "main_symbol.cc")
-target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
+  add_executable(symbol "main_symbol.cc")
+  target_link_libraries(symbol PUBLIC ${FLUFFOS_LINK})
 
-add_executable(generate_keywords "main_generate_keywords.cc")
-target_link_libraries(generate_keywords PUBLIC ${FLUFFOS_LINK})
+  add_executable(generate_keywords "main_generate_keywords.cc")
+  target_link_libraries(generate_keywords PUBLIC ${FLUFFOS_LINK})
 
-add_executable(o2json "main_o2json.cc")
-target_link_libraries(o2json PUBLIC ${FLUFFOS_LINK})
+  add_executable(o2json "main_o2json.cc")
+  target_link_libraries(o2json PUBLIC ${FLUFFOS_LINK})
 
-add_executable(json2o "main_json2o.cc")
-target_link_libraries(json2o PUBLIC ${FLUFFOS_LINK})
+  add_executable(json2o "main_json2o.cc")
+  target_link_libraries(json2o PUBLIC ${FLUFFOS_LINK})
+endif ()
 
 include(helper)
 
 message(STATUS "Final Compile Flags for libdriver: ")
 print_iterface_target_properties(libdriver)
 
+if (NOT EMSCRIPTEN)
 message(STATUS "Final Compile Flags for driver: ")
 print_target_properties(driver)
 
@@ -639,22 +786,23 @@ install(DIRECTORY include
 # Websocket http files
 install(DIRECTORY www
         DESTINATION bin)
+endif () # NOT EMSCRIPTEN
 
-if (NOT WIN32)
+if (NOT WIN32 AND NOT EMSCRIPTEN)
   add_executable(portbind "portbind.cc")
   install(TARGETS portbind
     RUNTIME DESTINATION bin)
 endif ()
 
 # Update generated grammar files
-if (${BISON_FOUND})
+if (${BISON_FOUND} AND NOT EMSCRIPTEN)
   add_custom_command(TARGET "driver" POST_BUILD
           COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_SOURCE}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
           COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_HEADER}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
           COMMENT "Copying and sanitizing generated grammar files")
 endif()
 
-if (FLEX_FOUND)
+if (FLEX_FOUND AND NOT EMSCRIPTEN)
   add_custom_command(TARGET "driver" POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
     COMMENT "Copying and sanitizing Flex-generated lexer.autogen.cc")

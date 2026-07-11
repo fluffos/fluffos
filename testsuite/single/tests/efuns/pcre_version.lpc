@@ -1,4 +1,6 @@
+#ifdef __PACKAGE_PCRE__
 void do_tests() {
     ASSERT(stringp(pcre_version()));
     ASSERT(strlen(pcre_version()) > 0);
 }
+#endif

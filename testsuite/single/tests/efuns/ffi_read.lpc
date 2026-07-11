@@ -1,7 +1,9 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
 private int near(float a, float b) { return (a>b?a-b:b-a) < 1e-9; }
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     buffer b = ffi_alloc(32);
     // Every scalar code round-trips through write/read.
     ffi_write(b, 0, FFI_INT8, -3);   ASSERT_EQ(-3, ffi_read(b, 0, FFI_INT8));

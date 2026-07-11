@@ -97,6 +97,12 @@ endif()
 
 add_subdirectory(src)
 
+if (CMAKE_CROSSCOMPILING)
+  # No native driver binary to run the LPC testsuite with (the WASM
+  # driver runs it in the page / under node instead).
+  return()
+endif ()
+
 add_custom_target(driver-testsuite
         COMMAND $<TARGET_FILE:driver> etc/config.test
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite"

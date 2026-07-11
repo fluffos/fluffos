@@ -34,6 +34,9 @@
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"
 #endif
+#ifdef PACKAGE_JSBRIDGE
+#include "packages/jsbridge/jsbridge.h"
+#endif
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 
@@ -705,6 +708,9 @@ void check_all_blocks(int flag) {
     mark_dns_requests();
 #ifdef PACKAGE_FFI
     mark_ffi();
+#endif
+#ifdef PACKAGE_JSBRIDGE
+    mark_js_calls();
 #endif
     mark_simuls();
     mark_mapping_node_blocks();

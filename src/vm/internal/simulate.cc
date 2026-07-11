@@ -45,6 +45,9 @@ void db_cleanup(void);  // FIXME
 #ifdef PACKAGE_FFI
 #include "packages/ffi/ffi.h"
 #endif
+#ifdef PACKAGE_JSBRIDGE
+#include "packages/jsbridge/jsbridge.h"
+#endif
 #ifdef PACKAGE_SOCKETS
 #include "packages/sockets/socket_efuns.h"
 #endif
@@ -85,6 +88,11 @@ void shutdownMudOS(int exit_code) {
 #endif
 #ifdef PACKAGE_FFI
   ffi_cleanup();
+#endif
+#ifdef PACKAGE_JSBRIDGE
+  // Must precede clear_tick_events(): pending delivery events reference
+  // the entries this frees, and are discarded unrun there.
+  jsbridge_cleanup();
 #endif
   shutdown_external_ports();
 

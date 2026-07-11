@@ -1,7 +1,9 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
 private int near(float a, float b) { return (a>b?a-b:b-a) < 1e-9; }
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     int lib, f, p, a;
     if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
     lib = ffi_load("");

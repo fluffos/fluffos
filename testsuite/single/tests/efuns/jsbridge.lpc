@@ -1,0 +1,28 @@
+void do_tests() {
+#ifdef __PACKAGE_JSBRIDGE__
+    // Synchronous eval round-trip.
+    ASSERT_EQ("3", js_eval("1+2"));
+    ASSERT_EQ("hi", js_eval("'h'+'i'"));
+
+    // js_call() schedules an async handler invocation and returns a
+    // nonnegative call id; ids increase per call. (Async delivery itself
+    // is exercised by the browser/node harnesses -- the testsuite runner
+    // is synchronous.)
+    int a = js_call("no_such_handler_for_tests", ({ "x" }));
+    int b = js_call("no_such_handler_for_tests", ({ }));
+    ASSERT(a >= 0);
+    ASSERT_EQ(a + 1, b);
+
+    // Argument validation: non-string array elements are rejected.
+    ASSERT(catch(js_call("h", ({ 1 }))));
+
+    // js_export: register (1), replace (1), unregister (0). Bad callback
+    // types are rejected at compile time by the efun signature.
+    // (Page-initiated invocation is exercised by the browser harness --
+    // fluffos.callLPC resolves on a later tick.)
+    ASSERT_EQ(1, js_export("test_export", (: 1 :)));
+    ASSERT_EQ(1, js_export("test_export", "do_tests"));
+    ASSERT_EQ(0, js_export("test_export"));
+#endif
+    ASSERT(1);
+}

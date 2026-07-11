@@ -4,26 +4,10 @@
 #include "backend.h"
 
 #include <chrono>
-#include <event2/dns.h>     // for evdns_set_log_fn
-#include <event2/event.h>   // for event_add, etc
-#include <event2/thread.h>  // for thread support
-#include <cmath>            // for exp
-#include <cstdio>           // for NULL, sprintf
-#ifdef TIME_WITH_SYS_TIME
-#include <sys/time.h>
-#include <ctime>
-#else
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#endif
-#include <sys/types.h>  // for int64_t
-#include <deque>        // for deque
-#include <functional>   // for _Bind, less, bind, function
-#include <map>          // for multimap, _Rb_tree_iterator
-#include <utility>      // for pair, make_pair
+#include <cmath>   // for exp
+#include <cstdio>  // for snprintf
+#include <deque>   // for deque
+#include <map>     // for multimap
 #include <algorithm>
 
 #include "vm/vm.h"
@@ -33,49 +17,24 @@
 #ifdef PACKAGE_MUDLIB_STATS
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
-#ifdef PACKAGE_SOCKETS
-#include "packages/sockets/socket_efuns.h"
-#endif
 
-// FIXME: rewrite other part so this could become static.
-struct event_base* g_event_base = nullptr;
+/*
+ * This file is the event-loop-agnostic core of the backend: the gametick
+ * event queue and the recurring maintenance work (resets, clean_up,
+ * reclaims) scheduled on it. The actual loop that advances time lives in
+ * the per-target implementation:
+ *
+ *   - backend_libevent.cc: native driver, a repeating libevent timer plus
+ *     event_base_loop(); also implements wall-time events.
+ *   - wasm/backend_wasm.cc: the JS host calls wasm_backend_advance() on a
+ *     timer; also implements wall-time events.
+ *
+ * Both call backend_register_tick_events() at startup and
+ * backend_run_one_gametick() per elapsed gametick.
+ */
 
-namespace {
-void libevent_log(int severity, const char* msg) {
-  if (severity == EVENT_LOG_ERR) {
-    debug(all, "libevent:%d:%s\n", severity, msg);
-  } else {
-    debug(event, "libevent:%d:%s\n", severity, msg);
-  }
-}
-void libevent_dns_log(int severity, const char* msg) {
-  if (severity == EVENT_LOG_ERR) {
-    debug(all, "libevent dns:%d:%s\n", severity, msg);
-  } else {
-    debug(dns, "libevent dns:%d:%s\n", severity, msg);
-  }
-}
-}  // namespace
-// Initialize backend
-event_base* init_backend() {
-  event_set_log_callback(libevent_log);
-  evdns_set_log_fn(libevent_dns_log);
-#ifdef DEBUG
-  event_enable_debug_logging(EVENT_DBG_ALL);
-  event_enable_debug_mode();
-#endif
-#ifdef _WIN32
-  evthread_use_windows_threads();
-#else
-  evthread_use_pthreads();
-#endif
-  g_event_base = event_base_new();
-  debug_message("Event backend in use: %s\n", event_base_get_method(g_event_base));
-  return g_event_base;
-}
-
-// This the current game time, which is updated in on_virtual_time_tick. Note we use a large type
-// to avoid dealing with rollover.
+// This the current game time, which is updated on every gametick. Note we use
+// a large type to avoid dealing with rollover.
 uint64_t g_current_gametick;
 
 int time_to_next_gametick(std::chrono::milliseconds msec) {
@@ -87,17 +46,6 @@ std::chrono::milliseconds gametick_to_time(int ticks) {
 }
 
 namespace {
-// TODO: remove the need for this
-// Global variable for game ticket event handle.
-struct event* g_ev_tick = nullptr;
-
-inline struct timeval gametick_timeval() {
-  static struct timeval const val{
-      CONFIG_INT(__RC_GAMETICK_MSEC__) / 1000,         // secs
-      CONFIG_INT(__RC_GAMETICK_MSEC__) % 1000 * 1000,  // usecs
-  };
-  return val;
-}
 
 // Global structure to holding all events to be executed on gameticks.
 using TickQueue = std::multimap<decltype(g_current_gametick), TickEvent*, std::less<>>;
@@ -133,54 +81,25 @@ inline void call_tick_events() {
     // TODO: randomly shuffle the events
 
     for (auto* event : all_events) {
-      if (event->valid) {
-        event->callback();
-      }
-      delete event;
+      backend_dispose_tick_event(event);
     }
   }
 }
 
-void on_game_tick(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
-  call_tick_events();
-  g_current_gametick++;
-
-  auto* ev = *(reinterpret_cast<struct event**>(arg));
-  auto t = gametick_timeval();
-  event_add(ev, &t);
-}
+void look_for_objects_to_swap();
 
 }  // namespace
 
-TickEvent* add_gametick_event(int delay_ticks, TickEvent::callback_type callback) {
-  auto* event = new TickEvent(callback);
-  g_tick_queue.insert(TickQueue::value_type(g_current_gametick + delay_ticks, event));
-  return event;
-}
-
-namespace {
-void on_walltime_event(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
-  auto* event = reinterpret_cast<TickEvent*>(arg);
+void backend_dispose_tick_event(TickEvent* event) {
   if (event->valid) {
     event->callback();
   }
   delete event;
 }
-}  // namespace
 
-// Schedule a immediate event on main loop.
-TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
-                              TickEvent::callback_type callback) {
+TickEvent* add_gametick_event(int delay_ticks, TickEvent::callback_type callback) {
   auto* event = new TickEvent(callback);
-  struct timeval val{
-      (int)(delay_msecs.count() / 1000),
-      (int)(delay_msecs.count() % 1000 * 1000),
-  };
-  struct timeval* delay_ptr = nullptr;
-  if (delay_msecs.count() != 0) {
-    delay_ptr = &val;
-  }
-  event_base_once(g_event_base, -1, EV_TIMEOUT, on_walltime_event, event, delay_ptr);
+  g_tick_queue.insert(TickQueue::value_type(g_current_gametick + delay_ticks, event));
   return event;
 }
 
@@ -193,11 +112,8 @@ void clear_tick_events() {
     }
     g_tick_queue.clear();
   }
+  i += clear_walltime_events();
   debug_message("clear_tick_events: %d leftover events cleared.\n", i);
-}
-
-namespace {
-void look_for_objects_to_swap();
 }
 
 // FIXME:
@@ -206,14 +122,17 @@ void call_remove_destructed_objects() {
                      TickEvent::callback_type(call_remove_destructed_objects));
   remove_destructed_objects();
 }
-/*
- * This is the backend. We will stay here for ever (almost).
- */
-void backend(struct event_base* base) {
-  clear_state();
-  g_current_gametick = 0;
 
-  // Register various tick events
+// Run the events of the current gametick and advance the counter: the
+// per-target loop calls this once per elapsed gametick period.
+void backend_run_one_gametick() {
+  call_tick_events();
+  g_current_gametick++;
+}
+
+// Register the driver's recurring maintenance events. Called once at
+// startup by the per-target backend() implementation.
+void backend_register_tick_events() {
   add_gametick_event(0, TickEvent::callback_type(call_heart_beat));
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
                      TickEvent::callback_type(look_for_objects_to_swap));
@@ -225,25 +144,7 @@ void backend(struct event_base* base) {
 #endif
   add_gametick_event(time_to_next_gametick(std::chrono::minutes(5)),
                      TickEvent::callback_type(call_remove_destructed_objects));
-
-  // NOTE: we don't use EV_PERSITENT here because that use fix-rate scheduling.
-  //
-  // Schedule a repeating tick for advancing virtual time.
-  // Gametick provides a fixed-delay scheduling with a guaranteed minimum delay for
-  // heartbeats, callouts, and various cleaning function.
-  g_ev_tick = evtimer_new(base, on_game_tick, &g_ev_tick);
-
-  auto t = gametick_timeval();
-  event_add(g_ev_tick, &t);
-
-  try {
-    event_base_loop(base, 0);
-  } catch (...) {  // catch everything
-    fatal("BUG: jumped out of event loop!");
-  }
-  // We've reached here meaning we are in shutdown sequence.
-  shutdownMudOS(-1);
-} /* backend() */
+}
 
 namespace {
 /*
@@ -417,6 +318,6 @@ void update_compile_av(int lines) {
 char* query_load_av() {
   static char buff[100];
 
-  sprintf(buff, "%.2f cmds/s, %.2f comp lines/s", load_av, compile_av);
+  snprintf(buff, sizeof(buff), "%.2f cmds/s, %.2f comp lines/s", load_av, compile_av);
   return (buff);
 } /* query_load_av() */

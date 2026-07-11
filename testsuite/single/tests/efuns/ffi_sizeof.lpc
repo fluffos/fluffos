@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     ASSERT_EQ(1, ffi_sizeof(FFI_INT8));
     ASSERT_EQ(2, ffi_sizeof(FFI_INT16));
     ASSERT_EQ(4, ffi_sizeof(FFI_INT32));

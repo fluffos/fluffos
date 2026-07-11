@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     mapping m = ffi_status();
     ASSERT(mapp(m));
     ASSERT(intp(m["libraries"]));

@@ -182,3 +182,64 @@ jobs:
 
       - name: Run LPC Testsuite
         run: cd build && ctest --output-on-failure -L testsuite
+
+  # WebAssembly build: cross-compile the driver with Emscripten and run
+  # the full LPC testsuite inside the wasm driver under node. See
+  # docs/build-wasm.md for the workflow and src/wasm/README.md for the
+  # architecture.
+  wasm:
+    name: WASM (Emscripten)
+    runs-on: ubuntu-24.04
+    env:
+      # Upstream dep pins: the deps build and the cache key below reference
+      # these. The emsdk itself tracks 'latest' (native wasm exceptions and
+      # friends); the resolved compiler version feeds the cache key.
+      ICU_VER: 74-2
+      ZLIB_VER: 1.3.1
+      WASM_DEPS_PREFIX: /opt/wasm-deps
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Resolve emscripten version
+        id: emver
+        run: echo "version=$(emcc -dumpversion)" >> "$GITHUB_OUTPUT"
+
+      - name: Install native dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential bison flex libssl-dev libicu-dev zlib1g-dev
+
+      # The deps prefix must exist and be runner-writable BEFORE the cache
+      # step: on a cache hit, actions/cache restores into it directly.
+      - name: Prepare wasm deps prefix
+        run: |
+          sudo mkdir -p "$WASM_DEPS_PREFIX"
+          sudo chown "$USER" "$WASM_DEPS_PREFIX"
+
+      # ICU + zlib cross-built for wasm32; ~10 minutes on a miss, so cache
+      # on the resolved emsdk + upstream versions (bump -v1 to invalidate).
+      - name: Cache wasm dependencies (ICU, zlib)
+        id: wasm-deps
+        uses: actions/cache@v4
+        with:
+          path: /opt/wasm-deps
+          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-zlib${{ env.ZLIB_VER }}-v1
+
+      - name: Build wasm dependencies
+        if: steps.wasm-deps.outputs.cache-hit != 'true'
+        run: |
+          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" ZLIB_VER="$ZLIB_VER" \
+            tools/wasm/build-deps.sh
+
+      - name: Build driver (native tools + wasm) and package testsuite
+        run: tools/wasm/build.sh
+
+      - name: Run LPC testsuite in the wasm driver
+        run: node tools/wasm/run-testsuite.js

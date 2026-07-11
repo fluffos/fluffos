@@ -6,7 +6,9 @@ int cmp(int a_addr, int b_addr) {
     return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT32) -
            ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT32);
 }
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     int lib, qs, cb, i;
     int *src = ({ 30, 10, 40, 20, 50 });
     buffer data;

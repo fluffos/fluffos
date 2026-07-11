@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     buffer b = ffi_alloc(8);
     int addr = ffi_address(b);
     ASSERT(intp(addr));

@@ -6,7 +6,6 @@
 #include "compiler/internal/lexer.h"  // for instrs, FIXME
 
 #include "packages/core/replace_program.h"
-#include "backward.hpp"
 
 void dealloc_funp(funptr_t* fp) {
   program_t* prog = nullptr;

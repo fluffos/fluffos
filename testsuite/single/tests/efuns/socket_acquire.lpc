@@ -1,6 +1,8 @@
+#ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
 void rcb(int fd) { }
 void do_tests() {
     // Only valid inside a release callback.
     ASSERT(socket_acquire(9999, "rcb", "rcb", "rcb") < 0);
 }
+#endif

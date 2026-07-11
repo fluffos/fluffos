@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_PCRE__
 void do_tests() {
     // Array form filters to matching members; string form is a boolean.
     ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca"));
@@ -5,3 +6,4 @@ void do_tests() {
     ASSERT(!pcre_match("hello", "^world$"));
     ASSERT(catch(pcre_match("x", "(unclosed")));
 }
+#endif

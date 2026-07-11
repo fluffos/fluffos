@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
 #include <socket_err.h>
 void rcb(int fd) { }
@@ -12,3 +13,4 @@ void do_tests() {
     ASSERT(socket_listen(fd, "lcb") < 0);
     socket_close(fd);
 }
+#endif

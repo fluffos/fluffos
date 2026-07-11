@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_PCRE__
 int same_array(mixed *x, mixed *y) {
   if (!arrayp(x) || !arrayp(y)) return 0;
   if (sizeof(x) != sizeof(y)) return 0;
@@ -189,3 +190,4 @@ TEXT;
   tmp = "foobar";
   ASSERT_EQ("foo->bar", pcre_replace_callback(tmp, "(foo)", (: $1 + "->" :)));
 }
+#endif

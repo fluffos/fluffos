@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_PCRE__
 void do_tests() {
     // The callback runs once per capture group of the match, receiving
     // (group_text, group_index), and its return replaces the group.
@@ -6,3 +7,4 @@ void do_tests() {
     ASSERT_EQ("a0 b1", pcre_replace_callback("ax by", "a(x) b(y)",
                                              (: "" + $2 :)));
 }
+#endif
