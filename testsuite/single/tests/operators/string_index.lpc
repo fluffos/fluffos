@@ -21,6 +21,21 @@ void do_tests() {
 
   // INDEX at strlen() return 0
   ASSERT_EQ(0, catch(charAt(tmp, strlen(tmp))));
+  ASSERT_EQ(0, charAt(tmp, strlen(tmp)));
+
+  // Strings index by extended grapheme cluster, and Unicode (UAX #29)
+  // treats CRLF as a SINGLE cluster (#1071):
+  ASSERT_EQ(1, strlen("\r\n"));
+  ASSERT_EQ(6, strlen("\r\nhello"));
+  ASSERT_EQ(7, strlen("\n\rhello"));       // LF,CR is two clusters
+  ASSERT_EQ(13, charAt("\r\n", 0));        // first codepoint of the cluster
+  ASSERT_EQ(0, charAt("\r\n", 1));         // one past the end: virtual NUL
+  ASSERT_EQ(oob, catch(charAt("\r\n", 2)));
+  // strsrch() matches on cluster boundaries: a lone LF never matches
+  // inside a CRLF cluster, while the CRLF cluster itself does.
+  ASSERT_EQ(-1, strsrch("\r\nhello", "\n"));
+  ASSERT_EQ(0, strsrch("\r\nhello", "\r\n"));
+  ASSERT_EQ(0, strsrch("\n\rhello", "\n"));
 
   // OOB cases
   ASSERT_EQ(oob, catch(charAt(tmp, -1 * strlen(tmp))));

@@ -111,7 +111,9 @@ UChar32 u8_egc_index_as_single_codepoint(const char* src, int32_t src_len, int32
   // out-of-bounds
   if (pos < 0) return -2;
   auto post_pos = iter.post_index_to_offset(index);
-  // end-of-string
+  // Index landed on the final break position (one past the last EGC):
+  // return 0, the virtual NUL terminator. This is deliberate C-string
+  // compat -- s[strlen(s)] == 0 -- pinned by tests/operators/string_index.lpc.
   if (post_pos < 0) return 0;
 
   if (post_pos - pos > U8_MAX_LENGTH) return c;
