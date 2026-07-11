@@ -29,6 +29,12 @@ title: async / async_getdir
             // array of matching filenames
         }
 
+### NOTE
+
+    When the 'this_player in call_out' driver setting is enabled,
+    this_player() inside the callback is preserved from the time the
+    request was made, like call_out().
+
 ### SEE ALSO
 
     file_size(3), get_dir(3), stat(3), time(3)

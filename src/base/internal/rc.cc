@@ -134,7 +134,8 @@ const FlagEntry INT_FLAGS[] = {
      "Strip ANSI before process_input() sees the input, rather than only before add_actions are "
      "called."},
     {"this_player in call_out", __RC_THIS_PLAYER_IN_CALL_OUT__, 1, 0, INT_MAX, "Language Behavior",
-     "Make this_player() usable from within call_out() callbacks."},
+     "Make this_player() usable from within call_out() callbacks, and from the callbacks of other "
+     "deferred efuns (resolve(), async_read(), async_write(), async_getdir(), async_db_exec())."},
     {"trace", __RC_TRACE__, 1, 0, INT_MAX, "Diagnostics",
      "Enable the trace() and traceprefix() efuns (leaving it off runs slightly faster)."},
     {"trace code", __RC_TRACE_CODE__, 0, 0, INT_MAX, "Diagnostics",
