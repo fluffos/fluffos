@@ -72,7 +72,10 @@ void f_div_eq() {
         if (sp->u.real == 0.0) {
           error("Division by 0nr\n");
         }
-        sp->u.real = argp->u.number /= sp->u.real;
+        /* int /= float promotes to float, matching int / float */
+        argp->type = T_REAL;
+        argp->u.real = argp->u.number / sp->u.real;
+        sp->u.real = argp->u.real;
       }
       break;
     }
@@ -402,7 +405,10 @@ void f_mult_eq() {
         sp->type = T_REAL;
         sp->u.real = argp->u.real *= sp->u.number;
       } else {
-        sp->u.real = argp->u.number *= sp->u.real;
+        /* int *= float promotes to float, matching int * float */
+        argp->type = T_REAL;
+        argp->u.real = argp->u.number * sp->u.real;
+        sp->u.real = argp->u.real;
       }
       break;
     }
@@ -896,7 +902,10 @@ void f_sub_eq() {
         sp->type = T_REAL;
         sp->u.real = argp->u.real -= sp->u.number;
       } else {
-        sp->u.real = argp->u.number -= sp->u.real;
+        /* int -= float promotes to float, matching int - float */
+        argp->type = T_REAL;
+        argp->u.real = argp->u.number - sp->u.real;
+        sp->u.real = argp->u.real;
       }
       break;
     }
