@@ -60,6 +60,20 @@ End a line with `\` to continue the definition:
 } while (0)
 ```
 
+A block comment opened on a directive line may also span lines — it
+reads as whitespace and does not end the directive, so both of these
+define `WARNING_LEVEL` as `1`:
+
+```c
+#define WARNING_LEVEL 1 /* change to a higher value to
+                           show more warnings */
+
+#define WARNING_LEVEL 1 // single-line form
+```
+
+Text after the comment's close on its final line still belongs to the
+directive, matching C.
+
 ## Redefinition
 
 Redefining a macro with a **different** body is allowed: the compiler

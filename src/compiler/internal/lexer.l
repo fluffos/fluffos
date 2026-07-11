@@ -572,9 +572,21 @@ WS_NO_NL    [ \t\r\v\f]
      * else fights.
      */
 <INITIAL,SC_COND_SKIP>^[ \t]*"#"[^\n]*(\\\r?\n[^\n]*)* {
-    lpc_lex_consume_directive_newline(yyscanner);
-    LpcDirectiveAction act =
-        lpc_lex_on_directive(yytext, yyleng, yyscanner, YY_START == SC_COND_SKIP);
+    /* The capture stops at a physical newline, which a block comment
+     * opened on the line may legally span (#1236) -- complete the
+     * logical line first (policy in lexer_rules_pp.cc, reading through
+     * lpc_lex_getc()). When it pulled the tail, the terminating newline
+     * has already been consumed and counted. */
+    ScratchString completed;
+    int pulled_lines = 0;
+    bool extended =
+        lpc_lex_complete_directive(yytext, yyleng, yyscanner, &completed, &pulled_lines);
+    if (!extended) {
+        lpc_lex_consume_directive_newline(yyscanner);
+    }
+    LpcDirectiveAction act = lpc_lex_on_directive(
+        extended ? completed.c_str() : yytext, extended ? (int)completed.size() : yyleng,
+        yyscanner, YY_START == SC_COND_SKIP, pulled_lines);
     if (act == LpcDirectiveAction::kEnterSkip) {
         BEGIN(SC_COND_SKIP);
     } else if (act == LpcDirectiveAction::kExitSkip) {
