@@ -257,6 +257,15 @@ void do_tests() {
     // https://github.com/fluffos/fluffos/issues/595
     ASSERT_EQ("   Mit indent sieht das so aus", sprintf("%30=s","Mit indent sieht das so aus"));
 
+    // https://github.com/fluffos/fluffos/issues/605 -- indented lines keep
+    // their indent and hard-wrap at the width instead of emitting a
+    // lone-space line and shifting the wrap grid.
+    ASSERT_EQ(" Mit indentsi\n tfddkdfkdfkdfskdfks\nll\n dffs\n dddeee",
+              sprintf("%-*=s", 20, " Mit indentsi\n tfddkdfkdfkdfskdfksll\n dffs\n dddeee"));
+    // A single word with no break opportunity still overflows the field
+    // whole (the issue #696 narrow-column behavior).
+    ASSERT_EQ("aaaaaabbb", sprintf("%-=6s", "aaaaaabbb"));
+
     // https://github.com/fluffos/fluffos/issues/696
   shouldbe = @TEXT
 one        line1
