@@ -3149,3 +3149,76 @@ void f_test_load() {
   }
 }
 #endif
+
+#if defined(F_GET_OS_ENV) || defined(F_SET_OS_ENV)
+/* Exact-name membership test against a colon-separated allow-list from
+ * the runtime config (issue #1045). */
+static bool os_env_name_listed(const char* list, const char* name) {
+  if (!list || !*list || !name || !*name) {
+    return false;
+  }
+  size_t const namelen = strlen(name);
+  const char* p = list;
+  for (;;) {
+    const char* sep = strchr(p, ':');
+    size_t const len = sep ? static_cast<size_t>(sep - p) : strlen(p);
+    if (len == namelen && strncmp(p, name, len) == 0) {
+      return true;
+    }
+    if (!sep) {
+      return false;
+    }
+    p = sep + 1;
+  }
+}
+#endif
+
+#ifdef F_GET_OS_ENV
+void f_get_os_env() {
+  const char* name = sp->u.string;
+
+  if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
+      !os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
+    error("get_os_env: '%s' is not in the 'allowed os environment variables' list.\n", name);
+  }
+
+  const char* val = getenv(name);
+  if (!val) {
+    free_string_svalue(sp);
+    *sp = const0u;
+    return;
+  }
+  char* copy = string_copy(val, "f_get_os_env");
+  free_string_svalue(sp);
+  put_malloced_string(copy);
+}
+#endif
+
+#ifdef F_SET_OS_ENV
+void f_set_os_env() {
+  int const num = st_num_arg;
+  svalue_t* namearg = sp - num + 1;
+  const char* name = namearg->u.string;
+
+  if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
+    error("set_os_env: '%s' is not in the 'writable os environment variables' list.\n", name);
+  }
+
+  int ok;
+  if (num == 2) {
+#ifdef _WIN32
+    ok = _putenv_s(name, sp->u.string) == 0;
+#else
+    ok = setenv(name, sp->u.string, 1) == 0;
+#endif
+  } else {
+#ifdef _WIN32
+    ok = _putenv_s(name, "") == 0;
+#else
+    ok = unsetenv(name) == 0;
+#endif
+  }
+  pop_n_elems(num);
+  push_number(ok);
+}
+#endif
