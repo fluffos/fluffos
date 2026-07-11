@@ -463,7 +463,7 @@ char* read_file(const char* file, int start, int lines) {
   // finding enough newlines. Clamp to the terminator slot so the '\0' below
   // stays inside the 2*max+1 byte buffer instead of writing one past it.
   if (ptr_end > the_buff + total_bytes_read) {
-    ptr_end = (char*)the_buff + total_bytes_read;
+    ptr_end = the_buff + total_bytes_read;  // the_buff is already char*
   }
 
   *ptr_end = '\0';

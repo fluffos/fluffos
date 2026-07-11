@@ -945,7 +945,7 @@ static char* pcre_get_replace(pcre_t* run, array_t* replacements) {
   // printf("ret_sz:%d\n", ret_sz);
 
   if (run->rc <= 1) {
-    strncpy(ret, run->subject, ret_sz);
+    memcpy(ret, run->subject, ret_sz);
     *(ret + ret_sz) = '\0';
     return ret;
   }
@@ -964,7 +964,7 @@ static char* pcre_get_replace(pcre_t* run, array_t* replacements) {
   {
     size_t n = (size_t)run->ovector[2];
     if (n > ret_sz - ret_pos) n = ret_sz - ret_pos;
-    strncpy(ret + ret_pos, run->subject, n);
+    memcpy(ret + ret_pos, run->subject, n);
     ret_pos += n;
   }
 
@@ -983,13 +983,13 @@ static char* pcre_get_replace(pcre_t* run, array_t* replacements) {
     if (gstart > last_end) {
       size_t gap = (size_t)(gstart - last_end);
       if (gap > ret_sz - ret_pos) gap = ret_sz - ret_pos;
-      strncpy(ret + ret_pos, run->subject + last_end, gap);
+      memcpy(ret + ret_pos, run->subject + last_end, gap);
       ret_pos += gap;
     }
 
     // The replacement for this group.
     if (rep_sz > ret_sz - ret_pos) rep_sz = ret_sz - ret_pos;
-    strncpy(ret + ret_pos, rep, rep_sz);
+    memcpy(ret + ret_pos, rep, rep_sz);
     ret_pos += rep_sz;
 
     last_end = gend;
@@ -1000,7 +1000,7 @@ static char* pcre_get_replace(pcre_t* run, array_t* replacements) {
   if ((size_t)last_end < run->s_length) {
     size_t tail = run->s_length - (size_t)last_end;
     if (tail > ret_sz - ret_pos) tail = ret_sz - ret_pos;
-    strncpy(ret + ret_pos, run->subject + last_end, tail);
+    memcpy(ret + ret_pos, run->subject + last_end, tail);
     ret_pos += tail;
   }
 
