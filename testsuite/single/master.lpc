@@ -130,6 +130,12 @@ mixed compile_object(string file)
     if (file=="/test/virtual") {
         return load_object("/single/void");
     }
+    // Virtual-object fixture for the recompile_object test: any
+    // /data/hu/virt* name materializes from the runtime-written
+    // /data/hu/vbase source.
+    if (file[0..12] == "/data/hu/virt" && file_size("/data/hu/vbase.lpc") > 0) {
+        return load_object("/data/hu/vbase");
+    }
     return 0;
 }
 

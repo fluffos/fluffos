@@ -35,6 +35,13 @@ title: objects / recompile_object
     inherit_program(4), include_file(4), get_include_path(4) and
     valid_read(4) are all consulted.
 
+    Virtual objects (materialized through the master's
+    compile_object(4) hook) update like any other object: the recompile
+    targets the BACKING program - the real file whose program the
+    virtual object carries - and the virtual name, identity and flag
+    are untouched. A virtual object whose backing program has no
+    on-disk source fails cleanly.
+
     The master object and the simul_efun object can themselves be
     recompiled: their cached dispatch tables (apply-name and
     simul_efun-name to function) are rebuilt against the new program

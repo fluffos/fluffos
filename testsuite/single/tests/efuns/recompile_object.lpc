@@ -23,13 +23,18 @@ private void write_src2(string file, string body) {
 }
 
 private void cleanup() {
-  foreach (string prog in ({ THING, DIR + "/seppuku" })) {
+  foreach (string prog in ({ THING, DIR + "/seppuku", DIR + "/rp_thing",
+                             DIR + "/rp_parent", DIR + "/virt",
+                             DIR + "/vbase" })) {
     foreach (object o in children(prog)) {
       if (o) destruct(o);
     }
   }
   rm(THING + ".lpc");
   rm(DIR + "/seppuku.lpc");
+  rm(DIR + "/rp_thing.lpc");
+  rm(DIR + "/rp_parent.lpc");
+  rm(DIR + "/vbase.lpc");
   rmdir(DIR);
 }
 
@@ -147,6 +152,59 @@ private void run_checks() {
   rm(THING + ".lpc");
   ASSERT(stringp(catch(recompile_object(ob))));
   ASSERT_EQ("v3", ob->version());
+
+  // Virtual objects update too: the object wears a virtual name
+  // (master::compile_object materialized it), but its program IS the
+  // backing file's program -- recompile_object() recompiles that
+  // backing source and swaps it in, keeping the virtual identity,
+  // name, flag and state.
+  write_src2(DIR + "/vbase.lpc",
+             "int n;\n" +
+             "int bump() { return ++n; }\n" +
+             "string vv() { return \"vb1\"; }\n");
+  ob = load_object(DIR + "/virt");  // via master::compile_object
+  ASSERT(objectp(ob));
+  ASSERT(virtualp(ob));
+  ASSERT_EQ(DIR + "/virt", file_name(ob));
+  ob->bump();
+  ASSERT_EQ(2, ob->bump());
+  write_src2(DIR + "/vbase.lpc",
+             "int n;\n" +
+             "int bump() { return ++n; }\n" +
+             "string vv() { return \"vb2 bigger\"; }\n");
+  ASSERT(recompile_object(ob) >= 1);
+  ASSERT(ob == find_object(DIR + "/virt"));
+  ASSERT(virtualp(ob));
+  ASSERT_EQ("vb2 bigger", ob->vv());
+  ASSERT_EQ(3, ob->bump());
+
+  // A replace_program() registered DURING the update -- old code on a
+  // not-yet-swapped clone, driven from the first target's __INIT -- was
+  // computed against the program being replaced; the swap voids it, or
+  // the backend sweep would later corrupt the fresh variable block.
+  // The rest of this suite run doubles as the sweep detector.
+  write_src2(DIR + "/rp_parent.lpc",
+             "int p1;\nint p2;\nint p3;\n" +
+             "int get_p3() { return p3; }\n");
+  write_src2(DIR + "/rp_thing.lpc",
+             "inherit \"" + DIR + "/rp_parent\";\n" +
+             "int a1;\n" +
+             "void do_rp() { replace_program(\"" + DIR + "/rp_parent\"); }\n" +
+             "string version() { return \"rp1\"; }\n");
+  ob = load_object(DIR + "/rp_thing");
+  c1 = new(DIR + "/rp_thing");
+  write_src2(DIR + "/rp_thing.lpc",
+             "int x = 1;\n" +
+             "int kicked = kick();\n" +
+             "int kick() {\n" +
+             "  foreach (object o in children(\"" + DIR + "/rp_thing\"))\n" +
+             "    if (o != this_object()) catch(o->do_rp());\n" +
+             "  return 1;\n" +
+             "}\n" +
+             "string version() { return \"rp2\"; }\n");
+  ASSERT_EQ(2, recompile_object(ob));
+  ASSERT_EQ("rp2", ob->version());
+  ASSERT_EQ("rp2", c1->version());
 
   // An object may destruct itself from its new program's __INIT while
   // being updated: the swap survives, the caller's stack reference is

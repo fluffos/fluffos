@@ -351,6 +351,10 @@ This exact flow — including the deepest case, editing an include of an
   `clonep()`) to destruct or migrate stragglers. Either way, anything
   fetched via `"/path/name"->func()` or fresh `find_object()`/`new()`
   after the reload gets the new code.
+* **Virtual objects update through their backing program** — the
+  efun recompiles the real file the virtual object carries. The
+  daemon's dependency records are keyed by compiled program name, so
+  watch virtual objects via their backing file.
 * **Even the master and simul_efun objects can be recompiled** — the
   driver rebuilds their dispatch tables (with name-stable simul_efun
   indices) during the swap. Do it from a `call_out` or another idle

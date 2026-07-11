@@ -975,6 +975,12 @@ int recompile_object(object_t* target) {
     svalue_t* old_vars = ob->variables;
     program_t* prev_prog = ob->prog;
 
+    // Old code running on a not-yet-swapped target (driven from an
+    // earlier target's __INIT) may have registered a replace_program()
+    // since the pre-flight check: computed against the program we are
+    // replacing right now, so void it.
+    cancel_pending_replace_program(ob);
+
     reference_prog(new_prog, "recompile_object");
     ob->prog = new_prog;
     ob->prog_generation++;

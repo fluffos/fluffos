@@ -26,6 +26,29 @@ int replace_program_pending(object_t* ob) {
   return 0;
 }
 
+/*
+ * Void any pending replace_program() for ob. recompile_object() calls
+ * this at the moment it swaps ob's program: a pending entry's target
+ * program pointer and variable offset were computed against the
+ * program being replaced (old code may have registered it mid-update,
+ * e.g. from another target's __INIT), and letting the backend sweep
+ * apply it to the fresh program would corrupt the variable block. An
+ * entry registered AFTER the swap is computed against the new program
+ * and is left alone.
+ */
+void cancel_pending_replace_program(object_t* ob) {
+  replace_ob_t **prev = &obj_list_replace, *r;
+
+  while ((r = *prev)) {
+    if (r->ob == ob) {
+      *prev = r->next;
+      FREE((char*)r);
+    } else {
+      prev = &r->next;
+    }
+  }
+}
+
 void replace_programs() {
   replace_ob_t *r_ob, *r_next;
   int i, num_fewer, offset;
