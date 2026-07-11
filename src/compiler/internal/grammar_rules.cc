@@ -372,6 +372,9 @@ void rule_define_class_members(struct ident_hash_elem_t* class_ihe, LPC_INT clas
     }
   }
   free_all_local_names(0);
+  /* Reads 1 while the very next top-level def is parsed -- see
+     rule_def_global_var()'s combined-declaration diagnostic. */
+  g_compile.class_def_cooldown = 2;
 }
 
 // ============================================================================
@@ -401,6 +404,9 @@ void rule_primary_expr_parameter(parse_node_t** result, LPC_INT n) {
 }
 
 void rule_program_append(parse_node_t** result, parse_node_t* prog, parse_node_t* def) {
+  if (g_compile.class_def_cooldown) {
+    g_compile.class_def_cooldown--;
+  }
   CREATE_TWO_VALUES(*result, 0, prog, def);
 }
 

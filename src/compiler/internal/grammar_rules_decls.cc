@@ -22,8 +22,20 @@ struct parse_node_t* rule_block_or_semi(struct parse_node_t* block_node) {
 }
 
 void rule_def_global_var(LPC_INT type_val) {
-  if (!(type_val & ~(DECL_MODS)) && (pragmas & PRAGMA_STRICT_TYPES)) {
-    yyerror("Missing type for global variable declaration");
+  if (!(type_val & ~(DECL_MODS))) {
+    /* A typeless declaration immediately after a class body is almost
+       certainly the C-style combined form 'class Foo { ... } var;', which
+       LPC does not support -- the variable would silently get unknown
+       type. Diagnose it here instead of letting '->' fail later (#788). */
+    if (g_compile.class_def_cooldown == 1) {
+      yyerror(
+          "Variable declaration cannot follow a class body directly; "
+          "declare it separately with the class type: 'class Name varname;'");
+      return;
+    }
+    if (pragmas & PRAGMA_STRICT_TYPES) {
+      yyerror("Missing type for global variable declaration");
+    }
   }
 }
 

@@ -1,0 +1,11 @@
+// Fixture for single/tests/compiler/class_combined_decl.lpc (#788):
+// the C-style combined 'class Foo { ... } var;' form must be a targeted
+// compile error, not a silently unknown-typed variable.
+class Person {
+  string name;
+} Me;
+
+void create() {
+  Me = new(class Person);
+  Me->name = "Jeremy";
+}

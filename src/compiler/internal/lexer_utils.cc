@@ -1249,6 +1249,7 @@ static void start_new_file_prepared(char* prepared_base, size_t prepared_body, v
   compiler_pending_fixits.clear();
   rule_clear_operand_ranges();
   compiler_directive_start_line = 0;
+  g_compile.class_def_cooldown = 0;
 
   // lpc_lex_reset pops any pushed buffers an aborted compile left stacked
   // (it walks lpc_lex_pushed_depth(), so the kind stack must still be
