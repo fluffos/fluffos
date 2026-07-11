@@ -1,0 +1,47 @@
+// tuidemo — interactive demo of /std/tui (see /std/tui/DESIGN.md).
+//
+//   tuidemo        readline prompt: editing, ↑/↓ history, Ctrl-R search,
+//                  Tab completion over a few verbs; "quit" (or Ctrl-D) exits
+//   tuidemo app    full-screen widget demo: Tab cycles focus, arrows drive
+//                  the list, the field submits on Enter, q quits
+
+#include <tui.h>
+
+private string *verbs = ({ "look", "listen", "inventory", "invite", "quit", "quaff" });
+
+private string *complete_verb(string buf, int pos) {
+  // complete only the first word
+  if (strsrch(buf[0..pos - 1], " ") != -1) return ({});
+  return verbs;
+}
+
+private void got_line(mixed line, int st) {
+  object me = this_player();
+
+  if (st != TUI_RL_DONE) {
+    write(st == TUI_RL_ABORT ? "[aborted]\n" : "[eof]\n");
+    return;
+  }
+  if (line == "quit") {
+    write("bye.\n");
+    return;
+  }
+  if (line != "") write("you typed: " + line + "\n");
+  me->tui_readline((: got_line :),
+                   ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
+}
+
+int main(string arg) {
+  object me = this_player();
+
+  if (!me) return 0;
+  if (arg == "app") {
+    me->tui_open(new("/clone/tuidemo_app"));
+    return 1;
+  }
+  write("TUI readline demo: editing keys, Up/Down history, Ctrl-R search,\n"
+        "Tab completion.  'quit' or Ctrl-D exits.\n");
+  me->tui_readline((: got_line :),
+                   ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
+  return 1;
+}

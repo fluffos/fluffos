@@ -1,0 +1,227 @@
+// /std/tui/screen — layer 2 of the TUI library: virtual screen + renderer.
+//
+// A cell grid you draw into with scr_put()/scr_box()/scr_fill(); scr_frame()
+// returns the ANSI bytes that transform what the terminal currently shows
+// into the current grid — a full paint on the first call (or after
+// scr_invalidate()/scr_resize()), a minimal diff afterwards.
+//
+// Cells are ({ grapheme, sgr-params }) pairs; a double-width character owns
+// its left cell and marks the right cell with 0.  Attributes are SGR
+// parameter strings ("1;36" — compose them with ansi_fg()/ansi_bg()), and ""
+// means default.  Coordinates are 0-based, (0,0) top-left.
+//
+// Pure state machine: no I/O; the caller writes the returned bytes.
+
+#include <tui.h>
+
+inherit TUI_ANSI;
+
+private int W = 80, H = 24;
+private mixed *grid;              // H rows of W cells
+private mixed *prev = 0;          // grid as of the last scr_frame(); 0 = full paint
+private int cx = 0, cy = 0, cvis = 0;
+private int pvis = -1;            // cursor visibility already emitted
+
+private mixed *blank_row() {
+  mixed *row = allocate(W);
+  int x;
+
+  for (x = 0; x < W; x++) row[x] = ({ " ", "" });
+  return row;
+}
+
+void scr_clear() {
+  int y;
+
+  grid = allocate(H);
+  for (y = 0; y < H; y++) grid[y] = blank_row();
+}
+
+void scr_resize(int w, int h) {
+  W = w < 1 ? 1 : w;
+  H = h < 1 ? 1 : h;
+  scr_clear();
+  prev = 0;
+}
+
+void scr_invalidate() { prev = 0; }
+
+int scr_width() { return W; }
+int scr_height() { return H; }
+
+void scr_set_cursor(int x, int y, int visible) {
+  cx = x;
+  cy = y;
+  cvis = visible;
+}
+
+void create() { scr_clear(); }
+
+// Copy-on-write: after scr_frame(), grid rows are shared with prev; the
+// first write to a row in a new frame takes a private copy, so untouched
+// rows stay identity-equal to prev and the diff skips them wholesale.
+// (Cells themselves are immutable by convention — writes always assign
+// fresh ({ ch, attr }) arrays — which is what makes row sharing safe.)
+private mixed *row_for_write(int y) {
+  mixed *row = grid[y];
+
+  if (prev && row == prev[y]) {
+    row = row[0..];
+    grid[y] = row;
+  }
+  return row;
+}
+
+// Blank out the wide character occupying (or spilling into) column x.
+private void unwide(mixed *row, int x) {
+  if (x < 0 || x >= W) return;
+  if (!row[x]) {  // continuation: blank its owner
+    if (x > 0 && arrayp(row[x - 1])) row[x - 1] = ({ " ", row[x - 1][1] });
+    row[x] = ({ " ", "" });
+  } else if (x + 1 < W && !row[x + 1] && strwidth(row[x][0]) == 2) {
+    row[x + 1] = ({ " ", "" });  // owner is being overwritten: free its tail
+  }
+}
+
+// Write plain text (no escape sequences) at (x, y) with an SGR attr string.
+varargs void scr_put(int x, int y, string text, string attr) {
+  mixed *row;
+  int i, n;
+
+  if (y < 0 || y >= H || !stringp(text)) return;
+  if (!stringp(attr)) attr = "";
+  row = row_for_write(y);
+  n = strlen(text);
+  for (i = 0; i < n; i++) {
+    string ch = text[i..i];
+    int cw = strwidth(ch);
+
+    if (cw <= 0) continue;  // control / zero-width: not representable in cells
+    if (x < 0) {
+      x += cw;
+      continue;
+    }
+    if (x + cw > W) break;
+    unwide(row, x);
+    if (cw == 2) {
+      unwide(row, x + 1);
+      row[x] = ({ ch, attr });
+      row[x + 1] = 0;
+    } else {
+      row[x] = ({ ch, attr });
+    }
+    x += cw;
+  }
+}
+
+varargs void scr_fill(int x, int y, int w, int h, string ch, string attr) {
+  int i;
+  string line;
+
+  if (w <= 0 || h <= 0) return;
+  if (!stringp(ch) || strwidth(ch) != 1) ch = " ";
+  line = repeat_string(ch, w);
+  for (i = 0; i < h; i++) scr_put(x, y + i, line, attr);
+}
+
+varargs void scr_hline(int x, int y, int w, string ch, string attr) {
+  if (!stringp(ch)) ch = "─";
+  scr_fill(x, y, w, 1, ch, attr);
+}
+
+varargs void scr_vline(int x, int y, int h, string ch, string attr) {
+  int i;
+
+  if (!stringp(ch)) ch = "│";
+  for (i = 0; i < h; i++) scr_put(x, y + i, ch, attr);
+}
+
+varargs void scr_box(int x, int y, int w, int h, int style, string attr) {
+  string *chars;
+
+  if (w < 2 || h < 2) return;
+  switch (style) {
+    case TUI_BOX_DOUBLE:
+      chars = ({ "╔", "╗", "╚", "╝", "═", "║" });
+      break;
+    case TUI_BOX_ROUND:
+      chars = ({ "╭", "╮", "╰", "╯", "─", "│" });
+      break;
+    case TUI_BOX_ASCII:
+      chars = ({ "+", "+", "+", "+", "-", "|" });
+      break;
+    default:
+      chars = ({ "┌", "┐", "└", "┘", "─", "│" });
+      break;
+  }
+  scr_hline(x + 1, y, w - 2, chars[4], attr);
+  scr_hline(x + 1, y + h - 1, w - 2, chars[4], attr);
+  scr_vline(x, y + 1, h - 2, chars[5], attr);
+  scr_vline(x + w - 1, y + 1, h - 2, chars[5], attr);
+  scr_put(x, y, chars[0], attr);
+  scr_put(x + w - 1, y, chars[1], attr);
+  scr_put(x, y + h - 1, chars[2], attr);
+  scr_put(x + w - 1, y + h - 1, chars[3], attr);
+}
+
+private int cell_eq(mixed a, mixed b) {
+  if (!arrayp(a) || !arrayp(b)) return a == b;
+  return a[0] == b[0] && a[1] == b[1];
+}
+
+// The ANSI delta that brings the terminal up to date with the grid.
+string scr_frame() {
+  string o = "";
+  string cur_attr = 0;  // unknown at frame start
+  mixed *base = prev;
+  int x, y;
+
+  if (!base) {
+    o += ansi_sgr("0") + ansi_ed(2);
+    cur_attr = "";
+    base = allocate(H);
+    for (y = 0; y < H; y++) base[y] = blank_row();
+  }
+
+  for (y = 0; y < H; y++) {
+    mixed *row = grid[y];
+    mixed *brow = base[y];
+
+    if (row == brow) continue;  // row untouched since the last frame
+    x = 0;
+    while (x < W) {
+      if (cell_eq(row[x], brow[x])) {
+        x++;
+        continue;
+      }
+      // a changed span begins; a continuation cell repaints from its owner
+      if (!row[x] && x > 0) x--;
+      o += ansi_cup(x, y);
+      while (x < W && !cell_eq(row[x], brow[x])) {
+        mixed *c = row[x];
+
+        if (!c) {  // continuation of an unchanged owner: repaint the owner
+          c = row[x - 1];
+          o += ansi_cup(x - 1, y);
+          x--;
+        }
+        if (cur_attr != c[1]) {
+          o += ansi_sgr(c[1] == "" ? "0" : "0;" + c[1]);
+          cur_attr = c[1];
+        }
+        o += c[0];
+        x += strwidth(c[0]);
+      }
+    }
+  }
+
+  if (stringp(cur_attr) && cur_attr != "") o += ansi_sgr("0");
+  if (cvis != pvis) {
+    o += ansi_cursor_visible(cvis);
+    pvis = cvis;
+  }
+  if (cvis) o += ansi_cup(cx, cy);
+
+  prev = grid[0..];  // rows are now shared; row_for_write() un-shares on write
+  return o;
+}

@@ -1,0 +1,321 @@
+// /std/tui/keys — layer 1 of the TUI library: the keystroke decoder.
+//
+// get_char() delivers one keystroke per callback (a character, or one byte
+// of an escape sequence).  feed() consumes those strings and returns the
+// decoded events; see include/tui.h for the event representation.
+//
+// The decoder is time-agnostic: a lone ESC is indistinguishable from the
+// start of a sequence, so when has_pending() is true after a feed(), the
+// caller schedules a short timeout and calls flush() — which resolves a
+// dangling ESC to TUI_KEY_ESC.  A partially received CSI/SS3 sequence is
+// NOT flushed (mid-sequence bytes are only ever split by network lag; the
+// rest will arrive).  Pure state machine: clone one per connection.
+
+#include <tui.h>
+
+#define S_NONE  0
+#define S_ESC   1
+#define S_CSI   2
+#define S_SS3   3
+#define S_OSC   4
+#define S_PASTE 5
+
+private int state = S_NONE;
+private string csi = "";       // accumulated CSI parameter/intermediate bytes
+private string paste = "";     // accumulated bracketed-paste content
+private int osc_esc = 0;       // saw ESC inside OSC (looking for ST)
+private int pending_cr = 0;    // last plain char was CR: swallow a following LF
+
+void reset() {
+  state = S_NONE;
+  csi = paste = "";
+  osc_esc = pending_cr = 0;
+}
+
+// Only a bare ESC needs timer-based disambiguation.
+int has_pending() { return state == S_ESC; }
+
+// xterm modifier parameter -> TUI_MOD_* bits (2=shift 3=alt 5=ctrl ...).
+private int mods_of(int m) {
+  int r = 0;
+
+  if (m < 2) return 0;
+  m--;
+  if (m & 1) r |= TUI_MOD_SHIFT;
+  if (m & 2) r |= TUI_MOD_ALT;
+  if (m & 4) r |= TUI_MOD_CTRL;
+  return r;
+}
+
+private mixed *csi_tilde(int *ps) {
+  int k = sizeof(ps) ? ps[0] : 0;
+  int mod = sizeof(ps) > 1 ? mods_of(ps[1]) : 0;
+
+  switch (k) {
+    case 1:
+    case 7:
+      return ({ mod | TUI_KEY_HOME });
+    case 2:
+      return ({ mod | TUI_KEY_INSERT });
+    case 3:
+      return ({ mod | TUI_KEY_DELETE });
+    case 4:
+    case 8:
+      return ({ mod | TUI_KEY_END });
+    case 5:
+      return ({ mod | TUI_KEY_PGUP });
+    case 6:
+      return ({ mod | TUI_KEY_PGDN });
+    case 11..15:
+      return ({ mod | (TUI_KEY_F1 + k - 11) });
+    case 17..21:
+      return ({ mod | (TUI_KEY_F6 + k - 17) });
+    case 23:
+      return ({ mod | TUI_KEY_F11 });
+    case 24:
+      return ({ mod | TUI_KEY_F12 });
+    case 200:  // bracketed paste begins
+      state = S_PASTE;
+      paste = "";
+      return ({});
+    case 201:  // stray paste terminator
+      return ({});
+  }
+  return ({ TUI_KEY_UNKNOWN });
+}
+
+// CSI-u (modifyOtherKeys / kitty): "code;mods u"
+private mixed *csi_u(int *ps) {
+  int code = sizeof(ps) ? ps[0] : 0;
+  int mod = sizeof(ps) > 1 ? mods_of(ps[1]) : 0;
+
+  switch (code) {
+    case 13:
+      return ({ mod | TUI_KEY_ENTER });
+    case 9:
+      return ({ mod | TUI_KEY_TAB });
+    case 27:
+      return ({ mod | TUI_KEY_ESC });
+    case 8:
+    case 127:
+      return ({ mod | TUI_KEY_BACKSPACE });
+  }
+  if (!code) return ({ TUI_KEY_UNKNOWN });
+  if (!mod && code >= 32) return ({ sprintf("%c", code) });
+  return ({ mod | code });
+}
+
+private mixed *csi_final(string p, int c) {
+  int *ps = ({});
+  int mod = 0;
+
+  // SGR mouse: ESC [ < b ; x ; y M/m
+  if (strlen(p) && p[0] == '<' && (c == 'M' || c == 'm')) {
+    string *parts = explode(p[1..], ";");
+    if (sizeof(parts) == 3) {
+      return ({ ({ TUI_EV_MOUSE, to_int(parts[0]), to_int(parts[1]) - 1,
+                   to_int(parts[2]) - 1, c == 'M' }) });
+    }
+    return ({ TUI_KEY_UNKNOWN });
+  }
+
+  if (p != "") {
+    foreach (string part in explode(p, ";")) ps += ({ to_int(part) });
+  }
+  if (sizeof(ps) > 1) mod = mods_of(ps[1]);
+
+  switch (c) {
+    case 'A':
+      return ({ mod | TUI_KEY_UP });
+    case 'B':
+      return ({ mod | TUI_KEY_DOWN });
+    case 'C':
+      return ({ mod | TUI_KEY_RIGHT });
+    case 'D':
+      return ({ mod | TUI_KEY_LEFT });
+    case 'H':
+      return ({ mod | TUI_KEY_HOME });
+    case 'F':
+      return ({ mod | TUI_KEY_END });
+    case 'Z':
+      return ({ TUI_MOD_SHIFT | TUI_KEY_TAB });
+    case '~':
+      return csi_tilde(ps);
+    case 'u':
+      return csi_u(ps);
+    case 'P':
+      return ({ mod | TUI_KEY_F1 });
+    case 'Q':
+      return ({ mod | TUI_KEY_F2 });
+    case 'S':
+      return ({ mod | TUI_KEY_F4 });
+    case 'R':  // cursor position report (response to ESC[6n)
+      if (sizeof(ps) == 2) return ({ ({ TUI_EV_CPR, ps[0], ps[1] }) });
+      return ({ mod | TUI_KEY_F3 });
+  }
+  return ({ TUI_KEY_UNKNOWN });
+}
+
+private mixed *ss3_final(int c) {
+  switch (c) {
+    case 'A':
+      return ({ TUI_KEY_UP });
+    case 'B':
+      return ({ TUI_KEY_DOWN });
+    case 'C':
+      return ({ TUI_KEY_RIGHT });
+    case 'D':
+      return ({ TUI_KEY_LEFT });
+    case 'H':
+      return ({ TUI_KEY_HOME });
+    case 'F':
+      return ({ TUI_KEY_END });
+    case 'M':
+      return ({ TUI_KEY_ENTER });
+    case 'P':
+      return ({ TUI_KEY_F1 });
+    case 'Q':
+      return ({ TUI_KEY_F2 });
+    case 'R':
+      return ({ TUI_KEY_F3 });
+    case 'S':
+      return ({ TUI_KEY_F4 });
+  }
+  return ({ TUI_KEY_UNKNOWN });
+}
+
+private mixed *plain(string ch, int c) {
+  int was_cr = pending_cr;
+
+  pending_cr = 0;
+  switch (c) {
+    case 27:
+      state = S_ESC;
+      return ({});
+    case 13:
+      pending_cr = 1;
+      return ({ TUI_KEY_ENTER });
+    case 10:
+      return was_cr ? ({}) : ({ TUI_KEY_ENTER });
+    case 9:
+      return ({ TUI_KEY_TAB });
+    case 8:
+    case 127:
+      return ({ TUI_KEY_BACKSPACE });
+    case 1..7:
+    case 11:
+    case 12:
+    case 14..26:
+      return ({ TUI_MOD_CTRL | (c + 96) });  // C-a .. C-z
+    case 28..31:
+      return ({ TUI_MOD_CTRL | (c + 64) });  // C-\ C-] C-^ C-_
+    case 0:
+      return ({});
+  }
+  return ({ ch });
+}
+
+private mixed *esc_second(string ch, int c) {
+  switch (c) {
+    case '[':
+      state = S_CSI;
+      csi = "";
+      return ({});
+    case 'O':
+      state = S_SS3;
+      return ({});
+    case ']':
+      state = S_OSC;
+      osc_esc = 0;
+      return ({});
+    case 27:  // ESC ESC: emit one, stay armed for the next
+      return ({ TUI_KEY_ESC });
+    case 8:
+    case 127:
+      state = S_NONE;
+      return ({ TUI_MOD_ALT | TUI_KEY_BACKSPACE });
+    case 13:
+      state = S_NONE;
+      return ({ TUI_MOD_ALT | TUI_KEY_ENTER });
+    case 9:
+      state = S_NONE;
+      return ({ TUI_MOD_ALT | TUI_KEY_TAB });
+  }
+  state = S_NONE;
+  if (c < 32) return ({ TUI_MOD_ALT | TUI_MOD_CTRL | (c + 96) });
+  return ({ TUI_MOD_ALT | c });
+}
+
+private mixed *step(string ch) {
+  int c = ch[0];
+
+  switch (state) {
+    case S_NONE:
+      return plain(ch, c);
+
+    case S_ESC:
+      return esc_second(ch, c);
+
+    case S_CSI:
+      if (c >= 0x40 && c <= 0x7e) {
+        string p = csi;
+        state = S_NONE;
+        csi = "";
+        return csi_final(p, c);
+      }
+      if (strlen(csi) > 64) {  // runaway guard
+        state = S_NONE;
+        csi = "";
+        return ({ TUI_KEY_UNKNOWN });
+      }
+      csi += ch;
+      return ({});
+
+    case S_SS3:
+      state = S_NONE;
+      return ss3_final(c);
+
+    case S_OSC:
+      if (c == 7 || (osc_esc && c == '\\')) {
+        state = S_NONE;
+      } else {
+        osc_esc = c == 27;
+      }
+      return ({});
+
+    case S_PASTE:
+      paste += ch;
+      if (strlen(paste) >= 6 && paste[<6..] == "\e[201~") {
+        string text = paste[0..<7];
+        state = S_NONE;
+        paste = "";
+        return text == "" ? ({}) : ({ text });
+      }
+      return ({});
+  }
+  return ({});
+}
+
+// Decode a chunk of input exactly as get_char() delivered it.  Also accepts
+// longer strings (tests, pastes replayed in one piece).  Returns the array
+// of decoded events, possibly empty.
+mixed *feed(string chunk) {
+  mixed *evs = ({});
+  int i, n;
+
+  if (!stringp(chunk)) return evs;
+  if (chunk == "") {
+    // pre-2026 drivers delivered "" for Backspace/Delete in char mode
+    return state == S_NONE ? ({ TUI_KEY_BACKSPACE }) : ({});
+  }
+  n = strlen(chunk);
+  for (i = 0; i < n; i++) evs += step(chunk[i..i]);
+  return evs;
+}
+
+// Resolve a dangling lone ESC (called by the glue layer on timeout).
+mixed *flush() {
+  if (state != S_ESC) return ({});
+  state = S_NONE;
+  return ({ TUI_KEY_ESC });
+}

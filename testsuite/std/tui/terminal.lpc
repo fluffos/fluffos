@@ -1,0 +1,200 @@
+// /std/tui/terminal — layer 3 of the TUI library: the interactive glue.
+//
+// Inherit this into an interactive object (user/login).  Two modes:
+//
+//   Prompt mode — tui_readline(cb [, opts]) is an input_to() replacement
+//     giving the prompt line full editing, ↑/↓ history and Ctrl-R search.
+//     cb(line, state) is called on completion: state is TUI_RL_DONE (line
+//     is the string), or TUI_RL_ABORT / TUI_RL_EOF (line is 0).
+//     opts: ([ "prompt": str, "initial": str, "masked": int,
+//              "completer": function, "history": string* ]).
+//     History persists across calls for the lifetime of this object.
+//
+//   App mode — tui_open(app) hands the terminal to an application object
+//     (inherit /std/tui/app), on the alternate screen with the cursor
+//     hidden; tui_close() restores the terminal (the app's app_quit()
+//     calls it for you).
+//
+// The glue owns: the get_char re-arm loop (one keystroke per callback; the
+// no-echo flag on every re-arm keeps client echo off), NAWS/TTYPE caching
+// via the window_size/terminal_type applies, and the lone-ESC timeout.
+//
+// If this object can be destructed or lose its connection while a TUI is
+// active, call tui_destroy() from your remove()/net_dead() paths.
+
+#include <tui.h>
+
+inherit TUI_ANSI;
+
+#define MODE_IDLE 0
+#define MODE_RL   1
+#define MODE_APP  2
+
+private nosave object k_dec;      // /std/tui/keys clone
+private nosave object rl;         // /std/tui/readline clone (persistent history)
+private nosave object cur_app;
+private nosave function rl_cb = 0;
+private nosave int tui_mode = MODE_IDLE;
+private nosave int term_w = 80, term_h = 24;
+private nosave int have_naws = 0;
+private nosave string term_type = "";
+private nosave int esc_pending = 0;
+private nosave int negotiated = 0;
+
+int tui_width() { return term_w; }
+int tui_height() { return term_h; }
+string tui_term() { return term_type; }
+int tui_active() { return tui_mode != MODE_IDLE; }
+object tui_editor() { return rl; }
+
+void tui_send(string s) {
+  if (stringp(s) && s != "") receive(s);
+}
+
+// --- driver applies (this object must be the interactive) ---------------
+
+void window_size(int w, int h) {
+  term_w = w;
+  term_h = h;
+  have_naws = 1;
+  if (tui_mode == MODE_RL && rl) {
+    rl->rl_set_width(w);
+    tui_send(rl->rl_take_output());
+  } else if (tui_mode == MODE_APP && cur_app) {
+    cur_app->on_resize(w, h);
+    tui_send(cur_app->render());
+  }
+}
+
+void terminal_type(string term) { term_type = term; }
+
+// --- internals -----------------------------------------------------------
+
+private void negotiate() {
+  if (negotiated) return;
+  negotiated = 1;
+  request_term_size();
+  start_request_term_type();
+}
+
+protected void _tui_char(string ch);  // forward
+
+private void arm() { get_char((: _tui_char :), 1); }
+
+private void finish_readline(int st) {
+  function cb = rl_cb;
+  string line = st == TUI_RL_DONE ? rl->rl_line() : 0;
+
+  rl_cb = 0;
+  tui_mode = MODE_IDLE;
+  tui_send(ansi_bracketed_paste(0));
+  if (functionp(cb)) evaluate(cb, line, st);
+}
+
+private void dispatch(mixed ev) {
+  switch (tui_mode) {
+    case MODE_RL: {
+      int st = rl->rl_feed(ev);
+
+      tui_send(rl->rl_take_output());
+      if (st != TUI_RL_MORE) finish_readline(st);
+      return;
+    }
+    case MODE_APP:
+      if (arrayp(ev) && sizeof(ev) && ev[0] == TUI_EV_MOUSE) {
+        cur_app->on_mouse(ev);
+      } else {
+        cur_app->on_key(ev);
+      }
+      // the app may have quit (tui_close() zeroes cur_app / destructs it)
+      if (cur_app) tui_send(cur_app->render());
+      return;
+  }
+}
+
+private void esc_flush() {
+  esc_pending = 0;
+  if (tui_mode == MODE_IDLE || !k_dec) return;
+  foreach (mixed ev in k_dec->flush()) {
+    if (tui_mode != MODE_IDLE) dispatch(ev);
+  }
+  if (tui_mode == MODE_IDLE) remove_get_char(this_object());
+}
+
+protected void _tui_char(string ch) {
+  mixed *evs;
+
+  if (tui_mode == MODE_IDLE) return;  // stray keystroke after teardown
+  evs = k_dec->feed(ch);
+  foreach (mixed ev in evs) {
+    if (tui_mode != MODE_IDLE) dispatch(ev);
+  }
+  if (tui_mode != MODE_IDLE) {
+    arm();
+    if (k_dec->has_pending() && !esc_pending) {
+      esc_pending = 1;
+      call_out_walltime((: esc_flush :), 0.06);
+    }
+  }
+}
+
+private void ensure_clones() {
+  if (!k_dec) k_dec = clone_object(TUI_KEYS);
+  if (!rl) rl = clone_object(TUI_READLINE);
+}
+
+// --- public API ------------------------------------------------------------
+
+varargs void tui_readline(function cb, mapping opts) {
+  if (tui_mode != MODE_IDLE) error("tui_readline: a TUI is already active.\n");
+  if (!functionp(cb)) error("tui_readline: callback required.\n");
+  ensure_clones();
+  negotiate();
+  k_dec->reset();
+  if (!mapp(opts)) opts = ([]);
+  rl->rl_set_prompt(stringp(opts["prompt"]) ? opts["prompt"] : "> ");
+  rl->rl_set_masked(opts["masked"]);
+  rl->rl_set_completer(opts["completer"]);
+  if (arrayp(opts["history"])) rl->rl_set_history(opts["history"]);
+  rl->rl_set_width(term_w);
+  rl_cb = cb;
+  tui_mode = MODE_RL;
+  tui_send(ansi_bracketed_paste(1) + rl->rl_begin(opts["initial"]));
+  arm();
+}
+
+varargs void tui_open(object app, mapping opts) {
+  if (tui_mode != MODE_IDLE) error("tui_open: a TUI is already active.\n");
+  if (!objectp(app)) error("tui_open: app object required.\n");
+  ensure_clones();
+  negotiate();
+  k_dec->reset();
+  if (!mapp(opts)) opts = ([]);
+  cur_app = app;
+  tui_mode = MODE_APP;
+  tui_send(ansi_alt_screen(1) + ansi_cursor_visible(0) + ansi_bracketed_paste(1) +
+           (opts["mouse"] ? ansi_mouse(1) : ""));
+  app->on_open(this_object(), term_w, term_h);
+  tui_send(app->render());
+  arm();
+}
+
+void tui_close() {
+  if (tui_mode == MODE_APP) {
+    tui_send(ansi_mouse(0) + ansi_bracketed_paste(0) + ansi_cursor_visible(1) +
+             ansi_sgr("0") + ansi_alt_screen(0));
+  } else if (tui_mode == MODE_RL) {
+    tui_send(ansi_bracketed_paste(0) + "\r\n");
+  }
+  cur_app = 0;
+  rl_cb = 0;
+  tui_mode = MODE_IDLE;
+  remove_get_char(this_object());
+}
+
+// Full teardown: call from remove() / net_dead() of the inheriting object.
+void tui_destroy() {
+  if (tui_mode != MODE_IDLE) tui_close();
+  if (k_dec) destruct(k_dec);
+  if (rl) destruct(rl);
+}

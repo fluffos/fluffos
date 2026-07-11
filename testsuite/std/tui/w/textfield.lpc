@@ -1,0 +1,68 @@
+// /std/tui/w/textfield — single-line input field.
+//
+// Editing is delegated to a private /std/tui/readline engine (so the field
+// gets the full keymap: word motion, kill/yank, history if you seed it);
+// the field renders the engine's buffer into the screen grid itself.
+//
+// Events: ("submit", line) on Enter.  Tab/Shift-Tab/Escape are not consumed,
+// so the app can cycle focus.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private object rl;
+private int scroll = 0;
+private string attr = "4";  // underline
+
+void create() {
+  w_focusable = 1;
+  wh = 1;
+  rl = clone_object(TUI_READLINE);
+  rl->rl_set_prompt("");
+  rl->rl_begin("");
+}
+
+void remove() {
+  if (rl) destruct(rl);
+}
+
+void set_attr(string a) { attr = stringp(a) ? a : ""; }
+void set_text(string t) { rl->rl_begin(stringp(t) ? t : ""); }
+string query_text() { return rl->rl_line(); }
+object query_editor() { return rl; }
+
+void draw(object scr) {
+  string disp = rl->rl_line();
+  int cpos = rl->rl_cursor();
+  int cur = cpos > 0 ? strwidth(disp[0..cpos - 1]) : 0;
+  string view;
+  if (cur < scroll) scroll = cur;
+  if (cur >= scroll + ww) scroll = cur - ww + 1;
+  view = wslice(disp, scroll, ww - 1);
+  scr->scr_put(wx, wy, wpad(view, ww), attr);
+  if (w_focused) scr->scr_set_cursor(wx + cur - scroll, wy, 1);
+}
+
+int handle_key(mixed ev) {
+  int st;
+
+  // leave focus / app navigation to the container
+  if (ev == TUI_KEY_TAB || ev == (TUI_MOD_SHIFT | TUI_KEY_TAB) || ev == TUI_KEY_ESC ||
+      ev == TUI_KEY_UP || ev == TUI_KEY_DOWN) {
+    return 0;
+  }
+  if (!stringp(ev) && !intp(ev)) return 0;
+  st = rl->rl_feed(ev);
+  rl->rl_take_output();  // the field draws itself; discard line-oriented bytes
+  if (st == TUI_RL_DONE) {
+    emit_event("submit", rl->rl_line());
+    rl->rl_begin("");
+    scroll = 0;
+  } else if (st != TUI_RL_MORE) {
+    rl->rl_begin("");
+    scroll = 0;
+  }
+  return 1;
+}
