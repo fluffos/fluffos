@@ -71,6 +71,10 @@ static const int TAG_PARSER = (TAG_PERMANENT + 37);
 #endif
 static const int TAG_INPUT_TO = (TAG_PERMANENT + 38);
 static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
+// An object's variable block (vm/internal/base/object.cc
+// allocate_object_variables) -- separate from the object_t allocation
+// so recompile_object() can swap programs with a different variable count.
+static const int TAG_OBJ_VARS = (TAG_PERMANENT + 40);
 // Compile-arena chunks (compiler/internal/scratchpad.cc): retained across
 // compiles by design -- whitelisted in check_all_blocks like the other
 // persistent driver infrastructure.

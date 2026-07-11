@@ -12,9 +12,7 @@ void dealloc_funp(funptr_t* fp) {
 
   switch (fp->hdr.type) {
     case FP_LOCAL | FP_NOT_BINDABLE:
-      if (fp->hdr.owner) {
-        prog = fp->hdr.owner->prog;
-      }
+      prog = fp->f.local.prog;
       break;
     case FP_FUNCTIONAL:
     case FP_FUNCTIONAL | FP_NOT_BINDABLE:
@@ -99,6 +97,7 @@ funptr_t* make_efun_funp(int opcode, svalue_t* args) {
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_efun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_efun_funp");
+  fp->hdr.owner_gen = current_object->prog_generation;
   fp->hdr.type = FP_EFUN;
 
   fp->f.efun.index = opcode;
@@ -127,11 +126,13 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_lfun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
+  fp->hdr.owner_gen = current_object->prog_generation;
   fp->hdr.type = FP_LOCAL | FP_NOT_BINDABLE;
 
-  fp->hdr.owner->prog->func_ref++;
-  debug(d_flag, "add func ref /%s: now %i\n", fp->hdr.owner->prog->filename,
-        fp->hdr.owner->prog->func_ref);
+  fp->f.local.prog = current_object->prog;
+  fp->f.local.prog->func_ref++;
+  debug(d_flag, "add func ref /%s: now %i\n", fp->f.local.prog->filename,
+        fp->f.local.prog->func_ref);
 
   newindex = index + function_index_offset;
   if (current_object->prog->function_flags[newindex] & FUNC_ALIAS) {
@@ -156,6 +157,7 @@ funptr_t* make_simul_funp(int index, svalue_t* args) {
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_simul_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_simul_funp");
+  fp->hdr.owner_gen = current_object->prog_generation;
   fp->hdr.type = FP_SIMUL;
 
   fp->f.simul.index = index;
@@ -184,6 +186,7 @@ funptr_t* make_functional_funp(short num_arg, short num_local, short len, svalue
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_functional_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_functional_funp");
+  fp->hdr.owner_gen = current_object->prog_generation;
   fp->hdr.type = FP_FUNCTIONAL + flag;
 
   current_prog->func_ref++;
@@ -219,6 +222,21 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
   if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED)) {
     error("Owner (/%s) of function pointer is destructed.\n",
           (funp->hdr.owner ? funp->hdr.owner->obname : "(null)"));
+  }
+  /* FP_LOCAL indices and FP_FUNCTIONAL variable offsets are relative to
+     the owner's program layout when the pointer was made; after a
+     recompile_object() they would run the wrong function or scribble over the
+     re-laid-out variables. Fail cleanly instead. */
+  switch (funp->hdr.type & FP_MASK) {
+    case FP_LOCAL:
+    case FP_FUNCTIONAL:
+      if (funp->hdr.owner_gen != funp->hdr.owner->prog_generation) {
+        error("Stale function pointer: owner /%s was recompiled since it was created.\n",
+              funp->hdr.owner->obname);
+      }
+      break;
+    default:
+      break;
   }
   setup_fake_frame(funp);
   if ((v = funp->hdr.args)) {

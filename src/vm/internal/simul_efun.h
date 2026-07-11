@@ -10,6 +10,7 @@ extern struct function_lookup_info_t* simuls;
 
 void init_simul_efun(const char*);
 void set_simul_efun(struct object_t*);
+void rebuild_simul_efuns();
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_simuls(void);

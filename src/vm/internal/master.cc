@@ -88,6 +88,20 @@ static void get_master_applies(object_t* ob) {
   }
 }
 
+/*
+ * Rebuild the cached apply-name -> function table after
+ * recompile_object() swapped a fresh program into the live master
+ * object. Must run before any LPC executes against the new program
+ * (its __INIT included): apply_master_ob() dispatches through this
+ * table by runtime index, and the old entries point into the old
+ * program's function table.
+ */
+void rebuild_master_applies() {
+  if (master_ob) {
+    get_master_applies(master_ob);
+  }
+}
+
 void set_master(object_t* ob) {
 #if defined(PACKAGE_UIDS) || defined(PACKAGE_MUDLIB_STATS)
   int first_load = (!master_ob);
@@ -95,10 +109,12 @@ void set_master(object_t* ob) {
   svalue_t* ret;
 
   get_master_applies(ob);
-  master_ob = ob;  // from here on apply_master_ob returns -1 only as return from the apply
+  if (master_ob != ob) {
+    master_ob = ob;  // from here on apply_master_ob returns -1 only as return from the apply
 
-  /* Make sure master_ob is never made a dangling pointer. */
-  add_ref(master_ob, "set_master");
+    /* Make sure master_ob is never made a dangling pointer. */
+    add_ref(master_ob, "set_master");
+  }
 #ifndef PACKAGE_UIDS
 #ifdef PACKAGE_MUDLIB_STATS
   if (first_load) {

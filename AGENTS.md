@@ -17,7 +17,7 @@ FluffOS is a high-performance LPMUD driver and game engine. Its codebase is stru
   - `wasm/`: WebAssembly target files (JS transport, exported entry points, crash-handler stub).
 * **`src/vm/`**: The execution VM and LPC bytecode interpreter.
   - `interpret.cc`: The core bytecode interpreter loop (`eval_instruction`).
-  - `simulate.cc`: Object loading, cloning, destruction, and simulation event loops.
+  - `simulate.cc`: Object loading, cloning, destruction, and simulation event loops; also `recompile_object()` (in-place program update: recompiles a source file and swaps the program into the live master copy and all clones, carrying variables over by name -- see docs/concepts/general/hot_reload.md).
   - `vm.cc`: VM startup and master object callbacks.
 * **`src/compiler/`**: The LPC parser, compiler, and code generator.
   - `grammar.y` / `grammar.autogen.cc`: Bison rules compiling LPC scripts to bytecode.
@@ -71,6 +71,11 @@ LPC variables are dynamically typed and managed via the `svalue_t` structure. Me
 * Compound types (`T_ARRAY`, `T_MAPPING`, `T_BUFFER`, `T_CLASS`, and ref-counted `T_STRING` strings) are reference-counted.
 * If you copy a pointer to one of these types into another structure, you must increment its ref count (e.g., `arr->ref++`).
 * If you overwrite or destroy a reference, you must decrement its ref count or use `free_svalue(sval, tag)` to clean it up safely.
+
+### Object Variable Block & Allocation Tags
+* An object's global variables are a SEPARATE allocation from the `object_t` itself (`ob->variables`, `TAG_OBJ_VARS`, always >= 1 svalue, sized to `prog->num_variables_total`) -- this is what lets `recompile_object()` swap a program with a different variable count onto a live object. Allocate via `allocate_object_variables()`; `tot_alloc_object_size` accounting uses `sizeof(object_t) + (max(n,1)-1)*sizeof(svalue_t)`.
+* When introducing a new DMALLOC tag, wire it into the debug-build walkers in `packages/develop/checkmemory.cc` (a `DO_MARK` at the owning object's mark site plus an orphan-report case), or every testsuite run on a Debug build will flag the blocks. Pick a free `TAG_PERMANENT + n` slot in `base/internal/debugmalloc.h`.
+* `destruct_object()` SWEEPS the VM stack (`remove_object_from_stack`): any efun that runs arbitrary LPC (applies, `__INIT`) before cleaning up an object argument must free it with `free_svalue(sp, ...)`, never `free_object(&sp->u.ob, ...)` -- the slot may have become a plain number 0.
 
 ### String Allocations
 * **Constant Strings (`STRING_CONSTANT`)**: Not ref-counted or freed (point directly to literal read-only memory).
@@ -126,6 +131,7 @@ FluffOS uses GitHub Actions for CI on pull requests and pushes to `master`.
 * **Testing Targets**:
   - `driver-testsuite`: Boots the local driver pointing to the test configuration.
   - `driver-fulltest` / `driver-autotest`: Runs the LPC test suite and reports results before exiting.
+* **Harness facts that bite:** LPC fixture files must live OUTSIDE `testsuite/single/tests/` (use `/clone/...` or write them at runtime under `/data/...`) -- the runner executes every `tests/**/*.lpc` in RANDOMIZED order. Tests that register global state (e.g. `master->set_compile_hooks()`) must tear it down UNCONDITIONALLY: ASSERT macros record-and-continue, so wrap the body in `catch(run_checks())`, clean up, then re-`error()`. `master::flag()` sits on the call stack for the entire run (so e.g. the master object can never be recompiled from inside a test; use a `call_out` that fires post-run and `shutdown(-1)`s on failure -- call_outs only fire after the suite in FULL runs, never in single-file runs, which shut down synchronously). A plain `-ftest:` filter needs the FULL test path; suite runs dirty `testsuite/aw_test.txt` and `testsuite/trace_test.json` (restore before committing). `file_name(ob)` returns a leading slash.
 * **The LPC suite is a real pass/fail gate, registered with ctest.** the ctest test is named `testsuite` — `ctest -R testsuite` (equivalently the `driver-autotest` CMake target) runs `driver etc/config.test -ftest`; CI runs `ctest -LE testsuite` (GTest) and `ctest -L testsuite` (this suite) as separate steps. The runner (`testsuite/command/tests.lpc`) prints gtest-style `[ RUN ]/[ OK ]/[ FAILED ]` blocks with per-file timing; **failed checks are recorded and the run continues** (one run reports every failure), then a recap lists the failed files and the driver exits nonzero. A clean run prints `Checks succeeded.` and exits 0 — that pair is the sound pass signal. Filter runs with `-ftest:single/tests/efuns/foo.lpc` (one file) or `-ftest:efuns/dual*` (glob). When touching the lexer/parser, run the suite 2–3× (it randomizes test file order) and prefer both a Debug ASan build and a `RelWithDebInfo` build (some issues are release-only).
 
 ---
@@ -155,6 +161,11 @@ When editing compiler, VM, or package features, keep these structural mechanics 
 ### Applies (Driver-to-LPC Callbacks)
 * "Applies" are standard callbacks that the driver VM invokes on LPC objects during specific runtime events (e.g., `create` during cloning, `init` when entering a room, `clean_up` during sweep collections).
 * Applies are mapped using the `applies_table.autogen.cc` lookup tables.
+* **Compile-time master applies** `inherit_program(from, path, priv)` and `include_file(compiled, from, path)` are consulted for every inherit statement / #include directive: string return redirects the path, array-of-strings return supplies the source text itself, any other return denies. They run MID-COMPILE (same precedent as `valid_override`/`get_include_path`): implementations must never trigger another compile. Reference pages in docs/apply/master/; the dependency graph they expose powers the hot-reload daemon (`testsuite/single/hot_reload.lpc`).
+
+### Hot Reload (`recompile_object()`)
+* `recompile_object(master_copy)` recompiles the source and swaps the program into the live master copy and every clone -- no destruct, identity preserved, variables carried by name (private included; new program's `__INIT` runs first, then surviving names get old values). Works for the master object, the simul_efun object (their cached dispatch tables `master_applies`/`simuls` are rebuilt against the new program BEFORE its `__INIT` runs; simul indices are name-stable by design) and virtual objects (the backing program is what recompiles).
+* Invariants when touching this machinery: refuse while any live frame executes the old program (bytecode/variable indices are layout-relative); void pending `replace_program()` entries at each target's swap point (`cancel_pending_replace_program` -- entries are computed against the program being replaced and old code can register one mid-update); function pointers that depend on the owner's layout (`FP_LOCAL`, `FP_FUNCTIONAL`) carry an `owner_gen` snapshot of `ob->prog_generation` and error cleanly when stale; `FP_LOCAL` funptrs store their creation program and account `func_ref` against IT (creation/destruction must stay symmetric -- decrementing `owner->prog` corrupts counts after a swap).
 
 ---
 

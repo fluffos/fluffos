@@ -2,6 +2,7 @@
 #define _REPLACE_PROGRAM_H_
 
 int replace_program_pending(object_t*);
+void cancel_pending_replace_program(object_t*);
 void replace_programs(void);
 
 typedef struct replace_ob_s {

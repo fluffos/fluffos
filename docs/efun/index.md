@@ -346,6 +346,7 @@ title: EFUN
 * [present](objects/present)
 * [query_heart_beat](objects/query_heart_beat)
 * [query_notify_destruct](objects/query_notify_destruct)
+* [recompile_object](objects/recompile_object)
 * [reload_object](objects/reload_object)
 * [restore_object](objects/restore_object)
 * [save_object](objects/save_object)

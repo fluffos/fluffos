@@ -101,11 +101,15 @@ static void get_simul_efuns(program_t* prog) {
 
   if (num_simul_efun) {
     remove_simuls();
-    if (!num_new) {
-      FREE(simul_names);
-      FREE(simuls);
-      num_simul_efun = 0;
-    } else {
+    /* Do NOT free the tables when the new program defines no simuls:
+     * previously-compiled programs still carry F_SIMUL_EFUN opcodes and
+     * FP_SIMUL funptrs with baked indices into these arrays (live across
+     * a recompile of the simul_efun object). remove_simuls() has already
+     * tombstoned every entry (func = nullptr), which yields the clean
+     * "no longer a simul_efun" error; keeping the arrays preserves the
+     * name->index mapping so any re-added simul reuses its slot. Only
+     * grow the arrays when there are new candidate functions. */
+    if (num_new) {
       /* will be resized later */
       simul_names =
           RESIZE(simul_names, num_simul_efun + num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
@@ -179,8 +183,27 @@ static void find_or_add_simul_efun(function_t* funp, int runtime_index) {
 void set_simul_efun(object_t* ob) {
   get_simul_efuns(ob->prog);
 
-  simul_efun_ob = ob;
-  add_ref(simul_efun_ob, "set_simul_efun");
+  if (simul_efun_ob != ob) {
+    simul_efun_ob = ob;
+    add_ref(simul_efun_ob, "set_simul_efun");
+  }
+}
+
+/*
+ * Rebuild the simul_efun dispatch table after recompile_object()
+ * swapped a fresh program into the live simul_efun object. Must run
+ * before any LPC executes against the new program (its __INIT
+ * included): call_simul_efun() dispatches by runtime index through
+ * this table, and the old entries point into the old program's
+ * function table. Indices are preserved by NAME across the rebuild
+ * (see get_simul_efuns), so calls compiled into other programs keep
+ * working; a simul_efun removed by the new source fails with the
+ * usual "no longer a simul_efun" error.
+ */
+void rebuild_simul_efuns() {
+  if (simul_efun_ob) {
+    get_simul_efuns(simul_efun_ob->prog);
+  }
 }
 
 void call_simul_efun(unsigned short index, int num_arg) {

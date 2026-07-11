@@ -562,7 +562,7 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
         break;
       case F_SIMUL_EFUN:
         COPY_SHORT(&sarg, pc);
-        if (sarg >= num_simul_efun) {
+        if (sarg >= num_simul_efun || !simuls[sarg].func) {
           sprintf(buff, "<invalid %d> %d\n", sarg, pc[2]);
         } else {
           sprintf(buff, "\"%s\" args: %d", simuls[sarg].func->funcname, pc[2]);
@@ -574,7 +574,9 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
         switch (EXTRACT_UCHAR(pc++)) {
           case FP_SIMUL:
             LOAD_SHORT(sarg, pc);
-            sprintf(buff, "<simul_efun> \"%s\"", simuls[sarg].func->funcname);
+            sprintf(buff, "<simul_efun> \"%s\"",
+                    (sarg < num_simul_efun && simuls[sarg].func) ? simuls[sarg].func->funcname
+                                                                 : "<removed>");
             break;
           case FP_EFUN:
             LOAD_SHORT(sarg, pc);

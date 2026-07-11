@@ -4,16 +4,21 @@
 /* It is usually better to include "lpc_incl.h" instead of including this
    directly */
 
+/* FP_SIMUL / FP_EFUN */
+typedef struct {
+  short index;
+} simul_ptr_t;
+typedef simul_ptr_t efun_ptr_t;
+
 /* FP_LOCAL */
 typedef struct {
   short index;
+  /* The owner's program when the pointer was made: `index` is relative
+     to ITS function table, and it is the program whose func_ref this
+     pointer holds. The owner's live prog can move on (recompile_object),
+     so creation/destruction accounting must use this one. */
+  struct program_t* prog;
 } local_ptr_t;
-
-/* FP_SIMUL */
-typedef local_ptr_t simul_ptr_t;
-
-/* FP_EFUN */
-typedef local_ptr_t efun_ptr_t;
 
 /* FP_FUNCTIONAL */
 struct functional_t {
@@ -34,6 +39,13 @@ struct funptr_hdr_t {
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
+  /* owner->prog_generation at creation/bind time. FP_LOCAL indices and
+     FP_FUNCTIONAL variable offsets are relative to the owner's program
+     LAYOUT at that moment; if recompile_object() has swapped the program
+     since, calling through them would run the wrong function or corrupt
+     variables -- the call path compares generations and errors
+     cleanly instead. */
+  uint32_t owner_gen;
   struct object_t* owner;
   struct array_t* args;
 };

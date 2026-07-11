@@ -81,6 +81,9 @@ struct object_t {
 #endif
   uint64_t time_of_ref; /* Time when last referenced. Used by clean_uo */
   program_t* prog;
+  uint32_t prog_generation; /* bumped by recompile_object() when prog is swapped
+                               on the live object; funptrs snapshot it so
+                               stale index-based pointers fail cleanly */
   struct object_t* next_all;
   struct object_t* prev_all;
 #ifndef NO_ENVIRONMENT
@@ -115,8 +118,11 @@ struct object_t {
 #ifdef PACKAGE_PARSER
   struct parse_info_s* pinfo;
 #endif
-  svalue_t variables[1]; /* All variables to this program */
-                         /* The variables MUST come last in the struct */
+  svalue_t* variables; /* All variables to this program. A separate
+                          allocation (TAG_OBJ_VARS) sized to
+                          prog->num_variables_total (min 1), so
+                          recompile_object() can swap in a program with a
+                          different variable count on the live object. */
 };
 
 typedef int (*get_objectsfn_t)(object_t*, void*);
@@ -165,6 +171,7 @@ int object_visible(object_t*);
 #define object_visible(x) 1
 #endif
 int find_global_variable(program_t*, const char* const, unsigned short*, int);
+svalue_t* allocate_object_variables(int num_var);
 void dealloc_object(object_t*, const char*);
 void get_objects(object_t***, int*, get_objectsfn_t, void*);
 #ifdef DEBUGMALLOC_EXTENSIONS

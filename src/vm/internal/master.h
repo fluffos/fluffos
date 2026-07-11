@@ -14,5 +14,6 @@ void init_master(const char*);
 struct svalue_t* apply_master_ob(int, int);
 struct svalue_t* safe_apply_master_ob(int, int);
 void set_master(struct object_t*);
+void rebuild_master_applies();
 
 #endif
