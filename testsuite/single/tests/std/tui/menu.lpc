@@ -1,0 +1,74 @@
+// /std/tui/menu: the inline select / multiselect engine.
+
+#include <tui.h>
+
+void do_tests() {
+  object m = clone_object(TUI_MENU);
+  string o;
+
+  // single select
+  o = m->m_begin("Pick a class:", ({ "warrior", "mage", "thief" }));
+  ASSERT(strsrch(o, "? Pick a class:") != -1);
+  ASSERT(strsrch(o, "❯") != -1);
+  ASSERT(strsrch(o, "warrior") != -1);
+  ASSERT_EQ(TUI_RL_MORE, m->m_state());
+
+  ASSERT_EQ(TUI_RL_MORE, m->m_feed(TUI_KEY_DOWN));
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_ENTER));
+  ASSERT_EQ(1, m->m_result());
+  ASSERT_EQ("mage", m->m_item(m->m_result()));
+  o = m->m_take_output();
+  ASSERT(strsrch(o, "mage") != -1);       // collapsed answer line
+  ASSERT(strsrch(o, "\e[0J") != -1);      // list cleared below
+
+  // keys after completion are ignored
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_DOWN));
+  ASSERT_EQ(1, m->m_result());
+
+  // abort restores nothing but reports the state
+  m->m_begin("Q:", ({ "x", "y" }));
+  ASSERT_EQ(TUI_RL_ABORT, m->m_feed(TUI_KEY_ESC));
+  m->m_begin("Q:", ({ "x", "y" }));
+  ASSERT_EQ(TUI_RL_ABORT, m->m_feed(TUI_CTRL('c')));
+
+  // multiselect: space toggles, enter accepts
+  o = m->m_begin("Skills:", ({ "a", "b", "c" }), ([ "multi": 1 ]));
+  ASSERT(strsrch(o, "[ ]") != -1);
+  m->m_feed(" ");                          // check a
+  m->m_feed(TUI_KEY_DOWN);
+  m->m_feed(" ");                          // check b
+  m->m_feed(" ");                          // uncheck b
+  m->m_feed(TUI_KEY_DOWN);
+  m->m_feed(" ");                          // check c
+  ASSERT_EQ(({ 0, 2 }), m->m_result());
+  o = m->m_take_output();
+  ASSERT(strsrch(o, "[x]") != -1);
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_ENTER));
+  ASSERT_EQ(({ 0, 2 }), m->m_result());
+
+  // enter with nothing checked picks the item under the cursor
+  m->m_begin("M2:", ({ "a", "b" }), ([ "multi": 1 ]));
+  m->m_feed(TUI_KEY_DOWN);
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_ENTER));
+  ASSERT_EQ(({ 1 }), m->m_result());
+
+  // preselection
+  m->m_begin("M3:", ({ "a", "b", "c" }), ([ "multi": 1, "checked": ({ 2 }) ]));
+  ASSERT_EQ(({ 2 }), m->m_result());
+
+  // height windowing: only `height` choices visible, overflow marked
+  o = m->m_begin("H:", ({ "one", "two", "three", "four", "five" }), ([ "height": 2 ]));
+  ASSERT(strsrch(o, "one") != -1);
+  ASSERT(strsrch(o, "three") == -1);
+  ASSERT(strsrch(o, "…") != -1);
+  m->m_feed(TUI_KEY_END);
+  o = m->m_take_output();
+  ASSERT(strsrch(o, "five") != -1);
+  ASSERT(strsrch(o, "one") == -1);
+
+  // an empty choice list aborts immediately
+  m->m_begin("E:", ({}));
+  ASSERT_EQ(TUI_RL_ABORT, m->m_state());
+
+  destruct(m);
+}

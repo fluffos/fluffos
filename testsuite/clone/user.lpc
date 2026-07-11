@@ -7,7 +7,7 @@
 
 inherit BASE;
 // TUI support: tui_readline() prompts, tui_open() full-screen apps, and the
-// window_size/terminal_type applies (see /std/tui/DESIGN.md).
+// window_size/terminal_type applies (see /std/tui/README.md).
 inherit TUI_TERMINAL;
 
 private string name;

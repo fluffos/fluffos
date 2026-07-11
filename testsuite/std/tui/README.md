@@ -1,13 +1,27 @@
-# LPC TUI Library — Design
+# /std/tui — the LPC TUI library
 
-A terminal UI toolkit written in pure LPC, layered like `readline` + `ncurses`:
-line editing / history / incremental search for the prompt line, plus a screen
-buffer, diff renderer, and widget set for full-screen TUIs. Lives in
-`/std/tui/` of the testsuite mudlib and is portable to any FluffOS mudlib.
+A terminal UI toolkit written in pure LPC, layered like `readline` +
+`ncurses` + `pterm`: line editing / history / incremental search for the
+prompt line, inline select/multiselect/confirm prompts and pretty-printers
+for ordinary output, plus a screen buffer, diff renderer, and widget set for
+full-screen TUIs. Lives in `/std/tui/` of the testsuite mudlib and is
+portable to any FluffOS mudlib.
+
+**Try it**: boot the testsuite (`driver etc/config.test`), telnet to port
+4000, and run the showcases:
+
+| Command | Shows |
+|---|---|
+| `tuidemo` | readline prompt: editing, ↑/↓ history, Ctrl-R search, Tab completion |
+| `tuidemo select` | inline select → multiselect → confirm prompt chain |
+| `tuidemo print` | the pterm-style printers, in plain line mode |
+| `tuidemo app` | minimal full-screen app (list + textfield) |
+| `tuidemo dashboard` | animated spinner, progress bars, sparkline, live table + log |
+| `tuidemo form` | textfield, radio group, checkbox list, buttons |
 
 ## 1. Driver substrate (research summary)
 
-Everything the library needs already exists in the driver, with two quirks
+Everything the library needs already exists in the driver, with the quirks
 fixed as part of this work (see §6):
 
 | Capability | Mechanism |
@@ -44,18 +58,20 @@ efuns with side effects, no interactivity — so the whole stack is exercised by
 the non-interactive testsuite.
 
 ```
-             ┌─────────────────────────────────────────────┐
-   apps      │  /command/tuidemo.lpc   (readline + widget demo)
-             ├─────────────────────────────────────────────┤
-   glue      │  /std/tui/terminal.lpc  (get_char loop, NAWS/TTYPE,
-             │      ESC timeout, cleanup; inherit into user objects)
-             ├──────────────┬──────────────────────────────┤
-   engines   │ readline.lpc │ screen.lpc   widget.lpc (+ widgets)
-             ├──────────────┴──────────────────────────────┤
-   input     │  keys.lpc   (bytes → key events)             │
-             ├─────────────────────────────────────────────┤
-   output    │  ansi.lpc   (escape builders, visible width) │
-             └─────────────────────────────────────────────┘
+             ┌──────────────────────────────────────────────────────┐
+   apps      │  /command/tuidemo.lpc  + /clone/tuidemo_*.lpc demos  │
+             ├──────────────────────────────────────────────────────┤
+   glue      │  terminal.lpc   (get_char loop, NAWS/TTYPE, ESC      │
+             │    timeout, cleanup; inherit into user objects;      │
+             │    tui_readline / tui_select / tui_confirm / tui_open)│
+             ├──────────────┬──────────┬────────────────────────────┤
+   engines   │ readline.lpc │ menu.lpc │ screen.lpc  widget.lpc     │
+             │ (line editor)│ (select) │ (+ w/* widget set)  app.lpc│
+             ├──────────────┴──────────┴────────────────────────────┤
+   input     │  keys.lpc   (bytes → key events)                     │
+             ├──────────────────────────────────────────────────────┤
+   output    │  ansi.lpc (escapes, widths)   print.lpc (printers)   │
+             └──────────────────────────────────────────────────────┘
               include/tui.h  (key codes, states, shared macros)
 ```
 
@@ -163,13 +179,47 @@ redundant attribute churn — the standard curses algorithm, minus insert/delete
 -line optimizations that don't pay at MUD line rates.
 
 `widget.lpc` is the inheritable widget base (geometry, focus, `draw(screen)`,
-`handle_key(ev)` → handled?), with a small set of shipped widgets, each a
-clonable inheriting it: `label`, `list` (scrollable, selectable), `textfield`
-(embeds the readline engine, width-clipped), and box/statusbar drawing via
-`screen` primitives. Widgets are deliberately minimal — the point is the
-protocol, on which mudlibs can build.
+`handle_key(ev)` → handled?, the on-event callback), and `app.lpc` is the
+application container (screen ownership, Tab focus cycling, key/mouse
+routing, Ctrl-C quit). The shipped widget set (each a clonable in `w/`,
+inspired by the pterm and blessed catalogs):
 
-### 2.5 `terminal.lpc` — the only impure module (inheritable)
+| Widget | Behavior | Events |
+|---|---|---|
+| `label` | static (multi-line) text | — |
+| `list` | scrollable single-select list | `select`, `change` |
+| `table` | column-aligned rows + header, scroll + selection | `select`, `change` |
+| `tree` | collapsible tree (`▸`/`▾`), ←/→/Enter fold | `select`, `change` |
+| `textfield` | single-line input backed by a full readline engine | `submit` |
+| `checklist` | `[x]` multi-select, Space toggles | `change` |
+| `radiolist` | `(•)` single-choice group | `change` |
+| `button` | `[ OK ]`, Enter/Space presses | `press` |
+| `progress` | label + bar + percentage | — |
+| `spinner` | braille spinner; app drives `tick()` from its own call_out | — |
+| `log` | bottom-anchored scrollback pane (PgUp/PgDn) | — |
+
+### 2.5 `print.lpc` — inline printers (stateless, inheritable)
+
+The pterm side of the library: string builders that compose with plain
+`write()` — no raw mode, no full screen — and double as rendering helpers
+for widgets. `p_table(rows, opts)` (boxed, width-aware, header rule),
+`p_tree(nodes)` (`├──`/`└──`), `p_bars(items)` (horizontal bar chart),
+`p_spark(values)` (▁▂▃▅▇ sparkline), `p_panel(title, body)`,
+`p_bullets(items)` (depth-nested), `p_header(text)` (centered banner),
+`p_progress(pct, width)`, `p_info/p_success/p_warn/p_error(text)` prefix
+printers, and `p_bigtext(text)` (banner letters via `/std/bitmap_font`).
+All wide-char aware; tables/trees/panels accept the `TUI_BOX_*` styles.
+
+### 2.6 `menu.lpc` — inline select/multiselect (clonable state machine)
+
+pterm's interactive prompts, MUD-style: a prompt plus a scrolling choice
+list rendered *in the normal output flow* and repainted in place with
+relative cursor movement; on completion it collapses to a one-line
+`? prompt: answer` record. Space toggles in multi mode, Enter accepts,
+Esc/Ctrl-C aborts, long lists window with `height`. Same engine API shape
+as readline: `m_begin/m_feed/m_take_output/m_result`.
+
+### 2.7 `terminal.lpc` — the only impure module (inheritable)
 
 Inherit into an interactive object (user/login) to run either mode:
 
@@ -178,6 +228,11 @@ Inherit into an interactive object (user/login) to run either mode:
   restore line mode, call `done_cb(line_or_0, state)`. History is kept per
   object (`opts` can seed/limit it), giving every prompt in the mudlib
   line editing + ↑↓ history + C-r search with one call.
+* **Inline prompts** — `tui_select(cb, prompt, choices, opts)` →
+  `cb(index, item, state)`; `tui_multiselect(...)` →
+  `cb(indexes, items, state)`; `tui_confirm(cb, prompt, default)` →
+  `cb(yes, state)`. All run the menu engine (or a one-keystroke y/n loop)
+  over the same char-mode plumbing as readline.
 * **App mode** — `tui_open(object app)` / `tui_close()`: alternate screen,
   cursor hidden, optional mouse on; forwards decoded events to the app
   (`on_key`, `on_mouse`, `on_resize(w,h)`, `on_open(term)`, `on_close`) and
@@ -195,16 +250,20 @@ line mode behind our back, the next line of input is handled gracefully.
 
 ```
 testsuite/include/tui.h                — key codes, states, macros (public contract)
-testsuite/std/tui/DESIGN.md            — this document
-testsuite/std/tui/ansi.lpc             — layer 0: output
+testsuite/std/tui/README.md            — this document
+testsuite/std/tui/ansi.lpc             — layer 0: escapes + width toolkit
+testsuite/std/tui/print.lpc            — layer 0: pterm-style inline printers
 testsuite/std/tui/keys.lpc             — layer 1: input decoding
 testsuite/std/tui/readline.lpc         — layer 2: line editor
+testsuite/std/tui/menu.lpc             — layer 2: inline select/multiselect
 testsuite/std/tui/screen.lpc           — layer 2: cell grid + diff renderer
 testsuite/std/tui/widget.lpc           — layer 2: widget base (inheritable)
-testsuite/std/tui/w/*.lpc              — shipped widgets (label, list, textfield)
+testsuite/std/tui/w/*.lpc              — the widget set (see §2.4)
+testsuite/std/tui/app.lpc              — layer 2: application container
 testsuite/std/tui/terminal.lpc         — layer 3: interactive glue
-testsuite/command/tuidemo.lpc          — demo command (prompt + app modes)
-testsuite/single/tests/std/tui_*.lpc   — testsuite coverage
+testsuite/command/tuidemo.lpc          — the showcases (see top of file)
+testsuite/clone/tuidemo_*.lpc          — full-screen showcase apps
+testsuite/single/tests/std/tui/*.lpc   — testsuite coverage
 docs/concepts/general/tui.md           — user-facing documentation
 ```
 
@@ -225,6 +284,12 @@ non-interactive testsuite files:
 * `tui_screen.lpc` — draw, frame, assert emitted ANSI; second frame after a
   small change must touch only the damaged region; wide-char overwrite edge
   cases.
+* `tui/widgets.lpc` + `tui/widgets2.lpc` — the whole widget set headless:
+  navigation, events, scrolling, toggle state, and selected render output.
+* `tui/print.lpc` — exact expected strings for the printers (box drawing,
+  width math, scaling).
+* `tui/menu.lpc` — scripted select/multiselect sessions: navigation,
+  toggling, windowing, accept/abort, the collapsed answer line.
 
 Clones are destructed at test end (DEBUGMALLOC `check_memory()` runs after
 every file). The interactive glue is kept too thin to need a terminal to
@@ -284,7 +349,7 @@ The decoder additionally copes with the old `""`-for-Backspace behavior, so
 the library degrades gracefully on older drivers for everything except
 non-ASCII input and escape sequences under default configs.
 
-## 7. Deliberate v1 scope cuts
+## 7. Deliberate scope cuts
 
 * **Multi-line soft-wrapped editing** (readline renders one terminal row with
   horizontal scroll). The engine's render layer is isolated, so a wrap
@@ -296,3 +361,9 @@ non-ASCII input and escape sequences under default configs.
   xterm.js, and modern terminal understands; `terminal_type` is cached and
   exposed so apps can special-case, but the library does not vary output.
 * **Scroll-region / insert-line diff optimizations** in the renderer.
+* **Fuzzy filtering in select/multiselect** (pterm types-to-filter; our menu
+  navigates only — the engine's input path has room for it).
+* From the pterm/blessed catalogs, deliberately not ported: pterm's Area /
+  Heatmap / theming, blessed's FileManager, Terminal, Image/Video and
+  absolute-positioned Layout manager — MUD-side value didn't justify the
+  surface area.

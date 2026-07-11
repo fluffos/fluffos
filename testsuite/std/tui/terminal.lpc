@@ -26,14 +26,20 @@
 
 inherit TUI_ANSI;
 
-#define MODE_IDLE 0
-#define MODE_RL   1
-#define MODE_APP  2
+#define MODE_IDLE    0
+#define MODE_RL      1
+#define MODE_APP     2
+#define MODE_MENU    3
+#define MODE_CONFIRM 4
 
 private nosave object k_dec;      // /std/tui/keys clone
 private nosave object rl;         // /std/tui/readline clone (persistent history)
+private nosave object menu;       // /std/tui/menu clone
 private nosave object cur_app;
 private nosave function rl_cb = 0;
+private nosave function menu_cb = 0;
+private nosave function confirm_cb = 0;
+private nosave int confirm_def = 0;
 private nosave int tui_mode = MODE_IDLE;
 private nosave int term_w = 80, term_h = 24;
 private nosave int have_naws = 0;
@@ -91,6 +97,39 @@ private void finish_readline(int st) {
   if (functionp(cb)) evaluate(cb, line, st);
 }
 
+private void finish_menu(int st) {
+  function cb = menu_cb;
+  mixed res = menu->m_result();
+
+  menu_cb = 0;
+  tui_mode = MODE_IDLE;
+  if (!functionp(cb)) return;
+  if (arrayp(res)) {  // multiselect: cb(int *indexes, string *items, int state)
+    if (st != TUI_RL_DONE) res = ({});
+    evaluate(cb, res, map(res, (: menu->m_item($1) :)), st);
+  } else {            // select: cb(int index, string item, int state)
+    if (st != TUI_RL_DONE) res = -1;
+    evaluate(cb, res, res >= 0 ? menu->m_item(res) : 0, st);
+  }
+}
+
+private void confirm_feed(mixed ev) {
+  function cb;
+  int yes, st = TUI_RL_DONE;
+
+  if (ev == "y" || ev == "Y") yes = 1;
+  else if (ev == "n" || ev == "N") yes = 0;
+  else if (ev == TUI_KEY_ENTER) yes = confirm_def;
+  else if (ev == TUI_CTRL('c') || ev == TUI_KEY_ESC) st = TUI_RL_ABORT;
+  else return;  // ignore anything else
+
+  cb = confirm_cb;
+  confirm_cb = 0;
+  tui_mode = MODE_IDLE;
+  tui_send((st == TUI_RL_ABORT ? "^C" : (yes ? "yes" : "no")) + "\r\n");
+  if (functionp(cb)) evaluate(cb, yes, st);
+}
+
 private void dispatch(mixed ev) {
   switch (tui_mode) {
     case MODE_RL: {
@@ -100,6 +139,16 @@ private void dispatch(mixed ev) {
       if (st != TUI_RL_MORE) finish_readline(st);
       return;
     }
+    case MODE_MENU: {
+      int st = menu->m_feed(ev);
+
+      tui_send(menu->m_take_output());
+      if (st != TUI_RL_MORE) finish_menu(st);
+      return;
+    }
+    case MODE_CONFIRM:
+      confirm_feed(ev);
+      return;
     case MODE_APP:
       if (arrayp(ev) && sizeof(ev) && ev[0] == TUI_EV_MOUSE) {
         cur_app->on_mouse(ev);
@@ -141,6 +190,7 @@ protected void _tui_char(string ch) {
 private void ensure_clones() {
   if (!k_dec) k_dec = clone_object(TUI_KEYS);
   if (!rl) rl = clone_object(TUI_READLINE);
+  if (!menu) menu = clone_object(TUI_MENU);
 }
 
 // --- public API ------------------------------------------------------------
@@ -160,6 +210,60 @@ varargs void tui_readline(function cb, mapping opts) {
   rl_cb = cb;
   tui_mode = MODE_RL;
   tui_send(ansi_bracketed_paste(1) + rl->rl_begin(opts["initial"]));
+  arm();
+}
+
+// Inline single-choice menu: cb(int index, string item, int state);
+// index is -1 when aborted.  opts: "height", "initial".
+varargs void tui_select(function cb, string prompt, string *choices, mapping opts) {
+  if (tui_mode != MODE_IDLE) error("tui_select: a TUI is already active.\n");
+  if (!functionp(cb)) error("tui_select: callback required.\n");
+  ensure_clones();
+  negotiate();
+  k_dec->reset();
+  if (!mapp(opts)) opts = ([]);
+  map_delete(opts, "multi");
+  menu_cb = cb;
+  tui_mode = MODE_MENU;
+  tui_send(menu->m_begin(prompt, choices, opts));
+  if (menu->m_state() != TUI_RL_MORE) {  // e.g. empty choice list
+    finish_menu(menu->m_state());
+    return;
+  }
+  arm();
+}
+
+// Inline multi-choice menu: cb(int *indexes, string *items, int state).
+// opts: "height", "initial", "checked" (int * preselection).
+varargs void tui_multiselect(function cb, string prompt, string *choices, mapping opts) {
+  if (tui_mode != MODE_IDLE) error("tui_multiselect: a TUI is already active.\n");
+  if (!functionp(cb)) error("tui_multiselect: callback required.\n");
+  ensure_clones();
+  negotiate();
+  k_dec->reset();
+  if (!mapp(opts)) opts = ([]);
+  opts["multi"] = 1;
+  menu_cb = cb;
+  tui_mode = MODE_MENU;
+  tui_send(menu->m_begin(prompt, choices, opts));
+  if (menu->m_state() != TUI_RL_MORE) {
+    finish_menu(menu->m_state());
+    return;
+  }
+  arm();
+}
+
+// y/n prompt: cb(int yes, int state).  Enter picks the default.
+varargs void tui_confirm(function cb, string prompt, int def) {
+  if (tui_mode != MODE_IDLE) error("tui_confirm: a TUI is already active.\n");
+  if (!functionp(cb)) error("tui_confirm: callback required.\n");
+  ensure_clones();
+  negotiate();
+  k_dec->reset();
+  confirm_cb = cb;
+  confirm_def = def;
+  tui_mode = MODE_CONFIRM;
+  tui_send("? " + prompt + (def ? " [Y/n] " : " [y/N] "));
   arm();
 }
 
@@ -188,6 +292,8 @@ void tui_close() {
   }
   cur_app = 0;
   rl_cb = 0;
+  menu_cb = 0;
+  confirm_cb = 0;
   tui_mode = MODE_IDLE;
   remove_get_char(this_object());
 }
@@ -197,4 +303,5 @@ void tui_destroy() {
   if (tui_mode != MODE_IDLE) tui_close();
   if (k_dec) destruct(k_dec);
   if (rl) destruct(rl);
+  if (menu) destruct(menu);
 }

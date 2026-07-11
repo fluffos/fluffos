@@ -1,0 +1,32 @@
+// /std/tui/w/spinner — animated activity indicator.
+//
+// The spinner does not own a timer: the application advances it with
+// tick() from its own call_out loop (and re-renders), so headless tests
+// and different tick rates all work.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string *frames = ({ "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" });
+private int frame = 0;
+private string label = "";
+private string attr = "36";
+
+void set_frames(string *f) {
+  if (arrayp(f) && sizeof(f)) {
+    frames = f[0..];
+    frame = 0;
+  }
+}
+
+void set_label(string l) { label = stringp(l) ? l : ""; }
+void set_attr(string a) { attr = stringp(a) ? a : ""; }
+string query_frame() { return frames[frame]; }
+
+void tick() { frame = (frame + 1) % sizeof(frames); }
+
+void draw(object scr) {
+  scr->scr_put(wx, wy, wpad(frames[frame] + " " + label, ww), attr);
+}

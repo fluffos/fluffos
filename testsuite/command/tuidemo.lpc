@@ -1,17 +1,26 @@
-// tuidemo — interactive demo of /std/tui (see /std/tui/DESIGN.md).
+// tuidemo — showcases for /std/tui (see /std/tui/README.md).
 //
-//   tuidemo        readline prompt: editing, ↑/↓ history, Ctrl-R search,
-//                  Tab completion over a few verbs; "quit" (or Ctrl-D) exits
-//   tuidemo app    full-screen widget demo: Tab cycles focus, arrows drive
-//                  the list, the field submits on Enter, q quits
+//   tuidemo            readline prompt: editing, ↑/↓ history, Ctrl-R search,
+//                      Tab completion; "quit" or Ctrl-D exits
+//   tuidemo select     inline select / multiselect / confirm prompts
+//   tuidemo print      the pterm-style inline printers, in plain line mode
+//   tuidemo app        basic full-screen demo (list + textfield)
+//   tuidemo dashboard  animated dashboard: spinner, progress, sparkline,
+//                      live table and log (q quits)
+//   tuidemo form       form demo: textfield, radio, checkboxes, buttons
 
 #include <tui.h>
 
+inherit TUI_PRINT;
+
 private string *verbs = ({ "look", "listen", "inventory", "invite", "quit", "quaff" });
 
+// --- readline showcase -------------------------------------------------
+
 private string *complete_verb(string buf, int pos) {
-  // complete only the first word
-  if (strsrch(buf[0..pos - 1], " ") != -1) return ({});
+  string head = pos > 0 ? buf[0..pos - 1] : "";
+
+  if (strsrch(head, " ") != -1) return ({});  // complete only the first word
   return verbs;
 }
 
@@ -31,16 +40,87 @@ private void got_line(mixed line, int st) {
                    ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
 }
 
+// --- select / multiselect / confirm showcase -----------------------------
+
+private void confirmed(int yes, int st) {
+  write(yes ? p_success("Character created.") : p_warn("Discarded."));
+}
+
+private void chose_skills(int *idx, string *items, int st) {
+  if (st != TUI_RL_DONE) {
+    write("[cancelled]\n");
+    return;
+  }
+  this_player()->tui_confirm((: confirmed :),
+                             "Create with " + implode(items, ", ") + "?", 1);
+}
+
+private void chose_class(int idx, string item, int st) {
+  if (st != TUI_RL_DONE) {
+    write("[cancelled]\n");
+    return;
+  }
+  this_player()->tui_multiselect((: chose_skills :), "Pick skills for the " + item + ":",
+                                 ({ "swords", "archery", "alchemy", "lockpicking",
+                                    "diplomacy", "cartography" }),
+                                 ([ "height": 4 ]));
+}
+
+// --- inline printers showcase ---------------------------------------------
+
+private void show_print() {
+  write(p_bigtext("TUI", "36"));
+  write(p_header("the /std/tui inline printers", 62));
+  write("\n");
+  write(p_info("printers compose with write() — no full-screen mode needed"));
+  write(p_success("this line came from p_success()"));
+  write(p_warn("p_warn() looks like this"));
+  write(p_error("and p_error() like this"));
+  write("\n");
+  write(p_panel("panel", "Boxed content, width-aware —\nwide chars work: 你好世界",
+                ([ "style": TUI_BOX_ROUND ])));
+  write(p_table(({ ({ "efun", "package", "notes" }),
+                   ({ "strwidth", "core", "display columns" }),
+                   ({ "terminal_colour", "contrib", "%^TOKEN%^ + wrapping" }),
+                   ({ "你好", "unicode", "double width" }) }),
+                ([ "header": 1 ])));
+  write(p_tree(({ ({ "std", ({ ({ "tui", ({ "ansi.lpc", "keys.lpc", "readline.lpc",
+                                            ({ "w", ({ "list.lpc", "table.lpc", "tree.lpc" }) }) }) }) }) }) })));
+  write("\n");
+  write(p_bars(({ ({ "orcs", 24 }), ({ "elves", 13 }), ({ "dwarves", 31 }) }),
+               ([ "width": 30, "attr": "36" ])));
+  write("\nsparkline  " + p_spark(({ 1, 3, 2, 8, 4, 6, 7, 2, 5, 8, 3, 1 })) + "\n");
+  write("progress   " + p_progress(64, 30) + "\n\n");
+  write(p_bullets(({ "bullet lists", ({ 1, "nest by depth" }), ({ 2, "three markers" }) })));
+}
+
+// ---------------------------------------------------------------------------
+
 int main(string arg) {
   object me = this_player();
 
   if (!me) return 0;
-  if (arg == "app") {
-    me->tui_open(new("/clone/tuidemo_app"));
-    return 1;
+  switch (arg) {
+    case "app":
+      me->tui_open(new("/clone/tuidemo_app"));
+      return 1;
+    case "dashboard":
+      me->tui_open(new("/clone/tuidemo_dash"));
+      return 1;
+    case "form":
+      me->tui_open(new("/clone/tuidemo_form"));
+      return 1;
+    case "print":
+      show_print();
+      return 1;
+    case "select":
+      me->tui_select((: chose_class :), "Pick a class:",
+                     ({ "warrior", "mage", "thief", "cleric", "ranger" }));
+      return 1;
   }
   write("TUI readline demo: editing keys, Up/Down history, Ctrl-R search,\n"
-        "Tab completion.  'quit' or Ctrl-D exits.\n");
+        "Tab completion.  'quit' or Ctrl-D exits.\n"
+        "Also try: tuidemo select | print | app | dashboard | form\n");
   me->tui_readline((: got_line :),
                    ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
   return 1;

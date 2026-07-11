@@ -1,0 +1,143 @@
+// /std/tui/w/tree — collapsible tree view (blessed/tview style).
+//
+// Nodes use the same shape as p_tree(): a node is a string (leaf) or
+// ({ label, ({ children... }) }).  Right/Enter expands, Left collapses,
+// Enter on a leaf emits ("select", label); moving emits ("change", label).
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private mixed *nodes = ({});
+private mapping expanded = ([]);   // path-key -> 1
+private mixed *visible = ({});     // ({ ({ key, depth, label, has_children }) ... })
+private int sel = 0;
+private int top = 0;
+private string attr = "";
+private string sel_attr = "7";
+
+void create() { w_focusable = 1; }
+
+private void flatten(mixed *ns, string prefix, int depth) {
+  int i;
+
+  for (i = 0; i < sizeof(ns); i++) {
+    mixed node = ns[i];
+    string label = arrayp(node) ? "" + node[0] : "" + node;
+    string key = prefix + "/" + i;
+    int kids = arrayp(node) && sizeof(node) > 1 && arrayp(node[1]) && sizeof(node[1]);
+
+    visible += ({ ({ key, depth, label, kids }) });
+    if (kids && expanded[key]) flatten(node[1], key, depth + 1);
+  }
+}
+
+private mixed *node_by_key(string key) {
+  mixed *ns = nodes;
+  mixed node = 0;
+
+  foreach (string part in explode(key[1..], "/")) {
+    node = ns[to_int(part)];
+    ns = arrayp(node) && sizeof(node) > 1 ? node[1] : ({});
+  }
+  return node;
+}
+
+private void reflatten() {
+  visible = ({});
+  flatten(nodes, "", 0);
+  if (sel >= sizeof(visible)) sel = sizeof(visible) - 1;
+  if (sel < 0) sel = 0;
+}
+
+void set_nodes(mixed *ns) {
+  nodes = arrayp(ns) ? ns : ({});
+  expanded = ([]);
+  sel = top = 0;
+  reflatten();
+}
+
+void set_attrs(string normal, string selected) {
+  if (stringp(normal)) attr = normal;
+  if (stringp(selected)) sel_attr = selected;
+}
+
+private void expand_walk(mixed *ns, string prefix) {
+  int i;
+
+  for (i = 0; i < sizeof(ns); i++) {
+    if (arrayp(ns[i]) && sizeof(ns[i]) > 1 && arrayp(ns[i][1])) {
+      expanded[prefix + "/" + i] = 1;
+      expand_walk(ns[i][1], prefix + "/" + i);
+    }
+  }
+}
+
+void expand_all() {
+  expand_walk(nodes, "");
+  reflatten();
+}
+
+string query_selected() { return sizeof(visible) ? visible[sel][2] : 0; }
+int query_visible_count() { return sizeof(visible); }
+
+void draw(object scr) {
+  int i;
+
+  if (sel < top) top = sel;
+  if (sel >= top + wh) top = sel - wh + 1;
+  if (top < 0) top = 0;
+  for (i = 0; i < wh; i++) {
+    int idx = top + i;
+    string line = "";
+
+    if (idx < sizeof(visible)) {
+      mixed *v = visible[idx];
+      string arrow = v[3] ? (expanded[v[0]] ? "▾ " : "▸ ") : "  ";
+
+      line = wslice(repeat_string("  ", v[1]) + arrow + v[2], 0, ww);
+    }
+    scr->scr_put(wx, wy + i, wpad(line, ww),
+                 (idx == sel && idx < sizeof(visible) && w_focused) ? sel_attr : attr);
+  }
+}
+
+int handle_key(mixed ev) {
+  mixed *v;
+
+  if (!intp(ev) || !sizeof(visible)) return 0;
+  v = visible[sel];
+  switch (ev) {
+    case TUI_KEY_UP:
+      if (sel > 0) sel--;
+      emit_event("change", visible[sel][2]);
+      return 1;
+    case TUI_KEY_DOWN:
+      if (sel < sizeof(visible) - 1) sel++;
+      emit_event("change", visible[sel][2]);
+      return 1;
+    case TUI_KEY_RIGHT:
+      if (v[3] && !expanded[v[0]]) {
+        expanded[v[0]] = 1;
+        reflatten();
+      }
+      return 1;
+    case TUI_KEY_LEFT:
+      if (v[3] && expanded[v[0]]) {
+        map_delete(expanded, v[0]);
+        reflatten();
+      }
+      return 1;
+    case TUI_KEY_ENTER:
+      if (v[3]) {
+        if (expanded[v[0]]) map_delete(expanded, v[0]);
+        else expanded[v[0]] = 1;
+        reflatten();
+      } else {
+        emit_event("select", v[2]);
+      }
+      return 1;
+  }
+  return 0;
+}

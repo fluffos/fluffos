@@ -4,13 +4,15 @@ title: general / tui
 # The LPC TUI library (/std/tui)
 
 The testsuite mudlib ships a terminal-UI toolkit written in pure LPC, layered
-like `readline` + `ncurses`: line editing, history and incremental search for
-the prompt line, plus a screen buffer, diff renderer and widget set for
-full-screen applications.  It lives in `testsuite/std/tui/` and is portable to
-any FluffOS mudlib (copy the directory plus `include/tui.h`).
+like `readline` + `ncurses` + `pterm`: line editing, history and incremental
+search for the prompt line, inline select/multiselect/confirm prompts and
+pretty-printers for ordinary output, plus a screen buffer, diff renderer and
+widget set for full-screen applications.  It lives in `testsuite/std/tui/`
+and is portable to any FluffOS mudlib (copy the directory plus
+`include/tui.h`).
 
 The architecture document is
-[`testsuite/std/tui/DESIGN.md`](https://github.com/fluffos/fluffos/blob/master/testsuite/std/tui/DESIGN.md);
+[`testsuite/std/tui/README.md`](https://github.com/fluffos/fluffos/blob/master/testsuite/std/tui/README.md);
 this page is the user view.
 
 ## Prompt-line editing (the readline replacement)
@@ -39,6 +41,29 @@ the options), bracketed paste, masked input (`"masked": 1` for passwords),
 wide-character (CJK) aware rendering with horizontal scrolling, and live
 terminal-resize handling via NAWS.  History persists per user object across
 calls.
+
+## Inline prompts and printers (the pterm layer)
+
+Three prompt helpers run in the normal output flow — no full-screen mode:
+
+```c
+tui_select((: chose :), "Pick a class:", ({ "warrior", "mage", "thief" }));
+// -> chose(int index, string item, int state)
+tui_multiselect((: picked :), "Skills:", skills, ([ "height": 5 ]));
+// -> picked(int *indexes, string *items, int state)
+tui_confirm((: sure :), "Delete the character?", 0);
+// -> sure(int yes, int state)
+```
+
+Arrows navigate, Space toggles, Enter accepts, Esc/Ctrl-C aborts; on
+completion the list collapses to a one-line `? prompt: answer` record.
+
+`/std/tui/print` is a set of stateless printers that compose with `write()`:
+`p_table()` (boxed, width-aware), `p_tree()`, `p_bars()` (bar chart),
+`p_spark()` (sparkline), `p_panel()`, `p_bullets()`, `p_header()`,
+`p_progress()`, `p_info/p_success/p_warn/p_error()` and `p_bigtext()`
+(banner letters via `/std/bitmap_font`).  Run `tuidemo print` to see them
+all.
 
 ## Full-screen applications
 
@@ -72,19 +97,27 @@ The terminal switches to the alternate screen with the cursor hidden; the app
 receives decoded key events (`on_key`), optional SGR mouse events
 (`on_mouse`, pass `(["mouse": 1])` to `tui_open`), and resize events
 (`on_resize`).  Tab/Shift-Tab cycle focus, Ctrl-C always quits, and
-`app_quit()` restores the terminal.  Shipped widgets: `label`, `list`
-(scrollable/selectable), `textfield` (a full readline engine per field);
-the widget base class (`/std/tui/widget`) makes new widgets ~30 lines.
+`app_quit()` restores the terminal.
+
+Shipped widgets (`/std/tui/w/`, modeled on the pterm and blessed sets):
+`label`, `list`, `table` (columns + header + selection), `tree`
+(collapsible), `textfield` (a full readline engine per field), `checklist`,
+`radiolist`, `button`, `progress`, `spinner`, and `log` (bottom-anchored
+scrollback pane).  The widget base class (`/std/tui/widget`) makes new
+widgets ~30 lines; `tuidemo dashboard` and `tuidemo form` show most of the
+set in action.
 
 ## The layers (use them à la carte)
 
 | Module | What it is |
 |---|---|
 | `/std/tui/ansi` | escape-sequence builders; `visible_width()` (ANSI-blind, wide-char-aware), `wslice()`, `wpad()` |
+| `/std/tui/print` | pterm-style inline printers: tables, trees, charts, panels, banners |
 | `/std/tui/keys` | keystroke decoder: `get_char()` byte stream → key events (CSI/SS3, modifiers, UTF-8, bracketed paste, SGR mouse) |
 | `/std/tui/readline` | the line-editor engine — a pure state machine, usable headless |
+| `/std/tui/menu` | the inline select/multiselect engine behind `tui_select()` |
 | `/std/tui/screen` | virtual cell grid + minimal-diff frame renderer (the ncurses core) |
-| `/std/tui/widget`, `/std/tui/w/*`, `/std/tui/app` | widget protocol, shipped widgets, application container |
+| `/std/tui/widget`, `/std/tui/w/*`, `/std/tui/app` | widget protocol, the widget set, application container |
 | `/std/tui/terminal` | the only impure module: `get_char` loop, NAWS/TTYPE, ESC timeout, teardown |
 
 Everything below `terminal` is side-effect-free and covered by the LPC
@@ -99,8 +132,12 @@ Boot the testsuite mudlib and connect with any terminal:
 ```bash
 ./driver testsuite/etc/config.test &
 telnet localhost 4000
-> tuidemo        # readline demo: editing, history, ^R search, Tab completion
-> tuidemo app    # full-screen widget demo (Tab cycles focus, q quits)
+> tuidemo            # readline demo: editing, history, ^R search, Tab completion
+> tuidemo select     # inline select -> multiselect -> confirm chain
+> tuidemo print      # the inline printers
+> tuidemo app        # minimal full-screen demo
+> tuidemo dashboard  # animated spinner/progress/sparkline/table/log
+> tuidemo form       # textfield, radio group, checkboxes, buttons
 ```
 
 ## Requirements & caveats
