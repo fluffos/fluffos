@@ -85,7 +85,20 @@ static inline void on_telnet_data(const char* buffer, unsigned long size, intera
     }
   }
 
-  auto sanitized = u8_sanitize({transdata, translen});
+  // A multi-byte character split across TCP segments must not be sanitized
+  // into U+FFFD: hold the incomplete tail back until the rest arrives.
+  std::string data;
+  data.reserve(ip->u8_carry_len + translen);
+  data.append(ip->u8_carry, ip->u8_carry_len);
+  ip->u8_carry_len = 0;
+  data.append(transdata, translen);
+  if (const auto tail = u8_incomplete_tail(data)) {
+    memcpy(ip->u8_carry, data.data() + data.size() - tail, tail);
+    ip->u8_carry_len = static_cast<int>(tail);
+    data.resize(data.size() - tail);
+  }
+
+  auto sanitized = u8_sanitize(data);
   on_user_input(ip, sanitized.c_str(), sanitized.length());
 
   if (transdata != buffer) {
@@ -379,8 +392,15 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char* buf, 
     }
     case TELNET_TELOPT_NAWS: {
       if (size >= 4) {
-        push_number((static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]));
-        push_number((static_cast<unsigned char>(buf[2]) << 8) | static_cast<unsigned char>(buf[3]));
+        const int w = (static_cast<unsigned char>(buf[0]) << 8) | static_cast<unsigned char>(buf[1]);
+        const int h = (static_cast<unsigned char>(buf[2]) << 8) | static_cast<unsigned char>(buf[3]);
+        // Cache: fast clients answer the initial DO NAWS while ip->ob is
+        // still the master object; on_user_logon() replays the apply on
+        // the real user object (comm.cc).
+        ip->naws_w = w;
+        ip->naws_h = h;
+        push_number(w);
+        push_number(h);
         set_eval(max_eval_cost);
         safe_apply(APPLY_WINDOW_SIZE, ip->ob, 2, ORIGIN_DRIVER);
       }

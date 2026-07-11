@@ -85,6 +85,18 @@ struct interactive_t {
   // libtelnet handle
   struct telnet_t* telnet;
 
+  // Incomplete trailing UTF-8 sequence held back from the last input chunk
+  // (a multi-byte character split across TCP segments), prepended to the
+  // next chunk before sanitizing.  See on_telnet_data().
+  char u8_carry[4];
+  int u8_carry_len;
+
+  // Last NAWS report (0 = none yet).  The window_size apply is replayed
+  // from this on logon, because fast clients answer the initial DO NAWS
+  // while ip->ob is still the master object.
+  int naws_w;
+  int naws_h;
+
   // --- native-transport private state (TRANSITIONAL) ---
   // Owned and touched only by the Transport implementations in
   // net/transport_libevent.cc (and net/websocket.cc); always null on

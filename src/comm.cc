@@ -134,6 +134,15 @@ void on_user_logon(interactive_t* user) {
 
   set_prompt("> ");
 
+  // A fast client may have answered the initial DO NAWS while ip->ob was
+  // still the master object; replay the cached report on the real user.
+  if (ob->interactive->naws_w) {
+    push_number(ob->interactive->naws_w);
+    push_number(ob->interactive->naws_h);
+    set_eval(max_eval_cost);
+    safe_apply(APPLY_WINDOW_SIZE, ob, 2, ORIGIN_DRIVER);
+  }
+
   // Call logon() on the object.
   set_eval(max_eval_cost);
   ret = safe_apply(APPLY_LOGON, ob, 0, ORIGIN_DRIVER);
@@ -414,7 +423,11 @@ void on_user_input(interactive_t* ip, const char* data, size_t len) {
         }
         break;
       case 0x1b:
-        if (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
+        // The anti-ANSI-injection rewrite is a line-mode protection; in
+        // single-char mode the mudlib asked for raw keystrokes and needs
+        // ESC intact to decode arrow/function keys.
+        if (!(ip->iflags & SINGLE_CHAR) && CONFIG_INT(__RC_NO_ANSI__) &&
+            CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
           ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
           break;
         }
@@ -426,6 +439,45 @@ void on_user_input(interactive_t* ip, const char* data, size_t len) {
   }
 }
 
+/*
+ * Single-char ("get_char") mode delivers one keystroke per callback.  A
+ * keystroke is one byte, except when the buffer starts with a complete,
+ * well-formed UTF-8 multi-byte sequence -- that is delivered whole, so LPC
+ * receives one valid character instead of 2-4 fragment bytes.  Waiting for
+ * the tail of a sequence is safe: the transports u8_sanitize() their input,
+ * so a valid prefix is always completed by subsequent bytes.  Malformed
+ * bytes are delivered one at a time, never stalled on.
+ *
+ * Returns the byte count to deliver, or 0 to wait for more input.
+ */
+static int single_char_bytes(const interactive_t* ip) {
+  const auto* p = reinterpret_cast<const unsigned char*>(ip->text) + ip->text_start;
+  const int avail = ip->text_end - ip->text_start;
+  if (avail <= 0) {
+    return 0;
+  }
+  int len;
+  if (p[0] < 0xc2 || p[0] > 0xf4) {
+    return 1; /* ASCII, or a byte that can't start a valid sequence */
+  } else if (p[0] < 0xe0) {
+    len = 2;
+  } else if (p[0] < 0xf0) {
+    len = 3;
+  } else {
+    len = 4;
+  }
+  if (avail < len) {
+    /* wait for the rest, unless the buffer can never grow */
+    return ip->text_end == sizeof(ip->text) - 1 ? 1 : 0;
+  }
+  for (int i = 1; i < len; i++) {
+    if ((p[i] & 0xc0) != 0x80) {
+      return 1; /* malformed: deliver the lead byte alone */
+    }
+  }
+  return len;
+}
+
 // Also used by ws_ascii.
 int cmd_in_buf(interactive_t* ip) {
   char* p;
@@ -435,9 +487,10 @@ int cmd_in_buf(interactive_t* ip) {
     return 0;
   }
 
-  /* if we're in single character mode, we've got input */
+  /* if we're in single character mode, we've got input once a whole
+     keystroke (possibly a multi-byte UTF-8 character) is buffered */
   if (ip->iflags & SINGLE_CHAR) {
-    return 1;
+    return single_char_bytes(ip) > 0;
   }
 
   for (p = ip->text + ip->text_start; p < ip->text + ip->text_end; p++) {
@@ -452,7 +505,7 @@ int cmd_in_buf(interactive_t* ip) {
 
 static char* first_cmd_in_buf(interactive_t* ip) {
   char* p;
-  static char tmp[2];
+  static char tmp[5];
 
   /* do standard input buffer cleanup */
   if (!clean_buf(ip)) {
@@ -461,13 +514,20 @@ static char* first_cmd_in_buf(interactive_t* ip) {
 
   p = ip->text + ip->text_start;
 
-  /* if we're in single character mode, we've got input */
+  /* if we're in single character mode, deliver one keystroke: control
+     bytes (including BS/DEL) verbatim, multi-byte UTF-8 characters whole */
   if (ip->iflags & SINGLE_CHAR) {
-    if (*p == 8 || *p == 127) {
-      *p = 0;
+    const int len = single_char_bytes(ip);
+    if (len == 0) {
+      /* incomplete UTF-8 sequence: wait for the rest */
+      ip->iflags &= ~CMD_IN_BUF;
+      return nullptr;
     }
-    tmp[0] = *p;
-    ip->text[ip->text_start++] = 0;
+    memcpy(tmp, p, len);
+    tmp[len] = '\0';
+    for (int i = 0; i < len; i++) {
+      ip->text[ip->text_start++] = 0;
+    }
     if (!clean_buf(ip)) {
       ip->iflags &= ~CMD_IN_BUF;
     }
