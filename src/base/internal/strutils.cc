@@ -425,14 +425,29 @@ void u8_truncate_below_width(const char* src, size_t len, size_t max_width, bool
   }
 
   if (break_for_line) {
-    // Try to find an better line break point
+    // Try to find a better line break point
     if (!hardwrap && src[break_length] != ' ' && !linebrk->isBoundary(break_length)) {
       auto prev_linebreak = linebrk->preceding(break_length);
-      // Suitable breakpoints
       if (prev_linebreak > 0) {
-        break_length = prev_linebreak;
-        break_width = u8_width(src, break_length);
+        // Only accept the earlier break point if it leaves visible text
+        // on this line: breaking right after a leading-space indent
+        // produced a bogus " " line and shifted the whole wrap grid;
+        // hard-wrap at the width instead (issue #605).
+        bool usable = false;
+        for (decltype(prev_linebreak) idx = 0; idx < prev_linebreak; idx++) {
+          if (src[idx] != ' ') {
+            usable = true;
+            break;
+          }
+        }
+        if (usable) {
+          break_length = prev_linebreak;
+          break_width = u8_width(src, break_length);
+        }
       } else {
+        // No break opportunity at all before the cut: a single word wider
+        // than the field overflows it whole (behavior pinned by the
+        // issue #696 narrow-column tests).
         auto next_linebreak = linebrk->following(break_length);
         if (next_linebreak > 0) {
           if (src[next_linebreak - 1] == '\n') {
