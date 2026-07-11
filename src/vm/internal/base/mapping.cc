@@ -6,6 +6,7 @@
 #include <map>
 #include <functional>
 
+#include "thirdparty/scope_guard/scope_guard.hpp"
 #include "vm/internal/base/machine.h"
 
 mapping_node_t* locked_map_nodes = nullptr;
@@ -604,6 +605,23 @@ void f_unique_mapping(void) {
   // item with same result together.
   typedef std::map<svalue_t, std::deque<svalue_t*>, unique_svalue_compare> MapResult;
   MapResult result;
+
+  // The callback in the loop below and the size limits in the mapping
+  // build afterwards can all error() and unwind (issue #126): release the
+  // copied keys exactly once, and drop the partially built mapping unless
+  // it was handed off to the stack.
+  mapping_t* m = nullptr;
+  bool completed = false;
+  DEFER {
+    for (auto& item : result) {
+      svalue_t key = item.first;
+      free_svalue(&key, "unique_mapping key");
+    }
+    if (!completed && m) {
+      free_mapping(m);
+    }
+  };
+
   int size = v->size;
   while (size--) {
     svalue_t* sv;
@@ -642,15 +660,14 @@ void f_unique_mapping(void) {
   }
 
   // Translate result into LPC mapping
-  mapping_t* m = allocate_mapping(0);
+  m = allocate_mapping(0);
   for (auto& item : result) {
     auto key = item.first;
     auto values = item.second;
 
-    // FIXME: find_for_insert can actually throw error if we exceeded maximum
-    // mapping size! we will leave garbage when that happens.
-    //
-    // key is copied, but not freed, the value is freed at the end of the loop.
+    // find_for_insert/allocate_empty_array may error() on the size
+    // limits; the scope guard above reclaims the partial mapping and the
+    // copied keys (it also releases the keys on the success path).
     svalue_t* l = find_for_insert(m, &key, 0);
     l->type = T_ARRAY;
     l->u.arr = allocate_empty_array(values.size());
@@ -658,9 +675,8 @@ void f_unique_mapping(void) {
       // values are copied.
       assign_svalue_no_free(&l->u.arr->item[i], values[i]);
     }
-    // Free reference
-    free_svalue(&key, "unique_mapping");
   }
+  completed = true;
   pop_n_elems(num_arg);
   push_refed_mapping(m);
 }
