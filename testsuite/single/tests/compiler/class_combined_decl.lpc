@@ -1,0 +1,15 @@
+// Issue #788: 'class Foo { ... } Me;' used to compile with Me silently
+// typed unknown, making every later use fail confusingly. It is now a
+// targeted compile error, while the legitimate neighboring forms keep
+// compiling.
+void do_tests() {
+  object o;
+  string err;
+
+  err = catch(load_object("/clone/class788_repro"));
+  ASSERT_NE(0, err);
+
+  o = load_object("/clone/class788_ok");
+  ASSERT_EQ("jeremy", o->probe());
+  ASSERT_EQ("kyle", o->probe2());
+}

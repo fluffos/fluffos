@@ -383,6 +383,14 @@ struct CompileState {
   // cleared) so dump_prog shows PRE-optimization bytecode.
   bool opt_dump_ast = false;
   bool opt_no_optimize = false;
+
+  // Set to 2 when a class declaration body completes, decremented as each
+  // top-level def is appended, so it reads 1 exactly while the def
+  // immediately following the class body is parsed. Diagnoses the C-style
+  // combined form 'class Foo { ... } var;' (which parses as a separate,
+  // typeless global variable declaration) with a targeted error instead
+  // of silently declaring 'var' with unknown type.
+  int class_def_cooldown = 0;
 };
 extern CompileState g_compile;
 
