@@ -18,11 +18,18 @@ private void write_src(string body) {
   ASSERT2(write_file(THING + ".lpc", body, 1), "write " + THING);
 }
 
+private void write_src2(string file, string body) {
+  ASSERT2(write_file(file, body, 1), "write " + file);
+}
+
 private void cleanup() {
-  foreach (object o in children(THING)) {
-    if (o) destruct(o);
+  foreach (string prog in ({ THING, DIR + "/seppuku" })) {
+    foreach (object o in children(prog)) {
+      if (o) destruct(o);
+    }
   }
   rm(THING + ".lpc");
+  rm(DIR + "/seppuku.lpc");
   rmdir(DIR);
 }
 
@@ -140,6 +147,65 @@ private void run_checks() {
   rm(THING + ".lpc");
   ASSERT(stringp(catch(recompile_object(ob))));
   ASSERT_EQ("v3", ob->version());
+
+  // An object may destruct itself from its new program's __INIT while
+  // being updated: the swap survives, the caller's stack reference is
+  // swept cleanly, and destructed objects drop out of the updated
+  // count.
+  write_src2(DIR + "/seppuku.lpc",
+             "int x = 1;\n" +
+             "string version() { return \"s1\"; }\n");
+  ob = load_object(DIR + "/seppuku");
+  c1 = new(DIR + "/seppuku");
+  write_src2(DIR + "/seppuku.lpc",
+             "int x = 2;\n" +
+             "int boom = go();\n" +
+             "int go() { destruct(this_object()); return 0; }\n" +
+             "string version() { return \"s2\"; }\n");
+  ASSERT_EQ(0, recompile_object(ob));
+  ASSERT(!objectp(ob));
+  ASSERT(!objectp(c1));
+  ASSERT(!find_object(DIR + "/seppuku"));
+
+  // The simul_efun object can be recompiled live: the dispatch table
+  // rebuilds against the new program with name-stable indices before
+  // its __INIT runs, so simul calls compiled into every other program
+  // keep working -- including this test's own ASSERT machinery, which
+  // dispatches through it on the very next line.
+  ASSERT_EQ(1, recompile_object(find_object("/single/simul_efun")));
+  ASSERT_EQ(1, same(({ 1, 2 }), ({ 1, 2 })));  // a simul from that very file
+
+  // The master object is recompilable too (see the post-run check
+  // below), but never while it is executing -- and in this harness
+  // master::flag() sits on the call stack for the entire run.
+  err = catch(recompile_object(find_object("/single/master")));
+  ASSERT2(stringp(err) && strsrch(err, "currently executing") != -1, "master: " + err);
+
+  // Once the run is over the master is idle, so recompile it then; the
+  // rebuilt apply table and carried-over master state are enforced by
+  // exiting nonzero on any failure.
+  call_out("master_recompile_check", 0);
+}
+
+protected void master_recompile_check() {
+  string err = catch(recompile_object(find_object("/single/master")));
+
+  if (err) {
+    debug_message("POST-RUN master recompile failed: " + err);
+    shutdown(-1);
+    return;
+  }
+  // State carried over (the check counter kept counting all run) and
+  // the rebuilt apply table dispatches (valid_write runs on the new
+  // program for this write_file).
+  if (!"/single/master"->query_num_checks() ||
+      !write_file("/data/master_recheck.tmp", "x", 1)) {
+    debug_message("POST-RUN master recompile: state or applies broken\n");
+    shutdown(-1);
+    return;
+  }
+  rm("/data/master_recheck.tmp");
+  debug_message("POST-RUN master recompile OK");
 }
 
 void do_tests() {

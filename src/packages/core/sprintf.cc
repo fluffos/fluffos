@@ -404,7 +404,13 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
           outbuf_add(outbuf, function_name(obj->u.fp->f.local.prog, obj->u.fp->f.local.index));
           break;
         case FP_SIMUL:
-          outbuf_add(outbuf, simuls[obj->u.fp->f.simul.index].func->funcname);
+          // The named simul_efun may have been removed by a simul_efun
+          // object update; the table entry stays with a null func.
+          if (simuls[obj->u.fp->f.simul.index].func) {
+            outbuf_add(outbuf, simuls[obj->u.fp->f.simul.index].func->funcname);
+          } else {
+            outbuf_add(outbuf, "<removed simul_efun>");
+          }
           break;
         case FP_FUNCTIONAL:
         case FP_FUNCTIONAL | FP_NOT_BINDABLE: {

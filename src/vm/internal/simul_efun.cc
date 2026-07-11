@@ -179,8 +179,27 @@ static void find_or_add_simul_efun(function_t* funp, int runtime_index) {
 void set_simul_efun(object_t* ob) {
   get_simul_efuns(ob->prog);
 
-  simul_efun_ob = ob;
-  add_ref(simul_efun_ob, "set_simul_efun");
+  if (simul_efun_ob != ob) {
+    simul_efun_ob = ob;
+    add_ref(simul_efun_ob, "set_simul_efun");
+  }
+}
+
+/*
+ * Rebuild the simul_efun dispatch table after recompile_object()
+ * swapped a fresh program into the live simul_efun object. Must run
+ * before any LPC executes against the new program (its __INIT
+ * included): call_simul_efun() dispatches by runtime index through
+ * this table, and the old entries point into the old program's
+ * function table. Indices are preserved by NAME across the rebuild
+ * (see get_simul_efuns), so calls compiled into other programs keep
+ * working; a simul_efun removed by the new source fails with the
+ * usual "no longer a simul_efun" error.
+ */
+void rebuild_simul_efuns() {
+  if (simul_efun_ob) {
+    get_simul_efuns(simul_efun_ob->prog);
+  }
 }
 
 void call_simul_efun(unsigned short index, int num_arg) {

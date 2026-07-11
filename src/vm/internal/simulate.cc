@@ -821,11 +821,6 @@ int recompile_object(object_t* target) {
   if (in_recompile_object) {
     error("recompile_object: already updating; nested recompile_object is not allowed.\n");
   }
-  if (simul_efun_ob && old_prog == simul_efun_ob->prog) {
-    // The simul_efun dispatch table points into this program's function
-    // table; swapping it would leave every simul call dangling.
-    error("recompile_object: cannot update the simul_efun object.\n");
-  }
   if (strrchr(target->obname, '#')) {
     // Normalize the request: updating "a clone" really means updating
     // the shared program; demand the master copy so the intent is clear.
@@ -986,6 +981,19 @@ int recompile_object(object_t* target) {
     ob->variables = allocate_object_variables(new_n);
     tot_alloc_object_size +=
         ((new_n ? new_n : 1) - (old_n ? old_n : 1)) * static_cast<int>(sizeof(svalue_t));
+
+    // The master and simul_efun objects dispatch through cached
+    // name->runtime-index tables; rebuild them against the new program
+    // BEFORE any LPC runs (the __INIT below included -- an error inside
+    // it would already route through these tables). Simul indices are
+    // preserved by name, so calls compiled into other programs keep
+    // working.
+    if (ob == master_ob) {
+      rebuild_master_applies();
+    }
+    if (ob == simul_efun_ob) {
+      rebuild_simul_efuns();
+    }
 
     // Fresh initializers first (this object's new code), then the
     // carried-over values overwrite every name that survived.

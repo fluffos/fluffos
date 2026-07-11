@@ -35,6 +35,17 @@ title: objects / recompile_object
     inherit_program(4), include_file(4), get_include_path(4) and
     valid_read(4) are all consulted.
 
+    The master object and the simul_efun object can themselves be
+    recompiled: their cached dispatch tables (apply-name and
+    simul_efun-name to function) are rebuilt against the new program
+    before its initializers run. Simul_efun indices are preserved by
+    NAME across the rebuild, so simul calls compiled into every other
+    program keep working; a simul_efun removed by the new source fails
+    with the usual "no longer a simul_efun" runtime error. Note that
+    the currently-executing rule below applies as usual - the master
+    cannot be recompiled from code the master itself is running (e.g.
+    from inside one of its applies).
+
     Returns the number of objects updated (the master copy plus its
     clones).
 
@@ -44,14 +55,15 @@ title: objects / recompile_object
 
     - a clone is passed (pass the master copy; its clones are updated
       with it);
-    - any object sharing the program is currently executing, anywhere
-      on the call stack (bytecode positions and variable indices in
-      live frames are relative to the old program) - in particular an
-      object cannot recompile itself;
+    - any live frame is executing the program's code, anywhere on the
+      call stack - including an inheritor running one of its inherited
+      functions (bytecode positions and variable indices in live frames
+      are relative to the old program). In particular an object cannot
+      recompile itself;
     - the source fails to compile (the objects are left untouched on
       the old program);
-    - the target is the simul_efun object, a replace_program() is
-      pending on the program, or recompile_object is already in progress.
+    - a replace_program() is pending on the program, or another
+      recompile_object() is already in progress.
 
 ### CAVEATS
 
@@ -63,8 +75,9 @@ title: objects / recompile_object
     update. Efun and simul_efun pointers are unaffected.
 
     Programs that INHERIT the updated program are not recompiled - like
-    with the destruct/reload cycle, inheritance copies code at compile
-    time. Update inheritors separately (parents first). The testsuite's
+    with the destruct/reload cycle, a child program stays bound to the
+    exact parent program it was compiled against. Update inheritors
+    separately (parents first). The testsuite's
     /single/hot_reload.lpc daemon automates exactly that ordering from
     the compile-time dependency graph.
 

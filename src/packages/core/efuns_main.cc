@@ -3217,9 +3217,11 @@ void f_reload_object() {
 
 #ifdef F_RECOMPILE_OBJECT
 void f_recompile_object() {
-  object_t* ob = sp->u.ob;
-  int count = recompile_object(ob);
-  free_object(&sp->u.ob, "f_recompile_object");
+  int count = recompile_object(sp->u.ob);
+  // The target (or one of its clones) may have destructed itself in its
+  // new program's __INIT: destruct sweeps the VM stack, so sp may hold
+  // a plain 0 instead of the object reference by now.
+  free_svalue(sp, "f_recompile_object");
   put_number(count);
 }
 #endif

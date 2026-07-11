@@ -113,7 +113,10 @@ private mapping closure_files(string prog, mapping seen) {
   return out;
 }
 
-// All programs in prog's inherit closure, excluding prog itself.
+// All programs in prog's inherit closure, excluding prog itself,
+// DEEPEST FIRST: a recompile snapshots the parent programs it links
+// against, so a changed grandparent must be fresh before a changed
+// parent recompiles, or the parent would bake the stale grandparent in.
 private string *ancestors(string prog, mapping seen) {
   string *out = ({ });
 
@@ -121,7 +124,7 @@ private string *ancestors(string prog, mapping seen) {
   foreach (string parent in keys(inherit_deps[prog])) {
     if (seen[parent]) continue;
     seen[parent] = 1;
-    out += ({ parent }) + ancestors(parent, seen);
+    out += ancestors(parent, seen) + ({ parent });
   }
   return out;
 }
@@ -196,6 +199,26 @@ private void restore_state(object ob, mixed state) {
 
 // --- reload ----------------------------------------------------------------
 
+// Drop a program's dep records ahead of a recompile (the applies
+// rebuild them during it) -- but restore them if the recompile throws
+// BEFORE compiling (currently-executing guard, unreadable file): the
+// object stays loaded on that path, so lost records would blind
+// closure_changed() to include-file changes forever.
+private void recompile_with_records(object ob, string prog) {
+  mapping fd = file_deps[prog];
+  mapping id = inherit_deps[prog];
+  string err;
+
+  map_delete(file_deps, prog);
+  map_delete(inherit_deps, prog);
+  err = catch(recompile_object(ob));
+  if (err) {
+    if (fd && !file_deps[prog]) file_deps[prog] = fd;
+    if (id && !inherit_deps[prog]) inherit_deps[prog] = id;
+    error(err);
+  }
+}
+
 private void reload(string prog) {
   mixed state;
   int have_state = 0;
@@ -216,17 +239,20 @@ private void reload(string prog) {
   foreach (string a in ancestors(prog, ([]))) {
     if (self_changed(a)) {
       object aob = find_object(a);
-      map_delete(file_deps, a);
-      map_delete(inherit_deps, a);
-      if (aob) recompile_object(aob);
+      if (aob) {
+        recompile_with_records(aob, a);
+      } else {
+        map_delete(file_deps, a);
+        map_delete(inherit_deps, a);
+      }
     }
   }
 
-  map_delete(file_deps, prog);
-  map_delete(inherit_deps, prog);
   if (use_recompile_object) {
-    recompile_object(ob);  // recompiles; the applies rebuild the dep records
+    recompile_with_records(ob, prog);  // the applies rebuild the dep records
   } else {
+    map_delete(file_deps, prog);
+    map_delete(inherit_deps, prog);
     if (cooperative && watched[prog] == WATCH_KEEP_STATE) {
       state = capture_state(ob);
       have_state = 1;

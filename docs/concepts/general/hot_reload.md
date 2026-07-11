@@ -22,8 +22,9 @@ mudlib implementation. A working reference lives in the testsuite:
 A compiled LPC program is built from more than its own source file:
 
 * every `#include`d header is spliced into the compile, and
-* every `inherit`ed program's code is copied into the child's program
-  at compile time.
+* every `inherit`ed program is bound into the child at compile time —
+  the child's program links against the exact parent program it was
+  compiled with.
 
 So when `/std/base.c` or a header it includes changes, reloading only
 the objects whose *own* file changed silently leaves every inheritor
@@ -284,8 +285,8 @@ Two things to know:
 
 ### Doing it by hand: value transfer
 
-Objects that define the cooperative pair
-`hot_reload_state()`/`hot_reload_restore()` opt out of `recompile_object()`
+Objects that define `hot_reload_state()` (optionally paired with
+`hot_reload_restore()`) opt out of `recompile_object()`
 in the reference daemon: they reload through destruct+load and get
 back exactly the state their pair chose to carry — the way to make
 some state deliberately *not* survive.
@@ -350,6 +351,10 @@ This exact flow — including the deepest case, editing an include of an
   `clonep()`) to destruct or migrate stragglers. Either way, anything
   fetched via `"/path/name"->func()` or fresh `find_object()`/`new()`
   after the reload gets the new code.
+* **Even the master and simul_efun objects can be recompiled** — the
+  driver rebuilds their dispatch tables (with name-stable simul_efun
+  indices) during the swap. Do it from a `call_out` or another idle
+  context: like any object, they cannot be recompiled while executing.
 * **Function pointers into a hot-updated object go stale** (pointers
   to local functions, functionals): calling one afterwards raises a
   clean error rather than running mis-indexed code. Recreate them

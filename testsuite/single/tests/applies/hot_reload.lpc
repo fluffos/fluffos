@@ -22,7 +22,9 @@ private void write_src(string file, string body) {
 
 private void cleanup(object d) {
   foreach (string prog in ({ DIR + "/widget", DIR + "/base", DIR + "/counter",
-                             DIR + "/coop", DIR + "/plain", DIR + "/gadget" })) {
+                             DIR + "/coop", DIR + "/plain", DIR + "/gadget",
+                             DIR + "/kid", DIR + "/mid", DIR + "/grand",
+                             DIR + "/loop" })) {
     foreach (object o in children(prog)) {
       if (o) destruct(o);
     }
@@ -33,7 +35,8 @@ private void cleanup(object d) {
   }
   foreach (string f in ({ "/color.h", "/base.lpc", "/widget.lpc",
                           "/counter.lpc", "/coop.lpc", "/plain.lpc",
-                          "/gadget.lpc" })) {
+                          "/gadget.lpc", "/kid.lpc", "/mid.lpc",
+                          "/grand.lpc", "/loop.h", "/loop.lpc" })) {
     rm(DIR + f);
   }
   rmdir(DIR);
@@ -112,6 +115,41 @@ private void run_checks() {
   ASSERT_EQ(2, d->check_now());
   ASSERT_EQ("fixed blue", (DIR + "/base")->color());
   ASSERT_EQ("one very fixed blue widget", (DIR + "/widget")->describe());
+
+  // A chain with SEVERAL changed ancestors must refresh deepest-first:
+  // recompiling the middle parent bakes in whatever grandparent program
+  // is live at that moment, so the grandparent has to go first.
+  write_src(DIR + "/grand.lpc", "string g() { return \"g1\"; }\n");
+  write_src(DIR + "/mid.lpc",
+            "inherit \"" + DIR + "/grand\";\n" +
+            "string m() { return \"m1/\" + g(); }\n");
+  write_src(DIR + "/kid.lpc",
+            "inherit \"" + DIR + "/mid\";\n" +
+            "string k() { return m(); }\n");
+  ASSERT(d->watch(DIR + "/kid"));
+  ASSERT_EQ("m1/g1", (DIR + "/kid")->k());
+  write_src(DIR + "/grand.lpc", "string g() { return \"g2 new\"; }\n");
+  write_src(DIR + "/mid.lpc",
+            "inherit \"" + DIR + "/grand\";\n" +
+            "string m() { return \"m2 longer/\" + g(); }\n");
+  ASSERT_EQ(1, d->check_now());
+  ASSERT_EQ("m2 longer/g2 new", (DIR + "/kid")->k());
+
+  // Dependency records survive a reload that throws BEFORE compiling
+  // (here: the currently-executing guard, because the watched object
+  // itself drives the pass) -- the include edit must still be seen on
+  // the next idle pass.
+  write_src(DIR + "/loop.h", "#define LOOPV \"one\"\n");
+  write_src(DIR + "/loop.lpc",
+            "#include \"" + DIR + "/loop.h\"\n" +
+            "string v() { return LOOPV; }\n" +
+            "int poke(object dmn) { return dmn->check_now(); }\n");
+  ASSERT(d->watch(DIR + "/loop"));
+  ASSERT_EQ("one", (DIR + "/loop")->v());
+  write_src(DIR + "/loop.h", "#define LOOPV \"two three\"\n");
+  ASSERT_EQ(0, (DIR + "/loop")->poke(d));
+  ASSERT_EQ(1, d->check_now());
+  ASSERT_EQ("two three", (DIR + "/loop")->v());
 
   // --- variable state across reloads ---------------------------------------
 
