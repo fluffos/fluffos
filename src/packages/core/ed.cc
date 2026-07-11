@@ -658,6 +658,12 @@ static int prntln(char* str, char* outstr, int vflg, int lineno) {
     *line++ = '$';
   }
 #endif
+  // A tab or control-code expansion in the final iteration can push `line`
+  // a few bytes past ED_MAXLINE within the slack of start[ED_MAXLINE + 100];
+  // clamp before copying into the caller's ED_MAXLINE-sized outstr.
+  if (line - start > ED_MAXLINE - 1) {
+    line = start + ED_MAXLINE - 1;
+  }
   *line = EOS;
 
   strcpy(outstr, start);
@@ -863,13 +869,15 @@ static char* getfn(int writeflg) {
   if (*inptr == NL) {
     P_NOFNAME = TRUE;
     file[0] = '/';
-    strcpy(file + 1, P_FNAME);
+    strncpy(file + 1, P_FNAME, MAXFNAME - 2);
+    file[MAXFNAME - 1] = '\0';
   } else {
     P_NOFNAME = FALSE;
     Skip_White_Space;
 
     cp = file;
-    while (*inptr && *inptr != NL && *inptr != SP && *inptr != HT) {
+    while (*inptr && *inptr != NL && *inptr != SP && *inptr != HT &&
+           cp < file + MAXFNAME - 1) {
       *cp++ = *inptr++;
     }
     *cp = '\0';
@@ -1045,7 +1053,9 @@ static int getrhs(char* sub) {
     return (EDERR);
   }
   while (*inptr != delim && *inptr != NL) {
-    if (sub > outmax) {
+    // Reserve room for the worst-case per-iteration write (the ESCAPE
+    // fall-through and octal cases write two bytes) and the trailing NUL.
+    if (sub >= outmax - 2) {
       return EDERR;
     }
     if (*inptr == ESCAPE) {
@@ -1253,7 +1263,9 @@ static regexp* optpat() {
     return P_OLDPAT;
   }
   cp = str;
-  while (*inptr != delim && *inptr != NL && *inptr != EOS && cp < str + MAXPAT - 1) {
+  // -2 (not -1): the escape branch below writes two bytes per iteration, and
+  // room must remain for the trailing EOS.
+  while (*inptr != delim && *inptr != NL && *inptr != EOS && cp < str + MAXPAT - 2) {
     if (*inptr == ESCAPE && inptr[1] != NL) {
       *cp++ = *inptr++;
     }
