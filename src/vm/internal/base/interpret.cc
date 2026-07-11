@@ -976,7 +976,7 @@ void copy_lvalue_range(svalue_t* from) {
           memcpy(b->item, old_item, ind1);
           new_item += ind1;
         }
-        memcpy(new_item, from->u.buf, fsize);
+        memcpy(new_item, from->u.buf->item, fsize);
         new_item += fsize;
 
         if ((size -= ind2) >= 1) {
@@ -1132,7 +1132,7 @@ void assign_lvalue_range(svalue_t* from) {
           memcpy(b->item, old_item, ind1);
           new_item += ind1;
         }
-        memcpy(new_item, from->u.buf, fsize);
+        memcpy(new_item, from->u.buf->item, fsize);
         new_item += fsize;
 
         if ((size -= ind2) >= 1) {

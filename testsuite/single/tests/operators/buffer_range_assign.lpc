@@ -1,0 +1,45 @@
+// Buffer range assignment with a size-changing rhs took the reallocation
+// branch of assign_lvalue_range/copy_lvalue_range, which copied from the
+// buffer_t header (ref/size fields) instead of its payload (->item),
+// corrupting the assigned bytes. Regression pin for that fix.
+
+void do_tests() {
+    buffer a, b;
+
+    // Grow: replace a 1-byte range with a 3-byte buffer (reallocation branch).
+    a = allocate_buffer(4);
+    a[0] = 'a'; a[1] = 'b'; a[2] = 'c'; a[3] = 'd';
+    b = allocate_buffer(3);
+    b[0] = 'X'; b[1] = 'Y'; b[2] = 'Z';
+
+    a[1..1] = b;
+    // a is now { 'a', 'X', 'Y', 'Z', 'c', 'd' }
+    ASSERT_EQ(6, sizeof(a));
+    ASSERT_EQ('a', a[0]);
+    ASSERT_EQ('X', a[1]);
+    ASSERT_EQ('Y', a[2]);
+    ASSERT_EQ('Z', a[3]);
+    ASSERT_EQ('c', a[4]);
+    ASSERT_EQ('d', a[5]);
+
+    // Shrink: replace a 3-byte range with a 1-byte buffer.
+    a = allocate_buffer(4);
+    a[0] = 'a'; a[1] = 'b'; a[2] = 'c'; a[3] = 'd';
+    b = allocate_buffer(1);
+    b[0] = 'Q';
+
+    a[1..3] = b;
+    // a is now { 'a', 'Q' }
+    ASSERT_EQ(2, sizeof(a));
+    ASSERT_EQ('a', a[0]);
+    ASSERT_EQ('Q', a[1]);
+
+    // Equal-size fast path (unchanged) still works.
+    a = allocate_buffer(3);
+    a[0] = 1; a[1] = 2; a[2] = 3;
+    b = allocate_buffer(1);
+    b[0] = 9;
+    a[1..1] = b;
+    ASSERT_EQ(3, sizeof(a));
+    ASSERT_EQ(9, a[1]);
+}
