@@ -732,10 +732,13 @@ int socket_accept(int fd, svalue_t* read_callback, svalue_t* write_callback) {
     return EENONBLOCK;
   }
 
-  if (evutil_make_socket_closeonexec(fd) == -1) {
+  // Set close-on-exec on the ACCEPTED socket, not the listener's LPC index.
+  // Passing `fd` (the lpc_socks[] index) misses accept_fd -- so the accepted
+  // connection would leak into exec'd children -- and the error path closed
+  // an unrelated low OS descriptor equal to that index.
+  if (evutil_make_socket_closeonexec(accept_fd) == -1) {
     debug(sockets, "socket_accept: make_socket_closeonexec error: %s.\n",
-          evutil_socket_error_to_string(evutil_socket_geterror(fd)));
-    evutil_closesocket(fd);
+          evutil_socket_error_to_string(evutil_socket_geterror(accept_fd)));
     evutil_closesocket(accept_fd);
     return EESETSOCKOPT;
   }
