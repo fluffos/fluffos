@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / get_char
 ---
 # get_char
@@ -11,7 +10,7 @@ title: interactive / get_char
 
 ### SYNOPSIS
 
-    varargs void get_char( string | function fun, int flag, ... );
+    varargs int get_char( string | function fun, int flag, ... );
 
 ### DESCRIPTION
 

@@ -55,16 +55,16 @@ time_t get_current_time() {
 /*
  * Get a microsecond clock sample.
  */
-void get_usec_clock(long *sec, long *usec) {
-  struct timeval tv {};
+void get_usec_clock(long* sec, long* usec) {
+  struct timeval tv{};
 
   gettimeofday(&tv, nullptr);
   *sec = tv.tv_sec;
   *usec = tv.tv_usec;
 }
 
-long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
-  struct rusage rus {};
+long get_cpu_times(unsigned long* secs, unsigned long* usecs) {
+  struct rusage rus{};
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {
     return 0;
@@ -76,17 +76,17 @@ long get_cpu_times(unsigned long *secs, unsigned long *usecs) {
 }
 
 /* return the current working directory */
-char *get_current_dir(char *buf, int limit) { return getcwd(buf, limit); /* POSIX */ }
+char* get_current_dir(char* buf, int limit) { return getcwd(buf, limit); /* POSIX */ }
 
 /* jemalloc stub, this function can't otherwise be replaced */
 #ifdef HAVE_JEMALLOC
-char *strdup(const char *str) {
+char* strdup(const char* str) {
   if (!str) {
     errno = EINVAL;
     return nullptr;
   }
   size_t const ln = strlen(str);
-  void *p = malloc(ln + 1);
-  return static_cast<char *>(memcpy(p, str, ln + 1));
+  void* p = malloc(ln + 1);
+  return static_cast<char*>(memcpy(p, str, ln + 1));
 }
 #endif

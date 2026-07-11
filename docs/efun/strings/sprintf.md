@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / sprintf
 ---
 # sprintf
@@ -82,6 +81,9 @@ title: strings / sprintf
     X       the integer arg is printed in hex (with A-F in capitals).
 
     f       floating point number
+
+    g       floating point number, trailing zeros removed
+            (e.g. 3.14 instead of 3.140000, 100 instead of 100.000000)
 
 ### RETURN VALUES
 

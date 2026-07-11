@@ -1,0 +1,7 @@
+void do_tests() {
+    // Builds an anonymous class value from element values.
+    mixed c = assemble_class(({ 11, "two" }));
+    ASSERT(classp(c));
+    ASSERT_EQ(11, fetch_class_member(c, 0));
+    ASSERT_EQ("two", fetch_class_member(c, 1));
+}

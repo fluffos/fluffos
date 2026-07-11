@@ -1,0 +1,22 @@
+void do_tests() {
+    ASSERT_EQ("swords", pluralize("sword"));
+    ASSERT_EQ("boxes", pluralize("box"));
+    ASSERT_EQ("wolves", pluralize("wolf"));
+    ASSERT_EQ("children", pluralize("child"));
+    // Adjective/article structure is preserved.
+    ASSERT_EQ("red swords", pluralize("red sword"));
+
+    // Issue #936: -ff words take -s (they used to become "bluves"),
+    // while the staff -> staves exception survives.
+    ASSERT_EQ("bluffs", pluralize("bluff"));
+    ASSERT_EQ("chaffs", pluralize("chaff"));
+    ASSERT_EQ("cliffs", pluralize("cliff"));
+    ASSERT_EQ("staves", pluralize("staff"));
+
+    // Issue #936: the Latin -is -> -es rule stays for thesis/axis but
+    // not for words like penis/marquis (they used to become "penes").
+    ASSERT_EQ("theses", pluralize("thesis"));
+    ASSERT_EQ("axes", pluralize("axis"));
+    ASSERT_EQ("penises", pluralize("penis"));
+    ASSERT_EQ("marquises", pluralize("marquis"));
+}

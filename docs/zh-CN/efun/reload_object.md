@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / reload_object
 ---
 # reload_object

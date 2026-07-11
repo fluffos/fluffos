@@ -1,0 +1,6 @@
+void do_tests() {
+    mixed err = catch(throw("custom throw value\n"));
+    ASSERT_EQ("custom throw value\n", err);
+    err = catch(throw(({ "structured", 42 })));
+    ASSERT_EQ(({ "structured", 42 }), err);
+}

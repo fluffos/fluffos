@@ -1,0 +1,7 @@
+void do_tests() {
+    ASSERT_EQ(3, max(({ 3, 1, 2 })));
+    ASSERT_EQ(3.0, max(({ 3.0, 1.5 })));
+    ASSERT_EQ("c", max(({ "b", "a", "c" })));
+    ASSERT_EQ(0, max(({ 3, 1, 2 }), 1));   // index of the maximum
+    ASSERT(catch(max(({ }))));
+}

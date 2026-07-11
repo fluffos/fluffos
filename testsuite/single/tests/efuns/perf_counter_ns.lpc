@@ -1,0 +1,6 @@
+void do_tests() {
+    int a = perf_counter_ns();
+    int b = perf_counter_ns();
+    ASSERT(intp(a));
+    ASSERT(b >= a);                  // monotonic
+}

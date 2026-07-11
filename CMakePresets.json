@@ -3,12 +3,15 @@
   "configurePresets": [
     {
       "name": "linux-debug",
-      "displayName": "Linux Debug",
+      "displayName": "Linux Debug (Clang + ASan/UBSan)",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "MARCH_NATIVE": "OFF"
+        "MARCH_NATIVE": "OFF",
+        "ENABLE_SANITIZER": "ON",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       },
       "condition": {
         "type": "equals",
@@ -18,12 +21,14 @@
     },
     {
       "name": "linux-relwithdebinfo",
-      "displayName": "Linux RelWithDebInfo",
+      "displayName": "Linux RelWithDebInfo (Clang)",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "MARCH_NATIVE": "OFF"
+        "MARCH_NATIVE": "OFF",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       },
       "condition": {
         "type": "equals",
@@ -100,6 +105,31 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "native-tools",
+      "displayName": "Native codegen tools (stage 1 of a cross build)",
+      "description": "Minimal native configuration whose only purpose is building make_func/build_applies/make_options_defs for a cross build.",
+      "binaryDir": "${sourceDir}/build-native-tools",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MARCH_NATIVE": "OFF",
+        "USE_JEMALLOC": "OFF",
+        "PACKAGE_DB": "OFF",
+        "PACKAGE_PCRE": "OFF",
+        "PACKAGE_FFI": "OFF",
+        "PACKAGE_EXTERNAL": "OFF"
+      }
+    },
+    {
+      "name": "wasm",
+      "displayName": "WebAssembly (Emscripten)",
+      "description": "Cross build of the web driver. Configure through the emscripten wrapper: `emcmake cmake --preset wasm` (after building the native-tools preset). Wasm-built ICU/zlib are expected under /opt/wasm-deps; override with -DFLUFFOS_WASM_DEPS=<prefix>.",
+      "binaryDir": "${sourceDir}/build-wasm",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "FLUFFOS_HOST_TOOLS_DIR": "${sourceDir}/build-native-tools/src/tools"
+      }
     }
   ],
   "buildPresets": [
@@ -107,6 +137,7 @@
       "name": "linux-debug",
       "configurePreset": "linux-debug"
     },
+
     {
       "name": "linux-relwithdebinfo",
       "configurePreset": "linux-relwithdebinfo"
@@ -126,6 +157,16 @@
     {
       "name": "windows-relwithdebinfo",
       "configurePreset": "windows-relwithdebinfo"
+    },
+    {
+      "name": "native-tools",
+      "configurePreset": "native-tools",
+      "targets": ["make_func", "build_applies", "make_options_defs"]
+    },
+    {
+      "name": "wasm",
+      "configurePreset": "wasm",
+      "targets": ["driver-web"]
     }
   ]
 }

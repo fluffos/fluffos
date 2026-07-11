@@ -1,0 +1,5 @@
+void do_tests() {
+    ASSERT_EQ(1, bufferp(allocate_buffer(4)));
+    ASSERT_EQ(0, bufferp("abc"));
+    ASSERT_EQ(0, bufferp(({ })));
+}

@@ -18,18 +18,18 @@
 
 // FIXME: remove this
 #define RESIZE(ptr, num, type, tag, desc) \
-  ((type *)DREALLOC((void *)ptr, sizeof(type) * (num), tag, desc))
+  ((type*)DREALLOC((void*)ptr, sizeof(type) * (num), tag, desc))
 
-void *debugmalloc(int, int, const char *);
-void *debugrealloc(void *, int, int, const char *);
-void *debugcalloc(int, int, int, const char *);
-void debugfree(void *);
+void* debugmalloc(int, int, const char*);
+void* debugrealloc(void*, int, int, const char*);
+void* debugcalloc(int, int, int, const char*);
+void debugfree(void*);
 
 void debugmalloc_init(void);
-void dump_malloc_data(struct outbuffer_t *);
+void dump_malloc_data(struct outbuffer_t*);
 
 void set_malloc_mask(int);
-char *dump_debugmalloc(const char *, int);
+char* dump_debugmalloc(const char*, int);
 
 /* tags */
 // NOTE: the digit after + must be unique, range is 0-255.
@@ -71,6 +71,19 @@ static const int TAG_PARSER = (TAG_PERMANENT + 37);
 #endif
 static const int TAG_INPUT_TO = (TAG_PERMANENT + 38);
 static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
+// An object's variable block (vm/internal/base/object.cc
+// allocate_object_variables) -- separate from the object_t allocation
+// so recompile_object() can swap programs with a different variable count.
+static const int TAG_OBJ_VARS = (TAG_PERMANENT + 40);
+// Compile-arena chunks (compiler/internal/scratchpad.cc): retained across
+// compiles by design -- whitelisted in check_all_blocks like the other
+// persistent driver infrastructure.
+static const int TAG_SCRATCHPAD = (TAG_PERMANENT + 50);
+// Pending replace_program() records (packages/core/replace_program.cc):
+// live from the queuing execution until the backend's
+// replace_programs() sweep -- legitimately survive a between-executions
+// check_all_blocks, so they get their own whitelisted tag.
+static const int TAG_REPLACE_OB = (TAG_PERMANENT + 51);
 static const int TAG_STRING = (TAG_DATA + 40);
 static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
 static const int TAG_SHARED_STRING = (TAG_DATA + 42);

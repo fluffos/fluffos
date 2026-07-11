@@ -1,0 +1,18 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    // struct { char a; int b; short c; } with natural alignment:
+    //   a@0, b@4 (aligned to 4), c@8; total padded to 12.
+    mixed *lay = ffi_struct_layout(({ FFI_INT8, FFI_INT32, FFI_INT16 }));
+    ASSERT_EQ(2, sizeof(lay));
+    ASSERT_EQ(12, lay[0]);                    // total size
+    ASSERT_EQ(({ 0, 4, 8 }), lay[1]);         // field offsets
+    // All same-size fields pack contiguously.
+    lay = ffi_struct_layout(({ FFI_INT32, FFI_INT32 }));
+    ASSERT_EQ(8, lay[0]);
+    ASSERT_EQ(({ 0, 4 }), lay[1]);
+#endif
+    ASSERT(1);
+}

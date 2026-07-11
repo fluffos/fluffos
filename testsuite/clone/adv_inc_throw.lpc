@@ -1,0 +1,2 @@
+#include "adv_throw.h"
+int fn() { return ADV_THROW; }

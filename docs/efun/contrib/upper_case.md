@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / upper_case.pre
 ---
 # upper_case

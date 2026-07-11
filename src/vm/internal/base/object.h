@@ -59,10 +59,10 @@
 
 struct sentence_t {
 #ifndef NO_ADD_ACTION
-  const char *verb;
+  const char* verb;
 #endif
-  struct sentence_t *next;
-  struct object_t *ob;
+  struct sentence_t* next;
+  struct object_t* ob;
   union string_or_func function;
   int flags;
 };
@@ -73,53 +73,59 @@ struct object_t {
 #ifdef DEBUGMALLOC_EXTENSIONS
   unsigned int extra_ref; /* Used to check ref count. */
 #endif
-  const char *obname;
+  const char* obname;
   /* the fields above must match lpc_object_t */
   int64_t load_time; /* time when this object was created */
 #ifndef NO_RESET
   int64_t next_reset; /* Time of next reset of this object */
 #endif
   uint64_t time_of_ref; /* Time when last referenced. Used by clean_uo */
-  program_t *prog;
-  struct object_t *next_all;
-  struct object_t *prev_all;
+  program_t* prog;
+  uint32_t prog_generation; /* bumped by recompile_object() when prog is swapped
+                               on the live object; funptrs snapshot it so
+                               stale index-based pointers fail cleanly */
+  struct object_t* next_all;
+  struct object_t* prev_all;
 #ifndef NO_ENVIRONMENT
-  struct object_t *next_inv;
-  struct object_t *contains;
-  struct object_t *super; /* Which object surround us ? */
+  struct object_t* next_inv;
+  struct object_t* contains;
+  struct object_t* super; /* Which object surround us ? */
 #endif
-  struct interactive_t *interactive; /* Data about an interactive user */
-  char *replaced_program;            /* Program replaced with */
+  struct interactive_t* interactive; /* Data about an interactive user */
+  char* replaced_program;            /* Program replaced with */
 #ifndef NO_LIGHT
   short total_light;
 #endif
 #ifndef NO_SHADOWS
-  struct object_t *shadowing; /* Is this object shadowing ? */
-  struct object_t *shadowed;  /* Is this object shadowed ? */
+  struct object_t* shadowing; /* Is this object shadowing ? */
+  struct object_t* shadowed;  /* Is this object shadowed ? */
 #endif                        /* NO_SHADOWS */
 #ifndef NO_ADD_ACTION
-  sentence_t *sent;
-  struct object_t *next_hashed_living;
-  const char *living_name; /* Name of living object if in hash */
+  sentence_t* sent;
+  struct object_t* next_hashed_living;
+  const char* living_name; /* Name of living object if in hash */
 #endif
 #ifdef PACKAGE_UIDS
-  struct userid_t *uid;  /* the "owner" of this object */
-  struct userid_t *euid; /* the effective "owner" */
+  struct userid_t* uid;  /* the "owner" of this object */
+  struct userid_t* euid; /* the effective "owner" */
 #endif
 #ifdef PRIVS
-  const char *privs; /* object's privledges */
+  const char* privs; /* object's privledges */
 #endif               /* PRIVS */
 #ifdef PACKAGE_MUDLIB_STATS
   struct statgroup_t stats; /* mudlib stats */
 #endif
 #ifdef PACKAGE_PARSER
-  struct parse_info_s *pinfo;
+  struct parse_info_s* pinfo;
 #endif
-  svalue_t variables[1]; /* All variables to this program */
-                         /* The variables MUST come last in the struct */
+  svalue_t* variables; /* All variables to this program. A separate
+                          allocation (TAG_OBJ_VARS) sized to
+                          prog->num_variables_total (min 1), so
+                          recompile_object() can swap in a program with a
+                          different variable count on the live object. */
 };
 
-typedef int (*get_objectsfn_t)(object_t *, void *);
+typedef int (*get_objectsfn_t)(object_t*, void*);
 
 #define add_ref(ob, str)                                                                        \
   SAFE(if (ob->ref++ > static_cast<decltype(ob->ref)>(-10)) {                                   \
@@ -136,43 +142,44 @@ typedef int (*get_objectsfn_t)(object_t *, void *);
 #define ROB_STRING_UTF8_ERROR 64
 #define ROB_ERROR 127
 
-#define SETOBNAME(ob, name) (*(const char **)&(ob->obname) = (char *)name)
+#define SETOBNAME(ob, name) (*(const char**)&(ob->obname) = (char*)name)
 
-extern object_t *previous_ob;
+extern object_t* previous_ob;
 extern int save_svalue_depth;
-extern object_t **cgsp;
+extern object_t** cgsp;
 #ifdef F_SET_HIDE
 extern int num_hidden;
 #endif
 
-void bufcat(char **, char *);
-int svalue_save_size(svalue_t *);
-void save_svalue(svalue_t *, char **);
-int restore_svalue(char *, svalue_t *);
-int save_object(object_t *, const char *, int);
-int save_object_str(object_t *, int, char *, int);
-int restore_object(object_t *, const char *, int);
-void restore_variable(svalue_t *, char *);
-object_t *get_empty_object(int);
-void reset_object(object_t *);
-void call_create(object_t *, int);
-void reload_object(object_t *);
-void free_object(object_t **, const char *const);
+void bufcat(char**, char*);
+int svalue_save_size(svalue_t*);
+void save_svalue(svalue_t*, char**);
+int restore_svalue(char*, svalue_t*);
+int save_object(object_t*, const char*, int);
+int save_object_str(object_t*, int, char*, int);
+int restore_object(object_t*, const char*, int);
+void restore_variable(svalue_t*, char*);
+object_t* get_empty_object(int);
+void reset_object(object_t*);
+void call_create(object_t*, int);
+void reload_object(object_t*);
+void free_object(object_t**, const char* const);
 #ifdef F_SET_HIDE
-int valid_hide(object_t *);
-int object_visible(object_t *);
+int valid_hide(object_t*);
+int object_visible(object_t*);
 #else
 #define object_visible(x) 1
 #endif
-int find_global_variable(program_t *, const char *const, unsigned short *, int);
-void dealloc_object(object_t *, const char *);
-void get_objects(object_t ***, int *, get_objectsfn_t, void *);
+int find_global_variable(program_t*, const char* const, unsigned short*, int);
+svalue_t* allocate_object_variables(int num_var);
+void dealloc_object(object_t*, const char*);
+void get_objects(object_t***, int*, get_objectsfn_t, void*);
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_command_giver_stack(void);
 #endif
-void save_command_giver(object_t *);
+void save_command_giver(object_t*);
 void restore_command_giver(void);
-void set_command_giver(object_t *);
-void clear_non_statics(object_t *ob);
-void restore_object_from_buff(object_t *, const char *, int);
+void set_command_giver(object_t*);
+void clear_non_statics(object_t* ob);
+void restore_object_from_buff(object_t*, const char*, int);
 #endif

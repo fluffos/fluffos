@@ -1,0 +1,190 @@
+/**
+ * std/decimal -- exact fixed-point decimal arithmetic in pure LPC.
+ *
+ * A decimal is a 2-element array ({ mant, scale }) whose value is
+ *   mant / 10^scale
+ * so arithmetic is EXACT (no binary floating-point rounding), which is
+ * what money / game-economy code wants. Backed by 64-bit LPC integers:
+ * ~18 significant digits total; scale (fractional places) is capped at
+ * DECIMAL_MAX_SCALE. Overflow of the 64-bit mantissa is detected and
+ * raised rather than silently wrapping.
+ *
+ * An array (not a class) so the type does not leak into every object's
+ * global class namespace via the simul_efun; decimals are immutable
+ * (every operation returns a fresh array). Construct with to_decimal();
+ * never build the array by hand.
+ *
+ * Inherited by /single/simul_efun so to_decimal()/decimal_*() are global
+ * simul-efuns. Tested by /single/tests/std/decimal.lpc.
+ */
+
+#define DECIMAL_MAX_SCALE 18
+#define DECIMAL_DIV_SCALE 12
+
+// Field indices into the ({ mant, scale }) representation.
+#define DEC_MANT 0
+#define DEC_SCALE 1
+
+private int _pow10(int n) {
+    int r = 1;
+    if (n < 0 || n > DECIMAL_MAX_SCALE)
+        error("decimal: exponent " + n + " out of range.\n");
+    while (n-- > 0) r *= 10;
+    return r;
+}
+
+private int _mul_checked(int a, int b) {
+    int p;
+    if (a == 0 || b == 0) return 0;
+    p = a * b;
+    if (p / a != b) error("decimal: integer overflow.\n");
+    return p;
+}
+
+private int _add_checked(int a, int b) {
+    int r = a + b;
+    // 64-bit two's-complement overflow: result sign is inconsistent.
+    if ((b > 0 && r < a) || (b < 0 && r > a)) error("decimal: integer overflow.\n");
+    return r;
+}
+
+private int *_make(int mant, int scale) {
+    if (scale < 0 || scale > DECIMAL_MAX_SCALE)
+        error("decimal: illegal scale " + scale + ".\n");
+    return ({ mant, scale });
+}
+
+// Is v a decimal value produced by this library?
+int decimalp(mixed v) {
+    return arrayp(v) && sizeof(v) == 2 && intp(v[DEC_MANT]) && intp(v[DEC_SCALE]);
+}
+
+private int *_from_string(string s) {
+    int i, len = strlen(s), sign = 1, mant = 0, scale = 0, seen_dot = 0, seen_digit = 0;
+    int c;
+    i = 0;
+    while (i < len && (s[i] == ' ' || s[i] == '\t')) i++;
+    if (i < len && (s[i] == '+' || s[i] == '-')) {
+        if (s[i] == '-') sign = -1;
+        i++;
+    }
+    for (; i < len; i++) {
+        c = s[i];
+        if (c == '.') {
+            if (seen_dot) error("decimal: multiple '.' in \"" + s + "\".\n");
+            seen_dot = 1;
+            continue;
+        }
+        if (c == '_') continue;  // digit-group separator
+        if (c < '0' || c > '9') error("decimal: bad character in \"" + s + "\".\n");
+        seen_digit = 1;
+        mant = _add_checked(_mul_checked(mant, 10), c - '0');
+        if (seen_dot && ++scale > DECIMAL_MAX_SCALE)
+            error("decimal: too many fractional digits in \"" + s + "\".\n");
+    }
+    if (!seen_digit) error("decimal: no digits in \"" + s + "\".\n");
+    return _make(sign < 0 ? -mant : mant, scale);
+}
+
+// Construct a decimal from a string ("12.34"), an int, a float (lossy),
+// or an existing decimal (returns an independent copy).
+int *to_decimal(mixed v) {
+    if (stringp(v)) return _from_string(v);
+    if (intp(v)) return _make(v, 0);
+    if (floatp(v)) return _from_string(sprintf("%.*f", DECIMAL_DIV_SCALE, v));
+    if (decimalp(v)) return _make(v[DEC_MANT], v[DEC_SCALE]);
+    error("decimal: cannot convert " + typeof(v) + " to decimal.\n");
+}
+
+// Align a and b to a common scale; returns ({ mant_a, mant_b, scale }).
+private mixed *_align(int *a, int *b) {
+    int s = a[DEC_SCALE] > b[DEC_SCALE] ? a[DEC_SCALE] : b[DEC_SCALE];
+    return ({ _mul_checked(a[DEC_MANT], _pow10(s - a[DEC_SCALE])),
+              _mul_checked(b[DEC_MANT], _pow10(s - b[DEC_SCALE])), s });
+}
+
+int *decimal_add(int *a, int *b) {
+    mixed *x = _align(a, b);
+    return _make(_add_checked(x[0], x[1]), x[2]);
+}
+
+int *decimal_sub(int *a, int *b) {
+    mixed *x = _align(a, b);
+    return _make(_add_checked(x[0], -x[1]), x[2]);
+}
+
+int *decimal_mul(int *a, int *b) {
+    int m = _mul_checked(a[DEC_MANT], b[DEC_MANT]);
+    int s = a[DEC_SCALE] + b[DEC_SCALE];
+    while (s > DECIMAL_MAX_SCALE && m % 10 == 0) { m /= 10; s--; }
+    if (s > DECIMAL_MAX_SCALE) error("decimal: product scale exceeds maximum.\n");
+    return _make(m, s);
+}
+
+int *decimal_div(int *a, int *b) {
+    int rs, shift, num, q;
+    if (b[DEC_MANT] == 0) error("decimal: division by zero.\n");
+    rs = a[DEC_SCALE] > b[DEC_SCALE] ? a[DEC_SCALE] : b[DEC_SCALE];
+    if (rs < DECIMAL_DIV_SCALE) rs = DECIMAL_DIV_SCALE;
+    shift = rs + b[DEC_SCALE] - a[DEC_SCALE];
+    num = shift >= 0 ? _mul_checked(a[DEC_MANT], _pow10(shift))
+                     : a[DEC_MANT] / _pow10(-shift);
+    q = num / b[DEC_MANT];
+    while (rs > 0 && q % 10 == 0) { q /= 10; rs--; }
+    return _make(q, rs);
+}
+
+int *decimal_mod(int *a, int *b) {
+    mixed *x;
+    if (b[DEC_MANT] == 0) error("decimal: modulo by zero.\n");
+    x = _align(a, b);
+    return _make(x[0] % x[1], x[2]);
+}
+
+int *decimal_neg(int *a) {
+    return _make(-a[DEC_MANT], a[DEC_SCALE]);
+}
+
+// -1 / 0 / 1
+int decimal_cmp(int *a, int *b) {
+    mixed *x = _align(a, b);
+    return x[0] < x[1] ? -1 : (x[0] > x[1] ? 1 : 0);
+}
+
+int decimal_eq(int *a, int *b) { return decimal_cmp(a, b) == 0; }
+int decimal_lt(int *a, int *b) { return decimal_cmp(a, b) < 0; }
+int decimal_gt(int *a, int *b) { return decimal_cmp(a, b) > 0; }
+
+string decimal_to_string(int *d) {
+    string digits, out;
+    int mant = d[DEC_MANT], scale = d[DEC_SCALE], neg = d[DEC_MANT] < 0, intlen;
+    // Unsigned magnitude digit string (peel digits to avoid negating the
+    // most-negative int).
+    digits = "";
+    if (mant == 0) {
+        digits = "0";
+    } else {
+        int t = mant, dg;
+        while (t != 0) {
+            dg = t % 10;
+            if (dg < 0) dg = -dg;
+            digits = sprintf("%c", '0' + dg) + digits;
+            t /= 10;
+        }
+    }
+    if (scale == 0) return (neg ? "-" : "") + digits;
+    intlen = strlen(digits) - scale;
+    if (intlen <= 0)
+        out = "0." + repeat_string("0", -intlen) + digits;
+    else
+        out = digits[0..intlen - 1] + "." + digits[intlen..];
+    return (neg ? "-" : "") + out;
+}
+
+int decimal_to_int(int *d) {
+    return d[DEC_MANT] / _pow10(d[DEC_SCALE]);
+}
+
+float decimal_to_float(int *d) {
+    return to_float(d[DEC_MANT]) / to_float(_pow10(d[DEC_SCALE]));
+}

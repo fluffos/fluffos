@@ -1,0 +1,8 @@
+int triple(int x) { return x * 3; }
+void do_tests() {
+    ASSERT_EQ(9, evaluate((: triple :), 3));
+    ASSERT_EQ(7, evaluate((: $1 + $2 :), 3, 4));
+    // Non-function first arg evaluates to itself.
+    ASSERT_EQ(5, evaluate(5));
+    ASSERT_EQ("s", evaluate("s"));
+}

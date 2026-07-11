@@ -1,0 +1,10 @@
+// Issues #1051 / #1088: prototype-only function-table entries (from an
+// included header) used to stop the ::-lookup with "Warning: BUG: inherit
+// function is undefined or prototype" instead of descending into that
+// program's own inherits.
+inherit "/single/tests/compiler/helper/proto_mid";
+
+void do_tests() {
+    ASSERT_EQ(42, proto_mid::proto_fn());
+    ASSERT_EQ(42, ::proto_fn());
+}

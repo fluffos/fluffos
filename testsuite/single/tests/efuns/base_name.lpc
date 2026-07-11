@@ -1,0 +1,10 @@
+void do_tests() {
+    object ob = clone_object("/clone/catch_tell_probe");
+    // base_name strips the clone's #NNN id; object names carry no
+    // source extension (see dual_extension.lpc).
+    ASSERT_EQ("/clone/catch_tell_probe", base_name(ob));
+    ASSERT_EQ("/single/tests/efuns/base_name", base_name(this_object()));
+    ASSERT_EQ("/single/tests/efuns/base_name", base_name());
+    ASSERT_EQ("/clone/catch_tell_probe", base_name(file_name(ob)));
+    destruct(ob);
+}

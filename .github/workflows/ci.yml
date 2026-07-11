@@ -22,21 +22,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Ubuntu - GCC
+          # Ubuntu - GCC (also builds the optional dwlib package so it can't
+          # silently bit-rot again)
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: gcc
             cc: gcc
             cxx: g++
             build: Debug
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            cmake_flags: -DPACKAGE_DWLIB=ON
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: gcc
             cc: gcc
             cxx: g++
             build: RelWithDebInfo
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            cmake_flags: -DPACKAGE_DWLIB=ON
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
 
           # Ubuntu - Clang
           - platform: Ubuntu
@@ -45,14 +48,14 @@ jobs:
             cc: clang
             cxx: clang++
             build: Debug
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
             build: RelWithDebInfo
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
 
           # Ubuntu - Clang with Sanitizer
           - platform: Ubuntu
@@ -63,7 +66,7 @@ jobs:
             build: Debug
             sanitizer: true
             cmake_flags: -DENABLE_SANITIZER=ON
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libdw-dev libbz2-dev libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: clang
@@ -72,19 +75,19 @@ jobs:
             build: RelWithDebInfo
             sanitizer: true
             cmake_flags: -DENABLE_SANITIZER=ON
-            packages: build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev libdw-dev libbz2-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libdw-dev libbz2-dev libffi-dev
 
           # macOS
           - platform: macOS
             os: macos-14
             build: Debug
-            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
+            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
           - platform: macOS
             os: macos-14
             build: RelWithDebInfo
-            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest
+            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
 
@@ -95,14 +98,14 @@ jobs:
             build: Debug
             cmake_generator: MSYS Makefiles
             cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
-            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest bison make
+            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi bison flex make
           - platform: Windows
             os: windows-latest
             shell: msys2 {0}
             build: RelWithDebInfo
             cmake_generator: MSYS Makefiles
             cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
-            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest bison make
+            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi bison flex make
 
     defaults:
       run:
@@ -128,7 +131,20 @@ jobs:
         if: matrix.platform == 'macOS'
         env:
           HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
-        run: brew install ${{ matrix.packages }}
+        run: |
+          brew install ${{ matrix.packages }}
+          # Homebrew flex/bison are keg-only (they'd shadow the too-old
+          # system copies); put their bin dirs on PATH so CMake's
+          # find_package(FLEX 2.6)/(BISON 3.8) picks them up and the
+          # scanner/parser are regenerated from lex.l/grammar.y instead of
+          # falling back to the checked-in pre-generated sources.
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          # bison also needs its lib dir for -ly at link time on some setups.
+          echo "LDFLAGS=-L$(brew --prefix bison)/lib" >> "$GITHUB_ENV"
+          # libffi is keg-only on macOS; expose its pkg-config so
+          # pkg_check_modules(libffi) in package_ffi resolves it.
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
 
       - name: Install Dependencies (Windows)
         if: matrix.platform == 'Windows'
@@ -162,7 +178,67 @@ jobs:
           ICU_ROOT: ${{ matrix.icu_root }}
 
       - name: Run Unit Tests
-        run: cd build && make test
+        run: cd build && ctest --output-on-failure -LE testsuite
 
       - name: Run LPC Testsuite
-        run: cd testsuite && ../build/bin/driver etc/config.test -ftest
+        run: cd build && ctest --output-on-failure -L testsuite
+
+  # WebAssembly build: cross-compile the driver with Emscripten and run
+  # the full LPC testsuite inside the wasm driver under node. See
+  # docs/build-wasm.md for the workflow and src/wasm/README.md for the
+  # architecture.
+  wasm:
+    name: WASM (Emscripten)
+    runs-on: ubuntu-24.04
+    env:
+      # Upstream dep pins: the deps build and the cache key below reference
+      # these. The emsdk itself tracks 'latest' (native wasm exceptions and
+      # friends); the resolved compiler version feeds the cache key.
+      ICU_VER: 74-2
+      WASM_DEPS_PREFIX: /opt/wasm-deps
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Resolve emscripten version
+        id: emver
+        run: echo "version=$(emcc -dumpversion)" >> "$GITHUB_OUTPUT"
+
+      - name: Install native dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential bison flex libssl-dev libicu-dev
+
+      # The deps prefix must exist and be runner-writable BEFORE the cache
+      # step: on a cache hit, actions/cache restores into it directly.
+      - name: Prepare wasm deps prefix
+        run: |
+          sudo mkdir -p "$WASM_DEPS_PREFIX"
+          sudo chown "$USER" "$WASM_DEPS_PREFIX"
+
+      # ICU cross-built for wasm32; ~10 minutes on a miss, so cache
+      # on the resolved emsdk + upstream versions (bump -v1 to invalidate).
+      - name: Cache wasm dependencies (ICU)
+        id: wasm-deps
+        uses: actions/cache@v4
+        with:
+          path: /opt/wasm-deps
+          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-v3
+
+      - name: Build wasm dependencies
+        if: steps.wasm-deps.outputs.cache-hit != 'true'
+        run: |
+          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" \
+            tools/wasm/build-deps.sh
+
+      - name: Build driver (native tools + wasm) and package testsuite
+        run: tools/wasm/build.sh
+
+      - name: Run LPC testsuite in the wasm driver
+        run: node tools/wasm/run-testsuite.js

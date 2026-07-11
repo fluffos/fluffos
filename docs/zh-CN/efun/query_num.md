@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / query_num.pre
 ---
 # query_num

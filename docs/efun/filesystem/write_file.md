@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: filesystem / write_file
 ---
 # write_file

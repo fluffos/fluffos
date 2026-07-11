@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: string / sha1
 ---
 # sha1

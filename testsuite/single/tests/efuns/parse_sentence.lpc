@@ -1,0 +1,10 @@
+void do_tests() {
+#ifdef __PACKAGE_PARSER__
+    parse_init();
+    // No verbs are registered for this object; a parse either declines
+    // (0 / error string) or errors -- it must not crash.
+    catch(parse_sentence("look"));
+    ASSERT(1);
+#endif
+    ASSERT(1);
+}

@@ -9,13 +9,13 @@
  * Ported from Amylaars LP 3.2 driver
  */
 
-replace_ob_t *obj_list_replace = nullptr;
+replace_ob_t* obj_list_replace = nullptr;
 
-static program_t *search_inherited(char * /*str*/, program_t * /*prg*/, int * /*offpnt*/);
-static replace_ob_t *retrieve_replace_program_entry();
+static program_t* search_inherited(char* /*str*/, program_t* /*prg*/, int* /*offpnt*/);
+static replace_ob_t* retrieve_replace_program_entry();
 
-int replace_program_pending(object_t *ob) {
-  replace_ob_t *r_ob;
+int replace_program_pending(object_t* ob) {
+  replace_ob_t* r_ob;
 
   for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next) {
     if (r_ob->ob == ob) {
@@ -26,15 +26,38 @@ int replace_program_pending(object_t *ob) {
   return 0;
 }
 
+/*
+ * Void any pending replace_program() for ob. recompile_object() calls
+ * this at the moment it swaps ob's program: a pending entry's target
+ * program pointer and variable offset were computed against the
+ * program being replaced (old code may have registered it mid-update,
+ * e.g. from another target's __INIT), and letting the backend sweep
+ * apply it to the fresh program would corrupt the variable block. An
+ * entry registered AFTER the swap is computed against the new program
+ * and is left alone.
+ */
+void cancel_pending_replace_program(object_t* ob) {
+  replace_ob_t **prev = &obj_list_replace, *r;
+
+  while ((r = *prev)) {
+    if (r->ob == ob) {
+      *prev = r->next;
+      FREE((char*)r);
+    } else {
+      prev = &r->next;
+    }
+  }
+}
+
 void replace_programs() {
   replace_ob_t *r_ob, *r_next;
   int i, num_fewer, offset;
-  svalue_t *svp;
+  svalue_t* svp;
 
   debug(d_flag, ("start of replace_programs"));
 
   for (r_ob = obj_list_replace; r_ob; r_ob = r_next) {
-    program_t *old_prog;
+    program_t* old_prog;
 
     num_fewer = r_ob->ob->prog->num_variables_total - r_ob->new_prog->num_variables_total;
 
@@ -99,15 +122,15 @@ void replace_programs() {
       r_ob->ob->shadowing = nullptr;
     }
 #endif
-    FREE((char *)r_ob);
+    FREE((char*)r_ob);
   }
-  obj_list_replace = (replace_ob_t *)nullptr;
+  obj_list_replace = (replace_ob_t*)nullptr;
   debug(d_flag, ("end of replace_programs"));
 }
 
 #ifdef F_REPLACE_PROGRAM
-static program_t *search_inherited(char *str, program_t *prg, int *offpnt) {
-  program_t *tmp;
+static program_t* search_inherited(char* str, program_t* prg, int* offpnt) {
+  program_t* tmp;
   int i;
 
   debug(d_flag, "search_inherited started");
@@ -133,11 +156,11 @@ static program_t *search_inherited(char *str, program_t *prg, int *offpnt) {
   }
   debug(d_flag, "search_inherited failed");
 
-  return (program_t *)nullptr;
+  return (program_t*)nullptr;
 }
 
-static replace_ob_t *retrieve_replace_program_entry() {
-  replace_ob_t *r_ob;
+static replace_ob_t* retrieve_replace_program_entry() {
+  replace_ob_t* r_ob;
 
   for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next) {
     if (r_ob->ob == current_object) {
@@ -148,10 +171,10 @@ static replace_ob_t *retrieve_replace_program_entry() {
 }
 
 void f_replace_program() {
-  replace_ob_t *tmp;
+  replace_ob_t* tmp;
   int name_len;
   char *name, *xname;
-  program_t *new_prog;
+  program_t* new_prog;
   int var_offset;
 
   if (sp->type != T_STRING) {
@@ -172,27 +195,34 @@ void f_replace_program() {
   }
 
   name_len = SVALUE_STRLEN(sp);
-  name = reinterpret_cast<char *>(DMALLOC(name_len + 3, TAG_TEMPORARY, "replace_program"));
+  name = reinterpret_cast<char*>(DMALLOC(name_len + 5, TAG_TEMPORARY, "replace_program"));
   xname = name;
   strcpy(name, sp->u.string);
-  if (name_len < 3) {
-    strcat(name, ".c");
-  } else {
-    if (name[name_len - 2] != '.' || name[name_len - 1] != 'c') {
-      strcat(name, ".c");
-    }
-  }
+  bool has_ext = (name_len >= 2 && strcmp(name + name_len - 2, ".c") == 0) ||
+                 (name_len >= 4 && strcmp(name + name_len - 4, ".lpc") == 0);
   if (*name == '/') {
     name++;
   }
-  new_prog = search_inherited(name, current_object->prog, &var_offset);
+  if (has_ext) {
+    new_prog = search_inherited(name, current_object->prog, &var_offset);
+  } else {
+    // Both source spellings are first-class: try ".lpc", then ".c".
+    size_t blen = strlen(name);
+    strcat(name, ".lpc");
+    new_prog = search_inherited(name, current_object->prog, &var_offset);
+    if (new_prog == nullptr) {
+      name[blen] = '\0';
+      strcat(name, ".c");
+      new_prog = search_inherited(name, current_object->prog, &var_offset);
+    }
+  }
   FREE(xname);
   if (!new_prog) {
     error("program to replace the current with has to be inherited\n");
   }
   if (!(tmp = retrieve_replace_program_entry())) {
-    tmp = reinterpret_cast<replace_ob_t *>(
-        DMALLOC(sizeof(replace_ob_t), TAG_TEMPORARY, "replace_program"));
+    tmp = reinterpret_cast<replace_ob_t*>(
+        DMALLOC(sizeof(replace_ob_t), TAG_REPLACE_OB, "replace_program"));
     tmp->ob = current_object;
     tmp->next = obj_list_replace;
     obj_list_replace = tmp;

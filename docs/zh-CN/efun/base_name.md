@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / base_name.pre
 ---
 # base_name

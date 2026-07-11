@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / in_edit
 ---
 # in_edit

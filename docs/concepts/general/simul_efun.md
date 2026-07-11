@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / simul_efun
 ---
 # simul_efun

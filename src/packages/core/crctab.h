@@ -79,7 +79,9 @@ static int64_t cr3tab[] = {
 #ifdef NFGM
 int64_t UPDC32(b, c)
 int64_t c;
-{ return (cr3tab[(c ^ b) & 0xff] ^ ((c >> 8) & 0x00FFFFFF)); }
+{
+  return (cr3tab[(c ^ b) & 0xff] ^ ((c >> 8) & 0x00FFFFFF));
+}
 
 #else
 #define UPDC32(b, c) (cr3tab[(c ^ b) & 0xff] ^ ((c >> 8) & 0x00FFFFFF))

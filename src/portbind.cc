@@ -15,10 +15,10 @@
     exit(-1);                       \
   }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   int port = -1;
-  char *ipaddress = nullptr;
-  const char *driver_name = "./driver";
+  char* ipaddress = nullptr;
+  const char* driver_name = "./driver";
   int uid = -1;
   int gid = -1;
 
@@ -94,8 +94,7 @@ int main(int argc, char **argv) {
   HANDLE_ERROR(close, close(fd));
 
   /* set local address reuse */
-  HANDLE_ERROR(setsockopt,
-               setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char *)&optval, sizeof(optval)));
+  HANDLE_ERROR(setsockopt, setsockopt(6, SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval)));
 
   /* setup our address */
   sin.sin_family = AF_INET;
@@ -103,7 +102,7 @@ int main(int argc, char **argv) {
   sin.sin_port = htons(static_cast<unsigned short>(port));
 
   /* bind to our address */
-  HANDLE_ERROR(bind, bind(6, (struct sockaddr *)&sin, sizeof(sin)));
+  HANDLE_ERROR(bind, bind(6, (struct sockaddr*)&sin, sizeof(sin)));
 
   /* change our uid and gid */
   if (gid != -1) {
@@ -114,7 +113,7 @@ int main(int argc, char **argv) {
     HANDLE_ERROR(setuid, setuid(uid));
   }
 
-  argv[0] = const_cast<char *>(driver_name);
+  argv[0] = const_cast<char*>(driver_name);
   /* exec the driver */
   HANDLE_ERROR(execv, execv(driver_name, argv));
   return 0;

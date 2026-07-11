@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: stdlib / database
 ---
 # database_zh

@@ -1,0 +1,5 @@
+// Fixture: "if_magic.h" does not exist; the test's compile hook
+// translates the include to /clone/if_real.h.
+#include "if_magic.h"
+
+int fn() { return MAGIC; }

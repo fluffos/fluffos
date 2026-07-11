@@ -52,7 +52,7 @@ An LPMUD system is built from three distinct layers, each with a clear responsib
 - **Clone-based objects** — an LPC source file is a blueprint. The driver clones it to create instances: one `/obj/sword.c` file → thousands of individual sword objects in the world.
 - **Inheritance** — objects inherit and override behavior: `/std/weapon.c` → `/obj/sword.c` → `/obj/cursed_sword.c`.
 - **Garbage collected** — the driver handles memory automatically via reference counting; LPC code never calls `free()`.
-- **Live hot-reload** — you can update and reload a running object without restarting the server or disconnecting players.
+- **Live hot-reload** — `recompile_object()` swaps a recompiled program into a running object *and all its clones* without restarting the server or disconnecting players; variables carry over by name, so state survives the update.
 - **Event-driven** — no threads, no blocking. Game logic runs in response to player commands, network events, and `call_out()` timers.
 - **Sandboxed** — the driver tracks evaluation cost and kills runaway code before it can crash the server.
 
@@ -69,6 +69,7 @@ FluffOS is the engine. It sits between your LPC source files and the operating s
 - **Networking** — simultaneous Telnet, WebSocket, and TLS connections; IAC option negotiation; MXP/MSP support.
 - **Async database I/O** — SQLite3, MySQL, and PostgreSQL queries run in a thread pool so the game loop never blocks.
 - **Modern runtime** — jemalloc allocator, async DNS, event loop based on libevent, cross-platform (Linux, macOS, Windows/MSYS2).
+- **Runs in the browser** — the driver cross-compiles to WebAssembly: a full mudlib boots inside a webpage (the page is the telnet client), with an LPC ↔ JavaScript bridge for `fetch()`, canvas/WebGL and page-driven UIs. See [Building for WebAssembly](#building-for-webassembly-browser).
 
 ### The Mudlib — Your Game World
 
@@ -135,8 +136,11 @@ sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
   libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
-  libdw-dev libbz2-dev
+  pkg-config libffi-dev libdw-dev libbz2-dev
 ```
+
+> [!NOTE]
+> `flex` is only needed if you modify the LPC lexer (`src/compiler/internal/lexer.l`). Otherwise the build uses the pre-committed generated lexer.
 
 **2. Compile:**
 ```bash
@@ -152,7 +156,7 @@ make -j$(nproc) install
 **1. Install dependencies (Homebrew):**
 ```bash
 brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
-  mysql sqlite3 googletest
+  mysql sqlite3 googletest libffi
 ```
 
 **2. Compile:**
@@ -175,6 +179,7 @@ pacman --noconfirm -S --needed \
   mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
+  mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
   bison make
 ```
 
@@ -218,7 +223,7 @@ apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
   mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
   openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
   pcre-dev bison git musl-dev libelf-static elfutils-dev \
-  zstd-static bzip2-static xz-static
+  pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 
 **2. Compile (static build):**
@@ -227,6 +232,27 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC=ON -DMARCH_NATIVE=OFF
 make -j$(nproc) install
 ```
+
+---
+
+### Building for WebAssembly (Browser)
+
+The driver cross-compiles with Emscripten and runs a full mudlib inside a
+webpage — every visitor gets their own driver instance, served as static
+files:
+
+```bash
+tools/wasm/build-deps.sh     # once: cross-build ICU for wasm32
+tools/wasm/build.sh          # native codegen tools + wasm driver + demo bundle
+python3 -m http.server -d build-wasm/dist 8080   # open http://localhost:8080/
+```
+
+Package your own mudlib with `tools/wasm/pack-mudlib.sh --mudlib <dir>
+--config <path>`. Full workflow: [docs/build-wasm.md](docs/build-wasm.md);
+recipes (playable demos on GitHub Pages, page UIs calling LPC via the
+`jsbridge` efuns, browser `fetch()`/canvas from LPC):
+[docs/driver/wasm.md](docs/driver/wasm.md); architecture:
+[src/wasm/README.md](src/wasm/README.md).
 
 ---
 
@@ -294,16 +320,19 @@ cd testsuite
 
 - **`src/`**: Core driver source code.
   - `main.cc`: Entry point.
-  - `backend.cc`: Main game loop and network/event dispatcher.
-  - `comm.cc`: Network sockets & packet handling.
+  - `backend.cc`: The tick/event queues (event-loop-agnostic core); `backend_libevent.cc` is the native blocking loop.
+  - `comm.cc`: Transport-agnostic connection handling (users, commands, prompts).
   - `user.cc`: Connection & session management.
+- **`src/net/`**: The byte-transport layer — `transport.h` (per-connection interface), `transport_libevent.cc` (sockets/TLS/websockets + listeners), telnet protocol handling.
+- **`src/wasm/`**: WebAssembly target — JS-bridged transport, host-driven event loop, exported entry points (see [src/wasm/README.md](src/wasm/README.md)).
 - **`src/vm/`**: LPC execution virtual machine.
   - `interpret.cc`: Bytecode interpreter loop.
   - `simulate.cc`: Game object lifecycle and simulation functions.
 - **`src/compiler/`**: LPC parsing engine (`grammar.y`, `lex.cc`, `generate.cc`).
-- **`src/packages/`**: Modular efun features (math, db, crypto, sockets, etc.).
+- **`src/packages/`**: Modular efun features (math, db, crypto, sockets, jsbridge, etc.).
+- **`tools/wasm/`**: WebAssembly tooling — dependency cross-build, end-to-end build, mudlib packer, node testsuite runner.
 - **`testsuite/`**: Official testsuite containing LPC tests and configurations.
-- **`docs/`**: Markdown documentation.
+- **`docs/`**: Documentation site (Markdown, built with Docusaurus — see [docs/README.md](docs/README.md)).
 
 ---
 
@@ -321,9 +350,20 @@ cd testsuite
 - Async IO operations.
 - External program integration.
 
+### Hot Reload
+- `recompile_object()` efun: recompile a source file and swap the new program into the live master copy and every clone — no destruct, object identity and variable state preserved (works for the master object, the simul_efun object, and virtual objects too).
+- Compile-time master applies `inherit_program()` and `include_file()` expose the full dependency graph (and can redirect, synthesize, or deny inherits/includes).
+- A reference auto-hot-reload daemon (watch files, reload on change, dependency-ordered) ships in the testsuite; see the [hot reload guide](https://www.fluffos.info/concepts/general/hot_reload).
+
 ### Networking
 - TLS support.
 - WebSocket protocol support (with a minimal example for a webclient).
+
+### WebAssembly
+- The whole driver runs in a browser page (or node) — compiler, VM, efuns, telnet.
+- Mudlibs ship as static bundles via `tools/wasm/pack-mudlib.sh`; no server required.
+- `jsbridge` efuns: LPC calls page JavaScript (`js_eval`, `js_call` — fetch, canvas/WebGL, audio, storage) and pages call LPC (`js_export` + `fluffos.callLPC`).
+- The LPC testsuite runs inside the wasm driver under node, gated in CI.
 
 ---
 

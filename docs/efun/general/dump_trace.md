@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / dump_trace
 ---
 # dump_trace

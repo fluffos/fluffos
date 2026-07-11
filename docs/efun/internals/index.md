@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals
 ---
 * [cache_stats](cache_stats)
@@ -8,21 +7,18 @@ title: internals
 * [debugmalloc](debugmalloc)
 * [dump_file_descriptors](dump_file_descriptors)
 * [dump_prog](dump_prog)
-* [dump_socket_status](dump_socket_status)
 * [dumpallobj](dumpallobj)
 * [get_config](get_config)
 * [malloc_status](malloc_status)
 * [memory_info](memory_info)
 * [moncontrol](moncontrol)
 * [mud_status](mud_status)
-* [opcprof](opcprof)
 * [query_load_average](query_load_average)
 * [refs](refs)
 * [rusage](rusage)
 * [set_config](set_config)
 * [set_debug_level](set_debug_level)
 * [set_malloc_mask](set_malloc_mask)
-* [swap](swap)
 * [time_expression](time_expression)
 * [trace](trace)
 * [traceprefix](traceprefix)

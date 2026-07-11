@@ -1,0 +1,34 @@
+void do_tests() {
+    mapping codes = ([ "RED" : "<r>", "RESET" : "<0>" ]);
+    string r;
+    string *lines;
+
+    ASSERT_EQ("<r>hot<0>", terminal_colour("%^RED%^hot%^RESET%^", codes));
+    // Unknown tokens pass through as their name.
+    ASSERT_EQ("plain", terminal_colour("plain", codes));
+    // With a wrap width the text is wrapped.
+    ASSERT(stringp(terminal_colour("some longer text to wrap here", codes, 10)));
+
+    // ASCII wrap pinning: break at the space (the RESET code is emitted
+    // before every wrap-inserted newline).
+    ASSERT_EQ("aaaa<0>\nbbbb", terminal_colour("aaaa bbbb", codes, 6));
+
+    // Issue #1054: wrapping counts display columns, not bytes, and never
+    // splits a multi-byte character. 12 double-width CJK chars at wrap 10
+    // -> 5 chars (10 columns) per line.
+    r = terminal_colour("字字字字字字字字字字字字", codes, 10);
+    lines = explode(r, "\n");
+    ASSERT_EQ(3, sizeof(lines));
+    ASSERT_EQ("字字字字字<0>", lines[0]);
+    ASSERT_EQ("字字字字字<0>", lines[1]);
+    ASSERT_EQ("字字", lines[2]);
+    // Nothing lost or garbled by the wrapping.
+    ASSERT_EQ("字字字字字字字字字字字字",
+              replace_string(replace_string(r, "<0>", ""), "\n", ""));
+
+    // Mixed-width text: every line fits within the wrap width in columns.
+    r = terminal_colour("abc 一二三四五 def 六七八九十 ghi", codes, 8);
+    foreach (string line in explode(r, "\n")) {
+        ASSERT(strwidth(replace_string(line, "<0>", "")) <= 8);
+    }
+}

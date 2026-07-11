@@ -8,7 +8,8 @@
 #include <sstream>
 
 #include "base/internal/debugmalloc.h"
-#include "base/internal/hash.h"
+#include <functional>
+#include <string_view>
 #include "base/internal/log.h"
 #include "base/internal/outbuf.h"
 #include "base/internal/rc.h"
@@ -70,12 +71,12 @@ uint64_t allocd_bytes = 0;
 uint64_t search_len = 0;
 uint64_t num_str_searches = 0;
 
-#define StrHash(s) (whashstr((s)) & (htable_size_minus_one))
+#define StrHash(s) (std::hash<std::string_view>{}(std::string_view(s)) & (htable_size_minus_one))
 
 #define hfindblock(s, h) sfindblock(s, (h) = StrHash(s))
 #define findblock(s) sfindblock(s, StrHash(s))
 
-static block_t *sfindblock(const char * /*s*/, int /*h*/);
+static block_t* sfindblock(const char* /*s*/, int /*h*/);
 
 /*
  * hash table - list of pointers to heads of string chains.
@@ -85,11 +86,11 @@ static block_t *sfindblock(const char * /*s*/, int /*h*/);
  * 1000 and 5000.
  */
 
-static block_t **base_table = (block_t **)nullptr;
+static block_t** base_table = (block_t**)nullptr;
 static int htable_size;
 static int htable_size_minus_one;
 
-static block_t *alloc_new_shared_string(const char * /*string*/, int /*h*/, const char * /*why*/);
+static block_t* alloc_new_shared_string(const char* /*string*/, int /*h*/, const char* /*why*/);
 
 void init_strings() {
   int x, y;
@@ -101,9 +102,9 @@ void init_strings() {
   CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__) = htable_size;
 
   htable_size_minus_one = htable_size - 1;
-  base_table = reinterpret_cast<block_t **>(
-      DCALLOC(htable_size, sizeof(block_t *), TAG_STR_TBL, "init_strings"));
-  overhead_bytes += (sizeof(block_t *) * htable_size);
+  base_table = reinterpret_cast<block_t**>(
+      DCALLOC(htable_size, sizeof(block_t*), TAG_STR_TBL, "init_strings"));
+  overhead_bytes += (sizeof(block_t*) * htable_size);
 
   for (x = 0; x < htable_size; x++) {
     base_table[x] = nullptr;
@@ -117,7 +118,7 @@ void init_strings() {
  * pointer on the hash chain into fs_prev.
  */
 
-static block_t *sfindblock(const char *s, int h) {
+static block_t* sfindblock(const char* s, int h) {
   block_t *curr, *prev;
 
   curr = base_table[h];
@@ -138,11 +139,11 @@ static block_t *sfindblock(const char *s, int h) {
     prev = curr;
     curr = NEXT(curr);
   }
-  return ((block_t *)nullptr); /* not found */
+  return ((block_t*)nullptr); /* not found */
 }
 
-const char *findstring(const char *s) {
-  block_t *b;
+const char* findstring(const char* s) {
+  block_t* b;
 
   if ((b = findblock(s))) {
     return STRING(b);
@@ -152,10 +153,10 @@ const char *findstring(const char *s) {
 
 /* alloc_new_string: Make a space for a string.  */
 
-static block_t *alloc_new_shared_string(const char *string, int h, const char *why) {
+static block_t* alloc_new_shared_string(const char* string, int h, const char* why) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  block_t *b;
+  block_t* b;
   int len = strlen(string);
   int size;
   int cut = 0;
@@ -164,7 +165,7 @@ static block_t *alloc_new_shared_string(const char *string, int h, const char *w
     cut = 1;
   }
   size = sizeof(block_t) + len + 1;
-  b = reinterpret_cast<block_t *>(DMALLOC(size, TAG_SHARED_STRING, why));
+  b = reinterpret_cast<block_t*>(DMALLOC(size, TAG_SHARED_STRING, why));
   strncpy(STRING(b), string, len);
   STRING(b)
   [len] = '\0'; /* strncpy doesn't put on \0 if 'from' too
@@ -174,7 +175,8 @@ static block_t *alloc_new_shared_string(const char *string, int h, const char *w
   }
   SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
   REFS(b) = 1;
-  md_record_ref_journal(PTR_TO_NODET(b), true, b->refs, "alloc_new_shared_string: " + std::string(why));
+  md_record_ref_journal(PTR_TO_NODET(b), true, b->refs,
+                        "alloc_new_shared_string: " + std::string(why));
   NEXT(b) = base_table[h];
   HASH(b) = h;
   base_table[h] = b;
@@ -183,8 +185,8 @@ static block_t *alloc_new_shared_string(const char *string, int h, const char *w
   return (b);
 }
 
-const char *int_make_shared_string(const char *str, const char *desc) {
-  block_t *b;
+const char* int_make_shared_string(const char* str, const char* desc) {
+  block_t* b;
   int h;
 
   b = hfindblock(str, h); /* hfindblock macro sets h = StrHash(s) */
@@ -193,7 +195,8 @@ const char *int_make_shared_string(const char *str, const char *desc) {
   } else {
     if (REFS(b)) {
       REFS(b)++;
-      md_record_ref_journal(PTR_TO_NODET(b), true, b->refs, "int_make_shared_string: " + std::string(desc));
+      md_record_ref_journal(PTR_TO_NODET(b), true, b->refs,
+                            "int_make_shared_string: " + std::string(desc));
     }
     ADD_STRING(SIZE(b));
   }
@@ -205,8 +208,8 @@ const char *int_make_shared_string(const char *str, const char *desc) {
    ref_string: Fatal to call this function on a string that isn't shared.
 */
 
-const char *int_ref_string(const char *str, const char *desc) {
-  block_t *b;
+const char* int_ref_string(const char* str, const char* desc) {
+  block_t* b;
 
   b = BLOCK(str);
   DEBUG_CHECK1(b != findblock(str), "stralloc.c: called ref_string on non-shared string: %s.\n",
@@ -226,7 +229,7 @@ const char *int_ref_string(const char *str, const char *desc) {
  * checks applied.
  */
 
-void int_free_string(const char *str, const char *desc) {
+void int_free_string(const char* str, const char* desc) {
   block_t **prev, *b;
   int h;
 
@@ -269,7 +272,7 @@ void int_free_string(const char *str, const char *desc) {
   CHECK_STRING_STATS;
 }
 
-void deallocate_string(char *str) {
+void deallocate_string(char* str) {
   int h;
   block_t *b, **prev;
 
@@ -288,7 +291,7 @@ void deallocate_string(char *str) {
   FREE(b);
 }
 
-uint64_t add_string_status(outbuffer_t *out, int verbose) {
+uint64_t add_string_status(outbuffer_t* out, int verbose) {
   if (verbose == 1) {
     outbuf_add(out, "All strings:\n");
     outbuf_add(out, "-------------------------\t Strings    Bytes\n");
@@ -329,12 +332,12 @@ char *the_null_string = (char *)&the_null_string_blocks[1];
 */
 
 #ifdef DEBUGMALLOC
-char *int_new_string(unsigned int size, const char *tag)
+char* int_new_string(unsigned int size, const char* tag)
 #else
-char *int_new_string(unsigned int size)
+char* int_new_string(unsigned int size)
 #endif
 {
-  malloc_block_t *mbt;
+  malloc_block_t* mbt;
 
 #if 0
   if (!size) {
@@ -344,7 +347,7 @@ char *int_new_string(unsigned int size)
   }
 #endif
 
-  mbt = reinterpret_cast<malloc_block_t *>(
+  mbt = reinterpret_cast<malloc_block_t*>(
       DMALLOC(size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, tag));
   if (size < UINT_MAX) {
     mbt->size = size;
@@ -356,14 +359,14 @@ char *int_new_string(unsigned int size)
   mbt->ref = 1;
   ADD_STRING(mbt->size);
   CHECK_STRING_STATS;
-  return reinterpret_cast<char *>(mbt + 1);
+  return reinterpret_cast<char*>(mbt + 1);
 }
 
-char *extend_string(const char *str, int len) {
-  malloc_block_t *mbt;
+char* extend_string(const char* str, int len) {
+  malloc_block_t* mbt;
   int const oldsize = MSTR_SIZE(str);
 
-  mbt = reinterpret_cast<malloc_block_t *>(DREALLOC(
+  mbt = reinterpret_cast<malloc_block_t*>(DREALLOC(
       MSTR_BLOCK(str), len + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, "extend_string"));
   if (len < UINT_MAX) {
     mbt->size = len;
@@ -373,32 +376,32 @@ char *extend_string(const char *str, int len) {
   ADD_STRING_SIZE(mbt->size - oldsize);
   CHECK_STRING_STATS;
 
-  return reinterpret_cast<char *>(mbt + 1);
+  return reinterpret_cast<char*>(mbt + 1);
 }
 
 #ifdef DEBUGMALLOC
-char *int_alloc_cstring(const char *str, const char *tag)
+char* int_alloc_cstring(const char* str, const char* tag)
 #else
-char *int_alloc_cstring(const char *str)
+char* int_alloc_cstring(const char* str)
 #endif
 {
-  char *ret;
+  char* ret;
 
-  ret = reinterpret_cast<char *>(DMALLOC(strlen(str) + 1, TAG_STRING, tag));
+  ret = reinterpret_cast<char*>(DMALLOC(strlen(str) + 1, TAG_STRING, tag));
   strcpy(ret, str);
   return ret;
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_copy(const char *const str, const char *desc)
+char* int_string_copy(const char* const str, const char* desc)
 #else
-char *int_string_copy(const char *const str)
+char* int_string_copy(const char* const str)
 #endif
 {
   // TODO: probabaly not a good idea to have it here.
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  char *p;
+  char* p;
   int len;
 
   DEBUG_CHECK(!str, "Null string passed to string_copy.\n");
@@ -416,54 +419,54 @@ char *int_string_copy(const char *const str)
 }
 
 #ifdef DEBUGMALLOC
-char *int_string_unlink(const char *str, const char *desc)
+char* int_string_unlink(const char* str, const char* desc)
 #else
-char *int_string_unlink(const char *str)
+char* int_string_unlink(const char* str)
 #endif
 {
   malloc_block_t *mbt, *newmbt;
 
-  mbt = ((malloc_block_t *)str) - 1;
+  mbt = ((malloc_block_t*)str) - 1;
   mbt->ref--;
 
   if (mbt->size == USHRT_MAX) {
     int const l = strlen(str + USHRT_MAX) + USHRT_MAX; /* ouch */
 
-    newmbt = reinterpret_cast<malloc_block_t *>(
+    newmbt = reinterpret_cast<malloc_block_t*>(
         DMALLOC(l + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc));
-    memcpy(reinterpret_cast<char *>(newmbt + 1), reinterpret_cast<char *>(mbt + 1), l + 1);
+    memcpy(reinterpret_cast<char*>(newmbt + 1), reinterpret_cast<char*>(mbt + 1), l + 1);
     newmbt->size = USHRT_MAX;
     ADD_NEW_STRING(USHRT_MAX, sizeof(malloc_block_t));
   } else {
-    newmbt = reinterpret_cast<malloc_block_t *>(
+    newmbt = reinterpret_cast<malloc_block_t*>(
         DMALLOC(mbt->size + sizeof(malloc_block_t) + 1, TAG_MALLOC_STRING, desc));
-    memcpy(reinterpret_cast<char *>(newmbt + 1), reinterpret_cast<char *>(mbt + 1), mbt->size + 1);
+    memcpy(reinterpret_cast<char*>(newmbt + 1), reinterpret_cast<char*>(mbt + 1), mbt->size + 1);
     newmbt->size = mbt->size;
     ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
   }
   newmbt->ref = 1;
   CHECK_STRING_STATS;
 
-  return reinterpret_cast<char *>(newmbt + 1);
+  return reinterpret_cast<char*>(newmbt + 1);
 }
 
-void stralloc_print_entry(std::stringstream &ss, block_t* entry) {
+void stralloc_print_entry(std::stringstream& ss, block_t* entry) {
 #if defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS)
-  auto *md_entry = PTR_TO_NODET(entry);
+  auto* md_entry = PTR_TO_NODET(entry);
   ss << fmt::format(FMT_STRING("{:d},{:d},{:s},{:s},"), md_entry->id, md_entry->size,
                     md_entry->tag == TAG_SHARED_STRING ? "S" : "M", md_entry->desc);
 #endif
-  ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash,
-                    entry->size, STRING(entry));
+  ss << fmt::format(FMT_STRING("{:d},{:x},{:d},{:.40s}\n"), entry->refs, entry->hash, entry->size,
+                    STRING(entry));
 }
 
-void dump_stralloc(outbuffer_t *out) {
+void dump_stralloc(outbuffer_t* out) {
   std::stringstream ss;
 
   ss << "===STRALLOC DUMP: allocd_strings:" << allocd_strings << "\n";
   // can't direct output to outbuf since it might realloc
   for (int hsh = 0; hsh < htable_size; hsh++) {
-    for (block_t *entry = base_table[hsh]; entry; entry = entry->next) {
+    for (block_t* entry = base_table[hsh]; entry; entry = entry->next) {
       stralloc_print_entry(ss, entry);
     }
   }

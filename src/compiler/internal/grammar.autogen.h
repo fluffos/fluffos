@@ -44,6 +44,12 @@
 #if YYDEBUG
 extern int yydebug;
 #endif
+/* "%code requires" blocks.  */
+#line 35 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+
+#include "compiler/internal/scratchpad.h"
+
+#line 53 "$BUILD_ROOT$/src/grammar.autogen.h"
 
 /* Token kinds.  */
 #ifndef YYTOKENTYPE
@@ -57,58 +63,54 @@ extern int yydebug;
     L_STRING = 258,                /* L_STRING  */
     L_NUMBER = 259,                /* L_NUMBER  */
     L_REAL = 260,                  /* L_REAL  */
-    L_BASIC_TYPE = 261,            /* L_BASIC_TYPE  */
-    L_TYPE_MODIFIER = 262,         /* L_TYPE_MODIFIER  */
-    L_DEFINED_NAME = 263,          /* L_DEFINED_NAME  */
-    L_IDENTIFIER = 264,            /* L_IDENTIFIER  */
-    L_EFUN = 265,                  /* L_EFUN  */
-    L_INC = 266,                   /* L_INC  */
-    L_DEC = 267,                   /* L_DEC  */
-    L_ASSIGN = 268,                /* L_ASSIGN  */
-    L_LAND = 269,                  /* L_LAND  */
-    L_LOR = 270,                   /* L_LOR  */
-    L_QUESTION_QUESTION = 271,     /* L_QUESTION_QUESTION  */
-    L_LSH = 272,                   /* L_LSH  */
-    L_RSH = 273,                   /* L_RSH  */
-    L_ORDER = 274,                 /* L_ORDER  */
-    L_NOT = 275,                   /* L_NOT  */
-    L_IF = 276,                    /* L_IF  */
-    L_ELSE = 277,                  /* L_ELSE  */
-    L_SWITCH = 278,                /* L_SWITCH  */
-    L_CASE = 279,                  /* L_CASE  */
-    L_DEFAULT = 280,               /* L_DEFAULT  */
-    L_RANGE = 281,                 /* L_RANGE  */
-    L_DOT_DOT_DOT = 282,           /* L_DOT_DOT_DOT  */
-    L_WHILE = 283,                 /* L_WHILE  */
-    L_DO = 284,                    /* L_DO  */
-    L_FOR = 285,                   /* L_FOR  */
-    L_FOREACH = 286,               /* L_FOREACH  */
-    L_IN = 287,                    /* L_IN  */
-    L_BREAK = 288,                 /* L_BREAK  */
-    L_CONTINUE = 289,              /* L_CONTINUE  */
-    L_RETURN = 290,                /* L_RETURN  */
-    L_ARROW = 291,                 /* L_ARROW  */
-    L_DOT = 292,                   /* L_DOT  */
+    L_TEMPLATE_HEAD = 261,         /* L_TEMPLATE_HEAD  */
+    L_TEMPLATE_MIDDLE = 262,       /* L_TEMPLATE_MIDDLE  */
+    L_TEMPLATE_TAIL = 263,         /* L_TEMPLATE_TAIL  */
+    L_BASIC_TYPE = 264,            /* L_BASIC_TYPE  */
+    L_TYPE_MODIFIER = 265,         /* L_TYPE_MODIFIER  */
+    L_DEFINED_NAME = 266,          /* L_DEFINED_NAME  */
+    L_IDENTIFIER = 267,            /* L_IDENTIFIER  */
+    L_EFUN = 268,                  /* L_EFUN  */
+    L_INC_DEC = 269,               /* L_INC_DEC  */
+    L_ASSIGN = 270,                /* L_ASSIGN  */
+    L_LAND = 271,                  /* L_LAND  */
+    L_LOR = 272,                   /* L_LOR  */
+    L_QUESTION_QUESTION = 273,     /* L_QUESTION_QUESTION  */
+    L_SHIFT = 274,                 /* L_SHIFT  */
+    L_EQ_NE = 275,                 /* L_EQ_NE  */
+    L_ORDER = 276,                 /* L_ORDER  */
+    L_IF = 277,                    /* L_IF  */
+    L_ELSE = 278,                  /* L_ELSE  */
+    L_SWITCH = 279,                /* L_SWITCH  */
+    L_CASE = 280,                  /* L_CASE  */
+    L_DEFAULT = 281,               /* L_DEFAULT  */
+    L_RANGE = 282,                 /* L_RANGE  */
+    L_DOT_DOT_DOT = 283,           /* L_DOT_DOT_DOT  */
+    L_WHILE = 284,                 /* L_WHILE  */
+    L_DO = 285,                    /* L_DO  */
+    L_FOR = 286,                   /* L_FOR  */
+    L_FOREACH = 287,               /* L_FOREACH  */
+    L_IN = 288,                    /* L_IN  */
+    L_BREAK = 289,                 /* L_BREAK  */
+    L_CONTINUE = 290,              /* L_CONTINUE  */
+    L_RETURN = 291,                /* L_RETURN  */
+    L_ARROW = 292,                 /* L_ARROW  */
     L_INHERIT = 293,               /* L_INHERIT  */
     L_COLON_COLON = 294,           /* L_COLON_COLON  */
-    L_ARRAY_OPEN = 295,            /* L_ARRAY_OPEN  */
-    L_MAPPING_OPEN = 296,          /* L_MAPPING_OPEN  */
+    L_OPTIONAL_DOT = 295,          /* L_OPTIONAL_DOT  */
+    L_DOT_OPTIONAL = 296,          /* L_DOT_OPTIONAL  */
     L_FUNCTION_OPEN = 297,         /* L_FUNCTION_OPEN  */
-    L_NEW_FUNCTION_OPEN = 298,     /* L_NEW_FUNCTION_OPEN  */
-    L_SSCANF = 299,                /* L_SSCANF  */
-    L_CATCH = 300,                 /* L_CATCH  */
-    L_ARRAY = 301,                 /* L_ARRAY  */
-    L_REF = 302,                   /* L_REF  */
-    L_PARSE_COMMAND = 303,         /* L_PARSE_COMMAND  */
-    L_TIME_EXPRESSION = 304,       /* L_TIME_EXPRESSION  */
-    L_CLASS = 305,                 /* L_CLASS  */
-    L_NEW = 306,                   /* L_NEW  */
-    L_PARAMETER = 307,             /* L_PARAMETER  */
-    L_TREE = 308,                  /* L_TREE  */
-    L_PREPROCESSOR_COMMAND = 309,  /* L_PREPROCESSOR_COMMAND  */
-    LOWER_THAN_ELSE = 310,         /* LOWER_THAN_ELSE  */
-    L_EQ = 311,                    /* L_EQ  */
-    L_NE = 312                     /* L_NE  */
+    L_SSCANF = 298,                /* L_SSCANF  */
+    L_CATCH = 299,                 /* L_CATCH  */
+    L_ARRAY = 300,                 /* L_ARRAY  */
+    L_REF = 301,                   /* L_REF  */
+    L_PARSE_COMMAND = 302,         /* L_PARSE_COMMAND  */
+    L_TIME_EXPRESSION = 303,       /* L_TIME_EXPRESSION  */
+    L_CLASS = 304,                 /* L_CLASS  */
+    L_NEW = 305,                   /* L_NEW  */
+    L_PARAMETER = 306,             /* L_PARAMETER  */
+    L_TREE = 307,                  /* L_TREE  */
+    LOWER_THAN_ELSE = 308          /* LOWER_THAN_ELSE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -117,28 +119,38 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 131 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 167 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
-  LPC_INT number; /* 8 */
-  LPC_FLOAT real; /* 8 */
-  char *string;
-  struct argument_t argument;
-  ident_hash_elem_t *ihe;
-  parse_node_t *node;
-  function_context_t *contextp;
+  LPC_INT number;              /* integers, opcodes, type flags */
+  LPC_FLOAT real;              /* floating-point literals */
+  ScratchString *string;       /* arena string: compile-lifetime, bulk-freed */
+  const char *shared_string;   /* SHARED string (stralloc): ref-counted, its
+                                * ref held elsewhere (e.g. the function
+                                * table). Distinct member so a slot's
+                                * scratch-vs-shared lifetime is visible in
+                                * the grammar ($<shared_string>x), never
+                                * silently overloaded onto `string`. */
+  argument_t argument;         /* function parameter list metadata */
+  ident_hash_elem_t *ihe;      /* symbol-table entry for a known name */
+  parse_node_t *node;          /* parse-tree node (most non-terminals) */
+  function_context_t *contextp; /* saved function-context pointer */
+  decl_t decl;                 /* block/declaration info (node + local count) */
+  func_block_t func_block;     /* saved state for anonymous function body */
   struct {
-    parse_node_t *node;
-    char num;
-  } decl; /* 9 */
+    struct ident_hash_elem_t *ihe;
+    LPC_INT classname_index;
+  } class_header;              /* class name and index during class declaration */
   struct {
-    uint8_t num_local;
-    uint8_t max_num_locals;
-    uint16_t context;
-    uint16_t save_current_type;
-    uint16_t save_exact_types;
-  } func_block; /* 8 */
+    parse_node_t *expr;
+    LPC_INT saved_context;
+    LPC_INT saved_cases_size;
+  } switch_header;             /* switch discriminant and saved case-table state */
+  struct {
+    LPC_INT saved_context;
+    LPC_INT saved_refs;
+  } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 142 "$REPO_ROOT$/build/src/grammar.autogen.h"
+#line 154 "$BUILD_ROOT$/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -146,11 +158,36 @@ typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_DECLARED 1
 #endif
 
+/* Location type.  */
+#if ! defined YYLTYPE && ! defined YYLTYPE_IS_DECLARED
+typedef struct YYLTYPE YYLTYPE;
+struct YYLTYPE
+{
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+};
+# define YYLTYPE_IS_DECLARED 1
+# define YYLTYPE_IS_TRIVIAL 1
+#endif
 
-extern YYSTYPE yylval;
 
 
-int yyparse (void);
+
+#ifndef YYPUSH_MORE_DEFINED
+# define YYPUSH_MORE_DEFINED
+enum { YYPUSH_MORE = 4 };
+#endif
+
+typedef struct yypstate yypstate;
+
+
+int yypush_parse (yypstate *ps,
+                  int pushed_char, YYSTYPE const *pushed_val, YYLTYPE *pushed_loc, void* yyscanner);
+
+yypstate *yypstate_new (void);
+void yypstate_delete (yypstate *ps);
 
 
 #endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */

@@ -16,6 +16,7 @@
 #endif
 
 #include "base/internal/tracing.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"
 
 #include "applies_table.autogen.h"
 #include "backend.h"      // for clear_tick_events , FIXME
@@ -27,7 +28,8 @@
 #include "vm/internal/master.h"
 #include "vm/internal/otable.h"
 #include "vm/internal/simul_efun.h"
-#include "compiler/internal/lex.h"  // for total_lines, FIXME
+#include "compiler/internal/compiler.h"  // for compiler_next_load_reason
+#include "compiler/internal/lexer.h"     // for total_lines, FIXME
 
 #include "packages/core/add_action.h"
 #include "packages/core/call_out.h"
@@ -39,6 +41,12 @@
 #endif
 #ifdef PACKAGE_DB
 void db_cleanup(void);  // FIXME
+#endif
+#ifdef PACKAGE_FFI
+#include "packages/ffi/ffi.h"
+#endif
+#ifdef PACKAGE_JSBRIDGE
+#include "packages/jsbridge/jsbridge.h"
 #endif
 #ifdef PACKAGE_SOCKETS
 #include "packages/sockets/socket_efuns.h"
@@ -52,7 +60,10 @@ void db_cleanup(void);  // FIXME
 
 #include "comm.h"  // FIXME
 
-#include "vm/internal/trace.h"  // for dump_trace && get_svalue_trace
+#include <vector>
+
+#include "packages/core/replace_program.h"  // for replace_program_pending
+#include "vm/internal/trace.h"              // for dump_trace && get_svalue_trace
 /*
  * This one is called from HUP.
  */
@@ -77,6 +88,14 @@ void shutdownMudOS(int exit_code) {
 
 #ifdef PACKAGE_DB
   db_cleanup();
+#endif
+#ifdef PACKAGE_FFI
+  ffi_cleanup();
+#endif
+#ifdef PACKAGE_JSBRIDGE
+  // Must precede clear_tick_events(): pending delivery events reference
+  // the entries this frees, and are discarded unrun there.
+  jsbridge_cleanup();
 #endif
   shutdown_external_ports();
 
@@ -107,33 +126,33 @@ void shutdownMudOS(int exit_code) {
 static int num_objects_this_thread = 0;
 
 #ifndef NO_ENVIRONMENT
-static object_t *restrict_destruct;
+static object_t* restrict_destruct;
 #endif
 
 object_t *obj_list, *obj_list_destruct;
 #ifdef DEBUG
-object_t *obj_list_dangling = 0;
+object_t* obj_list_dangling = 0;
 #endif
-object_t *current_object;      /* The object interpreting a function. */
-object_t *command_giver;       /* Where the current command came from. */
-object_t *current_interactive; /* The user who caused this execution */
+object_t* current_object;      /* The object interpreting a function. */
+object_t* command_giver;       /* Where the current command came from. */
+object_t* current_interactive; /* The user who caused this execution */
 
 #ifdef PRIVS
-static void init_privs_for_object(object_t *);
+static void init_privs_for_object(object_t*);
 #endif
 #ifdef PACKAGE_UIDS
-static int give_uid_to_object(object_t * /*ob*/);
+static int give_uid_to_object(object_t* /*ob*/);
 #endif
-static int init_object(object_t * /*ob*/);
-static object_t *load_virtual_object(const char * /*name*/, int /*clone*/);
-static char *make_new_name(const char * /*str*/);
+static int init_object(object_t* /*ob*/);
+static object_t* load_virtual_object(const char* /*name*/, int /*clone*/);
+static char* make_new_name(const char* /*str*/);
 #ifndef NO_ENVIRONMENT
-static void send_say(object_t * /*ob*/, const char * /*text*/, array_t * /*avoid*/);
+static void send_say(object_t* /*ob*/, const char* /*text*/, array_t* /*avoid*/);
 #endif
 
 #ifdef PRIVS
-static void init_privs_for_object(object_t *ob) {
-  svalue_t *value;
+static void init_privs_for_object(object_t* ob) {
+  svalue_t* value;
 
   if (!current_object
 #ifdef PACKAGE_UIDS
@@ -163,9 +182,9 @@ static void init_privs_for_object(object_t *ob) {
  * Give the correct uid and euid to a created object.
  */
 #ifdef PACKAGE_UIDS
-static int give_uid_to_object(object_t *ob) {
-  svalue_t *ret;
-  const char *creator_name;
+static int give_uid_to_object(object_t* ob) {
+  svalue_t* ret;
+  const char* creator_name;
 
   if (!master_ob) {
     ob->uid = add_uid("NONAME");
@@ -183,12 +202,12 @@ static int give_uid_to_object(object_t *ob) {
 
   ret = apply_master_ob(APPLY_CREATOR_FILE, 1);
   if (!ret) error("master object: No function %s() defined!\n", applies_table[APPLY_CREATOR_FILE]);
-  if (!ret || ret == (svalue_t *)-1 || ret->type != T_STRING) {
+  if (!ret || ret == (svalue_t*)-1 || ret->type != T_STRING) {
     destruct_object(ob);
     if (!ret) {
       error("Master object has no function %s().\n", applies_table[APPLY_CREATOR_FILE]);
     }
-    if (ret == (svalue_t *)-1) {
+    if (ret == (svalue_t*)-1) {
       error("Can't load objects without a master object.");
     }
     error(
@@ -241,7 +260,7 @@ static int give_uid_to_object(object_t *ob) {
 }
 #endif
 
-static int init_object(object_t *ob) {
+static int init_object(object_t* ob) {
 #ifdef PACKAGE_MUDLIB_STATS
   init_stats_for_object(ob);
 #endif
@@ -263,12 +282,12 @@ static int init_object(object_t *ob) {
 #endif
 }
 
-static object_t *load_virtual_object(const char *name, int clone) {
+static object_t* load_virtual_object(const char* name, int clone) {
   int argc = 2;
-  char *new_name;
+  char* new_name;
   object_t *new_ob, *ob;
-  array_t *args = nullptr;
-  svalue_t *v;
+  array_t* args = nullptr;
+  svalue_t* v;
 
   if (!master_ob) {
     if (clone) {
@@ -323,7 +342,7 @@ static object_t *load_virtual_object(const char *name, int clone) {
   /* perform the object rename */
   ObjectTable::instance().remove(new_ob->obname);
   if (new_ob->obname) {
-    FREE((char *)new_ob->obname);
+    FREE((char*)new_ob->obname);
   }
   SETOBNAME(new_ob, new_name);
   ObjectTable::instance().insert(new_ob->obname, new_ob);
@@ -349,10 +368,10 @@ static object_t *load_virtual_object(const char *name, int clone) {
   return new_ob;
 }
 
-int filename_to_obname(const char *src, char *dest, int size) {
+int filename_to_obname(const char* src, char* dest, int size) {
   char last_c = 0;
-  char *p = dest;
-  char *end = dest + size - 1;
+  char* p = dest;
+  char* end = dest + size - 1;
 
   while (*src == '/') {
     src++;
@@ -379,8 +398,16 @@ int filename_to_obname(const char *src, char *dest, int size) {
    *
    * The first solution is the one currently in use.
    */
-  while (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') {
-    p -= 2;
+  // Both source spellings are first-class: strip ".lpc" or ".c",
+  // repeatedly (see the duplicate-object rationale above).
+  for (;;) {
+    if (p - dest > 4 && p[-1] == 'c' && p[-2] == 'p' && p[-3] == 'l' && p[-4] == '.') {
+      p -= 4;
+    } else if (p - dest > 2 && p[-1] == 'c' && p[-2] == '.') {
+      p -= 2;
+    } else {
+      break;
+    }
   }
 
   *p = 0;
@@ -406,25 +433,30 @@ int filename_to_obname(const char *src, char *dest, int size) {
  * it.
  *
  */
-object_t *load_object(const char *lname, int callcreate) {
+object_t* load_object(const char* lname, int callcreate) {
   ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT,
                        [=] { return json{lname}; });
 
   auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
 
   int f;
-  program_t *prog;
-  object_t *ob;
-  svalue_t *mret;
+  program_t* prog;
+  object_t* ob;
+  svalue_t* mret;
   struct stat c_st;
   char name[400], actualname[400], real_name[sizeof(name) + 2], obname[sizeof(real_name)];
 
-  const char *pname = check_valid_path(lname, master_ob, "load_object", 0);
-  if (!pname) {
-    error("Read access denied.\n");
-  }
+  // Count this load BEFORE the valid_read master apply: a master whose
+  // valid_read itself triggers loads used to recurse through
+  // check_valid_path without ever hitting this limit, overflowing the C
+  // stack on small-stack platforms (issue #712).
   if (++num_objects_this_thread > inherit_chain_size) {
     error("Inherit chain too deep: > %d when trying to load '%s'.\n", inherit_chain_size, lname);
+  }
+
+  const char* pname = check_valid_path(lname, master_ob, "load_object", 0);
+  if (!pname) {
+    error("Read access denied.\n");
   }
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == nullptr) {
@@ -442,13 +474,31 @@ object_t *load_object(const char *lname, int callcreate) {
   }
 
   /*
-   * First check that the c-file exists.
+   * Source-file resolution: an explicitly requested extension is exact --
+   * load_object("/foo.c") probes only foo.c (no .lpc lookup), and
+   * load_object("/foo.lpc") probes only foo.lpc. Extension-less names
+   * prefer ".lpc" with ".c" as the transparent fallback. The chosen
+   * spelling flows into the compile/diagnostic name.
    */
+  size_t plen = strlen(pname);
+  bool explicit_ext = false;
+  const char* src_ext = ".lpc";
+  if (plen > 4 && strcmp(pname + plen - 4, ".lpc") == 0) {
+    explicit_ext = true;
+  } else if (plen > 2 && pname[plen - 1] == 'c' && pname[plen - 2] == '.') {
+    explicit_ext = true;
+    src_ext = ".c";
+  }
   (void)strcpy(real_name, actualname);
-  (void)strcat(real_name, ".c");
+  (void)strcat(real_name, src_ext);
+  if (!explicit_ext && (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode))) {
+    src_ext = ".c";
+    (void)strcpy(real_name, actualname);
+    (void)strcat(real_name, src_ext);
+  }
 
   (void)strcpy(obname, name);
-  (void)strcat(obname, ".c");
+  (void)strcat(obname, src_ext);
 
   if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
     save_command_giver(command_giver);
@@ -475,12 +525,17 @@ object_t *load_object(const char *lname, int callcreate) {
     error("Could not read the file '/%s'.\n", real_name);
   }
   save_command_giver(command_giver);
-  auto stream = std::make_unique<FileLexStream>(f);
-  prog = compile_file(std::move(stream), obname);
+  {
+    // An error() during the compile unwinds past this frame; guard the fd
+    // or every failed compile leaks one descriptor (issue #162).
+    DEFER { close(f); };
+    // Zero-copy load: compile_file_fd reads the file straight into the
+    // arena block the scanner reads in place -- no intermediate string.
+    prog = compile_file_fd(f, obname);
+  }
   restore_command_giver();
   update_compile_av(total_lines);
   total_lines = 0;
-  close(f);
 
   /* Sorry, can't handle objects without programs yet. */
   if (inherit_file == nullptr && (num_parse_error > 0 || prog == nullptr)) {
@@ -500,12 +555,22 @@ object_t *load_object(const char *lname, int callcreate) {
    * "inherit_file" will be set by lang.y to point to a file name.
    */
   if (inherit_file) {
-    object_t *inh_obj;
+    object_t* inh_obj;
     char inhbuf[MAX_OBJECT_NAME_SIZE];
+    char inhraw[MAX_OBJECT_NAME_SIZE];
+
+    // master::inherit_program may have supplied the inherited program's
+    // source inline; consume it together with inherit_file.
+    std::string inh_source = std::move(inherit_file_source);
+    inherit_file_source.clear();
 
     if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
       strcpy(inhbuf, inherit_file);
     }
+    // Keep the raw spelling too: an explicit ".c"/".lpc" in the inherit
+    // statement stays exact through the recursive load below.
+    strncpy(inhraw, inherit_file, sizeof inhraw - 1);
+    inhraw[sizeof inhraw - 1] = 0;
     FREE(inherit_file);
     inherit_file = nullptr;
 
@@ -522,7 +587,18 @@ object_t *load_object(const char *lname, int callcreate) {
       fatal("Inherited object is already loaded!");
 #endif
     } else {
-      inh_obj = load_object(inhbuf, 1);
+      // Provenance for the nested compile's diagnostics: "while loading
+      // '/child' inherited by '/parent'" (consumed by start_new_file).
+      compiler_next_load_reason =
+          std::string("while loading '/") + inhbuf + "' inherited by '/" + name + "'";
+      if (!inh_source.empty()) {
+        // The master supplied the inherited program's source itself; the
+        // object materializes under the inherit statement's name with no
+        // backing file.
+        inh_obj = load_object_from_source(inh_source, inhbuf, 1);
+      } else {
+        inh_obj = load_object(inhraw, 1);
+      }
     }
     if (!inh_obj) error("Inherited file '/%s' does not exist!\n", inhbuf);
 
@@ -533,7 +609,9 @@ object_t *load_object(const char *lname, int callcreate) {
      * -Beek
      */
     if (!(ob = ObjectTable::instance().find(name))) {
-      ob = load_object(name, 1);
+      // Reload ourselves with the caller's raw spelling so an explicit
+      // extension stays exact across the inherit-retry loop.
+      ob = load_object(lname, 1);
       /* sigh, loading the inherited file removed us */
       if (!ob) {
         num_objects_this_thread--;
@@ -584,9 +662,410 @@ object_t *load_object(const char *lname, int callcreate) {
   return ob;
 }
 
-static char *make_new_name(const char *str) {
+// Compile+load an object entirely in memory, with no backing .c file on
+// disk -- for tools (lpcshell) that need to run a snippet of LPC source
+// without writing it to the mudlib first, and for inherited programs
+// whose source master::inherit_program supplies inline. Deliberately a
+// stripped-down sibling of load_object() above, not a code path
+// load_object() itself takes: it skips the on-disk existence check and
+// the virtual-object fallback. The iterative "inherit an unloaded
+// file" dance IS supported -- the source string is in hand, so when a
+// compile aborts on an unloaded parent we load that parent (from disk,
+// or from inline source if the master supplies one for it too) and
+// recompile the same string. Without this, inline inherit source could
+// only inherit programs that happened to be loaded already.
+object_t* load_object_from_source(const std::string& source, const char* virtual_name,
+                                  int callcreate) {
+  auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
+  program_t* prog = nullptr;
+
+  for (int rounds = 0;; rounds++) {
+    save_command_giver(command_giver);
+    prog = compile_file(source, virtual_name);
+    restore_command_giver();
+
+    if (!inherit_file) {
+      break;
+    }
+
+    object_t* existing;
+    char inhbuf[MAX_OBJECT_NAME_SIZE];
+    char inhraw[MAX_OBJECT_NAME_SIZE];
+    // The nested inherit may itself come with master-supplied source.
+    std::string inh_source = std::move(inherit_file_source);
+    inherit_file_source.clear();
+
+    if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
+      strcpy(inhbuf, inherit_file);
+    }
+    strncpy(inhraw, inherit_file, sizeof inhraw - 1);
+    inhraw[sizeof inhraw - 1] = 0;
+    FREE(inherit_file);
+    inherit_file = nullptr;
+
+    if (prog) {
+      free_prog(&prog);
+      prog = nullptr;
+    }
+    if (strcmp(inhbuf, virtual_name) == 0) {
+      error("Illegal to inherit self.\n");
+    }
+    // Backstop against a master apply that redirects to a fresh unloaded
+    // name on every recompile of this same source.
+    if (rounds >= inherit_chain_size) {
+      error("Inherit chain too deep: > %d when compiling in-memory source for '/%s'.\n",
+            inherit_chain_size, virtual_name);
+    }
+
+    if (!ObjectTable::instance().find(inhbuf)) {
+      object_t* inh_obj;
+      compiler_next_load_reason =
+          std::string("while loading '/") + inhbuf + "' inherited by '/" + virtual_name + "'";
+      if (!inh_source.empty()) {
+        inh_obj = load_object_from_source(inh_source, inhbuf, 1);
+      } else {
+        inh_obj = load_object(inhraw, 1);
+      }
+      if (!inh_obj) {
+        error("Inherited file '/%s' does not exist!\n", inhbuf);
+      }
+    }
+    // Loading the parent ran arbitrary LPC that may already have
+    // materialized an object under our name -- mirror load_object()'s
+    // duplicate guard rather than compiling a colliding twin.
+    if ((existing = ObjectTable::instance().find(virtual_name))) {
+      return existing;
+    }
+  }
+
+  if (num_parse_error > 0 || prog == nullptr) {
+    if (prog) {
+      free_prog(&prog);
+    }
+    error("Error compiling in-memory source for '/%s'.\n", virtual_name);
+  }
+
+  object_t* ob = get_empty_object(prog->num_variables_total);
+  SETOBNAME(ob, alloc_cstring(virtual_name, "load_object_from_source"));
+  SET_TAG(ob->obname, TAG_OBJ_NAME);
+  ob->prog = prog;
+  ob->flags |= O_WILL_RESET;
+  ob->next_all = obj_list;
+  ob->prev_all = nullptr;
+  if (obj_list) {
+    obj_list->prev_all = ob;
+  }
+  obj_list = ob;
+  ObjectTable::instance().insert(ob->obname, ob);
+
+  save_command_giver(command_giver);
+  push_object(ob);
+  svalue_t* mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
+  if (mret && !MASTER_APPROVED(mret)) {
+    destruct_object(ob);
+    restore_command_giver();
+    error("master object: %s() denied permission to load in-memory object '/%s'.\n",
+          applies_table[APPLY_VALID_OBJECT], virtual_name);
+  }
+
+  if (init_object(ob) && callcreate) {
+    call_create(ob, 0);
+  }
+  if (!(ob->flags & O_DESTRUCTED) && function_exists(APPLY_CLEAN_UP, ob, 1)) {
+    ob->flags |= O_WILL_CLEAN_UP;
+  }
+  restore_command_giver();
+
+  ob->load_time = get_current_time();
+
+  return ob;
+}
+
+// Depth-first over the inherit tree, own variables last: the exact
+// layout order of an object's variable block (mirrors fgv_recurse).
+static void recompile_variable_names(program_t* prog, std::vector<const char*>& out) {
+  for (int i = 0; i < prog->num_inherited; i++) {
+    recompile_variable_names(prog->inherit[i].prog, out);
+  }
+  for (int i = 0; i < prog->num_variables_defined; i++) {
+    out.push_back(prog->variable_table[i]);
+  }
+}
+
+/*
+ * recompile_object(ob): recompile the object's program from its source file
+ * and swap the fresh program into the LIVE master copy and every clone
+ * sharing it. No destruct: object identity (pointers held elsewhere,
+ * name, inventory, shadows, interactive state, call_outs, heart_beat)
+ * is untouched. Global variables carry over BY NAME -- the fresh
+ * program's __INIT runs first, then every variable whose name also
+ * existed in the old program gets its old value back; new variables
+ * keep their initializers, vanished names are dropped. This is only
+ * possible because the variable block is a separate allocation
+ * (allocate_object_variables), sized per program.
+ *
+ * Function pointers made against the old program layout (FP_LOCAL
+ * indices, FP_FUNCTIONAL variable offsets) become stale: each updated
+ * object's prog_generation is bumped and call_function_pointer()
+ * errors cleanly on the mismatch instead of running mis-indexed code.
+ */
+int recompile_object(object_t* target) {
+  // Nested recompile_object (from a parent load's create(), or from __INIT
+  // below) would mutate the target set under the outer call's feet.
+  static bool in_recompile_object = false;
+
+  program_t* old_prog = target->prog;
+  if (!old_prog) {
+    error("recompile_object: object has no program.\n");
+  }
+  if (in_recompile_object) {
+    error("recompile_object: already updating; nested recompile_object is not allowed.\n");
+  }
+  if (strrchr(target->obname, '#')) {
+    // Normalize the request: updating "a clone" really means updating
+    // the shared program; demand the master copy so the intent is clear.
+    error("recompile_object: pass the master copy, not a clone.\n");
+  }
+
+  /*
+   * Refuse while any frame still executes (or will return into) the old
+   * program: bytecode positions and variable indices in live frames are
+   * relative to the old layout.
+   */
+  if ((current_object && current_object->prog == old_prog) || current_prog == old_prog) {
+    error("recompile_object: '/%s' is currently executing.\n", target->obname);
+  }
+  for (control_stack_t* f = control_stack; f <= csp; f++) {
+    if ((f->ob && f->ob->prog == old_prog) || f->prog == old_prog) {
+      error("recompile_object: '/%s' is currently executing.\n", target->obname);
+    }
+  }
+  for (object_t* ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->prog == old_prog && replace_program_pending(ob)) {
+      error("recompile_object: '/%s' has a pending replace_program().\n", ob->obname);
+    }
+  }
+
+  // The compiled name survives old_prog's release below.
+  std::string obname(old_prog->filename);
+  char obbase[MAX_OBJECT_NAME_SIZE];
+  if (!filename_to_obname(obname.c_str(), obbase, sizeof obbase)) {
+    strncpy(obbase, obname.c_str(), sizeof obbase - 1);
+    obbase[sizeof obbase - 1] = 0;
+  }
+
+  const char* pname = check_valid_path(obname.c_str(), target, "recompile_object", 0);
+  if (!pname) {
+    error("recompile_object: read access denied for '/%s'.\n", obname.c_str());
+  }
+  std::string source_path(pname);
+
+  in_recompile_object = true;
+  // error() throws, so the flag must reset on every path.
+  DEFER { in_recompile_object = false; };
+
+  /*
+   * Recompile, resolving unloaded parents with the same iterative dance
+   * as load_object() -- the recompile also re-consults the master's
+   * inherit_program/include_file applies.
+   */
+  auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
+  program_t* new_prog = nullptr;
+  for (int rounds = 0;; rounds++) {
+    int f = open(source_path.c_str(), O_RDONLY);
+    if (f == -1) {
+      error("recompile_object: could not read the file '/%s'.\n", source_path.c_str());
+    }
+#ifdef _WIN32
+    _setmode(f, _O_BINARY);
+#endif
+    save_command_giver(command_giver);
+    new_prog = compile_file_fd(f, obname.c_str());
+    restore_command_giver();
+    close(f);
+    update_compile_av(total_lines);
+    total_lines = 0;
+
+    if (!inherit_file) {
+      break;
+    }
+
+    char inhbuf[MAX_OBJECT_NAME_SIZE];
+    char inhraw[MAX_OBJECT_NAME_SIZE];
+    std::string inh_source = std::move(inherit_file_source);
+    inherit_file_source.clear();
+
+    if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
+      strcpy(inhbuf, inherit_file);
+    }
+    strncpy(inhraw, inherit_file, sizeof inhraw - 1);
+    inhraw[sizeof inhraw - 1] = 0;
+    FREE(inherit_file);
+    inherit_file = nullptr;
+
+    if (new_prog) {
+      free_prog(&new_prog);
+      new_prog = nullptr;
+    }
+    if (strcmp(inhbuf, obbase) == 0) {
+      error("Illegal to inherit self.\n");
+    }
+    if (rounds >= inherit_chain_size) {
+      error("Inherit chain too deep: > %d in recompile_object of '/%s'.\n", inherit_chain_size,
+            obbase);
+    }
+    if (!ObjectTable::instance().find(inhbuf)) {
+      object_t* inh_obj;
+      compiler_next_load_reason =
+          std::string("while loading '/") + inhbuf + "' inherited by '/" + obbase + "'";
+      if (!inh_source.empty()) {
+        inh_obj = load_object_from_source(inh_source, inhbuf, 1);
+      } else {
+        inh_obj = load_object(inhraw, 1);
+      }
+      if (!inh_obj) {
+        error("Inherited file '/%s' does not exist!\n", inhbuf);
+      }
+    }
+  }
+
+  if (num_parse_error > 0 || new_prog == nullptr) {
+    if (new_prog) {
+      free_prog(&new_prog);
+    }
+    error("recompile_object: error compiling '/%s'.\n", obname.c_str());
+  }
+
+  /*
+   * Variable transfer map: for every slot of the new layout, the old
+   * layout's slot with the same name (or -1). check_nosave=0: runtime
+   * state moves regardless of save-file semantics.
+   */
+  int old_n = old_prog->num_variables_total;
+  int new_n = new_prog->num_variables_total;
+  std::vector<const char*> names;
+  names.reserve(new_n);
+  recompile_variable_names(new_prog, names);
+  std::vector<int> old_index(new_n, -1);
+  for (int i = 0; i < new_n; i++) {
+    unsigned short vtype;
+    old_index[i] = find_global_variable(old_prog, names[i], &vtype, 0);
+  }
+
+  // Snapshot the update set first: __INIT below runs arbitrary LPC that
+  // may load/destruct objects and reshuffle obj_list.
+  std::vector<object_t*> targets;
+  for (object_t* ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->prog == old_prog && !(ob->flags & O_DESTRUCTED)) {
+      add_ref(ob, "recompile_object");
+      targets.push_back(ob);
+    }
+  }
+
+  int count = 0;
+  for (object_t* ob : targets) {
+    if (ob->flags & O_DESTRUCTED) {
+      // Destructed by an earlier target's __INIT: it still carries the
+      // old program and dies with it.
+      object_t* tmp = ob;
+      free_object(&tmp, "recompile_object");
+      continue;
+    }
+
+    svalue_t* old_vars = ob->variables;
+    program_t* prev_prog = ob->prog;
+
+    // Old code running on a not-yet-swapped target (driven from an
+    // earlier target's __INIT) may have registered a replace_program()
+    // since the pre-flight check: computed against the program we are
+    // replacing right now, so void it.
+    cancel_pending_replace_program(ob);
+
+    reference_prog(new_prog, "recompile_object");
+    ob->prog = new_prog;
+    ob->prog_generation++;
+    ob->variables = allocate_object_variables(new_n);
+    tot_alloc_object_size +=
+        ((new_n ? new_n : 1) - (old_n ? old_n : 1)) * static_cast<int>(sizeof(svalue_t));
+
+    // The master and simul_efun objects dispatch through cached
+    // name->runtime-index tables; rebuild them against the new program
+    // BEFORE any LPC runs (the __INIT below included -- an error inside
+    // it would already route through these tables). Simul indices are
+    // preserved by name, so calls compiled into other programs keep
+    // working.
+    if (ob == master_ob) {
+      rebuild_master_applies();
+    }
+    if (ob == simul_efun_ob) {
+      rebuild_simul_efuns();
+    }
+
+    // Fresh initializers first (this object's new code), then the
+    // carried-over values overwrite every name that survived. __INIT
+    // runs arbitrary LPC and may error(); catch it so one target's bad
+    // initializer can't leak this loop's held refs (the snapshot ref,
+    // new_prog's compile ref, old_vars) or abort the other targets.
+    // On error the object is left committed to the new program with a
+    // fresh (partially initialized) variable block -- carried-over
+    // state is dropped, as with a create() that throws during load.
+    bool init_ok = true;
+    {
+      error_context_t econ;
+      save_context(&econ);
+      try {
+        call___INIT(ob);
+      } catch (const char*) {
+        restore_context(&econ);
+        init_ok = false;
+      }
+      pop_context(&econ);
+    }
+    if (init_ok && !(ob->flags & O_DESTRUCTED)) {
+      for (int i = 0; i < new_n; i++) {
+        if (old_index[i] >= 0) {
+          assign_svalue(&ob->variables[i], &old_vars[old_index[i]]);
+        }
+      }
+    }
+    // The old variable block and the old program reference are dropped
+    // regardless of how __INIT fared -- ob has already moved off them.
+    for (int i = 0; i < old_n; i++) {
+      free_svalue(&old_vars[i], "recompile_object");
+    }
+    FREE(old_vars);
+    free_prog(&prev_prog);
+
+    if (init_ok && !(ob->flags & O_DESTRUCTED)) {
+      // Recompute the function-presence flags load_object derives.
+      if (function_exists(APPLY_CLEAN_UP, ob, 1)) {
+        ob->flags |= O_WILL_CLEAN_UP;
+      } else {
+        ob->flags &= ~O_WILL_CLEAN_UP;
+      }
+#ifdef NO_ADD_ACTION
+      if (function_exists(APPLY_CATCH_TELL, ob, 1) ||
+          function_exists(APPLY_RECEIVE_MESSAGE, ob, 1)) {
+        ob->flags |= O_LISTENER;
+      } else {
+        ob->flags &= ~O_LISTENER;
+      }
+#endif
+      count++;
+    }
+    object_t* tmp = ob;
+    free_object(&tmp, "recompile_object");
+  }
+
+  // Drop the compile's own reference; the updated objects hold theirs.
+  free_prog(&new_prog);
+
+  return count;
+}
+
+static char* make_new_name(const char* str) {
   static unsigned int i;
-  char *p = reinterpret_cast<char *>(DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name"));
+  char* p = reinterpret_cast<char*>(DMALLOC(strlen(str) + 12, TAG_OBJ_NAME, "make_new_name"));
 
   (void)sprintf(p, "%s#%u", str, i);
   i++;
@@ -597,7 +1076,7 @@ static char *make_new_name(const char *str) {
  * Save the command_giver, because reset() in the new object might change
  * it.
  */
-object_t *clone_object(const char *str1, int num_arg) {
+object_t* clone_object(const char* str1, int num_arg) {
   object_t *ob, *new_ob;
 
 #ifdef PACKAGE_UIDS
@@ -665,8 +1144,8 @@ object_t *clone_object(const char *str1, int num_arg) {
 }
 
 #ifndef NO_ENVIRONMENT
-object_t *environment(svalue_t *arg) {
-  object_t *ob = current_object;
+object_t* environment(svalue_t* arg) {
+  object_t* ob = current_object;
 
   if (arg && arg->type == T_OBJECT) {
     ob = arg->u.ob;
@@ -689,11 +1168,11 @@ object_t *environment(svalue_t *arg) {
  */
 
 #ifdef F_PRESENT
-static object_t *object_present2(const char * /*str*/, object_t * /*ob*/);
+static object_t* object_present2(const char* /*str*/, object_t* /*ob*/);
 
-object_t *object_present(svalue_t *v, object_t *ob) {
-  svalue_t *ret;
-  object_t *ret_ob;
+object_t* object_present(svalue_t* v, object_t* ob) {
+  svalue_t* ret;
+  object_t* ret_ob;
   int specific = 0;
 
   if (ob == nullptr) {
@@ -741,10 +1220,10 @@ object_t *object_present(svalue_t *v, object_t *ob) {
 // id(str) returns true, return that object.
 // If string is in format of "xxx 1", then look for the <digits>-th
 // object that id("xx") returns true.
-static object_t *object_present2(const char *str, object_t *ob) {
-  svalue_t *ret;
+static object_t* object_present2(const char* str, object_t* ob) {
+  svalue_t* ret;
 
-  const char *name = nullptr;
+  const char* name = nullptr;
   int namelen = 0, count = 0;
 
   if (str[0] == '\0') {
@@ -757,7 +1236,7 @@ static object_t *object_present2(const char *str, object_t *ob) {
 
   // If string ends with number, try to separate name and count.
   if (uisdigit(name[namelen - 1])) {
-    const char *ptr = strrchr(name, ' ');
+    const char* ptr = strrchr(name, ' ');
     if (ptr != nullptr) {
       // Make sure second part has only digits
       if (strspn(ptr + 1, "1234567890") == strlen(ptr + 1)) {
@@ -768,7 +1247,7 @@ static object_t *object_present2(const char *str, object_t *ob) {
   }
 
   for (; ob; ob = ob->next_inv) {
-    char *str_to_push = new_string(namelen, "object_present2");
+    char* str_to_push = new_string(namelen, "object_present2");
     memcpy(str_to_push, name, namelen);
     str_to_push[namelen] = 0;
     push_malloced_string(str_to_push);
@@ -789,8 +1268,8 @@ static object_t *object_present2(const char *str, object_t *ob) {
 }
 #endif
 
-static const char *saved_master_name;
-static const char *saved_simul_name;
+static const char* saved_master_name;
+static const char* saved_simul_name;
 
 static void fix_object_names() {
   SETOBNAME(master_ob, saved_master_name);
@@ -801,27 +1280,27 @@ static void fix_object_names() {
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-void destruct_object(object_t *ob) {
-  object_t **pp;
+void destruct_object(object_t* ob) {
+  object_t** pp;
 // int removed;
 #ifndef NO_ENVIRONMENT
-  object_t *super;
-  object_t *save_restrict_destruct = restrict_destruct;
+  object_t* super;
+  object_t* save_restrict_destruct = restrict_destruct;
 
   if (restrict_destruct && restrict_destruct != ob) {
     error("Only this_object() can be destructed from move_or_destruct.\n");
   }
 #endif
 
-/*
-  * Notify object that it is scheduled for destruction
-  *
-  * Proceed with destruction even if there is an error
-  * in the destructing() function in the mudlib.
-  */
-  if(ob->flags & O_NOTIFY_DESTRUCT) {
+  /*
+   * Notify object that it is scheduled for destruction
+   *
+   * Proceed with destruction even if there is an error
+   * in the destructing() function in the mudlib.
+   */
+  if (ob->flags & O_NOTIFY_DESTRUCT) {
     error_context_t econ;
-    save_context(&econ) ;
+    save_context(&econ);
     try {
       safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
     } catch (...) {  // catch everything
@@ -857,8 +1336,8 @@ void destruct_object(object_t *ob) {
  */
 #ifndef NO_SHADOWS
   if (ob->shadowed && !ob->shadowing) {
-    object_t *otmp;
-    object_t *ob2;
+    object_t* otmp;
+    object_t* ob2;
 
     /*
      * move from bottom to top of shadow chain
@@ -902,7 +1381,7 @@ void destruct_object(object_t *ob) {
   super = ob->super;
 
   while (ob->contains) {
-    object_t *otmp;
+    object_t* otmp;
 
     otmp = ob->contains;
     /*
@@ -939,7 +1418,7 @@ void destruct_object(object_t *ob) {
 #endif
 #ifndef NO_SNOOP
   if (ob->flags & O_SNOOP) {
-    users_foreach([ob](interactive_t *user) {
+    users_foreach([ob](interactive_t* user) {
       if (user->snooped_by == ob) {
         user->snooped_by = nullptr;
       }
@@ -976,7 +1455,7 @@ void destruct_object(object_t *ob) {
    */
   if (ob == master_ob || ob == simul_efun_ob) {
     object_t *new_ob, *tmp_ob;
-    const char *tmp = ob->obname;
+    const char* tmp = ob->obname;
 
     STACK_INC;
     sp->type = T_ERROR_HANDLER;
@@ -1082,9 +1561,9 @@ void destruct_object(object_t *ob) {
 /*
  * This one is called when no program is executing from the main loop.
  */
-void destruct2(object_t *ob) {
+void destruct2(object_t* ob) {
 #ifndef NO_ADD_ACTION
-  sentence_t *s;
+  sentence_t* s;
 #endif
 
   debug(d_flag, "Destruct-2 object /%s (ref %d)", ob->obname, ob->ref);
@@ -1120,7 +1599,7 @@ void destruct2(object_t *ob) {
    * reference to this object.
    */
   for (s = ob->sent; s;) {
-    sentence_t *next;
+    sentence_t* next;
 
     next = s->next;
     free_sentence(s);
@@ -1147,7 +1626,7 @@ void destruct2(object_t *ob) {
  */
 
 #ifndef NO_ENVIRONMENT
-static void send_say(object_t *ob, const char *text, array_t *avoid) {
+static void send_say(object_t* ob, const char* text, array_t* avoid) {
   int valid, j;
 
   for (valid = 1, j = 0; j < avoid->size; j++) {
@@ -1167,9 +1646,9 @@ static void send_say(object_t *ob, const char *text, array_t *avoid) {
   tell_object(ob, text, strlen(text));
 }
 
-void say(svalue_t *v, array_t *avoid) {
+void say(svalue_t* v, array_t* avoid) {
   object_t *ob, *origin;
-  const char *buff;
+  const char* buff;
 
   buff = v->u.string;
 
@@ -1218,9 +1697,9 @@ void say(svalue_t *v, array_t *avoid) {
  * Revised, bobf@metronet.com 9/6/93
  */
 #ifdef F_TELL_ROOM
-void tell_room(object_t *room, svalue_t *v, array_t *avoid) {
-  object_t *ob;
-  const char *buff;
+void tell_room(object_t* room, svalue_t* v, array_t* avoid) {
+  object_t* ob;
+  const char* buff;
   int valid, j;
   char txt_buf[LARGEST_PRINTABLE_STRING + 1];
 
@@ -1281,8 +1760,8 @@ void tell_room(object_t *room, svalue_t *v, array_t *avoid) {
 #endif
 #endif
 
-void shout_string(const char *str) {
-  object_t *ob;
+void shout_string(const char* str) {
+  object_t* ob;
 
   for (ob = obj_list; ob; ob = ob->next_all) {
     if (!(ob->flags & O_LISTENER) || (ob == command_giver)
@@ -1301,9 +1780,9 @@ void shout_string(const char *str) {
  * Set up a function in this object to be called with the next
  * user input string.
  */
-int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
-  sentence_t *s;
-  svalue_t *x;
+int input_to(svalue_t* fun, int flag, int num_arg, svalue_t* args) {
+  sentence_t* s;
+  svalue_t* x;
   int i;
 
   if (!command_giver || command_giver->flags & O_DESTRUCTED) {
@@ -1317,7 +1796,7 @@ int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
      */
     if (num_arg) {
       i = num_arg * sizeof(svalue_t);
-      if ((x = reinterpret_cast<svalue_t *>(DMALLOC(i, TAG_INPUT_TO, "input_to: 1"))) == nullptr) {
+      if ((x = reinterpret_cast<svalue_t*>(DMALLOC(i, TAG_INPUT_TO, "input_to: 1"))) == nullptr) {
         fatal("Out of memory!\n");
       }
       memcpy(x, args, i);
@@ -1350,9 +1829,9 @@ int input_to(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
  * user input character.
  */
 #ifdef F_GET_CHAR
-int get_char(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
-  sentence_t *s;
-  svalue_t *x;
+int get_char(svalue_t* fun, int flag, int num_arg, svalue_t* args) {
+  sentence_t* s;
+  svalue_t* x;
   int i;
 
   if (!command_giver || command_giver->flags & O_DESTRUCTED) {
@@ -1366,7 +1845,7 @@ int get_char(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
      */
     if (num_arg) {
       i = num_arg * sizeof(svalue_t);
-      if ((x = reinterpret_cast<svalue_t *>(DMALLOC(i, TAG_TEMPORARY, "get_char: 1"))) == nullptr) {
+      if ((x = reinterpret_cast<svalue_t*>(DMALLOC(i, TAG_TEMPORARY, "get_char: 1"))) == nullptr) {
         fatal("Out of memory!\n");
       }
       memcpy(x, args, i);
@@ -1393,7 +1872,7 @@ int get_char(svalue_t *fun, int flag, int num_arg, svalue_t *args) {
 }
 #endif
 
-void print_svalue(svalue_t *arg) {
+void print_svalue(svalue_t* arg) {
   char tbuf[LARGEST_PRINTABLE_STRING + 1];
   int len;
 
@@ -1437,8 +1916,8 @@ void print_svalue(svalue_t *arg) {
   return;
 }
 
-void do_write(svalue_t *arg) {
-  object_t *ob = command_giver;
+void do_write(svalue_t* arg) {
+  object_t* ob = command_giver;
 
 #ifndef NO_SHADOWS
   if (ob == nullptr && current_object->shadowing) {
@@ -1465,8 +1944,8 @@ void do_write(svalue_t *arg) {
  * returned.
  */
 
-object_t *find_object(const char *str) {
-  object_t *ob;
+object_t* find_object(const char* str) {
+  object_t* ob;
   char tmpbuf[MAX_OBJECT_NAME_SIZE];
 
   if (!filename_to_obname(str, tmpbuf, sizeof tmpbuf)) {
@@ -1476,7 +1955,10 @@ object_t *find_object(const char *str) {
   if ((ob = ObjectTable::instance().find(tmpbuf))) {
     return ob;
   }
-  ob = load_object(tmpbuf, 1);
+  // Load with the caller's raw spelling: an explicit ".c"/".lpc" must
+  // stay exact through load_object's source resolution (it re-strips
+  // internally for the object name).
+  ob = load_object(str, 1);
   if (!ob || (ob->flags & O_DESTRUCTED)) { /* *sigh* */
     return nullptr;
   }
@@ -1484,8 +1966,8 @@ object_t *find_object(const char *str) {
 }
 
 /* Look for a loaded object. Return 0 if non found. */
-object_t *find_object2(const char *str) {
-  object_t *ob;
+object_t* find_object2(const char* str) {
+  object_t* ob;
   char p[MAX_OBJECT_NAME_SIZE];
 
   if (!filename_to_obname(str, p, sizeof p)) {
@@ -1505,7 +1987,7 @@ object_t *find_object2(const char *str) {
  * The main work is to update all command definitions, depending on what is
  * living or not. Note that all objects in the same inventory are affected.
  */
-void move_object(object_t *item, object_t *dest) {
+void move_object(object_t* item, object_t* dest) {
   object_t **pp, *ob;
 
   save_command_giver(command_giver);
@@ -1573,7 +2055,7 @@ void move_object(object_t *item, object_t *dest) {
  * Update this.
  */
 
-void add_light(object_t *p, int n) {
+void add_light(object_t* p, int n) {
   if (n == 0) {
     return;
   }
@@ -1586,14 +2068,14 @@ void add_light(object_t *p, int n) {
 }
 #endif
 
-static sentence_t *sent_free = nullptr;
+static sentence_t* sent_free = nullptr;
 uint64_t tot_alloc_sentence;
 
-sentence_t *alloc_sentence() {
-  sentence_t *p;
+sentence_t* alloc_sentence() {
+  sentence_t* p;
 
   if (sent_free == nullptr) {
-    p = reinterpret_cast<sentence_t *>(DMALLOC(sizeof(sentence_t), TAG_SENTENCE, "alloc_sentence"));
+    p = reinterpret_cast<sentence_t*>(DMALLOC(sizeof(sentence_t), TAG_SENTENCE, "alloc_sentence"));
     tot_alloc_sentence++;
   } else {
     p = sent_free;
@@ -1611,7 +2093,7 @@ sentence_t *alloc_sentence() {
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_free_sentences() {
-  sentence_t *sent = sent_free;
+  sentence_t* sent = sent_free;
 
   while (sent) {
     DO_MARK(sent, TAG_SENTENCE);
@@ -1626,7 +2108,7 @@ void mark_free_sentences() {
 }
 #endif
 
-void free_sentence(sentence_t *p) {
+void free_sentence(sentence_t* p) {
   if (p->flags & V_FUNCTION) {
     if (p->function.f) {
       free_funp(p->function.f);
@@ -1650,7 +2132,7 @@ void free_sentence(sentence_t *p) {
   sent_free = p;
 }
 
-[[noreturn]] void fatal(const char *fmt, ...) {
+[[noreturn]] void fatal(const char* fmt, ...) {
   static int in_fatal = 0;
   char msg_buf[2049] = {};
   va_list args;
@@ -1731,7 +2213,7 @@ static int num_mudlib_error = 0;
   error("Throw with no catch.\n");
 }
 
-static void debug_message_with_location(char *err) {
+static void debug_message_with_location(char* err) {
   if (current_object && current_prog) {
     debug_message("%sprogram: /%s, object: /%s, file: %s\n", err, current_prog->filename,
                   current_object->obname, get_line_number(pc, current_prog));
@@ -1742,7 +2224,7 @@ static void debug_message_with_location(char *err) {
   }
 }
 
-static void add_message_with_location(char *err) {
+static void add_message_with_location(char* err) {
   if (current_object && current_prog) {
     add_vmessage(command_giver, "%sprogram: /%s, object: /%s, file: %s\n", err,
                  current_prog->filename, current_object->obname, get_line_number(pc, current_prog));
@@ -1754,11 +2236,11 @@ static void add_message_with_location(char *err) {
   }
 }
 
-static void mudlib_error_handler(char *err, int katch) {
-  mapping_t *m;
-  const char *file = nullptr;
+static void mudlib_error_handler(char* err, int katch) {
+  mapping_t* m;
+  const char* file = nullptr;
   int line = 0;
-  svalue_t *mret;
+  svalue_t* mret;
 
   m = allocate_mapping(6);
   add_mapping_string(m, "error", err);
@@ -1787,7 +2269,7 @@ static void mudlib_error_handler(char *err, int katch) {
   } else {
     mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);
   }
-  if ((mret == (svalue_t *)-1) || !mret) {
+  if ((mret == (svalue_t*)-1) || !mret) {
     debug_message("No error handler for error: ");
     debug_message_with_location(err);
     if (num_mudlib_error == 1) {
@@ -1799,15 +2281,15 @@ static void mudlib_error_handler(char *err, int katch) {
 }
 
 namespace {
-void _error_handler(char *err) {
-  const char *object_name = nullptr;
+void _error_handler(char* err) {
+  const char* object_name = nullptr;
 
   debug_message_with_location(err + 1);
   if (num_mudlib_error == 1) {
     object_name = dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
   }
   if (object_name) {
-    object_t *ob;
+    object_t* ob;
 
     ob = find_object2(object_name);
     if (!ob) {
@@ -1844,12 +2326,22 @@ void _error_handler(char *err) {
 
 }  // namespace
 
-[[noreturn]] void error_handler(char *err) {
+[[noreturn]] void error_handler(char* err) {
 /* in case we're going to jump out of load_object */
 #ifndef NO_ENVIRONMENT
   restrict_destruct = nullptr;
 #endif
   num_objects_this_thread = 0; /* reset the count */
+
+  if (!current_error_context) {
+    // Nothing set up a recovery point on this driver path (see issue
+    // #1047 for one such path); there is nothing to unwind to, so report
+    // the error and shut down cleanly instead of dereferencing null.
+    debug_message("Driver BUG: error() with no error context: ");
+    debug_message_with_location(err);
+    dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
+    fatal("error() without a context: %s", err + 1);
+  }
 
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
     /* user catches this error */
@@ -1952,7 +2444,7 @@ exit:
   fatal("Driver BUG: no error context.");
 }
 
-[[noreturn]] void error_needs_free(char *s) {
+[[noreturn]] void error_needs_free(char* s) {
   DEBUG_CHECK(current_error_context == nullptr, "error() without context");
 
   char err_buf[2048];
@@ -1964,7 +2456,7 @@ exit:
   error_handler(err_buf);
 }
 
-[[noreturn]] void error(const char *const fmt, ...) {
+[[noreturn]] void error(const char* const fmt, ...) {
   DEBUG_CHECK(current_error_context == nullptr, "error() without context");
 
   char err_buf[2048];
@@ -1977,9 +2469,9 @@ exit:
   error_handler(err_buf);
 }
 
-void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclude, int recurse) {
+void do_message(svalue_t* lclass, svalue_t* msg, array_t* scope, array_t* exclude, int recurse) {
   int i, j, valid;
-  object_t *ob;
+  object_t* ob;
 
   for (i = 0; i < scope->size; i++) {
     switch (scope->item[i].type) {
@@ -2013,7 +2505,7 @@ void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclud
     }
 #ifndef NO_ENVIRONMENT
     else if (recurse) {
-      array_t *tmp;
+      array_t* tmp;
 
       tmp = all_inventory(ob, 1);
       do_message(lclass, msg, tmp, exclude, 0);
@@ -2023,7 +2515,7 @@ void do_message(svalue_t *lclass, svalue_t *msg, array_t *scope, array_t *exclud
   }
 }
 
-void try_reset(object_t *ob) {
+void try_reset(object_t* ob) {
   if ((ob->next_reset < g_current_gametick) && !(ob->flags & O_RESET_STATE)) {
     debug(d_flag, "(lazy) RESET /%s\n", ob->obname);
 
@@ -2035,8 +2527,8 @@ void try_reset(object_t *ob) {
 
 #ifndef NO_ENVIRONMENT
 #ifdef F_FIRST_INVENTORY
-object_t *first_inventory(svalue_t *arg) {
-  object_t *ob;
+object_t* first_inventory(svalue_t* arg) {
+  object_t* ob;
 
   if (arg->type == T_STRING) {
     ob = find_object(arg->u.string);
@@ -2062,7 +2554,7 @@ object_t *first_inventory(svalue_t *arg) {
 #endif
 #endif
 
-void tell_npc(object_t *ob, const char *str) {
+void tell_npc(object_t* ob, const char* str) {
   copy_and_push_string(str);
   apply(APPLY_CATCH_TELL, ob, 1, ORIGIN_DRIVER);
 }
@@ -2077,7 +2569,7 @@ void tell_npc(object_t *ob, const char *str) {
  * goes to catch_tell unless the target of tell_object is interactive
  * and is the current_object in which case it is written via add_message().
  */
-void tell_object(object_t *ob, const char *str, int len) {
+void tell_object(object_t* ob, const char* str, int len) {
   if (!ob || (ob->flags & O_DESTRUCTED)) {
     add_message(nullptr, str, len);
     return;

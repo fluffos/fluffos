@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / global_include_file
 ---
 # global_include_file

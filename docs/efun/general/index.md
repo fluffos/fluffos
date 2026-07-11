@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general
 ---
 * [act_mxp](act_mxp)

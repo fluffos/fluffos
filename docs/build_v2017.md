@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: Build (v2017)
 ---
 # build_v2017

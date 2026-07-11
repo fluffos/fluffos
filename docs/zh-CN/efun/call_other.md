@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: calls / call_other
 ---
 # call_other

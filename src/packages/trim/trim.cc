@@ -17,7 +17,7 @@
 namespace {
 
 // trim from start
-inline std::string &ltrim_func(std::string &s, const std::string &charset) {
+inline std::string& ltrim_func(std::string& s, const std::string& charset) {
   std::string trimset{charset};
 
   if (trimset.empty()) {
@@ -28,7 +28,7 @@ inline std::string &ltrim_func(std::string &s, const std::string &charset) {
 }
 
 // trim from end
-inline std::string &rtrim_func(std::string &s, const std::string &charset) {
+inline std::string& rtrim_func(std::string& s, const std::string& charset) {
   std::string trimset{charset};
 
   if (trimset.empty()) {
@@ -39,7 +39,7 @@ inline std::string &rtrim_func(std::string &s, const std::string &charset) {
 }
 
 // trim from both ends
-inline std::string &trim_func(std::string &s, const std::string &charset) {
+inline std::string& trim_func(std::string& s, const std::string& charset) {
   std::string trimset{charset};
 
   if (trimset.empty()) {
@@ -49,9 +49,9 @@ inline std::string &trim_func(std::string &s, const std::string &charset) {
   return s;
 }
 
-using trim_func_type = std::string &(std::string &, const std::string &);
+using trim_func_type = std::string&(std::string&, const std::string&);
 
-inline void trim_impl(trim_func_type *func) {
+inline void trim_impl(trim_func_type* func) {
   std::string charset;
 
   // If use 2 arguments, we get characters to remove and positioning in previous

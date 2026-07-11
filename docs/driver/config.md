@@ -49,7 +49,8 @@ they always match the options it actually recognizes.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `mudlib directory` | string | — | **Required.** Absolute path to the mudlib root (this path is not relative to the mudlib). |
-| `log directory` | string | — | **Required.** Filesystem directory for debug.log and stats files, resolved relative to the driver's working directory (leading slashes are stripped); not a mudlib virtual path. |
+| `log directory` | string | — | **Required.** Filesystem directory for debug.log and stats files, resolved relative to the driver's "
+     "working directory (leading slashes are stripped); not a mudlib virtual path. |
 | `include directories` | string | — | **Required.** Colon-separated list of directories searched by `#include <...>`. |
 
 ### Core Files
@@ -69,15 +70,18 @@ they always match the options it actually recognizes.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `mudlib error handler` | int | 1 | Pass runtime errors to the master object's error_handler() instead of handling them in the driver. |
-| `trap crashes` | int | 1 | Call crash() in the master object and shut down cleanly on signals that would otherwise crash the driver. |
+| `mudlib error handler` | int | 1 | Pass runtime errors to the master object's error_handler() instead of handling them in the "
+     "driver. |
+| `trap crashes` | int | 1 | Call crash() in the master object and shut down cleanly on signals that would otherwise "
+     "crash the driver. |
 | `default error message` | string | — | Message shown to players when error() occurs. |
 
 ### Timing & Lifecycle
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `time to clean up` | int | 600 | Seconds an object may be idle before clean_up() is called on it; should be well above 'time to swap'. |
+| `time to clean up` | int | 600 | Seconds an object may be idle before clean_up() is called on it; should be well above 'time "
+     "to swap'. |
 | `time to reset` | int | 900 | Seconds between successive reset() calls on an object. |
 | `time to swap` | int | 300 | Seconds an unused object stays in memory before being swapped out; 0 disables swapping. |
 | `gametick msec` | int | 1000 | Granularity of in-game time in milliseconds (the shortest visible time interval). |
@@ -104,7 +108,8 @@ they always match the options it actually recognizes.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `hash table size` | int | 65536 | Size of the shared-string hash table; should be prime, roughly 1/5 of the number of distinct strings. _(min 7001)_ |
+| `hash table size` | int | 65536 | Size of the shared-string hash table; should be prime, roughly 1/5 of the number of distinct "
+     "strings. _(min 7001)_ |
 | `object table size` | int | 4096 | Size of the object hash table; roughly 1/4 of the number of objects in the game. _(min 1024)_ |
 | `living hash table size` | int | 256 | Size of the find_living() hash table; must be one of 4, 16, 64, 256, 1024, or 4096. _(min 256)_ |
 
@@ -123,7 +128,6 @@ they always match the options it actually recognizes.
 | `sane explode string` | int | 1 | explode() strips at most one leading delimiter (and still one trailing delimiter). |
 | `reversible explode string` | int | 0 | Make implode(explode(x, y), y) always equal x; overrides 'sane explode string'. |
 | `sane sorting` | int | 1 | Use a well-defined, stable ordering for the driver's sorting operations. |
-| `wombles` | int | 0 | Disallow spaces between the start/end token characters of arrays, mappings, and functionals. |
 | `this_player in call_out` | int | 1 | Make this_player() usable from within call_out() callbacks. |
 | `reverse defer` | int | 0 | Run deferred functions registered with defer() in reverse order. |
 | `old range behavior` | int | 0 | Treat negative range indices in strings/buffers as counting from the end (rvalue use only). |
@@ -144,24 +148,27 @@ they always match the options it actually recognizes.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `no ansi` | int | 1 | Replace ANSI escape characters (ASCII 27) in user input with a space before add_actions run. |
-| `strip before process input` | int | 1 | Strip ANSI before process_input() sees the input, rather than only before add_actions are called. |
+| `no ansi` | int | 1 | Replace ANSI escape characters (ASCII 27) in user input with a space before add_actions "
+     "run. |
+| `strip before process input` | int | 1 | Strip ANSI before process_input() sees the input, rather than only before add_actions are "
+     "called. |
 | `interactive catch tell` | int | 0 | Call catch_tell() on interactive users as well as on NPCs. |
 | `receive snoop` | int | 1 | Send snoop text to receive_snoop() in the snooper instead of directly via add_message(). |
 | `snoop shadowed` | int | 0 | Report snooped output even when the target's catch_tell() is shadowed (prefixed with $$). |
-| `noninteractive stderr write` | int | 0 | Write tells/messages sent to non-interactive objects to stderr, prefixed with ']' (legacy behavior). |
+| `noninteractive stderr write` | int | 0 | Write tells/messages sent to non-interactive objects to stderr, prefixed with ']' (legacy "
+     "behavior). |
 
 ### Diagnostics
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `warn tab` | int | 0 | Warn when source files are indented with tabs instead of spaces. |
 | `trace` | int | 1 | Enable the trace() and traceprefix() efuns (leaving it off runs slightly faster). |
 | `trace code` | int | 0 | Include the preceding lines of LPC code in error traces (slower). |
 | `has console` | int | 1 | Allow the driver's interactive console via the -C command-line argument. |
 | `suppress argument warnings` | int | 1 | Suppress unused-argument warnings, warning only about unused local variables. |
 | `trace lpc execution context` | int | 0 | Record LPC execution context for tracing and debugging. |
 | `trace lpc instructions` | int | 0 | Trace individual LPC instructions for debugging. |
+| `display preload progress` | int | 1 | Print each file name to the debug log while preload files are loaded at boot. |
 
 ### Protocol Support
 
@@ -173,6 +180,19 @@ they always match the options it actually recognizes.
 | `enable mssp` | int | 1 | Advertise and enable the MSSP telnet protocol. |
 | `enable msp` | int | 1 | Advertise and enable the MSP telnet protocol. |
 | `enable msdp` | int | 0 | Advertise and enable the MSDP telnet protocol. |
+
+### Security
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `ffi allowed libraries` | string | — | Colon-separated allow-list of shared-library paths that ffi_load() may open (package_ffi). "
+     "Empty means the driver imposes no path restriction and defers entirely to the master apply "
+     "valid_ffi(); every ffi_load/symbol/prepare/callback is gated by that apply regardless. |
+| `allowed os environment variables` | string | — | Colon-separated allow-list of environment variable names readable via get_os_env() "
+     "(package_contrib). Names in 'writable os environment variables' are readable too. Empty "
+     "(the default) denies all access. |
+| `writable os environment variables` | string | — | Colon-separated allow-list of environment variable names that set_os_env() may modify "
+     "(package_contrib); these are implicitly readable. Empty (the default) denies all writes. |
 
 ## Ports and Connections
 

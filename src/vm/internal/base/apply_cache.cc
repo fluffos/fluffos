@@ -8,12 +8,11 @@
 #include "base/internal/tracing.h"
 #include "vm/internal/base/program.h"
 
-static inline void fill_lookup_table(program_t *prog);
+static inline void fill_lookup_table(program_t* prog);
 
-lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
-  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE, [=] {
-    return json{"name", funcname};
-  });
+lookup_entry_s apply_cache_lookup(const char* funcname, program_t* prog) {
+  ScopedTracer _tracer("Apply Cache Lookup", EventCategory::APPLY_CACHE,
+                       [=] { return json{"name", funcname}; });
 
   // All function names are shared string.
   auto key = (intptr_t)(findstring(funcname));
@@ -37,7 +36,7 @@ lookup_entry_s apply_cache_lookup(const char *funcname, program_t *prog) {
 }
 
 static inline void fill_lookup_table_recurse(
-    std::unique_ptr<program_t::apply_lookup_table_type> &table, program_t *prog, uint16_t fio,
+    std::unique_ptr<program_t::apply_lookup_table_type>& table, program_t* prog, uint16_t fio,
     uint16_t vio) {
   // add all defined functions
   for (int i = 0; i < prog->num_functions_defined; i++) {
@@ -67,7 +66,7 @@ static inline void fill_lookup_table_recurse(
   }
 }
 
-static inline void fill_lookup_table(program_t *prog) {
+static inline void fill_lookup_table(program_t* prog) {
   prog->apply_lookup_table = std::make_unique<program_t::apply_lookup_table_type>();
   fill_lookup_table_recurse(prog->apply_lookup_table, prog, 0, 0);
 

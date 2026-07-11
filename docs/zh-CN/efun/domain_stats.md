@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mudlib / domain_stats
 ---
 # domain_stats

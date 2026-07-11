@@ -1,0 +1,21 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+private int near(float a, float b) { return (a>b?a-b:b-a) < 1e-9; }
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    buffer b = ffi_alloc(32);
+    // Every scalar code round-trips through write/read.
+    ffi_write(b, 0, FFI_INT8, -3);   ASSERT_EQ(-3, ffi_read(b, 0, FFI_INT8));
+    ffi_write(b, 1, FFI_UINT8, 200); ASSERT_EQ(200, ffi_read(b, 1, FFI_UINT8));
+    ffi_write(b, 2, FFI_INT16, -1000); ASSERT_EQ(-1000, ffi_read(b, 2, FFI_INT16));
+    ffi_write(b, 4, FFI_INT32, -70000); ASSERT_EQ(-70000, ffi_read(b, 4, FFI_INT32));
+    ffi_write(b, 8, FFI_INT64, 0x1122334455); ASSERT_EQ(0x1122334455, ffi_read(b, 8, FFI_INT64));
+    ffi_write(b, 16, FFI_FLOAT, 2.5);  ASSERT(near(2.5, ffi_read(b, 16, FFI_FLOAT)));
+    ffi_write(b, 20, FFI_DOUBLE, 3.25); ASSERT(near(3.25, ffi_read(b, 20, FFI_DOUBLE)));
+    // Out-of-range access errors.
+    ASSERT(catch(ffi_read(b, 30, FFI_INT64)));
+    ASSERT(catch(ffi_read(b, -1, FFI_INT8)));
+#endif
+    ASSERT(1);
+}

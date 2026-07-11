@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / save_variable
 ---
 # save_variable

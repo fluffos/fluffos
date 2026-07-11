@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / set_notify_destruct
 ---
 # set_notify_destruct

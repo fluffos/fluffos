@@ -1,0 +1,7 @@
+void do_tests() {
+#ifdef __PACKAGE_PARSER__
+    // Initializes/refreshes this object's parser view; idempotent here.
+    ASSERT_EQ(0, catch(parse_init()));
+#endif
+    ASSERT(1);
+}

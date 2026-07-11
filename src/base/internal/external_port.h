@@ -8,8 +8,8 @@
 #ifndef BASE_INTERNAL_EXTERNAL_PORT_H_
 #define BASE_INTERNAL_EXTERNAL_PORT_H_
 
-#include <event2/util.h>
-#include <openssl/ssl.h>
+#include "net/net_compat.h"
+
 #include <string>
 
 enum PORT_TYPE {

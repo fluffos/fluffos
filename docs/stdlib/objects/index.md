@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects
 ---
 * [all_environment](all_environment)

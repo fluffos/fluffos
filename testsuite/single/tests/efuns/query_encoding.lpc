@@ -1,0 +1,5 @@
+void do_tests() {
+    // Reports this_player()'s connection charset; no interactive here.
+    catch(query_encoding());
+    ASSERT(1);
+}

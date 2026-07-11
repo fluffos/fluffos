@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / save_object
 ---
 # save_object
@@ -11,6 +10,7 @@ title: objects / save_object
 ### SYNOPSIS
 
     int save_object( string name, int flag );
+    string save_object( int flag );
 
 ### DESCRIPTION
 
@@ -21,9 +21,15 @@ title: objects / save_object
     aren't).   Object  variables always save as 0.  If bit 1 is 1, then the
     save file will be compressed.
 
+    If no file name is given (the argument is omitted or is the integer
+    flag bitfield), the serialized data is not written to disk but is
+    returned as a string instead, suitable for use with the string form of
+    restore_object().
+
 ### RETURN VALUE
 
-    save_object() returns 1 for success, 0 for failure.
+    With a file name, save_object() returns 1 for success, 0 for failure.
+    In the no-file-name form it returns the save data as a string.
 
 ### SEE ALSO
 

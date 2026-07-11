@@ -1,0 +1,7 @@
+void do_tests() {
+#ifdef __DWLIB__
+    ASSERT_EQ("an apple", add_a("apple"));
+    ASSERT_EQ("a sword", add_a("sword"));
+#endif
+    ASSERT(1);
+}

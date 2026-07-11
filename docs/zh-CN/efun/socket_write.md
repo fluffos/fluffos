@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: sockets / socket_write
 ---
 # socket_write

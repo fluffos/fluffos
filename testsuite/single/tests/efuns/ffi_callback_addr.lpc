@@ -1,0 +1,16 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+int noop() { return 0; }
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    int cb = ffi_callback((: noop :), FFI_INT32, ({ }));
+    int addr = ffi_callback_addr(cb);
+    ASSERT(intp(addr));
+    ASSERT(addr != 0);                       // a real code address
+    ASSERT(catch(ffi_callback_addr(999999))); // unknown handle errors
+    ffi_callback_free(cb);
+#endif
+    ASSERT(1);
+}

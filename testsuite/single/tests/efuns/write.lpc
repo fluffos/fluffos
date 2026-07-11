@@ -1,0 +1,6 @@
+void do_tests() {
+    // No interactive: write() goes to the driver console/log; it must
+    // simply not error for strings and non-string values.
+    ASSERT_EQ(0, catch(write("write efun test line\n")));
+    ASSERT_EQ(0, catch(write(42)));
+}

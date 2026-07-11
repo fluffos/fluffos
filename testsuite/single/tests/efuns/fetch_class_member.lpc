@@ -1,0 +1,7 @@
+class P { int x; string s; }
+void do_tests() {
+    class P p = new(class P, x: 5, s: "hi");
+    ASSERT_EQ(5, fetch_class_member(p, 0));
+    ASSERT_EQ("hi", fetch_class_member(p, 1));
+    ASSERT(catch(fetch_class_member(p, 9)));
+}

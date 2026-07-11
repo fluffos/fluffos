@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: numbers / secure_random
 ---
 # secure_random

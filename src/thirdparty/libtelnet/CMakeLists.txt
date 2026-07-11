@@ -28,11 +28,15 @@ target_include_directories(libtelnet
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-find_package(ZLIB)
-if(${ZLIB_FOUND})
-      target_compile_definitions(libtelnet PUBLIC HAVE_ZLIB)
-      target_include_directories(libtelnet PRIVATE ${ZLIB_INCLUDE_DIRS})
-      target_link_libraries(libtelnet PRIVATE ${ZLIB_LIBRARIES})
+# No MCCP on the wasm target: zlib is not linked there at all (compressing
+# the byte stream to a client on the same page would waste CPU and size).
+if(NOT EMSCRIPTEN)
+    find_package(ZLIB)
+    if(${ZLIB_FOUND})
+        target_compile_definitions(libtelnet PUBLIC HAVE_ZLIB)
+        target_include_directories(libtelnet PRIVATE ${ZLIB_INCLUDE_DIRS})
+        target_link_libraries(libtelnet PRIVATE ${ZLIB_LIBRARIES})
+    endif()
 endif()
 
 #add_subdirectory(util)

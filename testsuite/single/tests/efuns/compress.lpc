@@ -1,0 +1,10 @@
+#ifdef __PACKAGE_COMPRESS__
+void do_tests() {
+    buffer b = compress("hello hello hello hello");
+    ASSERT(bufferp(b));
+    ASSERT(sizeof(b) > 0);
+    ASSERT_EQ("hello hello hello hello", string_decode(uncompress(b), "utf-8"));
+    // Buffers round-trip too.
+    ASSERT_EQ("abc", string_decode(uncompress(compress(string_encode("abc", "utf-8"))), "utf-8"));
+}
+#endif

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / real_time
 ---
 # real_time

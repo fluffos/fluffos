@@ -6,7 +6,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Introduction',
       collapsed: false,
-      items: ['index', 'build', 'bug'],
+      items: ['index', 'build', 'build-wasm', 'bug'],
     },
     {
       type: 'category',
@@ -14,21 +14,27 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'driver/index' },
       items: [
         'driver/config',
+        'driver/wasm',
         'driver/adding_efuns',
         'driver/stackmachine',
         'driver/parse_tree',
         'driver/call_into_vm',
         'driver/malloc',
+        'driver/ffi-plan',
       ],
     },
     {
       type: 'category',
       label: 'CLI',
+      link: { type: 'doc', id: 'cli/index' },
       items: [
         'cli/driver',
         'cli/lpcc',
         'cli/o2json',
         'cli/json2o',
+        'cli/portbind',
+        'cli/symbol',
+        'cli/generate_keywords',
       ],
     },
     {
@@ -40,6 +46,8 @@ const sidebars: SidebarsConfig = {
           label: 'LPC Language',
           link: { type: 'doc', id: 'lpc/index' },
           items: [
+            'lpc/source-files',
+            'lpc/diagnostics',
             {
               type: 'category',
               label: 'Types',
@@ -68,6 +76,7 @@ const sidebars: SidebarsConfig = {
                 'lpc/constructs/inherit',
                 'lpc/constructs/prototypes',
                 'lpc/constructs/switch',
+                'lpc/constructs/text_blocks',
                 'lpc/constructs/while',
               ],
             },
@@ -78,6 +87,8 @@ const sidebars: SidebarsConfig = {
               items: [
                 'lpc/preprocessor/define',
                 'lpc/preprocessor/include',
+                'lpc/preprocessor/conditionals',
+                'lpc/preprocessor/pragma',
               ],
             },
           ],
@@ -93,6 +104,7 @@ const sidebars: SidebarsConfig = {
           ],
         },
         { type: 'doc', id: 'efun/index', label: 'EFUN' },
+        { type: 'doc', id: 'stdlib/index', label: 'STDLIB' },
         {
           type: 'category',
           label: 'Concepts',

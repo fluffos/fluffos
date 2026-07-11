@@ -257,23 +257,23 @@ Example:
    parse_command() reentrant.
 */
 using parse_global_t = struct parse_global_s {
-  struct parse_global_s *next;
+  struct parse_global_s* next;
 
-  array_t *Id_list;
-  array_t *Pluid_list;
-  array_t *Adjid_list;
-  array_t *Id_list_d;    /* From master */
-  array_t *Pluid_list_d; /* From master */
-  array_t *Adjid_list_d; /* From master */
-  array_t *Prepos_list;  /* From master */
-  char *Allword;         /* From master */
+  array_t* Id_list;
+  array_t* Pluid_list;
+  array_t* Adjid_list;
+  array_t* Id_list_d;    /* From master */
+  array_t* Pluid_list_d; /* From master */
+  array_t* Adjid_list_d; /* From master */
+  array_t* Prepos_list;  /* From master */
+  char* Allword;         /* From master */
 
-  array_t *warr;
-  array_t *patarr;
-  array_t *obarr;
+  array_t* warr;
+  array_t* patarr;
+  array_t* obarr;
 };
 
-static parse_global_t *globals = nullptr;
+static parse_global_t* globals = nullptr;
 
 #define gId_list (globals->Id_list)
 #define gPluid_list (globals->Pluid_list)
@@ -287,34 +287,33 @@ static parse_global_t *globals = nullptr;
 #define parse_patarr (globals->patarr)
 #define parse_obarr (globals->obarr)
 
-static void load_lpc_info(int /*ix*/, object_t * /*ob*/);
+static void load_lpc_info(int /*ix*/, object_t* /*ob*/);
 static void parse_clean_up();
 static void push_parse_globals();
 static void pop_parse_globals();
-static void store_value(svalue_t * /*sp*/, int /*pos*/, int /*num*/, svalue_t * /*what*/);
-static void store_words_slice(svalue_t * /*sp*/, int /*pos*/, int /*num*/, array_t * /*warr*/,
+static void store_value(svalue_t* /*sp*/, int /*pos*/, int /*num*/, svalue_t* /*what*/);
+static void store_words_slice(svalue_t* /*sp*/, int /*pos*/, int /*num*/, array_t* /*warr*/,
                               int /*from*/, int /*to*/);
-static svalue_t *sub_parse(array_t * /*obarr*/, array_t * /*patarr*/, int * /*pix_in*/,
-                           array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/, svalue_t * /*sp*/);
-static svalue_t *one_parse(array_t * /*obarr*/, const char * /*pat*/, array_t * /*warr*/,
-                           int * /*cix_in*/, int * /*fail*/, svalue_t * /*prep_param*/);
-static svalue_t *number_parse(array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/);
-static svalue_t *item_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
-                            int * /*fail*/);
+static svalue_t* sub_parse(array_t* /*obarr*/, array_t* /*patarr*/, int* /*pix_in*/,
+                           array_t* /*warr*/, int* /*cix_in*/, int* /*fail*/, svalue_t* /*sp*/);
+static svalue_t* one_parse(array_t* /*obarr*/, const char* /*pat*/, array_t* /*warr*/,
+                           int* /*cix_in*/, int* /*fail*/, svalue_t* /*prep_param*/);
+static svalue_t* number_parse(array_t* /*warr*/, int* /*cix_in*/, int* /*fail*/);
+static svalue_t* item_parse(array_t* /*obarr*/, array_t* /*warr*/, int* /*cix_in*/, int* /*fail*/);
 #ifndef NO_ADD_ACTION
-static svalue_t *living_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
-                              int * /*fail*/);
+static svalue_t* living_parse(array_t* /*obarr*/, array_t* /*warr*/, int* /*cix_in*/,
+                              int* /*fail*/);
 #endif
-static svalue_t *single_parse(array_t * /*obarr*/, array_t * /*warr*/, int * /*cix_in*/,
-                              int * /*fail*/);
-static svalue_t *prepos_parse(array_t * /*warr*/, int * /*cix_in*/, int * /*fail*/,
-                              svalue_t * /*prepos*/);
-static int match_object(int /*obix*/, array_t * /*warr*/, int * /*cix_in*/, int * /*plur*/);
-static int find_string(const char * /*str*/, array_t * /*warr*/, int * /*cix_in*/);
-static int check_adjectiv(int /*obix*/, array_t * /*warr*/, int /*from*/, int /*to*/);
-static int member_string(const char * /*str*/, array_t * /*sarr*/);
-static const char *parse_to_plural(const char * /*str*/);
-static const char *parse_one_plural(const char * /*str*/);
+static svalue_t* single_parse(array_t* /*obarr*/, array_t* /*warr*/, int* /*cix_in*/,
+                              int* /*fail*/);
+static svalue_t* prepos_parse(array_t* /*warr*/, int* /*cix_in*/, int* /*fail*/,
+                              svalue_t* /*prepos*/);
+static int match_object(int /*obix*/, array_t* /*warr*/, int* /*cix_in*/, int* /*plur*/);
+static int find_string(const char* /*str*/, array_t* /*warr*/, int* /*cix_in*/);
+static int check_adjectiv(int /*obix*/, array_t* /*warr*/, int /*from*/, int /*to*/);
+static int member_string(const char* /*str*/, array_t* /*sarr*/);
+static const char* parse_to_plural(const char* /*str*/);
+static const char* parse_one_plural(const char* /*str*/);
 
 /*
  * Function name:       load_lpc_info
@@ -326,11 +325,11 @@ static const char *parse_one_plural(const char * /*str*/);
  * Arguments:           ix: Index in the array
  *                      ob: The object to call for information.
  */
-static void load_lpc_info(int ix, object_t *ob) {
+static void load_lpc_info(int ix, object_t* ob) {
   array_t *tmp, *sing;
-  svalue_t *ret;
+  svalue_t* ret;
   int il, make_plural = 0;
-  const char *str;
+  const char* str;
 
   if (!ob || ob->flags & O_DESTRUCTED) {
     return;
@@ -386,7 +385,7 @@ static void load_lpc_info(int ix, object_t *ob) {
 
 /* Some leak prevention: */
 static void parse_clean_up() {
-  parse_global_t *pg;
+  parse_global_t* pg;
 
   pg = globals;
   globals = pg->next;
@@ -428,13 +427,13 @@ static void parse_clean_up() {
 }
 
 static void push_parse_globals() {
-  parse_global_t *pg;
+  parse_global_t* pg;
 
   STACK_INC;
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = parse_clean_up;
 
-  pg = reinterpret_cast<parse_global_t *>(
+  pg = reinterpret_cast<parse_global_t*>(
       DMALLOC(sizeof(parse_global_t), TAG_TEMPORARY, "push_parse_globals"));
   pg->next = globals;
   globals = pg;
@@ -477,15 +476,15 @@ static svalue_t parse_ret;
  *                      num_arg: Number of destination arguments.
  * Returns:             True if command matched pattern.
  */
-int parse(const char *cmd,       /* Command to parse */
-          svalue_t *ob_or_array, /* Object or array of objects */
-          const char *pattern,   /* Special parsing pattern */
-          svalue_t *stack_args,  /* Pointer to lvalue args on
+int parse(const char* cmd,       /* Command to parse */
+          svalue_t* ob_or_array, /* Object or array of objects */
+          const char* pattern,   /* Special parsing pattern */
+          svalue_t* stack_args,  /* Pointer to lvalue args on
                                   * stack */
           int num_arg) {
   int pix, cix, six, fail, fword, ocix, fpix;
-  svalue_t *pval;
-  array_t *obarr = nullptr;
+  svalue_t* pval;
+  array_t* obarr = nullptr;
 
   /*
    * Pattern and commands can not be empty
@@ -649,8 +648,8 @@ int parse(const char *cmd,       /* Command to parse */
   return !fail;
 }
 
-static void store_value(svalue_t *sp, int pos, int num, svalue_t *what) {
-  svalue_t *ret;
+static void store_value(svalue_t* sp, int pos, int num, svalue_t* what) {
+  svalue_t* ret;
 
   if (pos >= num) {
     free_svalue(what, "store_value");
@@ -669,9 +668,9 @@ static void store_value(svalue_t *sp, int pos, int num, svalue_t *what) {
  *                      to:   Last word to use
  * Returns:             A pointer to a static svalue now containing string.
  */
-static void store_words_slice(svalue_t *sp, int pos, int num, array_t *warr, int from, int to) {
-  svalue_t *ret;
-  array_t *slice;
+static void store_words_slice(svalue_t* sp, int pos, int num, array_t* warr, int from, int to) {
+  svalue_t* ret;
+  array_t* slice;
 
   if (pos >= num) {
     return;
@@ -704,10 +703,10 @@ static void store_words_slice(svalue_t *sp, int pos, int num, array_t *warr, int
  *                      updates pointers in pattern and word arrays. It
  *                      handles alternate patterns but not "%s"
  */
-static svalue_t *sub_parse(array_t *obarr, array_t *patarr, int *pix_in, array_t *warr, int *cix_in,
-                           int *fail, svalue_t *sp) {
+static svalue_t* sub_parse(array_t* obarr, array_t* patarr, int* pix_in, array_t* warr, int* cix_in,
+                           int* fail, svalue_t* sp) {
   int cix, pix, subfail;
-  svalue_t *pval;
+  svalue_t* pval;
 
   /*
    * Fail if we have a pattern left but no words to parse
@@ -772,10 +771,10 @@ static svalue_t *sub_parse(array_t *obarr, array_t *patarr, int *pix_in, array_t
  *                      prep_param: Only used on %p (see prepos_parse)
  * Returns:             svalue holding result of parse.
  */
-static svalue_t *one_parse(array_t *obarr, const char *pat, array_t *warr, int *cix_in, int *fail,
-                           svalue_t *prep_param) {
+static svalue_t* one_parse(array_t* obarr, const char* pat, array_t* warr, int* cix_in, int* fail,
+                           svalue_t* prep_param) {
   char ch;
-  svalue_t *pval;
+  svalue_t* pval;
   const char *str1, *str2;
 
   /*
@@ -858,23 +857,23 @@ static svalue_t *one_parse(array_t *obarr, const char *pat, array_t *warr, int *
 */
 #ifndef PARSE_FOREIGN
 
-static const char *ord1[] = {"",          "first",     "second",      "third",      "fourth",
+static const char* ord1[] = {"",          "first",     "second",      "third",      "fourth",
                              "fifth",     "sixth",     "seventh",     "eighth",     "ninth",
                              "tenth",     "eleventh",  "twelfth",     "thirteenth", "fourteenth",
                              "fifteenth", "sixteenth", "seventeenth", "eighteenth", "nineteenth"};
 
-static const char *ord10[] = {"",      "",      "twenty",  "thirty", "forty",
+static const char* ord10[] = {"",      "",      "twenty",  "thirty", "forty",
                               "fifty", "sixty", "seventy", "eighty", "ninety"};
 
-static const char *sord10[] = {"",         "",         "twentieth",  "thirtieth", "fortieth",
+static const char* sord10[] = {"",         "",         "twentieth",  "thirtieth", "fortieth",
                                "fiftieth", "sixtieth", "seventieth", "eightieth", "ninetieth"};
 
-static const char *num1[] = {"",        "one",     "two",       "three",    "four",
+static const char* num1[] = {"",        "one",     "two",       "three",    "four",
                              "five",    "six",     "seven",     "eight",    "nine",
                              "ten",     "eleven",  "twelve",    "thirteen", "fourteen",
                              "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"};
 
-static const char *num10[] = {"",      "",      "twenty",  "thirty", "forty",
+static const char* num10[] = {"",      "",      "twenty",  "thirty", "forty",
                               "fifty", "sixty", "seventy", "eighty", "ninety"};
 
 #endif
@@ -893,7 +892,7 @@ static const char *num10[] = {"",      "",      "twenty",  "thirty", "forty",
  *                      fail: Fail flag if parse did not match
  * Returns:             svalue holding result of parse.
  */
-static svalue_t *number_parse(array_t *warr, int *cix_in, int *fail) {
+static svalue_t* number_parse(array_t* warr, int* cix_in, int* fail) {
   int cix, ten, ones, num;
   char buf[100];
 
@@ -964,9 +963,9 @@ static svalue_t *number_parse(array_t *warr, int *cix_in, int *fail) {
  *                      fail: Fail flag if parse did not match
  * Returns:             svalue holding result of parse.
  */
-static svalue_t *item_parse(array_t *obarr, array_t *warr, int *cix_in, int *fail) {
+static svalue_t* item_parse(array_t* obarr, array_t* warr, int* cix_in, int* fail) {
   array_t *tmp, *ret;
-  svalue_t *pval;
+  svalue_t* pval;
   int cix, tix, obix, plur_flag, max_cix, match_all;
 
   tmp = allocate_array(obarr->size + 1);
@@ -1048,10 +1047,10 @@ static svalue_t *item_parse(array_t *obarr, array_t *warr, int *cix_in, int *fai
  * Returns:             svalue holding result of parse.
  */
 #ifndef NO_ADD_ACTION
-static svalue_t *living_parse(array_t *obarr, array_t *warr, int *cix_in, int *fail) {
-  array_t *live;
-  svalue_t *pval;
-  object_t *ob;
+static svalue_t* living_parse(array_t* obarr, array_t* warr, int* cix_in, int* fail) {
+  array_t* live;
+  svalue_t* pval;
+  object_t* ob;
   int obix, tix;
 
   live = allocate_array(obarr->size);
@@ -1111,7 +1110,7 @@ static svalue_t *living_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
  *                      fail: Fail flag if parse did not match
  * Returns:             svalue holding result of parse.
  */
-static svalue_t *single_parse(array_t *obarr, array_t *warr, int *cix_in, int *fail) {
+static svalue_t* single_parse(array_t* obarr, array_t* warr, int* cix_in, int* fail) {
   int cix, obix, plur_flag;
 
   for (obix = 0; obix < obarr->size; obix++) {
@@ -1146,9 +1145,9 @@ static svalue_t *single_parse(array_t *obarr, array_t *warr, int *cix_in, int *f
  *                      prepos: Pointer to svalue holding prepos parameter.
  * Returns:             svalue holding result of parse.
  */
-static svalue_t *prepos_parse(array_t *warr, int *cix_in, int *fail, svalue_t *prepos) {
+static svalue_t* prepos_parse(array_t* warr, int* cix_in, int* fail, svalue_t* prepos) {
   array_t *parr, *tarr;
-  const char *tmp;
+  const char* tmp;
   int pix, tix;
 
   if ((!prepos) || (prepos->type != T_ARRAY)) {
@@ -1216,10 +1215,10 @@ static svalue_t *prepos_parse(array_t *warr, int *cix_in, int *fail, svalue_t *p
  *                      plur: This arg gets set if the noun was on pluralform
  * Returns:             True if object matches.
  */
-static int match_object(int obix, array_t *warr, int *cix_in, int *plur) {
-  array_t *ids;
+static int match_object(int obix, array_t* warr, int* cix_in, int* plur) {
+  array_t* ids;
   int il, pos, cplur, old_cix;
-  const char *str;
+  const char* str;
 
   for (cplur = (*plur * 2); cplur < 4; cplur++) {
     switch (cplur) {
@@ -1289,10 +1288,10 @@ static int match_object(int obix, array_t *warr, int *cix_in, int *plur) {
  *                      cix_in: Startpos in word array
  * Returns:             Pos in array if string found or -1
  */
-static int find_string(const char *str, array_t *warr, int *cix_in) {
+static int find_string(const char* str, array_t* warr, int* cix_in) {
   int fpos;
   const char *p1, *p2;
-  array_t *split;
+  array_t* split;
 
   for (; *cix_in < warr->size; (*cix_in)++) {
     p1 = warr->item[*cix_in].u.string;
@@ -1359,10 +1358,10 @@ static int find_string(const char *str, array_t *warr, int *cix_in) {
  *                      to:   last cmdword to test
  * Returns:             True if a match is made.
  */
-static int check_adjectiv(int obix, array_t *warr, int from, int to) {
+static int check_adjectiv(int obix, array_t* warr, int from, int to) {
   int il, back, sum, fail;
-  char *adstr;
-  array_t *ids;
+  char* adstr;
+  array_t* ids;
 
   if (gAdjid_list->item[obix].type == T_ARRAY) {
     ids = gAdjid_list->item[obix].u.arr;
@@ -1389,7 +1388,7 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
     return 0;
   }
 
-  adstr = reinterpret_cast<char *>(DMALLOC(sum, TAG_TEMPORARY, "check_adjectiv"));
+  adstr = reinterpret_cast<char*>(DMALLOC(sum, TAG_TEMPORARY, "check_adjectiv"));
 
   /*
    * If we now have: "adj1 adj2 adj3 ... adjN"
@@ -1440,7 +1439,7 @@ static int check_adjectiv(int obix, array_t *warr, int from, int to) {
  *                      sarr: array of strings
  * Returns:             Pos if found else -1.
  */
-static int member_string(const char *str, array_t *sarr) {
+static int member_string(const char* str, array_t* sarr) {
   int il;
 
   if (!sarr) {
@@ -1467,9 +1466,9 @@ static int member_string(const char *str, array_t *sarr) {
  * Arguments:           str: The sentence to change
  * Returns:             Sentence in plural form.
  */
-static const char *parse_to_plural(const char *str) {
-  array_t *words;
-  const char *sp;
+static const char* parse_to_plural(const char* str) {
+  array_t* words;
+  const char* sp;
   int il, changed;
 
   if (!(strchr(str, ' '))) {
@@ -1506,7 +1505,7 @@ static const char *parse_to_plural(const char *str) {
  * Arguments:           str: The sentence to change
  * Returns:             Word in plural form.
  */
-static const char *parse_one_plural(const char *str) {
+static const char* parse_one_plural(const char* str) {
   char ch, ch2, ch3;
   int sl;
   static char pbuf[100]; /* Words > 100 letters? In Wales maybe... */

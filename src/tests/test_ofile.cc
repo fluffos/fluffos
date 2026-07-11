@@ -96,7 +96,7 @@ TEST_F(OFileTest, TestToJsonAndBack) {
 
   ASSERT_EQ(ofile.program_name, ofile2.program_name);
   ASSERT_EQ(ofile.variables.size(), ofile2.variables.size());
-  for(size_t i = 0; i < ofile.variables.size(); i++) {
+  for (size_t i = 0; i < ofile.variables.size(); i++) {
     ASSERT_EQ(ofile.variables[i].first, ofile2.variables[i].first);
     ASSERT_EQ(ofile.variables[i].second.type, ofile2.variables[i].second.type);
     ASSERT_EQ(ofile.variables[i].second.u.number, ofile2.variables[i].second.u.number);

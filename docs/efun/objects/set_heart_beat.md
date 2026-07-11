@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / set_heart_beat
 ---
 # set_heart_beat
@@ -10,7 +9,7 @@ title: objects / set_heart_beat
 
 ### SYNOPSIS
 
-    int set_heart_beat( int flag );
+    void set_heart_beat( int flag );
 
 ### DESCRIPTION
 

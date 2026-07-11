@@ -24,7 +24,7 @@
 #include "vm/internal/otable.h"
 
 // FIXME: sprintf needs query_instr_name
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 
 // FIXME: disassembler needs icode
 #include "compiler/internal/icode.h"
@@ -48,7 +48,7 @@
 #include "net/telnet.h"  // Telnet related stuff
 
 // trace.cc
-extern struct array_t *get_svalue_trace();
+extern struct array_t* get_svalue_trace();
 
 // Tracing support
 #include "base/internal/tracing.h"

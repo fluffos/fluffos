@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: Tracing and Performance Profiling
 ---
 # Tracing and Performance Profiling

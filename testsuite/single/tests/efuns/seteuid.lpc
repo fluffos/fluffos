@@ -1,0 +1,10 @@
+void do_tests() {
+#ifdef __PACKAGE_UIDS__
+    string save = geteuid();
+    // Master valid_seteuid governs; our own uid is always settable.
+    ASSERT_EQ(1, seteuid(getuid()));
+    ASSERT_EQ(getuid(), geteuid());
+    seteuid(save);
+#endif
+    ASSERT(1);
+}

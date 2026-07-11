@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: parsing / query_verb
 ---
 # query_verb

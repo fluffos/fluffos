@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: functions / evaluate
 ---
 # evaluate

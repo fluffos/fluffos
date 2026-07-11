@@ -55,20 +55,20 @@ struct lpc_socket_t {
   struct sockaddr_storage r_addr;
   ev_socklen_t l_addrlen;
   ev_socklen_t r_addrlen;
-  object_t *owner_ob;
-  object_t *release_ob;
+  object_t* owner_ob;
+  object_t* release_ob;
   union string_or_func read_callback;
   union string_or_func write_callback;
   union string_or_func close_callback;
-  char *r_buf;
+  char* r_buf;
   int r_off;
   int r_len;
-  char *w_buf;
+  char* w_buf;
   int w_off;
   int w_len;
-  struct event *ev_read;
-  struct event *ev_write;
-  struct lpc_socket_event_data *ev_data;
+  struct event* ev_read;
+  struct event* ev_write;
+  struct lpc_socket_event_data* ev_data;
   SSL_CTX* ssl_ctx;
   SSL* ssl;
   svalue_t options[NUM_SOCKET_OPTIONS];
@@ -89,37 +89,37 @@ enum socket_flags {
   S_TLS_IS_SERVER = 0x800,
 };
 
-array_t *socket_status(int);
-array_t *socket_status_by_fd(int);
-int check_valid_socket(const char *const, int, object_t *, const char *const, int);
+array_t* socket_status(int);
+array_t* socket_status_by_fd(int);
+int check_valid_socket(const char* const, int, object_t*, const char* const, int);
 void socket_read_select_handler(int);
 void socket_write_select_handler(int);
-void assign_socket_owner(svalue_t *, object_t *);
-object_t *get_socket_owner(int);
-void dump_socket_status(outbuffer_t *);
-void close_referencing_sockets(object_t *);
-int get_socket_address(int, char *, int *, int);
-int socket_bind(int, int, const char *);
-int socket_create(enum socket_mode, svalue_t *, svalue_t *);
-int socket_listen(int, svalue_t *);
-int socket_accept(int, svalue_t *, svalue_t *);
-int socket_connect(int, const char *, svalue_t *, svalue_t *);
-int socket_write(int, svalue_t *, const char *);
+void assign_socket_owner(svalue_t*, object_t*);
+object_t* get_socket_owner(int);
+void dump_socket_status(outbuffer_t*);
+void close_referencing_sockets(object_t*);
+int get_socket_address(int, char*, int*, int);
+int socket_bind(int, int, const char*);
+int socket_create(int mode, svalue_t*, svalue_t*);
+int socket_listen(int, svalue_t*);
+int socket_accept(int, svalue_t*, svalue_t*);
+int socket_connect(int, const char*, svalue_t*, svalue_t*);
+int socket_write(int, svalue_t*, const char*);
 int socket_close(int, int);
-int socket_release(int, object_t *, svalue_t *);
-int socket_acquire(int, svalue_t *, svalue_t *, svalue_t *);
-const char *socket_error(int);
+int socket_release(int, object_t*, svalue_t*);
+int socket_acquire(int, svalue_t*, svalue_t*, svalue_t*);
+const char* socket_error(int);
 int find_new_socket(void);
-void set_read_callback(int, svalue_t *);
-void set_write_callback(int, svalue_t *);
-void set_close_callback(int, svalue_t *);
+void set_read_callback(int, svalue_t*);
+void set_write_callback(int, svalue_t*);
+void set_close_callback(int, svalue_t*);
 
 int lpc_socks_num();
-lpc_socket_t *lpc_socks_get(int i);
+lpc_socket_t* lpc_socks_get(int i);
 void mark_sockets();
 
 void lpc_socks_closeall();
 
-void new_lpc_socket_event_listener(int idx, lpc_socket_t *sock, evutil_socket_t real_fd);
+void new_lpc_socket_event_listener(int idx, lpc_socket_t* sock, evutil_socket_t real_fd);
 
 #endif /* _SOCKET_EFUNS_H_ */

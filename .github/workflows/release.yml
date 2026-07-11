@@ -213,6 +213,103 @@ jobs:
           asset_name: fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}
           asset_content_type: ${{ matrix.asset_type }}
 
+  # WebAssembly driver: cross-compile with the latest emsdk, gate on the
+  # LPC testsuite running inside the wasm driver under node, then ship
+  # driver + web terminal + mudlib packer as a self-contained zip. See
+  # docs/build-wasm.md for the workflow this asset supports.
+  build-wasm:
+    name: Build WASM Binary
+    needs: create-release
+    runs-on: ubuntu-24.04
+    env:
+      # Upstream dep pins, mirrored from the CI wasm job; the resolved
+      # emsdk version feeds the cache key.
+      ICU_VER: 74-2
+      WASM_DEPS_PREFIX: /opt/wasm-deps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.version }}
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Resolve emscripten version
+        id: emver
+        run: echo "version=$(emcc -dumpversion)" >> "$GITHUB_OUTPUT"
+
+      - name: Install native dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential bison flex libssl-dev libicu-dev zip
+
+      - name: Prepare wasm deps prefix
+        run: |
+          sudo mkdir -p "$WASM_DEPS_PREFIX"
+          sudo chown "$USER" "$WASM_DEPS_PREFIX"
+
+      - name: Cache wasm dependencies (ICU)
+        id: wasm-deps
+        uses: actions/cache@v4
+        with:
+          path: /opt/wasm-deps
+          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-v3
+
+      - name: Build wasm dependencies
+        if: steps.wasm-deps.outputs.cache-hit != 'true'
+        run: |
+          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" \
+            tools/wasm/build-deps.sh
+
+      - name: Build driver (native tools + wasm)
+        run: tools/wasm/build.sh
+
+      - name: Run LPC testsuite in the wasm driver
+        run: node tools/wasm/run-testsuite.js
+
+      - name: Package
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          ASSET_NAME="fluffos-${VERSION}-wasm.zip"
+          STAGE=$(mktemp -d)
+          cp build-wasm/src/fluffos.js build-wasm/src/fluffos.wasm "$STAGE/"
+          cp src/www/wasm/index.html "$STAGE/"
+          cp tools/wasm/pack-mudlib.sh "$STAGE/"
+          cat > "$STAGE/README.md" << EOF
+          # FluffOS ${VERSION} -- WebAssembly driver
+
+          The full FluffOS driver compiled to WebAssembly: it runs your
+          mudlib inside a browser tab and speaks telnet with the page.
+
+          Contents:
+          - fluffos.js / fluffos.wasm -- the driver
+          - index.html -- a self-contained web terminal (telnet client included)
+          - pack-mudlib.sh -- bundles YOUR mudlib with this driver into a
+            static site (requires emscripten's file_packager, i.e. emsdk on PATH)
+
+          Quick start:
+
+              ./pack-mudlib.sh --mudlib /path/to/mylib --config etc/config
+              python3 -m http.server -d dist 8080
+
+          Docs: https://www.fluffos.info/build-wasm
+          Cookbook (packer + JsBridge): https://www.fluffos.info/driver/wasm
+          EOF
+          (cd "$STAGE" && zip -r - .) > "$ASSET_NAME"
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./fluffos-${{ needs.create-release.outputs.version }}-wasm.zip
+          asset_name: fluffos-${{ needs.create-release.outputs.version }}-wasm.zip
+          asset_content_type: application/zip
+
   build-docker:
     name: Build and Push Docker Image
     needs: create-release
@@ -257,7 +354,7 @@ jobs:
 
   finalize-release:
     name: Finalize Release
-    needs: [create-release, build-binaries, build-docker]
+    needs: [create-release, build-binaries, build-wasm, build-docker]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -284,6 +381,16 @@ jobs:
             - Built on Alpine Linux
             - Complete distribution with all tools and libraries
             - Portable across most Linux distributions
+
+          - **WebAssembly**: \`fluffos-${VERSION}-wasm.zip\`
+            - The driver compiled to WebAssembly: runs a full mudlib in a
+              browser tab (the page is the telnet client)
+            - Contains \`fluffos.js\`/\`fluffos.wasm\`, a self-contained web
+              terminal (\`index.html\`), and \`pack-mudlib.sh\` to bundle your
+              mudlib into a static site
+            - Validated by running the LPC testsuite inside the wasm driver
+            - See the [WebAssembly build guide](https://www.fluffos.info/build-wasm)
+              and the [WASM driver cookbook](https://www.fluffos.info/driver/wasm)
 
           ### What's Included
           Each distribution contains:
@@ -334,6 +441,16 @@ jobs:
           docker run -v /path/to/mudlib:/mudlib ghcr.io/${{ github.repository }}:${VERSION} /mudlib/config.cfg
           \`\`\`
 
+          ### WebAssembly (browser)
+          \`\`\`bash
+          # Bundle your mudlib with the wasm driver into a static site
+          # (needs emscripten's file_packager, i.e. emsdk on PATH)
+          unzip fluffos-${VERSION}-wasm.zip -d fluffos-wasm
+          cd fluffos-wasm
+          ./pack-mudlib.sh --mudlib /path/to/mudlib --config etc/config
+          python3 -m http.server -d dist 8080   # then open http://localhost:8080/
+          \`\`\`
+
           ---
           EOF
 
@@ -368,6 +485,7 @@ jobs:
           ✅ Release ${VERSION} created successfully!
           📦 Windows binary: fluffos-${VERSION}-windows-x86_64.zip
           📦 Linux static binary: fluffos-${VERSION}-linux-x86_64-static.tar.gz
+          📦 WebAssembly driver + packer: fluffos-${VERSION}-wasm.zip
           🐳 Docker image: ghcr.io/${{ github.repository }}:${VERSION}
           🔗 View release: https://github.com/${{ github.repository }}/releases/tag/${VERSION}
           EOF

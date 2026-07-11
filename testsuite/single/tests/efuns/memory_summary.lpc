@@ -1,0 +1,5 @@
+void do_tests() {
+    mapping m = memory_summary();
+    ASSERT(mapp(m));
+    ASSERT(sizeof(m) > 0);
+}

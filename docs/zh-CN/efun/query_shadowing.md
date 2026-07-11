@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: calls / query_shadowing
 ---
 # query_shadowing

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: stdlib / array_sum
 ---
 # array_sum

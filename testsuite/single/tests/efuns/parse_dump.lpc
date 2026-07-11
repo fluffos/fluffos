@@ -1,0 +1,7 @@
+void do_tests() {
+#ifdef __PACKAGE_PARSER__
+    parse_init();
+    ASSERT(stringp(parse_dump()));
+#endif
+    ASSERT(1);
+}

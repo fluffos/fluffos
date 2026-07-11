@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: arrays / map_array
 ---
 # map_array

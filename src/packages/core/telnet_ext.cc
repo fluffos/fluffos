@@ -7,7 +7,7 @@
 /* TELNET */
 #ifdef F_REQUEST_TERM_TYPE
 void f_request_term_type() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_request_ttype(ip->telnet);
     flush_message(ip);
@@ -20,7 +20,7 @@ void f_request_term_type() {
 
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type() {
-  auto *ip = command_giver->interactive;
+  auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
     flush_message(ip);
@@ -34,7 +34,7 @@ void f_start_request_term_type() {
 
 #ifdef F_REQUEST_TERM_SIZE
 void f_request_term_size() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
 
   if (ip && ip->telnet) {
     if ((st_num_arg == 1) && (sp->u.number == 0)) {
@@ -55,7 +55,7 @@ void f_request_term_size() {
 
 #ifdef F_TELNET_NOP
 void f_telnet_nop() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_nop(ip->telnet);
     flush_message(ip);
@@ -67,7 +67,7 @@ void f_telnet_nop() {
 
 #ifdef F_TELNET_GA
 void f_telnet_ga() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_ga(ip->telnet);
     flush_message(ip);
@@ -93,7 +93,7 @@ void f_has_mxp() {
 
 #ifdef F_ACT_MXP
 void f_act_mxp() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     // start MXP
     telnet_begin_sb(ip->telnet, TELNET_TELOPT_MXP);
@@ -120,8 +120,8 @@ void f_has_gmcp() {
 
 #ifdef F_SEND_GMCP
 void f_send_gmcp() {
-  auto *ip = current_object->interactive;
-  const auto *data = sp->u.string;
+  auto* ip = current_object->interactive;
+  const auto* data = sp->u.string;
   auto len = SVALUE_STRLEN(sp);
   if (ip && ip->telnet) {
     std::string const transdata = u8_convert_encoding(ip->trans, data, len);
@@ -166,11 +166,12 @@ void f_has_msdp() {
 #endif
 
 #ifdef F_SEND_MSDP_VARIABLE
-/** TODO update to support sending other value type and use proper MSDP mapping/array formats as needed based on data types */
+/** TODO update to support sending other value type and use proper MSDP mapping/array formats as
+ * needed based on data types */
 void f_send_msdp_variable() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
-    switch(sp->type) {
+    switch (sp->type) {
       case T_STRING:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
         telnet_printf(ip->telnet, "\x01%s\x02", (sp - 1)->u.string);
@@ -179,18 +180,18 @@ void f_send_msdp_variable() {
         break;
       case T_NUMBER:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02%lu", (sp - 1)->u.string,  sp->u.number);
+        telnet_printf(ip->telnet, "\x01%s\x02%lu", (sp - 1)->u.string, sp->u.number);
         telnet_finish_sb((ip->telnet));
         break;
       case T_REAL:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02%f", (sp - 1)->u.string,  sp->u.real);
+        telnet_printf(ip->telnet, "\x01%s\x02%f", (sp - 1)->u.string, sp->u.real);
         telnet_finish_sb((ip->telnet));
         break;
       case T_BUFFER:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
         telnet_printf(ip->telnet, "\x01%s\x02", (sp - 1)->u.string);
-        telnet_send(ip->telnet, reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
+        telnet_send(ip->telnet, reinterpret_cast<char*>(sp->u.buf->item), sp->u.buf->size);
         telnet_finish_sb((ip->telnet));
         break;
       case T_ARRAY:
@@ -201,7 +202,8 @@ void f_send_msdp_variable() {
     }
     flush_message(ip);
   } else if (!ip) {
-    debug_message("Warning: wrong usage. send_msdp_variable() should only be called by a user object.\n");
+    debug_message(
+        "Warning: wrong usage. send_msdp_variable() should only be called by a user object.\n");
   }
   pop_2_elems();
 }
@@ -224,7 +226,7 @@ void f_has_zmp() {
 
 #ifdef F_SEND_ZMP
 void f_send_zmp() {
-  auto *ip = command_giver->interactive;
+  auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
 
@@ -246,7 +248,7 @@ void f_send_zmp() {
 
 #ifdef F_TELNET_MSP_OOB
 void f_telnet_msp_oob() {
-  auto *ip = current_object->interactive;
+  auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_msp_oob(ip, sp->u.string, SVALUE_STRLEN(sp));
     flush_message(ip);

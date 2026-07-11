@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: calls / call_stack
 ---
 # call_stack
@@ -11,7 +10,7 @@ title: calls / call_stack
 
 ### SYNOPSIS
 
-    string *call_stack(int option);
+    mixed *call_stack(int option);
 
 ### DESCRIPTION
 

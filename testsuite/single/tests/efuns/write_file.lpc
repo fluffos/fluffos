@@ -1,0 +1,9 @@
+void do_tests() {
+    rm("/wf_test.txt");
+    ASSERT_EQ(1, write_file("/wf_test.txt", "one\n"));
+    ASSERT_EQ(1, write_file("/wf_test.txt", "two\n"));      // appends
+    ASSERT_EQ("one\ntwo\n", read_file("/wf_test.txt"));
+    ASSERT_EQ(1, write_file("/wf_test.txt", "fresh\n", 1)); // flag overwrites
+    ASSERT_EQ("fresh\n", read_file("/wf_test.txt"));
+    rm("/wf_test.txt");
+}

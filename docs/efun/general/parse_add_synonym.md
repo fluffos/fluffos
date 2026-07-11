@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / parse_add_synonym
 ---
 # parse_add_synonym

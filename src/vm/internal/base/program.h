@@ -107,9 +107,9 @@
 #endif
 #define DECL_MODS (DECL_ACCESS | DECL_NOMASK | DECL_NOSAVE)
 
-#define DECL_MODIFY2(t, mod)                                                \
-  ((((t)&DECL_ACCESS) > ((mod)&DECL_ACCESS)) ? ((t) & ~DECL_ACCESS) | (mod) \
-                                             : (t) | ((mod) & ~DECL_ACCESS))
+#define DECL_MODIFY2(t, mod)                                                    \
+  ((((t) & DECL_ACCESS) > ((mod) & DECL_ACCESS)) ? ((t) & ~DECL_ACCESS) | (mod) \
+                                                 : (t) | ((mod) & ~DECL_ACCESS))
 
 /* only the flags that should be copied up through inheritance levels */
 #define FUNC_MASK                                                                           \
@@ -163,7 +163,7 @@ typedef struct {
 #endif
 
 struct function_t {
-  const char *funcname;
+  const char* funcname;
   unsigned short type;
   uint8_t num_arg;
   uint8_t min_arg;
@@ -181,27 +181,27 @@ struct function_t {
 };
 
 typedef struct {
-  const char *name;
+  const char* name;
   unsigned short type; /* Type of variable. See above. TYPE_ */
 } variable_t;
 
 struct inherit_t {
-  struct program_t *prog;
+  struct program_t* prog;
   unsigned short function_index_offset;
   unsigned short variable_index_offset;
   unsigned short type_mod;
 };
 
 struct lookup_entry_s {
-  struct program_t *progp;
-  struct function_t *funp;
+  struct program_t* progp;
+  struct function_t* funp;
   unsigned short function_index_offset;
   unsigned short variable_index_offset;
   unsigned short runtime_index;
 };
 
 struct program_t {
-  const char *filename; /* Name of file that defined prog */
+  const char* filename; /* Name of file that defined prog */
   unsigned short flags;
   unsigned short last_inherited;
   unsigned int ref; /* Reference count */
@@ -210,18 +210,18 @@ struct program_t {
   int extra_ref; /* Used to verify ref count */
   int extra_func_ref;
 #endif
-  char *program;            /* The binary instructions */
-  unsigned char *line_info; /* Line number information */
-  unsigned short *file_info;
+  char* program;            /* The binary instructions */
+  unsigned char* line_info; /* Line number information */
+  unsigned short* file_info;
   int line_swap_index; /* Where line number info is swapped */
-  function_t *function_table;
-  unsigned short *function_flags; /* separate for alignment reasons */
-  struct class_def_t *classes;
-  struct class_member_entry_t *class_members;
-  char **strings;                 /* All strings uses by the program */
-  char **variable_table;          /* variables defined by this program */
-  unsigned short *variable_types; /* variables defined by this program */
-  inherit_t *inherit;             /* List of inherited prgms */
+  function_t* function_table;
+  unsigned short* function_flags; /* separate for alignment reasons */
+  struct class_def_t* classes;
+  struct class_member_entry_t* class_members;
+  char** strings;                 /* All strings uses by the program */
+  char** variable_table;          /* variables defined by this program */
+  unsigned short* variable_types; /* variables defined by this program */
+  inherit_t* inherit;             /* List of inherited prgms */
   int total_size;                 /* Sum of all data in this struct */
                                   /*
                                    * The types of function arguments are saved where 'argument_types'
@@ -233,9 +233,9 @@ struct program_t {
                                    * inheritance. There are several lines of code that depends on the type
                                    * length (16 bits) of 'type_start' (sorry !).
                                    */
-  unsigned short *argument_types;
+  unsigned short* argument_types;
 #define INDEX_START_NONE 65535
-  unsigned short *type_start;
+  unsigned short* type_start;
   /*
    * And now some general size information.
    */
@@ -245,7 +245,7 @@ struct program_t {
   unsigned short num_classes;
   unsigned short num_functions_defined;
   unsigned short num_strings;
-  unsigned short num_variables_total; /* total number of variables including inherited */
+  unsigned short num_variables_total;   /* total number of variables including inherited */
   unsigned short num_variables_defined; /* total number of variables defined by this program */
   unsigned short num_inherited;
 
@@ -260,10 +260,10 @@ struct program_t {
   std::unique_ptr<apply_lookup_table_type> apply_lookup_table;
 };
 
-void reference_prog(program_t *, const char *);
-void free_prog(program_t **);
-void deallocate_program(program_t *);
-char *variable_name(program_t *, int);
-function_t *find_func_entry(program_t *, int);
+void reference_prog(program_t*, const char*);
+void free_prog(program_t**);
+void deallocate_program(program_t*);
+char* variable_name(program_t*, int);
+function_t* find_func_entry(program_t*, int);
 
 #endif

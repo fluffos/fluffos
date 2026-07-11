@@ -1,0 +1,26 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+private int near(float a, float b) { return (a>b?a-b:b-a) < 1e-9; }
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    int lib, f, p, a;
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    lib = ffi_load("");
+    // double sqrt(double)
+    f = ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE }));
+    ASSERT(near(3.0, ffi_call(f, ({ 9.0 }))));
+    ASSERT(near(1.4142135623730951, ffi_call(f, ({ 2.0 }))));
+    // double pow(double, double)
+    p = ffi_prepare(lib, "pow", FFI_DOUBLE, ({ FFI_DOUBLE, FFI_DOUBLE }));
+    ASSERT(near(8.0, ffi_call(p, ({ 2.0, 3.0 }))));
+    // int abs(int)
+    a = ffi_prepare(lib, "abs", FFI_INT, ({ FFI_INT }));
+    ASSERT_EQ(5, ffi_call(a, ({ -5 })));
+    ASSERT_EQ(7, ffi_call(a, ({ 7 })));
+    // Arg-count mismatch errors.
+    ASSERT(catch(ffi_call(f, ({ 1.0, 2.0 }))));
+    ffi_unload(lib);
+#endif
+    ASSERT(1);
+}

@@ -1,33 +1,22 @@
 ---
-layout: doc
 title: constructs / include
 ---
 # include
 
-### The LPC #include directive:
+```c
+#include "defs.h"
+#include <mudlib.h>
+```
 
-Syntax:
+`#include` textually splices another file into the one being compiled:
+the effect is exactly as if the contents of the header had been typed
+at the point of the directive. Each object that includes a file gets
+its own compiled copy of whatever the file contains — so headers are
+for `#define`s, prototypes and shared declarations, while shared
+*code* belongs in an [inherit](inherit)ed object.
 
-    #include <file.h>
-
-Alternate:
-
-    #include "file.h"
-
-Note: the `#include "file.h"` form looks for file.h in the current directory.
-The `#include <file.h>` form looks for file.h in one of the standard system
-include directories (on TMI these directories are /include and /local/include).
-
-For those that know C, the LPC #include statement is identical to C's #include
-statement.
-
-For those that don't know C, the #include statement is a way to textually
-include one file into another. Putting a statement `#include "file.h"` in a
-file gives the same effect as if you had simply typed the contents of file.h
-directly into the file at the point where you had the #include statement.
-
-Included files are recompiled each time the object that include's them is
-recompiled. If the included file contains variables or functions of the same
-name as variables in the file doing the including, then a duplicate-name
-error will occur at compile time(in the same way that the error would occur
-if you simply typed in file.h rather than using #include).
+The `"file"` form searches relative to the including file's directory
+first and then the include path; the `<file>` form searches only the
+include path. For the full resolution rules, macro file names,
+trailing comments, and nesting limits, see the preprocessor reference:
+[#include](../preprocessor/include).

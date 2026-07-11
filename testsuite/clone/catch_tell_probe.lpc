@@ -1,0 +1,9 @@
+// Fixture: records the last catch_tell() message (tell_object/tell_room
+// deliver through catch_tell on non-interactive objects).
+string last;
+void catch_tell(string msg) { last = msg; }
+string last_message() { return last; }
+// move_object() moves current_object, so fixtures move themselves.
+void enter(object dest) { move_object(dest); }
+// tell_room() delivers only to living objects.
+void make_living() { enable_commands(); }

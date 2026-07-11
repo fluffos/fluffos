@@ -11,23 +11,23 @@ typedef struct {
   uint32_t ref;
 } refed_t;
 
-typedef const char *LPC_STRING;
+typedef const char* LPC_STRING;
 union u {
   LPC_INT number;
   LPC_FLOAT real;
   LPC_STRING string;
 
-  refed_t *refed; /* any of the block below */
+  refed_t* refed; /* any of the block below */
 
-  struct buffer_t *buf;
-  struct object_t *ob;
-  struct array_t *arr;
-  struct mapping_t *map;
-  struct funptr_t *fp;
+  struct buffer_t* buf;
+  struct object_t* ob;
+  struct array_t* arr;
+  struct mapping_t* map;
+  struct funptr_t* fp;
 
-  struct svalue_t *lvalue;
-  struct ref_t *ref;
-  unsigned char *lvalue_byte;
+  struct svalue_t* lvalue;
+  struct ref_t* ref;
+  unsigned char* lvalue_byte;
   void (*error_handler)(void);
 };
 
@@ -46,8 +46,8 @@ struct ref_t {
   uint32_t ref;
 
   struct ref_t *next, *prev;
-  struct control_stack_t *csp;
-  svalue_t *lvalue;
+  struct control_stack_t* csp;
+  svalue_t* lvalue;
   svalue_t sv;
 };
 
@@ -97,9 +97,9 @@ struct ref_t {
 
 /* utility function for manipulating svalues */
 
-void copy_some_svalues(svalue_t *, svalue_t *, int);
-void assign_svalue(svalue_t *, svalue_t *);
-void assign_svalue_no_free(svalue_t *, svalue_t *);
+void copy_some_svalues(svalue_t*, svalue_t*, int);
+void assign_svalue(svalue_t*, svalue_t*);
+void assign_svalue_no_free(svalue_t*, svalue_t*);
 
 #ifdef DEBUG
 #define free_svalue(x, y) int_free_svalue(x, y)
@@ -117,13 +117,13 @@ extern svalue_t const0, const1, const0u;
 #define EXTEND_SVALUE_STRING(x, y, z)                                                             \
   SAFE({                                                                                          \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                             \
-    char *ess_res;                                                                                \
+    char* ess_res;                                                                                \
     int ess_len;                                                                                  \
     int ess_r;                                                                                    \
     ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y);                                             \
     if (ess_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
-      ess_res = (char *)extend_string((x)->u.string, ess_len);                                    \
+      ess_res = (char*)extend_string((x)->u.string, ess_len);                                     \
       if (!ess_res) fatal("Out of memory!\n");                                                    \
       strcpy(ess_res + ess_r, (y));                                                               \
     } else {                                                                                      \
@@ -140,7 +140,7 @@ extern svalue_t const0, const1, const0u;
 #define SVALUE_STRING_ADD_LEFT(y, z)                                                              \
   SAFE({                                                                                          \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                             \
-    char *pss_res;                                                                                \
+    char* pss_res;                                                                                \
     int pss_r;                                                                                    \
     int pss_len;                                                                                  \
     pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));                                            \
@@ -158,19 +158,19 @@ extern svalue_t const0, const1, const0u;
 #define SVALUE_STRING_JOIN(x, y, z)                                                               \
   SAFE({                                                                                          \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                             \
-    char *ssj_res;                                                                                \
+    char* ssj_res;                                                                                \
     int ssj_r;                                                                                    \
     int ssj_len;                                                                                  \
     ssj_r = SVALUE_STRLEN(x);                                                                     \
     ssj_len = ssj_r + SVALUE_STRLEN(y);                                                           \
     if (ssj_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
-      ssj_res = (char *)extend_string((x)->u.string, ssj_len);                                    \
+      ssj_res = (char*)extend_string((x)->u.string, ssj_len);                                     \
       if (!ssj_res) fatal("Out of memory!\n");                                                    \
       (void)strcpy(ssj_res + ssj_r, (y)->u.string);                                               \
       free_string_svalue(y);                                                                      \
     } else {                                                                                      \
-      ssj_res = (char *)new_string(ssj_len, z);                                                   \
+      ssj_res = (char*)new_string(ssj_len, z);                                                    \
       strcpy(ssj_res, (x)->u.string);                                                             \
       strcpy(ssj_res + ssj_r, (y)->u.string);                                                     \
       free_string_svalue(y);                                                                      \
@@ -181,6 +181,6 @@ extern svalue_t const0, const1, const0u;
   })
 
 // Translate svalue into json summary, only suitable for
-json svalue_to_json_summary(const svalue_t *obj, int depth = 0);
+json svalue_to_json_summary(const svalue_t* obj, int depth = 0);
 
 #endif /* LPC_SVALUE_H */

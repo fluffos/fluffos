@@ -1,0 +1,14 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    buffer b = ffi_alloc(8);
+    ffi_write(b, 0, FFI_INT32, 0x41424344);
+    ASSERT(ffi_read(b, 0, FFI_INT32) != 0);
+    ffi_free(b);
+    // Freeing zeroes the block (defensive) but the buffer is still valid.
+    ASSERT_EQ(0, ffi_read(b, 0, FFI_INT32));
+#endif
+    ASSERT(1);
+}

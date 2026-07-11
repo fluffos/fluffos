@@ -12,8 +12,8 @@
 /*
  * Check that it is an legal path. No '..' are allowed.
  */
-int legal_path(const char *path) {
-  const char *p;
+int legal_path(const char* path) {
+  const char* p;
 
   if (path == nullptr) {
     return 0;
@@ -35,7 +35,7 @@ int legal_path(const char *path) {
         return 0; /* check for `./', `..', or `../' */
       }
     }
-    p = const_cast<char *>(strstr(p, "/.")); /* search next component */
+    p = const_cast<char*>(strstr(p, "/.")); /* search next component */
     if (p) {
       p++; /* step over `/' */
     }

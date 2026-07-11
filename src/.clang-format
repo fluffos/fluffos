@@ -3,6 +3,11 @@
 BasedOnStyle: Google
 IndentWidth: 2
 SortIncludes: Never
+# Pin pointer alignment so the style is reproducible across clang-format
+# versions. Google's default relies on DerivePointerAlignment (which infers
+# per-file and drifted between versions); fix it to `type* name` explicitly.
+DerivePointerAlignment: false
+PointerAlignment: Left
 ---
 Language: Cpp
 ColumnLimit: 100

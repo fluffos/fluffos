@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / input_to
 ---
 # input_to
@@ -11,7 +10,7 @@ title: interactive / input_to
 
 ### SYNOPSIS
 
-    varargs void input_to( string | function fun, int flag, ... );
+    varargs int input_to( string | function fun, int flag, ... );
 
 ### DESCRIPTION
 

@@ -1,0 +1,3 @@
+// Twin of dual_retry_child.c (see there); must NOT be picked when the
+// ".c" spelling is requested explicitly.
+string which() { return "lpc"; }

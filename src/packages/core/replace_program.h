@@ -1,16 +1,17 @@
 #ifndef _REPLACE_PROGRAM_H_
 #define _REPLACE_PROGRAM_H_
 
-int replace_program_pending(object_t *);
+int replace_program_pending(object_t*);
+void cancel_pending_replace_program(object_t*);
 void replace_programs(void);
 
 typedef struct replace_ob_s {
-  object_t *ob;
-  program_t *new_prog;
+  object_t* ob;
+  program_t* new_prog;
   unsigned short var_offset;
-  struct replace_ob_s *next;
+  struct replace_ob_s* next;
 } replace_ob_t;
 
-extern replace_ob_t *obj_list_replace;
+extern replace_ob_t* obj_list_replace;
 
 #endif

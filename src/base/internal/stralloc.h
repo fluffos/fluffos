@@ -9,15 +9,15 @@
 #include <sstream>  // for std::stringstream
 
 #ifdef DEBUGMALLOC
-char *int_string_copy(const char *const, const char *);
-char *int_string_unlink(const char *, const char *);
-char *int_new_string(unsigned int, const char *);
-char *int_alloc_cstring(const char *, const char *);
+char* int_string_copy(const char* const, const char*);
+char* int_string_unlink(const char*, const char*);
+char* int_new_string(unsigned int, const char*);
+char* int_alloc_cstring(const char*, const char*);
 #else
-char *int_string_copy(const char *const);
-char *int_string_unlink(const char *);
-char *int_new_string(unsigned int);
-char *int_alloc_cstring(const char *);
+char* int_string_copy(const char* const);
+char* int_string_unlink(const char*);
+char* int_new_string(unsigned int);
+char* int_alloc_cstring(const char*);
 #endif
 
 #ifdef DEBUGMALLOC
@@ -61,7 +61,7 @@ void bp(void);
 
    is usually best.
  */
-void check_string_stats(outbuffer_t *);
+void check_string_stats(outbuffer_t*);
 #undef CHECK_STRING_STATS
 // #define CHECK_STRING_STATS check_string_stats(nullptr)  // enable when need to debug
 #define CHECK_STRING_STATS
@@ -89,7 +89,7 @@ void check_string_stats(outbuffer_t *);
 
 // The layout of malloc_block_s must be same as block_s
 typedef struct malloc_block_s {
-  void *_padding1;
+  void* _padding1;
   unsigned int _padding2;
 #ifdef DEBUGMALLOC_EXTENSIONS
   unsigned int extra_ref;
@@ -98,7 +98,7 @@ typedef struct malloc_block_s {
   unsigned short ref;
 } malloc_block_t;
 
-#define MSTR_BLOCK(x) (((malloc_block_t *)(x)) - 1)
+#define MSTR_BLOCK(x) (((malloc_block_t*)(x)) - 1)
 #define MSTR_EXTRA_REF(x) (MSTR_BLOCK(x)->extra_ref)
 #define MSTR_REF(x) (MSTR_BLOCK(x)->ref)
 #define MSTR_SIZE(x) (MSTR_BLOCK(x)->size)
@@ -126,13 +126,15 @@ typedef struct malloc_block_s {
 /* ref == 0 means the string has been referenced USHRT_MAX times and is
    immortal */
 #define INC_COUNTED_REF(x) \
-  if (MSTR_REF(x)) { MSTR_REF(x)++; }
+  if (MSTR_REF(x)) {       \
+    MSTR_REF(x)++;         \
+  }
 /* This is a conditional expression that evaluates to zero if the block
    should be deallocated */
 #define DEC_COUNTED_REF(x) (!(MSTR_REF(x) == 0 || --MSTR_REF(x) > 0))
 
 typedef struct block_s {
-  struct block_s *next; /* next block in the hash chain */
+  struct block_s* next; /* next block in the hash chain */
   unsigned int hash;
 #if defined(DEBUGMALLOC_EXTENSIONS)  //|| (SIZEOF_CHAR_P == 8)
   unsigned int extra_ref;
@@ -150,8 +152,8 @@ static_assert(sizeof(malloc_block_t) == sizeof(block_t),
 #define EXTRA_REF(x) (x)->extra_ref
 #define SIZE(x) (x)->size
 #define HASH(x) (x)->hash
-#define BLOCK(x) (((block_t *)(x)) - 1) /* pointer arithmetic */
-#define STRING(x) ((char *)(x + 1))
+#define BLOCK(x) (((block_t*)(x)) - 1) /* pointer arithmetic */
+#define STRING(x) ((char*)(x + 1))
 
 #define SHARED_STRLEN(x) COUNTED_STRLEN(x)
 
@@ -167,20 +169,20 @@ static_assert(sizeof(malloc_block_t) == sizeof(block_t),
  * stralloc.c
  */
 void init_strings(void);
-const char *findstring(const char *);
-const char *int_make_shared_string(const char *, const char *);
-const char *int_ref_string(const char *, const char *);
+const char* findstring(const char*);
+const char* int_make_shared_string(const char*, const char*);
+const char* int_ref_string(const char*, const char*);
 #define ref_string(x) int_ref_string(x, __CURRENT_FILE_LINE__)
-void int_free_string(const char *, const char *);
+void int_free_string(const char*, const char*);
 #define free_string(x) int_free_string(x, __CURRENT_FILE_LINE__)
-void deallocate_string(char *);
-uint64_t add_string_status(outbuffer_t *, int);
+void deallocate_string(char*);
+uint64_t add_string_status(outbuffer_t*, int);
 
-char *extend_string(const char *, int);
+char* extend_string(const char*, int);
 
 extern unsigned int svalue_strlen_size;
 
 #define make_shared_string(s) int_make_shared_string(s, __CURRENT_FILE_LINE__)
-void stralloc_print_entry(std::stringstream &ss, block_t* entry);
-void dump_stralloc(outbuffer_t *out);
+void stralloc_print_entry(std::stringstream& ss, block_t* entry);
+void dump_stralloc(outbuffer_t* out);
 #endif

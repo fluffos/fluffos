@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: calls / call_out_walltime
 ---
 # call_out_walltime

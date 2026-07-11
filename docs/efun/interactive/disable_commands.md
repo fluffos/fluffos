@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / disable_commands
 ---
 # disable_commands
@@ -10,16 +9,15 @@ title: interactive / disable_commands
 
 ### SYNOPSIS
 
-    int disable_commands( void );
+    void disable_commands();
 
 ### DESCRIPTION
 
     Makes a living object non-living, that is, add_actions have no effects,
     livingp returns false, and, if the object is interactive, disallows the
-    user  to type in commands other than for an input_to.  disable_commands
-    always returns 0.
+    user to type in commands other than for an input_to.
 
-    calling disable_commands() also have side-effct of clearing all actions
+    calling disable_commands() also has the side-effect of clearing all actions
     previously  added  by  other  object,  it also removes actions that was
     defined by this object.
 

@@ -1,0 +1,7 @@
+void do_tests() {
+#ifdef __DWLIB__
+    catch(reference_allowed(this_object()));
+    ASSERT(1);
+#endif
+    ASSERT(1);
+}

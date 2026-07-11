@@ -1,0 +1,2 @@
+// Fixture for /single/tests/efuns/replace_program.lpc.
+string pwhich() { return "parent"; }

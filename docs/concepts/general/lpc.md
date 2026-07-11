@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / lpc
 ---
 # lpc
@@ -73,3 +72,20 @@ not be pointers (since LPC does not have the explicit pointer data type). Also,
 expect. In C, the first word of `arg` would be copied into `str1` and the
 second word of `arg` into `str2`. In LPC, the first word is copied into `str1`
 and the _remainder_ of `arg` is copied into `str2`.
+
+## Modern mapping access
+
+FluffOS adds dot access and optional chaining for mappings to reduce bracket noise:
+
+- Direct dot access works on string keys: `m.key` is equivalent to `m["key"]`.
+  Mixed forms work too, e.g. `m.key["deep"]` or `m["key"].deep`.
+- Optional chaining for mappings short-circuits missing values to `undefined`:
+  `m?.key?.deep` and `m?.["key"]?.deep`. Reads return `undefined` instead of
+   an error when an intermediate step is missing or zero.
+- Standard bracket semantics remain: writing through a missing base (e.g.
+  `m["missing"]["deep"] = 1`) still errors, and optional chaining is for reads
+  only.
+- Optional chaining on bracket index is supported: `m?.[1]`, `m?.[this_player()]`.
+
+These features currently apply to mappings; class/object member access remains
+unchanged.

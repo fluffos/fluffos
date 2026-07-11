@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / move_object
 ---
 # move_object

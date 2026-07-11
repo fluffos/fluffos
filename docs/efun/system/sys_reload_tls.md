@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / sys_reload_tls
 ---
 # sys_reload_tls
@@ -22,3 +21,5 @@ title: system / sys_reload_tls
     Note:
       - you have to overwrite the previous cert/key file on disk before calling this function.
       - reloading TLS for websocket port is not currently supported.
+      - not available on the WebAssembly target (the page terminates TLS
+        there; the efun does not exist -- guard with `#ifndef __WASM__`).

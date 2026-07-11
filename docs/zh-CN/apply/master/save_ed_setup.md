@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / save_ed_setup
 ---
 # save_ed_setup

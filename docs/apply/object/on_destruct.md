@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: object / on_destruct
 ---
 # on_destruct

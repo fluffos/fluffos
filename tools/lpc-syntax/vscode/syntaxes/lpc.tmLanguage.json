@@ -1,0 +1,204 @@
+{
+  "$comment": "GENERATED from lpc-grammar.json by generate_ebnf.py (CMake target generate_ebnf) -- do not edit by hand.",
+  "name": "LPC",
+  "scopeName": "source.lpc",
+  "fileTypes": [
+    "lpc"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#textblock"
+    },
+    {
+      "include": "#template"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#chars"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#functional"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#modifiers"
+    },
+    {
+      "include": "#dollar-params"
+    },
+    {
+      "include": "#function-call"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.lpc",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.lpc",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "preprocessor": {
+      "name": "meta.preprocessor.lpc",
+      "begin": "^\\s*(#\\s*[A-Za-z_]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.lpc"
+        }
+      },
+      "end": "(?<!\\\\)$",
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "name": "string.quoted.other.include.lpc",
+          "match": "<[^>\\n]*>"
+        },
+        {
+          "include": "#numbers"
+        },
+        {
+          "name": "constant.character.escape.line-continuation.lpc",
+          "match": "\\\\$"
+        }
+      ]
+    },
+    "textblock": {
+      "name": "string.unquoted.textblock.lpc",
+      "begin": "(@@?)([A-Za-z_][A-Za-z0-9_]*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.operator.textblock.lpc"
+        },
+        "2": {
+          "name": "constant.other.terminator.lpc"
+        }
+      },
+      "end": "^\\2(?![A-Za-z0-9_])",
+      "endCaptures": {
+        "0": {
+          "name": "constant.other.terminator.lpc"
+        }
+      }
+    },
+    "template": {
+      "name": "string.interpolated.lpc",
+      "begin": "`",
+      "end": "`",
+      "patterns": [
+        {
+          "name": "constant.character.escape.lpc",
+          "match": "\\\\."
+        },
+        {
+          "name": "meta.embedded.interpolation.lpc",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.begin.lpc"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.end.lpc"
+            }
+          },
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.lpc",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.lpc",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "chars": {
+      "name": "constant.character.lpc",
+      "match": "'(\\\\.|[^'\\\\])'"
+    },
+    "numbers": {
+      "name": "constant.numeric.lpc",
+      "match": "\\b(0[xX][0-9A-Fa-f_]+|0[bB][01_]+|[0-9][0-9_]*(\\.(?!\\.)[0-9_]*)?([eE][+-]?[0-9][0-9_]*)?)"
+    },
+    "functional": {
+      "patterns": [
+        {
+          "name": "keyword.operator.functional.lpc",
+          "match": "\\(:"
+        },
+        {
+          "name": "keyword.operator.functional.lpc",
+          "match": ":\\)"
+        }
+      ]
+    },
+    "keywords": {
+      "name": "keyword.control.lpc",
+      "match": "\\b(time_expression|parse_command|__TREE__|continue|default|foreach|inherit|return|sscanf|switch|array|break|catch|class|while|case|efun|else|for|new|ref|do|if|in)\\b"
+    },
+    "types": {
+      "name": "storage.type.lpc",
+      "match": "\\b(function|mapping|buffer|object|string|float|mixed|void|int)\\b"
+    },
+    "modifiers": {
+      "name": "storage.modifier.lpc",
+      "match": "\\b(protected|private|varargs|nomask|nosave|public|static)\\b"
+    },
+    "dollar-params": {
+      "name": "variable.parameter.positional.lpc",
+      "match": "\\$[0-9]+"
+    },
+    "function-call": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": {
+          "name": "entity.name.function.lpc"
+        }
+      }
+    },
+    "operators": {
+      "name": "keyword.operator.lpc",
+      "match": "<<=|\\.\\.\\.|\\&\\&=|>>=|\\|\\|=|\\?\\?=|\\?\\.|\\^=|\\+=|\\|=|\\(:|\\->|\\.\\?|==|\\&=|:\\)|>>|<=|!=|\\|\\||\\*=|\\-=|::|<<|\\?\\?|\\-\\-|\\&\\&|\\+\\+|/=|>=|\\.\\.|%=|=|>"
+    }
+  }
+}

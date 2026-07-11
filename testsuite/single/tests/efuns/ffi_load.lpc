@@ -1,0 +1,18 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    // Empty path -> the driver's own libc/libm symbols (portable handle).
+    int lib = ffi_load("");
+    if (lib <= 0) { ASSERT(1); return; }   // FFI unreachable on this platform
+    ASSERT(lib > 0);
+    ffi_unload(lib);
+    // A nonexistent library returns 0 and sets ffi_error().
+    ASSERT_EQ(0, ffi_load("/no/such/library.so.999"));
+    ASSERT(strlen(ffi_error()) > 0);
+    // The master's valid_ffi denies a sentinel path -> error.
+    ASSERT(catch(ffi_load("DENY_ME.so")));
+#endif
+    ASSERT(1);
+}

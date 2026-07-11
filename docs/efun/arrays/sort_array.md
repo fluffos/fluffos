@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: arrays / sort_array
 ---
 # sort_array

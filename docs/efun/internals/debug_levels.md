@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / debug_levels
 ---
 # debug_levels

@@ -2,381 +2,206 @@
 
 #include "scratchpad.h"
 
-#include <cstdlib>
+#include <new>
 
-// FIXME: figure out where this is
-extern void yywarn(const char *, ...);
+#include "base/internal/outbuf.h"
 
 /*
- * This is a first attempt at beating malloc() for allocation of strings
- * during compilation.  It's pretty general, and could probably be done
- * better.
+ * Monotonic bump arena. See scratchpad.h for the contract.
  *
- * Here's what we can assume:
- * Things are going to conform to LIFO order, more or less.
- * Strings will be of the long variety and the short variety.
- * A realloc on strings might be nice, for "a" "b" "c" ... etc
+ * A singly-linked list of chunks (newest = `cur`, linked via `prev`).
+ * Allocation bumps `cur->used`; deallocation is a no-op (header inline);
+ * scratch_destroy frees every overflow chunk and resets the persistent
+ * base chunk, so back-to-back small compiles never touch malloc.
  *
- * Although in rare cases (errors) certain items won't come off until the
- * table is destroyed.
+ * Allocations never span a chunk: a request that doesn't fit the current
+ * chunk starts a new one (exact-fit when larger than the default chunk
+ * payload, so one huge string doesn't strand a huge tail).
+ *
+ * Everything here is POD static state -- nothing has a destructor, so
+ * arena-backed objects living in static/exit-scope storage can safely
+ * run THEIR destructors (no-op deallocate) in any order at process exit.
  */
-/* Here is what is currently being used:
- *
- * <0> <0> string1 <len1> string2 <len2>
- *                        ^          ^
- *                        last      tail
- *
- * len1 is the length of string1 including the zero at the end
- *
- * Note: "" looks a heck of a lot like a interior freed string.  Currently,
- * we ignore the problem.  In some cases, it could be left dangling, but
- * I don't think that can happen with the present grammar/use of the
- * scratchpad.
- */
-/*
- *  Todo: This algorithm might be faster if we aligned to 2 byte
- *  boundaries and used shorts for lengths.  We wouldn't have to
- *  worry about the 256 byte limit then
- */
-/*
- * Within this file, a capitalized identifier is that var cast to an
- * unsigned type.  It makes things easier to read than having casts
- * all over the place since we go back and forth a lot.  strict ANSI
- * requires casts from (unsigned char *) to (char *) and back, but
- * we want to deal with strings as unsigned since we keep the length
- * in them.
- */
-#define Str ((unsigned char *)str)
-#define Ptr ((unsigned char *)ptr)
-#define Res ((unsigned char *)res)
-#define S1 ((unsigned char *)s1)
-#define S2 ((unsigned char *)s2)
-#define Scratch_large_alloc(x) ((unsigned char *)scratch_large_alloc(x))
-#define Strlen(x) (strlen((char *)x))
-#define Strcpy(x, y) (strcpy((char *)x, (char *)y))
-#define Strncpy(x, y, z) (strncpy((char *)x, (char *)y, z))
 
-/* not strictly ANSI, but should always work ... */
-#define HDR_SIZE ((char *)&scratch_head.block[2] - (char *)&scratch_head)
-#define FIND_HDR(x) ((sp_block_t *)(x - HDR_SIZE))
-#define SIZE_WITH_HDR(x) (x + HDR_SIZE)
+namespace {
 
-static unsigned char scratchblock[SCRATCHPAD_SIZE];
-static sp_block_t scratch_head = {nullptr, nullptr};
-unsigned char *scr_last = &scratchblock[2], *scr_tail = &scratchblock[2];
-unsigned char *scratch_end = scratchblock + SCRATCHPAD_SIZE;
+// Production geometry: a 1MB buffer covers virtually every compile in a
+// single chunk (the 206KB bench program uses ~700KB of transients).
+constexpr std::size_t kBaseSize = std::size_t{1024} * 1024;  // persistent chunk 0
+constexpr int kMaxRetained = 8;  // 8 x 1MB warm ceiling, retained across compiles
 
-#if 0
-static void scratch_summary(void);
+// Runtime-adjustable so tests/benchmarks can force the WORST CASE
+// (e.g. 400-byte chunks: constant advances, every big string oversize).
+// Read only on the spill/oversize paths plus one compare per allocation.
+std::size_t chunk_payload = kBaseSize;
 
-static void scratch_summary()
-{
-  unsigned char *p = scratchblock;
-  int i;
+struct Chunk {
+  std::size_t cap;       // payload capacity in bytes
+  std::size_t used;      // bytes handed out
+  Chunk* next_overflow;  // intrusive list link (overflow chunks only)
+  std::size_t pad_;      // keeps data() max_align_t (16-byte) aligned
+  char* data() { return reinterpret_cast<char*>(this) + sizeof(Chunk); }
+};
+static_assert(sizeof(Chunk) % 16 == 0, "chunk payload must stay 16-byte aligned");
 
-  while (p <= scr_tail) {
-    if (*p == 0) { printf("0"); }
-    else if (*p < 32 || *p > 127) { printf("*"); }
-    else { printf("%c", *p); }
-    p++;
+// Deque-style chunk management (all POD statics -- no destructors, so
+// arena-backed objects in exit-scope storage can deallocate in any order
+// at process exit):
+//
+//   chunks[0..chunk_count)  standard-size chunks RETAINED across
+//                           compiles; chunks[0] is the persistent static
+//                           block. The bump cursor walks this array and
+//                           reset is just "cursor back to slot 0" -- the
+//                           tail of the array IS the warm cache, with no
+//                           separate parking list. A long-lived driver
+//                           reaches chunk_count == its peak demand and
+//                           never mallocs again (scratch_stats proves it).
+//   overflow chunks         everything past the retained ceiling and all
+//                           oversize exact-fit requests; freed at every
+//                           reset (retaining arbitrary amounts would pin
+//                           unbounded memory). cur_overflow is the active
+//                           bump target once the retained array is full.
+alignas(std::max_align_t) unsigned char base_storage[sizeof(Chunk) + kBaseSize];
+Chunk* chunks[kMaxRetained];
+int chunk_count = 0;
+int cur_index = 0;
+Chunk* overflow = nullptr;      // intrusive list of this cycle's overflow chunks
+Chunk* cur_overflow = nullptr;  // active overflow chunk (null = bump the array)
+Chunk* active = nullptr;        // THE bump target (cache of cur_overflow ?: chunks[cur_index])
+
+// Observability counters (scratch_stats / scratchpad_status).
+std::size_t cycle_bytes = 0;
+std::size_t peak_cycle_bytes = 0;
+std::size_t chunk_mallocs = 0;
+std::size_t reset_count = 0;
+
+void ensure_init() {
+  if (chunk_count == 0) {
+    Chunk* b = reinterpret_cast<Chunk*>(base_storage);
+    b->cap = chunk_payload < kBaseSize ? chunk_payload : kBaseSize;
+    b->used = 0;
+    b->next_overflow = nullptr;
+    chunks[0] = b;
+    chunk_count = 1;
+    cur_index = 0;
+    active = b;
   }
-  printf("\n");
-  i = scr_last - scratchblock;
-  while (i--) { printf(" "); }
-  printf("l\n");
-  i = scr_tail - scratchblock;
-  while (i--) { printf(" "); }
-  printf("t\n");
 }
-#endif
+
+inline std::size_t align_up(std::size_t n, std::size_t align) {
+  return (n + align - 1) & ~(align - 1);
+}
+
+Chunk* new_chunk(std::size_t cap) {
+  // DMALLOC with the dedicated TAG_SCRATCHPAD: chunks are visible to the
+  // driver's memory accounting, and check_all_blocks whitelists the tag
+  // (retained-across-compiles is by design, not a leak).
+  Chunk* c =
+      reinterpret_cast<Chunk*>(DMALLOC(sizeof(Chunk) + cap, TAG_SCRATCHPAD, "scratchpad chunk"));
+  c->cap = cap;
+  c->used = 0;
+  c->next_overflow = nullptr;
+  chunk_mallocs++;
+  return c;
+}
+
+}  // namespace
+
+void* scratch_raw_allocate(std::size_t bytes, std::size_t align) {
+  ensure_init();
+  Chunk* c = active;
+  std::size_t off = align_up(c->used, align);
+  if (off + bytes > c->cap) {
+    if (bytes > chunk_payload) {
+      // Oversize: its own exact-fit overflow chunk, filled completely.
+      // The active bump chunk is left untouched for later requests.
+      Chunk* big = new_chunk(bytes);
+      big->next_overflow = overflow;
+      overflow = big;
+      big->used = bytes;
+      cycle_bytes += bytes;
+      return big->data();
+    }
+    if (cur_overflow == nullptr && cur_index + 1 < chunk_count) {
+      c = chunks[++cur_index];  // warm reuse: next retained chunk
+      c->used = 0;
+    } else if (cur_overflow == nullptr && chunk_count < kMaxRetained) {
+      c = chunks[chunk_count] = new_chunk(chunk_payload);
+      cur_index = chunk_count++;
+    } else {
+      // Retained ceiling reached: bump from overflow chunks for the rest
+      // of this cycle (freed at reset).
+      c = new_chunk(chunk_payload);
+      c->next_overflow = overflow;
+      overflow = c;
+      cur_overflow = c;
+    }
+    active = c;
+    off = align_up(c->used, align);
+  }
+  char* p = c->data() + off;
+  c->used = off + bytes;
+  cycle_bytes += bytes;
+  return p;
+}
 
 void scratch_destroy() {
-  sp_block_t *next, *thisb = scratch_head.next;
-
-  SDEBUG(printf("scratch_destroy\n"));
-
-  while (thisb) {
-    next = thisb->next;
-    FREE(thisb);
-    thisb = next;
+  ensure_init();
+  while (overflow != nullptr) {
+    Chunk* next = overflow->next_overflow;
+    FREE(overflow);
+    overflow = next;
   }
-  scratch_head.next = nullptr;
-  scr_last = &scratchblock[2];
-  scr_tail = &scratchblock[2];
+  cur_overflow = nullptr;
+  cur_index = 0;
+  chunks[0]->used = 0;
+  active = chunks[0];
+  if (cycle_bytes > peak_cycle_bytes) peak_cycle_bytes = cycle_bytes;
+  cycle_bytes = 0;
+  reset_count++;
 }
 
-char *scratch_copy(const char *str) {
-  unsigned char *from, *to, *end;
-
-  SDEBUG2(printf("scratch_copy(%s):", str));
-
-  /* first, take a wild guess that there is room and save a strlen() :) */
-  from = Str;
-  to = scr_tail + 1;
-  end = scratch_end - 2; /* room for zero and len */
-  if (end > to + 255) {
-    end = to + 255;
-  }
-  while (*from && to < end) {
-    *to++ = *from++;
-  }
-  if (!(*from)) {
-    SDEBUG2(printf(" on scratchpad\n"));
-
-    scr_last = scr_tail + 1;
-    *to++ = 0;
-    scr_tail = to;
-    *to = to - scr_last;
-    return reinterpret_cast<char *>(scr_last);
-  }
-  SDEBUG(printf(" mallocing ... "));
-
-  /* ACK! no room. strlen(str) == (from - str) + strlen(from) */
-  to = Scratch_large_alloc((from - Str) + Strlen(from) + 1);
-  Strcpy(to, str);
-  return reinterpret_cast<char *>(to);
+void scratch_set_chunk_size_for_testing(std::size_t payload) {
+  // Test/bench knob: shrink chunks to force worst-case behavior
+  // (constant advances, oversize spills). Retained chunks of the OLD
+  // size are dropped so the new geometry applies uniformly; chunk 0's
+  // capacity is clamped to its static storage.
+  scratch_destroy();
+  for (int i = 1; i < chunk_count; i++) FREE(chunks[i]);
+  chunk_count = 0;
+  chunk_payload = payload;
+  ensure_init();
+  active = chunks[0];
 }
 
-void scratch_free(char *ptr) {
-  /* how do we know what this is?  first we check if it's the last string
-     we made.  Otherwise, take advantage of the fact that things on the
-     scratchpad have a zero two before them.  Things not on it wont
-     (we make sure of this) */
-
-  SDEBUG2(printf("scratch_free(%s): ", ptr));
-
-  if (Ptr == scr_last) {
-    SDEBUG2(printf("last freed\n"));
-    scratch_free_last();
-  } else if (*(Ptr - 2)) {
-    sp_block_t *sbt;
-
-    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_free called on non-scratchpad string.\n");
-    SDEBUG(printf("block freed\n"));
-    sbt = FIND_HDR(ptr);
-    if (sbt->prev) {
-      sbt->prev->next = sbt->next;
-    }
-    if (sbt->next) {
-      sbt->next->prev = sbt->prev;
-    }
-    FREE(sbt);
-  } else {
-    SDEBUG(printf("interior free\n"));
-    *ptr = 0; /* mark it as freed */
-  }
+ScratchStats scratch_stats() {
+  return ScratchStats{cycle_bytes, peak_cycle_bytes, chunk_mallocs, reset_count, chunk_count};
 }
 
-char *scratch_large_alloc(int size) {
-  sp_block_t *spt;
-
-  SDEBUG(printf("scratch_large_alloc(%i)\n", size));
-
-  spt = reinterpret_cast<sp_block_t *>(DMALLOC(SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_alloc"));
-  if ((spt->next = scratch_head.next)) {
-    spt->next->prev = spt;
+uint64_t scratchpad_status(outbuffer_t* out, int verbose) {
+  std::size_t retained = 0;
+  for (int i = 0; i < chunk_count; i++) retained += sizeof(Chunk) + chunks[i]->cap;
+  // chunk 0 is static storage, not heap.
+  std::size_t heap_retained = retained - (chunk_count > 0 ? sizeof(Chunk) + chunks[0]->cap : 0);
+  if (verbose == 1) {
+    outbuf_add(out, "compile scratchpad:\n");
+    outbuf_add(out, "-------------------------\n");
+    outbuf_addv(out,
+                "Retained chunks:\t\t%4d (%zu bytes, %zu heap)\nPeak compile bytes:\t%zu\n"
+                "Chunk mallocs:\t\t%zu\nCompiles (resets):\t%zu\n",
+                chunk_count, retained, heap_retained, peak_cycle_bytes, chunk_mallocs, reset_count);
+  } else if (verbose != -1) {
+    outbuf_addv(out, "compile scratchpad:\t\t\t%8zu %8zu\n", static_cast<std::size_t>(chunk_count),
+                retained);
   }
-  spt->prev = &scratch_head;
-  spt->block[0] = SCRATCH_MAGIC;
-  scratch_head.next = spt;
-  return &spt->block[2];
+  return heap_retained;
 }
 
-/* warning: unlike REALLOC(), this one only allows increases */
-char *scratch_realloc(char *ptr, int size) {
-  SDEBUG(printf("scratch_realloc(%s): ", ptr));
-
-  if (Ptr == scr_last) {
-    if (size < 256 && (scr_last + size) < scratch_end) {
-      SDEBUG(printf("on scratchpad\n"));
-      scr_tail = scr_last + size;
-      *scr_tail = size;
-      return ptr;
-    } else {
-      char *res;
-      SDEBUG(printf("copy off ... "));
-      res = scratch_large_alloc(size);
-      strcpy(res, ptr);
-      scratch_free_last();
-      return res;
-    }
-  } else if (*(Ptr - 2)) {
-    sp_block_t *sbt, *newsbt;
-
-    DEBUG_CHECK(*(Ptr - 2) != SCRATCH_MAGIC, "scratch_realloc on non-scratchpad string.\n");
-    SDEBUG(printf("block\n"));
-    sbt = FIND_HDR(ptr);
-    newsbt = reinterpret_cast<sp_block_t *>(
-        DREALLOC(sbt, SIZE_WITH_HDR(size), TAG_COMPILER, "scratch_realloc"));
-    newsbt->prev->next = newsbt;
-    if (newsbt->next) {
-      newsbt->next->prev = newsbt;
-    }
-    return &newsbt->block[2];
-  } else {
-    char *res;
-
-    SDEBUG(printf("interior ... "));
-    /* ACK!! it's in the middle. */
-    if (size < 256 && (scr_tail + size + 1) < scratch_end) {
-      SDEBUG(printf("move to end\n"));
-      scr_last = scr_tail + 1;
-      Strcpy(scr_last, ptr);
-      scr_tail = scr_last + size;
-      *scr_tail = size;
-      res = reinterpret_cast<char *>(scr_last);
-    } else {
-      SDEBUG(printf("copy off ... "));
-      res = scratch_large_alloc(size);
-      strcpy(res, ptr);
-    }
-    *ptr = 0; /* free the old version */
-    return res;
-  }
-}
-
-/* the routines above are better than this */
-char *scratch_alloc(int size) {
-  SDEBUG(printf("scratch_alloc(%i)\n", size));
-  if (size < 256 && (scr_tail + size + 1) < scratch_end) {
-    scr_last = scr_tail + 1;
-    scr_tail = scr_last + size;
-    *scr_tail = size;
-    return reinterpret_cast<char *>(scr_last);
-  } else {
-    return scratch_large_alloc(size);
-  }
-}
-
-char *scratch_join(char *s1, char *s2) {
-  char *res;
-  int tmp;
-
-  SDEBUG(printf("scratch_join\n"));
-  if (*(s1 - 2) || *(s2 - 2)) {
-    int l = strlen(s1);
-
-    DEBUG_CHECK(*(S1 - 2) && *(S1 - 2) != SCRATCH_MAGIC,
-                "argument 1 to scratch_join was not a scratchpad string.\n");
-    DEBUG_CHECK(*(S2 - 2) && *(S2 - 2) != SCRATCH_MAGIC,
-                "argument 2 to scratch_join was not a scratchpad string.\n");
-
-    res = scratch_realloc(s1, l + strlen(s2) + 1);
-    strcpy(res + l, s2);
-    scratch_free(s2);
-    return res;
-  } else {
-    /* This assumes that S1 and S2 were the last two things allocated.
-       Make sure this is true */
-    DEBUG_CHECK(S2 != scr_last, "Argument 2 to scratch_join was not the last allocated string.\n");
-    DEBUG_CHECK(S1 != (scr_last - 1 - (*(scr_last - 1))),
-                "Argument 1 to scratch_join was not the second to last "
-                "allocated string.\n");
-
-    if ((tmp = ((scr_tail - S1) - 2)) < 256) {
-      scr_tail = scr_last - 2;
-      do {
-        *scr_tail = *(scr_tail + 2);
-      } while (*scr_tail++);
-      *scr_tail = tmp;
-      scr_last = S1;
-      return s1;
-    } else {
-      char *ret = scratch_large_alloc(tmp);
-      strcpy(ret, s1);
-      strcpy(ret + (scr_last - S1) - 2, s2);
-      scratch_free(s1);
-      scratch_free(s2);
-      return ret;
-    }
-  }
-}
-
-char *scratch_copy_string(const char *s) {
-  int l;
-  unsigned char *to = scr_tail + 1;
-  char *res;
-
-  SDEBUG2(printf("scratch_copy_string\n"));
-  l = scratch_end - to;
-
-  if (l > 255) {
-    l = 255;
-  }
-  s++;
-  while (l--) {
-    if (*s == '\\') {
-      switch (*++s) {
-        case 'n':
-          *to++ = '\n';
-          break;
-        case 't':
-          *to++ = '\t';
-          break;
-        case 'r':
-          *to++ = '\r';
-          break;
-        case 'b':
-          *to++ = '\b';
-          break;
-        case '"':
-        case '\\':
-          *to++ = *s;
-          break;
-        default:
-          *to++ = *s;
-          yywarn("Unknown \\x char.");
-      }
-      s++;
-    } else if (*s == '"') {
-      *to++ = 0;
-      if (!l && (to == scratch_end)) {
-        res = scratch_large_alloc(to - scr_tail - 1);
-        Strcpy(res, scr_tail + 1);
-        return res;
-      }
-      scr_last = scr_tail + 1;
-      scr_tail = to;
-      *to = to - scr_last;
-      return reinterpret_cast<char *>(scr_last);
-    } else {
-      *to++ = *s++;
-    }
-  }
-  /* estimate the length we need */
-  /* Note that the last char is we read is ", not \0 - Sym */
-  res = scratch_large_alloc(to - scr_tail + strlen(s) - 1);
-  Strncpy(res, (scr_tail + 1), (to - scr_tail) - 1);
-  to = Res + (to - scr_tail) - 1;
-  for (;;) {
-    if (*s == '\\') {
-      switch (*++s) {
-        case 'n':
-          *to++ = '\n';
-          break;
-        case 't':
-          *to++ = '\t';
-          break;
-        case 'r':
-          *to++ = '\r';
-          break;
-        case 'b':
-          *to++ = '\b';
-          break;
-        case '"':
-        case '\\':
-          *to++ = *s;
-          break;
-        default:
-          *to++ = *s;
-          yywarn("Unknown \\x char.");
-      }
-      s++;
-    } else if (*s == '"') {
-      *to++ = 0;
-      return res;
-    } else {
-      *to++ = *s++;
-    }
-  }
+ScratchString* scratch_new_string(std::string_view sv) {
+  void* mem = scratch_raw_allocate(sizeof(ScratchString), alignof(ScratchString));
+  // Placement-new; deliberately never destructed. Both the object and its
+  // buffer (SSO bytes inside the object for short strings -- the common
+  // identifier case, one arena allocation total -- or a ScratchAllocator
+  // block) are arena memory, bulk-freed at scratch_destroy.
+  return new (mem) ScratchString(sv.data(), sv.size());
 }

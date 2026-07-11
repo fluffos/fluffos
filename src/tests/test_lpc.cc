@@ -47,9 +47,7 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
 TEST_F(DriverTest, TestInMemoryCompileFile) {
   program_t* prog = nullptr;
 
-  std::istringstream source("void test() {}");
-  auto stream = std::make_unique<IStreamLexStream>(source);
-  prog = compile_file(std::move(stream), "test");
+  prog = compile_file("void test() {}", "test");
 
   ASSERT_NE(prog, nullptr);
   deallocate_program(prog);
@@ -57,9 +55,7 @@ TEST_F(DriverTest, TestInMemoryCompileFile) {
 
 TEST_F(DriverTest, TestInMemoryCompileFileFail) {
   program_t* prog = nullptr;
-  std::istringstream source("aksdljfaljdfiasejfaeslfjsaef");
-  auto stream = std::make_unique<IStreamLexStream>(source);
-  prog = compile_file(std::move(stream), "test");
+  prog = compile_file("aksdljfaljdfiasejfaeslfjsaef", "test");
 
   ASSERT_EQ(prog, nullptr);
 }
@@ -120,35 +116,57 @@ void do_tests() {
     this_object()->test4(3, "bbb", 3);
 }
   )";
-  std::istringstream iss(source);
-  auto stream = std::make_unique<IStreamLexStream>(iss);
-  auto *prog = compile_file(std::move(stream), "test");
+  auto* prog = compile_file(source, "test");
 
   ASSERT_NE(prog, nullptr);
   dump_prog(prog, stdout, 1 | 2);
   deallocate_program(prog);
 }
 
-
 TEST_F(DriverTest, TestLPC_FunctionInherit) {
-    // Load the inherited object first
-    error_context_t econ{};
-    save_context(&econ);
-    try {
+  // Load the inherited object first
+  error_context_t econ{};
+  save_context(&econ);
+  try {
     auto obj = find_object("/single/tests/compiler/function");
-    ASSERT_NE(obj , nullptr);
+    ASSERT_NE(obj, nullptr);
 
     auto obj2 = find_object("/single/tests/compiler/function_inherit");
-    ASSERT_NE(obj2 , nullptr);
+    ASSERT_NE(obj2, nullptr);
 
     auto obj3 = find_object("/single/tests/compiler/function_inherit_2");
-    ASSERT_NE(obj3 , nullptr);
+    ASSERT_NE(obj3, nullptr);
 
     dump_prog(obj3->prog, stdout, 1 | 2);
-    } catch (...) {
-        restore_context(&econ);
-        FAIL();
-    }
-    pop_context(&econ);
+  } catch (...) {
+    restore_context(&econ);
+    FAIL();
+  }
+  pop_context(&econ);
+}
 
+// issue #968: with "reversible explode string" semantics, a string made
+// entirely of delimiters must still split into n+1 empty fields so that
+// implode(explode(s, d), d) == s.
+TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
+  array_t* v = explode_string("a", 1, "a", 1, true);
+  ASSERT_EQ(v->size, 2);
+  EXPECT_STREQ(v->item[0].u.string, "");
+  EXPECT_STREQ(v->item[1].u.string, "");
+  char* joined = implode_string(v, "a", 1);
+  EXPECT_STREQ(joined, "a");
+  FREE_MSTR(joined);
+  free_array(v);
+
+  v = explode_string("abab", 4, "ab", 2, true);
+  ASSERT_EQ(v->size, 3);
+  joined = implode_string(v, "ab", 2);
+  EXPECT_STREQ(joined, "abab");
+  FREE_MSTR(joined);
+  free_array(v);
+
+  // Non-reversible behavior is unchanged: no fields at all. (The result
+  // is the static the_null_array; nothing to free.)
+  v = explode_string("a", 1, "a", 1, false);
+  EXPECT_EQ(v->size, 0);
 }

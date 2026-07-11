@@ -44,10 +44,6 @@ FluffOS codebase contains three parts:
 - More strict type checking (optional)
 - libevent integration, epoll backend.
 
-## Demo
-
-    // TODO
-
 ## License & Copyright
 
 > Copyright 2019-2023 Yucong Sun

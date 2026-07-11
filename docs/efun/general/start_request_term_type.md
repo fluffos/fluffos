@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / start_request_term_type
 ---
 # start_request_term_type

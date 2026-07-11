@@ -6,7 +6,7 @@
 #ifndef COMM_H
 #define COMM_H
 
-#include <event2/util.h>
+#include "net/net_compat.h"
 
 /*
  * This macro is for testing whether ip is still valid, since many
@@ -41,38 +41,38 @@
  * comm.c
  */
 
-void add_vmessage(struct object_t *, const char *, ...);
-void add_message(struct object_t *, const char *, int);
+void add_vmessage(struct object_t*, const char*, ...);
+void add_message(struct object_t*, const char*, int);
 bool init_user_conn();
 void shutdown_external_ports();
-void set_prompt(const char *);
-void get_user_data(struct interactive_t *);
-int process_user_command(struct interactive_t *);
-int set_call(struct object_t *, struct sentence_t *, int);
-void remove_interactive(struct object_t *, int);
+void set_prompt(const char*);
+int process_user_command(struct interactive_t*);
+void comm_run_scheduled_command(struct interactive_t*);
+int set_call(struct object_t*, struct sentence_t*, int);
+void remove_interactive(struct object_t*, int);
 
-int flush_message(struct interactive_t *);
+int flush_message(struct interactive_t*);
 void flush_message_all();
 
-int query_idle(struct object_t *);
+int query_idle(struct object_t*);
 #ifndef NO_SNOOP
-int new_set_snoop(struct object_t *, struct object_t *);
-struct object_t *query_snoop(struct object_t *);
-struct object_t *query_snooping(struct object_t *);
+int new_set_snoop(struct object_t*, struct object_t*);
+struct object_t* query_snoop(struct object_t*);
+struct object_t* query_snooping(struct object_t*);
 #endif
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_iptable(void);
 #endif
 
-const char *sockaddr_to_string(const sockaddr *addr, ev_socklen_t len);
+const char* sockaddr_to_string(const sockaddr* addr, ev_socklen_t len);
 
-interactive_t *new_user(port_def_t *, evutil_socket_t, sockaddr *, ev_socklen_t);
-void on_user_logon(interactive_t *);
+void on_user_logon(interactive_t*);
 
-int cmd_in_buf(interactive_t *ip);
-void on_user_input(interactive_t *ip, const char *data, size_t len);
-void on_user_websocket_received(interactive_t *ip, const char *data, size_t len);
-void on_user_websocket_telnet_received(interactive_t *ip, const char *data, size_t len);
+int cmd_in_buf(interactive_t* ip);
+void on_user_input(interactive_t* ip, const char* data, size_t len);
+size_t comm_reserve_input_space(interactive_t* ip, size_t min_space);
+void comm_text_received(interactive_t* ip, const char* data, size_t len);
+void comm_telnet_received(interactive_t* ip, const char* data, size_t len);
 
 #endif /* COMM_H */

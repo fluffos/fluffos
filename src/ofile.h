@@ -1,11 +1,11 @@
 #pragma once
 
-#include <utility> // std::pair, std::make_pair
+#include <utility>  // std::pair, std::make_pair
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
 
-struct svalue_t; // forward declaration
+struct svalue_t;  // forward declaration
 
 class OFile {
  public:

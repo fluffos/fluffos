@@ -12,7 +12,11 @@
 #include <sstream>
 #include <unistd.h>
 #include <vector>
+#ifdef HAVE_ZLIB
 #include <zlib.h>
+#else
+typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
+#endif
 
 #include "applies_table.autogen.h"
 #include "base/internal/strutils.h"  // for startsWith, endsWith
@@ -39,16 +43,16 @@ namespace fs = ghc::filesystem;
 #define too_deep_save_error() \
   error("Mappings and/or arrays nested too deep (%d) for save_object\n", MAX_SAVE_SVALUE_DEPTH);
 
-object_t *previous_ob;
+object_t* previous_ob;
 
-static int restore_array(char **str, svalue_t * /*ret*/);
-static int restore_class(char **str, svalue_t * /*ret*/);
+static int restore_array(char** str, svalue_t* /*ret*/);
+static int restore_class(char** str, svalue_t* /*ret*/);
 
 #ifdef F_SET_HIDE
 int num_hidden = 0;
 
-int valid_hide(object_t *obj) {
-  svalue_t *ret;
+int valid_hide(object_t* obj) {
+  svalue_t* ret;
 
   if (!obj) {
     return 0;
@@ -60,12 +64,12 @@ int valid_hide(object_t *obj) {
 #endif
 
 int save_svalue_depth = 0, max_depth;
-int *sizes = nullptr;
+int* sizes = nullptr;
 
-int svalue_save_size(svalue_t *v) {
+int svalue_save_size(svalue_t* v) {
   switch (v->type) {
     case T_STRING: {
-      const char *cp = v->u.string;
+      const char* cp = v->u.string;
       char c;
       int size = 0;
 
@@ -79,7 +83,7 @@ int svalue_save_size(svalue_t *v) {
     }
 
     case T_ARRAY: {
-      svalue_t *sv = v->u.arr->item;
+      svalue_t* sv = v->u.arr->item;
       int i = v->u.arr->size, size = 0;
 
       if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
@@ -94,7 +98,7 @@ int svalue_save_size(svalue_t *v) {
     }
 
     case T_CLASS: {
-      svalue_t *sv = v->u.arr->item;
+      svalue_t* sv = v->u.arr->item;
       int i = v->u.arr->size, size = 0;
 
       if (++save_svalue_depth > MAX_SAVE_SVALUE_DEPTH) {
@@ -141,11 +145,11 @@ int svalue_save_size(svalue_t *v) {
   }
 }
 
-void save_svalue(svalue_t *v, char **buf) {
+void save_svalue(svalue_t* v, char** buf) {
   switch (v->type) {
     case T_STRING: {
-      char *cp = *buf;
-      const char *str = v->u.string;
+      char* cp = *buf;
+      const char* str = v->u.string;
       char c;
 
       *cp++ = '"';
@@ -165,7 +169,7 @@ void save_svalue(svalue_t *v, char **buf) {
 
     case T_ARRAY: {
       int i = v->u.arr->size;
-      svalue_t *sv = v->u.arr->item;
+      svalue_t* sv = v->u.arr->item;
 
       *(*buf)++ = '(';
       *(*buf)++ = '{';
@@ -181,7 +185,7 @@ void save_svalue(svalue_t *v, char **buf) {
 
     case T_CLASS: {
       int i = v->u.arr->size;
-      svalue_t *sv = v->u.arr->item;
+      svalue_t* sv = v->u.arr->item;
 
       *(*buf)++ = '(';
       *(*buf)++ = '/'; /* Why yes, this *is* a kludge! */
@@ -235,8 +239,8 @@ void save_svalue(svalue_t *v, char **buf) {
   }
 }
 
-static int restore_internal_size(const char **str, int is_mapping, int depth) {
-  const char *cp = *str;
+static int restore_internal_size(const char** str, int is_mapping, int depth) {
+  const char* cp = *str;
   int size = 0;
   char c, delim, toggle = 0;
 
@@ -292,7 +296,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = reinterpret_cast<int *>(
+            sizes = reinterpret_cast<int*>(
                 DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
@@ -316,7 +320,7 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
             while (max_depth <= depth) {
               max_depth <<= 1;
             }
-            sizes = reinterpret_cast<int *>(
+            sizes = reinterpret_cast<int*>(
                 DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
           } else if (depth >= max_depth) {
             while ((max_depth <<= 1) <= depth) {
@@ -355,8 +359,8 @@ static int restore_internal_size(const char **str, int is_mapping, int depth) {
   return 0;
 }
 
-static int restore_size(const char **str, int is_mapping) {
-  const char *cp = *str;
+static int restore_size(const char** str, int is_mapping) {
+  const char* cp = *str;
   int size = 0;
   char c, delim, toggle = 0;
 
@@ -451,8 +455,8 @@ static int restore_size(const char **str, int is_mapping) {
   return -1;
 }
 
-static int restore_interior_string(char **val, svalue_t *sv) {
-  char *cp = *val;
+static int restore_interior_string(char** val, svalue_t* sv) {
+  char* cp = *val;
   char *start = cp, *newstr;
   char c;
   int len;
@@ -465,7 +469,7 @@ static int restore_interior_string(char **val, svalue_t *sv) {
       }
 
       case '\\': {
-        char *news = cp - 1;
+        char* news = cp - 1;
 
         if ((*news++ = *cp++)) {
           while ((c = *cp++) != '"') {
@@ -522,8 +526,8 @@ static int restore_interior_string(char **val, svalue_t *sv) {
   return 0;
 }
 
-static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
-  char *cp = *cpp;
+static int parse_numeric(char** cpp, unsigned char c, svalue_t* dest) {
+  char* cp = *cpp;
   LPC_INT res_int = 0;
   LPC_FLOAT res_float = 0;
   int neg = 0;
@@ -624,7 +628,7 @@ static int parse_numeric(char **cpp, unsigned char c, svalue_t *dest) {
   }
 }
 
-static void add_map_stats(mapping_t *m, int count) {
+static void add_map_stats(mapping_t* m, int count) {
   total_mapping_nodes += count;
   total_mapping_size += count * sizeof(mapping_node_t);
 #ifdef PACKAGE_MUDLIB_STATS
@@ -633,19 +637,19 @@ static void add_map_stats(mapping_t *m, int count) {
   m->count = count;
 }
 
-static int restore_mapping(char **str, svalue_t *sv) {
+static int restore_mapping(char** str, svalue_t* sv) {
   int size, i, mask, count = 0;
   unsigned long oi;
   char c;
-  mapping_t *m;
+  mapping_t* m;
   svalue_t key, value;
   mapping_node_t **a, *elt, *elt2;
-  char *cp = *str;
+  char* cp = *str;
   int err;
 
   if (save_svalue_depth) {
     size = sizes[save_svalue_depth - 1];
-  } else if ((size = restore_size((const char **)str, 1)) < 0) {
+  } else if ((size = restore_size((const char**)str, 1)) < 0) {
     return 0;
   }
 
@@ -865,17 +869,17 @@ key_error:
   return err;
 }
 
-static int restore_class(char **str, svalue_t *ret) {
+static int restore_class(char** str, svalue_t* ret) {
   int size;
   char c;
-  array_t *v;
-  svalue_t *sv;
-  char *cp = *str;
+  array_t* v;
+  svalue_t* sv;
+  char* cp = *str;
   int err;
 
   if (save_svalue_depth) {
     size = sizes[save_svalue_depth - 1];
-  } else if ((size = restore_size((const char **)str, 0)) < 0) {
+  } else if ((size = restore_size((const char**)str, 0)) < 0) {
     return ROB_CLASS_ERROR;
   }
 
@@ -964,17 +968,17 @@ error:
   return err;
 }
 
-static int restore_array(char **str, svalue_t *ret) {
+static int restore_array(char** str, svalue_t* ret) {
   int size;
   char c;
-  array_t *v;
-  svalue_t *sv;
-  char *cp = *str;
+  array_t* v;
+  svalue_t* sv;
+  char* cp = *str;
   int err;
 
   if (save_svalue_depth) {
     size = sizes[save_svalue_depth - 1];
-  } else if ((size = restore_size((const char **)str, 0)) < 0) {
+  } else if ((size = restore_size((const char**)str, 0)) < 0) {
     return ROB_ARRAY_ERROR;
   }
 
@@ -1063,8 +1067,8 @@ error:
   return err;
 }
 
-static int restore_string(char *val, svalue_t *sv) {
-  char *cp = val;
+static int restore_string(char* val, svalue_t* sv) {
+  char* cp = val;
   char *start = cp, *newstr;
   char c;
   int len;
@@ -1077,7 +1081,7 @@ static int restore_string(char *val, svalue_t *sv) {
       }
 
       case '\\': {
-        char *news = cp - 1;
+        char* news = cp - 1;
         if ((*news++ = *cp++)) {
           while ((c = *cp++) != '"' && c) {
             if (c == '\\') {
@@ -1134,7 +1138,7 @@ static int restore_string(char *val, svalue_t *sv) {
 
 /* for this case, the variable in question has been set to zero already,
    and we don't have to worry about preserving it */
-int restore_svalue(char *cp, svalue_t *v) {
+int restore_svalue(char* cp, svalue_t* v) {
   int ret;
   char c;
 
@@ -1157,9 +1161,9 @@ int restore_svalue(char *cp, svalue_t *v) {
       if (save_svalue_depth) {
         save_svalue_depth = max_depth = 0;
         if (sizes) {
-          FREE((char *)sizes);
+          FREE((char*)sizes);
         }
-        sizes = (int *)nullptr;
+        sizes = (int*)nullptr;
       }
       return ret;
 
@@ -1189,7 +1193,7 @@ int restore_svalue(char *cp, svalue_t *v) {
 
 /* for this case, we're being careful and want to leave the value alone on
    an error */
-static int safe_restore_svalue(char *cp, svalue_t *v) {
+static int safe_restore_svalue(char* cp, svalue_t* v) {
   int ret;
   svalue_t val = {};
   char c;
@@ -1217,9 +1221,9 @@ static int safe_restore_svalue(char *cp, svalue_t *v) {
       if (save_svalue_depth) {
         save_svalue_depth = max_depth = 0;
         if (sizes) {
-          FREE((char *)sizes);
+          FREE((char*)sizes);
         }
-        sizes = (int *)nullptr;
+        sizes = (int*)nullptr;
       }
       if (ret) {
         return ret;
@@ -1252,7 +1256,7 @@ static int safe_restore_svalue(char *cp, svalue_t *v) {
   return 0;
 }
 
-static int fgv_recurse(program_t *prog, int *idx, const char *name, unsigned short *type,
+static int fgv_recurse(program_t* prog, int* idx, const char* name, unsigned short* type,
                        int check_nosave) {
   int i;
   for (i = 0; i < prog->num_inherited; i++) {
@@ -1274,10 +1278,10 @@ static int fgv_recurse(program_t *prog, int *idx, const char *name, unsigned sho
   return 0;
 }
 
-int find_global_variable(program_t *prog, const char *const name, unsigned short *type,
+int find_global_variable(program_t* prog, const char* const name, unsigned short* type,
                          int check_nosave) {
   int idx = 0;
-  const char *str = findstring(name);
+  const char* str = findstring(name);
 
   if (str && fgv_recurse(prog, &idx, str, type, check_nosave)) {
     return idx;
@@ -1286,12 +1290,12 @@ int find_global_variable(program_t *prog, const char *const name, unsigned short
   return -1;
 }
 
-void restore_object_from_line(object_t *ob, char *line, int noclear) {
-  char *space;
-  svalue_t *v;
+void restore_object_from_line(object_t* ob, char* line, int noclear) {
+  char* space;
+  svalue_t* v;
   char var[100];
   int idx;
-  svalue_t *sv = ob->variables;
+  svalue_t* sv = ob->variables;
   int rc;
   unsigned short t;
 
@@ -1348,7 +1352,7 @@ void restore_object_from_line(object_t *ob, char *line, int noclear) {
  * to assertain that the write is legal.
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
-static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int save_zeros, FILE *f,
+static int save_object_recurse(program_t* prog, svalue_t** svp, int type, int save_zeros, FILE* f,
                                gzFile gzf) {
   int i;
   int textsize = 1;
@@ -1383,7 +1387,7 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
       if (new_str) {
         FREE(new_str);
       }
-      new_str = reinterpret_cast<char *>(DMALLOC(theSize, TAG_PERMANENT, "save_object: 2"));
+      new_str = reinterpret_cast<char*>(DMALLOC(theSize, TAG_PERMANENT, "save_object: 2"));
       oldSize = theSize;
     }
 
@@ -1397,9 +1401,12 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
       textsize += strlen(prog->variable_table[i]);
       textsize += 2;
       int result;
+#ifdef HAVE_ZLIB
       if (gzf) {
         result = gzprintf(gzf, "%s %s\n", prog->variable_table[i], new_str);
-      } else {
+      } else
+#endif
+      {
         result = fprintf(f, "%s %s\n", prog->variable_table[i], new_str);
       }
       if (result < 0) {
@@ -1422,8 +1429,8 @@ static int save_object_recurse(program_t *prog, svalue_t **svp, int type, int sa
  * If 'save_zeros' is set, 0 valued variables will be saved
  */
 
-static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, int save_zeros,
-                                   char *buf, int bufsize) {
+static int save_object_recurse_str(program_t* prog, svalue_t** svp, int type, int save_zeros,
+                                   char* buf, int bufsize) {
   int i;
   int textsize = 1;
   int tmp;
@@ -1461,7 +1468,7 @@ static int save_object_recurse_str(program_t *prog, svalue_t **svp, int type, in
       if (new_str) {
         FREE(new_str);
       }
-      new_str = reinterpret_cast<char *>(DMALLOC(theSize, TAG_PERMANENT, "save_object: 2"));
+      new_str = reinterpret_cast<char*>(DMALLOC(theSize, TAG_PERMANENT, "save_object: 2"));
       oldSize = theSize;
     }
 
@@ -1491,13 +1498,13 @@ int sel = -1;
 const int SAVE_EXTENSION_GZ_LENGTH = strlen(SAVE_GZ_EXTENSION);
 }  // namespace
 
-int save_object(object_t *ob, const char *file, int save_zeros) {
+int save_object(object_t* ob, const char* file, int save_zeros) {
   char *name, *p;
   static char save_name[256], tmp_name[256];
   int len;
-  FILE *f;
+  FILE* f;
   int success;
-  svalue_t *v;
+  svalue_t* v;
 
   gzFile gzf;
   int save_compressed;
@@ -1508,30 +1515,42 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   } else {
     save_compressed = 0;
   }
+#ifndef HAVE_ZLIB
+  // No zlib on this build (wasm): degrade to a plain-text save so the
+  // data is still written and restorable.
+  save_compressed = 0;
+#endif
 
   if (ob->flags & O_DESTRUCTED) {
     return 0;
   }
 
   len = strlen(file);
-  if (file[len - 2] == '.' && file[len - 1] == 'c') {
+  if (len > 4 && strcmp(file + len - 4, ".lpc") == 0) {
+    len -= 4;
+  } else if (len > 2 && file[len - 2] == '.' && file[len - 1] == 'c') {
     len -= 2;
   }
 
   if (sel == -1) {
     sel = strlen(SAVE_EXTENSION);
   }
-  if (strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
+  if (len >= sel && strcmp(file + len - sel, SAVE_EXTENSION) == 0) {
     len -= sel;
   }
 
+  // Copy only the KEPT prefix: `file` may still carry a stripped source
+  // extension, and ".lpc" (4) is longer than the ".o" headroom (2) --
+  // strcpy'ing the whole string overflowed the buffer (ASan-caught by
+  // the save_object("/sf.lpc") testsuite case; the legacy ".c" strip
+  // fit only by coincidence).
   if (save_compressed) {
     name = new_string(len + SAVE_EXTENSION_GZ_LENGTH, "save_object");
-    strcpy(name, file);
+    memcpy(name, file, len);
     strcpy(name + len, SAVE_GZ_EXTENSION);
   } else {
     name = new_string(len + sel, "save_object");
-    strcpy(name, file);
+    memcpy(name, file, len);
     strcpy(name + len, SAVE_EXTENSION);
   }
 
@@ -1543,13 +1562,11 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     error("Denied write permission in save_object().\n");
   }
 
-  strcpy(save_name, ob->obname);
+  // Record the program's ACTUAL source file (carries the real .lpc/.c
+  // extension) instead of guessing an extension onto the object name.
+  strcpy(save_name, ob->prog->filename);
   if ((p = strrchr(save_name, '#')) != nullptr) {
     *p = '\0';
-  }
-  p = save_name + strlen(save_name) - 1;
-  if (*p != 'c' && *(p - 1) != '.') {
-    strcat(p, ".c");
   }
 
   /*
@@ -1560,6 +1577,7 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
 
   gzf = nullptr;
   f = nullptr;
+#ifdef HAVE_ZLIB
   if (save_compressed) {
     gzf = gzopen(tmp_name, "wb");
     if (!gzf) {
@@ -1568,7 +1586,9 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
     if (!gzprintf(gzf, "#/%s\n", ob->prog->filename)) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
-  } else {
+  } else
+#endif
+  {
     if (!(f = fopen(tmp_name, "wb")) || fprintf(f, "#/%s\n", save_name) < 0) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
@@ -1577,10 +1597,12 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
 
   success = save_object_recurse(ob->prog, &v, 0, save_zeros, f, gzf);
 
+#ifdef HAVE_ZLIB
   if (gzf && gzclose(gzf)) {
     debug_perror("save_object", file);
     success = 0;
   }
+#endif
 
   if (f && fclose(f) < 0) {
     debug_perror("save_object", file);
@@ -1612,24 +1634,21 @@ int save_object(object_t *ob, const char *file, int save_zeros) {
   return success;
 }
 
-int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
-  char *p;
+int save_object_str(object_t* ob, int save_zeros, char* saved, int size) {
+  char* p;
   int success;
-  svalue_t *v;
-  char *now = saved;
+  svalue_t* v;
+  char* now = saved;
   int left;
   if (ob->flags & O_DESTRUCTED) {
     return 0;
   }
   strcpy(now, "#/");
   now += 2;
-  strcpy(now, ob->obname);
+  // Same as save_object: the program's real source name, no guessing.
+  strcpy(now, ob->prog->filename);
   if ((p = strrchr(now, '#')) != nullptr) {
     *p = '\0';
-  }
-  p = now + strlen(now) - 1;
-  if (*p != 'c' && *(p - 1) != '.') {
-    strcat(p, ".c");
   }
   now = now + strlen(now);
   *now++ = '\n';
@@ -1648,7 +1667,7 @@ int save_object_str(object_t *ob, int save_zeros, char *saved, int size) {
   return success;
 }
 
-static void cns_just_count(int *idx, program_t *prog) {
+static void cns_just_count(int* idx, program_t* prog) {
   int i;
 
   for (i = 0; i < prog->num_inherited; i++) {
@@ -1657,7 +1676,7 @@ static void cns_just_count(int *idx, program_t *prog) {
   *idx += prog->num_variables_defined;
 }
 
-static void cns_recurse(object_t *ob, int *idx, program_t *prog) {
+static void cns_recurse(object_t* ob, int* idx, program_t* prog) {
   int i;
 
   for (i = 0; i < prog->num_inherited; i++) {
@@ -1676,12 +1695,12 @@ static void cns_recurse(object_t *ob, int *idx, program_t *prog) {
   *idx += prog->num_variables_defined;
 }
 
-void clear_non_statics(object_t *ob) {
+void clear_non_statics(object_t* ob) {
   int idx = 0;
   cns_recurse(ob, &idx, ob->prog);
 }
 
-void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
+void restore_object_from_buff(object_t* ob, const char* buf, int noclear) {
   std::istringstream input(buf);
   std::string line;
   while (std::getline(input, line, '\n')) {
@@ -1698,8 +1717,8 @@ void restore_object_from_buff(object_t *ob, const char *buf, int noclear) {
   }
 }
 
-int restore_object(object_t *ob, const char *file, int noclear) {
-  object_t *save = current_object;
+int restore_object(object_t* ob, const char* file, int noclear) {
+  object_t* save = current_object;
 
   if (ob->flags & O_DESTRUCTED) {
     return 0;
@@ -1707,8 +1726,10 @@ int restore_object(object_t *ob, const char *file, int noclear) {
 
   std::string filename(file);
 
-  // First get rid of all extensions.
-  if (ends_with(filename, ".c")) {
+  // First get rid of all extensions (both source spellings).
+  if (ends_with(filename, ".lpc")) {
+    filename = filename.substr(0, filename.length() - 4);
+  } else if (ends_with(filename, ".c")) {
     filename = filename.substr(0, filename.length() - 2);
   } else if (ends_with(filename, SAVE_EXTENSION)) {
     filename = filename.substr(0, filename.length() - strlen(SAVE_EXTENSION));
@@ -1716,6 +1737,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     filename = filename.substr(0, filename.length() - SAVE_EXTENSION_GZ_LENGTH);
   }
 
+#ifdef HAVE_ZLIB
   // Check if GZ file exists.
   struct stat st;
   std::string filename_gz = filename + SAVE_GZ_EXTENSION;
@@ -1728,6 +1750,11 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   } else {
     filename = filename + SAVE_EXTENSION;
   }
+#else
+  // No zlib on this build (wasm): compressed saves cannot be read, so
+  // only the plain-text save file is considered.
+  filename = filename + SAVE_EXTENSION;
+#endif
 
   // valid read permission.
   file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
@@ -1735,8 +1762,13 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
 
-  // We always use zlib functions here and below, as it handles non-gzip file as well.
+  // With zlib these reads go through gzopen, which transparently handles
+  // both gzip'd and plain save files; without it, plain stdio.
+#ifdef HAVE_ZLIB
   gzFile gzf = gzopen(file, "rb");
+#else
+  FILE* gzf = fopen(file, "rb");
+#endif
   if (gzf == nullptr) {
     // Compat: do not return error, if there are no save files.
     return 0;
@@ -1750,6 +1782,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   std::vector<char> buf(chunk);
   int total_bytes_read = 0;
   while (true) {
+#ifdef HAVE_ZLIB
     int bytes_read = gzread(gzf, buf.data() + total_bytes_read, chunk);
 
     // Error reading gzip file.
@@ -1759,6 +1792,14 @@ int restore_object(object_t *ob, const char *file, int noclear) {
       gzclose(gzf);
       error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
     }
+#else
+    int bytes_read = fread(buf.data() + total_bytes_read, 1, chunk, gzf);
+
+    if (bytes_read < chunk && ferror(gzf)) {
+      fclose(gzf);
+      error("restore_object: Error reading file: %s.\n", file);
+    }
+#endif
     // Read successfully
     total_bytes_read += bytes_read;
 
@@ -1775,7 +1816,11 @@ int restore_object(object_t *ob, const char *file, int noclear) {
     buf[total_bytes_read] = '\0';
     break;
   }
+#ifdef HAVE_ZLIB
   gzclose(gzf);
+#else
+  fclose(gzf);
+#endif
 
   // Compat: ignore empty file.
   if (total_bytes_read == 0) {
@@ -1800,7 +1845,7 @@ int restore_object(object_t *ob, const char *file, int noclear) {
   return 1;
 }
 
-void restore_variable(svalue_t *var, char *str) {
+void restore_variable(svalue_t* var, char* str) {
   int rc;
   rc = restore_svalue(str, var);
 
@@ -1822,9 +1867,9 @@ void restore_variable(svalue_t *var, char *str) {
   }
 }
 
-void dealloc_object(object_t *ob, const char *from) {
+void dealloc_object(object_t* ob, const char* from) {
 #ifdef DEBUG
-  object_t *prev_all = 0;
+  object_t* prev_all = 0;
 #endif
 
   debug(d_flag, "free_object: /%s.\n", ob->obname);
@@ -1849,6 +1894,10 @@ void dealloc_object(object_t *ob, const char *from) {
     free_prog(&ob->prog);
     ob->prog = nullptr;
   }
+  if (ob->variables) {
+    FREE(ob->variables);
+    ob->variables = nullptr;
+  }
   if (ob->replaced_program) {
     FREE_MSTR(ob->replaced_program);
     ob->replaced_program = nullptr;
@@ -1863,7 +1912,7 @@ void dealloc_object(object_t *ob, const char *from) {
 
     DEBUG_CHECK1(ObjectTable::instance().find(ob->obname) == ob,
                  "Freeing object /%s but name still in name table", ob->obname);
-    FREE((char *)ob->obname);
+    FREE((char*)ob->obname);
     SETOBNAME(ob, nullptr);
   }
 #ifdef DEBUG
@@ -1884,10 +1933,10 @@ void dealloc_object(object_t *ob, const char *from) {
   tot_dangling_object--;
 #endif
   tot_alloc_object--;
-  FREE((char *)ob);
+  FREE((char*)ob);
 }
 
-void free_object(object_t **ob, const char *const from) {
+void free_object(object_t** ob, const char* const from) {
   // note that we get a pointer to a pointer unlike MudOS where it's a pointer
   // to the object
   // this is so we can clear the variable holding the reference as that
@@ -1902,46 +1951,47 @@ void free_object(object_t **ob, const char *const from) {
   }
 
   if ((*ob)->ref > 0) {
-    *ob = (object_t *)9;
+    *ob = (object_t*)9;
     return;
   }
   dealloc_object(*ob, from);
-  *ob = (object_t *)1;
+  *ob = (object_t*)1;
 }
 
 /*
- * Allocate an empty object, and set all variables to 0. Note that a
- * 'object_t' already has space for one variable. So, if no variables
- * are needed, we waste one svalue worth of memory (or we'd write too
- * much memory in copying the NULL_object over.
+ * Allocate the variable block for an object: a separate allocation (so
+ * recompile_object() can swap programs with a different variable count on the
+ * live object), always at least one svalue so ob->variables is never
+ * null, every slot nil.
  */
-object_t *get_empty_object(int num_var) {
-  // static object_t NULL_object;
-  object_t *ob;
+svalue_t* allocate_object_variables(int num_var) {
+  int n = num_var ? num_var : 1;
+  auto* vars =
+      reinterpret_cast<svalue_t*>(DMALLOC(n * sizeof(svalue_t), TAG_OBJ_VARS, "object variables"));
+  for (int i = 0; i < n; i++) {
+    vars[i] = const0u;
+  }
+  return vars;
+}
+
+/*
+ * Allocate an empty object, and set all variables to 0.
+ */
+object_t* get_empty_object(int num_var) {
+  object_t* ob;
   int size = sizeof(object_t) + (num_var - !!num_var) * sizeof(svalue_t);
-  int i;
 
   tot_alloc_object++;
   tot_alloc_object_size += size;
-  ob = reinterpret_cast<object_t *>(DMALLOC(size, TAG_OBJECT, "get_empty_object"));
-  /*
-   * marion Don't initialize via memset, this is incorrect. E.g. the bull
-   * machines have a (char *)0 which is not zero. We have structure
-   * assignment, so use it.
-   */
-  //*ob = NULL_object; gives a warning on const pointers
-  // memcpy(ob, &NULL_object, sizeof NULL_object);
-  // screw the "bull machines" we're in the 21st century now
+  ob = reinterpret_cast<object_t*>(DMALLOC(sizeof(object_t), TAG_OBJECT, "get_empty_object"));
   memset(ob, 0, sizeof(object_t));
   ob->ref = 1;
-  for (i = 0; i < num_var; i++) {
-    ob->variables[i] = const0u;
-  }
+  ob->variables = allocate_object_variables(num_var);
   return ob;
 }
 
 namespace {
-void set_nextreset(object_t *ob) {
+void set_nextreset(object_t* ob) {
   auto time_to_reset_secs = CONFIG_INT(__TIME_TO_RESET__);
   if (CONFIG_INT(__RC_RANDOMIZED_RESETS__)) {
     time_to_reset_secs = time_to_reset_secs / 2 + random_number(time_to_reset_secs / 2);
@@ -1951,7 +2001,7 @@ void set_nextreset(object_t *ob) {
 }
 }  // namespace
 
-void reset_object(object_t *ob) {
+void reset_object(object_t* ob) {
   set_nextreset(ob);
   save_command_giver(nullptr);
   set_eval(max_eval_cost);
@@ -1963,7 +2013,7 @@ void reset_object(object_t *ob) {
   ob->flags |= O_RESET_STATE;
 }
 
-void call_create(object_t *ob, int num_arg) {
+void call_create(object_t* ob, int num_arg) {
   /* Be sure to update time first ! */
   set_nextreset(ob);
 
@@ -1980,7 +2030,7 @@ void call_create(object_t *ob, int num_arg) {
 }
 
 #ifdef F_SET_HIDE
-int object_visible(object_t *ob) {
+int object_visible(object_t* ob) {
   if (ob->flags & O_HIDDEN) {
     if (current_object->flags & O_HIDDEN) {
       return 1;
@@ -1993,7 +2043,7 @@ int object_visible(object_t *ob) {
 }
 #endif
 
-void reload_object(object_t *obj) {
+void reload_object(object_t* obj) {
   int i;
 
   if (!obj->prog) {
@@ -2015,8 +2065,8 @@ void reload_object(object_t *obj) {
  */
 #ifndef NO_SHADOWS
   if (obj->shadowed && !obj->shadowing) {
-    object_t *ob2;
-    object_t *otmp;
+    object_t* ob2;
+    object_t* otmp;
 
     for (ob2 = obj->shadowed; ob2;) {
       otmp = ob2;
@@ -2055,8 +2105,8 @@ void reload_object(object_t *obj) {
   call_create(obj, 0);
 }
 
-void get_objects(object_t ***list, int *size, get_objectsfn_t callback, void *data) {
-  object_t *ob;
+void get_objects(object_t*** list, int* size, get_objectsfn_t callback, void* data) {
+  object_t* ob;
 #ifdef F_SET_HIDE
   int display_hidden = 0;
 
@@ -2067,17 +2117,17 @@ void get_objects(object_t ***list, int *size, get_objectsfn_t callback, void *da
       display_hidden = valid_hide(current_object);
     }
   }
-  *list = reinterpret_cast<object_t **>(
-      new_string(((tot_alloc_object - (display_hidden ? 0 : num_hidden)) * sizeof(object_t *)) - 1,
+  *list = reinterpret_cast<object_t**>(
+      new_string(((tot_alloc_object - (display_hidden ? 0 : num_hidden)) * sizeof(object_t*)) - 1,
                  "get_objects"));
 #else
-  *list = (object_t **)new_string((tot_alloc_object * sizeof(object_t *)) - 1, "get_objects");
+  *list = (object_t**)new_string((tot_alloc_object * sizeof(object_t*)) - 1, "get_objects");
 #endif
 
   if (!*list) {
     fatal("Out of memory!\n");
   }
-  push_malloced_string(reinterpret_cast<char *>(*list));
+  push_malloced_string(reinterpret_cast<char*>(*list));
 
   for (*size = 0, ob = obj_list; ob; ob = ob->next_all) {
 #ifdef F_SET_HIDE
@@ -2091,12 +2141,12 @@ void get_objects(object_t ***list, int *size, get_objectsfn_t callback, void *da
   }
 }
 
-static object_t *command_giver_stack[CFG_MAX_CALL_DEPTH];
-object_t **cgsp = command_giver_stack;
+static object_t* command_giver_stack[CFG_MAX_CALL_DEPTH];
+object_t** cgsp = command_giver_stack;
 
 #ifdef DEBUGMALLOC_EXTENSIONS
 void mark_command_giver_stack(void) {
-  object_t **ob;
+  object_t** ob;
 
   for (ob = &command_giver_stack[0]; ob < cgsp; ob++) {
     if (*ob) {
@@ -2110,7 +2160,7 @@ void mark_command_giver_stack(void) {
 #endif
 
 /* set a new command giver, saving the old one */
-void save_command_giver(object_t *ob) {
+void save_command_giver(object_t* ob) {
   DEBUG_CHECK(cgsp == &command_giver_stack[CFG_MAX_CALL_DEPTH], "command_giver stack overflow");
   *(++cgsp) = command_giver;
 
@@ -2130,7 +2180,7 @@ void restore_command_giver(void) {
 }
 
 /* set a new command giver */
-void set_command_giver(object_t *ob) {
+void set_command_giver(object_t* ob) {
   if (command_giver) {
     free_object(&command_giver, "set_command_giver");
   }

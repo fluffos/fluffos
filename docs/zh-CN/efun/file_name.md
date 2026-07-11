@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / file_name
 ---
 # file_name

@@ -9,10 +9,10 @@
 #define SRC_VM_INTERNAL_COMPILER_KEYWORD_H_
 
 struct keyword_t {
-  const char *word;
+  const char* word;
   unsigned short token;     /* flags here too */
   unsigned short sem_value; /* semantic value for predefined tokens */
-  struct ident_hash_elem_t *next;
+  struct ident_hash_elem_t* next;
   /* the fields above must correspond to struct ident_hash_elem */
   short min_args;           /* Minimum number of arguments. */
   short max_args;           /* Maximum number of arguments. */

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / terminal_colour_replace
 ---
 # terminal_colour_replace

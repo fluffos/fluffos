@@ -1,0 +1,5 @@
+void do_tests() {
+    ASSERT_EQ(1.0, floor(1.8));
+    ASSERT_EQ(-2.0, floor(-1.2));
+    ASSERT_EQ(3.0, floor(3.0));
+}

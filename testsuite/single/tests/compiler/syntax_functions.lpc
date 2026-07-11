@@ -1,0 +1,55 @@
+// Function syntax matrix: super calls (anonymous and named scope),
+// varargs declarations with call-site spread, expression default
+// arguments, anonymous functions (with and without explicit return
+// type), and class instantiation with field initializers.
+// ((: :) functional forms are pinned by functional_forms.lpc.)
+inherit "/clone/syntax_parent";
+
+class Point {
+    int x;
+    int y;
+}
+
+string pwhich() { return "child"; }
+
+varargs int vsum(int a, int b, mixed extra...) {
+    int t = a + b;
+    foreach (mixed e in extra) t += e;
+    return t;
+}
+
+int dflt(int x, int y: (: 100 :)) { return x + y; }
+
+void do_tests() {
+    function f;
+    class Point p;
+
+    // Overriding + super calls: anonymous '::' and named scope.
+    ASSERT_EQ("child", pwhich());
+    ASSERT_EQ("parent", ::pwhich());
+    ASSERT_EQ("parent", syntax_parent::pwhich());
+
+    // varargs declaration; spread expands an array at the call site.
+    ASSERT_EQ(3, vsum(1, 2));
+    ASSERT_EQ(10, vsum(1, 2, 3, 4));
+    ASSERT_EQ(10, vsum(1, 2, ({ 3, 4 })...));
+
+    // Expression default argument.
+    ASSERT_EQ(105, dflt(5));
+    ASSERT_EQ(8, dflt(5, 3));
+
+    // Anonymous functions: only the 'function' return type is legal
+    // (a concrete type there is a compile error -- pinned by
+    // fail/lambda_typed_return.lpc).
+    f = function (int x) { return x * 2; };
+    ASSERT_EQ(14, f(7));
+    ASSERT_EQ(9, evaluate(function (int a, int b) { return a * b; }, 3, 3));
+
+    // Class instantiation with field initializers; '->' member access.
+    p = new(class Point, x: 3, y: 4);
+    ASSERT_EQ(3, p->x);
+    ASSERT_EQ(4, p->y);
+    p = new(class Point, y: 9);
+    ASSERT_EQ(0, p->x);
+    ASSERT_EQ(9, p->y);
+}

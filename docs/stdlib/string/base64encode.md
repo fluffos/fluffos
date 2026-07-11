@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: stdlib / base64encode
 ---
 # base64encode

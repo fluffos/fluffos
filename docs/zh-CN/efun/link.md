@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: filesystem / link
 ---
 # link
@@ -10,7 +9,7 @@ title: filesystem / link
 
 ### 语法
 
-    void link( string original, string reference );
+    int link( string original, string reference );
 
 ### 描述
 

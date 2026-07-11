@@ -2,23 +2,23 @@
 #define ADD_ACTION_H 1
 
 #ifndef NO_ADD_ACTION
-extern object_t **hashed_living;
+extern object_t** hashed_living;
 
 void init_living();
-int parse_command(char *, object_t *);
-void safe_parse_command(char *, object_t *);
-void clear_notify(object_t *);
-void stat_living_objects(outbuffer_t *);
-void remove_living_name(object_t *);
-object_t *find_living_object(const char *, int);
-void setup_new_commands(object_t *, object_t *);
+int parse_command(char*, object_t*);
+void safe_parse_command(char*, object_t*);
+void clear_notify(object_t*);
+void stat_living_objects(outbuffer_t*);
+void remove_living_name(object_t*);
+object_t* find_living_object(const char*, int);
+void setup_new_commands(object_t*, object_t*);
 #ifndef NO_ENVIRONMENT
-void remove_sent(object_t *, object_t *);
+void remove_sent(object_t*, object_t*);
 #endif
 #else
 /* STUBS */
 #define safe_parse_command(x, y) \
-  do {                      \
+  do {                           \
   } while (0)
 #define parse_command(x, y) \
   do {                      \

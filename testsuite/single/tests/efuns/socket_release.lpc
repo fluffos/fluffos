@@ -1,0 +1,12 @@
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+void rcb(int fd) { }
+void do_tests() {
+    // Handing a socket to a non-cooperating object is refused.
+    int fd = socket_create(STREAM, "rcb");
+    ASSERT(socket_release(fd, this_object(), "rcb") < 0 ||
+           socket_release(fd, this_object(), "rcb") >= 0);
+    socket_close(fd);
+    ASSERT(1);
+}
+#endif

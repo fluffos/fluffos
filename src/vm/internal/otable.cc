@@ -63,10 +63,10 @@ bool ObjectTable::remove(Key const& key) {
                           [&key](Value v) -> bool { return v->obname == key; });
   // guaranteed to be in list if basename(key) exists in children_
   if (it3 != it2->second.end()) {
-      it2->second.erase(it3);
+    it2->second.erase(it3);
   }
   if (it2->second.empty()) {
-      children_.erase(it2);
+    children_.erase(it2);
   }
   return true;
 }
@@ -107,18 +107,23 @@ int ObjectTable::showStatus(outbuffer_t* out, int verbose) {
 std::string basename(std::string s) {
   // remove all leading forward slashes from string.
   auto it1 = s.begin();
-  for (; *it1 == '/'; ++it1)
-    ;
+  for (; *it1 == '/'; ++it1);
   s.erase(s.begin(), it1);
 
   // find # in the string and delete it and all subsequent characters
   auto it2 = s.find('#');
   if (it2 != std::string::npos) s.erase(s.begin() + it2, s.end());
 
-  // remove all repetitions of .c at the end of the string
-  it1 = s.end() - 1;
-  for (; it1 - 1 != s.begin() && *it1 == 'c' && *(it1 - 1) == '.'; it1 -= 2)
-    ;
-  s.erase(it1 + 1, s.end());
+  // remove all repetitions of the ".lpc" / ".c" source extensions at the
+  // end of the string (mirrors filename_to_obname)
+  for (;;) {
+    if (s.size() > 4 && s.compare(s.size() - 4, 4, ".lpc") == 0) {
+      s.erase(s.size() - 4);
+    } else if (s.size() > 2 && s.compare(s.size() - 2, 2, ".c") == 0) {
+      s.erase(s.size() - 2);
+    } else {
+      break;
+    }
+  }
   return s;
 }

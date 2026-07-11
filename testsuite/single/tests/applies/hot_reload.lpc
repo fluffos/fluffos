@@ -1,0 +1,295 @@
+// Auto hot-reload on file changes, demonstrated end to end.
+//
+// The /single/hot_reload daemon registers itself as the master's
+// compile hooks, so the driver's inherit_program / include_file applies
+// feed it the full compile-time dependency graph (which files each
+// program's bytecode was built from). Its poller -- armed by enable(),
+// driven here synchronously via check_now() for determinism -- stats
+// those files and destructs+reloads any watched program's master copy
+// whose dependency closure changed on disk.
+//
+// The fixture chain is written at runtime under /data/hot:
+//   widget.lpc  inherits  base.lpc  which includes  color.h
+// so a change to the deepest dependency (an include of the INHERITED
+// program) must reload the watched top-level program.
+
+#define DIR "/data/hot"
+#define DAEMON "/single/hot_reload"
+
+private void write_src(string file, string body) {
+  ASSERT2(write_file(file, body, 1), "write " + file);
+}
+
+private void cleanup(object d) {
+  foreach (string prog in ({ DIR + "/widget", DIR + "/base", DIR + "/counter",
+                             DIR + "/coop", DIR + "/plain", DIR + "/gadget",
+                             DIR + "/kid", DIR + "/mid", DIR + "/grand",
+                             DIR + "/loop" })) {
+    foreach (object o in children(prog)) {
+      if (o) destruct(o);
+    }
+  }
+  if (d) {
+    d->disable();
+    destruct(d);
+  }
+  foreach (string f in ({ "/color.h", "/base.lpc", "/widget.lpc",
+                          "/counter.lpc", "/coop.lpc", "/plain.lpc",
+                          "/gadget.lpc", "/kid.lpc", "/mid.lpc",
+                          "/grand.lpc", "/loop.h", "/loop.lpc" })) {
+    rm(DIR + f);
+  }
+  rmdir(DIR);
+}
+
+private void run_checks() {
+  object d, widget, ob, g1, g2, p1;
+
+  ASSERT(mkdir(DIR) || file_size(DIR) == -2);
+
+  write_src(DIR + "/color.h", "#define COLOR \"red\"\n");
+  write_src(DIR + "/base.lpc",
+            "#include \"" + DIR + "/color.h\"\n" +
+            "string color() { return COLOR; }\n");
+  write_src(DIR + "/widget.lpc",
+            "inherit \"" + DIR + "/base\";\n" +
+            "string describe() { return \"a \" + color() + \" widget\"; }\n");
+
+  d = load_object(DAEMON);
+  // enable() registers the compile hooks AND arms the change poller --
+  // that call_out is the "auto" in auto hot-reload. The test drives the
+  // same pass synchronously through check_now() so it needs no timing.
+  d->enable(1);
+  ASSERT(d->query_polling());
+
+  ASSERT(d->watch(DIR + "/widget"));
+  widget = find_object(DIR + "/widget");
+  ASSERT(objectp(widget));
+  ASSERT_EQ("a red widget", widget->describe());
+
+  // Nothing changed on disk: no reload, same master-copy object.
+  ASSERT_EQ(0, d->check_now());
+  ASSERT(find_object(DIR + "/widget") == widget);
+
+  // Change the DEEPEST dependency: an include of the inherited program.
+  // The daemon must reload both the stale parent and the watched child.
+  write_src(DIR + "/color.h", "#define COLOR \"green\"\n");
+  ASSERT_EQ(1, d->check_now());
+  widget = find_object(DIR + "/widget");
+  ASSERT(objectp(widget));
+  ASSERT_EQ("a green widget", widget->describe());
+  ASSERT_EQ(1, d->query_reload_count());
+
+  // Change the watched program's own source.
+  write_src(DIR + "/widget.lpc",
+            "inherit \"" + DIR + "/base\";\n" +
+            "string describe() { return \"one very \" + color() + \" widget\"; }\n");
+  ASSERT_EQ(1, d->check_now());
+  ASSERT_EQ("one very green widget", (DIR + "/widget")->describe());
+  ASSERT_EQ(2, d->query_reload_count());
+
+  // Stable again.
+  ASSERT_EQ(0, d->check_now());
+
+  // A shared dependency must reload EVERY watched program in one pass:
+  // watch the parent too, then change the include both depend on. The
+  // stale set is collected before any reload, so refreshing the shared
+  // snapshot during the first reload must not hide the change from the
+  // second.
+  ASSERT(d->watch(DIR + "/base"));
+  write_src(DIR + "/color.h", "#define COLOR \"blue\"\n");
+  ASSERT_EQ(2, d->check_now());
+  ASSERT_EQ("one very blue widget", (DIR + "/widget")->describe());
+  ASSERT_EQ("blue", (DIR + "/base")->color());
+  ASSERT_EQ(0, d->check_now());
+
+  // A broken edit must not kill the daemon or the poller: the failed
+  // reloads are retried -- and self-heal -- once the file compiles
+  // again (a destructed watched program counts as stale).
+  write_src(DIR + "/base.lpc", "this does not compile\n");
+  ASSERT_EQ(0, d->check_now());
+  ASSERT(d->query_polling());
+  write_src(DIR + "/base.lpc",
+            "#include \"" + DIR + "/color.h\"\n" +
+            "string color() { return \"fixed \" + COLOR; }\n");
+  ASSERT_EQ(2, d->check_now());
+  ASSERT_EQ("fixed blue", (DIR + "/base")->color());
+  ASSERT_EQ("one very fixed blue widget", (DIR + "/widget")->describe());
+
+  // A chain with SEVERAL changed ancestors must refresh deepest-first:
+  // recompiling the middle parent bakes in whatever grandparent program
+  // is live at that moment, so the grandparent has to go first.
+  write_src(DIR + "/grand.lpc", "string g() { return \"g1\"; }\n");
+  write_src(DIR + "/mid.lpc",
+            "inherit \"" + DIR + "/grand\";\n" +
+            "string m() { return \"m1/\" + g(); }\n");
+  write_src(DIR + "/kid.lpc",
+            "inherit \"" + DIR + "/mid\";\n" +
+            "string k() { return m(); }\n");
+  ASSERT(d->watch(DIR + "/kid"));
+  ASSERT_EQ("m1/g1", (DIR + "/kid")->k());
+  write_src(DIR + "/grand.lpc", "string g() { return \"g2 new\"; }\n");
+  write_src(DIR + "/mid.lpc",
+            "inherit \"" + DIR + "/grand\";\n" +
+            "string m() { return \"m2 longer/\" + g(); }\n");
+  ASSERT_EQ(1, d->check_now());
+  ASSERT_EQ("m2 longer/g2 new", (DIR + "/kid")->k());
+
+  // Dependency records survive a reload that throws BEFORE compiling
+  // (here: the currently-executing guard, because the watched object
+  // itself drives the pass) -- the include edit must still be seen on
+  // the next idle pass.
+  write_src(DIR + "/loop.h", "#define LOOPV \"one\"\n");
+  write_src(DIR + "/loop.lpc",
+            "#include \"" + DIR + "/loop.h\"\n" +
+            "string v() { return LOOPV; }\n" +
+            "int poke(object dmn) { return dmn->check_now(); }\n");
+  ASSERT(d->watch(DIR + "/loop"));
+  ASSERT_EQ("one", (DIR + "/loop")->v());
+  write_src(DIR + "/loop.h", "#define LOOPV \"two three\"\n");
+  ASSERT_EQ(0, (DIR + "/loop")->poke(d));
+  ASSERT_EQ(1, d->check_now());
+  ASSERT_EQ("two three", (DIR + "/loop")->v());
+
+  // --- variable state across reloads ---------------------------------------
+
+  // The code is replaced, the variables are not: watch() carries the
+  // master copy's globals over by default. New variables ("extra")
+  // keep the fresh compile's initializers.
+  write_src(DIR + "/counter.lpc",
+            "int hits;\n" +
+            "int bump() { return ++hits; }\n" +
+            "string version() { return \"v1\"; }\n");
+  ASSERT(d->watch(DIR + "/counter"));
+  ob = find_object(DIR + "/counter");
+  ob->bump();
+  ob->bump();
+  ASSERT_EQ(3, ob->bump());
+  write_src(DIR + "/counter.lpc",
+            "int hits;\n" +
+            "int extra = 11;\n" +
+            "int bump() { return ++hits; }\n" +
+            "int query_extra() { return extra; }\n" +
+            "string version() { return \"v2\"; }\n");
+  ASSERT_EQ(1, d->check_now());
+  ob = find_object(DIR + "/counter");
+  ASSERT(objectp(ob));
+  ASSERT_EQ("v2", ob->version());
+  ASSERT_EQ(4, ob->bump());
+  ASSERT_EQ(11, ob->query_extra());
+
+  // --- clones ride along ------------------------------------------------
+
+  // A master copy change must reach every live clone. On the default
+  // (state-keeping) path the daemon reloads through the recompile_object()
+  // efun, which swaps the fresh program into the master copy AND every
+  // clone in place: same objects, new code, each clone's own state
+  // kept. children() is how a mudlib FINDS all live instances.
+  write_src(DIR + "/gadget.lpc",
+            "int uses;\n" +
+            "int use() { return ++uses; }\n" +
+            "string label() { return \"mk1\"; }\n");
+  ASSERT(d->watch(DIR + "/gadget"));
+  ob = find_object(DIR + "/gadget");
+  g1 = new(DIR + "/gadget");
+  g2 = new(DIR + "/gadget");
+  g1->use();
+  g2->use();
+  g2->use();
+
+  // Finding them: master copy + clones share the program name.
+  ASSERT_EQ(3, sizeof(children(DIR + "/gadget")));
+  ASSERT_EQ(2, sizeof(filter(children(DIR + "/gadget"), (: clonep($1) :))));
+
+  write_src(DIR + "/gadget.lpc",
+            "int uses;\n" +
+            "int use() { return ++uses; }\n" +
+            "string label() { return \"mk2 improved\"; }\n");
+  ASSERT_EQ(1, d->check_now());
+
+  // Same objects everywhere -- nothing was destructed...
+  ASSERT(find_object(DIR + "/gadget") == ob);
+  ASSERT(objectp(g1) && objectp(g2));
+  // ... running the new code ...
+  ASSERT_EQ("mk2 improved", ob->label());
+  ASSERT_EQ("mk2 improved", g1->label());
+  ASSERT_EQ("mk2 improved", g2->label());
+  // ... with each object's own state carried over.
+  ASSERT_EQ(1, ob->use());
+  ASSERT_EQ(2, g1->use());
+  ASSERT_EQ(3, g2->use());
+
+  // An object that defines the cooperative pair
+  // hot_reload_state()/hot_reload_restore() takes control of exactly
+  // what survives: it reloads through destruct+load and gets back only
+  // the state its pair chose to carry.
+  write_src(DIR + "/coop.lpc",
+            "private int secret = 5;\n" +
+            "int peek() { return secret; }\n" +
+            "void poke(int v) { secret = v; }\n" +
+            "string tag() { return \"first\"; }\n" +
+            "mixed hot_reload_state() { return secret; }\n" +
+            "void hot_reload_restore(mixed s) { secret = s; }\n");
+  ASSERT(d->watch(DIR + "/coop"));
+  ob = find_object(DIR + "/coop");
+  ob->poke(42);
+  write_src(DIR + "/coop.lpc",
+            "private int secret = 5;\n" +
+            "int peek() { return secret; }\n" +
+            "void poke(int v) { secret = v; }\n" +
+            "string tag() { return \"second one\"; }\n" +
+            "mixed hot_reload_state() { return secret; }\n" +
+            "void hot_reload_restore(mixed s) { secret = s; }\n");
+  ASSERT_EQ(1, d->check_now());
+  ob = find_object(DIR + "/coop");
+  ASSERT_EQ("second one", ob->tag());
+  ASSERT_EQ(42, ob->peek());
+
+  // Opt-out: watch(prog, 0) lets each reload start from initializers.
+  // This path destructs and reloads the master copy, so it CANNOT
+  // touch clones: they keep the old program until re-created.
+  write_src(DIR + "/plain.lpc",
+            "int n = 9;\n" +
+            "int get() { return n; }\n" +
+            "int set(int v) { return n = v; }\n" +
+            "string tag() { return \"aaa\"; }\n");
+  ASSERT(d->watch(DIR + "/plain", 0));
+  ob = find_object(DIR + "/plain");
+  ob->set(100);
+  p1 = new(DIR + "/plain");
+  p1->set(55);
+  write_src(DIR + "/plain.lpc",
+            "int n = 9;\n" +
+            "int get() { return n; }\n" +
+            "int set(int v) { return n = v; }\n" +
+            "string tag() { return \"b\"; }\n");
+  ASSERT_EQ(1, d->check_now());
+  ob = find_object(DIR + "/plain");
+  ASSERT_EQ("b", ob->tag());
+  ASSERT_EQ(9, ob->get());
+  // The pre-existing clone still runs the OLD program with its old
+  // state -- children() is how a mudlib finds such stragglers to
+  // destruct and re-create (or to pass to recompile_object-style handling).
+  ASSERT_EQ("aaa", p1->tag());
+  ASSERT_EQ(55, p1->get());
+  foreach (object straggler in filter(children(DIR + "/plain"), (: clonep($1) :))) {
+    destruct(straggler);
+  }
+  ASSERT(!objectp(p1));
+  ASSERT_EQ(1, sizeof(children(DIR + "/plain")));
+
+  d->disable();
+  ASSERT(!d->query_polling());
+  ASSERT(!"/single/master"->query_compile_hooks());
+}
+
+void do_tests() {
+  // Run the checks, but ALWAYS tear down: the daemon must not stay
+  // registered as the master's compile hooks (or keep its poller
+  // armed) for the rest of the randomized run if a check throws.
+  string err = catch(run_checks());
+
+  cleanup(find_object(DAEMON));
+  "/single/master"->set_compile_hooks(0);
+  if (err) error(err);
+}

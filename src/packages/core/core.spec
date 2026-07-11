@@ -79,7 +79,7 @@ void move_object(object | string);
 void add_action(string | function, string | string *, void | int);
 string query_verb();
 int command(string);
-int remove_action(string, string);
+int remove_action(string | function, string);
 int living(object default: F__THIS_OBJECT);
 mixed *commands();
 void disable_commands();
@@ -213,6 +213,7 @@ void set_hide(int);
 
 #ifndef NO_RESETS
 void set_reset(object, void | int);
+int request_clean_up(object default: F__THIS_OBJECT);
 #endif
 
 #ifndef NO_SHADOWS
@@ -275,6 +276,7 @@ int get_char(string | function, ...);
 object *children(string);
 
 void reload_object(object);
+int recompile_object(object);
 
 void error(string);
 int uptime();
@@ -367,4 +369,9 @@ int perf_counter_ns();
 int time_ns();
 
 mixed *sys_network_ports();
+#ifndef __EMSCRIPTEN__
+/* No TLS on the wasm target: the browser terminates TLS long before
+ * bytes reach the driver, so the efun does not exist there. (The
+ * fullspec is preprocessed with the TARGET compiler, so this works.) */
 void sys_reload_tls(int);
+#endif

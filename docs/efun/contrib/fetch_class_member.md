@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / fetch_class_member.pre
 ---
 # fetch_class_member

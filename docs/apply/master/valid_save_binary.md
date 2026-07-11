@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / valid_save_binary
 ---
 # valid_save_binary

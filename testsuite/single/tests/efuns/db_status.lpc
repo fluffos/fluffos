@@ -1,0 +1,6 @@
+void do_tests() {
+#ifdef __PACKAGE_DB__
+    ASSERT(stringp(db_status()));
+#endif
+    ASSERT(1);
+}

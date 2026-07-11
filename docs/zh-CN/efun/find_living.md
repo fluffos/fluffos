@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mudlib / find_living
 ---
 # find_living

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / cache_stats
 ---
 # cache_stats
@@ -18,7 +17,7 @@ title: internals / cache_stats
 
 ### 参考
 
-    opcprof(3), mud_status(3)
+    mud_status(3)
 
 ### 翻译 ###
 

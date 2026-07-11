@@ -109,7 +109,7 @@ void TraceWriter::flush(const std::string& filename) {
   debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
                 Tracer::timestamp(), buffer_->size(), filename.c_str());
 
-  this->dump_threads_.emplace_back([current_buffer = std::move(buffer_), filename] {
+  auto dump = [current_buffer = std::move(buffer_), filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
     std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
@@ -163,7 +163,14 @@ void TraceWriter::flush(const std::string& filename) {
 
     debug_message("[thread %lud]: Dump trace successfully to file %s, cost %lld ms.\n",
                   get_current_thread_id(), filename.c_str(), dur_us);
-  });
+  };
+
+#ifdef __EMSCRIPTEN__
+  // No threads on WASM: write the trace synchronously.
+  dump();
+#else
+  this->dump_threads_.emplace_back(std::move(dump));
+#endif
 }
 
 bool Tracer::is_enabled = false;

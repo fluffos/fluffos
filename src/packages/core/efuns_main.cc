@@ -13,13 +13,17 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
+#ifndef _WIN32
+#include <arpa/inet.h>  // for htonl/ntohl
+#endif
 
 #include <unistd.h>  // for rmdir(), FIXME
 #include "thirdparty/crypt/crypt.h"
 
 #include "packages/core/call_out.h"
 #include "packages/core/dns.h"
-#include "packages/core/add_action.h"  // stat_living_objects
+#include "packages/core/add_action.h"
+#include "compiler/internal/scratchpad.h"
 #include "packages/core/file.h"
 #include "packages/core/regexp.h"
 #include "packages/core/sprintf.h"  // string_print_formatted
@@ -29,12 +33,12 @@
 #include "packages/core/ed.h"
 #include "packages/core/heartbeat.h"
 
-int data_size(object_t *ob);
-void reload_object(object_t *obj);
+int data_size(object_t* ob);
+void reload_object(object_t* obj);
 
 #ifdef F_ALL_INVENTORY
 void f_all_inventory() {
-  array_t *vec = all_inventory(sp->u.ob, 0);
+  array_t* vec = all_inventory(sp->u.ob, 0);
   free_object(&sp->u.ob, "f_all_inventory");
   sp->type = T_ARRAY;
   sp->u.arr = vec;
@@ -55,7 +59,7 @@ void f_allocate() {
 
 #ifdef F_ALLOCATE_BUFFER
 void f_allocate_buffer() {
-  buffer_t *buf;
+  buffer_t* buf;
 
   buf = allocate_buffer(sp->u.number);
   if (buf) {
@@ -69,7 +73,7 @@ void f_allocate_buffer() {
 
 #ifdef F_ALLOCATE_MAPPING
 void f_allocate_mapping() {
-  array_t *arr;
+  array_t* arr;
 
   if (st_num_arg == 2) {
     if ((sp - 1)->type != T_ARRAY) {
@@ -98,10 +102,10 @@ void f_allocate_mapping() {
 
 #ifdef F_BIND
 void f_bind() {
-  object_t *ob = sp->u.ob;
-  funptr_t *old_fp = (sp - 1)->u.fp;
-  funptr_t *new_fp;
-  svalue_t *res;
+  object_t* ob = sp->u.ob;
+  funptr_t* old_fp = (sp - 1)->u.fp;
+  funptr_t* new_fp;
+  svalue_t* res;
 
   if (ob == old_fp->hdr.owner) {
     /* no change */
@@ -133,10 +137,11 @@ void f_bind() {
     error("Master object denied permission to bind() function pointer.\n");
   }
 
-  new_fp = reinterpret_cast<funptr_t *>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind"));
+  new_fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind"));
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
   new_fp->hdr.owner = ob; /* one ref from being on stack */
+  new_fp->hdr.owner_gen = ob->prog_generation;
   if (new_fp->hdr.args) {
     new_fp->hdr.args->ref++;
   }
@@ -152,7 +157,7 @@ void f_bind() {
 }
 #endif
 
-static int print_cache_stats(outbuffer_t *ob, int verbose) {
+static int print_cache_stats(outbuffer_t* ob, int verbose) {
   auto size = apply_cache_items * sizeof(lookup_entry_s);
   if (verbose == 1) {
     outbuf_add(ob, "Apply lookup cache information\n");
@@ -181,10 +186,10 @@ void f_cache_stats() {
 #ifdef F__CALL_OTHER
 /* enhanced call_other written 930314 by Luke Mewburn <zak@rmit.edu.au> */
 void f__call_other() {
-  svalue_t *arg;
-  const char *funcname;
+  svalue_t* arg;
+  const char* funcname;
   int num_arg = st_num_arg;
-  object_t *ob;
+  object_t* ob;
 
   if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
     pop_n_elems(num_arg);
@@ -195,8 +200,8 @@ void f__call_other() {
   if (arg[1].type == T_STRING) {
     funcname = arg[1].u.string;
   } else { /* must be T_ARRAY then */
-    array_t *v = arg[1].u.arr;
-    svalue_t *sv = nullptr;
+    array_t* v = arg[1].u.arr;
+    svalue_t* sv = nullptr;
 
     if (!((sv = v->item)->type == T_STRING)) {
       error("call_other: 1st elem of array for arg 2 must be a string\n");
@@ -209,7 +214,7 @@ void f__call_other() {
   if (arg[0].type == T_OBJECT) {
     ob = arg[0].u.ob;
   } else if (arg[0].type == T_ARRAY) {
-    array_t *ret;
+    array_t* ret;
 
     ret = call_all_other(arg[0].u.arr, funcname, num_arg - 2);
     pop_stack();
@@ -234,10 +239,10 @@ void f__call_other() {
 #endif
 
 #if defined(F_CALL_STACK) || defined(F_ORIGIN)
-static const char *origin_name(int orig) {
+static const char* origin_name(int orig) {
   /* FIXME: this should use ffs() if available (BSD) */
   int i = 0;
-  static const char *origins[] = {"driver",   "local", "call_other",       "simul",
+  static const char* origins[] = {"driver",   "local", "call_other",       "simul",
                                   "internal", "efun",  "function pointer", "functional"};
   while (orig >>= 1) {
     i++;
@@ -249,7 +254,7 @@ static const char *origin_name(int orig) {
 #ifdef F_CALL_STACK
 void f_call_stack() {
   int i, n = csp - &control_stack[0] + 1;
-  array_t *ret;
+  array_t* ret;
 
   if (sp->u.number < 0 || sp->u.number > 4) {
     error("First argument of call_stack() must be 0, 1, 2, 3, or 4.\n");
@@ -282,9 +287,9 @@ void f_call_stack() {
       for (i = 0; i < n; i++) {
         ret->item[i].type = T_STRING;
         if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-          const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
+          const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
           int const index = (csp - i)->fr.table_index;
-          function_t *cfp = &prog->function_table[index];
+          function_t* cfp = &prog->function_table[index];
 
           ret->item[i].subtype = STRING_SHARED;
           ret->item[i].u.string = cfp->funcname;
@@ -311,9 +316,9 @@ void f_call_stack() {
       for (i = 0; i < n; i++) {
         ret->item[i].type = T_STRING;
         if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
-          const program_t *prog = (i ? (csp - i + 1)->prog : current_prog);
+          const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
           int const index = (csp - i)->fr.table_index;
-          char *progc = (i ? (csp - i + 1)->pc : pc);
+          char* progc = (i ? (csp - i + 1)->pc : pc);
           ret->item[i].type = T_STRING;
           ret->item[i].subtype = STRING_MALLOC;
           ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
@@ -335,7 +340,7 @@ void f_capitalize() {
   if (uislower(sp->u.string[0])) {
     unlink_string_svalue(sp);
     // unlinked, so this is ok
-    (const_cast<char *>(sp->u.string))[0] = toupper(static_cast<unsigned char>(sp->u.string[0]));
+    (const_cast<char*>(sp->u.string))[0] = toupper(static_cast<unsigned char>(sp->u.string[0]));
   }
 }
 #endif
@@ -345,7 +350,7 @@ void f_children() {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   auto v = ObjectTable::instance().children(sp->u.string);
   auto len = v.size() < max_array_size ? v.size() : max_array_size;
-  auto *res = allocate_empty_array(len);
+  auto* res = allocate_empty_array(len);
 
   for (auto i = 0; i < v.size() && i < len; ++i) {
     res->item[i].u.ob = v[i];
@@ -371,7 +376,7 @@ void f_classp() {
 
 #ifdef F_CLEAR_BIT
 void f_clear_bit() {
-  char *str;
+  char* str;
   int len, ind, bit;
 
   auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
@@ -390,7 +395,7 @@ void f_clear_bit() {
     return; /* return first arg unmodified */
   }
   unlink_string_svalue(sp);
-  str = const_cast<char *>(sp->u.string);
+  str = const_cast<char*>(sp->u.string);
 
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
     error("Illegal bit pattern in clear_bit character %d\n", ind);
@@ -413,8 +418,8 @@ void f_clonep() {
 
 #ifdef F__NEW
 void f__new() {
-  svalue_t *arg = sp - st_num_arg + 1;
-  object_t *ob;
+  svalue_t* arg = sp - st_num_arg + 1;
+  object_t* ob;
 
   ob = clone_object(arg->u.string, st_num_arg - 1);
 
@@ -429,7 +434,7 @@ void f__new() {
 
 #ifdef F_DEEP_INHERIT_LIST
 void f_deep_inherit_list() {
-  array_t *vec;
+  array_t* vec;
 
   vec = deep_inherit_list(sp->u.ob);
   free_object(&sp->u.ob, "f_deep_inherit_list");
@@ -455,7 +460,7 @@ void f_clear_debug_level() {
 void f_debug_levels() {
   /* not in debug.h since debug.h is included in many places that don't
    know about mapping_t */
-  mapping_t *debug_levels();
+  mapping_t* debug_levels();
 
   push_refed_mapping(debug_levels());
 }
@@ -463,7 +468,7 @@ void f_debug_levels() {
 
 #ifdef F_DEEP_INVENTORY
 void f_deep_inventory() {
-  array_t *vec;
+  array_t* vec;
   int const args = st_num_arg;
   if (st_num_arg == 2 && sp->type == T_FUNCTION &&
       ((sp - 1)->type == T_ARRAY || (sp - 1)->type == T_OBJECT)) {
@@ -518,8 +523,8 @@ void f_error() {
   char err_buf[l + 3];
 
   err_buf[0] = '*';
-  u8_strncpy(reinterpret_cast<uint8_t *>(err_buf + 1),
-             reinterpret_cast<const uint8_t *>(sp->u.string), l);
+  u8_strncpy(reinterpret_cast<uint8_t*>(err_buf + 1),
+             reinterpret_cast<const uint8_t*>(sp->u.string), l);
   err_buf[l + 1] = '\n';
   err_buf[l + 2] = 0;
 
@@ -537,7 +542,7 @@ void f_disable_wizard() {
 
 #ifdef F_ENVIRONMENT
 void f_environment() {
-  object_t *ob = nullptr;
+  object_t* ob = nullptr;
 
   if (st_num_arg) {
     if ((ob = sp->u.ob)->flags & O_DESTRUCTED) {
@@ -559,7 +564,7 @@ void f_environment() {
 
 #ifdef F_FILE_NAME
 void f_file_name() {
-  char *res;
+  char* res;
 
   /* This function now returns a leading '/' */
   res = add_slash(sp->u.ob->obname);
@@ -570,7 +575,7 @@ void f_file_name() {
 
 #ifdef F_FILTER
 void f_filter() {
-  svalue_t *arg = sp - st_num_arg + 1;
+  svalue_t* arg = sp - st_num_arg + 1;
 
   if (arg->type == T_MAPPING) {
     filter_mapping(arg, st_num_arg);
@@ -597,7 +602,7 @@ void f_find_call_out() {
 
 #ifdef F_FIND_OBJECT
 void f_find_object() {
-  object_t *ob;
+  object_t* ob;
 
   if ((sp--)->u.number) {
     ob = find_object(sp->u.string);
@@ -617,11 +622,11 @@ void f_find_object() {
 #ifdef F_FUNCTION_PROFILE
 /* f_function_profile: John Garnett, 1993/05/31, 0.9.17.3 */
 void f_function_profile(void) {
-  array_t *vec;
-  mapping_t *map;
-  program_t *prog;
+  array_t* vec;
+  mapping_t* map;
+  program_t* prog;
   int nf, j;
-  object_t *ob;
+  object_t* ob;
 
   ob = sp->u.ob;
 
@@ -647,10 +652,10 @@ void f_function_profile(void) {
 
 #ifdef F_FUNCTION_EXISTS
 void f_function_exists() {
-  const char *str;
-  char *res;
+  const char* str;
+  char* res;
   int l;
-  object_t *ob;
+  object_t* ob;
   int flag = 0;
 
   if (st_num_arg > 1) {
@@ -671,7 +676,12 @@ void f_function_exists() {
   str = function_exists(sp->u.string, ob, flag);
   free_string_svalue(sp);
   if (str) {
-    l = SHARED_STRLEN(str) - 2; /* no .c */
+    l = SHARED_STRLEN(str); /* strip the source extension (.lpc or .c) */
+    if (l > 4 && strcmp(str + l - 4, ".lpc") == 0) {
+      l -= 4;
+    } else if (l > 2 && strcmp(str + l - 2, ".c") == 0) {
+      l -= 2;
+    }
     res = new_string(l + 1, "function_exists");
     res[0] = '/';
     strncpy(res + 1, str, l);
@@ -687,7 +697,7 @@ void f_function_exists() {
 
 #ifdef F_GET_CHAR
 void f_get_char() {
-  svalue_t *arg;
+  svalue_t* arg;
   int i, tmp;
   int flag;
 
@@ -719,9 +729,9 @@ void f_in_input() {
 #endif
 
 #ifdef F_INHERITS
-int inherits(program_t *prog, program_t *thep) {
+int inherits(program_t* prog, program_t* thep) {
   int j, k = prog->num_inherited, l;
-  program_t *pg;
+  program_t* pg;
 
   for (j = 0; j < k; j++) {
     if ((pg = prog->inherit[j].prog) == thep) {
@@ -757,7 +767,7 @@ void f_inherits() {
 
 #ifdef F_SHALLOW_INHERIT_LIST
 void f_shallow_inherit_list() {
-  array_t *vec;
+  array_t* vec;
 
   vec = inherit_list(sp->u.ob);
   free_object(&sp->u.ob, "f_inherit_list");
@@ -767,7 +777,7 @@ void f_shallow_inherit_list() {
 
 #ifdef F_INPUT_TO
 void f_input_to() {
-  svalue_t *arg;
+  svalue_t* arg;
   int i, tmp;
   int flag;
 
@@ -830,7 +840,7 @@ void f_functionp() {
 
 #ifdef F_KEYS
 void f_keys() {
-  array_t *vec;
+  array_t* vec;
 
   vec = mapping_indices(sp->u.map);
   free_mapping(sp->u.map);
@@ -840,7 +850,7 @@ void f_keys() {
 
 #ifdef F_VALUES
 void f_values() {
-  array_t *vec;
+  array_t* vec;
 
   vec = mapping_values(sp->u.map);
   free_mapping(sp->u.map);
@@ -850,15 +860,15 @@ void f_values() {
 
 #ifdef F_LOWER_CASE
 void f_lower_case() {
-  char *str;
+  char* str;
 
-  str = const_cast<char *>(sp->u.string);
+  str = const_cast<char*>(sp->u.string);
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uisupper(*str)) {
       int const l = str - sp->u.string;
       unlink_string_svalue(sp);
-      str = const_cast<char *>(sp->u.string) + l;
+      str = const_cast<char*>(sp->u.string) + l;
       *str = tolower(static_cast<unsigned char>(*str));
       for (str++; *str; str++) {
         if (uisupper(*str)) {
@@ -910,7 +920,7 @@ void f_mapp() {
 
 #ifdef F_MAP
 void f_map() {
-  svalue_t *arg = sp - st_num_arg + 1;
+  svalue_t* arg = sp - st_num_arg + 1;
 
   if (arg->type == T_MAPPING) {
     map_mapping(arg, st_num_arg);
@@ -946,16 +956,16 @@ void f_master() {
  */
 #ifdef F_MATCH_PATH
 void f_match_path() {
-  svalue_t *value;
-  const char *src;
-  char *dst;
-  svalue_t *nvalue;
-  mapping_t *map;
-  char *tmpstr;
+  svalue_t* value;
+  const char* src;
+  char* dst;
+  svalue_t* nvalue;
+  mapping_t* map;
+  char* tmpstr;
 
   value = &const0u;
 
-  tmpstr = reinterpret_cast<char *>(DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path"));
+  tmpstr = reinterpret_cast<char*>(DMALLOC(SVALUE_STRLEN(sp) + 1, TAG_STRING, "match_path"));
 
   src = sp->u.string;
   dst = tmpstr;
@@ -992,7 +1002,7 @@ void f_match_path() {
 
 #ifdef F_MEMBER_ARRAY
 void f_member_array() {
-  array_t *v;
+  array_t* v;
   int flag = 0;
   int i;
   int size;
@@ -1013,7 +1023,7 @@ void f_member_array() {
   }
 
   if (sp->type == T_STRING) {
-    const char *res;
+    const char* res;
     if (flag & 2) {
       error("member_array: can not search backwards in strings");
     }
@@ -1028,8 +1038,8 @@ void f_member_array() {
     }
     free_string_svalue(sp--);
   } else {
-    svalue_t *sv;
-    svalue_t *find;
+    svalue_t* sv;
+    svalue_t* find;
     int flen = 0;
 
     size = (v = sp->u.arr)->size;
@@ -1051,7 +1061,18 @@ void f_member_array() {
       if (flag & 2) {
         tmp = size - tmp - 1;
       }
-      switch (find->type | (sv = v->item + tmp)->type) {
+      sv = v->item + tmp;
+      if ((flag & 4) && find->type == T_FUNCTION) {
+        // Predicate search (issue #900): return the first index whose
+        // element makes the function return truthy.
+        push_svalue(sv);
+        svalue_t* ret = call_function_pointer(find->u.fp, 1);
+        if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
+          break;
+        }
+        continue;
+      }
+      switch (find->type | sv->type) {
         case T_STRING:
           if (flag & 1) {
             if (flen && (sv->subtype & STRING_COUNTED) && flen > MSTR_SIZE(sv->u.string)) {
@@ -1132,7 +1153,8 @@ void f_member_array() {
     free_svalue(find, "f_member_array");
     sp--;
   }
-  if (flag & 2) {
+  if (i != -1 && (flag & 2)) {
+    /* not-found used to be "reversed" too, returning size instead of -1 */
     i = size - i - 1;
   }
   put_number(i);
@@ -1143,7 +1165,7 @@ void f_member_array() {
 void f_message() {
   array_t *use = nullptr, *avoid;
   int const num_arg = st_num_arg;
-  svalue_t *args;
+  svalue_t* args;
 
   args = sp - num_arg + 1;
   switch (args[2].type) {
@@ -1211,7 +1233,7 @@ void f_move_object() {
 #endif
 
 namespace {
-int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
+int calculate_and_maybe_print_memory_info(outbuffer_t* ob, int verbose) {
   uint64_t tot = 0;
 
   tot += print_cache_stats(ob, verbose);
@@ -1290,6 +1312,9 @@ int calculate_and_maybe_print_memory_info(outbuffer_t *ob, int verbose) {
   if (verbose && verbose != -1) outbuf_add(ob, "\n");
 
   tot += add_string_status(ob, verbose);
+  if (verbose && verbose != -1) outbuf_add(ob, "\n");
+
+  tot += scratchpad_status(ob, verbose);
   if (verbose && verbose != -1) outbuf_add(ob, "\n");
 
   return tot;
@@ -1373,8 +1398,8 @@ void f_pointerp() {
 #ifdef F_PRESENT
 void f_present() {
   int const num_arg = st_num_arg;
-  svalue_t *arg = sp - num_arg + 1;
-  object_t *ob;
+  svalue_t* arg = sp - num_arg + 1;
+  object_t* ob;
 
   if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
     if (num_arg == 2) {
@@ -1393,9 +1418,9 @@ void f_present() {
 
 #ifdef F_PREVIOUS_OBJECT
 void f_previous_object() {
-  control_stack_t *p;
+  control_stack_t* p;
   int i;
-  object_t *ob = nullptr;
+  object_t* ob = nullptr;
 
   if ((i = sp->u.number) > 0) {
     if (i >= CONFIG_INT(__MAX_CALL_DEPTH__)) {
@@ -1411,7 +1436,7 @@ void f_previous_object() {
       }
     } while (--p >= control_stack);
   } else if (i == -1) {
-    array_t *v;
+    array_t* v;
 
     i = previous_ob ? 1 : 0;
     p = csp;
@@ -1462,7 +1487,7 @@ void f_previous_object() {
 #ifdef F_PRINTF
 void f_printf() {
   int const num_arg = st_num_arg;
-  char *ret;
+  char* ret;
 
   if (command_giver) {
     ret = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
@@ -1478,7 +1503,7 @@ void f_printf() {
 
 #ifdef F_PROCESS_STRING
 void f_process_string(void) {
-  char *str;
+  char* str;
 
   str = process_string(sp->u.string);
   if (str != sp->u.string) {
@@ -1490,7 +1515,7 @@ void f_process_string(void) {
 
 #ifdef F_PROCESS_VALUE
 void f_process_value(void) {
-  svalue_t *ret;
+  svalue_t* ret;
 
   ret = process_value(sp->u.string);
   free_string_svalue(sp);
@@ -1518,7 +1543,7 @@ void f_query_ed_mode(void) {
 
 #ifdef F_QUERY_HOST_NAME
 void f_query_host_name() {
-  char *tmp;
+  char* tmp;
 
   if ((tmp = query_host_name())) {
     push_constant_string(tmp);
@@ -1540,7 +1565,7 @@ void f_query_idle() {
 
 #ifdef F_QUERY_IP_NAME
 void f_query_ip_name() {
-  const char *tmp;
+  const char* tmp;
 
   tmp = query_ip_name(st_num_arg ? sp->u.ob : nullptr);
   if (st_num_arg) {
@@ -1557,7 +1582,7 @@ void f_query_ip_name() {
 
 #ifdef F_QUERY_IP_NUMBER
 void f_query_ip_number() {
-  const char *tmp;
+  const char* tmp;
 
   tmp = query_ip_number(st_num_arg ? sp->u.ob : nullptr);
   if (st_num_arg) {
@@ -1579,7 +1604,7 @@ void f_query_load_average() { copy_and_push_string(query_load_av()); }
 
 #ifdef F_QUERY_PRIVS
 void f_query_privs() {
-  object_t *ob;
+  object_t* ob;
 
   ob = sp->u.ob;
   if (ob->privs != nullptr) {
@@ -1596,7 +1621,7 @@ void f_query_privs() {
 
 #ifdef F_QUERY_SNOOPING
 void f_query_snooping() {
-  object_t *ob;
+  object_t* ob;
 
   ob = query_snooping(sp->u.ob);
   free_object(&sp->u.ob, "f_query_snooping");
@@ -1610,7 +1635,7 @@ void f_query_snooping() {
 
 #ifdef F_QUERY_SNOOP
 void f_query_snoop() {
-  object_t *ob;
+  object_t* ob;
 
   ob = query_snoop(sp->u.ob);
   free_object(&sp->u.ob, "f_query_snoop");
@@ -1644,9 +1669,9 @@ void f_secure_random() {
 
 #ifdef F_READ_BYTES
 void f_read_bytes() {
-  char *str;
+  char* str;
   int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
-  svalue_t *arg;
+  svalue_t* arg;
 
   arg = sp - num_arg + 1;
   if (num_arg > 1) {
@@ -1669,10 +1694,10 @@ void f_read_bytes() {
 
 #ifdef F_READ_BUFFER
 void f_read_buffer() {
-  char *str;
+  char* str;
   int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
   int from_file = 0; /* new line */
-  svalue_t *arg = sp - num_arg + 1;
+  svalue_t* arg = sp - num_arg + 1;
 
   if (num_arg > 1) {
     start = arg[1].u.number;
@@ -1690,7 +1715,7 @@ void f_read_buffer() {
   if (str == nullptr) {
     push_number(0);
   } else if (from_file) { /* changed */
-    buffer_t *buf;
+    buffer_t* buf;
 
     buf = allocate_buffer(rlen);
     memcpy(buf->item, str, rlen);
@@ -1706,7 +1731,7 @@ void f_read_buffer() {
 
 #ifdef F_READ_FILE
 void f_read_file() {
-  char *str;
+  char* str;
   int start = 0, len = 0;
 
   switch (st_num_arg) {
@@ -1745,7 +1770,7 @@ void f_receive() {
     free_string_svalue(sp--);
   } else {
     if (current_object->interactive) {
-      add_message(current_object, reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
+      add_message(current_object, reinterpret_cast<char*>(sp->u.buf->item), sp->u.buf->size);
     }
 
     free_buffer((sp--)->u.buf);
@@ -1755,8 +1780,8 @@ void f_receive() {
 
 #ifdef F_REG_ASSOC
 void f_reg_assoc() {
-  svalue_t *arg;
-  array_t *vec;
+  svalue_t* arg;
+  array_t* vec;
 
   arg = sp - st_num_arg + 1;
 
@@ -1779,7 +1804,7 @@ void f_reg_assoc() {
 
 #ifdef F_REGEXP
 void f_regexp() {
-  array_t *v;
+  array_t* v;
   int flag;
 
   if (st_num_arg > 2) {
@@ -1892,15 +1917,15 @@ void f_replace_string() {
 
   int plen, rlen, dlen, slen, first, last, cur, j;
 
-  const char *pattern;
-  const char *replace;
-  const char *src;
+  const char* pattern;
+  const char* replace;
+  const char* src;
   char *dst1, *dst2;
-  svalue_t *arg;
+  svalue_t* arg;
   int skip_table[256];
-  const char *slimit;
-  const char *flimit;
-  char *climit;
+  const char* slimit;
+  const char* flimit;
+  char* climit;
   int probe;
   int skip;
 
@@ -1970,7 +1995,7 @@ void f_replace_string() {
 
   if (rlen <= plen) {
     /* in string replacement */
-    dst2 = dst1 = const_cast<char *>(arg->u.string);
+    dst2 = dst1 = const_cast<char*>(arg->u.string);
 
     if (plen > 1) { /* pattern length > 1, jump table most efficient */
       while (src < flimit) {
@@ -2011,7 +2036,7 @@ void f_replace_string() {
             cur++;
 
             if (cur >= first && cur <= last) {
-              *const_cast<char *>(src) = *replace;
+              *const_cast<char*>(src) = *replace;
             }
           }
           src++;
@@ -2021,7 +2046,7 @@ void f_replace_string() {
           if (*src++ == *pattern) {
             cur++;
             if (cur >= first) {
-              dst2 = const_cast<char *>(src) - 1;
+              dst2 = const_cast<char*>(src) - 1;
               while (*src) {
                 if (*src == *pattern) {
                   cur++;
@@ -2168,7 +2193,7 @@ void f_rm() {
 
 #ifdef F_RMDIR
 void f_rmdir() {
-  const char *path;
+  const char* path;
 
   path = check_valid_path(sp->u.string, current_object, "rmdir", 1);
   if (!path || rmdir(path) == -1) {
@@ -2183,14 +2208,14 @@ void f_rmdir() {
 
 #ifdef F_SAY
 void f_say() {
-  array_t *avoid;
+  array_t* avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
                          1,
 #endif
                          1,
 #ifdef PACKAGE_MUDLIB_STATS
-                         {(mudlib_stats_t *)nullptr, (mudlib_stats_t *)nullptr}
+                         {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr}
 #endif
   };
 
@@ -2240,7 +2265,7 @@ void f_set_eval_limit() {
 
 #ifdef F_SET_BIT
 void f_set_bit() {
-  char *str;
+  char* str;
   int len, old_len, ind, bit;
 
   auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
@@ -2260,7 +2285,7 @@ void f_set_bit() {
   }
   if (ind < old_len) {
     unlink_string_svalue(sp);
-    str = const_cast<char *>(sp->u.string);
+    str = const_cast<char*>(sp->u.string);
   } else {
     str = new_string(len, "f_set_bit: str");
     str[len] = '\0';
@@ -2284,26 +2309,26 @@ void f_set_bit() {
 
 #ifdef F_SET_NOTIFY_DESTRUCT
 void f_set_notify_destruct() {
-  int const num = sp->u.number ;
+  int const num = sp->u.number;
 
-  if(num == 1) {
+  if (num == 1) {
     current_object->flags |= O_NOTIFY_DESTRUCT;
-  } else if(num == 0) {
+  } else if (num == 0) {
     current_object->flags &= ~O_NOTIFY_DESTRUCT;
   } else {
     error("Bad argument 1 to set_notify_destructing()\n");
   }
 
-  pop_stack() ;
+  pop_stack();
 }
 #endif
 
 #ifdef F_QUERY_NOTIFY_DESTRUCT
 void f_query_notify_destruct() {
-  object_t *ob = sp->u.ob;
-  int const num = ob->flags & O_NOTIFY_DESTRUCT ;
+  object_t* ob = sp->u.ob;
+  int const num = ob->flags & O_NOTIFY_DESTRUCT;
   free_object(&sp->u.ob, "f_query_notify_destruct");
-  put_number(num ? 1 : 0) ;
+  put_number(num ? 1 : 0);
 }
 #endif
 
@@ -2337,7 +2362,7 @@ void f_set_hide() {
 
 #ifdef F_SET_LIGHT
 void f_set_light() {
-  object_t *o1;
+  object_t* o1;
 
   add_light(current_object, sp->u.number);
   o1 = current_object;
@@ -2352,7 +2377,7 @@ void f_set_light() {
 
 #ifdef F_SET_PRIVS
 void f_set_privs() {
-  object_t *ob;
+  object_t* ob;
 
   ob = (sp - 1)->u.ob;
   if (ob->privs != nullptr) {
@@ -2372,7 +2397,7 @@ void f_set_privs() {
 
 #ifdef F_SHADOW
 void f_shadow() {
-  object_t *ob;
+  object_t* ob;
 
   ob = (sp - 1)->u.ob;
   if (!((sp--)->u.number)) {
@@ -2495,7 +2520,7 @@ void f_snoop() {
 
 #ifdef F_SPRINTF
 void f_sprintf() {
-  char *s;
+  char* s;
   int const num_arg = st_num_arg;
 
   s = string_print_formatted((sp - num_arg + 1)->u.string, num_arg - 1, sp - num_arg + 2);
@@ -2516,9 +2541,9 @@ void f_sprintf() {
 #ifdef F_STAT
 void f_stat() {
   struct stat buf;
-  const char *path;
-  array_t *v;
-  object_t *ob;
+  const char* path;
+  array_t* v;
+  object_t* ob;
 
   path = check_valid_path((--sp)->u.string, current_object, "stat", 0);
   if (!path) {
@@ -2576,9 +2601,9 @@ void f_stat() {
  */
 
 void f_strsrch() {
-  auto *arg1 = sp - 2;
-  auto *arg2 = sp - 1;
-  auto *arg3 = sp;
+  auto* arg1 = sp - 2;
+  auto* arg2 = sp - 1;
+  auto* arg3 = sp;
 
   // fast track empty string search
   if (arg1->u.string[0] == '\0') {
@@ -2606,9 +2631,9 @@ void f_strsrch() {
       single_char_search = true;
     }
     if (single_char_search && single >= 0) {
-      const auto *res =
+      const auto* res =
           arg3->u.number == 0 ? strchr(arg1->u.string, single) : strrchr(arg1->u.string, single);
-      auto pos = res == nullptr ? -1 : (const char *)res - arg1->u.string;
+      auto pos = res == nullptr ? -1 : (const char*)res - arg1->u.string;
 
       EGCIterator iter(arg1->u.string, SVALUE_STRLEN(arg1));
       auto ret = pos == -1 || !iter.ok() ? -1 : u8_offset_to_egc_index(iter, pos);
@@ -2620,7 +2645,7 @@ void f_strsrch() {
   }
 
   uint8_t buf[U8_MAX_LENGTH + 1] = {0};
-  const char *find = nullptr;
+  const char* find = nullptr;
   size_t find_len = 0;
 
   if (arg2->type == T_NUMBER) {
@@ -2631,7 +2656,7 @@ void f_strsrch() {
       error("Invalid codepoint to search.");
     }
     buf[offset] = '\0';
-    find = (const char *)buf;
+    find = (const char*)buf;
     find_len = offset;
   } else {
     find = arg2->u.string;
@@ -2698,20 +2723,20 @@ void f_tell_object() {
 
 #ifdef F_TELL_ROOM
 void f_tell_room() {
-  array_t *avoid;
+  array_t* avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
                          1,
 #endif
                          1,
 #ifdef PACKAGE_MUDLIB_STATS
-                         {(mudlib_stats_t *)nullptr, (mudlib_stats_t *)nullptr}
+                         {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr}
 #endif
   };
 
   int const num_arg = st_num_arg;
-  svalue_t *arg = sp - num_arg + 1;
-  object_t *ob;
+  svalue_t* arg = sp - num_arg + 1;
+  object_t* ob;
 
   if (arg->type == T_OBJECT) {
     ob = arg[0].u.ob;
@@ -2901,7 +2926,7 @@ void f__to_int() {
       sp->u.number = temp;
       break;
     case T_STRING: {
-      char *p;
+      char* p;
 
       temp = strtoll(sp->u.string, &p, 10);
       if (*p) {
@@ -2941,7 +2966,7 @@ void f__to_int() {
       } else {
         int hostint, netint;
 
-        memcpy(reinterpret_cast<char *>(&netint), sp->u.buf->item, sizeof(int));
+        memcpy(reinterpret_cast<char*>(&netint), sp->u.buf->item, sizeof(int));
         hostint = ntohl(netint);
         free_buffer(sp->u.buf);
         put_number(hostint);
@@ -2952,7 +2977,7 @@ void f__to_int() {
 
 #ifdef F_TYPEOF
 void f_typeof() {
-  const char *t = type_name(sp->type);
+  const char* t = type_name(sp->type);
 
   free_svalue(sp, "f_typeof");
   put_constant_string(t);
@@ -2996,10 +3021,10 @@ void f_users() {
 #endif
 
   auto total = users_num(include_hidden);
-  array_t *ret = allocate_empty_array(total);
+  array_t* ret = allocate_empty_array(total);
 
   int i = 0;
-  for (auto *user : users()) {
+  for (auto* user : users()) {
     if (!include_hidden) {
       if ((user->ob->flags & O_HIDDEN) != 0) {
         continue;
@@ -3052,21 +3077,21 @@ void f_write_bytes() {
   switch (sp->type) {
     case T_NUMBER: {
       int netint;
-      char *netbuf;
+      char* netbuf;
 
       if (!sp->u.number) {
         bad_arg(3, F_WRITE_BYTES);
       }
       /* convert to network byte-order */
       netint = htonl(sp->u.number);
-      netbuf = reinterpret_cast<char *>(&netint);
+      netbuf = reinterpret_cast<char*>(&netint);
       i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number, netbuf, sizeof(int));
       break;
     }
 
     case T_BUFFER: {
       i = write_bytes((sp - 2)->u.string, (sp - 1)->u.number,
-                      reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
+                      reinterpret_cast<char*>(sp->u.buf->item), sp->u.buf->size);
       break;
     }
 
@@ -3097,18 +3122,18 @@ void f_write_buffer() {
   switch (sp->type) {
     case T_NUMBER: {
       int netint;
-      char *netbuf;
+      char* netbuf;
 
       /* convert to network byte-order */
       netint = htonl(sp->u.number);
-      netbuf = reinterpret_cast<char *>(&netint);
+      netbuf = reinterpret_cast<char*>(&netint);
       i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number, netbuf, sizeof(int));
       break;
     }
 
     case T_BUFFER: {
       i = write_buffer((sp - 2)->u.buf, (sp - 1)->u.number,
-                       reinterpret_cast<char *>(sp->u.buf->item), sp->u.buf->size);
+                       reinterpret_cast<char*>(sp->u.buf->item), sp->u.buf->size);
       break;
     }
 
@@ -3160,7 +3185,7 @@ void f_reclaim_objects() {
 #ifdef F_MEMORY_INFO
 void f_memory_info() {
   LPC_INT mem;
-  object_t *ob;
+  object_t* ob;
 
   if (st_num_arg == 0) {
     LPC_INT const tot = calculate_and_maybe_print_memory_info(nullptr, -1);
@@ -3190,9 +3215,20 @@ void f_reload_object() {
 }
 #endif
 
+#ifdef F_RECOMPILE_OBJECT
+void f_recompile_object() {
+  int count = recompile_object(sp->u.ob);
+  // The target (or one of its clones) may have destructed itself in its
+  // new program's __INIT: destruct sweeps the VM stack, so sp may hold
+  // a plain 0 instead of the object reference by now.
+  free_svalue(sp, "f_recompile_object");
+  put_number(count);
+}
+#endif
+
 #ifdef F_QUERY_SHADOWING
 void f_query_shadowing() {
-  object_t *ob;
+  object_t* ob;
 
   if ((sp->type == T_OBJECT) && (ob = sp->u.ob)->shadowing) {
     add_ref(ob->shadowing, "query_shadowing(ob)");
@@ -3202,6 +3238,22 @@ void f_query_shadowing() {
     free_svalue(sp, "f_query_shadowing");
     *sp = const0;
   }
+}
+#endif
+
+#ifdef F_REQUEST_CLEAN_UP
+void f_request_clean_up() {
+  object_t* ob = sp->u.ob;
+  int success = 0;
+
+  // Same condition as at load/clone time: only objects that actually
+  // define clean_up() are put back on the sweep's query list (issue #917).
+  if (!(ob->flags & O_DESTRUCTED) && function_exists(APPLY_CLEAN_UP, ob, 1)) {
+    ob->flags |= O_WILL_CLEAN_UP;
+    success = 1;
+  }
+  free_object(&sp->u.ob, "f_request_clean_up");
+  put_number(success);
 }
 #endif
 
@@ -3250,7 +3302,7 @@ void f_flush_messages() {
 
 #ifdef F_FIRST_INVENTORY
 void f_first_inventory() {
-  object_t *ob;
+  object_t* ob;
 
   ob = first_inventory(sp);
   free_svalue(sp, "f_first_inventory");
@@ -3264,7 +3316,7 @@ void f_first_inventory() {
 
 #ifdef F_NEXT_INVENTORY
 void f_next_inventory() {
-  object_t *ob;
+  object_t* ob;
 
   ob = sp->u.ob->next_inv;
   free_object(&sp->u.ob, "f_next_inventory");
@@ -3286,7 +3338,7 @@ void f_next_inventory() {
 
 #ifdef F_DEFER
 void f_defer() {
-  auto *newlist = reinterpret_cast<struct defer_list *>(
+  auto* newlist = reinterpret_cast<struct defer_list*>(
       DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
 
   if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
@@ -3312,7 +3364,7 @@ void f_defer() {
       csp->defers = newlist;
     } else {
       // Search last defer.
-      struct defer_list *last_defer = csp->defers;
+      struct defer_list* last_defer = csp->defers;
       while (last_defer->next) last_defer = last_defer->next;
 
       last_defer->next = newlist;
@@ -3329,8 +3381,8 @@ void f_crypt() {
   const int sh_a512_prefix_len = 3;
   const int sh_a512_salt_len = 16;
   char salt[sh_a512_prefix_len + sh_a512_salt_len + 1];
-  const char *saltp = nullptr;
-  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
+  const char* saltp = nullptr;
+  const char* choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
 
   if (sp->type == T_STRING) {
     // Support $1$, $2a$ (a,x,y), $5$, $6$
@@ -3370,8 +3422,8 @@ void f_crypt() {
     salt[sizeof(salt) - 1] = '\0';
     saltp = salt;
   }
-  const auto *key = (sp - 1)->u.string;
-  auto *result = __crypt(key, saltp);
+  const auto* key = (sp - 1)->u.string;
+  auto* result = __crypt(key, saltp);
   if (result == nullptr || (result && result[0] == '*')) {
     error("Error in crypt(), check your salt");
     return;
@@ -3388,7 +3440,7 @@ void f_oldcrypt() {
 
   const char *res, *p;
   char salt[salt_len + 1];
-  const char *choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
+  const char* choice = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ./";
 
   if (sp->type == T_STRING && SVALUE_STRLEN(sp) >= 2) {
     p = sp->u.string;
@@ -3413,7 +3465,7 @@ void f_oldcrypt() {
 
 #ifdef F_RUSAGE
 void f_rusage() {
-  mapping_t *m;
+  mapping_t* m;
   struct rusage rus = {};
 
   if (getrusage(RUSAGE_SELF, &rus) < 0) {

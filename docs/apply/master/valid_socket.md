@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / valid_socket
 ---
 # valid_socket

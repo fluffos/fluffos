@@ -1,0 +1,10 @@
+void do_tests() {
+    object victim = clone_object("/clone/catch_tell_probe");
+    object sh = clone_object("/clone/shadow_probe");
+    ASSERT(sh->start(victim));
+    ASSERT_EQ(victim, query_shadowing(sh));
+    ASSERT_EQ(1, remove_shadow(sh));
+    ASSERT_EQ(0, query_shadowing(sh));
+    destruct(sh);
+    destruct(victim);
+}

@@ -1,0 +1,4 @@
+// Fixture: private inheritance must reach inherit_program with priv == 1.
+private inherit "/clone/ip_real";
+
+int child_fn() { return parent_fn() + 5; }

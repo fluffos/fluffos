@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / write_prompt
 ---
 # write_prompt

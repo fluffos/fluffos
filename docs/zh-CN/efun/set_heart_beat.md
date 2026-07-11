@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / set_heart_beat
 ---
 # set_heart_beat
@@ -10,7 +9,7 @@ title: objects / set_heart_beat
 
 ### 语法
 
-    int set_heart_beat( int flag );
+    void set_heart_beat( int flag );
 
 ### 描述
 

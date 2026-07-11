@@ -8,7 +8,7 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/simulate.h"
-#include "compiler/internal/lex.h"  // for ident_hash_elem_t etc, fix me!
+#include "compiler/internal/lexer.h"  // for ident_hash_elem_t etc, fix me!
 
 /*
  * This file rewritten by Beek because it was inefficient and slow.  We
@@ -27,16 +27,16 @@
  */
 
 struct simul_entry {
-  const char *name;
+  const char* name;
   short index;
 };
 
-simul_entry *simul_names = nullptr;
-function_lookup_info_t *simuls = nullptr;
+simul_entry* simul_names = nullptr;
+function_lookup_info_t* simuls = nullptr;
 int num_simul_efun = 0;
-object_t *simul_efun_ob;
+object_t* simul_efun_ob;
 
-static void find_or_add_simul_efun(function_t * /*funp*/, int /*runtime_index*/);
+static void find_or_add_simul_efun(function_t* /*funp*/, int /*runtime_index*/);
 static void remove_simuls(void);
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -53,9 +53,9 @@ void mark_simuls() {
  * If there is a simul_efun file, then take care of it and extract all
  * information we need.
  */
-void init_simul_efun(const char *file) {
+void init_simul_efun(const char* file) {
   char buf[512];
-  object_t *new_ob;
+  object_t* new_ob;
 
   if (!file || !file[0]) {
     debug_message("No simul_efun\n");
@@ -65,13 +65,11 @@ void init_simul_efun(const char *file) {
     error("Illegal simul_efun file name '%s'\n", file);
   }
 
-  if (file[strlen(file) - 2] != '.') {
-    strcat(buf, ".c");
-  }
-
-  new_ob = load_object(buf, 1);
+  // Load with the config's raw spelling: an explicit ".c"/".lpc" stays
+  // exact; extension-less names prefer ".lpc" and fall back to ".c".
+  new_ob = load_object(file, 1);
   if (new_ob == nullptr) {
-    debug_message("The simul_efun file %s was not loaded.\n", buf);
+    debug_message("The simul_efun file %s was not loaded.\n", file);
     exit(-1);
   }
   set_simul_efun(new_ob);
@@ -79,7 +77,7 @@ void init_simul_efun(const char *file) {
 
 static void remove_simuls() {
   int i;
-  ident_hash_elem_t *ihe;
+  ident_hash_elem_t* ihe;
   /* inactivate all old simul_efuns */
   for (i = 0; i < num_simul_efun; i++) {
     simuls[i].index = 0;
@@ -97,17 +95,21 @@ static void remove_simuls() {
   }
 }
 
-static void get_simul_efuns(program_t *prog) {
+static void get_simul_efuns(program_t* prog) {
   int i;
   int num_new = prog->num_functions_defined + prog->last_inherited;
 
   if (num_simul_efun) {
     remove_simuls();
-    if (!num_new) {
-      FREE(simul_names);
-      FREE(simuls);
-      num_simul_efun = 0;
-    } else {
+    /* Do NOT free the tables when the new program defines no simuls:
+     * previously-compiled programs still carry F_SIMUL_EFUN opcodes and
+     * FP_SIMUL funptrs with baked indices into these arrays (live across
+     * a recompile of the simul_efun object). remove_simuls() has already
+     * tombstoned every entry (func = nullptr), which yields the clean
+     * "no longer a simul_efun" error; keeping the arrays preserves the
+     * name->index mapping so any re-added simul reuses its slot. Only
+     * grow the arrays when there are new candidate functions. */
+    if (num_new) {
       /* will be resized later */
       simul_names =
           RESIZE(simul_names, num_simul_efun + num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");
@@ -116,9 +118,9 @@ static void get_simul_efuns(program_t *prog) {
     }
   } else {
     if (num_new) {
-      simul_names = reinterpret_cast<simul_entry *>(
+      simul_names = reinterpret_cast<simul_entry*>(
           DCALLOC(num_new, sizeof(simul_entry), TAG_SIMULS, "get_simul_efuns"));
-      simuls = reinterpret_cast<function_lookup_info_t *>(
+      simuls = reinterpret_cast<function_lookup_info_t*>(
           DCALLOC(num_new, sizeof(function_lookup_info_t), TAG_SIMULS, "get_simul_efuns: 2"));
     }
   }
@@ -140,8 +142,8 @@ static void get_simul_efuns(program_t *prog) {
 /*
  * Define a new simul_efun
  */
-static void find_or_add_simul_efun(function_t *funp, int runtime_index) {
-  ident_hash_elem_t *ihe;
+static void find_or_add_simul_efun(function_t* funp, int runtime_index) {
+  ident_hash_elem_t* ihe;
   int first = 0;
   int last = num_simul_efun - 1;
   int i, j;
@@ -178,15 +180,34 @@ static void find_or_add_simul_efun(function_t *funp, int runtime_index) {
   ref_string(funp->funcname);
 }
 
-void set_simul_efun(object_t *ob) {
+void set_simul_efun(object_t* ob) {
   get_simul_efuns(ob->prog);
 
-  simul_efun_ob = ob;
-  add_ref(simul_efun_ob, "set_simul_efun");
+  if (simul_efun_ob != ob) {
+    simul_efun_ob = ob;
+    add_ref(simul_efun_ob, "set_simul_efun");
+  }
+}
+
+/*
+ * Rebuild the simul_efun dispatch table after recompile_object()
+ * swapped a fresh program into the live simul_efun object. Must run
+ * before any LPC executes against the new program (its __INIT
+ * included): call_simul_efun() dispatches by runtime index through
+ * this table, and the old entries point into the old program's
+ * function table. Indices are preserved by NAME across the rebuild
+ * (see get_simul_efuns), so calls compiled into other programs keep
+ * working; a simul_efun removed by the new source fails with the
+ * usual "no longer a simul_efun" error.
+ */
+void rebuild_simul_efuns() {
+  if (simul_efun_ob) {
+    get_simul_efuns(simul_efun_ob->prog);
+  }
 }
 
 void call_simul_efun(unsigned short index, int num_arg) {
-  extern object_t *simul_efun_ob;
+  extern object_t* simul_efun_ob;
 
   if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
     pop_n_elems(num_arg);

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: master / retrieve_ed_setup
 ---
 # retrieve_ed_setup

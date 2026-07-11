@@ -1,0 +1,12 @@
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+void rcb(int fd) { }
+void do_tests() {
+    int fd = socket_create(STREAM, "rcb");
+    ASSERT(fd >= 0);
+    ASSERT_EQ(EESUCCESS, socket_bind(fd, 0));      // ephemeral port
+    ASSERT(socket_bind(fd, 0) < 0);                 // already bound
+    socket_close(fd);
+}
+#endif

@@ -86,13 +86,13 @@ maximum call depth : 30
 maximum evaluation cost : 300000000
 
 # This is the maximum array size allowed for one single array.
-maximum array size : 15000
+maximum array size : 100000
 
 # This is the maximum allowed size of a variable of type 'buffer'.
 maximum buffer size : 400000
 
 # Max size for a mapping
-maximum mapping size : 15000
+maximum mapping size : 100000
 
 # Max inherit chain size
 inherit chain size : 30
@@ -166,17 +166,6 @@ reversible explode string : 0
 # for sort_array.
 #
 sane sorting : 1
-
-# WARN_TAB: Some versions of the editor built in indent function use
-#   tabs for indenting. This options turns on a warning message for
-#   files indented with tabs instead of spaces.
-#
-warn tab : 0
-
-# WOMBLES: don't allow spaces between start/end of array/mapping/functional
-# token chars so ({1,2,3}) still works, but ( { 1 , 2 , 3 } ) doesn't
-# and ({ 1 , 2 , 3 }) does.
-wombles : 0
 
 # CALL_OTHER_TYPE_CHECK: enable type checking for call_other()
 # (-> operator on objects)
@@ -386,3 +375,8 @@ evaluator stack size : 1000
 # Define the size of the compiler stack. This defines how complex
 # expressions the compiler can parse.  (unused currently)
 compiler stack size : 200
+
+# get_os_env()/set_os_env() allow-lists (issue #1045); FLUFFOS_TEST_RW is
+# also implicitly readable.
+allowed os environment variables : PATH:FLUFFOS_TEST_RO
+writable os environment variables : FLUFFOS_TEST_RW

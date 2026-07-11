@@ -16,7 +16,7 @@
 #ifdef F_SOCKET_CREATE
 void f_socket_create() {
   int fd, num_arg = st_num_arg;
-  svalue_t *arg;
+  svalue_t* arg;
 
   arg = sp - num_arg + 1;
   if ((num_arg == 3) && !(arg[2].type & (T_STRING | T_FUNCTION))) {
@@ -40,7 +40,7 @@ void f_socket_create() {
 #ifdef F_SOCKET_BIND
 void f_socket_bind() {
   int i, fd, port, num_arg = st_num_arg;
-  svalue_t *arg;
+  svalue_t* arg;
   char addr[ADDR_BUF_SIZE];
 
   arg = sp - num_arg + 1;
@@ -118,7 +118,7 @@ void f_socket_connect() {
     /*
      * socket descriptor is not bound yet
      */
-    const char *s;
+    const char* s;
     int start = 0;
 
     addr[0] = '\0';
@@ -150,7 +150,7 @@ void f_socket_connect() {
 #ifdef F_SOCKET_WRITE
 void f_socket_write() {
   int i, fd, port;
-  svalue_t *arg;
+  svalue_t* arg;
   char addr[ADDR_BUF_SIZE];
   int const num_arg = st_num_arg;
 
@@ -162,7 +162,7 @@ void f_socket_write() {
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("write")) {
-    i = socket_write(fd, &arg[1], (num_arg == 3) ? arg[2].u.string : (char *)nullptr);
+    i = socket_write(fd, &arg[1], (num_arg == 3) ? arg[2].u.string : (char*)nullptr);
     pop_n_elems(num_arg - 1);
     sp->u.number = i;
   } else {
@@ -235,7 +235,7 @@ void f_socket_error() { put_constant_string(socket_error(sp->u.number)); }
 
 #ifdef F_SOCKET_ADDRESS
 void f_socket_address() {
-  char *str;
+  char* str;
   int local, port;
   char addr[ADDR_BUF_SIZE];
   char buf[2 * ADDR_BUF_SIZE]; /* a bit of overkill to be safe */
@@ -254,7 +254,7 @@ void f_socket_address() {
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int const ret = getnameinfo(reinterpret_cast<struct sockaddr *>(&sp->u.ob->interactive->addr),
+    int const ret = getnameinfo(reinterpret_cast<struct sockaddr*>(&sp->u.ob->interactive->addr),
                                 sp->u.ob->interactive->addrlen, host, sizeof(host), service,
                                 sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
@@ -277,7 +277,7 @@ void f_socket_address() {
 
 #ifdef F_SOCKET_STATUS
 void f_socket_status() {
-  array_t *info;
+  array_t* info;
   int i;
 
   if (st_num_arg) {
@@ -301,15 +301,15 @@ void f_socket_status() {
 
 #ifdef F_SOCKET_SET_OPTION
 void f_socket_set_option() {
-  auto lpc_sock  = (sp - 2)->u.number;
+  auto lpc_sock = (sp - 2)->u.number;
   auto option = (sp - 1)->u.number;
-  auto *arg = sp;
+  auto* arg = sp;
 
   if (lpc_sock < 0 || lpc_sock >= lpc_socks_num()) {
-     error("Bad socket descriptor: %d\n", lpc_sock);
+    error("Bad socket descriptor: %d\n", lpc_sock);
   }
 
-  switch(option) {
+  switch (option) {
     case SO_TLS_VERIFY_PEER:
       if (arg->type != T_NUMBER) {
         bad_arg(3, F_SOCKET_SET_OPTION);
@@ -338,7 +338,7 @@ void f_socket_set_option() {
       assign_svalue(&lpc_socks_get(lpc_sock)->options[SO_TLS_KEY], arg);
       break;
     default:
-        error("Unknown socket option: %d\n", option);
+      error("Unknown socket option: %d\n", option);
   }
   pop_3_elems();
 }
@@ -346,14 +346,14 @@ void f_socket_set_option() {
 
 #ifdef F_SOCKET_GET_OPTION
 void f_socket_get_option() {
-  auto lpc_sock  = (sp - 2)->u.number;
+  auto lpc_sock = (sp - 2)->u.number;
   auto option = (sp - 1)->u.number;
 
   if (lpc_sock < 0 || lpc_sock >= lpc_socks_num()) {
     error("Bad socket descriptor: %d\n", lpc_sock);
   }
 
-  switch(option) {
+  switch (option) {
     case SO_TLS_VERIFY_PEER:
       if (lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].type == T_NUMBER) {
         push_number(lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].u.number);
@@ -388,6 +388,5 @@ void f_socket_get_option() {
   pop_2_elems();
 }
 #endif
-
 
 #endif

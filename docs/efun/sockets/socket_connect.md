@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: sockets / socket_connect
 ---
 # socket_connect

@@ -40,15 +40,15 @@ void f_named_livings() {
   int apply_valid_hide, display_hidden = 0;
 #endif
   object_t *ob, **obtab;
-  array_t *vec;
+  array_t* vec;
 
   nob = 0;
 #ifdef F_SET_HIDE
   apply_valid_hide = 1;
 #endif
 
-  obtab = reinterpret_cast<object_t **>(
-      DCALLOC(max_array_size, sizeof(object_t *), TAG_TEMPORARY, "named_livings"));
+  obtab = reinterpret_cast<object_t**>(
+      DCALLOC(max_array_size, sizeof(object_t*), TAG_TEMPORARY, "named_livings"));
 
   for (i = 0; i < CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); i++) {
     for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
@@ -89,7 +89,7 @@ void f_named_livings() {
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
 void f_remove_shadow() {
-  object_t *ob;
+  object_t* ob;
 
   ob = current_object;
   if (st_num_arg) {
@@ -115,7 +115,7 @@ void f_remove_shadow() {
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
 void f_query_notify_fail() {
-  const char *p;
+  const char* p;
 
   if (command_giver && command_giver->interactive) {
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
@@ -139,11 +139,11 @@ void f_query_notify_fail() {
 #ifdef F_STORE_VARIABLE
 void f_store_variable() {
   int idx;
-  svalue_t *sv;
+  svalue_t* sv;
   unsigned short type;
 
-  const char *name = nullptr;
-  object_t *ob;
+  const char* name = nullptr;
+  object_t* ob;
 
   if (st_num_arg == 3) {
     ob = sp->u.ob;
@@ -169,8 +169,8 @@ void f_fetch_variable() {
   int idx;
   unsigned short type;
 
-  const char *name = nullptr;
-  object_t *ob;
+  const char* name = nullptr;
+  object_t* ob;
 
   if (st_num_arg == 2) {
     ob = sp->u.ob;
@@ -193,7 +193,7 @@ void f_fetch_variable() {
 /* Beek */
 #ifdef F_SET_PROMPT
 void f_set_prompt(void) {
-  object_t *who;
+  object_t* who;
   if (st_num_arg == 2) {
     who = sp->u.ob;
     pop_stack();
@@ -218,10 +218,10 @@ void f_set_prompt(void) {
 #ifdef F_COPY
 static int depth;
 
-static void deep_copy_svalue(svalue_t * /*from*/, svalue_t * /*to*/);
+static void deep_copy_svalue(svalue_t* /*from*/, svalue_t* /*to*/);
 
-static array_t *deep_copy_array(array_t *arg) {
-  array_t *vec;
+static array_t* deep_copy_array(array_t* arg) {
+  array_t* vec;
   int i;
 
   vec = allocate_empty_array(arg->size);
@@ -232,8 +232,8 @@ static array_t *deep_copy_array(array_t *arg) {
   return vec;
 }
 
-static array_t *deep_copy_class(array_t *arg) {
-  array_t *vec;
+static array_t* deep_copy_class(array_t* arg) {
+  array_t* vec;
   int i;
 
   vec = allocate_empty_class_by_size(arg->size);
@@ -244,10 +244,10 @@ static array_t *deep_copy_class(array_t *arg) {
   return vec;
 }
 
-static int doCopy(mapping_t * /*map*/, mapping_node_t *elt, void *dest) {
-  svalue_t *sv;
+static int doCopy(mapping_t* /*map*/, mapping_node_t* elt, void* dest) {
+  svalue_t* sv;
 
-  sv = find_for_insert(reinterpret_cast<mapping_t *>(dest), &elt->values[0], 1);
+  sv = find_for_insert(reinterpret_cast<mapping_t*>(dest), &elt->values[0], 1);
   if (!sv) {
     mapping_too_large();
     return 1;
@@ -257,15 +257,15 @@ static int doCopy(mapping_t * /*map*/, mapping_node_t *elt, void *dest) {
   return 0;
 }
 
-static mapping_t *deep_copy_mapping(mapping_t *arg) {
-  mapping_t *map;
+static mapping_t* deep_copy_mapping(mapping_t* arg) {
+  mapping_t* map;
 
   map = allocate_mapping(0);     /* this should be fixed.  -Beek */
   mapTraverse(arg, doCopy, map); /* Not horridly efficient either */
   return map;
 }
 
-static void deep_copy_svalue(svalue_t *from, svalue_t *to) {
+static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
   switch (from->type) {
     case T_ARRAY:
       depth++;
@@ -326,13 +326,13 @@ void f_copy() {
 void f_functions() {
   int i, j, num, ind;
   array_t *vec, *subvec;
-  function_t *funp;
-  program_t *prog;
+  function_t* funp;
+  program_t* prog;
   int const flag = (sp--)->u.number;
-  unsigned short *types;
+  unsigned short* types;
   char buf[256];
-  char *end = EndOf(buf);
-  program_t *progp = sp->u.ob->prog;
+  char* end = EndOf(buf);
+  program_t* progp = sp->u.ob->prog;
   int const offset = (flag & 2) ? progp->last_inherited : 0;
 
   num = (flag & 2) ? progp->num_functions_defined
@@ -396,7 +396,7 @@ void f_functions() {
       subvec->item[1].subtype = 0;
       subvec->item[1].u.number = funp->num_arg;
 
-      auto *p = get_type_name(buf, end, funp->type);
+      auto* p = get_type_name(buf, end, funp->type);
       *(p - 1) = '\0';  // get rid of last space
       subvec->item[2].type = T_STRING;
       subvec->item[2].subtype = STRING_SHARED;
@@ -404,7 +404,7 @@ void f_functions() {
 
       for (j = 0; j < funp->num_arg; j++) {
         if (types) {
-          auto *p = get_type_name(buf, end, types[j]);
+          auto* p = get_type_name(buf, end, types[j]);
           *(p - 1) = '\0';  // get rid of last space
           subvec->item[3 + j].type = T_STRING;
           subvec->item[3 + j].subtype = STRING_SHARED;
@@ -428,11 +428,11 @@ void f_functions() {
 
 /* Beek */
 #ifdef F_VARIABLES
-static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int flag) {
+static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int flag) {
   int i;
-  array_t *subarr;
+  array_t* subarr;
   char buf[256];
-  char *end = EndOf(buf);
+  char* end = EndOf(buf);
 
   for (i = 0; i < prog->num_inherited; i++) {
     fv_recurse(arr, idx, prog->inherit[i].prog, type | prog->inherit[i].type_mod, flag);
@@ -444,7 +444,7 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
       subarr->item[0].type = T_STRING;
       subarr->item[0].subtype = STRING_SHARED;
       subarr->item[0].u.string = ref_string(prog->variable_table[i]);
-      auto *p = get_type_name(buf, end, prog->variable_types[i]);
+      auto* p = get_type_name(buf, end, prog->variable_types[i]);
       *(p - 1) = '\0';  // get rid of last space
       subarr->item[1].type = T_STRING;
       subarr->item[1].subtype = STRING_SHARED;
@@ -460,9 +460,9 @@ static void fv_recurse(array_t *arr, int *idx, program_t *prog, int type, int fl
 
 void f_variables() {
   int idx = 0;
-  array_t *arr;
+  array_t* arr;
   int const flag = (sp--)->u.number;
-  program_t *prog = sp->u.ob->prog;
+  program_t* prog = sp->u.ob->prog;
 
   arr = allocate_empty_array(prog->num_variables_total);
   fv_recurse(arr, &idx, prog, 0, flag);
@@ -516,7 +516,7 @@ void f_heart_beats() { push_refed_array(get_heart_beats()); }
 #define TC_FIRST_CHAR '%'
 #define TC_SECOND_CHAR '^'
 
-static int at_end(int i, int imax, int z, const int *lens) {
+static int at_end(int i, int imax, int z, const int* lens) {
   if (z + 1 != lens[i]) {
     return 0;
   }
@@ -528,6 +528,47 @@ static int at_end(int i, int imax, int z, const int *lens) {
   return 1;
 }
 
+/* Byte length of the UTF-8 sequence starting with lead byte c (1 for ASCII
+ * and for invalid lead bytes). */
+static inline int tc_u8_seqlen(unsigned char c) {
+  if ((c & 0xE0) == 0xC0) return 2;
+  if ((c & 0xF0) == 0xE0) return 3;
+  if ((c & 0xF8) == 0xF0) return 4;
+  return 1;
+}
+
+/* Per-byte column-width tracker for the terminal_colour wrap passes.
+ * Byte counters stay byte-based; only `col` advances by display width,
+ * and a codepoint's width lands when its LAST byte is consumed so lines
+ * never break in the middle of a UTF-8 sequence (issue #1054). */
+struct tc_colwidth_state {
+  int pending = 0; /* continuation bytes left in the current sequence */
+  int width = 0;   /* display width of the current sequence */
+  int bytes = 1;   /* byte length of the current sequence */
+
+  /* Returns the columns to add for consuming byte p[z]. */
+  int advance(const char* p, int z, int len) {
+    unsigned char const c = p[z];
+    if ((c & 0xC0) == 0x80) {
+      /* continuation byte: width lands on the sequence's last byte */
+      return (pending > 0 && --pending == 0) ? width : 0;
+    }
+    if (c < 0x80) {
+      pending = 0;
+      width = 1;
+      bytes = 1;
+      return 1;
+    }
+    bytes = tc_u8_seqlen(c);
+    if (bytes > len - z) {
+      bytes = len - z; /* truncated sequence at segment end */
+    }
+    width = u8_width(p + z, bytes);
+    pending = bytes - 1;
+    return pending == 0 ? width : 0;
+  }
+};
+
 void f_terminal_colour() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
@@ -537,8 +578,8 @@ void f_terminal_colour() {
   char colouratstartword[MAX_COLOUR_STRING];
   int curcolourlen;
   int colourstartlen = 0;
-  const char *resetstr = nullptr;
-  const char *resetstrname;
+  const char* resetstr = nullptr;
+  const char* resetstrname;
   int resetstrlen = 0;
   int num, i, j, k, col, start, space, *lens, maybe_at_end;
   int space_garbage = 0;
@@ -547,7 +588,7 @@ void f_terminal_colour() {
   LPC_INT wrap = 0;
   LPC_INT indent = 0;
   int fillout = 0;
-  char *rep;
+  char* rep;
   int repused;
 
   if (st_num_arg >= 3) {
@@ -583,8 +624,8 @@ void f_terminal_colour() {
   if (cp == nullptr) {
     if (wrap) {
       num = 1;
-      parts = reinterpret_cast<const char **>(
-          DCALLOC(1, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts"));
+      parts = reinterpret_cast<const char**>(
+          DCALLOC(1, sizeof(char*), TAG_TEMPORARY, "f_terminal_colour: parts"));
       parts[0] = instr;
       savestr = nullptr;
     } else {
@@ -593,9 +634,9 @@ void f_terminal_colour() {
     }
   } else {
     /* here we have something to parse */
-    char *newstr = const_cast<char *>(cp);  // must be result of the string_copy above
-    parts = reinterpret_cast<const char **>(
-        DCALLOC(NSTRSEGS, sizeof(char *), TAG_TEMPORARY, "f_terminal_colour: parts"));
+    char* newstr = const_cast<char*>(cp);  // must be result of the string_copy above
+    parts = reinterpret_cast<const char**>(
+        DCALLOC(NSTRSEGS, sizeof(char*), TAG_TEMPORARY, "f_terminal_colour: parts"));
     if (newstr - instr) { /* starting seg, if not delimiter */
       num = 1;
       parts[0] = instr;
@@ -623,8 +664,8 @@ void f_terminal_colour() {
         if (newstr > instr) {
           if (num && num % NSTRSEGS == 0) {
             // Increase the size of the parts array.
-            parts = (const char **)RESIZE(parts, num + NSTRSEGS, char *, TAG_TEMPORARY,
-                                          "f_terminal_colour: parts realloc");
+            parts = (const char**)RESIZE(parts, num + NSTRSEGS, char*, TAG_TEMPORARY,
+                                         "f_terminal_colour: parts realloc");
           }
           // Put it in at the current location in the parts array.
           parts[num++] = instr;
@@ -634,8 +675,8 @@ void f_terminal_colour() {
     if (*instr) { /* trailing seg, if not delimiter */
       if (num && num % NSTRSEGS == 0) {
         // Increase the size of the parts array.
-        parts = (const char **)RESIZE(parts, num + NSTRSEGS, char *, TAG_TEMPORARY,
-                                      "f_terminal_colour: parts realloc");
+        parts = (const char**)RESIZE(parts, num + NSTRSEGS, char*, TAG_TEMPORARY,
+                                     "f_terminal_colour: parts realloc");
       }
       // Put it in at the current location in the parts array.
       parts[num++] = instr;
@@ -659,7 +700,7 @@ void f_terminal_colour() {
   /* Could keep track of the lens as we create parts, removing the need
      for a strlen() below */
   lens =
-      reinterpret_cast<int *>(DCALLOC(num, sizeof(int), TAG_TEMPORARY, "f_terminal_colour: lens"));
+      reinterpret_cast<int*>(DCALLOC(num, sizeof(int), TAG_TEMPORARY, "f_terminal_colour: lens"));
   mtab = sp->u.map->table;
 
   // First setup some little things.
@@ -702,9 +743,9 @@ void f_terminal_colour() {
     // Look it up in the mapping.
     repused = 0;
     copy_and_push_string(parts[i]);
-    svalue_t *reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+    svalue_t* reptmp = apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
-      rep = reinterpret_cast<char *>(alloca(SVALUE_STRLEN(reptmp) + 1));
+      rep = reinterpret_cast<char*>(alloca(SVALUE_STRLEN(reptmp) + 1));
       strcpy(rep, reptmp->u.string);
       repused = 1;
     }
@@ -792,7 +833,8 @@ void f_terminal_colour() {
 
     if (wrap) {
       int z;
-      const char *p = parts[i];
+      const char* p = parts[i];
+      tc_colwidth_state cw;
       // This is where we figure out the size of the lines and
       // the final output string.  j is the size of the final output
       // string and max_buflen is the size of the line.
@@ -812,7 +854,7 @@ void f_terminal_colour() {
           buflen = 0;
         } else {
           if (col > start || (c != ' ' && c != '\t')) {
-            col++;
+            col += cw.advance(p, z, lens[i]);
           } else {
             j--;
             buflen--;
@@ -827,7 +869,7 @@ void f_terminal_colour() {
             strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING - 1);
             colourstartlen = curcolourlen;
           }
-          if (col == wrap + 1) {
+          if (col > wrap) {
             if (space) {
               if (fillout) {
                 j += wrap - space;
@@ -841,11 +883,11 @@ void f_terminal_colour() {
               space_buflen = 0;
             } else {
               j++;
-              col = 1;
+              col = cw.width;
               j += resetstrlen + curcolourlen;
               buflen += resetstrlen + curcolourlen;
               max_buflen = (buflen > max_buflen ? buflen : max_buflen);
-              buflen = 1;
+              buflen = cw.bytes;
             }
             start = indent;
           } else {
@@ -882,8 +924,8 @@ void f_terminal_colour() {
      let's compose it, wrapping if necessary */
   ncp = deststr = new_string(j, "f_terminal_colour: deststr");
   if (wrap) {
-    char *tmp = new_string(max_buflen, "f_terminal_colour: wrap");
-    char *pt = tmp;
+    char* tmp = new_string(max_buflen, "f_terminal_colour: wrap");
+    char* pt = tmp;
 
     col = 0;
     start = -1;
@@ -893,7 +935,7 @@ void f_terminal_colour() {
     curcolourlen = 0;
     for (i = 0; i < num; i++) {
       int kind;
-      const char *p = parts[i];
+      const char* p = parts[i];
       if (lens[i] < 0) {
         memcpy(pt, p, -lens[i]);
         pt += -lens[i];
@@ -912,6 +954,7 @@ void f_terminal_colour() {
         }
         continue;
       }
+      tc_colwidth_state cw;
       for (k = 0; k < lens[i]; k++) {
         int n;
         int endpad = wrap - col;
@@ -929,7 +972,7 @@ void f_terminal_colour() {
           colourstartlen = curcolourlen;
         } else {
           if (col > start || (c != ' ' && c != '\t')) {
-            col++;
+            col += cw.advance(p, k, lens[i]);
           } else {
             pt--;
             buflen--;
@@ -945,7 +988,7 @@ void f_terminal_colour() {
             strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING - 1);
             colourstartlen = curcolourlen;
           }
-          if (col == wrap + 1) {
+          if (col > wrap) {
             if (space) {
               endpad = wrap - space;
               col -= space;
@@ -954,9 +997,9 @@ void f_terminal_colour() {
               buflen -= space_buflen;
               space_buflen = 0;
             } else {
-              col = 1;
+              col = cw.width;
               kind = 2;
-              buflen = 1;
+              buflen = cw.bytes;
               strncpy(colouratstartword, curcolour, MAX_COLOUR_STRING - 1);
               colourstartlen = curcolourlen;
             }
@@ -1038,16 +1081,16 @@ void f_terminal_colour() {
 /* number to chop is added */
 #define PLURAL_CHOP 2
 
-static char *pluralize(const char *str) {
-  char *pre;
+static char* pluralize(const char* str) {
+  char* pre;
   const char *p, *rel, *end;
-  char *of_buf;
+  char* of_buf;
   int of_len = 0, plen, slen;
   int sz;
 
   /* default rule */
   int found = 0;
-  const char *suffix = "s";
+  const char* suffix = "s";
 
   sz = strlen(str);
   if (!sz) {
@@ -1068,20 +1111,20 @@ static char *pluralize(const char *str) {
   if (str[0] == 'a' || str[0] == 'A') {
     if (str[1] == ' ') {
       plen = sz - 2;
-      pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
+      pre = reinterpret_cast<char*>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str + 2, plen);
     } else if (sz > 2 && str[1] == 'n' && str[2] == ' ') {
       plen = sz - 3;
-      pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
+      pre = reinterpret_cast<char*>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str + 3, plen);
     } else {
       plen = sz;
-      pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
+      pre = reinterpret_cast<char*>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str, plen);
     }
   } else {
     plen = sz;
-    pre = reinterpret_cast<char *>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
+    pre = reinterpret_cast<char*>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
     strncpy(pre, str, plen);
   }
   pre[plen] = 0;
@@ -1258,6 +1301,12 @@ static char *pluralize(const char *str) {
       if (!strcasecmp(rel + 1, "ech")) {
         found = PLURAL_SUFFIX;
         suffix = "s";
+        break;
+      }
+      if (!strcasecmp(rel + 1, "arquis")) {
+        /* not the Latin -is -> -es chop (issue #936) */
+        found = PLURAL_SUFFIX;
+        suffix = "es";
       }
       break;
     case 'O':
@@ -1271,6 +1320,12 @@ static char *pluralize(const char *str) {
     case 'p':
       if (!strcasecmp(rel + 1, "ants")) {
         found = PLURAL_SAME;
+        break;
+      }
+      if (!strcasecmp(rel + 1, "enis")) {
+        /* not the Latin -is -> -es chop (issue #936) */
+        found = PLURAL_SUFFIX;
+        suffix = "es";
       }
       break;
     case 'Q':
@@ -1402,10 +1457,12 @@ static char *pluralize(const char *str) {
         if ((end - pre) > 1 && (end[-2] == 'e' || end[-2] == 'E')) {
           break;
         }
-        found = PLURAL_CHOP + 1;
         if ((end - pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
-          found++;
+          /* words ending in -ff normally just take -s (bluffs, cliffs);
+           * staff -> staves lives in the exception table (issue #936) */
+          break;
         }
+        found = PLURAL_CHOP + 1;
         suffix = "ves";
         break;
       case 'H':
@@ -1500,7 +1557,7 @@ static char *pluralize(const char *str) {
       break;
   }
 
-  char *news = new_string(sz, "pluralize");
+  char* news = new_string(sz, "pluralize");
   news[sz] = 0;
 
   strncpy(news, pre, plen);
@@ -1517,7 +1574,7 @@ static char *pluralize(const char *str) {
 } /* end of pluralize() */
 
 void f_pluralize() {
-  char *s;
+  char* s;
 
   s = pluralize(sp->u.string);
   pop_stack();
@@ -1534,9 +1591,9 @@ void f_pluralize() {
  * file_length() efun, returns the number of lines in a file.
  * Returns -1 if no privs or file doesn't exist.
  */
-static int file_length(const char *file) {
+static int file_length(const char* file) {
   struct stat st;
-  FILE *f;
+  FILE* f;
   int ret = 0;
   size_t num;
   static char buf[2049];
@@ -1560,7 +1617,7 @@ static int file_length(const char *file) {
   do {
     num = fread(buf, 1, sizeof(buf) - 1, f);
     p = buf;
-    while ((newp = reinterpret_cast<char *>(memchr(p, '\n', num)))) {
+    while ((newp = reinterpret_cast<char*>(memchr(p, '\n', num)))) {
       num -= (newp - (p - 1));
       p = newp + 1;
       ret++;
@@ -1582,16 +1639,16 @@ void f_file_length() {
 
 #ifdef F_UPPER_CASE
 void f_upper_case() {
-  const char *str;
+  const char* str;
 
   str = sp->u.string;
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uislower(*str)) {
-      char *newstr;
+      char* newstr;
       int const l = str - sp->u.string;
       unlink_string_svalue(sp);
-      newstr = const_cast<char *>(sp->u.string) + l;
+      newstr = const_cast<char*>(sp->u.string) + l;
       *newstr = toupper(static_cast<unsigned char>(*newstr));
       for (newstr++; *newstr; newstr++) {
         if (uislower((unsigned char)*newstr)) {
@@ -1606,10 +1663,10 @@ void f_upper_case() {
 
 #ifdef F_REPLACEABLE
 void f_replaceable() {
-  object_t *obj;
-  program_t *prog;
+  object_t* obj;
+  program_t* prog;
   int i, j, num, numignore, replaceable;
-  const char **ignore;
+  const char** ignore;
 
   if (st_num_arg == 2) {
     obj = (sp - 1)->u.ob;
@@ -1624,8 +1681,8 @@ void f_replaceable() {
     if (st_num_arg == 2) {
       numignore = sp->u.arr->size;
       if (numignore) {
-        ignore = reinterpret_cast<const char **>(
-            DCALLOC(numignore + 2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+        ignore = reinterpret_cast<const char**>(
+            DCALLOC(numignore + 2, sizeof(char*), TAG_TEMPORARY, "replaceable"));
       } else {
         ignore = nullptr;
       }
@@ -1642,7 +1699,7 @@ void f_replaceable() {
     } else {
       numignore = 2;
       ignore =
-          reinterpret_cast<const char **>(DCALLOC(2, sizeof(char *), TAG_TEMPORARY, "replaceable"));
+          reinterpret_cast<const char**>(DCALLOC(2, sizeof(char*), TAG_TEMPORARY, "replaceable"));
       ignore[0] = findstring(APPLY_CREATE);
       ignore[1] = findstring(APPLY___INIT);
     }
@@ -1690,7 +1747,7 @@ struct ProgramInfoS {
       total;  // how big all together?
 };
 
-inline void sum_program_info(const program_t *const p, ProgramInfoS &info) {
+inline void sum_program_info(const program_t* const p, ProgramInfoS& info) {
   int n;
 
   info.h_c++;
@@ -1712,7 +1769,7 @@ inline void sum_program_info(const program_t *const p, ProgramInfoS &info) {
   info.t_c += p->num_functions_defined;
   n = 0;
   if (p->type_start) {
-    unsigned short *ts = p->type_start;
+    unsigned short* ts = p->type_start;
     int const nfd = p->num_functions_defined;
 
     for (int i = 0; i < nfd; i++) {
@@ -1728,8 +1785,8 @@ inline void sum_program_info(const program_t *const p, ProgramInfoS &info) {
 
 void f_program_info() {
   ProgramInfoS info{0};  // initialize all elements to 0
-  object_t *ob;
-  mapping_t *m;
+  object_t* ob;
+  mapping_t* m;
 
   if (st_num_arg == 1) {
     ob = sp->u.ob;
@@ -1751,8 +1808,8 @@ void f_program_info() {
   add_mapping_pair(m, "code size", info.p_s);
   add_mapping_pair(m, "function size",
                    info.ff_c * sizeof(unsigned short) + info.fd_c * sizeof(function_t));
-  add_mapping_pair(m, "string size", info.s_c * sizeof(char *));
-  add_mapping_pair(m, "var size", info.v_c * (sizeof(char *) + sizeof(unsigned short)));
+  add_mapping_pair(m, "string size", info.s_c * sizeof(char*));
+  add_mapping_pair(m, "var size", info.v_c * (sizeof(char*) + sizeof(unsigned short)));
   add_mapping_pair(m, "class size",
                    info.nc_c * sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
   add_mapping_pair(m, "inherit size", info.i_c * sizeof(inherit_t));
@@ -1792,7 +1849,7 @@ void f_remove_interactive() {
  * mud.
  */
 #ifdef F_QUERY_IP_PORT
-static int query_ip_port(object_t *ob) {
+static int query_ip_port(object_t* ob) {
   if (!ob || ob->interactive == nullptr) {
     return 0;
   }
@@ -1823,18 +1880,25 @@ void f_query_ip_port() {
 
 #if defined F_ZONETIME || defined F_IS_DAYLIGHT_SAVINGS_TIME
 
-const char *set_timezone(const char *new_tz) {
+const char* set_timezone(const char* new_tz) {
   static char put_tz[80];
-  char *old_tz;
-
-  old_tz = getenv("TZ");
+  // Copy the old TZ value out: getenv() returns a pointer INTO the
+  // environment that the putenv() below can invalidate (dangling read in
+  // reset_timezone otherwise). Returns nullptr when TZ was unset.
+  static char saved_tz[80];
+  const char* cur = getenv("TZ");
+  const char* old_tz = nullptr;
+  if (cur != nullptr) {
+    snprintf(saved_tz, sizeof(saved_tz), "%s", cur);
+    old_tz = saved_tz;
+  }
   snprintf(put_tz, sizeof(put_tz) / sizeof(char), "TZ=%s", new_tz);
   putenv(put_tz);
   tzset();
   return old_tz;
 }
 
-void reset_timezone(const char *old_tz) {
+void reset_timezone(const char* old_tz) {
   static char put_tz[80];
   if (old_tz) {
     snprintf(put_tz, sizeof(put_tz) / sizeof(char), "TZ=%s", old_tz);
@@ -1855,7 +1919,7 @@ void reset_timezone(const char *old_tz) {
 #ifdef F_ZONETIME
 void f_zonetime() {
   const char *new_tz, *old_tz;
-  char *retv;
+  char* retv;
   time_t time_val;
   int len;
 
@@ -1882,14 +1946,14 @@ void f_zonetime() {
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time() {
   time_t time_to_check = sp->u.number;
-  const char *new_tz = (sp - 1)->u.string;
-  const char *old_tz = set_timezone(new_tz);
+  const char* new_tz = (sp - 1)->u.string;
+  const char* old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {
     time_to_check = 0;
   }
   struct tm res = {};
-  struct tm *t = localtime_r(&time_to_check, &res);
+  struct tm* t = localtime_r(&time_to_check, &res);
 
   pop_stack();
   pop_stack();
@@ -1911,7 +1975,7 @@ void f_debug_message() {
 
 #ifdef F_FUNCTION_OWNER
 void f_function_owner() {
-  object_t *owner = sp->u.fp->hdr.owner;
+  object_t* owner = sp->u.fp->hdr.owner;
 
   free_funp(sp->u.fp);
   put_unrefed_object(owner, "f_function_owner");
@@ -1922,7 +1986,7 @@ void f_function_owner() {
 void f_repeat_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  const char *str;
+  const char* str;
   int repeat, len, newlen;
   char *ret, *p;
   int i;
@@ -1957,10 +2021,10 @@ void f_repeat_string() {
 #endif
 
 #ifdef F_MEMORY_SUMMARY
-static int memory_share(svalue_t * /*sv*/);
+static int memory_share(svalue_t* /*sv*/);
 
-static int node_share(mapping_t * /*m*/, mapping_node_t *elt, void *tp) {
-  int *t = reinterpret_cast<int *>(tp);
+static int node_share(mapping_t* /*m*/, mapping_node_t* elt, void* tp) {
+  int* t = reinterpret_cast<int*>(tp);
 
   *t += sizeof(mapping_node_t) - 2 * sizeof(svalue_t);
   *t += memory_share(&elt->values[0]);
@@ -1969,7 +2033,7 @@ static int node_share(mapping_t * /*m*/, mapping_node_t *elt, void *tp) {
   return 0;
 }
 
-static int memory_share(svalue_t *sv) {
+static int memory_share(svalue_t* sv) {
   int i, total = sizeof(svalue_t);
   int subtotal;
   static int calldepth = 0;
@@ -1999,7 +2063,7 @@ static int memory_share(svalue_t *sv) {
         subtotal += memory_share(&sv->u.arr->item[i]);
       }
       calldepth--;
-      return total + subtotal / sv->u.arr->ref;
+      return total + subtotal / (sv->u.arr->ref ? sv->u.arr->ref : 1);
     case T_MAPPING:
       if (1 + calldepth > 100) {
         return 0;
@@ -2008,7 +2072,7 @@ static int memory_share(svalue_t *sv) {
       subtotal = sizeof(mapping_t);
       mapTraverse(sv->u.map, node_share, &subtotal);
       calldepth--;
-      return total + subtotal / sv->u.map->ref;
+      return total + subtotal / (sv->u.map->ref ? sv->u.map->ref : 1);
     case T_FUNCTION: {
       svalue_t tmp;
       tmp.type = T_ARRAY;
@@ -2039,11 +2103,12 @@ static int memory_share(svalue_t *sv) {
           break;
       }
       calldepth--;
-      return total + subtotal / sv->u.fp->hdr.ref;
+      return total + subtotal / (sv->u.fp->hdr.ref ? sv->u.fp->hdr.ref : 1);
     }
     case T_BUFFER:
       /* first byte is stored inside the buffer struct */
-      return total + (sizeof(buffer_t) + sv->u.buf->size - 1) / sv->u.buf->ref;
+      return total +
+             (sizeof(buffer_t) + sv->u.buf->size - 1) / (sv->u.buf->ref ? sv->u.buf->ref : 1);
   }
   return total;
 }
@@ -2053,9 +2118,9 @@ static int memory_share(svalue_t *sv) {
  *
  * map["program name"]["variable name"] = memory usage
  */
-static void fms_recurse(mapping_t *map, object_t *ob, int *idx, program_t *prog) {
+static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog) {
   int i;
-  svalue_t *entry;
+  svalue_t* entry;
   svalue_t sv;
 
   sv.type = T_STRING;
@@ -2076,8 +2141,8 @@ static void fms_recurse(mapping_t *map, object_t *ob, int *idx, program_t *prog)
 }
 
 void f_memory_summary() {
-  mapping_t *result = allocate_mapping(8);
-  object_t *ob;
+  mapping_t* result = allocate_mapping(8);
+  object_t* ob;
   int idx;
   svalue_t sv;
 
@@ -2085,7 +2150,7 @@ void f_memory_summary() {
   sv.subtype = STRING_SHARED;
 
   for (ob = obj_list; ob; ob = ob->next_all) {
-    svalue_t *entry;
+    svalue_t* entry;
 
     sv.u.string = ob->prog->filename;
     entry = find_for_insert(result, &sv, 0);
@@ -2104,7 +2169,7 @@ void f_memory_summary() {
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
 void f_query_replaced_program() {
-  char *res = nullptr;
+  char* res = nullptr;
 
   if (st_num_arg) {
     if (sp->u.ob->replaced_program) {
@@ -2129,7 +2194,7 @@ void f_query_replaced_program() {
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
 void f_network_stats() {
-  mapping_t *m;
+  mapping_t* m;
   int i, ports = 0;
 
   for (i = 0; i < 5; i++) {
@@ -2191,9 +2256,9 @@ void f_network_stats() {
 
 #define EVENT_PREFIX "event_"
 
-void event(svalue_t *event_ob, const char *event_fun, int numparam, svalue_t *event_param) {
+void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* event_param) {
   object_t *ob, *origin;
-  char *name;
+  char* name;
   int i;
 
   origin = current_object;
@@ -2277,12 +2342,12 @@ void f_event() {
 #endif
 
 #ifdef F_QUERY_NUM
-void number_as_string(char *buf, LPC_INT n) {
-  const char *low[] = {"ten",     "eleven",  "twelve",    "thirteen", "fourteen",
+void number_as_string(char* buf, LPC_INT n) {
+  const char* low[] = {"ten",     "eleven",  "twelve",    "thirteen", "fourteen",
                        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"};
-  const char *hi[] = {"",      "",      "twenty",  "thirty", "forty",
+  const char* hi[] = {"",      "",      "twenty",  "thirty", "forty",
                       "fifty", "sixty", "seventy", "eighty", "ninety"};
-  const char *single[] = {"",     "one", "two",   "three", "four",
+  const char* single[] = {"",     "one", "two",   "three", "four",
                           "five", "six", "seven", "eight", "nine"};
   if (!n) {
     strcat(buf, "zero");
@@ -2309,7 +2374,7 @@ void f_query_num() {
   int i;
   LPC_INT n, limit;
   int changed = 0;
-  char *res;
+  char* res;
 
   ret[0] = 0;
   limit = sp->u.number;
@@ -2391,7 +2456,7 @@ void f_base_name() {
   pop_stack();
 
   if ((tmp = strchr(name, '#')) != nullptr) {
-    char *ret;
+    char* ret;
     i = tmp - name;
     ret = new_string(i, "f_base_name: ret");
     strncpy(ret, name, i);
@@ -2407,7 +2472,7 @@ void f_base_name() {
 #endif
 
 #ifdef F_GET_GARBAGE
-int garbage_check(object_t *ob, void * /*data*/) {
+int garbage_check(object_t* ob, void* /*data*/) {
   return (ob->ref == 1) && (ob->flags & O_CLONE)
 #if defined NO_ENVIRONMENT && !defined NO_SHADOWS
          && !ob->shadowing
@@ -2423,8 +2488,8 @@ void f_get_garbage() {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
-  object_t **obs;
-  array_t *ret;
+  object_t** obs;
+  array_t* ret;
   get_objects(&obs, &count, garbage_check, nullptr);
 
   if (count > max_array_size) {
@@ -2454,9 +2519,17 @@ void f_num_classes() {
 
 #ifdef F_ASSEMBLE_CLASS
 void f_assemble_class() {
-  array_t *arr = copy_array(sp->u.arr);
+  // Build through the CLASS allocator: retagging a copy_array() block as
+  // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
+  // is later freed as a class (caught by the testsuite's per-file
+  // check_memory gate via the assemble_class test).
+  array_t* src = sp->u.arr;
+  array_t* cl = allocate_class_by_size(src->size);
+  for (int i = 0; i < src->size; i++) {
+    assign_svalue_no_free(&cl->item[i], &src->item[i]);
+  }
   pop_stack();
-  push_refed_array(arr);
+  push_refed_array(cl);
   sp->type = T_CLASS;
 }
 
@@ -2464,7 +2537,7 @@ void f_assemble_class() {
 
 #ifdef F_DISASSEMBLE_CLASS
 void f_disassemble_class() {
-  array_t *arr;
+  array_t* arr;
   if (sp->type != T_CLASS) {
     error("Argument to disassemble_class() not a class.\n");
   }
@@ -2478,7 +2551,7 @@ void f_disassemble_class() {
 
 void f_fetch_class_member() {
   int pos = sp->u.number;
-  array_t *arr;
+  array_t* arr;
 
   pos = sp->u.number;
   pop_stack();
@@ -2502,7 +2575,7 @@ void f_fetch_class_member() {
 
 void f_store_class_member() {
   int const pos = (sp - 1)->u.number;
-  array_t *arr;
+  array_t* arr;
 
   if ((sp - 2)->type != T_CLASS) {
     error("Argument to store_class_member() not a class.\n");
@@ -2522,7 +2595,7 @@ void f_store_class_member() {
 
 #ifdef F_ELEMENT_OF
 void f_element_of() {
-  array_t *arr = sp->u.arr;
+  array_t* arr = sp->u.arr;
   if (!arr->size) {
     error("Can't take element from empty array.\n");
   }
@@ -2536,7 +2609,7 @@ void f_element_of() {
  * conversion by Taffyd.
  */
 
-void shuffle(array_t *args) {
+void shuffle(array_t* args) {
   int i, j;
   svalue_t temp;
 
@@ -2563,7 +2636,7 @@ void shuffle(array_t *args) {
 }
 
 void f_shuffle() {
-  svalue_t *sv = sp - st_num_arg + 1;
+  svalue_t* sv = sp - st_num_arg + 1;
 
   if (sv->type == T_ARRAY && sv->u.arr) {
     shuffle(sv->u.arr);
@@ -2576,8 +2649,8 @@ void f_shuffle() {
 #ifdef F_MAX
 
 void f_max() {
-  svalue_t *sarr = sp - 1;
-  array_t *arr = sarr->u.arr;
+  svalue_t* sarr = sp - 1;
+  array_t* arr = sarr->u.arr;
   int max_index = 0;
   int i;
 
@@ -2654,8 +2727,8 @@ void f_max() {
 #ifdef F_MIN
 
 void f_min() {
-  svalue_t *sarr = sp - 1;
-  array_t *arr = sarr->u.arr;
+  svalue_t* sarr = sp - 1;
+  array_t* arr = sarr->u.arr;
   int min_index = 0;
   int i;
 
@@ -2779,7 +2852,7 @@ int min3(int a, int b, int c) {
   return c;
 }
 
-int levenshtein(char *a, int as, char *b, int bs) {
+int levenshtein(char* a, int as, char* b, int bs) {
   int *table, skew, nskew, i, j;
   // Strip common pre- and suffix.  This doesn't change the result.
   while (as > 0 && a[0] == b[0]) {
@@ -2798,7 +2871,7 @@ int levenshtein(char *a, int as, char *b, int bs) {
     return bs;
   }
 
-  table = reinterpret_cast<int *>(DCALLOC(bs + 1, sizeof(int), TAG_TEMPORARY, "levenshtein"));
+  table = reinterpret_cast<int*>(DCALLOC(bs + 1, sizeof(int), TAG_TEMPORARY, "levenshtein"));
   for (i = 1; i <= bs; i++) {
     table[i] = i;
   }
@@ -2826,8 +2899,8 @@ void f_string_difference() {
   int diff, as, bs;
   char *a, *b;
 
-  a = const_cast<char *>(sp->u.string);
-  b = const_cast<char *>((sp - 1)->u.string);
+  a = const_cast<char*>(sp->u.string);
+  b = const_cast<char*>((sp - 1)->u.string);
 
   if (!strcmp(a, b)) {
     diff = 0;
@@ -2850,7 +2923,7 @@ void f_string_difference() {
 #endif
 
 #ifdef F_QUERY_CHARMODE
-static int query_charmode(object_t *ob) {
+static int query_charmode(object_t* ob) {
   int ret;
   if (!ob || ob->interactive == nullptr) {
     ret = -2;
@@ -2873,7 +2946,7 @@ void f_query_charmode() {
 }
 
 #ifdef F_REMOVE_CHARMODE
-static int remove_charmode(object_t *ob) {
+static int remove_charmode(object_t* ob) {
   int ret;
   if (!ob || ob->interactive == nullptr) {
     ret = -2;
@@ -2899,7 +2972,7 @@ void f_remove_charmode() {
 #endif
 #endif
 #ifdef F_REMOVE_GET_CHAR
-static int remove_get_char(object_t *ob) {
+static int remove_get_char(object_t* ob) {
   if (!ob || ob->interactive == nullptr) {
     return -2;
   }
@@ -2933,7 +3006,7 @@ void f_remove_get_char() {
 #ifdef F_SEND_NULLBYTE
 void f_send_nullbyte() {
   int tmp;
-  object_t *who;
+  object_t* who;
   tmp = 0;
 
   who = sp->u.ob;
@@ -2954,7 +3027,7 @@ void f_send_nullbyte() {
 
 #ifdef F_RESTORE_FROM_STRING
 void f_restore_from_string() {
-  const char *buf;
+  const char* buf;
   LPC_INT noclear;
 
   buf = (sp - 1)->u.string;
@@ -2965,7 +3038,7 @@ void f_restore_from_string() {
   copy_and_push_string(buf);  // restore_object_from_buff modifies the string in
                               // place, which is ok, copied strings aren't
                               // shared
-  restore_object_from_buff(current_object, const_cast<char *>(sp->u.string), noclear);
+  restore_object_from_buff(current_object, const_cast<char*>(sp->u.string), noclear);
   pop_3_elems();
 }
 #endif
@@ -2975,8 +3048,8 @@ void f_classes() {
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
-  char *end;
-  program_t *prog;
+  char* end;
+  program_t* prog;
 
   flag = (sp--)->u.number;
   end = EndOf(buf);
@@ -3013,7 +3086,7 @@ void f_classes() {
             make_shared_string(prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
-        auto *p = get_type_name(buf, end, prog->class_members[offset].type);
+        auto* p = get_type_name(buf, end, prog->class_members[offset].type);
         *(p - 1) = '\0';  // get rid of last space
         subsubvec->item[1].type = T_STRING;
         subsubvec->item[1].subtype = STRING_SHARED;
@@ -3034,18 +3107,18 @@ void f_classes() {
 #endif
 
 #ifdef F_TEST_LOAD
-const char *saved_extra_name;
-object_t *testloadob;
+const char* saved_extra_name;
+object_t* testloadob;
 static void fix_object_names() {
   if (testloadob) {
     SETOBNAME(testloadob, saved_extra_name);
-    ObjectTable::instance().insert(testloadob->obname,testloadob);
+    ObjectTable::instance().insert(testloadob->obname, testloadob);
   }
 }
 
 void f_test_load() {
-  const char *tmp = sp->u.string;
-  object_t *new_ob;
+  const char* tmp = sp->u.string;
+  object_t* new_ob;
   if ((testloadob = find_object2(sp->u.string))) {
     tmp = testloadob->obname;
     ObjectTable::instance().remove(testloadob->obname);
@@ -3072,7 +3145,80 @@ void f_test_load() {
   push_number(1);
   if (testloadob) {
     SETOBNAME(testloadob, saved_extra_name);
-    ObjectTable::instance().insert(testloadob->obname,testloadob);
+    ObjectTable::instance().insert(testloadob->obname, testloadob);
   }
+}
+#endif
+
+#if defined(F_GET_OS_ENV) || defined(F_SET_OS_ENV)
+/* Exact-name membership test against a colon-separated allow-list from
+ * the runtime config (issue #1045). */
+static bool os_env_name_listed(const char* list, const char* name) {
+  if (!list || !*list || !name || !*name) {
+    return false;
+  }
+  size_t const namelen = strlen(name);
+  const char* p = list;
+  for (;;) {
+    const char* sep = strchr(p, ':');
+    size_t const len = sep ? static_cast<size_t>(sep - p) : strlen(p);
+    if (len == namelen && strncmp(p, name, len) == 0) {
+      return true;
+    }
+    if (!sep) {
+      return false;
+    }
+    p = sep + 1;
+  }
+}
+#endif
+
+#ifdef F_GET_OS_ENV
+void f_get_os_env() {
+  const char* name = sp->u.string;
+
+  if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
+      !os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
+    error("get_os_env: '%s' is not in the 'allowed os environment variables' list.\n", name);
+  }
+
+  const char* val = getenv(name);
+  if (!val) {
+    free_string_svalue(sp);
+    *sp = const0u;
+    return;
+  }
+  char* copy = string_copy(val, "f_get_os_env");
+  free_string_svalue(sp);
+  put_malloced_string(copy);
+}
+#endif
+
+#ifdef F_SET_OS_ENV
+void f_set_os_env() {
+  int const num = st_num_arg;
+  svalue_t* namearg = sp - num + 1;
+  const char* name = namearg->u.string;
+
+  if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
+    error("set_os_env: '%s' is not in the 'writable os environment variables' list.\n", name);
+  }
+
+  int ok;
+  if (num == 2) {
+#ifdef _WIN32
+    ok = _putenv_s(name, sp->u.string) == 0;
+#else
+    ok = setenv(name, sp->u.string, 1) == 0;
+#endif
+  } else {
+#ifdef _WIN32
+    ok = _putenv_s(name, "") == 0;
+#else
+    ok = unsetenv(name) == 0;
+#endif
+  }
+  pop_n_elems(num);
+  push_number(ok);
 }
 #endif

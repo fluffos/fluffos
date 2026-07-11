@@ -17,7 +17,7 @@ void f_trace_start() {
     error("Invalid duration specified.");
   }
 
-  const auto *realfile = check_valid_path((sp - 1)->u.string, current_object, "trace_start", 1);
+  const auto* realfile = check_valid_path((sp - 1)->u.string, current_object, "trace_start", 1);
 
   if (!realfile) {
     error("Permission denied for trace file: %s", (sp - 1)->u.string);

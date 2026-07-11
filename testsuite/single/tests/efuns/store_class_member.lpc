@@ -1,0 +1,9 @@
+class P { int x; string s; }
+void do_tests() {
+    class P p = new(class P, x: 5, s: "hi");
+    store_class_member(p, 0, 8);
+    ASSERT_EQ(8, p->x);
+    store_class_member(p, 1, "bye");
+    ASSERT_EQ("bye", p->s);
+    ASSERT(catch(store_class_member(p, 9, 1)));
+}

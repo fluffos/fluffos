@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / set_prompt.pre
 ---
 # set_prompt

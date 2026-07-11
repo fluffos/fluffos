@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / gmcp_enable
 ---
 # gmcp_enable

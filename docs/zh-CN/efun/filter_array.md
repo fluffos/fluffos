@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: arrays / filter_array
 ---
 # filter_array

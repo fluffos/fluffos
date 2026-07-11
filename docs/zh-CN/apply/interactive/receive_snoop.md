@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: interactive / receive_snoop
 ---
 # receive_snoop

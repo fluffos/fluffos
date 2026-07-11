@@ -1,0 +1,89 @@
+// master::inherit_program(string from, string path, int priv)
+//
+// Called by the compiler for every `inherit "path";` while compiling
+// `from` (priv nonzero for `private inherit`). A string return is an
+// alternate path for the inherited file; an array-of-strings return is
+// the source code of the inherited file itself; any other return
+// prevents the inheritance. Returning `path` unchanged (what
+// /single/master does with no hook registered) keeps stock behavior.
+// Fixtures live in /clone/ip_*; the scriptable hook is
+// /clone/compile_hook.
+
+#define MASTER "/single/master"
+#define HOOK "/clone/compile_hook"
+
+private void run_checks() {
+  object hook, ob;
+  mixed *calls;
+
+  hook = load_object(HOOK);
+  MASTER->set_compile_hooks(hook);
+
+  // 1. Alternate path: "/clone/ip_magic" has no file on disk; the hook
+  //    redirects the inheritance to /clone/ip_real, which is then
+  //    loaded and inherited under its own name.
+  hook->set_inherit_rule("/clone/ip_magic", "/clone/ip_real");
+  ob = load_object("/clone/ip_child_redirect");
+  ASSERT_EQ(11, ob->child_fn());
+  ASSERT(objectp(find_object("/clone/ip_real")));
+  ASSERT_EQ("/clone/ip_real", function_exists("parent_fn", ob));
+  // The apply saw the compiling file and priv == 0 for a plain inherit.
+  calls = filter(hook->query_inherit_calls(), (: $1[1] == "/clone/ip_magic" :));
+  ASSERT(sizeof(calls) > 0);
+  ASSERT_EQ("/clone/ip_child_redirect.lpc", calls[<1][0]);
+  ASSERT_EQ(0, calls[<1][2]);
+
+  // 2. Inline source: "/clone/ip_synth" has no file either; the hook
+  //    returns the program's source as an array of strings. The
+  //    master copy materializes under the inherit statement's name.
+  hook->set_inherit_rule("/clone/ip_synth", ({ "int synth_fn() { return 21; }" }));
+  ob = load_object("/clone/ip_child_inline");
+  ASSERT_EQ(42, ob->child_fn());
+  ASSERT(objectp(find_object("/clone/ip_synth")));
+  ASSERT_EQ(21, "/clone/ip_synth"->synth_fn());
+
+  // 3. Denied: the inherited file exists, but the hook returns 0 --
+  //    the child must fail to load.
+  hook->set_inherit_rule("/clone/ip_forbidden", 0);
+  ASSERT(stringp(catch(load_object("/clone/ip_child_denied"))));
+  ASSERT(!find_object("/clone/ip_child_denied"));
+
+  // 4. `private inherit` reports priv == 1 -- and the apply is
+  //    consulted even though /clone/ip_real is already loaded.
+  ob = load_object("/clone/ip_child_priv");
+  ASSERT_EQ(15, ob->child_fn());
+  calls = filter(hook->query_inherit_calls(), (: $1[1] == "/clone/ip_real" :));
+  ASSERT(sizeof(calls) > 0);
+  ASSERT_EQ("/clone/ip_child_priv.lpc", calls[<1][0]);
+  ASSERT_EQ(1, calls[<1][2]);
+
+  // 5. Inline source may itself inherit: an unloaded on-disk parent is
+  //    loaded through the same retry dance, recompiling the supplied
+  //    source...
+  ASSERT(!find_object("/clone/ip_real2"));
+  hook->set_inherit_rule("/clone/ip_synth2",
+                         ({ "inherit \"/clone/ip_real2\";",
+                            "int synth2() { return real2() * 2; }" }));
+  ob = load_object("/clone/ip_child_inline2");
+  ASSERT_EQ(21, ob->child_fn2());
+  ASSERT(objectp(find_object("/clone/ip_real2")));
+
+  //    ... and so may nested inline source (synthesized inheriting
+  //    synthesized).
+  hook->set_inherit_rule("/clone/ip_synth_outer",
+                         ({ "inherit \"/clone/ip_synth_inner\";",
+                            "int outer() { return inner() + 1; }" }));
+  hook->set_inherit_rule("/clone/ip_synth_inner", ({ "int inner() { return 40; }" }));
+  ob = load_object("/clone/ip_child_nested");
+  ASSERT_EQ(42, ob->total());
+  ASSERT(objectp(find_object("/clone/ip_synth_inner")));
+}
+
+void do_tests() {
+  // Run the checks, but ALWAYS unhook: a thrown check must not leave
+  // the hook registered for the rest of the randomized run.
+  string err = catch(run_checks());
+
+  MASTER->set_compile_hooks(0);
+  if (err) error(err);
+}

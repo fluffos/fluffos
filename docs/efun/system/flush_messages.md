@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system / flush_messages
 ---
 # flush_messages
@@ -10,8 +9,8 @@ title: system / flush_messages
 
 ### SYNOPSIS
 
-    int flush_messages();
-    int flush_messages(object user);
+    void flush_messages();
+    void flush_messages(object user);
 
 ### DESCRIPTION
 

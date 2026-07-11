@@ -10,7 +10,7 @@ const config: Config = {
   baseUrl: '/',
   organizationName: 'fluffos',
   projectName: 'fluffos',
-  onBrokenLinks: 'warn',
+  onBrokenLinks: 'throw',
 
   i18n: {
     defaultLocale: 'en',
@@ -36,11 +36,9 @@ const config: Config = {
           editUrl: 'https://github.com/fluffos/fluffos/edit/master/docs/',
           exclude: [
             '**/node_modules/**',
-            '**/.vitepress/**',
             '**/archive/**',
-            '**/forum_posts/**',
-            '_layouts/**',
             'CLAUDE.md',
+            'README.md',
           ],
         },
         blog: false,
@@ -48,6 +46,24 @@ const config: Config = {
           customCss: './src/css/custom.css',
         },
       } satisfies Preset.Options,
+    ],
+  ],
+
+  themes: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        // offline/local search — no external service required
+        hashed: true,
+        indexBlog: false,
+        // docs live in this directory and are served from the site root
+        docsDir: '.',
+        docsRouteBasePath: '/',
+        // English docs plus the zh-CN pages
+        language: ['en', 'zh'],
+        highlightSearchTermsOnTargetPage: true,
+        explicitSearchResultPath: true,
+      },
     ],
   ],
 

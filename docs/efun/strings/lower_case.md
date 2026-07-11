@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: strings / lower_case
 ---
 # lower_case

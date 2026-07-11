@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects / tell_object
 ---
 # tell_object

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: objects
 ---
 * [all_inventory](all_inventory)
@@ -22,6 +21,7 @@ title: objects
 * [present](present)
 * [query_heart_beat](query_heart_beat)
 * [query_notify_destruct](query_notify_destruct)
+* [recompile_object](recompile_object)
 * [reload_object](reload_object)
 * [restore_object](restore_object)
 * [save_object](save_object)

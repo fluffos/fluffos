@@ -1,0 +1,7 @@
+#ifdef __PACKAGE_COMPRESS__
+void do_tests() {
+    string text = "the quick brown fox jumps over the lazy dog";
+    ASSERT_EQ(text, string_decode(uncompress(compress(text)), "utf-8"));
+    ASSERT(catch(uncompress(string_encode("not compressed data", "utf-8"))));
+}
+#endif

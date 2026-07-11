@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: stdlib / all_environment
 ---
 # all_environment

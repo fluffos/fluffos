@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / explode_reversible
 ---
 # explode_reversible

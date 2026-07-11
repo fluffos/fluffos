@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: filesystem / link
 ---
 # link
@@ -10,7 +9,7 @@ title: filesystem / link
 
 ### SYNOPSIS
 
-    void link( string original, string reference );
+    int link( string original, string reference );
 
 ### DESCRIPTION
 

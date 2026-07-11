@@ -38,12 +38,12 @@ std::string framekind_name(int framekind) {
     result += "| FRAME_OB_CHANGE";
   }
   if (framekind & FRAME_RETURNED_FROM_CATCH) {
-      result += "| FRAME_RETURNED_FROM_CATCH";
+    result += "| FRAME_RETURNED_FROM_CATCH";
   }
   return result;
 }
 
-std::string print_object_ptr(object_t *ob) {
+std::string print_object_ptr(object_t* ob) {
   if (!ob) {
     return "null";
   }
@@ -52,7 +52,7 @@ std::string print_object_ptr(object_t *ob) {
   return ss.str();
 }
 
-std::string print_program_ptr(program_t *prog) {
+std::string print_program_ptr(program_t* prog) {
   if (!prog) {
     return "null";
   }
@@ -61,7 +61,7 @@ std::string print_program_ptr(program_t *prog) {
   return ss.str();
 }
 
-std::string print_pc(program_t *prog, char *pc) {
+std::string print_pc(program_t* prog, char* pc) {
   if (!prog || !pc) {
     return "null";
   }
@@ -71,20 +71,20 @@ std::string print_pc(program_t *prog, char *pc) {
 }
 
 bool dump_vm_state() {
-  const auto *prefix = "  ";
+  const auto* prefix = "  ";
   std::cout << "VM state:\n";
   std::cout << prefix << "current_object = " << print_object_ptr(current_object) << ")\n";
   std::cout << prefix << "current_interactive = " << current_interactive << "\n";
   std::cout << prefix << "current_prog = " << print_program_ptr(current_prog) << "\n";
   std::cout << prefix << "caller_type = " << caller_type << "\n";
   std::cout << prefix << "pc = " << print_pc(current_prog, pc) << "\n";
-  std::cout << prefix << "fp = " << (void *)fp << " (sp - " << (sp - fp) << ")" << "\n";
-  std::cout << prefix << "sp = " << (void *)sp << "\n";
+  std::cout << prefix << "fp = " << (void*)fp << " (sp - " << (sp - fp) << ")" << "\n";
+  std::cout << prefix << "sp = " << (void*)sp << "\n";
   std::cout << prefix << "st_num_arg = " << st_num_arg << "\n";
 
   // Dump current stack
   std::cout << "current stack:\n";
-  for(auto *sv = csp->fp; sv < sp; sv++) {
+  for (auto* sv = csp->fp; sv < sp; sv++) {
     if (sv == nullptr) break;
     std::cout << "sv " << (sv - csp->fp) << ":\n";
     std::cout << prefix << "type = " << type_name(sv->type) << "\n";
@@ -92,11 +92,12 @@ bool dump_vm_state() {
   }
 
   // Dump control stack
-  auto *p = csp;
+  auto* p = csp;
   int depth = 1;
   while (p != control_stack && p->prog != nullptr) {
-    std::cout << "control stack: "<< -depth << "\n";
-    std::cout << prefix << "framekind = " << framekind_name(p->framekind) << "(" << p->framekind << ")\n";
+    std::cout << "control stack: " << -depth << "\n";
+    std::cout << prefix << "framekind = " << framekind_name(p->framekind) << "(" << p->framekind
+              << ")\n";
     std::cout << prefix << "ob = " << print_object_ptr(p->ob) << "\n";
     std::cout << prefix << "prev_ob = " << print_object_ptr(p->prev_ob) << "\n";
     std::cout << prefix << "prog = " << print_program_ptr(p->prog) << "\n";
@@ -119,5 +120,5 @@ bool dump_vm_state() {
     dump_trace(1);
   }
 
-  return true; // so we can use it in DEBUG_CHECK
+  return true;  // so we can use it in DEBUG_CHECK
 }

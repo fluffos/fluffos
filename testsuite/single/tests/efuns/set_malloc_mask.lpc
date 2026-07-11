@@ -1,0 +1,6 @@
+void do_tests() {
+#if efun_defined(set_malloc_mask)
+    catch(set_malloc_mask(0));
+#endif
+    ASSERT(1);
+}

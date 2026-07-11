@@ -1,0 +1,381 @@
+class TestClass {
+  int x;
+  string y;
+  mapping m;
+}
+
+private void bump_by_ref(int ref r) {
+  r += 1;
+}
+
+void do_tests() {
+  int num = 1, num2 = 2;
+  int *nums = ({1,3,4});
+  string fluffos = "FluffOS";
+  object tp = this_player();
+  mapping m = ([
+    1: num,
+    this_player(): nums,
+    "key": ([
+      "another key": ([
+        "finalKey": "Sup?"
+      ]),
+      "largo" : ([
+        "montego": ([
+          "baby" : "why",
+          "don't": "we go?"
+        ])
+      ])
+    ])
+  ]);
+
+
+  // Asserts directly on the mapping
+  ASSERT_EQ(num, m[1]);
+  ASSERT_EQ(nums, m[this_player()]);
+
+  ASSERT_EQ(([
+      "another key": ([
+        "finalKey": "Sup?"
+      ]),
+      "largo" : ([
+        "montego": ([
+          "baby" : "why",
+          "don't": "we go?"
+        ])
+      ])
+    ]),
+    m["key"]
+  );
+  ASSERT_EQ(([
+      "another key": ([
+        "finalKey": "Sup?"
+      ]),
+      "largo" : ([
+        "montego": ([
+          "baby" : "why",
+          "don't": "we go?"
+        ])
+      ])
+    ]),
+  m.key
+  );
+
+  ASSERT_EQ(([
+      "finalKey": "Sup?"
+    ]),
+    m["key"]["another key"]
+  );
+  ASSERT_EQ(([
+      "finalKey": "Sup?"
+    ]),
+    m.key["another key"]
+  );
+
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m["key"]["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m.key["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m.key.largo
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m["key"].largo
+  );
+
+  // Above, but with spaces
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m["key"] ["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m . key["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m . key . largo
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    m ["key"] . largo
+  );
+
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    m["key"]["largo"]["montego"]
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    m.key["largo"]["montego"]
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    m.key.largo["montego"]
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    m.key.largo.montego
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    m.key["largo"].montego
+  );
+
+  ASSERT_EQ(([])[0], m["nope"]);
+  ASSERT_EQ(([])[0], m.nope);
+
+  ASSERT_EQ(
+    "*Tried to take a member of something that isn't a mapping.\n",
+    catch(evaluate(m.still.nope))
+  );
+  ASSERT_EQ(
+    "*Value being indexed is zero.\n",
+    catch(evaluate(m["still"]["nope"]))
+  );
+
+  // Same asserts, but now on the mapping from the class
+
+  class TestClass testClass = new(class TestClass,
+    x: num2,
+    y: fluffos,
+    m: m
+  );
+
+  ASSERT_EQ(num, testClass.m[1]);
+  ASSERT_EQ(nums, testClass.m[this_player()]);
+
+  ASSERT_EQ(([
+      "another key": ([
+        "finalKey": "Sup?"
+      ]),
+      "largo" : ([
+        "montego": ([
+          "baby" : "why",
+          "don't": "we go?"
+        ])
+      ])
+    ]),
+    testClass.m["key"]
+  );
+  ASSERT_EQ(([
+      "another key": ([
+        "finalKey": "Sup?"
+      ]),
+      "largo" : ([
+        "montego": ([
+          "baby" : "why",
+          "don't": "we go?"
+        ])
+      ])
+    ]),
+    testClass.m.key
+  );
+
+  ASSERT_EQ(([
+      "finalKey": "Sup?"
+    ]),
+    m["key"]["another key"]
+  );
+  ASSERT_EQ(([
+      "finalKey": "Sup?"
+    ]),
+    testClass.m.key["another key"]
+  );
+
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass.m["key"]["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass.m.key["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass.m.key.largo
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass.m["key"].largo
+  );
+
+  // Above, but with spaces
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass . m["key"] ["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass. m . key["largo"]
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass . m . key . largo
+  );
+  ASSERT_EQ(([
+      "montego": ([
+        "baby" : "why",
+        "don't": "we go?"
+      ])
+    ]),
+    testClass . m ["key"] . largo
+  );
+
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    testClass.m["key"]["largo"]["montego"]
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    testClass.m.key["largo"]["montego"]
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    testClass.m.key.largo["montego"]
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    testClass.m.key.largo.montego
+  );
+  ASSERT_EQ(([
+      "baby" : "why",
+      "don't": "we go?"
+    ]),
+    testClass.m.key["largo"].montego
+  );
+
+  ASSERT_EQ(([])[0], testClass.m["nope"]);
+  ASSERT_EQ(([])[0], testClass.m.nope);
+
+  ASSERT_EQ(
+    "*Tried to take a member of something that isn't a mapping.\n",
+    catch(evaluate(testClass.m.still.nope))
+  );
+  ASSERT_EQ(
+    "*Value being indexed is zero.\n",
+    catch(evaluate(testClass.m["still"]["nope"]))
+  );
+
+  // Dot access as an lvalue (write, not just read). Found during a
+  // self-review pass: rule_lvalue() dispatches on the opcode's numeric
+  // value, and F_MAP_MEMBER sits outside the contiguous [F_LOCAL, F_MEMBER]
+  // "opcode+1 == lvalue variant" range that check originally covered (it
+  // was added to ops.spec right after member/member_lvalue, but numerically
+  // past F_MEMBER), so every dot-access write used to fail to compile with
+  // "Illegal lvalue".
+  mapping wm = ([]);
+  wm.key = "value";
+  ASSERT_EQ(wm.key, "value");
+
+  mapping wm2 = ([]);
+  wm2.a = ([]);
+  wm2.a.b = "nested";
+  ASSERT_EQ(wm2.a.b, "nested");
+
+  mapping wm3 = (["a": ([]) ]);
+  wm3["a"].b = "bracket-then-dot";
+  ASSERT_EQ(wm3["a"]["b"], "bracket-then-dot");
+
+  mapping wm4 = ([]);
+  wm4.a = ([]);
+  wm4.a["b"] = "dot-then-bracket";
+  ASSERT_EQ(wm4.a.b, "dot-then-bracket");
+
+  mapping wm5 = (["count": 0]);
+  wm5.count += 5;
+  ASSERT_EQ(wm5.count, 5);
+
+  mapping wm6 = ([]);
+  wm6.list = ({});
+  wm6.list += ({1, 2, 3});
+  ASSERT_EQ(wm6.list, ({1, 2, 3}));
+
+  mapping wm7 = (["count": 10]);
+  bump_by_ref(ref wm7.count);
+  ASSERT_EQ(wm7.count, 11);
+}

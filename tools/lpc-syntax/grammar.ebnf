@@ -1,0 +1,447 @@
+(* ============================================================================
+   Layer 1: LEXICAL GRAMMAR (hand-authored; source of truth: lexer.l and
+   lexer_utils.cc's reserved-word table). generate_ebnf.py includes this
+   file verbatim when composing grammar.ebnf -- edit HERE, not there.
+   ============================================================================ *)
+
+letter = ? [A-Za-z] ? ;
+digit = ? [0-9] ? ;
+hexDigit = ? [0-9A-Fa-f] ? ;
+binDigit = "0" | "1" ;
+
+identifier = ( letter | "_" ), { letter | digit | "_" } ;
+
+(* Underscores are legal digit separators in every numeric form. *)
+decimalNumber = digit, { digit | "_" } ;
+hexNumber = "0", ( "x" | "X" ), hexDigit, { hexDigit | "_" } ;
+binaryNumber = "0", ( "b" | "B" ), binDigit, { binDigit | "_" } ;
+integerLiteral = hexNumber | binaryNumber | decimalNumber ;
+realLiteral = decimalNumber, ".", { digit | "_" }, [ exponent ]
+            | decimalNumber, exponent ;
+exponent = ( "e" | "E" ), [ "+" | "-" ], digit, { digit | "_" } ;
+
+escapeSequence = "\\", ( "n" | "t" | "r" | "b" | "a" | "e" | '"' | "'" | "`" | "$" | "\\" )
+               | "\\", "x", hexDigit, [ hexDigit ]
+               | "\\", "u", hexDigit, hexDigit, hexDigit, hexDigit
+               | "\\", ? octal digits ? ;
+
+stringLiteral = '"', { ? any character except '"', newline ? | escapeSequence | "\\", ? newline ? }, '"' ;
+characterLiteral = "'", ( ? any single character ? | escapeSequence ), "'" ;
+
+(* Template literals: backtick strings with ${ expression } interpolation.
+   A backtick string with no interpolation lexes as a plain stringLiteral. *)
+templateLiteral = "`", { templateChar }, [ "${", ? expression ?, "}",
+                  { templateChar }, "`" ] ;
+templateChar = ? any character except "`", "$" ? | escapeSequence ;
+
+(* Text blocks (heredocs): @terminator...terminator (single string) and
+   @@terminator...terminator (array of one string per line). The
+   terminator is any identifier; the block ends on a line beginning with
+   it. *)
+textBlock = "@", identifier, ? newline ?, ? raw lines ?, identifier ;
+textArrayBlock = "@@", identifier, ? newline ?, ? raw lines ?, identifier ;
+
+lineComment = "//", { ? any character except newline ? } ;
+blockComment = "/*", { ? any character sequence not containing "*/" ? }, "*/" ;
+
+keywordControl = "break" | "case" | "catch" | "continue" | "default" | "do"
+               | "efun" | "else" | "for" | "foreach" | "if" | "in"
+               | "inherit" | "new" | "parse_command" | "return" | "sscanf"
+               | "switch" | "time_expression" | "while" | "class" ;
+keywordType = "buffer" | "float" | "function" | "int" | "mapping" | "mixed"
+            | "object" | "string" | "void" ;
+keywordModifier = "nomask" | "nosave" | "private" | "protected" | "public"
+                | "static" | "varargs" ;
+
+functionalOpen = "(:" ;
+functionalClose = ":)" ;
+functionalParameter = "$", decimalNumber ;
+
+(* ============================================================================
+   Layer 2: PREPROCESSOR GRAMMAR (hand-authored; source of truth:
+   lexer_rules_pp.cc). Preprocessing is interleaved with lexing in ONE
+   scan -- directives take effect at exactly their position in the token
+   stream. A '\' at end of line continues any directive line.
+   ============================================================================ *)
+
+directiveLine = ? line start ?, [ ? whitespace ? ], "#", directive ;
+directive = defineDirective | undefDirective | includeDirective
+          | conditionalDirective | pragmaDirective | lineDirective
+          | echoDirective | errorDirective | warnDirective ;
+
+defineDirective = "define", identifier, [ macroParameters ], { ? replacement token ? } ;
+macroParameters = "(", [ identifier, { ",", identifier } ], ")" ;
+(* Inside a replacement list: "#param" stringizes, "a ## b" pastes.
+   Redefinition with a different body is a non-fatal warning. *)
+
+undefDirective = "undef", identifier ;
+
+includeDirective = "include", ( '"', ? file path ?, '"'
+                              | "<", ? file path ?, ">"
+                              | ? macro expanding to either form ? ) ;
+
+conditionalDirective = "if", constantExpression
+                     | "ifdef", identifier
+                     | "ifndef", identifier
+                     | "elif", constantExpression
+                     | "else"
+                     | "endif" ;
+(* constantExpression is evaluated over TOKENS with C precedence:
+   integers, character literals, defined(name), efun_defined(name),
+   arithmetic/bitwise/logical/comparison/ternary operators. *)
+constantExpression = ? integer-valued token expression ? ;
+
+pragmaDirective = "pragma", identifier, { ",", identifier } ;
+lineDirective = "line", decimalNumber, [ '"', ? file path ?, '"' ] ;
+echoDirective = "echo", { ? any token ? } ;
+errorDirective = "error", { ? any token ? } ;
+warnDirective = "warn", { ? any token ? } ;
+
+builtinMacro = "__LINE__" | "__FILE__" | "__DIR__" ;
+
+(* ============================================================================
+   Layer 3: SYNTAX GRAMMAR (generated from grammar.y via bison --xml).
+   Do not edit -- regenerate with the generate_ebnf CMake target.
+   ============================================================================ *)
+
+loopStart = "" ;
+
+foreachStart = "" ;
+
+blockStart = "" ;
+
+specialContextStart = "" ;
+
+dollarStart = "" ;
+
+all = program ;
+
+program = { def, optSemicolon } ;
+
+optSemicolon = ""
+               | ";" ;
+
+def = function
+      | type, nameList, ";"
+      | inheritance
+      | typeDecl
+      | modifierChange ;
+
+function = type, optionalStar, identifier, "(", argument, ")", blockOrSemi ;
+
+blockOrSemi = block
+              | ";"
+              | error ;
+
+statement = commaExpr, ";"
+            | stmtCond
+            | stmtWhile
+            | stmtDo
+            | stmtFor
+            | stmtForeach
+            | stmtSwitch
+            | stmtReturn
+            | block
+            | ";"
+            | LBreak, ";"
+            | LContinue, ";" ;
+
+stmtReturn = LReturn, ";"
+             | LReturn, commaExpr, ";" ;
+
+stmtCond = LIf, "(", commaExpr, ")", statement, optionalElsePart ;
+
+optionalElsePart = ""
+                   | LElse, statement ;
+
+stmtWhile = LWhile, "(", commaExpr, ")", loopStart, statement ;
+
+stmtDo = LDo, loopStart, statement, LWhile, "(", commaExpr, ")", ";" ;
+
+stmtFor = LFor, "(", forInit, ";", forExpr, ";", forExpr, ")", loopStart, statement ;
+
+stmtForeach = LForeach, "(", foreachVars, LIn, expr, ")", foreachStart, statement ;
+
+stmtSwitch = switchHeader, "{", localDeclarations, case, switchBlock, "}" ;
+
+block = "{", blockStart, statements, "}" ;
+
+statements = { statement | localDeclarationStatement | error, ";" } ;
+
+localDeclStatementHeader = basicType ;
+
+localDeclarationStatement = localDeclStatementHeader, localNameList, ";" ;
+
+localDeclHeader = basicType ;
+
+localDeclarations = { localDeclHeader, localNameList, ";" } ;
+
+commaExpr = expr, { ",", expr } ;
+
+expr = ref, lvalue
+       | lvalue, LAssign, expr
+       | error, LAssign, expr
+       | expr, "?", expr, ":", expr
+       | expr, LQuestionQuestion, expr
+       | expr, LLor, expr
+       | expr, LLand, expr
+       | expr, "|", expr
+       | expr, "^", expr
+       | expr, "&", expr
+       | expr, LEqNe, expr
+       | expr, LOrder, expr
+       | expr, "<", expr
+       | expr, LShift, expr
+       | expr, "+", expr
+       | expr, "-", expr
+       | expr, "*", expr
+       | expr, "%", expr
+       | expr, "/", expr
+       | cast, expr
+       | LIncDec, lvalue
+       | "!", expr
+       | "~", expr
+       | "-", expr
+       | lvalue, LIncDec
+       | primaryExpr
+       | sscanf
+       | parseCommand
+       | timeExpression
+       | number
+       | real ;
+
+lvalue = primaryExpr ;
+
+primaryExpr = functionCall
+              | LDefinedName
+              | LIdentifier
+              | LParameter
+              | stringLike
+              | "(", commaExpr, ")"
+              | catch
+              | tree
+              | "$", "(", dollarStart, commaExpr, ")"
+              | primaryExpr, LArrow, identifier
+              | primaryExpr, ".", identifier
+              | primaryExpr, LOptionalDot, identifier
+              | primaryExpr, LOptionalDot, "[", commaExpr, "]"
+              | primaryExpr, LDotOptional, "[", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, LRange, commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, "<", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, LRange, "<", commaExpr, "]"
+              | primaryExpr, "[", commaExpr, LRange, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, "]"
+              | primaryExpr, "[", LRange, "<", commaExpr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, "<", expr, "]"
+              | primaryExpr, "[", "<", commaExpr, LRange, expr, "]"
+              | lambdaReturnType, "(", argument, ")", block
+              | functionalOpen, ":", ")"
+              | functionalOpen, ",", argList, ":", ")"
+              | LFunctionOpen, LDefinedName, ":", ")"
+              | LFunctionOpen, LDefinedName, ",", argList, ":", ")"
+              | LFunctionOpen, commaExpr, ":", ")"
+              | "(", "[", optPairList, "]", ")"
+              | "(", "{", optArgList, "}", ")" ;
+
+callOpen = "(" ;
+
+functionCall = efunOverride, callOpen, optArgList, ")"
+               | LNew, callOpen, optArgList, ")"
+               | LNew, "(", LClass, LDefinedName, optClassInit, ")"
+               | LNew, "(", LClass, LIdentifier, optClassInit, ")"
+               | LDefinedName, callOpen, optArgList, ")"
+               | functionName, callOpen, optArgList, ")"
+               | primaryExpr, "[", commaExpr, "]", callOpen, optArgList, ")"
+               | primaryExpr, LArrow, identifier, callOpen, optArgList, ")"
+               | "(", "*", commaExpr, ")", callOpen, optArgList, ")" ;
+
+sscanf = LSscanf, "(", expr, ",", expr, lvalueList, ")" ;
+
+parseCommand = LParseCommand, "(", expr, ",", expr, ",", expr, lvalueList, ")" ;
+
+catch = LCatch, specialContextStart, exprOrBlock ;
+
+timeExpression = LTimeExpression, specialContextStart, exprOrBlock ;
+
+tree = LTree, block
+       | LTree, "(", commaExpr, ")" ;
+
+switchHeader = LSwitch, "(", commaExpr, ")" ;
+
+switchBlock = { case | statement } ;
+
+case = LCase, caseLabel, ":"
+       | LCase, caseLabel, LRange, caseLabel, ":"
+       | LCase, caseLabel, LRange, ":"
+       | LCase, LRange, caseLabel, ":"
+       | LDefault, ":" ;
+
+caseLabel = constant
+            | stringConst ;
+
+forExpr = ""
+          | commaExpr ;
+
+forInit = forExpr
+          | singleNewLocalDefWithInit ;
+
+foreachVar = LDefinedName
+             | singleNewLocalDef
+             | LIdentifier ;
+
+foreachVars = foreachVar
+              | foreachVar, ",", foreachVar ;
+
+typeDecl = classHeader, memberList, "}" ;
+
+classHeader = typeModifierList, LClass, identifier, "{" ;
+
+memberList = { basicType, memberNameList, ";" } ;
+
+memberNameList = memberName, { ",", memberName } ;
+
+memberName = optionalStar, identifier ;
+
+classInit = identifier, ":", expr ;
+
+optClassInit = { ",", classInit } ;
+
+type = typeModifierList, optBasicType ;
+
+typeModifierList = { LTypeModifier } ;
+
+optBasicType = basicType
+               | "" ;
+
+basicType = atomicType
+            | optAtomicType, LArray ;
+
+optAtomicType = atomicType
+                | "" ;
+
+atomicType = LBasicType
+             | LClass, LDefinedName
+             | LClass, LIdentifier ;
+
+argType = basicType
+          | basicType, ref ;
+
+cast = "(", basicType, optionalStar, ")" ;
+
+optionalStar = ""
+               | "*" ;
+
+identifier = LDefinedName
+             | LIdentifier ;
+
+newLocalName = LIdentifier
+               | LDefinedName ;
+
+efunOverride = LEfun, LColonColon, identifier
+               | LEfun, LColonColon, LNew ;
+
+functionName = LIdentifier
+               | LColonColon, identifier
+               | LBasicType, LColonColon, identifier
+               | identifier, LColonColon, identifier ;
+
+inheritance = typeModifierList, LInherit, stringConst, ";" ;
+
+modifierChange = typeModifierList, ":" ;
+
+argument = ""
+           | argumentList
+           | argumentList, LDotDotDot ;
+
+argumentList = paramDecl, { ",", paramDecl } ;
+
+paramDecl = argType, optionalStar
+            | argType, optionalStar, newLocalName, optionalDefaultArgValue
+            | newLocalName ;
+
+optionalDefaultArgValue = ""
+                          | ":", LFunctionOpen, commaExpr, ":", ")" ;
+
+localNameList = newLocalDef, { ",", newLocalDef } ;
+
+newLocalDef = optionalStar, newLocalName
+              | optionalStar, newLocalName, LAssign, expr ;
+
+singleNewLocalDef = argType, optionalStar, newLocalName ;
+
+singleNewLocalDefWithInit = singleNewLocalDef, LAssign, expr ;
+
+nameList = newName, { ",", newName } ;
+
+newName = optionalStar, identifier
+          | optionalStar, identifier, LAssign, expr ;
+
+lambdaReturnType = LBasicType ;
+
+functionalOpen = LFunctionOpen, efunOverride ;
+
+assocPair = expr, ":", expr ;
+
+spreadExpr = expr
+             | expr, LDotDotDot ;
+
+argList = spreadExpr, { ",", spreadExpr } ;
+
+optArgList = ""
+             | argList
+             | argList, "," ;
+
+pairList = assocPair, { ",", assocPair } ;
+
+optPairList = ""
+              | pairList
+              | pairList, "," ;
+
+lvalueList = { ",", lvalue } ;
+
+exprOrBlock = block
+              | "(", commaExpr, ")" ;
+
+ref = LRef ;
+
+string = stringLiteral ;
+
+templateLiteral = LTemplateHead, expr, templateParts ;
+
+templateParts = LTemplateTail, { LTemplateMiddle, expr } ;
+
+stringLike = string
+             | templateLiteral
+             | stringLike, string
+             | stringLike, templateLiteral ;
+
+stringLiteral = LString, { LString } ;
+
+stringConst = stringLiteral
+              | "(", stringConst, ")"
+              | stringConst, "+", stringConst ;
+
+number = LNumber ;
+
+real = LReal ;
+
+constant = constant, "|", constant
+           | constant, "^", constant
+           | constant, "&", constant
+           | constant, LEqNe, constant
+           | constant, LOrder, constant
+           | constant, "<", constant
+           | constant, LShift, constant
+           | constant, "+", constant
+           | constant, "-", constant
+           | constant, "*", constant
+           | constant, "%", constant
+           | constant, "/", constant
+           | "(", constant, ")"
+           | LNumber
+           | "-", LNumber
+           | "!", LNumber
+           | "~", LNumber ;

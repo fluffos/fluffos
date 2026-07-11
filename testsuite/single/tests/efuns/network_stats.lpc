@@ -1,0 +1,5 @@
+void do_tests() {
+    mapping m = network_stats();
+    ASSERT(mapp(m));
+    ASSERT(sizeof(m) > 0);
+}

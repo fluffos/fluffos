@@ -1,0 +1,4 @@
+// Fixture for /single/tests/efuns/replace_program.lpc: exposes
+// replace_program() (it must be called by the object itself).
+inherit "/clone/replace_parent";
+string do_replace(string name) { return catch(replace_program(name)); }

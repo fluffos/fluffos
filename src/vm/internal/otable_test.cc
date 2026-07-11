@@ -38,7 +38,7 @@ TEST(OTableTest, Operations) {
   EXPECT_EQ(2, ObjectTable::instance().children("realms/silenus").size());
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

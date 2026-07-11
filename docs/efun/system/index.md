@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: system
 ---
 * [all_previous_objects](all_previous_objects)
@@ -7,7 +6,6 @@ title: system
 * [ctime](ctime)
 * [deep_inherit_list](deep_inherit_list)
 * [error](error)
-* [errorp](errorp)
 * [eval_cost](eval_cost)
 * [find_call_out](find_call_out)
 * [flush_messages](flush_messages)
@@ -20,6 +18,7 @@ title: system
 * [perf_counter_ns](perf_counter_ns)
 * [reclaim_objects](reclaim_objects)
 * [replace_program](replace_program)
+* [request_clean_up](request_clean_up)
 * [reset_eval_cost](reset_eval_cost)
 * [set_eval_limit](set_eval_limit)
 * [set_reset](set_reset)

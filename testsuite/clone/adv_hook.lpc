@@ -1,0 +1,8 @@
+// Probe hook: throws from include_file for one path, otherwise behaves
+// like the scriptable compile_hook it inherits.
+inherit "/clone/compile_hook";
+
+mixed include_file(string compiled, string from, string path) {
+  if (path == "adv_throw.h") error("probe: hook throws\n");
+  return ::include_file(compiled, from, path);
+}

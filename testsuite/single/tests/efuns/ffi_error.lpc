@@ -1,0 +1,12 @@
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    ASSERT(stringp(ffi_error()));
+    // A failed load records a message.
+    ffi_load("/no/such/library.so.999");
+    ASSERT(strlen(ffi_error()) > 0);
+#endif
+    ASSERT(1);
+}

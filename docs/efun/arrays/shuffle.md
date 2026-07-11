@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: arrays / shuffle
 ---
 # shuffle

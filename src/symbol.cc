@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #endif
 
-static FILE *out = nullptr;
+static FILE* out = nullptr;
 
 static int enable = 0;
 
@@ -17,7 +17,7 @@ std::string symbol_dir = "log/symbol/";
 
 void symbol_enable(int op) { enable = op; }
 
-void symbol_start(const char *filename) {
+void symbol_start(const char* filename) {
   std::string symbolfile;
 
   if (!enable) return;
@@ -44,7 +44,7 @@ void symbol_end() {
   out = nullptr;
 }
 
-void symbol_record(int op, const char *file, int line, const char *detail) {
+void symbol_record(int op, const char* file, int line, const char* detail) {
   if (!enable) return;
   if (out == nullptr) return;
 

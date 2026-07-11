@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: object
 ---
 * [clean_up](clean_up)

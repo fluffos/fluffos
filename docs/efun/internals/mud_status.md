@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / mud_status
 ---
 # mud_status
@@ -10,7 +9,7 @@ title: internals / mud_status
 
 ### SYNOPSIS
 
-    void mud_status( int extra );
+    string mud_status( int extra );
 
 ### DESCRIPTION
 

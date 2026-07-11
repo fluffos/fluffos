@@ -1,0 +1,11 @@
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+void rcb(int fd) { }
+void do_tests() {
+    int fd = socket_create(STREAM, "rcb");
+    ASSERT_EQ(EESUCCESS, socket_close(fd));
+    ASSERT(socket_close(fd) < 0);       // double close
+    ASSERT(socket_close(9999) < 0);     // never existed
+}
+#endif

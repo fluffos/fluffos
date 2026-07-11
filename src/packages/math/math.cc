@@ -175,7 +175,7 @@ void f_round() { sp->u.real = round(sp->u.real); }
    Yes, you could use dotprod() below to implement norm(), but in the interest
    of speed, norm() has less cases.
 */
-static LPC_FLOAT norm(array_t *a) {
+static LPC_FLOAT norm(array_t* a) {
   LPC_INT len = sp->u.arr->size;
   LPC_FLOAT total = 0.0;
 
@@ -207,7 +207,7 @@ void f_norm() {
 #endif
 
 #if defined(F_DOTPROD) | defined(F_DISTANCE) | defined(F_ANGLE)
-static LPC_FLOAT vector_op(array_t *a, array_t *b,
+static LPC_FLOAT vector_op(array_t* a, array_t* b,
                            LPC_FLOAT (*func)(const LPC_FLOAT, const LPC_FLOAT)) {
   LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
@@ -248,7 +248,7 @@ static LPC_FLOAT vector_op(array_t *a, array_t *b,
 static LPC_FLOAT dotprod_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return a * b; }
 
 /* dot product of two vectors */
-static LPC_FLOAT dotprod(array_t *a, array_t *b) { return vector_op(a, b, dotprod_mult); }
+static LPC_FLOAT dotprod(array_t* a, array_t* b) { return vector_op(a, b, dotprod_mult); }
 
 void f_dotprod() {
   LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult);

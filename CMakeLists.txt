@@ -16,6 +16,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
+# Export compile_commands.json for clangd / language servers (Makefile + Ninja only)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Target: symlink compile_commands.json from the build dir to the project root
+# so that editors and tools find it without extra configuration.
+if(NOT WIN32)
+  add_custom_target(compile_commands
+    COMMAND "${CMAKE_COMMAND}" -E create_symlink
+            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    COMMENT "Symlinking compile_commands.json to project root"
+    VERBATIM
+  )
+endif()
+
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "..." FORCE)
 endif()
@@ -82,6 +97,12 @@ endif()
 
 add_subdirectory(src)
 
+if (CMAKE_CROSSCOMPILING)
+  # No native driver binary to run the LPC testsuite with (the WASM
+  # driver runs it in the page / under node instead).
+  return()
+endif ()
+
 add_custom_target(driver-testsuite
         COMMAND $<TARGET_FILE:driver> etc/config.test
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite"
@@ -93,3 +114,18 @@ add_custom_target(driver-autotest
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite"
         COMMENT "Running driver automated tests"
 )
+
+# The LPC testsuite as a first-class ctest test: `ctest -R testsuite`
+# (equivalently `ctest -L testsuite`; plain `ctest` includes it) runs the
+# whole mudlib suite alongside the GTest binaries. The runner prints gtest-style [ RUN ]/[ OK ]/[ FAILED ]
+# blocks; "Checks succeeded." plus a clean exit is the pass signal, and
+# any recorded failure prints a [  FAILED  ] recap and exits nonzero.
+enable_testing()
+add_test(NAME testsuite
+        COMMAND $<TARGET_FILE:driver> etc/config.test -ftest
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(testsuite PROPERTIES
+        PASS_REGULAR_EXPRESSION "Checks succeeded\\."
+        FAIL_REGULAR_EXPRESSION "\\[  FAILED  \\]"
+        TIMEOUT 600
+        LABELS "testsuite")

@@ -1,0 +1,7 @@
+void do_tests() {
+    object ob = clone_object("/clone/catch_tell_probe");
+    ASSERT_EQ(0, query_heart_beat(ob));
+    // set_heart_beat is pinned in its own file; pin the query side here.
+    destruct(ob);
+    ASSERT_EQ(0, query_heart_beat(this_object()));
+}

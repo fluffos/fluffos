@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: contrib / roll_MdN.pre
 ---
 # roll_MdN

@@ -1,0 +1,7 @@
+// Optional chaining is read-only: m?.key = x must be a compile error,
+// not silently accepted (found and fixed alongside a real dot-access
+// lvalue bug during a self-review pass -- see dot-access.c).
+void foo() {
+    mapping m = ([]);
+    m?.key = "value";
+}

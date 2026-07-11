@@ -1,0 +1,12 @@
+#ifdef __PACKAGE_COMPRESS__
+void do_tests() {
+    string text = "uncompress_file round trip\n";
+    write_file("/ucf_src.txt", text, 1);
+    ASSERT_EQ(1, compress_file("/ucf_src.txt", "/ucf_out.gz"));
+    ASSERT_EQ(1, uncompress_file("/ucf_out.gz", "/ucf_back.txt"));
+    ASSERT_EQ(text, read_file("/ucf_back.txt"));
+    rm("/ucf_src.txt");
+    rm("/ucf_out.gz");
+    rm("/ucf_back.txt");
+}
+#endif

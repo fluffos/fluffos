@@ -9,12 +9,12 @@
 #define HEARTBEAT_H_
 
 // FIXME: remove this usage
-extern struct object_t *g_current_heartbeat_obj;
+extern struct object_t* g_current_heartbeat_obj;
 
-int set_heart_beat(struct object_t *, int);
-int query_heart_beat(struct object_t *);
-int heart_beat_status(struct outbuffer_t *, int);
-struct array_t *get_heart_beats();
+int set_heart_beat(struct object_t*, int);
+int query_heart_beat(struct object_t*);
+int heart_beat_status(struct outbuffer_t*, int);
+struct array_t* get_heart_beats();
 
 // Used by backend.cc
 void call_heart_beat();

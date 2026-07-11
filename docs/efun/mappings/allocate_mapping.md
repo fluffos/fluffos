@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: mappings / allocate_mapping
 ---
 # allocate_mapping

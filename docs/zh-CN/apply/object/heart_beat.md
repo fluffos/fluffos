@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: object / heart_beat()
 ---
 # heart_beat

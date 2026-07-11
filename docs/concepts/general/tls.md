@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: TLS/SSL Support
 ---
 # TLS/SSL Support

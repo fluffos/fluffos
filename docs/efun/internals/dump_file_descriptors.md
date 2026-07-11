@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: internals / dump_file_descriptors
 ---
 # dump_file_descriptors
@@ -10,7 +9,7 @@ title: internals / dump_file_descriptors
 
 ### SYNOPSIS
 
-    void dump_file_descriptors( void );
+    string dump_file_descriptors();
 
 ### DESCRIPTION
 

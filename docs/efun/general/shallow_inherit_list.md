@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: general / shallow_inherit_list
 ---
 # shallow_inherit_list

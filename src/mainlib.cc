@@ -29,15 +29,15 @@
 #endif
 #include <unicode/uversion.h>
 
+#include "base/internal/crash_handler.h"  // for install_crash_handler, etc
 #include "base/internal/tracing.h"
 #include "thirdparty/scope_guard/scope_guard.hpp"
-#include "packages/core/dns.h"                   // for init_dns_event_base.
-#include "vm/vm.h"                               // for push_constant_string, etc
-#include "comm.h"                                // for init_user_conn
-#include "backend.h"                             // for backend();
-#include "thirdparty/backward-cpp/backward.hpp"  // for backtracing
+#include "packages/core/dns.h"  // for init_dns_event_base.
+#include "vm/vm.h"              // for push_constant_string, etc
+#include "comm.h"               // for init_user_conn
+#include "backend.h"            // for backend();
 
-// from lex.cc
+// from lexer_utils.cc
 extern void print_all_predefines();
 
 namespace {
@@ -84,7 +84,7 @@ void print_rlimit() {
 #endif
 }
 
-void print_commandline(int argc, char **argv) {
+void print_commandline(int argc, char** argv) {
   debug_message("Full Command Line: ");
   for (int i = 0; i < argc; i++) {
     debug_message("%s ", argv[i]);
@@ -106,7 +106,7 @@ void print_version_and_time() {
 #ifdef HAVE_JEMALLOC
   /* Print jemalloc version */
   {
-    const char *ver;
+    const char* ver;
     size_t resultlen = sizeof(ver);
     mallctl("version", &ver, &resultlen, nullptr, 0);
     debug_message("jemalloc Version: %s\n", ver);
@@ -116,15 +116,7 @@ void print_version_and_time() {
 #endif
   debug_message("ICU Version: %s\n", U_ICU_VERSION);
 
-#ifndef _WIN32
-#if BACKWARD_HAS_DW == 1
-  debug_message("Backtrace support: libdw.\n");
-#elif BACKWARD_HAS_BFD == 1
-  debug_message("Backtrace support: libbfd.\n");
-#else
-  debug_message("libdw or libbfd is not found, you will only get very limited crash stacktrace.\n");
-#endif
-#endif /* _WIN32 */
+  debug_message("Backtrace support: %s.\n", crash_handler_backtrace_support());
 }
 
 void sig_cld(int sig) {
@@ -159,11 +151,7 @@ void sig_usr2(int /*sig*/) {
  * -Beek
  */
 void attempt_shutdown(int sig) {
-  using namespace backward;
-  static StackTrace st;
-  static Printer p;
-
-  const char *msg = "Unkonwn signal!";
+  const char* msg = "Unkonwn signal!";
   switch (sig) {
     case SIGTERM:
       msg = "SIGTERM: Process terminated";
@@ -178,11 +166,7 @@ void attempt_shutdown(int sig) {
   signal(SIGINT, SIG_DFL);
 
   // Print backtrace
-  st.load_here(64);
-  p.object = true;
-  p.color_mode = ColorMode::automatic;
-  p.address = true;
-  p.print(st, stderr);
+  print_native_stacktrace();
 
   // Attempt to call crash()
   fatal(msg);
@@ -212,7 +196,7 @@ void init_tz() {
 }  // namespace
 
 // Return the argument at the given position, start from 0.
-std::string get_argument(unsigned int pos, int argc, char **argv) {
+std::string get_argument(unsigned int pos, int argc, char** argv) {
   int argpos = 0;
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
@@ -241,7 +225,7 @@ void init_win32() {
 #endif
 }
 
-struct event_base *init_main(std::string_view config_file) {
+struct event_base* init_main(std::string_view config_file) {
 #ifdef _WIN32
   init_win32();
 #endif
@@ -251,7 +235,7 @@ struct event_base *init_main(std::string_view config_file) {
   reset_debug_message_fp();
 
   // Make sure mudlib dir is correct.
-  auto *root = CONFIG_STR(__MUD_LIB_DIR__);
+  auto* root = CONFIG_STR(__MUD_LIB_DIR__);
   debug_message("Execution root: %s\n", root);
   if (chdir(root) == -1) {
     debug_message("Bad mudlib directory: '%s'.\n", root);
@@ -261,7 +245,7 @@ struct event_base *init_main(std::string_view config_file) {
   debug_message("Initializing internal stuff ....\n");
 
   // Initialize libevent, This should be done before executing LPC.
-  auto *base = init_backend();
+  auto* base = init_backend();
   init_dns_event_base(base);
 
   // Initialize VM layer
@@ -296,10 +280,10 @@ void setup_signal_handlers() {
 }
 
 extern "C" {
-int driver_main(int argc, char **argv);
+int driver_main(int argc, char** argv);
 }
 
-int driver_main(int argc, char **argv) {
+int driver_main(int argc, char** argv) {
   // Emit a starter config to stdout and exit, before any startup output.
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--generate-config") == 0) {
@@ -326,11 +310,8 @@ int driver_main(int argc, char **argv) {
   print_rlimit();
   print_sep();
 
-  // backward-cpp doesn't yet work on win32
-
   // register crash handlers
-  backward::SignalHandling sh;
-  if (!sh.loaded()) {
+  if (!install_crash_handler()) {
     debug_message("Warning: Signal handler installation failed, not backtrace on crash!\n");
   }
 
@@ -387,13 +368,13 @@ int driver_main(int argc, char **argv) {
     exit(-1);
   }
 
-  auto *base = init_main(config_file);
+  auto* base = init_main(config_file);
 
   debug_message("==== Runtime Config Table ====\n");
   print_rc_table();
   debug_message("==============================\n");
 
-  // from lex.cc
+  // from lexer_utils.cc
   debug_message("==== LPC Predefines ====\n");
   print_all_predefines();
   debug_message("========================\n");
@@ -416,7 +397,7 @@ int driver_main(int argc, char **argv) {
 
         push_constant_string(argv[i] + 2);
         auto ret = safe_apply_master_ob(APPLY_FLAG, 1);
-        if (ret == (svalue_t *)-1 || ret == nullptr || MudOS_is_being_shut_down) {
+        if (ret == (svalue_t*)-1 || ret == nullptr || MudOS_is_being_shut_down) {
           debug_message("Shutdown by master object.\n");
           return -1;
         }

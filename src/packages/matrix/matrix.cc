@@ -11,14 +11,14 @@
 
 static Matrix identity = {1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
 
-static void print_matrix(Matrix, const char *);
-static void print_array(Vector *, const char *);
-static Vector *normalize_array(Vector *);
-static Vector *cross_product(Vector *, Vector *, Vector *);
-static Vector *points_to_array(Vector *, Vector *, Vector *);
+static void print_matrix(Matrix, const char*);
+static void print_array(Vector*, const char*);
+static Vector* normalize_array(Vector*);
+static Vector* cross_product(Vector*, Vector*, Vector*);
+static Vector* points_to_array(Vector*, Vector*, Vector*);
 
 void f_id_matrix() {
-  array_t *matrix;
+  array_t* matrix;
   int i;
 
   matrix = allocate_empty_array(16);
@@ -30,7 +30,7 @@ void f_id_matrix() {
 }
 
 void f_translate() {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix trans_matrix;
@@ -75,7 +75,7 @@ void f_translate() {
 }
 
 void f_scale() {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix scaling_matrix;
@@ -119,7 +119,7 @@ void f_scale() {
 }
 
 void f_rotate_x() {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
   Matrix rot_matrix;
@@ -154,7 +154,7 @@ void f_rotate_x() {
 }
 
 void f_rotate_y() {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
   Matrix rot_matrix;
@@ -189,7 +189,7 @@ void f_rotate_y() {
 }
 
 void f_rotate_z() {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
   Matrix rot_matrix;
@@ -224,7 +224,7 @@ void f_rotate_z() {
 }
 
 void f_lookat_rotate() {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix lookat_matrix;
@@ -264,7 +264,7 @@ void f_lookat_rotate() {
 
 #ifdef F_LOOKAT_ROTATE2
 void f_lookat_rotate2(void) {
-  array_t *matrix;
+  array_t* matrix;
   LPC_FLOAT ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;
   Matrix lookat_matrix;
@@ -308,7 +308,7 @@ void f_lookat_rotate2(void) {
 #endif
 
 #ifdef DEBUG
-static void print_matrix(Matrix m, const char *label) {
+static void print_matrix(Matrix m, const char* label) {
   int i;
   int j;
 
@@ -321,12 +321,12 @@ static void print_matrix(Matrix m, const char *label) {
   }
 }
 
-static void print_array(Vector *v, const char *label) {
+static void print_array(Vector* v, const char* label) {
   debug_message("%s:\t%f\t%f\t%f\n", label, v->x, v->y, v->z);
 }
 #endif
 
-static Vector *normalize_array(Vector *v) {
+static Vector* normalize_array(Vector* v) {
   LPC_FLOAT xx, yy, zz, mm, m;
 
   xx = v->x * v->x;
@@ -342,14 +342,14 @@ static Vector *normalize_array(Vector *v) {
   return (v);
 }
 
-static Vector *cross_product(Vector *v, Vector *va, Vector *vb) {
+static Vector* cross_product(Vector* v, Vector* va, Vector* vb) {
   v->x = (va->y * vb->z) - (va->z * vb->y);
   v->y = (va->z * vb->x) - (va->x * vb->z);
   v->z = (va->x * vb->y) - (va->y * vb->x);
   return (v);
 }
 
-static Vector *points_to_array(Vector *v, Vector *pa, Vector *pb) {
+static Vector* points_to_array(Vector* v, Vector* pa, Vector* pb) {
   v->x = pa->x - pb->x;
   v->y = pa->y - pb->y;
   v->z = pa->z - pb->z;

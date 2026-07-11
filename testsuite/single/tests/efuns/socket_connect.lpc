@@ -1,0 +1,14 @@
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+void rcb(int fd) { }
+void wcb(int fd) { }
+void do_tests() {
+    // A real connect's return code (EESUCCESS vs in-progress) and its
+    // async completion are platform-dependent, and a live self-connection
+    // leaves pending events that can wedge some event loops. Exercise the
+    // efun's argument validation instead: a bad descriptor is rejected
+    // cleanly on every platform.
+    ASSERT(socket_connect(9999, "127.0.0.1 1", "rcb", "wcb") < 0);
+}
+#endif

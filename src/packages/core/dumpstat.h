@@ -4,7 +4,7 @@
 /*
  * dumpstat.c
  */
-int data_size(struct object_t *);
-void dumpstat(const char *);
+int data_size(struct object_t*);
+void dumpstat(const char*);
 
 #endif

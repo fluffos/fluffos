@@ -10,7 +10,7 @@
 #include "vm/internal/base/machine.h"
 #include "vm/internal/base/debug.h"
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/lex.h"
+#include "compiler/internal/lexer.h"
 #include "compiler/internal/disassembler.h"
 #include "applies_table.autogen.h"
 
@@ -53,7 +53,7 @@ int convert_type(int type) {
 }
 
 // TODO: These should be moved somewhere else
-void check_co_args2(unsigned short *types, int num_arg, const char *name, const char *ob_name,
+void check_co_args2(unsigned short* types, int num_arg, const char* name, const char* ob_name,
                     int sparg) {
   int argc = sparg;
   int exptype, i = 0;
@@ -78,7 +78,7 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name, const 
               ob_name, type_name(exptype), type_name((sp - argc)->type));
       if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
         if (current_prog) {
-          const char *file;
+          const char* file;
           int line;
           get_line_number_info(&file, &line);
           int prsave = pragmas;
@@ -96,7 +96,7 @@ void check_co_args2(unsigned short *types, int num_arg, const char *name, const 
 }
 
 // util functions
-void check_co_args(int num_arg, const program_t *prog, function_t *fun, int findex) {
+void check_co_args(int num_arg, const program_t* prog, function_t* fun, int findex) {
   if (CONFIG_INT(__RC_CALL_OTHER_TYPE_CHECK__)) {
     if (num_arg != fun->num_arg) {
       char buf[1024];
@@ -105,7 +105,7 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun, int find
       sprintf(buf, "Wrong number of arguments to %s in %s.\n", fun->funcname, prog->filename);
       if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
         if (current_prog) {
-          const char *file;
+          const char* file;
           int line;
           int prsave = pragmas;
           pragmas &= ~PRAGMA_ERROR_CONTEXT;
@@ -159,13 +159,13 @@ void check_co_args(int num_arg, const program_t *prog, function_t *fun, int find
  * manually !  (Look towards end of this function.)
  */
 
-int apply_low(const char *fun, object_t *ob, int num_arg) {
+int apply_low(const char* fun, object_t* ob, int num_arg) {
   ScopedTracer _tracer(__PRETTY_FUNCTION__);
 
   int local_call_origin = call_origin;
 
 #ifdef DEBUG
-  control_stack_t *save_csp;
+  control_stack_t* save_csp;
 #endif
 
   if (!local_call_origin) {
@@ -219,7 +219,7 @@ retry_for_shadow:
   /* Ready to call the function now. */
   {
     int need;
-    function_t *funp = entry.funp;
+    function_t* funp = entry.funp;
     int findex = (funp - entry.progp->function_table);
     int funflags = ob->prog->function_flags[entry.runtime_index];
 
@@ -241,35 +241,38 @@ retry_for_shadow:
     }
     /* setup default arguments if needed */
     {
-      auto *progp = entry.progp;
-      auto *funcp = entry.funp;
+      auto* progp = entry.progp;
+      auto* funcp = entry.funp;
 
       if (!(funflags & FUNC_TRUE_VARARGS) && funcp->min_arg != funcp->num_arg) {
         if (num_arg < funcp->min_arg) {
-          // COMPAT: fluffos allow apply to call functions with fewer arguments than required, so we fix it up here
+          // COMPAT: fluffos allow apply to call functions with fewer arguments than required, so we
+          // fix it up here
           push_undefineds(funcp->min_arg - num_arg);
           num_arg = funcp->min_arg;
         }
         // for functions with default argument values, we want to invoke the closure to
         // fill in the arguments
         if (num_arg != funcp->num_arg) {
-          auto *saved_fp = fp;
+          auto* saved_fp = fp;
           fp = sp;  // leave the already pushed args on the stack
 
-          // NOTE: this assumes default arguments closure are always generated right after the function in order
+          // NOTE: this assumes default arguments closure are always generated right after the
+          // function in order
           for (int i = num_arg; i < funcp->num_arg; i++) {
             auto current_sp = sp;
-            auto *default_funcp =progp->function_table + funcp->default_args_findex[i];
-            if(default_funcp->funcname[0]!=APPLY___INIT_SPECIAL_CHAR) {
+            auto* default_funcp = progp->function_table + funcp->default_args_findex[i];
+            if (default_funcp->funcname[0] != APPLY___INIT_SPECIAL_CHAR) {
 #ifdef DEBUG
-                  dump_vm_state();
-                  dump_prog(progp, stdout, 1|2);
+              dump_vm_state();
+              dump_prog(progp, stdout, 1 | 2);
 #endif
-                  error("Driver Bug: Illegal default argument function name %s in %s\n", default_funcp->funcname, progp->filename);
+              error("Driver Bug: Illegal default argument function name %s in %s\n",
+                    default_funcp->funcname, progp->filename);
             }
             // notice we don't change current_object here, so the default arguments closure
             // will be called in the context of the caller
-            fp = sp + 1; // zero args
+            fp = sp + 1;  // zero args
             push_control_stack(FRAME_FUNCTION);
             caller_type = ORIGIN_LOCAL;
             csp->pc = pc;
@@ -286,14 +289,16 @@ retry_for_shadow:
             assign_svalue_no_free(&sv_funcp, sp);
             pop_stack();
 
-            DEBUG_CHECK((sv_funcp.type != T_FUNCTION || sv_funcp.u.fp == nullptr) && dump_vm_state(),
-                        "apply_low: default args closure returned null.");
+            DEBUG_CHECK(
+                (sv_funcp.type != T_FUNCTION || sv_funcp.u.fp == nullptr) && dump_vm_state(),
+                "apply_low: default args closure returned null.");
 
             // evaluate the closure in current context
             push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
             free_svalue(&sv_funcp, "apply_low: default args closure");
 
-            DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(), "Bad stack after default arguments call.");
+            DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(),
+                        "Bad stack after default arguments call.");
           }
 
           fp = saved_fp;
@@ -345,9 +350,9 @@ retry_for_shadow:
  * are deallocated.
  */
 
-svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
+svalue_t* apply(const char* fun, object_t* ob, int num_arg, int where) {
 #ifdef DEBUG
-  svalue_t *expected_sp;
+  svalue_t* expected_sp;
 #endif
 
   call_origin = where;
@@ -371,7 +376,7 @@ svalue_t *apply(const char *fun, object_t *ob, int num_arg, int where) {
  * applied function and the driver depends on being able to do something
  * after the apply. (such as the ed exit function, and the net_dead function).
  */
-svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
+svalue_t* safe_apply(const char* fun, object_t* ob, int num_arg, int where) {
   /* Arguments are already pushed on stack */
 
   if (ob->flags & O_DESTRUCTED) {
@@ -382,10 +387,10 @@ svalue_t *safe_apply(const char *fun, object_t *ob, int num_arg, int where) {
   error_context_t econ;
   save_context(&econ);
 
-  svalue_t *ret = nullptr;
+  svalue_t* ret = nullptr;
   try {
     ret = apply(fun, ob, num_arg, where);
-  } catch (const char *) {
+  } catch (const char*) {
     restore_context(&econ);
     pop_n_elems(num_arg);
     ret = nullptr;

@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: string
 ---
 * [base64decode](base64decode)
