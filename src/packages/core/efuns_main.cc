@@ -313,20 +313,13 @@ void f_call_stack() {
       }
       break;
     case 4:
+      /* Every frame reports "file:line", matching the documented behavior. */
       for (i = 0; i < n; i++) {
+        const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
+        char* progc = (i ? (csp - i + 1)->pc : pc);
         ret->item[i].type = T_STRING;
-        if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
-          const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
-          int const index = (csp - i)->fr.table_index;
-          char* progc = (i ? (csp - i + 1)->pc : pc);
-          ret->item[i].type = T_STRING;
-          ret->item[i].subtype = STRING_MALLOC;
-          ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
-        } else {
-          ret->item[i].subtype = STRING_CONSTANT;
-          ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
-        }
+        ret->item[i].subtype = STRING_MALLOC;
+        ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
       }
       break;
   }
