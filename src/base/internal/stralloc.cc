@@ -97,7 +97,9 @@ void init_strings() {
 
   /* ensure that htable size is a power of 2 */
   y = CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__);
-  for (htable_size = 1; htable_size < y; htable_size <<= 1) {
+  /* Cap the round-up at 2^30: a larger configured value would shift past
+     2^31 and overflow signed int (UB), spinning this loop forever at boot. */
+  for (htable_size = 1; htable_size < y && htable_size < (1 << 30); htable_size <<= 1) {
   }
   CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__) = htable_size;
 
