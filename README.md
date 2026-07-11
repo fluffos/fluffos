@@ -135,8 +135,11 @@ sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
   libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
-  libdw-dev libbz2-dev
+  pkg-config libffi-dev libdw-dev libbz2-dev
 ```
+
+> [!NOTE]
+> `flex` is only needed if you modify the LPC lexer (`src/compiler/internal/lexer.l`). Otherwise the build uses the pre-committed generated lexer.
 
 **2. Compile:**
 ```bash
@@ -152,7 +155,7 @@ make -j$(nproc) install
 **1. Install dependencies (Homebrew):**
 ```bash
 brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
-  mysql sqlite3 googletest
+  mysql sqlite3 googletest libffi
 ```
 
 **2. Compile:**
@@ -175,6 +178,7 @@ pacman --noconfirm -S --needed \
   mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
+  mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
   bison make
 ```
 
@@ -218,7 +222,7 @@ apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
   mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
   openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
   pcre-dev bison git musl-dev libelf-static elfutils-dev \
-  zstd-static bzip2-static xz-static
+  pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 
 **2. Compile (static build):**

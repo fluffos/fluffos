@@ -146,13 +146,14 @@ valgrind --leak-check=full ./build/bin/driver config.test
 ```bash
 # 安装依赖
 sudo apt install build-essential bison libmysqlclient-dev libpcre3-dev \
-  libpq-dev libsqlite3-dev libssl-dev libz-dev libjemalloc-dev libicu-dev
+  libpq-dev libsqlite3-dev libssl-dev libz-dev libjemalloc-dev libicu-dev \
+  pkg-config libffi-dev
 ```
 
 ### macOS
 ```bash
 # 安装依赖
-brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc icu4c
+brew install cmake pkg-config mysql pcre libgcrypt libevent openssl jemalloc icu4c libffi
 
 # 使用环境变量构建
 OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake ..
@@ -163,7 +164,8 @@ OPENSSL_ROOT_DIR="/usr/local/opt/openssl" ICU_ROOT="/usr/local/opt/icu4c" cmake 
 # 安装 MSYS2 包
 pacman -S git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake
 pacman -S mingw-w64-x86_64-zlib mingw-w64-x86_64-libevent \
-  mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-openssl
+  mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-openssl \
+  mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi
 
 # 在 MINGW64 终端中构建
 cmake -G "MSYS Makefiles" ..

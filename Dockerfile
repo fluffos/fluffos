@@ -5,7 +5,7 @@ RUN apk add --no-progress --no-cache \
     mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static\
     openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
     pcre-dev bison git musl-dev libelf-static elfutils-dev zstd-static bzip2-static xz-static \
-    libffi-dev
+    pkgconf libffi-dev
 
 WORKDIR /build
 

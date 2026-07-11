@@ -50,8 +50,11 @@ $ sudo apt update
 $ sudo apt install -y build-essential autoconf automake bison expect \
   libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libjemalloc-dev libicu-dev \
-  libgtest-dev
+  libgtest-dev pkg-config libffi-dev
 ```
+
+> [!NOTE]
+> `flex` is only needed if you modify the LPC lexer (`src/compiler/internal/lexer.l`). Otherwise the build uses the pre-committed generated lexer.
 
 For **sanitizer builds** (memory debugging), also install:
 ```shell
@@ -132,7 +135,7 @@ If not already installed, goto <https://brew.sh/> and follow instructions!
 
 ```shell
 $ brew install cmake pkg-config mysql pcre libgcrypt openssl jemalloc icu4c \
-  sqlite3 googletest
+  sqlite3 googletest libffi
 ```
 
 Set `HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1` to speed up brew installs if needed.
@@ -205,6 +208,7 @@ $ pacman --noconfirm -S --needed \
   mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
+  mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
   bison make
 ```
 
@@ -360,7 +364,7 @@ $ apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
     mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
     openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
     pcre-dev bison git musl-dev libelf-static elfutils-dev \
-    zstd-static bzip2-static xz-static
+    pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 
 ### Installing jemalloc
