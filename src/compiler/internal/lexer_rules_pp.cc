@@ -985,6 +985,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
         m.is_function_like = true;
         idx++;  // skip '('
         while (idx < rest.size() && rest[idx] != ')') {
+          size_t const before = idx;
           while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
           size_t ps = idx;
           while (idx < rest.size() &&
@@ -993,6 +994,12 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
           if (idx > ps) m.params.emplace_back(rest.substr(ps, idx - ps));
           while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
           if (idx < rest.size() && rest[idx] == ',') idx++;
+          // A stray character (not identifier/comma/space/')' -- e.g. '@' or a
+          // UTF-8 lead byte) consumes nothing; bail instead of looping forever.
+          if (idx == before) {
+            lexerror("#define: malformed macro parameter list");
+            return;
+          }
         }
         if (idx < rest.size()) idx++;  // skip ')'
       }
