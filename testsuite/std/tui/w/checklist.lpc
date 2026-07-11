@@ -1,0 +1,95 @@
+// /std/tui/w/checklist — multi-select checkbox list (blessed Checkbox group /
+// pterm interactive multiselect, as a widget).
+//
+// Space toggles the highlighted item; events: ("change", index) on toggle.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string *items = ({});
+private mapping checked = ([]);
+private int sel = 0;
+private int top = 0;
+private string attr = "";
+private string sel_attr = "7";
+
+void create() { w_focusable = 1; }
+
+void set_items(string *it) {
+  items = arrayp(it) ? it[0..] : ({});
+  checked = ([]);
+  sel = top = 0;
+}
+
+void set_checked(int *idx) {
+  checked = ([]);
+  if (arrayp(idx)) {
+    foreach (int i in idx) {
+      if (i >= 0 && i < sizeof(items)) checked[i] = 1;
+    }
+  }
+}
+
+int *query_checked() {
+  int *r = ({});
+  int i;
+
+  for (i = 0; i < sizeof(items); i++) {
+    if (checked[i]) r += ({ i });
+  }
+  return r;
+}
+
+string *query_checked_items() { return map(query_checked(), (: items[$1] :)); }
+int query_selected() { return sel; }
+
+void set_attrs(string normal, string selected) {
+  if (stringp(normal)) attr = normal;
+  if (stringp(selected)) sel_attr = selected;
+}
+
+void draw(object scr) {
+  int i;
+
+  if (sel < top) top = sel;
+  if (sel >= top + wh) top = sel - wh + 1;
+  if (top < 0) top = 0;
+  for (i = 0; i < wh; i++) {
+    int idx = top + i;
+    string line = "";
+
+    if (idx < sizeof(items)) {
+      line = wslice((checked[idx] ? "[x] " : "[ ] ") + items[idx], 0, ww);
+    }
+    scr->scr_put(wx, wy + i, wpad(line, ww),
+                 (idx == sel && idx < sizeof(items) && w_focused) ? sel_attr : attr);
+  }
+}
+
+int handle_key(mixed ev) {
+  if (ev == " " || ev == TUI_KEY_ENTER) {
+    if (sizeof(items)) {
+      checked[sel] = !checked[sel];
+      emit_event("change", sel);
+    }
+    return 1;
+  }
+  if (!intp(ev)) return 0;
+  switch (ev) {
+    case TUI_KEY_UP:
+      if (sel > 0) sel--;
+      return 1;
+    case TUI_KEY_DOWN:
+      if (sel < sizeof(items) - 1) sel++;
+      return 1;
+    case TUI_KEY_HOME:
+      sel = 0;
+      return 1;
+    case TUI_KEY_END:
+      if (sizeof(items)) sel = sizeof(items) - 1;
+      return 1;
+  }
+  return 0;
+}

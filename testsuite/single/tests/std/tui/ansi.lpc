@@ -1,0 +1,54 @@
+// /std/tui/ansi: escape builders and the visible-width toolkit.
+
+#include <tui.h>
+
+void do_tests() {
+  object a = clone_object(TUI_ANSI);
+
+  // cursor addressing is 0-based x,y -> 1-based row;col
+  ASSERT_EQ("\e[3;6H", a->ansi_cup(5, 2));
+  ASSERT_EQ("\e[1;1H", a->ansi_cup(0, 0));
+  ASSERT_EQ("\e[2C", a->ansi_fwd(2));
+  ASSERT_EQ("", a->ansi_fwd(0));
+  ASSERT_EQ("", a->ansi_back(-1));
+  ASSERT_EQ("\e[0K", a->ansi_el(0));
+  ASSERT_EQ("\e[2J", a->ansi_ed(2));
+  ASSERT_EQ("\e[1;36m", a->ansi_sgr("1;36"));
+
+  // colours are SGR parameter strings
+  ASSERT_EQ("36", a->ansi_fg(6));
+  ASSERT_EQ("97", a->ansi_fg(15));
+  ASSERT_EQ("38;5;208", a->ansi_fg(208));
+  ASSERT_EQ("41", a->ansi_bg(1));
+  ASSERT_EQ("100", a->ansi_bg(8));
+  ASSERT_EQ("38;2;1;2;3", a->ansi_rgb_fg(1, 2, 3));
+
+  // strip_ansi: CSI, OSC (BEL and ST terminated), two-char escapes
+  ASSERT_EQ("hello", a->strip_ansi("\e[1;36mhello\e[0m"));
+  ASSERT_EQ("ab", a->strip_ansi("a\e]0;title\ab"));
+  ASSERT_EQ("ab", a->strip_ansi("a\e]0;title\e\\b"));
+  ASSERT_EQ("abc", a->strip_ansi("\e7abc"));
+  ASSERT_EQ("", a->strip_ansi("\e[2J\e[?25l"));
+  ASSERT_EQ("x", a->strip_ansi("x\e["));  // truncated sequence at end
+  ASSERT_EQ("plain", a->strip_ansi("plain"));
+
+  // visible width: escapes are free, wide chars count 2
+  ASSERT_EQ(5, a->visible_width("\e[31mhello\e[0m"));
+  ASSERT_EQ(4, a->visible_width("\e[1m你好\e[0m"));
+  ASSERT_EQ(0, a->visible_width(""));
+
+  // wslice: column-addressed slicing of plain text
+  ASSERT_EQ("bc", a->wslice("abcd", 1, 2));
+  ASSERT_EQ("abcd", a->wslice("abcd", 0, 10));
+  ASSERT_EQ("", a->wslice("abcd", 0, 0));
+  ASSERT_EQ("你", a->wslice("你好", 0, 3));   // 好 would straddle the edge
+  ASSERT_EQ("你", a->wslice("a你b", 1, 2));
+  ASSERT_EQ("b", a->wslice("a你b", 3, 2));    // leading half of 你 excluded
+
+  // wpad pads, never truncates
+  ASSERT_EQ("ab  ", a->wpad("ab", 4));
+  ASSERT_EQ("你好", a->wpad("你好", 3));
+  ASSERT_EQ("你好 ", a->wpad("你好", 5));
+
+  destruct(a);
+}

@@ -1,0 +1,23 @@
+// /std/tui/w/progress — progress bar (pterm/blessed style).
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_PRINT;  // brings the ansi/width helpers transitively
+
+private int pct = 0;
+private string label = "";
+private string attr = "";
+
+void set_percent(int p) { pct = p < 0 ? 0 : (p > 100 ? 100 : p); }
+int query_percent() { return pct; }
+void set_label(string l) { label = stringp(l) ? l : ""; }
+void set_attr(string a) { attr = stringp(a) ? a : ""; }
+
+void draw(object scr) {
+  string lbl = label != "" ? label + " " : "";
+  int bar_w = ww - visible_width(lbl) - 5;  // " 100%" suffix
+
+  if (bar_w < 1) bar_w = 1;
+  scr->scr_put(wx, wy, wpad(lbl + p_progress(pct, bar_w), ww), attr);
+}

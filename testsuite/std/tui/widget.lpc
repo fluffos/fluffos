@@ -1,0 +1,51 @@
+// /std/tui/widget — widget base class (inherit into concrete widgets).
+//
+// The protocol an app container (/std/tui/app) speaks:
+//   draw(screen)        paint yourself into the screen clone
+//   handle_key(ev)      return 1 if the event was consumed
+//   query_focusable()   participates in Tab focus cycling
+//   set_focused(f)      focus state changed
+// Widgets report to the application through the on-event callback:
+//   evaluate(cb, widget, what, arg)  — e.g. ("select", index), ("submit", line)
+
+#include <tui.h>
+
+int wx, wy, ww = 10, wh = 1;
+int w_visible = 1;
+int w_focusable = 0;
+int w_focused = 0;
+private function w_on_event = 0;
+
+void set_geometry(int x, int y, int w, int h) {
+  wx = x;
+  wy = y;
+  ww = w < 1 ? 1 : w;
+  wh = h < 1 ? 1 : h;
+}
+
+int query_x() { return wx; }
+int query_y() { return wy; }
+int query_w() { return ww; }
+int query_h() { return wh; }
+
+void set_visible(int v) { w_visible = v; }
+int query_visible() { return w_visible; }
+
+int query_focusable() { return w_focusable && w_visible; }
+void set_focused(int f) { w_focused = f; }
+int query_focused() { return w_focused; }
+
+int contains(int x, int y) {
+  return w_visible && x >= wx && x < wx + ww && y >= wy && y < wy + wh;
+}
+
+void set_on_event(function f) { w_on_event = f; }
+
+protected varargs void emit_event(string what, mixed arg) {
+  if (functionp(w_on_event)) evaluate(w_on_event, this_object(), what, arg);
+}
+
+// --- overridables ---
+void draw(object scr) {}
+int handle_key(mixed ev) { return 0; }
+int handle_mouse(mixed *ev) { return 0; }

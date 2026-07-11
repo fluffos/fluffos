@@ -1,0 +1,126 @@
+// /std/tui/ansi — layer 0 of the TUI library: ANSI/VT100 escape builders and
+// the display-width toolkit the driver lacks (strwidth() counts escape bytes;
+// visible_width() does not).  Stateless: inherit it, or call it as an object.
+//
+// Colour helpers (ansi_fg/ansi_bg/ansi_rgb_fg/ansi_rgb_bg) return SGR
+// *parameter strings* ("36", "48;5;208"), so they compose into the attr
+// strings used by /std/tui/screen; wrap with ansi_sgr() to emit directly.
+
+#include <tui.h>
+
+// --- cursor -----------------------------------------------------------
+
+// Absolute addressing, 0-based x (column), y (row).
+string ansi_cup(int x, int y) { return sprintf("\e[%d;%dH", y + 1, x + 1); }
+
+string ansi_up(int n) { return n > 0 ? sprintf("\e[%dA", n) : ""; }
+string ansi_down(int n) { return n > 0 ? sprintf("\e[%dB", n) : ""; }
+string ansi_fwd(int n) { return n > 0 ? sprintf("\e[%dC", n) : ""; }
+string ansi_back(int n) { return n > 0 ? sprintf("\e[%dD", n) : ""; }
+
+string ansi_save_cursor() { return "\e7"; }
+string ansi_restore_cursor() { return "\e8"; }
+string ansi_cursor_visible(int on) { return on ? "\e[?25h" : "\e[?25l"; }
+
+// --- erase ------------------------------------------------------------
+
+// 0 = to end, 1 = to start, 2 = whole line/screen
+string ansi_el(int mode) { return sprintf("\e[%dK", mode); }
+string ansi_ed(int mode) { return sprintf("\e[%dJ", mode); }
+
+// --- attributes -------------------------------------------------------
+
+string ansi_sgr(string params) { return "\e[" + params + "m"; }
+string ansi_reset() { return "\e[0m"; }
+
+// SGR parameter strings.  color: 0-7 normal, 8-15 bright, 16-255 palette.
+string ansi_fg(int color) {
+  if (color < 8) return "" + (30 + color);
+  if (color < 16) return "" + (90 + color - 8);
+  return "38;5;" + color;
+}
+
+string ansi_bg(int color) {
+  if (color < 8) return "" + (40 + color);
+  if (color < 16) return "" + (100 + color - 8);
+  return "48;5;" + color;
+}
+
+string ansi_rgb_fg(int r, int g, int b) { return sprintf("38;2;%d;%d;%d", r, g, b); }
+string ansi_rgb_bg(int r, int g, int b) { return sprintf("48;2;%d;%d;%d", r, g, b); }
+
+// --- modes ------------------------------------------------------------
+
+string ansi_alt_screen(int on) { return on ? "\e[?1049h" : "\e[?1049l"; }
+string ansi_bracketed_paste(int on) { return on ? "\e[?2004h" : "\e[?2004l"; }
+// Button-event tracking + SGR extended coordinates.
+string ansi_mouse(int on) { return on ? "\e[?1002h\e[?1006h" : "\e[?1006l\e[?1002l"; }
+
+// --- visible width ----------------------------------------------------
+
+// Index just past the escape sequence starting at s[i] (s[i] == ESC).
+private int skip_escape(string s, int i) {
+  int n = strlen(s);
+  int j = i + 1;
+
+  if (j >= n) return n;
+  switch (s[j]) {
+    case '[':  // CSI: parameter/intermediate bytes 0x20-0x3f, final 0x40-0x7e
+      for (j++; j < n; j++) {
+        if (s[j] >= 0x40 && s[j] <= 0x7e) return j + 1;
+      }
+      return n;
+    case ']':  // OSC: terminated by BEL or ST (ESC \)
+      for (j++; j < n; j++) {
+        if (s[j] == 7) return j + 1;
+        if (s[j] == 27 && j + 1 < n && s[j + 1] == '\\') return j + 2;
+      }
+      return n;
+    default:  // two-character escape (ESC 7, ESC 8, ESC = ...)
+      return j + 1;
+  }
+}
+
+// s with all escape sequences removed.
+string strip_ansi(string s) {
+  string out = "";
+  int i = 0, seg = 0, n = strlen(s);
+
+  while (i < n) {
+    if (s[i] == 27) {
+      if (i > seg) out += s[seg..i - 1];
+      i = skip_escape(s, i);
+      seg = i;
+    } else {
+      i++;
+    }
+  }
+  if (i > seg) out += s[seg..i - 1];
+  return out;
+}
+
+// Display columns of s, not counting escape sequences.
+int visible_width(string s) { return strwidth(strip_ansi(s)); }
+
+// The substring of plain (escape-free) text s covering display columns
+// [col, col + ncols).  A wide character only partially inside the window is
+// excluded, so the result can be up to one column narrower at either edge.
+string wslice(string s, int col, int ncols) {
+  string out = "";
+  int i, n = strlen(s), c = 0, lo = col, hi = col + ncols;
+
+  if (ncols <= 0) return "";
+  for (i = 0; i < n && c < hi; i++) {
+    string ch = s[i..i];
+    int cw = strwidth(ch);
+    if (c >= lo && c + cw <= hi && cw > 0) out += ch;
+    c += cw;
+  }
+  return out;
+}
+
+// Pad plain text s with spaces to display width w (no truncation).
+string wpad(string s, int w) {
+  int sw = strwidth(s);
+  return sw < w ? s + repeat_string(" ", w - sw) : s;
+}

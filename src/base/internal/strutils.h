@@ -195,6 +195,10 @@ size_t u8_width(const char* src, int len);
 void u8_truncate_below_width(const char* src, size_t len, size_t max_width, bool break_for_line,
                              bool always_break_before_newline, size_t* out_len, size_t* out_width);
 std::string u8_sanitize(std::string_view src);
+// Length (0-3) of the incomplete-but-valid UTF-8 sequence prefix at the end
+// of buf.  Streaming input should hold those bytes back until the rest of
+// the character arrives, instead of sanitizing them into U+FFFD.
+size_t u8_incomplete_tail(std::string_view buf);
 int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t needle_len,
                               bool reverse);
 

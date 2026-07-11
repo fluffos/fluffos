@@ -1,0 +1,105 @@
+// /std/tui/w/list — scrollable selectable list.
+//
+// Events: ("select", index) on Enter, ("change", index) when the selection
+// moves.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string *items = ({});
+private int sel = 0;
+private int top = 0;
+private string attr = "";
+private string sel_attr = "7";  // reverse video
+
+void create() { w_focusable = 1; }
+
+void set_items(string *it) {
+  items = arrayp(it) ? it[0..] : ({});
+  if (sel >= sizeof(items)) sel = sizeof(items) - 1;
+  if (sel < 0) sel = 0;
+  top = 0;
+}
+
+string *query_items() { return items[0..]; }
+int query_selected() { return sel; }
+
+string query_selected_item() {
+  return sel >= 0 && sel < sizeof(items) ? items[sel] : 0;
+}
+
+void set_selected(int i) {
+  if (i >= 0 && i < sizeof(items)) sel = i;
+}
+
+void set_attrs(string normal, string selected) {
+  attr = stringp(normal) ? normal : "";
+  sel_attr = stringp(selected) ? selected : "7";
+}
+
+void draw(object scr) {
+  int i, n = sizeof(items);
+
+  if (sel < top) top = sel;
+  if (sel >= top + wh) top = sel - wh + 1;
+  if (top < 0) top = 0;
+  for (i = 0; i < wh; i++) {
+    int idx = top + i;
+    string line = idx < n ? wslice(items[idx], 0, ww) : "";
+
+    scr->scr_put(wx, wy + i, wpad(line, ww),
+                 (idx == sel && idx < n && w_focused) ? sel_attr : attr);
+  }
+}
+
+private void move_sel(int d) {
+  int n = sizeof(items);
+
+  if (!n) return;
+  sel += d;
+  if (sel < 0) sel = 0;
+  if (sel >= n) sel = n - 1;
+  emit_event("change", sel);
+}
+
+int handle_key(mixed ev) {
+  if (!intp(ev)) return 0;
+  switch (ev) {
+    case TUI_KEY_UP:
+      move_sel(-1);
+      return 1;
+    case TUI_KEY_DOWN:
+      move_sel(1);
+      return 1;
+    case TUI_KEY_PGUP:
+      move_sel(-wh);
+      return 1;
+    case TUI_KEY_PGDN:
+      move_sel(wh);
+      return 1;
+    case TUI_KEY_HOME:
+      move_sel(-sizeof(items));
+      return 1;
+    case TUI_KEY_END:
+      move_sel(sizeof(items));
+      return 1;
+    case TUI_KEY_ENTER:
+      if (sizeof(items)) emit_event("select", sel);
+      return 1;
+  }
+  return 0;
+}
+
+int handle_mouse(mixed *ev) {
+  int y = ev[3];
+
+  if (!ev[4]) return 0;  // only presses
+  if (y >= wy && y < wy + wh && top + y - wy < sizeof(items)) {
+    sel = top + y - wy;
+    emit_event("change", sel);
+    return 1;
+  }
+  return 0;
+}

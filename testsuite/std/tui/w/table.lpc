@@ -1,0 +1,121 @@
+// /std/tui/w/table — scrollable data table with a selectable row
+// (blessed ListTable / pterm Table, interactive).
+//
+// Events: ("select", row-index) on Enter, ("change", row-index) on move.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string *columns = ({});
+private mixed *rows = ({});
+private int sel = 0;
+private int top = 0;
+private string attr = "";
+private string head_attr = "1;4";
+private string sel_attr = "7";
+
+void create() { w_focusable = 1; }
+
+void set_columns(string *cols) { columns = arrayp(cols) ? cols[0..] : ({}); }
+
+void set_rows(mixed *r) {
+  rows = arrayp(r) ? r[0..] : ({});
+  if (sel >= sizeof(rows)) sel = sizeof(rows) - 1;
+  if (sel < 0) sel = 0;
+  top = 0;
+}
+
+void set_attrs(string normal, string header, string selected) {
+  if (stringp(normal)) attr = normal;
+  if (stringp(header)) head_attr = header;
+  if (stringp(selected)) sel_attr = selected;
+}
+
+int query_selected() { return sel; }
+mixed query_selected_row() { return sel >= 0 && sel < sizeof(rows) ? rows[sel] : 0; }
+
+private int *col_widths() {
+  int *w = ({});
+  int j, cols = sizeof(columns);
+
+  foreach (mixed row in rows) {
+    if (sizeof(row) > cols) cols = sizeof(row);
+  }
+  for (j = 0; j < cols; j++) {
+    int best = j < sizeof(columns) ? visible_width(columns[j]) : 0;
+    foreach (mixed row in rows) {
+      int cw = j < sizeof(row) ? visible_width("" + row[j]) : 0;
+      if (cw > best) best = cw;
+    }
+    w += ({ best });
+  }
+  return w;
+}
+
+private string fmt_row(mixed *cells, int *w) {
+  string line = "";
+  int j;
+
+  for (j = 0; j < sizeof(w); j++) {
+    string cell = j < sizeof(cells) ? "" + cells[j] : "";
+    line += wpad(cell, w[j]) + (j < sizeof(w) - 1 ? "  " : "");
+  }
+  return wslice(line, 0, ww);
+}
+
+void draw(object scr) {
+  int *w = col_widths();
+  int i, body = wh - (sizeof(columns) ? 1 : 0);
+
+  if (sizeof(columns)) scr->scr_put(wx, wy, wpad(fmt_row(columns, w), ww), head_attr);
+  if (sel < top) top = sel;
+  if (sel >= top + body) top = sel - body + 1;
+  if (top < 0) top = 0;
+  for (i = 0; i < body; i++) {
+    int idx = top + i;
+    string line = idx < sizeof(rows) ? fmt_row(rows[idx], w) : "";
+
+    scr->scr_put(wx, wy + (sizeof(columns) ? 1 : 0) + i, wpad(line, ww),
+                 (idx == sel && idx < sizeof(rows) && w_focused) ? sel_attr : attr);
+  }
+}
+
+private void move_sel(int d) {
+  int n = sizeof(rows);
+
+  if (!n) return;
+  sel += d;
+  if (sel < 0) sel = 0;
+  if (sel >= n) sel = n - 1;
+  emit_event("change", sel);
+}
+
+int handle_key(mixed ev) {
+  if (!intp(ev)) return 0;
+  switch (ev) {
+    case TUI_KEY_UP:
+      move_sel(-1);
+      return 1;
+    case TUI_KEY_DOWN:
+      move_sel(1);
+      return 1;
+    case TUI_KEY_PGUP:
+      move_sel(-(wh - 1));
+      return 1;
+    case TUI_KEY_PGDN:
+      move_sel(wh - 1);
+      return 1;
+    case TUI_KEY_HOME:
+      move_sel(-sizeof(rows));
+      return 1;
+    case TUI_KEY_END:
+      move_sel(sizeof(rows));
+      return 1;
+    case TUI_KEY_ENTER:
+      if (sizeof(rows)) emit_event("select", sel);
+      return 1;
+  }
+  return 0;
+}

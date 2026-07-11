@@ -1,0 +1,202 @@
+// /std/tui/readline: whole editing sessions scripted as event arrays.
+
+#include <tui.h>
+
+private object r;
+
+private void feed_text(string s) {
+  int i;
+
+  for (i = 0; i < strlen(s); i++) r->rl_feed(s[i..i]);
+}
+
+private void feed(mixed *evs) {
+  foreach (mixed ev in evs) r->rl_feed(ev);
+}
+
+void do_tests() {
+  string o;
+
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(40);
+
+  // --- basic editing -------------------------------------------------
+  o = r->rl_begin();
+  ASSERT(strsrch(o, "> ") != -1);  // initial paint shows the prompt
+  feed_text("hello");
+  ASSERT_EQ("hello", r->rl_line());
+  ASSERT_EQ(5, r->rl_cursor());
+
+  feed(({ TUI_KEY_LEFT, TUI_KEY_LEFT }));
+  ASSERT_EQ(3, r->rl_cursor());
+  feed_text("X");
+  ASSERT_EQ("helXlo", r->rl_line());
+  feed(({ TUI_KEY_BACKSPACE }));
+  ASSERT_EQ("hello", r->rl_line());
+  feed(({ TUI_KEY_HOME }));
+  ASSERT_EQ(0, r->rl_cursor());
+  feed(({ TUI_KEY_DELETE }));
+  ASSERT_EQ("ello", r->rl_line());
+  feed(({ TUI_CTRL('e') }));
+  ASSERT_EQ(4, r->rl_cursor());
+  feed(({ TUI_CTRL('a') }));
+  ASSERT_EQ(0, r->rl_cursor());
+
+  // kill to end / yank
+  feed(({ TUI_CTRL('k') }));
+  ASSERT_EQ("", r->rl_line());
+  feed(({ TUI_CTRL('y') }));
+  ASSERT_EQ("ello", r->rl_line());
+
+  // accept
+  ASSERT_EQ(TUI_RL_DONE, r->rl_feed(TUI_KEY_ENTER));
+  ASSERT_EQ("ello", r->rl_line());
+  ASSERT_EQ(({ "ello" }), r->rl_history());
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, "\r\n") != -1);  // finishing emits a newline
+
+  // events after completion are ignored until the next begin
+  ASSERT_EQ(TUI_RL_DONE, r->rl_feed("x"));
+  ASSERT_EQ("ello", r->rl_line());
+
+  // --- word motion and kills ------------------------------------------
+  r->rl_begin();
+  feed_text("foo bar baz");
+  feed(({ TUI_MOD_ALT | 'b' }));
+  ASSERT_EQ(8, r->rl_cursor());              // start of "baz"
+  feed(({ TUI_MOD_ALT | 'b' }));
+  ASSERT_EQ(4, r->rl_cursor());              // start of "bar"
+  feed(({ TUI_MOD_ALT | 'f' }));
+  ASSERT_EQ(7, r->rl_cursor());              // end of "bar"
+  feed(({ TUI_KEY_END, TUI_CTRL('w') }));
+  ASSERT_EQ("foo bar ", r->rl_line());       // C-w killed "baz"
+  feed(({ TUI_CTRL('u') }));
+  ASSERT_EQ("", r->rl_line());
+  feed(({ TUI_CTRL('y') }));
+  ASSERT_EQ("foo bar ", r->rl_line());
+
+  // transpose
+  r->rl_begin("ab");
+  feed(({ TUI_CTRL('t') }));
+  ASSERT_EQ("ba", r->rl_line());
+
+  // EOF only on an empty line
+  r->rl_begin();
+  ASSERT_EQ(TUI_RL_EOF, r->rl_feed(TUI_CTRL('d')));
+  r->rl_begin("x");
+  feed(({ TUI_KEY_HOME }));
+  ASSERT_EQ(TUI_RL_MORE, r->rl_feed(TUI_CTRL('d')));  // deletes instead
+  ASSERT_EQ("", r->rl_line());
+
+  // abort
+  ASSERT_EQ(TUI_RL_ABORT, r->rl_feed(TUI_CTRL('c')));
+
+  // --- history ---------------------------------------------------------
+  destruct(r);
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(40);
+  r->rl_set_history(({ "first", "second", "third" }));
+
+  r->rl_begin();
+  feed_text("live");
+  feed(({ TUI_KEY_UP }));
+  ASSERT_EQ("third", r->rl_line());
+  feed(({ TUI_KEY_UP, TUI_KEY_UP }));
+  ASSERT_EQ("first", r->rl_line());
+  feed(({ TUI_KEY_UP }));                    // already at the oldest
+  ASSERT_EQ("first", r->rl_line());
+  feed(({ TUI_KEY_DOWN, TUI_KEY_DOWN, TUI_KEY_DOWN }));
+  ASSERT_EQ("live", r->rl_line());           // the live edit came back
+
+  // duplicates are not appended
+  r->rl_begin("third");
+  r->rl_feed(TUI_KEY_ENTER);
+  ASSERT_EQ(({ "first", "second", "third" }), r->rl_history());
+
+  // --- incremental search -----------------------------------------------
+  destruct(r);
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(40);
+  r->rl_set_history(({ "make bread", "eat soup", "make tea" }));
+
+  r->rl_begin();
+  r->rl_feed(TUI_CTRL('r'));
+  ASSERT_EQ(1, r->rl_searching());
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, "reverse-i-search") != -1);
+  feed_text("ma");
+  ASSERT_EQ("make tea", r->rl_line());       // newest match first
+  r->rl_feed(TUI_CTRL('r'));
+  ASSERT_EQ("make bread", r->rl_line());     // step to the older match
+  ASSERT_EQ(TUI_RL_DONE, r->rl_feed(TUI_KEY_ENTER));  // accept & submit
+  ASSERT_EQ("make bread", r->rl_line());
+
+  // C-g restores the pre-search line
+  r->rl_begin("draft");
+  r->rl_feed(TUI_CTRL('r'));
+  feed_text("soup");
+  ASSERT_EQ("eat soup", r->rl_line());
+  r->rl_feed(TUI_CTRL('g'));
+  ASSERT_EQ(0, r->rl_searching());
+  ASSERT_EQ("draft", r->rl_line());
+
+  // failed search flags itself in the prompt
+  r->rl_begin();
+  r->rl_feed(TUI_CTRL('r'));
+  feed_text("zzz");
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, "failed") != -1);
+
+  // --- masking ----------------------------------------------------------
+  destruct(r);
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(40);
+  r->rl_set_prompt("pw: ");
+  r->rl_set_masked(1);
+  r->rl_begin();
+  feed_text("secret");
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, "secret") == -1);
+  ASSERT(strsrch(o, "******") != -1);
+  ASSERT_EQ("secret", r->rl_line());
+
+  // --- completion ---------------------------------------------------------
+  destruct(r);
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(40);
+  r->rl_set_completer((: ({ "look", "listen", "quit" }) :));
+  r->rl_begin();
+  feed_text("lo");
+  r->rl_feed(TUI_KEY_TAB);
+  ASSERT_EQ("look ", r->rl_line());          // unique match completes + space
+  r->rl_begin();
+  feed_text("l");
+  r->rl_feed(TUI_KEY_TAB);
+  ASSERT_EQ("l", r->rl_line());              // ambiguous: nothing to extend
+  r->rl_take_output();
+  r->rl_feed(TUI_KEY_TAB);                   // second Tab lists candidates
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, "look  listen") != -1);
+
+  // --- horizontal scrolling ------------------------------------------------
+  destruct(r);
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(20);
+  r->rl_set_prompt("> ");
+  r->rl_begin();
+  feed_text("abcdefghijklmnopqrstuvwxyz");
+  ASSERT(r->rl_scroll() > 0);                // line longer than the viewport
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, "<") != -1);             // left scroll marker shown
+  feed(({ TUI_KEY_HOME }));
+  ASSERT_EQ(0, r->rl_scroll());
+  o = r->rl_take_output();
+  ASSERT(strsrch(o, ">") != -1);             // right overflow marker shown
+
+  // width changes re-render sanely
+  r->rl_set_width(80);
+  ASSERT_EQ(0, r->rl_scroll());
+  ASSERT_EQ("abcdefghijklmnopqrstuvwxyz", r->rl_line());
+
+  destruct(r);
+}

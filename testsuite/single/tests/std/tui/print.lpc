@@ -1,0 +1,63 @@
+// /std/tui/print: the pterm-style inline printers.
+
+#include <tui.h>
+
+void do_tests() {
+  object p = clone_object(TUI_PRINT);
+  string o;
+
+  // table: width-aware cells (你 is 2 columns wide), header rule
+  o = p->p_table(({ ({ "a", "bb" }), ({ "你", "c" }) }), ([ "header": 1 ]));
+  ASSERT_EQ("┌────┬────┐\n"
+            "│ a  │ bb │\n"
+            "├────┼────┤\n"
+            "│ 你 │ c  │\n"
+            "└────┴────┘\n", o);
+  o = p->p_table(({ ({ "x" }) }), ([ "style": TUI_BOX_ASCII ]));
+  ASSERT_EQ("+---+\n| x |\n+---+\n", o);
+  ASSERT_EQ("", p->p_table(({}), 0));
+
+  // tree: both shapes — a rooted tree and a node list
+  o = p->p_tree(({ "root", ({ "a", ({ "b", ({ "c" }) }) }) }));
+  ASSERT_EQ("root\n├── a\n└── b\n    └── c\n", o);
+  o = p->p_tree(({ "x", "y" }));
+  ASSERT_EQ("├── x\n└── y\n", o);
+
+  // bar chart scales to the widest value
+  o = p->p_bars(({ ({ "ab", 4 }), ({ "c", 2 }) }), ([ "width": 4 ]));
+  ASSERT_EQ("ab ████ 4\nc  ██ 2\n", o);
+
+  // sparkline
+  ASSERT_EQ("▁█", p->p_spark(({ 1, 8 })));
+  ASSERT_EQ("▁▄█", p->p_spark(({ 0, 4, 8 })));
+
+  // progress string
+  ASSERT_EQ("█████░░░░░  50%", p->p_progress(50, 10));
+  ASSERT_EQ("░░░░░░░░░░   0%", p->p_progress(-5, 10));
+  ASSERT_EQ("██████████ 100%", p->p_progress(150, 10));
+
+  // panel
+  o = p->p_panel("t", "ab\n你");
+  ASSERT(strsrch(o, "─ t ") != -1);
+  ASSERT(strsrch(o, "│ ab") != -1);
+  ASSERT(strsrch(o, "│ 你") != -1);
+  ASSERT(strsrch(o, "└") != -1);
+
+  // bullets nest by depth
+  ASSERT_EQ("• x\n  ◦ y\n    ▪ z\n", p->p_bullets(({ "x", ({ 1, "y" }), ({ 2, "z" }) })));
+
+  // header centers inside a styled bar
+  ASSERT_EQ("\e[1;7m  hi  \e[0m\n", p->p_header("hi", 6));
+
+  // prefixes
+  ASSERT(strsrch(p->p_info("m"), "INFO") != -1);
+  ASSERT(strsrch(p->p_success("m"), " OK ") != -1);
+  ASSERT(strsrch(p->p_warn("m"), "WARN") != -1);
+  ASSERT(strsrch(p->p_error("m"), "FAIL") != -1);
+
+  // bigtext renders via /std/bitmap_font (or degrades to plain text)
+  o = p->p_bigtext("A");
+  ASSERT(stringp(o) && strlen(o) > 0);
+
+  destruct(p);
+}

@@ -1,0 +1,85 @@
+// /std/tui/w/chart — braille line-chart widget with rolling history
+// (blessed-contrib line chart).  Feed it points from your tick loop:
+//
+//   chart->add_series("traffic", "36");
+//   chart->add_point(0, value);      // keeps the last 2*width points
+//
+// Multiple series overlay with their own colours.  Auto-scales to the
+// visible data unless set_range() pins the y-range.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private object cv;
+private mixed *series = ({});   // ({ ({ name, int *values, attr }), ... })
+private int lo_fix, hi_fix, fixed = 0;
+
+void create() { cv = clone_object(TUI_CANVAS); }
+
+void remove() {
+  if (cv) destruct(cv);
+}
+
+int add_series(string name, string attr) {
+  series += ({ ({ stringp(name) ? name : "", ({}), stringp(attr) ? attr : "" }) });
+  return sizeof(series) - 1;
+}
+
+void set_data(int idx, int *values) {
+  if (idx < 0 || idx >= sizeof(series)) return;
+  series[idx][1] = arrayp(values) ? values[0..] : ({});
+}
+
+void add_point(int idx, int value) {
+  int keep = ww * 2;  // one point per dot column
+
+  if (idx < 0 || idx >= sizeof(series)) return;
+  series[idx][1] += ({ value });
+  if (keep > 0 && sizeof(series[idx][1]) > keep) {
+    series[idx][1] = series[idx][1][sizeof(series[idx][1]) - keep..];
+  }
+}
+
+int *query_data(int idx) {
+  return idx >= 0 && idx < sizeof(series) ? series[idx][1][0..] : ({});
+}
+
+void set_range(int lo, int hi) {
+  lo_fix = lo;
+  hi_fix = hi;
+  fixed = 1;
+}
+
+void clear_range() { fixed = 0; }
+
+void draw(object scr) {
+  int lo, hi, have = 0, cx, cy;
+
+  if (fixed) {
+    lo = lo_fix;
+    hi = hi_fix;
+  } else {
+    foreach (mixed s in series) {
+      foreach (int v in s[1]) {
+        if (!have) {
+          lo = hi = v;
+          have = 1;
+        }
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+    }
+  }
+
+  cv->c_resize(ww, wh);
+  foreach (mixed s in series) cv->c_plot(s[1], lo, hi, s[2]);
+  for (cy = 0; cy < wh; cy++) {
+    for (cx = 0; cx < ww; cx++) {
+      mixed *c = cv->c_cell(cx, cy);
+
+      scr->scr_put(wx + cx, wy + cy, c[0], c[1]);
+    }
+  }
+}

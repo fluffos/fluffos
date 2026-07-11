@@ -1,0 +1,75 @@
+// `tuidemo form` — a blessed-style form: textfield, radio group,
+// checkbox list and buttons.  Tab/Shift-Tab move between fields,
+// Space toggles, Enter presses; Ctrl-C quits.
+
+#include <tui.h>
+
+inherit TUI_APP;
+
+private object title, name_lbl, name_fld, class_lbl, class_rad;
+private object skills_lbl, skills_chk, ok_btn, cancel_btn, result;
+
+private void on_widget_event(object w, string what, mixed arg) {
+  if (w == ok_btn && what == "press") {
+    result->set_text(sprintf("→ %s the %s (%s)",
+                             name_fld->query_text() == "" ? "nameless" : name_fld->query_text(),
+                             class_rad->query_picked_item(),
+                             sizeof(skills_chk->query_checked_items())
+                                 ? implode(skills_chk->query_checked_items(), ", ")
+                                 : "no skills"));
+  } else if (w == cancel_btn && what == "press") {
+    app_quit();
+  }
+}
+
+void on_layout(int w, int h) {
+  object scr = app_screen();
+  int col = 16, fw = w - col - 4;
+
+  scr->scr_clear();
+  scr->scr_box(0, 1, w, h - 1, TUI_BOX_SINGLE, "34");
+  title->set_geometry(0, 0, w, 1);
+  name_lbl->set_geometry(3, 3, col - 3, 1);
+  name_fld->set_geometry(col, 3, fw > 30 ? 30 : fw, 1);
+  class_lbl->set_geometry(3, 5, col - 3, 1);
+  class_rad->set_geometry(col, 5, fw, 4);
+  skills_lbl->set_geometry(3, 10, col - 3, 1);
+  skills_chk->set_geometry(col, 10, fw, 5);
+  ok_btn->set_geometry(col, 16, 8, 1);
+  cancel_btn->set_geometry(col + 10, 16, 12, 1);
+  result->set_geometry(3, 18, w - 6, 2);
+}
+
+void on_open(object t, int w, int h) {
+  if (!title) {
+    title = app_add(new("/std/tui/w/label"));
+    title->set_attr("1;34");
+    title->set_text(" character sheet — Tab moves, Space toggles, Enter presses ");
+
+    name_lbl = app_add(new("/std/tui/w/label"));
+    name_lbl->set_text("name:");
+    name_fld = app_add(new("/std/tui/w/textfield"));
+
+    class_lbl = app_add(new("/std/tui/w/label"));
+    class_lbl->set_text("class:");
+    class_rad = app_add(new("/std/tui/w/radiolist"));
+    class_rad->set_items(({ "warrior", "mage", "thief", "cleric" }));
+
+    skills_lbl = app_add(new("/std/tui/w/label"));
+    skills_lbl->set_text("skills:");
+    skills_chk = app_add(new("/std/tui/w/checklist"));
+    skills_chk->set_items(({ "swords", "archery", "alchemy", "lockpicking", "diplomacy" }));
+
+    ok_btn = app_add(new("/std/tui/w/button"));
+    ok_btn->set_label("OK");
+    ok_btn->set_on_event((: on_widget_event :));
+
+    cancel_btn = app_add(new("/std/tui/w/button"));
+    cancel_btn->set_label("Cancel");
+    cancel_btn->set_on_event((: on_widget_event :));
+
+    result = app_add(new("/std/tui/w/label"));
+    result->set_attr("1;32");
+  }
+  ::on_open(t, w, h);
+}
