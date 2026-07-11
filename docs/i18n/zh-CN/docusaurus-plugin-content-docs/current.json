@@ -1,0 +1,2682 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.docs.category.Getting Started": {
+    "message": "快速开始",
+    "description": "The label for category 'Getting Started' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.LPC Language": {
+    "message": "LPC 语言",
+    "description": "The label for category 'LPC Language' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.Types": {
+    "message": "类型",
+    "description": "The label for category 'Types' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.Constructs": {
+    "message": "语法结构",
+    "description": "The label for category 'Constructs' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.Preprocessor": {
+    "message": "预处理器",
+    "description": "The label for category 'Preprocessor' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun": {
+    "message": "Efun 函数",
+    "description": "The label for category 'Efuns' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun.link.generated-index.title": {
+    "message": "Efun 函数",
+    "description": "The generated-index page title for category 'Efuns' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun.link.generated-index.description": {
+    "message": "驱动提供给 LPC 代码调用的内置函数（efun），按主题与包分类。",
+    "description": "The generated-index page description for category 'Efuns' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/arrays": {
+    "message": "数组",
+    "description": "The label for category 'Arrays' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/arrays.link.generated-index.title": {
+    "message": "数组",
+    "description": "The generated-index page title for category 'Arrays' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/arrays.link.generated-index.description": {
+    "message": "创建、分配、过滤、映射、排序和搜索 LPC 数组。",
+    "description": "The generated-index page description for category 'Arrays' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/async": {
+    "message": "异步 I/O",
+    "description": "The label for category 'Async I/O' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/async.link.generated-index.title": {
+    "message": "异步 I/O",
+    "description": "The generated-index page title for category 'Async I/O' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/async.link.generated-index.description": {
+    "message": "通过回调返回结果的非阻塞文件和数据库 I/O。",
+    "description": "The generated-index page description for category 'Async I/O' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/buffers": {
+    "message": "缓冲区",
+    "description": "The label for category 'Buffers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/buffers.link.generated-index.title": {
+    "message": "缓冲区",
+    "description": "The generated-index page title for category 'Buffers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/buffers.link.generated-index.description": {
+    "message": "分配、读写、转码和校验二进制缓冲区数据。",
+    "description": "The generated-index page description for category 'Buffers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/calls": {
+    "message": "函数调用与延时调用",
+    "description": "The label for category 'Function Calls & Call-Outs' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/calls.link.generated-index.title": {
+    "message": "函数调用与延时调用",
+    "description": "The generated-index page title for category 'Function Calls & Call-Outs' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/calls.link.generated-index.description": {
+    "message": "调用其他对象的函数、调度 call_out、管理 shadow 和异常。",
+    "description": "The generated-index page description for category 'Function Calls & Call-Outs' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/contrib": {
+    "message": "Contrib 扩展包",
+    "description": "The label for category 'Contrib Package' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/contrib.link.generated-index.title": {
+    "message": "Contrib 扩展包",
+    "description": "The generated-index page title for category 'Contrib Package' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/contrib.link.generated-index.description": {
+    "message": "contrib 包提供的可选附加 efun：类、字符串、生物、内存及杂项工具。",
+    "description": "The generated-index page description for category 'Contrib Package' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/crypto": {
+    "message": "加密",
+    "description": "The label for category 'Cryptography' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/crypto.link.generated-index.title": {
+    "message": "加密",
+    "description": "The generated-index page title for category 'Cryptography' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/crypto.link.generated-index.description": {
+    "message": "加密哈希函数。",
+    "description": "The generated-index page description for category 'Cryptography' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/db": {
+    "message": "数据库",
+    "description": "The label for category 'Database' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/db.link.generated-index.title": {
+    "message": "数据库",
+    "description": "The generated-index page title for category 'Database' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/db.link.generated-index.description": {
+    "message": "连接 SQL 数据库并执行查询、提交与回滚。",
+    "description": "The generated-index page description for category 'Database' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/ed": {
+    "message": "行编辑器 (ed)",
+    "description": "The label for category 'Line Editor (ed)' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/ed.link.generated-index.title": {
+    "message": "行编辑器 (ed)",
+    "description": "The generated-index page title for category 'Line Editor (ed)' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/ed.link.generated-index.description": {
+    "message": "从 LPC 驱动内置的 ed 行编辑器。",
+    "description": "The generated-index page description for category 'Line Editor (ed)' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/external": {
+    "message": "外部进程",
+    "description": "The label for category 'External Processes' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/external.link.generated-index.title": {
+    "message": "外部进程",
+    "description": "The generated-index page title for category 'External Processes' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/external.link.generated-index.description": {
+    "message": "启动外部程序并与之通信。",
+    "description": "The generated-index page description for category 'External Processes' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/ffi": {
+    "message": "外部函数接口 (FFI)",
+    "description": "The label for category 'Foreign Function Interface' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/ffi.link.generated-index.title": {
+    "message": "外部函数接口 (FFI)",
+    "description": "The generated-index page title for category 'Foreign Function Interface' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/ffi.link.generated-index.description": {
+    "message": "加载本地库并调用 C 函数、分配内存、读写结构体。",
+    "description": "The generated-index page description for category 'Foreign Function Interface' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/filesystem": {
+    "message": "文件系统",
+    "description": "The label for category 'Filesystem' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/filesystem.link.generated-index.title": {
+    "message": "文件系统",
+    "description": "The generated-index page title for category 'Filesystem' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/filesystem.link.generated-index.description": {
+    "message": "读取、写入、复制、移动和检查文件与目录。",
+    "description": "The generated-index page description for category 'Filesystem' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/floats": {
+    "message": "浮点数学",
+    "description": "The label for category 'Floating-Point Math' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/floats.link.generated-index.title": {
+    "message": "浮点数学",
+    "description": "The generated-index page title for category 'Floating-Point Math' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/floats.link.generated-index.description": {
+    "message": "三角函数、对数、幂、取整和浮点转换。",
+    "description": "The generated-index page description for category 'Floating-Point Math' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/functions": {
+    "message": "函数指针",
+    "description": "The label for category 'Function Pointers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/functions.link.generated-index.title": {
+    "message": "函数指针",
+    "description": "The generated-index page title for category 'Function Pointers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/functions.link.generated-index.description": {
+    "message": "创建、绑定、延迟求值和调用函数指针。",
+    "description": "The generated-index page description for category 'Function Pointers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/general": {
+    "message": "通用",
+    "description": "The label for category 'General' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/general.link.generated-index.title": {
+    "message": "通用",
+    "description": "The generated-index page title for category 'General' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/general.link.generated-index.description": {
+    "message": "杂项 efun：向量与矩阵运算、压缩、类型判断、保存/恢复和通用集合助手。",
+    "description": "The generated-index page description for category 'General' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/interactive": {
+    "message": "交互与网络",
+    "description": "The label for category 'Interactive & Networking' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/interactive.link.generated-index.title": {
+    "message": "交互与网络",
+    "description": "The generated-index page title for category 'Interactive & Networking' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/interactive.link.generated-index.description": {
+    "message": "玩家连接、输入输出、snoop、telnet 协商和终端协议（GMCP、MSDP、MXP、MSP、ZMP）。",
+    "description": "The generated-index page description for category 'Interactive & Networking' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/internals": {
+    "message": "驱动内部",
+    "description": "The label for category 'Driver Internals' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/internals.link.generated-index.title": {
+    "message": "驱动内部",
+    "description": "The generated-index page title for category 'Driver Internals' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/internals.link.generated-index.description": {
+    "message": "驱动自省、调试、内存、跟踪和运行时配置。",
+    "description": "The generated-index page description for category 'Driver Internals' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/jsbridge": {
+    "message": "JavaScript 桥",
+    "description": "The label for category 'JavaScript Bridge' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/jsbridge.link.generated-index.title": {
+    "message": "JavaScript 桥",
+    "description": "The generated-index page title for category 'JavaScript Bridge' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/jsbridge.link.generated-index.description": {
+    "message": "在 WebAssembly 版驱动上从 LPC 调用 JavaScript。",
+    "description": "The generated-index page description for category 'JavaScript Bridge' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/mappings": {
+    "message": "映射",
+    "description": "The label for category 'Mappings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/mappings.link.generated-index.title": {
+    "message": "映射",
+    "description": "The generated-index page title for category 'Mappings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/mappings.link.generated-index.description": {
+    "message": "创建、过滤、遍历和转换 LPC 映射（关联数组）。",
+    "description": "The generated-index page description for category 'Mappings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/mudlib": {
+    "message": "Mudlib 支持",
+    "description": "The label for category 'Mudlib Support' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/mudlib.link.generated-index.title": {
+    "message": "Mudlib 支持",
+    "description": "The generated-index page title for category 'Mudlib Support' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/mudlib.link.generated-index.description": {
+    "message": "用户/euid 身份、权限、生物和作者/域统计。",
+    "description": "The generated-index page description for category 'Mudlib Support' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/numbers": {
+    "message": "数字",
+    "description": "The label for category 'Numbers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/numbers.link.generated-index.title": {
+    "message": "数字",
+    "description": "The generated-index page title for category 'Numbers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/numbers.link.generated-index.description": {
+    "message": "整数判断、随机数生成和数字转换。",
+    "description": "The generated-index page description for category 'Numbers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/objects": {
+    "message": "对象",
+    "description": "The label for category 'Objects' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/objects.link.generated-index.title": {
+    "message": "对象",
+    "description": "The generated-index page title for category 'Objects' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/objects.link.generated-index.description": {
+    "message": "克隆、加载、移动、查找和销毁对象，并管理其物品清单与状态。",
+    "description": "The generated-index page description for category 'Objects' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/parsing": {
+    "message": "命令解析",
+    "description": "The label for category 'Command Parsing' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/parsing.link.generated-index.title": {
+    "message": "命令解析",
+    "description": "The generated-index page title for category 'Command Parsing' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/parsing.link.generated-index.description": {
+    "message": "parse_command 自然语言语句、动词和规则解析器。",
+    "description": "The generated-index page description for category 'Command Parsing' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/pcre": {
+    "message": "正则表达式 (PCRE)",
+    "description": "The label for category 'Regular Expressions (PCRE)' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/pcre.link.generated-index.title": {
+    "message": "正则表达式 (PCRE)",
+    "description": "The generated-index page title for category 'Regular Expressions (PCRE)' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/pcre.link.generated-index.description": {
+    "message": "Perl 兼容的正则表达式匹配、提取和替换。",
+    "description": "The generated-index page description for category 'Regular Expressions (PCRE)' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/sockets": {
+    "message": "套接字",
+    "description": "The label for category 'Sockets' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/sockets.link.generated-index.title": {
+    "message": "套接字",
+    "description": "The generated-index page title for category 'Sockets' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/sockets.link.generated-index.description": {
+    "message": "sockets 包提供的底层 TCP/UDP 网络。",
+    "description": "The generated-index page description for category 'Sockets' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/strings": {
+    "message": "字符串",
+    "description": "The label for category 'Strings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/strings.link.generated-index.title": {
+    "message": "字符串",
+    "description": "The generated-index page title for category 'Strings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/strings.link.generated-index.description": {
+    "message": "操作、格式化、搜索、修剪、编码和哈希字符串，以及位串操作。",
+    "description": "The generated-index page description for category 'Strings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/system": {
+    "message": "系统",
+    "description": "The label for category 'System' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/system.link.generated-index.title": {
+    "message": "系统",
+    "description": "The generated-index page title for category 'System' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.efun/system.link.generated-index.description": {
+    "message": "驱动运行时服务：时间、eval 开销限制、继承自省、call_out 信息和关机。",
+    "description": "The generated-index page description for category 'System' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply": {
+    "message": "Apply 回调",
+    "description": "The label for category 'Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply.link.generated-index.title": {
+    "message": "Apply 回调",
+    "description": "The generated-index page title for category 'Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply.link.generated-index.description": {
+    "message": "驱动在特定事件时调用 LPC 对象的回调函数（apply），按 interactive、master、object 三种角色分组。",
+    "description": "The generated-index page description for category 'Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/object": {
+    "message": "Object Apply",
+    "description": "The label for category 'Object Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/object.link.generated-index.title": {
+    "message": "Object Apply",
+    "description": "The generated-index page title for category 'Object Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/object.link.generated-index.description": {
+    "message": "驱动在普通对象上调用的生命周期 apply：create、reset、init、heart_beat、clean_up 等。",
+    "description": "The generated-index page description for category 'Object Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/master": {
+    "message": "Master Apply",
+    "description": "The label for category 'Master Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/master.link.generated-index.title": {
+    "message": "Master Apply",
+    "description": "The generated-index page title for category 'Master Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/master.link.generated-index.description": {
+    "message": "驱动在 master 对象上调用的 apply：安全、权限、UID、对象加载、错误处理和全局策略。",
+    "description": "The generated-index page description for category 'Master Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/interactive": {
+    "message": "Interactive Apply",
+    "description": "The label for category 'Interactive Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/interactive.link.generated-index.title": {
+    "message": "Interactive Apply",
+    "description": "The generated-index page title for category 'Interactive Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.apply/interactive.link.generated-index.description": {
+    "message": "驱动在交互式（玩家连接）对象上调用的 apply：输入输出、提示符及 telnet/GMCP/MSDP/MXP 协议协商。",
+    "description": "The generated-index page description for category 'Interactive Applies' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib": {
+    "message": "标准库",
+    "description": "The label for category 'Standard Library' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib.link.generated-index.title": {
+    "message": "标准库",
+    "description": "The generated-index page title for category 'Standard Library' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib.link.generated-index.description": {
+    "message": "随 FluffOS 测试套件 mudlib 提供的纯 LPC 辅助函数库（不是驱动 efun），按数据类型和领域组织。",
+    "description": "The generated-index page description for category 'Standard Library' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/arrays": {
+    "message": "数组",
+    "description": "The label for category 'Arrays' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/arrays.link.generated-index.title": {
+    "message": "数组",
+    "description": "The generated-index page title for category 'Arrays' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/arrays.link.generated-index.description": {
+    "message": "用于转换和聚合数组的 LPC 辅助函数，如 reduce。",
+    "description": "The generated-index page description for category 'Arrays' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/db": {
+    "message": "数据库",
+    "description": "The label for category 'Database' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/db.link.generated-index.title": {
+    "message": "数据库",
+    "description": "The generated-index page title for category 'Database' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/db.link.generated-index.description": {
+    "message": "用于 SQLite、MySQL 等 FluffOS 支持的数据库的流式 LPC 查询构建器。",
+    "description": "The generated-index page description for category 'Database' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/mappings": {
+    "message": "映射",
+    "description": "The label for category 'Mappings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/mappings.link.generated-index.title": {
+    "message": "映射",
+    "description": "The generated-index page title for category 'Mappings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/mappings.link.generated-index.description": {
+    "message": "处理映射的 LPC 辅助函数，如按权重随机选取键。",
+    "description": "The generated-index page description for category 'Mappings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/numbers": {
+    "message": "数字",
+    "description": "The label for category 'Numbers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/numbers.link.generated-index.title": {
+    "message": "数字",
+    "description": "The generated-index page title for category 'Numbers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/numbers.link.generated-index.description": {
+    "message": "对整数和浮点数进行数值聚合与百分比运算的 LPC 辅助函数。",
+    "description": "The generated-index page description for category 'Numbers' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/objects": {
+    "message": "对象",
+    "description": "The label for category 'Objects' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/objects.link.generated-index.title": {
+    "message": "对象",
+    "description": "The generated-index page title for category 'Objects' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/objects.link.generated-index.description": {
+    "message": "在物品清单和环境中定位与检查对象的 LPC 辅助函数。",
+    "description": "The generated-index page description for category 'Objects' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/string": {
+    "message": "字符串",
+    "description": "The label for category 'Strings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/string.link.generated-index.title": {
+    "message": "字符串",
+    "description": "The generated-index page title for category 'Strings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.stdlib/string.link.generated-index.description": {
+    "message": "字符串处理的 LPC 辅助函数，包括 base64 编码、自动换行和点阵字体渲染。",
+    "description": "The generated-index page description for category 'Strings' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.concepts": {
+    "message": "概念",
+    "description": "The label for category 'Concepts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.concepts.link.generated-index.title": {
+    "message": "概念",
+    "description": "The generated-index page title for category 'Concepts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.concepts.link.generated-index.description": {
+    "message": "讲解 LPC、对象和 FluffOS 驱动如何协同工作的概念指南，适合学习平台本身而非查找具体函数的读者。",
+    "description": "The generated-index page description for category 'Concepts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.concepts/general": {
+    "message": "通用概念",
+    "description": "The label for category 'General Concepts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.concepts/general.link.generated-index.title": {
+    "message": "通用概念",
+    "description": "The generated-index page title for category 'General Concepts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.concepts/general.link.generated-index.description": {
+    "message": "LPC 语言、对象模型、FluffOS 驱动，以及 simul_efun、热重载和网络等机制的基础讲解。",
+    "description": "The generated-index page description for category 'General Concepts' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.driver": {
+    "message": "驱动内部",
+    "description": "The label for category 'Driver Internals' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.driver.link.generated-index.title": {
+    "message": "驱动内部",
+    "description": "The generated-index page title for category 'Driver Internals' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.driver.link.generated-index.description": {
+    "message": "FluffOS 驱动的配置参考与实现内幕：从运行时配置到 VM、内存和本地扩展层。",
+    "description": "The generated-index page description for category 'Driver Internals' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.cli": {
+    "message": "命令行工具",
+    "description": "The label for category 'Command-Line Tools' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.cli.link.generated-index.title": {
+    "message": "命令行工具",
+    "description": "The generated-index page title for category 'Command-Line Tools' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.cli.link.generated-index.description": {
+    "message": "driver 主程序及随 FluffOS 附带的用于编译、检查和转换 LPC 与存档数据的命令行工具参考。",
+    "description": "The generated-index page description for category 'Command-Line Tools' in sidebar 'docs'"
+  },
+  "sidebar.docs.category.Historical": {
+    "message": "历史文档",
+    "description": "The label for category 'Historical' in sidebar 'docs'"
+  },
+  "sidebar.docs.doc.Overview": {
+    "message": "概览",
+    "description": "The label for the doc item 'Overview' in sidebar 'docs', linking to the doc index"
+  },
+  "sidebar.docs.doc.Build from Source": {
+    "message": "从源码构建",
+    "description": "The label for the doc item 'Build from Source' in sidebar 'docs', linking to the doc build"
+  },
+  "sidebar.docs.doc.Build for WebAssembly": {
+    "message": "构建 WebAssembly 版本",
+    "description": "The label for the doc item 'Build for WebAssembly' in sidebar 'docs', linking to the doc build-wasm"
+  },
+  "sidebar.docs.doc.Reporting Bugs": {
+    "message": "报告问题",
+    "description": "The label for the doc item 'Reporting Bugs' in sidebar 'docs', linking to the doc bug"
+  },
+  "sidebar.docs.doc.Source Files & Object Names": {
+    "message": "源文件与对象名",
+    "description": "The label for the doc item 'Source Files & Object Names' in sidebar 'docs', linking to the doc lpc/source-files"
+  },
+  "sidebar.docs.doc.Compiler Diagnostics": {
+    "message": "编译诊断",
+    "description": "The label for the doc item 'Compiler Diagnostics' in sidebar 'docs', linking to the doc lpc/diagnostics"
+  },
+  "sidebar.docs.doc.efun/arrays/allocate": {
+    "message": "allocate",
+    "description": "The label for the doc item 'allocate' in sidebar 'docs', linking to the doc efun/arrays/allocate"
+  },
+  "sidebar.docs.doc.efun/arrays/arrayp": {
+    "message": "arrayp",
+    "description": "The label for the doc item 'arrayp' in sidebar 'docs', linking to the doc efun/arrays/arrayp"
+  },
+  "sidebar.docs.doc.efun/arrays/element_of": {
+    "message": "element_of",
+    "description": "The label for the doc item 'element_of' in sidebar 'docs', linking to the doc efun/arrays/element_of"
+  },
+  "sidebar.docs.doc.efun/arrays/filter_array": {
+    "message": "filter_array",
+    "description": "The label for the doc item 'filter_array' in sidebar 'docs', linking to the doc efun/arrays/filter_array"
+  },
+  "sidebar.docs.doc.efun/arrays/map_array": {
+    "message": "map_array",
+    "description": "The label for the doc item 'map_array' in sidebar 'docs', linking to the doc efun/arrays/map_array"
+  },
+  "sidebar.docs.doc.efun/arrays/member_array": {
+    "message": "member_array",
+    "description": "The label for the doc item 'member_array' in sidebar 'docs', linking to the doc efun/arrays/member_array"
+  },
+  "sidebar.docs.doc.efun/arrays/pointerp": {
+    "message": "pointerp",
+    "description": "The label for the doc item 'pointerp' in sidebar 'docs', linking to the doc efun/arrays/pointerp"
+  },
+  "sidebar.docs.doc.efun/arrays/shuffle": {
+    "message": "shuffle",
+    "description": "The label for the doc item 'shuffle' in sidebar 'docs', linking to the doc efun/arrays/shuffle"
+  },
+  "sidebar.docs.doc.efun/arrays/sort_array": {
+    "message": "sort_array",
+    "description": "The label for the doc item 'sort_array' in sidebar 'docs', linking to the doc efun/arrays/sort_array"
+  },
+  "sidebar.docs.doc.efun/arrays/unique_array": {
+    "message": "unique_array",
+    "description": "The label for the doc item 'unique_array' in sidebar 'docs', linking to the doc efun/arrays/unique_array"
+  },
+  "sidebar.docs.doc.efun/async/async_db_exec": {
+    "message": "async_db_exec",
+    "description": "The label for the doc item 'async_db_exec' in sidebar 'docs', linking to the doc efun/async/async_db_exec"
+  },
+  "sidebar.docs.doc.efun/async/async_getdir": {
+    "message": "async_getdir",
+    "description": "The label for the doc item 'async_getdir' in sidebar 'docs', linking to the doc efun/async/async_getdir"
+  },
+  "sidebar.docs.doc.efun/async/async_read": {
+    "message": "async_read",
+    "description": "The label for the doc item 'async_read' in sidebar 'docs', linking to the doc efun/async/async_read"
+  },
+  "sidebar.docs.doc.efun/async/async_write": {
+    "message": "async_write",
+    "description": "The label for the doc item 'async_write' in sidebar 'docs', linking to the doc efun/async/async_write"
+  },
+  "sidebar.docs.doc.efun/buffers/allocate_buffer": {
+    "message": "allocate_buffer",
+    "description": "The label for the doc item 'allocate_buffer' in sidebar 'docs', linking to the doc efun/buffers/allocate_buffer"
+  },
+  "sidebar.docs.doc.efun/buffers/buffer_transcode": {
+    "message": "buffer_transcode",
+    "description": "The label for the doc item 'buffer_transcode' in sidebar 'docs', linking to the doc efun/buffers/buffer_transcode"
+  },
+  "sidebar.docs.doc.efun/buffers/bufferp": {
+    "message": "bufferp",
+    "description": "The label for the doc item 'bufferp' in sidebar 'docs', linking to the doc efun/buffers/bufferp"
+  },
+  "sidebar.docs.doc.efun/buffers/crc32": {
+    "message": "crc32",
+    "description": "The label for the doc item 'crc32' in sidebar 'docs', linking to the doc efun/buffers/crc32"
+  },
+  "sidebar.docs.doc.efun/buffers/read_buffer": {
+    "message": "read_buffer",
+    "description": "The label for the doc item 'read_buffer' in sidebar 'docs', linking to the doc efun/buffers/read_buffer"
+  },
+  "sidebar.docs.doc.efun/buffers/write_buffer": {
+    "message": "write_buffer",
+    "description": "The label for the doc item 'write_buffer' in sidebar 'docs', linking to the doc efun/buffers/write_buffer"
+  },
+  "sidebar.docs.doc.efun/calls/call_other": {
+    "message": "call_other",
+    "description": "The label for the doc item 'call_other' in sidebar 'docs', linking to the doc efun/calls/call_other"
+  },
+  "sidebar.docs.doc.efun/calls/call_out": {
+    "message": "call_out",
+    "description": "The label for the doc item 'call_out' in sidebar 'docs', linking to the doc efun/calls/call_out"
+  },
+  "sidebar.docs.doc.efun/calls/call_out_walltime": {
+    "message": "call_out_walltime",
+    "description": "The label for the doc item 'call_out_walltime' in sidebar 'docs', linking to the doc efun/calls/call_out_walltime"
+  },
+  "sidebar.docs.doc.efun/calls/call_stack": {
+    "message": "call_stack",
+    "description": "The label for the doc item 'call_stack' in sidebar 'docs', linking to the doc efun/calls/call_stack"
+  },
+  "sidebar.docs.doc.efun/calls/catch": {
+    "message": "catch",
+    "description": "The label for the doc item 'catch' in sidebar 'docs', linking to the doc efun/calls/catch"
+  },
+  "sidebar.docs.doc.efun/calls/origin": {
+    "message": "origin",
+    "description": "The label for the doc item 'origin' in sidebar 'docs', linking to the doc efun/calls/origin"
+  },
+  "sidebar.docs.doc.efun/calls/previous_object": {
+    "message": "previous_object",
+    "description": "The label for the doc item 'previous_object' in sidebar 'docs', linking to the doc efun/calls/previous_object"
+  },
+  "sidebar.docs.doc.efun/calls/query_shadowing": {
+    "message": "query_shadowing",
+    "description": "The label for the doc item 'query_shadowing' in sidebar 'docs', linking to the doc efun/calls/query_shadowing"
+  },
+  "sidebar.docs.doc.efun/calls/remove_call_out": {
+    "message": "remove_call_out",
+    "description": "The label for the doc item 'remove_call_out' in sidebar 'docs', linking to the doc efun/calls/remove_call_out"
+  },
+  "sidebar.docs.doc.efun/calls/shadow": {
+    "message": "shadow",
+    "description": "The label for the doc item 'shadow' in sidebar 'docs', linking to the doc efun/calls/shadow"
+  },
+  "sidebar.docs.doc.efun/calls/this_object": {
+    "message": "this_object",
+    "description": "The label for the doc item 'this_object' in sidebar 'docs', linking to the doc efun/calls/this_object"
+  },
+  "sidebar.docs.doc.efun/calls/throw": {
+    "message": "throw",
+    "description": "The label for the doc item 'throw' in sidebar 'docs', linking to the doc efun/calls/throw"
+  },
+  "sidebar.docs.doc.efun/contrib/abs": {
+    "message": "abs",
+    "description": "The label for the doc item 'abs' in sidebar 'docs', linking to the doc efun/contrib/abs"
+  },
+  "sidebar.docs.doc.efun/contrib/add_a": {
+    "message": "add_a",
+    "description": "The label for the doc item 'add_a' in sidebar 'docs', linking to the doc efun/contrib/add_a"
+  },
+  "sidebar.docs.doc.efun/contrib/assemble_class": {
+    "message": "assemble_class",
+    "description": "The label for the doc item 'assemble_class' in sidebar 'docs', linking to the doc efun/contrib/assemble_class"
+  },
+  "sidebar.docs.doc.efun/contrib/base_name": {
+    "message": "base_name",
+    "description": "The label for the doc item 'base_name' in sidebar 'docs', linking to the doc efun/contrib/base_name"
+  },
+  "sidebar.docs.doc.efun/contrib/classes": {
+    "message": "classes",
+    "description": "The label for the doc item 'classes' in sidebar 'docs', linking to the doc efun/contrib/classes"
+  },
+  "sidebar.docs.doc.efun/contrib/compressedp": {
+    "message": "compressedp",
+    "description": "The label for the doc item 'compressedp' in sidebar 'docs', linking to the doc efun/contrib/compressedp"
+  },
+  "sidebar.docs.doc.efun/contrib/copy": {
+    "message": "copy",
+    "description": "The label for the doc item 'copy' in sidebar 'docs', linking to the doc efun/contrib/copy"
+  },
+  "sidebar.docs.doc.efun/contrib/debug_message": {
+    "message": "debug_message",
+    "description": "The label for the doc item 'debug_message' in sidebar 'docs', linking to the doc efun/contrib/debug_message"
+  },
+  "sidebar.docs.doc.efun/contrib/disassemble_class": {
+    "message": "disassemble_class",
+    "description": "The label for the doc item 'disassemble_class' in sidebar 'docs', linking to the doc efun/contrib/disassemble_class"
+  },
+  "sidebar.docs.doc.efun/contrib/event": {
+    "message": "event",
+    "description": "The label for the doc item 'event' in sidebar 'docs', linking to the doc efun/contrib/event"
+  },
+  "sidebar.docs.doc.efun/contrib/fetch_class_member": {
+    "message": "fetch_class_member",
+    "description": "The label for the doc item 'fetch_class_member' in sidebar 'docs', linking to the doc efun/contrib/fetch_class_member"
+  },
+  "sidebar.docs.doc.efun/contrib/fetch_variable": {
+    "message": "fetch_variable",
+    "description": "The label for the doc item 'fetch_variable' in sidebar 'docs', linking to the doc efun/contrib/fetch_variable"
+  },
+  "sidebar.docs.doc.efun/contrib/file_length": {
+    "message": "file_length",
+    "description": "The label for the doc item 'file_length' in sidebar 'docs', linking to the doc efun/contrib/file_length"
+  },
+  "sidebar.docs.doc.efun/contrib/function_owner": {
+    "message": "function_owner",
+    "description": "The label for the doc item 'function_owner' in sidebar 'docs', linking to the doc efun/contrib/function_owner"
+  },
+  "sidebar.docs.doc.efun/contrib/functions": {
+    "message": "functions",
+    "description": "The label for the doc item 'functions' in sidebar 'docs', linking to the doc efun/contrib/functions"
+  },
+  "sidebar.docs.doc.efun/contrib/get_garbage": {
+    "message": "get_garbage",
+    "description": "The label for the doc item 'get_garbage' in sidebar 'docs', linking to the doc efun/contrib/get_garbage"
+  },
+  "sidebar.docs.doc.efun/contrib/get_os_env": {
+    "message": "get_os_env",
+    "description": "The label for the doc item 'get_os_env' in sidebar 'docs', linking to the doc efun/contrib/get_os_env"
+  },
+  "sidebar.docs.doc.efun/contrib/heart_beats": {
+    "message": "heart_beats",
+    "description": "The label for the doc item 'heart_beats' in sidebar 'docs', linking to the doc efun/contrib/heart_beats"
+  },
+  "sidebar.docs.doc.efun/contrib/is_daylight_savings_time": {
+    "message": "is_daylight_savings_time",
+    "description": "The label for the doc item 'is_daylight_savings_time' in sidebar 'docs', linking to the doc efun/contrib/is_daylight_savings_time"
+  },
+  "sidebar.docs.doc.efun/contrib/max": {
+    "message": "max",
+    "description": "The label for the doc item 'max' in sidebar 'docs', linking to the doc efun/contrib/max"
+  },
+  "sidebar.docs.doc.efun/contrib/memory_summary": {
+    "message": "memory_summary",
+    "description": "The label for the doc item 'memory_summary' in sidebar 'docs', linking to the doc efun/contrib/memory_summary"
+  },
+  "sidebar.docs.doc.efun/contrib/min": {
+    "message": "min",
+    "description": "The label for the doc item 'min' in sidebar 'docs', linking to the doc efun/contrib/min"
+  },
+  "sidebar.docs.doc.efun/contrib/named_livings": {
+    "message": "named_livings",
+    "description": "The label for the doc item 'named_livings' in sidebar 'docs', linking to the doc efun/contrib/named_livings"
+  },
+  "sidebar.docs.doc.efun/contrib/network_stats": {
+    "message": "network_stats",
+    "description": "The label for the doc item 'network_stats' in sidebar 'docs', linking to the doc efun/contrib/network_stats"
+  },
+  "sidebar.docs.doc.efun/contrib/num_classes": {
+    "message": "num_classes",
+    "description": "The label for the doc item 'num_classes' in sidebar 'docs', linking to the doc efun/contrib/num_classes"
+  },
+  "sidebar.docs.doc.efun/contrib/pluralize": {
+    "message": "pluralize",
+    "description": "The label for the doc item 'pluralize' in sidebar 'docs', linking to the doc efun/contrib/pluralize"
+  },
+  "sidebar.docs.doc.efun/contrib/program_info": {
+    "message": "program_info",
+    "description": "The label for the doc item 'program_info' in sidebar 'docs', linking to the doc efun/contrib/program_info"
+  },
+  "sidebar.docs.doc.efun/contrib/query_charmode": {
+    "message": "query_charmode",
+    "description": "The label for the doc item 'query_charmode' in sidebar 'docs', linking to the doc efun/contrib/query_charmode"
+  },
+  "sidebar.docs.doc.efun/contrib/query_ip_port": {
+    "message": "query_ip_port",
+    "description": "The label for the doc item 'query_ip_port' in sidebar 'docs', linking to the doc efun/contrib/query_ip_port"
+  },
+  "sidebar.docs.doc.efun/contrib/query_multiple_short": {
+    "message": "query_multiple_short",
+    "description": "The label for the doc item 'query_multiple_short' in sidebar 'docs', linking to the doc efun/contrib/query_multiple_short"
+  },
+  "sidebar.docs.doc.efun/contrib/query_notify_fail": {
+    "message": "query_notify_fail",
+    "description": "The label for the doc item 'query_notify_fail' in sidebar 'docs', linking to the doc efun/contrib/query_notify_fail"
+  },
+  "sidebar.docs.doc.efun/contrib/query_num": {
+    "message": "query_num",
+    "description": "The label for the doc item 'query_num' in sidebar 'docs', linking to the doc efun/contrib/query_num"
+  },
+  "sidebar.docs.doc.efun/contrib/query_replaced_program": {
+    "message": "query_replaced_program",
+    "description": "The label for the doc item 'query_replaced_program' in sidebar 'docs', linking to the doc efun/contrib/query_replaced_program"
+  },
+  "sidebar.docs.doc.efun/contrib/real_time": {
+    "message": "real_time",
+    "description": "The label for the doc item 'real_time' in sidebar 'docs', linking to the doc efun/contrib/real_time"
+  },
+  "sidebar.docs.doc.efun/contrib/reference_allowed": {
+    "message": "reference_allowed",
+    "description": "The label for the doc item 'reference_allowed' in sidebar 'docs', linking to the doc efun/contrib/reference_allowed"
+  },
+  "sidebar.docs.doc.efun/contrib/remove_charmode": {
+    "message": "remove_charmode",
+    "description": "The label for the doc item 'remove_charmode' in sidebar 'docs', linking to the doc efun/contrib/remove_charmode"
+  },
+  "sidebar.docs.doc.efun/contrib/remove_get_char": {
+    "message": "remove_get_char",
+    "description": "The label for the doc item 'remove_get_char' in sidebar 'docs', linking to the doc efun/contrib/remove_get_char"
+  },
+  "sidebar.docs.doc.efun/contrib/remove_interactive": {
+    "message": "remove_interactive",
+    "description": "The label for the doc item 'remove_interactive' in sidebar 'docs', linking to the doc efun/contrib/remove_interactive"
+  },
+  "sidebar.docs.doc.efun/contrib/remove_shadow": {
+    "message": "remove_shadow",
+    "description": "The label for the doc item 'remove_shadow' in sidebar 'docs', linking to the doc efun/contrib/remove_shadow"
+  },
+  "sidebar.docs.doc.efun/contrib/repeat_string": {
+    "message": "repeat_string",
+    "description": "The label for the doc item 'repeat_string' in sidebar 'docs', linking to the doc efun/contrib/repeat_string"
+  },
+  "sidebar.docs.doc.efun/contrib/replace": {
+    "message": "replace",
+    "description": "The label for the doc item 'replace' in sidebar 'docs', linking to the doc efun/contrib/replace"
+  },
+  "sidebar.docs.doc.efun/contrib/replace_dollars": {
+    "message": "replace_dollars",
+    "description": "The label for the doc item 'replace_dollars' in sidebar 'docs', linking to the doc efun/contrib/replace_dollars"
+  },
+  "sidebar.docs.doc.efun/contrib/replace_html": {
+    "message": "replace_html",
+    "description": "The label for the doc item 'replace_html' in sidebar 'docs', linking to the doc efun/contrib/replace_html"
+  },
+  "sidebar.docs.doc.efun/contrib/replace_mxp": {
+    "message": "replace_mxp",
+    "description": "The label for the doc item 'replace_mxp' in sidebar 'docs', linking to the doc efun/contrib/replace_mxp"
+  },
+  "sidebar.docs.doc.efun/contrib/replace_objects": {
+    "message": "replace_objects",
+    "description": "The label for the doc item 'replace_objects' in sidebar 'docs', linking to the doc efun/contrib/replace_objects"
+  },
+  "sidebar.docs.doc.efun/contrib/replaceable": {
+    "message": "replaceable",
+    "description": "The label for the doc item 'replaceable' in sidebar 'docs', linking to the doc efun/contrib/replaceable"
+  },
+  "sidebar.docs.doc.efun/contrib/restore_from_string": {
+    "message": "restore_from_string",
+    "description": "The label for the doc item 'restore_from_string' in sidebar 'docs', linking to the doc efun/contrib/restore_from_string"
+  },
+  "sidebar.docs.doc.efun/contrib/roll_MdN": {
+    "message": "roll_MdN",
+    "description": "The label for the doc item 'roll_MdN' in sidebar 'docs', linking to the doc efun/contrib/roll_MdN"
+  },
+  "sidebar.docs.doc.efun/contrib/roulette_wheel": {
+    "message": "roulette_wheel",
+    "description": "The label for the doc item 'roulette_wheel' in sidebar 'docs', linking to the doc efun/contrib/roulette_wheel"
+  },
+  "sidebar.docs.doc.efun/contrib/send_nullbyte": {
+    "message": "send_nullbyte",
+    "description": "The label for the doc item 'send_nullbyte' in sidebar 'docs', linking to the doc efun/contrib/send_nullbyte"
+  },
+  "sidebar.docs.doc.efun/contrib/set_os_env": {
+    "message": "set_os_env",
+    "description": "The label for the doc item 'set_os_env' in sidebar 'docs', linking to the doc efun/contrib/set_os_env"
+  },
+  "sidebar.docs.doc.efun/contrib/set_prompt": {
+    "message": "set_prompt",
+    "description": "The label for the doc item 'set_prompt' in sidebar 'docs', linking to the doc efun/contrib/set_prompt"
+  },
+  "sidebar.docs.doc.efun/contrib/store_class_member": {
+    "message": "store_class_member",
+    "description": "The label for the doc item 'store_class_member' in sidebar 'docs', linking to the doc efun/contrib/store_class_member"
+  },
+  "sidebar.docs.doc.efun/contrib/store_variable": {
+    "message": "store_variable",
+    "description": "The label for the doc item 'store_variable' in sidebar 'docs', linking to the doc efun/contrib/store_variable"
+  },
+  "sidebar.docs.doc.efun/contrib/string_difference": {
+    "message": "string_difference",
+    "description": "The label for the doc item 'string_difference' in sidebar 'docs', linking to the doc efun/contrib/string_difference"
+  },
+  "sidebar.docs.doc.efun/contrib/terminal_colour": {
+    "message": "terminal_colour",
+    "description": "The label for the doc item 'terminal_colour' in sidebar 'docs', linking to the doc efun/contrib/terminal_colour"
+  },
+  "sidebar.docs.doc.efun/contrib/test_load": {
+    "message": "test_load",
+    "description": "The label for the doc item 'test_load' in sidebar 'docs', linking to the doc efun/contrib/test_load"
+  },
+  "sidebar.docs.doc.efun/contrib/upper_case": {
+    "message": "upper_case",
+    "description": "The label for the doc item 'upper_case' in sidebar 'docs', linking to the doc efun/contrib/upper_case"
+  },
+  "sidebar.docs.doc.efun/contrib/variables": {
+    "message": "variables",
+    "description": "The label for the doc item 'variables' in sidebar 'docs', linking to the doc efun/contrib/variables"
+  },
+  "sidebar.docs.doc.efun/contrib/vowel": {
+    "message": "vowel",
+    "description": "The label for the doc item 'vowel' in sidebar 'docs', linking to the doc efun/contrib/vowel"
+  },
+  "sidebar.docs.doc.efun/contrib/zonetime": {
+    "message": "zonetime",
+    "description": "The label for the doc item 'zonetime' in sidebar 'docs', linking to the doc efun/contrib/zonetime"
+  },
+  "sidebar.docs.doc.efun/crypto/hash": {
+    "message": "hash",
+    "description": "The label for the doc item 'hash' in sidebar 'docs', linking to the doc efun/crypto/hash"
+  },
+  "sidebar.docs.doc.efun/db/db_close": {
+    "message": "db_close",
+    "description": "The label for the doc item 'db_close' in sidebar 'docs', linking to the doc efun/db/db_close"
+  },
+  "sidebar.docs.doc.efun/db/db_commit": {
+    "message": "db_commit",
+    "description": "The label for the doc item 'db_commit' in sidebar 'docs', linking to the doc efun/db/db_commit"
+  },
+  "sidebar.docs.doc.efun/db/db_connect": {
+    "message": "db_connect",
+    "description": "The label for the doc item 'db_connect' in sidebar 'docs', linking to the doc efun/db/db_connect"
+  },
+  "sidebar.docs.doc.efun/db/db_exec": {
+    "message": "db_exec",
+    "description": "The label for the doc item 'db_exec' in sidebar 'docs', linking to the doc efun/db/db_exec"
+  },
+  "sidebar.docs.doc.efun/db/db_fetch": {
+    "message": "db_fetch",
+    "description": "The label for the doc item 'db_fetch' in sidebar 'docs', linking to the doc efun/db/db_fetch"
+  },
+  "sidebar.docs.doc.efun/db/db_rollback": {
+    "message": "db_rollback",
+    "description": "The label for the doc item 'db_rollback' in sidebar 'docs', linking to the doc efun/db/db_rollback"
+  },
+  "sidebar.docs.doc.efun/db/db_status": {
+    "message": "db_status",
+    "description": "The label for the doc item 'db_status' in sidebar 'docs', linking to the doc efun/db/db_status"
+  },
+  "sidebar.docs.doc.efun/ed/ed_cmd": {
+    "message": "ed_cmd",
+    "description": "The label for the doc item 'ed_cmd' in sidebar 'docs', linking to the doc efun/ed/ed_cmd"
+  },
+  "sidebar.docs.doc.efun/ed/ed_start": {
+    "message": "ed_start",
+    "description": "The label for the doc item 'ed_start' in sidebar 'docs', linking to the doc efun/ed/ed_start"
+  },
+  "sidebar.docs.doc.efun/ed/query_ed_mode": {
+    "message": "query_ed_mode",
+    "description": "The label for the doc item 'query_ed_mode' in sidebar 'docs', linking to the doc efun/ed/query_ed_mode"
+  },
+  "sidebar.docs.doc.efun/external/external_start": {
+    "message": "external_start",
+    "description": "The label for the doc item 'external_start' in sidebar 'docs', linking to the doc efun/external/external_start"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_address": {
+    "message": "ffi_address",
+    "description": "The label for the doc item 'ffi_address' in sidebar 'docs', linking to the doc efun/ffi/ffi_address"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_alloc": {
+    "message": "ffi_alloc",
+    "description": "The label for the doc item 'ffi_alloc' in sidebar 'docs', linking to the doc efun/ffi/ffi_alloc"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_call": {
+    "message": "ffi_call",
+    "description": "The label for the doc item 'ffi_call' in sidebar 'docs', linking to the doc efun/ffi/ffi_call"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_callback": {
+    "message": "ffi_callback",
+    "description": "The label for the doc item 'ffi_callback' in sidebar 'docs', linking to the doc efun/ffi/ffi_callback"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_callback_addr": {
+    "message": "ffi_callback_addr",
+    "description": "The label for the doc item 'ffi_callback_addr' in sidebar 'docs', linking to the doc efun/ffi/ffi_callback_addr"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_callback_free": {
+    "message": "ffi_callback_free",
+    "description": "The label for the doc item 'ffi_callback_free' in sidebar 'docs', linking to the doc efun/ffi/ffi_callback_free"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_error": {
+    "message": "ffi_error",
+    "description": "The label for the doc item 'ffi_error' in sidebar 'docs', linking to the doc efun/ffi/ffi_error"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_free": {
+    "message": "ffi_free",
+    "description": "The label for the doc item 'ffi_free' in sidebar 'docs', linking to the doc efun/ffi/ffi_free"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_load": {
+    "message": "ffi_load",
+    "description": "The label for the doc item 'ffi_load' in sidebar 'docs', linking to the doc efun/ffi/ffi_load"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_peek": {
+    "message": "ffi_peek",
+    "description": "The label for the doc item 'ffi_peek' in sidebar 'docs', linking to the doc efun/ffi/ffi_peek"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_prepare": {
+    "message": "ffi_prepare",
+    "description": "The label for the doc item 'ffi_prepare' in sidebar 'docs', linking to the doc efun/ffi/ffi_prepare"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_read": {
+    "message": "ffi_read",
+    "description": "The label for the doc item 'ffi_read' in sidebar 'docs', linking to the doc efun/ffi/ffi_read"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_sizeof": {
+    "message": "ffi_sizeof",
+    "description": "The label for the doc item 'ffi_sizeof' in sidebar 'docs', linking to the doc efun/ffi/ffi_sizeof"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_status": {
+    "message": "ffi_status",
+    "description": "The label for the doc item 'ffi_status' in sidebar 'docs', linking to the doc efun/ffi/ffi_status"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_struct_layout": {
+    "message": "ffi_struct_layout",
+    "description": "The label for the doc item 'ffi_struct_layout' in sidebar 'docs', linking to the doc efun/ffi/ffi_struct_layout"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_symbol": {
+    "message": "ffi_symbol",
+    "description": "The label for the doc item 'ffi_symbol' in sidebar 'docs', linking to the doc efun/ffi/ffi_symbol"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_unload": {
+    "message": "ffi_unload",
+    "description": "The label for the doc item 'ffi_unload' in sidebar 'docs', linking to the doc efun/ffi/ffi_unload"
+  },
+  "sidebar.docs.doc.efun/ffi/ffi_write": {
+    "message": "ffi_write",
+    "description": "The label for the doc item 'ffi_write' in sidebar 'docs', linking to the doc efun/ffi/ffi_write"
+  },
+  "sidebar.docs.doc.efun/filesystem/cp": {
+    "message": "cp",
+    "description": "The label for the doc item 'cp' in sidebar 'docs', linking to the doc efun/filesystem/cp"
+  },
+  "sidebar.docs.doc.efun/filesystem/file_size": {
+    "message": "file_size",
+    "description": "The label for the doc item 'file_size' in sidebar 'docs', linking to the doc efun/filesystem/file_size"
+  },
+  "sidebar.docs.doc.efun/filesystem/get_dir": {
+    "message": "get_dir",
+    "description": "The label for the doc item 'get_dir' in sidebar 'docs', linking to the doc efun/filesystem/get_dir"
+  },
+  "sidebar.docs.doc.efun/filesystem/link": {
+    "message": "link",
+    "description": "The label for the doc item 'link' in sidebar 'docs', linking to the doc efun/filesystem/link"
+  },
+  "sidebar.docs.doc.efun/filesystem/mkdir": {
+    "message": "mkdir",
+    "description": "The label for the doc item 'mkdir' in sidebar 'docs', linking to the doc efun/filesystem/mkdir"
+  },
+  "sidebar.docs.doc.efun/filesystem/read_bytes": {
+    "message": "read_bytes",
+    "description": "The label for the doc item 'read_bytes' in sidebar 'docs', linking to the doc efun/filesystem/read_bytes"
+  },
+  "sidebar.docs.doc.efun/filesystem/read_file": {
+    "message": "read_file",
+    "description": "The label for the doc item 'read_file' in sidebar 'docs', linking to the doc efun/filesystem/read_file"
+  },
+  "sidebar.docs.doc.efun/filesystem/rename": {
+    "message": "rename",
+    "description": "The label for the doc item 'rename' in sidebar 'docs', linking to the doc efun/filesystem/rename"
+  },
+  "sidebar.docs.doc.efun/filesystem/rm": {
+    "message": "rm",
+    "description": "The label for the doc item 'rm' in sidebar 'docs', linking to the doc efun/filesystem/rm"
+  },
+  "sidebar.docs.doc.efun/filesystem/rmdir": {
+    "message": "rmdir",
+    "description": "The label for the doc item 'rmdir' in sidebar 'docs', linking to the doc efun/filesystem/rmdir"
+  },
+  "sidebar.docs.doc.efun/filesystem/stat": {
+    "message": "stat",
+    "description": "The label for the doc item 'stat' in sidebar 'docs', linking to the doc efun/filesystem/stat"
+  },
+  "sidebar.docs.doc.efun/filesystem/write_bytes": {
+    "message": "write_bytes",
+    "description": "The label for the doc item 'write_bytes' in sidebar 'docs', linking to the doc efun/filesystem/write_bytes"
+  },
+  "sidebar.docs.doc.efun/filesystem/write_file": {
+    "message": "write_file",
+    "description": "The label for the doc item 'write_file' in sidebar 'docs', linking to the doc efun/filesystem/write_file"
+  },
+  "sidebar.docs.doc.efun/floats/acos": {
+    "message": "acos",
+    "description": "The label for the doc item 'acos' in sidebar 'docs', linking to the doc efun/floats/acos"
+  },
+  "sidebar.docs.doc.efun/floats/asin": {
+    "message": "asin",
+    "description": "The label for the doc item 'asin' in sidebar 'docs', linking to the doc efun/floats/asin"
+  },
+  "sidebar.docs.doc.efun/floats/atan": {
+    "message": "atan",
+    "description": "The label for the doc item 'atan' in sidebar 'docs', linking to the doc efun/floats/atan"
+  },
+  "sidebar.docs.doc.efun/floats/ceil": {
+    "message": "ceil",
+    "description": "The label for the doc item 'ceil' in sidebar 'docs', linking to the doc efun/floats/ceil"
+  },
+  "sidebar.docs.doc.efun/floats/cos": {
+    "message": "cos",
+    "description": "The label for the doc item 'cos' in sidebar 'docs', linking to the doc efun/floats/cos"
+  },
+  "sidebar.docs.doc.efun/floats/exp": {
+    "message": "exp",
+    "description": "The label for the doc item 'exp' in sidebar 'docs', linking to the doc efun/floats/exp"
+  },
+  "sidebar.docs.doc.efun/floats/floatp": {
+    "message": "floatp",
+    "description": "The label for the doc item 'floatp' in sidebar 'docs', linking to the doc efun/floats/floatp"
+  },
+  "sidebar.docs.doc.efun/floats/floor": {
+    "message": "floor",
+    "description": "The label for the doc item 'floor' in sidebar 'docs', linking to the doc efun/floats/floor"
+  },
+  "sidebar.docs.doc.efun/floats/log": {
+    "message": "log",
+    "description": "The label for the doc item 'log' in sidebar 'docs', linking to the doc efun/floats/log"
+  },
+  "sidebar.docs.doc.efun/floats/pow": {
+    "message": "pow",
+    "description": "The label for the doc item 'pow' in sidebar 'docs', linking to the doc efun/floats/pow"
+  },
+  "sidebar.docs.doc.efun/floats/round": {
+    "message": "round",
+    "description": "The label for the doc item 'round' in sidebar 'docs', linking to the doc efun/floats/round"
+  },
+  "sidebar.docs.doc.efun/floats/sin": {
+    "message": "sin",
+    "description": "The label for the doc item 'sin' in sidebar 'docs', linking to the doc efun/floats/sin"
+  },
+  "sidebar.docs.doc.efun/floats/sqrt": {
+    "message": "sqrt",
+    "description": "The label for the doc item 'sqrt' in sidebar 'docs', linking to the doc efun/floats/sqrt"
+  },
+  "sidebar.docs.doc.efun/floats/tan": {
+    "message": "tan",
+    "description": "The label for the doc item 'tan' in sidebar 'docs', linking to the doc efun/floats/tan"
+  },
+  "sidebar.docs.doc.efun/floats/to_int": {
+    "message": "to_int",
+    "description": "The label for the doc item 'to_int' in sidebar 'docs', linking to the doc efun/floats/to_int"
+  },
+  "sidebar.docs.doc.efun/functions/bind": {
+    "message": "bind",
+    "description": "The label for the doc item 'bind' in sidebar 'docs', linking to the doc efun/functions/bind"
+  },
+  "sidebar.docs.doc.efun/functions/defer": {
+    "message": "defer",
+    "description": "The label for the doc item 'defer' in sidebar 'docs', linking to the doc efun/functions/defer"
+  },
+  "sidebar.docs.doc.efun/functions/evaluate": {
+    "message": "evaluate",
+    "description": "The label for the doc item 'evaluate' in sidebar 'docs', linking to the doc efun/functions/evaluate"
+  },
+  "sidebar.docs.doc.efun/functions/functionp": {
+    "message": "functionp",
+    "description": "The label for the doc item 'functionp' in sidebar 'docs', linking to the doc efun/functions/functionp"
+  },
+  "sidebar.docs.doc.efun/general/angle": {
+    "message": "angle",
+    "description": "The label for the doc item 'angle' in sidebar 'docs', linking to the doc efun/general/angle"
+  },
+  "sidebar.docs.doc.efun/general/classp": {
+    "message": "classp",
+    "description": "The label for the doc item 'classp' in sidebar 'docs', linking to the doc efun/general/classp"
+  },
+  "sidebar.docs.doc.efun/general/compress": {
+    "message": "compress",
+    "description": "The label for the doc item 'compress' in sidebar 'docs', linking to the doc efun/general/compress"
+  },
+  "sidebar.docs.doc.efun/general/compress_file": {
+    "message": "compress_file",
+    "description": "The label for the doc item 'compress_file' in sidebar 'docs', linking to the doc efun/general/compress_file"
+  },
+  "sidebar.docs.doc.efun/general/distance": {
+    "message": "distance",
+    "description": "The label for the doc item 'distance' in sidebar 'docs', linking to the doc efun/general/distance"
+  },
+  "sidebar.docs.doc.efun/general/dotprod": {
+    "message": "dotprod",
+    "description": "The label for the doc item 'dotprod' in sidebar 'docs', linking to the doc efun/general/dotprod"
+  },
+  "sidebar.docs.doc.efun/general/explode_reversible": {
+    "message": "explode_reversible",
+    "description": "The label for the doc item 'explode_reversible' in sidebar 'docs', linking to the doc efun/general/explode_reversible"
+  },
+  "sidebar.docs.doc.efun/general/filter": {
+    "message": "filter",
+    "description": "The label for the doc item 'filter' in sidebar 'docs', linking to the doc efun/general/filter"
+  },
+  "sidebar.docs.doc.efun/general/id_matrix": {
+    "message": "id_matrix",
+    "description": "The label for the doc item 'id_matrix' in sidebar 'docs', linking to the doc efun/general/id_matrix"
+  },
+  "sidebar.docs.doc.efun/general/log10": {
+    "message": "log10",
+    "description": "The label for the doc item 'log10' in sidebar 'docs', linking to the doc efun/general/log10"
+  },
+  "sidebar.docs.doc.efun/general/log2": {
+    "message": "log2",
+    "description": "The label for the doc item 'log2' in sidebar 'docs', linking to the doc efun/general/log2"
+  },
+  "sidebar.docs.doc.efun/general/lookat_rotate": {
+    "message": "lookat_rotate",
+    "description": "The label for the doc item 'lookat_rotate' in sidebar 'docs', linking to the doc efun/general/lookat_rotate"
+  },
+  "sidebar.docs.doc.efun/general/lookat_rotate2": {
+    "message": "lookat_rotate2",
+    "description": "The label for the doc item 'lookat_rotate2' in sidebar 'docs', linking to the doc efun/general/lookat_rotate2"
+  },
+  "sidebar.docs.doc.efun/general/map": {
+    "message": "map",
+    "description": "The label for the doc item 'map' in sidebar 'docs', linking to the doc efun/general/map"
+  },
+  "sidebar.docs.doc.efun/general/next_bit": {
+    "message": "next_bit",
+    "description": "The label for the doc item 'next_bit' in sidebar 'docs', linking to the doc efun/general/next_bit"
+  },
+  "sidebar.docs.doc.efun/general/norm": {
+    "message": "norm",
+    "description": "The label for the doc item 'norm' in sidebar 'docs', linking to the doc efun/general/norm"
+  },
+  "sidebar.docs.doc.efun/general/nullp": {
+    "message": "nullp",
+    "description": "The label for the doc item 'nullp' in sidebar 'docs', linking to the doc efun/general/nullp"
+  },
+  "sidebar.docs.doc.efun/general/restore_variable": {
+    "message": "restore_variable",
+    "description": "The label for the doc item 'restore_variable' in sidebar 'docs', linking to the doc efun/general/restore_variable"
+  },
+  "sidebar.docs.doc.efun/general/rotate_x": {
+    "message": "rotate_x",
+    "description": "The label for the doc item 'rotate_x' in sidebar 'docs', linking to the doc efun/general/rotate_x"
+  },
+  "sidebar.docs.doc.efun/general/rotate_y": {
+    "message": "rotate_y",
+    "description": "The label for the doc item 'rotate_y' in sidebar 'docs', linking to the doc efun/general/rotate_y"
+  },
+  "sidebar.docs.doc.efun/general/rotate_z": {
+    "message": "rotate_z",
+    "description": "The label for the doc item 'rotate_z' in sidebar 'docs', linking to the doc efun/general/rotate_z"
+  },
+  "sidebar.docs.doc.efun/general/save_variable": {
+    "message": "save_variable",
+    "description": "The label for the doc item 'save_variable' in sidebar 'docs', linking to the doc efun/general/save_variable"
+  },
+  "sidebar.docs.doc.efun/general/scale": {
+    "message": "scale",
+    "description": "The label for the doc item 'scale' in sidebar 'docs', linking to the doc efun/general/scale"
+  },
+  "sidebar.docs.doc.efun/general/sizeof": {
+    "message": "sizeof",
+    "description": "The label for the doc item 'sizeof' in sidebar 'docs', linking to the doc efun/general/sizeof"
+  },
+  "sidebar.docs.doc.efun/general/translate": {
+    "message": "translate",
+    "description": "The label for the doc item 'translate' in sidebar 'docs', linking to the doc efun/general/translate"
+  },
+  "sidebar.docs.doc.efun/general/typeof": {
+    "message": "typeof",
+    "description": "The label for the doc item 'typeof' in sidebar 'docs', linking to the doc efun/general/typeof"
+  },
+  "sidebar.docs.doc.efun/general/uncompress": {
+    "message": "uncompress",
+    "description": "The label for the doc item 'uncompress' in sidebar 'docs', linking to the doc efun/general/uncompress"
+  },
+  "sidebar.docs.doc.efun/general/uncompress_file": {
+    "message": "uncompress_file",
+    "description": "The label for the doc item 'uncompress_file' in sidebar 'docs', linking to the doc efun/general/uncompress_file"
+  },
+  "sidebar.docs.doc.efun/general/undefinedp": {
+    "message": "undefinedp",
+    "description": "The label for the doc item 'undefinedp' in sidebar 'docs', linking to the doc efun/general/undefinedp"
+  },
+  "sidebar.docs.doc.efun/interactive/act_mxp": {
+    "message": "act_mxp",
+    "description": "The label for the doc item 'act_mxp' in sidebar 'docs', linking to the doc efun/interactive/act_mxp"
+  },
+  "sidebar.docs.doc.efun/interactive/add_action": {
+    "message": "add_action",
+    "description": "The label for the doc item 'add_action' in sidebar 'docs', linking to the doc efun/interactive/add_action"
+  },
+  "sidebar.docs.doc.efun/interactive/command": {
+    "message": "command",
+    "description": "The label for the doc item 'command' in sidebar 'docs', linking to the doc efun/interactive/command"
+  },
+  "sidebar.docs.doc.efun/interactive/commands": {
+    "message": "commands",
+    "description": "The label for the doc item 'commands' in sidebar 'docs', linking to the doc efun/interactive/commands"
+  },
+  "sidebar.docs.doc.efun/interactive/disable_commands": {
+    "message": "disable_commands",
+    "description": "The label for the doc item 'disable_commands' in sidebar 'docs', linking to the doc efun/interactive/disable_commands"
+  },
+  "sidebar.docs.doc.efun/interactive/disable_wizard": {
+    "message": "disable_wizard",
+    "description": "The label for the doc item 'disable_wizard' in sidebar 'docs', linking to the doc efun/interactive/disable_wizard"
+  },
+  "sidebar.docs.doc.efun/interactive/ed": {
+    "message": "ed",
+    "description": "The label for the doc item 'ed' in sidebar 'docs', linking to the doc efun/interactive/ed"
+  },
+  "sidebar.docs.doc.efun/interactive/enable_commands": {
+    "message": "enable_commands",
+    "description": "The label for the doc item 'enable_commands' in sidebar 'docs', linking to the doc efun/interactive/enable_commands"
+  },
+  "sidebar.docs.doc.efun/interactive/exec": {
+    "message": "exec",
+    "description": "The label for the doc item 'exec' in sidebar 'docs', linking to the doc efun/interactive/exec"
+  },
+  "sidebar.docs.doc.efun/interactive/find_player": {
+    "message": "find_player",
+    "description": "The label for the doc item 'find_player' in sidebar 'docs', linking to the doc efun/interactive/find_player"
+  },
+  "sidebar.docs.doc.efun/interactive/get_char": {
+    "message": "get_char",
+    "description": "The label for the doc item 'get_char' in sidebar 'docs', linking to the doc efun/interactive/get_char"
+  },
+  "sidebar.docs.doc.efun/interactive/has_gmcp": {
+    "message": "has_gmcp",
+    "description": "The label for the doc item 'has_gmcp' in sidebar 'docs', linking to the doc efun/interactive/has_gmcp"
+  },
+  "sidebar.docs.doc.efun/interactive/has_msdp": {
+    "message": "has_msdp",
+    "description": "The label for the doc item 'has_msdp' in sidebar 'docs', linking to the doc efun/interactive/has_msdp"
+  },
+  "sidebar.docs.doc.efun/interactive/has_msp": {
+    "message": "has_msp",
+    "description": "The label for the doc item 'has_msp' in sidebar 'docs', linking to the doc efun/interactive/has_msp"
+  },
+  "sidebar.docs.doc.efun/interactive/has_mxp": {
+    "message": "has_mxp",
+    "description": "The label for the doc item 'has_mxp' in sidebar 'docs', linking to the doc efun/interactive/has_mxp"
+  },
+  "sidebar.docs.doc.efun/interactive/has_zmp": {
+    "message": "has_zmp",
+    "description": "The label for the doc item 'has_zmp' in sidebar 'docs', linking to the doc efun/interactive/has_zmp"
+  },
+  "sidebar.docs.doc.efun/interactive/in_edit": {
+    "message": "in_edit",
+    "description": "The label for the doc item 'in_edit' in sidebar 'docs', linking to the doc efun/interactive/in_edit"
+  },
+  "sidebar.docs.doc.efun/interactive/in_input": {
+    "message": "in_input",
+    "description": "The label for the doc item 'in_input' in sidebar 'docs', linking to the doc efun/interactive/in_input"
+  },
+  "sidebar.docs.doc.efun/interactive/input_to": {
+    "message": "input_to",
+    "description": "The label for the doc item 'input_to' in sidebar 'docs', linking to the doc efun/interactive/input_to"
+  },
+  "sidebar.docs.doc.efun/interactive/interactive": {
+    "message": "interactive",
+    "description": "The label for the doc item 'interactive' in sidebar 'docs', linking to the doc efun/interactive/interactive"
+  },
+  "sidebar.docs.doc.efun/interactive/message": {
+    "message": "message",
+    "description": "The label for the doc item 'message' in sidebar 'docs', linking to the doc efun/interactive/message"
+  },
+  "sidebar.docs.doc.efun/interactive/notify_fail": {
+    "message": "notify_fail",
+    "description": "The label for the doc item 'notify_fail' in sidebar 'docs', linking to the doc efun/interactive/notify_fail"
+  },
+  "sidebar.docs.doc.efun/interactive/printf": {
+    "message": "printf",
+    "description": "The label for the doc item 'printf' in sidebar 'docs', linking to the doc efun/interactive/printf"
+  },
+  "sidebar.docs.doc.efun/interactive/query_encoding": {
+    "message": "query_encoding",
+    "description": "The label for the doc item 'query_encoding' in sidebar 'docs', linking to the doc efun/interactive/query_encoding"
+  },
+  "sidebar.docs.doc.efun/interactive/query_host_name": {
+    "message": "query_host_name",
+    "description": "The label for the doc item 'query_host_name' in sidebar 'docs', linking to the doc efun/interactive/query_host_name"
+  },
+  "sidebar.docs.doc.efun/interactive/query_idle": {
+    "message": "query_idle",
+    "description": "The label for the doc item 'query_idle' in sidebar 'docs', linking to the doc efun/interactive/query_idle"
+  },
+  "sidebar.docs.doc.efun/interactive/query_ip_name": {
+    "message": "query_ip_name",
+    "description": "The label for the doc item 'query_ip_name' in sidebar 'docs', linking to the doc efun/interactive/query_ip_name"
+  },
+  "sidebar.docs.doc.efun/interactive/query_ip_number": {
+    "message": "query_ip_number",
+    "description": "The label for the doc item 'query_ip_number' in sidebar 'docs', linking to the doc efun/interactive/query_ip_number"
+  },
+  "sidebar.docs.doc.efun/interactive/query_snoop": {
+    "message": "query_snoop",
+    "description": "The label for the doc item 'query_snoop' in sidebar 'docs', linking to the doc efun/interactive/query_snoop"
+  },
+  "sidebar.docs.doc.efun/interactive/query_snooping": {
+    "message": "query_snooping",
+    "description": "The label for the doc item 'query_snooping' in sidebar 'docs', linking to the doc efun/interactive/query_snooping"
+  },
+  "sidebar.docs.doc.efun/interactive/receive": {
+    "message": "receive",
+    "description": "The label for the doc item 'receive' in sidebar 'docs', linking to the doc efun/interactive/receive"
+  },
+  "sidebar.docs.doc.efun/interactive/remove_action": {
+    "message": "remove_action",
+    "description": "The label for the doc item 'remove_action' in sidebar 'docs', linking to the doc efun/interactive/remove_action"
+  },
+  "sidebar.docs.doc.efun/interactive/request_term_size": {
+    "message": "request_term_size",
+    "description": "The label for the doc item 'request_term_size' in sidebar 'docs', linking to the doc efun/interactive/request_term_size"
+  },
+  "sidebar.docs.doc.efun/interactive/request_term_type": {
+    "message": "request_term_type",
+    "description": "The label for the doc item 'request_term_type' in sidebar 'docs', linking to the doc efun/interactive/request_term_type"
+  },
+  "sidebar.docs.doc.efun/interactive/resolve": {
+    "message": "resolve",
+    "description": "The label for the doc item 'resolve' in sidebar 'docs', linking to the doc efun/interactive/resolve"
+  },
+  "sidebar.docs.doc.efun/interactive/say": {
+    "message": "say",
+    "description": "The label for the doc item 'say' in sidebar 'docs', linking to the doc efun/interactive/say"
+  },
+  "sidebar.docs.doc.efun/interactive/send_gmcp": {
+    "message": "send_gmcp",
+    "description": "The label for the doc item 'send_gmcp' in sidebar 'docs', linking to the doc efun/interactive/send_gmcp"
+  },
+  "sidebar.docs.doc.efun/interactive/send_msdp_variable": {
+    "message": "send_msdp_variable",
+    "description": "The label for the doc item 'send_msdp_variable' in sidebar 'docs', linking to the doc efun/interactive/send_msdp_variable"
+  },
+  "sidebar.docs.doc.efun/interactive/send_zmp": {
+    "message": "send_zmp",
+    "description": "The label for the doc item 'send_zmp' in sidebar 'docs', linking to the doc efun/interactive/send_zmp"
+  },
+  "sidebar.docs.doc.efun/interactive/set_encoding": {
+    "message": "set_encoding",
+    "description": "The label for the doc item 'set_encoding' in sidebar 'docs', linking to the doc efun/interactive/set_encoding"
+  },
+  "sidebar.docs.doc.efun/interactive/set_this_player": {
+    "message": "set_this_player",
+    "description": "The label for the doc item 'set_this_player' in sidebar 'docs', linking to the doc efun/interactive/set_this_player"
+  },
+  "sidebar.docs.doc.efun/interactive/set_this_user": {
+    "message": "set_this_user",
+    "description": "The label for the doc item 'set_this_user' in sidebar 'docs', linking to the doc efun/interactive/set_this_user"
+  },
+  "sidebar.docs.doc.efun/interactive/shout": {
+    "message": "shout",
+    "description": "The label for the doc item 'shout' in sidebar 'docs', linking to the doc efun/interactive/shout"
+  },
+  "sidebar.docs.doc.efun/interactive/snoop": {
+    "message": "snoop",
+    "description": "The label for the doc item 'snoop' in sidebar 'docs', linking to the doc efun/interactive/snoop"
+  },
+  "sidebar.docs.doc.efun/interactive/start_request_term_type": {
+    "message": "start_request_term_type",
+    "description": "The label for the doc item 'start_request_term_type' in sidebar 'docs', linking to the doc efun/interactive/start_request_term_type"
+  },
+  "sidebar.docs.doc.efun/interactive/telnet_ga": {
+    "message": "telnet_ga",
+    "description": "The label for the doc item 'telnet_ga' in sidebar 'docs', linking to the doc efun/interactive/telnet_ga"
+  },
+  "sidebar.docs.doc.efun/interactive/telnet_msp_oob": {
+    "message": "telnet_msp_oob",
+    "description": "The label for the doc item 'telnet_msp_oob' in sidebar 'docs', linking to the doc efun/interactive/telnet_msp_oob"
+  },
+  "sidebar.docs.doc.efun/interactive/telnet_nop": {
+    "message": "telnet_nop",
+    "description": "The label for the doc item 'telnet_nop' in sidebar 'docs', linking to the doc efun/interactive/telnet_nop"
+  },
+  "sidebar.docs.doc.efun/interactive/this_interactive": {
+    "message": "this_interactive",
+    "description": "The label for the doc item 'this_interactive' in sidebar 'docs', linking to the doc efun/interactive/this_interactive"
+  },
+  "sidebar.docs.doc.efun/interactive/this_player": {
+    "message": "this_player",
+    "description": "The label for the doc item 'this_player' in sidebar 'docs', linking to the doc efun/interactive/this_player"
+  },
+  "sidebar.docs.doc.efun/interactive/this_user": {
+    "message": "this_user",
+    "description": "The label for the doc item 'this_user' in sidebar 'docs', linking to the doc efun/interactive/this_user"
+  },
+  "sidebar.docs.doc.efun/interactive/userp": {
+    "message": "userp",
+    "description": "The label for the doc item 'userp' in sidebar 'docs', linking to the doc efun/interactive/userp"
+  },
+  "sidebar.docs.doc.efun/interactive/users": {
+    "message": "users",
+    "description": "The label for the doc item 'users' in sidebar 'docs', linking to the doc efun/interactive/users"
+  },
+  "sidebar.docs.doc.efun/interactive/write": {
+    "message": "write",
+    "description": "The label for the doc item 'write' in sidebar 'docs', linking to the doc efun/interactive/write"
+  },
+  "sidebar.docs.doc.efun/internals/cache_stats": {
+    "message": "cache_stats",
+    "description": "The label for the doc item 'cache_stats' in sidebar 'docs', linking to the doc efun/internals/cache_stats"
+  },
+  "sidebar.docs.doc.efun/internals/check_memory": {
+    "message": "check_memory",
+    "description": "The label for the doc item 'check_memory' in sidebar 'docs', linking to the doc efun/internals/check_memory"
+  },
+  "sidebar.docs.doc.efun/internals/clear_debug_level": {
+    "message": "clear_debug_level",
+    "description": "The label for the doc item 'clear_debug_level' in sidebar 'docs', linking to the doc efun/internals/clear_debug_level"
+  },
+  "sidebar.docs.doc.efun/internals/debug_info": {
+    "message": "debug_info",
+    "description": "The label for the doc item 'debug_info' in sidebar 'docs', linking to the doc efun/internals/debug_info"
+  },
+  "sidebar.docs.doc.efun/internals/debug_levels": {
+    "message": "debug_levels",
+    "description": "The label for the doc item 'debug_levels' in sidebar 'docs', linking to the doc efun/internals/debug_levels"
+  },
+  "sidebar.docs.doc.efun/internals/debugmalloc": {
+    "message": "debugmalloc",
+    "description": "The label for the doc item 'debugmalloc' in sidebar 'docs', linking to the doc efun/internals/debugmalloc"
+  },
+  "sidebar.docs.doc.efun/internals/destructed_objects": {
+    "message": "destructed_objects",
+    "description": "The label for the doc item 'destructed_objects' in sidebar 'docs', linking to the doc efun/internals/destructed_objects"
+  },
+  "sidebar.docs.doc.efun/internals/dump_file_descriptors": {
+    "message": "dump_file_descriptors",
+    "description": "The label for the doc item 'dump_file_descriptors' in sidebar 'docs', linking to the doc efun/internals/dump_file_descriptors"
+  },
+  "sidebar.docs.doc.efun/internals/dump_jemalloc": {
+    "message": "dump_jemalloc",
+    "description": "The label for the doc item 'dump_jemalloc' in sidebar 'docs', linking to the doc efun/internals/dump_jemalloc"
+  },
+  "sidebar.docs.doc.efun/internals/dump_prog": {
+    "message": "dump_prog",
+    "description": "The label for the doc item 'dump_prog' in sidebar 'docs', linking to the doc efun/internals/dump_prog"
+  },
+  "sidebar.docs.doc.efun/internals/dump_stralloc": {
+    "message": "dump_stralloc",
+    "description": "The label for the doc item 'dump_stralloc' in sidebar 'docs', linking to the doc efun/internals/dump_stralloc"
+  },
+  "sidebar.docs.doc.efun/internals/dump_trace": {
+    "message": "dump_trace",
+    "description": "The label for the doc item 'dump_trace' in sidebar 'docs', linking to the doc efun/internals/dump_trace"
+  },
+  "sidebar.docs.doc.efun/internals/dumpallobj": {
+    "message": "dumpallobj",
+    "description": "The label for the doc item 'dumpallobj' in sidebar 'docs', linking to the doc efun/internals/dumpallobj"
+  },
+  "sidebar.docs.doc.efun/internals/get_config": {
+    "message": "get_config",
+    "description": "The label for the doc item 'get_config' in sidebar 'docs', linking to the doc efun/internals/get_config"
+  },
+  "sidebar.docs.doc.efun/internals/malloc_status": {
+    "message": "malloc_status",
+    "description": "The label for the doc item 'malloc_status' in sidebar 'docs', linking to the doc efun/internals/malloc_status"
+  },
+  "sidebar.docs.doc.efun/internals/memory_info": {
+    "message": "memory_info",
+    "description": "The label for the doc item 'memory_info' in sidebar 'docs', linking to the doc efun/internals/memory_info"
+  },
+  "sidebar.docs.doc.efun/internals/moncontrol": {
+    "message": "moncontrol",
+    "description": "The label for the doc item 'moncontrol' in sidebar 'docs', linking to the doc efun/internals/moncontrol"
+  },
+  "sidebar.docs.doc.efun/internals/mud_status": {
+    "message": "mud_status",
+    "description": "The label for the doc item 'mud_status' in sidebar 'docs', linking to the doc efun/internals/mud_status"
+  },
+  "sidebar.docs.doc.efun/internals/query_load_average": {
+    "message": "query_load_average",
+    "description": "The label for the doc item 'query_load_average' in sidebar 'docs', linking to the doc efun/internals/query_load_average"
+  },
+  "sidebar.docs.doc.efun/internals/refs": {
+    "message": "refs",
+    "description": "The label for the doc item 'refs' in sidebar 'docs', linking to the doc efun/internals/refs"
+  },
+  "sidebar.docs.doc.efun/internals/rusage": {
+    "message": "rusage",
+    "description": "The label for the doc item 'rusage' in sidebar 'docs', linking to the doc efun/internals/rusage"
+  },
+  "sidebar.docs.doc.efun/internals/set_config": {
+    "message": "set_config",
+    "description": "The label for the doc item 'set_config' in sidebar 'docs', linking to the doc efun/internals/set_config"
+  },
+  "sidebar.docs.doc.efun/internals/set_debug_level": {
+    "message": "set_debug_level",
+    "description": "The label for the doc item 'set_debug_level' in sidebar 'docs', linking to the doc efun/internals/set_debug_level"
+  },
+  "sidebar.docs.doc.efun/internals/set_malloc_mask": {
+    "message": "set_malloc_mask",
+    "description": "The label for the doc item 'set_malloc_mask' in sidebar 'docs', linking to the doc efun/internals/set_malloc_mask"
+  },
+  "sidebar.docs.doc.efun/internals/time_expression": {
+    "message": "time_expression",
+    "description": "The label for the doc item 'time_expression' in sidebar 'docs', linking to the doc efun/internals/time_expression"
+  },
+  "sidebar.docs.doc.efun/internals/trace": {
+    "message": "trace",
+    "description": "The label for the doc item 'trace' in sidebar 'docs', linking to the doc efun/internals/trace"
+  },
+  "sidebar.docs.doc.efun/internals/traceprefix": {
+    "message": "traceprefix",
+    "description": "The label for the doc item 'traceprefix' in sidebar 'docs', linking to the doc efun/internals/traceprefix"
+  },
+  "sidebar.docs.doc.efun/jsbridge/js_call": {
+    "message": "js_call",
+    "description": "The label for the doc item 'js_call' in sidebar 'docs', linking to the doc efun/jsbridge/js_call"
+  },
+  "sidebar.docs.doc.efun/jsbridge/js_eval": {
+    "message": "js_eval",
+    "description": "The label for the doc item 'js_eval' in sidebar 'docs', linking to the doc efun/jsbridge/js_eval"
+  },
+  "sidebar.docs.doc.efun/jsbridge/js_export": {
+    "message": "js_export",
+    "description": "The label for the doc item 'js_export' in sidebar 'docs', linking to the doc efun/jsbridge/js_export"
+  },
+  "sidebar.docs.doc.efun/mappings/allocate_mapping": {
+    "message": "allocate_mapping",
+    "description": "The label for the doc item 'allocate_mapping' in sidebar 'docs', linking to the doc efun/mappings/allocate_mapping"
+  },
+  "sidebar.docs.doc.efun/mappings/filter_mapping": {
+    "message": "filter_mapping",
+    "description": "The label for the doc item 'filter_mapping' in sidebar 'docs', linking to the doc efun/mappings/filter_mapping"
+  },
+  "sidebar.docs.doc.efun/mappings/keys": {
+    "message": "keys",
+    "description": "The label for the doc item 'keys' in sidebar 'docs', linking to the doc efun/mappings/keys"
+  },
+  "sidebar.docs.doc.efun/mappings/map_delete": {
+    "message": "map_delete",
+    "description": "The label for the doc item 'map_delete' in sidebar 'docs', linking to the doc efun/mappings/map_delete"
+  },
+  "sidebar.docs.doc.efun/mappings/map_mapping": {
+    "message": "map_mapping",
+    "description": "The label for the doc item 'map_mapping' in sidebar 'docs', linking to the doc efun/mappings/map_mapping"
+  },
+  "sidebar.docs.doc.efun/mappings/mapp": {
+    "message": "mapp",
+    "description": "The label for the doc item 'mapp' in sidebar 'docs', linking to the doc efun/mappings/mapp"
+  },
+  "sidebar.docs.doc.efun/mappings/match_path": {
+    "message": "match_path",
+    "description": "The label for the doc item 'match_path' in sidebar 'docs', linking to the doc efun/mappings/match_path"
+  },
+  "sidebar.docs.doc.efun/mappings/unique_mapping": {
+    "message": "unique_mapping",
+    "description": "The label for the doc item 'unique_mapping' in sidebar 'docs', linking to the doc efun/mappings/unique_mapping"
+  },
+  "sidebar.docs.doc.efun/mappings/values": {
+    "message": "values",
+    "description": "The label for the doc item 'values' in sidebar 'docs', linking to the doc efun/mappings/values"
+  },
+  "sidebar.docs.doc.efun/mudlib/author_stats": {
+    "message": "author_stats",
+    "description": "The label for the doc item 'author_stats' in sidebar 'docs', linking to the doc efun/mudlib/author_stats"
+  },
+  "sidebar.docs.doc.efun/mudlib/domain_stats": {
+    "message": "domain_stats",
+    "description": "The label for the doc item 'domain_stats' in sidebar 'docs', linking to the doc efun/mudlib/domain_stats"
+  },
+  "sidebar.docs.doc.efun/mudlib/enable_wizard": {
+    "message": "enable_wizard",
+    "description": "The label for the doc item 'enable_wizard' in sidebar 'docs', linking to the doc efun/mudlib/enable_wizard"
+  },
+  "sidebar.docs.doc.efun/mudlib/export_uid": {
+    "message": "export_uid",
+    "description": "The label for the doc item 'export_uid' in sidebar 'docs', linking to the doc efun/mudlib/export_uid"
+  },
+  "sidebar.docs.doc.efun/mudlib/find_living": {
+    "message": "find_living",
+    "description": "The label for the doc item 'find_living' in sidebar 'docs', linking to the doc efun/mudlib/find_living"
+  },
+  "sidebar.docs.doc.efun/mudlib/geteuid": {
+    "message": "geteuid",
+    "description": "The label for the doc item 'geteuid' in sidebar 'docs', linking to the doc efun/mudlib/geteuid"
+  },
+  "sidebar.docs.doc.efun/mudlib/getuid": {
+    "message": "getuid",
+    "description": "The label for the doc item 'getuid' in sidebar 'docs', linking to the doc efun/mudlib/getuid"
+  },
+  "sidebar.docs.doc.efun/mudlib/living": {
+    "message": "living",
+    "description": "The label for the doc item 'living' in sidebar 'docs', linking to the doc efun/mudlib/living"
+  },
+  "sidebar.docs.doc.efun/mudlib/livings": {
+    "message": "livings",
+    "description": "The label for the doc item 'livings' in sidebar 'docs', linking to the doc efun/mudlib/livings"
+  },
+  "sidebar.docs.doc.efun/mudlib/query_privs": {
+    "message": "query_privs",
+    "description": "The label for the doc item 'query_privs' in sidebar 'docs', linking to the doc efun/mudlib/query_privs"
+  },
+  "sidebar.docs.doc.efun/mudlib/set_author": {
+    "message": "set_author",
+    "description": "The label for the doc item 'set_author' in sidebar 'docs', linking to the doc efun/mudlib/set_author"
+  },
+  "sidebar.docs.doc.efun/mudlib/set_light": {
+    "message": "set_light",
+    "description": "The label for the doc item 'set_light' in sidebar 'docs', linking to the doc efun/mudlib/set_light"
+  },
+  "sidebar.docs.doc.efun/mudlib/set_living_name": {
+    "message": "set_living_name",
+    "description": "The label for the doc item 'set_living_name' in sidebar 'docs', linking to the doc efun/mudlib/set_living_name"
+  },
+  "sidebar.docs.doc.efun/mudlib/set_privs": {
+    "message": "set_privs",
+    "description": "The label for the doc item 'set_privs' in sidebar 'docs', linking to the doc efun/mudlib/set_privs"
+  },
+  "sidebar.docs.doc.efun/mudlib/seteuid": {
+    "message": "seteuid",
+    "description": "The label for the doc item 'seteuid' in sidebar 'docs', linking to the doc efun/mudlib/seteuid"
+  },
+  "sidebar.docs.doc.efun/mudlib/wizardp": {
+    "message": "wizardp",
+    "description": "The label for the doc item 'wizardp' in sidebar 'docs', linking to the doc efun/mudlib/wizardp"
+  },
+  "sidebar.docs.doc.efun/numbers/intp": {
+    "message": "intp",
+    "description": "The label for the doc item 'intp' in sidebar 'docs', linking to the doc efun/numbers/intp"
+  },
+  "sidebar.docs.doc.efun/numbers/random": {
+    "message": "random",
+    "description": "The label for the doc item 'random' in sidebar 'docs', linking to the doc efun/numbers/random"
+  },
+  "sidebar.docs.doc.efun/numbers/secure_random": {
+    "message": "secure_random",
+    "description": "The label for the doc item 'secure_random' in sidebar 'docs', linking to the doc efun/numbers/secure_random"
+  },
+  "sidebar.docs.doc.efun/numbers/to_float": {
+    "message": "to_float",
+    "description": "The label for the doc item 'to_float' in sidebar 'docs', linking to the doc efun/numbers/to_float"
+  },
+  "sidebar.docs.doc.efun/objects/all_inventory": {
+    "message": "all_inventory",
+    "description": "The label for the doc item 'all_inventory' in sidebar 'docs', linking to the doc efun/objects/all_inventory"
+  },
+  "sidebar.docs.doc.efun/objects/children": {
+    "message": "children",
+    "description": "The label for the doc item 'children' in sidebar 'docs', linking to the doc efun/objects/children"
+  },
+  "sidebar.docs.doc.efun/objects/clone_object": {
+    "message": "clone_object",
+    "description": "The label for the doc item 'clone_object' in sidebar 'docs', linking to the doc efun/objects/clone_object"
+  },
+  "sidebar.docs.doc.efun/objects/clonep": {
+    "message": "clonep",
+    "description": "The label for the doc item 'clonep' in sidebar 'docs', linking to the doc efun/objects/clonep"
+  },
+  "sidebar.docs.doc.efun/objects/deep_inventory": {
+    "message": "deep_inventory",
+    "description": "The label for the doc item 'deep_inventory' in sidebar 'docs', linking to the doc efun/objects/deep_inventory"
+  },
+  "sidebar.docs.doc.efun/objects/destruct": {
+    "message": "destruct",
+    "description": "The label for the doc item 'destruct' in sidebar 'docs', linking to the doc efun/objects/destruct"
+  },
+  "sidebar.docs.doc.efun/objects/environment": {
+    "message": "environment",
+    "description": "The label for the doc item 'environment' in sidebar 'docs', linking to the doc efun/objects/environment"
+  },
+  "sidebar.docs.doc.efun/objects/file_name": {
+    "message": "file_name",
+    "description": "The label for the doc item 'file_name' in sidebar 'docs', linking to the doc efun/objects/file_name"
+  },
+  "sidebar.docs.doc.efun/objects/find_object": {
+    "message": "find_object",
+    "description": "The label for the doc item 'find_object' in sidebar 'docs', linking to the doc efun/objects/find_object"
+  },
+  "sidebar.docs.doc.efun/objects/first_inventory": {
+    "message": "first_inventory",
+    "description": "The label for the doc item 'first_inventory' in sidebar 'docs', linking to the doc efun/objects/first_inventory"
+  },
+  "sidebar.docs.doc.efun/objects/load_object": {
+    "message": "load_object",
+    "description": "The label for the doc item 'load_object' in sidebar 'docs', linking to the doc efun/objects/load_object"
+  },
+  "sidebar.docs.doc.efun/objects/master": {
+    "message": "master",
+    "description": "The label for the doc item 'master' in sidebar 'docs', linking to the doc efun/objects/master"
+  },
+  "sidebar.docs.doc.efun/objects/move_object": {
+    "message": "move_object",
+    "description": "The label for the doc item 'move_object' in sidebar 'docs', linking to the doc efun/objects/move_object"
+  },
+  "sidebar.docs.doc.efun/objects/new": {
+    "message": "new",
+    "description": "The label for the doc item 'new' in sidebar 'docs', linking to the doc efun/objects/new"
+  },
+  "sidebar.docs.doc.efun/objects/next_inventory": {
+    "message": "next_inventory",
+    "description": "The label for the doc item 'next_inventory' in sidebar 'docs', linking to the doc efun/objects/next_inventory"
+  },
+  "sidebar.docs.doc.efun/objects/objectp": {
+    "message": "objectp",
+    "description": "The label for the doc item 'objectp' in sidebar 'docs', linking to the doc efun/objects/objectp"
+  },
+  "sidebar.docs.doc.efun/objects/objects": {
+    "message": "objects",
+    "description": "The label for the doc item 'objects' in sidebar 'docs', linking to the doc efun/objects/objects"
+  },
+  "sidebar.docs.doc.efun/objects/present": {
+    "message": "present",
+    "description": "The label for the doc item 'present' in sidebar 'docs', linking to the doc efun/objects/present"
+  },
+  "sidebar.docs.doc.efun/objects/query_heart_beat": {
+    "message": "query_heart_beat",
+    "description": "The label for the doc item 'query_heart_beat' in sidebar 'docs', linking to the doc efun/objects/query_heart_beat"
+  },
+  "sidebar.docs.doc.efun/objects/query_notify_destruct": {
+    "message": "query_notify_destruct",
+    "description": "The label for the doc item 'query_notify_destruct' in sidebar 'docs', linking to the doc efun/objects/query_notify_destruct"
+  },
+  "sidebar.docs.doc.efun/objects/recompile_object": {
+    "message": "recompile_object",
+    "description": "The label for the doc item 'recompile_object' in sidebar 'docs', linking to the doc efun/objects/recompile_object"
+  },
+  "sidebar.docs.doc.efun/objects/reload_object": {
+    "message": "reload_object",
+    "description": "The label for the doc item 'reload_object' in sidebar 'docs', linking to the doc efun/objects/reload_object"
+  },
+  "sidebar.docs.doc.efun/objects/restore_object": {
+    "message": "restore_object",
+    "description": "The label for the doc item 'restore_object' in sidebar 'docs', linking to the doc efun/objects/restore_object"
+  },
+  "sidebar.docs.doc.efun/objects/save_object": {
+    "message": "save_object",
+    "description": "The label for the doc item 'save_object' in sidebar 'docs', linking to the doc efun/objects/save_object"
+  },
+  "sidebar.docs.doc.efun/objects/set_heart_beat": {
+    "message": "set_heart_beat",
+    "description": "The label for the doc item 'set_heart_beat' in sidebar 'docs', linking to the doc efun/objects/set_heart_beat"
+  },
+  "sidebar.docs.doc.efun/objects/set_hide": {
+    "message": "set_hide",
+    "description": "The label for the doc item 'set_hide' in sidebar 'docs', linking to the doc efun/objects/set_hide"
+  },
+  "sidebar.docs.doc.efun/objects/set_notify_destruct": {
+    "message": "set_notify_destruct",
+    "description": "The label for the doc item 'set_notify_destruct' in sidebar 'docs', linking to the doc efun/objects/set_notify_destruct"
+  },
+  "sidebar.docs.doc.efun/objects/tell_object": {
+    "message": "tell_object",
+    "description": "The label for the doc item 'tell_object' in sidebar 'docs', linking to the doc efun/objects/tell_object"
+  },
+  "sidebar.docs.doc.efun/objects/tell_room": {
+    "message": "tell_room",
+    "description": "The label for the doc item 'tell_room' in sidebar 'docs', linking to the doc efun/objects/tell_room"
+  },
+  "sidebar.docs.doc.efun/objects/virtualp": {
+    "message": "virtualp",
+    "description": "The label for the doc item 'virtualp' in sidebar 'docs', linking to the doc efun/objects/virtualp"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_add_rule": {
+    "message": "parse_add_rule",
+    "description": "The label for the doc item 'parse_add_rule' in sidebar 'docs', linking to the doc efun/parsing/parse_add_rule"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_add_synonym": {
+    "message": "parse_add_synonym",
+    "description": "The label for the doc item 'parse_add_synonym' in sidebar 'docs', linking to the doc efun/parsing/parse_add_synonym"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_command": {
+    "message": "parse_command",
+    "description": "The label for the doc item 'parse_command' in sidebar 'docs', linking to the doc efun/parsing/parse_command"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_dump": {
+    "message": "parse_dump",
+    "description": "The label for the doc item 'parse_dump' in sidebar 'docs', linking to the doc efun/parsing/parse_dump"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_init": {
+    "message": "parse_init",
+    "description": "The label for the doc item 'parse_init' in sidebar 'docs', linking to the doc efun/parsing/parse_init"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_my_rules": {
+    "message": "parse_my_rules",
+    "description": "The label for the doc item 'parse_my_rules' in sidebar 'docs', linking to the doc efun/parsing/parse_my_rules"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_refresh": {
+    "message": "parse_refresh",
+    "description": "The label for the doc item 'parse_refresh' in sidebar 'docs', linking to the doc efun/parsing/parse_refresh"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_remove": {
+    "message": "parse_remove",
+    "description": "The label for the doc item 'parse_remove' in sidebar 'docs', linking to the doc efun/parsing/parse_remove"
+  },
+  "sidebar.docs.doc.efun/parsing/parse_sentence": {
+    "message": "parse_sentence",
+    "description": "The label for the doc item 'parse_sentence' in sidebar 'docs', linking to the doc efun/parsing/parse_sentence"
+  },
+  "sidebar.docs.doc.efun/parsing/process_string": {
+    "message": "process_string",
+    "description": "The label for the doc item 'process_string' in sidebar 'docs', linking to the doc efun/parsing/process_string"
+  },
+  "sidebar.docs.doc.efun/parsing/process_value": {
+    "message": "process_value",
+    "description": "The label for the doc item 'process_value' in sidebar 'docs', linking to the doc efun/parsing/process_value"
+  },
+  "sidebar.docs.doc.efun/parsing/query_verb": {
+    "message": "query_verb",
+    "description": "The label for the doc item 'query_verb' in sidebar 'docs', linking to the doc efun/parsing/query_verb"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_assoc": {
+    "message": "pcre_assoc",
+    "description": "The label for the doc item 'pcre_assoc' in sidebar 'docs', linking to the doc efun/pcre/pcre_assoc"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_cache": {
+    "message": "pcre_cache",
+    "description": "The label for the doc item 'pcre_cache' in sidebar 'docs', linking to the doc efun/pcre/pcre_cache"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_extract": {
+    "message": "pcre_extract",
+    "description": "The label for the doc item 'pcre_extract' in sidebar 'docs', linking to the doc efun/pcre/pcre_extract"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_match": {
+    "message": "pcre_match",
+    "description": "The label for the doc item 'pcre_match' in sidebar 'docs', linking to the doc efun/pcre/pcre_match"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_match_all": {
+    "message": "pcre_match_all",
+    "description": "The label for the doc item 'pcre_match_all' in sidebar 'docs', linking to the doc efun/pcre/pcre_match_all"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_replace": {
+    "message": "pcre_replace",
+    "description": "The label for the doc item 'pcre_replace' in sidebar 'docs', linking to the doc efun/pcre/pcre_replace"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_replace_callback": {
+    "message": "pcre_replace_callback",
+    "description": "The label for the doc item 'pcre_replace_callback' in sidebar 'docs', linking to the doc efun/pcre/pcre_replace_callback"
+  },
+  "sidebar.docs.doc.efun/pcre/pcre_version": {
+    "message": "pcre_version",
+    "description": "The label for the doc item 'pcre_version' in sidebar 'docs', linking to the doc efun/pcre/pcre_version"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_accept": {
+    "message": "socket_accept",
+    "description": "The label for the doc item 'socket_accept' in sidebar 'docs', linking to the doc efun/sockets/socket_accept"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_acquire": {
+    "message": "socket_acquire",
+    "description": "The label for the doc item 'socket_acquire' in sidebar 'docs', linking to the doc efun/sockets/socket_acquire"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_address": {
+    "message": "socket_address",
+    "description": "The label for the doc item 'socket_address' in sidebar 'docs', linking to the doc efun/sockets/socket_address"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_bind": {
+    "message": "socket_bind",
+    "description": "The label for the doc item 'socket_bind' in sidebar 'docs', linking to the doc efun/sockets/socket_bind"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_close": {
+    "message": "socket_close",
+    "description": "The label for the doc item 'socket_close' in sidebar 'docs', linking to the doc efun/sockets/socket_close"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_connect": {
+    "message": "socket_connect",
+    "description": "The label for the doc item 'socket_connect' in sidebar 'docs', linking to the doc efun/sockets/socket_connect"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_create": {
+    "message": "socket_create",
+    "description": "The label for the doc item 'socket_create' in sidebar 'docs', linking to the doc efun/sockets/socket_create"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_error": {
+    "message": "socket_error",
+    "description": "The label for the doc item 'socket_error' in sidebar 'docs', linking to the doc efun/sockets/socket_error"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_get_option": {
+    "message": "socket_get_option",
+    "description": "The label for the doc item 'socket_get_option' in sidebar 'docs', linking to the doc efun/sockets/socket_get_option"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_listen": {
+    "message": "socket_listen",
+    "description": "The label for the doc item 'socket_listen' in sidebar 'docs', linking to the doc efun/sockets/socket_listen"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_release": {
+    "message": "socket_release",
+    "description": "The label for the doc item 'socket_release' in sidebar 'docs', linking to the doc efun/sockets/socket_release"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_set_option": {
+    "message": "socket_set_option",
+    "description": "The label for the doc item 'socket_set_option' in sidebar 'docs', linking to the doc efun/sockets/socket_set_option"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_status": {
+    "message": "socket_status",
+    "description": "The label for the doc item 'socket_status' in sidebar 'docs', linking to the doc efun/sockets/socket_status"
+  },
+  "sidebar.docs.doc.efun/sockets/socket_write": {
+    "message": "socket_write",
+    "description": "The label for the doc item 'socket_write' in sidebar 'docs', linking to the doc efun/sockets/socket_write"
+  },
+  "sidebar.docs.doc.efun/strings/capitalize": {
+    "message": "capitalize",
+    "description": "The label for the doc item 'capitalize' in sidebar 'docs', linking to the doc efun/strings/capitalize"
+  },
+  "sidebar.docs.doc.efun/strings/clear_bit": {
+    "message": "clear_bit",
+    "description": "The label for the doc item 'clear_bit' in sidebar 'docs', linking to the doc efun/strings/clear_bit"
+  },
+  "sidebar.docs.doc.efun/strings/crypt": {
+    "message": "crypt",
+    "description": "The label for the doc item 'crypt' in sidebar 'docs', linking to the doc efun/strings/crypt"
+  },
+  "sidebar.docs.doc.efun/strings/explode": {
+    "message": "explode",
+    "description": "The label for the doc item 'explode' in sidebar 'docs', linking to the doc efun/strings/explode"
+  },
+  "sidebar.docs.doc.efun/strings/hash": {
+    "message": "hash",
+    "description": "The label for the doc item 'hash' in sidebar 'docs', linking to the doc efun/strings/hash"
+  },
+  "sidebar.docs.doc.efun/strings/implode": {
+    "message": "implode",
+    "description": "The label for the doc item 'implode' in sidebar 'docs', linking to the doc efun/strings/implode"
+  },
+  "sidebar.docs.doc.efun/strings/lower_case": {
+    "message": "lower_case",
+    "description": "The label for the doc item 'lower_case' in sidebar 'docs', linking to the doc efun/strings/lower_case"
+  },
+  "sidebar.docs.doc.efun/strings/ltrim": {
+    "message": "ltrim",
+    "description": "The label for the doc item 'ltrim' in sidebar 'docs', linking to the doc efun/strings/ltrim"
+  },
+  "sidebar.docs.doc.efun/strings/oldcrypt": {
+    "message": "oldcrypt",
+    "description": "The label for the doc item 'oldcrypt' in sidebar 'docs', linking to the doc efun/strings/oldcrypt"
+  },
+  "sidebar.docs.doc.efun/strings/reg_assoc": {
+    "message": "reg_assoc",
+    "description": "The label for the doc item 'reg_assoc' in sidebar 'docs', linking to the doc efun/strings/reg_assoc"
+  },
+  "sidebar.docs.doc.efun/strings/regexp": {
+    "message": "regexp",
+    "description": "The label for the doc item 'regexp' in sidebar 'docs', linking to the doc efun/strings/regexp"
+  },
+  "sidebar.docs.doc.efun/strings/replace_string": {
+    "message": "replace_string",
+    "description": "The label for the doc item 'replace_string' in sidebar 'docs', linking to the doc efun/strings/replace_string"
+  },
+  "sidebar.docs.doc.efun/strings/rtrim": {
+    "message": "rtrim",
+    "description": "The label for the doc item 'rtrim' in sidebar 'docs', linking to the doc efun/strings/rtrim"
+  },
+  "sidebar.docs.doc.efun/strings/set_bit": {
+    "message": "set_bit",
+    "description": "The label for the doc item 'set_bit' in sidebar 'docs', linking to the doc efun/strings/set_bit"
+  },
+  "sidebar.docs.doc.efun/strings/sha1": {
+    "message": "sha1",
+    "description": "The label for the doc item 'sha1' in sidebar 'docs', linking to the doc efun/strings/sha1"
+  },
+  "sidebar.docs.doc.efun/strings/sprintf": {
+    "message": "sprintf",
+    "description": "The label for the doc item 'sprintf' in sidebar 'docs', linking to the doc efun/strings/sprintf"
+  },
+  "sidebar.docs.doc.efun/strings/sscanf": {
+    "message": "sscanf",
+    "description": "The label for the doc item 'sscanf' in sidebar 'docs', linking to the doc efun/strings/sscanf"
+  },
+  "sidebar.docs.doc.efun/strings/strcmp": {
+    "message": "strcmp",
+    "description": "The label for the doc item 'strcmp' in sidebar 'docs', linking to the doc efun/strings/strcmp"
+  },
+  "sidebar.docs.doc.efun/strings/string_decode": {
+    "message": "string_decode",
+    "description": "The label for the doc item 'string_decode' in sidebar 'docs', linking to the doc efun/strings/string_decode"
+  },
+  "sidebar.docs.doc.efun/strings/string_encode": {
+    "message": "string_encode",
+    "description": "The label for the doc item 'string_encode' in sidebar 'docs', linking to the doc efun/strings/string_encode"
+  },
+  "sidebar.docs.doc.efun/strings/stringp": {
+    "message": "stringp",
+    "description": "The label for the doc item 'stringp' in sidebar 'docs', linking to the doc efun/strings/stringp"
+  },
+  "sidebar.docs.doc.efun/strings/strlen": {
+    "message": "strlen",
+    "description": "The label for the doc item 'strlen' in sidebar 'docs', linking to the doc efun/strings/strlen"
+  },
+  "sidebar.docs.doc.efun/strings/strsrch": {
+    "message": "strsrch",
+    "description": "The label for the doc item 'strsrch' in sidebar 'docs', linking to the doc efun/strings/strsrch"
+  },
+  "sidebar.docs.doc.efun/strings/strwidth": {
+    "message": "strwidth",
+    "description": "The label for the doc item 'strwidth' in sidebar 'docs', linking to the doc efun/strings/strwidth"
+  },
+  "sidebar.docs.doc.efun/strings/test_bit": {
+    "message": "test_bit",
+    "description": "The label for the doc item 'test_bit' in sidebar 'docs', linking to the doc efun/strings/test_bit"
+  },
+  "sidebar.docs.doc.efun/strings/trim": {
+    "message": "trim",
+    "description": "The label for the doc item 'trim' in sidebar 'docs', linking to the doc efun/strings/trim"
+  },
+  "sidebar.docs.doc.efun/system/all_previous_objects": {
+    "message": "all_previous_objects",
+    "description": "The label for the doc item 'all_previous_objects' in sidebar 'docs', linking to the doc efun/system/all_previous_objects"
+  },
+  "sidebar.docs.doc.efun/system/call_out_info": {
+    "message": "call_out_info",
+    "description": "The label for the doc item 'call_out_info' in sidebar 'docs', linking to the doc efun/system/call_out_info"
+  },
+  "sidebar.docs.doc.efun/system/ctime": {
+    "message": "ctime",
+    "description": "The label for the doc item 'ctime' in sidebar 'docs', linking to the doc efun/system/ctime"
+  },
+  "sidebar.docs.doc.efun/system/deep_inherit_list": {
+    "message": "deep_inherit_list",
+    "description": "The label for the doc item 'deep_inherit_list' in sidebar 'docs', linking to the doc efun/system/deep_inherit_list"
+  },
+  "sidebar.docs.doc.efun/system/error": {
+    "message": "error",
+    "description": "The label for the doc item 'error' in sidebar 'docs', linking to the doc efun/system/error"
+  },
+  "sidebar.docs.doc.efun/system/eval_cost": {
+    "message": "eval_cost",
+    "description": "The label for the doc item 'eval_cost' in sidebar 'docs', linking to the doc efun/system/eval_cost"
+  },
+  "sidebar.docs.doc.efun/system/find_call_out": {
+    "message": "find_call_out",
+    "description": "The label for the doc item 'find_call_out' in sidebar 'docs', linking to the doc efun/system/find_call_out"
+  },
+  "sidebar.docs.doc.efun/system/flush_messages": {
+    "message": "flush_messages",
+    "description": "The label for the doc item 'flush_messages' in sidebar 'docs', linking to the doc efun/system/flush_messages"
+  },
+  "sidebar.docs.doc.efun/system/function_exists": {
+    "message": "function_exists",
+    "description": "The label for the doc item 'function_exists' in sidebar 'docs', linking to the doc efun/system/function_exists"
+  },
+  "sidebar.docs.doc.efun/system/function_profile": {
+    "message": "function_profile",
+    "description": "The label for the doc item 'function_profile' in sidebar 'docs', linking to the doc efun/system/function_profile"
+  },
+  "sidebar.docs.doc.efun/system/inherit_list": {
+    "message": "inherit_list",
+    "description": "The label for the doc item 'inherit_list' in sidebar 'docs', linking to the doc efun/system/inherit_list"
+  },
+  "sidebar.docs.doc.efun/system/inherits": {
+    "message": "inherits",
+    "description": "The label for the doc item 'inherits' in sidebar 'docs', linking to the doc efun/system/inherits"
+  },
+  "sidebar.docs.doc.efun/system/localtime": {
+    "message": "localtime",
+    "description": "The label for the doc item 'localtime' in sidebar 'docs', linking to the doc efun/system/localtime"
+  },
+  "sidebar.docs.doc.efun/system/max_eval_cost": {
+    "message": "max_eval_cost",
+    "description": "The label for the doc item 'max_eval_cost' in sidebar 'docs', linking to the doc efun/system/max_eval_cost"
+  },
+  "sidebar.docs.doc.efun/system/perf_counter_ns": {
+    "message": "perf_counter_ns",
+    "description": "The label for the doc item 'perf_counter_ns' in sidebar 'docs', linking to the doc efun/system/perf_counter_ns"
+  },
+  "sidebar.docs.doc.efun/system/reclaim_objects": {
+    "message": "reclaim_objects",
+    "description": "The label for the doc item 'reclaim_objects' in sidebar 'docs', linking to the doc efun/system/reclaim_objects"
+  },
+  "sidebar.docs.doc.efun/system/replace_program": {
+    "message": "replace_program",
+    "description": "The label for the doc item 'replace_program' in sidebar 'docs', linking to the doc efun/system/replace_program"
+  },
+  "sidebar.docs.doc.efun/system/request_clean_up": {
+    "message": "request_clean_up",
+    "description": "The label for the doc item 'request_clean_up' in sidebar 'docs', linking to the doc efun/system/request_clean_up"
+  },
+  "sidebar.docs.doc.efun/system/reset_eval_cost": {
+    "message": "reset_eval_cost",
+    "description": "The label for the doc item 'reset_eval_cost' in sidebar 'docs', linking to the doc efun/system/reset_eval_cost"
+  },
+  "sidebar.docs.doc.efun/system/set_clean_up": {
+    "message": "set_clean_up",
+    "description": "The label for the doc item 'set_clean_up' in sidebar 'docs', linking to the doc efun/system/set_clean_up"
+  },
+  "sidebar.docs.doc.efun/system/set_eval_limit": {
+    "message": "set_eval_limit",
+    "description": "The label for the doc item 'set_eval_limit' in sidebar 'docs', linking to the doc efun/system/set_eval_limit"
+  },
+  "sidebar.docs.doc.efun/system/set_reset": {
+    "message": "set_reset",
+    "description": "The label for the doc item 'set_reset' in sidebar 'docs', linking to the doc efun/system/set_reset"
+  },
+  "sidebar.docs.doc.efun/system/shallow_inherit_list": {
+    "message": "shallow_inherit_list",
+    "description": "The label for the doc item 'shallow_inherit_list' in sidebar 'docs', linking to the doc efun/system/shallow_inherit_list"
+  },
+  "sidebar.docs.doc.efun/system/shutdown": {
+    "message": "shutdown",
+    "description": "The label for the doc item 'shutdown' in sidebar 'docs', linking to the doc efun/system/shutdown"
+  },
+  "sidebar.docs.doc.efun/system/strftime": {
+    "message": "strftime",
+    "description": "The label for the doc item 'strftime' in sidebar 'docs', linking to the doc efun/system/strftime"
+  },
+  "sidebar.docs.doc.efun/system/strptime": {
+    "message": "strptime",
+    "description": "The label for the doc item 'strptime' in sidebar 'docs', linking to the doc efun/system/strptime"
+  },
+  "sidebar.docs.doc.efun/system/sys_network_ports": {
+    "message": "sys_network_ports",
+    "description": "The label for the doc item 'sys_network_ports' in sidebar 'docs', linking to the doc efun/system/sys_network_ports"
+  },
+  "sidebar.docs.doc.efun/system/sys_reload_tls": {
+    "message": "sys_reload_tls",
+    "description": "The label for the doc item 'sys_reload_tls' in sidebar 'docs', linking to the doc efun/system/sys_reload_tls"
+  },
+  "sidebar.docs.doc.efun/system/time": {
+    "message": "time",
+    "description": "The label for the doc item 'time' in sidebar 'docs', linking to the doc efun/system/time"
+  },
+  "sidebar.docs.doc.efun/system/time_ns": {
+    "message": "time_ns",
+    "description": "The label for the doc item 'time_ns' in sidebar 'docs', linking to the doc efun/system/time_ns"
+  },
+  "sidebar.docs.doc.efun/system/trace_end": {
+    "message": "trace_end",
+    "description": "The label for the doc item 'trace_end' in sidebar 'docs', linking to the doc efun/system/trace_end"
+  },
+  "sidebar.docs.doc.efun/system/trace_start": {
+    "message": "trace_start",
+    "description": "The label for the doc item 'trace_start' in sidebar 'docs', linking to the doc efun/system/trace_start"
+  },
+  "sidebar.docs.doc.efun/system/uptime": {
+    "message": "uptime",
+    "description": "The label for the doc item 'uptime' in sidebar 'docs', linking to the doc efun/system/uptime"
+  },
+  "sidebar.docs.doc.apply/object/__INIT": {
+    "message": "__INIT",
+    "description": "The label for the doc item '__INIT' in sidebar 'docs', linking to the doc apply/object/__INIT"
+  },
+  "sidebar.docs.doc.apply/object/clean_up": {
+    "message": "clean_up",
+    "description": "The label for the doc item 'clean_up' in sidebar 'docs', linking to the doc apply/object/clean_up"
+  },
+  "sidebar.docs.doc.apply/object/create": {
+    "message": "create",
+    "description": "The label for the doc item 'create' in sidebar 'docs', linking to the doc apply/object/create"
+  },
+  "sidebar.docs.doc.apply/object/heart_beat": {
+    "message": "heart_beat",
+    "description": "The label for the doc item 'heart_beat' in sidebar 'docs', linking to the doc apply/object/heart_beat"
+  },
+  "sidebar.docs.doc.apply/object/id": {
+    "message": "id",
+    "description": "The label for the doc item 'id' in sidebar 'docs', linking to the doc apply/object/id"
+  },
+  "sidebar.docs.doc.apply/object/init": {
+    "message": "init",
+    "description": "The label for the doc item 'init' in sidebar 'docs', linking to the doc apply/object/init"
+  },
+  "sidebar.docs.doc.apply/object/is_living": {
+    "message": "is_living",
+    "description": "The label for the doc item 'is_living' in sidebar 'docs', linking to the doc apply/object/is_living"
+  },
+  "sidebar.docs.doc.apply/object/move_or_destruct": {
+    "message": "move_or_destruct",
+    "description": "The label for the doc item 'move_or_destruct' in sidebar 'docs', linking to the doc apply/object/move_or_destruct"
+  },
+  "sidebar.docs.doc.apply/object/on_destruct": {
+    "message": "on_destruct",
+    "description": "The label for the doc item 'on_destruct' in sidebar 'docs', linking to the doc apply/object/on_destruct"
+  },
+  "sidebar.docs.doc.apply/object/reset": {
+    "message": "reset",
+    "description": "The label for the doc item 'reset' in sidebar 'docs', linking to the doc apply/object/reset"
+  },
+  "sidebar.docs.doc.apply/object/virtual_start": {
+    "message": "virtual_start",
+    "description": "The label for the doc item 'virtual_start' in sidebar 'docs', linking to the doc apply/object/virtual_start"
+  },
+  "sidebar.docs.doc.apply/master/author_file": {
+    "message": "author_file",
+    "description": "The label for the doc item 'author_file' in sidebar 'docs', linking to the doc apply/master/author_file"
+  },
+  "sidebar.docs.doc.apply/master/compile_object": {
+    "message": "compile_object",
+    "description": "The label for the doc item 'compile_object' in sidebar 'docs', linking to the doc apply/master/compile_object"
+  },
+  "sidebar.docs.doc.apply/master/connect": {
+    "message": "connect",
+    "description": "The label for the doc item 'connect' in sidebar 'docs', linking to the doc apply/master/connect"
+  },
+  "sidebar.docs.doc.apply/master/crash": {
+    "message": "crash",
+    "description": "The label for the doc item 'crash' in sidebar 'docs', linking to the doc apply/master/crash"
+  },
+  "sidebar.docs.doc.apply/master/creator_file": {
+    "message": "creator_file",
+    "description": "The label for the doc item 'creator_file' in sidebar 'docs', linking to the doc apply/master/creator_file"
+  },
+  "sidebar.docs.doc.apply/master/domain_file": {
+    "message": "domain_file",
+    "description": "The label for the doc item 'domain_file' in sidebar 'docs', linking to the doc apply/master/domain_file"
+  },
+  "sidebar.docs.doc.apply/master/epilog": {
+    "message": "epilog",
+    "description": "The label for the doc item 'epilog' in sidebar 'docs', linking to the doc apply/master/epilog"
+  },
+  "sidebar.docs.doc.apply/master/error_handler": {
+    "message": "error_handler",
+    "description": "The label for the doc item 'error_handler' in sidebar 'docs', linking to the doc apply/master/error_handler"
+  },
+  "sidebar.docs.doc.apply/master/flag": {
+    "message": "flag",
+    "description": "The label for the doc item 'flag' in sidebar 'docs', linking to the doc apply/master/flag"
+  },
+  "sidebar.docs.doc.apply/master/get_bb_uid": {
+    "message": "get_bb_uid",
+    "description": "The label for the doc item 'get_bb_uid' in sidebar 'docs', linking to the doc apply/master/get_bb_uid"
+  },
+  "sidebar.docs.doc.apply/master/get_include_path": {
+    "message": "get_include_path",
+    "description": "The label for the doc item 'get_include_path' in sidebar 'docs', linking to the doc apply/master/get_include_path"
+  },
+  "sidebar.docs.doc.apply/master/get_mud_stats": {
+    "message": "get_mud_stats",
+    "description": "The label for the doc item 'get_mud_stats' in sidebar 'docs', linking to the doc apply/master/get_mud_stats"
+  },
+  "sidebar.docs.doc.apply/master/get_root_uid": {
+    "message": "get_root_uid",
+    "description": "The label for the doc item 'get_root_uid' in sidebar 'docs', linking to the doc apply/master/get_root_uid"
+  },
+  "sidebar.docs.doc.apply/master/get_save_file_name": {
+    "message": "get_save_file_name",
+    "description": "The label for the doc item 'get_save_file_name' in sidebar 'docs', linking to the doc apply/master/get_save_file_name"
+  },
+  "sidebar.docs.doc.apply/master/include_file": {
+    "message": "include_file",
+    "description": "The label for the doc item 'include_file' in sidebar 'docs', linking to the doc apply/master/include_file"
+  },
+  "sidebar.docs.doc.apply/master/inherit_program": {
+    "message": "inherit_program",
+    "description": "The label for the doc item 'inherit_program' in sidebar 'docs', linking to the doc apply/master/inherit_program"
+  },
+  "sidebar.docs.doc.apply/master/log_error": {
+    "message": "log_error",
+    "description": "The label for the doc item 'log_error' in sidebar 'docs', linking to the doc apply/master/log_error"
+  },
+  "sidebar.docs.doc.apply/master/make_path_absolute": {
+    "message": "make_path_absolute",
+    "description": "The label for the doc item 'make_path_absolute' in sidebar 'docs', linking to the doc apply/master/make_path_absolute"
+  },
+  "sidebar.docs.doc.apply/master/object_name": {
+    "message": "object_name",
+    "description": "The label for the doc item 'object_name' in sidebar 'docs', linking to the doc apply/master/object_name"
+  },
+  "sidebar.docs.doc.apply/master/parser_error_message": {
+    "message": "parser_error_message",
+    "description": "The label for the doc item 'parser_error_message' in sidebar 'docs', linking to the doc apply/master/parser_error_message"
+  },
+  "sidebar.docs.doc.apply/master/preload": {
+    "message": "preload",
+    "description": "The label for the doc item 'preload' in sidebar 'docs', linking to the doc apply/master/preload"
+  },
+  "sidebar.docs.doc.apply/master/privs_file": {
+    "message": "privs_file",
+    "description": "The label for the doc item 'privs_file' in sidebar 'docs', linking to the doc apply/master/privs_file"
+  },
+  "sidebar.docs.doc.apply/master/retrieve_ed_setup": {
+    "message": "retrieve_ed_setup",
+    "description": "The label for the doc item 'retrieve_ed_setup' in sidebar 'docs', linking to the doc apply/master/retrieve_ed_setup"
+  },
+  "sidebar.docs.doc.apply/master/save_ed_setup": {
+    "message": "save_ed_setup",
+    "description": "The label for the doc item 'save_ed_setup' in sidebar 'docs', linking to the doc apply/master/save_ed_setup"
+  },
+  "sidebar.docs.doc.apply/master/valid_bind": {
+    "message": "valid_bind",
+    "description": "The label for the doc item 'valid_bind' in sidebar 'docs', linking to the doc apply/master/valid_bind"
+  },
+  "sidebar.docs.doc.apply/master/valid_database": {
+    "message": "valid_database",
+    "description": "The label for the doc item 'valid_database' in sidebar 'docs', linking to the doc apply/master/valid_database"
+  },
+  "sidebar.docs.doc.apply/master/valid_hide": {
+    "message": "valid_hide",
+    "description": "The label for the doc item 'valid_hide' in sidebar 'docs', linking to the doc apply/master/valid_hide"
+  },
+  "sidebar.docs.doc.apply/master/valid_link": {
+    "message": "valid_link",
+    "description": "The label for the doc item 'valid_link' in sidebar 'docs', linking to the doc apply/master/valid_link"
+  },
+  "sidebar.docs.doc.apply/master/valid_object": {
+    "message": "valid_object",
+    "description": "The label for the doc item 'valid_object' in sidebar 'docs', linking to the doc apply/master/valid_object"
+  },
+  "sidebar.docs.doc.apply/master/valid_override": {
+    "message": "valid_override",
+    "description": "The label for the doc item 'valid_override' in sidebar 'docs', linking to the doc apply/master/valid_override"
+  },
+  "sidebar.docs.doc.apply/master/valid_read": {
+    "message": "valid_read",
+    "description": "The label for the doc item 'valid_read' in sidebar 'docs', linking to the doc apply/master/valid_read"
+  },
+  "sidebar.docs.doc.apply/master/valid_save_binary": {
+    "message": "valid_save_binary",
+    "description": "The label for the doc item 'valid_save_binary' in sidebar 'docs', linking to the doc apply/master/valid_save_binary"
+  },
+  "sidebar.docs.doc.apply/master/valid_seteuid": {
+    "message": "valid_seteuid",
+    "description": "The label for the doc item 'valid_seteuid' in sidebar 'docs', linking to the doc apply/master/valid_seteuid"
+  },
+  "sidebar.docs.doc.apply/master/valid_shadow": {
+    "message": "valid_shadow",
+    "description": "The label for the doc item 'valid_shadow' in sidebar 'docs', linking to the doc apply/master/valid_shadow"
+  },
+  "sidebar.docs.doc.apply/master/valid_socket": {
+    "message": "valid_socket",
+    "description": "The label for the doc item 'valid_socket' in sidebar 'docs', linking to the doc apply/master/valid_socket"
+  },
+  "sidebar.docs.doc.apply/master/valid_write": {
+    "message": "valid_write",
+    "description": "The label for the doc item 'valid_write' in sidebar 'docs', linking to the doc apply/master/valid_write"
+  },
+  "sidebar.docs.doc.apply/interactive/catch_tell": {
+    "message": "catch_tell",
+    "description": "The label for the doc item 'catch_tell' in sidebar 'docs', linking to the doc apply/interactive/catch_tell"
+  },
+  "sidebar.docs.doc.apply/interactive/gmcp": {
+    "message": "gmcp",
+    "description": "The label for the doc item 'gmcp' in sidebar 'docs', linking to the doc apply/interactive/gmcp"
+  },
+  "sidebar.docs.doc.apply/interactive/gmcp_enable": {
+    "message": "gmcp_enable",
+    "description": "The label for the doc item 'gmcp_enable' in sidebar 'docs', linking to the doc apply/interactive/gmcp_enable"
+  },
+  "sidebar.docs.doc.apply/interactive/logon": {
+    "message": "logon",
+    "description": "The label for the doc item 'logon' in sidebar 'docs', linking to the doc apply/interactive/logon"
+  },
+  "sidebar.docs.doc.apply/interactive/msdp": {
+    "message": "msdp",
+    "description": "The label for the doc item 'msdp' in sidebar 'docs', linking to the doc apply/interactive/msdp"
+  },
+  "sidebar.docs.doc.apply/interactive/msdp_enable": {
+    "message": "msdp_enable",
+    "description": "The label for the doc item 'msdp_enable' in sidebar 'docs', linking to the doc apply/interactive/msdp_enable"
+  },
+  "sidebar.docs.doc.apply/interactive/msp_enable": {
+    "message": "msp_enable",
+    "description": "The label for the doc item 'msp_enable' in sidebar 'docs', linking to the doc apply/interactive/msp_enable"
+  },
+  "sidebar.docs.doc.apply/interactive/mxp_enable": {
+    "message": "mxp_enable",
+    "description": "The label for the doc item 'mxp_enable' in sidebar 'docs', linking to the doc apply/interactive/mxp_enable"
+  },
+  "sidebar.docs.doc.apply/interactive/mxp_tag": {
+    "message": "mxp_tag",
+    "description": "The label for the doc item 'mxp_tag' in sidebar 'docs', linking to the doc apply/interactive/mxp_tag"
+  },
+  "sidebar.docs.doc.apply/interactive/net_dead": {
+    "message": "net_dead",
+    "description": "The label for the doc item 'net_dead' in sidebar 'docs', linking to the doc apply/interactive/net_dead"
+  },
+  "sidebar.docs.doc.apply/interactive/process_input": {
+    "message": "process_input",
+    "description": "The label for the doc item 'process_input' in sidebar 'docs', linking to the doc apply/interactive/process_input"
+  },
+  "sidebar.docs.doc.apply/interactive/receive_ed": {
+    "message": "receive_ed",
+    "description": "The label for the doc item 'receive_ed' in sidebar 'docs', linking to the doc apply/interactive/receive_ed"
+  },
+  "sidebar.docs.doc.apply/interactive/receive_environ": {
+    "message": "receive_environ",
+    "description": "The label for the doc item 'receive_environ' in sidebar 'docs', linking to the doc apply/interactive/receive_environ"
+  },
+  "sidebar.docs.doc.apply/interactive/receive_message": {
+    "message": "receive_message",
+    "description": "The label for the doc item 'receive_message' in sidebar 'docs', linking to the doc apply/interactive/receive_message"
+  },
+  "sidebar.docs.doc.apply/interactive/receive_snoop": {
+    "message": "receive_snoop",
+    "description": "The label for the doc item 'receive_snoop' in sidebar 'docs', linking to the doc apply/interactive/receive_snoop"
+  },
+  "sidebar.docs.doc.apply/interactive/telnet_suboption": {
+    "message": "telnet_suboption",
+    "description": "The label for the doc item 'telnet_suboption' in sidebar 'docs', linking to the doc apply/interactive/telnet_suboption"
+  },
+  "sidebar.docs.doc.apply/interactive/terminal_colour_replace": {
+    "message": "terminal_colour_replace",
+    "description": "The label for the doc item 'terminal_colour_replace' in sidebar 'docs', linking to the doc apply/interactive/terminal_colour_replace"
+  },
+  "sidebar.docs.doc.apply/interactive/terminal_type": {
+    "message": "terminal_type",
+    "description": "The label for the doc item 'terminal_type' in sidebar 'docs', linking to the doc apply/interactive/terminal_type"
+  },
+  "sidebar.docs.doc.apply/interactive/window_size": {
+    "message": "window_size",
+    "description": "The label for the doc item 'window_size' in sidebar 'docs', linking to the doc apply/interactive/window_size"
+  },
+  "sidebar.docs.doc.apply/interactive/write_prompt": {
+    "message": "write_prompt",
+    "description": "The label for the doc item 'write_prompt' in sidebar 'docs', linking to the doc apply/interactive/write_prompt"
+  },
+  "sidebar.docs.doc.apply/interactive/zmp": {
+    "message": "zmp",
+    "description": "The label for the doc item 'zmp' in sidebar 'docs', linking to the doc apply/interactive/zmp"
+  },
+  "sidebar.docs.doc.stdlib/arrays/reduce": {
+    "message": "reduce",
+    "description": "The label for the doc item 'reduce' in sidebar 'docs', linking to the doc stdlib/arrays/reduce"
+  },
+  "sidebar.docs.doc.stdlib/db/database": {
+    "message": "database",
+    "description": "The label for the doc item 'database' in sidebar 'docs', linking to the doc stdlib/db/database"
+  },
+  "sidebar.docs.doc.stdlib/mappings/element_of_weighted": {
+    "message": "element_of_weighted",
+    "description": "The label for the doc item 'element_of_weighted' in sidebar 'docs', linking to the doc stdlib/mappings/element_of_weighted"
+  },
+  "sidebar.docs.doc.stdlib/numbers/array_sum": {
+    "message": "array_sum",
+    "description": "The label for the doc item 'array_sum' in sidebar 'docs', linking to the doc stdlib/numbers/array_sum"
+  },
+  "sidebar.docs.doc.stdlib/numbers/percent": {
+    "message": "percent",
+    "description": "The label for the doc item 'percent' in sidebar 'docs', linking to the doc stdlib/numbers/percent"
+  },
+  "sidebar.docs.doc.stdlib/numbers/percent_of": {
+    "message": "percent_of",
+    "description": "The label for the doc item 'percent_of' in sidebar 'docs', linking to the doc stdlib/numbers/percent_of"
+  },
+  "sidebar.docs.doc.stdlib/numbers/sum": {
+    "message": "sum",
+    "description": "The label for the doc item 'sum' in sidebar 'docs', linking to the doc stdlib/numbers/sum"
+  },
+  "sidebar.docs.doc.stdlib/objects/all_environment": {
+    "message": "all_environment",
+    "description": "The label for the doc item 'all_environment' in sidebar 'docs', linking to the doc stdlib/objects/all_environment"
+  },
+  "sidebar.docs.doc.stdlib/objects/present_clone": {
+    "message": "present_clone",
+    "description": "The label for the doc item 'present_clone' in sidebar 'docs', linking to the doc stdlib/objects/present_clone"
+  },
+  "sidebar.docs.doc.stdlib/string/base64decode": {
+    "message": "base64decode",
+    "description": "The label for the doc item 'base64decode' in sidebar 'docs', linking to the doc stdlib/string/base64decode"
+  },
+  "sidebar.docs.doc.stdlib/string/base64encode": {
+    "message": "base64encode",
+    "description": "The label for the doc item 'base64encode' in sidebar 'docs', linking to the doc stdlib/string/base64encode"
+  },
+  "sidebar.docs.doc.stdlib/string/bitmap_font": {
+    "message": "bitmap_font",
+    "description": "The label for the doc item 'bitmap_font' in sidebar 'docs', linking to the doc stdlib/string/bitmap_font"
+  },
+  "sidebar.docs.doc.stdlib/string/break_string": {
+    "message": "break_string",
+    "description": "The label for the doc item 'break_string' in sidebar 'docs', linking to the doc stdlib/string/break_string"
+  },
+  "sidebar.docs.doc.stdlib/tui": {
+    "message": "TUI Toolkit",
+    "description": "The label for the doc item 'TUI Toolkit' in sidebar 'docs', linking to the doc stdlib/tui"
+  },
+  "sidebar.docs.doc.concepts/general/lpc": {
+    "message": "LPC 语言",
+    "description": "The label for the doc item 'The LPC Language' in sidebar 'docs', linking to the doc concepts/general/lpc"
+  },
+  "sidebar.docs.doc.concepts/general/objects": {
+    "message": "对象",
+    "description": "The label for the doc item 'Objects' in sidebar 'docs', linking to the doc concepts/general/objects"
+  },
+  "sidebar.docs.doc.concepts/general/oop": {
+    "message": "面向对象编程",
+    "description": "The label for the doc item 'Object-Oriented Programming' in sidebar 'docs', linking to the doc concepts/general/oop"
+  },
+  "sidebar.docs.doc.concepts/general/preprocessor": {
+    "message": "预处理器",
+    "description": "The label for the doc item 'Preprocessor' in sidebar 'docs', linking to the doc concepts/general/preprocessor"
+  },
+  "sidebar.docs.doc.concepts/general/global_include_file": {
+    "message": "全局包含文件",
+    "description": "The label for the doc item 'Global Include File' in sidebar 'docs', linking to the doc concepts/general/global_include_file"
+  },
+  "sidebar.docs.doc.concepts/general/fluffos_driver": {
+    "message": "FluffOS 驱动",
+    "description": "The label for the doc item 'The FluffOS Driver' in sidebar 'docs', linking to the doc concepts/general/fluffos_driver"
+  },
+  "sidebar.docs.doc.concepts/general/simul_efun": {
+    "message": "模拟 Efun",
+    "description": "The label for the doc item 'Simulated Efuns' in sidebar 'docs', linking to the doc concepts/general/simul_efun"
+  },
+  "sidebar.docs.doc.concepts/general/message_doc": {
+    "message": "message() 系统",
+    "description": "The label for the doc item 'The message() System' in sidebar 'docs', linking to the doc concepts/general/message_doc"
+  },
+  "sidebar.docs.doc.concepts/general/hot_reload": {
+    "message": "热重载",
+    "description": "The label for the doc item 'Hot Reload' in sidebar 'docs', linking to the doc concepts/general/hot_reload"
+  },
+  "sidebar.docs.doc.concepts/general/socket_efuns": {
+    "message": "套接字 Efun",
+    "description": "The label for the doc item 'Socket Efuns' in sidebar 'docs', linking to the doc concepts/general/socket_efuns"
+  },
+  "sidebar.docs.doc.concepts/general/tls": {
+    "message": "TLS",
+    "description": "The label for the doc item 'TLS' in sidebar 'docs', linking to the doc concepts/general/tls"
+  },
+  "sidebar.docs.doc.concepts/general/websocket": {
+    "message": "WebSocket",
+    "description": "The label for the doc item 'WebSocket' in sidebar 'docs', linking to the doc concepts/general/websocket"
+  },
+  "sidebar.docs.doc.concepts/general/tracing": {
+    "message": "跟踪",
+    "description": "The label for the doc item 'Tracing' in sidebar 'docs', linking to the doc concepts/general/tracing"
+  },
+  "sidebar.docs.doc.driver/config": {
+    "message": "Runtime Configuration",
+    "description": "The label for the doc item 'Runtime Configuration' in sidebar 'docs', linking to the doc driver/config"
+  },
+  "sidebar.docs.doc.driver/wasm": {
+    "message": "WASM Driver Cookbook",
+    "description": "The label for the doc item 'WASM Driver Cookbook' in sidebar 'docs', linking to the doc driver/wasm"
+  },
+  "sidebar.docs.doc.driver/adding_efuns": {
+    "message": "Adding Efuns",
+    "description": "The label for the doc item 'Adding Efuns' in sidebar 'docs', linking to the doc driver/adding_efuns"
+  },
+  "sidebar.docs.doc.driver/ffi-plan": {
+    "message": "FFI Package Design",
+    "description": "The label for the doc item 'FFI Package Design' in sidebar 'docs', linking to the doc driver/ffi-plan"
+  },
+  "sidebar.docs.doc.driver/call_into_vm": {
+    "message": "Calling Into the VM",
+    "description": "The label for the doc item 'Calling Into the VM' in sidebar 'docs', linking to the doc driver/call_into_vm"
+  },
+  "sidebar.docs.doc.driver/stackmachine": {
+    "message": "Stack Machine",
+    "description": "The label for the doc item 'Stack Machine' in sidebar 'docs', linking to the doc driver/stackmachine"
+  },
+  "sidebar.docs.doc.driver/parse_tree": {
+    "message": "Parse Tree Nodes",
+    "description": "The label for the doc item 'Parse Tree Nodes' in sidebar 'docs', linking to the doc driver/parse_tree"
+  },
+  "sidebar.docs.doc.driver/malloc": {
+    "message": "Memory Allocation",
+    "description": "The label for the doc item 'Memory Allocation' in sidebar 'docs', linking to the doc driver/malloc"
+  },
+  "sidebar.docs.doc.cli/driver": {
+    "message": "driver — the game server",
+    "description": "The label for the doc item 'driver — the game server' in sidebar 'docs', linking to the doc cli/driver"
+  },
+  "sidebar.docs.doc.cli/lpcc": {
+    "message": "lpcc — LPC compiler",
+    "description": "The label for the doc item 'lpcc — LPC compiler' in sidebar 'docs', linking to the doc cli/lpcc"
+  },
+  "sidebar.docs.doc.cli/symbol": {
+    "message": "symbol — LPC inspector",
+    "description": "The label for the doc item 'symbol — LPC inspector' in sidebar 'docs', linking to the doc cli/symbol"
+  },
+  "sidebar.docs.doc.cli/o2json": {
+    "message": "o2json — save file to JSON",
+    "description": "The label for the doc item 'o2json — save file to JSON' in sidebar 'docs', linking to the doc cli/o2json"
+  },
+  "sidebar.docs.doc.cli/json2o": {
+    "message": "json2o — JSON to save file",
+    "description": "The label for the doc item 'json2o — JSON to save file' in sidebar 'docs', linking to the doc cli/json2o"
+  },
+  "sidebar.docs.doc.cli/portbind": {
+    "message": "portbind — privileged ports",
+    "description": "The label for the doc item 'portbind — privileged ports' in sidebar 'docs', linking to the doc cli/portbind"
+  },
+  "sidebar.docs.doc.cli/generate_keywords": {
+    "message": "generate_keywords — efun metadata",
+    "description": "The label for the doc item 'generate_keywords — efun metadata' in sidebar 'docs', linking to the doc cli/generate_keywords"
+  },
+  "sidebar.docs.doc.Build (v2017, legacy)": {
+    "message": "构建（v2017，旧版）",
+    "description": "The label for the doc item 'Build (v2017, legacy)' in sidebar 'docs', linking to the doc build_v2017"
+  }
+}

@@ -250,9 +250,9 @@ These are accepted for backwards compatibility but silently ignored:
 
 ## See Also
 
-- [driver](../cli/driver.md) - Driver command-line options
-- [get_config](../efun/internals/get_config.md) - Query a config value at runtime
-- [set_config](../efun/internals/set_config.md) - Modify a config value at runtime
+- [driver](../cli/driver) - Driver command-line options
+- [get_config](../efun/internals/get_config) - Query a config value at runtime
+- [set_config](../efun/internals/set_config) - Modify a config value at runtime
 
 ## Reference Files
 

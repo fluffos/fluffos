@@ -1,4 +1,0 @@
----
-title: arrays
----
-* [reduce](reduce)

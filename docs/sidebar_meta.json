@@ -1,0 +1,246 @@
+{
+  "efun": {
+    "label": "Efuns",
+    "description": "Built-in functions (efuns) the driver exposes to LPC code, grouped by topic and package."
+  },
+  "efun/arrays": {
+    "label": "Arrays",
+    "description": "Create, allocate, filter, map, sort and search LPC arrays."
+  },
+  "efun/async": {
+    "label": "Async I/O",
+    "description": "Non-blocking file and database I/O that returns results via callbacks."
+  },
+  "efun/buffers": {
+    "label": "Buffers",
+    "description": "Allocate, read, write, transcode and checksum binary buffer data."
+  },
+  "efun/calls": {
+    "label": "Function Calls & Call-Outs",
+    "description": "Call functions on other objects, schedule call-outs, and manage shadows and exceptions."
+  },
+  "efun/contrib": {
+    "label": "Contrib Package",
+    "description": "Optional add-on efuns from the contrib package: classes, strings, livings, memory and misc utilities."
+  },
+  "efun/crypto": {
+    "label": "Cryptography",
+    "description": "Cryptographic hashing helpers."
+  },
+  "efun/db": {
+    "label": "Database",
+    "description": "Connect to SQL databases and run queries, commits and rollbacks."
+  },
+  "efun/ed": {
+    "label": "Line Editor (ed)",
+    "description": "Drive the built-in ed line editor from LPC."
+  },
+  "efun/external": {
+    "label": "External Processes",
+    "description": "Launch and communicate with external programs."
+  },
+  "efun/ffi": {
+    "label": "Foreign Function Interface",
+    "description": "Load native libraries and call C functions, allocate memory and read/write structs."
+  },
+  "efun/filesystem": {
+    "label": "Filesystem",
+    "description": "Read, write, copy, move and inspect files and directories."
+  },
+  "efun/floats": {
+    "label": "Floating-Point Math",
+    "description": "Trigonometry, logarithms, powers, rounding and float conversions."
+  },
+  "efun/functions": {
+    "label": "Function Pointers",
+    "description": "Create, bind, defer and evaluate function pointers."
+  },
+  "efun/general": {
+    "label": "General",
+    "description": "Miscellaneous efuns: vector and matrix math, compression, type predicates, save/restore and generic collection helpers."
+  },
+  "efun/interactive": {
+    "label": "Interactive & Networking",
+    "description": "Player connections, input/output, snooping, telnet negotiation and terminal protocols (GMCP, MSDP, MXP, MSP, ZMP)."
+  },
+  "efun/internals": {
+    "label": "Driver Internals",
+    "description": "Driver introspection, debugging, memory, tracing and runtime configuration."
+  },
+  "efun/jsbridge": {
+    "label": "JavaScript Bridge",
+    "description": "Call into JavaScript from LPC on the WebAssembly build of the driver."
+  },
+  "efun/mappings": {
+    "label": "Mappings",
+    "description": "Create, filter, iterate and transform LPC mappings (associative arrays)."
+  },
+  "efun/mudlib": {
+    "label": "Mudlib Support",
+    "description": "User/euid identities, privileges, livings and author/domain statistics."
+  },
+  "efun/numbers": {
+    "label": "Numbers",
+    "description": "Integer predicates, random-number generation and numeric conversion."
+  },
+  "efun/objects": {
+    "label": "Objects",
+    "description": "Clone, load, move, find and destruct objects and manage their inventory and state."
+  },
+  "efun/parsing": {
+    "label": "Command Parsing",
+    "description": "The parse_command natural-language sentence, verb and rule parser."
+  },
+  "efun/pcre": {
+    "label": "Regular Expressions (PCRE)",
+    "description": "Perl-compatible regular expression matching, extraction and replacement."
+  },
+  "efun/sockets": {
+    "label": "Sockets",
+    "description": "Low-level TCP/UDP socket networking from the sockets package."
+  },
+  "efun/strings": {
+    "label": "Strings",
+    "description": "Manipulate, format, search, trim, encode and hash strings, plus bit-string operations."
+  },
+  "efun/system": {
+    "label": "System",
+    "description": "Driver runtime services: time, eval-cost limits, inheritance introspection, call-out info and shutdown."
+  },
+  "apply": {
+    "label": "Applies",
+    "description": "Driver-to-LPC callbacks (applies) that the FluffOS driver invokes on your objects, grouped by the interactive, master, and object roles they serve.",
+    "order": [
+      "object",
+      "master",
+      "interactive"
+    ]
+  },
+  "apply/interactive": {
+    "label": "Interactive Applies",
+    "description": "Applies the driver calls on interactive (player-connected) objects to handle input, output, prompts, and telnet/GMCP/MSDP/MXP protocol negotiation."
+  },
+  "apply/master": {
+    "label": "Master Applies",
+    "description": "Applies the driver calls on the master object to control security, permissions, UIDs, object loading, error handling, and mud-wide policy."
+  },
+  "apply/object": {
+    "label": "Object Applies",
+    "description": "Lifecycle applies the driver calls on ordinary objects, such as create, reset, init, heart_beat, and clean_up."
+  },
+  "stdlib": {
+    "label": "Standard Library",
+    "description": "Pure-LPC helper functions and libraries shipped with the FluffOS testsuite mudlib (not driver efuns), organized by data type and domain.",
+    "labels": {
+      "tui": "TUI Toolkit"
+    }
+  },
+  "stdlib/arrays": {
+    "label": "Arrays",
+    "description": "LPC helpers for transforming and aggregating arrays, such as reduce."
+  },
+  "stdlib/db": {
+    "label": "Database",
+    "description": "A fluent LPC query builder for working with FluffOS-supported databases across SQLite, MySQL, and other backends."
+  },
+  "stdlib/mappings": {
+    "label": "Mappings",
+    "description": "LPC helpers for working with mappings, such as weighted random selection of keys."
+  },
+  "stdlib/numbers": {
+    "label": "Numbers",
+    "description": "LPC helpers for numeric aggregation and percentage math over ints and floats."
+  },
+  "stdlib/objects": {
+    "label": "Objects",
+    "description": "LPC helpers for locating and inspecting objects in inventories and environments."
+  },
+  "stdlib/string": {
+    "label": "Strings",
+    "description": "LPC helpers for string manipulation, including base64 encoding, word wrapping, and bitmap-font rendering."
+  },
+  "concepts": {
+    "label": "Concepts",
+    "description": "Conceptual guides explaining how LPC, objects, and the FluffOS driver work together, for readers learning the platform rather than a specific function."
+  },
+  "concepts/general": {
+    "label": "General Concepts",
+    "description": "Foundational explanations of the LPC language, object model, the FluffOS driver, and mud-wide mechanisms like simul_efuns, hot reload, and networking.",
+    "order": [
+      "lpc",
+      "objects",
+      "oop",
+      "preprocessor",
+      "global_include_file",
+      "fluffos_driver",
+      "simul_efun",
+      "message_doc",
+      "hot_reload",
+      "socket_efuns",
+      "tls",
+      "websocket",
+      "tracing"
+    ],
+    "labels": {
+      "lpc": "The LPC Language",
+      "objects": "Objects",
+      "oop": "Object-Oriented Programming",
+      "preprocessor": "Preprocessor",
+      "global_include_file": "Global Include File",
+      "fluffos_driver": "The FluffOS Driver",
+      "simul_efun": "Simulated Efuns",
+      "message_doc": "The message() System",
+      "hot_reload": "Hot Reload",
+      "socket_efuns": "Socket Efuns",
+      "tls": "TLS",
+      "websocket": "WebSocket",
+      "tracing": "Tracing"
+    }
+  },
+  "driver": {
+    "label": "Driver Internals",
+    "description": "Configuration reference and implementation internals of the FluffOS driver, from runtime config flags to the VM, memory, and native extension layers.",
+    "order": [
+      "config",
+      "wasm",
+      "adding_efuns",
+      "ffi-plan",
+      "call_into_vm",
+      "stackmachine",
+      "parse_tree",
+      "malloc"
+    ],
+    "labels": {
+      "config": "Runtime Configuration",
+      "wasm": "WASM Driver Cookbook",
+      "adding_efuns": "Adding Efuns",
+      "ffi-plan": "FFI Package Design",
+      "call_into_vm": "Calling Into the VM",
+      "stackmachine": "Stack Machine",
+      "parse_tree": "Parse Tree Nodes",
+      "malloc": "Memory Allocation"
+    }
+  },
+  "cli": {
+    "label": "Command-Line Tools",
+    "description": "Reference for the driver binary and the companion command-line utilities shipped with FluffOS for compiling, inspecting, and converting LPC and save-file data.",
+    "order": [
+      "driver",
+      "lpcc",
+      "symbol",
+      "o2json",
+      "json2o",
+      "portbind",
+      "generate_keywords"
+    ],
+    "labels": {
+      "driver": "driver — the game server",
+      "lpcc": "lpcc — LPC compiler",
+      "symbol": "symbol — LPC inspector",
+      "o2json": "o2json — save file to JSON",
+      "json2o": "json2o — JSON to save file",
+      "portbind": "portbind — privileged ports",
+      "generate_keywords": "generate_keywords — efun metadata"
+    }
+  }
+}

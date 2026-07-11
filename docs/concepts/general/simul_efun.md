@@ -5,7 +5,7 @@ title: general / simul_efun
 
 There is a mechanism to allow the mudlib to simulate efunctions (simulated
 efuns, or simul_efuns). All simulated efuns are defined in a single object whose
-path is given by the [`simulated efun file`](../../driver/config.md) config
+path is given by the [`simulated efun file`](../../driver/config) config
 option.
 
 When compiling an object, if a bareword function call (not a call_other) is
@@ -24,7 +24,7 @@ simulated efun of the same name that performs various restrictive checks and the
 calls `efun::move_object()`. The `efun::` prefix is necessary so that the driver
 calls the real `move_object` efun rather than recursively calling the simul_efun
 it is defined in. (The master object's
-[`valid_override()`](../../apply/master/valid_override.md) apply controls which
+[`valid_override()`](../../apply/master/valid_override) apply controls which
 objects may use the `efun::` prefix to bypass a simul_efun.) Simulated efuns are
 also useful for adding functions that many different objects need to call but
 which aren't appropriate for inclusion in an inherited file.

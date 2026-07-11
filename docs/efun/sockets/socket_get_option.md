@@ -119,9 +119,9 @@ void handle_connection(int sock) {
 
 ### SEE ALSO
 
-- [socket_set_option](socket_set_option.md) - Set socket options
-- [socket_create](socket_create.md) - Create a socket
-- [socket_status](socket_status.md) - Get socket status
+- [socket_set_option](socket_set_option) - Set socket options
+- [socket_create](socket_create) - Create a socket
+- [socket_status](socket_status) - Get socket status
 
 ### NOTES
 
