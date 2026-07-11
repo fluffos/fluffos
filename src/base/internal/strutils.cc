@@ -111,6 +111,12 @@ int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t need
     pos = std::string_view::npos;
     while ((pos = sv_haystack.rfind(sv_needle, pos)) != std::string_view::npos) {
       if (iter->isBoundary(pos) && iter->isBoundary(pos + sv_needle.length())) break;
+      // A match at offset 0 that is not grapheme-aligned must not decrement to
+      // npos and re-find offset 0 forever; report "no match" instead.
+      if (pos == 0) {
+        pos = std::string_view::npos;
+        break;
+      }
       pos--;
     }
   }
