@@ -402,7 +402,7 @@ To find regressions:
 - [trace_end](../../efun/system/trace_end.md) — stop tracing
 - [trace](../../efun/internals/trace.md) — per-execution debug tracing (separate feature)
 - [traceprefix](../../efun/internals/traceprefix.md) — set the debug-trace prefix
-- [dump_trace](../../efun/general/dump_trace.md) — return the current LPC call stack
+- [dump_trace](../../efun/internals/dump_trace.md) — return the current LPC call stack
 
 ## References
 

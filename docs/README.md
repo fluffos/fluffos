@@ -49,7 +49,9 @@ Notes:
 | Path | Contents |
 |------|----------|
 | `docusaurus.config.ts` | Site config: navbar, footer, docs plugin, search theme |
-| `sidebars.ts` | Sidebar navigation tree (Docusaurus `SidebarsConfig` format) |
+| `sidebars.ts` | Sidebar skeleton; splices in the generated reference trees |
+| `sidebars.generated.json` | Generated sidebar trees for the reference docs (do not hand-edit) |
+| `sidebar_meta.json` | Curated sidebar labels, descriptions and ordering for the generated trees |
 | `src/css/custom.css` | Infima CSS variable overrides |
 | `static/` | Files copied verbatim to the site root (`CNAME`, Google site verification) |
 | `apply/` | Driver-to-LPC callback (apply) reference |
@@ -66,8 +68,7 @@ Notes:
 
 | Script | Purpose |
 |--------|---------|
-| `update_index.sh` | Regenerates all generated `index.md` listing pages (calls `gen_index.py`) |
-| `gen_index.py` | Writes an `index.md` for one doc tree (e.g. `./gen_index.py efun EFUN`) |
+| `gen_sidebar.py` | Regenerates `sidebars.generated.json` from the reference doc trees + `sidebar_meta.json` (`--check` verifies freshness, used by CI) |
 | `gen_config_docs.py` | Regenerates `driver/config.md` from `src/base/internal/rc.cc` |
 | `add_missing_efuns.py` | Creates stub pages under `efun/general/` for undocumented efuns (needs a `keywords.json` from the `generate_keywords` tool) |
 
@@ -79,9 +80,12 @@ Notes:
   `{...}` in prose is still parsed as a JSX expression and breaks the build — escape it as
   `\{...\}` outside fenced code blocks.
 - Sidebar entries in `sidebars.ts` use doc IDs (relative path without extension), not URLs.
-- Generated `index.md` listing pages (efun/apply/stdlib/cli/concepts/driver/zh-CN) are
-  rewritten by `./update_index.sh` — regenerate rather than hand-edit them.
-  `lpc/index.md` is hand-written and deliberately not regenerated.
+- The reference trees (efun/apply/stdlib/cli/concepts/driver/zh-CN) have **no `index.md`
+  files**: their sidebar trees live in `sidebars.generated.json` and their landing pages
+  are Docusaurus `generated-index` card pages. After adding, removing, or moving a page
+  in those trees, run `./gen_sidebar.py` and commit the result — CI fails if it is stale.
+  Category labels/descriptions/ordering are curated in `sidebar_meta.json`.
+  `lpc/index.md` is hand-written and its sidebar is hand-authored in `sidebars.ts`.
 - `onBrokenLinks` is set to `'throw'`: a broken internal link fails the build (and the
   Pages deploy) instead of shipping a 404.
 

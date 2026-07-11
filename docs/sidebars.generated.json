@@ -1,0 +1,5175 @@
+{
+  "efun": {
+    "type": "category",
+    "label": "Efuns",
+    "link": {
+      "type": "generated-index",
+      "title": "Efuns",
+      "slug": "/efun/",
+      "description": "Built-in functions (efuns) the driver exposes to LPC code, grouped by topic and package."
+    },
+    "items": [
+      {
+        "type": "category",
+        "label": "Arrays",
+        "link": {
+          "type": "generated-index",
+          "title": "Arrays",
+          "slug": "/efun/arrays/",
+          "description": "Create, allocate, filter, map, sort and search LPC arrays."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/arrays/allocate",
+            "label": "allocate"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/arrayp",
+            "label": "arrayp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/element_of",
+            "label": "element_of"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/filter_array",
+            "label": "filter_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/map_array",
+            "label": "map_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/member_array",
+            "label": "member_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/pointerp",
+            "label": "pointerp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/shuffle",
+            "label": "shuffle"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/sort_array",
+            "label": "sort_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/unique_array",
+            "label": "unique_array"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Async I/O",
+        "link": {
+          "type": "generated-index",
+          "title": "Async I/O",
+          "slug": "/efun/async/",
+          "description": "Non-blocking file and database I/O that returns results via callbacks."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/async/async_db_exec",
+            "label": "async_db_exec"
+          },
+          {
+            "type": "doc",
+            "id": "efun/async/async_getdir",
+            "label": "async_getdir"
+          },
+          {
+            "type": "doc",
+            "id": "efun/async/async_read",
+            "label": "async_read"
+          },
+          {
+            "type": "doc",
+            "id": "efun/async/async_write",
+            "label": "async_write"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Buffers",
+        "link": {
+          "type": "generated-index",
+          "title": "Buffers",
+          "slug": "/efun/buffers/",
+          "description": "Allocate, read, write, transcode and checksum binary buffer data."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/buffers/allocate_buffer",
+            "label": "allocate_buffer"
+          },
+          {
+            "type": "doc",
+            "id": "efun/buffers/buffer_transcode",
+            "label": "buffer_transcode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/buffers/bufferp",
+            "label": "bufferp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/buffers/crc32",
+            "label": "crc32"
+          },
+          {
+            "type": "doc",
+            "id": "efun/buffers/read_buffer",
+            "label": "read_buffer"
+          },
+          {
+            "type": "doc",
+            "id": "efun/buffers/write_buffer",
+            "label": "write_buffer"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Function Calls & Call-Outs",
+        "link": {
+          "type": "generated-index",
+          "title": "Function Calls & Call-Outs",
+          "slug": "/efun/calls/",
+          "description": "Call functions on other objects, schedule call-outs, and manage shadows and exceptions."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/calls/call_other",
+            "label": "call_other"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/call_out",
+            "label": "call_out"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/call_out_walltime",
+            "label": "call_out_walltime"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/call_stack",
+            "label": "call_stack"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/catch",
+            "label": "catch"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/origin",
+            "label": "origin"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/previous_object",
+            "label": "previous_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/query_shadowing",
+            "label": "query_shadowing"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/remove_call_out",
+            "label": "remove_call_out"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/shadow",
+            "label": "shadow"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/this_object",
+            "label": "this_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/calls/throw",
+            "label": "throw"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Contrib Package",
+        "link": {
+          "type": "generated-index",
+          "title": "Contrib Package",
+          "slug": "/efun/contrib/",
+          "description": "Optional add-on efuns from the contrib package: classes, strings, livings, memory and misc utilities."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/contrib/abs",
+            "label": "abs"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/add_a",
+            "label": "add_a"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/assemble_class",
+            "label": "assemble_class"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/base_name",
+            "label": "base_name"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/classes",
+            "label": "classes"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/compressedp",
+            "label": "compressedp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/copy",
+            "label": "copy"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/debug_message",
+            "label": "debug_message"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/disassemble_class",
+            "label": "disassemble_class"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/event",
+            "label": "event"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/fetch_class_member",
+            "label": "fetch_class_member"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/fetch_variable",
+            "label": "fetch_variable"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/file_length",
+            "label": "file_length"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/function_owner",
+            "label": "function_owner"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/functions",
+            "label": "functions"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/get_garbage",
+            "label": "get_garbage"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/get_os_env",
+            "label": "get_os_env"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/heart_beats",
+            "label": "heart_beats"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/is_daylight_savings_time",
+            "label": "is_daylight_savings_time"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/max",
+            "label": "max"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/memory_summary",
+            "label": "memory_summary"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/min",
+            "label": "min"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/named_livings",
+            "label": "named_livings"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/network_stats",
+            "label": "network_stats"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/num_classes",
+            "label": "num_classes"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/pluralize",
+            "label": "pluralize"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/program_info",
+            "label": "program_info"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/query_charmode",
+            "label": "query_charmode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/query_ip_port",
+            "label": "query_ip_port"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/query_multiple_short",
+            "label": "query_multiple_short"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/query_notify_fail",
+            "label": "query_notify_fail"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/query_num",
+            "label": "query_num"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/query_replaced_program",
+            "label": "query_replaced_program"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/real_time",
+            "label": "real_time"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/reference_allowed",
+            "label": "reference_allowed"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/remove_charmode",
+            "label": "remove_charmode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/remove_get_char",
+            "label": "remove_get_char"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/remove_interactive",
+            "label": "remove_interactive"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/remove_shadow",
+            "label": "remove_shadow"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/repeat_string",
+            "label": "repeat_string"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/replace",
+            "label": "replace"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/replace_dollars",
+            "label": "replace_dollars"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/replace_html",
+            "label": "replace_html"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/replace_mxp",
+            "label": "replace_mxp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/replace_objects",
+            "label": "replace_objects"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/replaceable",
+            "label": "replaceable"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/restore_from_string",
+            "label": "restore_from_string"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/roll_MdN",
+            "label": "roll_MdN"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/roulette_wheel",
+            "label": "roulette_wheel"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/send_nullbyte",
+            "label": "send_nullbyte"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/set_os_env",
+            "label": "set_os_env"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/set_prompt",
+            "label": "set_prompt"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/store_class_member",
+            "label": "store_class_member"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/store_variable",
+            "label": "store_variable"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/string_difference",
+            "label": "string_difference"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/terminal_colour",
+            "label": "terminal_colour"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/test_load",
+            "label": "test_load"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/upper_case",
+            "label": "upper_case"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/variables",
+            "label": "variables"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/vowel",
+            "label": "vowel"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/zonetime",
+            "label": "zonetime"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Cryptography",
+        "link": {
+          "type": "generated-index",
+          "title": "Cryptography",
+          "slug": "/efun/crypto/",
+          "description": "Cryptographic hashing helpers."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/crypto/hash",
+            "label": "hash"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Database",
+        "link": {
+          "type": "generated-index",
+          "title": "Database",
+          "slug": "/efun/db/",
+          "description": "Connect to SQL databases and run queries, commits and rollbacks."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/db/db_close",
+            "label": "db_close"
+          },
+          {
+            "type": "doc",
+            "id": "efun/db/db_commit",
+            "label": "db_commit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/db/db_connect",
+            "label": "db_connect"
+          },
+          {
+            "type": "doc",
+            "id": "efun/db/db_exec",
+            "label": "db_exec"
+          },
+          {
+            "type": "doc",
+            "id": "efun/db/db_fetch",
+            "label": "db_fetch"
+          },
+          {
+            "type": "doc",
+            "id": "efun/db/db_rollback",
+            "label": "db_rollback"
+          },
+          {
+            "type": "doc",
+            "id": "efun/db/db_status",
+            "label": "db_status"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Line Editor (ed)",
+        "link": {
+          "type": "generated-index",
+          "title": "Line Editor (ed)",
+          "slug": "/efun/ed/",
+          "description": "Drive the built-in ed line editor from LPC."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/ed/ed_cmd",
+            "label": "ed_cmd"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ed/ed_start",
+            "label": "ed_start"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ed/query_ed_mode",
+            "label": "query_ed_mode"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "External Processes",
+        "link": {
+          "type": "generated-index",
+          "title": "External Processes",
+          "slug": "/efun/external/",
+          "description": "Launch and communicate with external programs."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/external/external_start",
+            "label": "external_start"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Foreign Function Interface",
+        "link": {
+          "type": "generated-index",
+          "title": "Foreign Function Interface",
+          "slug": "/efun/ffi/",
+          "description": "Load native libraries and call C functions, allocate memory and read/write structs."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_address",
+            "label": "ffi_address"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_alloc",
+            "label": "ffi_alloc"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_call",
+            "label": "ffi_call"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_callback",
+            "label": "ffi_callback"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_callback_addr",
+            "label": "ffi_callback_addr"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_callback_free",
+            "label": "ffi_callback_free"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_error",
+            "label": "ffi_error"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_free",
+            "label": "ffi_free"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_load",
+            "label": "ffi_load"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_peek",
+            "label": "ffi_peek"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_prepare",
+            "label": "ffi_prepare"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_read",
+            "label": "ffi_read"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_sizeof",
+            "label": "ffi_sizeof"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_status",
+            "label": "ffi_status"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_struct_layout",
+            "label": "ffi_struct_layout"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_symbol",
+            "label": "ffi_symbol"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_unload",
+            "label": "ffi_unload"
+          },
+          {
+            "type": "doc",
+            "id": "efun/ffi/ffi_write",
+            "label": "ffi_write"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Filesystem",
+        "link": {
+          "type": "generated-index",
+          "title": "Filesystem",
+          "slug": "/efun/filesystem/",
+          "description": "Read, write, copy, move and inspect files and directories."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/filesystem/cp",
+            "label": "cp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/file_size",
+            "label": "file_size"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/get_dir",
+            "label": "get_dir"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/link",
+            "label": "link"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/mkdir",
+            "label": "mkdir"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/read_bytes",
+            "label": "read_bytes"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/read_file",
+            "label": "read_file"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/rename",
+            "label": "rename"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/rm",
+            "label": "rm"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/rmdir",
+            "label": "rmdir"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/stat",
+            "label": "stat"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/write_bytes",
+            "label": "write_bytes"
+          },
+          {
+            "type": "doc",
+            "id": "efun/filesystem/write_file",
+            "label": "write_file"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Floating-Point Math",
+        "link": {
+          "type": "generated-index",
+          "title": "Floating-Point Math",
+          "slug": "/efun/floats/",
+          "description": "Trigonometry, logarithms, powers, rounding and float conversions."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/floats/acos",
+            "label": "acos"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/asin",
+            "label": "asin"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/atan",
+            "label": "atan"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/ceil",
+            "label": "ceil"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/cos",
+            "label": "cos"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/exp",
+            "label": "exp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/floatp",
+            "label": "floatp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/floor",
+            "label": "floor"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/log",
+            "label": "log"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/pow",
+            "label": "pow"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/round",
+            "label": "round"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/sin",
+            "label": "sin"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/sqrt",
+            "label": "sqrt"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/tan",
+            "label": "tan"
+          },
+          {
+            "type": "doc",
+            "id": "efun/floats/to_int",
+            "label": "to_int"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Function Pointers",
+        "link": {
+          "type": "generated-index",
+          "title": "Function Pointers",
+          "slug": "/efun/functions/",
+          "description": "Create, bind, defer and evaluate function pointers."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/functions/bind",
+            "label": "bind"
+          },
+          {
+            "type": "doc",
+            "id": "efun/functions/defer",
+            "label": "defer"
+          },
+          {
+            "type": "doc",
+            "id": "efun/functions/evaluate",
+            "label": "evaluate"
+          },
+          {
+            "type": "doc",
+            "id": "efun/functions/functionp",
+            "label": "functionp"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "General",
+        "link": {
+          "type": "generated-index",
+          "title": "General",
+          "slug": "/efun/general/",
+          "description": "Miscellaneous efuns: vector and matrix math, compression, type predicates, save/restore and generic collection helpers."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/general/angle",
+            "label": "angle"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/classp",
+            "label": "classp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/compress",
+            "label": "compress"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/compress_file",
+            "label": "compress_file"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/distance",
+            "label": "distance"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/dotprod",
+            "label": "dotprod"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/explode_reversible",
+            "label": "explode_reversible"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/filter",
+            "label": "filter"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/id_matrix",
+            "label": "id_matrix"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/log10",
+            "label": "log10"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/log2",
+            "label": "log2"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/lookat_rotate",
+            "label": "lookat_rotate"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/lookat_rotate2",
+            "label": "lookat_rotate2"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/map",
+            "label": "map"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/next_bit",
+            "label": "next_bit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/norm",
+            "label": "norm"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/nullp",
+            "label": "nullp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/restore_variable",
+            "label": "restore_variable"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/rotate_x",
+            "label": "rotate_x"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/rotate_y",
+            "label": "rotate_y"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/rotate_z",
+            "label": "rotate_z"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/save_variable",
+            "label": "save_variable"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/scale",
+            "label": "scale"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/sizeof",
+            "label": "sizeof"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/translate",
+            "label": "translate"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/typeof",
+            "label": "typeof"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/uncompress",
+            "label": "uncompress"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/uncompress_file",
+            "label": "uncompress_file"
+          },
+          {
+            "type": "doc",
+            "id": "efun/general/undefinedp",
+            "label": "undefinedp"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Interactive & Networking",
+        "link": {
+          "type": "generated-index",
+          "title": "Interactive & Networking",
+          "slug": "/efun/interactive/",
+          "description": "Player connections, input/output, snooping, telnet negotiation and terminal protocols (GMCP, MSDP, MXP, MSP, ZMP)."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/interactive/act_mxp",
+            "label": "act_mxp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/add_action",
+            "label": "add_action"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/command",
+            "label": "command"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/commands",
+            "label": "commands"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/disable_commands",
+            "label": "disable_commands"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/disable_wizard",
+            "label": "disable_wizard"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/ed",
+            "label": "ed"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/enable_commands",
+            "label": "enable_commands"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/exec",
+            "label": "exec"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/find_player",
+            "label": "find_player"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/get_char",
+            "label": "get_char"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/has_gmcp",
+            "label": "has_gmcp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/has_msdp",
+            "label": "has_msdp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/has_msp",
+            "label": "has_msp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/has_mxp",
+            "label": "has_mxp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/has_zmp",
+            "label": "has_zmp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/in_edit",
+            "label": "in_edit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/in_input",
+            "label": "in_input"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/input_to",
+            "label": "input_to"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/interactive",
+            "label": "interactive"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/message",
+            "label": "message"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/notify_fail",
+            "label": "notify_fail"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/printf",
+            "label": "printf"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_encoding",
+            "label": "query_encoding"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_host_name",
+            "label": "query_host_name"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_idle",
+            "label": "query_idle"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_ip_name",
+            "label": "query_ip_name"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_ip_number",
+            "label": "query_ip_number"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_snoop",
+            "label": "query_snoop"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/query_snooping",
+            "label": "query_snooping"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/receive",
+            "label": "receive"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/remove_action",
+            "label": "remove_action"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/request_term_size",
+            "label": "request_term_size"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/request_term_type",
+            "label": "request_term_type"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/resolve",
+            "label": "resolve"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/say",
+            "label": "say"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/send_gmcp",
+            "label": "send_gmcp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/send_msdp_variable",
+            "label": "send_msdp_variable"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/send_zmp",
+            "label": "send_zmp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/set_encoding",
+            "label": "set_encoding"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/set_this_player",
+            "label": "set_this_player"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/set_this_user",
+            "label": "set_this_user"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/shout",
+            "label": "shout"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/snoop",
+            "label": "snoop"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/start_request_term_type",
+            "label": "start_request_term_type"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/telnet_ga",
+            "label": "telnet_ga"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/telnet_msp_oob",
+            "label": "telnet_msp_oob"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/telnet_nop",
+            "label": "telnet_nop"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/this_interactive",
+            "label": "this_interactive"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/this_player",
+            "label": "this_player"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/this_user",
+            "label": "this_user"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/userp",
+            "label": "userp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/users",
+            "label": "users"
+          },
+          {
+            "type": "doc",
+            "id": "efun/interactive/write",
+            "label": "write"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Driver Internals",
+        "link": {
+          "type": "generated-index",
+          "title": "Driver Internals",
+          "slug": "/efun/internals/",
+          "description": "Driver introspection, debugging, memory, tracing and runtime configuration."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/internals/cache_stats",
+            "label": "cache_stats"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/check_memory",
+            "label": "check_memory"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/clear_debug_level",
+            "label": "clear_debug_level"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/debug_info",
+            "label": "debug_info"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/debug_levels",
+            "label": "debug_levels"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/debugmalloc",
+            "label": "debugmalloc"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/destructed_objects",
+            "label": "destructed_objects"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/dump_file_descriptors",
+            "label": "dump_file_descriptors"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/dump_jemalloc",
+            "label": "dump_jemalloc"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/dump_prog",
+            "label": "dump_prog"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/dump_stralloc",
+            "label": "dump_stralloc"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/dump_trace",
+            "label": "dump_trace"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/dumpallobj",
+            "label": "dumpallobj"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/get_config",
+            "label": "get_config"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/malloc_status",
+            "label": "malloc_status"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/memory_info",
+            "label": "memory_info"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/moncontrol",
+            "label": "moncontrol"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/mud_status",
+            "label": "mud_status"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/query_load_average",
+            "label": "query_load_average"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/refs",
+            "label": "refs"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/rusage",
+            "label": "rusage"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/set_config",
+            "label": "set_config"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/set_debug_level",
+            "label": "set_debug_level"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/set_malloc_mask",
+            "label": "set_malloc_mask"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/time_expression",
+            "label": "time_expression"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/trace",
+            "label": "trace"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/traceprefix",
+            "label": "traceprefix"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "JavaScript Bridge",
+        "link": {
+          "type": "generated-index",
+          "title": "JavaScript Bridge",
+          "slug": "/efun/jsbridge/",
+          "description": "Call into JavaScript from LPC on the WebAssembly build of the driver."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/jsbridge/js_call",
+            "label": "js_call"
+          },
+          {
+            "type": "doc",
+            "id": "efun/jsbridge/js_eval",
+            "label": "js_eval"
+          },
+          {
+            "type": "doc",
+            "id": "efun/jsbridge/js_export",
+            "label": "js_export"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Mappings",
+        "link": {
+          "type": "generated-index",
+          "title": "Mappings",
+          "slug": "/efun/mappings/",
+          "description": "Create, filter, iterate and transform LPC mappings (associative arrays)."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/mappings/allocate_mapping",
+            "label": "allocate_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/filter_mapping",
+            "label": "filter_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/keys",
+            "label": "keys"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/map_delete",
+            "label": "map_delete"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/map_mapping",
+            "label": "map_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/mapp",
+            "label": "mapp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/match_path",
+            "label": "match_path"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/unique_mapping",
+            "label": "unique_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mappings/values",
+            "label": "values"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Mudlib Support",
+        "link": {
+          "type": "generated-index",
+          "title": "Mudlib Support",
+          "slug": "/efun/mudlib/",
+          "description": "User/euid identities, privileges, livings and author/domain statistics."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/mudlib/author_stats",
+            "label": "author_stats"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/domain_stats",
+            "label": "domain_stats"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/enable_wizard",
+            "label": "enable_wizard"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/export_uid",
+            "label": "export_uid"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/find_living",
+            "label": "find_living"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/geteuid",
+            "label": "geteuid"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/getuid",
+            "label": "getuid"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/living",
+            "label": "living"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/livings",
+            "label": "livings"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/query_privs",
+            "label": "query_privs"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/set_author",
+            "label": "set_author"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/set_light",
+            "label": "set_light"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/set_living_name",
+            "label": "set_living_name"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/set_privs",
+            "label": "set_privs"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/seteuid",
+            "label": "seteuid"
+          },
+          {
+            "type": "doc",
+            "id": "efun/mudlib/wizardp",
+            "label": "wizardp"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Numbers",
+        "link": {
+          "type": "generated-index",
+          "title": "Numbers",
+          "slug": "/efun/numbers/",
+          "description": "Integer predicates, random-number generation and numeric conversion."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/numbers/intp",
+            "label": "intp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/numbers/random",
+            "label": "random"
+          },
+          {
+            "type": "doc",
+            "id": "efun/numbers/secure_random",
+            "label": "secure_random"
+          },
+          {
+            "type": "doc",
+            "id": "efun/numbers/to_float",
+            "label": "to_float"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Objects",
+        "link": {
+          "type": "generated-index",
+          "title": "Objects",
+          "slug": "/efun/objects/",
+          "description": "Clone, load, move, find and destruct objects and manage their inventory and state."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/objects/all_inventory",
+            "label": "all_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/children",
+            "label": "children"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/clone_object",
+            "label": "clone_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/clonep",
+            "label": "clonep"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/deep_inventory",
+            "label": "deep_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/destruct",
+            "label": "destruct"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/environment",
+            "label": "environment"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/file_name",
+            "label": "file_name"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/find_object",
+            "label": "find_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/first_inventory",
+            "label": "first_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/load_object",
+            "label": "load_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/master",
+            "label": "master"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/move_object",
+            "label": "move_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/new",
+            "label": "new"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/next_inventory",
+            "label": "next_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/objectp",
+            "label": "objectp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/objects",
+            "label": "objects"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/present",
+            "label": "present"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/query_heart_beat",
+            "label": "query_heart_beat"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/query_notify_destruct",
+            "label": "query_notify_destruct"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/recompile_object",
+            "label": "recompile_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/reload_object",
+            "label": "reload_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/restore_object",
+            "label": "restore_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/save_object",
+            "label": "save_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/set_heart_beat",
+            "label": "set_heart_beat"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/set_hide",
+            "label": "set_hide"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/set_notify_destruct",
+            "label": "set_notify_destruct"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/tell_object",
+            "label": "tell_object"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/tell_room",
+            "label": "tell_room"
+          },
+          {
+            "type": "doc",
+            "id": "efun/objects/virtualp",
+            "label": "virtualp"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Command Parsing",
+        "link": {
+          "type": "generated-index",
+          "title": "Command Parsing",
+          "slug": "/efun/parsing/",
+          "description": "The parse_command natural-language sentence, verb and rule parser."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_add_rule",
+            "label": "parse_add_rule"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_add_synonym",
+            "label": "parse_add_synonym"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_command",
+            "label": "parse_command"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_dump",
+            "label": "parse_dump"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_init",
+            "label": "parse_init"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_my_rules",
+            "label": "parse_my_rules"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_refresh",
+            "label": "parse_refresh"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_remove",
+            "label": "parse_remove"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/parse_sentence",
+            "label": "parse_sentence"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/process_string",
+            "label": "process_string"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/process_value",
+            "label": "process_value"
+          },
+          {
+            "type": "doc",
+            "id": "efun/parsing/query_verb",
+            "label": "query_verb"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Regular Expressions (PCRE)",
+        "link": {
+          "type": "generated-index",
+          "title": "Regular Expressions (PCRE)",
+          "slug": "/efun/pcre/",
+          "description": "Perl-compatible regular expression matching, extraction and replacement."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_assoc",
+            "label": "pcre_assoc"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_cache",
+            "label": "pcre_cache"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_extract",
+            "label": "pcre_extract"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_match",
+            "label": "pcre_match"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_match_all",
+            "label": "pcre_match_all"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_replace",
+            "label": "pcre_replace"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_replace_callback",
+            "label": "pcre_replace_callback"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_version",
+            "label": "pcre_version"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Sockets",
+        "link": {
+          "type": "generated-index",
+          "title": "Sockets",
+          "slug": "/efun/sockets/",
+          "description": "Low-level TCP/UDP socket networking from the sockets package."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_accept",
+            "label": "socket_accept"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_acquire",
+            "label": "socket_acquire"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_address",
+            "label": "socket_address"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_bind",
+            "label": "socket_bind"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_close",
+            "label": "socket_close"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_connect",
+            "label": "socket_connect"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_create",
+            "label": "socket_create"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_error",
+            "label": "socket_error"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_get_option",
+            "label": "socket_get_option"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_listen",
+            "label": "socket_listen"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_release",
+            "label": "socket_release"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_set_option",
+            "label": "socket_set_option"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_status",
+            "label": "socket_status"
+          },
+          {
+            "type": "doc",
+            "id": "efun/sockets/socket_write",
+            "label": "socket_write"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Strings",
+        "link": {
+          "type": "generated-index",
+          "title": "Strings",
+          "slug": "/efun/strings/",
+          "description": "Manipulate, format, search, trim, encode and hash strings, plus bit-string operations."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/strings/capitalize",
+            "label": "capitalize"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/clear_bit",
+            "label": "clear_bit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/crypt",
+            "label": "crypt"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/explode",
+            "label": "explode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/hash",
+            "label": "hash"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/implode",
+            "label": "implode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/lower_case",
+            "label": "lower_case"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/ltrim",
+            "label": "ltrim"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/oldcrypt",
+            "label": "oldcrypt"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/reg_assoc",
+            "label": "reg_assoc"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/regexp",
+            "label": "regexp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/replace_string",
+            "label": "replace_string"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/rtrim",
+            "label": "rtrim"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/set_bit",
+            "label": "set_bit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/sha1",
+            "label": "sha1"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/sprintf",
+            "label": "sprintf"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/sscanf",
+            "label": "sscanf"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/strcmp",
+            "label": "strcmp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/string_decode",
+            "label": "string_decode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/string_encode",
+            "label": "string_encode"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/stringp",
+            "label": "stringp"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/strlen",
+            "label": "strlen"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/strsrch",
+            "label": "strsrch"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/strwidth",
+            "label": "strwidth"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/test_bit",
+            "label": "test_bit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/strings/trim",
+            "label": "trim"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "System",
+        "link": {
+          "type": "generated-index",
+          "title": "System",
+          "slug": "/efun/system/",
+          "description": "Driver runtime services: time, eval-cost limits, inheritance introspection, call-out info and shutdown."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/system/all_previous_objects",
+            "label": "all_previous_objects"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/call_out_info",
+            "label": "call_out_info"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/ctime",
+            "label": "ctime"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/deep_inherit_list",
+            "label": "deep_inherit_list"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/error",
+            "label": "error"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/eval_cost",
+            "label": "eval_cost"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/find_call_out",
+            "label": "find_call_out"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/flush_messages",
+            "label": "flush_messages"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/function_exists",
+            "label": "function_exists"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/function_profile",
+            "label": "function_profile"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/inherit_list",
+            "label": "inherit_list"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/inherits",
+            "label": "inherits"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/localtime",
+            "label": "localtime"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/max_eval_cost",
+            "label": "max_eval_cost"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/perf_counter_ns",
+            "label": "perf_counter_ns"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/reclaim_objects",
+            "label": "reclaim_objects"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/replace_program",
+            "label": "replace_program"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/request_clean_up",
+            "label": "request_clean_up"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/reset_eval_cost",
+            "label": "reset_eval_cost"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/set_clean_up",
+            "label": "set_clean_up"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/set_eval_limit",
+            "label": "set_eval_limit"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/set_reset",
+            "label": "set_reset"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/shallow_inherit_list",
+            "label": "shallow_inherit_list"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/shutdown",
+            "label": "shutdown"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/strftime",
+            "label": "strftime"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/strptime",
+            "label": "strptime"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/sys_network_ports",
+            "label": "sys_network_ports"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/sys_reload_tls",
+            "label": "sys_reload_tls"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/time",
+            "label": "time"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/time_ns",
+            "label": "time_ns"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/trace_end",
+            "label": "trace_end"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/trace_start",
+            "label": "trace_start"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/uptime",
+            "label": "uptime"
+          }
+        ]
+      }
+    ]
+  },
+  "apply": {
+    "type": "category",
+    "label": "Applies",
+    "link": {
+      "type": "generated-index",
+      "title": "Applies",
+      "slug": "/apply/",
+      "description": "Driver-to-LPC callbacks (applies) that the FluffOS driver invokes on your objects, grouped by the interactive, master, and object roles they serve."
+    },
+    "items": [
+      {
+        "type": "category",
+        "label": "Object Applies",
+        "link": {
+          "type": "generated-index",
+          "title": "Object Applies",
+          "slug": "/apply/object/",
+          "description": "Lifecycle applies the driver calls on ordinary objects, such as create, reset, init, heart_beat, and clean_up."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "apply/object/__INIT",
+            "label": "__INIT"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/clean_up",
+            "label": "clean_up"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/create",
+            "label": "create"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/heart_beat",
+            "label": "heart_beat"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/id",
+            "label": "id"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/init",
+            "label": "init"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/is_living",
+            "label": "is_living"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/move_or_destruct",
+            "label": "move_or_destruct"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/on_destruct",
+            "label": "on_destruct"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/reset",
+            "label": "reset"
+          },
+          {
+            "type": "doc",
+            "id": "apply/object/virtual_start",
+            "label": "virtual_start"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Master Applies",
+        "link": {
+          "type": "generated-index",
+          "title": "Master Applies",
+          "slug": "/apply/master/",
+          "description": "Applies the driver calls on the master object to control security, permissions, UIDs, object loading, error handling, and mud-wide policy."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "apply/master/author_file",
+            "label": "author_file"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/compile_object",
+            "label": "compile_object"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/connect",
+            "label": "connect"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/crash",
+            "label": "crash"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/creator_file",
+            "label": "creator_file"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/domain_file",
+            "label": "domain_file"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/epilog",
+            "label": "epilog"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/error_handler",
+            "label": "error_handler"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/flag",
+            "label": "flag"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/get_bb_uid",
+            "label": "get_bb_uid"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/get_include_path",
+            "label": "get_include_path"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/get_mud_stats",
+            "label": "get_mud_stats"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/get_root_uid",
+            "label": "get_root_uid"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/get_save_file_name",
+            "label": "get_save_file_name"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/include_file",
+            "label": "include_file"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/inherit_program",
+            "label": "inherit_program"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/log_error",
+            "label": "log_error"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/make_path_absolute",
+            "label": "make_path_absolute"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/object_name",
+            "label": "object_name"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/parser_error_message",
+            "label": "parser_error_message"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/preload",
+            "label": "preload"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/privs_file",
+            "label": "privs_file"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/retrieve_ed_setup",
+            "label": "retrieve_ed_setup"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/save_ed_setup",
+            "label": "save_ed_setup"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_bind",
+            "label": "valid_bind"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_database",
+            "label": "valid_database"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_hide",
+            "label": "valid_hide"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_link",
+            "label": "valid_link"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_object",
+            "label": "valid_object"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_override",
+            "label": "valid_override"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_read",
+            "label": "valid_read"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_save_binary",
+            "label": "valid_save_binary"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_seteuid",
+            "label": "valid_seteuid"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_shadow",
+            "label": "valid_shadow"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_socket",
+            "label": "valid_socket"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_write",
+            "label": "valid_write"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Interactive Applies",
+        "link": {
+          "type": "generated-index",
+          "title": "Interactive Applies",
+          "slug": "/apply/interactive/",
+          "description": "Applies the driver calls on interactive (player-connected) objects to handle input, output, prompts, and telnet/GMCP/MSDP/MXP protocol negotiation."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "apply/interactive/catch_tell",
+            "label": "catch_tell"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/gmcp",
+            "label": "gmcp"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/gmcp_enable",
+            "label": "gmcp_enable"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/logon",
+            "label": "logon"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/msdp",
+            "label": "msdp"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/msdp_enable",
+            "label": "msdp_enable"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/msp_enable",
+            "label": "msp_enable"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/mxp_enable",
+            "label": "mxp_enable"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/mxp_tag",
+            "label": "mxp_tag"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/net_dead",
+            "label": "net_dead"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/process_input",
+            "label": "process_input"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/receive_ed",
+            "label": "receive_ed"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/receive_environ",
+            "label": "receive_environ"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/receive_message",
+            "label": "receive_message"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/receive_snoop",
+            "label": "receive_snoop"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/telnet_suboption",
+            "label": "telnet_suboption"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/terminal_colour_replace",
+            "label": "terminal_colour_replace"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/terminal_type",
+            "label": "terminal_type"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/window_size",
+            "label": "window_size"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/write_prompt",
+            "label": "write_prompt"
+          },
+          {
+            "type": "doc",
+            "id": "apply/interactive/zmp",
+            "label": "zmp"
+          }
+        ]
+      }
+    ]
+  },
+  "stdlib": {
+    "type": "category",
+    "label": "Standard Library",
+    "link": {
+      "type": "generated-index",
+      "title": "Standard Library",
+      "slug": "/stdlib/",
+      "description": "Pure-LPC helper functions and libraries shipped with the FluffOS testsuite mudlib (not driver efuns), organized by data type and domain."
+    },
+    "items": [
+      {
+        "type": "category",
+        "label": "Arrays",
+        "link": {
+          "type": "generated-index",
+          "title": "Arrays",
+          "slug": "/stdlib/arrays/",
+          "description": "LPC helpers for transforming and aggregating arrays, such as reduce."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "stdlib/arrays/reduce",
+            "label": "reduce"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Database",
+        "link": {
+          "type": "generated-index",
+          "title": "Database",
+          "slug": "/stdlib/db/",
+          "description": "A fluent LPC query builder for working with FluffOS-supported databases across SQLite, MySQL, and other backends."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "stdlib/db/database",
+            "label": "database"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/db/database_zh",
+            "label": "database (中文)"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Mappings",
+        "link": {
+          "type": "generated-index",
+          "title": "Mappings",
+          "slug": "/stdlib/mappings/",
+          "description": "LPC helpers for working with mappings, such as weighted random selection of keys."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "stdlib/mappings/element_of_weighted",
+            "label": "element_of_weighted"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Numbers",
+        "link": {
+          "type": "generated-index",
+          "title": "Numbers",
+          "slug": "/stdlib/numbers/",
+          "description": "LPC helpers for numeric aggregation and percentage math over ints and floats."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "stdlib/numbers/array_sum",
+            "label": "array_sum"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/numbers/percent",
+            "label": "percent"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/numbers/percent_of",
+            "label": "percent_of"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/numbers/sum",
+            "label": "sum"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Objects",
+        "link": {
+          "type": "generated-index",
+          "title": "Objects",
+          "slug": "/stdlib/objects/",
+          "description": "LPC helpers for locating and inspecting objects in inventories and environments."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "stdlib/objects/all_environment",
+            "label": "all_environment"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/objects/present_clone",
+            "label": "present_clone"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Strings",
+        "link": {
+          "type": "generated-index",
+          "title": "Strings",
+          "slug": "/stdlib/string/",
+          "description": "LPC helpers for string manipulation, including base64 encoding, word wrapping, and bitmap-font rendering."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "stdlib/string/base64decode",
+            "label": "base64decode"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/string/base64encode",
+            "label": "base64encode"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/string/bitmap_font",
+            "label": "bitmap_font"
+          },
+          {
+            "type": "doc",
+            "id": "stdlib/string/break_string",
+            "label": "break_string"
+          }
+        ]
+      },
+      {
+        "type": "doc",
+        "id": "stdlib/tui",
+        "label": "TUI Toolkit"
+      }
+    ]
+  },
+  "concepts": {
+    "type": "category",
+    "label": "Concepts",
+    "link": {
+      "type": "generated-index",
+      "title": "Concepts",
+      "slug": "/concepts/",
+      "description": "Conceptual guides explaining how LPC, objects, and the FluffOS driver work together, for readers learning the platform rather than a specific function."
+    },
+    "items": [
+      {
+        "type": "category",
+        "label": "General Concepts",
+        "link": {
+          "type": "generated-index",
+          "title": "General Concepts",
+          "slug": "/concepts/general/",
+          "description": "Foundational explanations of the LPC language, object model, the FluffOS driver, and mud-wide mechanisms like simul_efuns, hot reload, and networking."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "concepts/general/lpc",
+            "label": "The LPC Language"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/objects",
+            "label": "Objects"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/oop",
+            "label": "Object-Oriented Programming"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/preprocessor",
+            "label": "Preprocessor"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/global_include_file",
+            "label": "Global Include File"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/fluffos_driver",
+            "label": "The FluffOS Driver"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/simul_efun",
+            "label": "Simulated Efuns"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/message_doc",
+            "label": "The message() System"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/hot_reload",
+            "label": "Hot Reload"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/socket_efuns",
+            "label": "Socket Efuns"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/tls",
+            "label": "TLS"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/websocket",
+            "label": "WebSocket"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/tracing",
+            "label": "Tracing"
+          }
+        ]
+      }
+    ]
+  },
+  "driver": {
+    "type": "category",
+    "label": "Driver Internals",
+    "link": {
+      "type": "generated-index",
+      "title": "Driver Internals",
+      "slug": "/driver/",
+      "description": "Configuration reference and implementation internals of the FluffOS driver, from runtime config flags to the VM, memory, and native extension layers."
+    },
+    "items": [
+      {
+        "type": "doc",
+        "id": "driver/config",
+        "label": "Runtime Configuration"
+      },
+      {
+        "type": "doc",
+        "id": "driver/wasm",
+        "label": "WASM Driver Cookbook"
+      },
+      {
+        "type": "doc",
+        "id": "driver/adding_efuns",
+        "label": "Adding Efuns"
+      },
+      {
+        "type": "doc",
+        "id": "driver/ffi-plan",
+        "label": "FFI Package Design"
+      },
+      {
+        "type": "doc",
+        "id": "driver/call_into_vm",
+        "label": "Calling Into the VM"
+      },
+      {
+        "type": "doc",
+        "id": "driver/stackmachine",
+        "label": "Stack Machine"
+      },
+      {
+        "type": "doc",
+        "id": "driver/parse_tree",
+        "label": "Parse Tree Nodes"
+      },
+      {
+        "type": "doc",
+        "id": "driver/malloc",
+        "label": "Memory Allocation"
+      }
+    ]
+  },
+  "cli": {
+    "type": "category",
+    "label": "Command-Line Tools",
+    "link": {
+      "type": "generated-index",
+      "title": "Command-Line Tools",
+      "slug": "/cli/",
+      "description": "Reference for the driver binary and the companion command-line utilities shipped with FluffOS for compiling, inspecting, and converting LPC and save-file data."
+    },
+    "items": [
+      {
+        "type": "doc",
+        "id": "cli/driver",
+        "label": "driver — the game server"
+      },
+      {
+        "type": "doc",
+        "id": "cli/lpcc",
+        "label": "lpcc — LPC compiler"
+      },
+      {
+        "type": "doc",
+        "id": "cli/symbol",
+        "label": "symbol — LPC inspector"
+      },
+      {
+        "type": "doc",
+        "id": "cli/o2json",
+        "label": "o2json — save file to JSON"
+      },
+      {
+        "type": "doc",
+        "id": "cli/json2o",
+        "label": "json2o — JSON to save file"
+      },
+      {
+        "type": "doc",
+        "id": "cli/portbind",
+        "label": "portbind — privileged ports"
+      },
+      {
+        "type": "doc",
+        "id": "cli/generate_keywords",
+        "label": "generate_keywords — efun metadata"
+      }
+    ]
+  },
+  "zh-CN": {
+    "type": "category",
+    "label": "中文文档",
+    "link": {
+      "type": "generated-index",
+      "title": "中文文档",
+      "slug": "/zh-CN/",
+      "description": "FluffOS 的中文文档：efun 函数参考、apply 回调说明以及构建指南。"
+    },
+    "items": [
+      {
+        "type": "category",
+        "label": "构建指南",
+        "link": {
+          "type": "generated-index",
+          "title": "构建指南",
+          "slug": "/zh-CN/build/",
+          "description": "FluffOS 的中文构建指南。"
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "zh-CN/build/build",
+            "label": "编译构建"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Efun 函数",
+        "link": {
+          "type": "generated-index",
+          "title": "Efun 函数",
+          "slug": "/zh-CN/efun/",
+          "description": "efun（外部函数）的中文参考。"
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/abs",
+            "label": "abs"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/acos",
+            "label": "acos"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/add_a",
+            "label": "add_a"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/add_action",
+            "label": "add_action"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/all_inventory",
+            "label": "all_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/all_previous_objects",
+            "label": "all_previous_objects"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/allocate",
+            "label": "allocate"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/allocate_buffer",
+            "label": "allocate_buffer"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/allocate_mapping",
+            "label": "allocate_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/arrayp",
+            "label": "arrayp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/asin",
+            "label": "asin"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/assemble_class",
+            "label": "assemble_class"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/atan",
+            "label": "atan"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/author_stats",
+            "label": "author_stats"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/base_name",
+            "label": "base_name"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/bind",
+            "label": "bind"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/buffer_transcode",
+            "label": "buffer_transcode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/bufferp",
+            "label": "bufferp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/cache_stats",
+            "label": "cache_stats"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/call_other",
+            "label": "call_other"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/call_out",
+            "label": "call_out"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/call_out_info",
+            "label": "call_out_info"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/capitalize",
+            "label": "capitalize"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/catch",
+            "label": "catch"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ceil",
+            "label": "ceil"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/children",
+            "label": "children"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/classes",
+            "label": "classes"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/classp",
+            "label": "classp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/clear_bit",
+            "label": "clear_bit"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/clone_object",
+            "label": "clone_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/clonep",
+            "label": "clonep"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/command",
+            "label": "command"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/commands",
+            "label": "commands"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/compressedp",
+            "label": "compressedp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/copy",
+            "label": "copy"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/cos",
+            "label": "cos"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/cp",
+            "label": "cp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/crc32",
+            "label": "crc32"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/crypt",
+            "label": "crypt"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ctime",
+            "label": "ctime"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_close",
+            "label": "db_close"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_commit",
+            "label": "db_commit"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_connect",
+            "label": "db_connect"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_exec",
+            "label": "db_exec"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_fetch",
+            "label": "db_fetch"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_rollback",
+            "label": "db_rollback"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/db_status",
+            "label": "db_status"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/debug_info",
+            "label": "debug_info"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/debug_message",
+            "label": "debug_message"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/deep_inherit_list",
+            "label": "deep_inherit_list"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/deep_inventory",
+            "label": "deep_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/defer",
+            "label": "defer"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/destruct",
+            "label": "destruct"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/disable_commands",
+            "label": "disable_commands"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/disable_wizard",
+            "label": "disable_wizard"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/disassemble_class",
+            "label": "disassemble_class"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/domain_stats",
+            "label": "domain_stats"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/dump_file_descriptors",
+            "label": "dump_file_descriptors"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/dump_prog",
+            "label": "dump_prog"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/dumpallobj",
+            "label": "dumpallobj"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ed",
+            "label": "ed"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ed_cmd",
+            "label": "ed_cmd"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ed_start",
+            "label": "ed_start"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/element_of",
+            "label": "element_of"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/enable_commands",
+            "label": "enable_commands"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/enable_wizard",
+            "label": "enable_wizard"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/environment",
+            "label": "environment"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/error",
+            "label": "error"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/eval_cost",
+            "label": "eval_cost"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/evaluate",
+            "label": "evaluate"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/event",
+            "label": "event"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/exec",
+            "label": "exec"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/exp",
+            "label": "exp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/explode",
+            "label": "explode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/export_uid",
+            "label": "export_uid"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/fetch_class_member",
+            "label": "fetch_class_member"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/fetch_variable",
+            "label": "fetch_variable"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_address",
+            "label": "ffi_address"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_alloc",
+            "label": "ffi_alloc"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_call",
+            "label": "ffi_call"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_callback",
+            "label": "ffi_callback"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_callback_addr",
+            "label": "ffi_callback_addr"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_callback_free",
+            "label": "ffi_callback_free"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_error",
+            "label": "ffi_error"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_free",
+            "label": "ffi_free"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_load",
+            "label": "ffi_load"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_peek",
+            "label": "ffi_peek"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_prepare",
+            "label": "ffi_prepare"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_read",
+            "label": "ffi_read"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_sizeof",
+            "label": "ffi_sizeof"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_status",
+            "label": "ffi_status"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_struct_layout",
+            "label": "ffi_struct_layout"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_symbol",
+            "label": "ffi_symbol"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_unload",
+            "label": "ffi_unload"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ffi_write",
+            "label": "ffi_write"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/file_length",
+            "label": "file_length"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/file_name",
+            "label": "file_name"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/file_size",
+            "label": "file_size"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/filter",
+            "label": "filter"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/filter_array",
+            "label": "filter_array"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/filter_mapping",
+            "label": "filter_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/find_call_out",
+            "label": "find_call_out"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/find_living",
+            "label": "find_living"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/find_object",
+            "label": "find_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/find_player",
+            "label": "find_player"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/first_inventory",
+            "label": "first_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/floatp",
+            "label": "floatp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/floor",
+            "label": "floor"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/function_exists",
+            "label": "function_exists"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/function_owner",
+            "label": "function_owner"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/functionp",
+            "label": "functionp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/functions",
+            "label": "functions"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/get_char",
+            "label": "get_char"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/get_config",
+            "label": "get_config"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/get_dir",
+            "label": "get_dir"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/get_garbage",
+            "label": "get_garbage"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/geteuid",
+            "label": "geteuid"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/getuid",
+            "label": "getuid"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/hash",
+            "label": "hash"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/heart_beats",
+            "label": "heart_beats"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/implode",
+            "label": "implode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/in_edit",
+            "label": "in_edit"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/in_input",
+            "label": "in_input"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/inherit_list",
+            "label": "inherit_list"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/inherits",
+            "label": "inherits"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/input_to",
+            "label": "input_to"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/interactive",
+            "label": "interactive"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/intp",
+            "label": "intp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/is_daylight_savings_time",
+            "label": "is_daylight_savings_time"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/keys",
+            "label": "keys"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/link",
+            "label": "link"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/living",
+            "label": "living"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/livings",
+            "label": "livings"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/load_object",
+            "label": "load_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/localtime",
+            "label": "localtime"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/log",
+            "label": "log"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/lower_case",
+            "label": "lower_case"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/ltrim",
+            "label": "ltrim"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/malloc_status",
+            "label": "malloc_status"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/map",
+            "label": "map"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/map_array",
+            "label": "map_array"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/map_delete",
+            "label": "map_delete"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/map_mapping",
+            "label": "map_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/mapp",
+            "label": "mapp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/master",
+            "label": "master"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/match_path",
+            "label": "match_path"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/max",
+            "label": "max"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/max_eval_cost",
+            "label": "max_eval_cost"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/member_array",
+            "label": "member_array"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/memory_info",
+            "label": "memory_info"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/memory_summary",
+            "label": "memory_summary"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/message",
+            "label": "message"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/min",
+            "label": "min"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/mkdir",
+            "label": "mkdir"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/move_object",
+            "label": "move_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/mud_status",
+            "label": "mud_status"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/named_livings",
+            "label": "named_livings"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/network_stats",
+            "label": "network_stats"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/new",
+            "label": "new"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/next_inventory",
+            "label": "next_inventory"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/notify_fail",
+            "label": "notify_fail"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/nullp",
+            "label": "nullp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/num_classes",
+            "label": "num_classes"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/objectp",
+            "label": "objectp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/objects",
+            "label": "objects"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/oldcrypt",
+            "label": "oldcrypt"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/origin",
+            "label": "origin"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/parse_command",
+            "label": "parse_command"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_assoc",
+            "label": "pcre_assoc"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_cache",
+            "label": "pcre_cache"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_extract",
+            "label": "pcre_extract"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_match",
+            "label": "pcre_match"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_match_all",
+            "label": "pcre_match_all"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_replace",
+            "label": "pcre_replace"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_replace_callback",
+            "label": "pcre_replace_callback"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pcre_version",
+            "label": "pcre_version"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/perf_counter_ns",
+            "label": "perf_counter_ns"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pluralize",
+            "label": "pluralize"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pointerp",
+            "label": "pointerp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/pow",
+            "label": "pow"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/present",
+            "label": "present"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/previous_object",
+            "label": "previous_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/printf",
+            "label": "printf"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/program_info",
+            "label": "program_info"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_charmode",
+            "label": "query_charmode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_ed_mode",
+            "label": "query_ed_mode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_encoding",
+            "label": "query_encoding"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_heart_beat",
+            "label": "query_heart_beat"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_host_name",
+            "label": "query_host_name"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_idle",
+            "label": "query_idle"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_ip_name",
+            "label": "query_ip_name"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_ip_number",
+            "label": "query_ip_number"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_ip_port",
+            "label": "query_ip_port"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_load_average",
+            "label": "query_load_average"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_multiple_short",
+            "label": "query_multiple_short"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_notify_fail",
+            "label": "query_notify_fail"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_num",
+            "label": "query_num"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_privs",
+            "label": "query_privs"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_replaced_program",
+            "label": "query_replaced_program"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_shadowing",
+            "label": "query_shadowing"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_snoop",
+            "label": "query_snoop"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_snooping",
+            "label": "query_snooping"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/query_verb",
+            "label": "query_verb"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/random",
+            "label": "random"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/read_buffer",
+            "label": "read_buffer"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/read_bytes",
+            "label": "read_bytes"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/read_file",
+            "label": "read_file"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/real_time",
+            "label": "real_time"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/receive",
+            "label": "receive"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/reclaim_objects",
+            "label": "reclaim_objects"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/reference_allowed",
+            "label": "reference_allowed"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/refs",
+            "label": "refs"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/reg_assoc",
+            "label": "reg_assoc"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/regexp",
+            "label": "regexp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/reload_object",
+            "label": "reload_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/remove_action",
+            "label": "remove_action"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/remove_call_out",
+            "label": "remove_call_out"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/remove_charmode",
+            "label": "remove_charmode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/remove_get_char",
+            "label": "remove_get_char"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/remove_interactive",
+            "label": "remove_interactive"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/remove_shadow",
+            "label": "remove_shadow"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/rename",
+            "label": "rename"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/repeat_string",
+            "label": "repeat_string"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace",
+            "label": "replace"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace_dollars",
+            "label": "replace_dollars"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace_html",
+            "label": "replace_html"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace_mxp",
+            "label": "replace_mxp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace_objects",
+            "label": "replace_objects"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace_program",
+            "label": "replace_program"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replace_string",
+            "label": "replace_string"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/replaceable",
+            "label": "replaceable"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/reset_eval_cost",
+            "label": "reset_eval_cost"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/resolve",
+            "label": "resolve"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/restore_from_string",
+            "label": "restore_from_string"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/restore_object",
+            "label": "restore_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/restore_variable",
+            "label": "restore_variable"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/rm",
+            "label": "rm"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/rmdir",
+            "label": "rmdir"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/roll_MdN",
+            "label": "roll_MdN"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/roulette_wheel",
+            "label": "roulette_wheel"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/round",
+            "label": "round"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/rtrim",
+            "label": "rtrim"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/rusage",
+            "label": "rusage"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/save_object",
+            "label": "save_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/save_variable",
+            "label": "save_variable"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/say",
+            "label": "say"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/secure_random",
+            "label": "secure_random"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/send_nullbyte",
+            "label": "send_nullbyte"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_author",
+            "label": "set_author"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_bit",
+            "label": "set_bit"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_debug_level",
+            "label": "set_debug_level"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_encoding",
+            "label": "set_encoding"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_eval_limit",
+            "label": "set_eval_limit"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_heart_beat",
+            "label": "set_heart_beat"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_hide",
+            "label": "set_hide"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_light",
+            "label": "set_light"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_living_name",
+            "label": "set_living_name"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_privs",
+            "label": "set_privs"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/set_reset",
+            "label": "set_reset"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/seteuid",
+            "label": "seteuid"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sha1",
+            "label": "sha1"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/shadow",
+            "label": "shadow"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/shout",
+            "label": "shout"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/shuffle",
+            "label": "shuffle"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/shutdown",
+            "label": "shutdown"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sin",
+            "label": "sin"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sizeof",
+            "label": "sizeof"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/snoop",
+            "label": "snoop"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_accept",
+            "label": "socket_accept"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_acquire",
+            "label": "socket_acquire"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_address",
+            "label": "socket_address"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_bind",
+            "label": "socket_bind"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_close",
+            "label": "socket_close"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_connect",
+            "label": "socket_connect"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_create",
+            "label": "socket_create"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_error",
+            "label": "socket_error"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_listen",
+            "label": "socket_listen"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_release",
+            "label": "socket_release"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_status",
+            "label": "socket_status"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/socket_write",
+            "label": "socket_write"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sort_array",
+            "label": "sort_array"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sprintf",
+            "label": "sprintf"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sqrt",
+            "label": "sqrt"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/sscanf",
+            "label": "sscanf"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/stat",
+            "label": "stat"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/store_class_member",
+            "label": "store_class_member"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/store_variable",
+            "label": "store_variable"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/strcmp",
+            "label": "strcmp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/string_decode",
+            "label": "string_decode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/string_difference",
+            "label": "string_difference"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/string_encode",
+            "label": "string_encode"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/stringp",
+            "label": "stringp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/strlen",
+            "label": "strlen"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/strsrch",
+            "label": "strsrch"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/strwidth",
+            "label": "strwidth"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/tan",
+            "label": "tan"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/tell_object",
+            "label": "tell_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/tell_room",
+            "label": "tell_room"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/telnet_nop",
+            "label": "telnet_nop"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/terminal_colour",
+            "label": "terminal_colour"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/test_bit",
+            "label": "test_bit"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/test_load",
+            "label": "test_load"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/this_interactive",
+            "label": "this_interactive"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/this_object",
+            "label": "this_object"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/this_player",
+            "label": "this_player"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/this_user",
+            "label": "this_user"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/throw",
+            "label": "throw"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/time",
+            "label": "time"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/time_expression",
+            "label": "time_expression"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/to_float",
+            "label": "to_float"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/to_int",
+            "label": "to_int"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/trace_end",
+            "label": "trace_end"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/trace_start",
+            "label": "trace_start"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/trim",
+            "label": "trim"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/typeof",
+            "label": "typeof"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/undefinedp",
+            "label": "undefinedp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/unique_array",
+            "label": "unique_array"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/unique_mapping",
+            "label": "unique_mapping"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/upper_case",
+            "label": "upper_case"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/uptime",
+            "label": "uptime"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/userp",
+            "label": "userp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/users",
+            "label": "users"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/values",
+            "label": "values"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/variables",
+            "label": "variables"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/virtualp",
+            "label": "virtualp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/vowel",
+            "label": "vowel"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/wizardp",
+            "label": "wizardp"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/write",
+            "label": "write"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/write_buffer",
+            "label": "write_buffer"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/write_bytes",
+            "label": "write_bytes"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/write_file",
+            "label": "write_file"
+          },
+          {
+            "type": "doc",
+            "id": "zh-CN/efun/zonetime",
+            "label": "zonetime"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "label": "Apply 回调",
+        "link": {
+          "type": "generated-index",
+          "title": "Apply 回调",
+          "slug": "/zh-CN/apply/",
+          "description": "驱动调用 LPC 对象的回调函数（apply）中文说明。"
+        },
+        "items": [
+          {
+            "type": "category",
+            "label": "Object Apply",
+            "link": {
+              "type": "generated-index",
+              "title": "Object Apply",
+              "slug": "/zh-CN/apply/object/",
+              "description": "普通对象生命周期相关的 apply 回调：create、reset、heart_beat、init 等。"
+            },
+            "items": [
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/clean_up",
+                "label": "clean_up"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/create",
+                "label": "create"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/heart_beat",
+                "label": "heart_beat"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/id",
+                "label": "id"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/init",
+                "label": "init"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/move_or_destruct",
+                "label": "move_or_destruct"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/reset",
+                "label": "reset"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/object/virtual_start",
+                "label": "virtual_start"
+              }
+            ]
+          },
+          {
+            "type": "category",
+            "label": "Master Apply",
+            "link": {
+              "type": "generated-index",
+              "title": "Master Apply",
+              "slug": "/zh-CN/apply/master/",
+              "description": "master 对象的 apply 回调：权限校验、路径解析、错误处理等。"
+            },
+            "items": [
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/author_file",
+                "label": "author_file"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/compile_object",
+                "label": "compile_object"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/connect",
+                "label": "connect"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/crash",
+                "label": "crash"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/creator_file",
+                "label": "creator_file"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/domain_file",
+                "label": "domain_file"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/epilog",
+                "label": "epilog"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/error_handler",
+                "label": "error_handler"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/flag",
+                "label": "flag"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/get_bb_uid",
+                "label": "get_bb_uid"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/get_include_path",
+                "label": "get_include_path"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/get_mud_stats",
+                "label": "get_mud_stats"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/get_root_uid",
+                "label": "get_root_uid"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/get_save_file_name",
+                "label": "get_save_file_name"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/log_error",
+                "label": "log_error"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/make_path_absolute",
+                "label": "make_path_absolute"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/object_name",
+                "label": "object_name"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/preload",
+                "label": "preload"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/privs_file",
+                "label": "privs_file"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/retrieve_ed_setup",
+                "label": "retrieve_ed_setup"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/save_ed_setup",
+                "label": "save_ed_setup"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_bind",
+                "label": "valid_bind"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_database",
+                "label": "valid_database"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_hide",
+                "label": "valid_hide"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_link",
+                "label": "valid_link"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_object",
+                "label": "valid_object"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_override",
+                "label": "valid_override"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_read",
+                "label": "valid_read"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_seteuid",
+                "label": "valid_seteuid"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_shadow",
+                "label": "valid_shadow"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_socket",
+                "label": "valid_socket"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/valid_write",
+                "label": "valid_write"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/master/view_errors",
+                "label": "view_errors"
+              }
+            ]
+          },
+          {
+            "type": "category",
+            "label": "Interactive Apply",
+            "link": {
+              "type": "generated-index",
+              "title": "Interactive Apply",
+              "slug": "/zh-CN/apply/interactive/",
+              "description": "交互式（玩家连接）对象的 apply 回调：logon、catch_tell、gmcp、telnet 等。"
+            },
+            "items": [
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/catch_tell",
+                "label": "catch_tell"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/gmcp",
+                "label": "gmcp"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/logon",
+                "label": "logon"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/net_dead",
+                "label": "net_dead"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/process_input",
+                "label": "process_input"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/receive_environ",
+                "label": "receive_environ"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/receive_message",
+                "label": "receive_message"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/receive_snoop",
+                "label": "receive_snoop"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/telnet_suboption",
+                "label": "telnet_suboption"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/terminal_type",
+                "label": "terminal_type"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/window_size",
+                "label": "window_size"
+              },
+              {
+                "type": "doc",
+                "id": "zh-CN/apply/interactive/write_prompt",
+                "label": "write_prompt"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
