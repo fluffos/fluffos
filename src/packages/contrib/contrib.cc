@@ -2178,7 +2178,7 @@ void f_query_replaced_program() {
     free_object(&sp->u.ob, "f_query_replaced_program");
   } else {
     if (current_object->replaced_program) {
-      res = add_slash(sp->u.ob->replaced_program);
+      res = add_slash(current_object->replaced_program);
     }
     STACK_INC;
   }
