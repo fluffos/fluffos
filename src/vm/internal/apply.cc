@@ -89,7 +89,9 @@ void check_co_args2(unsigned short* types, int num_arg, const char* name, const 
           smart_log("driver", 0, buf, 1);
         }
       } else {
-        error(buf);
+        // buf is built from object-derived text (name/ob_name); never use it
+        // as a printf format (a '%' in a path/name would be a crash).
+        error("%s", buf);
       }
     }
   } while (i < num_arg);
@@ -116,12 +118,16 @@ void check_co_args(int num_arg, const program_t* prog, function_t* fun, int find
           smart_log("driver", 0, buf, 1);
         }
       } else {
-        error(buf);
+        error("%s", buf);
       }
     }
     int num_arg_check = std::min((unsigned char)num_arg, fun->num_arg);
+    // Pass num_arg_check as the loop bound: argument_types holds only
+    // fun->num_arg slots, so bounding the walk by the (possibly larger)
+    // passed num_arg would over-read the array. num_arg stays as sparg so
+    // stack indexing (sp - argc) still lines up with the pushed arguments.
     if (num_arg_check && prog->type_start && prog->type_start[findex] != INDEX_START_NONE)
-      check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg, fun->funcname,
+      check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg_check, fun->funcname,
                      prog->filename, num_arg);
   }
 }
