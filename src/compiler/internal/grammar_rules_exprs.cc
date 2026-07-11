@@ -328,6 +328,20 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
     }
 
     if (opcode == F_ASSIGN) (*result)->l.expr = do_promotions(rval, lval->type);
+
+    /* For arithmetic compound assigns, coerce the RHS to the declared type of
+     * the lvalue, mirroring what '=' does above. This keeps 'float f; f += 1'
+     * a float even when f still holds the integer 0 it was initialized with,
+     * and keeps 'int i; i += 1.5' an int. */
+    if (opcode == F_ADD_EQ || opcode == F_SUB_EQ || opcode == F_MULT_EQ || opcode == F_DIV_EQ) {
+      if (lval->type == TYPE_REAL && rval->type == TYPE_NUMBER) {
+        (*result)->l.expr = promote_to_float(rval);
+        (*result)->type = TYPE_REAL;
+      } else if (lval->type == TYPE_NUMBER && rval->type == TYPE_REAL) {
+        (*result)->l.expr = promote_to_int(rval);
+        (*result)->type = TYPE_NUMBER;
+      }
+    }
   }
 }
 
