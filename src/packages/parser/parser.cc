@@ -78,6 +78,16 @@ static int found_level = 0;
 static mapping_t* parse_nicks = nullptr;
 static array_t* parse_env = nullptr;
 
+// A parse holds a raw pointer (parse_vn) into a verb node for its whole
+// duration, but the applies it runs (can_/direct_/do_) may destruct the
+// handler object or call parse_remove(), which frees that object's verb
+// nodes synchronously -- a use-after-free under the active parse. While a
+// parse is in progress, node frees are deferred onto this list and flushed
+// when the last active parse unwinds (in free_parse_globals). Depth (not a
+// bool) because an apply can re-enter parse_sentence().
+static int parse_active_depth = 0;
+static verb_node_t* deferred_verb_nodes = nullptr;
+
 static int direct_object, indirect_object;
 
 static parser_error_t current_error_info;
@@ -616,6 +626,18 @@ void f_parse_refresh() {
 }
 
 /* called from free_object() */
+// Free a verb node, or defer it if a parse is in progress (parse_vn may still
+// reference it). Callers must have already unlinked the node from its hash
+// chain, so reusing its `next` field for the deferred list is safe.
+static void free_verb_node(verb_node_t* vn) {
+  if (parse_active_depth > 0) {
+    vn->next = deferred_verb_nodes;
+    deferred_verb_nodes = vn;
+  } else {
+    FREE(vn);
+  }
+}
+
 void parse_free(parse_info_t* pinfo) {
   int i;
 
@@ -628,7 +650,7 @@ void parse_free(parse_info_t* pinfo) {
           if ((*vn)->handler == pinfo->ob) {
             old = *vn;
             *vn = (*vn)->next;
-            FREE(old);
+            free_verb_node(old);
           } else {
             vn = &((*vn)->next);
           }
@@ -691,6 +713,7 @@ static void clear_result(parse_result_t* pr) {
   for (i = 0; i < 4; i++) {
     pr->res[i].func = nullptr;
     pr->res[i].args = nullptr;
+    pr->res[i].num = 0;
   }
 }
 
@@ -714,6 +737,16 @@ static void free_parse_globals() {
       free_object(&loaded_objects[i], "free_parse_globals");
     }
     objects_loaded = 0;
+  }
+
+  // End of one active parse: when the outermost one unwinds, it is finally
+  // safe to free any verb nodes that were destructed/removed mid-parse.
+  if (parse_active_depth > 0 && --parse_active_depth == 0) {
+    while (deferred_verb_nodes) {
+      verb_node_t* n = deferred_verb_nodes;
+      deferred_verb_nodes = n->next;
+      FREE(n);
+    }
   }
 }
 
@@ -2844,6 +2877,14 @@ static void we_are_finished(parse_state_t* state) {
     best_result = (parse_result_t*)DMALLOC(sizeof(parse_result_t), TAG_PARSER, "we_are_finished");
     clear_result(best_result);
     if (parse_vn->handler->flags & O_DESTRUCTED) {
+      // The handler destructed itself during check_functions(). We already
+      // committed best_match above and freed any prior result, so there is
+      // nothing valid to fall back to: tear down the half-built result and
+      // clear best_match so f_parse_sentence does not call do_the_call() with
+      // best_result->ob == NULL (a NULL deref). (#1014 sibling)
+      free_parse_result(best_result);
+      best_result = nullptr;
+      best_match = 0;
       DEBUG_DEC;
       return;
     }
@@ -3358,6 +3399,7 @@ void f_parse_sentence() {
   STACK_INC;
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = free_parse_globals;
+  parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = current_object;
   pi = current_object->pinfo;
@@ -3408,6 +3450,7 @@ void f_parse_my_rules() {
   STACK_INC;
   sp->type = T_ERROR_HANDLER;
   sp->u.error_handler = free_parse_globals;
+  parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = (sp - 2)->u.ob;
   pi = parse_user->pinfo;
@@ -3472,7 +3515,7 @@ void f_parse_remove() {
         if ((*vn)->handler == current_object) {
           old = *vn;
           *vn = (*vn)->next;
-          FREE(old);
+          free_verb_node(old);
         } else {
           vn = &((*vn)->next);
         }

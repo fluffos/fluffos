@@ -1,0 +1,39 @@
+// A verb handler that destructs itself from its direct_* apply while
+// returning success left we_are_finished() with best_match set but
+// best_result->ob == NULL, so f_parse_sentence -> do_the_call() dereferenced
+// NULL. Must not crash.
+//
+// The clone registers its OWN verb rule (so it IS parse_vn->handler) and is
+// the object matched by the sentence, so its direct_ apply destructs the
+// handler at the swap point.
+
+string* parse_command_id_list() {
+  return ({ "bag" });
+}
+
+void create() {
+  parse_init();
+  if (clonep()) {
+    parse_add_rule("look", "WRD OBJ");   // handler == this clone
+    move_object(__FILE__);
+  }
+}
+
+int can_look_wrd_obj() { return 1; }
+
+int direct_look_wrd_obj() {
+  destruct(this_object());   // destruct the handler, then report success
+  return 1;
+}
+
+int do_look_wrd_obj() { return 0; }
+
+void do_tests() {
+#ifndef __PACKAGE_PARSER__
+  write("no package parser, skipped.\n");
+#else
+  clone_object(__FILE__);
+  catch(parse_sentence("look in bag", 2, all_inventory()));
+#endif
+  ASSERT(1);
+}
