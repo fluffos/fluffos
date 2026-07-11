@@ -247,6 +247,15 @@ const StrFlagEntry STR_FLAGS[] = {
      "Colon-separated allow-list of shared-library paths that ffi_load() may open (package_ffi). "
      "Empty means the driver imposes no path restriction and defers entirely to the master apply "
      "valid_ffi(); every ffi_load/symbol/prepare/callback is gated by that apply regardless."},
+    {"allowed os environment variables", __OS_ENV_READABLE__, kOptional, "config file: aoev",
+     "Security",
+     "Colon-separated allow-list of environment variable names readable via get_os_env() "
+     "(package_contrib). Names in 'writable os environment variables' are readable too. Empty "
+     "(the default) denies all access."},
+    {"writable os environment variables", __OS_ENV_WRITABLE__, kOptional, "config file: woev",
+     "Security",
+     "Colon-separated allow-list of environment variable names that set_os_env() may modify "
+     "(package_contrib); these are implicitly readable. Empty (the default) denies all writes."},
 };
 
 bool scan_config_line(const char* fmt, void* dest, int required) {

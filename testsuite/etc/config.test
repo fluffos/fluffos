@@ -375,3 +375,8 @@ evaluator stack size : 1000
 # Define the size of the compiler stack. This defines how complex
 # expressions the compiler can parse.  (unused currently)
 compiler stack size : 200
+
+# get_os_env()/set_os_env() allow-lists (issue #1045); FLUFFOS_TEST_RW is
+# also implicitly readable.
+allowed os environment variables : PATH:FLUFFOS_TEST_RO
+writable os environment variables : FLUFFOS_TEST_RW
