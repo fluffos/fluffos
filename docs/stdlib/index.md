@@ -21,3 +21,5 @@ title: STDLIB
 * [base64encode](string/base64encode)
 * [bitmap_font](string/bitmap_font)
 * [break_string](string/break_string)
+## tui
+* [tui](tui) — terminal UI toolkit: readline prompts, inline printers & charts, full-screen widgets

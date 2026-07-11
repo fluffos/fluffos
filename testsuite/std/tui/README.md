@@ -281,7 +281,7 @@ testsuite/std/tui/terminal.lpc         — layer 3: interactive glue
 testsuite/command/tuidemo.lpc          — the showcases (see top of file)
 testsuite/clone/tuidemo_*.lpc          — full-screen showcase apps
 testsuite/single/tests/std/tui/*.lpc   — testsuite coverage
-docs/concepts/general/tui.md           — user-facing documentation
+docs/stdlib/tui.md                     — user-facing documentation
 ```
 
 ## 4. Testing strategy

@@ -1,5 +1,5 @@
 ---
-title: general / tui
+title: stdlib / tui
 ---
 # The LPC TUI library (/std/tui)
 
