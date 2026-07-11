@@ -880,9 +880,14 @@ int recompile_object(object_t* target) {
     _setmode(f, _O_BINARY);
 #endif
     save_command_giver(command_giver);
-    new_prog = compile_file_fd(f, obname.c_str());
+    {
+      // compile_file_fd may error() and unwind past this frame; guard the fd
+      // exactly as load_object() does, or a failed recompile leaks it (and
+      // this loop can open a fresh fd each round).
+      DEFER { close(f); };
+      new_prog = compile_file_fd(f, obname.c_str());
+    }
     restore_command_giver();
-    close(f);
     update_compile_av(total_lines);
     total_lines = 0;
 
