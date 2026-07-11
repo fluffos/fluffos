@@ -773,6 +773,45 @@ TEST(Preprocessor, DirectiveCommentUnterminatedAtEofErrors) {
   EXPECT_FALSE(p->errors().empty());
 }
 
+// Comments are whitespace (C translation phase 3) and must be stripped
+// from a directive's payload BEFORE it is parsed (#1240): a '//' tail
+// captured into a macro body comments out the rest of whatever spliced
+// text the macro later expands into, and a trailing comment on
+// #undef/#ifdef corrupts the looked-up name.
+
+TEST(Preprocessor, DefineLineCommentNotInBody) {
+  // The #1240 repro shape: CREDITS expanding inside MIN's spliced body
+  // must not swallow the rest of the expression.
+  EXPECT_EQ(pp("#define CREDITS \"credits\" // Current number of credits\n"
+               "#define MIN(x,y) ((x) < (y) ? (x) : (y))\n"
+               "int f() { return MIN(c, m[e][CREDITS]); }\n"),
+            "int f() { return ((c) < (m[e][\"credits\"]) ? (c) : (m[e][\"credits\"])); }");
+}
+
+TEST(Preprocessor, DefineBlockCommentInBodyIsOneSpace) {
+  // The comment folds to ONE space, so "-/*c*/-1" stays two '-' tokens;
+  // pasting them into '--' would fail the #if evaluation and flip the
+  // branch.
+  EXPECT_EQ(pp("#define TWO 1 -/*c*/-1\n#if TWO == 2\nint spaced;\n#else\nint pasted;\n#endif\n"),
+            "int spaced;");
+}
+
+TEST(Preprocessor, DefineParamListComment) {
+  // A comment inside a function-like parameter list is whitespace too.
+  EXPECT_EQ(pp("#define F(a, /* second */ b) a + b\nint x = F(1, 2);\n"), "int x = 1 + 2;");
+}
+
+TEST(Preprocessor, UndefWithTrailingComment) {
+  // "#undef GONE // bye" must erase GONE, not look up "GONE // bye".
+  EXPECT_EQ(pp("#define GONE 5\n#undef GONE // bye\nint GONE = 6;\nint x = GONE;\n"),
+            "int GONE = 6; int x = GONE;");
+}
+
+TEST(Preprocessor, IfdefWithTrailingComment) {
+  EXPECT_EQ(pp("#define FEAT 1\n#ifdef FEAT // enabled\nint on;\n#endif\n"), "int on;");
+  EXPECT_EQ(pp("#ifndef FEAT /* not defined */\nint off;\n#endif\n"), "int off;");
+}
+
 // ---------------------------------------------------------------------------
 // 5. Conditional compilation
 // ---------------------------------------------------------------------------

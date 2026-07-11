@@ -74,6 +74,15 @@ define `WARNING_LEVEL` as `1`:
 Text after the comment's close on its final line still belongs to the
 directive, matching C.
 
+Comments on a directive line are whitespace, never part of the macro:
+a trailing `//` or `/* */` after the body (or after the name on
+`#undef`/`#ifdef`) is stripped before the directive is parsed, and a
+block comment inside the body separates tokens like a space would:
+
+```c
+#define CREDITS "credits" // key into the economy mapping
+```
+
 ## Redefinition
 
 Redefining a macro with a **different** body is allowed: the compiler
