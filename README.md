@@ -52,7 +52,7 @@ An LPMUD system is built from three distinct layers, each with a clear responsib
 - **Clone-based objects** — an LPC source file is a blueprint. The driver clones it to create instances: one `/obj/sword.c` file → thousands of individual sword objects in the world.
 - **Inheritance** — objects inherit and override behavior: `/std/weapon.c` → `/obj/sword.c` → `/obj/cursed_sword.c`.
 - **Garbage collected** — the driver handles memory automatically via reference counting; LPC code never calls `free()`.
-- **Live hot-reload** — you can update and reload a running object without restarting the server or disconnecting players.
+- **Live hot-reload** — `recompile_object()` swaps a recompiled program into a running object *and all its clones* without restarting the server or disconnecting players; variables carry over by name, so state survives the update.
 - **Event-driven** — no threads, no blocking. Game logic runs in response to player commands, network events, and `call_out()` timers.
 - **Sandboxed** — the driver tracks evaluation cost and kills runaway code before it can crash the server.
 
@@ -349,6 +349,11 @@ cd testsuite
 - MySQL, PostgreSQL, SQLite integration.
 - Async IO operations.
 - External program integration.
+
+### Hot Reload
+- `recompile_object()` efun: recompile a source file and swap the new program into the live master copy and every clone — no destruct, object identity and variable state preserved (works for the master object, the simul_efun object, and virtual objects too).
+- Compile-time master applies `inherit_program()` and `include_file()` expose the full dependency graph (and can redirect, synthesize, or deny inherits/includes).
+- A reference auto-hot-reload daemon (watch files, reload on change, dependency-ordered) ships in the testsuite; see the [hot reload guide](https://www.fluffos.info/concepts/general/hot_reload).
 
 ### Networking
 - TLS support.
