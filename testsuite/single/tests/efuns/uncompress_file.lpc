@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_COMPRESS__
 void do_tests() {
     string text = "uncompress_file round trip\n";
     write_file("/ucf_src.txt", text, 1);
@@ -8,3 +9,4 @@ void do_tests() {
     rm("/ucf_out.gz");
     rm("/ucf_back.txt");
 }
+#endif

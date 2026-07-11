@@ -369,4 +369,9 @@ int perf_counter_ns();
 int time_ns();
 
 mixed *sys_network_ports();
+#ifndef __EMSCRIPTEN__
+/* No TLS on the wasm target: the browser terminates TLS long before
+ * bytes reach the driver, so the efun does not exist there. (The
+ * fullspec is preprocessed with the TARGET compiler, so this works.) */
 void sys_reload_tls(int);
+#endif

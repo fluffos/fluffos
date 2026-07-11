@@ -48,6 +48,7 @@ option(DEBUGMALLOC ${DEBUG})
 # VM, all core efuns, the telnet protocol layer -- builds unchanged.
 if (EMSCRIPTEN)
   set(PACKAGE_ASYNC OFF)     # worker threads
+  set(PACKAGE_COMPRESS OFF)  # compressing to a same-page client wastes CPU+size
   set(PACKAGE_CRYPTO OFF)    # OpenSSL
   set(PACKAGE_DB OFF)        # MySQL/SQLite/Postgres clients
   set(PACKAGE_EXTERNAL OFF)  # posix_spawn + socketpair
@@ -58,15 +59,12 @@ if (EMSCRIPTEN)
   set(USE_JEMALLOC OFF)
   set(STATIC OFF)
 
-  # Cross-built static ICU + zlib (see tools/wasm/build-deps.sh).
+  # Cross-built static ICU (see tools/wasm/build-deps.sh).
   set(FLUFFOS_WASM_DEPS "/opt/wasm-deps" CACHE PATH
-      "Prefix containing wasm-built static ICU and zlib")
+      "Prefix containing wasm-built static ICU")
   list(APPEND CMAKE_FIND_ROOT_PATH "${FLUFFOS_WASM_DEPS}")
   if (NOT ICU_ROOT)
     set(ICU_ROOT "${FLUFFOS_WASM_DEPS}")
-  endif ()
-  if (NOT ZLIB_ROOT)
-    set(ZLIB_ROOT "${FLUFFOS_WASM_DEPS}")
   endif ()
 endif ()
 
@@ -228,6 +226,20 @@ else()
   message(STATUS "Linking dynamic driver.")
 endif ()
 # end of STATIC
+
+if (NOT EMSCRIPTEN)
+  # zlib backs the core's gzip'd file support (write_file flag 2,
+  # compressed save_object, transparent gz reads) and MCCP; the wasm
+  # target drops it entirely and HAVE_ZLIB gates those code paths.
+  # This must stay BELOW the STATIC block: find_package before the
+  # static library-suffix setup caches the shared libz, which poisons
+  # every later try_compile run with -static (libwebsockets' OpenSSL
+  # feature checks would all fail and misconfigure it), and defined
+  # here (before the package/net subdirectories) so every target sees
+  # the macro.
+  find_package(ZLIB REQUIRED)
+  add_compile_definitions(HAVE_ZLIB)
+endif ()
 
 # Configuration phase
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -577,7 +589,6 @@ if (EMSCRIPTEN)
     "wasm/backend_wasm.cc"        # host-driven tick loop
     "wasm/comm_wasm.cc"           # JS byte transport (the page is the peer)
     "wasm/crash_handler_wasm.cc"  # traps reported by the JS host
-    "net/tls_stub.cc"             # no TLS endpoint to terminate
     )
 else ()
   list(APPEND SRC
@@ -664,6 +675,12 @@ endif ()
 target_link_libraries(libdriver PRIVATE crypt)
 target_link_libraries(libdriver PUBLIC libtelnet)
 if (NOT EMSCRIPTEN)
+  # The core uses zlib directly (see HAVE_ZLIB above) -- link it
+  # explicitly instead of relying on the compress package or libtelnet
+  # (both optional) to drag it in.
+  target_link_libraries(libdriver PUBLIC ZLIB::ZLIB)
+endif ()
+if (NOT EMSCRIPTEN)
   target_link_libraries(libdriver PUBLIC ${BACKWARD_ENABLE})
   add_backward(libdriver)
 endif ()
@@ -722,8 +739,9 @@ if (EMSCRIPTEN)
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME=createFluffOS"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
-    # ICU's static data (~30MB) lives in the wasm data segment.
-    "SHELL:-s INITIAL_MEMORY=128MB"
+    # Heap headroom for the compiler/VM; grows on demand (the ICU data
+    # segment is small now that the archive is brkitr-filtered).
+    "SHELL:-s INITIAL_MEMORY=64MB"
     "${FLUFFOS_WASM_STACK_FLAG}"
     "SHELL:-s FORCE_FILESYSTEM=1"
     "SHELL:-s EXPORTED_FUNCTIONS=_fluffos_boot,_fluffos_flag,_fluffos_tick,_fluffos_connect,_fluffos_input,_fluffos_disconnect,_fluffos_shutdown,_malloc,_free"

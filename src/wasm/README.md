@@ -18,7 +18,7 @@ workflow (deps → presets → packer → serve → embed) is
 `docs/build-wasm.md`.** Quick start:
 
 ```
-tools/wasm/build-deps.sh     # once: cross-build ICU + zlib
+tools/wasm/build-deps.sh     # once: cross-build ICU
 tools/wasm/build.sh          # presets native-tools + wasm, pack testsuite
 python3 -m http.server -d build-wasm/dist 8080
 # open http://localhost:8080/
@@ -81,7 +81,7 @@ The same link-time pattern covers the other per-target singletons:
 |---|---|---|
 | event loop (`backend.h`) | `backend_libevent.cc` | `wasm/backend_wasm.cc` |
 | connection transports | `net/transport_libevent.cc` | `wasm/comm_wasm.cc` |
-| TLS (`net/tls.h`) | `net/tls.cc` | `net/tls_stub.cc` (fails cleanly) |
+| TLS (`net/tls.h`) | `net/tls.cc` | not linked at all — the one shared caller (`sys_reload_tls`) is excluded from the target in `core.spec` |
 | DNS resolver (`packages/core/dns.h`) | `packages/core/dns_libevent.cc` | `packages/core/dns_stub.cc` |
 | crash handler (`base/internal/crash_handler.h`) | `base/internal/crash_handler.cc` (backward-cpp) | `wasm/crash_handler_wasm.cc` |
 
@@ -109,10 +109,10 @@ save files etc.) is the natural next step — see §5.
 |---|---|---|
 | libevent | **removed** | replaced by host-driven tick queues |
 | libwebsockets, `net/websocket.cc`, `net/ws_*.cc` | **removed** | the page *is* the client; no listening sockets |
-| OpenSSL, `net/tls.cc` | **removed** | no TLS endpoint to terminate; 2 struct fields typedef'd via `net/net_compat.h` |
+| OpenSSL, `net/tls.cc` | **removed** | no TLS endpoint to terminate (the page/browser owns TLS); the `sys_reload_tls` efun does not exist on this target; 2 struct fields typedef'd via `net/net_compat.h` |
 | libtelnet, `net/telnet.cc`, `net/msp.cc`, mssp | **kept** | pure C / portable; the page speaks telnet |
 | ICU (uc + data) | **kept** (cross-built) | core string handling: grapheme iteration, charset conversion, sprintf width |
-| zlib | **kept** (cross-built) | libtelnet MCCP + compress package |
+| zlib | **removed** | nothing on this target needs it: MCCP + the compress package are off, and the core's gzip'd file support is gated behind `HAVE_ZLIB` (compressed `save_object` degrades to a plain save; `write_file` flag 2 errors; reads use stdio) |
 | `thirdparty/crypt` (musl crypt) | **kept** | pure C |
 | backward-cpp | **removed** | no native unwinder in wasm |
 | jemalloc | **removed** | dlmalloc from emscripten |
@@ -122,10 +122,11 @@ Package matrix (`src/CMakeLists.txt` forces these under `EMSCRIPTEN`):
 
 | Package | State | Reason |
 |---|---|---|
-| core, ops, math, matrix, trim, uids, sha1, parser, contrib, develop, mudlib_stats, compress | **on** | portable |
+| core, ops, math, matrix, trim, uids, sha1, parser, contrib, develop, mudlib_stats | **on** | portable |
 | dwlib | default off (same as native) | portable; enable with `-DPACKAGE_DWLIB=ON` |
 | **jsbridge** | **on (WASM only)** | `js_eval()` / `js_call()` / `js_export()`: LPC ↔ page JavaScript in both directions (fetch, canvas/WebGL, page UIs driving the game, …) — see `docs/build-wasm.md` §7 and `docs/driver/wasm.md` |
 | sockets | off | BSD sockets (LPC socket efuns) |
+| compress | off | zlib efuns + MCCP make no sense against a same-page client |
 | external | off | `posix_spawn` child processes |
 | async | off | worker threads (see §5) |
 | db | off | MySQL/SQLite/PG client libs |
@@ -156,19 +157,31 @@ emcmake cmake --preset wasm && cmake --build --preset wasm
 testsuite; `tools/wasm/pack-mudlib.sh` packages any mudlib (see
 `docs/build-wasm.md`).
 
-### 3.1 Cross-built dependencies (ICU, zlib)
+### 3.1 Cross-built dependency (ICU)
 
-The build expects static wasm libraries under one prefix
+The build expects static wasm ICU under one prefix
 (`-DFLUFFOS_WASM_DEPS`, default `/opt/wasm-deps`): `libicuuc.a`,
-`libicudata.a`, `libz.a` + headers. **`tools/wasm/build-deps.sh` builds
-all of it**; for the record, the two ICU cross-compile quirks it handles:
+`libicudata.a` + headers. **`tools/wasm/build-deps.sh` builds all of
+it**; for the record, the ICU cross-compile quirks it handles:
 
 - copy `config/mh-linux` to `config/mh-unknown` (ICU doesn't know the
   emscripten triple);
-- `pkgdata` cannot produce a wasm object for the ~30MB data archive —
+- `pkgdata` cannot produce a wasm object for the data archive —
   generate it as C instead with the *host* build's `genccode`
   (`genccode -e icudt74 icudt74l.dat && emcc -c ... && emar rcs
-  libicudata.a ...`).
+  libicudata.a ...`);
+- **the data archive is trimmed with `icupkg`**: the stock archive is
+  ~30MB, but the driver only pulls break-iterator data from it
+  (grapheme + line breaking) — character properties and NFC are
+  compiled into libicuuc, and the UTF-8/UTF-16/Latin-1/ASCII converters
+  are algorithmic. The trim keeps `brkitr` rules + the converter alias
+  table (~780KB); segmentation dictionaries and table charsets (GBK,
+  Big5, Shift-JIS, …) are dropped — `string_encode()` etc. raise an LPC
+  error on those, and LPC can test `__WASM__` to adapt. Need a charset
+  back? Re-run `build-deps.sh` with `ICU_KEEP` (see the script header).
+  (`ICU_DATA_FILTER_FILE` doesn't work here: it only applies when
+  building ICU data from source, and the `-src` tarball ships a
+  prebuilt `.dat`.)
 
 ### 3.2 Link flags (see `driver-web` in `src/CMakeLists.txt`)
 
@@ -180,8 +193,8 @@ all of it**; for the record, the two ICU cross-compile quirks it handles:
 - `-sMODULARIZE=1 -sEXPORT_NAME=createFluffOS --no-entry`: the page
   instantiates the module and drives exported entry points; there is no
   `main()`.
-- `-sINITIAL_MEMORY=128MB -sALLOW_MEMORY_GROWTH=1 -sTOTAL_STACK=16MB`:
-  ICU's static data (~30MB) lives in the data segment.
+- `-sINITIAL_MEMORY=64MB -sALLOW_MEMORY_GROWTH=1 -sTOTAL_STACK=16MB`:
+  room for the compiler/VM heap up front; the heap grows on demand.
 - `-g0 --profiling-funcs`: full DWARF is dropped at link (binaryen's
   wasm-opt asserts trying to update it at -O3, notably with wasm EH) but
   the function-name section is kept, so browser/node stack traces stay
@@ -237,12 +250,13 @@ order:
    `socket_efuns`, they can be tunneled through `WebSocket` objects on
    the JS side with the same bridge pattern as the console (bytes in /
    bytes out per socket id). Inter-mud protocols would then work.
-5. **Size/latency budget.** `fluffos.wasm` is ~47MB debug / much smaller
-   with `-O2 -g0` + `--strip-debug`; the dominant cost is ICU data.
-   Apply an `ICU_DATA_FILTER_FILE` (keep root locale, brkitr, and the
-   charsets the mudlib actually uses) to cut it to a few MB, and serve
-   both files with gzip/brotli (wasm+data compress ~4:1).
-   (`-fwasm-exceptions` is already used on emsdk >= 3.1.57 — see §3.2.)
+5. **Size/latency budget — done.** ICU data is trimmed to brkitr only
+   (§3.1), DWARF is dropped at link (§3.2), MCCP/compress are off:
+   `fluffos.wasm` is ~3.6MB raw and **~0.8MB brotli** (~1.0MB gzip)
+   over the wire, plus ~110KB of JS glue. Remaining knobs if more is
+   ever needed: strip the name section (`--profiling-funcs` costs
+   ~0.4MB raw for readable stack traces) and `-Oz` on the code
+   (~1.7MB of the raw size is code).
 6. **Native loopback transport.** The `Transport` interface makes an
    in-process console user possible on the native driver too (a
    `PipeTransport`), which would let driver tests exercise the full
@@ -254,8 +268,16 @@ order:
 - `resolve()` raises "DNS resolver is not available"; `query_ip_number()`
   reports 127.0.0.1 for web connections.
 - Disabled-package efuns (`socket_*`, `external_start`, `db_*`, ffi,
-  async I/O, PCRE efuns) don't exist; their testsuite files skip
-  themselves via `__PACKAGE_*__` guards and the suite passes clean.
+  async I/O, PCRE efuns, `compress*`/`uncompress*`) don't exist; their
+  testsuite files skip themselves via `__PACKAGE_*__` guards and the
+  suite passes clean.
+- No zlib: gzip'd `write_file` (flag 2) raises an error, compressed
+  `save_object` falls back to a plain-text save, and `.gz` files are
+  not transparently decompressed by `read_file`/`restore_object`.
+- Only algorithmic charsets (UTF-8/UTF-16/UTF-32, Latin-1, ASCII):
+  `string_encode()`/`buffer_transcode()`/`set_encoding()` to table
+  charsets (GBK, Big5, …) raise an error unless the deps were built with
+  a custom `ICU_FILTER`. LPC can `#ifdef __WASM__` to adapt.
 - MEMFS writes are per-session until phase 2 lands.
 - The tab suspends timers in background: gameticks catch up (capped at
   100 ticks) when the tab wakes rather than running while hidden.

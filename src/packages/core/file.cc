@@ -40,7 +40,9 @@
 #include <fcntl.h>
 #include <sstream>
 #include <unistd.h>
+#ifdef HAVE_ZLIB
 #include <zlib.h>
+#endif
 
 #include "base/internal/strutils.h"
 #include "ghc/filesystem.hpp"
@@ -285,36 +287,37 @@ int remove_file(const char* path) {
  */
 int write_file(const char* file, const char* str, int flags) {
   FILE* f;
+#ifdef HAVE_ZLIB
   gzFile gf;
+#else
+  if (flags & 2) {
+    error("write_file: compressed writes are not available on this driver build.\n");
+  }
+#endif
 
   file = check_valid_path(file, current_object, "write_file", 1);
   if (!file) {
     return 0;
   }
+#ifdef HAVE_ZLIB
   if (flags & 2) {
     gf = gzopen(file, (flags & 1) ? "wb" : "ab");
     if (!gf) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
-  } else {
-    f = fopen(file, (flags & 1) ? "wb" : "ab");
-    if (f == nullptr) {
-      error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
-            (flags & 1) ? "overwrite" : "append", strerror(errno));
-    }
-  }
-  if (flags & 2) {
     gzwrite(gf, str, strlen(str));
-  } else {
-    fwrite(str, strlen(str), 1, f);
-  }
-
-  if (flags & 2) {
     gzclose(gf);
-  } else {
-    fclose(f);
+    return 1;
   }
+#endif
+  f = fopen(file, (flags & 1) ? "wb" : "ab");
+  if (f == nullptr) {
+    error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
+          (flags & 1) ? "overwrite" : "append", strerror(errno));
+  }
+  fwrite(str, strlen(str), 1, f);
+  fclose(f);
   return 1;
 }
 
@@ -358,7 +361,13 @@ char* read_file(const char* file, int start, int lines) {
     return nullptr;
   }
 
+  // With zlib, reads go through gzopen, which transparently decompresses
+  // .gz content and passes plain files through; without it, plain stdio.
+#ifdef HAVE_ZLIB
   gzFile f = gzopen(real_file, "rb");
+#else
+  FILE* f = fopen(real_file, "rb");
+#endif
 
   if (f == nullptr) {
     debug(file, "read_file: fail to open: %s.\n", file);
@@ -371,8 +380,13 @@ char* read_file(const char* file, int start, int lines) {
         DMALLOC(2 * read_file_max_size + 1, TAG_PERMANENT, "read_file: theBuff"));
   }
 
+#ifdef HAVE_ZLIB
   int const total_bytes_read = gzread(f, (void*)the_buff, 2 * read_file_max_size);
   gzclose(f);
+#else
+  int const total_bytes_read = fread(the_buff, 1, 2 * read_file_max_size, f);
+  fclose(f);
+#endif
 
   if (total_bytes_read <= 0) {
     debug(file, "read_file: read error: %s.\n", file);

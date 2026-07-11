@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
-# build-deps.sh -- cross-build the WASM driver's static dependencies
-# (ICU and zlib) with Emscripten, into a single install prefix.
+# build-deps.sh -- cross-build the WASM driver's static dependency (ICU)
+# with Emscripten, into an install prefix. (zlib is not used on the wasm
+# target: MCCP, the compress package and gzip'd file support are off.)
 #
 # Produces under $PREFIX (default /opt/wasm-deps):
-#   lib/libicuuc.a lib/libicui18n.a lib/libicudata.a lib/libz.a
-#   include/unicode/*.h include/zlib.h ...
+#   lib/libicuuc.a lib/libicui18n.a lib/libicudata.a
+#   include/unicode/*.h ...
 #
 # Requirements: emcc/emconfigure/emmake on PATH, a native C/C++
 # toolchain (ICU cross-builds need native ICU tools first), curl.
@@ -14,41 +15,39 @@
 #   PREFIX     install prefix            (default /opt/wasm-deps)
 #   WORK       scratch build directory   (default <prefix>-build)
 #   ICU_VER    ICU release               (default 74-2)
-#   ZLIB_VER   zlib release              (default 1.3.1)
+#   ICU_KEEP   extra icupkg keep-patterns for the ICU data trim, space
+#              separated (default: none beyond the built-ins below)
+#
+# ICU data: the stock icudt archive is ~30MB, which would dominate the
+# wasm binary. The driver only needs break iteration (grapheme/line
+# breaking) from the data archive -- character properties and NFC live
+# inside libicuuc, and UTF-8/UTF-16/Latin-1/ASCII converters are
+# algorithmic. The archive is therefore trimmed with icupkg down to
+# brkitr rules + the converter alias table (<1MB); dictionary-based
+# segmentation (CJK/Thai word breaking) and table charsets (GBK, Big5,
+# ...) are dropped -- string_encode()/set_encoding() to those raise an
+# LPC error on wasm, and LPC can test __WASM__ to adapt. Need a charset
+# back? Re-run with the prefix removed and e.g.
+#   ICU_KEEP='ibm-1386_P100-2001.cnv windows-936-2000.cnv'
+# (icupkg -l on the .dat lists the item names).
 
 set -euo pipefail
 
 PREFIX=${PREFIX:-/opt/wasm-deps}
 WORK=${WORK:-${PREFIX}-build}
 ICU_VER=${ICU_VER:-74-2}
-ZLIB_VER=${ZLIB_VER:-1.3.1}
 NPROC=$(nproc 2>/dev/null || echo 4)
 
 ICU_VER_U=${ICU_VER//-/_}   # 74_2
 ICU_MAJOR=${ICU_VER%%-*}    # 74
 
-if [ -f "$PREFIX/lib/libicuuc.a" ] && [ -f "$PREFIX/lib/libicudata.a" ] && \
-   [ -f "$PREFIX/lib/libz.a" ]; then
+if [ -f "$PREFIX/lib/libicuuc.a" ] && [ -f "$PREFIX/lib/libicudata.a" ]; then
   echo "wasm deps already present in $PREFIX; nothing to do."
   exit 0
 fi
 
 mkdir -p "$PREFIX" "$WORK"
 cd "$WORK"
-
-# ---------------- zlib ----------------
-if [ ! -f "$PREFIX/lib/libz.a" ]; then
-  echo "=== zlib $ZLIB_VER ==="
-  if [ ! -d "zlib-$ZLIB_VER" ]; then
-    curl -fsSL -o zlib.tar.gz \
-      "https://github.com/madler/zlib/releases/download/v$ZLIB_VER/zlib-$ZLIB_VER.tar.gz"
-    tar xzf zlib.tar.gz
-  fi
-  (cd "zlib-$ZLIB_VER" &&
-    emconfigure ./configure --static --prefix="$PREFIX" &&
-    emmake make -j"$NPROC" libz.a &&
-    emmake make install)
-fi
 
 # ---------------- ICU ----------------
 if [ ! -f "$PREFIX/lib/libicuuc.a" ] || [ ! -f "$PREFIX/lib/libicudata.a" ]; then
@@ -58,6 +57,7 @@ if [ ! -f "$PREFIX/lib/libicuuc.a" ] || [ ! -f "$PREFIX/lib/libicudata.a" ]; the
       "https://github.com/unicode-org/icu/releases/download/release-$ICU_VER/icu4c-$ICU_VER_U-src.tgz"
     tar xzf icu.tgz
   fi
+
   cd icu/source
 
   # ICU's config.sub doesn't know the emscripten triple; the generic
@@ -94,13 +94,32 @@ if [ ! -f "$PREFIX/lib/libicuuc.a" ] || [ ! -f "$PREFIX/lib/libicudata.a" ]; the
     emmake make -C common install >/dev/null &&
     emmake make -C i18n install >/dev/null)
 
-  # 3. The data archive: generate C source for the .dat with the HOST
-  #    genccode, compile it with emcc, archive it as libicudata.a.
-  echo "=== ICU data (genccode -> emcc) ==="
+  # 3. The data archive: trim it with icupkg (see header -- the stock
+  #    archive is ~30MB; break iteration + the converter alias table is
+  #    all the driver needs), then generate C source for it with the
+  #    HOST genccode, compile with emcc, archive as libicudata.a.
+  #    (ICU_DATA_FILTER_FILE would be nicer, but it only applies when
+  #    building the data from source -- the -src tarball ships a
+  #    prebuilt .dat, so filter the .dat itself.)
+  echo "=== ICU data (icupkg trim -> genccode -> emcc) ==="
   DAT=$(find "$PWD/build-host/data/out/tmp" -name "icudt${ICU_MAJOR}*.dat" | head -1)
   [ -n "$DAT" ] || { echo "error: host ICU data file not found" >&2; exit 1; }
-  (cd "$WORK" &&
-    "$WORK/icu/source/build-host/bin/genccode" -e "icudt${ICU_MAJOR}" -d . "$DAT" &&
+  ICUPKG="$WORK/icu/source/build-host/bin/icupkg"
+  (mkdir -p "$WORK/data-trim" && cd "$WORK/data-trim" &&
+    cp "$DAT" . &&
+    KEEP='^(brkitr/.*\.(brk|res)$|cnvalias\.icu$|pnames\.icu$|root\.res$|res_index\.res$|pool\.res$)' &&
+    { "$ICUPKG" -l "$DAT" | grep -vE "$KEEP"
+      # dictionary-based segmentation data is the next-largest chunk
+      "$ICUPKG" -l "$DAT" | grep -E '^brkitr/.*\.dict$'; } | sort -u > remove-all.txt &&
+    if [ -n "${ICU_KEEP:-}" ]; then
+      printf '%s\n' $ICU_KEEP > keep-extra.txt
+      grep -vFxf keep-extra.txt remove-all.txt > remove.txt
+    else
+      mv remove-all.txt remove.txt
+    fi &&
+    "$ICUPKG" -r remove.txt --ignore-deps "$(basename "$DAT")" &&
+    echo "trimmed data archive: $(du -h "$(basename "$DAT")" | cut -f1)" &&
+    "$WORK/icu/source/build-host/bin/genccode" -e "icudt${ICU_MAJOR}" -d . "$(basename "$DAT")" &&
     emcc -O2 -I"$WORK/icu/source/common" -c "$(basename "${DAT%.dat}")_dat.c" \
          -o icudata.o &&
     emar rcs "$PREFIX/lib/libicudata.a" icudata.o)

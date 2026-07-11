@@ -1766,6 +1766,12 @@ void add_predefines() {
   add_quoted_predefine("__ARCH__", ARCH);
   add_quoted_predefine("__COMPILER__", COMPILER);
   add_quoted_predefine("__CXXFLAGS__", CXXFLAGS);
+#ifdef __EMSCRIPTEN__
+  // The WebAssembly/browser target: lets mudlibs (and the testsuite)
+  // adapt to its capability differences, e.g. the reduced ICU charset
+  // set (UTF-8/UTF-16/Latin-1/ASCII only).
+  add_predefine("__WASM__", -1, "");
+#endif
 
   /* Backwards Compat */
   add_quoted_predefine("MUD_NAME", CONFIG_STR(__MUD_NAME__));

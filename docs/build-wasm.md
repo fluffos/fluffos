@@ -34,18 +34,24 @@ and isn't supported) see
 
 ## 1. Build the WASM dependencies (once)
 
-The driver needs static WASM builds of **ICU** (Unicode: grapheme
-iteration, charset conversion) and **zlib** (MCCP, compress package):
+The driver needs a static WASM build of **ICU** (Unicode: grapheme
+iteration, charset conversion) — the only cross-built dependency:
 
 ```bash
 tools/wasm/build-deps.sh          # installs into /opt/wasm-deps
 # or: PREFIX=$HOME/wasm-deps tools/wasm/build-deps.sh
 ```
 
-This is fully scripted, including the two ICU cross-compile quirks
-(the `mh-unknown` platform file, and generating the ~30MB data archive
-as C source with the host `genccode` because `pkgdata` cannot emit wasm
-objects). It only runs once; re-runs are no-ops.
+This is fully scripted, including the ICU cross-compile quirks (the
+`mh-unknown` platform file, and generating the data archive as C source
+with the host `genccode` because `pkgdata` cannot emit wasm objects).
+It only runs once; re-runs are no-ops.
+
+The ICU data archive is **trimmed to break-iterator data** so the
+driver stays small (`fluffos.wasm` is ~3.6MB raw, ~0.8MB brotli) —
+table charsets (GBK, Big5, …) are not available on this target unless
+you rebuild the deps with `ICU_KEEP` (see the header of
+`build-deps.sh`). UTF-8/UTF-16/Latin-1/ASCII always work.
 
 ## 2. Build the driver
 
@@ -98,7 +104,7 @@ python3 -m http.server -d dist 8080
 ```
 
 For production, serve `fluffos.wasm` and `mudlib.data` with gzip/brotli
-(they compress ~4:1) and long cache lifetimes.
+(fluffos.wasm is ~0.8MB brotli) and long cache lifetimes.
 
 ## 5. Run the LPC testsuite in the WASM driver
 
@@ -109,7 +115,8 @@ node tools/wasm/run-testsuite.js         # boots testsuite/, runs -ftest
 Exit code 0 plus `Checks succeeded.` is the pass signal — the same gate
 CI uses (see the `wasm` job in `.github/workflows/ci.yml`). Tests for
 packages that don't exist on this target (sockets, external, db, ffi,
-pcre, crypto, async) skip themselves via `#ifdef __PACKAGE_*__` guards.
+pcre, crypto, async, compress) skip themselves via `#ifdef __PACKAGE_*__`
+guards.
 
 ## 6. Embedding API (custom frontends)
 
@@ -134,7 +141,7 @@ M.ccall('fluffos_input', null, ['number','array','number'],
 ```
 
 The driver does real telnet negotiation on each connection (ECHO for
-password masking, NAWS, GMCP, MCCP…), so the page needs at least a
+password masking, NAWS, GMCP…), so the page needs at least a
 minimal telnet layer — copy the ~60-line client from
 `src/www/wasm/index.html`.
 
@@ -189,5 +196,11 @@ console — implemented in `testsuite/command/jsdemo.lpc` +
   `127.0.0.1`.
 * Mudlib writes live in page memory for the session; persistent storage
   (IDBFS) is on the roadmap in `src/wasm/README.md`.
+* No zlib on this target: compressed `save_object` degrades to a plain
+  save, gzip'd `write_file` raises an error, and `.gz` files aren't
+  transparently decompressed.
+* Only algorithmic charsets ship (UTF-8/UTF-16/UTF-32, Latin-1, ASCII);
+  `string_encode()` to a table charset raises an error. LPC can adapt
+  with `#ifdef __WASM__` (predefined on this target).
 * Background tabs throttle timers; the driver catches up (capped) when
   the tab wakes.

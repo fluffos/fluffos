@@ -242,7 +242,7 @@ webpage — every visitor gets their own driver instance, served as static
 files:
 
 ```bash
-tools/wasm/build-deps.sh     # once: cross-build ICU + zlib for wasm32
+tools/wasm/build-deps.sh     # once: cross-build ICU for wasm32
 tools/wasm/build.sh          # native codegen tools + wasm driver + demo bundle
 python3 -m http.server -d build-wasm/dist 8080   # open http://localhost:8080/
 ```

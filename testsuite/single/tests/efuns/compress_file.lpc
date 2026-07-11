@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_COMPRESS__
 void do_tests() {
     string text = "compress_file efun test payload payload payload\n";
     write_file("/cf_src.txt", text, 1);
@@ -8,3 +9,4 @@ void do_tests() {
     ASSERT_EQ(text, read_file("/cf_src.txt"));
     rm("/cf_src.txt");
 }
+#endif

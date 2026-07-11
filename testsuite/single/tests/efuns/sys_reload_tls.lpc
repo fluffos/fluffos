@@ -1,3 +1,6 @@
+// No TLS on the wasm target: the sys_reload_tls efun does not exist
+// there (the page terminates TLS), so this file must not reference it.
+#ifndef __WASM__
 void do_tests_real() {
   // non tls port
   ASSERT_NE(0, catch(sys_reload_tls(0)));
@@ -27,3 +30,8 @@ void do_tests() {
   call_out("after_boot", 0);
 }
 
+#else
+void do_tests() {
+  ASSERT(1);
+}
+#endif

@@ -118,7 +118,7 @@ FluffOS uses GitHub Actions for CI on pull requests and pushes to `master`.
   - **Ubuntu + Sanitizers** (`ubuntu-24.04`): Clang with `-DENABLE_SANITIZER=ON` (Address & Undefined Behavior), Debug and RelWithDebInfo.
   - **macOS** (`macos-14`, Apple Silicon): Default Clang, Debug and RelWithDebInfo.
   - **Windows** (`windows-latest`): MSYS2/MinGW64 via `msys2/setup-msys2@v2`, Debug and RelWithDebInfo.
-  - **WASM** (`ubuntu-24.04`, separate `wasm` job): latest emsdk (deps cache keyed on the resolved `emcc -dumpversion`) + cached wasm-built ICU/zlib → the two cross-build presets → the LPC testsuite running *inside the wasm driver* under node. The release workflow (`release.yml`) has a matching `build-wasm` job that ships `fluffos-<version>-wasm.zip` (driver + web terminal + `pack-mudlib.sh`).
+  - **WASM** (`ubuntu-24.04`, separate `wasm` job): latest emsdk (deps cache keyed on the resolved `emcc -dumpversion`) + cached wasm-built ICU → the two cross-build presets → the LPC testsuite running *inside the wasm driver* under node. The release workflow (`release.yml`) has a matching `build-wasm` job that ships `fluffos-<version>-wasm.zip` (driver + web terminal + `pack-mudlib.sh`).
   - **Flow** (native platforms): Install dependencies → CMake configure → Build → GTest unit tests → LPC testsuite.
 * **Docker CI** (`.github/workflows/docker-publish.yml`):
   - Builds a Docker image and pushes to `ghcr.io` on tagged releases and master merges.

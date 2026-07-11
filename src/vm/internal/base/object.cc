@@ -12,7 +12,11 @@
 #include <sstream>
 #include <unistd.h>
 #include <vector>
+#ifdef HAVE_ZLIB
 #include <zlib.h>
+#else
+typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
+#endif
 
 #include "applies_table.autogen.h"
 #include "base/internal/strutils.h"  // for startsWith, endsWith
@@ -1397,9 +1401,12 @@ static int save_object_recurse(program_t* prog, svalue_t** svp, int type, int sa
       textsize += strlen(prog->variable_table[i]);
       textsize += 2;
       int result;
+#ifdef HAVE_ZLIB
       if (gzf) {
         result = gzprintf(gzf, "%s %s\n", prog->variable_table[i], new_str);
-      } else {
+      } else
+#endif
+      {
         result = fprintf(f, "%s %s\n", prog->variable_table[i], new_str);
       }
       if (result < 0) {
@@ -1508,6 +1515,11 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
   } else {
     save_compressed = 0;
   }
+#ifndef HAVE_ZLIB
+  // No zlib on this build (wasm): degrade to a plain-text save so the
+  // data is still written and restorable.
+  save_compressed = 0;
+#endif
 
   if (ob->flags & O_DESTRUCTED) {
     return 0;
@@ -1565,6 +1577,7 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
 
   gzf = nullptr;
   f = nullptr;
+#ifdef HAVE_ZLIB
   if (save_compressed) {
     gzf = gzopen(tmp_name, "wb");
     if (!gzf) {
@@ -1573,7 +1586,9 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
     if (!gzprintf(gzf, "#/%s\n", ob->prog->filename)) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
-  } else {
+  } else
+#endif
+  {
     if (!(f = fopen(tmp_name, "wb")) || fprintf(f, "#/%s\n", save_name) < 0) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
@@ -1582,10 +1597,12 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
 
   success = save_object_recurse(ob->prog, &v, 0, save_zeros, f, gzf);
 
+#ifdef HAVE_ZLIB
   if (gzf && gzclose(gzf)) {
     debug_perror("save_object", file);
     success = 0;
   }
+#endif
 
   if (f && fclose(f) < 0) {
     debug_perror("save_object", file);
@@ -1720,6 +1737,7 @@ int restore_object(object_t* ob, const char* file, int noclear) {
     filename = filename.substr(0, filename.length() - SAVE_EXTENSION_GZ_LENGTH);
   }
 
+#ifdef HAVE_ZLIB
   // Check if GZ file exists.
   struct stat st;
   std::string filename_gz = filename + SAVE_GZ_EXTENSION;
@@ -1732,6 +1750,11 @@ int restore_object(object_t* ob, const char* file, int noclear) {
   } else {
     filename = filename + SAVE_EXTENSION;
   }
+#else
+  // No zlib on this build (wasm): compressed saves cannot be read, so
+  // only the plain-text save file is considered.
+  filename = filename + SAVE_EXTENSION;
+#endif
 
   // valid read permission.
   file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
@@ -1739,8 +1762,13 @@ int restore_object(object_t* ob, const char* file, int noclear) {
     error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
 
-  // We always use zlib functions here and below, as it handles non-gzip file as well.
+  // With zlib these reads go through gzopen, which transparently handles
+  // both gzip'd and plain save files; without it, plain stdio.
+#ifdef HAVE_ZLIB
   gzFile gzf = gzopen(file, "rb");
+#else
+  FILE* gzf = fopen(file, "rb");
+#endif
   if (gzf == nullptr) {
     // Compat: do not return error, if there are no save files.
     return 0;
@@ -1754,6 +1782,7 @@ int restore_object(object_t* ob, const char* file, int noclear) {
   std::vector<char> buf(chunk);
   int total_bytes_read = 0;
   while (true) {
+#ifdef HAVE_ZLIB
     int bytes_read = gzread(gzf, buf.data() + total_bytes_read, chunk);
 
     // Error reading gzip file.
@@ -1763,6 +1792,14 @@ int restore_object(object_t* ob, const char* file, int noclear) {
       gzclose(gzf);
       error("restore_object: Error reading file: %s,  error: %s.\n", file, errstr.c_str());
     }
+#else
+    int bytes_read = fread(buf.data() + total_bytes_read, 1, chunk, gzf);
+
+    if (bytes_read < chunk && ferror(gzf)) {
+      fclose(gzf);
+      error("restore_object: Error reading file: %s.\n", file);
+    }
+#endif
     // Read successfully
     total_bytes_read += bytes_read;
 
@@ -1779,7 +1816,11 @@ int restore_object(object_t* ob, const char* file, int noclear) {
     buf[total_bytes_read] = '\0';
     break;
   }
+#ifdef HAVE_ZLIB
   gzclose(gzf);
+#else
+  fclose(gzf);
+#endif
 
   // Compat: ignore empty file.
   if (total_bytes_read == 0) {
