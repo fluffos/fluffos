@@ -49,6 +49,10 @@ ScratchString strip_directive_comments(std::string_view s) {
       i += 2;
       while (i + 1 < s.size() && (s[i] != '*' || s[i + 1] != '/')) i++;
       if (i + 1 < s.size()) i += 2;
+      // A comment is ONE space (C translation phase 3), not nothing:
+      // eliding it entirely would paste the surrounding tokens together
+      // ("1/*x*/2" must stay two tokens, not become "12").
+      r += ' ';
     } else {
       r += s[i++];
     }
@@ -951,6 +955,13 @@ static ScratchString fold_backslash_newlines(std::string_view text) {
 static void dispatch_directive(std::string_view dir, std::string_view rest, void* yyscanner) {
   if (dir == "define") {
     if (lpc_lex_emitting()) {
+      // Comments are whitespace (C translation phase 3): strip them from
+      // the whole definition BEFORE parsing the name/params/body. A '//'
+      // tail otherwise lands in the stored body and -- expansion buffers
+      // carry no newline to end it -- comments out the rest of whatever
+      // spliced text the macro later expands into (#1240).
+      ScratchString rest_stripped = strip_directive_comments(rest);
+      rest = std::string_view(rest_stripped);
       size_t idx = 0;
       while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
       size_t ns = idx;
@@ -986,7 +997,10 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
         if (idx < rest.size()) idx++;  // skip ')'
       }
       while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
-      ScratchString body = (idx < rest.size()) ? ScratchString(rest.substr(idx)) : ScratchString();
+      // trim(): a stripped trailing comment leaves trailing whitespace,
+      // which must not make "1" vs "1 " look like a redefinition.
+      ScratchString body =
+          (idx < rest.size()) ? ScratchString(trim(rest.substr(idx))) : ScratchString();
 
       std::string_view bv(body);
       auto bv_trim = trim(bv);
@@ -1028,7 +1042,9 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     }
   } else if (dir == "undef") {
     if (lpc_lex_emitting()) {
-      std::string name(trim(rest));
+      // Same phase-3 rule as #define: "#undef X // why" names X, not
+      // "X // why" (which silently erased nothing).
+      std::string name(trim(std::string_view(strip_directive_comments(rest))));
       if (pp_is_predefined(name)) {
         lexerror("Illegal to #undef a predefined value.");
       } else {
@@ -1036,11 +1052,13 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
       }
     }
   } else if (dir == "ifdef") {
-    bool def = pp_find_macro(trim(rest)) != nullptr;
+    // Strip comments or "#ifdef X // why" looks up the wrong name and
+    // silently takes the false branch.
+    bool def = pp_find_macro(trim(std::string_view(strip_directive_comments(rest)))) != nullptr;
     bool emit = lpc_lex_emitting() && def;
     g_compile.conds.push_back({emit, emit});
   } else if (dir == "ifndef") {
-    bool def = pp_find_macro(trim(rest)) != nullptr;
+    bool def = pp_find_macro(trim(std::string_view(strip_directive_comments(rest)))) != nullptr;
     bool emit = lpc_lex_emitting() && !def;
     g_compile.conds.push_back({emit, emit});
   } else if (dir == "if") {
@@ -1115,7 +1133,9 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     }
   } else if (dir == "pragma") {
     if (lpc_lex_emitting()) {
-      ScratchString rest_str(trim(rest));
+      // Pragma payloads are word lists, so a trailing comment would read
+      // as an unknown pragma word -- strip like the other parsed forms.
+      ScratchString rest_str(trim(std::string_view(strip_directive_comments(rest))));
       handle_pragma(const_cast<char*>(rest_str.c_str()));
     }
   } else if (dir == "line" ||
