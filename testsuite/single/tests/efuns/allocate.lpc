@@ -5,4 +5,14 @@ void do_tests() {
     }
     ASSERT(allocate(0) == ({}));
     ASSERT(catch(allocate(-10)));
+
+    // allocate(n, function) applies the function per element.
+    ASSERT_EQ(({ 0, 1, 2, 3 }), allocate(4, (: $1 :)));
+
+    // If the per-element function errors mid-loop, the partially built array
+    // must not leak (checkmemory / the per-file leak gate catches it).
+    ASSERT(catch(allocate(5, function(int i) {
+        if (i == 2) error("boom");
+        return i;
+    })));
 }

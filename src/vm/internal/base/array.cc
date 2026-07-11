@@ -125,6 +125,11 @@ array_t* allocate_array2(int n, svalue_t* svp) {
 
   if (svp->type == T_FUNCTION) {
     ret = allocate_array(n);
+    // The callback runs arbitrary LPC and may error()/longjmp out of the
+    // loop. Keep ret on the VM stack so the unwind reclaims it (along with
+    // any refcounted values already stored) instead of leaking it; detach it
+    // without freeing on the normal path. (mirrors allocate_mapping2/map_array)
+    push_refed_array(ret);
 
     for (i = 0; i < n; i++) {
       svalue_t* r;
@@ -134,6 +139,7 @@ array_t* allocate_array2(int n, svalue_t* svp) {
       ret->item[i] = *r;
       r->type = T_NUMBER;
     }
+    sp--; /* detach ret from the stack; caller owns the reference */
   } else {
     ret = allocate_empty_array(n);
 
