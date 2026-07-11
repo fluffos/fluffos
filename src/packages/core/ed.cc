@@ -869,8 +869,12 @@ static char* getfn(int writeflg) {
   if (*inptr == NL) {
     P_NOFNAME = TRUE;
     file[0] = '/';
-    strncpy(file + 1, P_FNAME, MAXFNAME - 2);
-    file[MAXFNAME - 1] = '\0';
+    size_t fn_len = strlen(P_FNAME);
+    if (fn_len > MAXFNAME - 2) {
+      fn_len = MAXFNAME - 2;
+    }
+    memcpy(file + 1, P_FNAME, fn_len);
+    file[1 + fn_len] = '\0';
   } else {
     P_NOFNAME = FALSE;
     Skip_White_Space;
