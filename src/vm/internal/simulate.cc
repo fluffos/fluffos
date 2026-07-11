@@ -443,12 +443,17 @@ object_t* load_object(const char* lname, int callcreate) {
   struct stat c_st;
   char name[400], actualname[400], real_name[sizeof(name) + 2], obname[sizeof(real_name)];
 
+  // Count this load BEFORE the valid_read master apply: a master whose
+  // valid_read itself triggers loads used to recurse through
+  // check_valid_path without ever hitting this limit, overflowing the C
+  // stack on small-stack platforms (issue #712).
+  if (++num_objects_this_thread > inherit_chain_size) {
+    error("Inherit chain too deep: > %d when trying to load '%s'.\n", inherit_chain_size, lname);
+  }
+
   const char* pname = check_valid_path(lname, master_ob, "load_object", 0);
   if (!pname) {
     error("Read access denied.\n");
-  }
-  if (++num_objects_this_thread > inherit_chain_size) {
-    error("Inherit chain too deep: > %d when trying to load '%s'.\n", inherit_chain_size, lname);
   }
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == nullptr) {
