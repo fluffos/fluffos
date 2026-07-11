@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
     int lib = ffi_load("");
     ffi_unload(lib);

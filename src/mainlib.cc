@@ -29,13 +29,13 @@
 #endif
 #include <unicode/uversion.h>
 
+#include "base/internal/crash_handler.h"  // for install_crash_handler, etc
 #include "base/internal/tracing.h"
 #include "thirdparty/scope_guard/scope_guard.hpp"
-#include "packages/core/dns.h"                   // for init_dns_event_base.
-#include "vm/vm.h"                               // for push_constant_string, etc
-#include "comm.h"                                // for init_user_conn
-#include "backend.h"                             // for backend();
-#include "thirdparty/backward-cpp/backward.hpp"  // for backtracing
+#include "packages/core/dns.h"  // for init_dns_event_base.
+#include "vm/vm.h"              // for push_constant_string, etc
+#include "comm.h"               // for init_user_conn
+#include "backend.h"            // for backend();
 
 // from lexer_utils.cc
 extern void print_all_predefines();
@@ -116,15 +116,7 @@ void print_version_and_time() {
 #endif
   debug_message("ICU Version: %s\n", U_ICU_VERSION);
 
-#ifndef _WIN32
-#if BACKWARD_HAS_DW == 1
-  debug_message("Backtrace support: libdw.\n");
-#elif BACKWARD_HAS_BFD == 1
-  debug_message("Backtrace support: libbfd.\n");
-#else
-  debug_message("libdw or libbfd is not found, you will only get very limited crash stacktrace.\n");
-#endif
-#endif /* _WIN32 */
+  debug_message("Backtrace support: %s.\n", crash_handler_backtrace_support());
 }
 
 void sig_cld(int sig) {
@@ -159,10 +151,6 @@ void sig_usr2(int /*sig*/) {
  * -Beek
  */
 void attempt_shutdown(int sig) {
-  using namespace backward;
-  static StackTrace st;
-  static Printer p;
-
   const char* msg = "Unkonwn signal!";
   switch (sig) {
     case SIGTERM:
@@ -178,11 +166,7 @@ void attempt_shutdown(int sig) {
   signal(SIGINT, SIG_DFL);
 
   // Print backtrace
-  st.load_here(64);
-  p.object = true;
-  p.color_mode = ColorMode::automatic;
-  p.address = true;
-  p.print(st, stderr);
+  print_native_stacktrace();
 
   // Attempt to call crash()
   fatal(msg);
@@ -326,11 +310,8 @@ int driver_main(int argc, char** argv) {
   print_rlimit();
   print_sep();
 
-  // backward-cpp doesn't yet work on win32
-
   // register crash handlers
-  backward::SignalHandling sh;
-  if (!sh.loaded()) {
+  if (!install_crash_handler()) {
     debug_message("Warning: Signal handler installation failed, not backtrace on crash!\n");
   }
 

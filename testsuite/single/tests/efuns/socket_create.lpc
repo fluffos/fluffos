@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
 #include <socket_err.h>
 void rcb(int fd) { }
@@ -9,3 +10,4 @@ void do_tests() {
     // Bad mode is rejected.
     ASSERT(socket_create(-1, "rcb") < 0);
 }
+#endif

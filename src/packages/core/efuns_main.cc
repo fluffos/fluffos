@@ -13,6 +13,9 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
+#ifndef _WIN32
+#include <arpa/inet.h>  // for htonl/ntohl
+#endif
 
 #include <unistd.h>  // for rmdir(), FIXME
 #include "thirdparty/crypt/crypt.h"

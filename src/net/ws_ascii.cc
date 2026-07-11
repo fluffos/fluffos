@@ -9,15 +9,9 @@
 #include <cstdlib>
 
 #include "net/ws_ascii.h"
+#include "comm.h"
+#include "net/transport_native.h"
 #include "interactive.h"
-
-// from comm.cc
-interactive_t* new_user(port_def_t* port, evutil_socket_t fd, sockaddr* addr, socklen_t addrlen);
-extern void on_user_logon(interactive_t*);
-extern void remove_interactive(object_t* ob, int dested);
-int cmd_in_buf(interactive_t* ip);
-
-void on_user_websocket_received(interactive_t* ip, const char* data, size_t len);
 
 namespace {
 
@@ -196,7 +190,7 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
       if (!ip) {  // we are already disconnected
         return -1;
       }
-      on_user_websocket_received(ip, (const char*)in, len);
+      comm_text_received(ip, (const char*)in, len);
       break;
     }
     default:

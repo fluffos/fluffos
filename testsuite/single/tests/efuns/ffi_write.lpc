@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     buffer b = ffi_alloc(8);
     // Little-endian layout check: write 0x04030201 as int32, read bytes.
     ffi_write(b, 0, FFI_INT32, 0x04030201);

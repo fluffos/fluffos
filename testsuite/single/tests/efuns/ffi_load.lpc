@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+#endif
 void do_tests() {
+#ifdef __PACKAGE_FFI__
     // Empty path -> the driver's own libc/libm symbols (portable handle).
     int lib = ffi_load("");
     if (lib <= 0) { ASSERT(1); return; }   // FFI unreachable on this platform

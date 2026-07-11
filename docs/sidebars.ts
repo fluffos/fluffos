@@ -6,7 +6,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Introduction',
       collapsed: false,
-      items: ['index', 'build', 'bug'],
+      items: ['index', 'build', 'build-wasm', 'bug'],
     },
     {
       type: 'category',
@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'driver/index' },
       items: [
         'driver/config',
+        'driver/wasm',
         'driver/adding_efuns',
         'driver/stackmachine',
         'driver/parse_tree',

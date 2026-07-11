@@ -287,6 +287,10 @@ title: EFUN
 * [time_expression](internals/time_expression)
 * [trace](internals/trace)
 * [traceprefix](internals/traceprefix)
+## jsbridge (WASM only)
+* [js_call](jsbridge/js_call)
+* [js_eval](jsbridge/js_eval)
+* [js_export](jsbridge/js_export)
 ## mappings
 * [allocate_mapping](mappings/allocate_mapping)
 * [filter_mapping](mappings/filter_mapping)

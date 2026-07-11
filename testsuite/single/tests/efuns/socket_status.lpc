@@ -1,3 +1,4 @@
+#ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
 void rcb(int fd) { }
 void do_tests() {
@@ -7,3 +8,4 @@ void do_tests() {
     ASSERT(arrayp(socket_status(fd)));
     socket_close(fd);
 }
+#endif

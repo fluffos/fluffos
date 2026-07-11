@@ -1,8 +1,7 @@
 #ifndef INTERACITVE_H
 #define INTERACITVE_H
 
-#include <openssl/ssl.h>
-#include <event2/util.h>
+#include "net/net_compat.h"
 
 #include "vm/vm.h"  // FIXME: for union string_or_func
 
@@ -40,6 +39,9 @@
 // from ICU
 struct UConverter;
 
+// net/transport.h
+class Transport;
+
 struct interactive_t {
   struct object_t* ob; /* points to the associated object         */
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
@@ -72,11 +74,23 @@ struct interactive_t {
 #endif
   unsigned int iflags; /* interactive flags */
 
+  // The byte transport that connects this user to its peer (socket,
+  // websocket, or the WASM JS bridge). Owned by this struct; torn down in
+  // remove_interactive().
+  Transport* transport;
+
   // iconv handle
   UConverter* trans;
 
   // libtelnet handle
   struct telnet_t* telnet;
+
+  // --- native-transport private state (TRANSITIONAL) ---
+  // Owned and touched only by the Transport implementations in
+  // net/transport_libevent.cc (and net/websocket.cc); always null on
+  // targets without those transports. Shared code must go through
+  // `transport` instead of these. Moving them into the Transport
+  // subclasses is on the roadmap (src/wasm/README.md 5).
 
   // libevent event handle.
   struct bufferevent* ev_buffer;

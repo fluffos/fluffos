@@ -4,17 +4,15 @@
 #include "net/sys_telnet.h"  // our own version of telnet header.
 #include "net/msp.h"
 
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
 #include <string>
 #include <unicode/ucnv.h>
 
 #include "comm.h"
 #include "interactive.h"
+#include "net/transport.h"
 #include "packages/core/mssp.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
 #include "vm/vm.h"
-#include "net/websocket.h"
 
 static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
@@ -58,7 +56,10 @@ static const telnet_telopt_t my_telopts_ws[] = {{TELNET_TELOPT_TM, TELNET_WILL, 
 static void telnet_event_handler(telnet_t* /*telnet*/, telnet_event_t* /*ev*/, void* /*user_data*/);
 
 struct telnet_t* net_telnet_init(interactive_t* user) {
-  return telnet_init(user->lws ? my_telopts_ws : my_telopts, telnet_event_handler, 0, user);
+  // Self-compressing transports (websockets) get the table that refuses
+  // MCCP; see Transport::compresses_stream().
+  return telnet_init(user->transport->compresses_stream() ? my_telopts_ws : my_telopts,
+                     telnet_event_handler, 0, user);
 }
 
 static inline void on_telnet_data(const char* buffer, unsigned long size, interactive_t* ip) {
@@ -98,11 +99,7 @@ static inline void on_telnet_send(const char* buffer, unsigned long size, intera
   // socket byte-for-byte — no charset transcoding here (game text is already
   // transcoded in add_message() before it enters libtelnet; transcoding again
   // would corrupt protocol bytes and any MCCP-compressed data).
-  if (ip->connection_type == PORT_TYPE_WEBSOCKET) {
-    websocket_send_text(ip->lws, buffer, size);
-  } else {
-    bufferevent_write(ip->ev_buffer, buffer, size);
-  }
+  ip->transport->write(buffer, size);
 }
 
 static inline void on_telnet_iac(unsigned char cmd, interactive_t* ip) {
@@ -271,10 +268,10 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
       ip->iflags |= USING_ZMP;
       break;
     case TELNET_TELOPT_COMPRESS2:
-      // MCCP is refused on websocket connections (see my_telopts_ws);
-      // libtelnet answers WONT for them and this event never fires, but
-      // guard anyway so compression can't start on a ws stream.
-      if (!ip->lws) {
+      // MCCP is refused on self-compressing transports (see
+      // my_telopts_ws); libtelnet answers WONT for them and this event
+      // never fires, but guard anyway so compression can't start there.
+      if (!ip->transport->compresses_stream()) {
         telnet_begin_compress2(ip->telnet);
       }
       break;
@@ -545,10 +542,10 @@ void send_initial_telnet_negotiations(struct interactive_t* user) {
   // Also newenv
   telnet_negotiate(user->telnet, TELNET_DO, TELNET_TELOPT_NEW_ENVIRON);
 
-/* We support COMPRESS2, but not on websocket connections: the websocket
- * layer compresses on its own (permessage-deflate). */
+/* We support COMPRESS2, but not on transports that compress their own
+ * stream (websocket permessage-deflate). */
 #ifdef HAVE_ZLIB  // come from libtelnet
-  if (!user->lws) {
+  if (!user->transport->compresses_stream()) {
     telnet_negotiate(user->telnet, TELNET_WILL, TELNET_TELOPT_COMPRESS2);
   }
 #endif
