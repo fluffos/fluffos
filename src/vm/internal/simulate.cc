@@ -1002,22 +1002,41 @@ int recompile_object(object_t* target) {
     }
 
     // Fresh initializers first (this object's new code), then the
-    // carried-over values overwrite every name that survived.
-    call___INIT(ob);
-    if (!(ob->flags & O_DESTRUCTED)) {
+    // carried-over values overwrite every name that survived. __INIT
+    // runs arbitrary LPC and may error(); catch it so one target's bad
+    // initializer can't leak this loop's held refs (the snapshot ref,
+    // new_prog's compile ref, old_vars) or abort the other targets.
+    // On error the object is left committed to the new program with a
+    // fresh (partially initialized) variable block -- carried-over
+    // state is dropped, as with a create() that throws during load.
+    bool init_ok = true;
+    {
+      error_context_t econ;
+      save_context(&econ);
+      try {
+        call___INIT(ob);
+      } catch (const char*) {
+        restore_context(&econ);
+        init_ok = false;
+      }
+      pop_context(&econ);
+    }
+    if (init_ok && !(ob->flags & O_DESTRUCTED)) {
       for (int i = 0; i < new_n; i++) {
         if (old_index[i] >= 0) {
           assign_svalue(&ob->variables[i], &old_vars[old_index[i]]);
         }
       }
     }
+    // The old variable block and the old program reference are dropped
+    // regardless of how __INIT fared -- ob has already moved off them.
     for (int i = 0; i < old_n; i++) {
       free_svalue(&old_vars[i], "recompile_object");
     }
     FREE(old_vars);
     free_prog(&prev_prog);
 
-    if (!(ob->flags & O_DESTRUCTED)) {
+    if (init_ok && !(ob->flags & O_DESTRUCTED)) {
       // Recompute the function-presence flags load_object derives.
       if (function_exists(APPLY_CLEAN_UP, ob, 1)) {
         ob->flags |= O_WILL_CLEAN_UP;

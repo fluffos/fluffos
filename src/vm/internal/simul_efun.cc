@@ -101,11 +101,15 @@ static void get_simul_efuns(program_t* prog) {
 
   if (num_simul_efun) {
     remove_simuls();
-    if (!num_new) {
-      FREE(simul_names);
-      FREE(simuls);
-      num_simul_efun = 0;
-    } else {
+    /* Do NOT free the tables when the new program defines no simuls:
+     * previously-compiled programs still carry F_SIMUL_EFUN opcodes and
+     * FP_SIMUL funptrs with baked indices into these arrays (live across
+     * a recompile of the simul_efun object). remove_simuls() has already
+     * tombstoned every entry (func = nullptr), which yields the clean
+     * "no longer a simul_efun" error; keeping the arrays preserves the
+     * name->index mapping so any re-added simul reuses its slot. Only
+     * grow the arrays when there are new candidate functions. */
+    if (num_new) {
       /* will be resized later */
       simul_names =
           RESIZE(simul_names, num_simul_efun + num_new, simul_entry, TAG_SIMULS, "get_simul_efuns");

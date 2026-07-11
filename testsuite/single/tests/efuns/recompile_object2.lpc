@@ -4,12 +4,15 @@
 // so they must survive the swap and route into the new code.
 
 #define DIR "/data/hu3"
+#define MARK "/data/hu3_mark"
 
 private void write_src(string file, string body) {
   ASSERT2(write_file(file, body, 1), "write " + file);
 }
 
 private void cleanup() {
+  // NOTE: the /data/hu3/co object deliberately survives -- its pending
+  // call_outs must fire after the run (see verify_callouts).
   foreach (string prog in ({ DIR + "/ct", DIR + "/sh_target", DIR + "/sh_shadow",
                              DIR + "/act" })) {
     foreach (object o in children(prog)) {
@@ -20,7 +23,9 @@ private void cleanup() {
                           "/act.lpc" })) {
     rm(DIR + f);
   }
-  rmdir(DIR);
+  // co.lpc and DIR are removed by verify_callouts, which fires after
+  // the co object's pending call_outs (the object is kept alive
+  // until then).
 }
 
 private void run_checks() {
@@ -73,6 +78,29 @@ private void run_checks() {
   destruct(sh);
   ASSERT_EQ("t2", ob->who());
 
+  // --- call_outs armed BEFORE the swap fire AFTER it: the name-based
+  // one must run the NEW program's code; the funptr-based one is stale
+  // and must fail with the clean staleness error, not corrupt anything.
+  // Both fire post-run (this suite executes synchronously), so a
+  // deferred verifier enforces the outcome by exiting nonzero.
+  rm(MARK);
+  rm(MARK + "_fp");
+  write_src(DIR + "/co.lpc",
+            "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
+            "void late_tick() { write_file(\"" + MARK + "\", \"v1 ran\", 1); }\n" +
+            "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
+            "int pending() { return find_call_out(\"late_tick\"); }\n");
+  ob = load_object(DIR + "/co");
+  ob->arm();
+  write_src(DIR + "/co.lpc",
+            "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
+            "void late_tick() { write_file(\"" + MARK + "\", \"v2 code ran\", 1); }\n" +
+            "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
+            "int pending() { return find_call_out(\"late_tick\"); }\n");
+  ASSERT_EQ(1, recompile_object(ob));
+  ASSERT(ob->pending() >= 0);  // still scheduled after the swap
+  call_out("verify_callouts", 1);
+
 #ifndef __NO_ADD_ACTION__
   // --- add_action sentences (registered by v1 code) and heart_beat
   // survive; the verb dispatches by name into the NEW program.
@@ -104,6 +132,36 @@ private void run_checks() {
   ASSERT(ob->try());                           // v1's sentence still fires...
   ASSERT_EQ(11, ob->q());                      // ... into v2 code, state kept
 #endif
+}
+
+// Fires one backend second after the run: the 0-delay call_outs armed
+// before the recompile have executed by now.
+protected void verify_callouts() {
+  string mark = read_file(MARK);
+
+  // The name-based call_out must have dispatched into the NEW program.
+  if (!mark || strsrch(mark, "v2 code ran") == -1) {
+    debug_message("POST-RUN callout check: name call_out did not run v2 code: " +
+                  sprintf("%O", mark));
+    shutdown(-1);
+    return;
+  }
+  // The funptr call_out was made against the OLD program layout, so it
+  // is stale: it must fail cleanly (safe_call_function_pointer catches
+  // it) and its target must NOT have run -- no crash, no mis-indexed
+  // execution.
+  if (file_size(MARK + "_fp") != -1) {
+    debug_message("POST-RUN callout check: stale funptr call_out RAN (should have been refused)");
+    shutdown(-1);
+    return;
+  }
+  rm(MARK);
+  // The co object was kept alive across the run so its call_outs could
+  // fire; clean it up now.
+  if (find_object(DIR + "/co")) destruct(find_object(DIR + "/co"));
+  rm(DIR + "/co.lpc");
+  rmdir(DIR);
+  debug_message("POST-RUN callout checks OK");
 }
 
 void do_tests() {

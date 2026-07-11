@@ -758,7 +758,7 @@ void check_all_blocks(int flag) {
               if (first) {
                 hptr = first;
                 do {
-                  if (hptr->token & (IHE_SIMUL | IHE_EFUN)) {
+                  if (hptr->token & (IHE_SIMUL | IHE_EFUN | IHE_ORPHAN)) {
                     DO_MARK(hptr, TAG_PERM_IDENT);
                   }
                   hptr = hptr->next;
