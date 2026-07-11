@@ -161,6 +161,10 @@ static void mark_object(object_t* ob) {
     DO_MARK(ob->obname, TAG_OBJ_NAME);
   }
 
+  if (ob->variables) {
+    DO_MARK(ob->variables, TAG_OBJ_VARS);
+  }
+
   if (ob->replaced_program) {
     EXTRA_REF(BLOCK(ob->replaced_program))++;
   }
@@ -253,9 +257,7 @@ static void mark_funp(funptr_t* fp) {
   }
   switch (fp->hdr.type) {
     case FP_LOCAL | FP_NOT_BINDABLE:
-      if (fp->hdr.owner) {
-        fp->hdr.owner->prog->extra_func_ref++;
-      }
+      fp->f.local.prog->extra_func_ref++;
       break;
     case FP_FUNCTIONAL:
     case FP_FUNCTIONAL | FP_NOT_BINDABLE:
@@ -953,6 +955,10 @@ void check_all_blocks(int flag) {
           case TAG_OBJ_NAME:
             outbuf_addv(&out, "WARNING: Found orphan object name: %s %04x\n", entry->desc,
                         entry->tag);
+            break;
+          case TAG_OBJ_VARS:
+            outbuf_addv(&out, "WARNING: Found orphan object variable block: %s %04x\n",
+                        entry->desc, entry->tag);
             break;
           case TAG_INTERACTIVE:
             outbuf_addv(&out, "WARNING: Found orphan interactive: %s %04x\n", entry->desc,

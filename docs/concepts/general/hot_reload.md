@@ -5,9 +5,11 @@ title: general / hot_reload
 
 FluffOS can tell the mudlib, at compile time, exactly which files every
 program is built from. That is the missing piece for **auto hot-reload**:
-a daemon that watches source files on disk and automatically destructs
-and reloads the affected master copies when anything changes, so developers
-see their edits take effect without manually running an `update` command.
+a daemon that watches source files on disk and automatically
+hot-updates the affected programs — master copies and live clones
+alike, variable state intact — the moment anything changes, so
+developers see their edits take effect without manually running an
+`update` command.
 
 This page explains the driver mechanism and walks through a complete
 mudlib implementation. A working reference lives in the testsuite:
@@ -213,17 +215,22 @@ still use its code: compiled programs are reference counted, so
 existing inheritors keep the old program until they are themselves
 reloaded.
 
+This destruct+load `reload()` is the simplest correct baseline — step
+5 upgrades it to the driver's `recompile_object()` efun, which performs the
+same recompile-and-swap on the *live* objects, keeping variable state
+and reaching every clone.
+
 ## Step 4: make it automatic
 
 Poll from a `call_out` loop; `watch()` is the registration point (it
 loads the target itself so the compile happens while the daemon is
-recording):
+recording — `keep_state` is explained in step 5):
 
 ```c
-public int watch(string prog) {
+public int watch(string prog, int keep_state: (: 1 :)) {
     prog = program_of(prog);
     if (!find_object(prog)) load_object(prog);
-    watched[prog] = 1;
+    watched[prog] = keep_state ? WATCH_KEEP_STATE : WATCH_PLAIN;
     snapshot_program(prog);
     return 1;
 }
@@ -241,6 +248,78 @@ public void enable(int interval) {
 }
 ```
 
+## Step 5: keep variable state across reloads — recompile_object()
+
+The destruct+load cycle resets global variables to their initializers
+and cannot touch clones. The driver's
+[`recompile_object()`](../../efun/objects/recompile_object.md) efun replaces that
+cycle entirely:
+
+```c
+int n = recompile_object(find_object("/obj/widget"));
+```
+
+recompiles the program from its source file and swaps it into the
+**live master copy and every clone sharing it** — no destruct, same
+object identity everywhere (pointers held by other objects, inventory,
+shadows, interactive state, call_outs and heart_beat all survive).
+Each object's global variables carry over **by name**, private ones
+included: the new program's initializers run first, then every
+surviving name gets its old value back; new variables keep their
+initializers, vanished names are dropped. It returns the number of
+objects updated.
+
+The reference daemon's default (state-keeping) reload path is exactly
+this: `recompile_object()` on each changed ancestor, then on the watched
+program, so the child's recompile picks up the freshly swapped parent.
+
+Two things to know:
+
+* An object **currently executing** (anywhere on the call stack)
+  cannot be hot-updated — the daemon's poller naturally runs from a
+  `call_out`, where watched objects are idle.
+* Function pointers made against the old program layout (pointers to
+  local functions, functionals) become stale and raise a clean error
+  when called; recreate them after the update.
+
+### Doing it by hand: value transfer
+
+Objects that define the cooperative pair
+`hot_reload_state()`/`hot_reload_restore()` opt out of `recompile_object()`
+in the reference daemon: they reload through destruct+load and get
+back exactly the state their pair chose to carry — the way to make
+some state deliberately *not* survive.
+
+The same destruct+load path can also carry state generically without
+driver support, using three efuns from the contrib package —
+[`variables()`](../../efun/contrib/variables.md),
+[`fetch_variable()`](../../efun/contrib/fetch_variable.md) and
+[`store_variable()`](../../efun/contrib/store_variable.md):
+
+```c
+// BEFORE destructing: capture every reachable global by name
+mapping state = ([]);
+foreach (string name in variables(ob))
+    catch (state[name] = fetch_variable(name, ob));
+
+// AFTER the fresh load: restore the names that still exist
+foreach (string name, mixed value in state)
+    catch (store_variable(name, value, fresh));
+```
+
+Unlike `recompile_object()`, this transfer runs outside the driver, so
+`private` variables are not reachable (the `catch` skips them) and a
+captured value that referenced the old master copy nulls out when it
+is destructed.
+
+To summarize the reference daemon's modes: `watch(prog)` reloads
+through `recompile_object()` (state and clones carried in place),
+`watch(prog, 0)` opts out (destruct+load, fresh initializers, clones
+untouched), and the cooperative pair takes over when the object
+defines it. All three shapes are pinned by
+`/single/tests/applies/hot_reload.lpc`, and the `recompile_object()`
+semantics themselves by `/single/tests/efuns/recompile_object.lpc`.
+
 ## Putting it together
 
 ```c
@@ -251,9 +330,9 @@ d->watch("/obj/widget");      // widget inherits /std/base, which includes color
 // ... edit /std/colors.h on disk ...
 
 // within a poll interval the daemon notices: colors.h is in widget's
-// dependency closure through /std/base -> destructs the stale master
-// copies of base and widget, reloads /obj/widget, and the next
-// "/obj/widget"->describe() runs the new code.
+// dependency closure through /std/base -> hot-updates the stale base,
+// then widget, in place. The next "/obj/widget"->describe() -- and
+// every live widget clone -- runs the new code, all state intact.
 ```
 
 This exact flow — including the deepest case, editing an include of an
@@ -262,13 +341,19 @@ This exact flow — including the deepest case, editing an include of an
 
 ## Semantics and caveats
 
-* **What reloads is the master copy** (the object loaded from the
-  file, as opposed to its clones). Existing clones keep the old
-  program until they are re-created; anything fetched via
-  `"/path/name"->func()` or fresh `find_object()`/`new()` after the
-  reload gets the new code. The master copy's global variables reset to their
-  initializers on reload — daemons that must keep state across reloads
-  need to save/restore it themselves.
+* **Clones follow the reload path.** The default `recompile_object()` path
+  swaps the program into the master copy *and every live clone*, each
+  keeping its own state. The destruct+load path (opt-out mode, or the
+  cooperative pair) replaces only the master copy: existing clones
+  keep the old program until re-created — enumerate them with
+  [`children()`](../../efun/objects/children.md) (filter with
+  `clonep()`) to destruct or migrate stragglers. Either way, anything
+  fetched via `"/path/name"->func()` or fresh `find_object()`/`new()`
+  after the reload gets the new code.
+* **Function pointers into a hot-updated object go stale** (pointers
+  to local functions, functionals): calling one afterwards raises a
+  clean error rather than running mis-indexed code. Recreate them
+  after the update; efun/simul_efun pointers are unaffected.
 * **Only programs compiled while the daemon was registered have
   complete records.** That is why `watch()` loads its target itself,
   and why the daemon rebuilds records during every reload.
@@ -288,6 +373,9 @@ This exact flow — including the deepest case, editing an include of an
   [`include_file`](../../apply/master/include_file.md) — the apply
   reference pages, including the redirect / inline-source / deny
   return forms
+* [`recompile_object`](../../efun/objects/recompile_object.md) — the efun
+  reference: swap a recompiled program into the live master copy and
+  its clones
 * [`inherit`](../../lpc/constructs/inherit.md),
   [`#include`](../../lpc/preprocessor/include.md) — the language
   constructs and their resolution rules

@@ -401,7 +401,7 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
             outbuf_add(outbuf, "0");
             break;
           }
-          outbuf_add(outbuf, function_name(ob->prog, obj->u.fp->f.local.index));
+          outbuf_add(outbuf, function_name(obj->u.fp->f.local.prog, obj->u.fp->f.local.index));
           break;
         case FP_SIMUL:
           outbuf_add(outbuf, simuls[obj->u.fp->f.simul.index].func->funcname);

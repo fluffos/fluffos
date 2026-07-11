@@ -20,12 +20,16 @@
 #define MASTER "/single/master"
 #define DEFAULT_INTERVAL 2
 
+// watched[prog] values: reload drops state / reload carries state over
+#define WATCH_PLAIN 1
+#define WATCH_KEEP_STATE 2
+
 // program name (no extension) -> ([ source path : 1 ]) - own source and
 // every file it #includes, recorded at compile time
 private mapping file_deps = ([]);
 // program name -> ([ inherited program name : 1 ])
 private mapping inherit_deps = ([]);
-// programs registered for auto reload
+// programs registered for auto reload (value: WATCH_* mode)
 private mapping watched = ([]);
 // source path -> ({ size, mtime }) at the last (re)load
 private mapping snapshot = ([]);
@@ -169,25 +173,68 @@ private void snapshot_program(string prog) {
   }
 }
 
-// --- reload ----------------------------------------------------------------
+// --- variable-state carry-over ----------------------------------------------
+//
+// The driver's recompile_object() efun swaps the fresh program into the live
+// master copy and every clone, carrying each object's global variables
+// over by name (private ones included) - that is the default reload
+// mechanism for state-keeping watches. An object that wants full
+// control - some state shouldn't survive a reload - defines the
+// cooperative pair
+//   mixed hot_reload_state();
+//   void hot_reload_restore(mixed state);
+// and is then reloaded through destruct+load with exactly the state
+// its pair chose to carry.
 
-private void forget(string prog) {
-  object ob = find_object(prog);
+private mixed capture_state(object ob) { return ob->hot_reload_state(); }
 
-  if (ob) destruct(ob);
-  map_delete(file_deps, prog);
-  map_delete(inherit_deps, prog);
+private void restore_state(object ob, mixed state) {
+  if (function_exists("hot_reload_restore", ob)) {
+    ob->hot_reload_restore(state);
+  }
 }
 
+// --- reload ----------------------------------------------------------------
+
 private void reload(string prog) {
-  // A changed ancestor's master copy must go away first: recompiling prog
-  // finds already-loaded parent programs by name, so a stale parent
-  // would be inherited as-is.
+  mixed state;
+  int have_state = 0;
+  object ob = find_object(prog);
+  // recompile_object() swaps the fresh program into the LIVE master copy and
+  // every clone (state rides along inside the driver, private variables
+  // included) -- the default for state-keeping watches. The
+  // destruct+load path remains for the opt-out mode and for objects
+  // that take control through the cooperative pair.
+  int cooperative = ob && function_exists("hot_reload_state", ob);
+  int use_recompile_object = ob && watched[prog] == WATCH_KEEP_STATE && !cooperative;
+
+  // Changed ancestors first: a recompile of prog finds already-loaded
+  // parent programs by name, so a stale parent would be inherited
+  // as-is. A loaded ancestor is hot-updated in place (its own clones
+  // and state ride along); an unloaded one just loses its records and
+  // reloads fresh during prog's recompile.
   foreach (string a in ancestors(prog, ([]))) {
-    if (self_changed(a)) forget(a);
+    if (self_changed(a)) {
+      object aob = find_object(a);
+      map_delete(file_deps, a);
+      map_delete(inherit_deps, a);
+      if (aob) recompile_object(aob);
+    }
   }
-  forget(prog);
-  load_object(prog);  // recompiles; the applies rebuild the dep records
+
+  map_delete(file_deps, prog);
+  map_delete(inherit_deps, prog);
+  if (use_recompile_object) {
+    recompile_object(ob);  // recompiles; the applies rebuild the dep records
+  } else {
+    if (cooperative && watched[prog] == WATCH_KEEP_STATE) {
+      state = capture_state(ob);
+      have_state = 1;
+    }
+    if (ob) destruct(ob);
+    ob = load_object(prog);
+    if (have_state) restore_state(ob, state);
+  }
   reload_count++;
   snapshot_program(prog);
 }
@@ -195,10 +242,12 @@ private void reload(string prog) {
 // --- public interface -------------------------------------------------------
 
 // Track a program (and everything its compile touches) for hot reload.
-public int watch(string prog) {
+// keep_state (default on) carries the master copy's global variables
+// across reloads; pass 0 to let each reload start from initializers.
+public int watch(string prog, int keep_state: (: 1 :)) {
   prog = program_of(prog);
   if (!find_object(prog)) load_object(prog);
-  watched[prog] = 1;
+  watched[prog] = keep_state ? WATCH_KEEP_STATE : WATCH_PLAIN;
   snapshot_program(prog);
   return 1;
 }

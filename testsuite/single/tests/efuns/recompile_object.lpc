@@ -1,0 +1,150 @@
+// recompile_object(object master_copy)
+//
+// Recompiles the master copy's program from its source file and swaps
+// the fresh program into the live master copy AND every clone sharing
+// it -- no destruct, same object identity everywhere. Global variables
+// carry over BY NAME per object (including private ones: the transfer
+// happens inside the driver): the new program's initializers run
+// first, then every surviving name gets its old value back. Returns
+// the number of objects updated.
+//
+// Function pointers created against the old program layout error
+// cleanly ("stale") instead of running mis-indexed code.
+
+#define DIR "/data/hu"
+#define THING DIR + "/thing"
+
+private void write_src(string body) {
+  ASSERT2(write_file(THING + ".lpc", body, 1), "write " + THING);
+}
+
+private void cleanup() {
+  foreach (object o in children(THING)) {
+    if (o) destruct(o);
+  }
+  rm(THING + ".lpc");
+  rmdir(DIR);
+}
+
+private void run_checks() {
+  object ob, c1, c2;
+  function fp;
+  string err;
+  int n;
+
+  ASSERT(mkdir(DIR) || file_size(DIR) == -2);
+
+  write_src(
+      "int count;\n" +
+      "private int secret = 3;\n" +
+      "int gone = 1;\n" +
+      "int bump() { return ++count; }\n" +
+      "int peek() { return secret; }\n" +
+      "void poke(int v) { secret = v; }\n" +
+      "string version() { return \"v1\"; }\n");
+
+  ob = load_object(THING);
+  c1 = new(THING);
+  c2 = new(THING);
+
+  // Distinct per-object state.
+  ob->bump();                          // master: count 1
+  c1->bump(); c1->bump();              // c1: count 2
+  c2->bump(); c2->bump(); c2->bump();  // c2: count 3
+  ob->poke(10); c1->poke(11); c2->poke(12);
+
+  // v2: new code, a new variable with an initializer, one variable
+  // removed, count/secret kept.
+  write_src(
+      "int count;\n" +
+      "private int secret = 3;\n" +
+      "int extra = 7;\n" +
+      "int bump() { return ++count; }\n" +
+      "int peek() { return secret; }\n" +
+      "void poke(int v) { secret = v; }\n" +
+      "int query_extra() { return extra; }\n" +
+      "function get_bump_fp() { return (: bump :); }\n" +
+      "void arm() { call_out(\"tick\", 100); }\n" +
+      "void disarm() { remove_call_out(\"tick\"); }\n" +
+      "int armed() { return find_call_out(\"tick\") != -1; }\n" +
+      "void tick() { }\n" +
+      "string version() { return \"v2\"; }\n");
+
+  // The master copy AND both clones update in one call.
+  n = recompile_object(ob);
+  ASSERT_EQ(3, n);
+
+  // Identity preserved: no destruct anywhere.
+  ASSERT(find_object(THING) == ob);
+  ASSERT(objectp(c1) && objectp(c2));
+
+  // Everyone runs the new code...
+  ASSERT_EQ("v2", ob->version());
+  ASSERT_EQ("v2", c1->version());
+  ASSERT_EQ("v2", c2->version());
+
+  // ... with each object's own state carried over (count continues),
+  ASSERT_EQ(2, ob->bump());
+  ASSERT_EQ(3, c1->bump());
+  ASSERT_EQ(4, c2->bump());
+
+  // ... private variables included (the transfer is driver-side),
+  ASSERT_EQ(10, ob->peek());
+  ASSERT_EQ(11, c1->peek());
+  ASSERT_EQ(12, c2->peek());
+
+  // ... new variables get their fresh initializers,
+  ASSERT_EQ(7, ob->query_extra());
+  ASSERT_EQ(7, c1->query_extra());
+
+  // ... and removed variables are gone.
+  ASSERT(stringp(catch(fetch_variable("gone", ob))));
+
+  // Only the master copy may be passed.
+  ASSERT(stringp(catch(recompile_object(c1))));
+
+  // A function pointer from v2, and an armed call_out.
+  fp = ob->get_bump_fp();
+  ASSERT_EQ(3, evaluate(fp));  // works before the next update
+  ob->arm();
+
+  // v3: another swap on top.
+  write_src(
+      "int count;\n" +
+      "private int secret = 3;\n" +
+      "int extra = 7;\n" +
+      "int bump() { return ++count; }\n" +
+      "int peek() { return secret; }\n" +
+      "int query_extra() { return extra; }\n" +
+      "void disarm() { remove_call_out(\"tick\"); }\n" +
+      "int armed() { return find_call_out(\"tick\") != -1; }\n" +
+      "void tick() { }\n" +
+      "int self_update() { return recompile_object(this_object()); }\n" +
+      "string version() { return \"v3\"; }\n");
+  ASSERT_EQ(3, recompile_object(ob));
+  ASSERT_EQ("v3", ob->version());
+  ASSERT_EQ(4, ob->bump());  // state still riding along
+
+  // The call_out survived the swap (call_outs reference functions by
+  // name); the v2 function pointer is now stale and fails cleanly.
+  ASSERT_EQ(1, ob->armed());
+  err = catch(evaluate(fp));
+  ASSERT2(stringp(err) && strsrch(err, "was recompiled") != -1, "stale fp: " + err);
+  ob->disarm();
+
+  // An object cannot recompile itself mid-execution.
+  err = catch(ob->self_update());
+  ASSERT2(stringp(err) && strsrch(err, "currently executing") != -1, "self: " + err);
+
+  // A vanished source file is a clean error; the object is untouched.
+  rm(THING + ".lpc");
+  ASSERT(stringp(catch(recompile_object(ob))));
+  ASSERT_EQ("v3", ob->version());
+}
+
+void do_tests() {
+  string err = catch(run_checks());
+
+  cleanup();
+  if (err) error(err);
+}

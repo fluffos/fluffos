@@ -141,6 +141,7 @@ void f_bind() {
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
   new_fp->hdr.owner = ob; /* one ref from being on stack */
+  new_fp->hdr.owner_gen = ob->prog_generation;
   if (new_fp->hdr.args) {
     new_fp->hdr.args->ref++;
   }
@@ -3211,6 +3212,15 @@ void f_memory_info() {
 void f_reload_object() {
   reload_object(sp->u.ob);
   free_object(&(sp--)->u.ob, "f_reload_object");
+}
+#endif
+
+#ifdef F_RECOMPILE_OBJECT
+void f_recompile_object() {
+  object_t* ob = sp->u.ob;
+  int count = recompile_object(ob);
+  free_object(&sp->u.ob, "f_recompile_object");
+  put_number(count);
 }
 #endif
 

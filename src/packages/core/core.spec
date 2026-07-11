@@ -276,6 +276,7 @@ int get_char(string | function, ...);
 object *children(string);
 
 void reload_object(object);
+int recompile_object(object);
 
 void error(string);
 int uptime();

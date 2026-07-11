@@ -60,7 +60,10 @@ void db_cleanup(void);  // FIXME
 
 #include "comm.h"  // FIXME
 
-#include "vm/internal/trace.h"  // for dump_trace && get_svalue_trace
+#include <vector>
+
+#include "packages/core/replace_program.h"  // for replace_program_pending
+#include "vm/internal/trace.h"              // for dump_trace && get_svalue_trace
 /*
  * This one is called from HUP.
  */
@@ -776,6 +779,255 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   ob->load_time = get_current_time();
 
   return ob;
+}
+
+// Depth-first over the inherit tree, own variables last: the exact
+// layout order of an object's variable block (mirrors fgv_recurse).
+static void recompile_variable_names(program_t* prog, std::vector<const char*>& out) {
+  for (int i = 0; i < prog->num_inherited; i++) {
+    recompile_variable_names(prog->inherit[i].prog, out);
+  }
+  for (int i = 0; i < prog->num_variables_defined; i++) {
+    out.push_back(prog->variable_table[i]);
+  }
+}
+
+/*
+ * recompile_object(ob): recompile the object's program from its source file
+ * and swap the fresh program into the LIVE master copy and every clone
+ * sharing it. No destruct: object identity (pointers held elsewhere,
+ * name, inventory, shadows, interactive state, call_outs, heart_beat)
+ * is untouched. Global variables carry over BY NAME -- the fresh
+ * program's __INIT runs first, then every variable whose name also
+ * existed in the old program gets its old value back; new variables
+ * keep their initializers, vanished names are dropped. This is only
+ * possible because the variable block is a separate allocation
+ * (allocate_object_variables), sized per program.
+ *
+ * Function pointers made against the old program layout (FP_LOCAL
+ * indices, FP_FUNCTIONAL variable offsets) become stale: each updated
+ * object's prog_generation is bumped and call_function_pointer()
+ * errors cleanly on the mismatch instead of running mis-indexed code.
+ */
+int recompile_object(object_t* target) {
+  // Nested recompile_object (from a parent load's create(), or from __INIT
+  // below) would mutate the target set under the outer call's feet.
+  static bool in_recompile_object = false;
+
+  program_t* old_prog = target->prog;
+  if (!old_prog) {
+    error("recompile_object: object has no program.\n");
+  }
+  if (in_recompile_object) {
+    error("recompile_object: already updating; nested recompile_object is not allowed.\n");
+  }
+  if (simul_efun_ob && old_prog == simul_efun_ob->prog) {
+    // The simul_efun dispatch table points into this program's function
+    // table; swapping it would leave every simul call dangling.
+    error("recompile_object: cannot update the simul_efun object.\n");
+  }
+  if (strrchr(target->obname, '#')) {
+    // Normalize the request: updating "a clone" really means updating
+    // the shared program; demand the master copy so the intent is clear.
+    error("recompile_object: pass the master copy, not a clone.\n");
+  }
+
+  /*
+   * Refuse while any frame still executes (or will return into) the old
+   * program: bytecode positions and variable indices in live frames are
+   * relative to the old layout.
+   */
+  if ((current_object && current_object->prog == old_prog) || current_prog == old_prog) {
+    error("recompile_object: '/%s' is currently executing.\n", target->obname);
+  }
+  for (control_stack_t* f = control_stack; f <= csp; f++) {
+    if ((f->ob && f->ob->prog == old_prog) || f->prog == old_prog) {
+      error("recompile_object: '/%s' is currently executing.\n", target->obname);
+    }
+  }
+  for (object_t* ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->prog == old_prog && replace_program_pending(ob)) {
+      error("recompile_object: '/%s' has a pending replace_program().\n", ob->obname);
+    }
+  }
+
+  // The compiled name survives old_prog's release below.
+  std::string obname(old_prog->filename);
+  char obbase[MAX_OBJECT_NAME_SIZE];
+  if (!filename_to_obname(obname.c_str(), obbase, sizeof obbase)) {
+    strncpy(obbase, obname.c_str(), sizeof obbase - 1);
+    obbase[sizeof obbase - 1] = 0;
+  }
+
+  const char* pname = check_valid_path(obname.c_str(), target, "recompile_object", 0);
+  if (!pname) {
+    error("recompile_object: read access denied for '/%s'.\n", obname.c_str());
+  }
+  std::string source_path(pname);
+
+  in_recompile_object = true;
+  // error() throws, so the flag must reset on every path.
+  DEFER { in_recompile_object = false; };
+
+  /*
+   * Recompile, resolving unloaded parents with the same iterative dance
+   * as load_object() -- the recompile also re-consults the master's
+   * inherit_program/include_file applies.
+   */
+  auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
+  program_t* new_prog = nullptr;
+  for (int rounds = 0;; rounds++) {
+    int f = open(source_path.c_str(), O_RDONLY);
+    if (f == -1) {
+      error("recompile_object: could not read the file '/%s'.\n", source_path.c_str());
+    }
+#ifdef _WIN32
+    _setmode(f, _O_BINARY);
+#endif
+    save_command_giver(command_giver);
+    new_prog = compile_file_fd(f, obname.c_str());
+    restore_command_giver();
+    close(f);
+    update_compile_av(total_lines);
+    total_lines = 0;
+
+    if (!inherit_file) {
+      break;
+    }
+
+    char inhbuf[MAX_OBJECT_NAME_SIZE];
+    char inhraw[MAX_OBJECT_NAME_SIZE];
+    std::string inh_source = std::move(inherit_file_source);
+    inherit_file_source.clear();
+
+    if (!filename_to_obname(inherit_file, inhbuf, sizeof inhbuf)) {
+      strcpy(inhbuf, inherit_file);
+    }
+    strncpy(inhraw, inherit_file, sizeof inhraw - 1);
+    inhraw[sizeof inhraw - 1] = 0;
+    FREE(inherit_file);
+    inherit_file = nullptr;
+
+    if (new_prog) {
+      free_prog(&new_prog);
+      new_prog = nullptr;
+    }
+    if (strcmp(inhbuf, obbase) == 0) {
+      error("Illegal to inherit self.\n");
+    }
+    if (rounds >= inherit_chain_size) {
+      error("Inherit chain too deep: > %d in recompile_object of '/%s'.\n", inherit_chain_size,
+            obbase);
+    }
+    if (!ObjectTable::instance().find(inhbuf)) {
+      object_t* inh_obj;
+      compiler_next_load_reason =
+          std::string("while loading '/") + inhbuf + "' inherited by '/" + obbase + "'";
+      if (!inh_source.empty()) {
+        inh_obj = load_object_from_source(inh_source, inhbuf, 1);
+      } else {
+        inh_obj = load_object(inhraw, 1);
+      }
+      if (!inh_obj) {
+        error("Inherited file '/%s' does not exist!\n", inhbuf);
+      }
+    }
+  }
+
+  if (num_parse_error > 0 || new_prog == nullptr) {
+    if (new_prog) {
+      free_prog(&new_prog);
+    }
+    error("recompile_object: error compiling '/%s'.\n", obname.c_str());
+  }
+
+  /*
+   * Variable transfer map: for every slot of the new layout, the old
+   * layout's slot with the same name (or -1). check_nosave=0: runtime
+   * state moves regardless of save-file semantics.
+   */
+  int old_n = old_prog->num_variables_total;
+  int new_n = new_prog->num_variables_total;
+  std::vector<const char*> names;
+  names.reserve(new_n);
+  recompile_variable_names(new_prog, names);
+  std::vector<int> old_index(new_n, -1);
+  for (int i = 0; i < new_n; i++) {
+    unsigned short vtype;
+    old_index[i] = find_global_variable(old_prog, names[i], &vtype, 0);
+  }
+
+  // Snapshot the update set first: __INIT below runs arbitrary LPC that
+  // may load/destruct objects and reshuffle obj_list.
+  std::vector<object_t*> targets;
+  for (object_t* ob = obj_list; ob; ob = ob->next_all) {
+    if (ob->prog == old_prog && !(ob->flags & O_DESTRUCTED)) {
+      add_ref(ob, "recompile_object");
+      targets.push_back(ob);
+    }
+  }
+
+  int count = 0;
+  for (object_t* ob : targets) {
+    if (ob->flags & O_DESTRUCTED) {
+      // Destructed by an earlier target's __INIT: it still carries the
+      // old program and dies with it.
+      object_t* tmp = ob;
+      free_object(&tmp, "recompile_object");
+      continue;
+    }
+
+    svalue_t* old_vars = ob->variables;
+    program_t* prev_prog = ob->prog;
+
+    reference_prog(new_prog, "recompile_object");
+    ob->prog = new_prog;
+    ob->prog_generation++;
+    ob->variables = allocate_object_variables(new_n);
+    tot_alloc_object_size +=
+        ((new_n ? new_n : 1) - (old_n ? old_n : 1)) * static_cast<int>(sizeof(svalue_t));
+
+    // Fresh initializers first (this object's new code), then the
+    // carried-over values overwrite every name that survived.
+    call___INIT(ob);
+    if (!(ob->flags & O_DESTRUCTED)) {
+      for (int i = 0; i < new_n; i++) {
+        if (old_index[i] >= 0) {
+          assign_svalue(&ob->variables[i], &old_vars[old_index[i]]);
+        }
+      }
+    }
+    for (int i = 0; i < old_n; i++) {
+      free_svalue(&old_vars[i], "recompile_object");
+    }
+    FREE(old_vars);
+    free_prog(&prev_prog);
+
+    if (!(ob->flags & O_DESTRUCTED)) {
+      // Recompute the function-presence flags load_object derives.
+      if (function_exists(APPLY_CLEAN_UP, ob, 1)) {
+        ob->flags |= O_WILL_CLEAN_UP;
+      } else {
+        ob->flags &= ~O_WILL_CLEAN_UP;
+      }
+#ifdef NO_ADD_ACTION
+      if (function_exists(APPLY_CATCH_TELL, ob, 1) ||
+          function_exists(APPLY_RECEIVE_MESSAGE, ob, 1)) {
+        ob->flags |= O_LISTENER;
+      } else {
+        ob->flags &= ~O_LISTENER;
+      }
+#endif
+      count++;
+    }
+    object_t* tmp = ob;
+    free_object(&tmp, "recompile_object");
+  }
+
+  // Drop the compile's own reference; the updated objects hold theirs.
+  free_prog(&new_prog);
+
+  return count;
 }
 
 static char* make_new_name(const char* str) {
