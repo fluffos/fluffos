@@ -440,6 +440,7 @@ title: EFUN
 * [replace_program](system/replace_program)
 * [request_clean_up](system/request_clean_up)
 * [reset_eval_cost](system/reset_eval_cost)
+* [set_clean_up](system/set_clean_up)
 * [set_eval_limit](system/set_eval_limit)
 * [set_reset](system/set_reset)
 * [shutdown](system/shutdown)
