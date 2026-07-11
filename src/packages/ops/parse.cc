@@ -1060,6 +1060,12 @@ static svalue_t* living_parse(array_t* obarr, array_t* warr, int* cix_in, int* f
   *fail = 0;
 
   for (obix = 0; obix < obarr->size; obix++) {
+    // The array may hold non-objects (a caller-supplied 0, or a destructed
+    // object that check_for_destr turned into the number 0); skip them
+    // instead of dereferencing u.ob.
+    if (obarr->item[obix].type != T_OBJECT) {
+      continue;
+    }
     if (obarr->item[obix].u.ob->flags & O_ENABLE_COMMANDS) {
       assign_svalue_no_free(&live->item[tix++], &obarr->item[obix]);
     }

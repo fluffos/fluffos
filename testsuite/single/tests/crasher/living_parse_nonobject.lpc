@@ -1,0 +1,15 @@
+// living_parse() (parse_command %l) dereferenced obarr elements as objects
+// without checking their type. A non-object in the oblist (a caller-supplied
+// 0, or a destructed object turned into 0) caused a NULL/wild deref. It must
+// skip non-objects instead.
+
+void do_tests() {
+#ifdef __PACKAGE_OPS__
+    object target;
+
+    // oblist contains a non-object (0); must not crash.
+    ASSERT_EQ(0, catch(parse_command("get all", ({ 0 }), "'get' %l", target)));
+    ASSERT_EQ(0, catch(parse_command("get all", ({ 0, this_object() }), "'get' %l", target)));
+#endif
+    ASSERT(1);
+}
