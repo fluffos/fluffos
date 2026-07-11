@@ -214,6 +214,7 @@ void set_hide(int);
 #ifndef NO_RESETS
 void set_reset(object, void | int);
 int request_clean_up(object default: F__THIS_OBJECT);
+void set_clean_up(object, void | int);
 #endif
 
 #ifndef NO_SHADOWS

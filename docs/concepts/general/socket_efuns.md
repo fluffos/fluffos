@@ -241,7 +241,7 @@ accepted the connection.
 Socket use is gated by two mechanisms.
 
 First, the master object's
-[`valid_socket()`](../../apply/master/valid_socket.md) apply is consulted for
+[`valid_socket()`](../../apply/master/valid_socket) apply is consulted for
 every socket operation. It receives the calling object, the operation name, and
 an info array `({ fd, owner, address, port })`, and returns 1 to allow or 0 to
 deny. If the apply does not exist, access is **denied**. A permissive
@@ -261,17 +261,17 @@ and `socket_acquire()`.
 
 ## Efun reference
 
-- [socket_create](../../efun/sockets/socket_create.md)
-- [socket_bind](../../efun/sockets/socket_bind.md)
-- [socket_listen](../../efun/sockets/socket_listen.md)
-- [socket_accept](../../efun/sockets/socket_accept.md)
-- [socket_connect](../../efun/sockets/socket_connect.md)
-- [socket_write](../../efun/sockets/socket_write.md)
-- [socket_close](../../efun/sockets/socket_close.md)
-- [socket_error](../../efun/sockets/socket_error.md)
-- [socket_address](../../efun/sockets/socket_address.md)
-- [socket_status](../../efun/sockets/socket_status.md)
-- [socket_release](../../efun/sockets/socket_release.md)
-- [socket_acquire](../../efun/sockets/socket_acquire.md)
-- [socket_set_option](../../efun/sockets/socket_set_option.md)
-- [socket_get_option](../../efun/sockets/socket_get_option.md)
+- [socket_create](../../efun/sockets/socket_create)
+- [socket_bind](../../efun/sockets/socket_bind)
+- [socket_listen](../../efun/sockets/socket_listen)
+- [socket_accept](../../efun/sockets/socket_accept)
+- [socket_connect](../../efun/sockets/socket_connect)
+- [socket_write](../../efun/sockets/socket_write)
+- [socket_close](../../efun/sockets/socket_close)
+- [socket_error](../../efun/sockets/socket_error)
+- [socket_address](../../efun/sockets/socket_address)
+- [socket_status](../../efun/sockets/socket_status)
+- [socket_release](../../efun/sockets/socket_release)
+- [socket_acquire](../../efun/sockets/socket_acquire)
+- [socket_set_option](../../efun/sockets/socket_set_option)
+- [socket_get_option](../../efun/sockets/socket_get_option)

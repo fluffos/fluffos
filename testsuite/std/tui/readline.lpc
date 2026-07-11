@@ -1,0 +1,472 @@
+// /std/tui/readline — layer 2 of the TUI library: the line editor.
+//
+// A pure state machine: rl_feed() consumes key events (from /std/tui/keys),
+// mutates the edit buffer, and accumulates ANSI repaint bytes which the
+// caller drains with rl_take_output() and writes to the user.  The engine
+// repaints only its own line (no absolute cursor addressing), so it works at
+// any scroll position — this is the "better input_to" for prompt lines.
+//
+// Emacs/readline keymap: motion (C-a/C-e/C-b/C-f, M-b/M-f, Home/End,
+// arrows), kill/yank (C-k/C-u/C-w/M-d/C-y), transpose (C-t), history
+// (Up/Down/C-p/C-n), incremental search (C-r/C-s), completion (Tab),
+// accept (Enter), abort (C-c), EOF (C-d on an empty line).
+//
+// Clone one per user; it is reusable: each rl_begin() starts a fresh line
+// while history and configuration persist.
+
+#include <tui.h>
+
+inherit TUI_ANSI;
+
+// --- configuration ---
+private string prompt = "> ";
+private int width = 80;
+private int masked = 0;
+private function completer = 0;
+private int hist_max = 500;
+
+// --- line state ---
+private string buf = "";
+private int pos = 0;              // cursor, codepoint index into buf
+private int state = TUI_RL_MORE;
+private string out = "";          // pending repaint bytes
+private int scroll = 0;           // viewport start column
+private int began = 0;
+private string kill_buf = "";
+private int last_tab = 0;
+
+// --- history ---
+private string *hist = ({});
+private int hidx = 0;             // == sizeof(hist) while editing the live line
+private string hsave = "";        // the live line, saved while browsing
+
+// --- incremental search ---
+private int is_dir = 0;           // 0 off, -1 reverse (C-r), 1 forward (C-s)
+private string is_q = "";
+private int is_match = -1;        // hist index of current match
+private int is_fail = 0;
+private string is_save = "";
+private int is_pos_save = 0;
+
+private nosave mapping keymap;
+
+// forward declarations (used before their definitions)
+void rl_add_history(string line);
+string rl_take_output();
+
+// ----------------------------------------------------------------------
+// small string helpers (codepoint-index slicing with safe bounds)
+
+private string pre(string s, int i) { return i <= 0 ? "" : (i >= strlen(s) ? s : s[0..i - 1]); }
+private string post(string s, int i) { return i >= strlen(s) ? "" : (i <= 0 ? s : s[i..]); }
+
+private int is_word(int c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+         c == '_' || c > 127;
+}
+
+private int word_back() {
+  int i = pos;
+
+  while (i > 0 && !is_word(buf[i - 1])) i--;
+  while (i > 0 && is_word(buf[i - 1])) i--;
+  return i;
+}
+
+private int word_fwd() {
+  int i = pos, n = strlen(buf);
+
+  while (i < n && !is_word(buf[i])) i++;
+  while (i < n && is_word(buf[i])) i++;
+  return i;
+}
+
+// ----------------------------------------------------------------------
+// rendering
+
+private string isearch_prompt() {
+  return (is_fail ? "(failed " : "(") + (is_dir < 0 ? "reverse-i-search" : "i-search") +
+         ")`" + is_q + "': ";
+}
+
+// Repaint the whole line: \r prompt view EL, then park the cursor.
+private void render() {
+  string disp = masked ? repeat_string("*", strlen(buf)) : buf;
+  string pfx = is_dir ? isearch_prompt() : prompt;
+  int pw = visible_width(pfx);
+  int avail = width - pw - 1;  // leave the last column free (no autowrap)
+  int cur, total;
+  string view;
+
+  if (avail < 8) avail = 8;
+  cur = strwidth(pre(disp, pos));
+  total = strwidth(disp);
+
+  // keep the cursor inside the viewport, with a margin column where a
+  // scroll marker is displayed
+  if (cur < scroll + (scroll > 0 ? 1 : 0)) scroll = cur > 1 ? cur - 1 : 0;
+  if (total - scroll > avail && cur - scroll >= avail - 1) scroll = cur - avail + 2;
+  if (cur - scroll >= avail) scroll = cur - avail + 1;
+  if (scroll < 0) scroll = 0;
+
+  view = wslice(disp, scroll, avail);
+  if (scroll > 0) view = "<" + wslice(disp, scroll + 1, avail - 1);
+  if (total - scroll > avail) view = wslice(disp, scroll, avail - 1) + ">";
+
+  out += "\r" + pfx + view + ansi_el(0) + "\r" + ansi_fwd(pw + cur - scroll);
+}
+
+// Final repaint with the cursor at end-of-line, then newline.
+private void finish_line() {
+  is_dir = 0;
+  pos = strlen(buf);
+  render();
+  out += "\r\n";
+  began = 0;
+}
+
+// ----------------------------------------------------------------------
+// editing primitives
+
+private void insert(string text) {
+  if (!stringp(text) || text == "") return;
+  buf = pre(buf, pos) + text + post(buf, pos);
+  pos += strlen(text);
+}
+
+private void accept_line() {
+  rl_add_history(buf);
+  state = TUI_RL_DONE;
+  finish_line();
+}
+
+private void hist_move(int dir) {
+  int n = sizeof(hist);
+  int ni = hidx + dir;
+
+  if (ni < 0 || ni > n) return;
+  if (hidx == n) hsave = buf;
+  hidx = ni;
+  buf = ni == n ? hsave : hist[ni];
+  pos = strlen(buf);
+}
+
+// ----------------------------------------------------------------------
+// incremental history search
+
+private void isearch_find(int advance) {
+  int i, start, n = sizeof(hist);
+
+  is_fail = 0;
+  if (is_q == "") return;
+  if (is_dir < 0) {
+    start = is_match == -1 ? n - 1 : is_match - advance;
+    for (i = start; i >= 0; i--) {
+      if (strsrch(hist[i], is_q) != -1) break;
+    }
+    if (i < 0) i = -1;
+  } else {
+    start = is_match == -1 ? 0 : is_match + advance;
+    for (i = start; i < n; i++) {
+      if (strsrch(hist[i], is_q) != -1) break;
+    }
+    if (i >= n) i = -1;
+  }
+  if (i == -1) {
+    is_fail = 1;
+    return;
+  }
+  is_match = i;
+  hidx = i;
+  buf = hist[i];
+  pos = strsrch(buf, is_q) + strlen(is_q);
+}
+
+private void isearch_start(int dir) {
+  if (!is_dir) {
+    is_save = buf;
+    is_pos_save = pos;
+    is_q = "";
+    is_match = -1;
+    is_fail = 0;
+  }
+  is_dir = dir;
+}
+
+private void dispatch(mixed ev);  // forward
+
+private void isearch_feed(mixed ev) {
+  if (stringp(ev)) {
+    is_q += ev;
+    isearch_find(0);
+  } else if (ev == TUI_CTRL('r') || ev == TUI_CTRL('s')) {
+    is_dir = ev == TUI_CTRL('r') ? -1 : 1;
+    if (is_match != -1) isearch_find(1);
+    else isearch_find(0);
+  } else if (ev == TUI_KEY_BACKSPACE) {
+    if (is_q != "") is_q = pre(is_q, strlen(is_q) - 1);
+    is_match = -1;
+    isearch_find(0);
+  } else if (ev == TUI_CTRL('g')) {  // cancel: restore the pre-search line
+    buf = is_save;
+    pos = is_pos_save;
+    hidx = sizeof(hist);
+    is_dir = 0;
+  } else if (ev == TUI_KEY_ESC) {  // accept the result, keep editing
+    is_dir = 0;
+  } else {  // any other key accepts the result and acts normally
+    is_dir = 0;
+    dispatch(ev);
+    return;
+  }
+  render();
+}
+
+// ----------------------------------------------------------------------
+// completion
+
+private int common_prefix_len(string *words) {
+  int i, j, n;
+  string first;
+
+  if (!sizeof(words)) return 0;
+  first = words[0];
+  n = strlen(first);
+  for (i = 1; i < sizeof(words); i++) {
+    int m = strlen(words[i]);
+    if (m < n) n = m;
+    for (j = 0; j < n; j++) {
+      if (words[i][j] != first[j]) break;
+    }
+    n = j;
+  }
+  return n;
+}
+
+private void complete() {
+  mixed cands;
+  string frag;
+  string *matches = ({});
+  int fs, lcp;
+
+  if (!functionp(completer)) return;
+  cands = evaluate(completer, buf, pos);
+  if (!arrayp(cands) || !sizeof(cands)) return;
+
+  fs = word_back();
+  frag = pos > fs ? buf[fs..pos - 1] : "";
+  foreach (mixed c in cands) {
+    if (stringp(c) && strlen(c) >= strlen(frag) && pre(c, strlen(frag)) == frag) {
+      matches += ({ c });
+    }
+  }
+  if (!sizeof(matches)) return;
+
+  lcp = common_prefix_len(matches);
+  if (lcp > strlen(frag)) {
+    insert(matches[0][strlen(frag)..lcp - 1]);
+    if (sizeof(matches) == 1) insert(" ");
+  } else if (sizeof(matches) > 1 && last_tab) {
+    // second Tab with nothing to extend: list the candidates above the line
+    out += "\r\n" + implode(matches, "  ") + "\r\n";
+  }
+}
+
+// ----------------------------------------------------------------------
+// key dispatch
+
+private void kb_left() { if (pos > 0) pos--; }
+private void kb_right() { if (pos < strlen(buf)) pos++; }
+private void kb_home() { pos = 0; }
+private void kb_end() { pos = strlen(buf); }
+private void kb_word_back() { pos = word_back(); }
+private void kb_word_fwd() { pos = word_fwd(); }
+
+private void kb_backspace() {
+  if (!pos) return;
+  buf = pre(buf, pos - 1) + post(buf, pos);
+  pos--;
+}
+
+private void kb_delete() {
+  if (pos < strlen(buf)) buf = pre(buf, pos) + post(buf, pos + 1);
+}
+
+private void kb_delete_or_eof() {
+  if (buf == "") {
+    state = TUI_RL_EOF;
+    finish_line();
+    return;
+  }
+  kb_delete();
+}
+
+private void kb_kill_to_end() {
+  if (pos < strlen(buf)) kill_buf = post(buf, pos);
+  buf = pre(buf, pos);
+}
+
+private void kb_kill_to_start() {
+  if (pos > 0) kill_buf = pre(buf, pos);
+  buf = post(buf, pos);
+  pos = 0;
+}
+
+private void kb_kill_word_back() {
+  int b = word_back();
+
+  if (b >= pos) return;
+  kill_buf = buf[b..pos - 1];
+  buf = pre(buf, b) + post(buf, pos);
+  pos = b;
+}
+
+private void kb_kill_word_fwd() {
+  int e = word_fwd();
+
+  if (e <= pos) return;
+  kill_buf = buf[pos..e - 1];
+  buf = pre(buf, pos) + post(buf, e);
+}
+
+private void kb_yank() { insert(kill_buf); }
+
+private void kb_transpose() {
+  int n = strlen(buf), p;
+  string a, b;
+
+  if (n < 2) return;
+  p = pos == n ? n - 1 : pos;
+  if (p == 0) p = 1;
+  a = buf[p - 1..p - 1];
+  b = buf[p..p];
+  buf = pre(buf, p - 1) + b + a + post(buf, p + 1);
+  pos = p + 1 > n ? n : p + 1;
+}
+
+private void kb_hist_prev() { hist_move(-1); }
+private void kb_hist_next() { hist_move(1); }
+private void kb_isearch_rev() { isearch_start(-1); }
+private void kb_isearch_fwd() { isearch_start(1); }
+private void kb_abort() { state = TUI_RL_ABORT; finish_line(); }
+private void kb_clear() { out += ansi_ed(2) + ansi_cup(0, 0); }
+private void kb_tab() { complete(); last_tab = 2; }  // survives the end-of-dispatch clear
+
+private void build_keymap() {
+  keymap = ([
+    TUI_KEY_ENTER: (: accept_line :),
+    TUI_KEY_LEFT: (: kb_left :),
+    TUI_CTRL('b'): (: kb_left :),
+    TUI_KEY_RIGHT: (: kb_right :),
+    TUI_CTRL('f'): (: kb_right :),
+    TUI_KEY_HOME: (: kb_home :),
+    TUI_CTRL('a'): (: kb_home :),
+    TUI_KEY_END: (: kb_end :),
+    TUI_CTRL('e'): (: kb_end :),
+    TUI_MOD_ALT | 'b': (: kb_word_back :),
+    TUI_MOD_CTRL | TUI_KEY_LEFT: (: kb_word_back :),
+    TUI_MOD_ALT | 'f': (: kb_word_fwd :),
+    TUI_MOD_CTRL | TUI_KEY_RIGHT: (: kb_word_fwd :),
+    TUI_KEY_BACKSPACE: (: kb_backspace :),
+    TUI_KEY_DELETE: (: kb_delete :),
+    TUI_CTRL('d'): (: kb_delete_or_eof :),
+    TUI_CTRL('k'): (: kb_kill_to_end :),
+    TUI_CTRL('u'): (: kb_kill_to_start :),
+    TUI_CTRL('w'): (: kb_kill_word_back :),
+    TUI_MOD_ALT | 'd': (: kb_kill_word_fwd :),
+    TUI_MOD_ALT | TUI_KEY_BACKSPACE: (: kb_kill_word_back :),
+    TUI_CTRL('y'): (: kb_yank :),
+    TUI_CTRL('t'): (: kb_transpose :),
+    TUI_KEY_UP: (: kb_hist_prev :),
+    TUI_CTRL('p'): (: kb_hist_prev :),
+    TUI_KEY_DOWN: (: kb_hist_next :),
+    TUI_CTRL('n'): (: kb_hist_next :),
+    TUI_CTRL('r'): (: kb_isearch_rev :),
+    TUI_CTRL('s'): (: kb_isearch_fwd :),
+    TUI_CTRL('c'): (: kb_abort :),
+    TUI_CTRL('l'): (: kb_clear :),
+    TUI_KEY_TAB: (: kb_tab :),
+  ]);
+}
+
+void create() { build_keymap(); }
+
+private void dispatch(mixed ev) {
+  if (stringp(ev)) {
+    insert(ev);
+  } else if (intp(ev)) {
+    function f = keymap[ev];
+    if (f) evaluate(f);
+  }
+  // else: mouse/CPR arrays are not the line editor's business
+  if (last_tab) last_tab--;
+  if (state == TUI_RL_MORE) render();
+}
+
+// ----------------------------------------------------------------------
+// public API
+
+void rl_set_prompt(string p) { if (stringp(p)) prompt = p; }
+void rl_set_masked(int on) { masked = on; }
+void rl_set_completer(function f) { completer = f; }
+void rl_set_hist_max(int n) { if (n > 0) hist_max = n; }
+
+void rl_set_width(int w) {
+  if (w < 20) w = 20;
+  width = w;
+  if (began && state == TUI_RL_MORE) render();
+}
+
+void rl_set_history(string *h) {
+  hist = arrayp(h) ? h[0..] : ({});
+  hidx = sizeof(hist);
+}
+
+string *rl_history() { return hist[0..]; }
+
+void rl_add_history(string line) {
+  if (!stringp(line) || line == "") return;
+  if (sizeof(hist) && hist[<1] == line) return;
+  hist += ({ line });
+  if (sizeof(hist) > hist_max) hist = hist[sizeof(hist) - hist_max..];
+}
+
+// Start (or restart) editing.  Returns the initial repaint.
+varargs string rl_begin(string initial) {
+  buf = stringp(initial) ? initial : "";
+  pos = strlen(buf);
+  state = TUI_RL_MORE;
+  out = "";
+  scroll = 0;
+  hidx = sizeof(hist);
+  hsave = "";
+  is_dir = 0;
+  last_tab = 0;
+  began = 1;
+  render();
+  return rl_take_output();
+}
+
+// Feed one key event; returns the engine state (TUI_RL_*).
+int rl_feed(mixed ev) {
+  if (state != TUI_RL_MORE || !began) return state;
+  if (is_dir) {
+    isearch_feed(ev);
+  } else {
+    dispatch(ev);
+  }
+  return state;
+}
+
+string rl_take_output() {
+  string o = out;
+
+  out = "";
+  return o;
+}
+
+int rl_state() { return state; }
+string rl_line() { return buf; }
+int rl_cursor() { return pos; }
+int rl_scroll() { return scroll; }
+int rl_searching() { return is_dir != 0; }

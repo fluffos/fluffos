@@ -1,0 +1,16 @@
+int clean_up(int inherited) { return 0; }
+
+void do_tests() {
+    object ob = clone_object("/clone/catch_tell_probe");
+
+    // Contract: accepts both forms without error, like set_reset().
+    ASSERT_EQ(0, catch(set_clean_up(this_object(), 3600)));
+    ASSERT_EQ(0, catch(set_clean_up(this_object())));
+
+    // Objects without a clean_up() apply accept the call too (the
+    // deadline is recorded but the sweep will never query them).
+    ASSERT_EQ(0, catch(set_clean_up(ob, 60)));
+    ASSERT_EQ(0, catch(set_clean_up(ob)));
+
+    destruct(ob);
+}

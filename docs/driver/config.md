@@ -128,7 +128,8 @@ they always match the options it actually recognizes.
 | `sane explode string` | int | 1 | explode() strips at most one leading delimiter (and still one trailing delimiter). |
 | `reversible explode string` | int | 0 | Make implode(explode(x, y), y) always equal x; overrides 'sane explode string'. |
 | `sane sorting` | int | 1 | Use a well-defined, stable ordering for the driver's sorting operations. |
-| `this_player in call_out` | int | 1 | Make this_player() usable from within call_out() callbacks. |
+| `this_player in call_out` | int | 1 | Make this_player() usable from within call_out() callbacks, and from the callbacks of other "
+     "deferred efuns (resolve(), async_read(), async_write(), async_getdir(), async_db_exec()). |
 | `reverse defer` | int | 0 | Run deferred functions registered with defer() in reverse order. |
 | `old range behavior` | int | 0 | Treat negative range indices in strings/buffers as counting from the end (rvalue use only). |
 | `warn old range behavior` | int | 1 | Warn when code relies on 'old range behavior'. |
@@ -249,9 +250,9 @@ These are accepted for backwards compatibility but silently ignored:
 
 ## See Also
 
-- [driver](../cli/driver.md) - Driver command-line options
-- [get_config](../efun/internals/get_config.md) - Query a config value at runtime
-- [set_config](../efun/internals/set_config.md) - Modify a config value at runtime
+- [driver](../cli/driver) - Driver command-line options
+- [get_config](../efun/internals/get_config) - Query a config value at runtime
+- [set_config](../efun/internals/set_config) - Modify a config value at runtime
 
 ## Reference Files
 

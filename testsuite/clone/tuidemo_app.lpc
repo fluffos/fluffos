@@ -1,0 +1,54 @@
+// Full-screen demo application for `tuidemo app` (see /command/tuidemo.lpc).
+// A list, a text field, and a status bar; Tab cycles focus, q quits.
+
+#include <tui.h>
+
+inherit TUI_APP;
+inherit TUI_ANSI;
+
+private object lst, fld, status, title;
+private string last_event = "welcome — Tab cycles focus, q quits";
+
+private void on_widget_event(object w, string what, mixed arg) {
+  if (w == lst && what == "select") {
+    last_event = "selected: " + lst->query_selected_item();
+  } else if (w == fld && what == "submit") {
+    last_event = "submitted: " + arg;
+    lst->set_items(lst->query_items() + ({ arg }));
+  } else if (what == "change") {
+    last_event = "highlight: " + lst->query_selected_item();
+  }
+}
+
+void on_layout(int w, int h) {
+  object scr = app_screen();
+
+  scr->scr_clear();
+  scr->scr_box(0, 0, w, h - 1, TUI_BOX_ROUND, ansi_fg(6));
+  title->set_geometry(2, 0, w - 4, 1);
+  lst->set_geometry(2, 2, w / 2 - 3, h - 6);
+  fld->set_geometry(w / 2 + 1, 2, w - w / 2 - 3, 1);
+  status->set_geometry(0, h - 1, w, 1);
+}
+
+void on_open(object t, int w, int h) {
+  if (!lst) {
+    title = app_add(new("/std/tui/w/label"));
+    title->set_text(" /std/tui demo ");
+    title->set_attr("1;36");
+    lst = app_add(new("/std/tui/w/list"));
+    lst->set_items(({ "alpha", "bravo", "charlie", "delta", "echo", "foxtrot" }));
+    lst->set_on_event((: on_widget_event :));
+    fld = app_add(new("/std/tui/w/textfield"));
+    fld->set_on_event((: on_widget_event :));
+    status = app_add(new("/std/tui/w/label"));
+    status->set_attr("7");
+  }
+  ::on_open(t, w, h);
+}
+
+string render() {
+  status->set_text(sprintf(" %dx%d  %s ", app_screen()->scr_width(),
+                           app_screen()->scr_height(), last_event));
+  return ::render();
+}

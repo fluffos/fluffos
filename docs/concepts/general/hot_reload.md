@@ -41,9 +41,9 @@ mixed inherit_program( string from, string path, int priv );
 mixed include_file( string compiled, string from, string path );
 ```
 
-[`inherit_program`](../../apply/master/inherit_program.md) is called for
+[`inherit_program`](../../apply/master/inherit_program) is called for
 every `inherit "path";` statement while compiling `from` (`priv` is
-nonzero for `private inherit`). [`include_file`](../../apply/master/include_file.md)
+nonzero for `private inherit`). [`include_file`](../../apply/master/include_file)
 is called for every `#include` directive: `path` is about to be included
 by `from` during the compilation of `compiled` (`from` differs from
 `compiled` for an include nested inside a header).
@@ -253,7 +253,7 @@ public void enable(int interval) {
 
 The destruct+load cycle resets global variables to their initializers
 and cannot touch clones. The driver's
-[`recompile_object()`](../../efun/objects/recompile_object.md) efun replaces that
+[`recompile_object()`](../../efun/objects/recompile_object) efun replaces that
 cycle entirely:
 
 ```c
@@ -293,9 +293,9 @@ some state deliberately *not* survive.
 
 The same destruct+load path can also carry state generically without
 driver support, using three efuns from the contrib package —
-[`variables()`](../../efun/contrib/variables.md),
-[`fetch_variable()`](../../efun/contrib/fetch_variable.md) and
-[`store_variable()`](../../efun/contrib/store_variable.md):
+[`variables()`](../../efun/contrib/variables),
+[`fetch_variable()`](../../efun/contrib/fetch_variable) and
+[`store_variable()`](../../efun/contrib/store_variable):
 
 ```c
 // BEFORE destructing: capture every reachable global by name
@@ -347,7 +347,7 @@ This exact flow — including the deepest case, editing an include of an
   keeping its own state. The destruct+load path (opt-out mode, or the
   cooperative pair) replaces only the master copy: existing clones
   keep the old program until re-created — enumerate them with
-  [`children()`](../../efun/objects/children.md) (filter with
+  [`children()`](../../efun/objects/children) (filter with
   `clonep()`) to destruct or migrate stragglers. Either way, anything
   fetched via `"/path/name"->func()` or fresh `find_object()`/`new()`
   after the reload gets the new code.
@@ -370,7 +370,7 @@ This exact flow — including the deepest case, editing an include of an
   compiler is not reentrant. Record and return — do the loading from
   `check_now()`/`poll()`.
 * Includes that resolve through `valid_read` denials or exotic
-  [`get_include_path`](../../apply/master/get_include_path.md) setups
+  [`get_include_path`](../../apply/master/get_include_path) setups
   may need a smarter `resolve_include()` than the sketch above.
 * The applies also *can* rewrite compiles (redirect paths, inject
   source, deny). A hot-reload daemon should not: return `path`
@@ -378,13 +378,13 @@ This exact flow — including the deepest case, editing an include of an
 
 ## See also
 
-* [`inherit_program`](../../apply/master/inherit_program.md),
-  [`include_file`](../../apply/master/include_file.md) — the apply
+* [`inherit_program`](../../apply/master/inherit_program),
+  [`include_file`](../../apply/master/include_file) — the apply
   reference pages, including the redirect / inline-source / deny
   return forms
-* [`recompile_object`](../../efun/objects/recompile_object.md) — the efun
+* [`recompile_object`](../../efun/objects/recompile_object) — the efun
   reference: swap a recompiled program into the live master copy and
   its clones
-* [`inherit`](../../lpc/constructs/inherit.md),
-  [`#include`](../../lpc/preprocessor/include.md) — the language
+* [`inherit`](../../lpc/constructs/inherit),
+  [`#include`](../../lpc/preprocessor/include) — the language
   constructs and their resolution rules

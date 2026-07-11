@@ -14,7 +14,11 @@ const config: Config = {
 
   i18n: {
     defaultLocale: 'en',
-    locales: ['en'],
+    locales: ['en', 'zh-CN'],
+    localeConfigs: {
+      en: { label: 'English' },
+      'zh-CN': { label: '简体中文' },
+    },
   },
 
   markdown: {
@@ -37,6 +41,9 @@ const config: Config = {
           exclude: [
             '**/node_modules/**',
             '**/archive/**',
+            // the docs source dir is the site dir itself, so keep the
+            // translated corpus (i18n/) out of the default-locale glob
+            'i18n/**',
             'CLAUDE.md',
             'README.md',
           ],
@@ -76,6 +83,10 @@ const config: Config = {
           sidebarId: 'docs',
           position: 'left',
           label: 'Documentation',
+        },
+        {
+          type: 'localeDropdown',
+          position: 'right',
         },
         {
           href: 'https://github.com/fluffos/fluffos',

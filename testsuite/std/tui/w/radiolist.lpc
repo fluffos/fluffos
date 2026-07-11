@@ -1,0 +1,73 @@
+// /std/tui/w/radiolist — single-choice radio group (blessed RadioSet).
+//
+// Space/Enter picks the highlighted item; events: ("change", index).
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string *items = ({});
+private int picked = 0;
+private int sel = 0;
+private int top = 0;
+private string attr = "";
+private string sel_attr = "7";
+
+void create() { w_focusable = 1; }
+
+void set_items(string *it) {
+  items = arrayp(it) ? it[0..] : ({});
+  picked = sel = top = 0;
+}
+
+void set_picked(int i) {
+  if (i >= 0 && i < sizeof(items)) picked = i;
+}
+
+int query_picked() { return picked; }
+string query_picked_item() { return picked < sizeof(items) ? items[picked] : 0; }
+int query_selected() { return sel; }
+
+void set_attrs(string normal, string selected) {
+  if (stringp(normal)) attr = normal;
+  if (stringp(selected)) sel_attr = selected;
+}
+
+void draw(object scr) {
+  int i;
+
+  if (sel < top) top = sel;
+  if (sel >= top + wh) top = sel - wh + 1;
+  if (top < 0) top = 0;
+  for (i = 0; i < wh; i++) {
+    int idx = top + i;
+    string line = "";
+
+    if (idx < sizeof(items)) {
+      line = wslice((idx == picked ? "(•) " : "( ) ") + items[idx], 0, ww);
+    }
+    scr->scr_put(wx, wy + i, wpad(line, ww),
+                 (idx == sel && idx < sizeof(items) && w_focused) ? sel_attr : attr);
+  }
+}
+
+int handle_key(mixed ev) {
+  if (ev == " " || ev == TUI_KEY_ENTER) {
+    if (sizeof(items) && picked != sel) {
+      picked = sel;
+      emit_event("change", picked);
+    }
+    return 1;
+  }
+  if (!intp(ev)) return 0;
+  switch (ev) {
+    case TUI_KEY_UP:
+      if (sel > 0) sel--;
+      return 1;
+    case TUI_KEY_DOWN:
+      if (sel < sizeof(items) - 1) sel++;
+      return 1;
+  }
+  return 0;
+}

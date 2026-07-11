@@ -2668,8 +2668,10 @@ void eval_instruction(char* p) {
               lval->subtype = 0;
               /* both sides are numbers, no freeing required */
             } else if (sp->type == T_REAL) {
-              lval->u.number += sp->u.real;
-              lval->subtype = 0;
+              /* int += float promotes to float, matching int + float */
+              LPC_FLOAT result = lval->u.number + sp->u.real;
+              lval->type = T_REAL;
+              lval->u.real = result;
               /* both sides are numbers, no freeing required */
             } else {
               error(

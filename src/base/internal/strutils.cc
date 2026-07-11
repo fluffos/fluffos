@@ -43,6 +43,28 @@ bool u8_validate(const uint8_t* s, size_t len) {
 
 std::string u8_sanitize(std::string_view src) { return utf8::replace_invalid(src); }
 
+size_t u8_incomplete_tail(std::string_view buf) {
+  const size_t n = buf.size();
+  const size_t scan = n < 3 ? n : 3;
+
+  for (size_t back = 1; back <= scan; back++) {
+    const auto c = static_cast<unsigned char>(buf[n - back]);
+    if ((c & 0xc0) == 0x80) continue;  // continuation byte: keep scanning for the lead
+    size_t len;
+    if (c >= 0xc2 && c < 0xe0) {
+      len = 2;
+    } else if (c >= 0xe0 && c < 0xf0) {
+      len = 3;
+    } else if (c >= 0xf0 && c <= 0xf4) {
+      len = 4;
+    } else {
+      return 0;  // ASCII or invalid lead: nothing worth waiting for
+    }
+    return len > back ? back : 0;  // incomplete -> hold `back` bytes
+  }
+  return 0;  // 3 continuations with no lead: malformed, deliver as-is
+}
+
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
 int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t needle_len,
                               bool reverse) {
@@ -111,7 +133,9 @@ UChar32 u8_egc_index_as_single_codepoint(const char* src, int32_t src_len, int32
   // out-of-bounds
   if (pos < 0) return -2;
   auto post_pos = iter.post_index_to_offset(index);
-  // end-of-string
+  // Index landed on the final break position (one past the last EGC):
+  // return 0, the virtual NUL terminator. This is deliberate C-string
+  // compat -- s[strlen(s)] == 0 -- pinned by tests/operators/string_index.lpc.
   if (post_pos < 0) return 0;
 
   if (post_pos - pos > U8_MAX_LENGTH) return c;

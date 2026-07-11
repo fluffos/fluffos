@@ -1,0 +1,68 @@
+// /std/tui/w/log — a log pane permanently scrolled to the bottom
+// (blessed Log), with PgUp/PgDn scrollback when focused.
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string *lines = ({});
+private int max_lines = 500;
+private int offset = 0;       // lines scrolled back from the bottom
+private string attr = "";
+
+void set_max_lines(int n) {
+  if (n > 0) max_lines = n;
+}
+
+void set_attr(string a) { attr = stringp(a) ? a : ""; }
+
+void add_line(string s) {
+  if (!stringp(s)) return;
+  lines += explode(s, "\n");
+  if (sizeof(lines) > max_lines) lines = lines[sizeof(lines) - max_lines..];
+  offset = 0;  // new output snaps back to the bottom
+}
+
+void clear_lines() {
+  lines = ({});
+  offset = 0;
+}
+
+string *query_lines() { return lines[0..]; }
+int query_offset() { return offset; }
+
+void draw(object scr) {
+  int n = sizeof(lines);
+  int first = n - wh - offset;
+  int i;
+
+  if (first < 0) first = 0;
+  for (i = 0; i < wh; i++) {
+    string line = first + i < n && first + i >= 0 ? wslice(lines[first + i], 0, ww) : "";
+
+    scr->scr_put(wx, wy + i, wpad(line, ww), attr);
+  }
+}
+
+int handle_key(mixed ev) {
+  int max_off = sizeof(lines) - wh;
+
+  if (max_off < 0) max_off = 0;
+  if (!intp(ev)) return 0;
+  switch (ev) {
+    case TUI_KEY_PGUP:
+      offset = offset + wh > max_off ? max_off : offset + wh;
+      return 1;
+    case TUI_KEY_PGDN:
+      offset = offset - wh < 0 ? 0 : offset - wh;
+      return 1;
+    case TUI_KEY_HOME:
+      offset = max_off;
+      return 1;
+    case TUI_KEY_END:
+      offset = 0;
+      return 1;
+  }
+  return 0;
+}

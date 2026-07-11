@@ -1,0 +1,37 @@
+// /std/tui/w/button — push button.  Enter/Space -> ("press", 0).
+
+#include <tui.h>
+
+inherit TUI_WIDGET;
+inherit TUI_ANSI;
+
+private string label = "OK";
+private string attr = "";
+private string focus_attr = "7";
+
+void create() {
+  w_focusable = 1;
+  wh = 1;
+}
+
+void set_label(string l) { label = stringp(l) ? l : ""; }
+string query_label() { return label; }
+
+void set_attrs(string normal, string focused) {
+  if (stringp(normal)) attr = normal;
+  if (stringp(focused)) focus_attr = focused;
+}
+
+void draw(object scr) {
+  string text = "[ " + label + " ]";
+
+  scr->scr_put(wx, wy, wpad(wslice(text, 0, ww), ww), w_focused ? focus_attr : attr);
+}
+
+int handle_key(mixed ev) {
+  if (ev == TUI_KEY_ENTER || ev == " ") {
+    emit_event("press", 0);
+    return 1;
+  }
+  return 0;
+}

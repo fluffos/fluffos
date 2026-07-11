@@ -26,6 +26,12 @@ title: async / async_write
             //  0 for success
         }
 
+### NOTE
+
+    When the 'this_player in call_out' driver setting is enabled,
+    this_player() inside the callback is preserved from the time the
+    request was made, like call_out().
+
 ### SEE ALSO
 
     file_size(3), read_file(3), write_buffer(3), write_file(3), async_read(3),

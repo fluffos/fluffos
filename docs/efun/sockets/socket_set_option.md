@@ -185,10 +185,10 @@ void client_read(int sock, string data) {
 
 ### SEE ALSO
 
-- [socket_get_option](socket_get_option.md) - Get socket options
-- [socket_create](socket_create.md) - Create a socket
-- [socket_connect](socket_connect.md) - Connect a socket
-- [socket_accept](socket_accept.md) - Accept connections
+- [socket_get_option](socket_get_option) - Get socket options
+- [socket_create](socket_create) - Create a socket
+- [socket_connect](socket_connect) - Connect a socket
+- [socket_accept](socket_accept) - Accept connections
 
 ### NOTES
 

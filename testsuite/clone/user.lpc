@@ -3,8 +3,12 @@
 // purpose:  is the representation of an interactive (user) in the MUD
 
 #include <globals.h>
+#include <tui.h>
 
 inherit BASE;
+// TUI support: tui_readline() prompts, tui_open() full-screen apps, and the
+// window_size/terminal_type applies (see /std/tui/README.md).
+inherit TUI_TERMINAL;
 
 private string name;
 
@@ -213,6 +217,7 @@ void tell_room(object ob, string msg) {
 void
 net_dead()
 {
+    tui_destroy();
     set_heart_beat(0);
 #ifndef __NO_ENVIRONMENT__
     tell_room(environment(), query_name() + " is link-dead.\n");
@@ -232,8 +237,8 @@ reconnect()
 }
 
 void window_size(int width, int height) {
-  string msg = sprintf("TELNET NAWS: %dx%d\n", width, height);
-  receive(msg);
+  if (!tui_active()) receive(sprintf("TELNET NAWS: %dx%d\n", width, height));
+  ::window_size(width, height);  // let /std/tui/terminal cache it
 }
 
 // receive_environ

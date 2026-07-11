@@ -28,13 +28,14 @@ closest sibling: a `.spec`, a `.cc`, a `CMakeLists.txt`, an
 `option(PACKAGE_FFI ...)` toggle, and a handle table into an opaque
 native resource).
 
-> [!CAUTION]
-> An FFI is a **full sandbox escape**: any mudlib code that reaches
-> these efuns can call arbitrary native code and read/write arbitrary
-> memory. The security model (below) is not optional — the package is
-> `OFF` by default, every call is gated through a master apply, and the
-> recommendation is to wrap the raw efuns in a privileged simul-efun
-> that ordinary mudlib code cannot reach.
+:::danger[Full sandbox escape]
+An FFI is a **full sandbox escape**: any mudlib code that reaches
+these efuns can call arbitrary native code and read/write arbitrary
+memory. The security model (below) is not optional — the package is
+`OFF` by default, every call is gated through a master apply, and the
+recommendation is to wrap the raw efuns in a privileged simul-efun
+that ordinary mudlib code cannot reach.
+:::
 
 ---
 

@@ -25,7 +25,7 @@ FluffOS TLS support includes:
 Listening ports are configured with numbered `external_port_N` entries in the
 driver configuration file. TLS is enabled on a listener by adding a matching
 `external_port_N_tls` line giving a certificate and key. See the
-[driver configuration](../../driver/config.md) for the full port syntax.
+[driver configuration](../../driver/config) for the full port syntax.
 
 ```
 # Secure telnet on port 4443
@@ -144,7 +144,7 @@ external_port_1_tls : cert=/etc/letsencrypt/live/mud.yourdomain.com/fullchain.pe
 
 After a renewal the certificate files change on disk, but the running driver
 keeps using the certificate it loaded at boot. Reload it in-game without
-restarting using the [`sys_reload_tls()`](../../efun/system/sys_reload_tls.md)
+restarting using the [`sys_reload_tls()`](../../efun/system/sys_reload_tls)
 efun, which takes the 1-based external port number:
 
 ```c
@@ -366,13 +366,13 @@ connections alive avoids repeating handshakes.
 
 ## See Also
 
-- [socket_create](../../efun/sockets/socket_create.md) — create sockets
-- [socket_set_option](../../efun/sockets/socket_set_option.md) — configure TLS
-- [socket_get_option](../../efun/sockets/socket_get_option.md) — query TLS settings
-- [sys_reload_tls](../../efun/system/sys_reload_tls.md) — reload certificates
-- [socket_efuns](socket_efuns.md) — LPC sockets overview
-- [Driver Configuration](../../driver/config.md) — TLS port setup
-- [WebSocket Support](websocket.md) — WebSocket with TLS
+- [socket_create](../../efun/sockets/socket_create) — create sockets
+- [socket_set_option](../../efun/sockets/socket_set_option) — configure TLS
+- [socket_get_option](../../efun/sockets/socket_get_option) — query TLS settings
+- [sys_reload_tls](../../efun/system/sys_reload_tls) — reload certificates
+- [socket_efuns](socket_efuns) — LPC sockets overview
+- [Driver Configuration](../../driver/config) — TLS port setup
+- [WebSocket Support](websocket) — WebSocket with TLS
 
 ## References
 

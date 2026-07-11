@@ -1,0 +1,25 @@
+// Fixture for single/tests/compiler/class_combined_decl.lpc (#788):
+// everything here must keep compiling -- a typeless function directly
+// after a class body, a typed declaration after a class body, and the
+// separate 'class Person Me;' declaration form.
+class Person {
+  string name;
+}
+probe() {
+  class Person p = new(class Person);
+  p->name = "jeremy";
+  return p->name;
+}
+
+class Counter {
+  int n;
+}
+int typed_after_class;
+
+class Person Me;
+
+string probe2() {
+  Me = new(class Person);
+  Me->name = "kyle";
+  return Me->name;
+}

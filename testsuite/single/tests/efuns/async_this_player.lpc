@@ -1,0 +1,62 @@
+// Issue #1104: this_player() must survive into async callbacks
+// (async_read/async_write/resolve/...), following the call_out()
+// precedent -- gated on the 'this_player in call_out' setting, which
+// etc/config.test enables.
+//
+// Two objects each register a callback while THEY are this_player();
+// each callback asserts it sees its own registrant. Without per-request
+// context capture both callbacks fire under whatever command_giver
+// happens to be current, so at least one of them would fail.
+
+#if defined(__PACKAGE_ASYNC__) && !defined(__NO_ADD_ACTION__) && defined(__THIS_PLAYER_IN_CALL_OUT__)
+
+private object expected;
+
+private string my_file() {
+    return "/atp_test_" + (clonep() ? "clone" : "blueprint") + ".txt";
+}
+
+void got_read(mixed res) {
+    ASSERT_EQ(expected, this_player());
+}
+
+void got_write(mixed res) {
+    ASSERT_EQ(expected, this_player());
+    rm(my_file());
+}
+
+int atp_action() {
+    // Inside a command, this_player() is this living object.
+    expected = this_player();
+    ASSERT_EQ(this_object(), expected);
+
+    write_file(my_file(), "async this_player payload\n", 1);
+    ASSERT_EQ(0, catch(async_read(my_file(), (: got_read :))));
+    ASSERT_EQ(0, catch(async_write(my_file(), "more\n", 0, (: got_write :))));
+    return 1;
+}
+
+void setup() {
+    enable_commands();
+    add_action((: atp_action :), "atp");
+    ASSERT(command("atp"));
+    // Leaving a living object behind confuses the test runner's
+    // shutdown; the object itself must stay alive for the callbacks.
+    disable_commands();
+}
+
+void do_tests() {
+    object peer;
+
+    setup();
+    peer = clone_object(__FILE__);
+    peer->setup();
+}
+
+#else
+
+void do_tests() {
+    ASSERT(1);
+}
+
+#endif

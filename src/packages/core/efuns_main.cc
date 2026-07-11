@@ -313,20 +313,13 @@ void f_call_stack() {
       }
       break;
     case 4:
+      /* Every frame reports "file:line", matching the documented behavior. */
       for (i = 0; i < n; i++) {
+        const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
+        char* progc = (i ? (csp - i + 1)->pc : pc);
         ret->item[i].type = T_STRING;
-        if (true || ((csp - i)->framekind & FRAME_MASK) == FRAME_FUNP) {
-          const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
-          int const index = (csp - i)->fr.table_index;
-          char* progc = (i ? (csp - i + 1)->pc : pc);
-          ret->item[i].type = T_STRING;
-          ret->item[i].subtype = STRING_MALLOC;
-          ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
-        } else {
-          ret->item[i].subtype = STRING_CONSTANT;
-          ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
-        }
+        ret->item[i].subtype = STRING_MALLOC;
+        ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
       }
       break;
   }
@@ -3254,6 +3247,34 @@ void f_request_clean_up() {
   }
   free_object(&sp->u.ob, "f_request_clean_up");
   put_number(success);
+}
+#endif
+
+#ifdef F_SET_CLEAN_UP
+void f_set_clean_up() {
+  object_t* ob;
+
+  if (st_num_arg == 2) {
+    ob = (sp - 1)->u.ob;
+    ob->next_cleanup =
+        g_current_gametick + time_to_next_gametick(std::chrono::seconds(sp->u.number));
+  } else {
+    ob = sp->u.ob;
+    ob->next_cleanup = 0; /* back to the idle-time rule */
+  }
+
+  /* Same gate as at load/clone time and request_clean_up(): only objects
+     that actually define clean_up() are queried by the sweep. */
+  if (!(ob->flags & O_DESTRUCTED) && function_exists(APPLY_CLEAN_UP, ob, 1)) {
+    ob->flags |= O_WILL_CLEAN_UP;
+  }
+
+  if (st_num_arg == 2) {
+    free_object(&(--sp)->u.ob, "f_set_clean_up:1");
+    sp--;
+  } else {
+    free_object(&(sp--)->u.ob, "f_set_clean_up:2");
+  }
 }
 #endif
 

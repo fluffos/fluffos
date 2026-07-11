@@ -1,0 +1,85 @@
+// /std/tui/screen: cell grid, minimal-diff rendering, wide-char handling.
+
+#include <tui.h>
+
+void do_tests() {
+  object s = clone_object(TUI_SCREEN);
+  string f;
+
+  s->scr_resize(10, 3);
+
+  // first frame: reset + clear + hide cursor, nothing else (grid is blank)
+  ASSERT_EQ("\e[0m\e[2J\e[?25l", s->scr_frame());
+
+  // second frame paints only the touched cells
+  s->scr_put(1, 1, "hi", "1");
+  ASSERT_EQ("\e[2;2H\e[0;1mhi\e[0m", s->scr_frame());
+
+  // no change -> empty frame
+  ASSERT_EQ("", s->scr_frame());
+  s->scr_put(1, 1, "hi", "1");
+  ASSERT_EQ("", s->scr_frame());
+
+  // single-cell change repaints one cell
+  s->scr_put(2, 1, "o", "1");
+  ASSERT_EQ("\e[2;3H\e[0;1mo\e[0m", s->scr_frame());
+
+  // attribute-only change is a change
+  s->scr_put(1, 1, "h", "1;7");
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "\e[0;1;7mh") != -1);
+
+  // scr_invalidate forces a full repaint
+  s->scr_invalidate();
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "\e[2J") != -1);
+  ASSERT(strsrch(f, "hi") == -1);  // h and o have different attrs now
+  ASSERT(strsrch(f, "o") != -1);
+
+  // --- wide characters --------------------------------------------------
+  s->scr_resize(6, 2);
+  s->scr_frame();
+  s->scr_put(0, 0, "你a");
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "你a") != -1);
+  // overwriting the continuation cell blanks the owner
+  s->scr_put(1, 0, "x");
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "\e[1;1H") != -1);   // repaint starts at the owner
+  ASSERT(strsrch(f, " x") != -1);
+  ASSERT(strsrch(f, "你") == -1);
+  // a wide char that would cross the right edge is clipped entirely
+  s->scr_put(5, 1, "好");
+  ASSERT_EQ("", s->scr_frame());
+
+  // --- cursor -------------------------------------------------------------
+  s->scr_set_cursor(2, 1, 1);
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "\e[?25h") != -1);
+  ASSERT(strsrch(f, "\e[2;3H") != -1);
+  s->scr_set_cursor(2, 1, 0);
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "\e[?25l") != -1);
+
+  // --- box drawing ----------------------------------------------------------
+  s->scr_resize(5, 3);
+  s->scr_frame();
+  s->scr_box(0, 0, 5, 3, TUI_BOX_ASCII);
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "+---+") != -1);
+  ASSERT(strsrch(f, "|") != -1);
+
+  s->scr_box(0, 0, 5, 3, TUI_BOX_SINGLE);
+  f = s->scr_frame();
+  ASSERT(strsrch(f, "┌──┐") == -1);  // 5-wide: ┌───┐
+  ASSERT(strsrch(f, "┌───┐") != -1);
+
+  // out-of-range writes are clipped, never error
+  s->scr_put(-3, 0, "abcdefghij");
+  s->scr_put(0, 99, "x");
+  s->scr_put(99, 0, "x");
+  s->scr_fill(-1, -1, 100, 100, ".", "");
+  s->scr_frame();
+
+  destruct(s);
+}

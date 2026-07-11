@@ -34,16 +34,25 @@ title: interactive / get_char
     argument (a string). Any additional arguments supplied to get_char will
     be passed on to 'fun' as arguments following the user input.
 
-### BUGS
+### DELIVERY
 
-    Please note that get_char has a significant bug in MudOS 0.9  and  ear‐
-    lier.  On many systems with poor telnet negotiation (read: almost every
-    major workstation on the market), get_char makes screen  output  behave
-    strangely.   It  is  not  recommended  for  common usage throughout the
-    mudlib until that bug is fixed.  (It is currently only  known  to  work
-    well for users connecting from NeXT computers.)
+    Exactly one keystroke is delivered per callback:
+
+    - A printable character arrives as itself.  A multi-byte UTF-8  charac‐
+      ter  is  delivered  whole,  as one valid one-character string (it is
+      never split into fragment bytes).
+    - Control bytes arrive verbatim, including Backspace (0x08) and Delete
+      (0x7f) -- char mode performs no line editing.
+    - Escape sequences (arrow keys, function keys)  arrive  byte-by-byte:
+      ESC, '[', 'A' are three separate callbacks.  Reassembling  them  is
+      the mudlib's job; see /std/tui/keys.lpc in the testsuite mudlib for
+      a full decoder, and the TUI library built on top of it.
+
+    Char mode is one-shot: after each callback the driver reverts to  line
+    mode  unless  the callback re-arms get_char() before returning.  Pass‐
+    ing the no-echo flag on every re-arm keeps client echo off across  the
+    whole exchange.
 
 ### SEE ALSO
 
     call_other(3), call_out(3), input_to(3)
-
