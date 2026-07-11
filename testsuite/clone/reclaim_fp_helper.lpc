@@ -1,2 +1,4 @@
 // Helper for single/tests/crasher/reclaim_funptr_owner.lpc
-function make_fp() { return function() { return 42; }; }
+// Returns an FP_LOCAL funptr owned by this clone.
+int target() { return 42; }
+function make_fp() { return (: target :); }
