@@ -38,8 +38,11 @@ META_FILE = os.path.join(DOCS_ROOT, "sidebar_meta.json")
 OUT_FILE = os.path.join(DOCS_ROOT, "sidebars.generated.json")
 
 # The doc trees this script owns. lpc/ is NOT here: its index pages are
-# hand-written and its sidebar is hand-authored in sidebars.ts.
-TREES = ["efun", "apply", "stdlib", "concepts", "driver", "cli", "zh-CN"]
+# hand-written and its sidebar is hand-authored in sidebars.ts. The Chinese
+# corpus lives in i18n/zh-CN/ (Docusaurus i18n) and shares this sidebar;
+# its category labels are translated in
+# i18n/zh-CN/docusaurus-plugin-content-docs/current.json.
+TREES = ["efun", "apply", "stdlib", "concepts", "driver", "cli"]
 
 # Directory entries that are never documentation content.
 SKIP_DIRS = {"node_modules"}
@@ -100,11 +103,17 @@ def build_category(meta, rel):
                 {
                     "type": "doc",
                     "id": f"{rel}/{name}",
+                    # Unique translation key (labels repeat: e.g. hash exists
+                    # in both efun/crypto and efun/strings).
+                    "key": f"{rel}/{name}",
                     "label": labels.get(name, name),
                 }
             )
 
-    category = {"type": "category", "label": label}
+    # A stable, unique translation key: labels repeat across trees (both
+    # efun/ and stdlib/ have "Arrays"), which would collide in i18n
+    # translation files (sidebar.docs.category.<key>).
+    category = {"type": "category", "key": rel, "label": label}
     if os.path.exists(os.path.join(path, "index.md")):
         # A hand-written landing page wins over the generated card grid.
         category["link"] = {"type": "doc", "id": f"{rel}/index"}

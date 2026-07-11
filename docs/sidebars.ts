@@ -81,7 +81,6 @@ const sidebars: SidebarsConfig = {
     gen['concepts'],
     gen['driver'],
     gen['cli'],
-    gen['zh-CN'],
     {
       type: 'category',
       label: 'Historical',

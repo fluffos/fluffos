@@ -1,5 +1,6 @@
 ---
 title: interactive / interactive
+slug: /efun/interactive/interactive
 ---
 # interactive
 

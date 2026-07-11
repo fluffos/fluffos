@@ -398,11 +398,11 @@ To find regressions:
 
 ## See Also
 
-- [trace_start](../../efun/system/trace_start.md) — start tracing
-- [trace_end](../../efun/system/trace_end.md) — stop tracing
-- [trace](../../efun/internals/trace.md) — per-execution debug tracing (separate feature)
-- [traceprefix](../../efun/internals/traceprefix.md) — set the debug-trace prefix
-- [dump_trace](../../efun/internals/dump_trace.md) — return the current LPC call stack
+- [trace_start](../../efun/system/trace_start) — start tracing
+- [trace_end](../../efun/system/trace_end) — stop tracing
+- [trace](../../efun/internals/trace) — per-execution debug tracing (separate feature)
+- [traceprefix](../../efun/internals/traceprefix) — set the debug-trace prefix
+- [dump_trace](../../efun/internals/dump_trace) — return the current LPC call stack
 
 ## References
 

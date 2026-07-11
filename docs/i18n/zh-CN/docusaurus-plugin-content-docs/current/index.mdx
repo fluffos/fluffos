@@ -1,0 +1,114 @@
+---
+title: FluffOS
+slug: /
+---
+
+# FluffOS
+
+FluffOS 是一个高性能游戏引擎（LPMUD 驱动），常用于构建 MUD —— 参见
+[LPMud](https://en.wikipedia.org/wiki/LPMud)。FluffOS 最初是针对 MudOS 最后一个版本的补丁集，
+经过多次大规模重写和缺陷修复，在支持新特性的同时保持了对现有 mudlib 的向后兼容。
+
+代码库由三部分组成：
+
+- **LPC 解释器** —— 解析并执行 LPC 程序。
+- **网络服务器** —— 管理客户端连接并暴露给 LPC，支持 TELNET、TLS 和 WebSocket 协议。
+- **粘合接口**
+  - **Efun** —— LPC 程序可调用的内置 C/C++ 函数。
+  - **Apply** —— 驱动在各类游戏事件发生时回调 LPC 对象的函数。
+
+:::tip[当前版本]
+当前版本为 `master` 分支 —— CMake 构建系统，支持 Ubuntu、macOS、Windows（MSYS2/MinGW64）
+以及 WebAssembly。参见 [GitHub 上的所有版本](https://github.com/fluffos/fluffos/releases)。
+:::
+
+## 浏览文档
+
+<div className="row">
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>🚀 快速开始</h3></div>
+      <div className="card__body">
+        在 Linux、macOS、Windows 上从源码构建驱动，或构建可在浏览器中运行的 WebAssembly 版本。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/build">构建指南</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>📖 LPC 语言</h3></div>
+      <div className="card__body">
+        FluffOS 实现的 LPC 语言：类型、语法结构、预处理器和编译诊断。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/lpc/">语言参考</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>⚙️ Efun 函数</h3></div>
+      <div className="card__body">
+        驱动提供给 LPC 代码调用的全部内置函数参考，按主题分类。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/efun/">Efun 参考</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>🔔 Apply 回调</h3></div>
+      <div className="card__body">
+        驱动回调对象的函数：master 安全钩子、对象生命周期和玩家连接。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/apply/">Apply 参考</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>💡 概念</h3></div>
+      <div className="card__body">
+        LPC、对象与驱动如何协同工作 —— simul_efun、热重载、网络等。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/concepts/">概念指南</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>🔧 驱动内部</h3></div>
+      <div className="card__body">
+        运行时配置、VM 栈机、内存分配，以及如何添加自己的 efun。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/driver/">驱动文档</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+:::note
+中文文档目前覆盖 efun 参考、apply 回调和构建指南；尚未翻译的页面会自动显示英文内容。
+欢迎在 [GitHub](https://github.com/fluffos/fluffos) 上贡献翻译。
+:::
+
+## 特性
+
+- 使用 CMake 在 Ubuntu、macOS 和 Windows 上原生构建 —— 另有可在浏览器中运行完整 mudlib 的 WebAssembly 目标。
+- 原生 UTF-8，透明的输入/输出编码转换支持。（支持 Emoji！）
+- WebSocket 支持！
+- TLS 支持！
+- 默认 SHA512 crypt。
+
+## 许可证与版权
+
+> Copyright 2019-2023 Yucong Sun
+
+许可条款见英文版页面及仓库中的
+[Copyright](https://github.com/fluffos/fluffos/blob/master/Copyright) 文件。

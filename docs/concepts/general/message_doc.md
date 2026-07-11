@@ -150,13 +150,13 @@ on to propose an ad-hoc `"type:length:msg"` text convention for a hypothetical
 that FluffOS supports natively; use these rather than inventing your own wire
 format:
 
-- [GMCP](../../apply/interactive/gmcp.md) — Generic MUD Communication Protocol
-- [MSDP](../../apply/interactive/msdp.md) — Mud Server Data Protocol
-- [MXP](../../apply/interactive/mxp_tag.md) — MUD eXtension Protocol
-- [MSP](../../apply/interactive/msp_enable.md) — MUD Sound Protocol
-- [ZMP](../../apply/interactive/zmp.md) — Zenith MUD Protocol
+- [GMCP](../../apply/interactive/gmcp) — Generic MUD Communication Protocol
+- [MSDP](../../apply/interactive/msdp) — Mud Server Data Protocol
+- [MXP](../../apply/interactive/mxp_tag) — MUD eXtension Protocol
+- [MSP](../../apply/interactive/msp_enable) — MUD Sound Protocol
+- [ZMP](../../apply/interactive/zmp) — Zenith MUD Protocol
 
 A typical pattern is to keep using `message()` with a meaningful `type` for
 in-game classification, and have `receive_message` (or the relevant protocol
 apply) hand a structured payload to the client through the appropriate efun,
-such as [`send_gmcp()`](../../efun/interactive/send_gmcp.md).
+such as [`send_gmcp()`](../../efun/interactive/send_gmcp).
