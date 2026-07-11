@@ -458,6 +458,14 @@ char* read_file(const char* file, int start, int lines) {
     ptr_end = (char*)ptr_start + read_file_max_size;
   }
 
+  // The forward line search can post-increment ptr_end one past the last byte
+  // read (to the_buff + total_bytes_read + 1) when it runs off the end without
+  // finding enough newlines. Clamp to the terminator slot so the '\0' below
+  // stays inside the 2*max+1 byte buffer instead of writing one past it.
+  if (ptr_end > the_buff + total_bytes_read) {
+    ptr_end = (char*)the_buff + total_bytes_read;
+  }
+
   *ptr_end = '\0';
 
   bool const found_crlf = strchr(ptr_start, '\r') != nullptr;
