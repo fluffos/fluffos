@@ -110,9 +110,15 @@ static void parse_rule(parse_state_t*);
 static void clear_parallel_errors(saved_error_t**);
 static svalue_t* get_the_error(parser_error_t*, int);
 
-#define isignore(x) (!uisprint(x) || (x) == '\'')
-#define iskeep(x) \
-  (uisalnum(x) || (x) == '*' || (x) == '?' || (x) == '!' || (x) == '.' || (x) == ':')
+/* UTF-8 lead/continuation bytes are word bytes (issue #660): the C locale
+ * classifies them as non-printable and non-alphanumeric, which used to
+ * silently strip every non-ASCII character during tokenization. Matching
+ * stays bytewise (no case folding beyond ASCII). */
+#define ismultibyte(x) ((unsigned char)(x) >= 0x80)
+#define isignore(x) ((!uisprint(x) && !ismultibyte(x)) || (x) == '\'')
+#define iskeep(x)                                                                           \
+  (uisalnum(x) || ismultibyte(x) || (x) == '*' || (x) == '?' || (x) == '!' || (x) == '.' || \
+   (x) == ':')
 
 #define SHARED_STRING(x) ((x)->subtype == STRING_SHARED ? (x)->u.string : findstring((x)->u.string))
 
