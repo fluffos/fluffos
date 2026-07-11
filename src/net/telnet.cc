@@ -712,12 +712,14 @@ void on_telnet_do_zmp(const char** argv, unsigned long argc, interactive_t* ip) 
   // Push the command
   copy_and_push_string(argv[0]);
 
-  // Push the array
+  // Push the array of arguments (argv[0] is the command, already pushed).
+  // Destination index is i-1: filling item[1..argc-1] would write one past
+  // the argc-1 element array and leave item[0] uninitialized.
   array_t* arr = allocate_array(argc - 1);
   for (int i = 1; i < argc; i++) {
-    arr->item[i].u.string = string_copy(argv[i], "ZMP");
-    arr->item[i].type = T_STRING;
-    arr->item[i].subtype = STRING_MALLOC;
+    arr->item[i - 1].u.string = string_copy(argv[i], "ZMP");
+    arr->item[i - 1].type = T_STRING;
+    arr->item[i - 1].subtype = STRING_MALLOC;
   }
   push_refed_array(arr);
 
