@@ -128,6 +128,160 @@ varargs string p_bars(mixed *items, mapping opts) {
   return out;
 }
 
+// Vertical bar chart with eighth-block partial tops (pterm Barchart).
+// items: ({ ({ label, value }), ... })
+// opts: "height": bar rows (default 6), "attr": SGR for the bars,
+//       "values": 1 to print each value above its bar.
+varargs string p_vbars(mixed *items, mapping opts) {
+  string *eighths = ({ " ", "▁", "▂", "▃", "▄", "▅", "▆", "▇" });
+  int *colw = ({}), *ev = ({});
+  int height, max = 1, r, i;
+  string out = "", attr;
+
+  if (!arrayp(items) || !sizeof(items)) return "";
+  if (!mapp(opts)) opts = ([]);
+  height = opts["height"] > 0 ? opts["height"] : 6;
+  attr = stringp(opts["attr"]) ? opts["attr"] : "";
+
+  foreach (mixed it in items) {
+    int w = visible_width("" + it[0]);
+
+    if (opts["values"] && visible_width("" + it[1]) > w) w = visible_width("" + it[1]);
+    if (w < 3) w = 3;
+    colw += ({ w });
+    if (it[1] > max) max = it[1];
+  }
+  for (i = 0; i < sizeof(items); i++) ev += ({ items[i][1] * height * 8 / max });
+
+  if (opts["values"]) {
+    string line = "";
+    for (i = 0; i < sizeof(items); i++) line += wpad("" + items[i][1], colw[i]) + " ";
+    out += line + "\n";
+  }
+  for (r = height - 1; r >= 0; r--) {  // r = rows above the baseline
+    string line = "";
+    for (i = 0; i < sizeof(items); i++) {
+      int e = ev[i] - r * 8;
+      string seg = e >= 8 ? "█" : eighths[e > 0 ? e : 0];
+      line += repeat_string(seg, colw[i]) + " ";
+    }
+    out += (attr != "" ? ansi_sgr(attr) + line + ansi_reset() : line) + "\n";
+  }
+  for (i = 0; i < sizeof(items); i++) {
+    out += wpad(wslice("" + items[i][0], 0, colw[i]), colw[i]) + " ";
+  }
+  return out + "\n";
+}
+
+// Braille line chart (blessed-contrib style).
+// series: a plain int* for one line, or ({ ({ label, int *values, attr }), ... }).
+// opts: "width"/"height" in cells (default 56×10), "min"/"max" range
+//       override, "axis": 0 to drop the y-axis gutter.
+varargs string p_chart(mixed series, mapping opts) {
+  object cv;
+  string *rows, *legend = ({});
+  string out = "";
+  int width, height, lo, hi, have_range = 0, cy, gw;
+
+  if (!mapp(opts)) opts = ([]);
+  if (arrayp(series) && sizeof(series) && intp(series[0])) {
+    series = ({ ({ "", series, "" }) });
+  }
+  if (!arrayp(series) || !sizeof(series)) return "";
+  width = opts["width"] > 0 ? opts["width"] : 56;
+  height = opts["height"] > 0 ? opts["height"] : 10;
+
+  foreach (mixed s in series) {
+    foreach (int v in s[1]) {
+      if (!have_range) {
+        lo = hi = v;
+        have_range = 1;
+      }
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  if (!undefinedp(opts["min"])) lo = opts["min"];
+  if (!undefinedp(opts["max"])) hi = opts["max"];
+  if (hi <= lo) hi = lo + 1;
+
+  cv = clone_object(TUI_CANVAS);
+  cv->c_resize(width, height);
+  foreach (mixed s in series) {
+    cv->c_plot(s[1], lo, hi, stringp(s[2]) ? s[2] : "");
+    if (stringp(s[0]) && s[0] != "") {
+      legend += ({ (stringp(s[2]) && s[2] != "" ? ansi_sgr(s[2]) + "●" + ansi_reset() : "●") +
+                   " " + s[0] });
+    }
+  }
+  rows = cv->c_rows();
+  destruct(cv);
+
+  if (opts["axis"] == 0 && !undefinedp(opts["axis"])) {
+    out = implode(rows, "\n") + "\n";
+  } else {
+    gw = visible_width("" + hi);
+    if (visible_width("" + lo) > gw) gw = visible_width("" + lo);
+    for (cy = 0; cy < height; cy++) {
+      if (cy == 0) out += wpad("" + hi, gw) + "┤";
+      else if (cy == height - 1) out += wpad("" + lo, gw) + "┤";
+      else out += repeat_string(" ", gw) + "│";
+      out += rows[cy] + "\n";
+    }
+  }
+  if (sizeof(legend)) out += implode(legend, "  ") + "\n";
+  return out;
+}
+
+// Heatmap: a 2D int matrix as coloured cells (pterm Heatmap).
+// opts: "ramp": int* of 256-colour indexes (cool → hot),
+//       "xlabels"/"ylabels": string*, "cellw": cell width (default 2).
+varargs string p_heatmap(mixed *grid, mapping opts) {
+  int *ramp;
+  string *ylab;
+  int lo, hi, have = 0, gw = 0, cellw, y, x;
+  string out = "";
+
+  if (!arrayp(grid) || !sizeof(grid)) return "";
+  if (!mapp(opts)) opts = ([]);
+  ramp = arrayp(opts["ramp"]) ? opts["ramp"]
+                              : ({ 17, 18, 19, 20, 26, 32, 38, 44, 50, 220, 214, 208, 202, 196 });
+  cellw = opts["cellw"] > 0 ? opts["cellw"] : 2;
+  ylab = arrayp(opts["ylabels"]) ? opts["ylabels"] : 0;
+
+  foreach (mixed row in grid) {
+    foreach (int v in row) {
+      if (!have) {
+        lo = hi = v;
+        have = 1;
+      }
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  if (hi <= lo) hi = lo + 1;
+  if (ylab) {
+    foreach (string l in ylab) {
+      if (visible_width(l) > gw) gw = visible_width(l);
+    }
+  }
+
+  for (y = 0; y < sizeof(grid); y++) {
+    if (ylab) out += wpad(y < sizeof(ylab) ? ylab[y] : "", gw) + " ";
+    for (x = 0; x < sizeof(grid[y]); x++) {
+      int idx = (grid[y][x] - lo) * (sizeof(ramp) - 1) / (hi - lo);
+      out += ansi_sgr("48;5;" + ramp[idx]) + repeat_string(" ", cellw);
+    }
+    out += ansi_reset() + "\n";
+  }
+  if (arrayp(opts["xlabels"])) {
+    if (ylab) out += repeat_string(" ", gw + 1);
+    foreach (string l in opts["xlabels"]) out += wpad(wslice(l, 0, cellw), cellw);
+    out += "\n";
+  }
+  return out;
+}
+
 // Sparkline: one line, one char per value.
 string p_spark(int *values) {
   string *ticks = ({ "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" });

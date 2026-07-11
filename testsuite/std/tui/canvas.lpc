@@ -1,0 +1,142 @@
+// /std/tui/canvas — braille dot canvas (the blessed-contrib/drawille trick).
+//
+// Each terminal cell is a 2×4 grid of braille dots (U+2800 block), giving
+// sub-cell resolution for line charts, scatter plots and freehand drawing:
+// a W×H cell canvas addresses (2·W)×(4·H) dots, (0,0) top-left.
+//
+// Dots carry an optional SGR attr (last writer wins per CELL).  Render as
+// one string (c_render), per-row strings (c_rows), or per-cell ({ ch, attr })
+// pairs (c_cell — what /std/tui/w/chart uses to blit into a screen).
+//
+// Pure state machine: clone, draw, render.
+
+#include <tui.h>
+
+inherit TUI_ANSI;
+
+private int W = 40, H = 10;   // cells
+private int *dots;            // per-cell braille bitmask
+private string *attrs;        // per-cell SGR params ("" = default)
+
+// braille bit for dot (dx 0-1, dy 0-3) inside a cell
+private int *bit_row = ({ 1, 2, 4, 64 });      // dx == 0
+private int *bit_row2 = ({ 8, 16, 32, 128 });  // dx == 1
+
+void c_clear() {
+  dots = allocate(W * H);
+  attrs = allocate(W * H);
+}
+
+void c_resize(int w, int h) {
+  W = w < 1 ? 1 : w;
+  H = h < 1 ? 1 : h;
+  c_clear();
+}
+
+void create() { c_clear(); }
+
+int c_width() { return W; }
+int c_height() { return H; }
+int c_width_dots() { return W * 2; }
+int c_height_dots() { return H * 4; }
+
+varargs void c_set(int x, int y, string attr) {
+  int cx, cy, i;
+
+  if (x < 0 || y < 0 || x >= W * 2 || y >= H * 4) return;
+  cx = x / 2;
+  cy = y / 4;
+  i = cy * W + cx;
+  dots[i] |= (x & 1 ? bit_row2 : bit_row)[y & 3];
+  if (stringp(attr)) attrs[i] = attr;
+}
+
+void c_unset(int x, int y) {
+  if (x < 0 || y < 0 || x >= W * 2 || y >= H * 4) return;
+  dots[(y / 4) * W + x / 2] &= ~((x & 1 ? bit_row2 : bit_row)[y & 3]);
+}
+
+int c_get(int x, int y) {
+  if (x < 0 || y < 0 || x >= W * 2 || y >= H * 4) return 0;
+  return dots[(y / 4) * W + x / 2] & (x & 1 ? bit_row2 : bit_row)[y & 3] ? 1 : 0;
+}
+
+// Bresenham, in dot coordinates.
+varargs void c_line(int x0, int y0, int x1, int y1, string attr) {
+  int dx = x1 - x0, dy = y1 - y0;
+  int sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1;
+  int err, e2;
+
+  if (dx < 0) dx = -dx;
+  if (dy < 0) dy = -dy;
+  err = dx - dy;
+  while (1) {
+    c_set(x0, y0, attr);
+    if (x0 == x1 && y0 == y1) return;
+    e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x0 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y0 += sy;
+    }
+  }
+}
+
+// The cell at (cx, cy) as ({ ch, attr }); ({ " ", "" }) when empty.
+mixed *c_cell(int cx, int cy) {
+  int i;
+
+  if (cx < 0 || cy < 0 || cx >= W || cy >= H) return ({ " ", "" });
+  i = cy * W + cx;
+  if (!dots[i]) return ({ " ", "" });
+  return ({ sprintf("%c", 0x2800 | dots[i]), attrs[i] ? attrs[i] : "" });
+}
+
+// Plot values as a connected line across the full canvas, y-scaled to
+// [lo, hi] (bottom to top).  The shared engine behind p_chart() and
+// /std/tui/w/chart.
+varargs void c_plot(int *values, int lo, int hi, string attr) {
+  int n, i, wd = W * 2 - 1, hd = H * 4 - 1;
+
+  if (!arrayp(values) || !(n = sizeof(values))) return;
+  if (hi <= lo) hi = lo + 1;
+  if (n == 1) {
+    c_set(0, hd - (values[0] - lo) * hd / (hi - lo), attr);
+    return;
+  }
+  for (i = 0; i + 1 < n; i++) {
+    c_line(i * wd / (n - 1), hd - (values[i] - lo) * hd / (hi - lo),
+           (i + 1) * wd / (n - 1), hd - (values[i + 1] - lo) * hd / (hi - lo), attr);
+  }
+}
+
+// One row as a printable string with minimal SGR switching.
+string c_row(int cy) {
+  string out = "", cur = "";
+  int cx;
+
+  for (cx = 0; cx < W; cx++) {
+    mixed *c = c_cell(cx, cy);
+
+    if (c[1] != cur) {
+      out += c[1] == "" ? ansi_reset() : ansi_sgr("0;" + c[1]);
+      cur = c[1];
+    }
+    out += c[0];
+  }
+  if (cur != "") out += ansi_reset();
+  return out;
+}
+
+string *c_rows() {
+  string *r = ({});
+  int cy;
+
+  for (cy = 0; cy < H; cy++) r += ({ c_row(cy) });
+  return r;
+}
+
+string c_render() { return implode(c_rows(), "\n") + "\n"; }

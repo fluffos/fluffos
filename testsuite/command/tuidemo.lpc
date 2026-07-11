@@ -4,6 +4,7 @@
 //                      Tab completion; "quit" or Ctrl-D exits
 //   tuidemo select     inline select / multiselect / confirm prompts
 //   tuidemo print      the pterm-style inline printers, in plain line mode
+//   tuidemo charts     vertical bars, braille line chart, heatmap, sparkline
 //   tuidemo app        basic full-screen demo (list + textfield)
 //   tuidemo dashboard  animated dashboard: spinner, progress, sparkline,
 //                      live table and log (q quits)
@@ -94,6 +95,26 @@ private void show_print() {
   write(p_bullets(({ "bullet lists", ({ 1, "nest by depth" }), ({ 2, "three markers" }) })));
 }
 
+// --- charts showcase ---------------------------------------------------------
+
+private void show_charts() {
+  write(p_header("charts", 62));
+  write("\np_vbars — vertical bars with eighth-block tops:\n\n");
+  write(p_vbars(({ ({ "mon", 3 }), ({ "tue", 8 }), ({ "wed", 5 }),
+                   ({ "thu", 9 }), ({ "fri", 6 }) }),
+                ([ "height": 5, "values": 1, "attr": "33" ])));
+  write("\np_chart — braille line chart, two series:\n\n");
+  write(p_chart(({ ({ "hp", ({ 50, 52, 60, 55, 70, 65, 80, 90, 85, 95 }), "32" }),
+                   ({ "mana", ({ 90, 80, 82, 70, 65, 60, 50, 55, 40, 35 }), "36" }) }),
+                ([ "width": 50, "height": 8 ])));
+  write("\np_heatmap — logins per weekday/hour:\n\n");
+  write(p_heatmap(({ ({ 1, 3, 7, 4 }), ({ 2, 8, 9, 5 }), ({ 0, 4, 6, 2 }) }),
+                  ([ "ylabels": ({ "mon", "tue", "wed" }),
+                     "xlabels": ({ "00", "06", "12", "18" }), "cellw": 4 ])));
+  write("\np_spark — inline sparkline: " +
+        p_spark(({ 1, 3, 2, 8, 4, 6, 7, 2, 5, 8, 3, 1 })) + "\n");
+}
+
 // ---------------------------------------------------------------------------
 
 int main(string arg) {
@@ -113,6 +134,9 @@ int main(string arg) {
     case "print":
       show_print();
       return 1;
+    case "charts":
+      show_charts();
+      return 1;
     case "select":
       me->tui_select((: chose_class :), "Pick a class:",
                      ({ "warrior", "mage", "thief", "cleric", "ranger" }));
@@ -120,7 +144,7 @@ int main(string arg) {
   }
   write("TUI readline demo: editing keys, Up/Down history, Ctrl-R search,\n"
         "Tab completion.  'quit' or Ctrl-D exits.\n"
-        "Also try: tuidemo select | print | app | dashboard | form\n");
+        "Also try: tuidemo select | print | charts | app | dashboard | form\n");
   me->tui_readline((: got_line :),
                    ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
   return 1;

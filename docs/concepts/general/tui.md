@@ -65,6 +65,14 @@ completion the list collapses to a one-line `? prompt: answer` record.
 (banner letters via `/std/bitmap_font`).  Run `tuidemo print` to see them
 all.
 
+Charts are built on `/std/tui/canvas`, a braille dot canvas (2×4 dots per
+cell, the blessed-contrib technique): `p_chart()` renders multi-series
+braille line charts with a y-axis and coloured legend, `p_vbars()` draws
+vertical bars with eighth-block partial tops, and `p_heatmap()` renders a
+2D matrix as 256-colour cells.  The same engine powers the `chart` widget
+(`add_point()` rolling history — see the dashboard's traffic graph).  Run
+`tuidemo charts` to see them.
+
 ## Full-screen applications
 
 Inherit `/std/tui/app`, position widgets in `on_layout()`, and open the app
@@ -102,17 +110,18 @@ receives decoded key events (`on_key`), optional SGR mouse events
 Shipped widgets (`/std/tui/w/`, modeled on the pterm and blessed sets):
 `label`, `list`, `table` (columns + header + selection), `tree`
 (collapsible), `textfield` (a full readline engine per field), `checklist`,
-`radiolist`, `button`, `progress`, `spinner`, and `log` (bottom-anchored
-scrollback pane).  The widget base class (`/std/tui/widget`) makes new
-widgets ~30 lines; `tuidemo dashboard` and `tuidemo form` show most of the
-set in action.
+`radiolist`, `button`, `progress`, `spinner`, `log` (bottom-anchored
+scrollback pane), and `chart` (braille line chart with rolling history).
+The widget base class (`/std/tui/widget`) makes new widgets ~30 lines;
+`tuidemo dashboard` and `tuidemo form` show most of the set in action.
 
 ## The layers (use them à la carte)
 
 | Module | What it is |
 |---|---|
 | `/std/tui/ansi` | escape-sequence builders; `visible_width()` (ANSI-blind, wide-char-aware), `wslice()`, `wpad()` |
-| `/std/tui/print` | pterm-style inline printers: tables, trees, charts, panels, banners |
+| `/std/tui/canvas` | braille dot canvas: sub-cell lines/plots for charts |
+| `/std/tui/print` | pterm-style inline printers: tables, trees, charts, heatmaps, panels, banners |
 | `/std/tui/keys` | keystroke decoder: `get_char()` byte stream → key events (CSI/SS3, modifiers, UTF-8, bracketed paste, SGR mouse) |
 | `/std/tui/readline` | the line-editor engine — a pure state machine, usable headless |
 | `/std/tui/menu` | the inline select/multiselect engine behind `tui_select()` |
@@ -135,6 +144,7 @@ telnet localhost 4000
 > tuidemo            # readline demo: editing, history, ^R search, Tab completion
 > tuidemo select     # inline select -> multiselect -> confirm chain
 > tuidemo print      # the inline printers
+> tuidemo charts     # vertical bars, braille line chart, heatmap
 > tuidemo app        # minimal full-screen demo
 > tuidemo dashboard  # animated spinner/progress/sparkline/table/log
 > tuidemo form       # textfield, radio group, checkboxes, buttons

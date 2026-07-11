@@ -20,6 +20,7 @@
 #define TUI_TERMINAL   "/std/tui/terminal"
 #define TUI_PRINT      "/std/tui/print"
 #define TUI_MENU       "/std/tui/menu"
+#define TUI_CANVAS     "/std/tui/canvas"
 
 // Special keys sit just above the Unicode range (max codepoint 0x10FFFF),
 // so they can never collide with a real character.

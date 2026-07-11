@@ -15,6 +15,7 @@ portable to any FluffOS mudlib.
 | `tuidemo` | readline prompt: editing, ↑/↓ history, Ctrl-R search, Tab completion |
 | `tuidemo select` | inline select → multiselect → confirm prompt chain |
 | `tuidemo print` | the pterm-style printers, in plain line mode |
+| `tuidemo charts` | vertical bars, braille line chart, heatmap, sparkline |
 | `tuidemo app` | minimal full-screen app (list + textfield) |
 | `tuidemo dashboard` | animated spinner, progress bars, sparkline, live table + log |
 | `tuidemo form` | textfield, radio group, checkbox list, buttons |
@@ -197,6 +198,7 @@ inspired by the pterm and blessed catalogs):
 | `progress` | label + bar + percentage | — |
 | `spinner` | braille spinner; app drives `tick()` from its own call_out | — |
 | `log` | bottom-anchored scrollback pane (PgUp/PgDn) | — |
+| `chart` | braille line chart with rolling history (`add_point()`), multi-series | — |
 
 ### 2.5 `print.lpc` — inline printers (stateless, inheritable)
 
@@ -209,6 +211,20 @@ for widgets. `p_table(rows, opts)` (boxed, width-aware, header rule),
 `p_progress(pct, width)`, `p_info/p_success/p_warn/p_error(text)` prefix
 printers, and `p_bigtext(text)` (banner letters via `/std/bitmap_font`).
 All wide-char aware; tables/trees/panels accept the `TUI_BOX_*` styles.
+
+Charts, on top of `canvas.lpc` — a braille dot canvas (each cell is a 2×4
+dot grid, U+2800 block; the blessed-contrib/drawille technique) with
+`c_set/c_line/c_plot` in dot coordinates and per-cell colour:
+
+* `p_chart(series, opts)` — braille line chart, multiple coloured series,
+  y-axis gutter and legend (`series` = `({ ({ label, values, attr }) })`).
+* `p_vbars(items, opts)` — vertical bar chart with eighth-block partial
+  tops (`▁▂▃▄▅▆▇█`), optional value row.
+* `p_heatmap(grid, opts)` — 2D matrix as 256-colour cells with a
+  cool→hot ramp and optional axis labels.
+* `w/chart.lpc` — the same line chart as a live widget: `add_series()`,
+  `add_point()` (rolling window sized to the widget), auto- or fixed
+  y-range; drives the dashboard's traffic graph.
 
 ### 2.6 `menu.lpc` — inline select/multiselect (clonable state machine)
 
@@ -252,7 +268,8 @@ line mode behind our back, the next line of input is handled gracefully.
 testsuite/include/tui.h                — key codes, states, macros (public contract)
 testsuite/std/tui/README.md            — this document
 testsuite/std/tui/ansi.lpc             — layer 0: escapes + width toolkit
-testsuite/std/tui/print.lpc            — layer 0: pterm-style inline printers
+testsuite/std/tui/canvas.lpc           — layer 0: braille dot canvas
+testsuite/std/tui/print.lpc            — layer 0: pterm-style inline printers + charts
 testsuite/std/tui/keys.lpc             — layer 1: input decoding
 testsuite/std/tui/readline.lpc         — layer 2: line editor
 testsuite/std/tui/menu.lpc             — layer 2: inline select/multiselect
@@ -290,6 +307,9 @@ non-interactive testsuite files:
   width math, scaling).
 * `tui/menu.lpc` — scripted select/multiselect sessions: navigation,
   toggling, windowing, accept/abort, the collapsed answer line.
+* `tui/charts.lpc` — canvas dot/braille math (exact glyphs), line
+  drawing, `c_plot` endpoints, and exact `p_vbars` output; chart/heatmap
+  structure checks; the chart widget's rolling window.
 
 Clones are destructed at test end (DEBUGMALLOC `check_memory()` runs after
 every file). The interactive glue is kept too thin to need a terminal to
@@ -363,7 +383,7 @@ non-ASCII input and escape sequences under default configs.
 * **Scroll-region / insert-line diff optimizations** in the renderer.
 * **Fuzzy filtering in select/multiselect** (pterm types-to-filter; our menu
   navigates only — the engine's input path has room for it).
-* From the pterm/blessed catalogs, deliberately not ported: pterm's Area /
-  Heatmap / theming, blessed's FileManager, Terminal, Image/Video and
+* From the pterm/blessed catalogs, deliberately not ported: pterm's Area
+  and theming, blessed's FileManager, Terminal, Image/Video and
   absolute-positioned Layout manager — MUD-side value didn't justify the
   surface area.

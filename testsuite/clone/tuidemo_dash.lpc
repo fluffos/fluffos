@@ -1,14 +1,12 @@
 // `tuidemo dashboard` — an animated full-screen dashboard showing the
-// pterm/blessed-inspired widgets: spinner, progress bars, sparkline,
-// live table and a streaming log.  q (or Ctrl-C) quits.
+// pterm/blessed-inspired widgets: spinner, progress bars, a braille line
+// chart, live table and a streaming log.  q (or Ctrl-C) quits.
 
 #include <tui.h>
 
 inherit TUI_APP;
-inherit TUI_PRINT;
 
-private object title, spin, cpu, mem, net, spark, tbl, logw, status;
-private int *history = ({});
+private object title, spin, cpu, mem, net, spark_lbl, chart, tbl, logw, status;
 private int tick_no = 0;
 private int co = -1;
 
@@ -27,9 +25,10 @@ void on_layout(int w, int h) {
   cpu->set_geometry(2, 4, half - 3, 1);
   mem->set_geometry(2, 5, half - 3, 1);
   net->set_geometry(2, 6, half - 3, 1);
-  spark->set_geometry(2, 8, half - 3, 2);
+  spark_lbl->set_geometry(2, 8, half - 3, 1);
+  chart->set_geometry(2, 9, half - 3, 2);
   tbl->set_geometry(half + 1, 2, w - half - 3, 8);
-  logw->set_geometry(2, 11, w - 4, h - 13);
+  logw->set_geometry(2, 12, w - 4, h - 14);
   status->set_geometry(0, h - 1, w, 1);
 }
 
@@ -52,8 +51,12 @@ void on_open(object t, int w, int h) {
     net->set_label("net");
     net->set_attr("35");
 
-    spark = app_add(new("/std/tui/w/label"));
-    spark->set_attr("36");
+    spark_lbl = app_add(new("/std/tui/w/label"));
+    spark_lbl->set_attr("36");
+    spark_lbl->set_text("traffic");
+    chart = app_add(new("/std/tui/w/chart"));
+    chart->add_series("traffic", "36");
+    chart->set_range(0, 10);
 
     tbl = app_add(new("/std/tui/w/table"));
     tbl->set_columns(({ "player", "room", "hp" }));
@@ -88,9 +91,7 @@ private void tick() {
   mem->set_percent(40 + (tick_no * 3) % 55);
   net->set_percent(random(101));
 
-  history += ({ random(9) + 1 });
-  if (sizeof(history) > 40) history = history[<40..];
-  spark->set_text("traffic\n" + p_spark(history));
+  chart->add_point(0, random(9) + 1);
 
   for (i = 0; i < sizeof(names); i++) {
     rows += ({ ({ names[i], "room" + (1 + (tick_no + i) % 7), "" + (50 + random(50)) }) });

@@ -1,0 +1,103 @@
+// The chart layer: braille canvas, p_vbars, p_chart, p_heatmap, w/chart.
+
+#include <tui.h>
+
+void do_tests() {
+  object cv = clone_object(TUI_CANVAS);
+  object p = clone_object(TUI_PRINT);
+  object w, scr;
+  string o;
+
+  // --- canvas dot math ---------------------------------------------------
+  cv->c_resize(4, 1);
+  ASSERT_EQ(8, cv->c_width_dots());
+  ASSERT_EQ(4, cv->c_height_dots());
+
+  cv->c_set(0, 0);
+  ASSERT_EQ(1, cv->c_get(0, 0));
+  ASSERT_EQ(({ "⠁", "" }), cv->c_cell(0, 0));      // U+2801, dot 1
+  cv->c_set(1, 0, "36");
+  ASSERT_EQ(({ "⠉", "36" }), cv->c_cell(0, 0));    // dots 1+4 (0x2809)
+  cv->c_set(0, 3);
+  ASSERT_EQ(({ "⡉", "36" }), cv->c_cell(0, 0));    // + dot 7 (0x2849)
+  cv->c_unset(0, 3);
+  ASSERT_EQ(({ "⠉", "36" }), cv->c_cell(0, 0));
+  ASSERT_EQ(({ " ", "" }), cv->c_cell(3, 0));       // untouched cell
+  ASSERT_EQ(0, cv->c_get(99, 99));                  // out of range is safe
+  cv->c_set(-1, 0);
+  cv->c_set(99, 99);
+
+  // a horizontal line through the top dot row of every cell
+  cv->c_clear();
+  cv->c_line(0, 0, 7, 0);
+  ASSERT_EQ("⠉⠉⠉⠉", cv->c_row(0));
+
+  // c_plot puts endpoints where they belong (bottom-left, top-right)
+  cv->c_resize(1, 1);
+  cv->c_plot(({ 0, 3 }), 0, 3);
+  ASSERT_EQ(1, cv->c_get(0, 3));
+  ASSERT_EQ(1, cv->c_get(1, 0));
+
+  // c_row emits SGR only when the attr changes
+  cv->c_resize(2, 1);
+  cv->c_set(0, 0, "36");
+  cv->c_set(2, 0, "36");
+  o = cv->c_row(0);
+  ASSERT_EQ("\e[0;36m⠁⠁\e[0m", o);
+  destruct(cv);
+
+  // --- p_vbars --------------------------------------------------------------
+  o = p->p_vbars(({ ({ "ab", 8 }), ({ "cd", 4 }) }), ([ "height": 2 ]));
+  ASSERT_EQ("███     \n███ ███ \nab  cd  \n", o);
+  // partial top cell in eighths
+  o = p->p_vbars(({ ({ "x", 4 }), ({ "y", 8 }) }), ([ "height": 1 ]));
+  ASSERT_EQ("▄▄▄ ███ \nx   y   \n", o);
+  // value row + a 7/8ths partial
+  o = p->p_vbars(({ ({ "x", 7 }), ({ "y", 8 }) }), ([ "height": 1, "values": 1 ]));
+  ASSERT_EQ("7   8   \n▇▇▇ ███ \nx   y   \n", o);
+  ASSERT_EQ("", p->p_vbars(({}), 0));
+
+  // --- p_chart ----------------------------------------------------------------
+  o = p->p_chart(({ 0, 3, 0 }), ([ "width": 3, "height": 1 ]));
+  ASSERT(strsrch(o, "3┤") != -1);                   // y-axis gutter, max label
+  ASSERT_EQ(1, sizeof(explode(o, "\n")));           // height rows, no legend
+  o = p->p_chart(({ ({ "hp", ({ 1, 5, 3 }), "32" }) }),
+                 ([ "width": 6, "height": 2 ]));
+  ASSERT(strsrch(o, "5┤") != -1);
+  ASSERT(strsrch(o, "1┤") != -1);
+  ASSERT(strsrch(o, "\e[32m●") != -1);              // coloured legend bullet
+  ASSERT(strsrch(o, " hp") != -1);                  // legend label
+  o = p->p_chart(({ 1, 2 }), ([ "width": 2, "height": 1, "axis": 0 ]));
+  ASSERT(strsrch(o, "┤") == -1);                    // gutter suppressed
+  ASSERT_EQ("", p->p_chart(({}), 0));
+
+  // --- p_heatmap ----------------------------------------------------------------
+  o = p->p_heatmap(({ ({ 0, 5 }), ({ 10, 10 }) }));
+  ASSERT(strsrch(o, "48;5;17") != -1);              // coolest ramp colour
+  ASSERT(strsrch(o, "48;5;196") != -1);             // hottest ramp colour
+  o = p->p_heatmap(({ ({ 0, 1 }) }),
+                   ([ "ylabels": ({ "row" }), "xlabels": ({ "aa", "bb" }), "cellw": 2 ]));
+  ASSERT(strsrch(o, "row ") != -1);
+  ASSERT(strsrch(o, "aabb") != -1);
+  ASSERT_EQ("", p->p_heatmap(({}), 0));
+  destruct(p);
+
+  // --- w/chart ---------------------------------------------------------------------
+  scr = clone_object(TUI_SCREEN);
+  scr->scr_resize(4, 2);
+  scr->scr_frame();
+  w = new("/std/tui/w/chart");
+  w->set_geometry(0, 0, 2, 1);
+  ASSERT_EQ(0, w->add_series("traffic", "36"));
+  foreach (int v in ({ 1, 2, 3, 4, 5, 6 })) w->add_point(0, v);
+  ASSERT_EQ(({ 3, 4, 5, 6 }), w->query_data(0));    // rolled to 2*ww points
+  w->set_range(0, 10);
+  w->draw(scr);
+  o = scr->scr_frame();
+  ASSERT(strsrch(o, "\e[0;36m") != -1);             // series colour
+  ASSERT(strsrch(o, "⠀") == -1);                    // no blank braille cells
+  ASSERT(strlen(o) > 8);                             // something was painted
+  w->remove();
+  destruct(w);
+  destruct(scr);
+}
