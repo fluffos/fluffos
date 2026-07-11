@@ -62,11 +62,12 @@ title: objects / recompile_object
 
     - a clone is passed (pass the master copy; its clones are updated
       with it);
-    - any live frame is executing the program's code, anywhere on the
-      call stack - including an inheritor running one of its inherited
-      functions (bytecode positions and variable indices in live frames
-      are relative to the old program). In particular an object cannot
-      recompile itself;
+    - any live frame is executing the program's code or belongs to an
+      object running it, anywhere on the call stack - including an
+      inheritor running one of its inherited functions, and an object
+      of this program running an inherited parent's code (bytecode
+      positions and variable indices in live frames are relative to the
+      old layout). In particular an object cannot recompile itself;
     - the source fails to compile (the objects are left untouched on
       the old program);
     - a replace_program() is pending on the program, or another

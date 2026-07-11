@@ -316,8 +316,8 @@ is destructed.
 To summarize the reference daemon's modes: `watch(prog)` reloads
 through `recompile_object()` (state and clones carried in place),
 `watch(prog, 0)` opts out (destruct+load, fresh initializers, clones
-untouched), and the cooperative pair takes over when the object
-defines it. All three shapes are pinned by
+untouched), and the cooperative path takes over when the object
+defines `hot_reload_state()`. All three shapes are pinned by
 `/single/tests/applies/hot_reload.lpc`, and the `recompile_object()`
 semantics themselves by `/single/tests/efuns/recompile_object.lpc`.
 
