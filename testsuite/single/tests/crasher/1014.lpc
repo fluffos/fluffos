@@ -1,0 +1,60 @@
+// Issue #1014: an LPC error thrown from a parser package apply
+// (can_*/direct_*/do_*) during parse_sentence() must not corrupt the
+// VM value stack or crash the driver.
+string* parse_command_id_list() {
+  return ({ "bag" });
+}
+
+void create() {
+  parse_init();
+
+  if (clonep()) {
+    move_object(__FILE__);
+  }
+}
+
+can_look_wrd_obj() {
+  return 1;
+}
+
+direct_look_wrd_obj() {
+  error("direct apply throws (#1014)");
+}
+
+do_look_wrd_obj() {
+  return 0;
+}
+
+can_poke_obj() {
+  error("can apply throws (#1014)");
+}
+
+direct_poke_obj() {
+  return 1;
+}
+
+do_poke_obj() {
+  error("do apply throws (#1014)");
+}
+
+void do_tests() {
+#ifndef __PACKAGE_PARSER__
+  write("no package parser, skipped.\n");
+#else
+  mixed err;
+
+  clone_object(__FILE__);
+  parse_add_rule("look", "WRD OBJ");
+  parse_add_rule("poke", "OBJ");
+
+  // The throwing direct_ apply makes the parse fail to match; whether
+  // that surfaces as a soft failure or an LPC error, it must be
+  // catchable and leave the stack intact.
+  err = catch(parse_sentence("look in bag", 2, all_inventory()));
+  err = catch(parse_sentence("poke bag", 2, all_inventory()));
+
+  // Run a normal parse afterwards to prove the parser still works.
+  ASSERT_EQ(1, intp(parse_sentence("look in bag", 0, all_inventory())));
+#endif
+  ASSERT(1);
+}
