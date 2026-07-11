@@ -56,6 +56,137 @@ ScratchString strip_directive_comments(std::string_view s) {
   return r;
 }
 
+// Index of the first '/*' that never closes within `s`, or npos when
+// every block comment in `s` is terminated. Quote/'//' handling mirrors
+// strip_directive_comments() above -- a '/*' inside a string literal or
+// after '//' does not open a comment.
+static size_t open_comment_start(std::string_view s) {
+  size_t i = 0;
+  while (i < s.size()) {
+    if (s[i] == '"' || s[i] == '\'' || s[i] == '`') {
+      char q = s[i++];
+      while (i < s.size() && s[i] != q) {
+        if (s[i] == '\\') i++;
+        if (i < s.size()) i++;
+      }
+      if (i < s.size()) i++;
+    } else if (i + 1 < s.size() && s[i] == '/' && s[i + 1] == '/') {
+      return std::string_view::npos;  // '//' runs to the newline that ends the capture
+    } else if (i + 1 < s.size() && s[i] == '/' && s[i + 1] == '*') {
+      size_t start = i;
+      i += 2;
+      while (i + 1 < s.size() && (s[i] != '*' || s[i + 1] != '/')) i++;
+      if (i + 1 >= s.size()) return start;  // ran off the capture: still open
+      i += 2;
+    } else {
+      i++;
+    }
+  }
+  return std::string_view::npos;
+}
+
+bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, ScratchString* out,
+                                int* pulled_lines) {
+  std::string_view sv(text, len);
+  size_t open = open_comment_start(sv);
+  if (open == std::string_view::npos) return false;
+
+  int kind = lpc_lex_top_buffer_kind();
+  if (kind == LPC_BUF_PLAIN || kind == LPC_BUF_EXPANSION || kind == LPC_BUF_IF_EXPR) return false;
+
+  out->assign(sv.substr(0, open));
+  *out += ' ';
+
+  // Newlines consumed here that do NOT end up in *out (comment-internal
+  // ones and the terminator) get the same bookkeeping the rule's own
+  // terminator consumption does (native yylineno advance inside
+  // lpc_lex_getc() + lpc_lex_newline() for total_lines); kept
+  // continuation newlines are counted from the text later, exactly like
+  // capture-embedded ones.
+  int consumed = 0;
+  bool in_comment = true;
+  bool in_line_comment = false;
+  char in_quote = 0;
+  bool quote_escape = false;
+  int prev = 0;
+  for (;;) {
+    int c = lpc_lex_getc(yyscanner);
+    if (c <= 0) {
+      // Same terminal case as SC_BLOCK_COMMENT's <<EOF>> rule (and
+      // lpc_lex_getc() already continued into parent buffers, matching
+      // its lpc_lex_pop_splice_if_any step).
+      lexerror("End of file in a comment (opened on a preprocessor directive)");
+      break;
+    }
+    if (in_comment) {
+      if (c == '\n') {
+        lpc_lex_newline(yyscanner);
+        consumed++;
+        prev = 0;
+      } else if (prev == '*' && c == '/') {
+        in_comment = false;
+        prev = 0;
+      } else if (prev == '/' && c == '*') {
+        yywarn("/* found in comment.");  // same warning as SC_BLOCK_COMMENT
+        prev = 0;
+      } else {
+        prev = c;
+      }
+      continue;
+    }
+    if (c == '\n') {
+      // A backslash before the newline splices the next physical line
+      // in, matching the capture pattern's (\\\r?\n[^\n]*)* tail (and C,
+      // where splicing precedes comment recognition -- so it applies
+      // inside '//' too).
+      size_t n = out->size();
+      bool spliced = (n >= 1 && (*out)[n - 1] == '\\') ||
+                     (n >= 2 && (*out)[n - 1] == '\r' && (*out)[n - 2] == '\\');
+      if (spliced) {
+        *out += '\n';
+        continue;
+      }
+      lpc_lex_newline(yyscanner);
+      consumed++;
+      break;  // the logical line's terminator
+    }
+    if (in_line_comment) {
+      *out += static_cast<char>(c);
+      continue;
+    }
+    if (in_quote) {
+      *out += static_cast<char>(c);
+      if (quote_escape) {
+        quote_escape = false;
+      } else if (c == '\\') {
+        quote_escape = true;
+      } else if (c == in_quote) {
+        in_quote = 0;
+      }
+      continue;
+    }
+    *out += static_cast<char>(c);
+    if (c == '"' || c == '\'' || c == '`') {
+      in_quote = static_cast<char>(c);
+      quote_escape = false;
+      continue;
+    }
+    size_t n = out->size();
+    if (n >= 2 && (*out)[n - 2] == '/' && (*out)[n - 1] == '*') {
+      out->resize(n - 2);
+      *out += ' ';
+      in_comment = true;
+      prev = 0;
+    } else if (n >= 2 && (*out)[n - 2] == '/' && (*out)[n - 1] == '/') {
+      in_line_comment = true;
+    }
+  }
+  // The formula in lpc_lex_on_directive() already subtracts the
+  // terminator; report only the newlines beyond it.
+  *pulled_lines = consumed > 0 ? consumed - 1 : 0;
+  return true;
+}
+
 ScratchString stringize(std::string_view s) {
   ScratchString r("\"");
   for (char c : s) {
@@ -1026,16 +1157,18 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
 }
 
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
-                                        bool in_skip_mode) {
+                                        bool in_skip_mode, int pulled_lines) {
   // The directive's own first line, for error attribution: the lexer.l
   // rule consumed + counted the terminating newline before calling us,
   // so current_line is already one past the directive's LAST physical
   // line; its embedded continuations haven't been counted yet, so its
-  // FIRST line is exactly current_line - 1. Published around the
-  // dispatch calls below via compiler_directive_start_line (see its
-  // comment in compiler.h) so yyerror()/yywarn() attribute to the
-  // directive rather than the line after it.
-  int directive_line = current_line - 1;
+  // FIRST line is exactly current_line - 1 -- minus any extra physical
+  // lines lpc_lex_complete_directive() pulled for a spanning /* comment.
+  // Published around the dispatch calls below via
+  // compiler_directive_start_line (see its comment in compiler.h) so
+  // yyerror()/yywarn() attribute to the directive rather than the line
+  // after it.
+  int directive_line = current_line - 1 - pulled_lines;
 
   // Embedded continuation newlines are physical lines regardless of scan
   // mode or whether the directive dispatches -- counted exactly once,

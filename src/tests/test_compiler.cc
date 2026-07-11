@@ -261,6 +261,12 @@ static std::vector<Token> TokenizeSession(bool keep_macros, const std::string& s
     toks.push_back(std::move(t));
   }
 
+  // Ownership discipline (see lpc_lex_scanner_destroyed): whoever
+  // destroys a scanner clears the active pointer, or the NEXT compile's
+  // very first current_line read dereferences the destroyed scanner's
+  // guts -- an order-dependent use-after-free that intermittently
+  // segfaulted CompileEntry tests running after any tokenizer test.
+  lpc_lex_scanner_destroyed(scanner);
   yylex_destroy(scanner);
   free_string(const_cast<char*>(current_file));
   current_file = nullptr;
@@ -719,6 +725,52 @@ TEST(Preprocessor, BlockCommentMultiline) {
 int y;
 )"),
             "int x;\n \n\nint y;\n");
+}
+
+// A block comment opened on a directive line may close on a LATER line
+// (#1236): the directive rule's capture stops at the physical newline, so
+// lpc_lex_complete_directive() must pull the comment's remaining lines --
+// they are whitespace, not code, and they don't end the directive.
+
+TEST(Preprocessor, DefineWithCommentSpanningLines) {
+  // The exact #1236 repro shape: continuation line must not be tokenized.
+  EXPECT_EQ(pp("#define WARNING_LEVEL 1 /* Change this to higher values to\n"
+               "                           show more warnings. */\n"
+               "int x = WARNING_LEVEL;\n"),
+            "int x = 1;");
+}
+
+TEST(Preprocessor, DefineCommentTailStillDirective) {
+  // Text after the close on the final line still belongs to the body (C
+  // semantics: the whole comment reads as one space) -- and the tail may
+  // open ANOTHER spanning comment.
+  EXPECT_EQ(pp("#define V 10 /* spans\none line */ + 5\nint x = V;\n"), "int x = 10 + 5;");
+  EXPECT_EQ(pp("#define W 1 /* one\n*/ + 2 /* two\n*/ + 3\nint y = W;\n"), "int y = 1 + 2 + 3;");
+}
+
+TEST(Preprocessor, DefineCommentSpanKeepsLineCount) {
+  // Physical lines consumed for the comment are counted exactly once.
+  EXPECT_EQ(pp("#define W 1 /* a\nb\nc */\nint l = __LINE__;\n"), "int l = 4;");
+}
+
+TEST(Preprocessor, IfWithCommentSpanningLines) {
+  // On a live #if the comment is whitespace in the expression; on a dead
+  // one the branch below the comment's close is still skipped.
+  EXPECT_EQ(pp("#if 1 /* live,\nstill comment */\nint x = 1;\n#endif\n"), "int x = 1;");
+  EXPECT_EQ(pp("#if 0 /* dead,\nstill comment */\nnot code at all\n#endif\nint y = 2;\n"),
+            "int y = 2;");
+}
+
+TEST(Preprocessor, DirectiveStringDoesNotOpenComment) {
+  // A '/*' inside a string literal on the directive line is body text.
+  EXPECT_EQ(pp("#define S \"a/*b\"\nstring s = S;\n"), "string s = \"a/*b\";");
+}
+
+TEST(Preprocessor, DirectiveCommentUnterminatedAtEofErrors) {
+  // The pull must stop at EOF with a diagnostic, not spin.
+  auto p = LpcPreprocessor::make_session();
+  p->preprocess_next("#define X 1 /* never closed\n", "test");
+  EXPECT_FALSE(p->errors().empty());
 }
 
 // ---------------------------------------------------------------------------

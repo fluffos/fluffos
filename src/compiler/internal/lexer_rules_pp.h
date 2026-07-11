@@ -91,8 +91,32 @@ enum class LpcDirectiveAction {
   kEnterSkip,  // a condition turned false: BEGIN(SC_COND_SKIP)
   kExitSkip,   // the dead branch ended: BEGIN(INITIAL)
 };
+// pulled_lines: physical newlines lpc_lex_complete_directive() consumed
+// beyond the terminating one (0 when the rule's capture was already the
+// whole logical line) -- backed out of the first-line attribution below.
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
-                                        bool in_skip_mode);
+                                        bool in_skip_mode, int pulled_lines = 0);
+
+// The directive rule's capture stops at the first physical newline (plus
+// backslash continuations), which cannot span a /* comment that closes on
+// a LATER line -- the comment's remaining lines used to be tokenized as
+// code (#1236). Called by the rule action BEFORE
+// lpc_lex_consume_directive_newline(): scans the captured text
+// (quote-aware, same rules as strip_directive_comments()) and, when it
+// ends inside an open /* comment, keeps pulling raw bytes through
+// lpc_lex_getc() until the comment closes and the logical line really
+// ends. Each comment is folded to a single space (a comment is
+// whitespace, so text after the close still belongs to the directive, and
+// another /* there may open again). Returns false -- out/pulled_lines
+// untouched, nothing consumed -- when the capture has no open comment
+// (the common case costs one scan of the captured text) or the top buffer
+// is a splice/if-expr buffer (no newlines to pull; same guard as
+// lpc_lex_consume_directive_newline()). Returns true when it pulled the
+// tail: *out is the completed logical line, *pulled_lines the newline
+// count for lpc_lex_on_directive(), and the terminating newline has been
+// consumed AND counted -- the rule action must NOT consume it again.
+bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, ScratchString* out,
+                                int* pulled_lines);
 
 // #include implementation: resolves `rest` (macro-expanding it first when
 // unquoted), records the including file's identity on the include

@@ -38,6 +38,33 @@
 #define PRECEDENCE_OK 0
 #endif
 
+// #1236: a block comment opened on a directive line may close on a
+// LATER line -- the comment reads as whitespace, it neither ends the
+// directive nor leaves its continuation lines to be compiled as code.
+#define WARNING_LEVEL 1 /* Change this to higher values to
+                           show more warnings. */
+
+// Text after the close on the final line still belongs to the directive.
+#define CMT_TAIL 10 /* spans
+one line */ + 5
+
+// On a live #if...
+#if 1 /* comment on a live #if,
+closed here */
+#define CMT_IF_OK 1
+#else
+#define CMT_IF_OK 0
+#endif
+
+// ...and on a dead one: the branch below the comment is still skipped.
+#if 0 /* opened on the #if line,
+closed here */
+this is not code and must never be compiled
+#endif
+
+// A string literal on the directive line must not open a comment.
+#define CMT_STR "a/*b"
+
 void do_tests() {
     // ## token paste builds an identifier.
     int GLUE(fo, o) = 42;
@@ -68,6 +95,12 @@ void do_tests() {
     ASSERT_EQ(1, COND_OK);
     ASSERT_EQ(1, NOTDEF_OK);
     ASSERT_EQ(1, PRECEDENCE_OK);
+
+    // #1236 -- directive-line comments spanning physical lines.
+    ASSERT_EQ(1, WARNING_LEVEL);
+    ASSERT_EQ(15, CMT_TAIL);
+    ASSERT_EQ(1, CMT_IF_OK);
+    ASSERT_EQ("a/*b", CMT_STR);
 
     // Builtin macros: __FILE__ / __DIR__ / __LINE__.
     ASSERT_EQ("/single/tests/compiler/preprocessor.lpc", __FILE__);

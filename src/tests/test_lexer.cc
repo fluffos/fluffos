@@ -111,6 +111,10 @@ static std::vector<Token> Tokenize(const std::string& source, const char* filena
   end_new_file();
 
   g_last_lex_ctx = *yyget_extra(scanner);
+  // Clear the active pointer before destroying (ownership discipline of
+  // lpc_lex_scanner_destroyed) so a later compile's current_line read
+  // can't dereference the destroyed scanner.
+  lpc_lex_scanner_destroyed(scanner);
   yylex_destroy(scanner);
 
   // --- minimal epilog ---
