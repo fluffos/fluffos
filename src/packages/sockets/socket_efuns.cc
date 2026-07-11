@@ -188,7 +188,12 @@ static bool lpcaddr_to_sockaddr(const char* name, struct sockaddr* addr, ev_sock
   memset(host, 0, sizeof(host));
   memset(service, 0, sizeof(service));
 
-  memcpy(host, name, cp - name);
+  size_t const hlen = cp - name;
+  if (hlen >= sizeof(host)) {
+    debug(sockets, "lpcaddr_to_sockaddr: host too long: %s", name);
+    return false;
+  }
+  memcpy(host, name, hlen);  // host is zero-initialized above, so NUL-terminated
   strncpy(service, cp + 1, sizeof(service) - 1);
 
   struct addrinfo hints = {0}, *res;
