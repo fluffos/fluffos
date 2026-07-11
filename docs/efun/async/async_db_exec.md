@@ -31,6 +31,12 @@ title: async / async_db_exec
     );
     ```
 
+### NOTE
+
+    When the 'this_player in call_out' driver setting is enabled,
+    this_player() inside the callback is preserved from the time the
+    request was made, like call_out().
+
 ### SEE ALSO
 
     db_commit(3), db_exec(3), db_fetch(3), db_rollback(3), valid_database(4)

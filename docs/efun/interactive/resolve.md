@@ -25,6 +25,12 @@ title: interactive / resolve
     'resolved' the dotted decimal ip address.  The unknown value will be  0
     if the lookup failed.
 
+### NOTE
+
+    When the 'this_player in call_out' driver setting is enabled,
+    this_player() inside the callback is preserved from the time the
+    request was made, like call_out().
+
 ### SEE ALSO
 
     query_host_name(3),  socket_address(3), query_ip_name(3), query_ip_num‐

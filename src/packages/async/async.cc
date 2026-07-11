@@ -54,7 +54,19 @@ struct Request {
   struct Request* next;
   enum atypes type;
   int status;
+  /* User context captured at registration so this_player() survives into
+     the callback, like call_out() (issue #1104). Gated on the
+     'this_player in call_out' setting. */
+  object_t* command_giver = nullptr;
 };
+
+/* Capture the current user context on a new request (issue #1104). */
+void capture_command_giver(struct Request* req) {
+  if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__) && command_giver) {
+    req->command_giver = command_giver;
+    add_ref(command_giver, "async: capture_command_giver");
+  }
+}
 
 struct Work {
   struct Request* data;
@@ -290,6 +302,7 @@ int add_read(const char* fname, function_to_call_t* fun) {
     req->data.resize(read_file_max_size);
     req->fun = fun;
     req->type = AREAD;
+    capture_command_giver(req);
     req->path = std::string(fname);
     return aio_gzread(req);
   }
@@ -308,6 +321,7 @@ int add_getdir(const char* fname, function_to_call_t* fun) {
     req->data.resize(max_array_size);
     req->fun = fun;
     req->type = AGETDIR;
+    capture_command_giver(req);
     req->path = fname;
     return aio_getdir(req);
   }
@@ -326,6 +340,7 @@ int add_write(const char* fname, const char* buf, int size, char flags, function
   req->data = std::string(buf, size);
   req->fun = fun;
   req->type = AWRITE;
+  capture_command_giver(req);
   req->flags = flags;
   req->path = std::string(fname);
   if (flags & 2) {
@@ -339,6 +354,7 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun) {
   auto* req = new Request();
   req->fun = fun;
   req->type = ADBEXEC;
+  capture_command_giver(req);
   req->handle = handle;
   req->data = sql;
   return aio_db_exec(req);
@@ -428,6 +444,12 @@ void check_reqs() {
 
     enum atypes const type = (req->type);
     req->type = ADONE;
+    /* Restore the user context captured at registration (issue #1104). */
+    object_t* new_command_giver = nullptr;
+    if (req->command_giver && !(req->command_giver->flags & O_DESTRUCTED)) {
+      new_command_giver = req->command_giver;
+    }
+    save_command_giver(new_command_giver);
     switch (type) {
       case AREAD:
         handle_read(req);
@@ -450,6 +472,10 @@ void check_reqs() {
         break;
       default:
         fatal("unknown async type\n");
+    }
+    restore_command_giver();
+    if (req->command_giver) {
+      free_object(&req->command_giver, "async: check_reqs");
     }
     free_funp(req->fun->f.fp);
     delete req->fun;
@@ -558,17 +584,28 @@ void async_mark_request() {
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
     }
+    if (req->command_giver != nullptr) {
+      req->command_giver->extra_ref++;
+    }
   }
 
   // The request a worker is mid-processing (popped from reqs, not yet in
   // finished_reqs); guarded by reqs_lock, held above.
-  if (current_work != nullptr && current_work->data->fun != nullptr) {
-    current_work->data->fun->f.fp->hdr.extra_ref++;
+  if (current_work != nullptr) {
+    if (current_work->data->fun != nullptr) {
+      current_work->data->fun->f.fp->hdr.extra_ref++;
+    }
+    if (current_work->data->command_giver != nullptr) {
+      current_work->data->command_giver->extra_ref++;
+    }
   }
 
   for (auto& req : finished_reqs) {
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
+    }
+    if (req->command_giver != nullptr) {
+      req->command_giver->extra_ref++;
     }
   }
 #endif
