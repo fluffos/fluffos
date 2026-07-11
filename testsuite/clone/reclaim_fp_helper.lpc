@@ -1,0 +1,2 @@
+// Helper for single/tests/crasher/reclaim_funptr_owner.lpc
+function make_fp() { return function() { return 42; }; }

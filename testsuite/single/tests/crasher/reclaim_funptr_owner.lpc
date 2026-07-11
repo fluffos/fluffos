@@ -1,0 +1,20 @@
+// reclaim_call_outs() dereferenced a funptr call_out's hdr.owner without a
+// null check. reclaim_objects() nulls the owner of a funptr whose owning
+// object was destructed; a call_out scheduled with that funptr then crashed
+// the next reclaim. Must not crash.
+function saved_fp;
+
+void do_tests() {
+    object helper = clone_object("/clone/reclaim_fp_helper");
+    saved_fp = helper->make_fp();      // funptr owned by helper
+    ASSERT(functionp(saved_fp));
+
+    destruct(helper);
+    reclaim_objects();                 // nulls saved_fp->hdr.owner
+
+    call_out(saved_fp, 1);             // schedule with orphaned funptr
+    reclaim_objects();                 // walks the callout; must not deref null
+
+    saved_fp = 0;
+    ASSERT(1);
+}
