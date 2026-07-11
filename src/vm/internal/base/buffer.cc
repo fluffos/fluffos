@@ -44,20 +44,24 @@ buffer_t* allocate_buffer(int size) {
 }
 
 int write_buffer(buffer_t* buf, int start, const char* str, int theLength) {
-  int size;
+  unsigned int size = buf->size;
 
-  size = buf->size;
   if (start < 0) {
-    start = size + start;
+    start = (int)size + start;
     if (start < 0) {
       return 0;
     }
   }
+  if (theLength < 0) {
+    return 0;
+  }
   /*
    * can't write past the end of the buffer since we can't reallocate the
-   * buffer here (no easy way to propagate back the changes to the caller
+   * buffer here (no easy way to propagate back the changes to the caller).
+   * Compute the bound in unsigned arithmetic so a huge start can't overflow
+   * signed int past the check and drive an out-of-bounds memcpy.
    */
-  if ((start + theLength) > size) {
+  if ((unsigned int)start > size || (unsigned int)theLength > size - (unsigned int)start) {
     return 0;
   }
   memcpy(buf->item + start, str, theLength);
