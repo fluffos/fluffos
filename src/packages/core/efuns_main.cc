@@ -2919,6 +2919,28 @@ void f__to_float() {
 }
 #endif
 
+#ifdef F__TO_BUFFER
+void f__to_buffer() {
+  switch (sp->type) {
+    case T_BUFFER:
+      /* already a buffer */
+      break;
+    case T_STRING:
+    case T_ARRAY: {
+      /* string -> its raw UTF-8 bytes; array -> ints 0..255, one byte
+       * each (errors on any other item). Also the compile-time promotion
+       * behind 'buffer b = str' and 'b += str'. */
+      buffer_t* b = svalue_to_buffer_bytes(sp);
+      free_svalue(sp, "f__to_buffer");
+      put_buffer(b);
+      break;
+    }
+    default:
+      bad_argument(sp, T_STRING | T_BUFFER | T_ARRAY, 1, F__TO_BUFFER);
+  }
+}
+#endif
+
 #ifdef F__TO_INT
 void f__to_int() {
   LPC_INT temp = 0;

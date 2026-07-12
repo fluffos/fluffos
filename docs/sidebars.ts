@@ -57,6 +57,7 @@ const sidebars: SidebarsConfig = {
             'lpc/constructs/include',
             'lpc/constructs/inherit',
             'lpc/constructs/prototypes',
+            'lpc/constructs/ref',
             'lpc/constructs/switch',
             'lpc/constructs/text_blocks',
             'lpc/constructs/while',

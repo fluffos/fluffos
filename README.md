@@ -349,6 +349,8 @@ The driver processes untrusted input (mudlib code, network bytes, save files), s
 ### LPC Language & UTF-8 Support
 - LPC string operations are UTF-8 EGS aware, range operator supports emoji and other unicode characters.
 - Various new EFUNS for transparent input/output transcoding.
+- Pass-by-reference parameters with the `ref` keyword — or its shorthand `&` — in parameter declarations, call arguments, and `foreach` loops; see the [ref guide](https://www.fluffos.info/lpc/constructs/ref).
+- Buffers behave like byte arrays: `foreach` iteration (each byte an int 0–255, `ref` mutates in place), forward/reverse/open-ended indexing, range reads and assignments, `+`/`+=` concatenation, and range-checked byte writes (a value outside 0–255 errors instead of truncating). Strings (as raw UTF-8 bytes) and arrays of ints 0–255 promote to buffers in `=`, `+=`, `+`, and range assignments — explicitly via the `to_buffer()` efun.
 
 ### Driver Runtime
 - Jemalloc support for optimized memory management.

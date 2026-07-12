@@ -63,6 +63,25 @@ void do_tests() {
   ASSERT_EQ(oob_l, catch(tmp[-1] = 'a'));
   ASSERT_EQ(oob_l, catch(tmp[-999] = 'a'));
 
+  // Compound assignment on a string char lvalue. += and -= used to be
+  // rejected outright ("Bad Argument 1 to +=()") even though ++/-- worked.
+  tmp[0] += 1;
+  ASSERT_EQ("bbcdefg", tmp);
+  tmp[0] -= 1;
+  ASSERT_EQ("abcdefg", tmp);
+  ASSERT_EQ('c', tmp[1] += 1);   // rvalue is the resulting char
+  ASSERT_EQ('b', tmp[1] -= 1);
+  ASSERT_EQ("abcdefg", tmp);
+  tmp[<1] += 1;                  // through a reverse index too
+  ASSERT_EQ("abcdefh", tmp);
+  tmp[<1] -= 1;
+  ASSERT_EQ("abcdefg", tmp);
+  {
+    mixed bad = "x";               // typed as mixed so the check is at runtime
+    ASSERT(catch(tmp[0] += bad));  // non-number rhs still errors
+    ASSERT_EQ("abcdefg", tmp);
+  }
+
   // RINDEX
   ASSERT_EQ('g', tmp[<1]);
   ASSERT_EQ('f', tmp[<2]);

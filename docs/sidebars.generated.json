@@ -163,6 +163,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/buffers/to_buffer",
+            "key": "efun/buffers/to_buffer",
+            "label": "to_buffer"
+          },
+          {
+            "type": "doc",
             "id": "efun/buffers/write_buffer",
             "key": "efun/buffers/write_buffer",
             "label": "write_buffer"

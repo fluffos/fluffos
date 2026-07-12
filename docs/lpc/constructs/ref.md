@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: constructs / ref
 ---
 # ref (pass-by-reference)
@@ -60,7 +59,15 @@ foreach (int & n in nums) {
 // nums is now ({ 4, 8, 12 })
 ```
 
-Note: `ref` in `foreach` over strings has no effect — strings are immutable.
+Note: `ref` in `foreach` only mutates **arrays**, **buffers** (each byte an
+int 0..255), and mapping values in place. Iterating a string with a `ref` loop variable follows the same rules
+as an `s[i]` char lvalue: characters that index as a single codepoint work
+(reads and assignments through the loop variable succeed), while a wider
+grapheme cluster — such as a flag emoji — raises the same catchable
+`"Indexed character is multi-codepoint"` error when the loop reaches it.
+Writes through the loop variable do not propagate to the source variable —
+strings are passed into `foreach` by value. To mutate a string, assign
+through an index instead (`s[i] = c`, `s[i] += 1`).
 
 ### Restrictions
 

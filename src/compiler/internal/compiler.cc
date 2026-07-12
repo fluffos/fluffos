@@ -1962,6 +1962,24 @@ parse_node_t* promote_to_int(parse_node_t* node) {
   return expr;
 }
 
+/* Wrap node in a to_buffer() call: the promotion behind
+ * 'buffer b = <string or array of ints 0..255>' and 'b += <same>'. */
+parse_node_t* promote_to_buffer(parse_node_t* node) {
+  parse_node_t* expr;
+  expr = new_node();
+  expr->kind = NODE_EFUN;
+  expr->v.number = predefs[to_buffer_efun].token;
+  expr->type = TYPE_BUFFER;
+  expr->l.number = 1;
+  expr->r.expr = new_node_no_line();
+  expr->r.expr->kind = 1;
+  expr->r.expr->l.expr = expr->r.expr;
+  expr->r.expr->type = 0;
+  expr->r.expr->v.expr = node;
+  expr->r.expr->r.expr = nullptr;
+  return expr;
+}
+
 parse_node_t* add_type_check(parse_node_t* node, int intype) {
   parse_node_t *expr, *expr2;
   int type = 0;
@@ -2017,6 +2035,10 @@ parse_node_t* do_promotions(parse_node_t* node, int type) {
   }
   if (type == TYPE_NUMBER && node->type == TYPE_REAL) {
     return promote_to_int(node);
+  }
+  if (type == TYPE_BUFFER &&
+      (node->type == TYPE_STRING || (node->type & TYPE_MOD_ARRAY))) {
+    return promote_to_buffer(node);
   }
   if (type != TYPE_ANY && type != node->type) {
     return add_type_check(node, type);

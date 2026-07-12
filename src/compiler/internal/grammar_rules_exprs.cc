@@ -315,7 +315,16 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
   } else {
     CREATE_BINARY_OP(*result, opcode, rval->type, rval, lval);
 
-    if (exact_types && !compatible_types(rval->type, lval->type) &&
+    /* A string or an array of ints 0..255 promotes to a buffer: for '='
+     * do_promotions wraps the rhs in to_buffer() below; for '+=' the
+     * coercion block below does the same, so 'buffer b = str' and
+     * 'b += str' work. (Buffer range lvalues also convert at runtime,
+     * covering untyped/mixed rhs.) */
+    int buffer_conv =
+        ((opcode == F_ASSIGN || opcode == F_ADD_EQ) && lval->type == TYPE_BUFFER &&
+         (rval->type == TYPE_STRING || (rval->type & TYPE_MOD_ARRAY)));
+
+    if (exact_types && !compatible_types(rval->type, lval->type) && !buffer_conv &&
         !(opcode == F_ADD_EQ && lval->type == TYPE_STRING &&
           ((COMP_TYPE(rval->type, TYPE_NUMBER)) || rval->type == TYPE_OBJECT))) {
       char buf[256];
@@ -340,6 +349,10 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
       } else if (lval->type == TYPE_NUMBER && rval->type == TYPE_REAL) {
         (*result)->l.expr = promote_to_int(rval);
         (*result)->type = TYPE_NUMBER;
+      } else if (opcode == F_ADD_EQ && lval->type == TYPE_BUFFER &&
+                 (rval->type == TYPE_STRING || (rval->type & TYPE_MOD_ARRAY))) {
+        (*result)->l.expr = promote_to_buffer(rval);
+        (*result)->type = TYPE_BUFFER;
       }
     }
   }
@@ -1556,6 +1569,14 @@ void rule_expr_add(struct parse_node_t** result, struct parse_node_t* expr1,
           else if (t3 == TYPE_STRING)
             result_type = TYPE_STRING;
           else
+            goto add_error;
+          break;
+        }
+        case TYPE_BUFFER: {
+          /* buffer + string / array-of-ints appends converted bytes */
+          if (t3 == TYPE_BUFFER || t3 == TYPE_STRING || (t3 & TYPE_MOD_ARRAY)) {
+            result_type = TYPE_BUFFER;
+          } else
             goto add_error;
           break;
         }

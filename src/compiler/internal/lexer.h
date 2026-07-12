@@ -179,7 +179,7 @@ extern int efun_arg_types[];
 extern int context;
 extern int num_refs;
 extern int lex_fatal;
-extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
+extern int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, to_buffer_efun, new_efun;
 
 union YYSTYPE;
 struct YYLTYPE;

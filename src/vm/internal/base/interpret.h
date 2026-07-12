@@ -138,6 +138,14 @@ extern const char* lv_owner_str;
 void kill_ref(ref_t*);
 ref_t* make_ref(void);
 
+/* += / -= on the active string codepoint lvalue (T_LVALUE_CODEPOINT);
+ * returns the resulting codepoint. */
+LPC_INT codepoint_lvalue_add(LPC_INT delta);
+
+/* Convert a string (raw UTF-8 bytes) or array of ints 0..255 into a fresh
+ * buffer; errors on anything else. Caller owns the result. */
+buffer_t* svalue_to_buffer_bytes(svalue_t* from);
+
 void call_direct(object_t*, int, int, int);
 void eval_instruction(char* p);
 
