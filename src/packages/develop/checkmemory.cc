@@ -680,8 +680,9 @@ void check_all_blocks(int flag) {
     auto* dfm = CONFIG_STR(__DEFAULT_FAIL_MESSAGE__);
     if (dfm != nullptr && strlen(dfm) > 0) {
       char buf[8192];
-      strcpy(buf, dfm);
-      strcat(buf, "\n");
+      // dfm is the admin-configured __DEFAULT_FAIL_MESSAGE__; bound the copy so
+      // an over-long message can't overflow this fixed buffer.
+      snprintf(buf, sizeof(buf), "%s\n", dfm);
       const char* target = findstring(buf);
       if (target) {
         EXTRA_REF(BLOCK(target))++;

@@ -54,7 +54,11 @@ void f_sys_reload_tls() {
   auto port_index = port_index_display - 1;
 
   DEFER { pop_stack(); };
-  if (port_index < 0 || port_index > sizeof(external_port)) {
+  // external_port is a fixed array; bound by ELEMENT COUNT, not sizeof (which
+  // is the size in bytes and let indices up to ~sizeof(port_def_t)*N through,
+  // for an out-of-bounds read and a wild tls_server_close()/port->ssl write).
+  if (port_index < 0 ||
+      port_index >= (LPC_INT)(sizeof(external_port) / sizeof(external_port[0]))) {
     error("Invalid port index: %d\n", port_index_display);
   }
   auto* port = &external_port[port_index];

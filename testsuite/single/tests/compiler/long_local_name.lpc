@@ -1,0 +1,29 @@
+// Regression: a local variable name longer than the compiler's internal
+// 4096-byte name-block used to overflow the heap in alloc_local_name()
+// (it always allocated fixed 4096-byte blocks and copied the whole name in).
+// Compiling such a name must now succeed without corrupting the heap; under
+// ASan the old code aborted here.
+void do_tests() {
+    string longname = "";
+    string src;
+    object ob;
+    int i;
+
+    for (i = 0; i < 5000; i++) {
+        longname += "a";
+    }
+
+    src = "int test_var;\nint f() { int " + longname + "; " + longname + " = 7; return " +
+          longname + "; }\n";
+
+    rm("/gen_long_local.c");
+    write_file("/gen_long_local.c", src);
+
+    ob = load_object("/gen_long_local");
+    ASSERT2(objectp(ob), "object with a 5000-char local name should compile");
+    if (objectp(ob)) {
+        ASSERT_EQ(7, ob->f());
+        destruct(ob);
+    }
+    rm("/gen_long_local.c");
+}
