@@ -34,5 +34,5 @@ title: system / function_profile
 
 ### SEE ALSO
 
-    rusage(3), time_expression(3), opcprof(3)
+    rusage(3), time_expression(3)
 

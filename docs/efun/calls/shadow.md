@@ -44,5 +44,5 @@ title: calls / shadow
 
 ### SEE ALSO
 
-    destruct(3), shadowp(3), query_shadowing(3), valid_shadow(4)
+    destruct(3), query_shadowing(3), valid_shadow(4)
 

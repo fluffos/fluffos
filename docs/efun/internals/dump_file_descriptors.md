@@ -34,8 +34,3 @@ title: internals / dump_file_descriptors
      5    79      7   164599  f  600   2862      1       44784
      6    40    2e2   145996  c    0   2862      1           0
      7    79      7   164601  f  644   2862      1         506
-
-### SEE ALSO
-
-    dump_socket_status(3)
-

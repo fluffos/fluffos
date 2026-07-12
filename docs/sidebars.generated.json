@@ -3129,6 +3129,12 @@
           },
           {
             "type": "doc",
+            "id": "apply/master/valid_ffi",
+            "key": "apply/master/valid_ffi",
+            "label": "valid_ffi"
+          },
+          {
+            "type": "doc",
             "id": "apply/master/valid_hide",
             "key": "apply/master/valid_hide",
             "label": "valid_hide"
