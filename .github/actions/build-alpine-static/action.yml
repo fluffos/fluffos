@@ -1,11 +1,11 @@
 name: Build FluffOS (static, Alpine)
 description: >-
-  Build the statically-linked Linux driver inside an Alpine container and run
-  its tests. Shared by the CI `alpine-static` job and the release `build-linux`
-  job so the exact dependency list and cmake config that ships as
-  fluffos-<version>-linux-x86_64-static.tar.gz is exercised on every PR.
-  Leaves the installed tree in build/bin/ for the caller to package.
-  Keep the apk list below in sync with README.md's Alpine section.
+  Build the statically-linked (musl) Linux driver inside an Alpine container
+  and run its tests. Shared by the CI `alpine-static` job and the release
+  `build-linux` job so the exact dependency list and cmake config that ships
+  as fluffos-<version>-linux-x86_64-static.tar.gz is exercised on every PR.
+  Leaves the installed tree in build/bin/ for the caller to package. Keep the
+  apk list below in sync with README.md's Alpine section.
 
 inputs:
   build-type:
@@ -15,46 +15,48 @@ inputs:
 runs:
   using: composite
   steps:
+    # The build script is fed to the container over stdin via a QUOTED
+    # heredoc (<<'DOCKER'): the outer shell passes it through untouched, so
+    # apostrophes/quotes in comments can never break it (a single-quoted
+    # `sh -c '...'` string is a footgun -- one apostrophe ends the quote and
+    # the rest runs on the host). build-type crosses in as an env var.
     - name: Build and test in Alpine (static)
       shell: bash
       run: |
-        docker run --rm -v "$PWD":/workspace -w /workspace alpine:3.18 /bin/sh -c '
-          set -e
+        docker run --rm -i -e "BUILD_TYPE=${{ inputs.build-type }}" \
+          -v "$PWD":/workspace -w /workspace alpine:3.18 sh -s <<'DOCKER'
+        set -e
 
-          apk add --no-progress --no-cache \
-            linux-headers gcc g++ clang-dev make cmake bash \
-            mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
-            openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-            pcre-dev bison git musl-dev libelf-static elfutils-dev \
-            pkgconf libffi-dev zstd-static bzip2-static xz-static tar
+        apk add --no-progress --no-cache \
+          linux-headers gcc g++ clang-dev make cmake bash \
+          mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
+          openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
+          pcre-dev bison git musl-dev libelf-static elfutils-dev \
+          pkgconf libffi-dev zstd-static bzip2-static xz-static tar
 
-          # Build jemalloc
-          cd /tmp
-          wget -q -O - https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2 | tar -xj
-          cd jemalloc-5.3.0
-          ./configure --prefix=/usr && make -j$(nproc) && make install
+        # jemalloc: Alpine has no static jemalloc package, so build it.
+        cd /tmp
+        wget -q -O - https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2 | tar -xj
+        cd jemalloc-5.3.0
+        ./configure --prefix=/usr && make -j"$(nproc)" && make install
 
-          # Build FluffOS. This is the HARD gate: a missing/renamed Alpine
-          # package or a static-link break fails the job right here, which is
-          # the whole reason CI runs this configuration.
-          cd /workspace
-          mkdir -p build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=${{ inputs.build-type }} -DMARCH_NATIVE=OFF -DSTATIC=ON
-          make -j$(nproc) install
+        # Build the static driver. It embeds ICU's data blob (see
+        # FLUFFOS_EMBED_ICU_DATA / init_static_icu_data in mainlib.cc) so
+        # table-based charsets like GBK/Big5 work without an external
+        # icudtXX.dat file, the same as the dynamic and Docker builds.
+        cd /workspace
+        mkdir -p build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE:-RelWithDebInfo}" -DMARCH_NATIVE=OFF -DSTATIC=ON
+        make -j"$(nproc)" install
 
-          # Run the suite for visibility, but do NOT gate the static binary on
-          # it (matches the historical release build). ICU's charset-conversion
-          # tables live in its ~28MB data blob (libicudata); a static musl link
-          # does not pull that blob in, so table-based converters (GBK/Big5)
-          # fail at runtime with U_FILE_ACCESS_ERROR -- the same limitation the
-          # wasm target has. Exactly three tests exercise those legacy charsets
-          # (utf8_doc_examples, transcode, bitmap_font) and fail here while
-          # passing on the gated glibc builds, which load the full libicudata.so.
-          # Algorithmic converters (UTF-8/UTF-16) need no data and work fine.
-          # The glibc builds are the real test gate; this run is informational.
-          ctest --output-on-failure -LE testsuite || echo "WARNING: gtest suite reported failures on the static Alpine build (non-gating)"
-          ctest --output-on-failure -L testsuite || echo "WARNING: LPC testsuite reported failures on the static Alpine build (non-gating)"
+        # The full suite must pass on the static build too (gating).
+        ctest --output-on-failure -LE testsuite
+        ctest --output-on-failure -L testsuite
 
-          # Verify static linking
-          ldd bin/driver || echo "Binary is statically linked"
-        '
+        # Confirm the driver really is statically linked.
+        if ldd bin/driver 2>/dev/null; then
+          echo "WARNING: bin/driver is not fully static"
+        else
+          echo "bin/driver is statically linked"
+        fi
+        DOCKER
