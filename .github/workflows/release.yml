@@ -8,6 +8,11 @@ on:
         required: false
         type: boolean
         default: false
+  schedule:
+    # Monthly auto-release: 09:00 UTC on the 1st. Skipped automatically
+    # when master has no new commits since the latest release tag
+    # (see the check-changes job).
+    - cron: '0 9 1 * *'
 
 env:
   REGISTRY: ghcr.io
@@ -22,8 +27,51 @@ permissions:
   packages: write
 
 jobs:
+  check-changes:
+    name: Check for Changes Since Last Release
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes
+        id: check
+        run: |
+          git fetch --tags
+
+          # Manual dispatch always releases
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch: releasing"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Most recent release tag by creation date (tag formats have
+          # varied over the years, so date order beats version sort)
+          LAST_TAG=$(git tag -l 'v*' --sort=-creatordate | head -n 1)
+
+          if [ -z "$LAST_TAG" ]; then
+            echo "No release tag found: releasing"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          COUNT=$(git rev-list --count "$LAST_TAG"..HEAD)
+          echo "$COUNT commit(s) since $LAST_TAG"
+          if [ "$COUNT" -gt 0 ]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes since $LAST_TAG: skipping release"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
   generate-version:
     name: Generate Version Number
+    needs: check-changes
+    if: needs.check-changes.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.generate.outputs.version }}
@@ -92,7 +140,7 @@ jobs:
               tag_name: version,
               name: `FluffOS ${version}`,
               generate_release_notes: true,
-              prerelease: ${{ inputs.prerelease }},
+              prerelease: ${{ inputs.prerelease || false }},
               draft: false
             });
             core.setOutput('upload_url', release.data.upload_url);

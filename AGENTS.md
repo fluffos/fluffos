@@ -132,6 +132,8 @@ FluffOS uses GitHub Actions for CI on pull requests and pushes to `master`.
   - **Flow** (native platforms): Install dependencies → CMake configure → Build → GTest unit tests → LPC testsuite.
 * **Docker CI** (`.github/workflows/docker-publish.yml`):
   - Builds a Docker image and pushes to `ghcr.io` on tagged releases and master merges.
+* **Releases** (`.github/workflows/release.yml`):
+  - Runs on a monthly schedule (09:00 UTC on the 1st) and via manual `workflow_dispatch`. A `check-changes` gate skips the scheduled run when master has no commits since the latest release tag; manual dispatch always releases. Versions are date-based (`vYYYY.MMDD.N`), release notes are auto-generated from merged PRs, and the build matrix ships Linux/Windows binaries plus `fluffos-<version>-wasm.zip`.
 
 ---
 
