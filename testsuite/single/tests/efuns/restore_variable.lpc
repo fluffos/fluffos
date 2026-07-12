@@ -40,4 +40,20 @@ void do_tests() {
 	IS("([1:" + x + ",])", ([1:y ]));
 	IS("([" + x + ":" + x + ",])", ([ y: y ]));
     }
+
+    // Deeply-nested crafted input must be rejected, not overflow the C stack.
+    // The restore sizing pass caps recursion at the same depth the save side
+    // does, so an attacker-supplied string far deeper than that errors cleanly.
+    {
+	string deep_arr = "0";
+	string deep_map = "0";
+	for (i = 0; i < 400; i++) {
+	    deep_arr = "({" + deep_arr + ",})";
+	    deep_map = "([0:" + deep_map + ",])";
+	}
+	ASSERT2(catch(restore_variable(deep_arr)),
+		"Deeply-nested array should be rejected, not crash");
+	ASSERT2(catch(restore_variable(deep_map)),
+		"Deeply-nested mapping should be rejected, not crash");
+    }
 }
