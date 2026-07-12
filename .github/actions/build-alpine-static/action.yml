@@ -40,10 +40,7 @@ runs:
         cd jemalloc-5.3.0
         ./configure --prefix=/usr && make -j"$(nproc)" && make install
 
-        # Build the static driver. It embeds ICU's data blob (see
-        # FLUFFOS_EMBED_ICU_DATA / init_static_icu_data in mainlib.cc) so
-        # table-based charsets like GBK/Big5 work without an external
-        # icudtXX.dat file, the same as the dynamic and Docker builds.
+        # Build the static driver.
         cd /workspace
         mkdir -p build && cd build
         cmake .. -DCMAKE_BUILD_TYPE="${BUILD_TYPE:-RelWithDebInfo}" -DMARCH_NATIVE=OFF -DSTATIC=ON
