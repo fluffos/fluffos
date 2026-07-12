@@ -133,7 +133,7 @@ FluffOS uses GitHub Actions for CI on pull requests and pushes to `master`.
 * **Docker CI** (`.github/workflows/docker-publish.yml`):
   - Builds a Docker image and pushes to `ghcr.io` on tagged releases and master merges.
 * **Releases** (`.github/workflows/release.yml`):
-  - Runs on a monthly schedule (09:00 UTC on the 1st), via manual `workflow_dispatch`, or by pushing a `v*` tag. A `check-changes` gate skips the scheduled run when master has no commits since the latest release tag; dispatch and tag pushes always release. Versions are date-based (`vYYYY.MMDD.N`, taken from the tag when one was pushed), release notes are auto-generated from merged PRs, and the build matrix ships Linux/Windows binaries plus `fluffos-<version>-wasm.zip`.
+  - Runs on a monthly schedule (09:00 UTC on the 1st), via manual `workflow_dispatch`, by pushing a `v*` tag, or by pushing a `release/vX` branch (the workflow creates tag `vX` at that commit and deletes the trigger branch -- the route for tooling that can push refs but lacks `actions: write`). A `check-changes` gate skips the scheduled run when master has no commits since the latest release tag; every explicit trigger always releases. Versions are date-based (`vYYYY.MMDD.N`, taken from the ref when one was pushed), release notes are auto-generated from merged PRs, and the build matrix ships Linux/Windows binaries plus `fluffos-<version>-wasm.zip`.
 
 ---
 
