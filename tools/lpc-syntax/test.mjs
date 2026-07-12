@@ -127,6 +127,46 @@ check('formatter is stable on a source that swallows to EOF (unterminated constr
         const once = formatLPC('void f() {\n  "\n}\n');
         return formatLPC(once) === once;
       })());
+check('case/default label colon has no leading space (unlike ternary/mapping colons)',
+      formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n')
+        .includes('case 1:') &&
+      formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n')
+        .includes('default:'));
+check('heredoc (@/@@) terminator breaks trailing code onto its own line',
+      (() => {
+        const src1 = 'int help() {\n    write( @ENDHELP\nhelp text\nENDHELP\n    );\n    return 1;\n}\n';
+        const once1 = formatLPC(src1);
+        const src2 = 'int help() {\n    this_player()->more( @@ENDHELP\nhelp text\nENDHELP\n    , 1);\n    return 1;\n}\n';
+        const once2 = formatLPC(src2);
+        return once1 === formatLPC(once1) && once2 === formatLPC(once2) &&
+               once1.includes('ENDHELP\n    );\n') && once2.includes('ENDHELP\n    , 1);\n');
+      })());
+check('multiline array/mapping literals preserve their line breaks instead of collapsing',
+      (() => {
+        const arr = formatLPC('mixed x = ({\n    1,\n    2,\n});\n');
+        const map = formatLPC('mapping x = ([\n    "a": 1,\n    "b": 2,\n]);\n');
+        return arr === 'mixed x = ({\n    1,\n    2,\n});\n' && formatLPC(arr) === arr &&
+               map === 'mapping x = ([\n    "a" : 1,\n    "b" : 2,\n]);\n' && formatLPC(map) === map;
+      })());
+check('single-line array/mapping literals still collapse onto one line',
+      (() => {
+        const out = formatLPC('mixed x = ({ 1, 2, 3 }); mapping m = ([ "a":1, "b":2 ]);\n');
+        return out === 'mixed x = ({1, 2, 3});\nmapping m = (["a" : 1, "b" : 2]);\n';
+      })());
+check('indexing and ranges stay tight; varargs/spread keep normal spacing',
+      (() => {
+        const out = formatLPC('int f() { return a[0] + b[1..2] + c()[0] + e[..<4]; }\n');
+        const va = formatLPC('mixed f(int a, ...) { return g(1, 2, ...); }\n');
+        return out.includes('a[0]') && out.includes('b[1..2]') && out.includes('c()[0]') &&
+               out.includes('e[..<4]') && va.includes('int a, ...') && va.includes('g(1, 2, ...)');
+      })());
+check('indexing/mapping literals nested inside a multiline array literal do not corrupt bracket tracking',
+      (() => {
+        const src = 'mixed x = ({\n    a[0],\n    b[1..2],\n    ([ "k": 1 ]),\n});\n';
+        const once = formatLPC(src);
+        return formatLPC(once) === once && once.includes('a[0],') && once.includes('b[1..2],') &&
+               once.includes('(["k" : 1]),');
+      })());
 
 // --- lint ---------------------------------------------------------------------
 const msgs = (src) => lintLPC(src).map((d) => d.message);
