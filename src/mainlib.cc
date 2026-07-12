@@ -28,10 +28,6 @@
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 #include <unicode/uversion.h>
-#ifdef FLUFFOS_EMBED_ICU_DATA
-#include <unicode/udata.h>   // for udata_setCommonData
-#include <unicode/utypes.h>  // for U_ICUDATA_ENTRY_POINT, u_errorName
-#endif
 
 #include "base/internal/crash_handler.h"  // for install_crash_handler, etc
 #include "base/internal/tracing.h"
@@ -176,28 +172,6 @@ void attempt_shutdown(int sig) {
   fatal(msg);
 }
 
-// On a fully static (musl) Linux build, ICU's ~28MB data blob (libicudata,
-// which holds every Unicode table plus the legacy-charset conversion tables
-// for GBK, Big5, Shift-JIS, ...) is not embedded by default. Without it,
-// table-based converters fail at runtime with U_FILE_ACCESS_ERROR while
-// algorithmic ones (UTF-8/UTF-16) keep working. Reference the statically
-// linked data entry point and hand it to ICU as the common data -- the
-// pattern documented in unicode/udata.h. The extern reference also forces
-// the linker to pull the data member into the binary. No-op on dynamic
-// builds (which load libicudata.so) and on targets that ship their own data.
-#ifdef FLUFFOS_EMBED_ICU_DATA
-extern "C" const char U_IMPORT U_ICUDATA_ENTRY_POINT[];
-static void init_static_icu_data() {
-  UErrorCode status = U_ZERO_ERROR;
-  udata_setCommonData(&U_ICUDATA_ENTRY_POINT, &status);
-  if (U_FAILURE(status)) {
-    debug_message("Warning: failed to register static ICU data: %s\n", u_errorName(status));
-  }
-}
-#else
-static void init_static_icu_data() {}
-#endif
-
 void init_locale() {
   setlocale(LC_ALL, "");
   // Verify locale is UTF8, complain otherwise
@@ -326,7 +300,6 @@ int driver_main(int argc, char** argv) {
   }
 #endif
 
-  init_static_icu_data();  // must run before any ICU data access
   init_locale();
   init_tz();
   incrase_fd_rlimit();
