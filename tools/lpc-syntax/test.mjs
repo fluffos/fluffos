@@ -21,6 +21,9 @@ check('grammar keywords include control flow',
       ['if', 'foreach', 'inherit', 'catch'].every((k) => grammar.keywords.includes(k)));
 check('operators longest-match ordered',
       grammar.operators.indexOf('<<=') < grammar.operators.indexOf('<<'));
+check('grammar keywords include "struct" (an alternate spelling of L_CLASS,'
+      + ' both STRUCT_CLASS and STRUCT_STRUCT are on by default)',
+      grammar.keywords.includes('struct') && grammar.keywords.includes('class'));
 
 // --- tokenizer ---------------------------------------------------------------
 check('keywords vs identifiers',
@@ -81,6 +84,11 @@ check('highlight keyword span', html.includes('<span class="lpc-keyword">return<
 check('highlight string span', html.includes('<span class="lpc-string">&quot;hi&quot;</span>'));
 check('highlight comment span', html.includes('<span class="lpc-comment">// done</span>'));
 check('html escaped', highlightLPC('if (a < b) x = "<&>";').includes('&lt;&amp;&gt;'));
+check('highlight $N closure params get their own class, not lpc-identifier',
+      highlightLPC('(: $1 + $2 :)').includes('<span class="lpc-param">$1</span>') &&
+      highlightLPC('(: $1 + $2 :)').includes('<span class="lpc-param">$2</span>'));
+check('highlight illegal character is flagged, not silently dropped',
+      highlightLPC('int x = 1 \u0001;').includes('<span class="lpc-unknown">'));
 
 // --- formatter ----------------------------------------------------------------
 const ugly = 'int  f( int x ){if(x>0){return   x;}else{return -x;}}';
@@ -215,6 +223,18 @@ check('tmLanguage: scope + language wiring',
 check('tmLanguage: keywords from grammar contract',
       tml.repository.keywords.match.includes('foreach') &&
       tml.repository.types.match.includes('mapping'));
+check('tmLanguage: class/struct get their own storage.type.class scope, not keyword.control',
+      tml.repository['class-keyword'].name === 'storage.type.class.lpc' &&
+      /\bclass\b/.test(tml.repository['class-keyword'].match) &&
+      /\bstruct\b/.test(tml.repository['class-keyword'].match) &&
+      !/\bclass\b/.test(tml.repository.keywords.match) &&
+      !/\bstruct\b/.test(tml.repository.keywords.match));
+check('tmLanguage: function-call excludes reserved words (no "if (" misfire as entity.name.function)',
+      (() => {
+        const re = new RegExp(tml.repository['function-call'].match);
+        return !re.test('if (') && !re.test('while (') && !re.test('new (') &&
+               !re.test('catch(') && re.test('foo (') && re.test('bar(');
+      })());
 check('tmLanguage: operators longest-match ordered',
       (() => { const parts = tml.repository.operators.match.split('|');
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());

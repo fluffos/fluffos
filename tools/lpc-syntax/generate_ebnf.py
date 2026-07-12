@@ -218,7 +218,10 @@ TOKEN_SPEC = {
     "L_BREAK": ("keyword", ["break"]), "L_CONTINUE": ("keyword", ["continue"]),
     "L_RETURN": ("keyword", ["return"]), "L_INHERIT": ("keyword", ["inherit"]),
     "L_CATCH": ("keyword", ["catch"]), "L_NEW": ("keyword", ["new"]),
-    "L_CLASS": ("keyword", ["class"]), "L_EFUN": ("keyword", ["efun"]),
+    # lexer_utils.cc's reswords[] maps BOTH spellings to L_CLASS (STRUCT_CLASS
+    # and STRUCT_STRUCT are both unconditionally #defined in
+    # options_internal.h) -- "struct" is a real keyword, not a plain name.
+    "L_CLASS": ("keyword", ["class", "struct"]), "L_EFUN": ("keyword", ["efun"]),
     "L_SSCANF": ("keyword", ["sscanf"]),
     "L_PARSE_COMMAND": ("keyword", ["parse_command"]),
     "L_TIME_EXPRESSION": ("keyword", ["time_expression"]),
@@ -341,11 +344,21 @@ def emit_vscode_assets(data, script_dir):
     os.makedirs(syn_dir, exist_ok=True)
     os.makedirs(lib_dir, exist_ok=True)
 
-    kw = "|".join(sorted(data["keywords"], key=len, reverse=True))
+    # "class"/"struct" are type-introducing keywords (a struct/class
+    # declaration), not control flow -- split them into their own scope so
+    # themes color them like C-family grammars color storage.type.class,
+    # instead of lumping them in with if/while/return.
+    class_like = {"class", "struct"} & set(data["keywords"])
+    kw = "|".join(sorted((w for w in data["keywords"] if w not in class_like),
+                         key=len, reverse=True))
+    class_kw = "|".join(sorted(class_like, key=len, reverse=True))
     types = "|".join(sorted(data["typeKeywords"], key=len, reverse=True))
     mods = "|".join(sorted(data["modifierKeywords"], key=len, reverse=True))
     # Operators arrive longest-match ordered from the contract.
     ops = "|".join(_re_escape(o) for o in data["operators"])
+    # Every reserved word, for the function-call heuristic below.
+    reserved = "|".join(sorted(set(data["keywords"]) | set(data["typeKeywords"])
+                               | set(data["modifierKeywords"]), key=len, reverse=True))
 
     tm = {
         "$comment": "GENERATED from lpc-grammar.json by generate_ebnf.py "
@@ -362,6 +375,7 @@ def emit_vscode_assets(data, script_dir):
             {"include": "#chars"},
             {"include": "#numbers"},
             {"include": "#functional"},
+            {"include": "#class-keyword"},
             {"include": "#keywords"},
             {"include": "#types"},
             {"include": "#modifiers"},
@@ -423,6 +437,8 @@ def emit_vscode_assets(data, script_dir):
                 {"name": "keyword.operator.functional.lpc", "match": "\\(:"},
                 {"name": "keyword.operator.functional.lpc", "match": ":\\)"},
             ]},
+            "class-keyword": {"name": "storage.type.class.lpc",
+                               "match": "\\b(" + class_kw + ")\\b"},
             "keywords": {"name": "keyword.control.lpc",
                           "match": "\\b(" + kw + ")\\b"},
             "types": {"name": "storage.type.lpc",
@@ -431,7 +447,12 @@ def emit_vscode_assets(data, script_dir):
                            "match": "\\b(" + mods + ")\\b"},
             "dollar-params": {"name": "variable.parameter.positional.lpc",
                                "match": "\\$[0-9]+"},
-            "function-call": {"match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+            # Negative lookahead excludes reserved words so "if (", "while (",
+            # "new (", etc. can never be mistaken for a function call, no
+            # matter how the engine breaks a same-position tie against
+            # #keywords/#types/#modifiers/#class-keyword.
+            "function-call": {"match": "\\b(?!(?:" + reserved + ")\\b)"
+                                        "([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
                                "captures": {"1": {"name": "entity.name.function.lpc"}}},
             "operators": {"name": "keyword.operator.lpc",
                            "match": ops},

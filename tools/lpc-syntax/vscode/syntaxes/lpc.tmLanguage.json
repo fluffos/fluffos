@@ -31,6 +31,9 @@
       "include": "#functional"
     },
     {
+      "include": "#class-keyword"
+    },
+    {
       "include": "#keywords"
     },
     {
@@ -172,9 +175,13 @@
         }
       ]
     },
+    "class-keyword": {
+      "name": "storage.type.class.lpc",
+      "match": "\\b(struct|class)\\b"
+    },
     "keywords": {
       "name": "keyword.control.lpc",
-      "match": "\\b(time_expression|parse_command|__TREE__|continue|default|foreach|inherit|return|sscanf|switch|array|break|catch|class|while|case|efun|else|for|new|ref|do|if|in)\\b"
+      "match": "\\b(time_expression|parse_command|__TREE__|continue|default|foreach|inherit|return|sscanf|switch|array|break|catch|while|case|efun|else|for|new|ref|do|if|in)\\b"
     },
     "types": {
       "name": "storage.type.lpc",
@@ -189,7 +196,7 @@
       "match": "\\$[0-9]+"
     },
     "function-call": {
-      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "match": "\\b(?!(?:time_expression|parse_command|protected|__TREE__|function|continue|private|default|foreach|mapping|inherit|varargs|buffer|public|object|sscanf|static|return|struct|nomask|switch|string|nosave|while|class|break|float|array|catch|mixed|else|case|efun|void|ref|new|for|int|do|if|in)\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
       "captures": {
         "1": {
           "name": "entity.name.function.lpc"

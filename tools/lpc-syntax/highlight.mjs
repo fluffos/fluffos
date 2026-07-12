@@ -19,7 +19,13 @@ const CSS_CLASS = {
   operator: 'lpc-operator',
   punctuation: 'lpc-punctuation',
   functional: 'lpc-functional',
+  unknown: 'lpc-unknown',
 };
+
+// $1/$2/... closure params tokenize as plain 'identifier' (format.mjs relies
+// on that kind for call-parenthesis spacing) but still deserve their own
+// visual color, matching the VS Code grammar's dollar-params scope.
+const DOLLAR_PARAM = /^\$[0-9]+$/;
 
 const escapeHtml = (s) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -28,7 +34,8 @@ const escapeHtml = (s) =>
 export function highlightLPC(source) {
   let out = '';
   for (const t of tokenize(source)) {
-    const cls = CSS_CLASS[t.kind];
+    let cls = CSS_CLASS[t.kind];
+    if (t.kind === 'identifier' && DOLLAR_PARAM.test(t.text)) cls = 'lpc-param';
     if (cls === undefined || t.kind === 'whitespace') {
       out += escapeHtml(t.text);
     } else {
@@ -49,4 +56,6 @@ export const defaultCss = `
 .lpc-modifier { color: #6f42c1; font-style: italic; }
 .lpc-operator { color: #444; }
 .lpc-functional { color: #e36209; font-weight: 600; }
+.lpc-param { color: #e36209; }
+.lpc-unknown { color: #fff; background: #d73a49; }
 `;

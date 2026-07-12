@@ -23,6 +23,7 @@
     "ref",
     "return",
     "sscanf",
+    "struct",
     "switch",
     "time_expression",
     "while"
@@ -423,7 +424,8 @@
     "L_CLASS": {
       "category": "keyword",
       "spellings": [
-        "class"
+        "class",
+        "struct"
       ]
     },
     "L_NEW": {
