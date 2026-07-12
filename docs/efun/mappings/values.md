@@ -32,5 +32,5 @@ title: mappings / values
 
 ### SEE ALSO
 
-    keys(3), each(3)
+    keys(3), for
 

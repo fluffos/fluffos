@@ -23,5 +23,5 @@ title: strings / explode
 
 ### SEE ALSO
 
-    sscanf(3), extract(3), replace_string(3), strsrch(3)
+    sscanf(3), replace_string(3), strsrch(3)
 

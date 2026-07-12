@@ -20,7 +20,3 @@ title: object / is_living
     This response is used to check whether the object is allowed to match a
     "LIV" rule (see below) or not. The response is cached and so should it
     change parse_refresh() will need to be called before the will notice.
-
-### SEE ALSO
-
-   inventory_visible(4), inventory_accessible(4)

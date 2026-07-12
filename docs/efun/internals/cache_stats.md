@@ -19,5 +19,5 @@ title: internals / cache_stats
 
 ### SEE ALSO
 
-    opcprof(3), mud_status(3)
+    mud_status(3)
 
