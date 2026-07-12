@@ -43,11 +43,15 @@ runs:
           make -j$(nproc) install
 
           # Run the suite for visibility, but do NOT gate the static binary on
-          # it (matches the historical release build). The static musl ICU
-          # differs from the glibc ICU used by the main CI matrix, so a few
-          # UTF-8/transcode tests (utf8_doc_examples, transcode, bitmap_font)
-          # fail here while passing on the gated glibc builds. Those are the
-          # real test gate; this run is informational.
+          # it (matches the historical release build). ICU's charset-conversion
+          # tables live in its ~28MB data blob (libicudata); a static musl link
+          # does not pull that blob in, so table-based converters (GBK/Big5)
+          # fail at runtime with U_FILE_ACCESS_ERROR -- the same limitation the
+          # wasm target has. Exactly three tests exercise those legacy charsets
+          # (utf8_doc_examples, transcode, bitmap_font) and fail here while
+          # passing on the gated glibc builds, which load the full libicudata.so.
+          # Algorithmic converters (UTF-8/UTF-16) need no data and work fine.
+          # The glibc builds are the real test gate; this run is informational.
           ctest --output-on-failure -LE testsuite || echo "WARNING: gtest suite reported failures on the static Alpine build (non-gating)"
           ctest --output-on-failure -L testsuite || echo "WARNING: LPC testsuite reported failures on the static Alpine build (non-gating)"
 
