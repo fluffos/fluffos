@@ -8,6 +8,15 @@ void append_item(mixed ref *arr, mixed item) {
   arr += ({ item });
 }
 
+// & sugar in parameter declarations
+void decrement(int & value) {
+  value--;
+}
+
+void prepend_item(mixed & *arr, mixed item) {
+  arr = ({ item }) + arr;
+}
+
 void do_tests() {
   // Test ref keyword in call arguments
   {
@@ -37,5 +46,37 @@ void do_tests() {
       n *= 2;
     }
     ASSERT_EQ(({ 2, 4, 6 }), nums);
+  }
+
+  // Test ref keyword in foreach
+  {
+    int *nums = ({ 1, 2, 3 });
+    foreach(int ref n in nums) {
+      n += 10;
+    }
+    ASSERT_EQ(({ 11, 12, 13 }), nums);
+  }
+
+  // Test & in parameter declarations
+  {
+    int x = 10;
+    decrement(& x);
+    ASSERT_EQ(9, x);
+    decrement(ref x);
+    ASSERT_EQ(8, x);
+
+    mixed *arr = ({ 2, 3 });
+    prepend_item(& arr, 1);
+    ASSERT_EQ(({ 1, 2, 3 }), arr);
+  }
+
+  // Bitwise & and &= still parse and evaluate as binary AND
+  {
+    int a = 6, b = 3;
+    ASSERT_EQ(2, a & b);
+    ASSERT_EQ(2, 6&3);
+    a &= b;
+    ASSERT_EQ(2, a);
+    ASSERT_EQ(6, 4 | 6 & 3);
   }
 }

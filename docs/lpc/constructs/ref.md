@@ -1,5 +1,4 @@
 ---
-layout: doc
 title: constructs / ref
 ---
 # ref (pass-by-reference)
@@ -60,7 +59,9 @@ foreach (int & n in nums) {
 // nums is now ({ 4, 8, 12 })
 ```
 
-Note: `ref` in `foreach` over strings has no effect — strings are immutable.
+Note: `ref` in `foreach` is only supported over arrays. Do not use it when
+iterating over a string — characters cannot be modified through the loop
+variable (assignment raises a runtime error).
 
 ### Restrictions
 
