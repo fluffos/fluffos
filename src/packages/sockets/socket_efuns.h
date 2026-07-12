@@ -105,6 +105,10 @@ int socket_listen(int, svalue_t*);
 int socket_accept(int, svalue_t*, svalue_t*);
 int socket_connect(int, const char*, svalue_t*, svalue_t*);
 int socket_write(int, svalue_t*, const char*);
+/* flags for socket_close() */
+#define SC_FORCE 1u
+#define SC_DO_CALLBACK 2u
+#define SC_FINAL_CLOSE 4u
 int socket_close(int, int);
 int socket_release(int, object_t*, svalue_t*);
 int socket_acquire(int, svalue_t*, svalue_t*, svalue_t*);
