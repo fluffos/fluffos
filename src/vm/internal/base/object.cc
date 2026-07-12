@@ -252,16 +252,21 @@ void save_svalue(svalue_t* v, char** buf) {
   }
 }
 
-static int restore_internal_size(const char** str, int is_mapping, int depth) {
+static int restore_internal_size(const char** str, int is_mapping, int depth, int nest) {
   const char* cp = *str;
   int size = 0;
   char c, delim, toggle = 0;
 
-  // Bound recursion the same way the save path does (too_deep_save_error).
-  // Without this, a maliciously deep-nested save string (e.g. "({({({...")
-  // recurses until the C stack overflows. Returning 0 fails the size pre-pass
-  // so restore_size() reports an error before the actual restore recurses.
-  if (depth > MAX_SAVE_SVALUE_DEPTH) {
+  // Bound *recursion* depth the same way the save path does (too_deep_save_error),
+  // so a maliciously deep-nested save string (e.g. "({({({...") cannot recurse
+  // until the C stack overflows. This must track true nesting depth (`nest`), NOT
+  // `depth`: `depth` is save_svalue_depth, a monotonic index into sizes[] that
+  // counts every container across the whole structure in DFS order and is only
+  // reset at the outermost close. Bounding `depth` wrongly rejected valid
+  // wide-but-shallow data (e.g. a mapping of a few hundred classes) as "too deep"
+  // once the cumulative container count crossed the cap. Returning 0 fails the
+  // size pre-pass so restore_size() reports an error before the restore recurses.
+  if (nest > MAX_SAVE_SVALUE_DEPTH) {
     return 0;
   }
 
@@ -284,17 +289,17 @@ static int restore_internal_size(const char** str, int is_mapping, int depth) {
       case '(': {
         if (*cp == '{') {
           *str = ++cp;
-          if (!restore_internal_size(str, 0, save_svalue_depth++)) {
+          if (!restore_internal_size(str, 0, save_svalue_depth++, nest + 1)) {
             return 0;
           }
         } else if (*cp == '[') {
           *str = ++cp;
-          if (!restore_internal_size(str, 1, save_svalue_depth++)) {
+          if (!restore_internal_size(str, 1, save_svalue_depth++, nest + 1)) {
             return 0;
           }
         } else if (*cp == '/') {
           *str = ++cp;
-          if (!restore_internal_size(str, 0, save_svalue_depth++)) {
+          if (!restore_internal_size(str, 0, save_svalue_depth++, nest + 1)) {
             return 0;
           }
         } else {
@@ -406,17 +411,17 @@ static int restore_size(const char** str, int is_mapping) {
       case '(': {
         if (*cp == '{') {
           *str = ++cp;
-          if (!restore_internal_size(str, 0, save_svalue_depth++)) {
+          if (!restore_internal_size(str, 0, save_svalue_depth++, 1)) {
             return -1;
           }
         } else if (*cp == '[') {
           *str = ++cp;
-          if (!restore_internal_size(str, 1, save_svalue_depth++)) {
+          if (!restore_internal_size(str, 1, save_svalue_depth++, 1)) {
             return -1;
           }
         } else if (*cp == '/') {
           *str = ++cp;
-          if (!restore_internal_size(str, 0, save_svalue_depth++)) {
+          if (!restore_internal_size(str, 0, save_svalue_depth++, 1)) {
             return -1;
           }
         } else {

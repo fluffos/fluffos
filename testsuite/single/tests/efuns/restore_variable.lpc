@@ -56,4 +56,29 @@ void do_tests() {
 	ASSERT2(catch(restore_variable(deep_map)),
 		"Deeply-nested mapping should be rejected, not crash");
     }
+
+    // A wide-but-shallow collection must restore cleanly. The size pre-pass
+    // caches element counts in sizes[], keyed on a counter that climbs with the
+    // total container count across the whole structure -- not the nesting depth.
+    // Bounding recursion on that counter used to reject large flat collections:
+    // a mapping of a few hundred one-element arrays is only two levels deep, but
+    // its cumulative container count crossed the cap and it failed with "Illegal
+    // mapping format". Each element here is a nested container (scalars do not
+    // advance the counter), so this exercises the regression directly.
+    {
+	string wide_map = "";
+	string wide_arr = "";
+	mapping rm;
+	mixed *ra;
+	for (i = 0; i < 500; i++) {
+	    wide_map += i + ":({" + i + ",}),";
+	    wide_arr += "({" + i + ",}),";
+	}
+	rm = restore_variable("([" + wide_map + "])");
+	ASSERT_EQ(500, sizeof(rm));
+	ASSERT_EQ(7, rm[7][0]);
+	ra = restore_variable("({" + wide_arr + "})");
+	ASSERT_EQ(500, sizeof(ra));
+	ASSERT_EQ(499, ra[499][0]);
+    }
 }
