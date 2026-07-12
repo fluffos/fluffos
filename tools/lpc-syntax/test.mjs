@@ -62,6 +62,18 @@ check('text block array', kinds('@@T\nx\nT\n')[0].startsWith('textblock:@@T'));
 check('range vs ellipsis vs dot',
       kinds('a[1..2] f(...) x.y').join(',').includes('operator:..') &&
       kinds('f(...)').includes('operator:...'));
+check('char literal: multi-digit hex/octal escapes are not truncated',
+      kinds("'\\x41' '\\101' '\\n'").join(',') ===
+      "char:'\\x41',char:'\\101',char:'\\n'");
+check('template interpolation: brace inside a nested string/char/comment does not end it early',
+      (() => {
+        const k1 = kinds('`x=${ s == "}" }`');
+        const k2 = kinds("`c=${ ch == '}' }`");
+        const k3 = kinds('`r=${/* } */ x}`');
+        return k1[k1.length - 1] === 'template:}`' && k1.includes('string:"}"') &&
+               k2[k2.length - 1] === 'template:}`' && k2.includes("char:'}'") &&
+               k3[k3.length - 1] === 'template:}`' && k3.includes('comment:/* } */');
+      })());
 
 // --- highlighter --------------------------------------------------------------
 const html = highlightLPC('int f() { return "hi"; } // done');
@@ -73,16 +85,48 @@ check('html escaped', highlightLPC('if (a < b) x = "<&>";').includes('&lt;&amp;&
 // --- formatter ----------------------------------------------------------------
 const ugly = 'int  f( int x ){if(x>0){return   x;}else{return -x;}}';
 const pretty = formatLPC(ugly);
-check('formatter indents braces', pretty.includes('\n    if (x > 0) {') || pretty.includes('if (x > 0) {'));
+check('formatter indents braces', pretty.includes('\n    if (x > 0) {'));
 check('formatter newline per statement', pretty.split('\n').filter(Boolean).length >= 5);
 check('formatter idempotent', formatLPC(pretty) === pretty,
       JSON.stringify({ once: pretty, twice: formatLPC(pretty) }));
+check('nested blocks (if/else) indent one level per depth, not off-by-one',
+      pretty === 'int f(int x) {\n    if (x > 0) {\n        return x;\n    } else {\n        return - x;\n    }\n}\n',
+      pretty);
+check('switch/case body indents under the switch, not at column 0',
+      (() => {
+        const out = formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n');
+        return out.includes('\n    switch (x) {') &&
+               out.split('\n').every((l) => l === '' || l === 'int f(int x) {' || l === '}' || l.startsWith('    '));
+      })());
 const withDirective = formatLPC('#define X 1\n   int f(){return X;}');
 check('directives at column 0', withDirective.startsWith('#define X 1\n'));
 const withComment = formatLPC('// header\nint g(){return 1;}');
 check('standalone comment kept', withComment.startsWith('// header\n'));
 check('strings verbatim through formatter',
       formatLPC('string s="a  b";').includes('"a  b"'));
+check('array literal braces stay inline and do not affect indent depth',
+      (() => {
+        const out = formatLPC('void f() { return ({ 1, 2, 3 }); }\n');
+        return out.includes('return ({1, 2, 3});') && formatLPC(out) === out;
+      })());
+check('nested array literal in a call is idempotent',
+      (() => {
+        const src = 'mixed f() { ASSERT(catch(allocate(5, function(int i) { if (i == 2) error("boom"); return i; }))); }\n';
+        const once = formatLPC(src);
+        return formatLPC(once) === once;
+      })());
+check('trailing "//" comment forces a line break before following code',
+      (() => {
+        const src = 'void f() { if (a) //note\n    return b; else c(); }\n';
+        const once = formatLPC(src);
+        const twice = formatLPC(once);
+        return once === twice && !once.split('\n').some((l) => /\/\/note.+\S/.test(l));
+      })());
+check('formatter is stable on a source that swallows to EOF (unterminated construct)',
+      (() => {
+        const once = formatLPC('void f() {\n  "\n}\n');
+        return formatLPC(once) === once;
+      })());
 
 // --- lint ---------------------------------------------------------------------
 const msgs = (src) => lintLPC(src).map((d) => d.message);
@@ -136,7 +180,16 @@ check('tmLanguage: operators longest-match ordered',
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());
 check('vscode lib copies exist and are marked generated',
       readF(joinP(here2, 'vscode/lib/lint.mjs'), 'utf8').startsWith('// GENERATED COPY') &&
-      readF(joinP(here2, 'vscode/lib/tokenizer.mjs'), 'utf8').startsWith('// GENERATED COPY'));
+      readF(joinP(here2, 'vscode/lib/tokenizer.mjs'), 'utf8').startsWith('// GENERATED COPY') &&
+      readF(joinP(here2, 'vscode/lib/format.mjs'), 'utf8').startsWith('// GENERATED COPY'));
+check('extension.js wires up the formatter',
+      (() => { const src = readF(joinP(here2, 'vscode/extension.js'), 'utf8');
+               return src.includes('registerDocumentFormattingEditProvider') &&
+                      src.includes('formatLPC'); })());
+const langConfig = JSON.parse(readF(joinP(here2, 'vscode/language-configuration.json'), 'utf8'));
+check('language-configuration: brackets + doc-comment continuation wired',
+      langConfig.brackets.length === 3 &&
+      Array.isArray(langConfig.onEnterRules) && langConfig.onEnterRules.length > 0);
 
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

@@ -11,6 +11,10 @@
 //
 // Highlighting is declarative (syntaxes/lpc.tmLanguage.json, generated
 // from the compiler's grammar contract) -- no code here.
+//
+// Formatting (Format Document / format-on-save) runs lib/format.mjs, a
+// generated copy of the grammar-driven formatter one level up. A bad
+// format never blocks a save: errors and no-op results yield no edits.
 
 'use strict';
 
@@ -20,6 +24,7 @@ const cp = require('child_process');
 const { pathToFileURL } = require('url');
 
 let lintPromise = null;
+let formatPromise = null;
 
 function loadLint(ctx) {
   if (lintPromise === null) {
@@ -27,6 +32,14 @@ function loadLint(ctx) {
     lintPromise = import(url).then((m) => m.lintLPC);
   }
   return lintPromise;
+}
+
+function loadFormat(ctx) {
+  if (formatPromise === null) {
+    const url = pathToFileURL(path.join(ctx.extensionPath, 'lib', 'format.mjs')).href;
+    formatPromise = import(url).then((m) => m.formatLPC);
+  }
+  return formatPromise;
 }
 
 function toRange(d) {
@@ -141,6 +154,24 @@ function activate(ctx) {
   for (const doc of vscode.workspace.textDocuments) {
     runLint(doc, lintColl, ctx);
   }
+
+  ctx.subscriptions.push(
+    vscode.languages.registerDocumentFormattingEditProvider('lpc', {
+      provideDocumentFormattingEdits: async (doc) => {
+        const cfg = vscode.workspace.getConfiguration('lpc', doc.uri);
+        if (!cfg.get('format.enabled', true)) return [];
+        try {
+          const formatLPC = await loadFormat(ctx);
+          const formatted = formatLPC(doc.getText());
+          if (!formatted || formatted === doc.getText()) return [];
+          const fullRange = new vscode.Range(
+            doc.positionAt(0), doc.positionAt(doc.getText().length));
+          return [vscode.TextEdit.replace(fullRange, formatted)];
+        } catch (_err) {
+          return [];
+        }
+      },
+    }));
 }
 
 function deactivate() {}

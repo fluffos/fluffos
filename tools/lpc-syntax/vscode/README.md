@@ -15,6 +15,11 @@ what the driver actually accepts.
   unterminated strings/templates/block comments/text blocks, unbalanced
   brackets, mismatched `#if`/`#elif`/`#else`/`#endif` (from
   `lib/lint.mjs`, a generated copy of the grammar-driven linter).
+* **Format Document / format-on-save** — brace-depth reindentation,
+  operator spacing, directives at column 0, comments/strings/text
+  blocks left verbatim (from `lib/format.mjs`, a generated copy of the
+  grammar-driven formatter). A formatting error never blocks a save;
+  the document is just left unchanged.
 * **Real compiler errors on save** (optional) — set the two `lpcc`
   settings and the file is compiled with the actual FluffOS front-end;
   its clang-style errors and warnings appear inline, including in
@@ -25,6 +30,7 @@ what the driver actually accepts.
 | Setting | Meaning |
 |---|---|
 | `lpc.lint.enabled` | Toggle the built-in structural lint (default on). |
+| `lpc.format.enabled` | Toggle the built-in formatter for Format Document / format-on-save (default on). |
 | `lpc.lpcc.path` | Path to the `lpcc` binary (build target `lpcc`). |
 | `lpc.lpcc.configFile` | Driver config file passed to `lpcc`. |
 | `lpc.mudlibRoot` | Mudlib root; files are compiled by their path relative to it (default: the workspace folder). |

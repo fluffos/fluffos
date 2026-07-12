@@ -288,7 +288,10 @@ def emit_grammar_json(xml_path, json_path):
         sys.exit(1)
 
     # Longest-match order for tokenizers; ":)" closes "(:" functionals.
-    operators = sorted(set(operators + [":)"]), key=len, reverse=True)
+    # Secondary alphabetical key keeps regeneration deterministic --
+    # plain `key=len` ties break on Python's per-process string hash
+    # randomization, reordering same-length operators on every run.
+    operators = sorted(set(operators + [":)"]), key=lambda o: (-len(o), o))
 
     productions = []
     for rule in tree.iter("rule"):
@@ -444,7 +447,7 @@ def emit_vscode_assets(data, script_dir):
     header = ("// GENERATED COPY -- edit tools/lpc-syntax/%s and re-run the\n"
               "// generate_ebnf CMake target; a packaged VS Code extension\n"
               "// cannot reach outside its own folder.\n")
-    for name in ("tokenizer.mjs", "lint.mjs"):
+    for name in ("tokenizer.mjs", "lint.mjs", "format.mjs"):
         src_f = os.path.join(script_dir, name)
         dst_f = os.path.join(lib_dir, name)
         with open(src_f) as f:

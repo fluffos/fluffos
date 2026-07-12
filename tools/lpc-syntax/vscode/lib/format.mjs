@@ -1,3 +1,6 @@
+// GENERATED COPY -- edit tools/lpc-syntax/format.mjs and re-run the
+// generate_ebnf CMake target; a packaged VS Code extension
+// cannot reach outside its own folder.
 // Basic LPC formatter over the grammar-driven tokenizer: brace-depth
 // reindentation, single-space operator normalization, directives at
 // column 0, strings/comments/text blocks verbatim. Deterministic and
