@@ -11,8 +11,6 @@ on:
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
   VERBOSE: 1
-  # Common build types across all platforms
-  BUILD_TYPES: '["Debug", "RelWithDebInfo"]'
 
 jobs:
   build-and-test:
@@ -91,33 +89,11 @@ jobs:
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
 
-          # Windows
-          - platform: Windows
-            os: windows-latest
-            shell: msys2 {0}
-            build: Debug
-            cmake_generator: MSYS Makefiles
-            cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
-            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi bison flex make
-          - platform: Windows
-            os: windows-latest
-            shell: msys2 {0}
-            build: RelWithDebInfo
-            cmake_generator: MSYS Makefiles
-            cmake_flags: -DMARCH_NATIVE=OFF -DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1
-            packages: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi bison flex make
-
-    defaults:
-      run:
-        shell: ${{ matrix.shell || 'bash' }}
+    # Windows (MSYS2), the static Alpine build, and WASM are separate jobs
+    # below -- each wraps a composite action in .github/actions/ that the
+    # release workflow reuses, so a release-only build can't silently break.
 
     steps:
-      - name: Setup MSYS2 (Windows)
-        if: matrix.platform == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          update: true
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -146,25 +122,13 @@ jobs:
           # pkg_check_modules(libffi) in package_ffi resolves it.
           echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
 
-      - name: Install Dependencies (Windows)
-        if: matrix.platform == 'Windows'
-        run: pacman --noconfirm -S --needed ${{ matrix.packages }}
-
       - name: Configure
         run: |
           mkdir build && cd build
-          if [ "${{ matrix.platform }}" = "Windows" ]; then
-            cmake -G "${{ matrix.cmake_generator }}" \
-              -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
-              ${{ matrix.cmake_flags }} \
-              -DPACKAGE_DB_SQLITE=2 \
-              ..
-          else
-            cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
-              ${{ matrix.cmake_flags }} \
-              -DPACKAGE_DB_SQLITE=2 \
-              ..
-          fi
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
+            ${{ matrix.cmake_flags }} \
+            -DPACKAGE_DB_SQLITE=2 \
+            ..
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
@@ -183,62 +147,60 @@ jobs:
       - name: Run LPC Testsuite
         run: cd build && ctest --output-on-failure -L testsuite
 
-  # WebAssembly build: cross-compile the driver with Emscripten and run
-  # the full LPC testsuite inside the wasm driver under node. See
-  # docs/build-wasm.md for the workflow and src/wasm/README.md for the
-  # architecture.
-  wasm:
-    name: WASM (Emscripten)
+  # Windows (MSYS2/MinGW64). Uses the same build-windows composite as the
+  # release workflow, so the release build can't break in a way CI misses.
+  windows:
+    name: Windows (${{ matrix.build }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [Debug, RelWithDebInfo]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build & test
+        uses: ./.github/actions/build-windows
+        with:
+          build-type: ${{ matrix.build }}
+          db-sqlite: '2'
+          # flex regenerates the lexer from lexer.l instead of using the
+          # checked-in pre-generated source.
+          extra-packages: flex
+
+  # Statically-linked Alpine build. Uses the same build-alpine-static
+  # composite the release workflow ships as
+  # fluffos-<version>-linux-x86_64-static.tar.gz, so a missing/renamed Alpine
+  # package is caught on every PR instead of at release time.
+  alpine-static:
+    name: Alpine (static)
     runs-on: ubuntu-24.04
-    env:
-      # Upstream dep pins: the deps build and the cache key below reference
-      # these. The emsdk itself tracks 'latest' (native wasm exceptions and
-      # friends); the resolved compiler version feeds the cache key.
-      ICU_VER: 74-2
-      WASM_DEPS_PREFIX: /opt/wasm-deps
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: latest
-          actions-cache-folder: emsdk-cache
+      - name: Build & test
+        uses: ./.github/actions/build-alpine-static
 
-      - name: Resolve emscripten version
-        id: emver
-        run: echo "version=$(emcc -dumpversion)" >> "$GITHUB_OUTPUT"
+  # WebAssembly build: cross-compile the driver with Emscripten and run the
+  # full LPC testsuite inside the wasm driver under node, via the same
+  # build-wasm composite the release workflow uses. See docs/build-wasm.md
+  # for the workflow and src/wasm/README.md for the architecture.
+  wasm:
+    name: WASM (Emscripten)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Install native dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential bison flex libssl-dev libicu-dev
-
-      # The deps prefix must exist and be runner-writable BEFORE the cache
-      # step: on a cache hit, actions/cache restores into it directly.
-      - name: Prepare wasm deps prefix
-        run: |
-          sudo mkdir -p "$WASM_DEPS_PREFIX"
-          sudo chown "$USER" "$WASM_DEPS_PREFIX"
-
-      # ICU cross-built for wasm32; ~10 minutes on a miss, so cache
-      # on the resolved emsdk + upstream versions (bump -v1 to invalidate).
-      - name: Cache wasm dependencies (ICU)
-        id: wasm-deps
-        uses: actions/cache@v4
-        with:
-          path: /opt/wasm-deps
-          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-v3
-
-      - name: Build wasm dependencies
-        if: steps.wasm-deps.outputs.cache-hit != 'true'
-        run: |
-          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" \
-            tools/wasm/build-deps.sh
-
-      - name: Build driver (native tools + wasm) and package testsuite
-        run: tools/wasm/build.sh
-
-      - name: Run LPC testsuite in the wasm driver
-        run: node tools/wasm/run-testsuite.js
+      - name: Build & test
+        uses: ./.github/actions/build-wasm
