@@ -939,6 +939,12 @@ void f_sub_eq() {
       break;
     }
 
+    case T_LVALUE_CODEPOINT | T_NUMBER: {
+      sp->u.number = codepoint_lvalue_add(-sp->u.number);
+      sp->subtype = 0;
+      break;
+    }
+
     default: {
       if (!(sp->type & (T_NUMBER | T_REAL | T_ARRAY))) {
         error("Bad right type to -=\n");

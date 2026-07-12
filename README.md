@@ -349,6 +349,7 @@ The driver processes untrusted input (mudlib code, network bytes, save files), s
 ### LPC Language & UTF-8 Support
 - LPC string operations are UTF-8 EGS aware, range operator supports emoji and other unicode characters.
 - Various new EFUNS for transparent input/output transcoding.
+- Pass-by-reference parameters with the `ref` keyword — or its shorthand `&` — in parameter declarations, call arguments, and `foreach` loops; see the [ref guide](https://www.fluffos.info/lpc/constructs/ref).
 
 ### Driver Runtime
 - Jemalloc support for optimized memory management.

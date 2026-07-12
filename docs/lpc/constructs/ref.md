@@ -59,9 +59,11 @@ foreach (int & n in nums) {
 // nums is now ({ 4, 8, 12 })
 ```
 
-Note: `ref` in `foreach` is only supported over arrays. Do not use it when
-iterating over a string — characters cannot be modified through the loop
-variable (assignment raises a runtime error).
+Note: `ref` in `foreach` only mutates **arrays** (and mapping values) in
+place. Iterating a string with a `ref` loop variable reads the characters
+normally, but writes through the loop variable do not propagate to the
+source variable — strings are passed into `foreach` by value. To mutate a
+string, assign through an index instead (`s[i] = c`, `s[i] += 1`).
 
 ### Restrictions
 

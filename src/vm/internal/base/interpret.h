@@ -138,6 +138,10 @@ extern const char* lv_owner_str;
 void kill_ref(ref_t*);
 ref_t* make_ref(void);
 
+/* += / -= on the active string codepoint lvalue (T_LVALUE_CODEPOINT);
+ * returns the resulting codepoint. */
+LPC_INT codepoint_lvalue_add(LPC_INT delta);
+
 void call_direct(object_t*, int, int, int);
 void eval_instruction(char* p);
 

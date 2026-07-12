@@ -52,6 +52,53 @@ void do_tests() {
     ASSERT_EQ("abcdefg", str); // not suppose to change
   }
 
+  // A ref loop variable over a string must read the actual characters.
+  // The shared codepoint cursor used to be advanced before the body ran,
+  // so every read through the ref was off by one.
+  {
+    int r = 0;
+    foreach(int ref c in "abc") {
+      r = r * 1000 + c;
+    }
+    ASSERT_EQ(97098099, r);
+  }
+
+  // Nested foreach over strings: the EGC cursor is per-loop stack state.
+  // The inner loop used to reset the shared iterator out from under the
+  // outer loop and crash the driver.
+  {
+    string r = "";
+    foreach(int a in "ab") {
+      foreach(int b in "xy") {
+        r += sprintf("%c%c ", a, b);
+      }
+    }
+    ASSERT_EQ("ax ay bx by ", r);
+  }
+
+  // Same, with the outer loop variable a ref: reads stay on the outer
+  // loop's own character across the inner loop.
+  {
+    string r = "";
+    foreach(int ref a in "ab") {
+      foreach(int b in "xy") {
+        r += sprintf("%c%c ", a, b);
+      }
+    }
+    ASSERT_EQ("ax ay bx by ", r);
+  }
+
+  // Nested string foreach with multi-byte UTF-8 EGCs.
+  {
+    int n = 0;
+    foreach(int a in "héé") {
+      foreach(int b in "🍆🍠") {
+        n++;
+      }
+    }
+    ASSERT_EQ(6, n);
+  }
+
   // Issue #1127: the iteration count used to be stored in a 16-bit field,
   // so containers with more than 65535 entries iterated size % 65536 times
   // (65536 entries iterated zero times).

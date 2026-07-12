@@ -1026,6 +1026,14 @@ void assign_lvalue_codepoint(F&& func) {
   }
 }
 
+/* Add delta to the codepoint behind the active T_LVALUE_CODEPOINT lvalue
+ * and return the resulting codepoint (for the rvalue of += / -=). */
+LPC_INT codepoint_lvalue_add(LPC_INT delta) {
+  UChar32 out = 0;
+  assign_lvalue_codepoint([&out, delta](UChar32 c) { return out = c + delta; });
+  return out;
+}
+
 void assign_lvalue_range(svalue_t* from) {
   int ind1, ind2, size, fsize;
   svalue_t* owner;
@@ -2641,6 +2649,19 @@ void eval_instruction(char* p) {
         if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to +=.");
         lval = sp->u.lvalue;
         sp--; /* points to the RHS */
+        if (lval->type == T_LVALUE_CODEPOINT) {
+          if (sp->type != T_NUMBER) {
+            error("Bad right type to += of char lvalue.\n");
+          }
+          LPC_INT res = codepoint_lvalue_add(sp->u.number);
+          if (instruction == F_ADD_EQ) { /* reuse the RHS slot as the rvalue */
+            sp->subtype = 0;
+            sp->u.number = res;
+          } else {
+            sp--;
+          }
+          break;
+        }
         switch (lval->type) {
           case T_STRING:
             if (sp->type == T_STRING) {
@@ -2790,15 +2811,22 @@ void eval_instruction(char* p) {
             sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
           }
         } else if (sp->type == T_STRING) {
-          STACK_INC;
-          sp->type = T_NUMBER;
-          global_lvalue_codepoint.index = 0;
-          global_lvalue_codepoint.owner = sp - 1;
-          global_lvalue_codepoint.iter =
-              std::make_unique<EGCSmartIterator>((sp - 1)->u.string, SVALUE_STRLEN((sp - 1)));
-          if (!global_lvalue_codepoint.iter->ok()) {
+          // Validate the string up front; iteration state (the EGC cursor)
+          // lives in this loop's own stack slot, NOT in the shared
+          // global_lvalue_codepoint -- nested string foreach used to reset
+          // the shared iterator out from under the outer loop and crash.
+          bool valid;
+          {
+            EGCSmartIterator check(sp->u.string, SVALUE_STRLEN(sp));
+            valid = check.ok();
+          }
+          if (!valid) {
             error("f_foreach: Invalid utf-8 string.");
           }
+          STACK_INC;
+          sp->type = T_NUMBER;
+          sp->subtype = 0;
+          sp->u.number = 0; /* this loop's EGC cursor */
         } else {
           CHECK_TYPES(sp, T_ARRAY, 2, F_FOREACH);
 
@@ -2861,20 +2889,33 @@ void eval_instruction(char* p) {
             break;
           }
         } else if ((sp - 2)->type == T_STRING) { /* string */
-          auto pos =
-              global_lvalue_codepoint.iter->post_index_to_offset(global_lvalue_codepoint.index);
-          if (pos > 0) {
+          svalue_t* owner = sp - 2;
+          auto idx = (sp - 1)->u.number;
+          UChar32 c = u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner), idx);
+          /* 0 / -2 mean idx is at or past the last EGC (see
+           * u8_egc_index_as_single_codepoint); a negative single value is a
+           * multi-codepoint EGC and still iterates, matching string indexing. */
+          if (c != 0 && c != -2) {
             if (sp->type == T_REF) {
+              /* Aim the shared codepoint lvalue at THIS loop's current
+               * character. Re-arm it every iteration: any string foreach or
+               * string index lvalue in the loop body retargets the shared
+               * state. Reads/writes through the ref hit the loop's own
+               * (stack) copy of the string, so writes never reach the
+               * variable that was iterated -- pinned by
+               * tests/operators/foreach.lpc. */
+              global_lvalue_codepoint.index = idx;
+              global_lvalue_codepoint.owner = owner;
+              global_lvalue_codepoint.iter =
+                  std::make_unique<EGCSmartIterator>(owner->u.string, SVALUE_STRLEN(owner));
               sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
             } else {
               free_svalue(sp->u.lvalue, "foreach-string");
               sp->u.lvalue->type = T_NUMBER;
               sp->u.lvalue->subtype = 0;
-              sp->u.lvalue->u.number = u8_egc_index_as_single_codepoint(
-                  global_lvalue_codepoint.owner->u.string,
-                  SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index);
+              sp->u.lvalue->u.number = c;
             }
-            global_lvalue_codepoint.index++;
+            (sp - 1)->u.number = idx + 1;
 
             COPY_SHORT(&offset, pc);
             pc -= offset;
@@ -2901,17 +2942,9 @@ void eval_instruction(char* p) {
         stack_in_use_as_temporary--;
 #endif
         if (sp->type == T_REF) {
-          if (sp->u.ref->lvalue == &global_lvalue_codepoint_sv) {
-            sp->u.ref->lvalue = nullptr;
+          sp->u.ref->lvalue = nullptr;
 
-            global_lvalue_codepoint.index = 0;
-            global_lvalue_codepoint.owner = nullptr;
-            global_lvalue_codepoint.iter.reset();
-          } else {
-            sp->u.ref->lvalue = nullptr;
-          }
-
-          if (!(--sp->u.ref->ref) && sp->u.ref->lvalue == nullptr) {
+          if (!(--sp->u.ref->ref)) {
             FREE(sp->u.ref);
           }
         }
@@ -2924,11 +2957,15 @@ void eval_instruction(char* p) {
           /* array or string */
           sp -= 2;
           if (sp->type == T_STRING) {
+            /* Drop the shared codepoint lvalue only if it still points at
+             * this loop's string slot (about to be popped); an outer string
+             * foreach re-arms its own state on its next iteration. */
+            if (global_lvalue_codepoint.owner == sp) {
+              global_lvalue_codepoint.index = 0;
+              global_lvalue_codepoint.owner = nullptr;
+              global_lvalue_codepoint.iter.reset();
+            }
             free_string_svalue(sp--);
-
-            global_lvalue_codepoint.index = 0;
-            global_lvalue_codepoint.owner = nullptr;
-            global_lvalue_codepoint.iter.reset();
           } else {
             free_array((sp--)->u.arr);
           }
