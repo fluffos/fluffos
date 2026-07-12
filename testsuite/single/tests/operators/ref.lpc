@@ -56,12 +56,6 @@ void by_value(int value) {
 
 string flag_str;
 int *flag_seen;
-buffer flag_buf;
-
-void iter_buf_ref() {
-  foreach(int ref v in flag_buf) {
-  }
-}
 
 void iter_flag_collect() {
   flag_seen = ({});
@@ -257,13 +251,89 @@ void do_tests() {
     ASSERT_EQ("arr", mm["arr"]);
   }
 
-  // foreach over a non-iterable type (buffer) errors cleanly, ref or not
+  // foreach ref over a buffer mutates the bytes in place (buffers are
+  // reference types, like arrays)
   {
-    string err;
+    buffer b = allocate_buffer(3);
 
-    flag_buf = allocate_buffer(2);
-    err = catch(iter_buf_ref());
-    ASSERT_EQ(0, strsrch(err, "*Bad argument 2 to foreach"));
+    b[0] = 1; b[1] = 2; b[2] = 3;
+    foreach(int ref v in b) {
+      v = v * 2;   // read + assign through the ref
+    }
+    ASSERT_EQ(2, b[0]);
+    ASSERT_EQ(4, b[1]);
+    ASSERT_EQ(6, b[2]);
+
+    foreach(int ref v in b) {
+      v++;
+    }
+    ASSERT_EQ(3, b[0]);
+
+    foreach(int ref v in b) {
+      v += 2;
+    }
+    ASSERT_EQ(5, b[0]);
+  }
+
+  // buffer bytes stay bytes: reads are unsigned (0..255), and writing a
+  // value outside 0..255 through the ref errors like b[i] = v does
+  {
+    string range_err = "*Buffer byte value out of range: must be 0..255.\n";
+    buffer b = allocate_buffer(2);
+    int got;
+
+    b[0] = 200; b[1] = 255;
+    foreach(int ref v in b) {
+      got = v;
+    }
+    ASSERT_EQ(255, got);   // read the actual unsigned value
+
+    foreach(int ref v in b) {
+      ASSERT_EQ(range_err, catch(v = 256));
+      break;
+    }
+    foreach(int ref v in b) {
+      ASSERT_EQ(range_err, catch(v = -1));
+      break;
+    }
+    ASSERT_EQ(200, b[0]);  // failed writes leave the byte unchanged
+  }
+
+  // Each ref loop carries its own byte lvalue: nested buffer ref loops --
+  // and b[i] lvalues used in the body -- never alias each other. (The
+  // outer write used to land in the INNER loop's buffer via the shared
+  // byte lvalue.)
+  {
+    buffer b1 = allocate_buffer(2), b2 = allocate_buffer(2);
+    buffer o = allocate_buffer(1);
+
+    foreach(int ref x in b1) {
+      foreach(int ref y in b2) {
+        y++;
+      }
+      o[0]++;      // arms the shared b[i] lvalue mid-loop
+      x = 9;
+    }
+    ASSERT_EQ(9, b1[0]);
+    ASSERT_EQ(9, b1[1]);
+    ASSERT_EQ(2, b2[0]);
+    ASSERT_EQ(2, b2[1]);
+    ASSERT_EQ(2, o[0]);
+  }
+
+  // Same shape over arrays (also pins the ref_t leak fix for a ref loop
+  // variable reused by a re-entered inner loop)
+  {
+    int *a1 = ({ 0, 0 }), *a2 = ({ 0, 0 });
+
+    foreach(int ref x in a1) {
+      foreach(int ref y in a2) {
+        y++;
+      }
+      x = 9;
+    }
+    ASSERT_EQ(({ 9, 9 }), a1);
+    ASSERT_EQ(({ 2, 2 }), a2);
   }
 
   // ===== foreach ref over strings =====

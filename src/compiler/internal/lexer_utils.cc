@@ -111,7 +111,7 @@ static function_context_t function_context_stack[MAX_FUNCTION_DEPTH];
 static int last_function_context;
 function_context_t* current_function_context = nullptr;
 
-int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, new_efun;
+int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, to_buffer_efun, new_efun;
 
 /*
  * The number of arguments stated below, are used by the compiler.
@@ -1624,6 +1624,9 @@ void init_identifiers() {
       }
       if (strcmp(predefs[i].word, "to_float") == 0) {
         to_float_efun = i;
+      }
+      if (strcmp(predefs[i].word, "to_buffer") == 0) {
+        to_buffer_efun = i;
       }
       if (strcmp(predefs[i].word, "new") == 0) {
         new_efun = i;

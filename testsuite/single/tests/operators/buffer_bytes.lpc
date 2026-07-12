@@ -1,0 +1,235 @@
+// Buffer byte semantics: every element is a byte read as an int 0..255,
+// and every LPC write path (=, ++, --, +=, -=) range-checks the result --
+// a value outside 0..255 raises an error instead of silently truncating.
+// Also pins buffer + / += concatenation.
+
+void do_tests() {
+  string range_err = "*Buffer byte value out of range: must be 0..255.\n";
+  buffer b = allocate_buffer(2);
+
+  // boundary values are fine, and read back unsigned
+  b[0] = 0;
+  b[1] = 255;
+  ASSERT_EQ(0, b[0]);
+  ASSERT_EQ(255, b[1]);
+  b[0] = 200;
+  ASSERT_EQ(200, b[0]);
+  ASSERT_EQ(200, b[<2]);
+
+  // out-of-range assignment errors, byte unchanged
+  ASSERT_EQ(range_err, catch(b[0] = 256));
+  ASSERT_EQ(range_err, catch(b[0] = -1));
+  ASSERT_EQ(range_err, catch(b[0] = 99999));
+  ASSERT_EQ(200, b[0]);
+
+  // ++ / -- error at the boundaries instead of wrapping
+  ASSERT_EQ(range_err, catch(b[1]++));
+  ASSERT_EQ(range_err, catch(++b[1]));
+  ASSERT_EQ(255, b[1]);
+  b[0] = 0;
+  ASSERT_EQ(range_err, catch(b[0]--));
+  ASSERT_EQ(range_err, catch(--b[0]));
+  ASSERT_EQ(0, b[0]);
+
+  // += / -= range-check the result and yield it as the rvalue
+  b[0] = 254;
+  ASSERT_EQ(255, b[0] += 1);
+  ASSERT_EQ(range_err, catch(b[0] += 1));
+  ASSERT_EQ(255, b[0]);
+  b[0] = 1;
+  ASSERT_EQ(0, b[0] -= 1);
+  ASSERT_EQ(range_err, catch(b[0] -= 1));
+  ASSERT_EQ(0, b[0]);
+  b[0] = 100;
+  ASSERT_EQ(range_err, catch(b[0] += 1000));
+  ASSERT_EQ(range_err, catch(b[0] -= 1000));
+  ASSERT_EQ(100, b[0]);
+
+  // in-place ++/--/+= away from the boundaries still work
+  b[0] = 10;
+  b[0]++;
+  ASSERT_EQ(11, b[0]);
+  b[0]--;
+  ASSERT_EQ(10, b[0]);
+  b[0] += 5;
+  ASSERT_EQ(15, b[0]);
+  b[0] -= 5;
+  ASSERT_EQ(10, b[0]);
+
+  // buffer + buffer concatenates into a new buffer
+  {
+    buffer x = allocate_buffer(2), y = allocate_buffer(3), z;
+
+    x[0] = 1; x[1] = 2;
+    y[0] = 3; y[1] = 4; y[2] = 255;
+    z = x + y;
+    ASSERT_EQ(5, sizeof(z));
+    ASSERT_EQ(1, z[0]);
+    ASSERT_EQ(2, z[1]);
+    ASSERT_EQ(3, z[2]);
+    ASSERT_EQ(4, z[3]);
+    ASSERT_EQ(255, z[4]);
+    // operands are untouched
+    ASSERT_EQ(2, sizeof(x));
+    ASSERT_EQ(3, sizeof(y));
+
+    // += appends in place on the variable
+    x += y;
+    ASSERT_EQ(5, sizeof(x));
+    ASSERT_EQ(1, x[0]);
+    ASSERT_EQ(255, x[4]);
+
+    // empty operands
+    z = x + allocate_buffer(0);
+    ASSERT_EQ(5, sizeof(z));
+    z = allocate_buffer(0) + x;
+    ASSERT_EQ(5, sizeof(z));
+  }
+
+  // buffer + non-buffer is an error
+  {
+    buffer x = allocate_buffer(1);
+    mixed bad_rhs = 5;
+    mixed r;
+
+    ASSERT(catch(r = x + bad_rhs));
+    ASSERT(catch(x += bad_rhs));
+  }
+
+  // A string assigns into a buffer range as its raw UTF-8 bytes
+  {
+    buffer x = allocate_buffer(4);
+    mixed r;
+
+    x[0] = 1; x[1] = 2; x[2] = 3; x[3] = 4;
+    x[1..2] = "AB";                    // equal size
+    ASSERT_EQ(4, sizeof(x));
+    ASSERT_EQ(1, x[0]);
+    ASSERT_EQ('A', x[1]);
+    ASSERT_EQ('B', x[2]);
+    ASSERT_EQ(4, x[3]);
+
+    x[1..1] = "xyz";                   // grow
+    ASSERT_EQ(6, sizeof(x));
+    ASSERT_EQ('x', x[1]);
+    ASSERT_EQ('z', x[3]);
+    ASSERT_EQ('B', x[4]);
+
+    x = allocate_buffer(2);
+    x[0..0] = "é";                     // multi-byte codepoint: 2 UTF-8 bytes
+    ASSERT_EQ(3, sizeof(x));
+    ASSERT_EQ(0xC3, x[0]);
+    ASSERT_EQ(0xA9, x[1]);
+
+    // the rhs promotes before assignment, so the rvalue is the buffer
+    x = allocate_buffer(2);
+    r = (x[0..1] = "AB");
+    ASSERT(bufferp(r));
+    ASSERT_EQ(2, sizeof(r));
+    ASSERT_EQ('A', r[0]);
+  }
+
+  // An array of ints 0..255 assigns into a buffer range, one byte each
+  {
+    buffer x = allocate_buffer(4);
+
+    x[0] = 1; x[1] = 2; x[2] = 3; x[3] = 4;
+    x[1..2] = ({ 200, 255 });          // equal size
+    ASSERT_EQ(4, sizeof(x));
+    ASSERT_EQ(200, x[1]);
+    ASSERT_EQ(255, x[2]);
+
+    x[1..2] = ({ 9 });                 // shrink
+    ASSERT_EQ(3, sizeof(x));
+    ASSERT_EQ(1, x[0]);
+    ASSERT_EQ(9, x[1]);
+    ASSERT_EQ(4, x[2]);
+
+    x[1..1] = ({});                    // delete a byte
+    ASSERT_EQ(2, sizeof(x));
+    ASSERT_EQ(1, x[0]);
+    ASSERT_EQ(4, x[1]);
+  }
+
+  // invalid array items error and leave the buffer untouched
+  {
+    string item_err = "*Illegal array item in buffer conversion: must be ints 0..255.\n";
+    buffer x = allocate_buffer(2);
+    mixed bad = 5;
+
+    x[0] = 7; x[1] = 8;
+    ASSERT_EQ(item_err, catch(x[0..1] = ({ 256, 0 })));
+    ASSERT_EQ(item_err, catch(x[0..1] = ({ -1, 0 })));
+    ASSERT_EQ(item_err, catch(x[0..1] = ({ 1, "a" })));
+    ASSERT_EQ(item_err, catch(x[0..1] = ({ 1, 2.5 })));
+    ASSERT(catch(x[0..1] = bad));
+    ASSERT_EQ(7, x[0]);
+    ASSERT_EQ(8, x[1]);
+    ASSERT_EQ(2, sizeof(x));
+  }
+
+  // Strings and int arrays PROMOTE to buffer: in declarations, plain
+  // assignment, += and + (compile-time to_buffer() promotion for typed
+  // variables; runtime conversion covers mixed)
+  {
+    string item_err = "*Illegal array item in buffer conversion: must be ints 0..255.\n";
+    buffer a = "AB";                    // declaration initializer
+    buffer c = ({ 1, 2, 255 });
+    buffer d;
+    mixed r;
+
+    ASSERT_EQ(2, sizeof(a));
+    ASSERT_EQ('A', a[0]);
+    ASSERT_EQ('B', a[1]);
+    ASSERT_EQ(3, sizeof(c));
+    ASSERT_EQ(255, c[2]);
+
+    d = "é";                            // assignment: raw UTF-8 bytes
+    ASSERT_EQ(2, sizeof(d));
+    ASSERT_EQ(0xC3, d[0]);
+    ASSERT_EQ(0xA9, d[1]);
+    d = ({ 7 });
+    ASSERT_EQ(1, sizeof(d));
+    ASSERT_EQ(7, d[0]);
+
+    d += "AB";                          // append via +=
+    ASSERT_EQ(3, sizeof(d));
+    ASSERT_EQ('A', d[1]);
+    d += ({ 9 });
+    ASSERT_EQ(4, sizeof(d));
+    ASSERT_EQ(9, d[3]);
+
+    r = d + "z";                        // append via +
+    ASSERT(bufferp(r));
+    ASSERT_EQ(5, sizeof(r));
+    ASSERT_EQ('z', r[4]);
+    r = d + ({ 0 });
+    ASSERT_EQ(5, sizeof(r));
+    ASSERT_EQ(0, r[4]);
+
+    // invalid items error through every form
+    ASSERT_EQ(item_err, catch(d = ({ 300 })));
+    ASSERT_EQ(item_err, catch(d += ({ -1 })));
+    ASSERT_EQ(item_err, catch(r = d + ({ 999 })));
+  }
+
+  // the to_buffer() efun does the same conversion explicitly
+  {
+    string item_err = "*Illegal array item in buffer conversion: must be ints 0..255.\n";
+    mixed bad_type = 3.5;
+    mixed r;
+
+    r = to_buffer("hi");
+    ASSERT(bufferp(r));
+    ASSERT_EQ(2, sizeof(r));
+    ASSERT_EQ('h', r[0]);
+    r = to_buffer(({ 200, 0 }));
+    ASSERT_EQ(200, r[0]);
+    ASSERT_EQ(0, r[1]);
+    r = to_buffer(to_buffer("x"));      // idempotent on buffers
+    ASSERT(bufferp(r));
+    ASSERT_EQ(1, sizeof(r));
+    ASSERT_EQ(item_err, catch(to_buffer(({ "x" }))));
+    ASSERT(catch(to_buffer(bad_type)));
+  }
+}

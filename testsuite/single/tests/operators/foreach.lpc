@@ -1,3 +1,9 @@
+void iter_buffer_two_vars() {
+  buffer b = allocate_buffer(2);
+  foreach(string k, int v in b) {
+  }
+}
+
 void do_tests() {
   int* x = ({1, 2, 3, 4});
   int* x_orig = ({1, 2, 3, 4});
@@ -97,6 +103,47 @@ void do_tests() {
       }
     }
     ASSERT_EQ(6, n);
+  }
+
+  // foreach over a buffer iterates its bytes as unsigned ints (0..255)
+  {
+    buffer b = allocate_buffer(4);
+    int *seen = ({});
+
+    b[0] = 0; b[1] = 1; b[2] = 200; b[3] = 255;
+    foreach(int v in b) {
+      seen += ({ v });
+    }
+    ASSERT_EQ(({ 0, 1, 200, 255 }), seen);
+  }
+
+  // empty buffer: zero iterations
+  {
+    int n = 0;
+    foreach(int v in allocate_buffer(0)) {
+      n++;
+    }
+    ASSERT_EQ(0, n);
+  }
+
+  // nested buffer foreach: cursors are per-loop
+  {
+    buffer b1 = allocate_buffer(2), b2 = allocate_buffer(2);
+    int n = 0;
+
+    b1[0] = 1; b1[1] = 2; b2[0] = 3; b2[1] = 4;
+    foreach(int bx in b1) {
+      foreach(int by in b2) {
+        n += bx * by;
+      }
+    }
+    ASSERT_EQ(21, n);
+  }
+
+  // two-variable foreach over a buffer is still an error (mapping expected)
+  {
+    string err = catch(iter_buffer_two_vars());
+    ASSERT_EQ(0, strsrch(err, "*Bad argument 2 to foreach"));
   }
 
   // Issue #1127: the iteration count used to be stored in a 16-bit field,

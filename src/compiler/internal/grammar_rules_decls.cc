@@ -21,6 +21,12 @@ struct parse_node_t* rule_block_or_semi(struct parse_node_t* block_node) {
   return block_node;
 }
 
+/* A string or array-of-ints initializer promotes to a buffer via
+ * to_buffer() in do_promotions() -- exempt from the type-mismatch check. */
+static bool buffer_promotable(int type, int exprtype) {
+  return type == TYPE_BUFFER && (exprtype == TYPE_STRING || (exprtype & TYPE_MOD_ARRAY));
+}
+
 void rule_def_global_var(LPC_INT type_val) {
   if (!(type_val & ~(DECL_MODS))) {
     /* A typeless declaration immediately after a class body is almost
@@ -93,7 +99,7 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
     type = (current_type | star_modifier) & ~DECL_MODS;
     if ((current_type & ~DECL_MODS) == TYPE_VOID)
       yyerror("Illegal to declare global variable of type void.");
-    if (!compatible_types(type, expr->type)) {
+    if (!compatible_types(type, expr->type) && !buffer_promotable(type, expr->type)) {
       char buff[256];
       char* end = EndOf(buff);
       char* p;
@@ -140,7 +146,7 @@ parse_node_t* rule_new_local_def_with_init(const ScratchString* name, LPC_INT ty
   }
 
   if (assign_op != F_ASSIGN) yyerror("Only '=' is allowed in initializers.");
-  if (!compatible_types(expr->type, type)) {
+  if (!compatible_types(expr->type, type) && !buffer_promotable(type, expr->type)) {
     char buff[256];
     char* end = EndOf(buff);
     char* p;
@@ -171,7 +177,7 @@ parse_node_t* rule_single_new_local_def_with_init(LPC_INT local_num, LPC_INT ass
   type &= ~LOCAL_MODS;
 
   if (assign_op != F_ASSIGN) yyerror("Only '=' is allowed in initializers.");
-  if (!compatible_types(expr->type, type)) {
+  if (!compatible_types(expr->type, type) && !buffer_promotable(type, expr->type)) {
     char buff[256];
     char* end = EndOf(buff);
     char* p;

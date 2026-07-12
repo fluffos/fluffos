@@ -928,14 +928,17 @@ void f_sub_eq() {
     }
 
     case T_LVALUE_BYTE | T_NUMBER: {
-      char c;
+      LPC_INT res = *argp->u.lvalue_byte - sp->u.number;
 
-      c = *global_lvalue_byte.u.lvalue_byte - sp->u.number;
-
-      if (global_lvalue_byte.subtype == 0 && c == '\0') {
+      if (res < 0 || res > 255) {
+        error("Buffer byte value out of range: must be 0..255.\n");
+      }
+      if (argp->subtype == 0 && res == 0) {
         error("Strings cannot contain 0 bytes.\n");
       }
-      *global_lvalue_byte.u.lvalue_byte = c;
+      *argp->u.lvalue_byte = static_cast<unsigned char>(res);
+      sp->u.number = res;
+      sp->subtype = 0;
       break;
     }
 
