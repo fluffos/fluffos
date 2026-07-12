@@ -360,6 +360,13 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char* buf, 
       switch (action) {
         case LM_MODE:
           /* Don't do anything with an ACK */
+          // A LINEMODE MODE/DO/WILL sub-option carries a second byte; guard it
+          // since only size >= 1 (buf[0]) is guaranteed above -- a client can
+          // send a 1-byte sub-negotiation and make buf[1] an out-of-bounds
+          // read (reflected back to the client in the DO/WILL cases).
+          if (size < 2) {
+            break;
+          }
           if (!(buf[1] & MODE_ACK)) {
             /* Accept only EDIT and TRAPSIG && force them too */
             const unsigned char sb_ack[] = {LM_MODE, MODE_EDIT | MODE_TRAPSIG | MODE_ACK};
@@ -374,12 +381,18 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char* buf, 
         }
         /* refuse FORWARDMASK */
         case TELNET_DO: {
+          if (size < 2) {
+            break;
+          }
           const unsigned char sb_wont[] = {WONT, static_cast<unsigned char>(buf[1])};
           telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
                                 reinterpret_cast<const char*>(sb_wont), sizeof(sb_wont));
           break;
         }
         case TELNET_WILL: {
+          if (size < 2) {
+            break;
+          }
           const unsigned char sb_dont[] = {DONT, static_cast<unsigned char>(buf[1])};
           telnet_subnegotiation(ip->telnet, TELNET_TELOPT_LINEMODE,
                                 reinterpret_cast<const char*>(sb_dont), sizeof(sb_dont));

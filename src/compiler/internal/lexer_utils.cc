@@ -1412,10 +1412,26 @@ lname_linked_buf_t* lnamebuf = nullptr;
 int lb_index = 4096;
 
 static char* alloc_local_name(const char* name) {
-  int len = strlen(name) + 1;
+  size_t len = strlen(name) + 1;
   char* res;
 
-  if (lb_index + len > 4096) {
+  // A name that cannot fit in a whole block gets its own exactly-sized
+  // allocation, then we force the next request to start a fresh normal block.
+  // Previously the code only ever allocated fixed 4096-byte blocks and copied
+  // `len` bytes in unconditionally, so a >4096-char local variable/parameter
+  // name (identifiers are only capped at YYLMAX ~64KB) overran the heap block.
+  if (len > sizeof(lnamebuf->block)) {
+    auto* new_buf = reinterpret_cast<lname_linked_buf_t*>(DMALLOC(
+        sizeof(lname_linked_buf_t) - sizeof(lnamebuf->block) + len, TAG_COMPILER,
+        "alloc_local_name"));
+    new_buf->next = lnamebuf;
+    lnamebuf = new_buf;
+    lb_index = sizeof(new_buf->block);  // next alloc must open a fresh block
+    memcpy(new_buf->block, name, len);
+    return new_buf->block;
+  }
+
+  if (lb_index + len > sizeof(lnamebuf->block)) {
     lname_linked_buf_t* new_buf;
     new_buf = reinterpret_cast<lname_linked_buf_t*>(
         DMALLOC(sizeof(lname_linked_buf_t), TAG_COMPILER, "alloc_local_name"));
@@ -1424,7 +1440,7 @@ static char* alloc_local_name(const char* name) {
     lb_index = 0;
   }
   res = &(lnamebuf->block[lb_index]);
-  strcpy(res, name);
+  memcpy(res, name, len);
   lb_index += len;
   return res;
 }

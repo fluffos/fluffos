@@ -10,6 +10,13 @@ void do_tests_real() {
 
   // valid tls
   ASSERT_EQ(0, sys_reload_tls(4));
+
+  // Regression: the index bound used sizeof(external_port) (the array's size in
+  // BYTES) instead of its element count (5), letting indices in the gap slip
+  // through to an out-of-bounds read and a wild tls_server_close()/->ssl write.
+  // Index 8 lands in that old gap; it and a negative index must error cleanly.
+  ASSERT_NE(0, catch(sys_reload_tls(8)));
+  ASSERT_NE(0, catch(sys_reload_tls(-1)));
 }
 void after_boot() {
   mixed err;

@@ -176,7 +176,10 @@ void f_round() { sp->u.real = round(sp->u.real); }
    of speed, norm() has less cases.
 */
 static LPC_FLOAT norm(array_t* a) {
-  LPC_INT len = sp->u.arr->size;
+  // Length must come from the array we actually index (a), not sp->u.arr:
+  // f_angle() calls norm((sp-1)->u.arr), a different array, so using sp's size
+  // would read past `a` if the two ever differed in length.
+  LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
 
   while (len-- > 0) {
