@@ -26,10 +26,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  # Common build configuration
-  CMAKE_BUILD_TYPE: Release
-  CMAKE_COMMON_FLAGS: -DCMAKE_BUILD_TYPE=Release -DMARCH_NATIVE=OFF
-  CTEST_OUTPUT_ON_FAILURE: 1
+  # Per-platform build configuration lives in the composite actions under
+  # .github/actions/, shared with the CI workflow.
 
 permissions:
   contents: write
@@ -174,30 +172,17 @@ jobs:
             core.setOutput('id', release.data.id);
             return release.data.id;
 
-  build-binaries:
-    name: Build ${{ matrix.platform }} Binary
+  # Windows binary. The build+test is the same build-windows composite the
+  # CI `windows` job runs; this job adds packaging + release upload.
+  build-windows:
+    name: Build Windows Binary
     needs: create-release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows
-            os: windows-latest
-            shell: msys2 {0}
-            asset_suffix: windows-x86_64.zip
-            asset_type: application/zip
-          - platform: linux
-            os: ubuntu-latest
-            shell: bash
-            asset_suffix: linux-x86_64-static.tar.gz
-            asset_type: application/gzip
+    runs-on: windows-latest
     defaults:
       run:
-        shell: ${{ matrix.shell }}
+        shell: msys2 {0}
     steps:
-      - name: Setup MSYS2 (Windows)
-        if: matrix.platform == 'windows'
+      - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
           update: true
@@ -206,76 +191,48 @@ jobs:
         with:
           ref: ${{ needs.create-release.outputs.version }}
 
-      - name: Install Dependencies (Windows)
-        if: matrix.platform == 'windows'
+      - name: Build & test
+        uses: ./.github/actions/build-windows
+        with:
+          build-type: Release
+          db-sqlite: '1'
+          extra-packages: zip   # for packaging the release archive below
+
+      - name: Package
         run: |
-          pacman --noconfirm -S --needed \
-            mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib \
-            mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
-            mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
-            bison make zip
-
-      - name: Build (Windows)
-        if: matrix.platform == 'windows'
-        run: |
-          mkdir build && cd build
-          cmake -G "MSYS Makefiles" \
-            ${{ env.CMAKE_COMMON_FLAGS }} \
-            -DPACKAGE_CRYPTO=OFF \
-            -DPACKAGE_DB_MYSQL="" \
-            -DPACKAGE_DB_SQLITE=1 \
-            ..
-          VERBOSE=1 make -j 2 install
-
-      - name: Build (Linux)
-        if: matrix.platform == 'linux'
-        run: |
-          docker run --rm -v $PWD:/workspace -w /workspace alpine:3.18 /bin/sh -c '
-            set -e
-
-            # Install dependencies
-            apk add --no-progress --no-cache \
-              linux-headers gcc g++ clang-dev make cmake bash \
-              mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
-              openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-              pcre-dev bison git musl-dev libelf-static elfutils-dev \
-              zstd-static bzip2-static xz-static tar
-
-            # Build jemalloc
-            cd /tmp
-            wget -q -O - https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2 | tar -xj
-            cd jemalloc-5.3.0
-            ./configure --prefix=/usr && make -j$(nproc) && make install
-
-            # Build FluffOS
-            cd /workspace
-            mkdir -p build && cd build
-            cmake .. ${{ env.CMAKE_COMMON_FLAGS }} -DSTATIC=ON
-            make -j$(nproc) install
-
-            # Run tests
-            make test || true
-
-            # Verify static linking
-            ldd bin/driver || echo "✓ Binary is statically linked"
-          '
-
-      - name: Run Tests (Windows)
-        if: matrix.platform == 'windows'
-        env:
-          CTEST_OUTPUT_ON_FAILURE: 1
-        run: cd build && make test
-
-      - name: Package (Windows)
-        if: matrix.platform == 'windows'
-        run: |
-          ASSET_NAME="fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}"
+          ASSET_NAME="fluffos-${{ needs.create-release.outputs.version }}-windows-x86_64.zip"
           cd build/bin && zip -r "../../${ASSET_NAME}" .
 
-      - name: Package (Linux)
-        if: matrix.platform == 'linux'
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./fluffos-${{ needs.create-release.outputs.version }}-windows-x86_64.zip
+          asset_name: fluffos-${{ needs.create-release.outputs.version }}-windows-x86_64.zip
+          asset_content_type: application/zip
+
+  # Linux static binary. The build+test is the same build-alpine-static
+  # composite the CI `alpine-static` job runs; this job adds packaging +
+  # release upload.
+  build-linux:
+    name: Build Linux Binary
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.version }}
+
+      - name: Build & test
+        uses: ./.github/actions/build-alpine-static
+        with:
+          build-type: Release
+
+      - name: Package
         run: |
-          ASSET_NAME="fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}"
+          ASSET_NAME="fluffos-${{ needs.create-release.outputs.version }}-linux-x86_64-static.tar.gz"
           cd build/bin && tar czf "../../${ASSET_NAME}" .
 
       - name: Upload Release Asset
@@ -284,9 +241,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}
-          asset_name: fluffos-${{ needs.create-release.outputs.version }}-${{ matrix.asset_suffix }}
-          asset_content_type: ${{ matrix.asset_type }}
+          asset_path: ./fluffos-${{ needs.create-release.outputs.version }}-linux-x86_64-static.tar.gz
+          asset_name: fluffos-${{ needs.create-release.outputs.version }}-linux-x86_64-static.tar.gz
+          asset_content_type: application/gzip
 
   # WebAssembly driver: cross-compile with the latest emsdk, gate on the
   # LPC testsuite running inside the wasm driver under node, then ship
@@ -296,54 +253,15 @@ jobs:
     name: Build WASM Binary
     needs: create-release
     runs-on: ubuntu-24.04
-    env:
-      # Upstream dep pins, mirrored from the CI wasm job; the resolved
-      # emsdk version feeds the cache key.
-      ICU_VER: 74-2
-      WASM_DEPS_PREFIX: /opt/wasm-deps
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.create-release.outputs.version }}
 
-      - name: Setup Emscripten
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: latest
-          actions-cache-folder: emsdk-cache
-
-      - name: Resolve emscripten version
-        id: emver
-        run: echo "version=$(emcc -dumpversion)" >> "$GITHUB_OUTPUT"
-
-      - name: Install native dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential bison flex libssl-dev libicu-dev zip
-
-      - name: Prepare wasm deps prefix
-        run: |
-          sudo mkdir -p "$WASM_DEPS_PREFIX"
-          sudo chown "$USER" "$WASM_DEPS_PREFIX"
-
-      - name: Cache wasm dependencies (ICU)
-        id: wasm-deps
-        uses: actions/cache@v4
-        with:
-          path: /opt/wasm-deps
-          key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ env.ICU_VER }}-v3
-
-      - name: Build wasm dependencies
-        if: steps.wasm-deps.outputs.cache-hit != 'true'
-        run: |
-          WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="$ICU_VER" \
-            tools/wasm/build-deps.sh
-
-      - name: Build driver (native tools + wasm)
-        run: tools/wasm/build.sh
-
-      - name: Run LPC testsuite in the wasm driver
-        run: node tools/wasm/run-testsuite.js
+      # Same build-wasm composite the CI `wasm` job runs; this job adds
+      # packaging + release upload.
+      - name: Build & test
+        uses: ./.github/actions/build-wasm
 
       - name: Package
         run: |
@@ -429,7 +347,7 @@ jobs:
 
   finalize-release:
     name: Finalize Release
-    needs: [create-release, build-binaries, build-wasm, build-docker]
+    needs: [create-release, build-windows, build-linux, build-wasm, build-docker]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

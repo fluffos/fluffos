@@ -1,0 +1,66 @@
+name: Build WASM driver
+description: >-
+  Cross-compile the FluffOS driver to WebAssembly with the latest emsdk and
+  run the full LPC testsuite inside the wasm driver under node. Shared by the
+  CI `wasm` job and the release `build-wasm` job so the two can't drift.
+  Leaves the built driver in build-wasm/src/ for the caller to package.
+
+inputs:
+  icu-ver:
+    description: ICU release version cross-built for wasm (feeds the deps cache key).
+    default: '74-2'
+  deps-prefix:
+    description: Install prefix for the wasm-cross-built dependencies (ICU).
+    default: /opt/wasm-deps
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: latest
+        actions-cache-folder: emsdk-cache
+
+    - name: Resolve emscripten version
+      id: emver
+      shell: bash
+      run: echo "version=$(emcc -dumpversion)" >> "$GITHUB_OUTPUT"
+
+    - name: Install native dependencies
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential bison flex libssl-dev libicu-dev zip
+
+    # The deps prefix must exist and be runner-writable BEFORE the cache
+    # step: on a cache hit, actions/cache restores into it directly.
+    - name: Prepare wasm deps prefix
+      shell: bash
+      run: |
+        sudo mkdir -p "${{ inputs.deps-prefix }}"
+        sudo chown "$USER" "${{ inputs.deps-prefix }}"
+
+    # ICU cross-built for wasm32; ~10 minutes on a miss, so cache on the
+    # resolved emsdk + upstream versions (bump the -vN suffix to invalidate).
+    - name: Cache wasm dependencies (ICU)
+      id: wasm-deps
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.deps-prefix }}
+        key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ inputs.icu-ver }}-v3
+
+    - name: Build wasm dependencies
+      if: steps.wasm-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="${{ inputs.icu-ver }}" \
+          tools/wasm/build-deps.sh
+
+    - name: Build driver (native tools + wasm)
+      shell: bash
+      run: tools/wasm/build.sh
+
+    - name: Run LPC testsuite in the wasm driver
+      shell: bash
+      run: node tools/wasm/run-testsuite.js
