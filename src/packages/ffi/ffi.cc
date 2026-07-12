@@ -632,11 +632,14 @@ void f_ffi_address() {
 #ifdef F_FFI_READ
 void f_ffi_read() {
   int code = sp->u.number;
-  int offset = (sp - 1)->u.number;
+  LPC_INT offset = (sp - 1)->u.number;
   buffer_t* buf = (sp - 2)->u.buf;
   int sz = type_size(code);
-  if (offset < 0 || offset + sz > static_cast<int>(buf->size)) {
-    error("ffi_read: offset %d (size %d) out of range for buffer of %u.\n", offset, sz, buf->size);
+  // Range-check in a non-truncating, non-overflowing form: a huge offset must
+  // not truncate to int or wrap past the check into an out-of-bounds memcpy.
+  if (offset < 0 || static_cast<size_t>(offset) + static_cast<size_t>(sz) > buf->size) {
+    error("ffi_read: offset %" LPC_INT_FMTSTR_P " (size %d) out of range for buffer of %u.\n",
+          offset, sz, buf->size);
   }
   void* at = &buf->item[offset];
   FfiArgSlot tmp;
@@ -686,11 +689,12 @@ void f_ffi_read() {
 void f_ffi_write() {
   svalue_t* val = sp;
   int code = (sp - 1)->u.number;
-  int offset = (sp - 2)->u.number;
+  LPC_INT offset = (sp - 2)->u.number;
   buffer_t* buf = (sp - 3)->u.buf;
   int sz = type_size(code);
-  if (offset < 0 || offset + sz > static_cast<int>(buf->size)) {
-    error("ffi_write: offset %d (size %d) out of range for buffer of %u.\n", offset, sz, buf->size);
+  if (offset < 0 || static_cast<size_t>(offset) + static_cast<size_t>(sz) > buf->size) {
+    error("ffi_write: offset %" LPC_INT_FMTSTR_P " (size %d) out of range for buffer of %u.\n",
+          offset, sz, buf->size);
   }
   FfiArgSlot tmp;
   lpc_to_slot(code, val, &tmp);

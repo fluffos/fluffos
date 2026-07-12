@@ -374,6 +374,16 @@ void get_user_data(interactive_t* ip) {
   /* read the data from the socket */
   debug(connections, "get_user_data: read on fd %d\n", ip->fd);
 
+  // Never read more than buf holds. A malicious PORT_TYPE_MUD length prefix
+  // can make text_space negative, which would convert to a huge size_t and
+  // overflow buf; clamp to [0, sizeof(buf)] here regardless of protocol.
+  if (text_space < 0) {
+    text_space = 0;
+  }
+  if (text_space > static_cast<int>(sizeof(buf))) {
+    text_space = sizeof(buf);
+  }
+
   num_bytes = bufferevent_read(ip->ev_buffer, buf, text_space);
 
   if (num_bytes == -1) {
@@ -410,7 +420,10 @@ void get_user_data(interactive_t* ip) {
       if (num_bytes == text_space) {
         if (ip->text_end == 4) {
           *reinterpret_cast<volatile int*>(ip->text) = ntohl(*reinterpret_cast<int*>(ip->text));
-          if (*reinterpret_cast<volatile int*>(ip->text) > MAX_TEXT - 5) {
+          int const msg_len = *reinterpret_cast<volatile int*>(ip->text);
+          // Reject non-positive (a negative prefix would drive a negative
+          // text_space) and oversized message lengths.
+          if (msg_len <= 0 || msg_len > MAX_TEXT - 5) {
             remove_interactive(ip->ob, 0);
           }
         } else {

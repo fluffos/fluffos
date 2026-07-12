@@ -47,6 +47,9 @@ void f_translate() {
    * get arguments from stack.
    */
   matrix = (sp - 3)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
@@ -92,6 +95,9 @@ void f_scale() {
    * get arguments from stack.
    */
   matrix = (sp - 3)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
@@ -130,6 +136,9 @@ void f_rotate_x() {
    * get arguments from stack.
    */
   matrix = (sp - 1)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   angle = (sp--)->u.real;
   /*
    * convert vec matrix to float matrix.
@@ -165,6 +174,9 @@ void f_rotate_y() {
    * get arguments from stack.
    */
   matrix = (sp - 1)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   angle = (sp--)->u.real;
   /*
    * convert vec matrix to float matrix.
@@ -200,6 +212,9 @@ void f_rotate_z() {
    * get arguments from stack.
    */
   matrix = (sp - 1)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   angle = (sp--)->u.real;
   /*
    * convert vec matrix to float matrix.
@@ -240,6 +255,9 @@ void f_lookat_rotate() {
    * get arguments from stack.
    */
   matrix = (sp - 3)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
@@ -279,6 +297,9 @@ void f_lookat_rotate2(void) {
    * get arguments from stack.
    */
   matrix = (sp - 6)->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
   ex = (sp - 5)->u.real;
   ey = (sp - 4)->u.real;
   ez = (sp - 3)->u.real;

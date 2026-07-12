@@ -435,11 +435,13 @@ static int user_parser(char* buff) {
          it moved somewhere or dested itself */
       if (s == command_giver->sent) {
         char buf[256];
+        // s->verb is an arbitrary-length shared string; bound the format so a
+        // long verb cannot overflow buf (the result is only shown via error).
         if (s->flags & V_FUNCTION) {
-          sprintf(buf, "Verb '%s' bound to uncallable function pointer.\n", s->verb);
+          snprintf(buf, sizeof(buf), "Verb '%s' bound to uncallable function pointer.\n", s->verb);
           error("%s", buf);
         } else {
-          sprintf(buf, "Function for verb '%s' not found.\n", s->verb);
+          snprintf(buf, sizeof(buf), "Function for verb '%s' not found.\n", s->verb);
           error("%s", buf);
         }
       }

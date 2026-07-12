@@ -121,11 +121,19 @@ LPC_INT rule_param_decl_untyped_name(const ScratchString* name) {
 }
 
 void rule_argument_varargs(argument_t* result, argument_t* arg_list) {
-  int x = type_of_locals_ptr[max_num_locals - 1];
-  int lt = x & ~LOCAL_MODS;
-
   *result = *arg_list;
   result->flags |= ARG_IS_VARARGS;
+
+  // '...' needs a preceding named parameter to hold the remaining args; with
+  // none (e.g. `foo(void ...)`) max_num_locals is 0 and the type lookup below
+  // would read type_of_locals_ptr[-1].
+  if (max_num_locals <= 0) {
+    yyerror("'...' requires a preceding parameter to hold the remaining arguments.");
+    return;
+  }
+
+  int x = type_of_locals_ptr[max_num_locals - 1];
+  int lt = x & ~LOCAL_MODS;
 
   if (x & LOCAL_MOD_REF) {
     yyerror("Variable to hold remainder of args may not be a reference");

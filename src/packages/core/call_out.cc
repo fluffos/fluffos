@@ -606,12 +606,27 @@ inline void int_call_out(bool walltime) {
 
   LPC_INT delay_msecs = 0;
   switch (arg[1].type) {
-    case T_NUMBER:
-      delay_msecs = arg[1].u.number * 1000;
+    case T_NUMBER: {
+      // seconds * 1000 can overflow int64 (UB / UBSan abort); saturate.
+      LPC_INT secs = arg[1].u.number;
+      if (secs > INT64_MAX / 1000) {
+        delay_msecs = INT64_MAX;
+      } else {
+        delay_msecs = secs * 1000;
+      }
       break;
-    case T_REAL:
-      delay_msecs = floor(arg[1].u.real * 1000.0);
+    }
+    case T_REAL: {
+      double ms = floor(arg[1].u.real * 1000.0);
+      if (ms >= (double)INT64_MAX) {
+        delay_msecs = INT64_MAX;
+      } else if (ms <= 0.0) {
+        delay_msecs = 0;
+      } else {
+        delay_msecs = (LPC_INT)ms;
+      }
       break;
+    }
   }
   if (delay_msecs < 0) {
     delay_msecs = 0;
