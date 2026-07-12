@@ -13,6 +13,10 @@ on:
     # when master has no new commits since the latest release tag
     # (see the check-changes job).
     - cron: '0 9 1 * *'
+  push:
+    # Pushing a version tag also cuts a release for that tag.
+    tags:
+      - 'v*'
 
 env:
   REGISTRY: ghcr.io
@@ -42,9 +46,10 @@ jobs:
         run: |
           git fetch --tags
 
-          # Manual dispatch always releases
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual dispatch: releasing"
+          # Manual dispatch and tag pushes always release; only the
+          # monthly schedule is gated on changes
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "${{ github.event_name }} event: releasing"
             echo "should_release=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -83,6 +88,13 @@ jobs:
       - name: Generate Version
         id: generate
         run: |
+          # A pushed tag IS the version
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Using pushed tag: ${GITHUB_REF_NAME}"
+            echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           # Get current date in YYYY.MMDD format
           DATE_VERSION=$(date -u '+%Y.%m%d')
 
@@ -121,6 +133,8 @@ jobs:
           fetch-depth: 0
 
       - name: Create Git Tag
+        # A pushed tag already exists; only scheduled/dispatched runs tag
+        if: github.event_name != 'push'
         run: |
           VERSION="${{ needs.generate-version.outputs.version }}"
           git config user.name "github-actions[bot]"
