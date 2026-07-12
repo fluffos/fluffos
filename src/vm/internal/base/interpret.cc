@@ -589,6 +589,26 @@ static struct {
 } global_lvalue_codepoint;
 static svalue_t global_lvalue_codepoint_sv = {T_LVALUE_CODEPOINT};
 
+/* Aim the shared string-char lvalue (global_lvalue_codepoint /
+ * global_lvalue_codepoint_sv) at EGC #ind of *owner, a T_STRING svalue.
+ * The character must be indexable as a single codepoint -- the same rule
+ * as s[i] -- or this errors cleanly. Every consumer of the lvalue (=, ++,
+ * --, +=, -=) then writes through assign_lvalue_codepoint(), so string
+ * index lvalues and foreach ref loop variables share one arming and one
+ * assignment path. */
+static void aim_lvalue_codepoint(svalue_t* owner, int32_t ind) {
+  UChar32 c = u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner), ind);
+  if (c == -2 || c == 0) {
+    error("Index out of bounds in string index lvalue.\n");
+  } else if (c < 0) {
+    error("Indexed character is multi-codepoint.\n");
+  }
+  global_lvalue_codepoint.index = ind;
+  global_lvalue_codepoint.owner = owner;
+  global_lvalue_codepoint.iter =
+      std::make_unique<EGCSmartIterator>(owner->u.string, SVALUE_STRLEN(owner));
+}
+
 /*
  * Compute the address of an array element.
  */
@@ -628,19 +648,11 @@ void push_indexed_lvalue(int reverse) {
         } else {
           if (ind < 0) error("Index out of bounds in string index lvalue.\n");
         }
-        UChar32 c = u8_egc_index_as_single_codepoint(lv->u.string, SVALUE_STRLEN(lv), ind);
-        if (c == -2 || c == 0) {
-          error("Index out of bounds in string index lvalue.\n");
-        } else if (c < 0) {
-          error("Indexed character is multi-codepoint.\n");
-        }
+        /* unlink first so the armed iterator sees the final (unshared) string */
         unlink_string_svalue(lv);
+        aim_lvalue_codepoint(lv, ind);
         sp->type = T_LVALUE;
         sp->u.lvalue = &global_lvalue_codepoint_sv;
-        global_lvalue_codepoint.index = ind;
-        global_lvalue_codepoint.owner = lv;
-        global_lvalue_codepoint.iter =
-            std::make_unique<EGCSmartIterator>(lv->u.string, SVALUE_STRLEN(lv));
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
         lv_owner_str = lv->u.string;
@@ -2898,16 +2910,16 @@ void eval_instruction(char* p) {
           if (c != 0 && c != -2) {
             if (sp->type == T_REF) {
               /* Aim the shared codepoint lvalue at THIS loop's current
-               * character. Re-arm it every iteration: any string foreach or
+               * character -- the same arming/validation as an s[i] lvalue,
+               * so a character that cannot be indexed as a single codepoint
+               * (e.g. a flag emoji) errors cleanly instead of reading as
+               * garbage. Re-arm it every iteration: any string foreach or
                * string index lvalue in the loop body retargets the shared
                * state. Reads/writes through the ref hit the loop's own
                * (stack) copy of the string, so writes never reach the
                * variable that was iterated -- pinned by
                * tests/operators/foreach.lpc. */
-              global_lvalue_codepoint.index = idx;
-              global_lvalue_codepoint.owner = owner;
-              global_lvalue_codepoint.iter =
-                  std::make_unique<EGCSmartIterator>(owner->u.string, SVALUE_STRLEN(owner));
+              aim_lvalue_codepoint(owner, idx);
               sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
             } else {
               free_svalue(sp->u.lvalue, "foreach-string");
