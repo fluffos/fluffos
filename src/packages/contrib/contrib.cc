@@ -1998,10 +1998,15 @@ void f_repeat_string() {
   if (repeat > 0) {
     str = sp->u.string;
     len = SVALUE_STRLEN(sp);
-    if ((newlen = len * repeat) > max_string_length) {
+    // Clamp repeat BEFORE multiplying: len * repeat in int can overflow and
+    // wrap to a small/zero newlen, driving an undersized allocation and a
+    // massive heap overflow in the copy loop. Also avoids div-by-zero on len==0.
+    if (len == 0) {
+      repeat = 0;
+    } else if (repeat > max_string_length / len) {
       repeat = max_string_length / len;
-      newlen = len * repeat;
     }
+    newlen = len * repeat;
   }
   if (repeat <= 0) {
     free_string_svalue(sp);

@@ -2069,9 +2069,19 @@ void f_replace_string() {
     if (plen > 1) {
       while (src < flimit) {
         if ((skip = skip_table[static_cast<unsigned char>(src[probe])])) {
+          // This fast-path copy is not covered by the dlen-based guards below;
+          // bound it against the output buffer and count it in dlen so a later
+          // match's expansion guard sees the true written length.
+          if (dst2 + skip > dst1 + max_string_length) {
+            pop_n_elems(st_num_arg);
+            push_svalue(&const0u);
+            FREE_MSTR(dst1);
+            return;
+          }
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
             ;
           }
+          dlen += skip;
 
         } else if (memcmp(src, pattern, plen) == 0) {
           cur++;

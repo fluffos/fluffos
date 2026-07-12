@@ -242,7 +242,12 @@ array_t* get_dir(const char* path, int flags) {
   rewinddir(dirp);
   endtemp = temppath + strlen(temppath);
 
-  strcat(endtemp++, "/");
+  // Append '/' only if it fits (leaving room for the terminator); the
+  // directory path can be up to MAX_FNAME_SIZE+MAX_PATH_LEN long.
+  if ((size_t)(endtemp - temppath) + 2 <= sizeof(temppath)) {
+    *endtemp++ = '/';
+    *endtemp = '\0';
+  }
 
   for (i = 0, de = readdir(dirp); i < count; de = readdir(dirp)) {
     namelen = strlen(de->d_name);
@@ -258,8 +263,14 @@ array_t* get_dir(const char* path, int flags) {
        * We'll have to .... sigh.... stat() the file to get some add'tl
        * info.
        */
-      strcpy(endtemp, de->d_name);
-      stat(temppath, &st); /* We assume it works. */
+      size_t const avail = sizeof(temppath) - (size_t)(endtemp - temppath);
+      if (namelen < avail) {
+        memcpy(endtemp, de->d_name, namelen + 1);
+        stat(temppath, &st); /* We assume it works. */
+      } else {
+        // Combined path too long to form; can't stat it, report zeroed info.
+        memset(&st, 0, sizeof(st));
+      }
     }
     encode_stat(&v->item[i], flags, de->d_name, &st);
     i++;
