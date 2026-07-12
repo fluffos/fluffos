@@ -314,6 +314,14 @@ cd testsuite
 > [!NOTE]
 > **Test Suite Contributions**: The LPC test cases are located in the `testsuite/` directory. When adding new package efuns or editing existing driver features, contributors should add relevant LPC test files under `testsuite/single/tests/efuns/` (or `testsuite/single/tests/` generally) to ensure the changes are continuously verified by the CI workflows.
 
+### Memory-Safety Work
+
+The driver processes untrusted input (mudlib code, network bytes, save files), so memory-safety review matters. For any change touching C strings, buffers, arrays, offsets, or reference counts:
+
+* Build **both** a Debug + sanitizer tree (`-DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON`) and a `RelWithDebInfo` tree, and run the LPC suite 2–3× in each (it randomizes file order) — some defects are release-only, some only trip ASan/UBSan, and the Debug build's per-file ref-count checker (`Bad ref count …`) is a hard gate.
+* Add a regression test that demonstrably fails on the *unfixed* binary.
+* **[AGENTS.md](AGENTS.md) §13 is the memory-safety audit checklist** (the recurring bug classes — unbounded copies, integer overflow before alloc, `INT_MIN / -1`, unbounded recursion on nested data, tainted format strings, `error()`-path leaks, off-graph/cross-thread refs); §3 and §4 cover reference counting, the debug ref-count checker, and stack-unwinding safety in detail.
+
 ---
 
 ## Directory Structure & Core Components
