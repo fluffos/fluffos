@@ -1886,7 +1886,13 @@ void rule_expr_div(struct parse_node_t** result, struct parse_node_t* expr1,
           break;
         }
         *result = expr1;
-        expr1->v.number /= expr2->v.number;
+        if (expr2->v.number == -1) {
+          // x / -1 == -x; computed directly it traps (SIGFPE) for INT_MIN.
+          // Two's-complement negate for the well-defined wrapped result.
+          expr1->v.number = (LPC_INT)(0ULL - (uint64_t)expr1->v.number);
+        } else {
+          expr1->v.number /= expr2->v.number;
+        }
         break;
       }
       if (expr2->kind == NODE_REAL) {
