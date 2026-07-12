@@ -6,6 +6,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 
@@ -76,13 +77,19 @@ struct Work {
 std::deque<struct Work*> reqs;
 std::mutex reqs_lock;
 
-// The request a worker thread is CURRENTLY processing: popped from reqs
-// but not yet moved to finished_reqs. Guarded by reqs_lock so
-// async_mark_request() (main thread, via check_memory) can account for
-// its callback funptr during that window -- otherwise a DEBUGMALLOC
-// sweep that lands mid-processing false-flags the ref (Windows Debug
-// hit this on async_read.lpc).
-struct Work* current_work = nullptr;
+// Works a worker thread is CURRENTLY processing: popped from reqs but not yet
+// moved to finished_reqs. Guarded by reqs_lock so async_mark_request() (main
+// thread, via check_memory) can account for their callback funptr /
+// command_giver during that window -- otherwise a DEBUGMALLOC sweep that lands
+// mid-processing false-flags the ref (Windows Debug hit this on async_read.lpc).
+//
+// This is a SET, not a single pointer: do_stuff() spawns a fresh worker thread
+// whenever reqs is momentarily empty, which happens while an earlier worker is
+// still inside a slow w->func() (it has already popped its request). So two or
+// more workers can run at once; a single `current_work` pointer only tracked
+// the last one and left the others' refs unaccounted -> flaky "Bad ref count"
+// (gcc Debug hit this via the async_* tests firing in quick succession).
+std::set<struct Work*> current_works;
 
 std::deque<struct Request*> finished_reqs;
 std::mutex finished_reqs_lock;
@@ -97,12 +104,11 @@ void thread_func() {
     {
       std::lock_guard<std::mutex> const lock(reqs_lock);
       if (reqs.empty()) {
-        current_work = nullptr;
         return;
       }
       w = reqs.front();
       reqs.pop_front();
-      current_work = w;  // in-flight: keep it accountable while we process
+      current_works.insert(w);  // in-flight: keep it accountable while we process
     }
 
     if (w) {
@@ -118,12 +124,12 @@ void thread_func() {
         // order) so the funptr is marked exactly once across the move.
         std::lock_guard<std::mutex> const rlock(reqs_lock);
         std::lock_guard<std::mutex> const flock(finished_reqs_lock);
-        current_work = nullptr;
+        current_works.erase(w);
         finished_reqs.push_back(w->data);
         delete w;
       } else {
         std::lock_guard<std::mutex> const lock(reqs_lock);
-        current_work = nullptr;
+        current_works.erase(w);
         reqs.push_back(w);
       }
 
@@ -273,7 +279,11 @@ void* getdirthread(struct Request* req) {
   int i = 0;
   for (auto* de = readdir(dirp); de; de = readdir(dirp)) {
     if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
-    req->data.resize(req->data.size() + sizeof(dirent*));
+    // The buffer is used as an array of `struct dirent`, indexed by i, so it
+    // must grow by sizeof(dirent) per entry -- growing by sizeof(dirent*) (a
+    // pointer, ~8 bytes) undersized it and memcpy of the ~280-byte dirent
+    // overflowed the heap once a directory held enough entries.
+    req->data.resize(static_cast<size_t>(i + 1) * sizeof(struct dirent));
     memcpy(&((dirent*)(req->data.data()))[i], de, sizeof(*de));
     i++;
   }
@@ -306,6 +316,10 @@ int add_read(const char* fname, function_to_call_t* fun) {
     req->path = std::string(fname);
     return aio_gzread(req);
   }
+  // Denied path: no request will ever be created to free the callback the
+  // efun already ref-bumped and handed us, so release it before unwinding.
+  free_funp(fun->f.fp);
+  delete fun;
   error("permission denied\n");
 
   return 1;
@@ -325,6 +339,9 @@ int add_getdir(const char* fname, function_to_call_t* fun) {
     req->path = fname;
     return aio_getdir(req);
   }
+  // Denied path: free the callback the efun already ref-bumped and handed us.
+  free_funp(fun->f.fp);
+  delete fun;
   error("permission denied\n");
 
   return 1;
@@ -333,6 +350,9 @@ int add_getdir(const char* fname, function_to_call_t* fun) {
 
 int add_write(const char* fname, const char* buf, int size, char flags, function_to_call_t* fun) {
   if (!fname) {
+    // Denied path: free the callback the efun already ref-bumped and handed us.
+    free_funp(fun->f.fp);
+    delete fun;
     error("permission denied\n");
   }
 
@@ -589,14 +609,15 @@ void async_mark_request() {
     }
   }
 
-  // The request a worker is mid-processing (popped from reqs, not yet in
-  // finished_reqs); guarded by reqs_lock, held above.
-  if (current_work != nullptr) {
-    if (current_work->data->fun != nullptr) {
-      current_work->data->fun->f.fp->hdr.extra_ref++;
+  // Requests a worker is mid-processing (popped from reqs, not yet in
+  // finished_reqs); guarded by reqs_lock, held above. There may be several
+  // concurrent workers, so mark every in-flight work, not just one.
+  for (auto* work : current_works) {
+    if (work->data->fun != nullptr) {
+      work->data->fun->f.fp->hdr.extra_ref++;
     }
-    if (current_work->data->command_giver != nullptr) {
-      current_work->data->command_giver->extra_ref++;
+    if (work->data->command_giver != nullptr) {
+      work->data->command_giver->extra_ref++;
     }
   }
 
