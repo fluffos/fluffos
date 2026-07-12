@@ -14,9 +14,14 @@ on:
     # (see the check-changes job).
     - cron: '0 9 1 * *'
   push:
-    # Pushing a version tag also cuts a release for that tag.
+    # Pushing a version tag also cuts a release for that tag; pushing a
+    # release/vX branch cuts a release named vX (the workflow creates the
+    # tag and deletes the trigger branch) -- useful for tooling that can
+    # push refs but lacks the actions:write scope to dispatch workflows.
     tags:
       - 'v*'
+    branches:
+      - 'release/v*'
 
 env:
   REGISTRY: ghcr.io
@@ -88,10 +93,11 @@ jobs:
       - name: Generate Version
         id: generate
         run: |
-          # A pushed tag IS the version
+          # A pushed tag (or release/vX trigger branch) IS the version
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "Using pushed tag: ${GITHUB_REF_NAME}"
-            echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            VERSION="${GITHUB_REF_NAME#release/}"
+            echo "Using pushed ref version: ${VERSION}"
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -133,14 +139,21 @@ jobs:
           fetch-depth: 0
 
       - name: Create Git Tag
-        # A pushed tag already exists; only scheduled/dispatched runs tag
-        if: github.event_name != 'push'
+        # A pushed tag already exists; every other trigger tags HEAD here
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           VERSION="${{ needs.generate-version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "$VERSION" -m "Release $VERSION"
           git push origin "$VERSION"
+
+          # A release/vX trigger branch has done its job once the tag exists
+          case "${GITHUB_REF}" in
+            refs/heads/release/*)
+              git push origin --delete "${GITHUB_REF_NAME}" || true
+              ;;
+          esac
 
       - name: Create Release
         id: create_release
