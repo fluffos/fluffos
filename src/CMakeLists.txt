@@ -277,6 +277,16 @@ find_package(ICU REQUIRED COMPONENTS uc dt)
 add_compile_options("-DU_CHARSET_IS_UTF8=1")
 if(STATIC)
   add_compile_options("-DU_STATIC_IMPLEMENTATION")
+  # On a fully static Linux build, ICU's data blob (libicudata) is not
+  # embedded by default, so table-based charset converters (GBK/Big5/...)
+  # fail at runtime with U_FILE_ACCESS_ERROR. init_static_icu_data() in
+  # mainlib.cc registers the statically-linked data and forces it into the
+  # binary. Windows/MinGW static already resolves ICU data on its own;
+  # EMSCRIPTEN sets STATIC OFF and ships trimmed data; Apple static is
+  # unsupported -- so this only applies to the musl/glibc static Linux build.
+  if(NOT WIN32)
+    add_compile_options("-DFLUFFOS_EMBED_ICU_DATA")
+  endif()
 ENDIF()
 
 # multiple packages uses this, so we simply do a global inclusion too.
