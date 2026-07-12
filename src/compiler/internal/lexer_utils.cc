@@ -1407,7 +1407,18 @@ typedef struct lname_linked_buf_s {
   char block[4096];
 } lname_linked_buf_t;
 
+// A name that cannot fit in a whole block (identifiers are only capped at
+// YYLMAX ~64KB) gets its own allocation here instead of being overlaid onto
+// lname_linked_buf_t::block -- that struct's block is a fixed 4096-byte
+// array, so writing more than 4096 bytes into it is a real overrun even
+// when the backing DMALLOC is sized larger. This header has no trailing
+// array; the name data is the `len` bytes placed immediately after it.
+typedef struct lname_big_buf_s {
+  struct lname_big_buf_s* next;
+} lname_big_buf_t;
+
 lname_linked_buf_t* lnamebuf = nullptr;
+static lname_big_buf_t* lname_big_list = nullptr;
 
 int lb_index = 4096;
 
@@ -1415,20 +1426,14 @@ static char* alloc_local_name(const char* name) {
   size_t len = strlen(name) + 1;
   char* res;
 
-  // A name that cannot fit in a whole block gets its own exactly-sized
-  // allocation, then we force the next request to start a fresh normal block.
-  // Previously the code only ever allocated fixed 4096-byte blocks and copied
-  // `len` bytes in unconditionally, so a >4096-char local variable/parameter
-  // name (identifiers are only capped at YYLMAX ~64KB) overran the heap block.
   if (len > sizeof(lnamebuf->block)) {
-    auto* new_buf = reinterpret_cast<lname_linked_buf_t*>(DMALLOC(
-        sizeof(lname_linked_buf_t) - sizeof(lnamebuf->block) + len, TAG_COMPILER,
-        "alloc_local_name"));
-    new_buf->next = lnamebuf;
-    lnamebuf = new_buf;
-    lb_index = sizeof(new_buf->block);  // next alloc must open a fresh block
-    memcpy(new_buf->block, name, len);
-    return new_buf->block;
+    auto* big = reinterpret_cast<lname_big_buf_t*>(
+        DMALLOC(sizeof(lname_big_buf_t) + len, TAG_COMPILER, "alloc_local_name"));
+    big->next = lname_big_list;
+    lname_big_list = big;
+    res = reinterpret_cast<char*>(big + 1);
+    memcpy(res, name, len);
+    return res;
   }
 
   if (lb_index + len > sizeof(lnamebuf->block)) {
@@ -1457,6 +1462,7 @@ ident_hash_elem_list_t* ihe_list = nullptr;
 void free_unused_identifiers() {
   ident_hash_elem_list_t *ihel, *next;
   lname_linked_buf_t *lnb, *lnbn;
+  lname_big_buf_t *lbb, *lbbn;
   int i;
 
   /* clean up dirty idents */
@@ -1499,6 +1505,14 @@ void free_unused_identifiers() {
   }
   lnamebuf = nullptr;
   lb_index = 4096;
+
+  lbb = lname_big_list;
+  while (lbb) {
+    lbbn = lbb->next;
+    FREE(lbb);
+    lbb = lbbn;
+  }
+  lname_big_list = nullptr;
 }
 
 static ident_hash_elem_t* quick_alloc_ident_entry() {
