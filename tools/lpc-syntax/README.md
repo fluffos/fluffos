@@ -16,9 +16,9 @@ if `grammar.y` grows a token the spec doesn't categorize.
 | `lpc-grammar.json` | **Generated** — keywords, type/modifier keywords, operators (longest-match ordered), punctuation, preprocessor directives, token categories, and all grammar productions. Never hand-edit. |
 | `tokenizer.mjs` | Grammar-driven scanner: strings/escapes, template literals with nested `${}` interpolation (interpolated code is recursively tokenized), `@`/`@@` text blocks, comments, `#` directive lines with `\` continuations, numbers (hex/binary/underscores/reals), keyword classification, longest-match operators. |
 | `highlight.mjs` | `highlightLPC(source)` → HTML with `<span class="lpc-...">` runs; `defaultCss` export. |
-| `format.mjs` | `formatLPC(source)` → basic formatter: brace-depth reindentation, statement-per-line, operator spacing, directives at column 0, comments/strings/text blocks verbatim. Deterministic and idempotent. |
+| `format.mjs` | `formatLPC(source)` → basic formatter: brace-depth reindentation, statement-per-line, operator spacing, directives at column 0, comments/strings/text blocks verbatim. Deterministic and idempotent. Powers the VS Code extension's Format Document / format-on-save. |
 | `lint.mjs` | `lintLPC(source)` → structural diagnostics (illegal characters, unterminated literals, unbalanced brackets, mismatched conditionals) with 1-based positions. Powers the VS Code extension's as-you-type diagnostics. |
-| `vscode/` | VS Code extension: declarative highlighting (generated TextMate grammar), structural diagnostics as you type, real `lpcc` compiler errors on save. See `vscode/README.md`. |
+| `vscode/` | VS Code extension: declarative highlighting (generated TextMate grammar), structural diagnostics as you type, Format Document / format-on-save, real `lpcc` compiler errors on save. See `vscode/README.md`. |
 | `test.mjs` | `node tools/lpc-syntax/test.mjs` — 49 assertions, no dependencies (tokenizer, highlighter, formatter, linter, generated VS Code assets). |
 
 ## Regenerating the grammar contract

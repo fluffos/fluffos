@@ -405,7 +405,8 @@ lvalueList = { ",", lvalue } ;
 exprOrBlock = block
               | "(", commaExpr, ")" ;
 
-ref = LRef ;
+ref = LRef
+      | "&" ;
 
 string = stringLiteral ;
 

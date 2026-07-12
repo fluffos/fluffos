@@ -50,6 +50,11 @@
           "default": true,
           "description": "Run the built-in structural lint (illegal characters, unterminated literals, unbalanced brackets, mismatched #if/#endif) as you type."
         },
+        "lpc.format.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the built-in LPC formatter for the Format Document command and format-on-save."
+        },
         "lpc.lpcc.path": {
           "type": "string",
           "default": "",

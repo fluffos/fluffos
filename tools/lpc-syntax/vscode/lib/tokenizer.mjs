@@ -27,6 +27,63 @@ const isIdentStart = (c) => /[A-Za-z_]/.test(c);
 const isIdentChar = (c) => /[A-Za-z0-9_]/.test(c);
 const isDigit = (c) => /[0-9]/.test(c);
 
+// Brace-depth scan for a template interpolation body: a raw '{'/'}' count
+// is fooled by a '}' inside a nested string/char/comment/template (e.g.
+// `${ ch == '}' }` or `${ s == "}" }`), so those spans must be skipped
+// as opaque units rather than scanned character-by-character.
+function skipStringSpan(src, i) {
+  let j = i + 1;
+  while (j < src.length && src[j] !== '"') {
+    if (src[j] === '\\') j++;
+    j++;
+  }
+  return Math.min(j + 1, src.length);
+}
+
+function skipCharSpan(src, i) {
+  let j = i + 1;
+  if (src[j] === '\\') j++;
+  j++;
+  if (src[j] === "'") j++;
+  return j;
+}
+
+function findInterpEnd(src, start) {
+  let depth = 1;
+  let k = start;
+  while (k < src.length && depth > 0) {
+    const c = src[k];
+    if (c === '"') { k = skipStringSpan(src, k); continue; }
+    if (c === "'") { k = skipCharSpan(src, k); continue; }
+    if (c === '/' && src[k + 1] === '/') {
+      const nl = src.indexOf('\n', k);
+      k = nl < 0 ? src.length : nl;
+      continue;
+    }
+    if (c === '/' && src[k + 1] === '*') {
+      const e = src.indexOf('*/', k + 2);
+      k = e < 0 ? src.length : e + 2;
+      continue;
+    }
+    if (c === '`') { k = skipTemplateSpan(src, k); continue; }
+    if (c === '{') { depth++; k++; continue; }
+    if (c === '}') { depth--; if (depth > 0) k++; continue; }
+    k++;
+  }
+  return k;
+}
+
+function skipTemplateSpan(src, i) {
+  let j = i + 1;
+  while (j < src.length) {
+    if (src[j] === '\\') { j += 2; continue; }
+    if (src[j] === '`') return j + 1;
+    if (src[j] === '$' && src[j + 1] === '{') { j = findInterpEnd(src, j + 2) + 1; continue; }
+    j++;
+  }
+  return j;
+}
+
 export function tokenize(src) {
   const toks = [];
   let i = 0;
@@ -134,13 +191,7 @@ export function tokenize(src) {
           push('template', frag + '${');
           i = j + 2;
           // scan interpolation with brace tracking, recursively tokenized
-          let depth = 1;
-          let k = i;
-          while (k < src.length && depth > 0) {
-            if (src[k] === '{') depth++;
-            else if (src[k] === '}') depth--;
-            if (depth > 0) k++;
-          }
+          const k = findInterpEnd(src, i);
           const inner = src.slice(i, k);
           for (const t of tokenize(inner)) {
             toks.push({ ...t, line: 0, col: 0 });
@@ -164,14 +215,17 @@ export function tokenize(src) {
       continue;
     }
 
-    // char literal
+    // char literal -- escapes can be longer than one char (\xHH hex,
+    // \NNN octal are variable-length), so scan for the closing quote
+    // the same way string literals do rather than assuming a fixed width.
     if (c === "'") {
       let j = i + 1;
-      if (src[j] === '\\') j++;
-      j++;
-      if (src[j] === "'") j++;
-      push('char', src.slice(i, j));
-      i = j;
+      while (j < src.length && src[j] !== "'") {
+        if (src[j] === '\\') j++;
+        j++;
+      }
+      push('char', src.slice(i, Math.min(j + 1, src.length)));
+      i = Math.min(j + 1, src.length);
       continue;
     }
 

@@ -21,6 +21,9 @@ check('grammar keywords include control flow',
       ['if', 'foreach', 'inherit', 'catch'].every((k) => grammar.keywords.includes(k)));
 check('operators longest-match ordered',
       grammar.operators.indexOf('<<=') < grammar.operators.indexOf('<<'));
+check('grammar keywords include "struct" (an alternate spelling of L_CLASS,'
+      + ' both STRUCT_CLASS and STRUCT_STRUCT are on by default)',
+      grammar.keywords.includes('struct') && grammar.keywords.includes('class'));
 
 // --- tokenizer ---------------------------------------------------------------
 check('keywords vs identifiers',
@@ -62,6 +65,18 @@ check('text block array', kinds('@@T\nx\nT\n')[0].startsWith('textblock:@@T'));
 check('range vs ellipsis vs dot',
       kinds('a[1..2] f(...) x.y').join(',').includes('operator:..') &&
       kinds('f(...)').includes('operator:...'));
+check('char literal: multi-digit hex/octal escapes are not truncated',
+      kinds("'\\x41' '\\101' '\\n'").join(',') ===
+      "char:'\\x41',char:'\\101',char:'\\n'");
+check('template interpolation: brace inside a nested string/char/comment does not end it early',
+      (() => {
+        const k1 = kinds('`x=${ s == "}" }`');
+        const k2 = kinds("`c=${ ch == '}' }`");
+        const k3 = kinds('`r=${/* } */ x}`');
+        return k1[k1.length - 1] === 'template:}`' && k1.includes('string:"}"') &&
+               k2[k2.length - 1] === 'template:}`' && k2.includes("char:'}'") &&
+               k3[k3.length - 1] === 'template:}`' && k3.includes('comment:/* } */');
+      })());
 
 // --- highlighter --------------------------------------------------------------
 const html = highlightLPC('int f() { return "hi"; } // done');
@@ -69,20 +84,97 @@ check('highlight keyword span', html.includes('<span class="lpc-keyword">return<
 check('highlight string span', html.includes('<span class="lpc-string">&quot;hi&quot;</span>'));
 check('highlight comment span', html.includes('<span class="lpc-comment">// done</span>'));
 check('html escaped', highlightLPC('if (a < b) x = "<&>";').includes('&lt;&amp;&gt;'));
+check('highlight $N closure params get their own class, not lpc-identifier',
+      highlightLPC('(: $1 + $2 :)').includes('<span class="lpc-param">$1</span>') &&
+      highlightLPC('(: $1 + $2 :)').includes('<span class="lpc-param">$2</span>'));
+check('highlight illegal character is flagged, not silently dropped',
+      highlightLPC('int x = 1 \u0001;').includes('<span class="lpc-unknown">'));
 
 // --- formatter ----------------------------------------------------------------
 const ugly = 'int  f( int x ){if(x>0){return   x;}else{return -x;}}';
 const pretty = formatLPC(ugly);
-check('formatter indents braces', pretty.includes('\n    if (x > 0) {') || pretty.includes('if (x > 0) {'));
+check('formatter indents braces', pretty.includes('\n    if (x > 0) {'));
 check('formatter newline per statement', pretty.split('\n').filter(Boolean).length >= 5);
 check('formatter idempotent', formatLPC(pretty) === pretty,
       JSON.stringify({ once: pretty, twice: formatLPC(pretty) }));
+check('nested blocks (if/else) indent one level per depth, not off-by-one',
+      pretty === 'int f(int x) {\n    if (x > 0) {\n        return x;\n    } else {\n        return - x;\n    }\n}\n',
+      pretty);
+check('switch/case body indents under the switch, not at column 0',
+      (() => {
+        const out = formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n');
+        return out.includes('\n    switch (x) {') &&
+               out.split('\n').every((l) => l === '' || l === 'int f(int x) {' || l === '}' || l.startsWith('    '));
+      })());
 const withDirective = formatLPC('#define X 1\n   int f(){return X;}');
 check('directives at column 0', withDirective.startsWith('#define X 1\n'));
 const withComment = formatLPC('// header\nint g(){return 1;}');
 check('standalone comment kept', withComment.startsWith('// header\n'));
 check('strings verbatim through formatter',
       formatLPC('string s="a  b";').includes('"a  b"'));
+check('array literal braces stay inline and do not affect indent depth',
+      (() => {
+        const out = formatLPC('void f() { return ({ 1, 2, 3 }); }\n');
+        return out.includes('return ({1, 2, 3});') && formatLPC(out) === out;
+      })());
+check('nested array literal in a call is idempotent',
+      (() => {
+        const src = 'mixed f() { ASSERT(catch(allocate(5, function(int i) { if (i == 2) error("boom"); return i; }))); }\n';
+        const once = formatLPC(src);
+        return formatLPC(once) === once;
+      })());
+check('trailing "//" comment forces a line break before following code',
+      (() => {
+        const src = 'void f() { if (a) //note\n    return b; else c(); }\n';
+        const once = formatLPC(src);
+        const twice = formatLPC(once);
+        return once === twice && !once.split('\n').some((l) => /\/\/note.+\S/.test(l));
+      })());
+check('formatter is stable on a source that swallows to EOF (unterminated construct)',
+      (() => {
+        const once = formatLPC('void f() {\n  "\n}\n');
+        return formatLPC(once) === once;
+      })());
+check('case/default label colon has no leading space (unlike ternary/mapping colons)',
+      formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n')
+        .includes('case 1:') &&
+      formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n')
+        .includes('default:'));
+check('heredoc (@/@@) terminator breaks trailing code onto its own line',
+      (() => {
+        const src1 = 'int help() {\n    write( @ENDHELP\nhelp text\nENDHELP\n    );\n    return 1;\n}\n';
+        const once1 = formatLPC(src1);
+        const src2 = 'int help() {\n    this_player()->more( @@ENDHELP\nhelp text\nENDHELP\n    , 1);\n    return 1;\n}\n';
+        const once2 = formatLPC(src2);
+        return once1 === formatLPC(once1) && once2 === formatLPC(once2) &&
+               once1.includes('ENDHELP\n    );\n') && once2.includes('ENDHELP\n    , 1);\n');
+      })());
+check('multiline array/mapping literals preserve their line breaks instead of collapsing',
+      (() => {
+        const arr = formatLPC('mixed x = ({\n    1,\n    2,\n});\n');
+        const map = formatLPC('mapping x = ([\n    "a": 1,\n    "b": 2,\n]);\n');
+        return arr === 'mixed x = ({\n    1,\n    2,\n});\n' && formatLPC(arr) === arr &&
+               map === 'mapping x = ([\n    "a" : 1,\n    "b" : 2,\n]);\n' && formatLPC(map) === map;
+      })());
+check('single-line array/mapping literals still collapse onto one line',
+      (() => {
+        const out = formatLPC('mixed x = ({ 1, 2, 3 }); mapping m = ([ "a":1, "b":2 ]);\n');
+        return out === 'mixed x = ({1, 2, 3});\nmapping m = (["a" : 1, "b" : 2]);\n';
+      })());
+check('indexing and ranges stay tight; varargs/spread keep normal spacing',
+      (() => {
+        const out = formatLPC('int f() { return a[0] + b[1..2] + c()[0] + e[..<4]; }\n');
+        const va = formatLPC('mixed f(int a, ...) { return g(1, 2, ...); }\n');
+        return out.includes('a[0]') && out.includes('b[1..2]') && out.includes('c()[0]') &&
+               out.includes('e[..<4]') && va.includes('int a, ...') && va.includes('g(1, 2, ...)');
+      })());
+check('indexing/mapping literals nested inside a multiline array literal do not corrupt bracket tracking',
+      (() => {
+        const src = 'mixed x = ({\n    a[0],\n    b[1..2],\n    ([ "k": 1 ]),\n});\n';
+        const once = formatLPC(src);
+        return formatLPC(once) === once && once.includes('a[0],') && once.includes('b[1..2],') &&
+               once.includes('(["k" : 1]),');
+      })());
 
 // --- lint ---------------------------------------------------------------------
 const msgs = (src) => lintLPC(src).map((d) => d.message);
@@ -131,12 +223,33 @@ check('tmLanguage: scope + language wiring',
 check('tmLanguage: keywords from grammar contract',
       tml.repository.keywords.match.includes('foreach') &&
       tml.repository.types.match.includes('mapping'));
+check('tmLanguage: class/struct get their own storage.type.class scope, not keyword.control',
+      tml.repository['class-keyword'].name === 'storage.type.class.lpc' &&
+      /\bclass\b/.test(tml.repository['class-keyword'].match) &&
+      /\bstruct\b/.test(tml.repository['class-keyword'].match) &&
+      !/\bclass\b/.test(tml.repository.keywords.match) &&
+      !/\bstruct\b/.test(tml.repository.keywords.match));
+check('tmLanguage: function-call excludes reserved words (no "if (" misfire as entity.name.function)',
+      (() => {
+        const re = new RegExp(tml.repository['function-call'].match);
+        return !re.test('if (') && !re.test('while (') && !re.test('new (') &&
+               !re.test('catch(') && re.test('foo (') && re.test('bar(');
+      })());
 check('tmLanguage: operators longest-match ordered',
       (() => { const parts = tml.repository.operators.match.split('|');
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());
 check('vscode lib copies exist and are marked generated',
       readF(joinP(here2, 'vscode/lib/lint.mjs'), 'utf8').startsWith('// GENERATED COPY') &&
-      readF(joinP(here2, 'vscode/lib/tokenizer.mjs'), 'utf8').startsWith('// GENERATED COPY'));
+      readF(joinP(here2, 'vscode/lib/tokenizer.mjs'), 'utf8').startsWith('// GENERATED COPY') &&
+      readF(joinP(here2, 'vscode/lib/format.mjs'), 'utf8').startsWith('// GENERATED COPY'));
+check('extension.js wires up the formatter',
+      (() => { const src = readF(joinP(here2, 'vscode/extension.js'), 'utf8');
+               return src.includes('registerDocumentFormattingEditProvider') &&
+                      src.includes('formatLPC'); })());
+const langConfig = JSON.parse(readF(joinP(here2, 'vscode/language-configuration.json'), 'utf8'));
+check('language-configuration: brackets + doc-comment continuation wired',
+      langConfig.brackets.length === 3 &&
+      Array.isArray(langConfig.onEnterRules) && langConfig.onEnterRules.length > 0);
 
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
