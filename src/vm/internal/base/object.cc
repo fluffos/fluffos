@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include <chrono>
+#include <climits>  // for INT_MAX
 #include <ctype.h>  // for isdigit
 #include <cstdio>   // for std::remove
 #include <math.h>   // for pow
@@ -252,6 +253,37 @@ void save_svalue(svalue_t* v, char** buf) {
   }
 }
 
+// Grow the global `sizes` scratch array (see reset_restore_scratch()) so it
+// can hold sizes[depth]. `depth` is a monotonic per-container counter over
+// the WHOLE structure being sized (see restore_internal_size()'s `depth` vs
+// `nest` comment) and, unlike `nest`, is not bounded by MAX_SAVE_SVALUE_DEPTH
+// -- a pathologically wide (not deep) save-string can drive it arbitrarily
+// high. Doubling `max_depth` without a bound would eventually overflow a
+// signed int to <= 0 and loop forever; bail out and let the caller fail the
+// size pre-pass cleanly instead.
+static bool grow_restore_sizes(int depth) {
+  if (!sizes) {
+    max_depth = 128;
+    while (max_depth <= depth) {
+      if (max_depth > INT_MAX / 2) {
+        return false;
+      }
+      max_depth <<= 1;
+    }
+    sizes = reinterpret_cast<int*>(
+        DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
+  } else if (depth >= max_depth) {
+    while (max_depth <= depth) {
+      if (max_depth > INT_MAX / 2) {
+        return false;
+      }
+      max_depth <<= 1;
+    }
+    sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+  }
+  return true;
+}
+
 static int restore_internal_size(const char** str, int is_mapping, int depth, int nest) {
   const char* cp = *str;
   int size = 0;
@@ -317,18 +349,8 @@ static int restore_internal_size(const char** str, int is_mapping, int depth, in
       case ']': {
         if (*cp++ == ')' && is_mapping) {
           *str = cp;
-          if (!sizes) {
-            max_depth = 128;
-            while (max_depth <= depth) {
-              max_depth <<= 1;
-            }
-            sizes = reinterpret_cast<int*>(
-                DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
-          } else if (depth >= max_depth) {
-            while ((max_depth <<= 1) <= depth) {
-              ;
-            }
-            sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+          if (!grow_restore_sizes(depth)) {
+            return 0;
           }
           sizes[depth] = size;
           return 1;
@@ -341,18 +363,8 @@ static int restore_internal_size(const char** str, int is_mapping, int depth, in
       case '}': {
         if (*cp++ == ')' && !is_mapping) {
           *str = cp;
-          if (!sizes) {
-            max_depth = 128;
-            while (max_depth <= depth) {
-              max_depth <<= 1;
-            }
-            sizes = reinterpret_cast<int*>(
-                DCALLOC(max_depth, sizeof(int), TAG_TEMPORARY, "restore_internal_size"));
-          } else if (depth >= max_depth) {
-            while ((max_depth <<= 1) <= depth) {
-              ;
-            }
-            sizes = RESIZE(sizes, max_depth, int, TAG_TEMPORARY, "restore_internal_size");
+          if (!grow_restore_sizes(depth)) {
+            return 0;
           }
           sizes[depth] = size;
           return 1;

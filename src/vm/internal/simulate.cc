@@ -885,7 +885,12 @@ int recompile_object(object_t* target) {
       // exactly as load_object() does, or a failed recompile leaks it (and
       // this loop can open a fresh fd each round).
       DEFER { close(f); };
-      new_prog = compile_file_fd(f, obname.c_str());
+      // Pass old_prog's own (ref-counted, stable for this whole call)
+      // filename rather than obname.c_str() -- the compiler stashes the
+      // pointer it's given in g_compile.filename for the duration of the
+      // compile, so it must not be the address of a local std::string's
+      // internal buffer.
+      new_prog = compile_file_fd(f, old_prog->filename);
     }
     restore_command_giver();
     update_compile_av(total_lines);
