@@ -66,6 +66,19 @@ int valid_hide(object_t* obj) {
 int save_svalue_depth = 0, max_depth;
 int* sizes = nullptr;
 
+/* Reset the transient scratch state used while sizing a restore string.
+ * restore_svalue() frees this on its normal return, but a nested restore that
+ * longjmps out via error() (OOM / mapping-too-large) skips that cleanup, which
+ * would leak `sizes` and leave save_svalue_depth dirty so that the *next*
+ * restore reads a stale sizes[] entry. Call this before any such error(). */
+static void reset_restore_scratch() {
+  save_svalue_depth = max_depth = 0;
+  if (sizes) {
+    FREE((char*)sizes);
+    sizes = nullptr;
+  }
+}
+
 int svalue_save_size(svalue_t* v) {
   switch (v->type) {
     case T_STRING: {
@@ -243,6 +256,14 @@ static int restore_internal_size(const char** str, int is_mapping, int depth) {
   const char* cp = *str;
   int size = 0;
   char c, delim, toggle = 0;
+
+  // Bound recursion the same way the save path does (too_deep_save_error).
+  // Without this, a maliciously deep-nested save string (e.g. "({({({...")
+  // recurses until the C stack overflows. Returning 0 fails the size pre-pass
+  // so restore_size() reports an error before the actual restore recurses.
+  if (depth > MAX_SAVE_SVALUE_DEPTH) {
+    return 0;
+  }
 
   delim = is_mapping ? ':' : ',';
   while ((c = *cp++)) {
@@ -650,7 +671,10 @@ static int restore_mapping(char** str, svalue_t* sv) {
   if (save_svalue_depth) {
     size = sizes[save_svalue_depth - 1];
   } else if ((size = restore_size((const char**)str, 1)) < 0) {
-    return 0;
+    // A malformed / too-deeply-nested mapping must be reported as an error like
+    // restore_array/restore_class do; returning 0 here signalled "success" yet
+    // left the caller's svalue uninitialized.
+    return ROB_MAPPING_ERROR;
   }
 
   if (!size) {
@@ -830,6 +854,7 @@ static int restore_mapping(char** str, svalue_t* sv) {
         free_mapping(m);
         free_svalue(&key, "restore_mapping: out of memory");
         free_svalue(&value, "restore_mapping: out of memory");
+        reset_restore_scratch();  // error() below skips restore_svalue's cleanup
         error("Out of memory\n");
       }
     }
@@ -839,6 +864,7 @@ static int restore_mapping(char** str, svalue_t* sv) {
       free_mapping(m);
       free_svalue(&key, "restore_mapping: mapping too large");
       free_svalue(&value, "restore_mapping: mapping too large");
+      reset_restore_scratch();  // mapping_too_large() error()s past the cleanup
       mapping_too_large();
     }
 
