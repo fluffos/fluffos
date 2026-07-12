@@ -43,7 +43,9 @@ void dump_trace_line(const char* fname, const char* pname, const char* const obn
   p = strput(p, end, "() at ");
   p = strput(p, end, where);
   p = strput(p, end, "\n");
-  debug_message(line);
+  // line embeds object/program filenames and function names, which can
+  // contain '%'; never use it as the printf format.
+  debug_message("%s", line);
 }
 
 }  // namespace

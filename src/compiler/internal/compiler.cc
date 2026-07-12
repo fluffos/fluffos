@@ -821,7 +821,9 @@ static void show_overload_warnings() {
   ovlwarn_t *p, *next;
   p = overload_warnings;
   while (p) {
-    yywarn(p->warn);
+    // p->warn is a precomposed message embedding program filenames, which
+    // can contain '%'; pass it as an argument, not the format.
+    yywarn("%s", p->warn);
     FREE(p->warn);
     next = p->next;
     FREE(p);
