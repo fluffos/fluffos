@@ -208,6 +208,17 @@ if (NOT _BACKWARD_DEFINITIONS)
 	map_definitions("STACK_DETAILS_" "BACKWARD_HAS_" BACKTRACE_SYMBOL DW BFD DWARF)
 endif()
 
+# From upstream v1.6: the Windows implementation (StackWalk64 + dbghelp
+# symbol resolution) needs these import libraries. Deliberately WITHOUT
+# upstream's MinGW msvcr90 addition: msvcr90(d).dll only exists on
+# machines with Visual Studio / the VC2008 redist, so linking it makes
+# binaries fail at load (STATUS_DLL_NOT_FOUND) on CI and user machines;
+# the lone _set_abort_behavior() call it served is MSVC-guarded in our
+# backward.hpp instead. dbghelp/psapi are always-present system DLLs.
+if(WIN32)
+    list(APPEND _BACKWARD_LIBRARIES dbghelp psapi)
+endif()
+
 set(BACKWARD_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 set(BACKWARD_HAS_EXTERNAL_LIBRARIES FALSE)
