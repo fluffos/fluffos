@@ -25,6 +25,7 @@
 #ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #endif
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
 #include "private-lib-core.h"
 
 #if defined(LWS_WITH_MBEDTLS)
@@ -78,11 +79,10 @@ lws_plat_set_nonblocking(lws_sockfd_type fd)
 {
 	u_long optl = 1;
 	int result = !!ioctlsocket(fd, FIONBIO, &optl);
+#if (_LWS_ENABLED_LOGS & LLL_ERR)
 	if (result)
-	{
-		int error = LWS_ERRNO;
-		lwsl_err("ioctlsocket FIONBIO 1 failed with error %d\n", error);
-	}
+		lwsl_err("ioctlsocket FIONBIO 1 failed with error %d\n", LWS_ERRNO);
+#endif
 	return result;
 }
 
@@ -104,8 +104,9 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 		optval = 1;
 		if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 			       (const char *)&optval, optlen) < 0) {
-			int error = LWS_ERRNO;
-			lwsl_err("setsockopt SO_KEEPALIVE 1 failed with error %d\n", error);
+#if (_LWS_ENABLED_LOGS & LLL_ERR)
+			lwsl_err("setsockopt SO_KEEPALIVE 1 failed with error %d\n", LWS_ERRNO);
+#endif
 			return 1;
 		}
 
@@ -115,8 +116,9 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 
 		if (WSAIoctl(fd, SIO_KEEPALIVE_VALS, &alive, sizeof(alive),
 			     NULL, 0, &dwBytesRet, NULL, NULL)) {
-			int error = LWS_ERRNO;
-			lwsl_err("WSAIoctl SIO_KEEPALIVE_VALS 1 %lu %lu failed with error %d\n", alive.keepalivetime, alive.keepaliveinterval, error);
+#if (_LWS_ENABLED_LOGS & LLL_ERR)
+			lwsl_err("WSAIoctl SIO_KEEPALIVE_VALS 1 %lu %lu failed with error %d\n", alive.keepalivetime, alive.keepaliveinterval, LWS_ERRNO);
+#endif
 			return 1;
 		}
 	}
@@ -126,8 +128,9 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 #ifndef _WIN32_WCE
 	tcp_proto = getprotobyname("TCP");
 	if (!tcp_proto) {
-		int error = LWS_ERRNO;
-		lwsl_warn("getprotobyname(\"TCP\") failed with error, falling back to 6 %d\n", error);
+#if (_LWS_ENABLED_LOGS & LLL_WARN)
+		lwsl_warn("getprotobyname(\"TCP\") failed with error, falling back to 6 %d\n", LWS_ERRNO);
+#endif
 		protonbr = 6;  /* IPPROTO_TCP */
 	} else
 		protonbr = tcp_proto->p_proto;
@@ -136,8 +139,9 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 #endif
 
 	if (setsockopt(fd, protonbr, TCP_NODELAY, (const char *)&optval, optlen) ) {
-		int error = LWS_ERRNO;
-		lwsl_warn("setsockopt TCP_NODELAY 1 failed with error %d\n", error);
+#if (_LWS_ENABLED_LOGS & LLL_WARN)
+		lwsl_warn("setsockopt TCP_NODELAY 1 failed with error %d\n", LWS_ERRNO);
+#endif
 	}
 
 	return lws_plat_set_nonblocking(fd);
@@ -145,16 +149,66 @@ lws_plat_set_socket_options(struct lws_vhost *vhost, lws_sockfd_type fd,
 
 int
 lws_plat_set_socket_options_ip(lws_sockfd_type fd, uint8_t pri, int lws_flags)
-{
+{	
+	int optval = 1, ret = 0;
+	socklen_t optlen = sizeof(optval);
+#if (_LWS_ENABLED_LOGS & LLL_WARN)
+	int en;
+#endif
+
 	/*
 	 * Seems to require "differeniated services" but no docs
 	 *
 	 * https://docs.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options
 	 * https://docs.microsoft.com/en-us/previous-versions/windows/desktop/qos/differentiated-services
 	 */
-	lwsl_warn("%s: not implemented on windows platform\n", __func__);
+	lwsl_info("%s: priority and ip sockets options not implemented on windows platform\n", __func__);
+	
 
-	return 0;
+	/*
+	* only accept that we are the only listener on the port
+	* https://msdn.microsoft.com/zh-tw/library/
+	*    windows/desktop/ms740621(v=vs.85).aspx
+	*
+	* for lws, to match Linux, we default to exclusive listen
+	*/
+	if (lws_flags & LCCSCF_ALLOW_REUSE_ADDR) {
+		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
+					(const void *)&optval, optlen) < 0) { 
+#if (_LWS_ENABLED_LOGS & LLL_WARN)
+			en = errno;
+			lwsl_warn("%s: unable to reuse local addresses: errno %d\n",
+				__func__, en);
+#endif
+			ret = 1;
+		} else
+			lwsl_notice("%s: set reuse addresses\n", __func__);
+
+	} else {
+		if (setsockopt(fd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+				       (const void *)&optval, optlen) < 0) {
+#if (_LWS_ENABLED_LOGS & LLL_WARN)
+			en = errno;
+			lwsl_warn("%s: unable to use exclusive addresses: errno %d\n",
+				__func__, en);
+#endif
+			ret = 1;
+		} else
+			lwsl_info("%s: set use exclusive addresses\n", __func__);
+	}
+
+
+#if defined(LWS_WITH_IPV6)
+	/* I do not believe Microsoft supports RFC5014
+	 * Instead, you must set lws_client_connect_info::iface */
+	if (lws_flags & LCCSCF_IPV6_PREFER_PUBLIC_ADDR) {
+		lwsl_err("%s: UNIMPLEMENTED on this platform\n", __func__);
+	}
+#endif
+
+	
+
+	return ret;
 }
 
 int
@@ -558,19 +612,22 @@ int
 lws_plat_mbedtls_net_send(void *ctx, const uint8_t *buf, size_t len)
 {
 	int fd = ((mbedtls_net_context *) ctx)->fd;
-	int ret;
+	int ret, en;
 
 	if (fd < 0)
 		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
 
-	ret = write(fd, buf, (unsigned int)len);
+	ret = send(fd, (const char *)buf, (unsigned int)len, 0);
 	if (ret >= 0)
 		return ret;
 
-	if (errno == EAGAIN || errno == EWOULDBLOCK)
+	en = LWS_ERRNO;
+	if (en == EAGAIN || en == EWOULDBLOCK)
 		return MBEDTLS_ERR_SSL_WANT_WRITE;
 
-        if (WSAGetLastError() == WSAECONNRESET )
+	ret = WSAGetLastError();
+	lwsl_notice("%s: errno %d, GLE %d\n", __func__, en, ret);
+	if (ret == WSAECONNRESET )
             return( MBEDTLS_ERR_NET_CONN_RESET );
 
 	return MBEDTLS_ERR_NET_SEND_FAILED;
@@ -580,19 +637,23 @@ int
 lws_plat_mbedtls_net_recv(void *ctx, unsigned char *buf, size_t len)
 {
 	int fd = ((mbedtls_net_context *) ctx)->fd;
-	int ret;
+	int ret, en;
 
 	if (fd < 0)
 		return MBEDTLS_ERR_NET_INVALID_CONTEXT;
 
-	ret = (int)read(fd, buf, (unsigned int)len);
+	ret = (int)recv(fd, (char *)buf, (unsigned int)len, 0);
 	if (ret >= 0)
 		return ret;
 
-	if (errno == EAGAIN || errno == EWOULDBLOCK)
+	en = LWS_ERRNO;
+	if (en == EAGAIN || en == EWOULDBLOCK || en == WSAEWOULDBLOCK)
 		return MBEDTLS_ERR_SSL_WANT_READ;
 
-        if (WSAGetLastError() == WSAECONNRESET)
+	ret = WSAGetLastError();
+	lwsl_notice("%s: errno %d, GLE %d\n", __func__, en, ret);
+
+        if (ret == WSAECONNRESET)
             return MBEDTLS_ERR_NET_CONN_RESET;
 
 	return MBEDTLS_ERR_NET_RECV_FAILED;

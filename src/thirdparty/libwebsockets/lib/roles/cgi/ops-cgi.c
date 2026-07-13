@@ -24,7 +24,7 @@
 
 #include <private-lib-core.h>
 
-static int
+static lws_handling_result_t
 rops_handle_POLLIN_cgi(struct lws_context_per_thread *pt, struct lws *wsi,
 		       struct lws_pollfd *pollfd)
 {
@@ -34,35 +34,32 @@ rops_handle_POLLIN_cgi(struct lws_context_per_thread *pt, struct lws *wsi,
 
 	if (wsi->lsp_channel >= LWS_STDOUT &&
 	    !(pollfd->revents & pollfd->events & LWS_POLLIN))
-		return LWS_HPI_RET_HANDLED;
+		return LWS_HPI_RET_PLEASE_CLOSE_ME;
 
 	if (wsi->lsp_channel == LWS_STDIN &&
 	    !(pollfd->revents & pollfd->events & LWS_POLLOUT))
-		return LWS_HPI_RET_HANDLED;
+		return LWS_HPI_RET_PLEASE_CLOSE_ME;
 
 	if (wsi->lsp_channel == LWS_STDIN &&
 	    lws_change_pollfd(wsi, LWS_POLLOUT, 0)) {
-		lwsl_info("failed at set pollfd\n");
+		lwsl_wsi_info(wsi, "failed at set pollfd");
 		return LWS_HPI_RET_WSI_ALREADY_DIED;
 	}
 
 	if (!wsi->parent) {
-		lwsl_debug("%s: stdwsi content with parent\n",
-				__func__);
+		lwsl_wsi_debug(wsi, "stdwsi content with parent");
 
 		return LWS_HPI_RET_HANDLED;
 	}
 
 	if (!wsi->parent->http.cgi) {
-		lwsl_notice("%s: stdwsi content with deleted cgi object\n",
-				__func__);
+		lwsl_wsi_notice(wsi, "stdwsi content with deleted cgi object");
 
 		return LWS_HPI_RET_HANDLED;
 	}
 
 	if (!wsi->parent->http.cgi->lsp) {
-		lwsl_notice("%s: stdwsi content with reaped lsp\n",
-				__func__);
+		lwsl_wsi_notice(wsi, "stdwsi content with reaped lsp");
 
 		return LWS_HPI_RET_HANDLED;
 	}
@@ -71,8 +68,8 @@ rops_handle_POLLIN_cgi(struct lws_context_per_thread *pt, struct lws *wsi,
 	args.stdwsi = &wsi->parent->http.cgi->lsp->stdwsi[0];
 	args.hdr_state = (enum lws_cgi_hdr_state)wsi->hdr_state;
 
-	lwsl_debug("CGI LWS_STDOUT %p wsistate 0x%x\n",
-		   wsi->parent, wsi->wsistate);
+	lwsl_wsi_debug(wsi, "CGI LWS_STDOUT %p wsistate 0x%x",
+			    wsi->parent, wsi->wsistate);
 
 	if (user_callback_handle_rxflow(wsi->parent->a.protocol->callback,
 					wsi->parent, LWS_CALLBACK_CGI,
@@ -83,7 +80,7 @@ rops_handle_POLLIN_cgi(struct lws_context_per_thread *pt, struct lws *wsi,
 	return LWS_HPI_RET_HANDLED;
 }
 
-static int
+static lws_handling_result_t
 rops_handle_POLLOUT_cgi(struct lws *wsi)
 {
 	return LWS_HP_RET_USER_SERVICE;

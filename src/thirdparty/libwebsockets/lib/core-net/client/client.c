@@ -31,7 +31,7 @@ lws_set_proxy(struct lws_vhost *vhost, const char *proxy)
 {
 	char authstring[96];
 	int brackets = 0;
-	char *p;
+	const char *p;
 
 	if (!proxy)
 		return -1;
@@ -53,7 +53,7 @@ lws_set_proxy(struct lws_vhost *vhost, const char *proxy)
 		    sizeof vhost->proxy_basic_auth_token) < 0)
 			goto auth_too_long;
 
-		lwsl_info(" Proxy auth in use\n");
+		lwsl_vhost_info(vhost, " Proxy auth in use");
 
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
 		proxy = p + 1;
@@ -84,37 +84,38 @@ lws_set_proxy(struct lws_vhost *vhost, const char *proxy)
 
 #if defined(LWS_WITH_IPV6)
 	if (brackets) {
+		char *ncp;
+
 		/* original is IPv6 format "[::1]:443" */
 
-		p = strchr(vhost->http.http_proxy_address, ']');
-		if (!p) {
-			lwsl_err("%s: malformed proxy '%s'\n", __func__, proxy);
+		ncp = strchr(vhost->http.http_proxy_address, ']');
+		if (!ncp) {
+			lwsl_vhost_err(vhost, "malformed proxy '%s'", proxy);
 
 			return -1;
 		}
-		*p++ = '\0';
+		*ncp++ = '\0';
 	}
 #endif
 
 	p = strchr(p, ':');
 	if (!p && !vhost->http.http_proxy_port) {
-		lwsl_err("http_proxy needs to be ads:port\n");
+		lwsl_vhost_err(vhost, "http_proxy needs to be ads:port");
 
 		return -1;
 	}
 	if (p) {
-		*p = '\0';
 		vhost->http.http_proxy_port = (unsigned int)atoi(p + 1);
 	}
 
-	lwsl_info(" Proxy %s:%u\n", vhost->http.http_proxy_address,
-		  vhost->http.http_proxy_port);
+	lwsl_vhost_info(vhost, " Proxy %s:%u", vhost->http.http_proxy_address,
+					    vhost->http.http_proxy_port);
 #endif
 
 	return 0;
 
 auth_too_long:
-	lwsl_err("proxy auth too long\n");
+	lwsl_vhost_err(vhost, "proxy auth too long");
 
 	return -1;
 }

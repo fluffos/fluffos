@@ -70,6 +70,12 @@
 
 #if defined(LWS_WITH_TLS)
 #include <wincrypt.h>
+#if defined(LWS_WITH_BORINGSSL)
+  /* Undefine wincrypt.h symbols that conflict with BoringSSL */
+  #undef X509_NAME
+  #undef X509_EXTENSIONS
+  #undef PKCS7_SIGNER_INFO
+#endif
 #endif
 
 #if defined(LWS_HAVE_PTHREAD_H)
@@ -78,6 +84,11 @@
 #define lws_mutex_destroy(x)	pthread_mutex_destroy(&(x))
 #define lws_mutex_lock(x)	pthread_mutex_lock(&(x))
 #define lws_mutex_unlock(x)	pthread_mutex_unlock(&(x))
+
+#define lws_tid_t		pthread_t
+#define lws_thread_is(x)	pthread_equal(x, pthread_self())
+#define lws_thread_id()		pthread_self()
+
 #endif
 
  #if !defined(LWS_HAVE_ATOLL)
@@ -155,7 +166,11 @@ struct lws_fd_hashtable {
 #endif
 
 typedef SOCKET lws_sockfd_type;
+#if defined(__MINGW32__)
+typedef int lws_filefd_type;
+#else
 typedef HANDLE lws_filefd_type;
+#endif
 #define LWS_WIN32_HANDLE_TYPES
 
 LWS_EXTERN struct lws *

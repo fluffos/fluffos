@@ -92,11 +92,11 @@
    */
 #undef LT_OBJDIR // We're not using libtool
 
-/* Define to rpl_malloc if the replacement function should be used. */
-#cmakedefine malloc
+///* Define to rpl_malloc if the replacement function should be used. */
+//#cmakedefine malloc
 
 /* Define to rpl_realloc if the replacement function should be used. */
-#cmakedefine realloc
+//#cmakedefine realloc
 
 /* Define to 1 if we have getifaddrs */
 #cmakedefine LWS_HAVE_GETIFADDRS
@@ -109,3 +109,4 @@
 
 /* Defined if you have the <inttypes.h> header file. */
 #cmakedefine LWS_HAVE_INTTYPES_H
+

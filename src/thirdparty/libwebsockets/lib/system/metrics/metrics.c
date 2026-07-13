@@ -68,7 +68,7 @@ lws_metrics_tag_add(lws_dll2_owner_t *owner, const char *name, const char *val)
 int
 lws_metrics_tag_wsi_add(struct lws *wsi, const char *name, const char *val)
 {
-	__lws_lc_tag(NULL, &wsi->lc, "|%s", val);
+	__lws_lc_tag(wsi->a.context, NULL, &wsi->lc, "|%s", val);
 
 	return lws_metrics_tag_add(&wsi->cal_conn.mtags_owner, name, val);
 }
@@ -77,15 +77,15 @@ lws_metrics_tag_wsi_add(struct lws *wsi, const char *name, const char *val)
 int
 lws_metrics_tag_ss_add(struct lws_ss_handle *ss, const char *name, const char *val)
 {
-	__lws_lc_tag(NULL, &ss->lc, "|%s", val);
+	__lws_lc_tag(ss->context, NULL, &ss->lc, "|%s", val);
 	return lws_metrics_tag_add(&ss->cal_txn.mtags_owner, name, val);
 }
-#if defined(LWS_WITH_SECURE_STREAMS)
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
 int
 lws_metrics_tag_sspc_add(struct lws_sspc_handle *sspc, const char *name,
 			 const char *val)
 {
-	__lws_lc_tag(NULL, &sspc->lc, "|%s", val);
+	__lws_lc_tag(sspc->context, NULL, &sspc->lc, "|%s", val);
 	return lws_metrics_tag_add(&sspc->cal_txn.mtags_owner, name, val);
 }
 #endif
@@ -263,7 +263,8 @@ lws_metrics_check_in_policy(const char *polstring, const char *name)
 		ts.e = (int8_t)lws_tokenize(&ts);
 
 		if (ts.e == LWS_TOKZE_TOKEN) {
-			if (!lws_strcmp_wildcard(ts.token, ts.token_len, name))
+			if (!lws_strcmp_wildcard(ts.token, ts.token_len, name,
+						 strlen(name)))
 				/* yes, we are mentioned in this guy's policy */
 				return 0;
 		}
@@ -436,10 +437,12 @@ int
 lws_metric_destroy(lws_metric_t **pmt, int keep)
 {
 	lws_metric_t *mt = *pmt;
-	lws_metric_pub_t *pub = lws_metrics_priv_to_pub(mt);
+	lws_metric_pub_t *pub;
 
 	if (!mt)
 		return 0;
+
+	pub = lws_metrics_priv_to_pub(mt);
 
 	lws_dll2_remove(&mt->list);
 
@@ -607,7 +610,7 @@ lws_metrics_hist_bump_describe_wsi(struct lws *wsi, lws_metric_pub_t *pub,
 	} else
 		if (wsi->client_proxy_onward) {
 			lws_ss_handle_t *h = (lws_ss_handle_t *)wsi->a.opaque_user_data;
-			struct conn *conn = h->conn_if_sspc_onw;
+			struct lws_sss_proxy_conn *conn = h->conn_if_sspc_onw;
 
 			if (conn && conn->ss)
 				p += lws_snprintf(p, lws_ptr_diff_size_t(end, p),

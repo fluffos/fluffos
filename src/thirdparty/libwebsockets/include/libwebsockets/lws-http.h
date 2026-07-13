@@ -350,6 +350,7 @@ enum lws_token_indexes {
 	_WSI_TOKEN_CLIENT_ORIGIN,
 	_WSI_TOKEN_CLIENT_METHOD,
 	_WSI_TOKEN_CLIENT_IFACE,
+	_WSI_TOKEN_CLIENT_LOCALPORT,
 	_WSI_TOKEN_CLIENT_ALPN,
 
 	/* always last real token index*/
@@ -435,7 +436,7 @@ lws_hdr_copy(struct lws *wsi, char *dest, int len, enum lws_token_indexes h);
 /**
  * lws_hdr_copy_fragment() - copy a single fragment of the given header to a buffer
  *		The buffer length len must include space for an additional
- *		terminating '\0', or it will fail returning -1.
+ *		terminating '\0', or it will fail returning -2.
  *		If the requested fragment index is not present, it fails
  *		returning -1.
  *
@@ -494,6 +495,26 @@ LWS_VISIBLE LWS_EXTERN int
 lws_hdr_custom_copy(struct lws *wsi, char *dst, int len, const char *name,
 		    int nlen);
 
+typedef void (*lws_hdr_custom_fe_cb_t)(const char *name, int nlen, void *opaque);
+/**
+ * lws_hdr_custom_name_foreach() - Iterate the custom header names
+ *
+ * \param wsi: websocket connection
+ * \param cb: callback for each custom header name
+ * \param opaque: ignored by lws except to pass to callback
+ *
+ * Lws knows about 100 common http headers, and parses them into indexes when
+ * it recognizes them.  When it meets a header that it doesn't know, it stores
+ * the name and value directly, and you can look them up using
+ * lws_hdr_custom_length() and lws_hdr_custom_copy().
+ * 
+ * This api returns -1 on error else 0. Use lws_hdr_custom_copy() to get the
+ * values of headers. Lws must be built with LWS_WITH_CUSTOM_HEADERS (on by
+ * default) to use this api.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_hdr_custom_name_foreach(struct lws *wsi, lws_hdr_custom_fe_cb_t cb, void *opaque);
+
 /**
  * lws_get_urlarg_by_name_safe() - get copy and return length of y for x=y urlargs
  *
@@ -514,8 +535,6 @@ lws_hdr_custom_copy(struct lws *wsi, char *dst, int len, const char *name,
  *
  * Use this in place of lws_get_urlarg_by_name() that does not return an
  * explicit length.
- *
- * Use lws_get_urlarg_by_name_safe() instead of this, which returns the length.
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_get_urlarg_by_name_safe(struct lws *wsi, const char *name, char *buf, int len);
@@ -846,7 +865,7 @@ lws_http_redirect(struct lws *wsi, int code, const unsigned char *loc, int len,
  * lws_http_transaction_completed() - wait for new http transaction or close
  * \param wsi:	websocket connection
  *
- *	Returns 1 if the HTTP connection must close now
+ *	Returns nonzero if the HTTP connection must close now
  *	Returns 0 and resets connection to wait for new HTTP header /
  *	  transaction if possible
  */

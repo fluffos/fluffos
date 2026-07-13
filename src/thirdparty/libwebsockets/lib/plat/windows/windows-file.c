@@ -33,7 +33,8 @@ int lws_plat_apply_FD_CLOEXEC(int n)
 }
 
 lws_fop_fd_t
-_lws_plat_file_open(const struct lws_plat_file_ops *fops, const char *filename,
+_lws_plat_file_open(const struct lws_plat_file_ops *fops_own,
+		    const struct lws_plat_file_ops *fops, const char *filename,
 		    const char *vpath, lws_fop_flags_t *flags)
 {
 	HANDLE ret;
@@ -42,15 +43,14 @@ _lws_plat_file_open(const struct lws_plat_file_ops *fops, const char *filename,
 	LARGE_INTEGER llFileSize = {0};
 
 	MultiByteToWideChar(CP_UTF8, 0, filename, -1, buf, LWS_ARRAY_SIZE(buf));
-	if (((*flags) & 7) == _O_RDONLY) {
-		ret = CreateFileW(buf, GENERIC_READ, FILE_SHARE_READ,
-			  NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	} else {
+	if (((*flags) & 7) == _O_RDONLY)
+		ret = CreateFileW(buf, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+				  NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	else
 		ret = CreateFileW(buf, GENERIC_WRITE, 0, NULL,
-			  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	}
+				  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-	if (ret == LWS_INVALID_FILE)
+	if (ret == INVALID_HANDLE_VALUE)
 		goto bail;
 
 	fop_fd = malloc(sizeof(*fop_fd));
@@ -58,8 +58,13 @@ _lws_plat_file_open(const struct lws_plat_file_ops *fops, const char *filename,
 		goto bail;
 
 	fop_fd->fops = fops;
+#if defined(__MINGW32__)
+	/* we use filesystem_priv */
+	fop_fd->fd = (int)(intptr_t)ret;
+#else
 	fop_fd->fd = ret;
-	fop_fd->filesystem_priv = NULL; /* we don't use it */
+#endif
+	fop_fd->filesystem_priv = ret;
 	fop_fd->flags = *flags;
 	fop_fd->len = GetFileSize(ret, NULL);
 	if(GetFileSizeEx(ret, &llFileSize))
@@ -76,7 +81,7 @@ bail:
 int
 _lws_plat_file_close(lws_fop_fd_t *fop_fd)
 {
-	HANDLE fd = (*fop_fd)->fd;
+	HANDLE fd = (*fop_fd)->filesystem_priv;
 
 	free(*fop_fd);
 	*fop_fd = NULL;
@@ -92,7 +97,23 @@ _lws_plat_file_seek_cur(lws_fop_fd_t fop_fd, lws_fileofs_t offset)
 	LARGE_INTEGER l;
 
 	l.QuadPart = offset;
-	return SetFilePointerEx((HANDLE)fop_fd->fd, l, NULL, FILE_CURRENT);
+	if (!SetFilePointerEx((HANDLE)fop_fd->filesystem_priv, l, NULL, FILE_CURRENT))
+	{
+		lwsl_err("error seeking from cur %ld, offset %ld\n", (long)fop_fd->pos, (long)offset);
+		return -1;
+	}
+
+	LARGE_INTEGER zero;
+	zero.QuadPart = 0;
+	LARGE_INTEGER newPos;
+	if (!SetFilePointerEx((HANDLE)fop_fd->filesystem_priv, zero, &newPos, FILE_CURRENT))
+	{
+		lwsl_err("error seeking from cur %ld, offset %ld\n", (long)fop_fd->pos, (long)offset);
+		return -1;
+	}
+	fop_fd->pos = newPos.QuadPart;
+
+	return newPos.QuadPart;
 }
 
 int
@@ -101,7 +122,7 @@ _lws_plat_file_read(lws_fop_fd_t fop_fd, lws_filepos_t *amount,
 {
 	DWORD _amount;
 
-	if (!ReadFile((HANDLE)fop_fd->fd, buf, (DWORD)len, &_amount, NULL)) {
+	if (!ReadFile((HANDLE)fop_fd->filesystem_priv, buf, (DWORD)len, &_amount, NULL)) {
 		*amount = 0;
 
 		return 1;
@@ -119,7 +140,7 @@ _lws_plat_file_write(lws_fop_fd_t fop_fd, lws_filepos_t *amount,
 {
 	DWORD _amount;
 
-	if (!WriteFile((HANDLE)fop_fd->fd, buf, (DWORD)len, &_amount, NULL)) {
+	if (!WriteFile((HANDLE)fop_fd->filesystem_priv, buf, (DWORD)len, &_amount, NULL)) {
 		*amount = 0;
 
 		return 1;

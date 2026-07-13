@@ -33,6 +33,11 @@
  */
 ///@{
 
+#if defined(LWS_WITH_AWSLC) || defined(LWS_WITH_BORINGSSL)
+#include <openssl/hmac.h>
+#endif
+
+
 enum lws_genhash_types {
 	LWS_GENHASH_TYPE_UNKNOWN,
 	LWS_GENHASH_TYPE_MD5,
@@ -50,6 +55,8 @@ enum lws_genhmac_types {
 };
 
 #define LWS_GENHASH_LARGEST 64
+
+#if defined(LWS_WITH_TLS) && defined(LWS_WITH_GENCRYPTO)
 
 struct lws_genhash_ctx {
         uint8_t type;
@@ -75,7 +82,8 @@ struct lws_genhmac_ctx {
 #else
 	const EVP_MD *evp_type;
 
-#if defined(LWS_HAVE_EVP_PKEY_new_raw_private_key)
+#if !defined(LWS_WITH_BORINGSSL) &&\
+    defined(LWS_HAVE_EVP_PKEY_new_raw_private_key)
 	EVP_MD_CTX *ctx;
 	EVP_PKEY *key;
 #else
@@ -93,7 +101,8 @@ struct lws_genhmac_ctx {
  *
  * \param type:	one of LWS_GENHASH_TYPE_...
  *
- * Returns number of bytes in this type of hash
+ * Returns number of bytes in this type of hash, if the hash type is unknown, it
+ * will return 0.
  */
 LWS_VISIBLE LWS_EXTERN size_t LWS_WARN_UNUSED_RESULT
 lws_genhash_size(enum lws_genhash_types type);
@@ -102,7 +111,8 @@ lws_genhash_size(enum lws_genhash_types type);
  *
  * \param type:	one of LWS_GENHASH_TYPE_...
  *
- * Returns number of bytes in this type of hmac
+ * Returns number of bytes in this type of hmac, if the hmac type is unknown, it
+ * will return 0.
  */
 LWS_VISIBLE LWS_EXTERN size_t LWS_WARN_UNUSED_RESULT
 lws_genhmac_size(enum lws_genhmac_types type);
@@ -184,4 +194,6 @@ lws_genhmac_update(struct lws_genhmac_ctx *ctx, const void *in, size_t len);
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_genhmac_destroy(struct lws_genhmac_ctx *ctx, void *result);
+
+#endif
 ///@}

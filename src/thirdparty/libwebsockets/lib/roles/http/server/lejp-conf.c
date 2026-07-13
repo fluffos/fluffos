@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2025 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -71,7 +71,6 @@ enum lejp_global_paths {
 
 static const char * const paths_vhosts[] = {
 	"vhosts[]",
-	"vhosts[].mounts[]",
 	"vhosts[].name",
 	"vhosts[].port",
 	"vhosts[].interface",
@@ -89,13 +88,23 @@ static const char * const paths_vhosts[] = {
 	"vhosts[].mounts[].auth-mask",
 	"vhosts[].mounts[].cgi-timeout",
 	"vhosts[].mounts[].cgi-env[].*",
+	"vhosts[].mounts[].cgi-env[]",
 	"vhosts[].mounts[].cache-max-age",
 	"vhosts[].mounts[].cache-reuse",
 	"vhosts[].mounts[].cache-revalidate",
+	"vhosts[].mounts[].cache-no",
 	"vhosts[].mounts[].basic-auth",
 	"vhosts[].mounts[].cache-intermediaries",
 	"vhosts[].mounts[].extra-mimetypes.*",
+	"vhosts[].mounts[].extra-mimetypes",
 	"vhosts[].mounts[].interpret.*",
+	"vhosts[].mounts[].interpret",
+	"vhosts[].mounts[].cgi-chroot",
+	"vhosts[].mounts[].cgi-chdir",
+	"vhosts[].mounts[].headers[].*",
+	"vhosts[].mounts[].headers[]",
+	"vhosts[].mounts[].keepalive-timeout",
+	"vhosts[].mounts[]",
 	"vhosts[].ws-protocols[].*.*",
 	"vhosts[].ws-protocols[].*",
 	"vhosts[].ws-protocols[]",
@@ -108,6 +117,7 @@ static const char * const paths_vhosts[] = {
 	"vhosts[].ssl-option-set",
 	"vhosts[].ssl-option-clear",
 	"vhosts[].mounts[].pmo[].*",
+	"vhosts[].mounts[].pmo[]",
 	"vhosts[].headers[].*",
 	"vhosts[].headers[]",
 	"vhosts[].client-ssl-key",
@@ -119,6 +129,7 @@ static const char * const paths_vhosts[] = {
 	"vhosts[].ignore-missing-cert",
 	"vhosts[].error-document-404",
 	"vhosts[].alpn",
+	"vhosts[].fo-listen-queue",
 	"vhosts[].ssl-client-option-set",
 	"vhosts[].ssl-client-option-clear",
 	"vhosts[].tls13-ciphers",
@@ -139,7 +150,6 @@ static const char * const paths_vhosts[] = {
 
 enum lejp_vhost_paths {
 	LEJPVP,
-	LEJPVP_MOUNTS,
 	LEJPVP_NAME,
 	LEJPVP_PORT,
 	LEJPVP_INTERFACE,
@@ -157,13 +167,25 @@ enum lejp_vhost_paths {
 	LEJPVP_DEFAULT_AUTH_MASK,
 	LEJPVP_CGI_TIMEOUT,
 	LEJPVP_CGI_ENV,
+	LEJPVP_CGI_ENV_base,
 	LEJPVP_MOUNT_CACHE_MAX_AGE,
 	LEJPVP_MOUNT_CACHE_REUSE,
 	LEJPVP_MOUNT_CACHE_REVALIDATE,
+	LEJPVP_MOUNT_CACHE_NO,
 	LEJPVP_MOUNT_BASIC_AUTH,
 	LEJPVP_MOUNT_CACHE_INTERMEDIARIES,
 	LEJPVP_MOUNT_EXTRA_MIMETYPES,
+	LEJPVP_MOUNT_EXTRA_MIMETYPES_base,
 	LEJPVP_MOUNT_INTERPRET,
+	LEJPVP_MOUNT_INTERPRET_base,
+	LEJPVP_CGI_CHROOT,
+	LEJPVP_CGI_CHDIR,
+	LEJPVP_MOUNTPOINT_HEADERS_NAME,
+	LEJPVP_MOUNTPOINT_HEADERS,
+	LEJPVP_MOUNTPOINT_KEEPALIVE_TIMEOUT,
+
+	LEJPVP_MOUNTS,
+
 	LEJPVP_PROTOCOL_NAME_OPT,
 	LEJPVP_PROTOCOL_NAME,
 	LEJPVP_PROTOCOL,
@@ -176,6 +198,7 @@ enum lejp_vhost_paths {
 	LEJPVP_SSL_OPTION_SET,
 	LEJPVP_SSL_OPTION_CLEAR,
 	LEJPVP_PMO,
+	LEJPVP_PM_baseO,
 	LEJPVP_HEADERS_NAME,
 	LEJPVP_HEADERS,
 	LEJPVP_CLIENT_SSL_KEY,
@@ -187,6 +210,7 @@ enum lejp_vhost_paths {
 	LEJPVP_IGNORE_MISSING_CERT,
 	LEJPVP_ERROR_DOCUMENT_404,
 	LEJPVP_ALPN,
+	LWJPVP_FO_LISTEN_QUEUE,
 	LEJPVP_SSL_CLIENT_OPTION_SET,
 	LEJPVP_SSL_CLIENT_OPTION_CLEAR,
 	LEJPVP_TLS13_CIPHERS,
@@ -219,6 +243,9 @@ struct jpargs {
 	struct lws_protocol_vhost_options *pvo;
 	struct lws_protocol_vhost_options *pvo_em;
 	struct lws_protocol_vhost_options *pvo_int;
+
+	struct lws_protocol_vhost_options *pvo_mp;
+
 	struct lws_http_mount m;
 	const char **plugin_dirs;
 	int count_plugin_dirs;
@@ -228,6 +255,9 @@ struct jpargs {
 	unsigned int fresh_mount:1;
 	unsigned int any_vhosts:1;
 	unsigned int chunk:1;
+
+	struct lwsac *ac;
+       void *user;
 };
 
 static void *
@@ -375,6 +405,12 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 	char *p, *p1;
 	int n;
 
+	if (reason == LEJPCB_VAL_STR_START ||
+	    reason == LEJPCB_VAL_STR_CHUNK ||
+	    reason == LEJPCB_VAL_STR_END)
+		if (lejp_string_unify_part(ctx, &a->ac, reason))
+			return 1;
+
 #if 0
 	lwsl_notice(" %d: %s (%d)\n", reason, ctx->path, ctx->path_match);
 	for (n = 0; n < ctx->wildcount; n++)
@@ -422,6 +458,7 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 #if defined(LWS_ROLE_WS)
 		a->info->extensions = a->extensions;
 #endif
+               a->info->user = a->user;
 #if defined(LWS_WITH_TLS)
 #if defined(LWS_WITH_CLIENT)
 		a->info->client_ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
@@ -447,11 +484,13 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 				       "!DES:!MD5:!PSK:!RC4:!HMAC_SHA1:"
 				       "!SHA1:!DHE-RSA-AES128-GCM-SHA256:"
 				       "!DHE-RSA-AES128-SHA256:"
+                                      "!ECDHE-RSA-AES128-GCM-SHA256:"
 				       "!AES128-GCM-SHA256:"
 				       "!AES128-SHA256:"
 				       "!DHE-RSA-AES256-SHA256:"
 				       "!AES256-GCM-SHA384:"
-				       "!AES256-SHA256";
+                                      "!AES256-SHA256:"
+                                      "!CAMELLIA128:!CAMELLIA256";
 #endif
 #endif
 		a->info->keepalive_timeout = 5;
@@ -509,6 +548,37 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 		a->chunk = reason == LEJPCB_VAL_STR_CHUNK;
 		goto dostring;
 	}
+
+	/* this catches, eg, vhosts[].mount[].headers[].xxx */
+	if ((reason == LEJPCB_VAL_STR_END || reason == LEJPCB_VAL_STR_CHUNK) &&
+	    ctx->path_match == LEJPVP_MOUNTPOINT_HEADERS_NAME + 1) {
+
+		if (!a->chunk) {
+			headers = lwsws_align(a);
+			a->p += sizeof(*headers);
+
+			n = lejp_get_wildcard(ctx, 0, a->p,
+					lws_ptr_diff(a->end, a->p));
+			/* ie, add this header */
+			/* linked-list of pvos start held in a->pvo_mp */
+			headers->next = a->pvo_mp;
+			a->pvo_mp = headers;
+			headers->name = a->p;
+
+			lwsl_notice("  adding header %s=%s\n", a->p, ctx->buf);
+			a->p += n - 1;
+			*(a->p++) = ':';
+			if (a->p < a->end)
+				*(a->p++) = '\0';
+			else
+				*(a->p - 1) = '\0';
+			headers->value = a->p;
+			headers->options = NULL;
+		}
+		a->chunk = reason == LEJPCB_VAL_STR_CHUNK;
+		goto dostring;
+	}
+
 
 	if (reason == LEJPCB_OBJECT_END &&
 	    (ctx->path_match == LEJPVP + 1 || !ctx->path[0]) &&
@@ -605,6 +675,10 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 			return 1;
 		}
 
+		/* attach the tree of mountpoint headers, if any */
+		m->headers = a->pvo_mp;
+		a->pvo_mp = NULL;
+
 		a->p += sizeof(*m);
 		if (!a->head)
 			a->head = m;
@@ -682,6 +756,9 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 	case LEJPVP_MOUNT_CACHE_REVALIDATE:
 		a->m.cache_revalidate = !!arg_to_bool(ctx->buf);
 		return 0;
+	case LEJPVP_MOUNT_CACHE_NO:
+		a->m.cache_no = !!arg_to_bool(ctx->buf);
+		return 0;
 	case LEJPVP_MOUNT_CACHE_INTERMEDIARIES:
 		a->m.cache_intermediaries = !!arg_to_bool(ctx->buf);;
 		return 0;
@@ -693,8 +770,14 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 	case LEJPVP_CGI_TIMEOUT:
 		a->m.cgi_timeout = atoi(ctx->buf);
 		return 0;
+	case LWJPVP_FO_LISTEN_QUEUE:
+		a->info->fo_listen_queue = atoi(ctx->buf);
+		return 0;
 	case LEJPVP_KEEPALIVE_TIMEOUT:
 		a->info->keepalive_timeout = atoi(ctx->buf);
+		return 0;
+	case LEJPVP_MOUNTPOINT_KEEPALIVE_TIMEOUT:
+		a->m.keepalive_timeout = (unsigned int)atoi(ctx->buf);
 		return 0;
 #if defined(LWS_WITH_TLS)
 #if defined(LWS_WITH_CLIENT)
@@ -718,6 +801,9 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 #endif
 	case LEJPVP_PMO:
 	case LEJPVP_CGI_ENV:
+		if (a->chunk)
+			goto dostring;
+
 		mp_cgienv = lwsws_align(a);
 		a->p += sizeof(*a->m.cgienv);
 
@@ -738,6 +824,9 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 		 * vhosts[].ws-protocols[].xxx-protocol.yyy-option
 		 * ie, these are options attached to a protocol with { }
 		 */
+		if (a->chunk)
+			goto dostring;
+
 		pvo = lwsws_align(a);
 		a->p += sizeof(*a->pvo);
 
@@ -749,9 +838,12 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 		a->p += n;
 		pvo->value = a->p;
 		pvo->options = NULL;
-		break;
+		goto dostring;
 
 	case LEJPVP_MOUNT_EXTRA_MIMETYPES:
+		if (a->chunk)
+			goto dostring;
+
 		a->pvo_em = lwsws_align(a);
 		a->p += sizeof(*a->pvo_em);
 
@@ -764,9 +856,12 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 		a->p += n;
 		a->pvo_em->value = a->p;
 		a->pvo_em->options = NULL;
-		break;
+		goto dostring;
 
 	case LEJPVP_MOUNT_INTERPRET:
+		if (a->chunk)
+			goto dostring;
+
 		a->pvo_int = lwsws_align(a);
 		a->p += sizeof(*a->pvo_int);
 
@@ -780,6 +875,14 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 		a->p += n;
 		a->pvo_int->value = a->p;
 		a->pvo_int->options = NULL;
+		goto dostring;
+
+	case LEJPVP_CGI_CHROOT:
+		a->m.cgi_chroot_path = a->p;
+		break;
+
+	case LEJPVP_CGI_CHDIR:
+		a->m.cgi_wd = a->p;
 		break;
 
 	case LEJPVP_ENABLE_CLIENT_SSL:
@@ -899,8 +1002,24 @@ lejp_vhosts_cb(struct lejp_ctx *ctx, char reason)
 	}
 
 dostring:
-	p = ctx->buf;
-	p[LEJP_STRING_CHUNK] = '\0';
+	if (reason == LEJPCB_VAL_STR_CHUNK) {
+		a->chunk = 1;
+		return 0;
+	}
+
+	if (reason == LEJPCB_VAL_STR_END) {
+		lejp_string_unify(ctx, &a->ac);
+		p = ctx->su.fp;
+	} else
+		p = ctx->buf;
+
+	a->chunk = 0;
+
+	if (!p)
+		return 0;
+
+	if (reason != LEJPCB_VAL_STR_END)
+		p[LEJP_STRING_CHUNK] = '\0';
 	p1 = strstr(p, ESC_INSTALL_DATADIR);
 	if (p1) {
 		n = lws_ptr_diff(p1, p);
@@ -931,6 +1050,8 @@ lwsws_get_config(void *user, const char *f, const char * const *paths,
 	unsigned char buf[128];
 	struct lejp_ctx ctx;
 	int n, m = 0, fd;
+
+	memset(&ctx, 0, sizeof(ctx));
 
 	fd = lws_open(f, O_RDONLY);
 	if (fd < 0) {
@@ -1034,11 +1155,35 @@ lwsws_get_config_globals(struct lws_context_creation_info *info, const char *d,
 
 	a.plugin_dirs[a.count_plugin_dirs] = NULL;
 
+	lwsac_free(&a.ac);
+
 	*cs = a.p;
 	*len = lws_ptr_diff(a.end, a.p);
 
 	return 0;
 }
+
+#if 0
+typedef struct lws_retry_bo {
+        const uint32_t  *retry_ms_table;           /* base delay in ms */
+        uint16_t        retry_ms_table_count;      /* entries in table */
+        uint16_t        conceal_count;             /* max retries to conceal */
+        uint16_t        secs_since_valid_ping;     /* idle before PING issued */
+        uint16_t        secs_since_valid_hangup;   /* idle before hangup conn */
+        uint8_t         jitter_percent;         /* % additional random jitter */
+} lws_retry_bo_t;
+#endif
+
+static const uint32_t rmst[] = { 1000, 2000, 5000, 10000, 30000 };
+
+static const lws_retry_bo_t rebo = {
+	.retry_ms_table			= rmst,
+	.retry_ms_table_count		= LWS_ARRAY_SIZE(rmst),
+	.conceal_count			= 2,
+	.secs_since_valid_ping		= 15,
+	.secs_since_valid_hangup	= 20,
+	.jitter_percent			= 25,
+};
 
 int
 lwsws_get_config_vhosts(struct lws_context *context,
@@ -1052,11 +1197,14 @@ lwsws_get_config_vhosts(struct lws_context *context,
 	memset(&a, 0, sizeof(a));
 
 	a.info = info;
+	if (!a.info->retry_and_idle_policy)
+		a.info->retry_and_idle_policy = &rebo;
 	a.p = *cs;
 	a.end = a.p + *len;
 	a.valid = 0;
 	a.context = context;
 	a.protocols = info->protocols;
+       a.user = info->user;
 	a.pprotocols = info->pprotocols;
 #if defined(LWS_ROLE_WS)
 	a.extensions = info->extensions;
@@ -1078,6 +1226,8 @@ lwsws_get_config_vhosts(struct lws_context *context,
 
 	*cs = a.p;
 	*len = lws_ptr_diff(a.end, a.p);
+
+	lwsac_free(&a.ac);
 
 	if (!a.any_vhosts) {
 		lwsl_err("Need at least one vhost\n");

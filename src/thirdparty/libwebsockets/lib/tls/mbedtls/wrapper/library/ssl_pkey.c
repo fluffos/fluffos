@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "private-lib-core.h"
+
 #include "ssl_pkey.h"
 #include "ssl_methods.h"
 #include "ssl_dbg.h"
@@ -91,7 +93,7 @@ EVP_PKEY *d2i_PrivateKey(int type,
     if (a && *a) {
         pkey = *a;
     } else {
-        pkey = EVP_PKEY_new();;
+        pkey = EVP_PKEY_new();
         if (!pkey) {
             SSL_DEBUG(SSL_PKEY_ERROR_LEVEL, "EVP_PKEY_new() return NULL");
             goto failed1;

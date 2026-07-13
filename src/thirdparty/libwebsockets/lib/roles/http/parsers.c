@@ -520,7 +520,7 @@ int lws_hdr_copy_fragment(struct lws *wsi, char *dst, int len,
 	}
 
 	if (wsi->http.ah->frags[f].len >= len)
-		return -1;
+		return -2;
 
 	memcpy(dst, wsi->http.ah->data + wsi->http.ah->frags[f].offset,
 	       wsi->http.ah->frags[f].len);
@@ -545,24 +545,19 @@ int lws_hdr_copy(struct lws *wsi, char *dst, int len,
 		return -1;
 
 	n = wsi->http.ah->frag_index[h];
-	if (h == WSI_TOKEN_HTTP_URI_ARGS)
-		lwsl_err("%s: WSI_TOKEN_HTTP_URI_ARGS start frag %d\n",
-				__func__, n);
-
-
 	if (!n)
 		return 0;
 	do {
 		comma = (wsi->http.ah->frags[n].nfrag) ? 1 : 0;
 
-		if (h == WSI_TOKEN_HTTP_URI_ARGS)
+/*		if (h == WSI_TOKEN_HTTP_URI_ARGS)
 			lwsl_notice("%s: WSI_TOKEN_HTTP_URI_ARGS '%.*s'\n",
 				    __func__, (int)wsi->http.ah->frags[n].len,
 				    &wsi->http.ah->data[
 				                wsi->http.ah->frags[n].offset]);
-
+*/
 		if (wsi->http.ah->frags[n].len + comma >= len) {
-			lwsl_notice("blowout len\n");
+			lwsl_wsi_notice(wsi, "blowout len");
 			return -1;
 		}
 		strncpy(dst, &wsi->http.ah->data[wsi->http.ah->frags[n].offset],
@@ -592,8 +587,8 @@ int lws_hdr_copy(struct lws *wsi, char *dst, int len,
 	} while (n);
 	*dst = '\0';
 
-	if (h == WSI_TOKEN_HTTP_URI_ARGS)
-		lwsl_err("%s: WSI_TOKEN_HTTP_URI_ARGS toklen %d\n", __func__, (int)toklen);
+	// if (h == WSI_TOKEN_HTTP_URI_ARGS)
+	//	lwsl_err("%s: WSI_TOKEN_HTTP_URI_ARGS toklen %d\n", __func__, (int)toklen);
 
 	return toklen;
 }
@@ -655,6 +650,31 @@ lws_hdr_custom_copy(struct lws *wsi, char *dst, int len, const char *name,
 	}
 
 	return -1;
+}
+
+int
+lws_hdr_custom_name_foreach(struct lws *wsi, lws_hdr_custom_fe_cb_t cb,
+			    void *custom)
+{
+	ah_data_idx_t ll;
+
+	if (!wsi->http.ah || wsi->mux_substream)
+		return -1;
+
+	ll = wsi->http.ah->unk_ll_head;
+
+	while (ll) {
+		if (ll >= wsi->http.ah->data_length)
+			return -1;
+
+		cb(&wsi->http.ah->data[ll + UHO_NAME],
+		   lws_ser_ru16be((uint8_t *)&wsi->http.ah->data[ll + UHO_NLEN]),
+		   custom);
+
+		ll = lws_ser_ru32be((uint8_t *)&wsi->http.ah->data[ll + UHO_LL]);
+	}
+
+	return 0;
 }
 #endif
 
@@ -1512,82 +1532,81 @@ forbid:
 	return LPR_FORBIDDEN;
 }
 
+static const char * const cookie_prefixes[] = { "", "__Host-", "__Secure-" };
+
 int
 lws_http_cookie_get(struct lws *wsi, const char *name, char *buf,
 		    size_t *max_len)
 {
-	size_t max = *max_len, bl = strlen(name);
+	size_t max = *max_len, bl;
 	char *p, *bo = buf;
-	int n;
+	int n, m;
 
-	n = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COOKIE);
-	if ((unsigned int)n < bl + 1)
-		return 1;
+	for (m = 0; m < (int)LWS_ARRAY_SIZE(cookie_prefixes); m++) {
+		char nbuf[128];
+		const char *use_name = name;
 
-	/*
-	 * This can come to us two ways, in ah fragments (h2) or as a single
-	 * semicolon-delimited string (h1)
-	 */
+		if (m) {
+			lws_snprintf(nbuf, sizeof(nbuf), "%s%s",
+				     cookie_prefixes[m], name);
+			use_name = nbuf;
+		}
+
+		bl = strlen(use_name);
+		n = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COOKIE);
+		if ((unsigned int)n < bl + 1)
+			continue;
 
 #if defined(LWS_ROLE_H2)
-	if (lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COLON_METHOD)) {
+		if (lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COLON_METHOD)) {
+			int f = wsi->http.ah->frag_index[WSI_TOKEN_HTTP_COOKIE];
+			size_t fl;
 
-		/*
-		 * The h2 way...
-		 */
+			while (f) {
+				p = wsi->http.ah->data + wsi->http.ah->frags[f].offset;
+				fl = (size_t)wsi->http.ah->frags[f].len;
+				if (fl >= bl + 1 &&
+				    p[bl] == '=' &&
+				    !memcmp(p, use_name, bl)) {
+					fl -= bl + 1;
+					if (max - 1 < fl)
+						fl = max - 1;
+					if (fl)
+						memcpy(buf, p + bl + 1, fl);
+					*max_len = fl;
+					buf[fl] = '\0';
 
-		int f = wsi->http.ah->frag_index[WSI_TOKEN_HTTP_COOKIE];
-		size_t fl;
-
-		while (f) {
-			p = wsi->http.ah->data + wsi->http.ah->frags[f].offset;
-			fl = (size_t)wsi->http.ah->frags[f].len;
-			if (fl >= bl + 1 &&
-			    p[bl] == '=' &&
-			    !memcmp(p, name, bl)) {
-				fl -= bl + 1;
-				if (max - 1 < fl)
-					fl = max - 1;
-				if (fl)
-					memcpy(buf, p + bl + 1, fl);
-				*max_len = fl;
-				buf[fl] = '\0';
-
-				return 0;
+					return 0;
+				}
+				f = wsi->http.ah->frags[f].nfrag;
 			}
-			f = wsi->http.ah->frags[f].nfrag;
-		}
-
-		return -1;
-	}
+		} else
 #endif
+		{
+			p = lws_hdr_simple_ptr(wsi, WSI_TOKEN_HTTP_COOKIE);
+			if (p) {
+				char *pe = p + n;
 
-	/*
-	 * The h1 way...
-	 */
+				while (p < pe) {
+					if (!memcmp(p, use_name, bl) && p[bl] == '=') {
+						/* it's a match... is it at the start or after a space / ;? */
+						if (p == lws_hdr_simple_ptr(wsi, WSI_TOKEN_HTTP_COOKIE) ||
+						    p[-1] == ' ' || p[-1] == ';') {
+							p += bl + 1;
+							while (p < pe && *p != ';' && max > 1) {
+								*buf++ = *p++;
+								max--;
+							}
+							*buf = '\0';
+							*max_len = lws_ptr_diff_size_t(buf, bo);
 
-	p = lws_hdr_simple_ptr(wsi, WSI_TOKEN_HTTP_COOKIE);
-	if (!p)
-		return 1;
-
-	p += bl;
-	n -= (int)bl;
-	while (n-- > (int)bl) {
-		if (*p == '=' && !memcmp(p - bl, name, (unsigned int)bl)) {
-			p++;
-			while (*p != ';' && n-- && max) {
-				*buf++ = *p++;
-				max--;
+							return 0;
+						}
+					}
+					p++;
+				}
 			}
-			if (!max)
-				return 2;
-
-			*buf = '\0';
-			*max_len = lws_ptr_diff_size_t(buf, bo);
-
-			return 0;
 		}
-		p++;
 	}
 
 	return 1;

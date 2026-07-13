@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -22,9 +22,72 @@
  * IN THE SOFTWARE.
  *
  * These are exports needed by event lib plugins.
- *
- * You should consider these opaque for normal user code.
  */
+
+enum lws_event_lib_ops_flags {
+	LELOF_ISPOLL				= (1 >> 0),
+	LELOF_DESTROY_FINAL			= (1 >> 1),
+};
+
+enum {
+	LWS_EV_READ				= (1 << 0),
+	LWS_EV_WRITE				= (1 << 1),
+	LWS_EV_START				= (1 << 2),
+	LWS_EV_STOP				= (1 << 3),
+};
+
+struct lws_event_loop_ops {
+	const char *name;
+	/* event loop-specific context init during context creation */
+	int (*init_context)(struct lws_context *context,
+			    const struct lws_context_creation_info *info);
+	/* called during lws_destroy_context */
+	int (*destroy_context1)(struct lws_context *context);
+	/* called during lws_destroy_context2 */
+	int (*destroy_context2)(struct lws_context *context);
+	/* init vhost listening wsi */
+	int (*init_vhost_listen_wsi)(struct lws *wsi);
+	/* init the event loop for a pt */
+	int (*init_pt)(struct lws_context *context, void *_loop, int tsi);
+	/* called at end of first phase of close_free_wsi()  */
+	int (*wsi_logical_close)(struct lws *wsi);
+	/* return nonzero if client connect not allowed  */
+	int (*check_client_connect_ok)(struct lws *wsi);
+	/* close handle manually  */
+	void (*close_handle_manually)(struct lws *wsi);
+	/* event loop accept processing  */
+	int (*sock_accept)(struct lws *wsi);
+	/* control wsi active events  */
+	void (*io)(struct lws *wsi, unsigned int flags);
+	/* run the event loop for a pt */
+	void (*run_pt)(struct lws_context *context, int tsi);
+	/* called before pt is destroyed */
+	void (*destroy_pt)(struct lws_context *context, int tsi);
+	/* called just before wsi is freed  */
+	void (*destroy_wsi)(struct lws *wsi);
+	/* return nonzero if caller thread is not loop service thread  */
+	int (*foreign_thread)(struct lws_context *context, int tsi);
+	/* optional: custom implementation for faking POLLIN for buffered.
+	 *           return nonzero if any wsi faked */
+	int (*fake_POLLIN_override)(struct lws_context *context, int tsi);
+
+	uint8_t	flags;
+
+	uint16_t	evlib_size_ctx;
+	uint16_t	evlib_size_pt;
+	uint16_t	evlib_size_vh;
+	uint16_t	evlib_size_wsi;
+};
+
+LWS_VISIBLE LWS_EXTERN void *
+lws_evlib_wsi_to_evlib_pt(struct lws *wsi);
+
+LWS_VISIBLE LWS_EXTERN void *
+lws_evlib_tsi_to_evlib_pt(struct lws_context *ctx, int tsi);
+
+ /*
+  * You should consider these opaque for normal user code.
+  */
 
 LWS_VISIBLE LWS_EXTERN void *
 lws_realloc(void *ptr, size_t size, const char *reason);
@@ -35,6 +98,10 @@ lws_vhost_destroy1(struct lws_vhost *vh);
 LWS_VISIBLE LWS_EXTERN void
 lws_close_free_wsi(struct lws *wsi, enum lws_close_status reason,
 		   const char *caller);
+
+LWS_VISIBLE LWS_EXTERN int
+lws_vhost_foreach_listen_wsi(struct lws_context *cx, void *arg,
+			     lws_dll2_foreach_cb_t cb);
 
 struct lws_context_per_thread;
 LWS_VISIBLE LWS_EXTERN void

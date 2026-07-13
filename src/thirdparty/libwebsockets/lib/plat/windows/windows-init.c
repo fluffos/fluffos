@@ -77,6 +77,44 @@ lws_plat_init(struct lws_context *context,
 	struct lws_context_per_thread *pt = &context->pt[0];
 	int i, n = context->count_threads;
 
+#if defined(LWS_WITH_MBEDTLS)
+	{
+		int n;
+
+		/* initialize platform random through mbedtls */
+		mbedtls_entropy_init(&context->mec);
+		mbedtls_ctr_drbg_init(&context->mcdc);
+
+		n = mbedtls_ctr_drbg_seed(&context->mcdc, mbedtls_entropy_func,
+					  &context->mec, NULL, 0);
+		if (n)
+			lwsl_err("%s: mbedtls_ctr_drbg_seed() returned 0x%x\n",
+				 __func__, n);
+#if 0
+		else {
+			uint8_t rtest[16];
+			lwsl_notice("%s: started drbg\n", __func__);
+			if (mbedtls_ctr_drbg_random(&context->mcdc, rtest,
+							sizeof(rtest)))
+				lwsl_err("%s: get random failed\n", __func__);
+			else
+				lwsl_hexdump_notice(rtest, sizeof(rtest));
+		}
+#endif
+	}
+#endif
+
+#if defined(LWS_HAVE_SSL_CTX_set_keylog_callback) && \
+		defined(LWS_WITH_TLS) && defined(LWS_WITH_CLIENT)
+	{
+		char *klf_env = getenv("SSLKEYLOGFILE");
+
+		if (klf_env)
+			lws_strncpy(context->keylog_file, klf_env,
+				sizeof(context->keylog_file));
+	}
+#endif
+
 	for (i = 0; i < FD_HASHTABLE_MODULUS; i++) {
 		context->fd_hashtable[i].wsi =
 			lws_zalloc(sizeof(struct lws*) * context->max_fds,
@@ -94,12 +132,17 @@ lws_plat_init(struct lws_context *context,
 
 	context->fd_random = 0;
 
-#if defined(LWS_WITH_PLUGINS)
+#if defined(LWS_WITH_PLUGINS) && !defined(LWS_WITH_PLUGINS_BUILTIN)
 	if (info->plugin_dirs)
 		lws_plat_plugins_init(&context->plugin_list, info->plugin_dirs,
 				      "lws_protocol_plugin",
 				      protocol_plugin_cb, context);
 #endif
+#if defined(LWS_BUILTIN_PLUGIN_NAMES)
+	lws_plugins_handle_builtin(&context->plugin_list,
+				   protocol_plugin_cb, context);
+#endif
+
 
 	return 0;
 }

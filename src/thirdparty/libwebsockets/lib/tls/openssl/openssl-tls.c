@@ -27,48 +27,10 @@
 
 extern int openssl_websocket_private_data_index,
 	   openssl_SSL_CTX_private_data_index;
+static int openssl_contexts_using_global_init;
 #if defined(LWS_WITH_NETWORK)
 static char openssl_ex_indexes_acquired;
 #endif
-
-char* lws_ssl_get_error_string(int status, int ret, char *buf, size_t len) {
-	switch (status) {
-	case SSL_ERROR_NONE:
-		return lws_strncpy(buf, "SSL_ERROR_NONE", len);
-	case SSL_ERROR_ZERO_RETURN:
-		return lws_strncpy(buf, "SSL_ERROR_ZERO_RETURN", len);
-	case SSL_ERROR_WANT_READ:
-		return lws_strncpy(buf, "SSL_ERROR_WANT_READ", len);
-	case SSL_ERROR_WANT_WRITE:
-		return lws_strncpy(buf, "SSL_ERROR_WANT_WRITE", len);
-	case SSL_ERROR_WANT_CONNECT:
-		return lws_strncpy(buf, "SSL_ERROR_WANT_CONNECT", len);
-	case SSL_ERROR_WANT_ACCEPT:
-		return lws_strncpy(buf, "SSL_ERROR_WANT_ACCEPT", len);
-	case SSL_ERROR_WANT_X509_LOOKUP:
-		return lws_strncpy(buf, "SSL_ERROR_WANT_X509_LOOKUP", len);
-	case SSL_ERROR_SYSCALL:
-		switch (ret) {
-                case 0:
-                        lws_snprintf(buf, len, "SSL_ERROR_SYSCALL: EOF");
-                        return buf;
-                case -1:
-#ifndef LWS_PLAT_OPTEE
-			lws_snprintf(buf, len, "SSL_ERROR_SYSCALL: %s",
-				     strerror(errno));
-#else
-			lws_snprintf(buf, len, "SSL_ERROR_SYSCALL: %d", errno);
-#endif
-			return buf;
-                default:
-                        return strncpy(buf, "SSL_ERROR_SYSCALL", len);
-	}
-	case SSL_ERROR_SSL:
-		return "SSL_ERROR_SSL";
-	default:
-		return "SSL_ERROR_UNKNOWN";
-	}
-}
 
 void
 lws_tls_err_describe_clear(void)
@@ -77,15 +39,11 @@ lws_tls_err_describe_clear(void)
 	unsigned long l;
 
 	do {
-		l = ERR_get_error();
+		l = ERR_peek_error();
 		if (!l)
 			break;
 
-		ERR_error_string_n(
-#if defined(LWS_WITH_BORINGSSL)
-				(uint32_t)
-#endif
-				l, buf, sizeof(buf));
+		ERR_error_string_n(ERR_get_error(), buf, sizeof(buf));
 		lwsl_info("   openssl error: %s\n", buf);
 	} while (l);
 	lwsl_info("\n");
@@ -118,40 +76,47 @@ lws_openssl_thread_id(void)
 }
 #endif
 
-
 int
-lws_context_init_ssl_library(const struct lws_context_creation_info *info)
+lws_context_init_ssl_library(struct lws_context *cx,
+                             const struct lws_context_creation_info *info)
 {
 #ifdef USE_WOLFSSL
 #ifdef USE_OLD_CYASSL
-	lwsl_info(" Compiled with CyaSSL support\n");
+	lwsl_cx_info(cx, " Compiled with CyaSSL support");
 #else
-	lwsl_info(" Compiled with wolfSSL support\n");
+	lwsl_cx_info(cx, " Compiled with wolfSSL support");
 #endif
 #else
 #if defined(LWS_WITH_BORINGSSL)
-	lwsl_info(" Compiled with BoringSSL support\n");
+	lwsl_cx_info(cx, " Compiled with BoringSSL support");
+#elif defined(LWS_WITH_AWSLC)
+	lwsl_cx_info(cx, " Compiled with AWS-LC support");
 #else
-	lwsl_info(" Compiled with OpenSSL support\n");
+	lwsl_cx_info(cx, " Compiled with OpenSSL support");
 #endif
 #endif
 	if (!lws_check_opt(info->options, LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT)) {
-		lwsl_info(" SSL disabled: no "
-			  "LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT\n");
+#if !defined(LWS_WITH_MBEDTLS) && defined(LWS_WITH_NETWORK)
+		if (!info->provided_client_ssl_ctx)
+#endif
+			lwsl_cx_info(cx, " SSL disabled: no "
+				"LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT");
 		return 0;
 	}
 
 	/* basic openssl init */
 
-	lwsl_info("Doing SSL library init\n");
+	if (!openssl_contexts_using_global_init++) {
+		lwsl_cx_info(cx, "Doing SSL library init");
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-	SSL_library_init();
-	OpenSSL_add_all_algorithms();
-	SSL_load_error_strings();
+		SSL_library_init();
+		OpenSSL_add_all_algorithms();
+		SSL_load_error_strings();
 #else
-	OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
+		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
 #endif
+	}
 #if defined(LWS_WITH_NETWORK)
 	if (!openssl_ex_indexes_acquired) {
 		openssl_websocket_private_data_index =
@@ -194,12 +159,12 @@ lws_context_init_ssl_library(const struct lws_context_creation_info *info)
 void
 lws_context_deinit_ssl_library(struct lws_context *context)
 {
-#if LWS_MAX_SMP != 1
-	int n;
-
 	if (!lws_check_opt(context->options,
 			   LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT))
 		return;
+
+#if LWS_MAX_SMP != 1
+	int n;
 
 	CRYPTO_set_locking_callback(NULL);
 
@@ -211,4 +176,11 @@ lws_context_deinit_ssl_library(struct lws_context *context)
 		openssl_mutexes = NULL;
 	}
 #endif
+
+	if (!--openssl_contexts_using_global_init) {
+		lwsl_cx_info(context, "Doing SSL library cleanup");
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+		OPENSSL_cleanup();
+#endif
+	}
 }

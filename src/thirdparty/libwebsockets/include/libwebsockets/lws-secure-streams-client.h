@@ -29,6 +29,9 @@
  * lws_sspc_        when client is in a different process to the event loop
  *
  * The client api is almost the same except the slightly diffent names.
+ *
+ * This header is included as part of libwebsockets.h, for link against the
+ * libwebsockets library.
  */
 
 /*
@@ -39,6 +42,9 @@
  * Helper translation so user code written to lws_ss_ can be built for
  * lws_sspc_ in one step by #define LWS_SS_USE_SSPC before including
  */
+
+
+struct lws_sspc_handle;
 
 #if defined(LWS_SS_USE_SSPC)
 #define lws_ss_handle			lws_sspc_handle
@@ -60,17 +66,142 @@
 #define lws_ss_to_user_object		lws_sspc_to_user_object
 #define lws_ss_change_handlers		lws_sspc_change_handlers
 #define lws_smd_ss_rx_forward		lws_smd_sspc_rx_forward
+#define lws_ss_server_ack		lws_sspc_server_ack
 #define lws_ss_tag			lws_sspc_tag
 #define _lws_fi_user_ss_fi		_lws_fi_user_sspc_fi
+#define lwsl_ss_get_cx			lwsl_sspc_get_cx
+
+#undef lwsl_ss
+#define lwsl_ss lwsl_sspc
+
+#undef lwsl_hexdump_ss
+#define lwsl_hexdump_ss lwsl_hexdump_sspc
 #endif
 
+LWS_VISIBLE LWS_EXTERN void
+lws_log_prepend_sspc(struct lws_log_cx *cx, void *obj, char **p, char *e);
 
-struct lws_sspc_handle;
+LWS_VISIBLE LWS_EXTERN struct lws_log_cx *
+lwsl_sspc_get_cx(struct lws_sspc_handle *ss);
+
+#define lwsl_sspc(_h, _fil, ...) \
+		 _lws_log_cx(lwsl_sspc_get_cx(_h), lws_log_prepend_sspc, _h, \
+					_fil, __func__, __VA_ARGS__)
+
+#define lwsl_hexdump_sspc(_h, _fil, _buf, _len) \
+		lwsl_hexdump_level_cx(lwsl_sspc_get_cx(_h), \
+				      lws_log_prepend_sspc, \
+				      _h, _fil, _buf, _len)
+
+/*
+ * lwsl_sspc
+ */
+
+#if (_LWS_ENABLED_LOGS & LLL_ERR)
+#define lwsl_sspc_err(_w, ...) lwsl_sspc(_w, LLL_ERR, __VA_ARGS__)
+#else
+#define lwsl_sspc_err(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_WARN)
+#define lwsl_sspc_warn(_w, ...) lwsl_sspc(_w, LLL_WARN, __VA_ARGS__)
+#else
+#define lwsl_sspc_warn(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_NOTICE)
+#define lwsl_sspc_notice(_w, ...) lwsl_sspc(_w, LLL_NOTICE, __VA_ARGS__)
+#else
+#define lwsl_sspc_notice(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_INFO)
+#define lwsl_sspc_info(_w, ...) lwsl_sspc(_w, LLL_INFO, __VA_ARGS__)
+#else
+#define lwsl_sspc_info(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_DEBUG)
+#define lwsl_sspc_debug(_w, ...) lwsl_sspc(_w, LLL_DEBUG, __VA_ARGS__)
+#else
+#define lwsl_sspc_debug(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_PARSER)
+#define lwsl_sspc_parser(_w, ...) lwsl_sspc(_w, LLL_PARSER, __VA_ARGS__)
+#else
+#define lwsl_sspc_parser(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_HEADER)
+#define lwsl_sspc_header(_w, ...) lwsl_sspc(_w, LLL_HEADER, __VA_ARGS__)
+#else
+#define lwsl_sspc_header(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_EXT)
+#define lwsl_sspc_ext(_w, ...) lwsl_sspc(_w, LLL_EXT, __VA_ARGS__)
+#else
+#define lwsl_sspc_ext(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_CLIENT)
+#define lwsl_sspc_client(_w, ...) lwsl_sspc(_w, LLL_CLIENT, __VA_ARGS__)
+#else
+#define lwsl_sspc_client(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_LATENCY)
+#define lwsl_sspc_latency(_w, ...) lwsl_sspc(_w, LLL_LATENCY, __VA_ARGS__)
+#else
+#define lwsl_sspc_latency(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_THREAD)
+#define lwsl_sspc_thread(_w, ...) lwsl_sspc(_w, LLL_THREAD, __VA_ARGS__)
+#else
+#define lwsl_sspc_thread(_w, ...) do {} while(0)
+#endif
+
+#if (_LWS_ENABLED_LOGS & LLL_USER)
+#define lwsl_sspc_user(_w, ...) lwsl_sspc(_w, LLL_USER, __VA_ARGS__)
+#else
+#define lwsl_sspc_user(_w, ...) do {} while(0)
+#endif
+
+#define lwsl_hexdump_sspc_err(_v, ...)    lwsl_hexdump_sspc(_v, LLL_ERR, __VA_ARGS__)
+#define lwsl_hexdump_sspc_warn(_v, ...)   lwsl_hexdump_sspc(_v, LLL_WARN, __VA_ARGS__)
+#define lwsl_hexdump_sspc_notice(_v, ...) lwsl_hexdump_sspc(_v, LLL_NOTICE, __VA_ARGS__)
+#define lwsl_hexdump_sspc_info(_v, ...)   lwsl_hexdump_sspc(_v, LLL_INFO, __VA_ARGS__)
+#define lwsl_hexdump_sspc_debug(_v, ...)  lwsl_hexdump_sspc(_v, LLL_DEBUG, __VA_ARGS__)
+
+/*
+ * How lws refers to your per-proxy-link private data... not allocated or freed
+ * by lws, nor used except to pass a pointer to it through to ops callbacks
+ * below.  Should be set to your transport private instance object, it's set to
+ * the wsi for the wsi transport.  Notice it is provided as a ** (ptr-to-ptr) in
+ * most apis.
+ */
+
+/*
+ * Stub context when using LWS_ONLY_SSPC
+ */
+
+struct lws_context_standalone {
+	lws_txp_path_client_t			txp_cpath;
+	lws_dll2_owner_t			ss_client_owner;
+	uint32_t				ssidx;
+};
+
+#if defined(STANDALONE)
+#define lws_context lws_context_standalone
+struct lws_context_standalone;
+#endif
 
 LWS_VISIBLE LWS_EXTERN int
 lws_sspc_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 		void *opaque_user_data, struct lws_sspc_handle **ppss,
-		struct lws_sequencer *seq_owner, const char **ppayload_fmt);
+		void *reserved, const char **ppayload_fmt);
 
 /**
  * lws_sspc_destroy() - Destroy secure stream
@@ -119,24 +250,10 @@ lws_sspc_request_tx_len(struct lws_sspc_handle *h, unsigned long len);
  *
  * \param h: secure streams handle
  *
- * Starts the connection process for the secure stream.  Returns 0 if OK or
- * nonzero if we have already failed.
+ * Starts the connection process for the secure stream.  Returns 0.
  */
 LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t
 lws_sspc_client_connect(struct lws_sspc_handle *h);
-
-/**
- * lws_sspc_get_sequencer() - Return parent sequencer pointer if any
- *
- * \param h: secure streams handle
- *
- * Returns NULL if the secure stream is not associated with a sequencer.
- * Otherwise returns a pointer to the owning sequencer.  You can use this to
- * identify which sequencer to direct messages to, from the secure stream
- * callback.
- */
-LWS_VISIBLE LWS_EXTERN struct lws_sequencer *
-lws_sspc_get_sequencer(struct lws_sspc_handle *h);
 
 /**
  * lws_sspc_proxy_create() - Start a unix domain socket proxy for Secure Streams
@@ -161,7 +278,9 @@ lws_sspc_proxy_create(struct lws_context *context);
 LWS_VISIBLE LWS_EXTERN struct lws_context *
 lws_sspc_get_context(struct lws_sspc_handle *h);
 
-LWS_VISIBLE extern const struct lws_protocols lws_sspc_protocols[2];
+#if defined(LWS_WITH_NETWORK)
+extern const struct lws_protocols lws_sspc_protocols[2];
+#endif
 
 LWS_VISIBLE LWS_EXTERN const char *
 lws_sspc_rideshare(struct lws_sspc_handle *h);
@@ -188,7 +307,7 @@ lws_sspc_rideshare(struct lws_sspc_handle *h);
  * when the policy is using h1 is interpreted to add h1 headers of the given
  * name with the value of the metadata on the left.
  *
- * Return 0 if OK.
+ * Return 0 if OK, or nonzero if failed.
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_sspc_set_metadata(struct lws_sspc_handle *h, const char *name,
@@ -215,14 +334,29 @@ lws_sspc_to_user_object(struct lws_sspc_handle *h);
 
 LWS_VISIBLE LWS_EXTERN void
 lws_sspc_change_handlers(struct lws_sspc_handle *h,
-	lws_ss_state_return_t (*rx)(void *userobj, const uint8_t *buf,
-				    size_t len, int flags),
-	lws_ss_state_return_t (*tx)(void *userobj, lws_ss_tx_ordinal_t ord,
-				    uint8_t *buf, size_t *len, int *flags),
-	lws_ss_state_return_t (*state)(void *userobj, void *h_src
-					/* ss handle type */,
-				       lws_ss_constate_t state,
-				       lws_ss_tx_ordinal_t ack));
+			 lws_sscb_rx rx,lws_sscb_tx tx, lws_sscb_state state);
 
-const char *
+LWS_VISIBLE LWS_EXTERN void
+lws_sspc_server_ack(struct lws_sspc_handle *h, int nack);
+
+
+/*
+ * Helpers offered by lws to handle transport SSPC-side proxy link events
+ */
+
+/**
+ * lws_sspc_tag() - get the sspc log tag
+ *
+ * \param h: the sspc handle
+ *
+ * Returns the sspc log tag, to assist in logging traceability
+ */
+LWS_VISIBLE LWS_EXTERN const char *
 lws_sspc_tag(struct lws_sspc_handle *h);
+
+
+#if defined(STANDALONE)
+#undef lws_context
+#endif
+
+

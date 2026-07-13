@@ -31,6 +31,15 @@ lws_tls_server_client_cert_verify_config(struct lws_vhost *vh)
 {
 	int verify_options = SSL_VERIFY_PEER;
 
+	if (lws_check_opt(vh->options,
+			  LWS_SERVER_OPTION_MBEDTLS_VERIFY_CLIENT_CERT_POST_HANDSHAKE)) {
+		verify_options |= SSL_VERIFY_POST_HANDSHAKE;
+		SSL_CTX_set_verify(vh->tls.ssl_ctx, verify_options, NULL);
+		lwsl_notice("%s: vh %s can verify client cert post-handshake\n",
+				__func__, vh->name);
+		return 0;
+	}
+
 	/* as a server, are we requiring clients to identify themselves? */
 	if (!lws_check_opt(vh->options,
 			  LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT)) {
@@ -39,7 +48,7 @@ lws_tls_server_client_cert_verify_config(struct lws_vhost *vh)
 	}
 
 	if (!lws_check_opt(vh->options, LWS_SERVER_OPTION_PEER_CERT_NOT_REQUIRED))
-		verify_options = SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+		verify_options |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 
 	lwsl_notice("%s: vh %s requires client cert %d\n", __func__, vh->name,
 		    verify_options);
@@ -148,7 +157,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 	}
 	if (lws_tls_alloc_pem_to_der_file(vhost->context, cert, mem_cert,
 					  mem_cert_len, &p, &flen)) {
-		lwsl_err("couldn't find cert file %s\n", cert);
+		lwsl_err("couldn't load cert file %s\n", cert);
 
 		return 1;
 	}
@@ -196,6 +205,7 @@ lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
 		return 1;
 	}
 
+	vhost->tls.ssl_ctx->rngctx = &vhost->context->mcdc;
 	if (!vhost->tls.use_ssl ||
 	    (!info->ssl_cert_filepath && !info->server_ssl_cert_mem))
 		return 0;
@@ -264,14 +274,12 @@ lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 	return 0;
 }
 
-#if defined(LWS_AMAZON_RTOS)
 enum lws_ssl_capable_status
-#else
-int
-#endif
 lws_tls_server_abort_connection(struct lws *wsi)
 {
-	__lws_tls_shutdown(wsi);
+	if (wsi->tls.use_ssl)
+		__lws_tls_shutdown(wsi);
+	
 	SSL_free(wsi->tls.ssl);
 
 	return 0;

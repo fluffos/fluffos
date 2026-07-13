@@ -23,6 +23,7 @@
  */
 
 #include "private-lib-core.h"
+#include "private-lib-tls-openssl.h"
 
 /*
  * Care: many openssl apis return 1 for success.  These are translated to the
@@ -51,6 +52,8 @@ OpenSSL_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
 	 * static
 	 */
 	wsi = SSL_get_ex_data(ssl, openssl_websocket_private_data_index);
+	if (!wsi)
+		return 0; /* OpenSSL failure */
 
 	n = lws_tls_openssl_cert_info(topcert, LWS_TLS_CERT_INFO_COMMON_NAME,
 				      &ir, sizeof(ir.ns.name));
@@ -159,7 +162,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
     ((OPENSSL_VERSION_NUMBER < 0x30000000l) || \
      defined(LWS_SUPPRESS_DEPRECATED_API_WARNINGS))
 	const char *ecdh_curve = "prime256v1";
-#if !defined(LWS_WITH_BORINGSSL) && defined(LWS_HAVE_SSL_EXTRA_CHAIN_CERTS)
+#if !defined(LWS_WITH_BORINGSSL) && !defined(LWS_WITH_AWSLC) && defined(LWS_HAVE_SSL_EXTRA_CHAIN_CERTS)
 	STACK_OF(X509) *extra_certs = NULL;
 #endif
 	EC_KEY *ecdh, *EC_key = NULL;
@@ -213,14 +216,8 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 		m = SSL_CTX_use_certificate_chain_file(vhost->tls.ssl_ctx, cert);
 		if (m != 1) {
 			const char *s;
-			error = ERR_get_error();
-
-			s = ERR_error_string(
-#if defined(LWS_WITH_BORINGSSL)
-				(uint32_t)
-#endif
-					error,
-				       (char *)vhost->context->pt[0].serv_buf);
+			error = ERR_peek_error();
+			s = ERR_error_string(ERR_get_error(), (char *)vhost->context->pt[0].serv_buf);
 
 			lwsl_err("problem getting cert '%s' %lu: %s\n",
 				 cert, error, s);
@@ -228,28 +225,18 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 			return 1;
 		}
 
-		if (private_key) {
+		if (!private_key) {
+			lwsl_err("ssl private key not set\n");
+			return 1;
+		} else {
 			/* set the private key from KeyFile */
 			if (SSL_CTX_use_PrivateKey_file(vhost->tls.ssl_ctx, private_key,
 							SSL_FILETYPE_PEM) != 1) {
 				const char *s;
-				error = ERR_get_error();
-				s = ERR_error_string(
-	#if defined(LWS_WITH_BORINGSSL)
-					(uint32_t)
-	#endif
-						error,
-					       (char *)vhost->context->pt[0].serv_buf);
+				error = ERR_peek_error();
+				s = ERR_error_string(ERR_get_error(), (char *)vhost->context->pt[0].serv_buf);
 				lwsl_err("ssl problem getting key '%s' %lu: %s\n",
 					 private_key, error, s);
-				return 1;
-			}
-		} else {
-			if (vhost->protocols[0].callback(wsi,
-				      LWS_CALLBACK_OPENSSL_CONTEXT_REQUIRES_PRIVATE_KEY,
-							 vhost->tls.ssl_ctx, NULL, 0)) {
-				lwsl_err("ssl private key not set\n");
-
 				return 1;
 			}
 		}
@@ -267,13 +254,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 	}
 
 #if !defined(USE_WOLFSSL)
-	ret = SSL_CTX_use_certificate_ASN1(vhost->tls.ssl_ctx,
-#if defined(LWS_WITH_BORINGSSL)
-				(size_t)
-#else
-				(int)
-#endif
-				flen, p);
+	ret = SSL_CTX_use_certificate_ASN1(vhost->tls.ssl_ctx, SSL_SIZE_CAST(flen), p);
 #else
 	ret = wolfSSL_CTX_use_certificate_buffer(vhost->tls.ssl_ctx,
 						 (uint8_t *)p, (int)flen,
@@ -296,7 +277,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 
 #if !defined(USE_WOLFSSL)
 	ret = SSL_CTX_use_PrivateKey_ASN1(EVP_PKEY_RSA, vhost->tls.ssl_ctx, p,
-#if defined(LWS_WITH_BORINGSSL)
+#if defined(LWS_WITH_BORINGSSL) || defined(LWS_WITH_AWSLC)
 			(size_t)
 #else
 					  (long)(long long)
@@ -305,7 +286,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 	if (ret != 1) {
 		ret = SSL_CTX_use_PrivateKey_ASN1(EVP_PKEY_EC,
 						  vhost->tls.ssl_ctx, p,
-#if defined(LWS_WITH_BORINGSSL)
+#if defined(LWS_WITH_BORINGSSL) || defined(LWS_WITH_AWSLC)
 			(size_t)
 #else
 					  (long)(long long)
@@ -313,7 +294,7 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 						  flen);
 	}
 #else
-	ret = wolfSSL_CTX_use_PrivateKey_buffer(vhost->tls.ssl_ctx, p, flen,
+	ret = wolfSSL_CTX_use_PrivateKey_buffer(vhost->tls.ssl_ctx, p, (long) flen,
 						WOLFSSL_FILETYPE_ASN1);
 #endif
 	lws_free_set_NULL(p);
@@ -334,19 +315,19 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 		 * The passed memory-buffer cert image is in DER, and the
 		 * memory-buffer private key image is PEM.
 		 */
-#ifndef USE_WOLFSSL
 		if (lws_tls_alloc_pem_to_der_file(vhost->context, cert, mem_cert,
 						  mem_cert_len, &p, &flen)) {
 			lwsl_err("%s: couldn't convert pem to der\n", __func__);
 			return 1;
 		}
+#ifndef USE_WOLFSSL
 		if (SSL_CTX_use_certificate_ASN1(vhost->tls.ssl_ctx,
 						 (int)flen,
 						 (uint8_t *)p) != 1) {
 #else
 		if (wolfSSL_CTX_use_certificate_buffer(vhost->tls.ssl_ctx,
-						 (uint8_t *)mem_cert,
-						 (int)mem_cert_len,
+						 (uint8_t *)p,
+						 (int)flen,
 						 WOLFSSL_FILETYPE_ASN1) != 1) {
 
 #endif
@@ -389,7 +370,10 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 		return 1;
 	}
 
-	if (n != LWS_TLS_EXTANT_ALTERNATIVE && private_key) {
+	if (n == LWS_TLS_EXTANT_ALTERNATIVE || !private_key) {
+		lwsl_err("ssl private key not set\n");
+		return 1;
+	} else {
 		/* set the private key from KeyFile */
 		if (SSL_CTX_use_PrivateKey_file(vhost->tls.ssl_ctx, private_key,
 					        SSL_FILETYPE_PEM) != 1) {
@@ -398,14 +382,6 @@ lws_tls_server_certs_load(struct lws_vhost *vhost, struct lws *wsi,
 				 private_key, error,
 				 ERR_error_string(error,
 				      (char *)vhost->context->pt[0].serv_buf));
-			return 1;
-		}
-	} else {
-		if (vhost->protocols[0].callback(wsi,
-			      LWS_CALLBACK_OPENSSL_CONTEXT_REQUIRES_PRIVATE_KEY,
-						 vhost->tls.ssl_ctx, NULL, 0)) {
-			lwsl_err("ssl private key not set\n");
-
 			return 1;
 		}
 	}
@@ -449,7 +425,7 @@ check_key:
 		lwsl_notice(" Using ECDH certificate support\n");
 
 	/* Get X509 certificate from ssl context */
-#if !defined(LWS_WITH_BORINGSSL)
+#if !defined(LWS_WITH_BORINGSSL) && !defined(LWS_WITH_AWSLC) && !defined(USE_WOLFSSL)
 #if !defined(LWS_HAVE_SSL_EXTRA_CHAIN_CERTS)
 	x = sk_X509_value(vhost->tls.ssl_ctx->extra_certs, 0);
 #else
@@ -492,7 +468,7 @@ check_key:
 
 	EC_KEY_free(EC_key);
 
-#if !defined(OPENSSL_NO_EC) && !defined(LWS_WITH_BORINGSSL)
+#if !defined(OPENSSL_NO_EC) && !defined(LWS_WITH_BORINGSSL) && !defined(LWS_WITH_AWSLC) && !defined(USE_WOLFSSL)
 post_ecdh:
 #endif
 	vhost->tls.skipped_certs = 0;
@@ -512,13 +488,8 @@ lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
 
 	if (!method) {
 		const char *s;
-		error = ERR_get_error();
-		s = ERR_error_string(
-#if defined(LWS_WITH_BORINGSSL)
-			(uint32_t)
-#endif
-				error,
-			       (char *)vhost->context->pt[0].serv_buf);
+		error = ERR_peek_error();
+		s = ERR_error_string(ERR_get_error(), (char *)vhost->context->pt[0].serv_buf);
 
 		lwsl_err("problem creating ssl method %lu: %s\n",
 				error, s);
@@ -528,17 +499,17 @@ lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
 	if (!vhost->tls.ssl_ctx) {
 		const char *s;
 
-		error = ERR_get_error();
-		s = ERR_error_string(
-#if defined(LWS_WITH_BORINGSSL)
-			(uint32_t)
-#endif
-				error,
-			       (char *)vhost->context->pt[0].serv_buf);
+		error = ERR_peek_error();
+		s = ERR_error_string(ERR_get_error(), (char *)vhost->context->pt[0].serv_buf);
 		lwsl_err("problem creating ssl context %lu: %s\n",
 				error, s);
 		return 1;
 	}
+	/* Added for sniffing packets on hub side */
+#if defined(LWS_HAVE_SSL_CTX_set_keylog_callback) && \
+		defined(LWS_WITH_TLS) && (!defined(LWS_WITHOUT_CLIENT) || !defined(LWS_WITHOUT_SERVER))
+	SSL_CTX_set_keylog_callback(vhost->tls.ssl_ctx, lws_klog_dump);
+#endif
 
 	SSL_CTX_set_ex_data(vhost->tls.ssl_ctx,
 			    openssl_SSL_CTX_private_data_index,
@@ -549,6 +520,14 @@ lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
 #ifdef SSL_OP_NO_COMPRESSION
 	SSL_CTX_set_options(vhost->tls.ssl_ctx, SSL_OP_NO_COMPRESSION);
 #endif
+	if (lws_check_opt(info->options,
+	                  LWS_SERVER_OPTION_OPENSSL_AUTO_DH_PARAMETERS))
+#if defined(LWS_HAVE_SSL_CTX_SET_ECDH_AUTO) || defined(LWS_WITH_BORINGSSL)
+		(void)SSL_CTX_set_ecdh_auto(vhost->tls.ssl_ctx, 1);
+#else
+		SSL_CTX_set_dh_auto(vhost->tls.ssl_ctx, 1);
+#endif
+
 	SSL_CTX_set_options(vhost->tls.ssl_ctx, SSL_OP_SINGLE_DH_USE);
 	SSL_CTX_set_options(vhost->tls.ssl_ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
@@ -579,41 +558,24 @@ lws_tls_server_vhost_backend_init(const struct lws_context_creation_info *info,
 			 __func__);
 	}
 
+	SSL_OPT_TYPE ssl_options_set_value = (SSL_OPT_TYPE) info->ssl_options_set;
+
 	if (info->ssl_options_set)
-		SSL_CTX_set_options(vhost->tls.ssl_ctx,
-#if defined(USE_WOLFSSL)
-				(long)
-#else
-#if defined(LWS_WITH_BORINGSSL)
-				(uint32_t)
-#else
-#if (OPENSSL_VERSION_NUMBER >= 0x10003000l) && !defined(LIBRESSL_VERSION_NUMBER) /* not documented by openssl */
-				    (unsigned long)
-#else
-				    (long)
-#endif
-#endif
-#endif
-				info->ssl_options_set);
+		SSL_CTX_set_options(vhost->tls.ssl_ctx, ssl_options_set_value);
+
+#if (OPENSSL_VERSION_NUMBER >= 0x009080df) && !defined(USE_WOLFSSL)
 
 /* SSL_clear_options introduced in 0.9.8m */
-#if (OPENSSL_VERSION_NUMBER >= 0x009080df) && !defined(USE_WOLFSSL)
-	if (info->ssl_options_clear)
-		SSL_CTX_clear_options(vhost->tls.ssl_ctx,
-#if defined(LWS_WITH_BORINGSSL)
-				(uint32_t)
-#else
-#if (OPENSSL_VERSION_NUMBER >= 0x10003000l)  && !defined(LIBRESSL_VERSION_NUMBER)/* not documented by openssl */
-				    (unsigned long)
-#else
-				    (long)
-#endif
-#endif
-				      info->ssl_options_clear);
-#endif
+	SSL_OPT_TYPE ssl_options_clear_value = (SSL_OPT_TYPE) info->ssl_options_clear;
+
+	if (info->ssl_options_clear) {
+		SSL_CTX_clear_options(vhost->tls.ssl_ctx, ssl_options_clear_value);
+	}
 
 	lwsl_info(" SSL options 0x%lX\n",
 			(unsigned long)SSL_CTX_get_options(vhost->tls.ssl_ctx));
+#endif
+
 	if (!vhost->tls.use_ssl ||
 	    (!info->ssl_cert_filepath && !info->server_ssl_cert_mem))
 		return 0;
@@ -679,13 +641,14 @@ lws_tls_server_new_nonblocking(struct lws *wsi, lws_sockfd_type accept_fd)
 	return 0;
 }
 
-int
+enum lws_ssl_capable_status
 lws_tls_server_abort_connection(struct lws *wsi)
 {
-	SSL_shutdown(wsi->tls.ssl);
+	if (wsi->tls.use_ssl)
+		SSL_shutdown(wsi->tls.ssl);
 	SSL_free(wsi->tls.ssl);
 
-	return 0;
+	return LWS_SSL_CAPABLE_DONE;
 }
 
 enum lws_ssl_capable_status

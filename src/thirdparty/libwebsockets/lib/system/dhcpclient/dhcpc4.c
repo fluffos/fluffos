@@ -282,7 +282,7 @@ retry_conn:
 }
 
 struct lws_protocols lws_system_protocol_dhcpc4 =
-	{ "lws-dhcp4client", callback_dhcpc4, 0, 128, };
+	{ "lws-dhcp4client", callback_dhcpc4, 0, 128, 0, NULL, 0 };
 
 void
 lws_dhcpc4_retry_conn(struct lws_sorted_usec_list *sul)
@@ -425,9 +425,12 @@ lws_dhcpc4_parse(lws_dhcpc_req_t *r, void *in, size_t len)
 					break;
 				m = LWSDH_SA46_DNS_SRV_1;
 				while (l && m - LWSDH_SA46_DNS_SRV_1 < 4) {
-					lws_sa46_set_ipv4(r, (unsigned int)m++, p);
+					lws_sa46_set_ipv4(r, (unsigned int)m, p);
+					lws_async_dns_server_add(r->context,
+								&r->is.sa46[m]);
 					l = (uint8_t)(l - 4);
 					p += 4;
+					m++;
 				}
 				break;
 

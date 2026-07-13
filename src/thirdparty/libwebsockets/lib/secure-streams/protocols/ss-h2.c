@@ -52,7 +52,7 @@ secstream_h2(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 			 */
 			lwsl_info("%s: reporting initial tx cr from server %d\n",
 				  __func__, wsi->txc.tx_cr);
-			ss_proxy_onward_txcr((void *)&h[1], wsi->txc.tx_cr);
+			ss_proxy_onward_txcr((void *)(h + 1), wsi->txc.tx_cr);
 		}
 #endif
 
@@ -106,7 +106,7 @@ secstream_h2(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 #if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
 		if (h->being_serialized)
 			/* we are the proxy-side SS for a remote client */
-			ss_proxy_onward_txcr((void *)&h[1], (int)len);
+			ss_proxy_onward_txcr((void *)(h + 1), (int)len);
 #endif
 		break;
 
@@ -120,8 +120,7 @@ secstream_h2(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 const struct lws_protocols protocol_secstream_h2 = {
 	"lws-secstream-h2",
 	secstream_h2,
-	0,
-	0,
+	0, 0, 0, NULL, 0
 };
 
 /*
@@ -159,6 +158,9 @@ secstream_connect_munge_h2(lws_ss_handle_t *h, char *buf, size_t len,
 	if (h->policy->flags & LWSSSPOLF_HTTP_X_WWW_FORM_URLENCODED)
 		i->ssl_connection |= LCCSCF_HTTP_X_WWW_FORM_URLENCODED;
 
+	if (h->policy->flags & LWSSSPOLF_HTTP_CACHE_COOKIES)
+		i->ssl_connection |= LCCSCF_CACHE_COOKIES;
+
 	i->ssl_connection |= LCCSCF_PIPELINE;
 
 	i->alpn = "h2";
@@ -185,6 +187,8 @@ secstream_connect_munge_h2(lws_ss_handle_t *h, char *buf, size_t len,
 	if (lws_strexp_expand(&exp, pbasis, strlen(pbasis),
 			      &used_in, &used_out) != LSTRX_DONE)
 		return 1;
+
+	__lws_lc_tag_append(&h->lc, buf);
 
 	return 0;
 }

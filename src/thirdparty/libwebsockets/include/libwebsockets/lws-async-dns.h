@@ -22,7 +22,7 @@
  * IN THE SOFTWARE.
  */
 
-#if defined(LWS_WITH_UDP)
+#if defined(LWS_WITH_UDP) && defined(LWS_WITH_NETWORK)
 
 typedef enum dns_query_type {
 	LWS_ADNS_RECORD_A					= 0x01,
@@ -40,10 +40,16 @@ typedef enum {
 	LADNS_RET_CONTINUING
 } lws_async_dns_retcode_t;
 
+#define LWS_ADNS_SYNTHETIC	0x10000	/* don't send, synthetic response will
+					 * be injected for testing */
+
 struct addrinfo;
 
 typedef struct lws * (*lws_async_dns_cb_t)(struct lws *wsi, const char *ads,
 		const struct addrinfo *result, int n, void *opaque);
+
+struct lws_adns_q;
+struct lws_async_dns;
 
 /**
  * lws_async_dns_query() - perform a dns lookup using async dns
@@ -54,6 +60,7 @@ typedef struct lws * (*lws_async_dns_cb_t)(struct lws *wsi, const char *ads,
  * \param qtype: type of query (A, AAAA etc)
  * \param cb: query completion callback
  * \param wsi: wsi if the query is related to one
+ * \param pq: NULL, or pointer to lws_adns_q query (used for testing)
  *
  * Starts an asynchronous DNS lookup, on completion the \p cb callback will
  * be called.
@@ -68,7 +75,7 @@ typedef struct lws * (*lws_async_dns_cb_t)(struct lws *wsi, const char *ads,
 LWS_VISIBLE LWS_EXTERN lws_async_dns_retcode_t
 lws_async_dns_query(struct lws_context *context, int tsi, const char *name,
 		    adns_query_type_t qtype, lws_async_dns_cb_t cb,
-		    struct lws *wsi, void *opaque);
+		    struct lws *wsi, void *opaque, struct lws_adns_q **pq);
 
 /**
  * lws_async_dns_freeaddrinfo() - decrement refcount on cached addrinfo results
@@ -82,5 +89,42 @@ lws_async_dns_query(struct lws_context *context, int tsi, const char *name,
  */
 LWS_VISIBLE LWS_EXTERN void
 lws_async_dns_freeaddrinfo(const struct addrinfo **ai);
+
+/**
+ * lws_async_dns_server_add() - add a DNS server to the lws async DNS list
+ *
+ * \param cx: the lws_context
+ * \param sa46: the ipv4 or ipv6 DNS server address to add
+ *
+ * Adds the given DNS server to the lws list of async DNS servers to query.
+ * If the address is already listed, its refcount is increased, otherwise a new
+ * entry is made.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_async_dns_server_add(struct lws_context *cx, const lws_sockaddr46 *sa46);
+
+/**
+ * lws_async_dns_server_remove() - remove a DNS server from the lws async DNS list
+ *
+ * \param cx: the lws_context
+ * \param sa46: the ipv4 or ipv6 DNS server address to add
+ *
+ * Removes the given DNS server from the lws list of async DNS servers to query.
+ * If the address does not correspond to an existing entry, no action is taken.
+ * If it does, the refcount on it is decremented, and if it reaches zero, the
+ * entry is detached from the list and destroyed.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_async_dns_server_remove(struct lws_context *cx, const lws_sockaddr46 *sa46);
+
+/* only needed for testing */
+
+LWS_VISIBLE LWS_EXTERN uint16_t
+lws_adns_get_tid(struct lws_adns_q *q);
+LWS_VISIBLE LWS_EXTERN struct lws_async_dns *
+lws_adns_get_async_dns(struct lws_adns_q *q);
+
+LWS_VISIBLE LWS_EXTERN void
+lws_adns_parse_udp(struct lws_async_dns *dns, const uint8_t *pkt, size_t len);
 
 #endif

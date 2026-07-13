@@ -30,6 +30,8 @@
 
 #if defined(LWS_WITH_TLS)
 
+#include "private-jit-trust.h"
+
 #if defined(USE_WOLFSSL)
  #if defined(USE_OLD_CYASSL)
   #if defined(_WIN32)
@@ -119,15 +121,18 @@ enum lws_tls_extant {
 #if defined(LWS_WITH_TLS)
 
 #if defined(LWS_WITH_TLS_SESSIONS) && defined(LWS_WITH_CLIENT) && \
-	(defined(LWS_WITH_MBEDTLS) || defined(OPENSSL_IS_BORINGSSL))
+	(defined(LWS_WITH_MBEDTLS) || defined(OPENSSL_IS_BORINGSSL)) || defined(OPENSSL_IS_AWSLC)
 #define LWS_TLS_SYNTHESIZE_CB 1
 #endif
 
 int
-lws_tls_restrict_borrow(struct lws_context *context);
+lws_tls_restrict_borrow(struct lws *wsi);
 
 void
-lws_tls_restrict_return(struct lws_context *context);
+lws_tls_restrict_return(struct lws *wsi);
+
+void
+lws_tls_restrict_return_handshake(struct lws *wsi);
 
 typedef SSL lws_tls_conn;
 typedef SSL_CTX lws_tls_ctx;
@@ -139,7 +144,8 @@ typedef X509 lws_tls_x509;
 #endif
 
 int
-lws_context_init_ssl_library(const struct lws_context_creation_info *info);
+lws_context_init_ssl_library(struct lws_context *cx,
+			     const struct lws_context_creation_info *info);
 void
 lws_context_deinit_ssl_library(struct lws_context *context);
 #define LWS_SSL_ENABLED(vh) (vh && vh->tls.use_ssl)
@@ -168,8 +174,6 @@ int
 lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 			      const char *inbuf, lws_filepos_t inlen,
 			      uint8_t **buf, lws_filepos_t *amount);
-char *
-lws_ssl_get_error_string(int status, int ret, char *buf, size_t len);
 
 int
 lws_gencrypto_bits_to_bytes(int bits);

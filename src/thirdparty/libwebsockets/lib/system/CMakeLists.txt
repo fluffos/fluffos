@@ -1,7 +1,7 @@
 #
 # libwebsockets - small server side websockets and web server implementation
 #
-# Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+# Copyright (C) 2010 - 2025 Andy Green <andy@warmcat.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -31,8 +31,14 @@
 
 include_directories(./async-dns)
 
-list(APPEND SOURCES
-	system/system.c)
+if (NOT LWS_PLAT_FREERTOS AND NOT LWS_PLAT_BAREMETAL AND NOT LWS_PLAT_ANDROID AND LWS_WITH_NETWORK)
+	list(APPEND SOURCES system/stdin.c)
+endif()
+
+if (NOT LWS_ONLY_SSPC)
+	list(APPEND SOURCES
+		system/system.c)
+endif()
 	
 if (LWS_WITH_NETWORK)
 
@@ -52,6 +58,12 @@ if (LWS_WITH_NETWORK)
 			system/dhcpclient/dhcpclient.c
 			system/dhcpclient/dhcpc4.c)
 	endif()
+
+	if (LWS_WITH_OTA)
+		list(APPEND SOURCES
+			system/ota/ota.c)
+	endif()
+
 
 	if (LWS_WITH_SYS_SMD)
 		add_subdir_include_dirs(smd)

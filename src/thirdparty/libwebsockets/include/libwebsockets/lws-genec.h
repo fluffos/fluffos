@@ -147,7 +147,7 @@ lws_genecdsa_new_keypair(struct lws_genec_ctx *ctx, const char *curve_name,
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_genecdsa_set_key(struct lws_genec_ctx *ctx,
-		     struct lws_gencrypto_keyelem *el);
+		     const struct lws_gencrypto_keyelem *el);
 
 /** lws_genecdsa_hash_sig_verify_jws() - Verifies a JWS ECDSA signature on a given hash
  *
@@ -184,7 +184,7 @@ lws_genecdsa_hash_sig_verify_jws(struct lws_genec_ctx *ctx, const uint8_t *in,
  * \param sig: pointer to buffer to take signature
  * \param sig_len: length of the buffer (must be >= length of key N)
  *
- * Returns <0 for error, or 0 for success.
+ * Returns <0 for error, or >=0 for success.
  *
  * This creates a JWS ECDSA signature for a hash you already computed and provide.
  *

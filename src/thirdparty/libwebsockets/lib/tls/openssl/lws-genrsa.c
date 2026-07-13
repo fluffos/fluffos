@@ -77,7 +77,8 @@ bail:
 }
 
 int
-lws_genrsa_create(struct lws_genrsa_ctx *ctx, struct lws_gencrypto_keyelem *el,
+lws_genrsa_create(struct lws_genrsa_ctx *ctx,
+		  const struct lws_gencrypto_keyelem *el,
 		  struct lws_context *context, enum enum_genrsa_mode mode,
 		  enum lws_genhash_types oaep_hashid)
 {
@@ -93,7 +94,7 @@ lws_genrsa_create(struct lws_genrsa_ctx *ctx, struct lws_gencrypto_keyelem *el,
 	 */
 
 	for (n = 0; n < 5; n++) {
-		ctx->bn[n] = BN_bin2bn(el[n].buf, (int)el[n].len, NULL);
+		ctx->bn[n] = BN_bin2bn(el[n].buf, SSL_SIZE_CAST(el[n].len), NULL);
 		if (!ctx->bn[n]) {
 			lwsl_notice("mpi load failed\n");
 			goto bail;
@@ -224,7 +225,7 @@ int
 lws_genrsa_public_encrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 			  size_t in_len, uint8_t *out)
 {
-	int n = RSA_public_encrypt((int)in_len, in, out, ctx->rsa,
+	int n = RSA_public_encrypt(SSL_SIZE_CAST(in_len), in, out, ctx->rsa,
 				   mode_map_crypt[ctx->mode]);
 	if (n < 0) {
 		lwsl_err("%s: RSA_public_encrypt failed\n", __func__);
@@ -239,7 +240,7 @@ int
 lws_genrsa_private_encrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 			   size_t in_len, uint8_t *out)
 {
-	int n = RSA_private_encrypt((int)in_len, in, out, ctx->rsa,
+	int n = RSA_private_encrypt(SSL_SIZE_CAST(in_len), in, out, ctx->rsa,
 			        mode_map_crypt[ctx->mode]);
 	if (n < 0) {
 		lwsl_err("%s: RSA_private_encrypt failed\n", __func__);
@@ -254,7 +255,7 @@ int
 lws_genrsa_public_decrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 			  size_t in_len, uint8_t *out, size_t out_max)
 {
-	int n = RSA_public_decrypt((int)in_len, in, out, ctx->rsa,
+	int n = RSA_public_decrypt(SSL_SIZE_CAST(in_len), in, out, ctx->rsa,
 			       mode_map_crypt[ctx->mode]);
 	if (n < 0) {
 		lwsl_err("%s: RSA_public_decrypt failed\n", __func__);
@@ -268,7 +269,7 @@ int
 lws_genrsa_private_decrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 			   size_t in_len, uint8_t *out, size_t out_max)
 {
-	int n = RSA_private_decrypt((int)in_len, in, out, ctx->rsa,
+	int n = RSA_private_decrypt(SSL_SIZE_CAST(in_len), in, out, ctx->rsa,
 			        mode_map_crypt[ctx->mode]);
 	if (n < 0) {
 		lwsl_err("%s: RSA_private_decrypt failed\n", __func__);
@@ -293,7 +294,8 @@ lws_genrsa_hash_sig_verify(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 
 	switch(ctx->mode) {
 	case LGRSAM_PKCS1_1_5:
-		n = RSA_verify(n, in, (unsigned int)h, (uint8_t *)sig, (unsigned int)sig_len, ctx->rsa);
+		n = RSA_verify(n, in, (unsigned int)h, (uint8_t *)sig,
+			       (unsigned int)sig_len, ctx->rsa);
 		break;
 	case LGRSAM_PKCS1_OAEP_PSS:
 		md = lws_gencrypto_openssl_hash_to_EVP_MD(hash_type);
@@ -301,12 +303,12 @@ lws_genrsa_hash_sig_verify(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 			return -1;
 
 #if defined(LWS_HAVE_RSA_verify_pss_mgf1)
-		n = RSA_verify_pss_mgf1(ctx->rsa, in, h, md, NULL, -1,
+		n = RSA_verify_pss_mgf1(ctx->rsa, in, SSL_SIZE_CAST(h), md, NULL, -1,
 					(uint8_t *)sig,
 #else
 		n = RSA_verify_PKCS1_PSS(ctx->rsa, in, md, (uint8_t *)sig,
 #endif
-					 (int)sig_len);
+			SSL_SIZE_CAST(sig_len));
 		break;
 	default:
 		return -1;

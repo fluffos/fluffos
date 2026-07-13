@@ -342,7 +342,10 @@ build_auth_string(struct lws *wsi, char * buf, size_t bufsz,
 		struct lws_ss_handle *h, struct sigv4 *s,
 		uint8_t *signature_bin)
 {
-	char *start = buf, *end = &buf[bufsz - 1];
+#if defined(_DEBUG)
+	char *start = buf;
+#endif
+	char *end = &buf[bufsz - 1];
 	char *c;
 	lws_system_blob_t *ab;
 	size_t keyidlen = 128; // max keyid len is 128
@@ -381,9 +384,11 @@ build_auth_string(struct lws *wsi, char * buf, size_t bufsz,
 			    "%s", " Signature=");
 	bin2hex(signature_bin, 32, buf);
 
-	assert(buf+65 <= start + bufsz);
+#if defined(_DEBUG)
+	assert(buf + 65 <= start + bufsz);
 
 	lwsl_debug("%s %s\n", __func__, start);
+#endif
 
 	return 0;
 
@@ -459,7 +464,7 @@ lws_ss_sigv4_set_aws_key(struct lws_context* context, uint8_t idx,
 
 #if defined(__linux__) || defined(__APPLE__) || defined(WIN32) || \
 	defined(__FreeBSD__) || defined(__NetBSD__) || defined(__ANDROID__) || \
-	defined(__sun) || defined(__OpenBSD__)
+	defined(__sun) || defined(__OpenBSD__) || defined(__NuttX__)
 
 /* ie, if we have filesystem ops */
 

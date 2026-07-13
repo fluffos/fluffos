@@ -626,7 +626,7 @@ callback_lws_openmetrics_prox_agg(struct lws *wsi,
 			}
 		} else {
 			lwsl_warn("%s: proxy-side-bind-name required\n", __func__);
-			return 1;
+			return 0;
 		}
 
 		break;
@@ -802,7 +802,7 @@ callback_lws_openmetrics_prox_server(struct lws *wsi,
 			}
 		} else {
 			lwsl_warn("%s: proxy-side-bind-name required\n", __func__);
-			return 1;
+			return 0;
 		}
 
 		break;
@@ -946,7 +946,8 @@ callback_lws_openmetrics_prox_client(struct lws *wsi,
 				lws_get_vhost(wsi), lws_get_protocol(wsi));
 	struct lws_context *cx = lws_get_context(wsi);
 	struct pss *pss = (struct pss *)user;
-	unsigned int m, wm;
+	enum lws_write_protocol wm;
+	unsigned int m;
 	const char *cp;
 	char first;
 
@@ -971,10 +972,10 @@ callback_lws_openmetrics_prox_client(struct lws *wsi,
 
 		/* the proxy server uri */
 
-		if (lws_pvo_get_str(in, "ws-server-uri", &cp)) {
-			lwsl_err("%s: ws-server-uri pvo required\n", __func__);
+		if (lws_pvo_get_str(in, "ws-server-uri", &cp) || !cp) {
+			lwsl_warn("%s: ws-server-uri pvo required\n", __func__);
 
-			return 1;
+			return 0;
 		}
 		lws_strncpy(vhd->ws_server_uri, cp, sizeof(vhd->ws_server_uri));
 
@@ -1116,11 +1117,9 @@ callback_lws_openmetrics_prox_client(struct lws *wsi,
 			return -1;
 		}
 
-		wm = (unsigned int)lws_write_ws_flags(LWS_WRITE_TEXT, first,
-						      !pss->walk);
+		wm = lws_write_ws_flags(LWS_WRITE_TEXT, first, !pss->walk);
 
-		if (lws_write(wsi, start, lws_ptr_diff_size_t(p, start),
-			      (enum lws_write_protocol)wm) < 0) {
+		if (lws_write(wsi, start, lws_ptr_diff_size_t(p, start), wm) < 0) {
 			lwsl_notice("%s: write fail\n", __func__);
 			return 1;
 		}
@@ -1162,19 +1161,19 @@ LWS_VISIBLE const struct lws_protocols lws_openmetrics_export_protocols[] = {
 		"lws-openmetrics",
 		callback_lws_openmetrics_export,
 		sizeof(struct pss),
-		1024,
+		1024, 0, NULL, 0
 	},
 	{ /* for scraper via ws proxy: http export on listen socket */
 		"lws-openmetrics-prox-agg",
 		callback_lws_openmetrics_prox_agg,
 		sizeof(struct pss),
-		1024,
+		1024, 0, NULL, 0
 	},
 	{ /* metrics proxy server side: ws server for clients to connect to */
 		"lws-openmetrics-prox-server",
 		callback_lws_openmetrics_prox_server,
 		sizeof(struct pss),
-		1024,
+		1024, 0, NULL, 0
 	},
 #endif
 #if defined(LWS_WITH_CLIENT) && defined(LWS_ROLE_WS)
@@ -1182,7 +1181,7 @@ LWS_VISIBLE const struct lws_protocols lws_openmetrics_export_protocols[] = {
 		"lws-openmetrics-prox-client",
 		callback_lws_openmetrics_prox_client,
 		sizeof(struct pss),
-		1024,
+		1024, 0, NULL, 0
 	},
 #endif
 };

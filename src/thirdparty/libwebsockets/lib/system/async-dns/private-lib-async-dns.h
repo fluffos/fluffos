@@ -23,11 +23,13 @@
  */
 
 
-#define DNS_MAX			96	/* Maximum host name		*/
-#define DNS_RECURSION_LIMIT	3
+#define DNS_MAX			128	/* Maximum host name		*/
+#define DNS_RECURSION_LIMIT	4
 #define DNS_PACKET_LEN		1400	/* Buffer size for DNS packet	*/
 #define MAX_CACHE_ENTRIES	10	/* Dont cache more than that	*/
 #define DNS_QUERY_TIMEOUT	30	/* Query timeout, seconds	*/
+
+#if defined(LWS_WITH_SYS_ASYNC_DNS)
 
 /*
  * ... when we completed a query then the query object is destroyed and a
@@ -53,7 +55,7 @@ typedef struct lws_adns_cache {
  * these objects are used while a query is ongoing...
  */
 
-typedef struct {
+typedef struct lws_adns_q {
 	lws_sorted_usec_list_t	sul;	/* per-query write retry timer */
 	lws_sorted_usec_list_t	write_sul;	/* fail if unable to write by this time */
 	lws_dll2_t		list;
@@ -66,6 +68,7 @@ typedef struct {
 	void			*opaque;
 	struct addrinfo		**last;
 	lws_async_dns_t		*dns;
+	lws_async_dns_server_t	*dsrv;
 
 	lws_adns_cache_t	*firstcache;
 
@@ -88,6 +91,7 @@ typedef struct {
 	uint8_t			go_nogo;
 
 	uint8_t			is_retry:1;
+	uint8_t			is_synthetic:1; /* test will deliver canned */
 
 	/* name overallocated here */
 } lws_adns_q_t;
@@ -115,18 +119,19 @@ sul_cb_expire(struct lws_sorted_usec_list *sul);
 void
 lws_adns_cache_destroy(lws_adns_cache_t *c);
 
-int
+lws_async_dns_retcode_t
 lws_async_dns_complete(lws_adns_q_t *q, lws_adns_cache_t *c);
 
 lws_adns_cache_t *
 lws_adns_get_cache(lws_async_dns_t *dns, const char *name);
 
-void
-lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len);
-
 lws_adns_q_t *
 lws_adns_get_query(lws_async_dns_t *dns, adns_query_type_t qtype,
-		   lws_dll2_owner_t *owner, uint16_t tid, const char *name);
+		   uint16_t tid, const char *name);
+
+lws_adns_q_t *
+lws_adns_get_query_srv(lws_async_dns_server_t *dsrv, adns_query_type_t qtype,
+		       uint16_t tid, const char *name);
 
 void
 lws_async_dns_trim_cache(lws_async_dns_t *dns);
@@ -135,9 +140,25 @@ int
 lws_async_dns_get_new_tid(struct lws_context *context, lws_adns_q_t *q);
 
 
+
+/* require: context lock on this set */
+
+lws_async_dns_server_t *
+__lws_async_dns_server_find(lws_async_dns_t *dns, const lws_sockaddr46 *sa46);
+lws_async_dns_server_t *
+__lws_async_dns_server_find_wsi(lws_async_dns_t *dns, struct lws *wsi);
+lws_async_dns_server_t *
+__lws_async_dns_server_add(lws_async_dns_t *dns, const lws_sockaddr46 *sa46);
+void
+__lws_async_dns_server_remove(lws_async_dns_t *dns, const lws_sockaddr46 *sa46);
+
+
 #if defined(_DEBUG)
 void
 lws_adns_dump(lws_async_dns_t *dns);
 #else
 #define lws_adns_dump(_d)
 #endif
+
+#endif
+

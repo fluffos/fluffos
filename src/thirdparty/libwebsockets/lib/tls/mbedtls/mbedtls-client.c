@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -25,11 +25,48 @@
 #include "private-lib-core.h"
 #include "private-lib-tls-mbedtls.h"
 
+#if defined(LWS_WITH_TLS_JIT_TRUST)
+
+/*
+ * We get called for each peer certificate that was provided in turn.
+ *
+ * Our job is just to collect the AKID and SKIDs into ssl->kid_chain, and walk
+ * later at verification result time if it failed.
+ *
+ * None of these should be trusted, even if a misconfigured server sends us
+ * his root CA.
+ */
+
 static int
-OpenSSL_client_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx)
+lws_mbedtls_client_verify_callback(SSL *ssl, mbedtls_x509_crt *x509)
 {
+	union lws_tls_cert_info_results ci;
+
+	/* we reached the max we can hold? */
+
+	if (ssl->kid_chain.count == LWS_ARRAY_SIZE(ssl->kid_chain.akid))
+		return 0;
+
+	/* if not, stash the SKID and AKID into the next kid slot */
+
+	if (!lws_tls_mbedtls_cert_info(x509, LWS_TLS_CERT_INFO_SUBJECT_KEY_ID,
+				       &ci, 0))
+		lws_tls_kid_copy(&ci,
+				 &ssl->kid_chain.skid[ssl->kid_chain.count]);
+
+	if (!lws_tls_mbedtls_cert_info(x509, LWS_TLS_CERT_INFO_AUTHORITY_KEY_ID,
+				       &ci, 0))
+		lws_tls_kid_copy(&ci,
+				 &ssl->kid_chain.akid[ssl->kid_chain.count]);
+
+	ssl->kid_chain.count++;
+
+	// lwsl_notice("%s: %u\n", __func__, ssl->kid_chain.count);
+
 	return 0;
 }
+
+#endif
 
 int
 lws_ssl_client_bio_create(struct lws *wsi)
@@ -37,6 +74,7 @@ lws_ssl_client_bio_create(struct lws *wsi)
 	char hostname[128], *p;
 	const char *alpn_comma = wsi->a.context->tls.alpn_default;
 	struct alpn_ctx protos;
+	int fl = SSL_VERIFY_PEER;
 
 	if (wsi->stash)
 		lws_strncpy(hostname, wsi->stash->cis[CIS_HOST], sizeof(hostname));
@@ -80,36 +118,53 @@ lws_ssl_client_bio_create(struct lws *wsi)
 		/* Enable automatic hostname checks */
 	//	X509_VERIFY_PARAM_set_hostflags(param,
 	//				X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-		X509_VERIFY_PARAM_set1_host(param, hostname, 0);
+		lwsl_info("%s: setting hostname %s\n", __func__, hostname);
+		if (X509_VERIFY_PARAM_set1_host(param, hostname, 0) != 1)
+			return -1;
 	}
 
 	if (wsi->a.vhost->tls.alpn)
 		alpn_comma = wsi->a.vhost->tls.alpn;
 
 	if (wsi->stash) {
-		lws_strncpy(hostname, wsi->stash->cis[CIS_HOST], sizeof(hostname));
-		alpn_comma = wsi->stash->cis[CIS_ALPN];
+		lws_strncpy(hostname, wsi->stash->cis[CIS_HOST],
+				sizeof(hostname));
+		if (wsi->stash->cis[CIS_ALPN])
+			alpn_comma = wsi->stash->cis[CIS_ALPN];
 	} else {
 		if (lws_hdr_copy(wsi, hostname, sizeof(hostname),
 				_WSI_TOKEN_CLIENT_ALPN) > 0)
 			alpn_comma = hostname;
 	}
 
-	lwsl_info("%s: %s: client conn sending ALPN list '%s'\n",
-		  __func__, lws_wsi_tag(wsi), alpn_comma);
-
 	protos.len = (uint8_t)lws_alpn_comma_to_openssl(alpn_comma, protos.data,
 					       sizeof(protos.data) - 1);
 
+	lwsl_info("%s: %s: client conn sending ALPN list '%s' (protos.len %d)\n",
+		  __func__, lws_wsi_tag(wsi), alpn_comma, protos.len);
+
 	/* with mbedtls, protos is not pointed to after exit from this call */
 	SSL_set_alpn_select_cb(wsi->tls.ssl, &protos);
+
+	if (wsi->flags & LCCSCF_ALLOW_SELFSIGNED) {
+		lwsl_notice("%s: allowing selfsigned\n", __func__);
+		fl = SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+	}
+
+	if (wsi->flags & LCCSCF_ALLOW_INSECURE)
+		fl = SSL_VERIFY_NONE;
 
 	/*
 	 * use server name indication (SNI), if supported,
 	 * when establishing connection
 	 */
+#if defined(LWS_WITH_TLS_JIT_TRUST)
 	SSL_set_verify(wsi->tls.ssl, SSL_VERIFY_PEER,
-		       OpenSSL_client_verify_callback);
+			lws_mbedtls_client_verify_callback);
+	(void)fl;
+#else
+	SSL_set_verify(wsi->tls.ssl, fl, NULL);
+#endif
 
 	SSL_set_fd(wsi->tls.ssl, (int)wsi->desc.sockfd);
 
@@ -195,16 +250,13 @@ enum lws_ssl_capable_status
 lws_tls_client_connect(struct lws *wsi, char *errbuf, size_t elen)
 {
 	int m, n = SSL_connect(wsi->tls.ssl), en;
-	const unsigned char *prot;
-	unsigned int len;
 
 	if (n == 1) {
-		SSL_get0_alpn_selected(wsi->tls.ssl, &prot, &len);
-		lws_role_call_alpn_negotiated(wsi, (const char *)prot);
+		lws_tls_server_conn_alpn(wsi);
 #if defined(LWS_WITH_TLS_SESSIONS)
 		lws_tls_session_new_mbedtls(wsi);
 #endif
-		lwsl_info("client connect OK\n");
+		lwsl_info("%s: client connect OK\n", __func__);
 		return LWS_SSL_CAPABLE_DONE;
 	}
 
@@ -220,7 +272,8 @@ lws_tls_client_connect(struct lws *wsi, char *errbuf, size_t elen)
 	if (!n) /* we don't know what he wants, but he says to retry */
 		return LWS_SSL_CAPABLE_MORE_SERVICE;
 
-	if (m == SSL_ERROR_SYSCALL && !en)
+	if (m == SSL_ERROR_SYSCALL && !en && n >= 0) /* otherwise we miss explicit failures and spin
+						      * in hs state 17 until timeout... */
 		return LWS_SSL_CAPABLE_MORE_SERVICE;
 
 	lws_snprintf(errbuf, elen, "mbedtls connect %d %d %d", n, m, en);
@@ -294,6 +347,10 @@ lws_tls_client_confirm_peer_cert(struct lws *wsi, char *ebuf, size_t ebuf_len)
 		return 0;
 	}
 
+#if defined(LWS_WITH_TLS_JIT_TRUST)
+	if (n == X509_V_ERR_INVALID_CA)
+	    lws_tls_jit_trust_sort_kids(wsi, &wsi->tls.ssl->kid_chain);
+#endif
 	lws_snprintf(ebuf, ebuf_len,
 		"server's cert didn't look good, %s (use_ssl 0x%x) X509_V_ERR = %d: %s\n",
 		type, (unsigned int)wsi->tls.use_ssl, n,
@@ -321,8 +378,8 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 					unsigned int key_mem_len
 					)
 {
-	X509 *d2i_X509(X509 **cert, const unsigned char *buffer, long len);
-	SSL_METHOD *method = (SSL_METHOD *)TLS_client_method();
+	X509 *d2i_X509(X509 **cert, const unsigned char **buffer, long len);
+	SSL_METHOD *method;
 	unsigned long error;
 	int n;
 
@@ -330,6 +387,16 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 	vh->tls_session_cache_max = info->tls_session_cache_max ?
 				    info->tls_session_cache_max : 10;
 	lws_tls_session_cache(vh, info->tls_session_timeout);
+#endif
+
+#if defined(MBEDTLS_SSL_PROTO_TLS1_2)
+	method = (SSL_METHOD *)TLSv1_2_client_method();
+#elif defined(MBEDTLS_SSL_PROTO_TLS1_1)
+	method = (SSL_METHOD *)TLSv1_1_client_method();
+#elif defined(MBEDTLS_SSL_PROTO_TLS1)
+	method = (SSL_METHOD *)TLSv1_client_method();
+#else
+	method = (SSL_METHOD *)TLS_client_method();
 #endif
 
 	if (!method) {
@@ -349,37 +416,48 @@ lws_tls_client_create_vhost_context(struct lws_vhost *vh,
 		return 1;
 	}
 
-	if (!ca_filepath && (!ca_mem || !ca_mem_len))
-		return 0;
-
-	if (ca_filepath) {
+	vh->tls.ssl_client_ctx->rngctx = &vh->context->mcdc;
+	if (!ca_filepath && (!ca_mem || !ca_mem_len)) {
+#if defined(LWS_HAVE_SSL_CTX_load_verify_dir)
+		if (!SSL_CTX_load_verify_dir(
+			vh->tls.ssl_client_ctx, LWS_OPENSSL_CLIENT_CERTS))
+#else
+		if (!SSL_CTX_load_verify_locations(
+			vh->tls.ssl_client_ctx, NULL, LWS_OPENSSL_CLIENT_CERTS))
+#endif
+			lwsl_err("Unable to load SSL Client certs from %s "
+			    "(set by LWS_OPENSSL_CLIENT_CERTS) -- "
+			    "client ssl isn't going to work\n",
+			    LWS_OPENSSL_CLIENT_CERTS);
+	} else if (ca_filepath) {
 #if !defined(LWS_PLAT_OPTEE)
-		uint8_t *buf;
-		lws_filepos_t len;
-
-		if (alloc_file(vh->context, ca_filepath, &buf, &len)) {
-			lwsl_err("Load CA cert file %s failed\n", ca_filepath);
-			return 1;
+#if defined(LWS_HAVE_SSL_CTX_load_verify_file)
+		if (!SSL_CTX_load_verify_file(
+			vh->tls.ssl_client_ctx, ca_filepath)) {
+#else
+		if (!SSL_CTX_load_verify_locations(
+			vh->tls.ssl_client_ctx, ca_filepath, NULL)) {
+#endif
+			lwsl_err(
+				"Unable to load SSL Client certs "
+				"file from %s -- client ssl isn't "
+				"going to work\n", ca_filepath);
 		}
-		vh->tls.x509_client_CA = d2i_X509(NULL, buf, (long)len);
-		free(buf);
-		lwsl_info("Loading client CA for verification %s\n", ca_filepath);
 #endif
 	} else {
-		vh->tls.x509_client_CA = d2i_X509(NULL, (uint8_t*)ca_mem, (long)ca_mem_len);
+		vh->tls.x509_client_CA = d2i_X509(NULL, (const uint8_t **)&ca_mem, (long)ca_mem_len);
 		lwsl_info("%s: using mem client CA cert %d\n",
 			    __func__, ca_mem_len);
-	}
+		if (!vh->tls.x509_client_CA) {
+			lwsl_err("client CA: x509 parse failed\n");
+			return 1;
+		}
 
-	if (!vh->tls.x509_client_CA) {
-		lwsl_err("client CA: x509 parse failed\n");
-		return 1;
+		if (!vh->tls.ssl_ctx)
+			SSL_CTX_add_client_CA(vh->tls.ssl_client_ctx, vh->tls.x509_client_CA);
+		else
+			SSL_CTX_add_client_CA(vh->tls.ssl_ctx, vh->tls.x509_client_CA);
 	}
-
-	if (!vh->tls.ssl_ctx)
-		SSL_CTX_add_client_CA(vh->tls.ssl_client_ctx, vh->tls.x509_client_CA);
-	else
-		SSL_CTX_add_client_CA(vh->tls.ssl_ctx, vh->tls.x509_client_CA);
 
 	/* support for client-side certificate authentication */
 	if (cert_filepath) {

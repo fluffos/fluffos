@@ -25,6 +25,10 @@
 #if !defined(__LWS_SSH_H__)
 #define __LWS_SSH_H__
 
+#if defined(LWS_HAVE_SYS_TYPES_H)
+#include <sys/types.h>
+#endif
+
 #if defined(LWS_WITH_MBEDTLS)
 #include "mbedtls/sha1.h"
 #include "mbedtls/sha256.h"
@@ -274,6 +278,11 @@ enum {
 	SSHS_NVC_CHRQ_EXEC_CMD,
 
 	SSHS_NVC_CHRQ_SUBSYSTEM,
+
+	SSHS_NVC_CHRQ_WNDCHANGE_TW,
+	SSHS_NVC_CHRQ_WNDCHANGE_TH,
+	SSHS_NVC_CHRQ_WNDCHANGE_TWP,
+	SSHS_NVC_CHRQ_WNDCHANGE_THP,
 
 	SSHS_NVC_CH_EOF,
 	SSHS_NVC_CH_CLOSE,

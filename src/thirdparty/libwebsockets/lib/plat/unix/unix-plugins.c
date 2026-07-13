@@ -76,11 +76,15 @@ lws_plat_dlopen(struct lws_plugin **pplugin, const char *libpath,
 		goto bail;
 	}
 
-	if (strcmp(hdr->lws_build_hash, LWS_BUILD_HASH))
+	if (strcmp(hdr->lws_build_hash, LWS_BUILD_HASH)) {
+		lwsl_info("%s: build hash mismatch\n", __func__);
 		goto bail;
+	}
 
-	if (strcmp(hdr->_class, _class))
+	if (strcmp(hdr->_class, _class)) {
+		lwsl_info("%s: class mismatch\n", __func__);
 		goto bail;
+	}
 
 	/*
 	 * We don't already have one of these, right?
@@ -88,8 +92,10 @@ lws_plat_dlopen(struct lws_plugin **pplugin, const char *libpath,
 
 	pin = *pplugin;
 	while (pin) {
-		if (!strcmp(pin->hdr->name, hdr->name))
+		if (!strcmp(pin->hdr->name, hdr->name)) {
+			lwsl_info("%s: plugin seems duped\n", __func__);
 			goto bail;
+		}
 		pin = pin->list;
 	}
 
@@ -97,12 +103,9 @@ lws_plat_dlopen(struct lws_plugin **pplugin, const char *libpath,
 	 * OK let's bring it in
 	 */
 
-	pin = lws_malloc(sizeof(*pin), __func__);
+	pin = lws_plugin_alloc(pplugin);
 	if (!pin)
 		goto bail;
-
-	pin->list = *pplugin;
-	*pplugin = pin;
 
 	pin->u.l = l;
 	pin->hdr = hdr;
@@ -110,7 +113,7 @@ lws_plat_dlopen(struct lws_plugin **pplugin, const char *libpath,
 	if (each)
 		each(pin, each_user);
 
-	lwsl_notice("   %s\n", libpath);
+	lwsl_info("   %s\n", libpath);
 
 	return hdr;
 

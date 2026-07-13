@@ -1,7 +1,7 @@
 #
 # libwebsockets - small server side websockets and web server implementation
 #
-# Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+# Copyright (C) 2010 - 2022 Andy Green <andy@warmcat.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -22,25 +22,10 @@
 # IN THE SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.22)
-include(CheckFunctionExists)
-include(CheckSymbolExists)
-include(CheckIncludeFile)
-include(CheckIncludeFiles)
-include(CheckLibraryExists)
-include(CheckTypeSize)
-include(CheckCSourceCompiles)
+cmake_minimum_required(VERSION 3.10...4.0)
 
-if (POLICY CMP0048)
-	cmake_policy(SET CMP0048 NEW)
-endif()
-
-#if (POLICY CMP0024)
-#	cmake_policy(SET CMP0024 NEW)
-#endif()
-
-if (POLICY CMP0075)
-	cmake_policy(SET CMP0075 NEW)
+if (PICO_SDK_PATH)
+	include(cmake/pico_sdk_import.cmake)
 endif()
 
 # General Advice
@@ -63,20 +48,71 @@ if (ESP_PLATFORM)
 endif()
 
 # it's at this point any toolchain file is brought in
-project(libwebsockets C CXX)
+project(libwebsockets C)
+if (LWS_WITH_SECURE_STREAMS_CPP)
+	enable_language(CXX)
+endif()
+
+# On macOS, check for the Apple Silicon Homebrew path and add it to the search prefix.
+# This makes find_package(), find_library(), etc. automatically find things
+# installed in /opt/homebrew on Apple Silicon machines, without breaking
+# the default /usr/local search on older Intel machines.
+if (APPLE)
+    if (EXISTS "/opt/homebrew/bin/brew")
+        list (PREPEND CMAKE_PREFIX_PATH "/opt/homebrew")
+    endif()
+endif()
+
+include(CheckFunctionExists)
+include(CheckSymbolExists)
+include(CheckIncludeFile)
+include(CheckIncludeFiles)
+include(CheckLibraryExists)
+include(CheckTypeSize)
+include(CheckCSourceCompiles)
+include(GNUInstallDirs)
 include(CTest)
+
+if (PICO_SDK_PATH)
+	pico_sdk_init()
+endif()
 
 if (ESP_PLATFORM)
        include_directories(
 		$ENV{IDF_PATH}/components/esp_hw_support/include/soc/
 		$ENV{IDF_PATH}/components/freertos/include/
+		$ENV{IDF_PATH}/components/lwip/include/
+		$ENV{IDF_PATH}/components/freertos/esp_additions/include/
+		$ENV{IDF_PATH}/components/freertos/esp_additions/include/freertos/
+		$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel/include/
+		$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/linux/include/
 		$ENV{IDF_PATH}/components/xtensa/${CONFIG_IDF_TARGET}/include/
 		$ENV{IDF_PATH}/components/freertos/include/esp_additions
 		$ENV{IDF_PATH}/components/hal/include
+		$ENV{IDF_PATH}/components/esp_rom/${CONFIG_IDF_TARGET}/include/${CONFIG_IDF_TARGET}/
 		$ENV{IDF_PATH}/components/soc/${CONFIG_IDF_TARGET}/include/
+		$ENV{IDF_PATH}/components/soc/${CONFIG_IDF_TARGET}/register/
 		$ENV{IDF_PATH}/components/soc/include/
 		$ENV{IDF_PATH}/components/esp_hw_support/include
 		$ENV{IDF_PATH}/components/hal/${CONFIG_IDF_TARGET}/include/
+		$ENV{IDF_PATH}/components/app_update/include/
+		$ENV{IDF_PATH}/components/bootloader_support/include
+		$ENV{IDF_PATH}/components/lwip/port/include
+		$ENV{IDF_PATH}/components/lwip/port/freertos/include
+		$ENV{IDF_PATH}/components/lwip/port/esp32xx/include
+		$ENV{IDF_PATH}/components/freertos/config/include/freertos/
+		$ENV{IDF_PATH}/components/freertos/config/${CONFIG_IDF_TARGET_ARCH}/include
+		$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/${CONFIG_IDF_TARGET_ARCH}/include
+		$ENV{IDF_PATH}/components/freertos/FreeRTOS-Kernel/portable/${CONFIG_IDF_TARGET_ARCH}/include/freertos
+		$ENV{IDF_PATH}/components/freertos/config/include
+		$ENV{IDF_PATH}/components/esp_driver_gpio/include
+		$ENV{IDF_PATH}/components/esp_driver_spi/include
+		$ENV{IDF_PATH}/components/esp_driver_ledc/include
+		$ENV{IDF_PATH}/components/esp_partition/include
+		$ENV{IDF_PATH}/components/spi_flash/include
+		$ENV{IDF_PATH}/components/esp_app_format/include
+		$ENV{IDF_PATH}/components/esp_bootloader_format/include
+		$ENV{IDF_PATH}/components/esp_system/include/
 	)
 
 	if (CONFIG_IDF_TARGET_ARCH_RISCV)
@@ -138,21 +174,29 @@ option(LWS_WITH_SYS_ASYNC_DNS "Nonblocking internal IPv4 + IPv6 DNS resolver" OF
 option(LWS_WITH_SYS_NTPCLIENT "Build in tiny ntpclient good for tls date validation and run via lws_system" OFF)
 option(LWS_WITH_SYS_DHCP_CLIENT "Build in tiny DHCP client" OFF)
 option(LWS_WITH_HTTP_BASIC_AUTH "Support Basic Auth" ON)
+option(LWS_WITH_HTTP_DIGEST_AUTH "Support Digest Auth (caution deprecated crypto)" ON)
 option(LWS_WITH_HTTP_UNCOMMON_HEADERS "Include less common http header support" ON)
 option(LWS_WITH_SYS_STATE "lws_system state support" ON)
 option(LWS_WITH_SYS_SMD "Lws System Message Distribution" ON)
 option(LWS_WITH_SYS_FAULT_INJECTION "Enable fault injection support" OFF)
 option(LWS_WITH_SYS_METRICS "Lws Metrics API" OFF)
+option(LWS_WITH_UPNG "Enable stateful PNG stream decoder" ON)
+option(LWS_WITH_GZINFLATE "Enable internal minimal gzip inflator" ON)
+option(LWS_WITH_JPEG "Enable stateful JPEG stream decoder" ON)
+option(LWS_WITH_DLO "Enable Display List Objects" ON)
 
 #
 # Secure Streams
 #
-option(LWS_WITH_SECURE_STREAMS "Secure Streams protocol-agnostic API" OFF)
+option(LWS_WITH_SECURE_STREAMS "Secure Streams protocol-agnostic API" ON)
 option(LWS_WITH_SECURE_STREAMS_CPP "Secure Streams C++ classes" OFF)
 option(LWS_WITH_SECURE_STREAMS_PROXY_API "Secure Streams support to work across processes" OFF)
 option(LWS_WITH_SECURE_STREAMS_SYS_AUTH_API_AMAZON_COM "Auth support for api.amazon.com" OFF)
 option(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY "Secure Streams Policy is hardcoded only" OFF)
 option(LWS_WITH_SECURE_STREAMS_AUTH_SIGV4 "Secure Streams Auth support for AWS Sigv4" OFF)
+option(LWS_WITH_SECURE_STREAMS_BUFFER_DUMP "Secure Streams protocol buffer dump" OFF)
+option(LWS_WITH_SS_DIRECT_PROTOCOL_STR "Secure Streams directly set/get metadata w/o policy" OFF)
+option(LWS_ONLY_SSPC "Remove everything from library except standalone SSPC client support" OFF)
 
 #
 # CTest options
@@ -173,11 +217,12 @@ option(LWS_WITH_SSL "Include SSL support (defaults to OpenSSL or similar, mbedTL
 option(LWS_WITH_MBEDTLS "Use mbedTLS (>=2.0) replacement for OpenSSL. When setting this, you also may need to specify LWS_MBEDTLS_LIBRARIES and LWS_MBEDTLS_INCLUDE_DIRS" OFF)
 option(LWS_WITH_BORINGSSL "Use BoringSSL replacement for OpenSSL" OFF)
 option(LWS_WITH_CYASSL "Use CyaSSL replacement for OpenSSL. When setting this, you also need to specify LWS_CYASSL_LIBRARIES and LWS_CYASSL_INCLUDE_DIRS" OFF)
-option(LWS_WITH_WOLFSSL "Use wolfSSL replacement for OpenSSL. When setting this, you also need to specify LWS_WOLFSSL_LIBRARIES and LWS_WOLFSSL_INCLUDE_DIRS" OFF)
+option(LWS_WITH_WOLFSSL "Use wolfSSL replacement for OpenSSL. When setting this, you also may need to specify LWS_WOLFSSL_LIBRARIES and LWS_WOLFSSL_INCLUDE_DIRS" OFF)
 option(LWS_SSL_CLIENT_USE_OS_CA_CERTS "SSL support should make use of the OS-installed CA root certs" ON)
 option(LWS_TLS_LOG_PLAINTEXT_RX "For debugging log the received plaintext as soon as decrypted" OFF)
 option(LWS_TLS_LOG_PLAINTEXT_TX "For debugging log the transmitted plaintext just before encryption" OFF)
 option(LWS_WITH_TLS_SESSIONS "Enable persistent, resumable TLS sessions" ON)
+option(LWS_WITH_TLS_JIT_TRUST "Enable dynamically computing which trusted TLS CA is needed to be instantiated" OFF)
 
 #
 # Event library options (may select multiple, or none for default poll()
@@ -209,7 +254,7 @@ option(LWS_WITH_STATIC "Build the static version of the library" ON)
 option(LWS_WITH_SHARED "Build the shared version of the library" ON)
 option(LWS_LINK_TESTAPPS_DYNAMIC "Link the test apps to the shared version of the library. Default is to link statically" OFF)
 option(LWS_STATIC_PIC "Build the static version of the library with position-independent code" OFF)
-option(LWS_SUPPRESS_DEPRECATED_API_WARNINGS "Turn off complaints about, eg, openssl deprecated api usage" OFF)
+option(LWS_SUPPRESS_DEPRECATED_API_WARNINGS "Turn off complaints about, eg, openssl 3 deprecated api usage" ON)
 
 #
 # Specific platforms
@@ -218,6 +263,7 @@ option(LWS_WITH_ESP32 "Build for ESP32" OFF)
 option(LWS_PLAT_OPTEE "Build for OPTEE" OFF)
 option(LWS_PLAT_FREERTOS "Build for FreeRTOS" OFF)
 option(LWS_PLAT_ANDROID "Android flavour of unix platform" OFF)
+option(LWS_PLAT_BAREMETAL "Build for deeply embedded baremetal" OFF)
 
 #
 # Client / Server / Test Apps build control
@@ -242,9 +288,13 @@ option(LWS_WITHOUT_BUILTIN_SHA1 "Don't build the lws sha-1 (eg, because openssl 
 option(LWS_WITHOUT_DAEMONIZE "Don't build the daemonization api" ON)
 option(LWS_SSL_SERVER_WITH_ECDH_CERT "Include SSL server use ECDH certificate" OFF)
 option(LWS_WITH_LEJP "With the Lightweight JSON Parser" ON)
+option(LWS_WITH_CBOR "With the Lightweight LECP CBOR Parser" OFF)
+option(LWS_WITH_CBOR_FLOAT "Build floating point types if building CBOR LECP" ON)
 option(LWS_WITH_SQLITE3 "Require SQLITE3 support" OFF)
+option(LWS_WITH_LHP "With the Lightweight HTML5 parser" ON)
 option(LWS_WITH_STRUCT_JSON "Generic struct serialization to and from JSON" OFF)
 option(LWS_WITH_STRUCT_SQLITE3 "Generic struct serialization to and from SQLITE3" OFF)
+option(LWS_WITH_JSONRPC "JSON RPC support" ON)
 # broken atm
 #option(LWS_WITH_SMTP "Provide SMTP support" OFF)
 if (LWS_WITH_ESP32)
@@ -260,23 +310,30 @@ set(LWS_LOGGING_BITFIELD_CLEAR 0 CACHE STRING "Bitfield describing which log lev
 option(LWS_LOGS_TIMESTAMP "Timestamp at start of logs" ON)
 option(LWS_LOG_TAG_LIFECYCLE "Log tagged object lifecycle as NOTICE" ON)
 option(LWS_AVOID_SIGPIPE_IGN "Android 7+ reportedly needs this" OFF)
-option(LWS_WITH_JOSE "JSON Web Signature / Encryption / Keys (RFC7515/6/) API" OFF)
+option(LWS_WITH_JOSE "JOSE JSON Web Signature / Encryption / Keys (RFC7515/6/) API" OFF)
+option(LWS_WITH_COSE "COSE CBOR Signature / Encryption / Keys (RFC8152) API" OFF)
 option(LWS_WITH_GENCRYPTO "Enable support for Generic Crypto apis independent of TLS backend" OFF)
 option(LWS_WITH_SELFTESTS "Selftests run at context creation" OFF)
 option(LWS_WITH_GCOV "Build with gcc gcov coverage instrumentation" OFF)
 option(LWS_WITH_EXPORT_LWSTARGETS "Export libwebsockets CMake targets.  Disable if they conflict with an outer cmake project." ON)
 option(LWS_REPRODUCIBLE "Build libwebsockets reproducible. It removes the build user and hostname from the build" ON)
+if (ESP_PLATFORM OR LWS_WITH_ESP32 OR LWS_PLAT_BAREMETAL OR LWS_PLAT_FREERTOS)
 option(LWS_WITH_MINIMAL_EXAMPLES "Also build the normally standalone minimal examples, for QA" OFF)
+else()
+option(LWS_WITH_MINIMAL_EXAMPLES "Also build the normally standalone minimal examples, for QA" ON)
+endif()
 option(LWS_WITH_LWSAC "lwsac Chunk Allocation api" ON)
 option(LWS_WITH_CUSTOM_HEADERS "Store and allow querying custom HTTP headers (H1 only)" ON)
-option(LWS_WITH_DISKCACHE "Hashed cache directory with lazy LRU deletion to size limit" OFF)
+option(LWS_WITH_DISKCACHE "Hashed cache directory with lazy LRU deletion to size limit (unrelated to lws_cache_ttl)" OFF)
 option(LWS_WITH_ASAN "Build with gcc runtime sanitizer options enabled (needs libasan)" OFF)
 option(LWS_WITH_LEJP_CONF "With LEJP configuration parser as used by lwsws" OFF)
 option(LWS_WITH_ZLIB "Include zlib support (required for extensions)" OFF)
 option(LWS_WITH_BUNDLED_ZLIB "Use bundled zlib version (Windows only)" ${LWS_WITH_BUNDLED_ZLIB_DEFAULT})
 option(LWS_WITH_MINIZ "Use miniz instead of zlib" OFF)
-option(LWS_WITH_DEPRECATED_THINGS "Temporary workaround for deprecated apis" OFF)
-option(LWS_WITH_SEQUENCER "lws_seq_t support" OFF)
+if (LWS_WITH_MINIZ AND NOT LWS_WITHOUT_EXTENSIONS)
+	message(FATAL_ERROR "Miniz does not support api needed by ws compression extension, either disable LWS_WITH_MINIZ or LWS_WITHOUT_EXTENSIONS must be ON")
+endif()
+
 option(LWS_WITH_EXTERNAL_POLL "Support external POLL integration using callback messages (not recommended)" OFF)
 option(LWS_WITH_LWS_DSH "Support lws_dsh_t Disordered Shared Heap" OFF)
 option(LWS_CLIENT_HTTP_PROXYING "Support external http proxies for client connections" ON)
@@ -289,19 +346,58 @@ option(LWS_HTTP_HEADERS_ALL "Override header reduction optimization and include 
 option(LWS_WITH_SUL_DEBUGGING "Enable zombie lws_sul checking on object deletion" OFF)
 option(LWS_WITH_PLUGINS_API "Build generic lws_plugins apis (see LWS_WITH_PLUGINS to also build protocol plugins)" OFF)
 option(LWS_WITH_CONMON "Collect introspectable connection latency stats on individual client connections" ON)
+option(LWS_WITH_WOL "Wake On Lan support" ON)
 option(LWS_WITHOUT_EVENTFD "Force using pipe instead of eventfd" OFF)
+if (UNIX OR WIN32)
+	option(LWS_WITH_CACHE_NSCOOKIEJAR "Build file-backed lws-cache-ttl that uses netscape cookie jar format (linux-only)" ON)
+else()
+	option(LWS_WITH_CACHE_NSCOOKIEJAR "Build file-backed lws-cache-ttl that uses netscape cookie jar format (linux-only)" OFF)
+endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	option(LWS_WITH_NETLINK "Monitor Netlink for Routing Table changes" ON)
+	option(LWS_WITH_BINDTODEVICE "Use bind to interface socket option" ON)
+	option(LWS_WITH_LIBCAP "Enable libcap" ON)
 else()
 	set(LWS_WITH_NETLINK 0)
+	set(LWS_WITH_BINDTODEVICE 0)
+	set(LWS_WITH_LIBCAP OFF)
 endif()
+option(LWS_WITH_MCUFONT_ENCODER "Build the ttf to mcufont encoder" OFF)
+option(LWS_WITH_WAKE_LOGGING "Log each wake reason" OFF)
+
+#
+# Compressed backtraces
+#
+option(LWS_WITH_COMPRESSED_BACKTRACES "Build with support for compressed backtraces" OFF)
+set(LWS_COMPRESSED_BACKTRACES_SNIP_PRE 2 CACHE STRING "Amount of callstack to snip from top")
+set(LWS_COMPRESSED_BACKTRACES_SNIP_POST 1 CACHE STRING "Amount of callstack to snip from bottom")
+option(LWS_WITH_ALLOC_METADATA_LWS "Build lws_*alloc() with compressed backtraces (requires WITH_COMPRESSED_BACKTRACES)" OFF)
+
+#
+# Over The Air updates
+#
+option(LWS_WITH_OTA "Build with support for Over The Air update download and validation" OFF)
+set(LWS_OTA_VARIANT "set-LWS_OTA_VARIANT" CACHE STRING "Build Variant ID for OTA filtering")
+set(LWS_OTA_PUBLIC_JWK_FILE "$ENV{HOME}/.lws_ota/libwebsockets.org-ota-v1.public.jwk" CACHE STRING "Filepath of public JWK used to validate packages")
+if (LWS_WITH_OTA)
+	file(READ ${LWS_OTA_PUBLIC_JWK_FILE} LWS_OTA_PUBLIC_JWK)
+endif()
+
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
        # its openssl has md5 deprecated
        set(LWS_SUPPRESS_DEPRECATED_API_WARNINGS 1)
 endif()
 
+if (MSVC)
+	option(LWS_MSVC_STATIC_RUNTIME "Link to static MSVC runtime" OFF)
+endif()
+
+
+if (DEFINED CACHE{LIB_SUFFIX})
+	message(WARNING "LIB_SUFFIX is deprecated and has no effect. Use CMAKE_INSTALL_LIBDIR and/or LWS_INSTALL_LIB_DIR instead.")
+endif()
 
 #
 # to use miniz, enable both LWS_WITH_ZLIB and LWS_WITH_MINIZ
@@ -326,12 +422,22 @@ macro(add_subdir_include_directories arg1)
 	include_directories(${_CMAKE_INC_LIST})
 endmacro()
 
+macro(add_subdir_include_directories_local arg1)
+	add_subdirectory(${arg1})
+	list(APPEND CMAKE_INC_LIST_TEMP ${_CMAKE_INC_LIST})
+endmacro()
+
+macro(add_subdir_include_directories_local_end)
+	set(_CMAKE_INC_LIST ${CMAKE_INC_LIST_TEMP} PARENT_SCOPE)
+endmacro()
+
+
 macro(exports_to_parent_scope)
 	set(SOURCES ${SOURCES} PARENT_SCOPE)
 	if (LIB_LIST)
 		set(LIB_LIST ${LIB_LIST} PARENT_SCOPE)
 	endif()
-	get_property(_CURR DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
+	get_property(_CURR DIRECTORY PROPERTY INCLUDE_DIRECTORIES) 
 	set(_CMAKE_INC_LIST ${_CURR} PARENT_SCOPE)
 	if (LWS_LIB_BUILD_INC_PATHS)
 		set(LWS_LIB_BUILD_INC_PATHS ${LWS_LIB_BUILD_INC_PATHS} PARENT_SCOPE)
@@ -392,8 +498,8 @@ set(PACKAGE "libwebsockets")
 set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 set(CPACK_PACKAGE_NAME "${PACKAGE}")
 set(CPACK_PACKAGE_VERSION_MAJOR "4")
-set(CPACK_PACKAGE_VERSION_MINOR "2")
-set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "1")
+set(CPACK_PACKAGE_VERSION_MINOR "5")
+set(CPACK_PACKAGE_VERSION_PATCH_NUMBER "8")
 
 set(CPACK_PACKAGE_VERSION_PATCH "${CPACK_PACKAGE_VERSION_PATCH_NUMBER}-${LWS_BUILD_HASH}")
 set(CPACK_PACKAGE_RELEASE 1)
@@ -402,7 +508,7 @@ set(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSIO
 set(CPACK_PACKAGE_VENDOR "andy@warmcat.com")
 set(CPACK_PACKAGE_CONTACT "andy@warmcat.com")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PACKAGE} ${CPACK_PACKAGE_VERSION}")
-set(SOVERSION "18")
+set(SOVERSION "21")
 if(NOT CPACK_GENERATOR)
     if(UNIX)
         set(CPACK_GENERATOR "TGZ")
@@ -446,22 +552,19 @@ if (CMAKE_TOOLCHAIN_FILE)
 	message(STATUS "CMAKE_TOOLCHAIN_FILE='${CMAKE_TOOLCHAIN_FILE}'")
 endif()
 
-if (NOT LIB_SUFFIX)
-	set(LIB_SUFFIX "")
-endif()
-
 if (WIN32)
 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/win32port/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/win32port/version.rc @ONLY)
 	set(RESOURCES ${CMAKE_CURRENT_BINARY_DIR}/win32port/version.rc)
+       include_directories("${CMAKE_CURRENT_SOURCE_DIR}/win32port/win32helpers")
 endif()
 
 include_directories(include)
 
 # Allow the user to override installation directories.
-set(LWS_INSTALL_LIB_DIR       lib CACHE PATH "Installation directory for libraries")
-set(LWS_INSTALL_BIN_DIR       bin CACHE PATH "Installation directory for executables")
-set(LWS_INSTALL_INCLUDE_DIR   include CACHE PATH "Installation directory for header files")
-set(LWS_INSTALL_EXAMPLES_DIR  bin CACHE PATH "Installation directory for example files")
+set(LWS_INSTALL_LIB_DIR       ${CMAKE_INSTALL_LIBDIR} CACHE PATH "Installation directory for libraries")
+set(LWS_INSTALL_BIN_DIR       ${CMAKE_INSTALL_BINDIR} CACHE PATH "Installation directory for executables")
+set(LWS_INSTALL_INCLUDE_DIR   ${CMAKE_INSTALL_INCLUDEDIR} CACHE PATH "Installation directory for header files")
+set(LWS_INSTALL_EXAMPLES_DIR  ${CMAKE_INSTALL_BINDIR} CACHE PATH "Installation directory for example files")
 
 # if you gave LWS_WITH_MINIZ, point to MINIZ here if not found
 # automatically
@@ -523,7 +626,7 @@ if (NOT LWS_HAVE_inline)
 endif()
 
 # Put the libraries and binaries that get built into directories at the
-# top of the build tree rather than in hard-to-find leaf directories.
+# top of the build tree rather than in hard-to-find leaf directories. 
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
@@ -532,7 +635,7 @@ SET(LWS_INSTALL_PATH "${CMAKE_INSTALL_PREFIX}")
 
 # Put absolute path of dynamic libraries into the object code. Some
 # architectures, notably Mac OS X, need this.
-SET(CMAKE_INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/${LWS_INSTALL_LIB_DIR}${LIB_SUFFIX}")
+SET(CMAKE_INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/${LWS_INSTALL_LIB_DIR}")
 
 if (LWS_WITHOUT_BUILTIN_SHA1)
 	set(LWS_SHA1_USE_OPENSSL_NAME 1)
@@ -546,6 +649,10 @@ CHECK_C_SOURCE_COMPILES(
 	"#include <malloc.h>
 	int main(int argc, char **argv) { return (int)malloc_usable_size((void *)0); }
 	" LWS_HAVE_MALLOC_USABLE_SIZE)
+
+if (PICO_SDK_PATH)
+	set(CMAKE_REQUIRED_DEFINITIONS "-Dxxexit=exit")
+endif()
 
 CHECK_FUNCTION_EXISTS(fork LWS_HAVE_FORK)
 CHECK_FUNCTION_EXISTS(getenv LWS_HAVE_GETENV)
@@ -573,6 +680,41 @@ CHECK_FUNCTION_EXISTS(getgrnam_r LWS_HAVE_GETGRNAM_R)
 CHECK_FUNCTION_EXISTS(getpwuid_r LWS_HAVE_GETPWUID_R)
 CHECK_FUNCTION_EXISTS(getpwnam_r LWS_HAVE_GETPWNAM_R)
 CHECK_FUNCTION_EXISTS(timegm LWS_HAVE_TIMEGM)
+CHECK_C_SOURCE_COMPILES("#include <malloc.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_IN6ADDR_H)
+CHECK_C_SOURCE_COMPILES("#include <memory.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_MEMORY_H)
+CHECK_C_SOURCE_COMPILES("#include <netinet/in.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_NETINET_IN_H)
+CHECK_C_SOURCE_COMPILES("#include <stdint.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_STDINT_H)
+CHECK_C_SOURCE_COMPILES("#include <stdlib.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_STDLIB_H)
+CHECK_C_SOURCE_COMPILES("#include <strings.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_STRINGS_H)
+CHECK_C_SOURCE_COMPILES("#include <string.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_STRING_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/prctl.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYS_PRCTL_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/socket.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYS_SOCKET_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/sockio.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYS_SOCKIO_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/stat.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYS_STAT_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/types.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYS_TYPES_H)
+CHECK_C_SOURCE_COMPILES("#include <unistd.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_UNISTD_H)
+CHECK_C_SOURCE_COMPILES("#include <vfork.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_VFORK_H)
+CHECK_C_SOURCE_COMPILES("#include <malloc.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_MALLOC_H)
+CHECK_C_SOURCE_COMPILES("#include <pthread.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_PTHREAD_H)
+CHECK_C_SOURCE_COMPILES("#include <inttypes.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_INTTYPES_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/resource.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYS_RESOURCE_H)
+CHECK_C_SOURCE_COMPILES("#include <linux/ipv6.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_LINUX_IPV6_H)
+CHECK_C_SOURCE_COMPILES("#include <sys/types.h>\n#include <net/if_ether.h>\n void main(void) { while (1) ; } void xxexit(void){}" LWS_HAVE_NET_IF_ETHER_H)
+if (LWS_HAVE_SYS_TYPES_H)
+	CHECK_C_SOURCE_COMPILES("#include <sys/types.h>\n#include <net/ethernet.h>\n void main(void) { while (1) ; } void xxexit(void){}" LWS_HAVE_NET_ETHERNET_H)
+else()
+	CHECK_C_SOURCE_COMPILES("#include <net/ethernet.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_NET_ETHERNET_H)
+endif()
+CHECK_C_SOURCE_COMPILES("#include <systemd/sd-daemon.h>\nvoid main(void) { while(1) ; } void xxexit(void){}" LWS_HAVE_SYSTEMD_H)
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
+	unset(LWS_HAVE_CTIME_R CACHE)
+endif()
+
+
+if (LWS_EXT_PTHREAD_INCLUDE_DIR)
+	set(LWS_HAVE_PTHREAD_H 1)
+endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 	if(CMAKE_OSX_DEPLOYMENT_TARGET LESS "10.12")
@@ -592,7 +734,7 @@ if (LWS_EXT_PTHREAD_INCLUDE_DIR)
 	set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES};${LWS_EXT_PTHREAD_INCLUDE_DIR})
 	include_directories(${LWS_EXT_PTHREAD_INCLUDE_DIR})
 
-	list(APPEND LIB_LIST_AT_END ${LWS_EXT_PTHREAD_LIBRARIES})
+#	list(APPEND LIB_LIST_AT_END ${LWS_EXT_PTHREAD_LIBRARIES})
 	set(CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} " -DHAVE_STRUCT_TIMESPEC=1")
 endif()
 
@@ -613,26 +755,6 @@ if (LWS_WITH_PLUGINS_API AND UNIX AND CMAKE_DL_LIBS AND NOT (${CMAKE_SYSTEM_NAME
 endif()
 
 
-CHECK_INCLUDE_FILE(in6addr.h LWS_HAVE_IN6ADDR_H)
-CHECK_INCLUDE_FILE(memory.h LWS_HAVE_MEMORY_H)
-CHECK_INCLUDE_FILE(netinet/in.h LWS_HAVE_NETINET_IN_H)
-CHECK_INCLUDE_FILE(stdint.h LWS_HAVE_STDINT_H)
-CHECK_INCLUDE_FILE(stdlib.h LWS_HAVE_STDLIB_H)
-CHECK_INCLUDE_FILE(strings.h LWS_HAVE_STRINGS_H)
-CHECK_INCLUDE_FILE(string.h LWS_HAVE_STRING_H)
-CHECK_INCLUDE_FILE(sys/prctl.h LWS_HAVE_SYS_PRCTL_H)
-CHECK_INCLUDE_FILE(sys/socket.h LWS_HAVE_SYS_SOCKET_H)
-CHECK_INCLUDE_FILE(sys/sockio.h LWS_HAVE_SYS_SOCKIO_H)
-CHECK_INCLUDE_FILE(sys/stat.h LWS_HAVE_SYS_STAT_H)
-CHECK_INCLUDE_FILE(sys/types.h LWS_HAVE_SYS_TYPES_H)
-CHECK_INCLUDE_FILE(unistd.h LWS_HAVE_UNISTD_H)
-CHECK_INCLUDE_FILE(vfork.h LWS_HAVE_VFORK_H)
-CHECK_INCLUDE_FILE(sys/capability.h LWS_HAVE_SYS_CAPABILITY_H)
-CHECK_INCLUDE_FILE(malloc.h LWS_HAVE_MALLOC_H)
-CHECK_INCLUDE_FILE(pthread.h LWS_HAVE_PTHREAD_H)
-CHECK_INCLUDE_FILE(inttypes.h LWS_HAVE_INTTYPES_H)
-CHECK_INCLUDE_FILE(sys/resource.h LWS_HAVE_SYS_RESOURCE_H)
-
 if (WIN32 OR MSVC)
 	CHECK_C_SOURCE_COMPILES("#include <winsock2.h>
 				 #include <afunix.h>
@@ -644,7 +766,22 @@ if (WIN32 OR MSVC)
 	endif()
 endif()
 
-CHECK_LIBRARY_EXISTS(cap cap_set_flag "" LWS_HAVE_LIBCAP)
+if (LWS_WITH_LIBCAP)
+	find_path(LIBCAP_INCLUDE_DIRS NAMES sys/capability.h)
+	find_library(LIBCAP_LIBRARIES NAMES cap)
+	if (LIBCAP_INCLUDE_DIRS AND LIBCAP_LIBRARIES)
+		set(LWS_HAVE_LIBCAP ON)
+		set(LWS_HAVE_SYS_CAPABILITY_H ON)
+		include_directories("${LIBCAP_INCLUDE_DIRS}")
+		list(APPEND LIB_LIST_AT_END ${LIBCAP_LIBRARIES})
+	else()
+		set(LWS_HAVE_LIBCAP OFF)
+		set(LWS_HAVE_SYS_CAPABILITY_H OFF)
+	endif()
+else()
+   set(LWS_HAVE_LIBCAP OFF)
+   set(LWS_HAVE_SYS_CAPABILITY_H OFF)
+endif()
 
 
 if (LWS_WITH_ZLIB AND NOT LWS_WITH_BUNDLED_ZLIB)
@@ -667,7 +804,7 @@ if (NOT CMAKE_REQUIRED_LIBRARIES)
 	set(CMAKE_REQUIRED_LIBRARIES "")
 endif()
 
-CHECK_C_SOURCE_COMPILES("#include <stdint.h>
+CHECK_C_SOURCE_COMPILES("#include <stdint.h> 
 	int main(void) {
 		intptr_t test = 1;
 		return 0;
@@ -780,9 +917,17 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR COMPILER_IS_CLANG)
 
 	# always warn all and generate debug info
 	if (UNIX AND NOT LWS_PLAT_FREERTOS)
-		set(CMAKE_C_FLAGS "-Wall -Wconversion -Wsign-compare -Wstrict-aliasing ${VISIBILITY_FLAG} -Wundef ${GCOV_FLAGS} ${CMAKE_C_FLAGS} ${ASAN_FLAGS}" )
+		set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wconversion -Wsign-compare -Wstrict-aliasing ${VISIBILITY_FLAG} -Wundef ${GCOV_FLAGS} ${CMAKE_C_FLAGS} ${ASAN_FLAGS}" )
 	else()
 		set(CMAKE_C_FLAGS "-Wall -Wsign-compare ${VISIBILITY_FLAG} ${GCOV_FLAGS} ${CMAKE_C_FLAGS}" )
+	endif()
+
+	if (PICO_SDK_PATH)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wconversion -Wsign-compare -Wstrict-aliasing -Wundef -nolibc")
+	endif()
+
+	if (ESP_PLATFORM AND (CONFIG_IDF_TARGET_ESP32 OR CONFIG_IDF_TARGET_ESP32S2 OR CONFIG_IDF_TARGET_ESP32S3))
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mlongcalls")
 	endif()
 
 	if ("${DISABLE_WERROR}" STREQUAL "OFF")
@@ -802,7 +947,7 @@ if ((CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX) AND NOT LWS_WITHOUT_TE
 	# jeez clang understands -pthread but dies if he sees it at link time!
 	# http://stackoverflow.com/questions/2391194/what-is-gs-pthread-equiv-in-clang
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread" )
-	list(APPEND LIB_LIST_AT_END -lpthread)
+	# list(APPEND LIB_LIST_AT_END -lpthread)
     endif()
 endif()
 
@@ -813,6 +958,13 @@ if (COMPILER_IS_CLANG)
 	if (UNIX AND LWS_HAVE_PTHREAD_H)
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -Wno-error=unused-command-line-argument" )
 	endif()
+endif()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
+		list(APPEND LIB_LIST_AT_END -lsocket)
+		if ((CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX))
+			set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-conversion")
+		endif()
 endif()
 
 if (WINCE)
@@ -826,6 +978,37 @@ if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE)
 	# Fail the build if any warnings
 	add_compile_options(/W3 /WX)
+	# Unbreak MSVC broken preprocessor __VA_ARGS__ behaviour
+	if (MSVC_VERSION GREATER 1925)
+		add_compile_options(/Zc:preprocessor /wd5105)
+	else()
+		add_compile_options(/experimental:preprocessor /wd5105)
+	endif()
+	if (LWS_MSVC_STATIC_RUNTIME AND NOT LWS_WITH_STATIC)
+		message(FATAL_ERROR "Incompatible options: when LWS_MSVC_STATIC_RUNTIME=ON, must also set LWS_WITH_STATIC=ON")
+	endif()
+	if (LWS_MSVC_STATIC_RUNTIME)
+		if (LWS_WITH_SHARED)
+			message(FATAL_ERROR "Incompatible options: when LWS_MSVC_STATIC_RUNTIME=ON, must also set LWS_WITH_SHARED=OFF")
+		endif()
+		if (${CMAKE_VERSION} VERSION_GREATER 3.15 OR ${CMAKE_VERSION} VERSION_EQUAL 3.15)
+			set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>)
+		else()
+			# Link the runtime library statically so that MSVCR*.DLL is not required at runtime.
+			# https://msdn.microsoft.com/en-us/library/2kzt1wy3.aspx
+			# This is achieved by replacing msvc option /MD with /MT and /MDd with /MTd
+			# http://www.cmake.org/Wiki/CMake_FAQ#How_can_I_build_my_MSVC_application_with_a_static_runtime.3F
+			foreach (flag_var
+					CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+					CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+				if(${flag_var} MATCHES "/MD")
+					string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+				endif()
+			endforeach()
+		endif()
+	else()
+		set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)
+	endif()
 endif(MSVC)
 
 if (MINGW)
@@ -855,7 +1038,7 @@ if (LWS_WITH_ZLIB)
 	if (NOT ZLIB_FOUND)
 		if (LWS_WITH_MINIZ)
 			find_package(Miniz REQUIRED)
-			set(ZLIB_INCLUDE_DIRS ${MINIZ_INCLUDE_DIRS})
+			set(ZLIB_INCLUDE_DIRS ${MINIZ_INCLUDE_DIR})
 			set(ZLIB_LIBRARIES ${MINIZ_LIBRARIES})
 		else()
 			find_package(ZLIB REQUIRED)
@@ -905,11 +1088,6 @@ if (LWS_WITH_HUBBUB)
 	list(APPEND LIB_LIST ${LIBHUBBUB_LIBRARIES} )
 endif()
 
-if (LWS_HAVE_LIBCAP)
-	find_library(LIBCAP_LIBRARIES NAMES cap)
-	list(APPEND LIB_LIST ${LIBCAP_LIBRARIES} )
-endif()
-
 if (LWS_WITH_PLUGINS_BUILTIN)
 	add_subdirectory(plugins)
 endif()
@@ -925,36 +1103,35 @@ list(APPEND LIB_LIST ${LIB_LIST_AT_END})
 #
 
 include_directories("${PROJECT_SOURCE_DIR}/lib")
-
 add_subdirectory(lib)
 
 
 if(WIN32 AND NOT CYGWIN)
   set(DEF_INSTALL_CMAKE_DIR cmake)
 else()
-  set(DEF_INSTALL_CMAKE_DIR lib${LIB_SUFFIX}/cmake/libwebsockets)
+  set(DEF_INSTALL_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/libwebsockets)
 endif()
-
+                
 configure_file(${PROJECT_SOURCE_DIR}/cmake/LwsCheckRequirements.cmake
 		${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LwsCheckRequirements.cmake
 		@ONLY)
-
+		
 configure_file(${PROJECT_SOURCE_DIR}/cmake/LwsCheckRequirements.cmake
 		${PROJECT_BINARY_DIR}/LwsCheckRequirements.cmake
-		@ONLY)
+		@ONLY)  
 
 # Generate version info for both build-tree and install-tree.
 configure_file(${PROJECT_SOURCE_DIR}/cmake/libwebsockets-config-version.cmake.in
-                ${PROJECT_BINARY_DIR}/libwebsockets-config-version.cmake
+                ${PROJECT_BINARY_DIR}/libwebsockets-config-version.cmake 
                 @ONLY)
 
 # Generate the config file for the build-tree.
-set(LWS__INCLUDE_DIRS
+set(LWS__INCLUDE_DIRS 
     "${PROJECT_SOURCE_DIR}/lib"
     "${PROJECT_BINARY_DIR}")
 set(LIBWEBSOCKETS_INCLUDE_DIRS ${LWS__INCLUDE_DIRS} CACHE PATH "Libwebsockets include directories")
 configure_file(${PROJECT_SOURCE_DIR}/cmake/libwebsockets-config.cmake.in
-                ${PROJECT_BINARY_DIR}/libwebsockets-config.cmake
+                ${PROJECT_BINARY_DIR}/libwebsockets-config.cmake 
                 @ONLY)
 set(LWS_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH "Installation directory for CMake files")
 
@@ -971,7 +1148,10 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 message("DIR ${libwebsockets_DIR} CMP ${CMAKE_MODULE_PATH}")
 
 if (LWS_WITH_MINIMAL_EXAMPLES)
-	add_subdirectory(minimal-examples)
+	if (LWS_WITH_SECURE_STREAMS)
+		add_subdirectory(minimal-examples)
+	endif()
+	add_subdirectory(minimal-examples-lowlevel)
 endif()
 
 if (NOT LWS_WITHOUT_TESTAPPS)
@@ -982,12 +1162,19 @@ if (NOT LWS_WITH_PLUGINS_BUILTIN)
 add_subdirectory(plugins)
 endif()
 add_subdirectory(lwsws)
+if (PICO_SDK_PATH)
+	link_libraries(pico_stdlib PRIVATE)
+endif()
+
+if (LWS_WITH_MCUFONT_ENCODER)
+	add_subdirectory(contrib/mcufont/encoder)
+endif()
 
 # Generate the lws_config.h that includes all the public compilation settings.
 configure_file(
        "${PROJECT_SOURCE_DIR}/cmake/lws_config.h.in"
        "${PROJECT_BINARY_DIR}/lws_config.h")
-
+       
 add_custom_command(
 		OUTPUT ${PROJECT_BINARY_DIR}/include/lws_config.h
 			${PROJECT_BINARY_DIR}/include/libwebsockets.h
@@ -1002,6 +1189,11 @@ add_custom_command(
 )
 
 add_custom_target(GENHDR DEPENDS  ${PROJECT_BINARY_DIR}/include/lws_config.h)
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.15)
+    set_property(TARGET GENHDR APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+	    "${PROJECT_BINARY_DIR}/include/libwebsockets")
+endif()
+
 
 file(GLOB HDR_PUBLIC1 RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} include/libwebsockets/*.h)
 file(GLOB HDR_PUBLIC2 RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} include/libwebsockets.h)
@@ -1017,6 +1209,9 @@ if (LWS_WITH_SHARED)
 	add_dependencies(websockets_shared GENHDR)
 endif()
 
+if (LWS_ONLY_SSPC)
+		target_compile_definitions(websockets PUBLIC STANDALONE)
+endif()
 
 
 #
@@ -1034,13 +1229,16 @@ install(FILES ${PROJECT_BINARY_DIR}/include/libwebsockets.h ${PROJECT_BINARY_DIR
 # Generate the config file for the installation tree.
 get_filename_component(LWS_ABSOLUTE_INSTALL_CMAKE_DIR ${LWS_INSTALL_CMAKE_DIR} ABSOLUTE)
 get_filename_component(LWS_ABSOLUTE_INSTALL_INCLUDE_DIR ${LWS_INSTALL_INCLUDE_DIR} ABSOLUTE)
-file(RELATIVE_PATH
-    REL_INCLUDE_DIR
+file(RELATIVE_PATH 
+    REL_INCLUDE_DIR 
     "${LWS_ABSOLUTE_INSTALL_CMAKE_DIR}"
     "${LWS_ABSOLUTE_INSTALL_INCLUDE_DIR}") # Calculate the relative directory from the cmake dir.
 
 if (DEFINED REL_INCLUDE_DIR)
     set(LWS__INCLUDE_DIRS "\${LWS_CMAKE_DIR}/${REL_INCLUDE_DIR}")
+endif()
+if (DEFINED OPENSSL_INCLUDE_DIRS)
+	set(LWS__INCLUDE_DIRS "${LWS__INCLUDE_DIRS};${OPENSSL_INCLUDE_DIRS}")
 endif()
 
 configure_file(${PROJECT_SOURCE_DIR}/cmake/libwebsockets-config.cmake.in

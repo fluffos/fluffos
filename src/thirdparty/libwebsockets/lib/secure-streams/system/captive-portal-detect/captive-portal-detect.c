@@ -41,14 +41,13 @@ ss_cpd_state(void *userobj, void *sh, lws_ss_constate_t state,
 	ss_cpd_t *m = (ss_cpd_t *)userobj;
 	struct lws_context *cx = (struct lws_context *)m->opaque_data;
 
-	lwsl_info("%s: %s, ord 0x%x\n", __func__, lws_ss_state_name((int)state),
+	lwsl_ss_info(m->ss, "%s, ord 0x%x\n", lws_ss_state_name(state),
 		  (unsigned int)ack);
 
 	switch (state) {
 	case LWSSSCS_CREATING:
 		lws_ss_start_timeout(m->ss, 3 * LWS_US_PER_SEC);
-		lws_ss_request_tx(m->ss);
-		break;
+		return lws_ss_request_tx(m->ss);
 
 	case LWSSSCS_QOS_ACK_REMOTE:
 		lws_system_cpd_set(cx, LWS_CPD_INTERNET_OK);
@@ -85,12 +84,12 @@ int
 lws_ss_sys_cpd(struct lws_context *cx)
 {
 	if (cx->ss_cpd) {
-		lwsl_notice("%s: CPD already ongoing\n", __func__);
+		lwsl_cx_notice(cx, "CPD already ongoing");
 		return 0;
 	}
 
 	if (lws_ss_create(cx, 0, &ssi_cpd, cx, &cx->ss_cpd, NULL, NULL)) {
-		lwsl_info("%s: Create stream failed (policy?)\n", __func__);
+		lwsl_cx_info(cx, "Create stream failed (policy?)");
 
 		return 1;
 	}

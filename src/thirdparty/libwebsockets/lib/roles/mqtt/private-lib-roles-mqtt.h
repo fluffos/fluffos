@@ -45,6 +45,7 @@ extern struct lws_role_ops role_ops_mqtt;
 
 #define LWS_MQTT_RESPONSE_TIMEOUT      (3 * LWS_US_PER_SEC)
 #define LWS_MQTT_RETRY_CEILING         (60 * LWS_US_PER_SEC)
+#define LWS_MQTT_MAX_PUBLISH_RETRY 	   (3)
 
 typedef enum {
 	LMSPR_COMPLETED			=  0,
@@ -155,6 +156,15 @@ typedef enum {
 	LMQCPP_PUBACK_PACKET = LMQCP_PUBACK << 4,
 	LMQCPP_PUBACK_VH_PKT_ID,
 	LMQCPP_PUBACK_PROPERTIES_LEN_VBI,
+
+	LMQCPP_PUBREC_PACKET = LMQCP_PUBREC << 4,
+	LMQCPP_PUBREC_VH_PKT_ID,
+
+	LMQCPP_PUBREL_PACKET = LMQCP_PUBREL << 4,
+	LMQCPP_PUBREL_VH_PKT_ID,
+
+	LMQCPP_PUBCOMP_PACKET = LMQCP_PUBCOMP << 4,
+	LMQCPP_PUBCOMP_VH_PKT_ID,
 
 	LMQCPP_SUBACK_PACKET = LMQCP_STOC_SUBACK << 4,
 	LMQCPP_SUBACK_VH_PKT_ID,
@@ -337,18 +347,23 @@ typedef struct lws_mqttc {
 		uint8_t		retain;
 	} will;
 	uint16_t		keep_alive_secs;
-	uint8_t			conn_flags;
+	uint16_t			conn_flags;
 	uint8_t			aws_iot;
 } lws_mqttc_t;
 
 struct _lws_mqtt_related {
 	lws_mqttc_t		client;
+	lws_sorted_usec_list_t	sul_qos_puback_pubrec_wait; /* QoS1 puback or QoS2 pubrec wait TO */
 	lws_sorted_usec_list_t	sul_qos1_puback_wait; /* QoS1 puback wait TO */
+	lws_sorted_usec_list_t	sul_unsuback_wait; /* unsuback wait TO */
+	lws_sorted_usec_list_t	sul_qos2_pubrec_wait; /* QoS2 pubrec wait TO */
+	lws_sorted_usec_list_t	sul_shadow_wait; /* Device Shadow wait TO */
 	struct lws		*wsi; /**< so sul can use lws_container_of */
 	lws_mqtt_subs_t		*subs_head; /**< Linked-list of heap-allocated subscription objects */
 	void			*rx_cpkt_param;
 	uint16_t		pkt_id;
 	uint16_t		ack_pkt_id;
+	uint16_t		peer_ack_pkt_id;
 	uint16_t		sub_size;
 
 #if defined(LWS_WITH_CLIENT)
@@ -358,10 +373,20 @@ struct _lws_mqtt_related {
 	uint8_t			inside_payload:1;
 	uint8_t			inside_subscribe:1;
 	uint8_t			inside_unsubscribe:1;
+	uint8_t			inside_birth:1;
+	uint8_t			inside_resume_session:1;
 	uint8_t 		send_puback:1;
+	uint8_t 		send_pubrel:1;
+	uint8_t 		send_pubrec:1;
+	uint8_t 		send_pubcomp:1;
 	uint8_t			unacked_publish:1;
+	uint8_t			unacked_pubrel:1;
 
 	uint8_t			done_subscribe:1;
+	uint8_t			done_birth:1;
+	uint8_t			inside_shadow:1;
+	uint8_t			done_shadow_subscribe:1;
+	uint8_t			send_shadow_unsubscribe:1;
 };
 
 /*
@@ -403,6 +428,9 @@ lws_create_client_mqtt_object(const struct lws_client_connect_info *i,
 struct lws *
 lws_mqtt_client_send_connect(struct lws *wsi);
 
+struct lws *
+lws_mqtt_client_send_disconnect(struct lws *wsi);
+
 int
 lws_mqtt_fill_fixed_header(uint8_t *p, lws_mqtt_control_packet_t ctrl_pkt_type,
 			   uint8_t dup, lws_mqtt_qos_levels_t qos,
@@ -413,6 +441,9 @@ lws_wsi_mqtt_adopt(struct lws *parent_wsi, struct lws *wsi);
 
 lws_mqtt_subs_t *
 lws_mqtt_find_sub(struct _lws_mqtt_related *mqtt, const char *topic);
+
+lws_mqtt_match_topic_return_t
+lws_mqtt_is_topic_matched(const char* sub, const char* pub);
 
 #endif /* _PRIVATE_LIB_ROLES_MQTT */
 

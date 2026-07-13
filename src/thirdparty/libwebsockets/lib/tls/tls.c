@@ -25,6 +25,62 @@
 #include "private-lib-core.h"
 #include "private-lib-tls.h"
 
+#if defined(LWS_HAVE_SSL_CTX_set_keylog_callback) && defined(LWS_WITH_NETWORK) && \
+	defined(LWS_WITH_TLS) && !defined(LWS_WITH_MBEDTLS) && \
+	(!defined(LWS_WITHOUT_CLIENT) || !defined(LWS_WITHOUT_SERVER))
+void
+lws_klog_dump(const SSL *ssl, const char *line)
+{
+	struct lws *wsi = (struct lws *)SSL_get_ex_data(ssl,
+					  openssl_websocket_private_data_index);
+	char path[128], hdr[128], ts[64];
+	size_t w = 0, wx = 0;
+	int fd, t;
+
+	if (!wsi || !wsi->a.context->keylog_file[0] || !wsi->a.vhost)
+		return;
+
+	lws_snprintf(path, sizeof(path), "%s.%s", wsi->a.context->keylog_file,
+			wsi->a.vhost->name);
+
+	fd = open(path, O_CREAT | O_RDWR | O_APPEND, 0600);
+	if (fd == -1) {
+		lwsl_vhost_warn(wsi->a.vhost, "Failed to append %s", path);
+		return;
+	}
+
+	/* the first item in the chunk */
+	if (!strncmp(line, "SERVER_HANDSHAKE_TRAFFIC_SECRET", 31)) {
+		w += (size_t)write(fd, "\n# ", 3);
+		wx += 3;
+		t = lwsl_timestamp(LLL_WARN, ts, sizeof(ts));
+		wx += (size_t)t;
+		w += (size_t)write(fd, ts, (size_t)t);
+
+		t = lws_snprintf(hdr, sizeof(hdr), "%s\n", wsi->lc.gutag);
+		w += (size_t)write(fd, hdr, (size_t)t);
+		wx += (size_t)t;
+
+		lwsl_vhost_warn(wsi->a.vhost, "appended ssl keylog: %s", path);
+	}
+
+	wx += strlen(line) + 1;
+	w += (size_t)write(fd, line, 
+#if defined(WIN32)
+			(unsigned int)
+#endif
+			strlen(line));
+	w += (size_t)write(fd, "\n", 1);
+	close(fd);
+
+	if (w != wx) {
+		lwsl_vhost_warn(wsi->a.vhost, "Failed to write %s", path);
+		return;
+	}
+}
+#endif
+
+
 #if defined(LWS_WITH_NETWORK)
 #if defined(LWS_WITH_MBEDTLS) || (defined(OPENSSL_VERSION_NUMBER) && \
 				  OPENSSL_VERSION_NUMBER >= 0x10002000L)
@@ -46,40 +102,110 @@ alpn_cb(SSL *s, const unsigned char **out, unsigned char *outlen,
 #endif
 
 int
-lws_tls_restrict_borrow(struct lws_context *context)
+lws_tls_restrict_borrow(struct lws *wsi)
 {
-	if (!context->simultaneous_ssl_restriction)
-		return 0;
+	struct lws_context *cx = wsi->a.context;
 
-	if (context->simultaneous_ssl >= context->simultaneous_ssl_restriction) {
+	if (cx->simultaneous_ssl_restriction &&
+	    cx->simultaneous_ssl >= cx->simultaneous_ssl_restriction) {
 		lwsl_notice("%s: tls connection limit %d\n", __func__,
-			    context->simultaneous_ssl);
+			    cx->simultaneous_ssl);
 		return 1;
 	}
 
-	if (++context->simultaneous_ssl == context->simultaneous_ssl_restriction)
-		/* that was the last allowed SSL connection */
-		lws_gate_accepts(context, 0);
+	if (cx->simultaneous_ssl_handshake_restriction &&
+	    cx->simultaneous_ssl_handshake >=
+			    cx->simultaneous_ssl_handshake_restriction) {
+		lwsl_notice("%s: tls handshake limit %d\n", __func__,
+			    cx->simultaneous_ssl_handshake);
+		return 1;
+	}
+
+	cx->simultaneous_ssl++;
+	cx->simultaneous_ssl_handshake++;
+	wsi->tls_borrowed_hs = 1;
+	wsi->tls_borrowed = 1;
 
 	lwsl_info("%s: %d -> %d\n", __func__,
-		  context->simultaneous_ssl - 1,
-		  context->simultaneous_ssl);
+		  cx->simultaneous_ssl - 1,
+		  cx->simultaneous_ssl);
+
+	assert(!cx->simultaneous_ssl_restriction ||
+			cx->simultaneous_ssl <=
+				cx->simultaneous_ssl_restriction);
+	assert(!cx->simultaneous_ssl_handshake_restriction ||
+			cx->simultaneous_ssl_handshake <=
+				cx->simultaneous_ssl_handshake_restriction);
+
+#if defined(LWS_WITH_SERVER)
+	lws_gate_accepts(cx,
+			(cx->simultaneous_ssl_restriction &&
+			 cx->simultaneous_ssl == cx->simultaneous_ssl_restriction) ||
+			(cx->simultaneous_ssl_handshake_restriction &&
+			 cx->simultaneous_ssl_handshake == cx->simultaneous_ssl_handshake_restriction));
+#endif
 
 	return 0;
 }
 
-void
-lws_tls_restrict_return(struct lws_context *context)
+static void
+_lws_tls_restrict_return(struct lws *wsi)
 {
-	if (context->simultaneous_ssl_restriction) {
-		if (context->simultaneous_ssl-- ==
-					context->simultaneous_ssl_restriction)
-			/* we made space and can do an accept */
-			lws_gate_accepts(context, 1);
-		lwsl_info("%s: %d -> %d\n", __func__,
-			  context->simultaneous_ssl + 1,
-			  context->simultaneous_ssl);
-	}
+#if defined(LWS_WITH_SERVER)
+	struct lws_context *cx = wsi->a.context;
+
+	assert(cx->simultaneous_ssl_handshake >= 0);
+	assert(cx->simultaneous_ssl >= 0);
+
+	lws_gate_accepts(cx,
+			(cx->simultaneous_ssl_restriction &&
+			 cx->simultaneous_ssl == cx->simultaneous_ssl_restriction) ||
+			(cx->simultaneous_ssl_handshake_restriction &&
+			 cx->simultaneous_ssl_handshake == cx->simultaneous_ssl_handshake_restriction));
+#endif
+}
+
+void
+lws_tls_restrict_return_handshake(struct lws *wsi)
+{
+	struct lws_context *cx = wsi->a.context;
+
+	/* we're just returning the hs part */
+
+	if (!wsi->tls_borrowed_hs)
+		return;
+
+	wsi->tls_borrowed_hs = 0; /* return it one time per wsi */
+	cx->simultaneous_ssl_handshake--;
+
+	lwsl_info("%s:  %d -> %d\n", __func__,
+		  cx->simultaneous_ssl_handshake + 1,
+		  cx->simultaneous_ssl_handshake);
+
+	_lws_tls_restrict_return(wsi);
+}
+
+void
+lws_tls_restrict_return(struct lws *wsi)
+{
+	struct lws_context *cx = wsi->a.context;
+
+	if (!wsi->tls_borrowed)
+		return;
+
+	wsi->tls_borrowed = 0;
+	cx->simultaneous_ssl--;
+
+	lwsl_info("%s: %d -> %d\n", __func__,
+		  cx->simultaneous_ssl + 1,
+		  cx->simultaneous_ssl);
+
+	/* We're returning everything, even if hs didn't complete */
+
+	if (wsi->tls_borrowed_hs)
+		lws_tls_restrict_return_handshake(wsi);
+	else
+		_lws_tls_restrict_return(wsi);
 }
 
 void
@@ -94,6 +220,7 @@ lws_context_init_alpn(struct lws_vhost *vhost)
 
 	lwsl_info(" Server '%s' advertising ALPN: %s\n",
 		    vhost->name, alpn_comma);
+
 	vhost->tls.alpn_ctx.len = (uint8_t)lws_alpn_comma_to_openssl(alpn_comma,
 					vhost->tls.alpn_ctx.data,
 					sizeof(vhost->tls.alpn_ctx.data) - 1);
@@ -101,9 +228,9 @@ lws_context_init_alpn(struct lws_vhost *vhost)
 	SSL_CTX_set_alpn_select_cb(vhost->tls.ssl_ctx, alpn_cb,
 				   &vhost->tls.alpn_ctx);
 #else
-	lwsl_err(
-		" HTTP2 / ALPN configured but not supported by OpenSSL 0x%lx\n",
-		    OPENSSL_VERSION_NUMBER);
+	lwsl_err(" HTTP2 / ALPN configured "
+		 "but not supported by OpenSSL 0x%lx\n",
+		 OPENSSL_VERSION_NUMBER);
 #endif // OPENSSL_VERSION_NUMBER >= 0x10002000L
 }
 
@@ -116,8 +243,12 @@ lws_tls_server_conn_alpn(struct lws *wsi)
 	char cstr[10];
 	unsigned len;
 
-	if (!wsi->tls.ssl)
+	lwsl_info("%s\n", __func__);
+
+	if (!wsi->tls.ssl) {
+		lwsl_err("%s: non-ssl\n", __func__);
 		return 0;
+	}
 
 	SSL_get0_alpn_selected(wsi->tls.ssl, &name, &len);
 	if (!len) {
@@ -131,10 +262,12 @@ lws_tls_server_conn_alpn(struct lws *wsi)
 	memcpy(cstr, name, len);
 	cstr[len] = '\0';
 
-	lwsl_info("negotiated '%s' using ALPN\n", cstr);
+	lwsl_info("%s: negotiated '%s' using ALPN\n", __func__, cstr);
 	wsi->tls.use_ssl |= LCCSCF_USE_SSL;
 
 	return lws_role_call_alpn_negotiated(wsi, (const char *)cstr);
+#else
+	lwsl_err("%s: openssl too old\n", __func__);
 #endif // OPENSSL_VERSION_NUMBER >= 0x10002000L
 
 	return 0;
@@ -284,7 +417,7 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 
 	if (!filename) {
 		/* we don't know if it's in const memory... alloc the output */
-		pem = lws_malloc(((size_t)inlen * 3) / 4, "alloc_der");
+		pem = lws_malloc(((size_t)(inlen + 3) * 3) / 4, "alloc_der");
 		if (!pem) {
 			lwsl_err("a\n");
 			return 1;
@@ -300,7 +433,6 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 		p++;
 
 	if (*p != '-') {
-		lwsl_err("b\n");
 		goto bail;
 	}
 
@@ -308,7 +440,6 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 		p++;
 
 	if (p >= end) {
-		lwsl_err("c\n");
 		goto bail;
 	}
 
@@ -321,10 +452,8 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 	while (q > opem && *q != '\n')
 		q--;
 
-	if (*q != '\n') {
-		lwsl_err("d\n");
+	if (*q != '\n')
 		goto bail;
-	}
 
 	/* we can't write into the input buffer for mem, since it may be in RO
 	 * const segment
@@ -332,8 +461,18 @@ lws_tls_alloc_pem_to_der_file(struct lws_context *context, const char *filename,
 	if (filename)
 		*q = '\0';
 
-	*amount = (unsigned int)lws_b64_decode_string_len((char *)p, lws_ptr_diff(q, p),
-					    (char *)pem, (int)(long long)len);
+	n = lws_ptr_diff(q, p);
+	if (n == -1) /* coverity */
+		goto bail;
+
+	n = lws_b64_decode_string_len((char *)p, n,
+				      (char *)pem, (int)(long long)len);
+	if (n < 0) {
+		lwsl_err("%s: base64 pem decode failed\n", __func__);
+		goto bail;
+	}
+
+	*amount = (unsigned int)n;
 	*buf = (uint8_t *)pem;
 
 	return 0;

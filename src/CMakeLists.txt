@@ -318,17 +318,32 @@ set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
 set(LWS_IPV6 ON CACHE BOOL "" FORCE)
 set(LWS_WITHOUT_EXTENSIONS OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_LIBEVENT ON CACHE BOOL "" FORCE)
+# Since v4.1 lws defaults to building event libs as runtime plugins on unix;
+# we need the libevent event lib compiled statically into the library.
+set(LWS_WITH_EVLIB_PLUGINS OFF CACHE BOOL "" FORCE)
 set(LWS_STATIC_PIC ON CACHE BOOL "" FORCE)
 set(LWS_WITH_DIR OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_SSL ON CACHE BOOL "" FORCE)
 set(LWS_WITH_HTTP2 ON CACHE BOOL "" FORCE)
-set(LWS_WITHOUT_TESTAPPS ON CACHE BOOL "" FORCE)
+# Explicitly OFF (not just implied via LWS_WITHOUT_TESTAPPS): the pruned
+# vendor tree no longer ships minimal-examples*, and lws's unguarded
+# add_subdirectory would hard-fail if this ever flipped back on.
+set(LWS_WITH_MINIMAL_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LWS_WITHOUT_TEST_SERVER ON CACHE BOOL "" FORCE)
 set(LWS_WITHOUT_TEST_SERVER_EXTPOLL ON CACHE BOOL "" FORCE)
 set(LWS_WITHOUT_TEST_PING ON CACHE BOOL "" FORCE)
 set(LWS_WITHOUT_TEST_CLIENT ON CACHE BOOL "" FORCE)
 set(LWS_WITH_LEJP OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_LEJP_CONF OFF CACHE BOOL "" FORCE)
+# Defaults ON since v4.3 and force-implies LWS_WITH_GENCRYPTO, whose openssl
+# backend trips an #error guard against deprecated EC APIs on OpenSSL 3.0+.
+set(LWS_WITH_HTTP_DIGEST_AUTH OFF CACHE BOOL "" FORCE)
+# HTML5/PNG display-list parsers (default ON since v4.4) are for embedded
+# display targets; LHP also force-implies the Secure Streams subsystem
+# (which needs LEJP). None of it is used by the driver.
+set(LWS_WITH_LHP OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_UPNG OFF CACHE BOOL "" FORCE)
+set(LWS_WITH_SECURE_STREAMS OFF CACHE BOOL "" FORCE)
 set(LWS_UNIX_SOCK OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_NETLINK OFF CACHE BOOL "" FORCE)
 set(OPENSSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR} CACHE STRING "" FORCE)

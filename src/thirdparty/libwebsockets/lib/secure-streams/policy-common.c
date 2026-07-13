@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -85,12 +85,33 @@ lws_ss_set_metadata(struct lws_ss_handle *h, const char *name,
 {
 	lws_ss_metadata_t *omd = lws_ss_get_handle_metadata(h, name);
 
-	if (!omd) {
-		lwsl_info("%s: unknown metadata %s\n", __func__, name);
-		return 1;
-	}
+	lws_service_assert_loop_thread(h->context, h->tsi);
 
-	return _lws_ss_set_metadata(omd, name, value, len);
+	if (omd)
+		return _lws_ss_set_metadata(omd, name, value, len);
+
+#if defined(LWS_WITH_SS_DIRECT_PROTOCOL_STR)
+	if (h->policy->flags & LWSSSPOLF_DIRECT_PROTO_STR) {
+		omd = lws_ss_get_handle_instant_metadata(h, name);
+		if (!omd) {
+			omd = lws_zalloc(sizeof(*omd), "imetadata");
+			if (!omd) {
+				lwsl_err("%s OOM\n", __func__);
+				return 1;
+			}
+			omd->name = name;
+			omd->next = h->instant_metadata;
+			h->instant_metadata = omd;
+		}
+		omd->value__may_own_heap = (void *)value;
+		omd->length = len;
+
+		return 0;
+	}
+#endif
+
+	lwsl_info("%s: unknown metadata %s\n", __func__, name);
+	return 1;
 }
 
 int
@@ -128,6 +149,8 @@ lws_ss_alloc_set_metadata(struct lws_ss_handle *h, const char *name,
 {
 	lws_ss_metadata_t *omd = lws_ss_get_handle_metadata(h, name);
 
+	lws_service_assert_loop_thread(h->context, h->tsi);
+
 	if (!omd) {
 		lwsl_info("%s: unknown metadata %s\n", __func__, name);
 		return 1;
@@ -141,16 +164,58 @@ lws_ss_get_metadata(struct lws_ss_handle *h, const char *name,
 		    const void **value, size_t *len)
 {
 	lws_ss_metadata_t *omd = lws_ss_get_handle_metadata(h, name);
+#if defined(LWS_WITH_SS_DIRECT_PROTOCOL_STR)
+	int n;
+#endif
 
-	if (!omd) {
-		lwsl_info("%s: unknown metadata %s\n", __func__, name);
+	lws_service_assert_loop_thread(h->context, h->tsi);
+
+	if (omd) {
+		*value = omd->value__may_own_heap;
+		*len = omd->length;
+
+		return 0;
+	}
+#if defined(LWS_WITH_SS_DIRECT_PROTOCOL_STR)
+	if (!(h->policy->flags & LWSSSPOLF_DIRECT_PROTO_STR) || !h->wsi)
+		goto bail;
+
+	n = lws_http_string_to_known_header(name, strlen(name));
+	if (n != LWS_HTTP_NO_KNOWN_HEADER) {
+		*len = (size_t)lws_hdr_total_length(h->wsi, n);
+		if (!*len)
+			goto bail;
+		*value = lws_hdr_simple_ptr(h->wsi, n);
+		if (!*value)
+			goto bail;
+
+		return 0;
+	}
+#if defined(LWS_WITH_CUSTOM_HEADERS)
+	n = lws_hdr_custom_length(h->wsi, (const char *)name,
+				  (int)strlen(name));
+	if (n <= 0)
+		goto bail;
+	*value = lwsac_use(&h->imd_ac, (size_t)(n+1), (size_t)(n+1));
+	if (!*value) {
+		lwsl_err("%s ac OOM\n", __func__);
 		return 1;
 	}
-
-	*value = omd->value__may_own_heap;
-	*len = omd->length;
+	if (lws_hdr_custom_copy(h->wsi, (char *)(*value), n+1, name,
+				(int)strlen(name))) {
+		/* waste n+1 bytes until ss is destryed */
+		goto bail;
+	}
+	*len = (size_t)n;
 
 	return 0;
+#endif
+
+bail:
+#endif
+	lwsl_info("%s: unknown metadata %s\n", __func__, name);
+
+	return 1;
 }
 
 lws_ss_metadata_t *
@@ -158,12 +223,32 @@ lws_ss_get_handle_metadata(struct lws_ss_handle *h, const char *name)
 {
 	int n;
 
+	lws_service_assert_loop_thread(h->context, h->tsi);
+
 	for (n = 0; n < h->policy->metadata_count; n++)
 		if (!strcmp(name, h->metadata[n].name))
 			return &h->metadata[n];
 
 	return NULL;
 }
+
+#if defined(LWS_WITH_SS_DIRECT_PROTOCOL_STR)
+lws_ss_metadata_t *
+lws_ss_get_handle_instant_metadata(struct lws_ss_handle *h, const char *name)
+{
+	lws_ss_metadata_t *imd = h->instant_metadata;
+
+	while (imd) {
+		if (!strcmp(name, imd->name))
+			return imd;
+		imd = imd->next;
+	}
+
+	return NULL;
+}
+
+#endif
+
 
 lws_ss_metadata_t *
 lws_ss_policy_metadata(const lws_ss_policy_t *p, const char *name)
@@ -255,6 +340,10 @@ lws_ss_policy_ref_trust_store(struct lws_context *context,
 	i.client_ssl_ca_mem_len = (unsigned int)
 			pol->trust.store->ssx509[0]->ca_der_len;
 #endif
+#if defined(LWS_ROLE_WS) && !defined(LWS_WITHOUT_EXTENSIONS)
+	lwsl_err("%s: ctx ext %p\n", __func__, context->extensions);
+	i.extensions = context->extensions;
+#endif
 	i.port = CONTEXT_PORT_NO_LISTEN;
 	lwsl_info("%s: %s trust store initial '%s'\n", __func__,
 		  i.vhost_name, pol->trust.store->ssx509[0]->vhost_name);
@@ -282,7 +371,7 @@ lws_ss_policy_ref_trust_store(struct lws_context *context,
 	}
 
 accepted:
-#if defined(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY)
+#if defined(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY) || defined(LWS_WITH_SECURE_STREAMS_CPP)
 	if (doref)
 		v->ss_refcount++;
 #endif
@@ -290,7 +379,7 @@ accepted:
 	return v;
 }
 
-#if defined(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY)
+#if defined(LWS_WITH_SECURE_STREAMS_STATIC_POLICY_ONLY) || defined(LWS_WITH_SECURE_STREAMS_CPP)
 int
 lws_ss_policy_unref_trust_store(struct lws_context *context,
 				const lws_ss_policy_t *pol)
@@ -334,6 +423,9 @@ lws_ss_policy_set(struct lws_context *context, const char *name)
 	 * Parsing seems to have succeeded, and we're going to use the new
 	 * policy that's laid out in args->ac
 	 */
+
+	if (!args)
+		return 1;
 
 	lejp_destruct(&args->jctx);
 

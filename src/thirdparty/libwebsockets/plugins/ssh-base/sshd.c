@@ -533,7 +533,10 @@ lws_ssh_parse_plaintext(struct per_session_data__sshd *pss, uint8_t *p, size_t l
 	struct lws_genrsa_ctx ctx;
 	struct lws_ssh_channel *ch;
 	struct lws_subprotocol_scp *scp;
-	uint8_t *pp, *ps, hash[64], *otmp;
+	uint8_t *pp, *ps, hash[64];
+#if !defined(MBEDTLS_VERSION_NUMBER) || MBEDTLS_VERSION_NUMBER < 0x03000000
+	uint8_t *otmp = NULL;
+#endif
 	uint32_t m;
 	int n;
 
@@ -1247,7 +1250,6 @@ again:
 					      LGRSAM_PKCS1_1_5,
 					      LWS_GENHASH_TYPE_UNKNOWN))
 				goto ua_fail;
-
 			/*
 			 * point to the encrypted signature payload we
 			 * were sent
@@ -1256,6 +1258,7 @@ again:
 			m = lws_g32(&pp);
 			pp += m;
 			m = lws_g32(&pp);
+#if !defined(MBEDTLS_VERSION_NUMBER) || MBEDTLS_VERSION_NUMBER < 0x03000000
 
 			/*
 			 * decrypt it, resulting in an error, or some ASN1
@@ -1290,6 +1293,12 @@ again:
 			}
 
 			free(otmp);
+		#else
+			ctx.ctx->MBEDTLS_PRIVATE(len) = m;
+			n = lws_genrsa_hash_sig_verify(&ctx, hash,
+				(enum lws_genhash_types)rsa_hash_alg_from_ident(pss->ua->alg),
+				pp, m) == 0 ? 1 : 0;
+		#endif
 			lws_genrsa_destroy(&ctx);
 
 			/*
@@ -1340,7 +1349,6 @@ again:
 
 		case SSHS_NVC_DISCONNECT_DESC:
 			pss->disconnect_desc = (char *)pss->last_alloc;
-			pss->last_alloc = NULL; /* it was adopted */
 			state_get_string(pss, SSHS_NVC_DISCONNECT_LANG);
 			break;
 
@@ -1472,6 +1480,12 @@ again:
 				lwsl_notice("subsystem\n");
 				state_get_string_alloc(pss,
 						       SSHS_NVC_CHRQ_SUBSYSTEM);
+				break;
+			}
+			if (!strcmp(pss->name, "window-change")) {
+				lwsl_info("%s: window-change\n", __func__);
+				state_get_u32(pss,
+					      SSHS_NVC_CHRQ_WNDCHANGE_TW);
 				break;
 			}
 
@@ -1628,6 +1642,34 @@ again:
 			pss->parser_state = SSHS_MSG_EAT_PADDING;
 			break;
 #endif
+
+		/* CHRQ window-change */
+
+	case SSHS_NVC_CHRQ_WNDCHANGE_TW:
+		pss->args.pty.width_ch = pss->len;
+		state_get_u32(pss, SSHS_NVC_CHRQ_WNDCHANGE_TH);
+		break;
+        case SSHS_NVC_CHRQ_WNDCHANGE_TH:
+		pss->args.pty.height_ch = pss->len;
+		state_get_u32(pss, SSHS_NVC_CHRQ_WNDCHANGE_TWP);
+		break;
+        case SSHS_NVC_CHRQ_WNDCHANGE_TWP:
+		pss->args.pty.width_px = pss->len;
+		state_get_u32(pss, SSHS_NVC_CHRQ_WNDCHANGE_THP);
+		break;
+        case SSHS_NVC_CHRQ_WNDCHANGE_THP:
+		pss->args.pty.height_px = pss->len;
+		pss->args.pty.term[0] = 0;
+		pss->args.pty.modes = NULL;
+		pss->args.pty.modes_len = 0;
+		n = 0;
+		if (pss->vhd->ops && pss->vhd->ops->pty_req)
+			n = pss->vhd->ops->pty_req(pss->ch_temp->priv,
+						   &pss->args.pty);
+		if (n)
+			goto chrq_fail;
+		pss->parser_state = SSHS_MSG_EAT_PADDING;
+		break;
 
 		/* SSH_MSG_CHANNEL_DATA */
 
@@ -1822,7 +1864,9 @@ ch_fail:
 			pss->parser_state = SSH_KEX_STATE_SKIP;
 			break;
 
+#if !defined(MBEDTLS_VERSION_NUMBER) || MBEDTLS_VERSION_NUMBER < 0x03000000
 ua_fail1:
+#endif
 			lws_genrsa_destroy(&ctx);
 ua_fail:
 			write_task(pss, NULL, SSH_WT_UA_FAILURE);
@@ -1969,7 +2013,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 	const struct lws_protocol_vhost_options *pvo;
 	const struct lws_protocols *prot;
 	struct lws_ssh_channel *ch;
-	char lang[10];
+	char lang[10] = "";
 	int n, m, o;
 
 	/*
@@ -2045,7 +2089,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 
         case LWS_CALLBACK_RAW_ADOPT:
 		lwsl_info("LWS_CALLBACK_RAW_ADOPT\n");
-		if (!vhd)
+		if (!vhd || !pss)
 			return -1;
 		pss->next = vhd->live_pss_list;
 		vhd->live_pss_list = pss;
@@ -2067,7 +2111,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		 *
 		 * The RECOMMENDED timeout period is 10 minutes.
 		 */
-		lws_set_timeout(wsi,
+		lws_set_timeout(wsi, (enum pending_timeout)
 		       SSH_PENDING_TIMEOUT_CONNECT_TO_SUCCESSFUL_AUTH, 10 * 60);
                 break;
 
@@ -2201,12 +2245,12 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 			pp = ps + 5;
 			*pp++ = SSH_MSG_USERAUTH_BANNER;
 			if (pss->vhd && pss->vhd->ops->banner)
-				n = (int)pss->vhd->ops->banner((char *)&buf[650],
+				n = (int)pss->vhd->ops->banner((char *)&buf[750],
 							  150 - 1,
 							  lang, (int)sizeof(lang));
 			lws_p32(pp, (uint32_t)n);
 			pp += 4;
-			strcpy((char *)pp, (char *)&buf[650]);
+			strcpy((char *)pp, (char *)&buf[750]);
 			pp += n;
 			if (lws_cstr(&pp, lang, sizeof(lang)))
 				goto bail;
@@ -2257,9 +2301,9 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		case SSH_WT_CH_OPEN_CONF:
 			pp = ps + 5;
 			*pp++ = SSH_MSG_CHANNEL_OPEN_CONFIRMATION;
-			lws_p32(pp, pss->ch_temp->server_ch);
-			pp += 4;
 			lws_p32(pp, pss->ch_temp->sender_ch);
+			pp += 4;
+			lws_p32(pp, pss->ch_temp->server_ch);
 			pp += 4;
 			/* tx initial window size towards us */
 			lws_p32(pp, LWS_SSH_INITIAL_WINDOW);
@@ -2275,9 +2319,9 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		case SSH_WT_CH_FAILURE:
 			pp = ps + 5;
 			*pp++ = SSH_MSG_CHANNEL_OPEN_FAILURE;
-			lws_p32(pp, ch->server_ch);
-			pp += 4;
 			lws_p32(pp, ch->sender_ch);
+			pp += 4;
+			lws_p32(pp, ch->server_ch);
 			pp += 4;
 			lws_cstr(&pp, "reason", 64);
 			lws_cstr(&pp, "en/US", 64);
@@ -2287,7 +2331,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		case SSH_WT_CHRQ_SUCC:
 			pp = ps + 5;
 			*pp++ = SSH_MSG_CHANNEL_SUCCESS;
-			lws_p32(pp, ch->server_ch);
+			lws_p32(pp, ch->sender_ch);
 			lwsl_info("SSH_WT_CHRQ_SUCC\n");
 			pp += 4;
 			goto pac;
@@ -2295,7 +2339,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		case SSH_WT_CHRQ_FAILURE:
 			pp = ps + 5;
 			*pp++ = SSH_MSG_CHANNEL_FAILURE;
-			lws_p32(pp, ch->server_ch);
+			lws_p32(pp, ch->sender_ch);
 			pp += 4;
 			lwsl_info("SSH_WT_CHRQ_FAILURE\n");
 			goto pac;
@@ -2303,7 +2347,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		case SSH_WT_CH_CLOSE:
 			pp = ps + 5;
 			*pp++ = SSH_MSG_CHANNEL_CLOSE;
-			lws_p32(pp, ch->server_ch);
+			lws_p32(pp, ch->sender_ch);
 			lwsl_info("SSH_WT_CH_CLOSE\n");
 			pp += 4;
 			goto pac;
@@ -2311,7 +2355,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 		case SSH_WT_CH_EOF:
 			pp = ps + 5;
 			*pp++ = SSH_MSG_CHANNEL_EOF;
-			lws_p32(pp, ch->server_ch);
+			lws_p32(pp, ch->sender_ch);
 			lwsl_info("SSH_WT_CH_EOF\n");
 			pp += 4;
 			goto pac;
@@ -2393,7 +2437,7 @@ lws_callback_raw_sshd(struct lws *wsi, enum lws_callback_reasons reason,
 			else
 				*pp++ = SSH_MSG_CHANNEL_EXTENDED_DATA;
 			/* ps + 6 */
-			lws_p32(pp, pss->ch_list->server_ch);
+			lws_p32(pp, pss->ch_list->sender_ch);
 			m = 14;
 			if (n == LWS_STDERR) {
 				pp += 4;
@@ -2577,7 +2621,7 @@ LWS_VISIBLE const lws_plugin_protocol_t lws_ssh_base = {
 	},
 
 	.protocols = lws_ssh_base_protocols,
-	.count_protocols = LWS_ARRAY_SIZE(lws_ssh_base_protocols),
+	.count_protocols = LWS_ARRAY_SIZE(lws_ssh_base_protocols) - 1,
 	.extensions = NULL,
 	.count_extensions = 0,
 };

@@ -47,11 +47,18 @@
 #define LWS_TOKENIZE_F_ASTERISK_NONTERM	(1 << 9)
 /* Do not treat = as a terminal character, so "x=y" is one token */
 #define LWS_TOKENIZE_F_EQUALS_NONTERM	(1 << 10)
+/* Do not treat : as a terminal character, so ::1 is one token */
+#define LWS_TOKENIZE_F_COLON_NONTERM	(1 << 11)
+
+/* We're just tokenizing a chunk, don't treat running out of input as final */
+#define LWS_TOKENIZE_F_EXPECT_MORE	(1 << 12)
 
 typedef enum {
 
-	LWS_TOKZE_ERRS			=  5, /* the number of errors defined */
+	LWS_TOKZE_ERRS			=  7, /* the number of errors defined */
 
+	LWS_TOKZE_TOO_LONG		= -7,	/* token too long */
+	LWS_TOKZE_WANT_READ		= -6,	/* need more input */
 	LWS_TOKZE_ERR_BROKEN_UTF8	= -5,	/* malformed or partial utf8 */
 	LWS_TOKZE_ERR_UNTERM_STRING	= -4,	/* ended while we were in "" */
 	LWS_TOKZE_ERR_MALFORMED_FLOAT	= -3,	/* like 0..1 or 0.1.1 */
@@ -84,16 +91,32 @@ enum lws_tokenize_delimiter_tracking {
 	LWSTZ_DT_NEED_NEXT_CONTENT,
 };
 
+typedef enum {
+	LWS_TOKZS_LEADING_WHITESPACE,
+	LWS_TOKZS_QUOTED_STRING,
+	LWS_TOKZS_TOKEN,
+	LWS_TOKZS_TOKEN_POST_TERMINAL
+} lws_tokenize_state;
+
 typedef struct lws_tokenize {
+	char collect[256]; /* token length limit */
 	const char *start; /**< set to the start of the string to tokenize */
 	const char *token; /**< the start of an identified token or delimiter */
 	size_t len;	/**< set to the length of the string to tokenize */
 	size_t token_len;	/**< the length of the identied token or delimiter */
 
+	lws_tokenize_state state;
+
+	int line;
+	int effline;
+
 	uint16_t flags;	/**< optional LWS_TOKENIZE_F_ flags, or 0 */
 	uint8_t delim;
 
 	int8_t e; /**< convenient for storing lws_tokenize return */
+	uint8_t reset_token:1;
+	uint8_t crlf:1;
+	uint8_t dry:1;
 } lws_tokenize_t;
 
 /**
@@ -259,11 +282,14 @@ lws_strexp_expand(lws_strexp_t *exp, const char *in, size_t len,
  * lws_strcmp_wildcard() - strcmp but the first arg can have wildcards
  *
  * \p wildcard: a string that may contain zero to three *, and may lack a NUL
- * \p len: length of the wildcard string
+ * \p wlen: length of the wildcard string
  * \p check: string to test to see if it matches wildcard
+ * \p clen: length of check string
  *
- * Exactly like strcmp, but supports patterns like "a*", "a*b", "a*b*" etc
- * where a and b are arbitrary substrings
+ * Like strcmp, but supports patterns like "a*", "a*b", "a*b*" etc
+ * where a and b are arbitrary substrings.  Both the wc and check strings need
+ * not be NUL terminated, but are specified by lengths.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_strcmp_wildcard(const char *wildcard, size_t len, const char *check);
+lws_strcmp_wildcard(const char *wildcard, size_t wlen, const char *check,
+		    size_t clen);

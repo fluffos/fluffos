@@ -1,6 +1,104 @@
 Changelog
 ---------
 
+v4.5.0
+======
+
+ - fixes from coverity and Nozomi Networks
+ - fix for mountpoint headers being sticky for all following mounts too
+ - b64 apis: fixes and new api tests
+ - improvements to deaddrop example, now very useful for crossplatform
+   clipboard and file sharing
+ - mbedtls updates / fixes
+ - support basic auth on h2 POST
+ - add X-FORWARDED-FOR support to lws proxying, other fixes
+ - ctest improvements for speed and OSX UDS support
+ - esp-idf update to 5.5
+ - new lejp api tests
+ - NEW APIs: lws_humanize_pad
+ - NEW APIs: lws_dir_via_info
+ - NEW APIs: lws_http_mp_sm POST form api, plus examples
+ - NEW APIs: lws_wsmsg: lws_buflist variant that handles fragmentation flags
+ - ctest: disable broken amazon tests: broken at amazon
+ - lws_struct: extra api tests, docs
+ - ws: now checks sanity of fragment ordering at ws and ss levels
+ - stdin also allowed as source for commandline, add examples
+ - 307/308 POST support
+ - lws_hexdump_user() that was missing added in
+
+v4.4.0
+======
+
+ - API CHANGE: VFS open() has an extra file_ops pointer at the beginning.
+ The other args shift along one and are otherwise unchanged.  The new
+ file_ops is the active file_ops the callback belongs to, the original
+ file_ops that's the second arg now remains the platform file_ops ptr.  If you
+ don't define your own VFS implementation, you don't need to care.
+
+- Secure Streams:  this is a thin layer on top of the traditional lws
+  apis, which continue unchanged.  You can choose to continue with the
+  old ways or look at using Secure Streams, it basically abstracts out
+  the differences between what protocol you're using into a JSON policy.
+  minimal-examples is for the SS API and minimal-examples-lowlevel is
+  the traditional stuff.  See  READMEs/README.secure-streams.md
+
+ - html parsing: see READMEs/README.html-parser.md  This uses the lws
+   support for DLO (Display List Objects) and png / jpeg linewise
+   decoding, which allows it to work on devices with very little RAM
+
+ - Support for various embedded EPD devices.  See
+   minimal-examples/embedded/lhp 
+
+ - Many fixes and cleanups
+
+v4.3.0
+======
+
+ - Add full CBOR stream parsing and writing support, with huge
+   amount of test vectors and resumable printf type write apis
+   See ./READMEs/README.cbor-lecp.md
+ - Add COSE key and signing / validation support with huge amount of
+   test vectors
+    cose_sign[1] ES256/384/512, RS256/384/512
+    cose_mac0    HS256/384/512
+   See ./READMEs/README.cbor-cose.md
+ - JIT Trust: for constrained devices, provides a way to determine the
+   trusted CA certs the peer requires, and instantiate just those.
+   This allows generic client browsing without the overhead of ~130
+   x.509 CA certs in memory permanently.
+   See ./READMEs/README.jit-trust.md
+ - Add support for client Netscape cookie jar with caching
+ - Secure Streams: issue LWSSSCS_EVENT_WAIT_CANCELLED state() when
+   lws_cancel_service() called, so cross-thread events can be handled
+   in SS
+ - Actively assert() on attempt to destroy SS handles still active in
+   the call stack, use DESTROY_ME returns instead so caller can choose
+   how to handle it.
+ - Improved Client Connection Error report strings for tls errors
+ - SMP: Use a private fakewsi for PROTOCOL_INIT so pts cannot try to
+   use the same one concurrently
+ - MbedTLS v3 support for all release changes, as well as retaining
+   support for v2.x
+ - MQTT client: support QoS2
+ - Event lib ops can now be set at context creation time directly,
+   bringing full event lib hooking to custom event loops.  See
+   minimal-http-server-eventlib-custom
+ - Extra APIs to recover AKID and SKID from x.509 in mbedtls and openssl
+ - Improve http redirect to handle h2-> h2 cleanly
+ - IPv4+6 listen sockets on vhosts are now done with two separate
+   sockets bound individually to AF_INET and AF_INET6 addresses,
+   handled by the same vhost listen flow.
+ - Improved tls restriction handling
+ - Log contexts: allow objects to log into local logging contexts, by
+   lws_context, vhost, wsi and ss handle.  Each context has its own
+   emit function and log level. See ./READMEs/README.logging.md
+ - Upgrade compiler checking to default to -Werror -Wall -Wextra
+ - Fault injection apis now also support pseudo-random number binding
+   within a specified range, eg,
+   --fault-injection "f1(10%),f1_delay(123..456)"
+ - Remove LWS_WITH_DEPRECATED_THINGS, remove master branch
+ - Interface binding now uses ipv6 scoring to select bind address
+
 v4.2.0
 ======
 

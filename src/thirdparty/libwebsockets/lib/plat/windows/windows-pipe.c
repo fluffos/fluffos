@@ -67,6 +67,11 @@ lws_plat_pipe_create(struct lws *wsi)
 	si->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	si->sin_port = 0;
 
+	if (bind(fd[1], (const struct sockaddr *)si, sizeof(*si)) < 0)
+		goto bail;
+
+	si->sin_port = 0;
+
 	if (bind(fd[0], (const struct sockaddr *)si, sizeof(*si)) < 0)
 		goto bail;
 
@@ -124,4 +129,12 @@ lws_plat_pipe_close(struct lws *wsi)
 		closesocket(pt->dummy_pipe_fds[1]);
 
 	pt->dummy_pipe_fds[0] = pt->dummy_pipe_fds[1] = LWS_SOCK_INVALID;
+}
+
+int
+lws_plat_pipe_is_fd_assocated(struct lws_context *cx, int tsi, lws_sockfd_type fd)
+{
+	struct lws_context_per_thread *pt = &cx->pt[tsi];
+
+	return fd == pt->dummy_pipe_fds[0] || fd == pt->dummy_pipe_fds[1];
 }
