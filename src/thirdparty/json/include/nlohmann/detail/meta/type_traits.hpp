@@ -1,17 +1,18 @@
 //     __ _____ _____ _____
 //  __|  |   __|     |   | |  JSON for Modern C++
-// |  |  |__   |  |  | | | |  version 3.11.2
+// |  |  |__   |  |  | | | |  version 3.12.0
 // |_____|_____|_____|_|___|  https://github.com/nlohmann/json
 //
-// SPDX-FileCopyrightText: 2013-2022 Niels Lohmann <https://nlohmann.me>
+// SPDX-FileCopyrightText: 2013 - 2025 Niels Lohmann <https://nlohmann.me>
 // SPDX-License-Identifier: MIT
 
 #pragma once
 
 #include <limits> // numeric_limits
+#include <string> // char_traits
+#include <tuple> // tuple
 #include <type_traits> // false_type, is_constructible, is_integral, is_same, true_type
 #include <utility> // declval
-#include <tuple> // tuple
 
 #include <nlohmann/detail/iterators/iterator_traits.hpp>
 #include <nlohmann/detail/macro_scope.hpp>
@@ -181,6 +182,63 @@ struct actual_object_comparator
 template<typename BasicJsonType>
 using actual_object_comparator_t = typename actual_object_comparator<BasicJsonType>::type;
 
+/////////////////
+// char_traits //
+/////////////////
+
+// Primary template of char_traits calls std char_traits
+template<typename T>
+struct char_traits : std::char_traits<T>
+{};
+
+// Explicitly define char traits for unsigned char since it is not standard
+template<>
+struct char_traits<unsigned char> : std::char_traits<char>
+{
+    using char_type = unsigned char;
+    using int_type = uint64_t;
+
+    // Redefine to_int_type function
+    static int_type to_int_type(char_type c) noexcept
+    {
+        return static_cast<int_type>(c);
+    }
+
+    static char_type to_char_type(int_type i) noexcept
+    {
+        return static_cast<char_type>(i);
+    }
+
+    static constexpr int_type eof() noexcept
+    {
+        return static_cast<int_type>(std::char_traits<char>::eof());
+    }
+};
+
+// Explicitly define char traits for signed char since it is not standard
+template<>
+struct char_traits<signed char> : std::char_traits<char>
+{
+    using char_type = signed char;
+    using int_type = uint64_t;
+
+    // Redefine to_int_type function
+    static int_type to_int_type(char_type c) noexcept
+    {
+        return static_cast<int_type>(c);
+    }
+
+    static char_type to_char_type(int_type i) noexcept
+    {
+        return static_cast<char_type>(i);
+    }
+
+    static constexpr int_type eof() noexcept
+    {
+        return static_cast<int_type>(std::char_traits<char>::eof());
+    }
+};
+
 ///////////////////
 // is_ functions //
 ///////////////////
@@ -203,20 +261,19 @@ struct is_default_constructible : std::is_default_constructible<T> {};
 
 template <typename T1, typename T2>
 struct is_default_constructible<std::pair<T1, T2>>
-            : conjunction<is_default_constructible<T1>, is_default_constructible<T2>> {};
+    : conjunction<is_default_constructible<T1>, is_default_constructible<T2>> {};
 
 template <typename T1, typename T2>
 struct is_default_constructible<const std::pair<T1, T2>>
-            : conjunction<is_default_constructible<T1>, is_default_constructible<T2>> {};
+    : conjunction<is_default_constructible<T1>, is_default_constructible<T2>> {};
 
 template <typename... Ts>
 struct is_default_constructible<std::tuple<Ts...>>
-            : conjunction<is_default_constructible<Ts>...> {};
+    : conjunction<is_default_constructible<Ts>...> {};
 
 template <typename... Ts>
 struct is_default_constructible<const std::tuple<Ts...>>
-            : conjunction<is_default_constructible<Ts>...> {};
-
+    : conjunction<is_default_constructible<Ts>...> {};
 
 template <typename T, typename... Args>
 struct is_constructible : std::is_constructible<T, Args...> {};
@@ -232,7 +289,6 @@ struct is_constructible<std::tuple<Ts...>> : is_default_constructible<std::tuple
 
 template <typename... Ts>
 struct is_constructible<const std::tuple<Ts...>> : is_default_constructible<const std::tuple<Ts...>> {};
-
 
 template<typename T, typename = void>
 struct is_iterator_traits : std::false_type {};
@@ -415,8 +471,8 @@ is_detected<range_value_t, ConstructibleArrayType>::value&&
 // special case for types like std::filesystem::path whose iterator's value_type are themselves
 // c.f. https://github.com/nlohmann/json/pull/3073
 !std::is_same<ConstructibleArrayType, detected_t<range_value_t, ConstructibleArrayType>>::value&&
-        is_complete_type <
-        detected_t<range_value_t, ConstructibleArrayType >>::value >>
+is_complete_type <
+detected_t<range_value_t, ConstructibleArrayType >>::value >>
 {
     using value_type = range_value_t<ConstructibleArrayType>;
 
@@ -539,12 +595,12 @@ using is_usable_as_key_type = typename std::conditional <
 template<typename BasicJsonType, typename KeyTypeCVRef, bool RequireTransparentComparator = true,
          bool ExcludeObjectKeyType = RequireTransparentComparator, typename KeyType = uncvref_t<KeyTypeCVRef>>
 using is_usable_as_basic_json_key_type = typename std::conditional <
-        is_usable_as_key_type<typename BasicJsonType::object_comparator_t,
-        typename BasicJsonType::object_t::key_type, KeyTypeCVRef,
-        RequireTransparentComparator, ExcludeObjectKeyType>::value
-        && !is_json_iterator_of<BasicJsonType, KeyType>::value,
-        std::true_type,
-        std::false_type >::type;
+    is_usable_as_key_type<typename BasicJsonType::object_comparator_t,
+    typename BasicJsonType::object_t::key_type, KeyTypeCVRef,
+    RequireTransparentComparator, ExcludeObjectKeyType>::value
+    && !is_json_iterator_of<BasicJsonType, KeyType>::value,
+    std::true_type,
+    std::false_type >::type;
 
 template<typename ObjectType, typename KeyType>
 using detect_erase_with_key_type = decltype(std::declval<ObjectType&>().erase(std::declval<KeyType>()));
@@ -643,7 +699,6 @@ struct value_in_range_of_impl2<OfType, T, false, true>
     }
 };
 
-
 template<typename OfType, typename T>
 struct value_in_range_of_impl2<OfType, T, true, true>
 {
@@ -679,7 +734,7 @@ struct value_in_range_of_impl1<OfType, T, true>
 };
 
 template<typename OfType, typename T>
-inline constexpr bool value_in_range_of(T val)
+constexpr bool value_in_range_of(T val)
 {
     return value_in_range_of_impl1<OfType, T>::test(val);
 }
@@ -695,7 +750,7 @@ namespace impl
 {
 
 template<typename T>
-inline constexpr bool is_c_string()
+constexpr bool is_c_string()
 {
     using TUnExt = typename std::remove_extent<T>::type;
     using TUnCVExt = typename std::remove_cv<TUnExt>::type;
@@ -723,7 +778,7 @@ namespace impl
 {
 
 template<typename T>
-inline constexpr bool is_transparent()
+constexpr bool is_transparent()
 {
     return is_detected<detect_is_transparent, T>::value;
 }
