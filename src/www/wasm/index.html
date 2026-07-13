@@ -39,6 +39,53 @@
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
     font: inherit; padding: 10px 16px 10px 8px;
   }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; z-index: 1000;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    width: min(720px, 100%); max-height: 85vh; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+  }
+  .modal-header h2 {
+    margin: 0; font-size: 15px; color: #f7768e; font-weight: 600;
+  }
+  .modal-close {
+    background: transparent; border: 0; color: var(--dim); font-size: 20px;
+    line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+  }
+  .modal-close:hover { color: var(--fg); background: var(--border); }
+  .modal-body { padding: 14px 18px; overflow-y: auto; }
+  .modal-message {
+    margin: 0 0 12px; color: var(--fg); font-size: 13px; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .modal-body details { margin-top: 8px; }
+  .modal-body summary {
+    cursor: pointer; color: var(--dim); font-size: 12px; user-select: none;
+  }
+  .modal-body pre {
+    margin: 8px 0 0; padding: 10px; background: #04060a; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    max-height: 40vh; overflow-y: auto; color: var(--dim);
+  }
+  .modal-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 12px 18px; border-top: 1px solid var(--border);
+  }
+  .modal-footer button {
+    background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 14px; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .modal-footer button:hover { border-color: var(--accent); color: var(--accent); }
+  .modal-footer button.primary { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -54,6 +101,86 @@
          placeholder="loading…" disabled>
 </div>
 
+<div id="errorModal" class="modal-overlay" hidden>
+  <div class="modal" role="alertdialog" aria-labelledby="errorModalTitle">
+    <div class="modal-header">
+      <h2 id="errorModalTitle">Driver crashed</h2>
+      <button id="errorModalClose" class="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="errorModalMessage" class="modal-message"></p>
+      <details id="errorModalDetails">
+        <summary>Stack trace &amp; debug info</summary>
+        <pre id="errorModalStack"></pre>
+      </details>
+    </div>
+    <div class="modal-footer">
+      <button id="errorModalCopy">Copy details</button>
+      <button id="errorModalReload" class="primary">Reload page</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Crash/error reporting -- wired up before the wasm runtime scripts load
+  // so it can catch failures during script loading, instantiation, and
+  // execution alike (load failure, runtime abort, uncaught exception,
+  // unhandled promise rejection).
+  const ErrorModal = (() => {
+    const overlay = document.getElementById('errorModal');
+    const titleEl = document.getElementById('errorModalTitle');
+    const messageEl = document.getElementById('errorModalMessage');
+    const stackEl = document.getElementById('errorModalStack');
+
+    const stringifyStack = (err) => {
+      if (err instanceof Error) return err.stack || err.message;
+      if (typeof err === 'object' && err !== null) {
+        try { return JSON.stringify(err, null, 2); } catch (_) { return String(err); }
+      }
+      return String(err);
+    };
+
+    const show = (title, err, extra) => {
+      titleEl.textContent = title;
+      messageEl.textContent = err instanceof Error ? err.message : String(err);
+      const lines = [stringifyStack(err)];
+      lines.push('');
+      lines.push('-- environment --');
+      lines.push('time: ' + new Date().toISOString());
+      lines.push('url: ' + location.href);
+      lines.push('userAgent: ' + navigator.userAgent);
+      if (extra) lines.push('', '-- context --', extra);
+      stackEl.textContent = lines.join('\n');
+      overlay.hidden = false;
+    };
+
+    document.getElementById('errorModalClose').addEventListener('click', () => {
+      overlay.hidden = true;
+    });
+    document.getElementById('errorModalReload').addEventListener('click', () => {
+      location.reload();
+    });
+    document.getElementById('errorModalCopy').addEventListener('click', async (ev) => {
+      const text = titleEl.textContent + '\n' + messageEl.textContent + '\n\n' + stackEl.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        const btn = ev.currentTarget;
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      } catch (_) { /* clipboard unavailable, ignore */ }
+    });
+
+    return { show };
+  })();
+
+  window.addEventListener('error', (ev) => {
+    ErrorModal.show('Uncaught error', ev.error || ev.message);
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    ErrorModal.show('Unhandled promise rejection', ev.reason);
+  });
+</script>
 <script>
   // Mudlib image (created by emscripten's file_packager, see
   // tools/wasm/pack-mudlib.sh) attaches itself to this global before
@@ -62,6 +189,12 @@
     print: (s) => Terminal.log(s),
     printErr: (s) => Terminal.log(s),
     locateFile: (f) => f,
+    onAbort: (what) => {
+      status.textContent = 'driver aborted';
+      ErrorModal.show('WebAssembly runtime aborted', what,
+        'The wasm module called abort() -- this usually means an ' +
+        'unrecoverable native crash (assertion, OOM, illegal memory access).');
+    },
   };
 </script>
 <script src="fluffos-boot.js"></script>
@@ -265,6 +398,8 @@ createFluffOS(Module).then((M) => {
   });
 }).catch((e) => {
   status.textContent = 'failed to load: ' + e;
+  ErrorModal.show('Failed to load WebAssembly driver', e,
+    'mount: ' + BOOT.mount + '\nconfig: ' + BOOT.config);
 });
 </script>
 </body>
