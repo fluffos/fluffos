@@ -240,6 +240,17 @@
 #include <dwarf.h>
 #include <elfutils/libdw.h>
 #include <elfutils/libdwfl.h>
+// FluffOS local patch: TraceResolverLinuxBase::resolve_exec_path() uses
+// Dl_info unconditionally, but upstream only pulls in <dlfcn.h> on the
+// BFD/DWARF branches; on musl (Alpine/static builds) nothing includes it
+// transitively and the DW-only build fails to compile.
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#undef _GNU_SOURCE
+#else
+#include <dlfcn.h>
+#endif
 #endif
 
 #if BACKWARD_HAS_DWARF == 1
@@ -260,6 +271,8 @@
 #if (BACKWARD_HAS_BACKTRACE == 1) || (BACKWARD_HAS_BACKTRACE_SYMBOL == 1)
 // then we shall rely on backtrace
 #include <execinfo.h>
+// FluffOS local patch: Dl_info on musl (see the DW branch above).
+#include <dlfcn.h>
 #endif
 
 #endif // defined(BACKWARD_SYSTEM_LINUX)
@@ -4304,7 +4317,15 @@ public:
     SetUnhandledExceptionFilter(crash_handler);
 
     signal(SIGABRT, signal_handler);
+#if defined(_MSC_VER)
+    // FluffOS local patch: only call this under the real MSVC runtime.
+    // On MinGW the symbol lives in msvcr80+.dll, not msvcrt.dll; upstream
+    // works around that by linking msvcr90 (msvcr90d in Debug), but those
+    // DLLs only exist on machines with Visual Studio / the VC2008 redist,
+    // so the produced binaries die at load with STATUS_DLL_NOT_FOUND.
+    // Skipping the call merely leaves the default abort() dialog behavior.
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
 
     std::set_terminate(&terminator);
 #ifndef BACKWARD_ATLEAST_CXX17
