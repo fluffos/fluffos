@@ -451,8 +451,23 @@ add_custom_command(
 endif ()
 
 find_package(BISON 3.8)
-if (${BISON_FOUND})
-  message(STATUS "BISON: ${BISON_VERSION}")
+# The committed generated file pins the generator version that produced it:
+# a host with an OLDER bison must not regenerate (it cannot reproduce the
+# committed output and would churn it on the post-build copy-back); it
+# builds from the committed copy instead. Hosts at or above the pin still
+# regenerate, so CI keeps validating grammar.y against a real toolchain.
+set(FLUFFOS_PINNED_BISON_VERSION "0")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc"
+     _fluffos_bison_pin_line REGEX "made by GNU Bison" LIMIT_COUNT 1)
+if (_fluffos_bison_pin_line MATCHES "GNU Bison ([0-9]+\\.[0-9]+(\\.[0-9]+)?)")
+  set(FLUFFOS_PINNED_BISON_VERSION "${CMAKE_MATCH_1}")
+endif()
+set(FLUFFOS_BISON_REGEN FALSE)
+if (BISON_FOUND AND NOT BISON_VERSION VERSION_LESS FLUFFOS_PINNED_BISON_VERSION)
+  set(FLUFFOS_BISON_REGEN TRUE)
+endif()
+if (FLUFFOS_BISON_REGEN)
+  message(STATUS "BISON: ${BISON_VERSION} (committed files pinned at ${FLUFFOS_PINNED_BISON_VERSION})")
   BISON_TARGET(Grammar "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y"
           ${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc
           DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h"
@@ -490,7 +505,11 @@ if (${BISON_FOUND})
     )
   endif()
 else()
-  message(STATUS "BISON: version too low, using pre-generated source.")
+  if (BISON_FOUND)
+    message(STATUS "BISON: ${BISON_VERSION} is older than the pinned ${FLUFFOS_PINNED_BISON_VERSION}, using pre-generated source.")
+  else()
+    message(STATUS "BISON: version too low, using pre-generated source.")
+  endif()
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.cc"
            "${CMAKE_CURRENT_BINARY_DIR}/grammar.autogen.h"
@@ -507,14 +526,33 @@ endif()
 
 # ── Flex (LPC lexer) ──────────────────────────────────────────────────────
 find_package(FLEX 2.6)
-if (FLEX_FOUND)
-  message(STATUS "FLEX: ${FLEX_VERSION}")
+# Same version-pin scheme as bison above, read from the committed scanner's
+# YY_FLEX_*_VERSION defines.
+set(FLUFFOS_PINNED_FLEX_VERSION "0")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc"
+     _fluffos_flex_pin_lines REGEX "#define YY_FLEX_(MAJOR|MINOR|SUBMINOR)_VERSION")
+if ("${_fluffos_flex_pin_lines}" MATCHES "MAJOR_VERSION ([0-9]+)")
+  set(_fluffos_flex_pin_major "${CMAKE_MATCH_1}")
+  if ("${_fluffos_flex_pin_lines}" MATCHES "MINOR_VERSION ([0-9]+)")
+    set(_fluffos_flex_pin_minor "${CMAKE_MATCH_1}")
+    if ("${_fluffos_flex_pin_lines}" MATCHES "SUBMINOR_VERSION ([0-9]+)")
+      set(FLUFFOS_PINNED_FLEX_VERSION
+          "${_fluffos_flex_pin_major}.${_fluffos_flex_pin_minor}.${CMAKE_MATCH_1}")
+    endif()
+  endif()
+endif()
+set(FLUFFOS_FLEX_REGEN FALSE)
+if (FLEX_FOUND AND NOT FLEX_VERSION VERSION_LESS FLUFFOS_PINNED_FLEX_VERSION)
+  set(FLUFFOS_FLEX_REGEN TRUE)
+endif()
+if (FLUFFOS_FLEX_REGEN)
+  message(STATUS "FLEX: ${FLEX_VERSION} (committed files pinned at ${FLUFFOS_PINNED_FLEX_VERSION})")
   FLEX_TARGET(LpcLexer
     "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l"
     "${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc"
     COMPILE_FLAGS "-Ca"
   )
-  if (BISON_FOUND)
+  if (FLUFFOS_BISON_REGEN)
     # Only valid when BISON_TARGET(Grammar) actually ran -- on the
     # bison-too-old path (macOS's stock bison) the Grammar target doesn't
     # exist and newer CMake makes this a hard configure error; the header
@@ -523,7 +561,11 @@ if (FLEX_FOUND)
   endif()
   set(GENERATED_LEXER_FILE "${FLEX_LpcLexer_OUTPUTS}")
 else()
-  message(STATUS "FLEX: not found, using pre-generated source.")
+  if (FLEX_FOUND)
+    message(STATUS "FLEX: ${FLEX_VERSION} is older than the pinned ${FLUFFOS_PINNED_FLEX_VERSION}, using pre-generated source.")
+  else()
+    message(STATUS "FLEX: not found, using pre-generated source.")
+  endif()
   add_custom_command(
     OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc"
     COMMAND "${CMAKE_COMMAND}" -D ACTION=DENORMALIZE -D FILE_IN="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc" -D FILE_OUT="${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
@@ -827,17 +869,21 @@ if (NOT WIN32 AND NOT EMSCRIPTEN)
     RUNTIME DESTINATION bin)
 endif ()
 
-# Update generated grammar files
-if (${BISON_FOUND} AND NOT EMSCRIPTEN)
+# Update generated grammar files. The copy-back is gated twice: only hosts
+# whose generator is at/above the committed pin regenerate at all, and
+# util.cmake skips the write unless the .y/.l INPUT hash changed -- so
+# same-version generators with cosmetically different output (distro
+# patches) can never churn the committed files.
+if (FLUFFOS_BISON_REGEN AND NOT EMSCRIPTEN)
   add_custom_command(TARGET "driver" POST_BUILD
-          COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_SOURCE}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
-          COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_HEADER}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
+          COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_SOURCE}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -D SRC_FILE="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
+          COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${BISON_Grammar_OUTPUT_HEADER}" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.autogen.h" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -D SRC_FILE="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/grammar.y" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
           COMMENT "Copying and sanitizing generated grammar files")
 endif()
 
-if (FLEX_FOUND AND NOT EMSCRIPTEN)
+if (FLUFFOS_FLEX_REGEN AND NOT EMSCRIPTEN)
   add_custom_command(TARGET "driver" POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
+    COMMAND "${CMAKE_COMMAND}" -D ACTION=NORMALIZE -D FILE_IN="${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc" -D FILE_OUT="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.autogen.cc" -D REPO_ROOT="${CMAKE_SOURCE_DIR}" -D BUILD_ROOT="${CMAKE_BINARY_DIR}" -D SRC_FILE="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l" -P "${CMAKE_SOURCE_DIR}/cmake/util.cmake"
     COMMENT "Copying and sanitizing Flex-generated lexer.autogen.cc")
 endif()
 
