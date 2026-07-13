@@ -6,6 +6,7 @@
 #include <thread>
 #include <string>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <event2/event.h>
 

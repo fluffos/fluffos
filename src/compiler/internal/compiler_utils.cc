@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
