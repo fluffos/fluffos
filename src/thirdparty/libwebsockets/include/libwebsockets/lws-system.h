@@ -108,6 +108,9 @@ typedef enum { /* keep system_state_names[] in sync in context.c */
 	LWS_SYSTATE_CONTEXT_CREATED,	 /* context was just created */
 	LWS_SYSTATE_INITIALIZED,	 /* protocols initialized.  Lws itself
 					  * can operate normally */
+	LWS_SYSTATE_COLLECTING_STDIN,	 /* we are waiting for stdin RX and / or
+					  * closure.  This is skipped if
+					  * system_ops.stdin_rx is NULL */
 	LWS_SYSTATE_IFACE_COLDPLUG,	 /* existing net ifaces iterated */
 	LWS_SYSTATE_DHCP,		 /* at least one net iface configured */
 	LWS_SYSTATE_CPD_PRE_TIME,	 /* Captive portal detect without valid
@@ -133,12 +136,21 @@ typedef enum { /* keep system_state_names[] in sync in context.c */
 	LWS_SYSTATE_AUTH1,		 /* identity used for main auth token */
 	LWS_SYSTATE_AUTH2,		 /* identity used for optional auth */
 
+	LWS_SYSTATE_ONE_TIME_UPDATES,	 /* pre-OPERATIONAL one-time updates,
+					  * when a firmware needs to perform
+					  * one-time upgrades to state before
+					  * OPERATIONAL */
+
 	LWS_SYSTATE_OPERATIONAL,	 /* user code can operate normally */
 
 	LWS_SYSTATE_POLICY_INVALID,	 /* user code is changing its policies
 					  * drop everything done with old
 					  * policy, switch to new then enter
 					  * LWS_SYSTATE_POLICY_VALID */
+	LWS_SYSTATE_CONTEXT_DESTROYING,	 /* Context is being destroyed */
+	LWS_SYSTATE_AWAITING_MODAL_UPDATING,	 /* We're negotiating with the
+						  * user code for update mode */
+	LWS_SYSTATE_MODAL_UPDATING,	 /* We're updating the firmware */
 } lws_system_states_t;
 
 /* Captive Portal Detect -related */
@@ -153,6 +165,11 @@ typedef enum {
 
 typedef void (*lws_attach_cb_t)(struct lws_context *context, int tsi, void *opaque);
 struct lws_attach_item;
+
+LWS_EXTERN LWS_VISIBLE int
+lws_tls_jit_trust_got_cert_cb(struct lws_context *cx, void *got_opaque,
+			      const uint8_t *skid, size_t skid_len,
+			      const uint8_t *der, size_t der_len);
 
 typedef struct lws_system_ops {
 	int (*reboot)(void);
@@ -181,12 +198,37 @@ typedef struct lws_system_ops {
 	 * by calling lws_captive_portal_detect_result() api
 	 */
 
+#if defined(LWS_WITH_NETWORK)
 	int (*metric_report)(lws_metric_pub_t *mdata);
 	/**< metric \p item is reporting an event of kind \p rpt,
 	 * held in \p mdata... return 0 to leave the metric object as it is,
 	 * or nonzero to reset it. */
+#endif
+	int (*jit_trust_query)(struct lws_context *cx, const uint8_t *skid,
+			       size_t skid_len, void *got_opaque);
+	/**< user defined trust store search, if we do trust a cert with SKID
+	 * matching skid / skid_len, then it should get hold of the DER for the
+	 * matching root CA and call
+	 * lws_tls_jit_trust_got_cert_cb(..., got_opaque) before cleaning up and
+	 * returning.  The DER should be destroyed if in heap before returning.
+	 */
 
-	uint32_t	wake_latency_us;
+	int (*stdin_rx)(struct lws_context *cx, const char *buf, size_t len);
+	/**< anything from stdin turns up here, eg, echo -n 123 | ./myapp will
+	 * cause this to be called with buf = "123" and len=3.  If stdin closes
+	 * before the event loop terminates, we will be called with buf = NULL
+	 * and len = 0 and nothing further, since stdin will be closed.  This is
+	 * very handy for passing secrets into your app that will not be visible
+	 * to others via the commandline and with solid behaviours whenever the
+	 * stdin source closes.
+	 */
+
+#if defined(LWS_WITH_OTA)
+	lws_ota_ops_t		ota_ops;
+	/**< Platform OTA interface to lws_ota, see lws-ota.h */
+#endif
+
+	uint32_t		wake_latency_us;
 	/**< time taken for this device to wake from suspend, in us
 	 */
 } lws_system_ops_t;
@@ -294,6 +336,7 @@ enum {
 	_LWSDH_SA46_COUNT,
 };
 
+#if defined(LWS_WITH_NETWORK)
 typedef struct lws_dhcpc_ifstate {
 	char				ifname[16];
 	char				domain[64];
@@ -382,3 +425,41 @@ lws_system_cpd_set(struct lws_context *context, lws_cpd_result_t result);
  */
 LWS_EXTERN LWS_VISIBLE lws_cpd_result_t
 lws_system_cpd_state_get(struct lws_context *context);
+
+enum {
+	LWS_SAS_FLAG__APPEND_COMMANDLINE	= (1 << 0)
+};
+
+/**
+ * lws_system_adopt_stdin(): add stdin to be a wsi handled by the event loop
+ *
+ * \param context: the lws_context
+ *
+ * The user code should call this after context creation.  It will add stdin
+ * to the context event loop and handle it one of two ways
+ *
+ * 1) flags has LWS_SAS_FLAG__APPEND_COMMANDLINE set: internally manage the
+ *    stdin input as additional commandline content that can be accessed
+ *    alongside the official commandline context using the
+ *    lws_cmdline_option_cx() api.  Note this a) requires you to pass your
+ *    app argc and argv to the same-named context creation info struct members,
+ *    and b) is only effective after context creation.  This is very useful if
+ *    passing secrets to your app that can't appear on the commandline.  Or,
+ *
+ *  2) flags = 0: ignore the received stdin input internally, and call back
+ *  rx data (and close) to lws_system to the .stdin_rx callback.
+ *
+ * The callback is called with a buffer and length for received RX from stdin,
+ * which may be arbitrarily fragmented.  If it's called with a NULL buffer and
+ * 0 length, it means stdin was closed.
+ *
+ * Your callback should process the provided RX passed to it, and choose to
+ * return 0 to continue to wait for stdin RX, or nonzero to close stdin and
+ * continue the lws_system state startup.
+ */
+LWS_EXTERN LWS_VISIBLE int
+lws_system_adopt_stdin(struct lws_context *cx, unsigned int flags);
+
+
+#endif
+

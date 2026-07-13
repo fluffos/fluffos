@@ -38,7 +38,7 @@ LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
 lws_send_pipe_choked(struct lws *wsi);
 
 /**
- * lws_is_final_fragment() - tests if last part of ws message
+ * lws_is_final_fragment() - tests if received fragment is last part of ws message
  *
  * \param wsi: lws connection
  */
@@ -46,7 +46,7 @@ LWS_VISIBLE LWS_EXTERN int
 lws_is_final_fragment(struct lws *wsi);
 
 /**
- * lws_is_first_fragment() - tests if first part of ws message
+ * lws_is_first_fragment() - tests if received fragment is first part of ws message
  *
  * \param wsi: lws connection
  */
@@ -54,11 +54,27 @@ LWS_VISIBLE LWS_EXTERN int
 lws_is_first_fragment(struct lws *wsi);
 
 /**
+ * lws_ws_sending_multifragment() - return 1 if we are in the middle of sending a multi-fragment message
+ *
+ * \param wsi: lws connection
+ */
+
+LWS_VISIBLE LWS_EXTERN int
+lws_ws_sending_multifragment(struct lws *wsi);
+
+/**
  * lws_get_reserved_bits() - access reserved bits of ws frame
  * \param wsi: lws connection
  */
 LWS_VISIBLE LWS_EXTERN unsigned char
 lws_get_reserved_bits(struct lws *wsi);
+
+/**
+ * lws_get_opcode() - access opcode of ws frame
+ * \param wsi: lws connection
+ */
+LWS_VISIBLE LWS_EXTERN uint8_t
+lws_get_opcode(struct lws *wsi);
 
 /**
  * lws_partial_buffered() - find out if lws buffered the last write

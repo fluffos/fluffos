@@ -170,7 +170,7 @@ io_sd(struct lws *wsi, unsigned int flags)
 	// assert that the requested flags do not contain anything unexpected
 	if (!((flags & (LWS_EV_START | LWS_EV_STOP)) &&
 	    (flags & (LWS_EV_READ | LWS_EV_WRITE)))) {
-		lwsl_err("%s: assert: flags %d", __func__, flags);
+		lwsl_wsi_err(wsi, "assert: flags %d", flags);
 		assert(0);
 	}
 
@@ -232,21 +232,33 @@ init_vhost_listen_wsi_sd(struct lws *wsi)
 }
 
 static int
+elops_listen_init_sdevent(struct lws_dll2 *d, void *user)
+{
+#if defined(LWS_WITH_SERVER)
+	struct lws *wsi = lws_container_of(d, struct lws, listen_list);
+
+	if (init_vhost_listen_wsi_sd(wsi) == -1)
+		return -1;
+#endif
+
+	return 0;
+}
+
+static int
 init_pt_sd(struct lws_context *context, void *_loop, int tsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
 	struct lws_pt_eventlibs_sdevent *ptpriv = pt_to_priv_sd(pt);
 	struct sd_event *loop = (struct sd_event *)_loop;
-	struct lws_vhost *vh;
-	int first = 1;  // we are the first that create and initialize the loop
+	int first = 1;  /* first to create and initialize the loop */
 
 	ptpriv->pt = pt;
 
-	// make sure we have an event loop
+	/* make sure we have an event loop */
 	if (!ptpriv->io_loop) {
 		if (!loop) {
 			if (sd_event_default(&loop) < 0) {
-				lwsl_err("%s: sd_event_default failed\n", __func__);
+				lwsl_cx_err(context, "sd_event_default failed");
 
 				return -1;
 			}
@@ -257,7 +269,6 @@ init_pt_sd(struct lws_context *context, void *_loop, int tsi)
 		}
 
 		ptpriv->io_loop = loop;
-
 	} else
 		 /*
 		  * If the loop was initialized before, we do not need to
@@ -265,12 +276,7 @@ init_pt_sd(struct lws_context *context, void *_loop, int tsi)
 		  */
 		first = 0;
 
-	// initialize accept/read for vhosts
-	// Note: default vhost usually not included here
-	for (vh = context->vhost_list; vh; vh = vh->vhost_next)
-		/* call lws_event_loop_ops->init_vhost_listen_wsi */
-		if (init_vhost_listen_wsi_sd(vh->lserv_wsi) == -1)
-			return -1;
+	lws_vhost_foreach_listen_wsi(context, NULL, elops_listen_init_sdevent);
 
 	if (first) {
 
@@ -361,16 +367,25 @@ run_pt_sd(struct lws_context *context, int tsi)
 		sd_event_run(ptpriv->io_loop, (uint64_t) -1);
 }
 
+static int
+elops_listen_destroy_sdevent(struct lws_dll2 *d, void *user)
+{
+#if defined(LWS_WITH_SERVER)
+	struct lws *wsi = lws_container_of(d, struct lws, listen_list);
+
+	wsi_logical_close_sd(wsi);
+#endif
+
+	return 0;
+}
+
 static void
 destroy_pt_sd(struct lws_context *context, int tsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
 	struct lws_pt_eventlibs_sdevent *ptpriv = pt_to_priv_sd(pt);
-	struct lws_vhost *vh;
 
-	for (vh = context->vhost_list; vh; vh = vh->vhost_next)
-		if (vh->lserv_wsi)
-			wsi_logical_close_sd(vh->lserv_wsi);
+	lws_vhost_foreach_listen_wsi(context, NULL, elops_listen_destroy_sdevent);
 
 	if (ptpriv->sultimer) {
 		sd_event_source_set_enabled(ptpriv->sultimer,
@@ -390,7 +405,6 @@ destroy_pt_sd(struct lws_context *context, int tsi)
 		sd_event_unref(ptpriv->io_loop);
 		ptpriv->io_loop = NULL;
 	}
-
 }
 
 const struct lws_event_loop_ops event_loop_ops_sdevent = {

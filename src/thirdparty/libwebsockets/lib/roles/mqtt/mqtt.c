@@ -214,13 +214,6 @@ static const uint8_t map_flags[] = {
 					  LMQCP_LUT_FLAG_PACKET_ID_NONE | 0x00,
 };
 
-void
-lws_mqttc_state_transition(lws_mqttc_t *c, lwsgs_mqtt_states_t s)
-{
-	lwsl_debug("%s: ep %p: state %d -> %d\n", __func__, c, c->estate, s);
-	c->estate = s;
-}
-
 static int
 lws_mqtt_pconsume(lws_mqtt_parser_t *par, int consumed)
 {
@@ -275,74 +268,6 @@ lws_mqtt_set_client_established(struct lws *wsi)
 	lws_set_timeout(wsi, NO_PENDING_TIMEOUT, 0);
 
 	return 0;
-}
-
-
-static lws_mqtt_match_topic_return_t
-lws_mqtt_is_topic_matched(const char* sub, const char* pub)
-{
-	const char *ppos = pub, *spos = sub;
-
-	if (!ppos || !spos) {
-		return LMMTR_TOPIC_MATCH_ERROR;
-	}
-
-	while (*spos) {
-		if (*ppos == '#' || *ppos == '+') {
-			lwsl_err("%s: PUBLISH to wildcard "
-				 "topic \"%s\" not supported\n",
-				 __func__, pub);
-			return LMMTR_TOPIC_MATCH_ERROR;
-		}
-		/* foo/+/bar == foo/xyz/bar ? */
-		if (*spos == '+') {
-			/* Skip ahead */
-			while (*ppos != '\0' && *ppos != '/') {
-				ppos++;
-			}
-		} else if (*spos == '#') {
-			return LMMTR_TOPIC_MATCH;
-		} else {
-			if (*ppos == '\0') {
-				/* foo/bar == foo/bar/# ? */
-				if (!strncmp(spos, "/#", 2))
-					return LMMTR_TOPIC_MATCH;
-				return LMMTR_TOPIC_NOMATCH;
-			/* Non-matching character */
-			} else if (*ppos != *spos) {
-				return LMMTR_TOPIC_NOMATCH;
-			}
-			ppos++;
-		}
-		spos++;
-	}
-
-	if (*spos == '\0' && *ppos == '\0')
-		return LMMTR_TOPIC_MATCH;
-
-	return LMMTR_TOPIC_NOMATCH;
-}
-
-lws_mqtt_subs_t* lws_mqtt_find_sub(struct _lws_mqtt_related* mqtt,
-				   const char* ptopic) {
-	lws_mqtt_subs_t *s = mqtt->subs_head;
-
-	while (s) {
-		/*  SUB topic  ==   PUB topic  ? */
-		/* foo/bar/xyz ==  foo/bar/xyz ? */
-		if (!s->wildcard) {
-			if (!strcmp((const char*)s->topic, ptopic))
-				return s;
-		} else {
-			if (lws_mqtt_is_topic_matched(
-			    s->topic, ptopic) == LMMTR_TOPIC_MATCH)
-				return s;
-		}
-
-		s = s->next;
-	}
-
-	return NULL;
 }
 
 static lws_mqtt_validate_topic_return_t
@@ -429,10 +354,8 @@ lws_mqtt_create_sub(struct _lws_mqtt_related *mqtt, const char *topic)
 				 __func__);
 			return NULL;
 		}
-		if (flag == LMVTR_VALID_WILDCARD)
-			mysub->wildcard = 1;
-		else if (flag == LMVTR_VALID_SHADOW)
-			mysub->shadow = 1;
+		mysub->wildcard = (flag == LMVTR_VALID_WILDCARD);
+		mysub->shadow = (flag == LMVTR_VALID_SHADOW);
 		break;
 
 	default:
@@ -477,6 +400,126 @@ lws_mqtt_client_remove_subs(struct _lws_mqtt_related *mqtt)
 		return 0;
 	}
 	return 1;
+}
+
+/*
+ * This fires if the wsi did a PUBLISH under QoS1 or QoS2, but no PUBACK or
+ * PUBREC came before the timeout period
+ */
+
+static void
+lws_mqtt_publish_resend(struct lws_sorted_usec_list *sul)
+{
+	struct _lws_mqtt_related *mqtt = lws_container_of(sul,
+			struct _lws_mqtt_related, sul_qos_puback_pubrec_wait);
+
+	lwsl_notice("%s: %s\n", __func__, lws_wsi_tag(mqtt->wsi));
+
+	if (mqtt->wsi->a.protocol->callback(mqtt->wsi, LWS_CALLBACK_MQTT_RESEND,
+				mqtt->wsi->user_space, NULL, 0))
+		lws_set_timeout(mqtt->wsi, 1, LWS_TO_KILL_ASYNC);
+}
+
+static void
+lws_mqtt_unsuback_timeout(struct lws_sorted_usec_list *sul)
+{
+	struct _lws_mqtt_related *mqtt = lws_container_of(sul,
+			struct _lws_mqtt_related, sul_unsuback_wait);
+
+	lwsl_debug("%s: %s\n", __func__, lws_wsi_tag(mqtt->wsi));
+
+	if (mqtt->wsi->a.protocol->callback(mqtt->wsi,
+					   LWS_CALLBACK_MQTT_UNSUBSCRIBE_TIMEOUT,
+					   mqtt->wsi->user_space, NULL, 0))
+		lws_set_timeout(mqtt->wsi, 1, LWS_TO_KILL_ASYNC);
+}
+
+static void
+lws_mqtt_shadow_timeout(struct lws_sorted_usec_list *sul)
+{
+	struct _lws_mqtt_related *mqtt = lws_container_of(sul,
+			struct _lws_mqtt_related, sul_shadow_wait);
+
+	lwsl_debug("%s: %s\n", __func__, lws_wsi_tag(mqtt->wsi));
+
+	if (mqtt->wsi->a.protocol->callback(mqtt->wsi,
+					    LWS_CALLBACK_MQTT_SHADOW_TIMEOUT,
+					    mqtt->wsi->user_space, NULL, 0))
+		lws_set_timeout(mqtt->wsi, 1, LWS_TO_KILL_ASYNC);
+}
+
+void
+lws_mqttc_state_transition(lws_mqttc_t *c, lwsgs_mqtt_states_t s)
+{
+	lwsl_debug("%s: ep %p: state %d -> %d\n", __func__, c, c->estate, s);
+	c->estate = s;
+}
+
+lws_mqtt_match_topic_return_t
+lws_mqtt_is_topic_matched(const char* sub, const char* pub)
+{
+	const char *ppos = pub, *spos = sub;
+
+	if (!ppos || !spos) {
+		return LMMTR_TOPIC_MATCH_ERROR;
+	}
+
+	while (*spos) {
+		if (*ppos == '#' || *ppos == '+') {
+			lwsl_err("%s: PUBLISH to wildcard "
+				 "topic \"%s\" not supported\n",
+				 __func__, pub);
+			return LMMTR_TOPIC_MATCH_ERROR;
+		}
+		/* foo/+/bar == foo/xyz/bar ? */
+		if (*spos == '+') {
+			/* Skip ahead */
+			while (*ppos != '\0' && *ppos != '/') {
+				ppos++;
+			}
+		} else if (*spos == '#') {
+			return LMMTR_TOPIC_MATCH;
+		} else {
+			if (*ppos == '\0') {
+				/* foo/bar == foo/bar/# ? */
+				if (!strncmp(spos, "/#", 2))
+					return LMMTR_TOPIC_MATCH;
+				return LMMTR_TOPIC_NOMATCH;
+			/* Non-matching character */
+			} else if (*ppos != *spos) {
+				return LMMTR_TOPIC_NOMATCH;
+			}
+			ppos++;
+		}
+		spos++;
+	}
+
+	if (*spos == '\0' && *ppos == '\0')
+		return LMMTR_TOPIC_MATCH;
+
+	return LMMTR_TOPIC_NOMATCH;
+}
+
+lws_mqtt_subs_t* lws_mqtt_find_sub(struct _lws_mqtt_related* mqtt,
+				   const char* ptopic) {
+	lws_mqtt_subs_t *s = mqtt->subs_head;
+
+	while (s) {
+		/*  SUB topic  ==   PUB topic  ? */
+		/* foo/bar/xyz ==  foo/bar/xyz ? */
+		if (!s->wildcard) {
+			if (!strcmp((const char*)s->topic, ptopic))
+				return s;
+		} else {
+			if (lws_mqtt_is_topic_matched(
+			    s->topic, ptopic) == LMMTR_TOPIC_MATCH)
+				return s;
+		}
+
+		s = s->next;
+	}
+
+	return NULL;
 }
 
 int
@@ -655,6 +698,114 @@ _lws_mqtt_rx_parser(struct lws *wsi, lws_mqtt_parser_t *par,
 			}
 			break;
 
+		/* PUBREC */
+		case LMQCPP_PUBREC_PACKET:
+			lwsl_debug("%s: received PUBREC pkt\n", __func__);
+			lws_mqtt_vbi_init(&par->vbit);
+			switch (lws_mqtt_vbi_r(&par->vbit, &buf, &len)) {
+			case LMSPR_NEED_MORE:
+				break;
+			case LMSPR_COMPLETED:
+				par->cpkt_remlen = par->vbit.value;
+				lwsl_debug("%s: PUBREC pkt len = %d\n",
+					   __func__, (int)par->cpkt_remlen);
+				if (par->cpkt_remlen < 2)
+					goto send_protocol_error_and_close;
+				par->state = LMQCPP_PUBREC_VH_PKT_ID;
+				break;
+			default:
+				lwsl_notice("%s: pubrec bad vbi\n", __func__);
+				goto send_protocol_error_and_close;
+			}
+			break;
+
+		case LMQCPP_PUBREC_VH_PKT_ID:
+			if (len < 2) {
+				lwsl_notice("%s: len breakage 3\n", __func__);
+				return -1;
+			}
+
+			par->cpkt_id = lws_ser_ru16be(buf);
+			wsi->mqtt->ack_pkt_id = par->cpkt_id;
+			buf += 2;
+			len -= 2;
+			par->cpkt_remlen -= 2;
+			par->n = 0;
+
+			goto cmd_completion;
+
+		/* PUBREL */
+		case LMQCPP_PUBREL_PACKET:
+			lwsl_debug("%s: received PUBREL pkt\n", __func__);
+			lws_mqtt_vbi_init(&par->vbit);
+			switch (lws_mqtt_vbi_r(&par->vbit, &buf, &len)) {
+			case LMSPR_NEED_MORE:
+				break;
+			case LMSPR_COMPLETED:
+				par->cpkt_remlen = par->vbit.value;
+				lwsl_debug("%s: PUBREL pkt len = %d\n",
+					   __func__, (int)par->cpkt_remlen);
+				if (par->cpkt_remlen < 2)
+					goto send_protocol_error_and_close;
+				par->state = LMQCPP_PUBREL_VH_PKT_ID;
+				break;
+			default:
+				lwsl_err("%s: pubrel bad vbi\n", __func__);
+				goto send_protocol_error_and_close;
+			}
+			break;
+
+		case LMQCPP_PUBREL_VH_PKT_ID:
+			if (len < 2) {
+				lwsl_notice("%s: len breakage 3\n", __func__);
+				return -1;
+			}
+
+			par->cpkt_id = lws_ser_ru16be(buf);
+			wsi->mqtt->ack_pkt_id = par->cpkt_id;
+			buf += 2;
+			len -= 2;
+			par->cpkt_remlen -= 2;
+			par->n = 0;
+
+			goto cmd_completion;
+
+		/* PUBCOMP */
+		case LMQCPP_PUBCOMP_PACKET:
+			lwsl_debug("%s: received PUBCOMP pkt\n", __func__);
+			lws_mqtt_vbi_init(&par->vbit);
+			switch (lws_mqtt_vbi_r(&par->vbit, &buf, &len)) {
+			case LMSPR_NEED_MORE:
+				break;
+			case LMSPR_COMPLETED:
+				par->cpkt_remlen = par->vbit.value;
+				lwsl_debug("%s: PUBCOMP pkt len = %d\n",
+					   __func__, (int)par->cpkt_remlen);
+				if (par->cpkt_remlen < 2)
+					goto send_protocol_error_and_close;
+				par->state = LMQCPP_PUBCOMP_VH_PKT_ID;
+				break;
+			default:
+				lwsl_err("%s: pubcmp bad vbi\n", __func__);
+				goto send_protocol_error_and_close;
+			}
+			break;
+
+		case LMQCPP_PUBCOMP_VH_PKT_ID:
+			if (len < 2) {
+				lwsl_notice("%s: len breakage 3\n", __func__);
+				return -1;
+			}
+
+			par->cpkt_id = lws_ser_ru16be(buf);
+			wsi->mqtt->ack_pkt_id = par->cpkt_id;
+			buf += 2;
+			len -= 2;
+			par->cpkt_remlen -= 2;
+			par->n = 0;
+
+			goto cmd_completion;
+
 		case LMQCPP_PUBLISH_PACKET:
 			if (lwsi_role_client(wsi) && wsi->mqtt->inside_subscribe) {
 				lwsl_notice("%s: Topic rx before subscribing\n",
@@ -769,7 +920,7 @@ _lws_mqtt_rx_parser(struct lws *wsi, lws_mqtt_parser_t *par,
 			par->cpkt_id = lws_ser_ru16be(buf);
 			buf += 2;
 			len -= 2;
-			wsi->mqtt->ack_pkt_id = par->cpkt_id;
+			wsi->mqtt->peer_ack_pkt_id = par->cpkt_id;
 			lwsl_debug("%s: Packet ID %d\n",
 					__func__, (int)par->cpkt_id);
 			par->state = LMQCPP_PAYLOAD;
@@ -878,17 +1029,27 @@ _lws_mqtt_rx_parser(struct lws *wsi, lws_mqtt_parser_t *par,
 			switch (par->conn_rc) {
 			case 0:
 				goto cmd_completion;
+			/* 3.1.1 errors [MQTT-3.2.3] */
 			case 1:
-			case 2:
-			case 3:
-			case 4:
-			case 5:
-				par->reason = LMQCP_REASON_UNSUPPORTED_PROTOCOL +
-						par->conn_rc - 1;
+				par->reason = LMQCP_REASON_UNSUPPORTED_PROTOCOL;
 				goto send_reason_and_close;
+			case 2:
+				par->reason = LMQCP_REASON_CLIENT_ID_INVALID;
+				goto send_reason_and_close;
+			case 3:
+				par->reason = LMQCP_REASON_SERVER_UNAVAILABLE;
+				goto send_reason_and_close;
+			case 4:
+				par->reason = LMQCP_REASON_BAD_CREDENTIALS;
+				goto send_reason_and_close;
+			case 5:
+				par->reason = LMQCP_REASON_NOT_AUTHORIZED;
+				goto send_reason_and_close;
+			/* 5.0 and all other errors [MQTT-3.2.2.2] */
 			default:
+				par->reason = (lws_mqtt_reason_t)par->conn_rc;
 				lwsl_notice("%s: bad connack retcode\n", __func__);
-				goto send_protocol_error_and_close;
+				goto send_reason_and_close;
 			}
 			break;
 
@@ -1133,7 +1294,9 @@ cmd_completion:
 				lws_set_timeout(wsi, 0, 0);
 
 				w = lws_create_new_server_wsi(wsi->a.vhost,
-							      wsi->tsi, "mqtt_sid1");
+							      wsi->tsi,
+							      LWSLCG_WSI_MUX,
+							      "mqtt_sid1");
 				if (!w) {
 					lwsl_notice("%s: sid 1 migrate failed\n",
 							__func__);
@@ -1214,6 +1377,93 @@ bail1:
 
 				return 0;
 
+			case LMQCP_PUBREC:
+				lwsl_err("%s: cmd_completion: PUBREC\n",
+						__func__);
+				/*
+				 * Figure out which child asked for this
+				 */
+				n = 0;
+				lws_start_foreach_ll(struct lws *, w,
+						     wsi->mux.child_list) {
+					if (w->mqtt->unacked_publish &&
+					    w->mqtt->ack_pkt_id == par->cpkt_id) {
+						char requested_close = 0;
+
+						w->mqtt->unacked_publish = 0;
+						w->mqtt->unacked_pubrel = 1;
+
+						if (user_callback_handle_rxflow(
+							    w->a.protocol->callback,
+							    w, LWS_CALLBACK_MQTT_ACK,
+							    w->user_space, NULL, 0) < 0) {
+							lwsl_info("%s: MQTT_ACK requests close\n",
+								 __func__);
+							requested_close = 1;
+						}
+						n = 1;
+
+						/*
+						 * We got an assertive PUBREC,
+						 * no need for timeout wait
+						 * any more
+						 */
+						lws_sul_cancel(&w->mqtt->
+							  sul_qos_puback_pubrec_wait);
+
+						if (requested_close) {
+							__lws_close_free_wsi(w,
+								0, "ack cb");
+							break;
+						}
+
+						break;
+					}
+				} lws_end_foreach_ll(w, mux.sibling_list);
+
+				if (!n) {
+					lwsl_err("%s: unsolicited PUBREC\n",
+							__func__);
+					return -1;
+				}
+				wsi->mqtt->send_pubrel = 1;
+				lws_callback_on_writable(wsi);
+				break;
+
+			case LMQCP_PUBCOMP:
+				lwsl_err("%s: cmd_completion: PUBCOMP\n",
+						__func__);
+				n = 0;
+				lws_start_foreach_ll(struct lws *, w,
+						     wsi->mux.child_list) {
+					if (w->mqtt->unacked_pubrel > 0 &&
+					    w->mqtt->ack_pkt_id == par->cpkt_id) {
+						w->mqtt->unacked_pubrel = 0;
+						n = 1;
+					}
+				} lws_end_foreach_ll(w, mux.sibling_list);
+
+				if (!n) {
+					lwsl_err("%s: unsolicited PUBCOMP\n",
+							__func__);
+					return -1;
+				}
+
+				/*
+				 * If we published something and PUBCOMP arrived,
+				 * our connection is definitely working in both
+				 * directions at the moment.
+				 */
+				lws_validity_confirmed(wsi);
+				break;
+
+			case LMQCP_PUBREL:
+				lwsl_err("%s: cmd_completion: PUBREL\n",
+						__func__);
+				wsi->mqtt->send_pubcomp = 1;
+				lws_callback_on_writable(wsi);
+				break;
+
 			case LMQCP_PUBACK:
 				lwsl_info("%s: cmd_completion: PUBACK\n",
 						__func__);
@@ -1245,7 +1495,7 @@ bail1:
 						 * no need for ACK timeout wait
 						 * any more
 						 */
-						lws_sul_cancel(&w->mqtt->sul_qos1_puback_wait);
+						lws_sul_cancel(&w->mqtt->sul_qos_puback_pubrec_wait);
 
 						if (requested_close) {
 							__lws_close_free_wsi(w,
@@ -1356,6 +1606,7 @@ bail1:
 						}
 						n = 1;
 
+						lws_sul_cancel(&w->mqtt->sul_unsuback_wait);
 						if (requested_close) {
 							__lws_close_free_wsi(w,
 									     0, "unsub ack cb");
@@ -1440,9 +1691,13 @@ bail1:
 					break;
 				}
 
-				/* For QOS>0, send out PUBACK */
-				if (pub->qos) {
+				if (pub->qos == 1) {
+				/* For QOS = 1, send out PUBACK */
 					wsi->mqtt->send_puback = 1;
+					lws_callback_on_writable(wsi);
+				} else if (pub->qos == 2) {
+				/* For QOS = 2, send out PUBREC */
+					wsi->mqtt->send_pubrec = 1;
 					lws_callback_on_writable(wsi);
 				}
 
@@ -1500,7 +1755,7 @@ bail1:
 				 lws_mqtt_str_init(&par->s_temp, NULL, 0, 0);
 
 				/* property arg state enums are so encoded */
-				par->state = 0x100 | par->vbit.value;
+				par->state = 0x100 | par->prop_id;
 				break;
 			default:
 				lwsl_notice("%s: prop id bad vbi\n", __func__);
@@ -1613,6 +1868,10 @@ bail1:
 			lwsl_err("%s: Unimplemented packet state 0x%x\n",
 					__func__, par->state);
 			return -1;
+
+		default:
+			lwsl_notice("%s: unhandled state 0x%x\n", __func__, par->state);
+			goto send_protocol_error_and_close;
 		}
 	}
 
@@ -1710,24 +1969,6 @@ lws_mqtt_fill_fixed_header(uint8_t *p, lws_mqtt_control_packet_t ctrl_pkt_type,
 	return 0;
 }
 
-/*
- * This fires if the wsi did a PUBLISH under QoS1, but no PUBACK came before
- * the timeout period
- */
-
-static void
-lws_mqtt_publish_resend(struct lws_sorted_usec_list *sul)
-{
-	struct _lws_mqtt_related *mqtt = lws_container_of(sul,
-			struct _lws_mqtt_related, sul_qos1_puback_wait);
-
-	lwsl_notice("%s: %s\n", __func__, lws_wsi_tag(mqtt->wsi));
-
-	if (mqtt->wsi->a.protocol->callback(mqtt->wsi, LWS_CALLBACK_MQTT_RESEND,
-				mqtt->wsi->user_space, NULL, 0))
-		lws_set_timeout(mqtt->wsi, 1, LWS_TO_KILL_ASYNC);
-}
-
 int
 lws_mqtt_client_send_publish(struct lws *wsi, lws_mqtt_publish_param_t *pub,
 			     const void *buf, uint32_t len, int is_complete)
@@ -1770,7 +2011,7 @@ lws_mqtt_client_send_publish(struct lws *wsi, lws_mqtt_publish_param_t *pub,
 	 * payload (if any)
 	 */
 	if (lws_mqtt_fill_fixed_header(p++, LMQCP_PUBLISH,
-				       0, pub->qos, 0)) {
+				       pub->dup, pub->qos, pub->retain)) {
 		lwsl_err("%s: Failed to fill fixed header\n", __func__);
 		return 1;
 	}
@@ -1815,7 +2056,9 @@ lws_mqtt_client_send_publish(struct lws *wsi, lws_mqtt_publish_param_t *pub,
 	/* Packet ID */
 	if (pub->qos != QOS0) {
 		p = lws_mqtt_str_next(&mqtt_vh_payload, NULL);
-		wsi->mqtt->ack_pkt_id = pub->packet_id = ++nwsi->mqtt->pkt_id;
+		if (!pub->dup)
+			nwsi->mqtt->pkt_id++;
+		wsi->mqtt->ack_pkt_id = pub->packet_id = nwsi->mqtt->pkt_id;
 		lwsl_debug("%s: pkt_id = %d\n", __func__,
 			   (int)wsi->mqtt->ack_pkt_id);
 		lws_ser_wu16be(p, pub->packet_id);
@@ -1824,17 +2067,12 @@ lws_mqtt_client_send_publish(struct lws *wsi, lws_mqtt_publish_param_t *pub,
 			return 1;
 		}
 	}
-	/*
-	 * A non-empty Payload is expected and a chunk
-	 * is present
-	 */
-	if (pub->payload_len && len) {
-		p = lws_mqtt_str_next(&mqtt_vh_payload, NULL);
-		memcpy(p, buf, len);
-		if (lws_mqtt_str_advance(&mqtt_vh_payload, (int)len))
-			return 1;
-		p = lws_mqtt_str_next(&mqtt_vh_payload, NULL);
-	}
+
+	p = lws_mqtt_str_next(&mqtt_vh_payload, NULL);
+	memcpy(p, buf, len);
+	if (lws_mqtt_str_advance(&mqtt_vh_payload, (int)len))
+		return 1;
+	p = lws_mqtt_str_next(&mqtt_vh_payload, NULL);
 
 	if (!is_complete)
 		nwsi->mqtt->inside_payload = wsi->mqtt->inside_payload = 1;
@@ -1874,16 +2112,22 @@ do_write:
 			lwsl_err("%s: ACK callback exited\n", __func__);
 			return 1;
 		}
-
-		return 0;
+	} else if (pub->qos == QOS1 || pub->qos == QOS2) {
+		/* For QoS1 or QoS2, if no PUBACK or PUBREC coming after 3s,
+		 * we must RETRY the publish
+		 */
+		wsi->mqtt->sul_qos_puback_pubrec_wait.cb = lws_mqtt_publish_resend;
+		__lws_sul_insert_us(&pt->pt_sul_owner[wsi->conn_validity_wakesuspend],
+				    &wsi->mqtt->sul_qos_puback_pubrec_wait,
+				    3 * LWS_USEC_PER_SEC);
 	}
 
-	/* For QoS1, if no PUBACK coming after 3s, we must RETRY the publish */
-
-	wsi->mqtt->sul_qos1_puback_wait.cb = lws_mqtt_publish_resend;
-	__lws_sul_insert_us(&pt->pt_sul_owner[wsi->conn_validity_wakesuspend],
-			    &wsi->mqtt->sul_qos1_puback_wait,
-			    3 * LWS_USEC_PER_SEC);
+	if (wsi->mqtt->inside_shadow) {
+		wsi->mqtt->sul_shadow_wait.cb = lws_mqtt_shadow_timeout;
+		__lws_sul_insert_us(&pt->pt_sul_owner[wsi->conn_validity_wakesuspend],
+				    &wsi->mqtt->sul_shadow_wait,
+				    60 * LWS_USEC_PER_SEC);
+	}
 
 	return 0;
 }
@@ -2009,6 +2253,8 @@ lws_mqtt_client_send_subcribe(struct lws *wsi, lws_mqtt_subscribe_param_t *sub)
 			   (int)sub->packet_id);
 		lws_ser_wu16be(p, wsi->mqtt->ack_pkt_id);
 
+		nwsi->mqtt->client.aws_iot = wsi->mqtt->client.aws_iot;
+
 		if (lws_mqtt_str_advance(&mqtt_vh_payload, 2))
 			return 1;
 
@@ -2059,6 +2305,9 @@ lws_mqtt_client_send_subcribe(struct lws *wsi, lws_mqtt_subscribe_param_t *sub)
 		return 1;
 	}
 
+	if (wsi->mqtt->inside_resume_session)
+		return 0;
+
 	if (lws_write(nwsi, start, lws_ptr_diff_size_t(p, start), LWS_WRITE_BINARY) !=
 					lws_ptr_diff(p, start))
 		return 1;
@@ -2092,7 +2341,7 @@ lws_mqtt_client_send_unsubcribe(struct lws *wsi,
 		for (n = 0; n < unsub->num_topics; n++) {
 			mysub = lws_mqtt_find_sub(nwsi->mqtt,
 						  unsub->topic[n].name);
-			assert(mysub);
+			//assert(mysub);
 
 			if (mysub && --mysub->ref_count == 0) {
 				lwsl_notice("%s: Need to send UNSUB\n", __func__);
@@ -2151,8 +2400,10 @@ lws_mqtt_client_send_unsubcribe(struct lws *wsi,
 
 		wsi->mqtt->sub_size = (uint16_t)rem_len;
 
+#if defined(_DEBUG)
 		lwsl_debug("%s: Number of topics = %d, Remaining len = %d\n",
 			   __func__, (int)tops, (int)rem_len);
+#endif
 
 		p += lws_mqtt_vbi_encode(rem_len, p);
 
@@ -2171,6 +2422,8 @@ lws_mqtt_client_send_unsubcribe(struct lws *wsi,
 		lwsl_debug("%s: pkt_id = %d\n", __func__,
 			   (int)wsi->mqtt->ack_pkt_id);
 		lws_ser_wu16be(p, wsi->mqtt->ack_pkt_id);
+
+		nwsi->mqtt->client.aws_iot = wsi->mqtt->client.aws_iot;
 
 		if (lws_mqtt_str_advance(&mqtt_vh_payload, 2))
 			return 1;
@@ -2213,6 +2466,11 @@ lws_mqtt_client_send_unsubcribe(struct lws *wsi,
 		return 1;
 
 	wsi->mqtt->inside_unsubscribe = 1;
+
+	wsi->mqtt->sul_unsuback_wait.cb = lws_mqtt_unsuback_timeout;
+	__lws_sul_insert_us(&pt->pt_sul_owner[wsi->conn_validity_wakesuspend],
+			    &wsi->mqtt->sul_unsuback_wait,
+			    3 * LWS_USEC_PER_SEC);
 
 	return 0;
 }

@@ -1,7 +1,7 @@
 /*
  * Generic SPI
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2022 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -24,3 +24,70 @@
 
 #include <libwebsockets.h>
 	
+int
+lws_spi_table_issue(const lws_spi_ops_t *spi_ops, uint32_t flags,
+		    const uint8_t *p, size_t len)
+{
+	lws_spi_desc_t desc;
+	size_t pos = 0;
+
+	memset(&desc, 0, sizeof(desc));
+	desc.count_cmd = 1;
+	desc.flags = flags;
+
+	while (pos < len) {
+
+		desc.count_write = p[pos++];
+
+		desc.src = (uint8_t *)&p[pos++];
+		if (desc.count_write)
+			desc.data = (uint8_t *)&p[pos];
+		else
+			desc.data = NULL;
+
+		if (spi_ops->queue(spi_ops, &desc) != ESP_OK) {
+			lwsl_err("%s: unable to queue\n", __func__);
+			return 1;
+		}
+
+		pos += desc.count_write;
+	}
+
+	return 0;
+}
+
+int
+lws_spi_readback(const lws_spi_ops_t *spi_ops, uint32_t flags,
+                 const uint8_t *p, size_t len, uint8_t *rb, size_t rb_len)
+{
+        lws_spi_desc_t desc;
+        size_t pos = 0;
+
+        memset(&desc, 0, sizeof(desc));
+        desc.count_cmd = 1;
+        desc.flags = flags;
+
+        while (pos < len) {
+
+                desc.count_write = p[pos++];
+
+                desc.src = (uint8_t *)&p[pos++];
+                if (desc.count_write)
+                        desc.data = (uint8_t *)&p[pos];
+                else
+                        desc.data = NULL;
+
+		desc.dest = rb;
+		desc.count_read = rb_len;
+
+                if (spi_ops->queue(spi_ops, &desc) != ESP_OK) {
+                        lwsl_err("%s: unable to queue\n", __func__);
+                        return 1;
+                }
+
+                pos += desc.count_write;
+        }
+
+	return 0;
+}
+

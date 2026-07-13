@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -62,7 +62,7 @@ lws_client_connect_4_established(struct lws *wsi, struct lws *wsi_piggyback,
 		if (!cpa)
 			goto failed;
 
-		lwsl_info("%s: going via proxy\n", __func__);
+		lwsl_wsi_info(wsi, "going via proxy");
 
 		plen = lws_snprintf((char *)pt->serv_buf, 256,
 			"CONNECT %s:%u HTTP/1.1\x0d\x0a"
@@ -95,10 +95,11 @@ lws_client_connect_4_established(struct lws *wsi, struct lws *wsi_piggyback,
 			goto failed;
 		wsi->c_port = (uint16_t)wsi->a.vhost->http.http_proxy_port;
 
-		n = (int)send(wsi->desc.sockfd, (char *)pt->serv_buf, (unsigned int)plen,
+		n = (int)send(wsi->desc.sockfd, (char *)pt->serv_buf,
+			      (unsigned int)plen,
 			 MSG_NOSIGNAL);
 		if (n < 0) {
-			lwsl_debug("ERROR writing to proxy socket\n");
+			lwsl_wsi_debug(wsi, "ERROR writing to proxy socket");
 			cce = "proxy write failed";
 			goto failed;
 		}
@@ -157,18 +158,22 @@ send_hs:
 		 */
 		lws_callback_on_writable(wsi_piggyback);
 
-		lwsl_info("%s: %s: waiting to send hdrs (par state 0x%x)\n",
-			    __func__, wsi->lc.gutag, lwsi_state(wsi_piggyback));
+		lwsl_wsi_info(wsi, "waiting to send hdrs (par state 0x%x)",
+			      lwsi_state(wsi_piggyback));
 	} else {
-		lwsl_info("%s: %s: %s %s client created own conn "
-			  "(raw %d) vh %sm st 0x%x\n",
-			    __func__, wsi->lc.gutag, wsi->role_ops->name,
-			    wsi->a.protocol->name, rawish, wsi->a.vhost->name,
-			    lwsi_state(wsi));
+		lwsl_wsi_info(wsi, "%s %s client created own conn "
+			  "(raw %d) vh %s st 0x%x",
+			  wsi->role_ops->name, wsi->a.protocol->name, rawish,
+			  wsi->a.vhost->name, lwsi_state(wsi));
 
 		/* we are making our own connection */
 
-		if (!rawish) {
+		if (!rawish
+#if defined(LWS_WITH_TLS)
+		    // && (!(wsi->tls.use_ssl & LCCSCF_USE_SSL) || wsi->tls.ssl)
+#endif
+		    ) {
+
 			if (lwsi_state(wsi) != LRS_H1C_ISSUE_HANDSHAKE2)
 				lwsi_set_state(wsi, LRS_H1C_ISSUE_HANDSHAKE);
 		} else {
@@ -183,20 +188,22 @@ send_hs:
 			    (wsi->tls.use_ssl & LCCSCF_USE_SSL)) {
 				int result;
 
+				//lwsi_set_state(wsi, LRS_WAITING_SSL);
+
 				/*
 				 * We can retry this... just cook the SSL BIO
 				 * the first time
 				 */
 
 				result = lws_client_create_tls(wsi, &cce, 1);
-				lwsl_debug("%s: create_tls said %d\n",
-							__func__, result);
 				switch (result) {
 				case CCTLS_RETURN_DONE:
 					break;
 				case CCTLS_RETURN_RETRY:
+					lwsl_wsi_debug(wsi, "create_tls RETRY");
 					return wsi;
 				default:
+					lwsl_wsi_debug(wsi, "create_tls FAIL");
 					goto failed;
 				}
 
@@ -207,9 +214,9 @@ send_hs:
 				 * LRS_H2_WAITING_TO_SEND_HEADERS already.
 				 */
 
-				lwsl_notice("%s: %s: "
-					    "tls established st 0x%x\n",
-					    __func__, wsi->lc.gutag, lwsi_state(wsi));
+				lwsl_wsi_notice(wsi, "tls established st 0x%x, "
+					    "client_h2_alpn %d", lwsi_state(wsi),
+					    wsi->client_h2_alpn);
 
 				if (lwsi_state(wsi) !=
 						LRS_H2_WAITING_TO_SEND_HEADERS)
@@ -217,7 +224,13 @@ send_hs:
 						LRS_H1C_ISSUE_HANDSHAKE2);
 				lws_set_timeout(wsi,
 					PENDING_TIMEOUT_AWAITING_CLIENT_HS_SEND,
-						(int)wsi->a.context->timeout_secs);
+					(int)wsi->a.context->timeout_secs);
+#if 0
+				/* ensure pollin enabled */
+				if (lws_change_pollfd(wsi, 0, LWS_POLLIN))
+					lwsl_wsi_notice(wsi,
+							"unable to set POLLIN");
+#endif
 
 				goto provoke_service;
 			}
@@ -230,9 +243,10 @@ send_hs:
 			if (m) {
 				n = user_callback_handle_rxflow(
 						wsi->a.protocol->callback, wsi,
-						(enum lws_callback_reasons)m, wsi->user_space, NULL, 0);
+						(enum lws_callback_reasons)m,
+						wsi->user_space, NULL, 0);
 				if (n < 0) {
-					lwsl_info("RAW_PROXY_CLI_ADOPT err\n");
+					lwsl_wsi_info(wsi, "RAW_PROXY_CLI_ADOPT err");
 					goto failed;
 				}
 			}
@@ -240,15 +254,14 @@ send_hs:
 			/* service.c pollout processing wants this */
 			wsi->hdr_parsing_completed = 1;
 #if defined(LWS_ROLE_MQTT)
-			if (!strcmp(meth, "MQTT")) {
+			if (meth && !strcmp(meth, "MQTT")) {
 #if defined(LWS_WITH_TLS)
 				if (wsi->tls.use_ssl & LCCSCF_USE_SSL) {
 					lwsi_set_state(wsi, LRS_WAITING_SSL);
 					return wsi;
 				}
 #endif
-				lwsl_info("%s: settings LRS_MQTTC_IDLE\n",
-					  __func__);
+				lwsl_wsi_info(wsi, "settings LRS_MQTTC_IDLE");
 				lwsi_set_state(wsi, LRS_MQTTC_IDLE);
 
 				/*
@@ -265,9 +278,8 @@ send_hs:
 				pfd.events = LWS_POLLIN;
 				pfd.revents = LWS_POLLOUT;
 
-				lwsl_info("%s: going to service fd\n",
-						__func__);
-				n = lws_service_fd(wsi->a.context, &pfd);
+				lwsl_wsi_info(wsi, "going to service fd");
+				n = lws_service_fd_tsi(wsi->a.context, &pfd, wsi->tsi);
 				if (n < 0) {
 					cce = "first service failed";
 					goto failed;
@@ -278,7 +290,7 @@ send_hs:
 				return wsi;
 			}
 #endif
-			lwsl_info("%s: setting ESTABLISHED\n", __func__);
+			lwsl_wsi_info(wsi, "setting ESTABLISHED");
 			lwsi_set_state(wsi, LRS_ESTABLISHED);
 
 			return wsi;
@@ -306,7 +318,7 @@ provoke_service:
 		pfd.events = LWS_POLLIN;
 		pfd.revents = LWS_POLLIN;
 
-		n = lws_service_fd(wsi->a.context, &pfd);
+		n = lws_service_fd_tsi(wsi->a.context, &pfd, wsi->tsi);
 		if (n < 0) {
 			cce = "first service failed";
 			goto failed;
@@ -320,7 +332,7 @@ provoke_service:
 failed:
 	lws_inform_client_conn_fail(wsi, (void *)cce, strlen(cce));
 
-	lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS, "client_connect2");
+	lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS, "client_connect4");
 
 	return NULL;
 }

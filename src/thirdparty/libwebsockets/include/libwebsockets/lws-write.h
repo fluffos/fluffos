@@ -27,23 +27,6 @@
     APIs related to writing data on a connection
 */
 //@{
-#if !defined(LWS_SIZEOFPTR)
-#define LWS_SIZEOFPTR ((int)sizeof (void *))
-#endif
-
-#if defined(__x86_64__)
-#define _LWS_PAD_SIZE 16	/* Intel recommended for best performance */
-#else
-#define _LWS_PAD_SIZE LWS_SIZEOFPTR   /* Size of a pointer on the target arch */
-#endif
-#define _LWS_PAD(n) (((n) % _LWS_PAD_SIZE) ? \
-		((n) + (_LWS_PAD_SIZE - ((n) % _LWS_PAD_SIZE))) : (n))
-/* last 2 is for lws-meta */
-#define LWS_PRE _LWS_PAD(4 + 10 + 2)
-/* used prior to 1.7 and retained for backward compatibility */
-#define LWS_SEND_BUFFER_PRE_PADDING LWS_PRE
-#define LWS_SEND_BUFFER_POST_PADDING 0
-
 #define LWS_WRITE_RAW LWS_WRITE_HTTP
 
 /*
@@ -241,18 +224,18 @@ lws_write(struct lws *wsi, unsigned char *buf, size_t len,
  * Returns the correct LWS_WRITE_ flag to use for each fragment of a message
  * in turn.
  */
-static LWS_INLINE int
+static LWS_INLINE enum lws_write_protocol
 lws_write_ws_flags(int initial, int is_start, int is_end)
 {
-	int r;
+	enum lws_write_protocol r;
 
 	if (is_start)
-		r = initial;
+		r = (enum lws_write_protocol)initial;
 	else
 		r = LWS_WRITE_CONTINUATION;
 
 	if (!is_end)
-		r |= LWS_WRITE_NO_FIN;
+		r = (enum lws_write_protocol)((int)r | (int)LWS_WRITE_NO_FIN);
 
 	return r;
 }

@@ -185,7 +185,7 @@ An array of ms delays for each retry in turn
 
 The number of retries to conceal from higher layers before giving errors.  If
 this is larger than the number of times in the backoff array, then the last time
-is used for the extra delays
+is used for the extra delays.  65535 means never stop trying.
 
 ### `jitterpc`
 
@@ -380,10 +380,16 @@ Indicate that the streamtype should use the named auth type from the `auth`
 array in the policy
 
 ### `aws_region`
+
 Indicate which metadata should be used to set aws region for certain streamtype
 
 ### `aws_service`
+
 Indicate which metadata should be used to set aws service for certain streamtype
+
+### `direct_proto_str`
+
+If set to `true`, application can use `lws_ss_set_metadata()` to directly set protocol related string and use `lws_ss_get_metadata` to fetch certain protocol related string.  Please note that currently HTTP header is the supported protocol string.  The `name` parameter is the name of HTTP header name (**with ':'**, e.g. `"Content-Type:"`) and `value` is the header's value. `LWS_WITH_SS_DIRECT_PROTOCOL_STR` flag needs to be configured during compilation for this.  Currently it's only work for non-proxy case.
 
 ### `server_cert`
 
@@ -615,6 +621,10 @@ The `content-type` to mark up the multipart mime section with if present
 
 Indicate the data is sent in `x-www-form-urlencoded` form
 
+### `http_cookies`
+
+This streamtype should store and bring out http cookies from the peer.
+
 ### `rideshare`
 
 For special cases where one logically separate stream travels with another when using this
@@ -632,6 +642,11 @@ protocol.  Eg, a single multipart mime transaction carries content from two or m
 
 Use if the ws messages are binary
 
+### `ws_prioritize_reads`
+
+Set `true` if the event loop should prioritize keeping up with input at the
+potential expense of output latency.
+
 ## MQTT transport
 
 ### `mqtt_topic`
@@ -645,6 +660,10 @@ Set the topic this streamtype subscribes to
 ### `mqtt qos`
 
 Set the QOS level for this streamtype
+
+### `mqtt_retain`
+
+Set to true if this streamtype should use MQTT's "retain" feature.
 
 ### `mqtt_keep_alive`
 

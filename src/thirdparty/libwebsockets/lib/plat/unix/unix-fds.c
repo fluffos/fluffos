@@ -174,8 +174,10 @@ delete_from_fd(const struct lws_context *context, int fd)
 	struct lws **p, **done;
 
 	if (!context->max_fds_unrelated_to_ulimit) {
-		if (context->lws_lookup)
+		if (context->lws_lookup) {
+			assert((int)context->max_fds > fd - lws_plat_socket_offset());
 			context->lws_lookup[fd - lws_plat_socket_offset()] = NULL;
+		}
 
 		return;
 	}
@@ -192,9 +194,7 @@ delete_from_fd(const struct lws_context *context, int fd)
 	while (p != done && (!*p || (*p)->desc.sockfd != fd))
 		p++;
 
-	if (p == done)
-		lwsl_debug("%s: fd %d not found\n", __func__, fd);
-	else
+	if (p != done)
 		*p = NULL;
 
 #if defined(_DEBUG)

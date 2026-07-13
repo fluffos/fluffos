@@ -71,7 +71,7 @@ lws_read_h1(struct lws *wsi, unsigned char *buf, lws_filepos_t len)
 		}
 		lwsl_parser("issuing %d bytes to parser\n", (int)len);
 #if defined(LWS_ROLE_WS) && defined(LWS_WITH_CLIENT)
-		if (lws_ws_handshake_client(wsi, &buf, (size_t)len))
+		if (lws_ws_handshake_client(wsi, &buf, (size_t)len) == LWS_HPI_RET_PLEASE_CLOSE_ME)
 			goto bail;
 #endif
 		last_char = buf;
@@ -259,7 +259,7 @@ postbody_completion:
 ws_mode:
 #if defined(LWS_WITH_CLIENT) && defined(LWS_ROLE_WS)
 		// lwsl_notice("%s: ws_mode\n", __func__);
-		if (lws_ws_handshake_client(wsi, &buf, (size_t)len))
+		if (lws_ws_handshake_client(wsi, &buf, (size_t)len) == LWS_HPI_RET_PLEASE_CLOSE_ME)
 			goto bail;
 #endif
 #if defined(LWS_ROLE_WS)
@@ -292,9 +292,11 @@ ws_mode:
 		// assert(0);
 		/* fallthru */
 
+	case LRS_WAITING_CONNECT: /* observed on warmcat.com */
+		break;
+
 	default:
 		lwsl_err("%s: Unhandled state %d\n", __func__, lwsi_state(wsi));
-		assert(0);
 		goto bail;
 	}
 
@@ -325,7 +327,7 @@ bail:
 	return -1;
 }
 #if defined(LWS_WITH_SERVER)
-static int
+static lws_handling_result_t
 lws_h1_server_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 {
 	struct lws_context_per_thread *pt = &wsi->a.context->pt[(int)wsi->tsi];
@@ -367,6 +369,7 @@ lws_h1_server_socket_service(struct lws *wsi, struct lws_pollfd *pollfd)
 	if ((lwsi_state(wsi) == LRS_ESTABLISHED ||
 	     lwsi_state(wsi) == LRS_ISSUING_FILE ||
 	     lwsi_state(wsi) == LRS_HEADERS ||
+	     lwsi_state(wsi) == LRS_DOING_TRANSACTION || /* at least, SSE */
 	     lwsi_state(wsi) == LRS_DISCARD_BODY ||
 	     lwsi_state(wsi) == LRS_BODY)) {
 
@@ -556,7 +559,7 @@ fail:
 }
 #endif
 
-static int
+static lws_handling_result_t
 rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 		       struct lws_pollfd *pollfd)
 {
@@ -628,7 +631,7 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 
 #if defined(LWS_WITH_SERVER)
 	if (!lwsi_role_client(wsi)) {
-		int n;
+		lws_handling_result_t hr;
 
 		lwsl_debug("%s: %s: wsistate 0x%x\n", __func__, lws_wsi_tag(wsi),
 			   (unsigned int)wsi->wsistate);
@@ -637,9 +640,9 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 		    !lws_buflist_total_len(&wsi->buflist))
 			return LWS_HPI_RET_PLEASE_CLOSE_ME;
 
-		n = lws_h1_server_socket_service(wsi, pollfd);
-		if (n != LWS_HPI_RET_HANDLED)
-			return n;
+		hr = lws_h1_server_socket_service(wsi, pollfd);
+		if (hr != LWS_HPI_RET_HANDLED)
+			return hr;
 		if (lwsi_state(wsi) != LRS_SSL_INIT)
 			if (lws_server_socket_service_ssl(wsi,
 							  LWS_SOCK_INVALID,
@@ -706,7 +709,7 @@ rops_handle_POLLIN_h1(struct lws_context_per_thread *pt, struct lws *wsi,
 	return LWS_HPI_RET_HANDLED;
 }
 
-static int
+static lws_handling_result_t
 rops_handle_POLLOUT_h1(struct lws *wsi)
 {
 
@@ -750,7 +753,7 @@ rops_handle_POLLOUT_h1(struct lws *wsi)
 				return LWS_HP_RET_DROP_POLLOUT;
 			}
 
-			lwsl_err("%s: nothing to send\n", __func__);
+			lwsl_wsi_info(wsi, "nothing to send");
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)
 			/* prepare ourselves to do the parsing */
 			wsi->http.ah->parser_state = WSI_TOKEN_NAME_PART;
@@ -968,11 +971,20 @@ static const char * const http_methods[] = {
 	"GET", "POST", "OPTIONS", "HEAD", "PUT", "PATCH", "DELETE", "CONNECT"
 };
 
+int
+_lws_is_http_method(const char *method)
+{
+	if (method)
+		for (int n = 0; n < (int)LWS_ARRAY_SIZE(http_methods); n++)
+			if (!strcmp(method, http_methods[n]))
+				return 1;
+
+	return 0;
+}
+
 static int
 rops_client_bind_h1(struct lws *wsi, const struct lws_client_connect_info *i)
 {
-	int n;
-
 	if (!i) {
 		/* we are finalizing an already-selected role */
 
@@ -1043,10 +1055,8 @@ rops_client_bind_h1(struct lws *wsi, const struct lws_client_connect_info *i)
 	}
 
 	/* if a recognized http method, bind to it */
-
-	for (n = 0; n < (int)LWS_ARRAY_SIZE(http_methods); n++)
-		if (!strcmp(i->method, http_methods[n]))
-			goto bind_h1;
+	if (_lws_is_http_method(i->method))
+		goto bind_h1;
 
 	/* other roles may bind to it */
 

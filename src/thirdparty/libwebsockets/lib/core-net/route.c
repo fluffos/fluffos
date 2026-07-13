@@ -35,41 +35,48 @@
 
 
 void
-_lws_routing_entry_dump(lws_route_t *rou)
+_lws_routing_entry_dump(struct lws_context *cx, lws_route_t *rou)
 {
 	char sa[48], fin[192], *end = &fin[sizeof(fin)];
+	char *it = fin;
+	int n;
+
+	fin[0] = '\0';
 
 	if (rou->dest.sa4.sin_family) {
 		lws_sa46_write_numeric_address(&rou->dest, sa, sizeof(sa));
-		lws_snprintf(fin, lws_ptr_diff_size_t(end, fin),
+		n = lws_snprintf(it, lws_ptr_diff_size_t(end, it),
 				  "dst: %s/%d, ", sa, rou->dest_len);
+		it = it + n;
 	}
 
 	if (rou->src.sa4.sin_family) {
 		lws_sa46_write_numeric_address(&rou->src, sa, sizeof(sa));
-		lws_snprintf(fin, lws_ptr_diff_size_t(end, fin),
+		n = lws_snprintf(it, lws_ptr_diff_size_t(end, it),
 				  "src: %s/%d, ", sa, rou->src_len);
+		it = it + n;
 	}
 
 	if (rou->gateway.sa4.sin_family) {
 		lws_sa46_write_numeric_address(&rou->gateway, sa, sizeof(sa));
-		lws_snprintf(fin, lws_ptr_diff_size_t(end, fin),
+		n = lws_snprintf(it, lws_ptr_diff_size_t(end, it),
 				  "gw: %s, ", sa);
+		it = it + n;
 	}
 
-	lwsl_info(" %s ifidx: %d, pri: %d, proto: %d\n", fin,
+	lwsl_cx_info(cx, " %s ifidx: %d, pri: %d, proto: %d\n", fin,
 		  rou->if_idx, rou->priority, rou->proto);
 }
 
 void
 _lws_routing_table_dump(struct lws_context *cx)
 {
-	lwsl_info("%s\n", __func__);
+	lwsl_cx_info(cx, "\n");
 	lws_start_foreach_dll(struct lws_dll2 *, d,
 			      lws_dll2_get_head(&cx->routing_table)) {
 		lws_route_t *rou = lws_container_of(d, lws_route_t, list);
 
-		_lws_routing_entry_dump(rou);
+		_lws_routing_entry_dump(cx, rou);
 	} lws_end_foreach_dll(d);
 }
 #endif
@@ -96,11 +103,15 @@ _lws_routing_table_dump(struct lws_context *cx)
 lws_route_uidx_t
 _lws_route_get_uidx(struct lws_context *cx)
 {
+	lws_route_uidx_t ou;
+
 	if (!cx->route_uidx)
 		cx->route_uidx++;
 
-	while (1) {
-		char again = 0;
+	ou = cx->route_uidx;
+
+	do {
+		uint8_t again = 0;
 
 		/* Anybody in the table already uses the pt's next uidx? */
 
@@ -113,17 +124,18 @@ _lws_route_get_uidx(struct lws_context *cx)
 				cx->route_uidx++;
 				if (!cx->route_uidx)
 					cx->route_uidx++;
-				if (again) {
+				if (cx->route_uidx == ou) {
 					assert(0); /* we have filled up the 8-bit uidx space? */
 					return 0;
 				}
 				again = 1;
+				break;
 			}
 		} lws_end_foreach_dll(d);
 
 		if (!again)
 			return cx->route_uidx++;
-	}
+	} while (1);
 }
 
 lws_route_t *
@@ -134,7 +146,7 @@ _lws_route_remove(struct lws_context_per_thread *pt, lws_route_t *robj, int flag
 		lws_route_t *rou = lws_container_of(d, lws_route_t, list);
 
 		if ((!(flags & LRR_MATCH_SRC) || !lws_sa46_compare_ads(&robj->src, &rou->src)) &&
-		    ((flags & LRR_MATCH_SRC) || !lws_sa46_compare_ads(&robj->dest, &rou->dest)) &&
+		    (!(flags & LRR_MATCH_DST) || !lws_sa46_compare_ads(&robj->dest, &rou->dest)) &&
 		    (!robj->gateway.sa4.sin_family ||
 		     !lws_sa46_compare_ads(&robj->gateway, &rou->gateway)) &&
 		    robj->dest_len <= rou->dest_len &&
@@ -142,9 +154,7 @@ _lws_route_remove(struct lws_context_per_thread *pt, lws_route_t *robj, int flag
 		    ((flags & LRR_IGNORE_PRI) ||
 		      robj->priority == rou->priority)
 		    ) {
-			if (flags & LRR_JUST_CHECK)
-				return rou;
-			lwsl_info("%s: deleting route\n", __func__);
+			lwsl_cx_info(pt->context, "deleting route");
 			_lws_route_pt_close_route_users(pt, robj->uidx);
 			lws_dll2_remove(&rou->list);
 			lws_free(rou);
@@ -195,7 +205,7 @@ _lws_route_est_outgoing(struct lws_context_per_thread *pt,
 	int best_gw_priority = INT_MAX;
 
 	if (!dest->sa4.sin_family) {
-		lwsl_notice("%s: dest has 0 AF\n", __func__);
+		lwsl_cx_notice(pt->context, "dest has 0 AF");
 		/* leave it alone */
 		return NULL;
 	}
@@ -222,9 +232,9 @@ _lws_route_est_outgoing(struct lws_context_per_thread *pt,
 			 */
 			return rou;
 
-		lwsl_debug("%s: dest af %d, rou gw af %d, pri %d\n", __func__,
-			   dest->sa4.sin_family, rou->gateway.sa4.sin_family,
-			   rou->priority);
+		lwsl_cx_debug(pt->context, "dest af %d, rou gw af %d, pri %d",
+			      dest->sa4.sin_family, rou->gateway.sa4.sin_family,
+			      rou->priority);
 
 		if (rou->gateway.sa4.sin_family &&
 
@@ -240,7 +250,7 @@ _lws_route_est_outgoing(struct lws_context_per_thread *pt,
 			(dest->sa4.sin_family == AF_INET &&
 			 rou->gateway.sa4.sin_family == AF_INET6)) &&
 		    rou->priority < best_gw_priority) {
-			lwsl_info("%s: gw hit\n", __func__);
+			lwsl_cx_info(pt->context, "gw hit");
 			best_gw_priority = rou->priority;
 			best_gw = rou;
 		}
@@ -253,7 +263,7 @@ _lws_route_est_outgoing(struct lws_context_per_thread *pt,
 	 * gw route for dest.
 	 */
 
-	lwsl_info("%s: returning %p\n", __func__, best_gw);
+	lwsl_cx_info(pt->context, "returning %p", best_gw);
 
 	return best_gw;
 }
@@ -304,7 +314,7 @@ _lws_route_check_wsi(struct lws *wsi)
 
 	if (!_lws_route_est_outgoing(pt, &wsi->sa46_peer)) {
 		/* no way to talk to the peer */
-		lwsl_notice("%s: %s: dest route gone\n", __func__, wsi->lc.gutag);
+		lwsl_wsi_notice(wsi, "dest route gone");
 		return 1;
 	}
 
@@ -320,13 +330,12 @@ _lws_route_check_wsi(struct lws *wsi)
 
 		lws_sa46_write_numeric_address(&wsi->sa46_local,
 					       buf, sizeof(buf));
-		lwsl_notice("%s: %s: source %s gone\n", __func__,
-			    wsi->lc.gutag, buf);
+		lwsl_wsi_notice(wsi, "source %s gone", buf);
 
 		return 1;
 	}
 
-	lwsl_debug("%s: %s: source + dest OK\n", __func__, wsi->lc.gutag);
+	lwsl_wsi_debug(wsi, "source + dest OK");
 
 	return 0;
 }
@@ -337,11 +346,15 @@ _lws_route_pt_close_unroutable(struct lws_context_per_thread *pt)
 	struct lws *wsi;
 	unsigned int n;
 
-	if (!pt->context->nl_initial_done ||
-	    pt->context->mgr_system.state < LWS_SYSTATE_IFACE_COLDPLUG)
+	if (!pt->context->nl_initial_done
+#if defined(LWS_WITH_SYS_STATE)
+		       	||
+	    pt->context->mgr_system.state < LWS_SYSTATE_IFACE_COLDPLUG
+#endif
+	)
 		return 0;
 
-	lwsl_debug("%s\n", __func__);
+	lwsl_cx_debug(pt->context, "in");
 #if defined(_DEBUG)
 	_lws_routing_table_dump(pt->context);
 #endif
@@ -352,7 +365,7 @@ _lws_route_pt_close_unroutable(struct lws_context_per_thread *pt)
 			continue;
 
 		if (_lws_route_check_wsi(wsi)) {
-			lwsl_info("%s: culling wsi %s\n", __func__, lws_wsi_tag(wsi));
+			lwsl_wsi_info(wsi, "culling wsi");
 			lws_wsi_close(wsi, LWS_TO_KILL_ASYNC);
 		}
 	}
@@ -362,7 +375,7 @@ _lws_route_pt_close_unroutable(struct lws_context_per_thread *pt)
 
 int
 _lws_route_pt_close_route_users(struct lws_context_per_thread *pt,
-			       lws_route_uidx_t uidx)
+				lws_route_uidx_t uidx)
 {
 	struct lws *wsi;
 	unsigned int n;
@@ -370,7 +383,7 @@ _lws_route_pt_close_route_users(struct lws_context_per_thread *pt,
 	if (!uidx)
 		return 0;
 
-	lwsl_info("%s: closing users of route %d\n", __func__, uidx);
+	lwsl_cx_info(pt->context, "closing users of route %d", uidx);
 
 	for (n = 0; n < pt->fds_count; n++) {
 		wsi = wsi_from_fd(pt->context, pt->fds[n].fd);
@@ -384,7 +397,7 @@ _lws_route_pt_close_route_users(struct lws_context_per_thread *pt,
 #endif
 		    wsi->sa46_peer.sa4.sin_family &&
 		    wsi->peer_route_uidx == uidx) {
-			lwsl_notice("%s: culling wsi %s\n", __func__, lws_wsi_tag(wsi));
+			lwsl_wsi_notice(wsi, "culling wsi");
 			lws_wsi_close(wsi, LWS_TO_KILL_ASYNC);
 		}
 	}

@@ -4,6 +4,9 @@
 # If we are being built externally, confirm installed lws was configured to
 # support reqconfig, else error out with a helpful message about the problem.
 #
+
+include(CheckIncludeFile)
+
 MACRO(require_lws_config reqconfig _val result)
 
 	if (DEFINED ${reqconfig})
@@ -22,11 +25,16 @@ MACRO(require_lws_config reqconfig _val result)
 		set(SAME 0)
 	endif()
 
+	string(COMPARE EQUAL "${result}" requirements _cmp)
+
+	# we go in the first clause if in-tree
 	if (LWS_WITH_MINIMAL_EXAMPLES AND NOT ${SAME})
-		if (${_val})
-			message("${SAMP}: skipping as lws being built without ${reqconfig}")
-		else()
-			message("${SAMP}: skipping as lws built with ${reqconfig}")
+               if (${result} EQUAL "requirements")
+                       if (${_val})
+                               message("${SAMP}: skipping as lws being built without ${reqconfig} (${_val} / ${rq})")
+                       else()
+                               message("${SAMP}: skipping as lws built with ${reqconfig} (${_val} / ${rq})")
+                       endif()
 		endif()
 		set(${result} 0)
 	else()
@@ -45,7 +53,7 @@ MACRO(require_lws_config reqconfig _val result)
 				set(MET 0)
 			endif()
 		endif()
-		if (NOT MET)
+		if (NOT MET AND _cmp)
 			if (${_val})
 				message(FATAL_ERROR "This project requires lws must have been configured with ${reqconfig}")
 			else()
@@ -69,7 +77,9 @@ MACRO(require_pthreads result)
 		if (WIN32)
 			set(PTHREAD_LIB ${LWS_EXT_PTHREAD_LIBRARIES})
 		else()
-			set(PTHREAD_LIB pthread)
+			if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "QNX")
+				set(PTHREAD_LIB pthread)
+			endif()
 		endif()
 	endif()
 ENDMACRO()

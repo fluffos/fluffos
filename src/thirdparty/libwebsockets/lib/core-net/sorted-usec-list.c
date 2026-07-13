@@ -81,6 +81,8 @@ lws_sul2_schedule(struct lws_context *context, int tsi, int flags,
 
 	lws_pt_assert_lock_held(pt);
 
+	assert(sul->cb);
+
 	__lws_sul_insert(
 		&pt->pt_sul_owner[!!(flags & LWSSULLI_WAKE_IF_SUSPENDED)], sul);
 }
@@ -143,6 +145,12 @@ __lws_sul_service_ripe(lws_dll2_owner_t *own, int own_len, lws_usec_t usnow)
 			return lowest - usnow;
 
 		/* his moment has come... remove him from his owning list */
+
+		if (!hit->cb) {
+			lwsl_err("%s: sul with NULL callback (did not cancel on destory?)\n", __func__);
+
+			return 0;
+		}
 
 		lws_dll2_remove(&hit->list);
 		hit->us = 0;
@@ -272,6 +280,8 @@ lws_sul_schedule(struct lws_context *ctx, int tsi, lws_sorted_usec_list_t *sul,
 {
 	struct lws_context_per_thread *_pt = &ctx->pt[tsi];
 
+	assert(_cb);
+
 	lws_pt_lock(_pt, __func__);
 
 	if (_us == (lws_usec_t)LWS_SET_TIMER_USEC_CANCEL)
@@ -291,6 +301,8 @@ lws_sul_schedule_wakesuspend(struct lws_context *ctx, int tsi,
 			     lws_usec_t _us)
 {
 	struct lws_context_per_thread *_pt = &ctx->pt[tsi];
+
+	assert(_cb);
 
 	lws_pt_lock(_pt, __func__);
 
@@ -334,16 +346,23 @@ lws_sul_debug_zombies(struct lws_context *ctx, void *po, size_t len,
 					lws_container_of(p,
 						lws_sorted_usec_list_t, list);
 
+				if (!po) {
+					lwsl_cx_err(ctx, "%s",
+							 destroy_description);
+					/* just sanity check the list */
+					assert(sul->cb);
+				}
+
 				/*
 				 * Is the sul resident inside the object that is
 				 * indicated as being deleted?
 				 */
 
-				if ((void *)sul >= po &&
+				if (po &&
+				    (void *)sul >= po &&
 				    (size_t)lws_ptr_diff(sul, po) < len) {
-					lwsl_err("%s: ERROR: Zombie Sul "
-						 "(on list %d) %s, cb %p\n",
-						 __func__, m,
+					lwsl_cx_err(ctx, "ERROR: Zombie Sul "
+						 "(on list %d) %s, cb %p\n", m,
 						 destroy_description, sul->cb);
 					/*
 					 * This assert fires if you have left

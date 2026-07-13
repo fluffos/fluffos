@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#include "private-lib-core.h"
+
 #include "ssl_lib.h"
 #include "ssl_pkey.h"
 #include "ssl_x509.h"
 #include "ssl_cert.h"
 #include "ssl_dbg.h"
 #include "ssl_port.h"
-
-#include "private-lib-core.h"
 
 char *
 lws_strncpy(char *dest, const char *src, size_t size);
@@ -179,6 +180,8 @@ OSSL_HANDSHAKE_STATE SSL_get_state(const SSL *ssl)
     return state;
 }
 
+const char *mbedtls_client_preload_filepath;
+
 /**
  * @brief create a SSL context
  */
@@ -187,6 +190,9 @@ SSL_CTX* SSL_CTX_new(const SSL_METHOD *method)
     SSL_CTX *ctx;
     CERT *cert;
     X509 *client_ca;
+#if defined(LWS_HAVE_mbedtls_x509_crt_parse_file)
+    int n;
+#endif
 
     if (!method) {
         SSL_DEBUG(SSL_LIB_ERROR_LEVEL, "no no_method");
@@ -217,6 +223,22 @@ SSL_CTX* SSL_CTX_new(const SSL_METHOD *method)
 
     ctx->version = method->version;
 
+#if defined(LWS_HAVE_mbedtls_x509_crt_parse_file)
+    if (mbedtls_client_preload_filepath) {
+	mbedtls_x509_crt **px = (mbedtls_x509_crt **)ctx->client_CA->x509_pm;
+
+	*px = malloc(sizeof(**px));
+	mbedtls_x509_crt_init(*px);
+	n = mbedtls_x509_crt_parse_file(*px, mbedtls_client_preload_filepath);
+	if (n < 0) {
+		lwsl_err("%s: unable to load cert bundle 0x%x\n", __func__, -n);
+		mbedtls_x509_crt_free(*px);
+		free(*px);
+	} else
+		lwsl_info("%s: loaded cert bundle %d\n", __func__, n);
+    }
+#endif
+
     return ctx;
 
 failed3:
@@ -235,6 +257,17 @@ void SSL_CTX_free(SSL_CTX* ctx)
     SSL_ASSERT3(ctx);
 
     ssl_cert_free(ctx->cert);
+
+#if defined(LWS_HAVE_mbedtls_x509_crt_parse_file)
+    if (mbedtls_client_preload_filepath) {
+        mbedtls_x509_crt **px = (mbedtls_x509_crt **)ctx->client_CA->x509_pm;
+
+        if (*px) {
+            mbedtls_x509_crt_free(*px);
+            free(*px);
+        }
+    }
+#endif
 
     X509_free(ctx->client_CA);
 
@@ -1059,7 +1092,7 @@ void SSL_set_verify_depth(SSL *ssl, int depth)
 /**
  * @brief set the SSL context verifying of the SSL context
  */
-void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, int (*verify_callback)(int, X509_STORE_CTX *))
+void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, int (*verify_callback)(SSL *, mbedtls_x509_crt *))
 {
     SSL_ASSERT3(ctx);
 
@@ -1070,7 +1103,7 @@ void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, int (*verify_callback)(int, X509
 /**
  * @brief set the SSL verifying of the SSL context
  */
-void SSL_set_verify(SSL *ssl, int mode, int (*verify_callback)(int, X509_STORE_CTX *))
+void SSL_set_verify(SSL *ssl, int mode, int (*verify_callback)(SSL *, mbedtls_x509_crt *))
 {
     SSL_ASSERT3(ssl);
 
@@ -1222,4 +1255,60 @@ void SSL_set_alpn_select_cb(SSL *ssl, void *arg)
 	_openssl_alpn_to_mbedtls(ac, (char ***)&ssl->alpn_protos);
 
 	_ssl_set_alpn_list(ssl);
+}
+
+int SSL_CTX_load_verify_file(SSL_CTX *ctx, const char *CAfile)
+{
+	X509 *x;
+	int ret;
+
+	SSL_ASSERT1(ctx);
+	SSL_ASSERT1(CAfile);
+
+	x = X509_new();
+	ret = X509_METHOD_CALL(load_file, x, CAfile);
+	if (ret) {
+		X509_free(x);
+		return 0;
+	}
+
+	SSL_CTX_add_client_CA(ctx, x);
+	return 1;
+}
+
+int SSL_CTX_load_verify_dir(SSL_CTX *ctx, const char *CApath)
+{
+	X509 *x;
+	int ret;
+
+	SSL_ASSERT1(ctx);
+	SSL_ASSERT1(CApath);
+
+	x = X509_new();
+	ret = X509_METHOD_CALL(load_path, x, CApath);
+	if (ret) {
+		X509_free(x);
+		return 0;
+	}
+
+	SSL_CTX_add_client_CA(ctx, x);
+	return 1;
+}
+
+int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile,
+                                  const char *CApath)
+{
+	if (CAfile == NULL && CApath == NULL) {
+		return 0;
+	}
+
+	if (CAfile != NULL && !SSL_CTX_load_verify_file(ctx, CAfile)) {
+		return 0;
+	}
+
+	if (CApath != NULL && !SSL_CTX_load_verify_dir(ctx, CApath)) {
+		return 0;
+	}
+
+	return 1;
 }

@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2019 - 2020 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2019 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -48,134 +48,6 @@
  * In the second, IPC, case, all packets are prepended by one or more bytes
  * indicating the packet type and serializing any associated data, known as
  * Serialized Secure Streams or SSS.
- *
- * Serialized Secure Streams
- * -------------------------
- *
- * On the transport, adjacent packets may be coalesced, that is, the original
- * packet sizes are lost and two or more packets are combined.  For that reason
- * the serialization format always contains a 1-byte type and then a 2-byte
- * frame length.
- *
- * Client to proxy
- *
- * - Proxied connection setup
- *
- *   -  0: LWSSS_SER_TXPRE_STREAMTYPE
- *   -  1: 2-byte MSB-first rest-of-frame length
- *   -  3: 1-byte Client SSS protocol version (introduced in SSSv1)
- *   -  4: 4-byte Client PID (introduced in SSSv1)
- *   -  8: 4-byte MSB-first initial tx credit
- *   - 12: the streamtype name with no NUL
- *
- * - Proxied tx
- *
- *   -  0: LWSSS_SER_TXPRE_TX_PAYLOAD
- *   -  1: 2 byte MSB-first rest-of-frame length
- *   -  3: 4-byte MSB-first flags
- *   -  7: 4-byte MSB-first us between client requested write and wrote to proxy
- *   - 11: 8-byte MSB-first us resolution unix time client wrote to proxy
- *   - 19: payload
- *
- * - Proxied secure stream destroy
- *
- *   -  0: LWSSS_SER_TXPRE_DESTROYING
- *   -  1: 00, 00
- *
- * - Proxied metadata - sent when one metadata item set clientside
- *
- *   -  0: LWSSS_SER_TXPRE_METADATA
- *   -  1: 2-byte MSB-first rest-of-frame length
- *   -  3: 1-byte metadata name length
- *   -  4: metadata name
- *   -  ...: metadata value (for rest of packet)
- *
- * - TX credit management - sent when using tx credit apis, cf METADATA
- *
- *   - 0: LWSSS_SER_TXPRE_TXCR_UPDATE
- *   - 1: 2-byte MSB-first rest-of-frame length 00, 04
- *   - 3: 4-byte additional tx credit adjust value
- *
- * - Stream timeout management - forwarded when user applying or cancelling t.o.
- *
- *   -  0: LWSSS_SER_TXPRE_TIMEOUT_UPDATE
- *   -  1: 2-byte MSB-first rest-of-frame length 00, 04
- *   -  3: 4-byte MSB-first unsigned 32-bit timeout, 0 = use policy, -1 = cancel
- *
- * - Passing up payload length hint
- *
- *   -  0: LWSSS_SER_TXPRE_PAYLOAD_LENGTH_HINT
- *   -  1: 2-byte MSB-first rest-of-frame length 00, 04
- *   -  3: 4-byte MSB-first unsigned 32-bit payload length hint
- *
- * Proxy to client
- *
- * - Proxied connection setup result
- *
- *   -  0: LWSSS_SER_RXPRE_CREATE_RESULT
- *   -  1: 2 byte MSB-first rest-of-frame length (usually 00, 03)
- *   -  3: 1 byte result, 0 = success.  On failure, proxy will close connection.
- *   -  4: 4 byte client dsh allocation recommended for stream type, from policy
- *         (introduced in SSSv1)
- *   -  8: 2 byte MSB-first initial tx credit
- *   - 10: if present, comma-sep list of rideshare types from policy
- *
- * - Proxied rx
- *
- *   -  0: LWSSS_SER_RXPRE_RX_PAYLOAD
- *   -  1: 2 byte MSB-first rest-of-frame length
- *   -  3: 4-byte MSB-first flags
- *   -  7: 4-byte MSB-first us between inbound read and wrote to client
- *   - 11: 8-byte MSB-first us resolution unix time proxy wrote to client
- *   - 17: (rideshare name len + rideshare name if flags & LWSSS_FLAG_RIDESHARE)
- *          payload
- *
- * - Proxied tx credit
- *
- *   -  0: LWSSS_SER_RXPRE_TXCR_UPDATE
- *   -  1: 00, 04
- *   -  3: 4-byte MSB-first addition tx credit bytes
- *
- * - Proxied rx metadata
- *
- *   -  0: LWSSS_SER_RXPRE_METADATA
- *   -  1: 2-byte MSB-first rest-of-frame length
- *   -  3: 1-byte metadata name length
- *   -  4: metadata name
- *   -  ...: metadata value (for rest of packet)
- *
- * - Proxied state (8 or 11 byte packet)
- *
- *   -  0: LWSSS_SER_RXPRE_CONNSTATE
- *   -  1: 00, 05 if state < 256, else 00, 08
- *   -  3: 1 byte state index if state < 256, else 4-byte MSB-first state index
- *   -  4 or 7: 4-byte MSB-first ordinal
- *
- * - Proxied performance information
- *
- *   -  0: LWSSS_SER_RXPRE_PERF
- *   -  1: 2-byte MSB-first rest-of-frame length
- *   -  3: ... performance JSON (for rest of packet)
- *
- * Proxied tx may be read by the proxy but rejected due to lack of buffer space
- * at the proxy.  For that reason, tx must be held at the sender until it has
- * been acknowledged or denied.
- *
- * Sinks
- * -----
- *
- * Sinks are logical "servers", you can register as a sink for a particular
- * streamtype by using the lws_ss_create() api with ssi->register_sink set to 1.
- *
- * For directly fulfilled Secure Streams, new streams of that streamtype bind
- * to the rx, tx and state handlers given when it was registered.
- *
- *  - When new streams are created the registered sink handler for (*state) is
- *    called with event LWSSSCS_SINK_JOIN and the new client stream handle in
- *    the h_src parameter.
- *
- *  - When the client stream sends something to the sink, it calls the sink's
- *    (*rx) with the client stream's
  */
 
 /** \defgroup secstr Secure Streams
@@ -189,6 +61,11 @@
 
 struct lws_ss_handle;
 typedef uint32_t lws_ss_tx_ordinal_t;
+
+#if defined(STANDALONE)
+#define lws_context lws_context_standalone
+struct lws_context_standalone;
+#endif
 
 /*
  * connection state events
@@ -217,6 +94,15 @@ typedef enum {
 	LWSSSCS_SERVER_TXN,
 	LWSSSCS_SERVER_UPGRADE,		/* the server protocol upgraded */
 
+	LWSSSCS_EVENT_WAIT_CANCELLED, /* somebody called lws_cancel_service */
+
+	LWSSSCS_UPSTREAM_LINK_RETRY,	/* if we are being proxied over some
+					 * intermediate link, this transient
+					 * state may be sent to indicate we are
+					 * waiting to establish that link before
+					 * creation can proceed.. ack is the
+					 * number of ms we have been trying */
+
 	LWSSSCS_SINK_JOIN,		/* sinks get this when a new source
 					 * stream joins the sink */
 	LWSSSCS_SINK_PART,		/* sinks get this when a new source
@@ -244,54 +130,7 @@ enum {
 	LWSSS_FLAG_PERF_JSON					= (1 << 6),
 	/* This RX is JSON performance data, only on streams with "perf" flag
 	 * set */
-
-	/*
-	 * In the case the secure stream is proxied across a process or thread
-	 * boundary, eg by proxying through a socket for IPC, metadata must be
-	 * carried in-band.  A byte is prepended to each rx payload to
-	 * differentiate what it is.
-	 *
-	 * Secure streams where the user is called back directly does not need
-	 * any of this and only pure payloads are passed.
-	 *
-	 * rx (received by client) prepends for proxied connections
-	 */
-
-	LWSSS_SER_RXPRE_RX_PAYLOAD				= 0x55,
-	LWSSS_SER_RXPRE_CREATE_RESULT,
-	LWSSS_SER_RXPRE_CONNSTATE,
-	LWSSS_SER_RXPRE_TXCR_UPDATE,
-	LWSSS_SER_RXPRE_METADATA,
-	LWSSS_SER_RXPRE_TLSNEG_ENCLAVE_SIGN,
-	LWSSS_SER_RXPRE_PERF,
-
-	/* tx (send by client) prepends for proxied connections */
-
-	LWSSS_SER_TXPRE_STREAMTYPE				= 0xaa,
-	LWSSS_SER_TXPRE_ONWARD_CONNECT,
-	LWSSS_SER_TXPRE_DESTROYING,
-	LWSSS_SER_TXPRE_TX_PAYLOAD,
-	LWSSS_SER_TXPRE_METADATA,
-	LWSSS_SER_TXPRE_TXCR_UPDATE,
-	LWSSS_SER_TXPRE_TIMEOUT_UPDATE,
-	LWSSS_SER_TXPRE_PAYLOAD_LENGTH_HINT,
-	LWSSS_SER_TXPRE_TLSNEG_ENCLAVE_SIGNED,
 };
-
-typedef enum {
-	LPCSPROX_WAIT_INITIAL_TX = 1, /* after connect, must send streamtype */
-	LPCSPROX_REPORTING_FAIL, /* stream creation failed, wait to to tell */
-	LPCSPROX_REPORTING_OK, /* stream creation succeeded, wait to to tell */
-	LPCSPROX_OPERATIONAL, /* ready for payloads */
-	LPCSPROX_DESTROYED,
-
-	LPCSCLI_SENDING_INITIAL_TX,  /* after connect, must send streamtype */
-	LPCSCLI_WAITING_CREATE_RESULT,   /* wait to hear if proxy ss create OK */
-	LPCSCLI_LOCAL_CONNECTED,	      /* we are in touch with the proxy */
-	LPCSCLI_ONWARD_CONNECT,	      /* request onward ss connection */
-	LPCSCLI_OPERATIONAL, /* ready for payloads */
-
-} lws_ss_conn_states_t;
 
 /*
  * Returns from state() callback can tell the caller what the user code
@@ -333,6 +172,9 @@ enum {
 	LWSSSINFLAGS_ACCEPTED				=	(1 << 3),
 	/**< Set on the accepted object copy of the ssi / info to indicate that
 	 * we are an accepted connection from a server's listening socket */
+	LWSSSINFLAGS_ACCEPTED_SINK			=	(1 << 4),
+	/**< Set on the accepted object copy of the ssi / info to indicate that
+	 * we are an accepted connection from a local sink */
 };
 
 typedef lws_ss_state_return_t (*lws_sscb_rx)(void *userobj, const uint8_t *buf,
@@ -344,6 +186,11 @@ typedef lws_ss_state_return_t (*lws_sscb_tx)(void *userobj,
 typedef lws_ss_state_return_t (*lws_sscb_state)(void *userobj, void *h_src,
 						lws_ss_constate_t state,
 						lws_ss_tx_ordinal_t ack);
+
+#if defined(LWS_WITH_SECURE_STREAMS_BUFFER_DUMP)
+typedef void (*lws_ss_buffer_dump_cb)(void *userobj, const uint8_t *buf,
+		size_t len, int done);
+#endif
 
 struct lws_ss_policy;
 
@@ -377,6 +224,10 @@ typedef struct lws_ss_info {
 	/**< advisory cb about state of stream and QoS status if applicable...
 	 * h_src is only used with sinks and LWSSSCS_SINK_JOIN/_PART events.
 	 * Return nonzero to indicate you want to destroy the stream. */
+#if defined(LWS_WITH_SECURE_STREAMS_BUFFER_DUMP)
+	lws_ss_buffer_dump_cb dump;
+	/**< cb to record needed protocol buffer data*/
+#endif
 	int	    manual_initial_tx_credit;
 	/**< 0 = manage any tx credit automatically, nonzero explicitly sets the
 	 * peer stream to have the given amount of tx credit, if the protocol
@@ -399,6 +250,28 @@ typedef struct lws_ss_info {
 	 */
 
 } lws_ss_info_t;
+
+#define LWS_SS_USER_TYPEDEF \
+	typedef struct { \
+		struct lws_ss_handle 	*ss; \
+		void			*opaque_data;
+
+#define LWS_SS_INFO(_streamtype, _type) \
+	const lws_ss_info_t ssi_##_type = { \
+		.handle_offset = offsetof(_type, ss), \
+		.opaque_user_data_offset = offsetof(_type, opaque_data), \
+		.user_alloc = sizeof(_type), \
+		.streamtype = _streamtype,
+
+#define lws_ss_from_user(_u)		(_u)->ss
+#define lws_ss_opaque_from_user(_u)	(_u)->opaque_data
+#define lws_ss_cx_from_user(_u)		lws_ss_get_context((_u)->ss)
+
+#if defined(LWS_SS_USE_SSPC)
+#define lws_context_info_defaults(_x, _y) _lws_context_info_defaults(_x, NULL)
+#else
+#define lws_context_info_defaults(_x, _y) _lws_context_info_defaults(_x, _y)
+#endif
 
 /**
  * lws_ss_create() - Create secure stream
@@ -436,10 +309,10 @@ typedef struct lws_ss_info {
  * formats, \p ppayload_fmt is set to point to the name of the needed payload
  * format from the policy database if non-NULL.
  */
-LWS_VISIBLE LWS_EXTERN int
+LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
 lws_ss_create(struct lws_context *context, int tsi, const lws_ss_info_t *ssi,
 	      void *opaque_user_data, struct lws_ss_handle **ppss,
-	      struct lws_sequencer *seq_owner, const char **ppayload_fmt);
+	      void *reserved, const char **ppayload_fmt);
 
 /**
  * lws_ss_destroy() - Destroy secure stream
@@ -460,9 +333,9 @@ lws_ss_destroy(struct lws_ss_handle **ppss);
  * write on this stream, the \p *tx callback will occur with an empty buffer for
  * the stream owner to fill in.
  *
- * Returns 0 or LWSSSSRET_SS_HANDLE_DESTROYED
+ * Returns 0 or LWSSSSRET_DESTROY_ME
  */
-LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t
+LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t LWS_WARN_UNUSED_RESULT
 lws_ss_request_tx(struct lws_ss_handle *pss);
 
 /**
@@ -478,7 +351,7 @@ lws_ss_request_tx(struct lws_ss_handle *pss);
  * This api variant should be used when it's possible the payload will go out
  * over h1 with x-web-form-urlencoded or similar Content-Type.
  */
-LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t
+LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t LWS_WARN_UNUSED_RESULT
 lws_ss_request_tx_len(struct lws_ss_handle *pss, unsigned long len);
 
 /**
@@ -494,21 +367,8 @@ lws_ss_request_tx_len(struct lws_ss_handle *pss, unsigned long len);
  * LWSSSSRET_OK means the connection is ongoing.
  *
  */
-LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t
+LWS_VISIBLE LWS_EXTERN lws_ss_state_return_t LWS_WARN_UNUSED_RESULT
 lws_ss_client_connect(struct lws_ss_handle *h);
-
-/**
- * lws_ss_get_sequencer() - Return parent sequencer pointer if any
- *
- * \param h: secure streams handle
- *
- * Returns NULL if the secure stream is not associated with a sequencer.
- * Otherwise returns a pointer to the owning sequencer.  You can use this to
- * identify which sequencer to direct messages to, from the secure stream
- * callback.
- */
-LWS_VISIBLE LWS_EXTERN struct lws_sequencer *
-lws_ss_get_sequencer(struct lws_ss_handle *h);
 
 /**
  * lws_ss_proxy_create() - Start a unix domain socket proxy for Secure Streams
@@ -537,7 +397,7 @@ lws_ss_proxy_create(struct lws_context *context, const char *bind, int port);
  * Returns a printable name for the connection state index passed in.
  */
 LWS_VISIBLE LWS_EXTERN const char *
-lws_ss_state_name(int state);
+lws_ss_state_name(lws_ss_constate_t state);
 
 /**
  * lws_ss_get_context() - convenience helper to recover the lws context
@@ -549,6 +409,17 @@ lws_ss_state_name(int state);
  */
 LWS_VISIBLE LWS_EXTERN struct lws_context *
 lws_ss_get_context(struct lws_ss_handle *h);
+
+/**
+ * lws_ss_get_vhost() - convenience helper to get the vhost the ss is bound to
+ *
+ * \param h: secure streams handle
+ *
+ * Returns NULL if disconnected, or the the lws_vhost of the ss' wsi connection. 
+ */
+LWS_VISIBLE LWS_EXTERN struct lws_vhost *
+lws_ss_get_vhost(struct lws_ss_handle *h);
+
 
 #define LWSSS_TIMEOUT_FROM_POLICY				0
 
@@ -782,6 +653,46 @@ lws_ss_get_est_peer_tx_credit(struct lws_ss_handle *h);
 LWS_VISIBLE LWS_EXTERN const char *
 lws_ss_tag(struct lws_ss_handle *h);
 
+LWS_VISIBLE LWS_EXTERN void
+lws_ss_dump_extant(struct lws_context *cx, int tsi);
+
+#if defined(LWS_WITH_NETWORK)
+/**
+ * lws_ss_adopt_raw() - bind ss to existing fd
+ *
+ * \param ss: pointer to lws_ss_t to adopt the fd
+ * \param fd: the existing fd
+ *
+ * "connects" the existing ss to a wsi adoption of fd, it's useful for cases
+ * like local representation of eg a pipe() fd using ss.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_ss_adopt_raw(struct lws_ss_handle *ss, lws_sock_file_fd_type fd);
+#endif
+
+/*
+ * lws_ss_validity_confirmed() - reset the validity timer for a network connection
+ *
+ * \param h: the SS handle
+ *
+ * Network connections are subject to intervals defined by the context, the
+ * vhost if server connections, or the client connect info if a client
+ * connection.  If the connection goes longer than the specified time since
+ * last observing traffic that can only happen if traffic is passing in both
+ * directions, then lws will try to create a PING transaction on the network
+ * connection.
+ *
+ * If the connection reaches the specified `.secs_since_valid_hangup` time
+ * still without any proof of validity, the connection will be closed.
+ *
+ * If the PONG comes, or user code observes traffic that satisfies the proof
+ * that both directions are passing traffic to the peer and calls this api,
+ * the connection validity timer is reset and the scheme repeats.
+ */
+LWS_VISIBLE LWS_EXTERN void
+lws_ss_validity_confirmed(struct lws_ss_handle *h);
+
+
 
 #if defined(LWS_WITH_SECURE_STREAMS_AUTH_SIGV4)
 /**
@@ -821,7 +732,10 @@ LWS_VISIBLE LWS_EXTERN int
 lws_aws_filesystem_credentials_helper(const char *path, const char *kid,
 				      const char *ak, char **aws_keyid,
 				      char **aws_key);
+#endif
 
+#if defined(STANDALONE)
+#undef lws_context
 #endif
 
 ///@}

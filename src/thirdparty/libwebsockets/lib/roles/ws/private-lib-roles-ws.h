@@ -137,6 +137,10 @@ struct _lws_websocket_related {
 	uint32_t rx_ubuf_head;
 	uint32_t rx_ubuf_alloc;
 
+	uint8_t		last_valid;
+	uint8_t		last_opcode;	/* for outgoing state validation */
+	uint8_t		last_fin;	/* for outgoing state validation */
+
 	uint8_t pong_payload_len;
 	uint8_t mask_idx;
 	uint8_t opcode;
@@ -148,6 +152,8 @@ struct _lws_websocket_related {
 	uint8_t stashed_write_type;
 	uint8_t tx_draining_stashed_wp;
 	uint8_t ietf_spec_revision;
+	uint8_t allow_reserved_bits;
+	uint8_t allow_unknown_opcode;
 #if !defined(LWS_WITHOUT_EXTENSIONS)
 	uint8_t count_act_ext;
 #endif
@@ -163,8 +169,11 @@ struct lws_ext_pm_deflate_rx_ebufs {
 	struct lws_tokens eb_out;
 };
 
-int
+lws_handling_result_t
 lws_ws_handshake_client(struct lws *wsi, unsigned char **buf, size_t len);
+
+lws_handling_result_t
+lws_ws_client_rx_parser_block(struct lws *wsi, const uint8_t **buf, size_t *len);
 
 #if !defined(LWS_WITHOUT_EXTENSIONS)
 LWS_VISIBLE void
@@ -179,6 +188,8 @@ lws_ext_cb_active(struct lws *wsi, int reason, void *buf, int len);
 LWS_EXTERN int
 lws_ext_cb_all_exts(struct lws_context *context, struct lws *wsi, int reason,
 		    void *arg, int len);
+LWS_EXTERN int
+lws_extension_server_handshake(struct lws *wsi, char **p, int budget);
 #endif
 
 int

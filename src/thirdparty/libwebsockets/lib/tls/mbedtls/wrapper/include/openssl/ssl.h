@@ -708,7 +708,7 @@ int SSL_CTX_get_verify_depth(const SSL_CTX *ctx);
  *
  * @return none
  */
-void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, int (*verify_callback)(int, X509_STORE_CTX *));
+void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, int (*verify_callback)(SSL *, mbedtls_x509_crt *));
 
 /**
  * @brief set the SSL verifying of the SSL context
@@ -719,7 +719,7 @@ void SSL_CTX_set_verify(SSL_CTX *ctx, int mode, int (*verify_callback)(int, X509
  *
  * @return none
  */
-void SSL_set_verify(SSL *s, int mode, int (*verify_callback)(int, X509_STORE_CTX *));
+void SSL_set_verify(SSL *s, int mode, int (*verify_callback)(SSL *, mbedtls_x509_crt *));
 
 /**
  * @brief set the SSL verify depth of the SSL context
@@ -739,7 +739,7 @@ void SSL_CTX_set_verify_depth(SSL_CTX *ctx, int depth);
  *
  * @return verifying result
  */
-int tls_verify_callback(int preverify_ok, X509_STORE_CTX *x509_ctx);
+int verify_callback(SSL *, mbedtls_x509_crt *);
 
 /**
  * @brief set the session timeout time
@@ -1821,6 +1821,44 @@ const char *SSL_get_psk_identity_hint(SSL *ssl);
  * @return identity
  */
 const char *SSL_get_psk_identity(SSL *ssl);
+
+/**
+ * @brief Load a file containing CA certificates for verification into the SSL context
+ *
+ * @param ctx    - SSL context pointer
+ * @param CAfile - Path to the file containing CA certificates.
+ *
+ * @return result
+ *     1 : OK
+ *     0 : failed
+ */
+int SSL_CTX_load_verify_file(SSL_CTX *ctx, const char *CAfile);
+
+/**
+ * @brief Load a directory containing CA certificates for verification into the SSL context
+ *
+ * @param ctx    - SSL context pointer
+ * @param CApath - Path to the directory containing CA certificates.
+ *
+ * @return result
+ *     1 : OK
+ *     0 : failed
+ */
+int SSL_CTX_load_verify_dir(SSL_CTX *ctx, const char *CApath);
+
+/**
+ * @brief Load CA certificates from file and/or directory for verification
+ *
+ * @param ctx    - SSL context pointer
+ * @param CAfile - Path to the file containing CA certificates.
+ * @param CApath - Path to the directory containing CA certificates.
+ *
+ * @return result
+ *     1 : OK
+ *     0 : failed
+ */
+int SSL_CTX_load_verify_locations(SSL_CTX *ctx, const char *CAfile,
+                                  const char *CApath);
 
 #ifdef __cplusplus
 }

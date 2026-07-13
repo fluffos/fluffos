@@ -24,18 +24,18 @@
 
 #include <private-lib-core.h>
 
-static int
+static lws_handling_result_t
 rops_handle_POLLIN_raw_file(struct lws_context_per_thread *pt, struct lws *wsi,
 			    struct lws_pollfd *pollfd)
 {
 	int n;
 
 	if (pollfd->revents & LWS_POLLOUT) {
-		n = lws_callback_as_writeable(wsi);
 		if (lws_change_pollfd(wsi, LWS_POLLOUT, 0)) {
-			lwsl_info("failed at set pollfd\n");
+			lwsl_wsi_info(wsi, "failed at set pollfd");
 			return LWS_HPI_RET_WSI_ALREADY_DIED;
 		}
+		n = lws_callback_as_writeable(wsi);
 		if (n)
 			return LWS_HPI_RET_PLEASE_CLOSE_ME;
 	}
@@ -44,7 +44,7 @@ rops_handle_POLLIN_raw_file(struct lws_context_per_thread *pt, struct lws *wsi,
 		if (user_callback_handle_rxflow(wsi->a.protocol->callback,
 						wsi, LWS_CALLBACK_RAW_RX_FILE,
 						wsi->user_space, NULL, 0)) {
-			lwsl_debug("raw rx callback closed it\n");
+			lwsl_wsi_debug(wsi, "raw rx callback closed it");
 			return LWS_HPI_RET_PLEASE_CLOSE_ME;
 		}
 	}

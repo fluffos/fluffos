@@ -41,7 +41,7 @@ lws_http_client_connect_via_info2(struct lws *wsi)
 	struct client_info_stash *stash = wsi->stash;
 	int n;
 
-	lwsl_debug("%s: %s (stash %p)\n", __func__, lws_lc_tag(&wsi->lc), stash);
+	lwsl_wsi_debug(wsi, "stash %p", stash);
 
 	if (!stash)
 		return wsi;
@@ -60,7 +60,7 @@ lws_http_client_connect_via_info2(struct lws *wsi)
 	for (n = 0; n < (int)LWS_ARRAY_SIZE(hnames); n++)
 		if (hnames[n] && stash->cis[n] &&
 		    lws_hdr_simple_create(wsi, hnames[n], stash->cis[n]))
-			goto bail1;
+			goto bail;
 
 #if defined(LWS_WITH_SOCKS5)
 	if (!wsi->a.vhost->socks_proxy_port)
@@ -68,15 +68,60 @@ lws_http_client_connect_via_info2(struct lws *wsi)
 #endif
 
 no_ah:
-	return lws_client_connect_2_dnsreq(wsi);
+	return lws_client_connect_2_dnsreq_MAY_CLOSE_WSI(wsi);
 
-bail1:
+bail:
 #if defined(LWS_WITH_SOCKS5)
 	if (!wsi->a.vhost->socks_proxy_port)
 		lws_free_set_NULL(wsi->stash);
 #endif
 
+	lws_free_set_NULL(wsi->stash);
+
 	return NULL;
+}
+
+int
+lws_client_stash_create(struct lws *wsi, const char **cisin)
+{
+	size_t size;
+	char *pc;
+	int n;
+
+	size = sizeof(*wsi->stash) + 1;
+
+	/*
+	 * Let's overallocate the stash object with space for all the args
+	 * in one hit.
+	 */
+	for (n = 0; n < CIS_COUNT; n++)
+		if (cisin[n])
+			size += strlen(cisin[n]) + 1;
+
+	if (wsi->stash)
+		lws_free_set_NULL(wsi->stash);
+
+	wsi->stash = lws_malloc(size, "client stash");
+	if (!wsi->stash)
+		return 1;
+
+	/* all the pointers default to NULL, but no need to zero the args */
+	memset(wsi->stash, 0, sizeof(*wsi->stash));
+
+	pc = (char *)&wsi->stash[1];
+
+	for (n = 0; n < CIS_COUNT; n++)
+		if (cisin[n]) {
+			size_t mm;
+			wsi->stash->cis[n] = pc;
+			if (n == CIS_PATH && cisin[n][0] != '/')
+				*pc++ = '/';
+			mm = strlen(cisin[n]) + 1;
+			memcpy(pc, cisin[n], mm);
+			pc += mm;
+		}
+
+	return 0;
 }
 
 struct lws *
@@ -86,10 +131,9 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	struct lws *wsi, *safe = NULL;
 	const struct lws_protocols *p;
 	const char *cisin[CIS_COUNT];
-	struct lws_vhost *vh, *v;
-	size_t size;
-	int n, tsi;
-	char *pc;
+	char buf_localport[8];
+	struct lws_vhost *vh;
+	int tsi;
 
 	if (i->context->requested_stop_internal_loops)
 		return NULL;
@@ -115,21 +159,30 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 
 	/* PHASE 2: create a bare wsi */
 
-	wsi = __lws_wsi_create_with_role(i->context, tsi, NULL);
+	wsi = __lws_wsi_create_with_role(i->context, tsi, NULL, i->log_cx);
 	lws_context_unlock(i->context);
 	if (wsi == NULL)
-		goto bail;
+		return NULL;
 
 	vh = i->vhost;
 	if (!vh) {
-		vh = i->context->vhost_list;
+#if defined(LWS_WITH_TLS_JIT_TRUST)
+		if (lws_tls_jit_trust_vhost_bind(i->context, i->address, &vh))
+#endif
+		{
+			vh = lws_get_vhost_by_name(i->context, "default");
+			if (!vh) {
 
-		if (!vh) { /* coverity */
-			lwsl_err("%s: no vhost\n", __func__);
-			goto bail;
+				vh = i->context->vhost_list;
+
+				if (!vh) { /* coverity */
+					lwsl_cx_err(i->context, "no vhost");
+					goto bail; /* this frees the wsi */
+				}
+				if (!strcmp(vh->name, "system"))
+					vh = vh->vhost_next;
+			}
 		}
-		if (!strcmp(vh->name, "system"))
-			vh = vh->vhost_next;
 	}
 
 #if defined(LWS_WITH_SECURE_STREAMS)
@@ -169,6 +222,8 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 #endif
 #endif
 
+	lws_wsi_fault_timedclose(wsi);
+
 	/*
 	 * Until we exit, we can report connection failure directly to the
 	 * caller without needing to call through to protocol CONNECTION_ERROR.
@@ -180,7 +235,6 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	else
 		wsi->keep_warm_secs = 5;
 
-	wsi->seq = i->seq;
 	wsi->flags = i->ssl_connection;
 
 	wsi->c_pri = i->priority;
@@ -193,27 +247,15 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	if (i->ssl_connection & LCCSCF_WAKE_SUSPEND__VALIDITY)
 		wsi->conn_validity_wakesuspend = 1;
 
-	if (!i->vhost) {
-		v = i->context->vhost_list;
-
-		if (!v) { /* coverity */
-			lwsl_err("%s: no vhost\n", __func__);
-			goto bail;
-		}
-		if (!strcmp(v->name, "system"))
-			v = v->vhost_next;
-	} else
-		v = i->vhost;
-
-	lws_vhost_bind_wsi(v, wsi);
+	lws_vhost_bind_wsi(vh, wsi);
 
 #if defined(LWS_WITH_SYS_FAULT_INJECTION)
 	/* additionally inerit from vhost we bound to */
-	lws_fi_inherit_copy(&wsi->fic, &v->fic, "wsi", i->fi_wsi_name);
+	lws_fi_inherit_copy(&wsi->fic, &vh->fic, "wsi", i->fi_wsi_name);
 #endif
 
 	if (!wsi->a.vhost) {
-		lwsl_err("%s: No vhost in the context\n", __func__);
+		lwsl_wsi_err(wsi, "No vhost in the context");
 
 		goto bail;
 	}
@@ -226,11 +268,11 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	 */
 
 	if (lws_role_call_client_bind(wsi, i) < 0) {
-		lwsl_err("%s: unable to bind to role\n", __func__);
+		lwsl_wsi_err(wsi, "unable to bind to role");
 
 		goto bail;
 	}
-	lwsl_info("%s: role binding to %s\n", __func__, wsi->role_ops->name);
+	lwsl_wsi_info(wsi, "role binding to %s", wsi->role_ops->name);
 
 	/*
 	 * PHASE 4: fill up the wsi with stuff from the connect_info as far as
@@ -266,16 +308,16 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	}
 
 	if (local) {
-		lwsl_info("%s: vh %s protocol binding to %s\n", __func__,
+		lwsl_wsi_info(wsi, "vh %s protocol binding to %s\n",
 				wsi->a.vhost->name, local);
 		p = lws_vhost_name_to_protocol(wsi->a.vhost, local);
 		if (p)
 			lws_bind_protocol(wsi, p, __func__);
 		else
-			lwsl_info("%s: unknown protocol %s\n", __func__, local);
+			lwsl_wsi_info(wsi, "unknown protocol %s", local);
 
-		lwsl_info("%s: %s: %s %s entry\n",
-			    __func__, lws_wsi_tag(wsi), wsi->role_ops->name,
+		lwsl_wsi_info(wsi, "%s: %s %s entry",
+			    lws_wsi_tag(wsi), wsi->role_ops->name,
 			    wsi->a.protocol ? wsi->a.protocol->name : "none");
 	}
 
@@ -293,7 +335,7 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	wsi->tls.use_ssl = (unsigned int)i->ssl_connection;
 #else
 	if (i->ssl_connection & LCCSCF_USE_SSL) {
-		lwsl_err("%s: lws not configured for tls\n", __func__);
+		lwsl_wsi_err(wsi, "lws not configured for tls");
 		goto bail;
 	}
 #endif
@@ -316,25 +358,33 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	cisin[CIS_PROTOCOL]	= i->protocol;
 	cisin[CIS_METHOD]	= i->method;
 	cisin[CIS_IFACE]	= i->iface;
+	lws_snprintf(buf_localport, sizeof(buf_localport), "%u", i->local_port);
+	cisin[CIS_LOCALPORT]	= buf_localport;
 	cisin[CIS_ALPN]		= i->alpn;
+	cisin[CIS_USERNAME]	= i->auth_username;
+	cisin[CIS_PASSWORD]	= i->auth_password;
 
-	size = sizeof(*wsi->stash);
+/*
+	lwsl_notice("%d\n", (int)(cisin[CIS_ADDRESS] ? (int)strlen(cisin[CIS_ADDRESS]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_PATH] ? (int)strlen(cisin[CIS_PATH]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_HOST] ? (int)strlen(cisin[CIS_HOST]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_ORIGIN] ? (int)strlen(cisin[CIS_ORIGIN]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_PROTOCOL] ? (int)strlen(cisin[CIS_PROTOCOL]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_METHOD] ? (int)strlen(cisin[CIS_METHOD]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_IFACE] ? (int)strlen(cisin[CIS_IFACE]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_LOCALPORT] ? (int)strlen(cisin[CIS_LOCALPORT]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_ALPN] ? (int)strlen(cisin[CIS_ALPN]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_USERNAME] ? (int)strlen(cisin[CIS_USERNAME]) : -1));
+	lwsl_notice("%d\n", (int)(cisin[CIS_PASSWORD] ? (int)strlen(cisin[CIS_PASSWORD]) : -1));
+*/
 
-	/*
-	 * Let's overallocate the stash object with space for all the args
-	 * in one hit.
-	 */
-	for (n = 0; n < CIS_COUNT; n++)
-		if (cisin[n])
-			size += strlen(cisin[n]) + 1;
+	if (lws_client_stash_create(wsi, cisin))
+		goto bail;
 
-	wsi->stash = lws_malloc(size, "client stash");
-	if (!wsi->stash) {
-		lwsl_err("%s: OOM\n", __func__);
-		goto bail1;
-	}
-	/* all the pointers default to NULL, but no need to zero the args */
-	memset(wsi->stash, 0, sizeof(*wsi->stash));
+#if defined(LWS_WITH_TLS)
+	if (i->alpn)
+		lws_strncpy(wsi->alpn, i->alpn, sizeof(wsi->alpn));
+#endif
 
 	wsi->a.opaque_user_data = wsi->stash->opaque_user_data =
 		i->opaque_user_data;
@@ -347,7 +397,7 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 		 * LCCSCF_SECSTREAM_PROXY_LINK  : client SSPC link to proxy
 		 * LCCSCF_SECSTREAM_PROXY_ONWARD: proxy's onward connection
 		 */
-		__lws_lc_tag(&i->context->lcg[
+		__lws_lc_tag(i->context, &i->context->lcg[
 #if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
 		         i->ssl_connection & LCCSCF_SECSTREAM_PROXY_LINK ? LWSLCG_WSI_SSP_CLIENT :
 #if defined(LWS_WITH_SERVER)
@@ -370,22 +420,11 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 			lws_ss_tag(((lws_ss_handle_t *)i->opaque_user_data)));
 	} else
 #endif
-		__lws_lc_tag(&i->context->lcg[LWSLCG_WSI_CLIENT], &wsi->lc,
-			     "%s/%s/%s", i->method ? i->method : "WS",
-			     wsi->role_ops->name, i->address);
+		__lws_lc_tag(i->context, &i->context->lcg[LWSLCG_WSI_CLIENT], &wsi->lc,
+			     "%s/%s/%s/%s", i->method ? i->method : "WS",
+			     wsi->role_ops->name ? wsi->role_ops->name : "novh", vh->name, i->address);
 
 	lws_metrics_tag_wsi_add(wsi, "vh", wsi->a.vhost->name);
-
-	pc = (char *)&wsi->stash[1];
-
-	for (n = 0; n < CIS_COUNT; n++)
-		if (cisin[n]) {
-			size_t mm;
-			wsi->stash->cis[n] = pc;
-			mm = strlen(cisin[n]) + 1;
-			memcpy(pc, cisin[n], mm);
-			pc += mm;
-		}
 
 	/*
 	 * at this point user callbacks like
@@ -395,8 +434,8 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	 */
 
 	if (i->parent_wsi) {
-		lwsl_info("%s: created child %p of parent %p\n", __func__,
-			  wsi, i->parent_wsi);
+		lwsl_wsi_info(wsi, "created as child %s",
+			      lws_wsi_tag(i->parent_wsi));
 		wsi->parent = i->parent_wsi;
 		safe = wsi->sibling_list = i->parent_wsi->child_list;
 		i->parent_wsi->child_list = wsi;
@@ -412,11 +451,9 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 		int n = lws_rops_func_fidx(wsi->role_ops, LWS_ROPS_client_bind).
 							client_bind(wsi, NULL);
 
-		if (n && i->parent_wsi) {
+		if (n && i->parent_wsi)
 			/* unpick from parent */
-
 			i->parent_wsi->child_list = safe;
-		}
 
 		if (n < 0)
 			/* we didn't survive, wsi is freed */
@@ -432,6 +469,10 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	if (i->pwsi)
 		*i->pwsi = wsi;
 
+	if (!wsi->a.protocol)
+		/* we must have one protocol or another bound by this point */
+		goto bail;
+
 	/* PHASE 8: notify protocol with role-specific connected callback */
 
 	/* raw socket per se doesn't want this... raw socket proxy wants it... */
@@ -439,8 +480,8 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 	if (wsi->role_ops != &role_ops_raw_skt ||
 	    (i->local_protocol_name &&
 	     !strcmp(i->local_protocol_name, "raw-proxy"))) {
-		lwsl_debug("%s: %s: adoption cb %d to %s %s\n", __func__,
-			   lws_wsi_tag(wsi), wsi->role_ops->adoption_cb[0],
+		lwsl_wsi_debug(wsi, "adoption cb %d to %s %s",
+			   wsi->role_ops->adoption_cb[0],
 			   wsi->role_ops->name, wsi->a.protocol->name);
 
 		wsi->a.protocol->callback(wsi, wsi->role_ops->adoption_cb[0],
@@ -467,7 +508,7 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 
 		wsi->tls.ssl = NULL;
 
-		if (wsi->tls.use_ssl & LCCSCF_USE_SSL) {
+		if (wsi->role_ops != &role_ops_raw_skt && (wsi->tls.use_ssl & LCCSCF_USE_SSL)) {
 			const char *cce = NULL;
 
 			switch (
@@ -504,7 +545,7 @@ lws_client_connect_via_info(const struct lws_client_connect_info *i)
 
 #if defined(LWS_WITH_TLS)
 bail3:
-	lwsl_info("%s: tls start fail\n", __func__);
+	lwsl_wsi_info(wsi, "tls start fail");
 	lws_close_free_wsi(wsi, LWS_CLOSE_STATUS_NOSTATUS, "tls start fail");
 
 	if (i->pwsi)
@@ -513,15 +554,15 @@ bail3:
 	return NULL;
 #endif
 
-bail1:
+bail:
+	lws_dll2_remove(&wsi->pre_natal);
+
 #if defined(LWS_WITH_TLS)
-	if (wsi->tls.ssl && wsi->tls_borrowed)
-		lws_tls_restrict_return(i->context);
+	if (wsi->tls.ssl)
+		lws_tls_restrict_return(wsi);
 #endif
 
 	lws_free_set_NULL(wsi->stash);
-
-bail:
 	lws_fi_destroy(&wsi->fic);
 	lws_free(wsi);
 #if defined(LWS_ROLE_H1) || defined(LWS_ROLE_H2)

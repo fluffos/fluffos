@@ -33,8 +33,9 @@ secstream_ws(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 #endif
 	lws_ss_handle_t *h = (lws_ss_handle_t *)lws_get_opaque_user_data(wsi);
 	uint8_t buf[LWS_PRE + 1400];
+	enum lws_write_protocol f1;
 	lws_ss_state_return_t r;
-	int f = 0, f1, n;
+	int f = 0, n;
 	size_t buflen;
 
 	switch (reason) {
@@ -113,8 +114,13 @@ secstream_ws(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 
 	case LWS_CALLBACK_ESTABLISHED:
 	case LWS_CALLBACK_CLIENT_ESTABLISHED:
-		h->retry = 0;
-		h->seqstate = SSSEQ_CONNECTED;
+		if (!h) {
+			return LWSSSSRET_DISCONNECT_ME;
+		}
+		h->retry		= 0;
+		h->seqstate		= SSSEQ_CONNECTED;
+		wsi->ws->last_valid	= 0;
+		wsi->ws->last_fin	= 0;
 		lws_sul_cancel(&h->sul);
 #if defined(LWS_WITH_SYS_METRICS)
 		/*
@@ -158,6 +164,21 @@ secstream_ws(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		}
 
 		buflen = sizeof(buf) - LWS_PRE;
+
+		/*
+		 * Let's prepare *flags with information about the channel ws message state
+		 * which the callback can simply overwrite.  But if you are tracing problems
+		 * with your own flags state blowing assert()s below, you can use this for
+		 * debugging the illegal state while still in your ss tx callback; otherwise
+		 * it can be harder to understand what you're doing wrong after we returned
+		 * from the callback and blow chunks here.
+		 *
+		 * b1 of flags is set if we know the last fin state.  If b1 is set, b0 is
+		 * the last FIN state.  You can use this info to see if your flags will
+		 * cause us to assert when you return.
+		 */
+
+		f = (!!wsi->ws->last_valid << 1) | (!!wsi->ws->last_fin);
 		r = h->info.tx(ss_to_userobj(h),  h->txord++, buf + LWS_PRE,
 				  &buflen, &f);
 		if (r == LWSSSSRET_TX_DONT_SEND)
@@ -165,12 +186,25 @@ secstream_ws(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		if (r != LWSSSSRET_OK)
 			return _lws_ss_handle_state_ret_CAN_DESTROY_HANDLE(r, wsi, &h);
 
+		if ((f & LWSSS_FLAG_SOM) && wsi->ws->last_valid && !wsi->ws->last_fin) {
+			lwsl_ss_err(h, "%s TX: Illegal LWSSS_FLAG_SOM after previous frame without LWSSS_FLAG_EOM", h->policy ? h->policy->streamtype : "unknown");
+			assert(0);
+		}
+		if (!(f & LWSSS_FLAG_SOM) && wsi->ws->last_valid && wsi->ws->last_fin) {
+			lwsl_ss_err(h, "%s TX: Missing LWSSS_FLAG_SOM after previous frame with LWSSS_FLAG_EOM", h->policy ? h->policy->streamtype : "unknown");
+			assert(0);
+		}
+		if (!(f & LWSSS_FLAG_SOM) && !wsi->ws->last_valid) {
+			lwsl_ss_err(h, "%s TX: Missing LWSSS_FLAG_SOM on first frame", h->policy ? h->policy->streamtype : "unknown");
+			assert(0);
+		}
+
 		f1 = lws_write_ws_flags(h->policy->u.http.u.ws.binary ?
 					   LWS_WRITE_BINARY : LWS_WRITE_TEXT,
 					!!(f & LWSSS_FLAG_SOM),
 					!!(f & LWSSS_FLAG_EOM));
 
-		n = lws_write(wsi, buf + LWS_PRE, buflen, (enum lws_write_protocol)f1);
+		n = lws_write(wsi, buf + LWS_PRE, buflen, f1);
 		if (n < (int)buflen) {
 			lwsl_info("%s: write failed %d %d\n", __func__,
 					n, (int)buflen);
@@ -190,8 +224,7 @@ secstream_ws(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 const struct lws_protocols protocol_secstream_ws = {
 	"lws-secstream-ws",
 	secstream_ws,
-	0,
-	0,
+	0, 0, 0, NULL, 0
 };
 /*
  * Munge connect info according to protocol-specific considerations... this
@@ -213,8 +246,6 @@ secstream_connect_munge_ws(lws_ss_handle_t *h, char *buf, size_t len,
 	size_t used_in, used_out;
 	lws_strexp_t exp;
 
-	lwsl_notice("%s\n", __func__);
-
 	/* i.path on entry is used to override the policy urlpath if not "" */
 
 	if (i->path[0])
@@ -222,6 +253,12 @@ secstream_connect_munge_ws(lws_ss_handle_t *h, char *buf, size_t len,
 
 	if (!pbasis)
 		return 0;
+
+	if (h->policy->flags & LWSSSPOLF_HTTP_CACHE_COOKIES)
+		i->ssl_connection |= LCCSCF_CACHE_COOKIES;
+
+	if (h->policy->flags & LWSSSPOLF_PRIORITIZE_READS)
+		i->ssl_connection |= LCCSCF_PRIORITIZE_READS;
 
 	/* protocol aux is the path part ; ws subprotocol name */
 
@@ -234,13 +271,15 @@ secstream_connect_munge_ws(lws_ss_handle_t *h, char *buf, size_t len,
 			      &used_in, &used_out) != LSTRX_DONE)
 		return 1;
 
+	__lws_lc_tag_append(&h->lc, buf);
+
 	i->protocol = h->policy->u.http.u.ws.subprotocol;
 
-	lwsl_notice("%s: url %s, ws subprotocol %s\n", __func__, buf, i->protocol);
+	lwsl_ss_info(h, "url %s, ws subprotocol %s", buf, i->protocol);
 
 	return 0;
 }
 
 const struct ss_pcols ss_pcol_ws = {
-	"ws",  "http/1.1",  &protocol_secstream_ws, secstream_connect_munge_ws
+	"ws",  "http/1.1",  &protocol_secstream_ws, secstream_connect_munge_ws, 0, 0
 };

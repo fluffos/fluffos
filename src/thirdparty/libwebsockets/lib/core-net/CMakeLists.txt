@@ -56,9 +56,9 @@ if (LWS_WITH_LWS_DSH)
 		core-net/lws-dsh.c)
 endif()
 
-if (LWS_WITH_SEQUENCER)
+if (LWS_WITH_WOL)
 	list(APPEND SOURCES
-		core-net/sequencer.c)
+		core-net/wol.c)
 endif()
 
 if (LWS_WITH_CLIENT)
@@ -69,7 +69,7 @@ if (LWS_WITH_CLIENT)
 		core-net/client/connect3.c
 		core-net/client/connect4.c
 		core-net/client/sort-dns.c
-	)
+		)
 	if (LWS_WITH_CONMON)
 		list(APPEND SOURCES
 			core-net/client/conmon.c

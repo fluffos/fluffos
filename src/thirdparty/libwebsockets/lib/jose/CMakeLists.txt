@@ -26,8 +26,9 @@ include_directories(. ./jwe ./jws ./jwk)
 
 if (LWS_WITH_JOSE)
 	list(APPEND SOURCES
-		jose/jwk/jwk.c
 		jose/jws/jose.c
+		jose/jwk/jwk.c
+		jose/jwk/jose_key.c
 		jose/jws/jws.c
 		jose/jwe/jwe.c
 		jose/jwe/enc/aescbc.c

@@ -31,26 +31,18 @@ static const struct lws_extension extensions[] = {
      "; client_max_window_bits"},
     {NULL, NULL, NULL /* terminator */}};
 
-// modified on create.
-static struct lws_http_mount mount = {
-    /* .mount_next */ nullptr, /* linked-list "next" */
-    /* .mountpoint */ "/",     /* mountpoint URL */
-    /* .origin */ nullptr,     /* serve from dir */
-    /* .def */ "index.html",   /* default filename */
-    /* .protocol */ nullptr,
-    /* .cgienv */ nullptr,
-    /* .extra_mimetypes */ nullptr,
-    /* .interpret */ nullptr,
-    /* .cgi_timeout */ 0,
-    /* .cache_max_age */ 0,
-    /* .auth_mask */ 0,
-    /* .cache_reusable */ 0,
-    /* .cache_revalidate */ 0,
-    /* .cache_intermediaries */ 0,
-    /* .origin_protocol */ LWSMPRO_FILE, /* files in a dir */
-    /* .mountpoint_len */ 1,             /* char count */
-    /* .basic_auth_login_file */ nullptr,
-};
+// Field-by-field init (not positional aggregate init): lws has inserted new
+// members mid-struct across releases, which silently shifts positional
+// initializers. Remaining fields are zero/nullptr; origin is set on create.
+static struct lws_http_mount init_mount() {
+  struct lws_http_mount m = {};
+  m.mountpoint = "/";            /* mountpoint URL */
+  m.def = "index.html";          /* default filename */
+  m.origin_protocol = LWSMPRO_FILE; /* files in a dir */
+  m.mountpoint_len = 1;          /* char count */
+  return m;
+}
+static struct lws_http_mount mount = init_mount();
 
 void lws_log(int severity, const char* msg) {
   if (severity == LLL_ERR) {
@@ -123,7 +115,14 @@ struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
 }
 
 struct lws* init_user_websocket(struct lws_context* context, evutil_socket_t fd) {
-  return lws_adopt_socket(context, fd);
+  // Since lws v4.3 the context's vhost list is headed by an internal "system"
+  // vhost, which carries none of our ws protocols; lws_adopt_socket() adopts
+  // onto the list head, so adopt explicitly onto our own vhost instead.
+  auto* vhost = lws_get_vhost_by_name(context, "default");
+  if (!vhost) {
+    return nullptr;
+  }
+  return lws_adopt_socket_vhost(vhost, fd);
 }
 
 void websocket_send_text(struct lws* wsi, const char* data, size_t len) {

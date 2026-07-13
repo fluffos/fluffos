@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2025 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -28,10 +28,17 @@
 #include "lws_config.h"
 #include "lws_config_private.h"
 
+#if !defined(LHP_URL_LEN)
+#define LHP_URL_LEN			240
+#endif
 
 #if defined(LWS_WITH_CGI) && defined(LWS_HAVE_VFORK) && \
     !defined(NO_GNU_SOURCE_THIS_TIME) && !defined(_GNU_SOURCE)
  #define  _GNU_SOURCE
+#endif
+
+#if defined(LWS_SUPPRESS_DEPRECATED_API_WARNINGS)
+#define OPENSSL_SUPPRESS_DEPRECATED
 #endif
 
 /*
@@ -40,6 +47,16 @@
 #endif
 */
 
+#ifdef LWS_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#if !defined(PICO_SDK_PATH)
+#ifdef LWS_HAVE_INTTYPES_H
+#include <inttypes.h>
+#endif
+#endif
+
+//#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,15 +66,8 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#ifdef LWS_HAVE_INTTYPES_H
-#include <inttypes.h>
-#endif
-
 #include <assert.h>
 
-#ifdef LWS_HAVE_SYS_TYPES_H
- #include <sys/types.h>
-#endif
 #if defined(LWS_HAVE_SYS_STAT_H) && !defined(LWS_PLAT_OPTEE)
  #include <sys/stat.h>
 #endif
@@ -117,19 +127,22 @@
   *
   */
 
-#if defined(LWS_PLAT_FREERTOS)
- #include "private-lib-plat-freertos.h"
-#else
- #if defined(WIN32) || defined(_WIN32)
-  #include "private-lib-plat-windows.h"
+ #if defined(LWS_PLAT_FREERTOS)
+  #include "private-lib-plat-freertos.h"
  #else
-  #if defined(LWS_PLAT_OPTEE)
-   #include "private-lib-plat.h"
+  #if defined(WIN32) || defined(_WIN32)
+   #include "private-lib-plat-windows.h"
   #else
-   #include "private-lib-plat-unix.h"
+   #if defined(LWS_PLAT_BAREMETAL)
+   #else
+    #if defined(LWS_PLAT_OPTEE)
+     #include "private-lib-plat.h"
+    #else
+     #include "private-lib-plat-unix.h"
+    #endif
+   #endif
   #endif
  #endif
-#endif
 
  /*
   *
@@ -153,6 +166,7 @@ typedef struct lws_dsh_obj {
 	lws_dll2_t			list;	/* must be first */
 	struct lws_dsh	  		*dsh;	/* invalid when on free list */
 	size_t				size;	/* invalid when on free list */
+	size_t				pos;    /* invalid when on free list */
 	size_t				asize;
 	int				kind; /* so we can account at free */
 } lws_dsh_obj_t;
@@ -161,10 +175,12 @@ typedef struct lws_dsh {
 	lws_dll2_t			list;
 	uint8_t				*buf;
 	lws_dsh_obj_head_t		*oha;	/* array of object heads/kind */
+	size_t				splitat;
 	size_t				buffer_size;
 	size_t				locally_in_use;
 	size_t				locally_free;
 	int				count_kinds;
+	uint32_t			flags;
 	uint8_t				being_destroyed;
 	/*
 	 * Overallocations at create:
@@ -195,20 +211,24 @@ typedef struct lws_lifecycle {
 #endif
 	lws_dll2_t			list; /* group list membership */
 	uint64_t			us_creation; /* creation timestamp */
+	lws_log_cx_t			*log_cx;
+	uint8_t				recycle_len;
 } lws_lifecycle_t;
 
 void
-__lws_lc_tag(lws_lifecycle_group_t *grp, lws_lifecycle_t *lc,
-		    const char *format, ...);
+__lws_lc_tag(struct lws_context *cx, lws_lifecycle_group_t *grp,
+	     lws_lifecycle_t *lc, const char *format, ...);
 
 void
 __lws_lc_tag_append(lws_lifecycle_t *lc, const char *app);
 
 void
-__lws_lc_untag(lws_lifecycle_t *lc);
+__lws_lc_untag(struct lws_context *cx, lws_lifecycle_t *lc);
 
 const char *
 lws_lc_tag(lws_lifecycle_t *lc);
+
+extern lws_log_cx_t log_cx;
 
 /*
  * Generic bidi tx credit management
@@ -305,12 +325,12 @@ struct lws_ring {
 struct lws_protocols;
 struct lws;
 
-#if defined(LWS_WITH_NETWORK) /* network */
-#include "private-lib-event-libs.h"
-
 #if defined(LWS_WITH_SECURE_STREAMS)
 #include "private-lib-secure-streams.h"
 #endif
+
+#if defined(LWS_WITH_NETWORK) /* network */
+#include "private-lib-event-libs.h"
 
 #if defined(LWS_WITH_SYS_SMD)
 #include "private-lib-system-smd.h"
@@ -322,18 +342,15 @@ struct lws;
 
 #include "private-lib-system-metrics.h"
 
-
 struct lws_foreign_thread_pollfd {
 	struct lws_foreign_thread_pollfd *next;
 	int fd_index;
 	int _and;
 	int _or;
 };
-#endif /* network */
 
-#if defined(LWS_WITH_NETWORK)
 #include "private-lib-core-net.h"
-#endif
+#endif /* network */
 
 struct lws_system_blob {
 	union {
@@ -404,9 +421,31 @@ enum {
 #endif
 #endif
 
+#if defined(LWS_WITH_SERVER)
+	LWSLCG_WSI_SSP_SINK,		/* accepted sink conn */
+	LWSLCG_WSI_SSP_SOURCE,		/* accepted source conn */
+#endif
+
 	/* always last */
 	LWSLCG_COUNT
 };
+
+#if defined(LWS_WITH_SECURE_STREAMS) && defined(LWS_WITH_SERVER)
+typedef struct lws_ss_sinks {
+	lws_dll2_t				list;
+	lws_ss_info_t				info;
+	lws_dll2_owner_t			accepts;
+} lws_ss_sinks_t;
+#endif
+
+typedef struct lws_buflist {
+	struct lws_buflist			*next;
+	size_t					len;
+	size_t					pos;
+	unsigned char				awaiting_eom;
+	unsigned char				src_channel;
+} lws_buflist_t;
+
 
 /*
  * the rest is managed per-context, that includes
@@ -419,6 +458,10 @@ struct lws_context {
  #if defined(LWS_WITH_SERVER)
 	char canonical_hostname[96];
  #endif
+#if defined(LWS_HAVE_SSL_CTX_set_keylog_callback) && \
+	defined(LWS_WITH_TLS) && (!defined(LWS_WITHOUT_CLIENT) || !defined(LWS_WITHOUT_SERVER))
+	char					keylog_file[96];
+#endif
 
 #if defined(LWS_WITH_FILE_OPS)
 	struct lws_plat_file_ops fops_platform;
@@ -438,12 +481,25 @@ struct lws_context {
 #endif
 	lws_sorted_usec_list_t			sul_cpd_defer;
 
+#if defined(LWS_WITH_DLO)
+	lws_dll2_owner_t			fonts;
+	lws_dll2_owner_t			dlo_file;
+#if defined(LWS_WITH_SECURE_STREAMS)
+	lws_dll2_owner_t			active_assets; /* dloss_t */
+#endif
+#endif
+
 #if defined(LWS_WITH_NETWORK)
 	struct lws_context_per_thread		pt[LWS_MAX_SMP];
 	lws_retry_bo_t				default_retry;
 	lws_sorted_usec_list_t			sul_system_state;
 
 	lws_lifecycle_group_t			lcg[LWSLCG_COUNT];
+
+	const struct lws_protocols		*protocols_copy;
+#if defined(LWS_ROLE_WS)
+        const struct lws_extension		*extensions;
+#endif
 
 #if defined(LWS_WITH_NETLINK)
 	lws_sorted_usec_list_t			sul_nl_coldplug;
@@ -514,6 +570,12 @@ struct lws_context {
 
 #if defined(LWS_WITH_TLS)
 	struct lws_context_tls		tls;
+#if defined (LWS_WITH_TLS_JIT_TRUST)
+	lws_dll2_owner_t		jit_inflight;
+	/* ongoing sync or async jit trust lookups */
+	struct lws_cache_ttl_lru	*trust_cache;
+	/* caches host -> truncated trust SKID mappings */
+#endif
 #endif
 #if defined(LWS_WITH_DRIVERS)
 	lws_netdevs_t			netdevs;
@@ -528,6 +590,9 @@ struct lws_context {
 	/**< Toplevel Fault Injection ctx */
 #endif
 
+#if defined(LWS_WITH_CACHE_NSCOOKIEJAR) && defined(LWS_WITH_CLIENT)
+	struct lws_cache_ttl_lru *l1, *nsc;
+#endif
 
 #if defined(LWS_WITH_SYS_NTPCLIENT)
 	void				*ntpclient_priv;
@@ -583,15 +648,43 @@ struct lws_context {
 
 #endif
 
+#if defined(LWS_WITH_OTA)
+	lws_sorted_usec_list_t		sul_ota_periodic;
+	lws_ss_handle_t			* ota_ss;	/* opaque to platform */
+#endif
+
+	const char			*wol_if;
+
 /*
  * <====== LWS_WITH_NETWORK end
  */
 
 #endif /* NETWORK */
 
+	lws_log_cx_t				*log_cx;
+	const char				*name;
+
 #if defined(LWS_WITH_SECURE_STREAMS_PROXY_API)
-	const char	*ss_proxy_bind;
-	const char	*ss_proxy_address;
+	const char				*ss_proxy_bind;
+	const char				*ss_proxy_address;
+
+	lws_txp_path_proxy_t			txp_ppath;
+	lws_txp_path_client_t			txp_cpath;
+
+	const void				*txp_ssproxy_info;
+#endif
+
+#if !defined(LWS_PLAT_FREERTOS) && !defined(LWS_PLAT_BAREMETAL)
+	int					argc;
+	const char				**argv;
+
+	int					stdin_argc;
+	const char				*stdin_argv[16];
+
+	struct lws_buflist			*stdin_buflist;
+	char					*stdin_linear;
+	size_t					stdin_linear_size;
+	unsigned int				stdin_flags;
 #endif
 
 #if defined(LWS_WITH_FILE_OPS)
@@ -603,12 +696,12 @@ struct lws_context {
 	const char *username, *groupname;
 #endif
 
-#if defined(LWS_AMAZON_RTOS) && defined(LWS_WITH_MBEDTLS)
+#if defined(LWS_WITH_MBEDTLS)
 	mbedtls_entropy_context mec;
 	mbedtls_ctr_drbg_context mcdc;
 #endif
 
-#if defined(LWS_WITH_THREADPOOL)
+#if defined(LWS_WITH_THREADPOOL) && defined(LWS_HAVE_PTHREAD_H)
 	struct lws_threadpool *tp_list_head;
 #endif
 
@@ -629,6 +722,9 @@ struct lws_context {
 #endif
 	const lws_ss_policy_t		*pss_policies;
 	const lws_ss_auth_t		*pss_auths;
+#if defined(LWS_WITH_SERVER)
+	lws_dll2_owner_t		sinks;
+#endif
 #if defined(LWS_WITH_SSPLUGINS)
 	const lws_ss_plugin_t		**pss_plugins;
 #endif
@@ -677,6 +773,9 @@ struct lws_context {
 	int fd_random;
 	int count_cgi_spawned;
 #endif
+#if defined(WIN32)
+	unsigned int win32_connect_check_interval_usec;
+#endif
 
 	unsigned int fd_limit_per_thread;
 	unsigned int timeout_secs;
@@ -685,7 +784,11 @@ struct lws_context {
 	unsigned int max_http_header_pool;
 	int simultaneous_ssl_restriction;
 	int simultaneous_ssl;
-	int ssl_handshake_serialize;
+	int simultaneous_ssl_handshake_restriction;
+	int simultaneous_ssl_handshake;
+#if defined(LWS_WITH_TLS_JIT_TRUST)
+	int		vh_idle_grace_ms;
+#endif
 #if defined(LWS_WITH_PEER_LIMITS)
 	uint32_t pl_hash_elements;	/* protected by context->lock */
 	uint32_t count_peers;		/* protected by context->lock */
@@ -697,11 +800,14 @@ struct lws_context {
 	uint16_t smd_queue_depth;
 #endif
 
-#if defined(LWS_WITH_NETLINK)
+#if defined(LWS_WITH_NETLINK) && defined(LWS_WITH_NETWORK)
 	lws_route_uidx_t			route_uidx;
 #endif
 
+	char		tls_gate_accepts;
+
 	unsigned int deprecated:1;
+	unsigned int interrupted:1;
 	unsigned int inside_context_destroy:1;
 	unsigned int being_destroyed:1;
 	unsigned int service_no_longer_possible:1;
@@ -745,6 +851,13 @@ lws_jws_base64_enc(const char *in, size_t in_len, char *out, size_t out_max);
 void
 lws_vhost_destroy1(struct lws_vhost *vh);
 
+#if defined(LWS_WITH_CACHE_NSCOOKIEJAR) && defined(LWS_WITH_CLIENT)
+int
+lws_parse_set_cookie(struct lws *wsi);
+
+int
+lws_cookie_send_cookies(struct lws *wsi, char **pp, char *end);
+#endif
 
 #if defined(LWS_PLAT_FREERTOS)
 int
@@ -758,20 +871,156 @@ int
 lws_system_do_attach(struct lws_context_per_thread *pt);
 #endif
 
-struct lws_buflist {
-	struct lws_buflist *next;
-	size_t len;
-	size_t pos;
-};
-
 char *
 lws_strdup(const char *s);
-
-extern int log_level;
 
 int
 lws_b64_selftest(void);
 
+#define FIRST_LENGTH_CODE_INDEX		257
+#define LAST_LENGTH_CODE_INDEX		285
+
+/*256 literals, the end code, some length codes, and 2 unused codes */
+#define NUM_DEFLATE_CODE_SYMBOLS	288
+/*the distance codes have their own symbols, 30 used, 2 unused */
+#define NUM_DISTANCE_SYMBOLS		32
+/* The code length codes. 0-15: code lengths, 16: copy previous 3-6 times,
+ * 17: 3-10 zeros, 18: 11-138 zeros */
+#define NUM_CODE_LENGTH_CODES		19
+/* largest number of symbols used by any tree type */
+#define MAX_SYMBOLS			288
+
+#define DEFLATE_CODE_BITLEN		15
+#define DISTANCE_BITLEN			15
+#define CODE_LENGTH_BITLEN		7
+/* largest bitlen used by any tree type */
+#define MAX_BIT_LENGTH			15
+
+#define DEFLATE_CODE_BUFFER_SIZE	(NUM_DEFLATE_CODE_SYMBOLS * 2)
+#define DISTANCE_BUFFER_SIZE		(NUM_DISTANCE_SYMBOLS * 2)
+#define CODE_LENGTH_BUFFER_SIZE		(NUM_DISTANCE_SYMBOLS * 2)
+
+typedef uint16_t huff_t;
+
+typedef enum {
+	UPNS_ID_BL_GB_DONE,
+	UPNS_ID_BL_GB_BTYPEb0,
+	UPNS_ID_BL_GB_BTYPEb1,
+
+	UPNS_ID_BL_GB_BTYPE_0,
+	UPNS_ID_BL_GB_BTYPE_1,
+	UPNS_ID_BL_GB_BTYPE_2,
+
+	UPNS_ID_BL_GB_BTYPE_0a,
+	UPNS_ID_BL_GB_BTYPE_0b,
+	UPNS_ID_BL_GB_BTYPE_0c,
+	UPNS_ID_BL_GB_BTYPE_0d,
+
+	UPNS_ID_BL_GB_BTYPE_2a,
+	UPNS_ID_BL_GB_BTYPE_2b,
+	UPNS_ID_BL_GB_BTYPE_2c,
+	UPNS_ID_BL_GB_BTYPE_2d,
+	UPNS_ID_BL_GB_BTYPE_2e,
+
+	UPNS_ID_BL_GB_BTYPE_2_16,
+	UPNS_ID_BL_GB_BTYPE_2_17,
+	UPNS_ID_BL_GB_BTYPE_2_18,
+
+	UPNS_ID_BL_GB_SPIN,
+
+	UPNS_ID_BL_GB_SPINa,
+	UPNS_ID_BL_GB_SPINb,
+	UPNS_ID_BL_GB_SPINc,
+	UPNS_ID_BL_GB_SPINd,
+	UPNS_ID_BL_GB_SPINe,
+
+	UPNS_ID_BL_GB_GZIP_ID1,
+	UPNS_ID_BL_GB_GZIP_ID2,
+	UPNS_ID_BL_GB_GZIP_METHOD,
+	UPNS_ID_BL_GB_GZIP_FLAGS,
+	UPNS_ID_BL_GB_GZIP_EOH,
+	UPNS_ID_BL_GB_GZIP_SKIP_EXTRA_C1,
+	UPNS_ID_BL_GB_GZIP_SKIP_EXTRA_C2,
+	UPNS_ID_BL_GB_GZIP_SKIP_EXTRA,
+	UPNS_ID_BL_GB_GZIP_SKIP_FILENAME,
+	UPNS_ID_BL_GB_GZIP_SKIP_COMMENT,
+	UPNS_ID_BL_GB_GZIP_SKIP_CRC,
+
+} upng_inflate_states_t;
+
+typedef struct htree {
+	huff_t			*tree2d;
+	/*maximum number of bits a single code can get */
+	uint16_t		maxbitlen;
+	/*number of symbols in the alphabet = number of codes */
+	uint16_t		numcodes;
+} htree_t;
+
+typedef struct inflator_ctx {
+	unsigned int		clenc[NUM_CODE_LENGTH_CODES];
+	unsigned int		bitlen[NUM_DEFLATE_CODE_SYMBOLS];
+	unsigned int		bitlenD[NUM_DISTANCE_SYMBOLS];
+	huff_t			clct_buffer[CODE_LENGTH_BUFFER_SIZE];
+	huff_t			ct_buffer[DEFLATE_CODE_BUFFER_SIZE];
+	huff_t			ctD_buffer[DISTANCE_BUFFER_SIZE];
+
+	lws_upng_t		*upng;
+
+	const uint8_t		*in;
+	uint8_t			*out;
+
+	htree_t			clct;
+	htree_t			ct;
+	htree_t			ctD;
+
+	size_t			bp;
+	size_t			inpos;
+	size_t			inlen;
+	size_t			archive_pos;
+	size_t			outpos;
+	size_t			outpos_linear;
+	size_t			consumed_linear;
+	size_t			outlen;
+	size_t			length;
+	size_t			start;
+	size_t			forward;
+	size_t			backward;
+	size_t			exbits;
+	size_t			bypl;
+
+	upng_inflate_states_t	state;
+
+	unsigned int		len;
+	unsigned int		nlen;
+	unsigned int		n;
+	unsigned int		hlit;
+	unsigned int		hdist;
+	unsigned int		hclen;
+	unsigned int		i;
+	unsigned int		t;
+	unsigned int		codeD;
+	unsigned int		distance;
+	unsigned int		exbitsD;
+	unsigned int		code;
+	unsigned int		treepos;
+
+	unsigned int		read_bits_shifter;
+	unsigned int		read_bits_limit;
+	unsigned int 		read_bits_i;
+
+	unsigned int		info_size;
+
+	uint16_t		ctr;
+	uint8_t			subsequent;
+	uint8_t			btype;
+	uint8_t			done;
+	uint8_t			gz_flags;
+
+	char			read_bits_ongoing;
+} inflator_ctx_t;
+
+lws_stateful_ret_t
+_lws_upng_inflate_data(inflator_ctx_t *inf);
 
 #ifndef LWS_NO_DAEMONIZE
  pid_t get_daemonize_pid();
@@ -795,7 +1044,7 @@ void lwsl_emit_stderr(int level, const char *line);
  #define lws_ssl_SSL_CTX_destroy(_a)
  #define lws_ssl_remove_wsi_from_buffered_list(_a)
  #define __lws_ssl_remove_wsi_from_buffered_list(_a)
- #define lws_context_init_ssl_library(_a)
+ #define lws_context_init_ssl_library(_a, _b)
  #define lws_context_deinit_ssl_library(_a)
  #define lws_tls_check_all_cert_lifetimes(_a)
  #define lws_tls_acme_sni_cert_destroy(_a)
@@ -803,7 +1052,7 @@ void lwsl_emit_stderr(int level, const char *line);
 
 
 
-#if LWS_MAX_SMP > 1
+#if defined(LWS_WITH_NETWORK) && LWS_MAX_SMP > 1
 #define lws_context_lock(c, reason) lws_mutex_refcount_lock(&c->mr, reason)
 #define lws_context_unlock(c) lws_mutex_refcount_unlock(&c->mr)
 #define lws_context_assert_lock_held(c) lws_mutex_refcount_assert_held(&c->mr)
@@ -828,6 +1077,9 @@ void lwsl_emit_stderr(int level, const char *line);
 #define lws_pt_stats_lock(_a) (void)(_a)
 #define lws_pt_stats_unlock(_a) (void)(_a)
 #endif
+
+void
+lws_ota_periodic_cb(lws_sorted_usec_list_t *sul);
 
 int LWS_WARN_UNUSED_RESULT
 lws_ssl_capable_read_no_ssl(struct lws *wsi, unsigned char *buf, size_t len);
@@ -857,6 +1109,9 @@ lws_vhost_protocol_options(struct lws_vhost *vh, const char *name);
 const struct lws_http_mount *
 lws_find_mount(struct lws *wsi, const char *uri_ptr, int uri_len);
 
+#ifdef LWS_WITH_HTTP2
+int lws_wsi_is_h2(struct lws *wsi);
+#endif
 /*
  * custom allocator
  */
@@ -922,10 +1177,54 @@ lws_check_utf8(unsigned char *state, unsigned char *buf, size_t len);
 int alloc_file(struct lws_context *context, const char *filename,
 			  uint8_t **buf, lws_filepos_t *amount);
 
+int
+lws_lec_scratch(lws_lec_pctx_t *ctx);
+void
+lws_lec_signed(lws_lec_pctx_t *ctx, int64_t num);
+
+int
+lws_cose_key_checks(const lws_cose_key_t *key, int64_t kty, int64_t alg,
+		    int key_op, const char *crv);
+
 void lws_msleep(unsigned int);
 
 void
 lws_context_destroy2(struct lws_context *context);
+
+/* it's public extern const lws_transport_client_ops_t lws_txp_inside_sspc; */
+
+lws_transport_mux_ch_t *
+lws_transport_mux_create_channel(lws_transport_mux_t *tm, lws_mux_ch_idx_t i);
+
+lws_transport_mux_ch_t *
+lws_transport_mux_add_channel(lws_transport_mux_t *tm, lws_transport_priv_t priv);
+
+void
+lws_transport_mux_destroy_channel(lws_transport_mux_ch_t **_mc);
+
+lws_transport_mux_ch_t *
+lws_transport_mux_get_channel(lws_transport_mux_t *tm, lws_mux_ch_idx_t i);
+
+int
+lws_transport_mux_next_free(lws_transport_mux_t *tm, lws_mux_ch_idx_t *result);
+
+void
+sul_ping_cb(lws_sorted_usec_list_t *sul);
+
+/* Added Declaration of this function to make common for openssl-server */
+#if defined(LWS_HAVE_SSL_CTX_set_keylog_callback) && \
+	defined(LWS_WITH_TLS)
+void
+lws_klog_dump(const SSL *ssl, const char *line);
+#endif
+
+struct lws_plugin *
+lws_plugin_alloc(struct lws_plugin **pplugin);
+
+int
+lws_plugins_handle_builtin(struct lws_plugin **pplugin,
+			   each_plugin_cb_t each, void *each_user);
+
 
 #if !defined(PRIu64)
 #define PRIu64 "llu"

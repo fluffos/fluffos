@@ -52,7 +52,7 @@ struct lws_jwk {
 	struct lws_gencrypto_keyelem e[LWS_GENCRYPTO_MAX_KEYEL_COUNT];
 	/* generic meta key elements, like KID */
 	struct lws_gencrypto_keyelem meta[LWS_COUNT_JWK_ELEMENTS];
-	int kty;			/**< one of LWS_JWK_ */
+	int kty;			/**< one of LWS_GENCRYPTO_KTY_ */
 	char private_key; /* nonzero = has private key elements */
 };
 
@@ -64,6 +64,8 @@ struct lws_jwk_parse_state {
 	lws_jwk_key_import_callback per_key_cb;
 	void *user;
 	int pos;
+	int cose_state;
+	int seen;
 	unsigned short possible;
 };
 
@@ -191,7 +193,7 @@ lws_jwk_rfc7638_fingerprint(struct lws_jwk *jwk, char *digest32);
  * \param in: string to copy
  * \param len: length of string to copy
  *
- * Returns 0 for OK or -1 for failure
+ * Returns 0 for OK or nonzero for failure
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_jwk_strdup_meta(struct lws_jwk *jwk, enum enum_jwk_meta_tok idx,
@@ -209,7 +211,7 @@ lws_jwk_dump(struct lws_jwk *jwk);
  * \param bits: for OCT and RSA keys, the number of bits
  * \param curve: for EC keys, the name of the curve
  *
- * Returns 0 for OK or -1 for failure
+ * Returns 0 for OK or nonzero for failure
  */
 LWS_VISIBLE int
 lws_jwk_generate(struct lws_context *context, struct lws_jwk *jwk,

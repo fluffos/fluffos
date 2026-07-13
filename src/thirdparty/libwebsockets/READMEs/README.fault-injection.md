@@ -232,14 +232,25 @@ matches an object, the fault will be injected every time.  It's also possible
 to make the fault inject itself at a random probability, or in a cyclic pattern,
 by giving additional information in brackets, eg
 
-|Syntax|Meaning|
-|---|---|
-|`wsi/thefault`|Inject the fault every time|
-|`wsi/thefault(10%)`|Randomly inject the fault at 10% probability|
-|`wsi/thefault(.............X.X)`|Inject the fault on the 14th and 16th try, every 16 tries|
+|Syntax|Used with|Meaning|
+|---|---|---|
+|`wsi/thefault`|lws_fi()|Inject the fault every time|
+|`wsi/thefault(10%)`|lws_fi()|Randomly inject the fault at 10% probability|
+|`wsi/thefault(.............X.X)`|lws_fi()|Inject the fault on the 14th and 16th try, every 16 tries|
+|`wsi/thefault2(123..456)`|lws_fi_range()|Pick a number between 123 and 456|
 
 You must quote the strings containing these symbols, since they may otherwise be
 interpreted by your shell.
+
+The last example above does not decide whether to inject the fault via `lws_fi()`
+like the others.  Instead you can use it via `lws_fi_range()` as part of the
+fault processing, on a secondary fault injection name.  For example you may have
+a fault `myfault` you use with `lws_fi()` to decide when to inject the fault,
+and then a second, related fault name `myfault_delay` to allow you to add code
+to delay the fault action by some random amount of ms within an externally-
+given range.  You can get a pseudo-random number within the externally-given
+range by calling `lws_fi_range()` on `myfault_delay`, and control the whole
+thing by giving, eg, `"myfault(10%),myfault_delay(123..456)"`
 
 ## Well-known fault names in lws
 
@@ -262,6 +273,9 @@ interpreted by your shell.
 |context||`ctx_createfail_ss_pol1`|Fail context creation due to ss policy parse start failed (if policy enabled)|
 |context||`ctx_createfail_ss_pol2`|Fail context creation due to ss policy parse failed (if policy enabled)|
 |context||`ctx_createfail_ss_pol3`|Fail context creation due to ss policy set failed (if policy enabled)|
+|context||`cache_createfail`|Fail `lws_cache` creation due to OOM|
+|context||`cache_lookup_oom`|Fail `lws_cache` lookup due to OOM|
+|vhost|`vh`|`vh_create_oom`|Fail vh creation on vh object alloc OOM|
 |vhost|`vh`|`vh_create_oom`|Fail vh creation on vh object alloc OOM|
 |vhost|`vh`|`vh_create_pcols_oom`|Fail vh creation at protocols alloc OOM|
 |vhost|`vh`|`vh_create_access_log_open_fail`|Fail vh creation due to unable to open access log (LWS_WITH_ACCESS_LOG)|
@@ -293,7 +307,17 @@ interpreted by your shell.
 |ssproxy|`wsi`|`sspc_dsh_ss2p_oom`|Cause ss->proxy dsh allocation to fail|
 |ssproxy|`ss`|`ssproxy_onward_conn_fail`|Act as if proxy onward client connection failed immediately|
 |ssproxy|`ss`|`ssproxy_dsh_c2p_pay_oom`|Cause proxy's DSH alloc for C->P payload to fail|
-
+|ss|`ss`|`ss_create_smd`|SMD: ss creation smd registration fail|
+|ss|`ss`|`ss_create_vhost`|Server: ss creation acts like no vhost matching typename (only for `!vhost`)|
+|ss|`ss`|`ss_create_pcol`|Server: ss creation acts like no protocol given in policy|
+|ss|`ss`|`ss_srv_vh_fail`|Server: ss creation acts like unable to create vhost|
+|ss|`ss`|`ss_create_destroy_me`|ss creation acts like CREATING state returned DESTROY_ME|
+|ss|`ss`|`ss_create_no_ts`|Static Policy: ss creation acts like no trust store|
+|ss|`ss`|`ss_create_smd_1`|SMD: ss creation acts like CONNECTING said DESTROY_ME|
+|ss|`ss`|`ss_create_smd_2`|SMD: ss creation acts like CONNECTED said DESTROY_ME|
+|ss|`ss`|`ss_create_conn`|Nailed up: ss creation client connection fails with DESTROY_ME|
+|wsi|`wsi`|`timedclose`|(see next) Cause wsi to close after some time|
+|wsi|`wsi`|`timedclose_ms`|Range of ms for timedclose (eg, "timedclose_ms(10..250)"|
 
 ## Well-known namespace targets
 

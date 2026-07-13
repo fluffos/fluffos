@@ -64,6 +64,7 @@ static const char * const lejp_tokens_policy[] = {
 	"s[].*.attr_high_reliability",
 	"s[].*.attr_low_cost",
 	"s[].*.long_poll",
+	"s[].*.ws_prioritize_reads",
 	"s[].*.retry",
 	"s[].*.timeout_ms",
 	"s[].*.perf",
@@ -98,28 +99,36 @@ static const char * const lejp_tokens_policy[] = {
 	"s[].*.http_mime_content_type",
 	"s[].*.http_www_form_urlencoded",
 	"s[].*.http_expect",
+	"s[].*.http_cookies",
 	"s[].*.http_fail_redirect",
 	"s[].*.http_multipart_ss_in",
 	"s[].*.ws_subprotocol",
 	"s[].*.ws_binary",
 	"s[].*.local_sink",
+	"s[].*.options[].*",
 	"s[].*.server",
 	"s[].*.server_cert",
 	"s[].*.server_key",
 	"s[].*.mqtt_topic",
 	"s[].*.mqtt_subscribe",
 	"s[].*.mqtt_qos",
+	"s[].*.mqtt_retain",
 	"s[].*.mqtt_keep_alive",
 	"s[].*.mqtt_clean_start",
 	"s[].*.mqtt_will_topic",
 	"s[].*.mqtt_will_message",
 	"s[].*.mqtt_will_qos",
 	"s[].*.mqtt_will_retain",
+	"s[].*.mqtt_birth_topic",
+	"s[].*.mqtt_birth_message",
+	"s[].*.mqtt_birth_qos",
+	"s[].*.mqtt_birth_retain",
 	"s[].*.aws_iot",
 	"s[].*.swake_validity",
 	"s[].*.use_auth",
 	"s[].*.aws_region",
 	"s[].*.aws_service",
+	"s[].*.direct_proto_str",
 	"s[].*",
 	"auth[].name",
 	"auth[].type",
@@ -165,6 +174,7 @@ typedef enum {
 	LSSPPT_ATTR_HIGH_RELIABILITY,
 	LSSPPT_ATTR_LOW_COST,
 	LSSPPT_LONG_POLL,
+	LSSPPT_PRIORITIZE_READS,
 	LSSPPT_RETRYPTR,
 	LSSPPT_DEFAULT_TIMEOUT_MS,
 	LSSPPT_PERF,
@@ -198,28 +208,36 @@ typedef enum {
 	LSSPPT_HTTP_MULTIPART_CONTENT_TYPE,
 	LSSPPT_HTTP_WWW_FORM_URLENCODED,
 	LSSPPT_HTTP_EXPECT,
+	LSSPPT_HTTP_COOKIES,
 	LSSPPT_HTTP_FAIL_REDIRECT,
 	LSSPPT_HTTP_MULTIPART_SS_IN,
 	LSSPPT_WS_SUBPROTOCOL,
 	LSSPPT_WS_BINARY,
 	LSSPPT_LOCAL_SINK,
+	LSSPPT_OPTIONS,
 	LSSPPT_SERVER,
 	LSSPPT_SERVER_CERT,
 	LSSPPT_SERVER_KEY,
 	LSSPPT_MQTT_TOPIC,
 	LSSPPT_MQTT_SUBSCRIBE,
 	LSSPPT_MQTT_QOS,
+	LSSPPT_MQTT_RETAIN,
 	LSSPPT_MQTT_KEEPALIVE,
 	LSSPPT_MQTT_CLEAN_START,
 	LSSPPT_MQTT_WILL_TOPIC,
 	LSSPPT_MQTT_WILL_MESSAGE,
 	LSSPPT_MQTT_WILL_QOS,
 	LSSPPT_MQTT_WILL_RETAIN,
+	LSSPPT_MQTT_BIRTH_TOPIC,
+	LSSPPT_MQTT_BIRTH_MESSAGE,
+	LSSPPT_MQTT_BIRTH_QOS,
+	LSSPPT_MQTT_BIRTH_RETAIN,
 	LSSPPT_MQTT_AWS_IOT,
 	LSSPPT_SWAKE_VALIDITY,
 	LSSPPT_USE_AUTH,
 	LSSPPT_AWS_REGION,
 	LSSPPT_AWS_SERVICE,
+	LSSPPT_DIRECT_PROTO_STR,
 	LSSPPT_STREAMTYPES,
 	LSSPPT_AUTH_NAME,
 	LSSPPT_AUTH_TYPE,
@@ -291,13 +309,14 @@ static signed char
 lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 {
 	struct policy_cb_args *a = (struct policy_cb_args *)ctx->user;
-#if defined(LWS_WITH_SSPLUGINS)
-	const lws_ss_plugin_t **pin;
-#endif
 	char **pp, dotstar[32], *q;
 	lws_ss_trust_store_t *ts;
 	lws_ss_metadata_t *pmd;
 	lws_ss_x509_t *x, **py;
+#if defined(LWS_WITH_SERVER)
+	struct lws_protocol_vhost_options *pvo;
+	const char *pvo_name;
+#endif
 	lws_ss_policy_t *p2;
 	lws_retry_bo_t *b;
 	size_t inl, outl;
@@ -305,8 +324,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 	backoff_t *bot;
 	int n = -1;
 
-//	lwsl_debug("%s: %d %d %s\n", __func__, reason, ctx->path_match - 1,
-//		   ctx->path);
+	// lwsl_notice("%s: %d %d %s %s\n", __func__, reason, ctx->path_match - 1,
+	//	   ctx->path, ctx->buf);
 
 	switch (ctx->path_match - 1) {
 	case LSSPPT_RETRY:
@@ -372,6 +391,11 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		return 0;
 	}
 
+	if (reason == LEJPCB_ARRAY_END &&
+	    ctx->path_match - 1 == LSSPPT_OPTIONS &&
+	    a->pvosp)
+		a->pvosp--;
+
 	if (reason == LEJPCB_OBJECT_END && a->p) {
 		/*
 		 * Allocate a just-the-right-size buf for the cert DER now
@@ -381,6 +405,7 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		 * The struct *x is in the lwsac... the ca_der it points to
 		 * is individually allocated from the heap
 		 */
+
 		a->curr[LTY_X509].x->ca_der = lws_malloc((unsigned int)a->count, "ssx509");
 		if (!a->curr[LTY_X509].x->ca_der)
 			goto oom;
@@ -582,6 +607,36 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		goto string2;
 #endif
 
+	case LSSPPT_OPTIONS:
+#if defined(LWS_WITH_SERVER)
+		pvo_name = ctx->path + ctx->st[ctx->sp - 2].p + 1;
+		pvo = lwsac_use(&a->ac, sizeof(*pvo) + strlen(pvo_name) + 1 +
+				 ctx->npos + 1, POL_AC_GRAIN);
+		if (!pvo)
+			goto oom;
+
+		pvo->name = (const char *)&pvo[1];
+		pvo->value = pvo->name + strlen(pvo_name) + 1;
+		memcpy((char *)pvo->name, pvo_name, strlen(pvo_name) + 1);
+		memcpy((char *)pvo->value, ctx->buf, ctx->npos);
+		*((char *)&pvo->value[ctx->npos]) = '\0';
+		pvo->next = NULL;
+		pvo->options = NULL;
+
+		if (!a->curr[LTY_POLICY].p->pvo)
+			a->curr[LTY_POLICY].p->pvo = pvo;
+
+		/* for now we just support one level of options */
+
+		// lwsl_notice("%s: lv %d, %s=%s\n", __func__, a->pvosp,
+		//		pvo->name, pvo->value);
+
+		if (a->pvostack[a->pvosp])
+			a->pvostack[a->pvosp]->next = pvo;
+		a->pvostack[a->pvosp] = pvo;
+#endif
+		break;
+
 	case LSSPPT_SERVER_CERT:
 	case LSSPPT_SERVER_KEY:
 
@@ -686,29 +741,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		pp = (char **)&a->curr[LTY_POLICY].p->payload_fmt;
 		goto string2;
 
-	case LSSPPT_PLUGINS:
-#if defined(LWS_WITH_SSPLUGINS)
-		pin = a->context->pss_plugins;
-		if (a->count ==
-			  (int)LWS_ARRAY_SIZE(a->curr[LTY_POLICY].p->plugins)) {
-			lwsl_err("%s: too many plugins\n", __func__);
-
-			goto oom;
-		}
-		if (!pin)
-			break;
-		while (*pin) {
-			if (!strncmp((*pin)->name, ctx->buf, ctx->npos)) {
-				a->curr[LTY_POLICY].p->plugins[a->count++] = *pin;
-				return 0;
-			}
-			pin++;
-		}
-		lwsl_err("%s: unknown plugin\n", __func__);
-		goto oom;
-#else
+	case LSSPPT_PLUGINS: /* deprecated */
 		break;
-#endif
 
 	case LSSPPT_TLS:
 		if (reason == LEJPCB_VAL_TRUE)
@@ -754,6 +788,11 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		if (reason == LEJPCB_VAL_TRUE)
 			a->curr[LTY_POLICY].p->flags |= LWSSSPOLF_LONG_POLL;
 		break;
+	case LSSPPT_PRIORITIZE_READS:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |= LWSSSPOLF_PRIORITIZE_READS;
+		break;
+
 	case LSSPPT_HTTP_WWW_FORM_URLENCODED:
 		if (reason == LEJPCB_VAL_TRUE)
 			a->curr[LTY_POLICY].p->flags |=
@@ -768,6 +807,11 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		if (reason == LEJPCB_VAL_TRUE)
 			a->curr[LTY_POLICY].p->flags |=
 						LWSSSPOLF_ALLOW_REDIRECTS;
+		break;
+	case LSSPPT_HTTP_COOKIES:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |=
+						LWSSSPOLF_HTTP_CACHE_COOKIES;
 		break;
 	case LSSPPT_HTTP_MULTIPART_SS_IN:
 		if (reason == LEJPCB_VAL_TRUE)
@@ -852,6 +896,8 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 			sizeof(lws_ss_metadata_t) + ctx->npos +
 			(unsigned int)(ctx->path_match_len - ctx->st[ctx->sp - 2].p + 1) + 2,
 			POL_AC_GRAIN);
+		if (!a->curr[LTY_POLICY].p->metadata)
+			return -1;
 		a->curr[LTY_POLICY].p->metadata->next = pmd;
 
 		q = (char *)a->curr[LTY_POLICY].p->metadata +
@@ -996,6 +1042,11 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		a->curr[LTY_POLICY].p->u.mqtt.qos = (uint8_t)atoi(ctx->buf);
 		break;
 
+	case LSSPPT_MQTT_RETAIN:
+		a->curr[LTY_POLICY].p->u.mqtt.retain =
+						reason == LEJPCB_VAL_TRUE;
+		break;
+
 	case LSSPPT_MQTT_KEEPALIVE:
 		a->curr[LTY_POLICY].p->u.mqtt.keep_alive = (uint16_t)atoi(ctx->buf);
 		break;
@@ -1019,12 +1070,33 @@ lws_ss_policy_parser_cb(struct lejp_ctx *ctx, char reason)
 		a->curr[LTY_POLICY].p->u.mqtt.will_retain =
 						reason == LEJPCB_VAL_TRUE;
 		break;
+	case LSSPPT_MQTT_BIRTH_TOPIC:
+		pp = (char **)&a->curr[LTY_POLICY].p->u.mqtt.birth_topic;
+		goto string2;
+
+	case LSSPPT_MQTT_BIRTH_MESSAGE:
+		pp = (char **)&a->curr[LTY_POLICY].p->u.mqtt.birth_message;
+		goto string2;
+
+	case LSSPPT_MQTT_BIRTH_QOS:
+		a->curr[LTY_POLICY].p->u.mqtt.birth_qos = (uint8_t)atoi(ctx->buf);
+		break;
+	case LSSPPT_MQTT_BIRTH_RETAIN:
+		a->curr[LTY_POLICY].p->u.mqtt.birth_retain =
+						reason == LEJPCB_VAL_TRUE;
+		break;
 	case LSSPPT_MQTT_AWS_IOT:
 		if (reason == LEJPCB_VAL_TRUE)
 			a->curr[LTY_POLICY].p->u.mqtt.aws_iot =
 						reason == LEJPCB_VAL_TRUE;
 		break;
 #endif
+	case LSSPPT_DIRECT_PROTO_STR:
+		if (reason == LEJPCB_VAL_TRUE)
+			a->curr[LTY_POLICY].p->flags |=
+					LWSSSPOLF_DIRECT_PROTO_STR;
+		break;
+
 
 	case LSSPPT_PROTOCOL:
 		a->curr[LTY_POLICY].p->protocol = 0xff;
@@ -1123,17 +1195,23 @@ lws_ss_policy_parse_abandon(struct lws_context *context)
 {
 	struct policy_cb_args *args = (struct policy_cb_args *)context->pol_args;
 	lws_ss_x509_t *x;
-
+lwsl_notice("%s\n", __func__);
 	x = args->heads[LTY_X509].x;
 	while (x) {
 		/*
 		 * Free all the client DER buffers now they have been parsed
 		 * into tls library X.509 objects
 		 */
-		if (!x->keep) { /* used for server */
-			lws_free((void *)x->ca_der);
-			x->ca_der = NULL;
-		}
+		lws_free((void *)x->ca_der);
+		x->ca_der = NULL;
+
+		x = x->next;
+	}
+
+	x = context->server_der_list;
+	while (x) {
+		lws_free((void *)x->ca_der);
+		x->ca_der = NULL;
 
 		x = x->next;
 	}
@@ -1141,6 +1219,8 @@ lws_ss_policy_parse_abandon(struct lws_context *context)
 	lejp_destruct(&args->jctx);
 	lwsac_free(&args->ac);
 	lws_free_set_NULL(context->pol_args);
+
+	context->server_der_list = NULL;
 
 	return 0;
 }
@@ -1153,8 +1233,10 @@ lws_ss_policy_parse_file(struct lws_context *cx, const char *filepath)
 	uint8_t buf[512];
 	int n, m, fd = lws_open(filepath, LWS_O_RDONLY);
 
-	if (fd < 0)
-		return -1;
+	if (fd < 0) {
+		lwsl_cx_err(cx, "Unable to open policy '%s'", filepath);
+		return LEJP_REJECT_UNKNOWN;
+	}
 
 	do {
 		n = (int)read(fd, buf, sizeof(buf));
@@ -1193,12 +1275,11 @@ lws_ss_policy_parse(struct lws_context *context, const uint8_t *buf, size_t len)
 	int m;
 
 #if !defined(LWS_PLAT_FREERTOS) && !defined(LWS_PLAT_OPTEE)
-	if (!args->jctx.line && buf[0] != '{') {
-		puts((const char *)buf);
+	if (args->jctx.line < 2 && buf[0] != '{' && !args->parse_data)
 		return lws_ss_policy_parse_file(context, (const char *)buf);
-	}
 #endif
 
+	args->parse_data = 1;
 	m = lejp_parse(&args->jctx, buf, (int)len);
 	if (m == LEJP_CONTINUE || m >= 0)
 		return m;

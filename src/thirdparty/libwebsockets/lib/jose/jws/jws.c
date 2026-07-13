@@ -339,20 +339,24 @@ lws_jws_compact_decode(const char *in, int len, struct lws_jws_map *map,
 		return -1;
 
 	while (m < blocks) {
-		n = lws_b64_decode_string_len(map_b64->buf[m], (int)map_b64->len[m],
-					      out, *out_len);
-		if (n < 0) {
-			lwsl_err("%s: b64 decode failed\n", __func__);
-			return -1;
-		}
-		/* replace the map entry with the decoded content */
-		if (n)
-			map->buf[m] = out;
-		else
-			map->buf[m] = NULL;
-		map->len[m++] = (unsigned int)n;
-		out += n;
-		*out_len -= n;
+		if ((int)map_b64->len[m]) {
+			n = lws_b64_decode_string_len(map_b64->buf[m], (int)map_b64->len[m],
+						      out, *out_len);
+			if (n < 0) {
+				lwsl_err("%s: b64 decode failed len %d\n",
+							__func__, (int)map_b64->len[m]);
+				return -1;
+			}
+			/* replace the map entry with the decoded content */
+			if (n)
+				map->buf[m] = out;
+			else
+				map->buf[m] = NULL;
+			map->len[m++] = (unsigned int)n;
+			out += n;
+			*out_len -= n;
+		} else
+			m++;
 
 		if (*out_len < 1)
 			return -1;
@@ -368,15 +372,20 @@ lws_jws_compact_decode_map(struct lws_jws_map *map_b64, struct lws_jws_map *map,
 	int n, m = 0;
 
 	for (n = 0; n < LWS_JWS_MAX_COMPACT_BLOCKS; n++) {
-		n = lws_b64_decode_string_len(map_b64->buf[m], (int)map_b64->len[m],
-					      out, *out_len);
-		if (n < 0) {
-			lwsl_err("%s: b64 decode failed\n", __func__);
-			return -1;
-		}
-		/* replace the map entry with the decoded content */
-		map->buf[m] = out;
-		map->len[m++] = (unsigned int)n;
+		if ((int)map_b64->len[m]) {
+			n = lws_b64_decode_string_len(map_b64->buf[m], (int)map_b64->len[m],
+						      out, *out_len);
+			if (n < 0) {
+				lwsl_err("%s: b64 decode failed len %d\n",
+						__func__, (int)map_b64->len[m]);
+
+				return -1;
+			}
+			/* replace the map entry with the decoded content */
+			map->buf[m] = out;
+			map->len[m++] = (unsigned int)n;
+		} else
+			m++;
 		out += n;
 		*out_len -= n;
 
@@ -1258,12 +1267,12 @@ lws_jwt_token_sanity(const char *in, size_t in_len,
 	 * ... and not too late for it?
 	 */
 	cp = lws_json_simple_find(in, in_len, "\"exp\":", &len);
-	exp = (unsigned long)atol(cp);
 	if (!cp || (unsigned long)atol(cp) < now) {
 		lwsl_notice("%s: exp fail %lu vs %lu\n", __func__,
 				cp ? (unsigned long)atol(cp) : 0, now);
 		return 1;
 	}
+	exp = (unsigned long)atol(cp);
 
 	/*
 	 * Caller cares about subject?  Then we must have it, and it can't be

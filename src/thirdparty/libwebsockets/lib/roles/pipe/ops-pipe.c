@@ -24,7 +24,7 @@
 
 #include <private-lib-core.h>
 
-static int
+static lws_handling_result_t
 rops_handle_POLLIN_pipe(struct lws_context_per_thread *pt, struct lws *wsi,
 			struct lws_pollfd *pollfd)
 {
@@ -60,7 +60,7 @@ rops_handle_POLLIN_pipe(struct lws_context_per_thread *pt, struct lws *wsi,
 		return LWS_HPI_RET_PLEASE_CLOSE_ME;
 #endif
 
-#if defined(LWS_WITH_THREADPOOL)
+#if defined(LWS_WITH_THREADPOOL) && defined(LWS_HAVE_PTHREAD_H)
 	/*
 	 * threadpools that need to call for on_writable callbacks do it by
 	 * marking the task as needing one for its wsi, then cancelling service.
@@ -93,6 +93,13 @@ rops_handle_POLLIN_pipe(struct lws_context_per_thread *pt, struct lws *wsi,
 		} lws_end_foreach_dll_safe(d, d1);
 	}
 
+#endif
+
+#if defined(LWS_WITH_SECURE_STREAMS)
+	lws_dll2_foreach_safe(&pt->ss_owner, NULL, lws_ss_cancel_notify_dll);
+#if defined(LWS_WITH_SECURE_STREAMS_PROXY_API) && defined(LWS_WITH_CLIENT)
+	lws_dll2_foreach_safe(&pt->ss_client_owner, NULL, lws_sspc_cancel_notify_dll);
+#endif
 #endif
 
 	/*

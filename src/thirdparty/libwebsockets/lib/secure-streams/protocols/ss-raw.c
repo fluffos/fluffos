@@ -120,7 +120,16 @@ secstream_raw(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 		lwsl_info("%s: RAW_ADOPT\n", __func__);
 		break;
 
-	/* chunks of chunked content, with header removed */
+       /* chunks of chunked content, with header removed */
+       case LWS_CALLBACK_RAW_RX_FILE:
+               in = p;
+               f = (int)read((int)(intptr_t)wsi->desc.filefd, p, sizeof(buf) - LWS_PRE);
+               if (f < 0)
+                       return 0;
+               len = (unsigned int)f;
+
+               /* fallthru */
+
 	case LWS_CALLBACK_RAW_RX:
 		if (!h || !h->info.rx)
 			return 0;
@@ -181,6 +190,7 @@ const struct lws_protocols protocol_secstream_raw = {
 	secstream_raw,
 	0,
 	0,
+	0, NULL, 0
 };
 
 const struct ss_pcols ss_pcol_raw = {
@@ -188,5 +198,5 @@ const struct ss_pcols ss_pcol_raw = {
 	"",
 	&protocol_secstream_raw,
 	secstream_connect_munge_raw,
-	NULL
+	NULL, NULL
 };

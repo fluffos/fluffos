@@ -33,9 +33,12 @@ lws_adns_parse_label(const uint8_t *pkt, int len, const uint8_t *ls, int budget,
 		     char **dest, size_t dl)
 {
 	const uint8_t *e = pkt + len, *ols = ls;
-	char pointer = 0, first = 1;
+	char pointer = 0;
+	int n, readsize = 0, consumed = -1;
 	uint8_t ll;
-	int n;
+
+	if (len < DHO_SIZEOF || len > 1500)
+		return -1;
 
 	if (budget < 1)
 		return 0;
@@ -52,13 +55,22 @@ again1:
 			return -1;
 		/* pointer into message pkt to name to actually use */
 		n = lws_ser_ru16be(ls) & 0x3fff;
-		if (n >= len) {
+               if (n < DHO_SIZEOF || n >= len) {
 			lwsl_notice("%s: illegal name pointer\n", __func__);
 
 			return -1;
 		}
 
 		/* dereference the label pointer */
+
+		/*
+		 * If this is the first pointer we encountered, the consumption
+		 * of the input from the caller's perspective ends here (plus
+		 * the 2-byte pointer).
+		 */
+		if (consumed == -1)
+			consumed = lws_ptr_diff(ls, ols) + 2;
+
 		ls = pkt + n;
 
 		/* are we being fuzzed or messed with? */
@@ -67,7 +79,7 @@ again1:
 			lwsl_notice("%s: label ptr to ptr invalid\n", __func__);
 
 			return -1;
-		}
+		} /* loops of pointers are not allowed, but ptr->label->ptr is */
 		pointer = 1;
 	}
 
@@ -81,13 +93,24 @@ again1:
 
 		return -1;
 	}
-	if (ll > budget) {
-		lwsl_notice("%s: label too long %d vs %d\n", __func__, ll, budget);
+
+	/*
+	 * If we are following a pointer, ls is not linearly related to ols any
+	 * more.  So we can't check it against the budget from ols.
+	 *
+	 * We already checked that the new ls and the label length are within
+	 * the packet boundaries (e).
+	 */
+
+	if (!pointer && ll > lws_ptr_diff_size_t(ls, ols) + (size_t)budget) {
+		lwsl_notice("%s: label too long %d vs %d (rem budget %d)\n",
+				__func__, ll, budget,
+				(int)(lws_ptr_diff_size_t(ls, ols) + (size_t)budget));
 
 		return -1;
 	}
 
-	if ((unsigned int)ll + 2 > dl) {
+	if ((unsigned int)(ll + 2 + readsize) > dl) {
 		lwsl_notice("%s: qname too large\n", __func__);
 
 		return -1;
@@ -100,6 +123,7 @@ again1:
 	(*dest)[ll + 1] = '\0';
 	*dest += ll + 1;
 	ls += ll;
+	readsize += ll + 1;
 
 	if (pointer) {
 		if (*ls)
@@ -109,19 +133,20 @@ again1:
 		 * special fun rule... if whole qname was a pointer label,
 		 * it has no 00 terminator afterwards
 		 */
-		if (first)
-			return 2; /* we just took the 16-bit pointer */
 
-		return 3;
+		 return consumed;
 	}
 
-	first = 0;
 
 	if (*ls)
 		goto again1;
 
 	ls++;
 
+	/*
+	 * If we didn't use a pointer, consumed is still -1, and we return
+	 * the linear consumption
+	 */
 	return lws_ptr_diff(ls, ols);
 }
 
@@ -132,7 +157,7 @@ typedef int (*lws_async_dns_find_t)(const char *name, void *opaque,
 /* locally query the response packet */
 
 struct label_stack {
-	char name[DNS_MAX];
+	char name[DNS_MAX + 10];
 	int enl;
 	const uint8_t *p;
 };
@@ -153,11 +178,14 @@ lws_adns_iterate(lws_adns_q_t *q, const uint8_t *pkt, int len,
 		 const char *expname, lws_async_dns_find_t cb, void *opaque)
 {
 	const uint8_t *e = pkt + len, *p, *pay;
-	struct label_stack stack[4];
+	struct label_stack stack[8];
 	int n = 0, stp = 0, ansc, m;
 	uint16_t rrtype, rrpaylen;
 	char *sp, inq;
 	uint32_t ttl;
+
+	if (len < DHO_SIZEOF || len > 1500)
+		return -1;
 
 	lws_strncpy(stack[0].name, expname, sizeof(stack[0].name));
 	stack[0].enl = (int)strlen(expname);
@@ -202,10 +230,9 @@ start:
 
 		/* while we have more labels */
 
-		n = lws_adns_parse_label(pkt, len, p, len, &sp,
+		n = lws_adns_parse_label(pkt, len, p, lws_ptr_diff(e, p), &sp,
 					 sizeof(stack[0].name) -
 					 lws_ptr_diff_size_t(sp, stack[0].name));
-		/* includes case name won't fit */
 		if (n < 0)
 			return -1;
 
@@ -254,11 +281,11 @@ start:
 		 */
 
 		n = lws_ptr_diff(sp, stack[0].name);
-		if (stack[0].name[n - 1] == '.')
+		if (n > 0 && stack[0].name[n - 1] == '.')
 			n--;
 
 		m = stack[stp].enl;
-		if (stack[stp].name[m - 1] == '.')
+		if (m > 0 && stack[stp].name[m - 1] == '.')
 			m--;
 
 		if (n < 1 || n != m ||
@@ -310,6 +337,10 @@ do_cb:
 			break;
 
 		case LWS_ADNS_RECORD_CNAME:
+			if (rrpaylen == 0) {
+				lwsl_notice("%s: CNAME with empty RDATA, skipping\n", __func__);
+				goto skip;
+			}
 			/*
 			 * The name the CNAME refers to MAY itself be
 			 * included elsewhere in the response packet.
@@ -338,7 +369,7 @@ do_cb:
 
 			p += n;
 
-			if (p + 14 > e)
+			if (p > e)
 				return -1;
 #if 0
 			/* it should have exactly reached rrpaylen if only one
@@ -398,6 +429,7 @@ skip:
 	q->sent[1] = 0;
 #endif
 	q->sent[0] = 0;
+	q->is_synthetic = 0;
 	q->recursion++;
 	if (q->recursion == DNS_RECURSION_LIMIT) {
 		lwsl_err("%s: recursion overflow\n", __func__);
@@ -423,7 +455,8 @@ skip:
 		*cp = '\0';
 	}
 
-	lws_callback_on_writable(q->dns->wsi);
+	if (q->dsrv && q->dsrv->wsi)
+		lws_callback_on_writable(q->dsrv->wsi);
 
 	return 2;
 }
@@ -534,14 +567,14 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 	lws_adns_cache_t *c;
 	struct adstore adst;
 	lws_adns_q_t *q;
-	int n, ncname;
+	int n;
 	size_t est;
 
 	// lwsl_hexdump_notice(pkt, len);
 
 	/* we have to at least have the header */
 
-	if (len < DHO_SIZEOF)
+	if (len < DHO_SIZEOF || len > 1500)
 		return;
 
 	/* we asked with one query, so anything else is bogus */
@@ -551,8 +584,7 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 
 	/* match both A and AAAA queries if any */
 
-	q = lws_adns_get_query(dns, 0, &dns->waiting,
-			       lws_ser_ru16be(pkt + DHO_TID), NULL);
+	q = lws_adns_get_query(dns, 0, lws_ser_ru16be(pkt + DHO_TID), NULL);
 	if (!q) {
 		lwsl_info("%s: dropping unknown query tid 0x%x\n",
 			    __func__, lws_ser_ru16be(pkt + DHO_TID));
@@ -560,12 +592,19 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 		return;
 	}
 
-	/* we can get dups... drop any that have already happened */
+	/*
+	 * we may have recursed and the packet we just got started earlier than
+	 * the current TID we are working with... if so, ignore it
+	 */
+
+	if ((lws_ser_ru16be(pkt + DHO_TID) & 0xfffe) !=
+			(LADNS_MOST_RECENT_TID(q) & 0xfffe))
+		return;
 
 	n = 1 << (lws_ser_ru16be(pkt + DHO_TID) & 1);
 	if (q->responded & n) {
 		lwsl_notice("%s: dup\n", __func__);
-		goto fail_out;
+		return;
 	}
 
 	q->responded = (uint8_t)(q->responded | n);
@@ -583,9 +622,12 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 	 *  char []: copy of resolved name
 	 */
 
-	ncname = (int)strlen(nmcname) + 1;
+	/* but we want to create the cache entry against the original request */
 
-	est = sizeof(lws_adns_cache_t) + (unsigned int)ncname;
+	nm = ((const char *)&q[1]) + DNS_MAX;
+	n = (int)strlen(nm) + 1;
+
+	est = sizeof(lws_adns_cache_t) + (unsigned int)n;
 	if (lws_ser_ru16be(pkt + DHO_NANSWERS)) {
 		int ir = lws_adns_iterate(q, pkt, (int)len, nmcname,
 					  lws_async_dns_estimate, &est);
@@ -595,11 +637,6 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 		if (ir == 2) /* CNAME recursive resolution */
 			return;
 	}
-
-	/* but we want to create the cache entry against the original request */
-
-	nm = ((const char *)&q[1]) + DNS_MAX;
-	n = (int)strlen(nm) + 1;
 
 	lwsl_info("%s: create cache entry for %s, %zu\n", __func__, nm,
 			est - sizeof(lws_adns_cache_t));
@@ -656,6 +693,7 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 	} else {
 
 		q->firstcache = c;
+		c->refcount++;
 		c->incomplete = !q->responded;// != q->asked;
 
 		/*
@@ -697,6 +735,8 @@ lws_adns_parse_udp(lws_async_dns_t *dns, const uint8_t *pkt, size_t len)
 	 */
 
 fail_out:
+	if (q->go_nogo != METRES_GO)
+		lws_async_dns_complete(q, NULL);
 	lws_adns_q_destroy(q);
 }
 

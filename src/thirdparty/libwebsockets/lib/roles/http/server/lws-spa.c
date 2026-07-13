@@ -1,7 +1,7 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010 - 2021 Andy Green <andy@warmcat.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -438,12 +438,12 @@ done:
 
 		case MT_IGNORE3:
 			if (*in == '\x0d')
-				s->state = MT_IGNORE1;
-			else if (*in == '-') {
+				s->state = MT_IGNORE2;
+			if (*in == '-') {
 				s->state = MT_COMPLETED;
 				s->wsi->http.rx_content_remain = 0;
 			}
-			else in++;
+			in++;
 			break;
 		case MT_COMPLETED:
 			break;
@@ -482,7 +482,23 @@ lws_urldecode_spa_lookup(struct lws_spa *spa, const char *name)
 	int n;
 
 	for (n = 0; n < spa->i.count_params; n++) {
-		if (!strcmp(*pp, name))
+		if (!*pp && !spa->i.param_names_stride && spa->i.ac) {
+			unsigned int len = (unsigned int)strlen(name);
+			char **ptr = (char**)spa->i.param_names;
+
+			/* Use NULLs at end of list to dynamically create
+			 * unknown entries */
+
+			ptr[n] = lwsac_use(spa->i.ac, len + 1, spa->i.ac_chunk_size);
+			if (!ptr[n])
+				return -1;
+
+			memcpy(ptr[n], name, len);
+			ptr[n][len] = '\0';
+
+			return n;
+		}
+		if (*pp && !strcmp(*pp, name))
 			return n;
 
 		if (spa->i.param_names_stride)
@@ -570,7 +586,7 @@ lws_spa_create_via_info(struct lws *wsi, const lws_spa_create_info_t *i)
 	if (!spa->storage)
 		goto bail2;
 
-	spa->end = spa->storage + i->max_storage - 1;
+	spa->end = spa->storage + spa->i.max_storage - 1;
 
 	if (i->count_params) {
 		if (i->ac)
@@ -583,7 +599,7 @@ lws_spa_create_via_info(struct lws *wsi, const lws_spa_create_info_t *i)
 			goto bail3;
 	}
 
-	spa->s = lws_urldecode_s_create(spa, wsi, spa->storage, i->max_storage,
+	spa->s = lws_urldecode_s_create(spa, wsi, spa->storage, spa->i.max_storage,
 					lws_urldecode_spa_cb);
 	if (!spa->s)
 		goto bail4;

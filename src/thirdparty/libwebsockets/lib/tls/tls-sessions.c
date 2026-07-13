@@ -34,7 +34,8 @@ lws_tls_session_tag_discrete(const char *vhname, const char *host,
 	 * different client certs.
 	 */
 
-	lws_snprintf(buf, len, "%s_%s_%u", vhname, host, port);
+	lws_snprintf(buf, len, "%s_%s_%u", vhname, host, (unsigned int)port);
+	lws_filename_purify_inplace(buf);
 }
 
 int

@@ -250,6 +250,8 @@ struct _lws_http_mode_related {
 #endif
 #if defined(LWS_WITH_SERVER)
 	unsigned int response_code;
+	const struct lws_protocol_vhost_options *mount_specific_headers;
+	unsigned int mount_specific_keepalive_timeout_secs;
 #endif
 #ifdef LWS_WITH_CGI
 	struct lws_cgi *cgi; /* wsi being cgi stream have one of these */
@@ -279,6 +281,10 @@ struct _lws_http_mode_related {
 	unsigned int multipart:1;
 	unsigned int cgi_transaction_complete:1;
 	unsigned int multipart_issue_boundary:1;
+
+	char auth_username[64];
+	char auth_password[64];
+	char *digest_auth_hdr;
 };
 
 

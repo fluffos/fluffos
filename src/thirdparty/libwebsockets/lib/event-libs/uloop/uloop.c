@@ -121,7 +121,7 @@ lws_uloop_cb(struct uloop_fd *ufd, unsigned int revents)
 	lws_service_fd_tsi(context, &eventfd, wu->wsi->tsi);
 
 	if (pt->destroy_self) {
-		lwsl_notice("%s: pt destroy self coming true\n", __func__);
+		lwsl_cx_notice(context, "pt destroy self coming true");
 		lws_context_destroy(pt->context);
 		return;
 	}
@@ -133,32 +133,31 @@ lws_uloop_cb(struct uloop_fd *ufd, unsigned int revents)
 }
 
 static int
+elops_listen_init_uloop(struct lws_dll2 *d, void *user)
+{
+#if defined(LWS_WITH_SERVER)
+	struct lws *wsi = lws_container_of(d, struct lws, listen_list);
+	struct lws_wsi_eventlibs_uloop *wu = wsi_to_priv_uloop(wsi);
+
+	wu->wsi = wsi;
+	wu->fd.fd = wsi->desc.sockfd;
+	wu->fd.cb = lws_uloop_cb;
+	uloop_fd_add(&wu->fd,  ULOOP_READ);
+	wu->actual_events = ULOOP_READ;
+#endif
+
+	return 0;
+}
+
+static int
 elops_init_pt_uloop(struct lws_context *context, void *v, int tsi)
 {
-	struct lws_vhost *vh = context->vhost_list;
 	struct lws_context_per_thread *pt = &context->pt[tsi];
 	struct lws_pt_eventlibs_uloop *ptpr = pt_to_priv_uloop(pt);
 
 	ptpr->pt = pt;
 
-	/*
-	* Initialize all events with the listening sockets
-	* and register a callback for read operations
-	*/
-
-	while (vh) {
-		if (vh->lserv_wsi) {
-			struct lws_wsi_eventlibs_uloop *wu =
-					       wsi_to_priv_uloop(vh->lserv_wsi);
-			wu->wsi = vh->lserv_wsi;
-			wu->fd.fd = vh->lserv_wsi->desc.sockfd;
-			wu->fd.cb = lws_uloop_cb;
-			uloop_fd_add(&wu->fd,  ULOOP_READ);
-			wu->actual_events = ULOOP_READ;
-		}
-
-		vh = vh->vhost_next;
-	}
+	lws_vhost_foreach_listen_wsi(context, NULL, elops_listen_init_uloop);
 
 	/* static event loop objects */
 
@@ -217,20 +216,26 @@ elops_run_pt_uloop(struct lws_context *context, int tsi)
 	uloop_run();
 }
 
+static int
+elops_listen_destroy_uloop(struct lws_dll2 *d, void *user)
+{
+#if defined(LWS_WITH_SERVER)
+	struct lws *wsi = lws_container_of(d, struct lws, listen_list);
+	struct lws_wsi_eventlibs_uloop *wu = wsi_to_priv_uloop(wsi);
+
+	uloop_fd_delete(&wu->fd);
+#endif
+
+	return 0;
+}
+
 static void
 elops_destroy_pt_uloop(struct lws_context *context, int tsi)
 {
 	struct lws_context_per_thread *pt = &context->pt[tsi];
 	struct lws_pt_eventlibs_uloop *ptpr = pt_to_priv_uloop(pt);
-	struct lws_vhost *vh;
 
-	vh = context->vhost_list;
-	while (vh) {
-		if (vh->lserv_wsi)
-			uloop_fd_delete(&wsi_to_priv_uloop(vh->lserv_wsi)->fd);
-
-		vh = vh->vhost_next;
-	}
+	lws_vhost_foreach_listen_wsi(context, NULL, elops_listen_destroy_uloop);
 
 	uloop_timeout_cancel(&ptpr->hrtimer);
 	uloop_timeout_cancel(&ptpr->idle_timer);
@@ -295,6 +300,8 @@ static const struct lws_event_loop_ops event_loop_ops_uloop = {
 	/* run_pt */			elops_run_pt_uloop,
 	/* destroy_pt */		elops_destroy_pt_uloop,
 	/* destroy wsi */		elops_destroy_wsi_uloop,
+	/* foreign_thread */		NULL,
+	/* fake_POLLIN */		NULL,
 
 	/* flags */			0,
 

@@ -277,7 +277,10 @@ void new_conn_handler(evconnlistener* listener, evutil_socket_t fd, struct socka
 
   if (port->kind == PORT_TYPE_WEBSOCKET) {
     // For websocket connections, wait until they are handshake finished.
-    init_user_websocket(port->lws_context, fd);
+    if (init_user_websocket(port->lws_context, fd) == nullptr) {
+      debug_message("new_conn_handler: failed to adopt websocket fd %d.\n", (int)fd);
+      evutil_closesocket(fd);
+    }
     return;
   } else {
     // For other connections go straight to no handshake necessary, schedule to logon.
@@ -652,6 +655,14 @@ bool init_user_conn() {
     port.fd = fd;
     if (port.kind == PORT_TYPE_WEBSOCKET) {
       port.lws_context = init_websocket_context(g_event_base, &port);
+      if (port.lws_context == nullptr) {
+        // Fail closed: without a context every accepted connection would
+        // otherwise null-deref on first adoption.
+        debug_message("Unable to create websocket context for port %d.\n", port.port);
+        evconnlistener_free(port.ev_conn);
+        port.ev_conn = nullptr;
+        return false;
+      }
     }
   }
   return true;
