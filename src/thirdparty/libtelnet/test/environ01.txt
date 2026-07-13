@@ -1,2 +1,0 @@
-ENVIRON [2 parts] ==> SEND VAR "FOO" USERVAR "BAR"
-ENVIRON [0 parts] ==> SEND
