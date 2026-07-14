@@ -1,0 +1,13 @@
+// Fixture for testsuite/single/tests/efuns/dwlib_replace_objects.lpc:
+// an object whose name() (and therefore the master's object_name()
+// apply, which calls ob->name()) returns a string long enough to
+// overflow replace_objects()'s fixed 2000-byte buffer if unbounded.
+string name() {
+    string s;
+    int i;
+    s = "";
+    for (i = 0; i < 2100; i++) {
+        s += "x";
+    }
+    return s;
+}
