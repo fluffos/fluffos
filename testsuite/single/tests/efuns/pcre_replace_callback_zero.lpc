@@ -1,0 +1,12 @@
+// f_pcre_replace_callback() (src/packages/pcre/pcre.cc) allocated its
+// substrings array via pcre_get_substrings() *before* validating the
+// third argument, so passing the documented "no callback" sentinel (0)
+// on a pattern with capture groups took the error() path without ever
+// freeing that array -- a deterministic per-call leak. This just
+// exercises the path for a clean, catchable error; the leak itself is
+// verified separately (build with the fix reverted and compare
+// LeakSanitizer output across a run exercising this call many times).
+void do_tests() {
+    mixed err = catch(pcre_replace_callback("ab", "(a)(b)", 0));
+    ASSERT(err);
+}
