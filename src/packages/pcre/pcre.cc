@@ -103,7 +103,12 @@ void f_pcre_match() {
   array_t* v;
   int flag = 0;
   int pcre_flags = 0;
-  bool is_string = ((sp - 1)->type == T_STRING);
+  // The subject (1st arg) sits at sp - st_num_arg + 1 regardless of how
+  // many optional trailing args (flag, pcre_flags) are present; reading
+  // (sp - 1) here only happened to be correct for the 2-arg call form --
+  // with a 3rd (or 4th) argument on the stack, sp - 1 is the pattern (or
+  // flag) instead, always misidentifying array-mode calls as string-mode.
+  bool is_string = ((sp - st_num_arg + 1)->type == T_STRING);
 
   // optional 4th arg: pcre_flags
   if (st_num_arg > 3) {
