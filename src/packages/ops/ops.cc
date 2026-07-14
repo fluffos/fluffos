@@ -358,6 +358,11 @@ void f_lt() {
 void f_lsh() {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_LSH);
   CHECK_TYPES(sp, T_NUMBER, 2, F_LSH);
+  // A negative or >=64 (LPC_INT is int64_t) shift count is undefined
+  // behavior for '<<'.
+  if (sp->u.number < 0 || sp->u.number >= 64) {
+    error("Illegal shift amount to <<.\n");
+  }
   sp--;
   sp->u.number <<= (sp + 1)->u.number;
 }
@@ -370,6 +375,9 @@ void f_lsh_eq() {
   }
   if ((--sp)->type != T_NUMBER) {
     error("Bad right type to <<=\n");
+  }
+  if (sp->u.number < 0 || sp->u.number >= 64) {
+    error("Illegal shift amount to <<=.\n");
   }
   sp->u.number = argp->u.number <<= sp->u.number;
   sp->subtype = 0;
@@ -876,6 +884,11 @@ void f_extract_range(int code) {
 void f_rsh() {
   CHECK_TYPES((sp - 1), T_NUMBER, 1, F_RSH);
   CHECK_TYPES(sp, T_NUMBER, 2, F_RSH);
+  // A negative or >=64 (LPC_INT is int64_t) shift count is undefined
+  // behavior for '>>'.
+  if (sp->u.number < 0 || sp->u.number >= 64) {
+    error("Illegal shift amount to >>.\n");
+  }
   sp--;
   sp->u.number >>= (sp + 1)->u.number;
 }
@@ -888,6 +901,9 @@ void f_rsh_eq() {
   }
   if ((--sp)->type != T_NUMBER) {
     error("Bad right type to >>=\n");
+  }
+  if (sp->u.number < 0 || sp->u.number >= 64) {
+    error("Illegal shift amount to >>=.\n");
   }
   sp->u.number = argp->u.number >>= sp->u.number;
   sp->subtype = 0;

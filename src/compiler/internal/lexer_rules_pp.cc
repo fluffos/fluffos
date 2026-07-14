@@ -561,10 +561,22 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
         lhs = lhs > rhs;
         break;
       case 's':
-        lhs = lhs << rhs;
+        // A negative or >=64-bit (lhs/rhs are `long`) shift count is
+        // undefined behavior.
+        if (rhs < 0 || rhs >= 64) {
+          ifexpr_set_error(st, "shift amount out of range in #if");
+          lhs = 0;
+        } else {
+          lhs = lhs << rhs;
+        }
         break;
       case 'S':
-        lhs = lhs >> rhs;
+        if (rhs < 0 || rhs >= 64) {
+          ifexpr_set_error(st, "shift amount out of range in #if");
+          lhs = 0;
+        } else {
+          lhs = lhs >> rhs;
+        }
         break;
       case '+':
         lhs = lhs + rhs;
