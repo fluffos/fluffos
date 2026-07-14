@@ -175,12 +175,21 @@ void f_round() { sp->u.real = round(sp->u.real); }
    Yes, you could use dotprod() below to implement norm(), but in the interest
    of speed, norm() has less cases.
 */
-static LPC_FLOAT norm(array_t* a) {
+// norm()/vector_op() used to signal errors by returning special sentinel
+// float values (-INT_MAX, -INT_MAX+1, -INT_MAX+2) instead of a real
+// result. A legitimate result can coincide with one of those exact
+// values (e.g. a dotprod() of large-magnitude vectors landing on
+// -INT_MAX+1), which would misreport a valid computation as an error.
+// Report success/failure out-of-band instead.
+enum { VEC_OK = 0, VEC_ERR_SIZE_MISMATCH = -1, VEC_ERR_ARG1 = 1, VEC_ERR_ARG2 = 2 };
+
+static LPC_FLOAT norm(array_t* a, bool* ok) {
   // Length must come from the array we actually index (a), not sp->u.arr:
   // f_angle() calls norm((sp-1)->u.arr), a different array, so using sp's size
   // would read past `a` if the two ever differed in length.
   LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
+  *ok = true;
 
   while (len-- > 0) {
     if (a->item[len].type == T_NUMBER) {
@@ -188,7 +197,8 @@ static LPC_FLOAT norm(array_t* a) {
     } else if (a->item[len].type == T_REAL) {
       total += SQUARE(a->item[len].u.real);
     } else {
-      return -INT_MAX + 1;
+      *ok = false;
+      return 0;
     }
   }
 
@@ -196,9 +206,10 @@ static LPC_FLOAT norm(array_t* a) {
 }
 
 void f_norm() {
-  LPC_FLOAT const val = norm(sp->u.arr);
+  bool ok;
+  LPC_FLOAT const val = norm(sp->u.arr, &ok);
 
-  if (val == (-INT_MAX + 1)) {
+  if (!ok) {
     pop_stack();
     error("norm: invalid argument 1.\n");
     return;
@@ -211,12 +222,14 @@ void f_norm() {
 
 #if defined(F_DOTPROD) | defined(F_DISTANCE) | defined(F_ANGLE)
 static LPC_FLOAT vector_op(array_t* a, array_t* b,
-                           LPC_FLOAT (*func)(const LPC_FLOAT, const LPC_FLOAT)) {
+                           LPC_FLOAT (*func)(const LPC_FLOAT, const LPC_FLOAT), int* status) {
   LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
+  *status = VEC_OK;
 
   if (b->size != len) {
-    return -INT_MAX;
+    *status = VEC_ERR_SIZE_MISMATCH;
+    return 0;
   }
 
   while (len-- > 0) {
@@ -227,7 +240,8 @@ static LPC_FLOAT vector_op(array_t* a, array_t* b,
       } else if (a->item[len].type == T_REAL) {
         total += func(a->item[len].u.real, static_cast<LPC_FLOAT>(b->item[len].u.number));
       } else {
-        return -INT_MAX + 1;
+        *status = VEC_ERR_ARG1;
+        return 0;
       }
     } else if (b->item[len].type == T_REAL) {
       if (a->item[len].type == T_NUMBER) {
@@ -236,10 +250,12 @@ static LPC_FLOAT vector_op(array_t* a, array_t* b,
       } else if (a->item[len].type == T_REAL) {
         total += func(a->item[len].u.real, b->item[len].u.real);
       } else {
-        return -INT_MAX + 1;
+        *status = VEC_ERR_ARG1;
+        return 0;
       }
     } else {
-      return -INT_MAX + 2;
+      *status = VEC_ERR_ARG2;
+      return 0;
     }
   }
 
@@ -251,20 +267,23 @@ static LPC_FLOAT vector_op(array_t* a, array_t* b,
 static LPC_FLOAT dotprod_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return a * b; }
 
 /* dot product of two vectors */
-static LPC_FLOAT dotprod(array_t* a, array_t* b) { return vector_op(a, b, dotprod_mult); }
+static LPC_FLOAT dotprod(array_t* a, array_t* b, int* status) {
+  return vector_op(a, b, dotprod_mult, status);
+}
 
 void f_dotprod() {
-  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult);
+  int status;
+  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult, &status);
 
-  if (total == -INT_MAX) {
+  if (status == VEC_ERR_SIZE_MISMATCH) {
     pop_2_elems();
     error("dotprod: cannot take the dotprod of vectors of different sizes.\n");
     return;
   }
 
-  if ((total == (-INT_MAX + 1)) || (total == (-INT_MAX + 2))) {
+  if (status == VEC_ERR_ARG1 || status == VEC_ERR_ARG2) {
     pop_2_elems();
-    error("dotprod: invalid arg %d.\n", (total + INT_MAX));
+    error("dotprod: invalid arg %d.\n", status);
     return;
   }
 
@@ -278,17 +297,18 @@ static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQ
 
 /* The (Euclidian) distance between two points */
 void f_distance() {
-  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, distance_mult);
+  int status;
+  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, distance_mult, &status);
 
-  if (total == -INT_MAX) {
+  if (status == VEC_ERR_SIZE_MISMATCH) {
     pop_2_elems();
     error("distance: cannot take the distance of vectors of different sizes.\n");
     return;
   }
 
-  if ((total == (-INT_MAX + 1)) || (total == (-INT_MAX + 2))) {
+  if (status == VEC_ERR_ARG1 || status == VEC_ERR_ARG2) {
     pop_2_elems();
-    error("distance: invalid arg %d.\n", (total + INT_MAX));
+    error("distance: invalid arg %d.\n", status);
     return;
   }
 
@@ -300,32 +320,34 @@ void f_distance() {
 #ifdef F_ANGLE
 void f_angle() {
   LPC_FLOAT dot, norma, normb;
+  int status;
+  bool ok;
 
-  dot = dotprod((sp - 1)->u.arr, sp->u.arr);
+  dot = dotprod((sp - 1)->u.arr, sp->u.arr, &status);
 
-  if (dot <= (-INT_MAX + 2)) {
+  if (status != VEC_OK) {
     pop_2_elems();
-    if (dot == -INT_MAX) {
+    if (status == VEC_ERR_SIZE_MISMATCH) {
       error(
           "angle: cannot calculate the angle between vectors of different "
           "sizes.\n");
     } else {
-      error("angle: invalid arg %d.\n", (dot + INT_MAX));
+      error("angle: invalid arg %d.\n", status);
     }
     return;
   }
 
-  norma = norm((sp - 1)->u.arr);
+  norma = norm((sp - 1)->u.arr, &ok);
 
-  if (norma <= (-INT_MAX + 1)) {
+  if (!ok) {
     pop_2_elems();
     error("angle: invalid argument 1.\n");
     return;
   }
 
-  normb = norm(sp->u.arr);
+  normb = norm(sp->u.arr, &ok);
 
-  if (normb <= (-INT_MAX + 1)) {
+  if (!ok) {
     pop_2_elems();
     error("angle: invalid argument 2.\n");
     return;
