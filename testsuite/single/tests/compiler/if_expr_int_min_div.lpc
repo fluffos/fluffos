@@ -1,0 +1,31 @@
+// The #if preprocessor expression evaluator (ifexpr_binop() in
+// src/compiler/internal/lexer_rules_pp.cc) guarded '/' and '%' against a
+// zero divisor but not against divisor == -1 with a LONG_MIN dividend --
+// computing that directly is undefined behavior and traps (SIGFPE) on
+// x86, crashing the whole driver at COMPILE time. Compiling such an
+// expression must now produce a normal (successful or cleanly erroring)
+// compile instead of taking down the process.
+void do_tests() {
+    string src;
+    object ob;
+
+    // (-9223372036854775807-1) constructs LONG_MIN without lexing an
+    // out-of-range positive literal; dividing/modulo-ing it by -1 used
+    // to SIGFPE inside the preprocessor's constant-expression evaluator.
+    src = "#if (-9223372036854775807-1)/-1\n"
+          "int div_branch = 1;\n"
+          "#endif\n"
+          "#if (-9223372036854775807-1)%-1\n"
+          "int mod_branch = 1;\n"
+          "#endif\n"
+          "int marker = 7;\n";
+
+    rm("/gen_if_expr_int_min_div.c");
+    write_file("/gen_if_expr_int_min_div.c", src);
+
+    // Surviving this call is the regression signal.
+    ob = load_object("/gen_if_expr_int_min_div");
+    ASSERT2(objectp(ob), "compiling INT_MIN/-1 in a #if expression must not crash the driver");
+
+    rm("/gen_if_expr_int_min_div.c");
+}
