@@ -22,6 +22,8 @@
 
 #include "base/package_api.h"
 
+#include <string>
+
 #include "packages/parser/parser.h"
 #include "packages/core/outbuf.h"
 
@@ -40,7 +42,12 @@ enum {
   MAX_WORD_LENGTH = 1024,
   MAX_MATCHES = 10,
   CHAR_FUNC = 1024,
-  CHAR_BUF = 1024
+  CHAR_BUF = 1024,
+  // add_objects_from_array()/get_objects_from_array() recurse into nested
+  // T_ARRAY elements of the caller-supplied `environment` argument to
+  // parse_sentence()/parse_init() (parse_env); cap the depth so an
+  // arbitrarily deep-nested array literal can't overflow the C stack.
+  MAX_PARSE_ARRAY_DEPTH = 100
 };
 
 char* pluralize(char*);
@@ -77,6 +84,25 @@ static match_t matches[MAX_MATCHES];
 static int found_level = 0;
 static mapping_t* parse_nicks = nullptr;
 static array_t* parse_env = nullptr;
+// parse_rule()'s backtracking search (OBJ/OBS/STR/WRD tokens each retry
+// over every remaining word position, recursing into the rest of the
+// rule) is combinatorial in the number of words and tokens per rule; it
+// isn't governed by the normal LPC eval-cost limiter at all (this is
+// plain recursive C, not bytecode). A crafted rule + a long sentence can
+// still fail to match after a very large amount of backtracking, so cap
+// the total number of parse_rule() calls per parse_sentence() as a
+// backstop -- generous enough to never trigger on realistic rules/input.
+enum { MAX_PARSE_RULE_STEPS = 2000000 };
+static int parse_rule_steps = 0;
+// Once the step cap trips, every parse_rule() call (including ones already
+// pending higher up the recursion) returns immediately instead of
+// error()-ing -- error() would longjmp out through however many nested
+// parse_recurse()/parse_rule() frames are pending, skipping their normal
+// per-frame cleanup (e.g. parse_recurse()'s FREE_MSTR of its temporary
+// compound-word string) and leaking them. Aborting via plain returns
+// unwinds the same way an exhausted-but-unmatched search already does, so
+// this is indistinguishable from "no match found" to the LPC caller.
+static bool parse_rule_aborted = false;
 
 // A parse holds a raw pointer (parse_vn) into a verb node for its whole
 // duration, but the applies it runs (can_/direct_/do_) may destruct the
@@ -1060,7 +1086,7 @@ static void rec_add_object(object_t* ob, int flags) {
   }
 }
 
-static void add_objects_from_array(array_t* arr, int flags) {
+static void add_objects_from_array(array_t* arr, int flags, int depth = 0) {
   int i, f;
   int last_flags = 0;
   int last_was_me = 0;
@@ -1077,7 +1103,9 @@ static void add_objects_from_array(array_t* arr, int flags) {
         if (last_was_me) {
           f |= RAO_MY;
         }
-        add_objects_from_array(arr->item[i].u.arr, f);
+        if (depth < MAX_PARSE_ARRAY_DEPTH) {
+          add_objects_from_array(arr->item[i].u.arr, f, depth + 1);
+        }
       }
     }
     last_flags = 0;
@@ -1103,14 +1131,16 @@ static void add_objects_from_array(array_t* arr, int flags) {
   }
 }
 
-static void get_objects_from_array(array_t* arr) {
+static void get_objects_from_array(array_t* arr, int depth = 0) {
   int i;
 
   for (i = 0; i < arr->size; i++) {
     object_t* ob;
 
     if (arr->item[i].type == T_ARRAY) {
-      get_objects_from_array(arr->item[i].u.arr);
+      if (depth < MAX_PARSE_ARRAY_DEPTH) {
+        get_objects_from_array(arr->item[i].u.arr, depth + 1);
+      }
     }
     if (arr->item[i].type != T_OBJECT) {
       continue;
@@ -2945,7 +2975,19 @@ static void do_the_call() {
       return;
     }
   }
-  error("Parse accepted, but no do_* function found in object /%s!\n", ob->obname);
+  {
+    // Copy the name out, then release best_result's ref on `ob` (and its
+    // other allocations) *before* error() longjmps out of this function --
+    // otherwise the pending ref/allocations are only ever reclaimed by the
+    // next f_parse_sentence() call, which may never come. Capture the name
+    // first since dropping the ref can be the last one and free `ob`.
+    std::string obname = ob->obname;
+    if (best_result) {
+      free_parse_result(best_result);
+      best_result = nullptr;
+    }
+    error("Parse accepted, but no do_* function found in object /%s!\n", obname.c_str());
+  }
 }
 
 static void parse_rule(parse_state_t* state) {
@@ -2953,6 +2995,14 @@ static void parse_rule(parse_state_t* state) {
   parse_state_t local_state;
   match_t* mp;
   int start;
+
+  if (parse_rule_aborted) {
+    return;
+  }
+  if (++parse_rule_steps > MAX_PARSE_RULE_STEPS) {
+    parse_rule_aborted = true;
+    return;
+  }
 
   DEBUG_INC;
   DEBUG_P(("parse_rule"));
@@ -3200,6 +3250,8 @@ static void parse_sentence(const char* input) {
 
   reset_error();
   free_words();
+  parse_rule_steps = 0;
+  parse_rule_aborted = false;
   p = start = buf;
   flag = 0;
   inp = (unsigned char*)input;

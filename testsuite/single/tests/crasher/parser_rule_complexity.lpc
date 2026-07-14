@@ -1,0 +1,48 @@
+// parse_rule() (src/packages/parser/parser.cc) backtracks over every
+// possible word-split for each non-terminal STR/OBJ/OBS/LIV/LVS token in a
+// rule, recursing into the rest of the rule at each split point.
+// make_rule()'s "only two object tokens" cap does NOT apply to STR_TOKEN,
+// so a rule chaining many STR tokens against a sentence with enough words
+// makes the number of backtracking combinations combinatorial in the word
+// count -- and none of this is charged against the normal LPC eval-cost
+// limiter (it's plain C recursion, not bytecode). This used to be able to
+// run for a very long time before failing to match; it must now give up
+// (as a clean "no match", same as any other exhausted search) once
+// parse_rule()'s step cap trips.
+void create() {
+    parse_init();
+    if (clonep()) {
+        move_object(__FILE__);
+    }
+}
+
+void do_tests() {
+#ifndef __PACKAGE_PARSER__
+    write("no package parser, skipped.\n");
+#else
+    string sentence;
+    int i;
+    int start_ns, elapsed_ms;
+
+    clone_object(__FILE__);
+    // No object exists that the final OBJ token could ever match (empty
+    // inventory), so no split of the preceding STR tokens can ever
+    // complete the match -- forcing the unfixed driver to exhaustively
+    // backtrack through every way to divide the sentence's words among
+    // the 8 STR tokens before giving up.
+    parse_add_rule("frob", "STR STR STR STR STR STR STR STR OBJ");
+
+    sentence = "frob";
+    for (i = 0; i < 40; i++) {
+        sentence += " word" + i;
+    }
+
+    // No rule the parser knows about can match this sentence, so this is
+    // "no match" either way -- the regression signal is how long it takes
+    // to get there, not the return value itself.
+    start_ns = time_ns();
+    ASSERT_EQ(0, parse_sentence(sentence, 0, all_inventory()));
+    elapsed_ms = (time_ns() - start_ns) / 1000000;
+    ASSERT(elapsed_ms < 2000);
+#endif
+}

@@ -1,0 +1,36 @@
+// do_the_call() (src/packages/parser/parser.cc) tries up to 4 "do_..."
+// applies and, if none exist, calls error("Parse accepted, but no do_*
+// function found...") -- which used to longjmp out while best_result
+// still held a ref on the handler object (and its unfreed res[].func
+// name strings), leaking them until some later, unrelated
+// f_parse_sentence()/f_parse_my_rules() call happened to clean up the
+// stale global. A rule whose can_/direct_ applies exist but whose do_
+// applies don't reaches exactly this path. The ASSERT below just pins
+// that the error is still raised (behavior-preserving); the leak itself
+// shows up as a "Bad ref count"/"unaccounted node block" from the
+// debug-checker (per-file, or at final shutdown accounting if nothing
+// later happens to free the stale global first).
+
+int can_frob_wrd_obj() { return 1; }
+int direct_frob_wrd_obj() { return 1; }
+// Deliberately no do_frob_wrd_obj() (or any of its siblings): do_the_call()
+// must fail to find any of them.
+
+string* parse_command_id_list() { return ({ "thing" }); }
+
+void create() {
+    parse_init();
+    if (clonep()) {
+        move_object(__FILE__);
+    }
+}
+
+void do_tests() {
+#ifndef __PACKAGE_PARSER__
+    write("no package parser, skipped.\n");
+#else
+    clone_object(__FILE__);
+    parse_add_rule("frob", "WRD OBJ");
+    ASSERT(catch(parse_sentence("frob at thing", 0, all_inventory())));
+#endif
+}
