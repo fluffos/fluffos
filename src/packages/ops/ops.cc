@@ -37,6 +37,7 @@ void f_and_eq() {
     error("Bad right type to &=\n");
   }
   sp->u.number = argp->u.number &= sp->u.number;
+  argp->subtype = 0;
   sp->subtype = 0;
 }
 
@@ -54,6 +55,7 @@ void f_div_eq() {
       } else {
         argp->u.number /= sp->u.number;
       }
+      argp->subtype = 0;
       sp->u.number = argp->u.number;
       sp->subtype = 0;
       break;
@@ -380,6 +382,7 @@ void f_lsh_eq() {
     error("Illegal shift amount to <<=.\n");
   }
   sp->u.number = argp->u.number <<= sp->u.number;
+  argp->subtype = 0;
   sp->subtype = 0;
 }
 
@@ -400,6 +403,7 @@ void f_mod_eq() {
   } else {
     argp->u.number %= sp->u.number;
   }
+  argp->subtype = 0;
   sp->u.number = argp->u.number;
   sp->subtype = 0;
 }
@@ -410,6 +414,7 @@ void f_mult_eq() {
   switch (argp->type | sp->type) {
     case T_NUMBER: {
       sp->u.number = argp->u.number *= sp->u.number;
+      argp->subtype = 0;
       sp->subtype = 0;
       break;
     }
@@ -554,6 +559,7 @@ void f_or() {
   CHECK_TYPES(sp, T_NUMBER, 2, F_OR);
   sp--;
   sp->u.number |= (sp + 1)->u.number;
+  sp->subtype = 0;
 }
 
 void f_or_eq() {
@@ -573,6 +579,7 @@ void f_or_eq() {
     error("Bad right type to |=\n");
   }
   sp->u.number = argp->u.number |= sp->u.number;
+  argp->subtype = 0;
   sp->subtype = 0;
 }
 
@@ -906,6 +913,7 @@ void f_rsh_eq() {
     error("Illegal shift amount to >>=.\n");
   }
   sp->u.number = argp->u.number >>= sp->u.number;
+  argp->subtype = 0;
   sp->subtype = 0;
 }
 
@@ -915,6 +923,7 @@ void f_sub_eq() {
   switch (argp->type | sp->type) {
     case T_NUMBER: {
       sp->u.number = argp->u.number -= sp->u.number;
+      argp->subtype = 0;
       sp->subtype = 0;
       break;
     }
@@ -1213,6 +1222,8 @@ void f_xor_eq() {
     error("Bad right type to ^=\n");
   }
   sp->u.number = argp->u.number ^= sp->u.number;
+  argp->subtype = 0;
+  sp->subtype = 0;
 }
 
 void f_function_constructor() {
