@@ -49,6 +49,17 @@ struct ref_t {
   struct control_stack_t* csp;
   svalue_t* lvalue;
   svalue_t sv;
+
+  /* Set alongside lvalue == &global_lvalue_codepoint_sv (interpret.cc): this
+   * ref's OWN owning string and EGC index, so a concurrently-armed string-char
+   * lvalue elsewhere (another ref, or a plain s[i]) can't corrupt what this
+   * ref reads/writes. The shared global is re-armed from these right before
+   * each use (read via F_REF, write via F_REF_LVALUE); unused otherwise.
+   * ref_t is raw-malloc'd (make_ref()), so these carry no implicit default --
+   * make_ref() sets them, and they are only meaningful once the codepoint
+   * arming site (F_NEXT_FOREACH) also sets lvalue to the sentinel above. */
+  svalue_t* codepoint_owner;
+  int32_t codepoint_index;
 };
 
 /* values for type field of svalue struct */

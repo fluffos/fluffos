@@ -1,0 +1,38 @@
+// Pre/post inc/dec on a string-char lvalue (s[i]++, ++s[i], s[i]--,
+// --s[i]) must produce the correct VALUE (old for postfix, new for
+// prefix) and correctly mutate the character -- not leave a raw
+// internal T_LVALUE svalue on the stack (F_PRE_INC/F_POST_INC/
+// F_POST_DEC used to skip writing the result back to sp entirely), not
+// silently no-op the mutation (F_POST_INC's lambda used postfix c++,
+// which returns the OLD codepoint as the "new" one), and not throw
+// "-- of non-numeric argument" (F_PRE_DEC had no T_LVALUE_CODEPOINT
+// case at all).
+void do_tests() {
+    string s;
+    int x;
+
+    s = "ab";
+    x = s[0]++;
+    ASSERT_EQ('a', x);
+    ASSERT_EQ("bb", s);
+
+    s = "ab";
+    x = ++s[0];
+    ASSERT_EQ('b', x);
+    ASSERT_EQ("bb", s);
+
+    s = "ab";
+    x = s[1]--;
+    ASSERT_EQ('b', x);
+    ASSERT_EQ("aa", s);
+
+    s = "ab";
+    x = --s[1];
+    ASSERT_EQ('a', x);
+    ASSERT_EQ("aa", s);
+
+    // Bare statement form (result discarded) must still work.
+    s = "ab";
+    s[0]++;
+    ASSERT_EQ("bb", s);
+}
