@@ -209,6 +209,8 @@ ref_t* make_ref(void) {
   global_ref_list = ref;
   ref->csp = csp;
   ref->ref = 1;
+  ref->codepoint_owner = nullptr;
+  ref->codepoint_index = 0;
   return ref;
 }
 
@@ -2206,6 +2208,15 @@ void eval_instruction(char* p) {
          */
         ref = make_ref();
         ref->lvalue = sp->u.lvalue;
+        if (ref->lvalue == &global_lvalue_codepoint_sv) {
+          // sp->u.lvalue can be the shared codepoint sentinel here (e.g. a
+          // call-site `f(ref s[i])`, armed by push_indexed_lvalue just
+          // before this opcode runs) -- capture ITS owner/index onto this
+          // ref, or a later F_REF/F_REF_LVALUE has nothing of its own to
+          // re-arm the shared scratch state from.
+          ref->codepoint_owner = global_lvalue_codepoint.owner;
+          ref->codepoint_index = global_lvalue_codepoint.index;
+        }
         if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE && op != F_REF_LVALUE) {
           ref->sv.type = lv_owner_type;
           ref->sv.subtype = STRING_MALLOC; /* ignored if non-string */
@@ -2255,9 +2266,12 @@ void eval_instruction(char* p) {
             push_number(*reflval->u.lvalue_byte);
             break;
           } else if (reflval->type == T_LVALUE_CODEPOINT) {
-            push_number(u8_egc_index_as_single_codepoint(
-                global_lvalue_codepoint.owner->u.string,
-                SVALUE_STRLEN(global_lvalue_codepoint.owner), global_lvalue_codepoint.index));
+            // Read from THIS ref's own owner/index, not the shared scratch
+            // global -- a concurrently-armed string-char lvalue elsewhere
+            // (another ref, or a plain s[i]) must not corrupt this read.
+            svalue_t* owner = s->u.ref->codepoint_owner;
+            push_number(u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner),
+                                                          s->u.ref->codepoint_index));
             break;
           }
         }
@@ -2274,6 +2288,14 @@ void eval_instruction(char* p) {
 
         if (s->type == T_REF) {
           if (s->u.ref->lvalue) {
+            if (s->u.ref->lvalue == &global_lvalue_codepoint_sv) {
+              // The lvalue consumer (=, ++, --, +=, -=) reads/writes through
+              // the shared scratch global; re-arm it from THIS ref's own
+              // owner/index right before use, since it may have been
+              // retargeted by another string-char lvalue since this ref was
+              // armed.
+              aim_lvalue_codepoint(s->u.ref->codepoint_owner, s->u.ref->codepoint_index);
+            }
             STACK_INC;
             sp->type = T_LVALUE;
             sp->u.lvalue = s->u.ref->lvalue;
@@ -3014,6 +3036,8 @@ void eval_instruction(char* p) {
                * tests/operators/foreach.lpc. */
               aim_lvalue_codepoint(owner, idx);
               sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
+              sp->u.ref->codepoint_owner = owner;
+              sp->u.ref->codepoint_index = idx;
             } else {
               free_svalue(sp->u.lvalue, "foreach-string");
               sp->u.lvalue->type = T_NUMBER;
@@ -3461,6 +3485,14 @@ void eval_instruction(char* p) {
             sp->subtype = 0;
             sp->u.number = --(*lval->u.lvalue_byte);
             break;
+          case T_LVALUE_CODEPOINT: {
+            LPC_INT newval = 0;
+            assign_lvalue_codepoint([&newval](UChar32 c) { return newval = --c; });
+            sp->type = T_NUMBER;
+            sp->subtype = 0;
+            sp->u.number = newval;
+            break;
+          }
           default:
             error("-- of non-numeric argument\n");
         }
@@ -3587,9 +3619,14 @@ void eval_instruction(char* p) {
             sp->subtype = 0;
             sp->u.number = ++*lval->u.lvalue_byte;
             break;
-          case T_LVALUE_CODEPOINT:
-            assign_lvalue_codepoint([](UChar32 c) { return ++c; });
+          case T_LVALUE_CODEPOINT: {
+            LPC_INT newval = 0;
+            assign_lvalue_codepoint([&newval](UChar32 c) { return newval = ++c; });
+            sp->type = T_NUMBER;
+            sp->subtype = 0;
+            sp->u.number = newval;
             break;
+          }
           default:
             error("++ of non-numeric argument\n");
         }
@@ -4034,9 +4071,17 @@ void eval_instruction(char* p) {
             sp->subtype = 0;
             sp->u.number = (*lval->u.lvalue_byte)--;
             break;
-          case T_LVALUE_CODEPOINT:
-            assign_lvalue_codepoint([](UChar32 c) { return --c; });
+          case T_LVALUE_CODEPOINT: {
+            LPC_INT oldval = 0;
+            assign_lvalue_codepoint([&oldval](UChar32 c) {
+              oldval = c;
+              return --c;
+            });
+            sp->type = T_NUMBER;
+            sp->subtype = 0;
+            sp->u.number = oldval;
             break;
+          }
           default:
             error("-- of non-numeric argument\n");
         }
@@ -4062,9 +4107,17 @@ void eval_instruction(char* p) {
             sp->u.number = (*lval->u.lvalue_byte)++;
             sp->subtype = 0;
             break;
-          case T_LVALUE_CODEPOINT:
-            assign_lvalue_codepoint([](UChar32 c) { return c++; });
+          case T_LVALUE_CODEPOINT: {
+            LPC_INT oldval = 0;
+            assign_lvalue_codepoint([&oldval](UChar32 c) {
+              oldval = c;
+              return c + 1;
+            });
+            sp->type = T_NUMBER;
+            sp->subtype = 0;
+            sp->u.number = oldval;
             break;
+          }
           default:
             error("++ of non-numeric argument\n");
         }

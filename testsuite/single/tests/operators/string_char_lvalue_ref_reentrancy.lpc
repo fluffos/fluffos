@@ -1,0 +1,21 @@
+// foreach(int ref c in a_string) arms the ONE shared VM-level scratch
+// slot (global_lvalue_codepoint) with the loop's owner/index, but used
+// to read the ref's VALUE straight back off that same shared slot
+// (F_REF) instead of state private to the ref itself. Any other
+// string-char lvalue operation in the loop body -- even on a
+// completely unrelated string -- retargets the shared slot and
+// silently corrupts what the ref reads next.
+void do_tests() {
+    string outer, inner, got;
+
+    outer = "AB";
+    inner = "xy";
+    got = "";
+    foreach (int ref c in outer) {
+        inner[0]++;  // unrelated string-char lvalue op, same shared VM slot
+        got += sprintf("%c", c);
+    }
+    ASSERT_EQ("AB", got);
+    // inner[0] incremented once per outer-loop iteration: 'x'->'y'->'z'.
+    ASSERT_EQ("zy", inner);
+}
