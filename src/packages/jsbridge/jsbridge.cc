@@ -79,7 +79,19 @@ void mark_callback_refs(svalue_t* call_back, object_t* ob) {
     ob->extra_ref++;
   }
   if (call_back->type == T_STRING) {
-    EXTRA_REF(BLOCK(call_back->u.string))++;
+    // call_back can hold any string subtype (assign_svalue_no_free() only
+    // bumps a real ref count for STRING_MALLOC/STRING_SHARED); blindly
+    // treating a STRING_CONSTANT literal as preceded by a block_t header
+    // and bumping ".extra_ref" there corrupts whatever memory actually
+    // precedes it. Mirror checkmemory.cc's mark_svalue() dispatch.
+    switch (call_back->subtype) {
+      case STRING_MALLOC:
+        MSTR_EXTRA_REF(call_back->u.string)++;
+        break;
+      case STRING_SHARED:
+        EXTRA_REF(BLOCK(call_back->u.string))++;
+        break;
+    }
   } else if (call_back->type == T_FUNCTION) {
     call_back->u.fp->hdr.extra_ref++;
   }
