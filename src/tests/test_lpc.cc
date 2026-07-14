@@ -145,6 +145,63 @@ TEST_F(DriverTest, TestLPC_FunctionInherit) {
   pop_context(&econ);
 }
 
+// move_object() lazily calls try_reset() on the destination just before
+// linking the moved item into it. reset() is arbitrary LPC and can
+// self-destruct the destination as a perfectly ordinary side effect (no
+// error() involved, so safe_apply() inside try_reset() doesn't catch it).
+// move_object() must recheck O_DESTRUCTED afterward instead of linking the
+// item into (or out of) an object that's no longer live.
+TEST_F(DriverTest, TestMoveObjectDestructDuringReset) {
+  auto saved_lazy_resets = CONFIG_INT(__RC_LAZY_RESETS__);
+  auto saved_no_resets = CONFIG_INT(__RC_NO_RESETS__);
+  auto saved_gametick = g_current_gametick;
+  CONFIG_INT(__RC_LAZY_RESETS__) = 1;
+  CONFIG_INT(__RC_NO_RESETS__) = 0;
+  // try_reset()'s "is a reset due" check is next_reset < g_current_gametick;
+  // the test harness never pumps the backend loop, so make sure the clock
+  // side of that comparison is unambiguously past whatever next_reset ends
+  // up being.
+  g_current_gametick += 1000000;
+
+  current_object = master_ob;
+  object_t* dest = nullptr;
+  object_t* item = nullptr;
+  bool errored = false;
+
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    dest = find_object("/clone/move_object_reset_dest");
+    item = find_object("/clone/move_object_item");
+    ASSERT_NE(dest, nullptr);
+    ASSERT_NE(item, nullptr);
+    // Loading an object already schedules its first reset in the future
+    // (call_create() -> set_nextreset()); force it due now so
+    // try_reset() actually fires inside move_object() below.
+    dest->next_reset = 0;
+    dest->flags &= ~O_RESET_STATE;
+    move_object(item, dest);
+  } catch (...) {
+    errored = true;
+    restore_context(&econ);
+  }
+  if (!errored) {
+    pop_context(&econ);
+  }
+
+  CONFIG_INT(__RC_LAZY_RESETS__) = saved_lazy_resets;
+  CONFIG_INT(__RC_NO_RESETS__) = saved_no_resets;
+  g_current_gametick = saved_gametick;
+
+  // dest self-destructed out of reset(); move_object() must have errored
+  // out instead of linking item into it.
+  EXPECT_TRUE(errored);
+  ASSERT_NE(dest, nullptr);
+  EXPECT_TRUE(dest->flags & O_DESTRUCTED);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->super, nullptr);
+}
+
 // issue #968: with "reversible explode string" semantics, a string made
 // entirely of delimiters must still split into n+1 empty fields so that
 // implode(explode(s, d), d) == s.
