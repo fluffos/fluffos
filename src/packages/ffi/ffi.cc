@@ -710,12 +710,15 @@ void f_ffi_struct_layout() {
 
   // Compute each field's aligned offset and the struct's total size,
   // following the natural C alignment (align == size for scalars here).
-  array_t* offs = allocate_array(n);
+  // unique_ptr with free_array as the deleter so an error() unwind (an
+  // unrecognized FFI type code via type_size()/code_to_type(), or a bad
+  // field type) frees `offs` instead of leaking it -- same pattern as
+  // f_ffi_callback() above.
+  std::unique_ptr<array_t, void (*)(array_t*)> offs(allocate_array(n), free_array);
   int cur = 0;
   int max_align = 1;
   for (int i = 0; i < n; i++) {
     if (fields->item[i].type != T_NUMBER) {
-      free_array(offs);
       error("ffi_struct_layout: field-type array must hold ints.\n");
     }
     int code = fields->item[i].u.number;
@@ -741,7 +744,7 @@ void f_ffi_struct_layout() {
   result->item[0].subtype = 0;
   result->item[0].u.number = cur;
   result->item[1].type = T_ARRAY;
-  result->item[1].u.arr = offs;  // ref transferred
+  result->item[1].u.arr = offs.release();  // ref transferred
   pop_stack();
   push_refed_array(result);
 }
