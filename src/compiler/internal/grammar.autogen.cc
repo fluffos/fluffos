@@ -1744,7 +1744,7 @@ int yydebug;
 struct yypstate
   {
     /* Number of syntax errors so far.  */
-    int yynerrs YY_ATTRIBUTE_UNUSED;
+    int yynerrs;
 
     yy_state_fast_t yystate;
     /* Number of tokens to shift before error messages enabled.  */
@@ -4270,3 +4270,4 @@ yypushreturn:
 #undef yyes_capacity
 #line 1159 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
+/* FluffOS generated-from grammar.y sha256=1e0b0dc0115624b2604b675a147b6ef88d5e9f72cbc76dc9e48b661f1a4eeacc */
