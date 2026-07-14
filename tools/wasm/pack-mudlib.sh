@@ -7,7 +7,9 @@
 #   fluffos.js / fluffos.wasm   the driver (from a `wasm` preset build)
 #   mudlib.js / mudlib.data     your mudlib, packed for the in-memory FS
 #   fluffos-boot.js             mount point + config file for the page
-#   index.html                  the web terminal (telnet client included)
+#   index.html                  the web terminal page
+#   telnet.js                   the telnet client layer (shared with src/www)
+#   vendor/                     xterm.js + fit addon (the terminal emulator)
 #
 # Usage:
 #   tools/wasm/pack-mudlib.sh --mudlib <dir> --config <relative path> \
@@ -114,12 +116,18 @@ EOF
 echo "== driver + web shell"
 cp "$DRIVER_DIR/fluffos.js" "$DRIVER_DIR/fluffos.wasm" "$OUT/"
 # Prefer an index.html shipped next to a --driver dir (release zips), then
-# the layout-derived default.
+# the layout-derived default.  The page's companions ship alongside it:
+# vendor/ (xterm.js + fit addon, vendored from npm under src/www/vendor)
+# and telnet.js (the shared telnet client).
 if [ -f "$DRIVER_DIR/index.html" ]; then
+  SHELL_DIR="$DRIVER_DIR"
   cp "$DRIVER_DIR/index.html" "$OUT/"
 else
+  SHELL_DIR="$(dirname "$SHELL_HTML")/.."
   cp "$SHELL_HTML" "$OUT/"
 fi
+[ -d "$SHELL_DIR/vendor" ] && cp -r "$SHELL_DIR/vendor" "$OUT/"
+[ -f "$SHELL_DIR/telnet.js" ] && cp "$SHELL_DIR/telnet.js" "$OUT/"
 
 echo
 echo "Done: $OUT"

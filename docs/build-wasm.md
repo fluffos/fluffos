@@ -26,7 +26,12 @@ and isn't supported) see
 
 * **Emscripten** (`emcc`, `emcmake`, `emmake` on PATH) — install via
   [emsdk](https://emscripten.org/docs/getting_started/downloads.html), or
-  your distro package (`apt install emscripten`).
+  your distro package (`apt install emscripten`). **Avoid emsdk 6.0.2**: it
+  defaulted `GROWABLE_ARRAYBUFFERS=1`, and in browsers with wasm
+  resizable-ArrayBuffer support the driver fails on boot with
+  `getRandomValues ... must not be resizable` (and jsbridge string passing
+  breaks the same way). Use 6.0.3+ — the version CI pins is in
+  `.github/actions/build-wasm/action.yml`.
 * A **native toolchain** plus the usual FluffOS build deps (OpenSSL/ICU
   headers): the codegen tools run on the build machine, and ICU's cross
   build needs a native ICU build first.

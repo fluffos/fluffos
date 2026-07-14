@@ -149,8 +149,11 @@ private mixed *csi_final(string p, int c) {
       return ({ mod | TUI_KEY_F2 });
     case 'S':
       return ({ mod | TUI_KEY_F4 });
-    case 'R':  // cursor position report (response to ESC[6n)
-      if (sizeof(ps) == 2) return ({ ({ TUI_EV_CPR, ps[0], ps[1] }) });
+    case 'R':  // F3, or a cursor position report (response to ESC[6n).
+      // xterm sends modified F3 as ESC[1;mR, colliding with a CPR for
+      // row 1.  Nothing in /std/tui ever sends ESC[6n, so prefer the key:
+      // ps[0] == 1 is F3-with-modifier, anything else two-param is a CPR.
+      if (sizeof(ps) == 2 && ps[0] != 1) return ({ ({ TUI_EV_CPR, ps[0], ps[1] }) });
       return ({ mod | TUI_KEY_F3 });
   }
   return ({ TUI_KEY_UNKNOWN });

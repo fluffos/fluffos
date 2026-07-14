@@ -35,12 +35,12 @@ void got_command(mixed line, int state) {
 
 Every prompt now has Emacs/readline editing: cursor motion (arrows,
 Ctrl-A/E/B/F, word motion Alt-B/F or Ctrl-arrows), kill/yank
-(Ctrl-K/U/W/Y, Alt-D), Ctrl-T transpose, ↑/↓ history, Ctrl-R/Ctrl-S
-incremental history search, Tab completion (pass a `"completer"` function in
-the options), bracketed paste, masked input (`"masked": 1` for passwords),
-wide-character (CJK) aware rendering with horizontal scrolling, and live
-terminal-resize handling via NAWS.  History persists per user object across
-calls.
+(Ctrl-K/U/W/Y, Alt-D), Ctrl-T transpose, Ctrl-_ undo, ↑/↓ history,
+Ctrl-R/Ctrl-S incremental history search, Tab completion (pass a
+`"completer"` function in the options), bracketed paste, masked input
+(`"masked": 1` for passwords), wide-character (CJK) aware rendering with
+horizontal scrolling, and live terminal-resize handling via NAWS.  History
+persists per user object across calls.
 
 ## Inline prompts and printers (the pterm layer)
 
@@ -55,8 +55,11 @@ tui_confirm((: sure :), "Delete the character?", 0);
 // -> sure(int yes, int state)
 ```
 
-Arrows navigate, Space toggles, Enter accepts, Esc/Ctrl-C aborts; on
-completion the list collapses to a one-line `? prompt: answer` record.
+Arrows navigate, Space toggles, Enter accepts, Esc/Ctrl-C aborts, and
+typing printable text filters the choices live (case-insensitive
+substring; Backspace edits the query — result indexes always refer to the
+original choices array).  On completion the list collapses to a one-line
+`? prompt: answer` record.
 
 `/std/tui/print` is a set of stateless printers that compose with `write()`:
 `p_table()` (boxed, width-aware), `p_tree()`, `p_bars()` (bar chart),

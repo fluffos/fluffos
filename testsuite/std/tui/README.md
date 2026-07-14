@@ -149,6 +149,7 @@ Default keymap (emacs/readline):
 | Enter | accept → `TUI_RL_DONE` |
 | C-c | abort → `TUI_RL_ABORT` |
 | C-l | clear screen and repaint the line |
+| C-_ | undo (snapshots taken per buffer-changing key, 200 deep) |
 
 Rendering: single logical line with horizontal scrolling when
 `visible_width(prompt+buffer) >= cols` (busybox/readline `--horizontal-scroll`
@@ -188,16 +189,16 @@ inspired by the pterm and blessed catalogs):
 | Widget | Behavior | Events |
 |---|---|---|
 | `label` | static (multi-line) text | — |
-| `list` | scrollable single-select list | `select`, `change` |
-| `table` | column-aligned rows + header, scroll + selection | `select`, `change` |
-| `tree` | collapsible tree (`▸`/`▾`), ←/→/Enter fold | `select`, `change` |
+| `list` | scrollable single-select list; wheel scrolls | `select`, `change` |
+| `table` | column-aligned rows + header, scroll + selection; click/wheel aware | `select`, `change` |
+| `tree` | collapsible tree (`▸`/`▾`), ←/→/Enter fold, ← on a leaf jumps to its parent; wheel scrolls | `select`, `change` |
 | `textfield` | single-line input backed by a full readline engine | `submit` |
 | `checklist` | `[x]` multi-select, Space toggles | `change` |
 | `radiolist` | `(•)` single-choice group | `change` |
 | `button` | `[ OK ]`, Enter/Space presses | `press` |
 | `progress` | label + bar + percentage | — |
 | `spinner` | braille spinner; app drives `tick()` from its own call_out | — |
-| `log` | bottom-anchored scrollback pane (PgUp/PgDn) | — |
+| `log` | bottom-anchored scrollback pane (PgUp/PgDn, wheel) | — |
 | `chart` | braille line chart with rolling history (`add_point()`), multi-series | — |
 
 ### 2.5 `print.lpc` — inline printers (stateless, inheritable)
@@ -232,8 +233,14 @@ pterm's interactive prompts, MUD-style: a prompt plus a scrolling choice
 list rendered *in the normal output flow* and repainted in place with
 relative cursor movement; on completion it collapses to a one-line
 `? prompt: answer` record. Space toggles in multi mode, Enter accepts,
-Esc/Ctrl-C aborts, long lists window with `height`. Same engine API shape
-as readline: `m_begin/m_feed/m_take_output/m_result`.
+Esc/Ctrl-C aborts, long lists window with `height` (with `…` indicators
+on both overflow edges). Typing printable text filters the choices live
+(pterm types-to-filter; case-insensitive substring, Backspace edits the
+query) — results always index the ORIGINAL choices array. Rendered lines
+clip to the terminal width (`m_set_width`, fed by the glue and re-fed on
+every NAWS resize via `m_redraw()`), so long items can never wrap and
+desync the in-place repaint. Same engine API shape as readline:
+`m_begin/m_feed/m_take_output/m_result` (+ `m_filter/m_set_width/m_redraw`).
 
 ### 2.7 `terminal.lpc` — the only impure module (inheritable)
 
@@ -310,6 +317,12 @@ non-interactive testsuite files:
 * `tui/charts.lpc` — canvas dot/braille math (exact glyphs), line
   drawing, `c_plot` endpoints, and exact `p_vbars` output; chart/heatmap
   structure checks; the chart widget's rolling window.
+* `tui/fixes.lpc` — pinned regressions: `wslice` zero-width handling,
+  `ESC[1;mR` vs CPR decoding, readline dual scroll markers / undo /
+  isearch-vs-mouse / completion, menu clipping + filter + indicators,
+  widget wheel support, tree parent jump, focus cycling, and app teardown
+  on a terminal-initiated close (mock terminal drives the app_quit ↔
+  tui_close reentry cycle).
 
 Clones are destructed at test end (DEBUGMALLOC `check_memory()` runs after
 every file). The interactive glue is kept too thin to need a terminal to
@@ -374,15 +387,14 @@ non-ASCII input and escape sequences under default configs.
 * **Multi-line soft-wrapped editing** (readline renders one terminal row with
   horizontal scroll). The engine's render layer is isolated, so a wrap
   renderer can replace it without touching editing logic.
-* **Undo** (C-_), **kill ring** beyond a single buffer, vi keymap.
+* **Kill ring** beyond a single buffer, vi keymap. (Single-level-stack
+  undo — C-_ — IS implemented.)
 * **Grapheme-cluster cursor motion** — cursor moves by codepoint; combining
   marks may take two arrow presses. (Display width is still correct.)
 * **terminfo** — we emit the VT100/xterm common subset that every MUD client,
   xterm.js, and modern terminal understands; `terminal_type` is cached and
   exposed so apps can special-case, but the library does not vary output.
 * **Scroll-region / insert-line diff optimizations** in the renderer.
-* **Fuzzy filtering in select/multiselect** (pterm types-to-filter; our menu
-  navigates only — the engine's input path has room for it).
 * From the pterm/blessed catalogs, deliberately not ported: pterm's Area
   and theming, blessed's FileManager, Terminal, Image/Video and
   absolute-positioned Layout manager — MUD-side value didn't justify the
