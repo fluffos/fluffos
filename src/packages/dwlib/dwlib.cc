@@ -731,24 +731,42 @@ void f_roulette_wheel() {
   free_mapping(m);
 }
 
+// Appends up to (bufsize - 1 - *len) bytes of `text` to buf[*len..], always
+// NUL-terminating and never writing past bufsize. `text` need not be
+// NUL-terminated at `textlen` (used for LPC strings, which may embed NULs).
+static void append_bounded(char* buf, size_t bufsize, size_t* len, const char* text,
+                            size_t textlen) {
+  size_t avail = (*len < bufsize) ? bufsize - 1 - *len : 0;
+  if (textlen > avail) {
+    textlen = avail;
+  }
+  memcpy(buf + *len, text, textlen);
+  *len += textlen;
+  buf[*len] = '\0';
+}
+
 svalue_t replace_tmp = {T_NUMBER};
 svalue_t* replace_objects(svalue_t* thing) {
   int i;
   switch (thing->type) {
     case T_OBJECT: {
+      // thing->u.ob->obname and, especially, the master's object_name()
+      // apply below are arbitrary-length and mudlib/master-controlled --
+      // bound every copy into this fixed buffer instead of strcpy/strcat.
       char buf[2000];
-      strcpy(buf, thing->u.ob->obname);
+      size_t len = 0;
+      append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
       svalue_t* tmp = nullptr;
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
         push_object(thing->u.ob);
         tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
       } else {
-        strcat(buf, " (destructed)");
+        append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
       }
       if (tmp && tmp->type == T_STRING) {
-        strcat(buf, " (\"");
-        strcat(buf, tmp->u.string);
-        strcat(buf, "\")");
+        append_bounded(buf, sizeof(buf), &len, " (\"", 3);
+        append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp));
+        append_bounded(buf, sizeof(buf), &len, "\")", 2);
       }
       copy_and_push_string(buf);
       assign_svalue(&replace_tmp, sp);

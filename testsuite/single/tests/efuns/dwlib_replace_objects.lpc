@@ -1,0 +1,16 @@
+// replace_objects() (src/packages/dwlib/dwlib.cc) formats an object
+// reference into a fixed 2000-byte stack buffer, including whatever
+// string the master's object_name() apply returns -- an arbitrary-length,
+// mudlib-controlled string. The copies into that buffer must be bounded.
+void do_tests() {
+    object ob = load_object("/clone/dwlib_long_name");
+
+    // Surviving this call is the regression signal: an unbounded copy of
+    // the ~2100-char name() result overflows the 2000-byte stack buffer
+    // and ASan-aborts the whole process before replace_objects() returns.
+    // replace_objects() formats an object reference as a description
+    // string; it must come back bounded, not crash the driver.
+    mixed result = replace_objects(ob);
+    ASSERT(stringp(result));
+    ASSERT(strlen(result) < 2000);
+}
