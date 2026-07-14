@@ -1,0 +1,5 @@
+// Fixture for the TestMoveObjectDestructDuringReset gtest
+// (src/tests/test_lpc.cc): self-destructs from reset(), which
+// move_object() (src/vm/internal/simulate.cc) can trigger via a lazy
+// try_reset() on the destination just before linking an item into it.
+void reset() { destruct(); }

@@ -1,0 +1,3 @@
+// Fixture for the TestMoveObjectDestructDuringReset gtest
+// (src/tests/test_lpc.cc): a plain object to be moved.
+int f() { return 1; }

@@ -2019,6 +2019,14 @@ void move_object(object_t* item, object_t* dest) {
 
   if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
     try_reset(dest);
+    // try_reset() runs dest's reset() apply, arbitrary LPC that can
+    // destruct dest (or, via some other reachable path, item) as a side
+    // effect -- never know what can happen (see clone_object()'s recheck
+    // after call_create()). Linking item into/out of a destructed object
+    // below would corrupt the object graph.
+    if ((dest->flags & O_DESTRUCTED) || (item->flags & O_DESTRUCTED)) {
+      error("move_object(): the object was destructed during reset()\n");
+    }
   }
 #ifndef NO_LIGHT
   add_light(dest, item->total_light);
