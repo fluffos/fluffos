@@ -444,7 +444,10 @@ object_t* load_object(const char* lname, int callcreate) {
   object_t* ob;
   svalue_t* mret;
   struct stat c_st;
-  char name[400], actualname[400], real_name[sizeof(name) + 2], obname[sizeof(real_name)];
+  // real_name/obname hold `actualname`/`name` (each up to 399 chars of
+  // content) plus a 4-char extension (".lpc"/".c") and a NUL -- +2 is not
+  // enough headroom (up to 404 bytes needed); +5 covers the worst case.
+  char name[400], actualname[400], real_name[sizeof(name) + 5], obname[sizeof(real_name)];
 
   // Count this load BEFORE the valid_read master apply: a master whose
   // valid_read itself triggers loads used to recurse through
