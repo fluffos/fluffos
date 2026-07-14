@@ -247,6 +247,10 @@ void f_pcre_replace() {
     st_num_arg--;
   }
 
+  if (sp->type != T_ARRAY) {
+    error("Bad argument 3 to pcre_replace()\n");
+  }
+
   run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
 
   run->ovector = nullptr;
@@ -285,6 +289,12 @@ void f_pcre_replace() {
     pop_2_elems();
     return;
     // push_malloced_string(run->subject);
+  }
+
+  for (int i = 0; i < replacements->size; i++) {
+    if (replacements->item[i].type != T_STRING) {
+      error("Bad argument 3 to pcre_replace(): replacement array must contain only strings.\n");
+    }
   }
 
   ret = pcre_get_replace(run, replacements);
@@ -341,6 +351,7 @@ void f_pcre_replace_callback() {
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
     process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
   } else {  // 0
+    free_array(arr);
     error("Illegal third argument (0) to pcre_replace_callback");
   }
 
@@ -604,6 +615,7 @@ static array_t* pcre_match(array_t* v, const char* pattern, int flag, int pcre_f
   }
 
   res = (char*)DMALLOC(size, TAG_TEMPORARY, "prcre_match: res");
+  DEFER { FREE(res); };
   sv1 = v->item + size;
   num_match = 0;
 
@@ -656,7 +668,6 @@ static array_t* pcre_match(array_t* v, const char* pattern, int flag, int pcre_f
       }
     }
   }
-  FREE(res);
 
   return ret;
 }
@@ -782,6 +793,22 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
       if (rmp->begin == tmp && (!*++tmp)) {
         break;
       }
+    }
+
+    // Validate the result array size BEFORE allocating it: allocate_empty_array()
+    // itself error()s past this limit, which would unwind past rgpp/rmph/ret
+    // (none of which are RAII-guarded here) and leak them all.
+    if (2 * num_match + 1 > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+      for (i = 0; i < size; i++) {
+        pcre_free_memory(rgpp[i]);
+      }
+      FREE(rgpp);
+      while ((rmp = rmph)) {
+        rmph = rmp->next;
+        FREE((char*)rmp);
+      }
+      free_empty_array(ret);
+      error("Too many matches (%d) for pcre_assoc().\n", num_match);
     }
 
     sv = ret->item;

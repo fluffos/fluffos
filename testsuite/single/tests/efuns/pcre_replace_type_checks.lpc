@@ -1,0 +1,22 @@
+// pcre_replace() (src/packages/pcre/pcre.cc) trusted its 3rd argument's
+// declared "string *" spec type with no runtime check (spec types are a
+// compile-time hint only; a "mixed" value bypasses them), and trusted
+// every array element to be a string. Both a non-array argument and a
+// non-string element used to reinterpret garbage bits as a char* and
+// crash the driver; both must now be clean, catchable errors, and the
+// well-typed case must keep working exactly as before.
+void do_tests() {
+    mixed err;
+    mixed non_array;
+    mixed bad_elems;
+
+    non_array = 5;
+    err = catch(pcre_replace("ab cd", "(\\w+) (\\w+)", non_array));
+    ASSERT(err);
+
+    bad_elems = ({1, 2});
+    err = catch(pcre_replace("ab cd", "(\\w+) (\\w+)", bad_elems));
+    ASSERT(err);
+
+    ASSERT_EQ("cd ab", pcre_replace("ab cd", "(\\w+) (\\w+)", ({"cd", "ab"})));
+}
