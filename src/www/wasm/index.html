@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FluffOS — WebAssembly driver</title>
+<link rel="stylesheet" href="vendor/xterm.css">
 <style>
   :root {
     --bg: #0b0e14; --fg: #d5dbe5; --dim: #6b7484; --accent: #7aa2f7;
@@ -22,18 +23,17 @@
   }
   header h1 { font-size: 15px; margin: 0; color: var(--accent); font-weight: 600; }
   header #status { color: var(--dim); font-size: 12px; }
-  #term {
-    flex: 1; overflow-y: auto; padding: 12px 16px; white-space: pre-wrap;
-    word-break: break-word;
-  }
-  #term .log { color: var(--dim); }
-  #inputbar {
-    display: flex; border-top: 1px solid var(--border); background: var(--panel);
-  }
+  #term { flex: 1; min-height: 0; padding: 6px 8px; }
+  #term .xterm { height: 100%; }
   #jscanvas {
     display: none; position: fixed; right: 16px; top: 56px;
     border: 1px solid var(--border); border-radius: 6px; background: #04060a;
+    z-index: 10;
   }
+  #inputbar {
+    display: flex; border-top: 1px solid var(--border); background: var(--panel);
+  }
+  #inputbar.hidden { display: none; }
   #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
   #cmd {
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
@@ -182,12 +182,44 @@
   });
 </script>
 <script>
+  // Emscripten's WASI random_get() (src/lib/libwasi.js) fills entropy with
+  // crypto.getRandomValues(HEAPU8.subarray(...)) directly against wasm
+  // memory, with no shared/resizable guard. When the heap is backed by a
+  // resizable ArrayBuffer (GROWABLE_ARRAYBUFFERS + ALLOW_MEMORY_GROWTH ->
+  // wasmMemory.toResizableBuffer()), getRandomValues() throws on boot:
+  // "The provided ArrayBufferView value must not be resizable". This is
+  // not hypothetical: emsdk 6.0.2 DEFAULTED GROWABLE_ARRAYBUFFERS to 1 and
+  // broke exactly this way in Chrome. 6.0.3 reverted the default and fixed
+  // the sibling string-decode path in codegen (getUnsharedTextDecoderView
+  // -> getHeapViewOrCopy, src/parseTools.mjs) -- but random_get() itself
+  // is still unguarded upstream as of 6.0.3, so it breaks again the moment
+  // the default flips back on. This wrapper is certified against the real
+  // 6.0.2 failure: no-op on a non-resizable heap, copy-fill-copy on a
+  // resizable/shared one. (CI pins emsdk -- see
+  // .github/actions/build-wasm/action.yml -- this is the belt to that
+  // suspender.)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const originalGetRandomValues = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = (view) => {
+      const buf = view.buffer;
+      const unsafe = buf && (buf.resizable ||
+        (typeof SharedArrayBuffer !== 'undefined' && buf instanceof SharedArrayBuffer));
+      if (!unsafe) return originalGetRandomValues(view);
+      const copy = new Uint8Array(view.length);
+      originalGetRandomValues(copy);
+      new Uint8Array(buf, view.byteOffset, view.byteLength).set(copy);
+      return view;
+    };
+  }
+</script>
+<script>
   // Mudlib image (created by emscripten's file_packager, see
   // tools/wasm/pack-mudlib.sh) attaches itself to this global before
-  // the runtime factory consumes it.
+  // the runtime factory consumes it.  pageLog is defined by the main
+  // script below; these callbacks only fire after it exists.
   var Module = {
-    print: (s) => Terminal.log(s),
-    printErr: (s) => Terminal.log(s),
+    print: (s) => pageLog(s),
+    printErr: (s) => pageLog(s),
     locateFile: (f) => f,
     onAbort: (what) => {
       status.textContent = 'driver aborted';
@@ -197,92 +229,62 @@
     },
   };
 </script>
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script src="telnet.js"></script>
 <script src="fluffos-boot.js"></script>
 <script src="mudlib.js"></script>
 <script src="fluffos.js"></script>
 <script>
 'use strict';
 
-const Terminal = (() => {
-  const el = document.getElementById('term');
-  const append = (text, cls) => {
-    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
-    const span = document.createElement('span');
-    if (cls) span.className = cls;
-    span.textContent = text;
-    el.appendChild(span);
-    if (atBottom) el.scrollTop = el.scrollHeight;
-  };
-  return {
-    write: (text) => append(text, null),
-    log: (text) => append(text + '\n', 'log'),
-  };
-})();
+// ==========================================================================
+// The web terminal: xterm.js does the terminal emulation (rendering, SGR,
+// alternate screen, mouse reporting, bracketed paste, keyboard encoding);
+// this page supplies the two things xterm.js does not:
+//
+//   TelnetClient  the telnet protocol: ECHO, SGA (= the driver's char-mode
+//                 signal, src/net/telnet.cc set_charmode), NAWS, TTYPE.
+//   input glue    line mode = the input bar (a MUD-style local-edit line);
+//                 char mode = xterm.js keystrokes stream straight to the
+//                 driver.  Switches automatically on the SGA negotiation.
+// ==========================================================================
 
-// --- Minimal telnet client ---------------------------------------------
-// The wasm driver speaks real telnet. We refuse every option except ECHO
-// (used for password prompts) and decode the rest as UTF-8 text.
-const IAC = 255, DONT = 254, DO = 253, WONT = 252, WILL = 251, SB = 250, SE = 240;
-const OPT_ECHO = 1;
+const term = new Terminal({
+  fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
+  fontSize: 14,
+  scrollback: 2000,
+  theme: {
+    background: '#0b0e14', foreground: '#d5dbe5',
+    cursor: '#d5dbe5', cursorAccent: '#0b0e14',
+    black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+    blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6',
+    brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a',
+    brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
+    brightCyan: '#7dcfff', brightWhite: '#c0caf5',
+  },
+});
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('term'));
+fitAddon.fit();
+window.term = term;   // devtools + tests
 
-class TelnetClient {
-  constructor(sendBytes) {
-    this.sendBytes = sendBytes;
-    this.state = 'data';
-    this.decoder = new TextDecoder('utf-8');
-    this.onText = () => {};
-    this.onEcho = () => {};
-  }
-  receive(bytes) {
-    const text = [];
-    for (const b of bytes) {
-      switch (this.state) {
-        case 'data':
-          if (b === IAC) this.state = 'iac';
-          else if (b !== 0) text.push(b);
-          break;
-        case 'iac':
-          if (b === IAC) { text.push(b); this.state = 'data'; }
-          else if (b === WILL || b === WONT || b === DO || b === DONT) {
-            this.verb = b; this.state = 'opt';
-          } else if (b === SB) this.state = 'sb';
-          else this.state = 'data'; // GA, NOP, ...
-          break;
-        case 'opt': {
-          if (this.verb === WILL) {
-            if (b === OPT_ECHO) { this.onEcho(true); this.sendBytes([IAC, DO, b]); }
-            else this.sendBytes([IAC, DONT, b]);
-          } else if (this.verb === WONT) {
-            if (b === OPT_ECHO) this.onEcho(false);
-            this.sendBytes([IAC, DONT, b]);
-          } else if (this.verb === DO) {
-            this.sendBytes([IAC, WONT, b]);
-          }
-          this.state = 'data';
-          break;
-        }
-        case 'sb':
-          if (b === IAC) this.state = 'sb-iac';
-          break;
-        case 'sb-iac':
-          this.state = (b === SE) ? 'data' : 'sb';
-          break;
-      }
-    }
-    if (text.length) {
-      this.onText(this.decoder.decode(new Uint8Array(text), { stream: true }));
-    }
-  }
-}
+// Driver stdout/stderr (boot noise, debug_message) -- dim, above the game.
+function pageLog(s) { term.write('\x1b[2m' + s + '\x1b[0m\r\n'); }
+
+// (TelnetClient comes from the shared telnet.js)
 
 // --- Boot ---------------------------------------------------------------
 const status = document.getElementById('status');
 const input = document.getElementById('cmd');
+const inputBar = document.getElementById('inputbar');
+const utf8enc = new TextEncoder();
 
 // Mount point + config file, written by the packer (fluffos-boot.js).
 if (!window.FLUFFOS_BOOT) {
-  Terminal.log('warning: fluffos-boot.js missing (bundle not built by the ' +
-               'packer?) — falling back to the testsuite defaults');
+  pageLog('warning: fluffos-boot.js missing (bundle not built by the ' +
+          'packer?) — falling back to the testsuite defaults');
 }
 const BOOT = window.FLUFFOS_BOOT || { mount: '/testsuite', config: 'etc/config.test' };
 
@@ -290,31 +292,90 @@ createFluffOS(Module).then((M) => {
   status.textContent = 'booting driver…';
   M.FS.chdir(BOOT.mount);
 
-  // Output arrives synchronously while fluffos_connect() is still running
-  // (telnet negotiation, the logon banner), i.e. before we know our
-  // connection id -- buffer both directions until it is known.
+  // The wasm bridge is synchronous BOTH ways: fluffos_input() can emit
+  // output before it returns, and onOutput arrives while our telnet parser
+  // is mid-byte-stream. Calling back into the driver from inside receive()
+  // therefore re-enters the parser and corrupts its state (negotiation
+  // ping-pong until stack overflow). Decouple both directions with queues:
+  // sends flush from a 0-timeout (never inside receive()), and inbound
+  // chunks drain through a non-reentrant loop.
   const connId = { value: -1 };
-  const pendingIn = [];   // driver -> page, before id is known
-  const pendingOut = [];  // page -> driver (negotiation replies)
-  const telnet = new TelnetClient((bytes) => {
-    if (connId.value >= 0) {
+  const pendingIn = [];   // driver -> page, before the id is known
+  const outbox = [];      // page -> driver, flushed outside receive()
+  let flushScheduled = false;
+  const flushOutbox = () => {
+    flushScheduled = false;
+    while (connId.value >= 0 && outbox.length) {
+      const bytes = outbox.shift();
       M.ccall('fluffos_input', null, ['number', 'array', 'number'],
               [connId.value, bytes, bytes.length]);
-    } else {
-      pendingOut.push(bytes);
     }
+  };
+  const sendToDriver = (bytes) => {
+    outbox.push(bytes);
+    if (connId.value >= 0 && !flushScheduled) {
+      flushScheduled = true;
+      setTimeout(flushOutbox, 0);
+    }
+  };
+  const inbox = [];
+  let receiving = false;
+  const deliver = (bytes) => {
+    inbox.push(bytes);
+    if (receiving) return;
+    receiving = true;
+    try {
+      while (inbox.length) telnet.receive(inbox.shift());
+    } finally {
+      receiving = false;
+    }
+  };
+  const telnet = new TelnetClient(sendToDriver);
+  telnet.onText = (t) => term.write(t);
+
+  let charMode = false;
+  let serverEchoes = false;
+  telnet.onEcho = (on) => {
+    serverEchoes = on;
+    if (!charMode) input.type = on ? 'password' : 'text';
+  };
+  telnet.onCharMode = (on) => {
+    if (on === charMode) return;
+    charMode = on;
+    if (on) {
+      inputBar.classList.add('hidden');
+      status.textContent = 'char mode — keys go straight to the mud';
+      fitAddon.fit();
+      term.focus();
+    } else {
+      inputBar.classList.remove('hidden');
+      status.textContent = 'connected (conn ' + connId.value + ')';
+      input.type = serverEchoes ? 'password' : 'text';
+      fitAddon.fit();
+      input.focus();
+    }
+  };
+
+  // raw application data (telnet.sendRaw doubles IAC bytes)
+  const sendData = (bytes) => telnet.sendRaw(bytes);
+
+  // Char mode: xterm.js encodes keys, mouse reports and bracketed pastes
+  // into the exact byte sequences a terminal would send -- forward them.
+  term.onData((d) => {
+    if (charMode) sendData(Array.from(utf8enc.encode(d)));
   });
-  telnet.onText = (t) => Terminal.write(t.replace(/\r/g, ''));
-  telnet.onEcho = (serverEchoes) => { input.type = serverEchoes ? 'password' : 'text'; };
+  term.onBinary((d) => {
+    if (charMode) sendData(Array.from(d, (c) => c.charCodeAt(0) & 0xff));
+  });
 
   M.fluffos = {
     onOutput: (id, bytes) => {
       if (connId.value === -1) pendingIn.push(bytes);
-      else if (id === connId.value) telnet.receive(bytes);
+      else if (id === connId.value) deliver(bytes);
     },
     onDisconnect: (id) => {
       if (id === connId.value) {
-        Terminal.log('*** disconnected ***');
+        pageLog('*** disconnected ***');
         input.disabled = true;
         status.textContent = 'disconnected';
       }
@@ -369,6 +430,11 @@ createFluffOS(Module).then((M) => {
   const rc = M.ccall('fluffos_boot', 'number', ['string'], [BOOT.config]);
   if (rc !== 0) { status.textContent = 'boot failed (' + rc + ')'; return; }
 
+  // Real geometry before connecting, so the NAWS answer to the driver's
+  // initial DO NAWS carries it.
+  telnet.size = { cols: term.cols, rows: term.rows };
+  term.onResize(({ cols, rows }) => telnet.setSize(cols, rows));
+
   // Drive the game loop: heartbeats, call_outs and buffered commands all
   // run inside fluffos_tick().
   setInterval(() => {
@@ -376,25 +442,28 @@ createFluffOS(Module).then((M) => {
   }, 50);
 
   connId.value = M.ccall('fluffos_connect', 'number', [], []);
-  for (const bytes of pendingIn.splice(0)) telnet.receive(bytes);
-  for (const bytes of pendingOut.splice(0)) {
-    M.ccall('fluffos_input', null, ['number', 'array', 'number'],
-            [connId.value, bytes, bytes.length]);
-  }
+  for (const bytes of pendingIn.splice(0)) deliver(bytes);
+  flushOutbox();   // negotiation replies buffered while connId was unknown
   status.textContent = 'connected (conn ' + connId.value + ')';
   input.disabled = false;
-  input.placeholder = 'type a command — try: eval return 1+1, tests, who';
+  input.placeholder = 'type a command — try: eval return 1+1, tuidemo, who';
   input.focus();
 
-  const encoder = new TextEncoder();
+  // window resize -> refit xterm -> onResize fires -> NAWS; the driver
+  // re-fires the window_size apply, so full-screen TUIs relayout live.
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => fitAddon.fit(), 120);
+  });
+
+  // --- line mode input ---
   input.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter') return;
     const line = input.value;
     input.value = '';
-    if (input.type !== 'password') Terminal.write(line + '\n');
-    const bytes = Array.from(encoder.encode(line + '\r\n'));
-    M.ccall('fluffos_input', null, ['number', 'array', 'number'],
-            [connId.value, bytes, bytes.length]);
+    if (input.type !== 'password') term.write(line + '\r\n');
+    sendData(Array.from(utf8enc.encode(line + '\r\n')));
   });
 }).catch((e) => {
   status.textContent = 'failed to load: ' + e;

@@ -93,10 +93,14 @@ int handle_key(mixed ev) {
 }
 
 int handle_mouse(mixed *ev) {
-  int y = ev[3];
+  int b = ev[1], y = ev[3];
 
   if (!ev[4]) return 0;  // only presses
-  if (y >= wy && y < wy + wh && top + y - wy < sizeof(items)) {
+  if (b == 64 || b == 65) {  // wheel scrolls the selection
+    move_sel(b == 64 ? -1 : 1);
+    return 1;
+  }
+  if (b < 3 && y >= wy && y < wy + wh && top + y - wy < sizeof(items)) {
     sel = top + y - wy;
     emit_event("change", sel);
     return 1;

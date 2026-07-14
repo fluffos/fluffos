@@ -70,10 +70,17 @@ There are three implementations, selected per target at link time:
   no-op).
 
 Because the driver still emits/consumes real telnet, the page needs a
-(tiny) telnet client — `src/www/wasm/index.html` includes one (~60
-lines): refuse every option except ECHO (used to mask password input),
-skip subnegotiations, decode the rest as UTF-8. Any full JS telnet client
-(or an xterm.js frontend) plugs in the same two callbacks.
+telnet client — `src/www/wasm/index.html` includes one that negotiates
+ECHO (password masking), SGA (the driver's char-mode signal: the page
+auto-switches between its line-input bar and raw keystroke streaming),
+NAWS (live window size, re-reported on resize → the `window_size` apply)
+and TTYPE (`xterm-256color`). Terminal emulation itself — rendering,
+SGR, the alternate screen, mouse reporting, bracketed paste, keyboard
+encoding — is [xterm.js](https://xtermjs.org), vendored from npm under
+`src/www/vendor/` (shared with the websocket client, see
+`src/www/README.md`) and shipped by `tools/wasm/pack-mudlib.sh`, which
+is what makes the mudlib TUI library (`testsuite/std/tui`) work in the
+browser end to end.
 
 The same link-time pattern covers the other per-target singletons:
 

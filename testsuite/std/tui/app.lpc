@@ -13,6 +13,7 @@ private object screen;
 private object *widgets = ({});
 private int focus = -1;
 private object term;
+private int quitting = 0;
 
 void app_quit();  // forward (used by on_key before its definition)
 
@@ -40,10 +41,14 @@ void app_focus(object w) {
 
 void app_cycle_focus(int dir) {
   int i, n = sizeof(widgets);
+  int from = focus;
 
   if (!n) return;
+  // With nothing focused yet, cycle as if from just outside the list, so
+  // forward lands on the first focusable and backward on the last.
+  if (from < 0) from = dir > 0 ? -1 : 0;
   for (i = 1; i <= n; i++) {
-    int j = (focus + dir * i + n * i) % n;
+    int j = (from + dir * i + n * i) % n;
     if (widgets[j]->query_focusable()) {
       app_focus(widgets[j]);
       return;
@@ -111,6 +116,11 @@ string render() {
 void app_quit() {
   object t = term;
 
+  // Reentry guard: tui_close() calls back into app_quit() so a
+  // terminal-initiated close (user disconnect, tui_destroy) tears the app
+  // down too -- without it the two would recurse into each other.
+  if (quitting) return;
+  quitting = 1;
   term = 0;
   if (t) t->tui_close();
   on_closed();

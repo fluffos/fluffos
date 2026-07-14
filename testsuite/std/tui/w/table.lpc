@@ -119,3 +119,21 @@ int handle_key(mixed ev) {
   }
   return 0;
 }
+
+int handle_mouse(mixed *ev) {
+  int b = ev[1], y = ev[3];
+  int header = sizeof(columns) ? 1 : 0;
+
+  if (!ev[4]) return 0;  // only presses
+  if (b == 64 || b == 65) {  // wheel scrolls the selection
+    move_sel(b == 64 ? -1 : 1);
+    return 1;
+  }
+  if (b < 3 && y >= wy + header && y < wy + wh &&
+      top + y - wy - header < sizeof(rows)) {
+    sel = top + y - wy - header;
+    emit_event("change", sel);
+    return 1;
+  }
+  return 0;
+}

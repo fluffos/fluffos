@@ -34,6 +34,8 @@ private int scroll = 0;           // viewport start column
 private int began = 0;
 private string kill_buf = "";
 private int last_tab = 0;
+private mixed *undo_stack = ({}); // ({ buf, pos }) snapshots, oldest first
+#define UNDO_MAX 200
 
 // --- history ---
 private string *hist = ({});
@@ -109,9 +111,17 @@ private void render() {
   if (cur - scroll >= avail) scroll = cur - avail + 1;
   if (scroll < 0) scroll = 0;
 
-  view = wslice(disp, scroll, avail);
-  if (scroll > 0) view = "<" + wslice(disp, scroll + 1, avail - 1);
-  if (total - scroll > avail) view = wslice(disp, scroll, avail - 1) + ">";
+  {
+    // scroll markers: "<" replaces the first visible column when scrolled,
+    // ">" the last when there is more text to the right — independently,
+    // so a mid-line viewport shows both.
+    int lm = scroll > 0;
+    int rm = total - scroll > avail;
+
+    view = (lm ? "<" : "") +
+           wslice(disp, scroll + lm, avail - lm - rm) +
+           (rm ? ">" : "");
+  }
 
   out += "\r" + pfx + view + ansi_el(0) + "\r" + ansi_fwd(pw + cur - scroll);
 }
@@ -196,6 +206,7 @@ private void isearch_start(int dir) {
 private void dispatch(mixed ev);  // forward
 
 private void isearch_feed(mixed ev) {
+  if (arrayp(ev)) return;  // mouse/CPR reports don't cancel the search
   if (stringp(ev)) {
     is_q += ev;
     isearch_find(0);
@@ -266,6 +277,9 @@ private void complete() {
   if (lcp > strlen(frag)) {
     insert(matches[0][strlen(frag)..lcp - 1]);
     if (sizeof(matches) == 1) insert(" ");
+  } else if (sizeof(matches) == 1) {
+    // the fragment already IS the unique match: just terminate the word
+    insert(" ");
   } else if (sizeof(matches) > 1 && last_tab) {
     // second Tab with nothing to extend: list the candidates above the line
     out += "\r\n" + implode(matches, "  ") + "\r\n";
@@ -344,6 +358,16 @@ private void kb_transpose() {
   pos = p + 1 > n ? n : p + 1;
 }
 
+private void kb_undo() {
+  mixed *snap;
+
+  if (!sizeof(undo_stack)) return;
+  snap = undo_stack[<1];
+  undo_stack = undo_stack[0..<2];
+  buf = snap[0];
+  pos = snap[1];
+}
+
 private void kb_hist_prev() { hist_move(-1); }
 private void kb_hist_next() { hist_move(1); }
 private void kb_isearch_rev() { isearch_start(-1); }
@@ -387,11 +411,17 @@ private void build_keymap() {
     TUI_CTRL('l'): (: kb_clear :),
     TUI_KEY_TAB: (: kb_tab :),
   ]);
+  // undo restores a snapshot instead of taking one; dispatch special-cases it
+  keymap[TUI_CTRL('_')] = (: kb_undo :);
 }
 
 void create() { build_keymap(); }
 
 private void dispatch(mixed ev) {
+  string obuf = buf;
+  int opos = pos;
+  int is_undo = ev == TUI_CTRL('_');
+
   if (stringp(ev)) {
     insert(ev);
   } else if (intp(ev)) {
@@ -399,6 +429,10 @@ private void dispatch(mixed ev) {
     if (f) evaluate(f);
   }
   // else: mouse/CPR arrays are not the line editor's business
+  if (!is_undo && buf != obuf) {  // buffer changed: snapshot for C-_
+    undo_stack += ({ ({ obuf, opos }) });
+    if (sizeof(undo_stack) > UNDO_MAX) undo_stack = undo_stack[1..];
+  }
   if (last_tab) last_tab--;
   if (state == TUI_RL_MORE) render();
 }
@@ -442,6 +476,7 @@ varargs string rl_begin(string initial) {
   hsave = "";
   is_dir = 0;
   last_tab = 0;
+  undo_stack = ({});
   began = 1;
   render();
   return rl_take_output();

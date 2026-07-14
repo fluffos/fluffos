@@ -66,3 +66,16 @@ int handle_key(mixed ev) {
   }
   return 0;
 }
+
+int handle_mouse(mixed *ev) {
+  int b = ev[1];
+  int max_off = sizeof(lines) - wh;
+
+  if (max_off < 0) max_off = 0;
+  if (!ev[4] || (b != 64 && b != 65)) return 0;
+  // wheel scrolls the backlog three lines at a time
+  offset += b == 64 ? 3 : -3;
+  if (offset > max_off) offset = max_off;
+  if (offset < 0) offset = 0;
+  return 1;
+}

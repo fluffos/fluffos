@@ -339,9 +339,12 @@ The driver processes untrusted input (mudlib code, network bytes, save files), s
   - `simulate.cc`: Game object lifecycle and simulation functions.
 - **`src/compiler/`**: LPC parsing engine (`grammar.y`, `lex.cc`, `generate.cc`).
 - **`src/packages/`**: Modular efun features (math, db, crypto, sockets, jsbridge, etc.).
+- **`src/thirdparty/`**: Vendored third-party libraries (libwebsockets, libevent, fmt, nlohmann/json, backward-cpp, …), each a byte-exact copy of an upstream release tag plus a small set of documented FluffOS-local patches; unused test/example/doc trees are pruned. Update one dependency per commit, vendoring from a `git clone` of the upstream tag and re-applying the local patches — the full workflow, the local-patch inventory, and the platform traps (clang configure probes, musl, MinGW runtime DLLs) are documented in [AGENTS.md §14](AGENTS.md).
 - **`tools/wasm/`**: WebAssembly tooling — dependency cross-build, end-to-end build, mudlib packer, node testsuite runner.
 - **`testsuite/`**: Official testsuite containing LPC tests and configurations.
 - **`docs/`**: Documentation site (Markdown, built with Docusaurus — see [docs/README.md](docs/README.md)).
+
+The committed Bison/Flex outputs (`src/compiler/internal/*.autogen.*`) are pinned to the generator versions recorded inside them: hosts with older bison/flex build from the committed copies, hosts at or above the pin regenerate, and the copy-back into the source tree only happens when `grammar.y`/`lexer.l` actually changed (tracked by an input-hash stamp) — so local builds never churn these files.
 
 ---
 

@@ -111,34 +111,39 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
       lwsl_info("LWS_CALLBACK_CLOSED: wsi %p\n", wsi);
 
       auto* ip = pss->user;
-      if (!ip) {
-        return -1;
+      if (ip) {
+        remove_interactive(ip->ob, 0);
+        pss->user = nullptr;
       }
-
-      remove_interactive(ip->ob, 0);
-      pss->user = nullptr;
-
-      evbuffer_free(pss->buffer);
-      pss->buffer = nullptr;
-
+      // Always free the session resources -- see the twin handler in
+      // ws_telnet.cc.
+      if (pss->buffer) {
+        evbuffer_free(pss->buffer);
+        pss->buffer = nullptr;
+      }
       break;
     }
     case LWS_CALLBACK_SERVER_WRITEABLE: {
       lwsl_info("LWS_CALLBACK_SERVER_WRITEABLE\n");
 
-      auto total = evbuffer_get_length(pss->buffer);
-
+      // Drain as many windows as the socket accepts -- see the twin loop
+      // in ws_telnet.cc for the full explanation. Key point: lws will not
+      // re-arm the writeable callback when the socket is simply full, so
+      // the exit below must re-request it whenever data remains.
       static unsigned char buf[LWS_PRE + 2048];
-      auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
-      if (numbytes > 0) {
+      while (evbuffer_get_length(pss->buffer) > 0 && !lws_send_pipe_choked(wsi)) {
+        auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
+        if (numbytes <= 0) {
+          break;
+        }
         // Hold back a trailing incomplete UTF-8 sequence so a codepoint is
         // never split across ws messages. evbuffer_copyout() does not drain,
         // so the held-back bytes stay at the front of pss->buffer and go out
         // with the next write.
         auto new_numbytes = static_cast<ev_ssize_t>(u8_truncate(&buf[LWS_PRE], numbytes));
         if (new_numbytes == 0) {
-          // Only an incomplete codepoint is buffered; wait for the rest of it
-          // instead of re-arming the writeable callback in a busy loop.
+          // Only an incomplete codepoint is buffered; the exit below keeps
+          // a writeable callback requested until the rest of it arrives.
           break;
         }
         numbytes = new_numbytes;
@@ -152,22 +157,19 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
         // TODO: we could use LWS_WRITE_TEXT , however it is much safer to use binary mode, its
         // better to let client deal with incorrect encoding.
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
-        // Per lws docs, a return less than the requested length means the
-        // connection has failed. On success lws consumed the entire payload
-        // (truncated sends are buffered and flushed internally), and the
-        // return can exceed numbytes under encapsulation (TLS), so it must
-        // NOT be used as a drain count: doing so silently drops the start
-        // of the next chunk on wss connections.
+        // A short return means the connection failed. On success lws
+        // consumed the whole payload (partials are buffered and flushed
+        // internally), and the return can EXCEED numbytes on TLS -- never
+        // use it as a drain count.
         if (m < static_cast<int>(numbytes)) {
           lwsl_warn("ERROR %d writing to ws socket.\n", m);
           return -1;
         }
         evbuffer_drain(pss->buffer, numbytes);
-        total -= numbytes;
-        // May have more text to write.
-        if (total > 0) {
-          lws_callback_on_writable(wsi);
-        }
+      }
+      // Data still queued: request the next writeable callback.
+      if (evbuffer_get_length(pss->buffer) > 0) {
+        lws_callback_on_writable(wsi);
       }
       break;
     }
@@ -201,6 +203,8 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
   return 0;
 }
 
+// Queue the bytes and request a writeable callback; actual sending only
+// happens in LWS_CALLBACK_SERVER_WRITEABLE.
 void ws_ascii_send(struct lws* wsi, const char* data, size_t len) {
   DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_ASCII, "wrong protocol!");
   auto pss = reinterpret_cast<ws_ascii_session*>(lws_wsi_user(wsi));
