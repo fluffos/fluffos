@@ -1,0 +1,16 @@
+// set_bit() (src/packages/core/efuns_main.cc) rejects a bit index above
+// __MAX_BITFIELD_BITS__ by checking sp->u.number (the full 64-bit LPC
+// int) before it is narrowed into a 32-bit `int bit`. A large-magnitude
+// negative index whose low 32 bits form a large positive value used to
+// slip past both checks: it's negative (so the pre-truncation
+// > max_bitfield_bits check never fires) yet truncates to a positive
+// bit index that can exceed max_bitfield_bits without ever being
+// rejected -- a config-bypass / uncapped-allocation bug.
+void do_tests() {
+    // -4294967296 + 20000: negative, but its low 32 bits equal 20000 --
+    // an index far beyond the default __MAX_BITFIELD_BITS__ (12000) that
+    // must still be rejected as an ordinary negative argument.
+    int crafted = -4294967296 + 20000;
+    mixed err = catch(set_bit("", crafted));
+    ASSERT(err);
+}
