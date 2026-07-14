@@ -361,6 +361,17 @@ void get_user_data(interactive_t* ip) {
       text_space = comm_reserve_input_space(ip, sizeof(ip->text) / 16);
       break;
 
+    case PORT_TYPE_ASCII:
+      // Like PORT_TYPE_TELNET: PORT_TYPE_ASCII also accumulates into
+      // ip->text (below) tracked by ip->text_end, so the read must be
+      // bounded by the ACTUAL remaining room there, not by the local
+      // scratch buffer's size -- falling through to the `default:` case
+      // (which just uses sizeof(buf)) let a client withholding a
+      // newline grow ip->text_end near MAX_TEXT and then overflow
+      // ip->text on the next read.
+      text_space = comm_reserve_input_space(ip, sizeof(ip->text) / 16);
+      break;
+
     case PORT_TYPE_MUD:
       if (ip->text_end < 4) {
         text_space = 4 - ip->text_end;
