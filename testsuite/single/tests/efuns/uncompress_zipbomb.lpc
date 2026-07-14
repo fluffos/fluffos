@@ -1,0 +1,30 @@
+#ifdef __PACKAGE_COMPRESS__
+// uncompress() (src/packages/compress/compress.cc, f_uncompress()) used to
+// grow a plain `int len` by COMPRESS_BUF_SIZE on every inflate() iteration
+// with no upper bound, only rejecting an oversized result via
+// allocate_buffer()'s own cap check *after* fully decompressing it -- for a
+// large enough "zip bomb" that lets a small compressed input drive
+// unbounded intermediate DMALLOC/DREALLOC/memcpy work (and, past ~2GB of
+// decompressed output, overflow the 32-bit `len` itself). The fix checks
+// `len` against the same cap on every iteration and bails out immediately.
+//
+// A fixture that actually overflows `len` would need to inflate to >2GB,
+// which is impractical to ship/run here (the pre-fix growth pattern makes
+// that pathologically slow well before it gets there). This test instead
+// pins the still-observable, fast-to-check part of the fix: a
+// moderately-sized zip bomb (/data/compress/zipbomb.zbin, ~2KB compressed
+// -> 2,000,000 bytes inflated, past this testsuite's configured "maximum
+// buffer size" of 400000) is rejected with a clean catchable error rather
+// than succeeding or crashing.
+void do_tests() {
+    buffer bomb;
+    mixed err;
+
+    bomb = to_buffer(read_bytes("/data/compress/zipbomb.zbin"));
+    ASSERT(bufferp(bomb));
+    ASSERT(sizeof(bomb) > 0);
+
+    err = catch(uncompress(bomb));
+    ASSERT(stringp(err));
+}
+#endif
