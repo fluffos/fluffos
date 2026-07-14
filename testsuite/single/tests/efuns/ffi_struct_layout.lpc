@@ -13,6 +13,15 @@ void do_tests() {
     lay = ffi_struct_layout(({ FFI_INT32, FFI_INT32 }));
     ASSERT_EQ(8, lay[0]);
     ASSERT_EQ(({ 0, 4 }), lay[1]);
+
+    // Regression: an unrecognized FFI type code after at least one valid
+    // field used to leak the partially-built offsets array (code_to_type()
+    // error()s from inside type_size(), skipping the cleanup that only
+    // covered the "not an int" case). Must error cleanly instead (checked
+    // for a leak by the per-file debug-checker).
+    ASSERT(catch(ffi_struct_layout(({ FFI_INT32, 9999 }))));
+    // Still errors cleanly on a non-int field type too.
+    ASSERT(catch(ffi_struct_layout(({ FFI_INT32, "x" }))));
 #endif
     ASSERT(1);
 }
