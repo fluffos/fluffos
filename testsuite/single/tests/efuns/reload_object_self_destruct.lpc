@@ -1,0 +1,18 @@
+// f_reload_object() (src/packages/core/efuns_main.cc) calls
+// reload_object(), which runs the target's create() again -- arbitrary
+// LPC that can self-destruct the very object argument sitting on
+// f_reload_object()'s own VM stack slot. destruct_object() sweeps the
+// VM stack, so that slot may hold a plain 0 by the time control
+// returns; f_reload_object() used to unconditionally free_object() it
+// regardless, crashing on the swept slot.
+void do_tests() {
+    object ob;
+    mixed err;
+
+    ob = load_object("/clone/reload_self_destruct");
+    ASSERT(objectp(ob));
+
+    // Surviving this call is the regression signal.
+    err = catch(reload_object(ob));
+    ASSERT(err || 1);
+}
