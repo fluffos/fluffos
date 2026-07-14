@@ -1,34 +1,37 @@
-// LPC ints are 64-bit (int64_t); '<<'/'>>' with a shift count that is
+// LPC ints are 64-bit (int64_t); '<<'/'>>' with a raw shift count that is
 // negative or >= 64 is C++ undefined behavior. Three separate sites
 // computed this with no guard: the runtime shift efuns (f_lsh/f_rsh/
 // f_lsh_eq/f_rsh_eq, src/packages/ops/ops.cc), the compiler's constant
 // folder (src/compiler/internal/trees.cc), and the #if preprocessor
 // expression evaluator (src/compiler/internal/lexer_rules_pp.cc,
 // already guarded for '/' and '%' but not 's'/'S').
+//
+// Rather than rejecting an out-of-range count with an error, all three
+// sites mask it to the low 6 bits (mod 64) before shifting -- matching
+// Java's `long` shift semantics (JLS 15.19) -- so every LPC int is a
+// legal shift count and a folded/unfolded shift by the same count always
+// agree.
 void do_tests() {
     int x, n;
-    mixed err;
 
-    // Runtime '<<' / '>>' with an out-of-range shift count must be a
-    // clean, catchable error, not a crash. Non-constant operands (a
-    // local variable) so the compiler's constant folder can't collapse
-    // these at compile time -- that's tested separately below.
+    // Runtime '<<' / '>>' with an out-of-range shift count is masked mod
+    // 64, not rejected. Non-constant operands (a local variable) so the
+    // compiler's constant folder can't collapse these at compile time --
+    // that's tested separately below.
     n = 100;
-    err = catch(x = 1 << n);
-    ASSERT(err);
+    ASSERT_EQ(1 << 36, 1 << n);       // 100 & 63 == 36
     n = -1;
-    err = catch(x = 1 >> n);
-    ASSERT(err);
+    ASSERT_EQ(1 >> 63, 1 >> n);       // -1 & 63 == 63
 
     // Runtime '<<=' / '>>=' likewise.
     x = 1;
     n = 100;
-    err = catch(x <<= n);
-    ASSERT(err);
+    x <<= n;
+    ASSERT_EQ(1 << 36, x);
     x = 1;
     n = -1;
-    err = catch(x >>= n);
-    ASSERT(err);
+    x >>= n;
+    ASSERT_EQ(1 >> 63, x);
 
     // Ordinary in-range shifts must still work exactly as before,
     // both as compile-time constants and at runtime.
@@ -44,25 +47,25 @@ void do_tests() {
     x >>= 3;
     ASSERT_EQ(1, x);
 
-    // Compile-time constant folding (trees.cc) with an out-of-range
-    // shift count must not crash the driver at compile time -- it's
-    // now a clean (catchable) compile error, not a crash.
+    // Compile-time constant folding (trees.cc) with an out-of-range shift
+    // count folds the same way the runtime does (100 & 63 == 36), not a
+    // compile error.
     string src = "int f() { return 1 << 100; }\n";
     rm("/gen_shift_const.c");
     write_file("/gen_shift_const.c", src);
-    catch(load_object("/gen_shift_const"));
-    ASSERT(1);
+    ASSERT_EQ(1 << 36, load_object("/gen_shift_const")->f());
     rm("/gen_shift_const.c");
 
-    // The #if preprocessor evaluator's shift operators must not crash
-    // the driver at compile time either.
+    // The #if preprocessor evaluator's shift operators mask the same way,
+    // so `1 << 100` (== 68719476736) is nonzero/truthy and `marker` gets
+    // defined.
     src = "#if (1 << 100)\n"
-          "int marker = 1;\n"
-          "#endif\n"
-          "int done = 1;\n";
+          "int marker() { return 1; }\n"
+          "#else\n"
+          "int marker() { return 0; }\n"
+          "#endif\n";
     rm("/gen_shift_if.c");
     write_file("/gen_shift_if.c", src);
-    catch(load_object("/gen_shift_if"));
-    ASSERT(1);
+    ASSERT_EQ(1, load_object("/gen_shift_if")->marker());
     rm("/gen_shift_if.c");
 }

@@ -174,20 +174,15 @@ parse_node_t* binary_int_op(parse_node_t* l, parse_node_t* r, char op, const cha
           l->v.number &= r->v.number;
           break;
         case F_LSH:
-          // A negative or >=64 (LPC_INT is int64_t) shift count is
-          // undefined behavior.
-          if (r->v.number < 0 || r->v.number >= 64) {
-            yyerror("Shift amount out of range in constant expression");
-            break;
-          }
-          l->v.number <<= r->v.number;
+          // A raw negative or >=64 (LPC_INT is int64_t) shift count is
+          // undefined behavior; mask to the low 6 bits (mod 64) instead
+          // of rejecting the constant, matching the runtime opcode
+          // (f_lsh()/f_rsh() in ops.cc) so a folded and unfolded shift
+          // by the same count always agree.
+          l->v.number <<= (r->v.number & 63);
           break;
         case F_RSH:
-          if (r->v.number < 0 || r->v.number >= 64) {
-            yyerror("Shift amount out of range in constant expression");
-            break;
-          }
-          l->v.number >>= r->v.number;
+          l->v.number >>= (r->v.number & 63);
           break;
         case F_MOD:
           if (r->v.number == 0) {
