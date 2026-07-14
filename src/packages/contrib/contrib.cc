@@ -590,6 +590,7 @@ void f_terminal_colour() {
   int fillout = 0;
   char* rep;
   int repused;
+  char** rep_allocs;
 
   if (st_num_arg >= 3) {
     if (st_num_arg == 4) {
@@ -701,6 +702,12 @@ void f_terminal_colour() {
      for a strlen() below */
   lens =
       reinterpret_cast<int*>(DCALLOC(num, sizeof(int), TAG_TEMPORARY, "f_terminal_colour: lens"));
+  // Tracks the heap allocations backing `rep` below so they can all be
+  // freed together once `parts[]` is done being read (parts[i] can alias
+  // rep well past the iteration that created it -- see the composition
+  // loop further down). DCALLOC zero-inits, so unused slots stay nullptr.
+  rep_allocs = reinterpret_cast<char**>(
+      DCALLOC(num, sizeof(char*), TAG_TEMPORARY, "f_terminal_colour: rep_allocs"));
   mtab = sp->u.map->table;
 
   // First setup some little things.
@@ -749,8 +756,15 @@ void f_terminal_colour() {
     // replacement, which is the desired robust behavior anyway.
     svalue_t* reptmp = safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
-      rep = reinterpret_cast<char*>(alloca(SVALUE_STRLEN(reptmp) + 1));
+      // Was alloca() -- called once per loop iteration, that memory isn't
+      // reclaimed until the whole function returns (alloca doesn't free on
+      // block/loop exit), so a string with many %^ segments and/or a
+      // terminal_colour_replace() apply returning long strings could blow
+      // the C stack. Heap-allocate instead and free via rep_allocs[] below.
+      rep = reinterpret_cast<char*>(
+          DMALLOC(SVALUE_STRLEN(reptmp) + 1, TAG_TEMPORARY, "f_terminal_colour: rep"));
       strcpy(rep, reptmp->u.string);
+      rep_allocs[i] = rep;
       repused = 1;
     }
 
@@ -1058,6 +1072,12 @@ void f_terminal_colour() {
   *ncp = 0;
   FREE(lens);
   FREE(parts);
+  for (i = 0; i < num; i++) {
+    if (rep_allocs[i]) {
+      FREE(rep_allocs[i]);
+    }
+  }
+  FREE(rep_allocs);
   if (savestr) {
     FREE_MSTR(savestr);
   }

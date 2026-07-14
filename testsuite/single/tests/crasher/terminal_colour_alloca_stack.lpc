@@ -1,0 +1,26 @@
+// f_terminal_colour() (src/packages/contrib/contrib.cc) used to alloca() a
+// replacement buffer once per %^-delimited segment, inside the loop that
+// walks every segment. alloca'd memory is not reclaimed until the whole
+// function returns (unlike a normal per-iteration stack allocation), so
+// with many segments and a terminal_colour_replace() apply that returns a
+// long string for each one, the accumulated alloca'd stack usage keeps
+// growing for the entire call -- and can exceed the thread's stack and
+// crash the driver. It is now heap-allocated instead, and freed once at
+// the end of the efun.
+
+string terminal_colour_replace(string s) {
+    return repeat_string("x", 4000);
+}
+
+void do_tests() {
+#ifdef __PACKAGE_CONTRIB__
+    mapping codes = ([ "RED" : "<r>", "RESET" : "<0>" ]);
+    // 1000 repetitions * 3 parts/rep * ~4000 bytes/part =~ 12MB of would-be
+    // alloca()'d stack -- past the default 8MB thread stack. Surviving this
+    // call cleanly is the regression signal; the unfixed driver stack
+    // overflows and crashes (ASan: stack-overflow) before returning.
+    string text = repeat_string("%^RED%^hot%^RESET%^", 1000);
+    ASSERT(stringp(terminal_colour(text, codes)));
+#endif
+    ASSERT(1);
+}
