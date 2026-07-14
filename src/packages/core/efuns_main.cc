@@ -2276,10 +2276,13 @@ void f_set_bit() {
     error("set_bit() bit requested: %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", sp->u.number,
           max_bitfield_bits);
   }
-  bit = (sp--)->u.number;
-  if (bit < 0) {
+  // Check the sign on the untruncated 64-bit value: a large-magnitude
+  // negative LPC_INT can truncate into a positive `int` that would slip
+  // past a post-truncation check, bypassing max_bitfield_bits entirely.
+  if (sp->u.number < 0) {
     error("Bad argument 2 (negative) to set_bit().\n");
   }
+  bit = (sp--)->u.number;
   ind = bit / 6;
   bit %= 6;
   old_len = len = SVALUE_STRLEN(sp);
