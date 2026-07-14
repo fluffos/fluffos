@@ -114,6 +114,7 @@ Three unwinding hazards that recur beyond raw heap pointers:
   - `efuns.autogen.cc`/`.h` is generated from spec files using the `make_func` tool.
   - `applies_table.autogen.cc`/`.h` is generated using the `build_applies` tool.
   - `options.autogen.h` is generated using the `make_options_defs` tool.
+* **Committed scanner/parser are version-pinned and hash-stamped.** The committed `grammar.autogen.cc/.h` and `lexer.autogen.cc` pin the generator that produced them (the "made by GNU Bison X.Y.Z" banner / `YY_FLEX_*_VERSION` defines): a host with an OLDER bison/flex does not regenerate and builds from the committed copy; hosts at/above the pin regenerate normally (so CI still validates `grammar.y`/`lexer.l`). The post-build copy-back into the source tree is additionally gated on the sha256 of the INPUT, recorded in a trailing `/* FluffOS generated-from <file> sha256=... */` stamp — generator builds that emit cosmetically different code (distro-patched bison reporting the same version) can never churn the committed files; only a real `.y`/`.l` edit updates them. Do not hand-edit the stamp; do not commit locally-regenerated autogen files unless you actually changed the grammar/lexer. Machinery: `cmake/util.cmake` + the `FLUFFOS_PINNED_*`/`FLUFFOS_*_REGEN` logic in `src/CMakeLists.txt`.
 * **WASM / Emscripten build**: the driver cross-compiles to WebAssembly and runs a full mudlib in the browser (the page is the telnet client). **`src/wasm/README.md` is the architecture doc** (Transport interface, host-driven tick loop, per-target implementation files, package on/off matrix, roadmap); **`docs/build-wasm.md` is the user workflow** (deps via `tools/wasm/build-deps.sh`, the `native-tools` + `wasm` CMake presets, mudlib packaging via `tools/wasm/pack-mudlib.sh`). Per-connection byte transport is the `Transport` interface (`src/net/transport.h`); per-target singletons (event loop, TLS, DNS resolver, crash handler) are selected at link time (`*_libevent.cc` vs `src/wasm/*.cc` / `*_stub.cc`) -- do not add `#ifdef __EMSCRIPTEN__` to shared logic files. CI's `wasm` job runs the LPC testsuite inside the wasm driver under node; testsuite files for optional packages must guard themselves with `#ifdef __PACKAGE_*__`.
 
 ---
@@ -341,3 +342,31 @@ Repeated audits of the driver keep surfacing the **same handful of defect shapes
 
 **Validate a fix** on **Debug + ASan/UBSan AND RelWithDebInfo** (some bugs are release-only, some only trip the sanitizers), run the LPC suite 2–3× (randomized order), and add a regression under `testsuite/single/tests/` that demonstrably fails on the unfixed binary (see §7).
 
+
+---
+
+## 14. Vendored Third-Party Dependencies (`src/thirdparty/`)
+
+All third-party libraries are vendored as full source trees. Lessons from the 2026-07 full-fleet upgrade (argparse v3.2, scope_guard 0.9.4, backward-cpp v1.6, ghc/filesystem v1.5.14, nlohmann/json 3.12.0, fmt 12.2.0, utfcpp 4.1.1, libwebsockets v4.5.8):
+
+### Updating a dependency
+* **Vendor byte-exact from a `git clone` of the upstream release tag**, then verify with a full-tree `diff -rq` against the clone. Never reconstruct source through a lossy channel (an LLM fetch tool WILL silently truncate and even fabricate plausible C++ -- this was observed, and the resulting "fmt 12.2.0" compiled and passed every test while dynamic width/precision was silently non-functional). Passing tests do NOT prove a vendored tree is faithful.
+* **Hunt for FluffOS-local patches FIRST**: `git log --follow -- src/thirdparty/<dep>` (unshallow the clone if needed) and diff the vendored tree against the pristine upstream tag it claims to be. Local patches must be re-applied on top of the new tag and disclosed in the commit message. If a local patch is obsolete upstream, say so in the commit message.
+* **One dependency per commit**, integration porting included in that dependency's commit. Commit messages disclose: version range, security-relevant fixes picked up, every local patch carried, and what was pruned.
+* **Prune policy**: delete test/example/doc trees only after proving they are unreferenced -- read the vendor's own CMakeLists for guards. Known traps: lws `plugins/` and `lwsws/` have UNCONDITIONAL `add_subdirectory` (internally guarded -- must stay); lws `win32port/` is used by the WIN32 build; fmt `support/cmake/` is referenced unconditionally; deleting a dir whose `add_subdirectory` is only transitively disabled leaves a landmine (force the guarding option OFF explicitly in `src/CMakeLists.txt`).
+* **Validate on BOTH gcc and clang locally** before pushing: clang 18+/AppleClang hard-errors where gcc warns (`void main(void)` in lws's configure probes silently failed EVERY header check under clang, including `LWS_HAVE_PTHREAD_H`, breaking the whole build). Alpine/Docker are musl: glibc gets `Dl_info` etc. transitively, musl does not (backward-cpp needed an explicit `<dlfcn.h>`). Windows loader failures (`0xc0000135` = STATUS_DLL_NOT_FOUND) after a clean link mean a linked import library has no runtime DLL on CI -- never link `msvcr90(d)`; those DLLs only exist where Visual Studio is installed (Windows builds here are always gcc/MinGW64, so `_MSC_VER`-guard MSVC-runtime-only calls instead).
+* **Positional aggregate initializers of vendor structs are a trap across upgrades** (lws inserted a bitfield mid-`lws_http_mount`, silently shifting every later positional field). Use field-by-field init for vendor structs in FluffOS code.
+
+### Current FluffOS-local patches (keep across future updates unless obsolete upstream)
+* **backward-cpp** `BackwardConfig.cmake`: static-link set `elf/dl/lzma/bz2/zstd` alongside `dw` (elfutils on modern distros), PUBLIC propagation through static `libdriver`, WIN32 `dbghelp`/`psapi` (no msvcr!), cmake_minimum_required bump.
+* **backward-cpp** `backward.hpp`: `<dlfcn.h>` under the `BACKWARD_HAS_DW` and backtrace branches (musl), `_MSC_VER` guard around `_set_abort_behavior()` (MinGW).
+* **libwebsockets** `CMakeLists.txt`: configure probes spelled `int main(void)` (clang 18+; still `void main` upstream as of v4.5-stable).
+
+### libwebsockets integration facts (bitten once each)
+* Since lws v4.3 an internal **"system" vhost heads `context->vhost_list`**, so `lws_adopt_socket()` (which adopts onto the list head) binds to a vhost with none of our ws protocols and every upgrade is rejected with "No supported protocol". Adopt explicitly: `lws_adopt_socket_vhost(lws_get_vhost_by_name(context, "default"), fd)` (`src/net/websocket.cc`).
+* New default-ON lws subsystems are forced OFF in `src/CMakeLists.txt` -- see the commented block there (`EVLIB_PLUGINS` static evlib, `HTTP_DIGEST_AUTH`→GENCRYPTO→OpenSSL-3 `#error`, `LHP`/`UPNG`/`SECURE_STREAMS`, `MINIMAL_EXAMPLES` pruned). Re-audit that option block on every lws bump; the implied-options file (`CMakeLists-implied-options.txt`) force-enables features transitively.
+* **The test suites do not exercise a websocket client connection** -- the vhost-adoption regression above passed the full GTest + LPC suites. After touching lws or `src/net/`, run a real end-to-end smoke test: boot `driver etc/config.test`, complete a 101 upgrade handshake on the plain and TLS ws ports with the `ascii`/`telnet`/`binary` subprotocols, and confirm the first data frame arrives.
+
+### Known state / deferred
+* `crypt` (musl 1.1.24 subset) and `utf8_decoder_dfa` (Hoehrmann) are intentionally frozen -- confirmed unchanged upstream through musl 1.2.6 / no upstream versioning.
+* libtelnet, libevent, widecharwidth: upgrades deliberately deferred (maintainer request, 2026-07); their unused test/doc trees are already pruned.
