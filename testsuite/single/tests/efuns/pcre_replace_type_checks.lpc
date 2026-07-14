@@ -5,6 +5,7 @@
 // non-string element used to reinterpret garbage bits as a char* and
 // crash the driver; both must now be clean, catchable errors, and the
 // well-typed case must keep working exactly as before.
+#ifdef __PACKAGE_PCRE__
 void do_tests() {
     mixed err;
     mixed non_array;
@@ -20,3 +21,4 @@ void do_tests() {
 
     ASSERT_EQ("cd ab", pcre_replace("ab cd", "(\\w+) (\\w+)", ({"cd", "ab"})));
 }
+#endif

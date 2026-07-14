@@ -6,7 +6,9 @@
 // exercises the path for a clean, catchable error; the leak itself is
 // verified separately (build with the fix reverted and compare
 // LeakSanitizer output across a run exercising this call many times).
+#ifdef __PACKAGE_PCRE__
 void do_tests() {
     mixed err = catch(pcre_replace_callback("ab", "(a)(b)", 0));
     ASSERT(err);
 }
+#endif
