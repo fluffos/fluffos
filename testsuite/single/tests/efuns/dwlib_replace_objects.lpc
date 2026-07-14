@@ -3,6 +3,7 @@
 // string the master's object_name() apply returns -- an arbitrary-length,
 // mudlib-controlled string. The copies into that buffer must be bounded.
 void do_tests() {
+#ifdef __PACKAGE_DWLIB__
     object ob = load_object("/clone/dwlib_long_name");
 
     // Surviving this call is the regression signal: an unbounded copy of
@@ -13,4 +14,6 @@ void do_tests() {
     mixed result = replace_objects(ob);
     ASSERT(stringp(result));
     ASSERT(strlen(result) < 2000);
+#endif
+    ASSERT(1);
 }
