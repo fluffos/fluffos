@@ -1055,6 +1055,12 @@ int socket_write(int fd, svalue_t* message, const char* name) {
                 memcpy(&buf[i * sizeof(int)], reinterpret_cast<char*>(&el[i].u.real), sizeof(int));
                 break;
               default:
+                // Non-numeric elements are silently skipped (unchanged
+                // behavior), but the slot must still be initialized --
+                // buf came from DMALLOC (not zeroed), and this buffer is
+                // sent to the remote peer as-is: leaving it untouched
+                // would transmit uninitialized heap memory.
+                memset(&buf[i * sizeof(int)], 0, sizeof(int));
                 break;
             }
           }
