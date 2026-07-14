@@ -163,33 +163,31 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
       lwsl_info("LWS_CALLBACK_CLOSED: wsi %p\n", wsi);
 
       auto* ip = pss->user;
-      if (!ip) {
-        return -1;
+      if (ip) {
+        remove_interactive(ip->ob, 0);
+        pss->user = nullptr;
       }
-
-      remove_interactive(ip->ob, 0);
-      pss->user = nullptr;
-
-      evbuffer_free(pss->buffer);
-      pss->buffer = nullptr;
-
+      // Always free the session resources: on driver-initiated closes
+      // close_user_websocket() has already nulled pss->user, and an early
+      // return here used to leak the evbuffer on that path.
+      if (pss->buffer) {
+        evbuffer_free(pss->buffer);
+        pss->buffer = nullptr;
+      }
       break;
     }
     case LWS_CALLBACK_SERVER_WRITEABLE: {
       lwsl_info("LWS_CALLBACK_SERVER_WRITEABLE\n");
 
-      // Drain as much as the socket accepts within THIS callback. Requesting
-      // another writeable event from inside the handler is LOSSY with the
-      // libevent event lib: after the user callback returns, lws core clears
-      // POLLOUT and its pollfd bookkeeping desyncs from the evlib watcher --
-      // the request is dropped, and once wedged every later
-      // lws_callback_on_writable() no-ops, freezing output on the connection
-      // for good (first bites on any burst larger than one window, e.g. a
-      // full-screen TUI frame). lws_send_pipe_choked() is the documented
-      // gate for multiple lws_write() calls per callback: while it is clear
-      // more writes are allowed; when a write chokes, lws buffers the
-      // partial internally, keeps POLLOUT armed itself (a core-managed path
-      // that does not desync), and fires this callback again once flushed.
+      // All sending happens here (lws rule: only write from the WRITEABLE
+      // callback); a callback with nothing to do is a harmless no-op.
+      // Drain as many windows as the socket accepts, gated on
+      // lws_send_pipe_choked(). Choked can simply mean the socket is full
+      // right now (zero-timeout poll) with nothing pending inside lws --
+      // lws will NOT re-arm the callback on its own in that case, so the
+      // exit below must re-request it whenever data remains, or output
+      // wedges for good on any burst that fills the kernel send buffer
+      // while the peer reads slowly.
       static unsigned char buf[LWS_PRE + 2048];
       while (evbuffer_get_length(pss->buffer) > 0 && !lws_send_pipe_choked(wsi)) {
         auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
@@ -206,24 +204,28 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
           auto new_numbytes = static_cast<ev_ssize_t>(telnet_truncate(
               &buf[LWS_PRE], numbytes, numbytes == static_cast<ev_ssize_t>(sizeof(buf) - LWS_PRE)));
           if (new_numbytes == 0) {
-            // Only an incomplete sequence is buffered; the rest of it will
-            // request a fresh writeable event when it is queued.
+            // Only an incomplete sequence is buffered; the exit below keeps
+            // a writeable callback requested until the rest of it arrives.
             break;
           }
           numbytes = new_numbytes;
         }
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
-        // Per lws docs, a return less than the requested length means the
-        // connection has failed. On success lws consumed the entire payload
-        // (truncated sends are buffered and flushed internally), and the
-        // return can exceed numbytes under encapsulation (TLS), so it must
-        // NOT be used as a drain count: doing so silently drops the start
-        // of the next chunk on wss connections.
+        // A short return means the connection failed. On success lws
+        // consumed the whole payload (partials are buffered and flushed
+        // internally), and the return can EXCEED numbytes on TLS -- never
+        // use it as a drain count.
         if (m < static_cast<int>(numbytes)) {
           lwsl_warn("ERROR %d writing to ws socket.\n", m);
           return -1;
         }
         evbuffer_drain(pss->buffer, numbytes);
+      }
+      // Data still queued: request the next writeable callback. Never rely
+      // on lws to re-arm it (see above) -- this keeps the invariant that
+      // queued data always has a callback requested.
+      if (evbuffer_get_length(pss->buffer) > 0) {
+        lws_callback_on_writable(wsi);
       }
       break;
     }
@@ -252,6 +254,8 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
   return 0;
 }
 
+// Queue the bytes and request a writeable callback; actual sending only
+// happens in LWS_CALLBACK_SERVER_WRITEABLE.
 void ws_telnet_send(struct lws* wsi, const char* data, size_t len) {
   DEBUG_CHECK(lws_get_protocol(wsi)->id != PROTOCOL_WS_TELNET, "wrong protocol!");
   auto pss = reinterpret_cast<ws_telnet_session*>(lws_wsi_user(wsi));

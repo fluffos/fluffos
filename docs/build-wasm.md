@@ -94,10 +94,10 @@ tools/wasm/pack-mudlib.sh \
   exactly like running `driver etc/config` natively from that directory.
   Ports/TLS entries in the config are ignored (there are no listening
   sockets; the page connects directly).
-* The bundle contains `index.html` (a self-contained web terminal with a
-  minimal telnet client), `fluffos.js`/`fluffos.wasm`,
-  `mudlib.js`/`mudlib.data`, and `fluffos-boot.js` (mount + config for
-  the page).
+* The bundle contains `index.html` (the web terminal: xterm.js under
+  `vendor/`, telnet client in `telnet.js` — see `src/www/README.md`),
+  `fluffos.js`/`fluffos.wasm`, `mudlib.js`/`mudlib.data`, and
+  `fluffos-boot.js` (mount + config for the page).
 
 ## 4. Serve it
 
@@ -125,8 +125,8 @@ guards.
 
 ## 6. Embedding API (custom frontends)
 
-`index.html` is intentionally small; any frontend (e.g. xterm.js) can
-drive the same module:
+`index.html` keeps the page glue small (xterm.js does the emulation);
+any custom frontend can drive the same module:
 
 ```js
 const M = await createFluffOS({ print, printErr, locateFile });
@@ -146,9 +146,9 @@ M.ccall('fluffos_input', null, ['number','array','number'],
 ```
 
 The driver does real telnet negotiation on each connection (ECHO for
-password masking, NAWS, GMCP…), so the page needs at least a
-minimal telnet layer — copy the ~60-line client from
-`src/www/wasm/index.html`.
+password masking, SGA char mode, NAWS, GMCP…), so the page needs a
+telnet layer — reuse `src/www/telnet.js` (transport-agnostic; the
+bundled terminal wires it to both the wasm bridge and websockets).
 
 ## 7. Calling JavaScript from LPC (jsbridge)
 

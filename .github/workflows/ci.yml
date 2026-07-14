@@ -147,6 +147,15 @@ jobs:
       - name: Run LPC Testsuite
         run: cd build && ctest --output-on-failure -L testsuite
 
+      # Only on Clang Debug (with and without the sanitizer) -- it's the
+      # only test that drives real websocket client traffic against the
+      # native driver (see src/www/AGENTS.md); the sanitizer variant also
+      # catches memory-safety bugs in the ws_telnet.cc/ws_ascii.cc nudge
+      # timer that ctest's unit/LPC suites can't reach.
+      - name: Websocket smoke test
+        if: matrix.platform == 'Ubuntu' && matrix.compiler == 'clang' && matrix.build == 'Debug'
+        run: node tools/ws-smoke.js build/src/driver testsuite
+
   # Windows (MSYS2/MinGW64). Uses the same build-windows composite as the
   # release workflow, so the release build can't break in a way CI misses.
   windows:

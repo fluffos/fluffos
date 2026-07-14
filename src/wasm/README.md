@@ -77,7 +77,8 @@ NAWS (live window size, re-reported on resize → the `window_size` apply)
 and TTYPE (`xterm-256color`). Terminal emulation itself — rendering,
 SGR, the alternate screen, mouse reporting, bracketed paste, keyboard
 encoding — is [xterm.js](https://xtermjs.org), vendored from npm under
-`src/www/wasm/vendor/` and shipped by `tools/wasm/pack-mudlib.sh`, which
+`src/www/vendor/` (shared with the websocket client, see
+`src/www/README.md`) and shipped by `tools/wasm/pack-mudlib.sh`, which
 is what makes the mudlib TUI library (`testsuite/std/tui`) work in the
 browser end to end.
 
