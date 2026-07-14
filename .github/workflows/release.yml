@@ -282,7 +282,8 @@ jobs:
 
           Contents:
           - fluffos.js / fluffos.wasm -- the driver
-          - index.html -- a self-contained web terminal (telnet client included)
+          - index.html -- the web terminal (xterm.js under vendor/,
+            telnet client in telnet.js)
           - pack-mudlib.sh -- bundles YOUR mudlib with this driver into a
             static site (requires emscripten's file_packager, i.e. emsdk on PATH)
 
