@@ -1,0 +1,41 @@
+// define_new_function() (src/compiler/internal/compiler.cc) builds a
+// "Function ... inherited from '/<filename>' ..." warning that embeds
+// the inherited-from program's filename, then used to pass that buffer
+// straight to yywarn() as the FORMAT STRING instead of via "%s" -- so a
+// '%' in the filename got interpreted as a printf conversion instead of
+// appearing literally. Trigger it via an ordinary return-type mismatch
+// across an inherit, using a parent filename containing "%s", and check
+// (via master::log_error(), which the testsuite master writes to
+// LOG_DIR + "/compile") that the warning text preserves it literally.
+void do_tests() {
+    string parent_name, child_name, parent_src, child_src, log_content;
+    object child;
+    string tag;
+
+    parent_name = "/gen_tf_TAG%sEND_parent";
+    child_name = "/gen_tf_child";
+    tag = "TAG%sEND";
+
+    parent_src = "int foo() { return 1; }\n";
+    child_src = "inherit \"" + parent_name + "\";\n"
+                "string foo() { return \"x\"; }\n";
+
+    rm(parent_name + ".c");
+    rm(child_name + ".c");
+    write_file(parent_name + ".c", parent_src);
+    write_file(child_name + ".c", child_src);
+
+    // Surviving this compile is itself part of the regression signal --
+    // an unfortunate vararg read for a stray "%s" could crash outright.
+    child = load_object(child_name);
+    ASSERT2(objectp(child), "return-type-mismatch warning across a '%'-containing "
+                            "inherited filename must not crash the driver");
+
+    log_content = read_file(LOG_DIR + "/compile");
+    ASSERT2(stringp(log_content) && strsrch(log_content, tag) != -1,
+            "the '%' in the inherited-from filename must appear literally in the "
+            "logged warning, not be consumed as a printf conversion");
+
+    rm(parent_name + ".c");
+    rm(child_name + ".c");
+}
