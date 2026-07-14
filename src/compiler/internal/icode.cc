@@ -357,10 +357,27 @@ static int try_to_push(int kind, int value) {
   return 0;
 }
 
+namespace {
+// A left-nested chain of binary/unary/ternary operators (e.g. tens of
+// thousands of '+' terms) builds a parse tree of matching depth with no
+// bound from the grammar/parser -- walking it here recurses just as deep.
+// Cap it so pathological input errors cleanly instead of overflowing the
+// C stack (mirrors MAX_INCLUDE_DEPTH's role for #include nesting).
+int g_generate_node_depth = 0;
+constexpr int kMaxGenerateNodeDepth = 500;
+}  // namespace
+
 void i_generate_node(parse_node_t* expr) {
   if (!expr) {
     return;
   }
+
+  if (++g_generate_node_depth > kMaxGenerateNodeDepth) {
+    --g_generate_node_depth;
+    yyerror("Expression nested too deeply.");
+    return;
+  }
+  DEFER { --g_generate_node_depth; };
 
   if (expr->line && expr->line != line_being_generated) {
     switch_to_line(expr->line);

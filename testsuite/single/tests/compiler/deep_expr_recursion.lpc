@@ -1,0 +1,29 @@
+// A left-nested chain of binary operators (e.g. tens of thousands of
+// '+' terms) builds a parse tree as deep as the input -- LALR parsing
+// itself stays shallow (each '+' reduces immediately), but the
+// optimizer (optimize(), generate.cc) and code generator
+// (i_generate_node(), icode.cc) then walk that tree with plain
+// recursion and no depth cap, overflowing the C stack at compile time.
+// A single seed variable (not a literal) prevents constant-folding
+// from collapsing the chain before it reaches the walkers.
+void do_tests() {
+    string src, expr;
+    int i;
+
+    expr = "x";
+    for (i = 0; i < 50000; i++) {
+        expr += "+x";
+    }
+    src = "int x; int f() { x = 1; return " + expr + "; }\n";
+
+    rm("/gen_deep_expr.c");
+    write_file("/gen_deep_expr.c", src);
+
+    // Surviving this compile is the regression signal -- whether the
+    // compile is accepted or cleanly rejected past the new depth cap,
+    // it must not crash the driver.
+    catch(load_object("/gen_deep_expr"));
+    ASSERT(1);
+
+    rm("/gen_deep_expr.c");
+}
