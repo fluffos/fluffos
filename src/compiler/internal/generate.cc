@@ -50,10 +50,25 @@ static void optimize_lvalue_list(parse_node_t* expr) {
 #define OPTIMIZER_IN_COND 2 /* switch or if or ?: */
 static int optimizer_state = 0;
 
+namespace {
+// See the matching guard in icode.cc's i_generate_node(): a left-nested
+// operator chain builds a parse tree as deep as the input, with no bound
+// from the grammar/parser. Skipping optimization of a pathologically deep
+// subtree (rather than erroring) is behavior-preserving -- it only means
+// that subtree keeps its un-optimized (still correct) bytecode.
+int g_optimize_depth = 0;
+constexpr int kMaxOptimizeDepth = 500;
+}  // namespace
+
 static parse_node_t* optimize(parse_node_t* expr) {
   if (!expr) {
     return nullptr;
   }
+  if (++g_optimize_depth > kMaxOptimizeDepth) {
+    --g_optimize_depth;
+    return expr;
+  }
+  DEFER { --g_optimize_depth; };
 
   switch (expr->kind) {
     case NODE_TERNARY_OP:
