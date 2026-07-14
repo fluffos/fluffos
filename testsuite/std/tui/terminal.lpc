@@ -66,6 +66,9 @@ void window_size(int w, int h) {
   if (tui_mode == MODE_RL && rl) {
     rl->rl_set_width(w);
     tui_send(rl->rl_take_output());
+  } else if (tui_mode == MODE_MENU && menu) {
+    menu->m_set_width(w);
+    tui_send(menu->m_redraw());
   } else if (tui_mode == MODE_APP && cur_app) {
     cur_app->on_resize(w, h);
     tui_send(cur_app->render());
@@ -225,6 +228,7 @@ varargs void tui_select(function cb, string prompt, string *choices, mapping opt
   map_delete(opts, "multi");
   menu_cb = cb;
   tui_mode = MODE_MENU;
+  menu->m_set_width(term_w);
   tui_send(menu->m_begin(prompt, choices, opts));
   if (menu->m_state() != TUI_RL_MORE) {  // e.g. empty choice list
     finish_menu(menu->m_state());
@@ -245,6 +249,7 @@ varargs void tui_multiselect(function cb, string prompt, string *choices, mappin
   opts["multi"] = 1;
   menu_cb = cb;
   tui_mode = MODE_MENU;
+  menu->m_set_width(term_w);
   tui_send(menu->m_begin(prompt, choices, opts));
   if (menu->m_state() != TUI_RL_MORE) {
     finish_menu(menu->m_state());
@@ -284,6 +289,8 @@ varargs void tui_open(object app, mapping opts) {
 }
 
 void tui_close() {
+  object app = cur_app;
+
   if (tui_mode == MODE_APP) {
     tui_send(ansi_mouse(0) + ansi_bracketed_paste(0) + ansi_cursor_visible(1) +
              ansi_sgr("0") + ansi_alt_screen(0));
@@ -296,6 +303,10 @@ void tui_close() {
   confirm_cb = 0;
   tui_mode = MODE_IDLE;
   remove_get_char(this_object());
+  // A terminal-initiated close (disconnect, tui_destroy) must tear the app
+  // down too, or the clone leaks.  app_quit() is reentry-guarded, so this
+  // is a no-op when the app itself initiated the close.
+  if (app) app->app_quit();
 }
 
 // Full teardown: call from remove() / net_dead() of the inheriting object.

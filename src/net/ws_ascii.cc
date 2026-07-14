@@ -126,19 +126,28 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
     case LWS_CALLBACK_SERVER_WRITEABLE: {
       lwsl_info("LWS_CALLBACK_SERVER_WRITEABLE\n");
 
-      auto total = evbuffer_get_length(pss->buffer);
-
+      // Drain as much as the socket accepts within THIS callback -- see the
+      // twin loop in ws_telnet.cc: re-arming the writeable event from inside
+      // the handler is lossy with the libevent event lib (lws core clears
+      // POLLOUT after the callback and desyncs from the evlib watcher,
+      // permanently wedging output on any burst larger than one window).
+      // lws_send_pipe_choked() gates multiple lws_write() calls; a choked
+      // write is flushed by lws's own core-managed POLLOUT path, which
+      // fires this callback again afterwards.
       static unsigned char buf[LWS_PRE + 2048];
-      auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
-      if (numbytes > 0) {
+      while (evbuffer_get_length(pss->buffer) > 0 && !lws_send_pipe_choked(wsi)) {
+        auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
+        if (numbytes <= 0) {
+          break;
+        }
         // Hold back a trailing incomplete UTF-8 sequence so a codepoint is
         // never split across ws messages. evbuffer_copyout() does not drain,
         // so the held-back bytes stay at the front of pss->buffer and go out
         // with the next write.
         auto new_numbytes = static_cast<ev_ssize_t>(u8_truncate(&buf[LWS_PRE], numbytes));
         if (new_numbytes == 0) {
-          // Only an incomplete codepoint is buffered; wait for the rest of it
-          // instead of re-arming the writeable callback in a busy loop.
+          // Only an incomplete codepoint is buffered; the rest of it will
+          // request a fresh writeable event when it is queued.
           break;
         }
         numbytes = new_numbytes;
@@ -163,11 +172,6 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
           return -1;
         }
         evbuffer_drain(pss->buffer, numbytes);
-        total -= numbytes;
-        // May have more text to write.
-        if (total > 0) {
-          lws_callback_on_writable(wsi);
-        }
       }
       break;
     }

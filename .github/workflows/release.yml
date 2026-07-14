@@ -245,10 +245,11 @@ jobs:
           asset_name: fluffos-${{ needs.create-release.outputs.version }}-linux-x86_64-static.tar.gz
           asset_content_type: application/gzip
 
-  # WebAssembly driver: cross-compile with the latest emsdk, gate on the
-  # LPC testsuite running inside the wasm driver under node, then ship
-  # driver + web terminal + mudlib packer as a self-contained zip. See
-  # docs/build-wasm.md for the workflow this asset supports.
+  # WebAssembly driver: cross-compile with the pinned emsdk (see
+  # .github/actions/build-wasm/action.yml), gate on the LPC testsuite
+  # running inside the wasm driver under node, then ship driver + web
+  # terminal + mudlib packer as a self-contained zip. See docs/build-wasm.md
+  # for the workflow this asset supports.
   build-wasm:
     name: Build WASM Binary
     needs: create-release
@@ -270,6 +271,8 @@ jobs:
           STAGE=$(mktemp -d)
           cp build-wasm/src/fluffos.js build-wasm/src/fluffos.wasm "$STAGE/"
           cp src/www/wasm/index.html "$STAGE/"
+          cp src/www/telnet.js "$STAGE/"
+          cp -r src/www/vendor "$STAGE/"
           cp tools/wasm/pack-mudlib.sh "$STAGE/"
           cat > "$STAGE/README.md" << EOF
           # FluffOS ${VERSION} -- WebAssembly driver

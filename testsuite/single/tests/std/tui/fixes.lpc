@@ -1,0 +1,237 @@
+// Regression tests for /std/tui bug fixes and features:
+//   wslice zero-width handling, ESC[1;mR vs CPR, readline scroll markers /
+//   undo / isearch robustness / completion, menu width clipping + type-to-
+//   filter + scroll indicators, widget mouse-wheel support, tree parent
+//   jump, app focus cycling, app teardown on terminal-initiated close.
+
+#include <tui.h>
+
+private mixed *events = ({});
+
+private void on_evt(object w, string what, mixed arg) {
+  events += ({ ({ what, arg }) });
+}
+
+private void feed_text(object r, string s) {
+  int i;
+
+  for (i = 0; i < strlen(s); i++) r->rl_feed(s[i..i]);
+}
+
+void do_tests() {
+  object a = clone_object(TUI_ANSI);
+  object k, r, m, w, w2, scr, app, mock;
+  string o;
+  mixed *ev;
+
+  // --- wslice: combining marks stay attached to their base ----------------
+  // "e" + U+0301 combining acute; the mark is zero-width
+  o = a->wslice("caf" + sprintf("e%c", 0x0301) + "!", 0, 4);
+  ASSERT_EQ("caf" + sprintf("e%c", 0x0301), o);
+  // window starting after the base drops the orphaned mark
+  o = a->wslice(sprintf("e%c", 0x0301) + "xyz", 1, 2);
+  ASSERT_EQ("xy", o);
+  // control characters are still dropped (never emitted raw)
+  // (sprintf: "\x01b" would parse as one greedy hex escape, 0x1b = ESC)
+  o = a->wslice(sprintf("a%cb", 1), 0, 3);
+  ASSERT_EQ("ab", o);
+
+  // --- keys: modified F3 vs cursor position report ------------------------
+  k = clone_object(TUI_KEYS);
+  ASSERT_EQ(({ TUI_MOD_CTRL | TUI_KEY_F3 }), k->feed("\e[1;5R"));
+  ev = k->feed("\e[12;34R");           // a real CPR: row 12, col 34
+  ASSERT_EQ(1, sizeof(ev));
+  ASSERT_EQ(({ TUI_EV_CPR, 12, 34 }), ev[0]);
+  ASSERT_EQ(({ TUI_KEY_F3 }), k->feed("\eOR"));  // plain F3 still works
+  destruct(k);
+
+  // --- readline: both scroll markers on a mid-line viewport ---------------
+  r = clone_object(TUI_READLINE);
+  r->rl_set_width(24);                 // avail = 24 - 2 (prompt) - 1 = 21
+  r->rl_begin();
+  feed_text(r, "abcdefghijklmnopqrstuvwxyz0123456789");
+  r->rl_feed(TUI_CTRL('a'));           // home: viewport snaps left
+  foreach (int i in allocate(25)) r->rl_feed(TUI_KEY_RIGHT);
+  o = r->rl_take_output();
+  // cursor at column 25 forces a scroll; text continues on both sides
+  ASSERT(strsrch(o, "<") != -1);       // left marker
+  ASSERT(strsrch(o, ">") != -1);       // right marker
+
+  // --- readline: undo (C-_) ------------------------------------------------
+  r->rl_begin();
+  feed_text(r, "hello");
+  r->rl_feed(TUI_CTRL('w'));           // kill the word
+  ASSERT_EQ("", r->rl_line());
+  r->rl_feed(TUI_CTRL('_'));           // undo the kill
+  ASSERT_EQ("hello", r->rl_line());
+  ASSERT_EQ(5, r->rl_cursor());
+  r->rl_feed(TUI_CTRL('_'));           // undo the last typed char
+  ASSERT_EQ("hell", r->rl_line());
+  foreach (int i in allocate(10)) r->rl_feed(TUI_CTRL('_'));
+  ASSERT_EQ("", r->rl_line());         // stack exhausts cleanly
+
+  // --- readline: mouse reports don't cancel an incremental search ---------
+  r->rl_begin();
+  feed_text(r, "needle");
+  r->rl_feed(TUI_KEY_ENTER);
+  r->rl_begin();
+  r->rl_feed(TUI_CTRL('r'));
+  feed_text(r, "need");
+  ASSERT_EQ(1, r->rl_searching());
+  r->rl_feed(({ TUI_EV_MOUSE, 0, 3, 3, 1 }));   // stray mouse click
+  ASSERT_EQ(1, r->rl_searching());              // still searching
+  ASSERT_EQ("needle", r->rl_line());
+  r->rl_feed(TUI_KEY_ESC);                      // accept the match
+  ASSERT_EQ(0, r->rl_searching());
+
+  // --- readline: completing an already-complete unique match adds a space -
+  r->rl_set_completer((: ({ "quit", "quaff" }) :));
+  r->rl_begin();
+  feed_text(r, "quit");
+  r->rl_feed(TUI_KEY_TAB);
+  ASSERT_EQ("quit ", r->rl_line());
+  destruct(r);
+
+  // --- menu: width clipping keeps every line inside the terminal ----------
+  m = clone_object(TUI_MENU);
+  o = m->m_begin("Pick:", ({ "short", repeat_string("x", 100) }),
+                 ([ "width": 20 ]));
+  foreach (string line in explode(o, "\r\n")) {
+    ASSERT(a->visible_width(line) < 20);
+  }
+
+  // --- menu: type-to-filter -------------------------------------------------
+  m->m_begin("Class:", ({ "warrior", "mage", "thief", "warlock" }));
+  m->m_take_output();
+  m->m_feed("w");
+  m->m_feed("a");
+  m->m_feed("r");                       // filter "war": warrior + warlock
+  o = m->m_take_output();
+  ASSERT(strsrch(o, "warrior") != -1);
+  ASSERT(strsrch(o, "warlock") != -1);
+  ASSERT(strsrch(o, "mage") == -1);
+  ASSERT_EQ("war", m->m_filter());
+  m->m_feed(TUI_KEY_DOWN);              // select warlock (2nd filtered)
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_ENTER));
+  ASSERT_EQ(3, m->m_result());          // ORIGINAL index of warlock
+  ASSERT_EQ("warlock", m->m_item(m->m_result()));
+
+  // backspace widens the filter again; no-match state accepts nothing
+  m->m_begin("F2:", ({ "aa", "bb" }));
+  m->m_feed("z");                       // no match
+  o = m->m_take_output();
+  ASSERT(strsrch(o, "(no match)") != -1);
+  ASSERT_EQ(TUI_RL_MORE, m->m_feed(TUI_KEY_ENTER));  // Enter refused
+  m->m_feed(TUI_KEY_BACKSPACE);         // clear the filter
+  ASSERT_EQ("", m->m_filter());
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_ENTER));
+  ASSERT_EQ(0, m->m_result());
+
+  // filter in multiselect: toggles apply to original indexes
+  m->m_begin("F3:", ({ "red", "green", "blue" }), ([ "multi": 1 ]));
+  m->m_feed("g");                       // green only
+  m->m_feed(" ");                       // toggle it
+  ASSERT_EQ(TUI_RL_DONE, m->m_feed(TUI_KEY_ENTER));
+  ASSERT_EQ(({ 1 }), m->m_result());
+
+  // --- menu: scroll indicator above AND below ------------------------------
+  m->m_begin("S:", ({ "one", "two", "three", "four", "five", "six" }),
+             ([ "height": 2 ]));
+  m->m_take_output();
+  m->m_feed(TUI_KEY_END);
+  o = m->m_take_output();
+  ASSERT(strsrch(o, "…") != -1);        // indicator above (scrolled to end)
+  ASSERT(strsrch(o, "six") != -1);
+  ASSERT(strsrch(o, "one") == -1);
+  destruct(m);
+  destruct(a);
+
+  // --- widgets: mouse wheel -------------------------------------------------
+  scr = clone_object(TUI_SCREEN);
+  scr->scr_resize(30, 6);
+
+  events = ({});
+  w = new("/std/tui/w/list");
+  w->set_geometry(0, 0, 20, 3);
+  w->set_items(({ "a", "b", "c", "d" }));
+  w->set_on_event((: on_evt :));
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 65, 0, 0, 1 })));  // wheel down
+  ASSERT_EQ(1, w->query_selected());
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 64, 0, 0, 1 })));  // wheel up
+  ASSERT_EQ(0, w->query_selected());
+  // wheel over a row moves by one, it no longer jumps to the hovered row
+  w->handle_mouse(({ TUI_EV_MOUSE, 65, 0, 2, 1 }));
+  ASSERT_EQ(1, w->query_selected());
+  // a real click still selects the row
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 0, 0, 2, 1 })));
+  ASSERT_EQ(2, w->query_selected());
+  destruct(w);
+
+  // table: click honours the header row offset; wheel scrolls
+  w = new("/std/tui/w/table");
+  w->set_geometry(0, 0, 28, 4);
+  w->set_columns(({ "n" }));
+  w->set_rows(({ ({ "r0" }), ({ "r1" }), ({ "r2" }) }));
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 0, 0, 2, 1 })));  // y=2 -> row 1
+  ASSERT_EQ(1, w->query_selected());
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 65, 0, 0, 1 })));
+  ASSERT_EQ(2, w->query_selected());
+  destruct(w);
+
+  // tree: Left on a leaf jumps to the parent; wheel moves selection
+  w = new("/std/tui/w/tree");
+  w->set_geometry(0, 0, 20, 6);
+  w->set_nodes(({ ({ "root", ({ "leaf1", "leaf2" }) }) }));
+  w->expand_all();
+  w->handle_key(TUI_KEY_DOWN);           // onto leaf1
+  ASSERT_EQ("leaf1", w->query_selected());
+  w->handle_key(TUI_KEY_LEFT);           // jump to parent
+  ASSERT_EQ("root", w->query_selected());
+  w->handle_key(TUI_KEY_DOWN);
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 65, 0, 0, 1 })));
+  ASSERT_EQ("leaf2", w->query_selected());
+  destruct(w);
+
+  // log: wheel scrolls the backlog
+  w = new("/std/tui/w/log");
+  w->set_geometry(0, 0, 20, 2);
+  foreach (int i in allocate(10)) w->add_line("line" + i);
+  ASSERT_EQ(0, w->query_offset());
+  ASSERT_EQ(1, w->handle_mouse(({ TUI_EV_MOUSE, 64, 0, 0, 1 })));  // wheel up
+  ASSERT_EQ(3, w->query_offset());
+  w->handle_mouse(({ TUI_EV_MOUSE, 65, 0, 0, 1 }));                // wheel down
+  ASSERT_EQ(0, w->query_offset());
+  destruct(w);
+  destruct(scr);
+
+  // --- app: backward focus cycling with nothing focused yet ---------------
+  app = new(TUI_APP);
+  w = app->app_add(new("/std/tui/w/button"));
+  app->app_add(new("/std/tui/w/label"));  // not focusable
+  w2 = app->app_add(new("/std/tui/w/button"));
+  app->app_cycle_focus(-1);             // backward from the initial state
+  ASSERT_EQ(w2, app->app_focused());    // lands on the LAST focusable
+  app->app_cycle_focus(1);
+  ASSERT_EQ(w, app->app_focused());     // wraps forward to the first
+  app->app_quit();
+  ASSERT(!app);                          // app destructs itself
+  ASSERT(!w);                            // ... and its widgets
+  ASSERT(!w2);
+
+  // --- app: terminal-initiated close tears the app down (no clone leak) ---
+  write_file("/data/tui_mock_term.c",
+             "object app;\n" +
+             "void set_app(object a) { app = a; }\n" +
+             "void tui_close() { object a = app; app = 0; if (a) a->app_quit(); }\n",
+             1);
+  mock = load_object("/data/tui_mock_term");
+  app = new(TUI_APP);
+  w = app->app_add(new("/std/tui/w/button"));
+  app->on_open(mock, 40, 10);
+  mock->set_app(app);
+  mock->tui_close();                     // what tui_destroy()/disconnect does
+  ASSERT(!app);                          // app destructed via app_quit()
+  ASSERT(!w);                            // widgets too
+  destruct(mock);
+  rm("/data/tui_mock_term.c");
+}

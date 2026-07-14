@@ -105,6 +105,9 @@ int visible_width(string s) { return strwidth(strip_ansi(s)); }
 // The substring of plain (escape-free) text s covering display columns
 // [col, col + ncols).  A wide character only partially inside the window is
 // excluded, so the result can be up to one column narrower at either edge.
+// Zero-width characters (combining marks, ZWJ, variation selectors) stay
+// attached to their base character; control characters are dropped (they
+// are "rendered as nothing" — emitting them would inject ESC and friends).
 string wslice(string s, int col, int ncols) {
   string out = "";
   int i, n = strlen(s), c = 0, lo = col, hi = col + ncols;
@@ -113,7 +116,12 @@ string wslice(string s, int col, int ncols) {
   for (i = 0; i < n && c < hi; i++) {
     string ch = s[i..i];
     int cw = strwidth(ch);
-    if (c >= lo && c + cw <= hi && cw > 0) out += ch;
+    if (cw > 0) {
+      if (c >= lo && c + cw <= hi) out += ch;
+    } else if (ch[0] >= 32 && ch[0] != 127) {
+      // zero-width mark: keep it iff its base character was kept
+      if (c > lo && c <= hi && out != "") out += ch;
+    }
     c += cw;
   }
   return out;

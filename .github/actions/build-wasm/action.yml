@@ -1,11 +1,28 @@
 name: Build WASM driver
 description: >-
-  Cross-compile the FluffOS driver to WebAssembly with the latest emsdk and
+  Cross-compile the FluffOS driver to WebAssembly with a pinned emsdk and
   run the full LPC testsuite inside the wasm driver under node. Shared by the
   CI `wasm` job and the release `build-wasm` job so the two can't drift.
   Leaves the built driver in build-wasm/src/ for the caller to package.
 
 inputs:
+  emsdk-ver:
+    description: >-
+      Emscripten SDK version. Pinned rather than "latest": 6.0.2 defaulted
+      GROWABLE_ARRAYBUFFERS to 1, so any ALLOW_MEMORY_GROWTH build got a
+      heap backed by a resizable ArrayBuffer (wasmMemory.toResizableBuffer())
+      in browsers that ship the wasm rab-integration -- and two runtime
+      paths pass raw HEAPU8.subarray() views into Web APIs that reject
+      resizable-backed views: random_get() -> crypto.getRandomValues()
+      (threw on boot: "The provided ArrayBufferView value must not be
+      resizable") and UTF8ToString()/stringToUTF8ToString() -> TextDecoder
+      (breaking packages/jsbridge). 6.0.3 reverted the default AND fixed
+      the string codegen (getUnsharedTextDecoderView -> getHeapViewOrCopy,
+      src/parseTools.mjs), but random_get() is still unguarded upstream --
+      src/www/wasm/index.html carries a crypto.getRandomValues wrapper for
+      when the default flips back on. Bump this deliberately, not by
+      tracking latest, and re-check libwasi.js random_get() when you do.
+    default: '6.0.3'
   icu-ver:
     description: ICU release version cross-built for wasm (feeds the deps cache key).
     default: '74-2'
@@ -19,7 +36,7 @@ runs:
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
       with:
-        version: latest
+        version: ${{ inputs.emsdk-ver }}
         actions-cache-folder: emsdk-cache
 
     - name: Resolve emscripten version
