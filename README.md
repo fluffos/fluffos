@@ -320,7 +320,8 @@ The driver processes untrusted input (mudlib code, network bytes, save files), s
 
 * Build **both** a Debug + sanitizer tree (`-DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON`) and a `RelWithDebInfo` tree, and run the LPC suite 2–3× in each (it randomizes file order) — some defects are release-only, some only trip ASan/UBSan, and the Debug build's per-file ref-count checker (`Bad ref count …`) is a hard gate.
 * Add a regression test that demonstrably fails on the *unfixed* binary.
-* **[AGENTS.md](AGENTS.md) §13 is the memory-safety audit checklist** (the recurring bug classes — unbounded copies, integer overflow before alloc, `INT_MIN / -1`, unbounded recursion on nested data, tainted format strings, `error()`-path leaks, off-graph/cross-thread refs); §3 and §4 cover reference counting, the debug ref-count checker, and stack-unwinding safety in detail.
+* The driver builds with `-fwrapv`, so plain signed `+`/`-`/`*` overflow is defined wraparound (LPC scripts rely on this) — but that's not the same as *safe*: a wrapped size/offset/count is still a memory-safety bug the moment it reaches an allocation or `memcpy`. `error()` is a real C++ `throw` (not a raw longjmp), so RAII cleans up correctly across it, but any plain post-call cleanup statement does not run. See AGENTS.md §2 and §4 for both nuances in detail.
+* **[AGENTS.md](AGENTS.md) §13 is the memory-safety audit checklist** (the recurring bug classes — unbounded copies, integer overflow before alloc, `-fwrapv` scope, `INT_MIN / -1` and shift UB, unbounded recursion on nested data, tainted format strings, sentinel-value collisions, `error()`-path leaks, off-graph/cross-thread refs, unmetered backtracking); §2–§4 cover the generic efun type-check dispatch, reference counting, the debug ref-count checker, and stack-unwinding safety in detail.
 
 ---
 
