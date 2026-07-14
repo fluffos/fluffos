@@ -59,7 +59,17 @@ void f_compress_file() {
 
   real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
   if (!real_output_file) {
-    FREE_MSTR(output_file);
+    if (num_arg != 2) {
+      FREE_MSTR(output_file);
+    }
+    pop_n_elems(num_arg);
+    push_number(0);
+    return;
+  }
+  if (strlen(real_output_file) >= sizeof(outname)) {
+    if (num_arg != 2) {
+      FREE_MSTR(output_file);
+    }
     pop_n_elems(num_arg);
     push_number(0);
     return;
@@ -158,6 +168,14 @@ void f_uncompress_file() {
       FREE_MSTR(output_file);
     }
 
+    pop_n_elems(num_arg);
+    push_number(0);
+    return;
+  }
+  if (strlen(real_output_file) >= sizeof(outname)) {
+    if (num_arg != 2) {
+      FREE_MSTR(output_file);
+    }
     pop_n_elems(num_arg);
     push_number(0);
     return;
@@ -281,11 +299,19 @@ void f_uncompress() {
 
   len = 0;
   output_data = nullptr;
+  bool too_large = false;
   do {
     ret = inflate(compressed, 0);
     if (ret == Z_OK || ret == Z_STREAM_END) {
       pos = len;
       len += COMPRESS_BUF_SIZE - compressed->avail_out;
+      if (len > CONFIG_INT(__MAX_BUFFER_SIZE__)) {
+        // Decompressed output has grown past the configured limit (e.g. a
+        // zip bomb) -- stop here, before `len` can overflow the plain int
+        // used for the DMALLOC/DREALLOC/memcpy sizes below.
+        too_large = true;
+        break;
+      }
       if (!output_data) {
         output_data = reinterpret_cast<unsigned char*>(DMALLOC(len, TAG_TEMPORARY, "uncompress"));
       } else {
@@ -301,6 +327,14 @@ void f_uncompress() {
   inflateEnd(compressed);
 
   pop_n_elems(st_num_arg);
+
+  if (too_large) {
+    if (output_data) {
+      FREE(output_data);
+    }
+    FREE(compressed);
+    error("uncompress: decompressed data exceeds maximum buffer size\n");
+  }
 
   if (ret == Z_STREAM_END) {
     buffer = allocate_buffer(len);

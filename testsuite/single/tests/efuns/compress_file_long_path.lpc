@@ -1,0 +1,20 @@
+#ifdef __PACKAGE_COMPRESS__
+// compress_file()/uncompress_file() (src/packages/compress/compress.cc) copy
+// the valid-path-checked output filename into a fixed 1024-byte stack buffer
+// (`char outname[1024]`) via a raw strcpy(). check_valid_path() imposes no
+// length limit on the path it returns, so an arbitrarily long (but
+// otherwise valid) path overflows that buffer before any filesystem check
+// runs -- the target file does not need to exist.
+void do_tests() {
+    string long_name;
+
+    long_name = "/" + repeat_string("a", 1100);
+
+    // Surviving these calls cleanly (returning 0, since the path is too
+    // long) is the regression signal -- an undersized buffer overflows the
+    // stack and ASan-aborts the whole process before any of that logic
+    // runs.
+    ASSERT_EQ(0, compress_file(long_name));
+    ASSERT_EQ(0, uncompress_file(long_name + ".gz"));
+}
+#endif
