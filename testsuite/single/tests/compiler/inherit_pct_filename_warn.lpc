@@ -29,6 +29,16 @@ void do_tests() {
     write_file(parent_name + ".c", parent_src);
     write_file(child_name + ".c", child_src);
 
+    // LOG_DIR + "/compile" is a single file that every compile in this
+    // suite run appends to (master::log_error() never truncates it), and
+    // read_file() only returns the first 2 * __MAX_READ_FILE_SIZE__ bytes
+    // of a file -- by the time hundreds of other test files have compiled
+    // (with whatever warnings they trigger), the log can already be large
+    // enough that our freshly-appended entry falls outside that window.
+    // Clear it immediately before triggering our own warning so the check
+    // below only ever has to find the tag in a small, fresh file.
+    rm(LOG_DIR + "/compile");
+
     // Surviving this compile is itself part of the regression signal --
     // an unfortunate vararg read for a stray "%s" could crash outright.
     child = load_object(child_name);
