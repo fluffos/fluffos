@@ -778,6 +778,11 @@ static int MySQL_connect(dbconn_t* c, const char* host, const char* database, co
   if (!c->mysql.handle) {
     strncpy(c->mysql.errormsg, mysql_error(tmp), sizeof(c->mysql.errormsg));
     c->mysql.errormsg[sizeof(c->mysql.errormsg) - 1] = 0;
+    // mysql_init() above already allocated internal buffers on tmp; a bare
+    // FREE(tmp) here (unlike the mysql_select_db failure branch below)
+    // leaked them. mysql_close() releases those before we free the
+    // driver-owned wrapper struct itself.
+    mysql_close(tmp);
     FREE(tmp);
     return 0;
   }
