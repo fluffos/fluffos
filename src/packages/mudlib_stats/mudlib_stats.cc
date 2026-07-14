@@ -461,7 +461,7 @@ static void save_stat_list(const char* file, mudlib_stats_t* list) {
       }
       f = fopen(file, "w");
     } else {
-      sprintf(fname, "%s/%s", CONFIG_STR(__LOG_DIR__), file);
+      snprintf(fname, sizeof(fname_buf), "%s/%s", CONFIG_STR(__LOG_DIR__), file);
       if (fname[0] == '/') {
         fname++;
       }
