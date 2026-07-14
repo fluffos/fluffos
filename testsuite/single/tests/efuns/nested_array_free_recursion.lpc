@@ -1,0 +1,34 @@
+// Ordinary, unprivileged LPC code can build an arbitrarily deep
+// singly-nested array purely in memory (cheap: O(N) array headers of
+// size 1). When the last reference drops, free_svalue() -> dealloc_array()
+// -> free_svalue() -> ... used to recurse once per nesting level with no
+// depth cap, overflowing the C stack (src/vm/internal/base/svalue.cc).
+void do_tests() {
+    mixed a;
+    int i;
+
+    a = 0;
+    for (i = 0; i < 200000; i++) {
+        a = ({a});
+    }
+
+    // Surviving this reassignment -- which drops the last reference to
+    // the 200000-deep chain, triggering its deallocation -- is the
+    // regression signal.
+    a = 0;
+    ASSERT_EQ(0, a);
+
+    // Same hazard, via dealloc_mapping()'s identical recursive shape.
+    // Capped at 50000 (well past the few-thousand-frame stack limit this
+    // regression is about) rather than 200000: every nested mapping here
+    // shares the one literal key "k", and a shared string's ref count is
+    // a 16-bit field (block_t::refs, stralloc.h) -- a fully separate,
+    // pre-existing ceiling unrelated to this recursion fix that a much
+    // higher N would spuriously trip.
+    a = 0;
+    for (i = 0; i < 50000; i++) {
+        a = ([ "k": a ]);
+    }
+    a = 0;
+    ASSERT_EQ(0, a);
+}

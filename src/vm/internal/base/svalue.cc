@@ -3,6 +3,7 @@
 #include "vm/internal/base/machine.h"
 
 #include <nlohmann/json.hpp>
+#include <vector>
 using json = nlohmann::json;
 
 // FIXME: move init from main() to compile time;
@@ -70,6 +71,61 @@ void copy_some_svalues(svalue_t* dest, svalue_t* v, int num) {
   }
 }
 
+namespace {
+// dealloc_array()/dealloc_mapping()/dealloc_class() each loop over their
+// children calling free_svalue(), which recurses right back into
+// int_free_svalue() below whenever a child is itself a compound value
+// hitting ref 0 -- unboundedly, for e.g. a singly-nested array chain built
+// by `mixed a = 0; for (...) a = ({a});`. Only the OUTERMOST call actually
+// invokes dealloc_*() synchronously; any compound child discovered while
+// one is already running is queued here instead of recursed into, and
+// drained in a loop after the outer call returns -- so C-stack usage stays
+// O(1) regardless of nesting depth. Order of the drain doesn't matter
+// (every queued pointer is unreachable garbage the moment it's queued);
+// only that each is eventually dealloc'd exactly once.
+struct PendingCompoundFree {
+  void* ptr;
+  unsigned short type;  // T_ARRAY, T_CLASS, or T_MAPPING
+};
+bool g_freeing_compound = false;
+std::vector<PendingCompoundFree>* g_pending_compound_frees = nullptr;
+
+void dealloc_one_compound(void* ptr, unsigned short type) {
+  switch (type) {
+    case T_CLASS:
+      dealloc_class(reinterpret_cast<array_t*>(ptr));
+      break;
+    case T_ARRAY:
+      dealloc_array(reinterpret_cast<array_t*>(ptr));
+      break;
+    case T_MAPPING:
+      dealloc_mapping(reinterpret_cast<mapping_t*>(ptr));
+      break;
+  }
+}
+
+// Dispatches one T_ARRAY/T_CLASS/T_MAPPING deallocation, deferring to the
+// queue above if a dealloc_*() call is already in progress further up the
+// (now-flat) call chain.
+void free_compound(void* ptr, unsigned short type) {
+  if (g_freeing_compound) {
+    if (!g_pending_compound_frees) {
+      g_pending_compound_frees = new std::vector<PendingCompoundFree>();
+    }
+    g_pending_compound_frees->push_back({ptr, type});
+    return;
+  }
+  g_freeing_compound = true;
+  dealloc_one_compound(ptr, type);
+  while (g_pending_compound_frees && !g_pending_compound_frees->empty()) {
+    PendingCompoundFree next = g_pending_compound_frees->back();
+    g_pending_compound_frees->pop_back();
+    dealloc_one_compound(next.ptr, next.type);
+  }
+  g_freeing_compound = false;
+}
+}  // namespace
+
 /*
  * Free the data that an svalue is pointing to. Not the svalue
  * itself.
@@ -131,11 +187,11 @@ void int_free_svalue(svalue_t* v)
           dealloc_object(v->u.ob, "free_svalue");
           break;
         case T_CLASS:
-          dealloc_class(v->u.arr);
+          free_compound(v->u.arr, T_CLASS);
           break;
         case T_ARRAY:
           if (v->u.arr != &the_null_array) {
-            dealloc_array(v->u.arr);
+            free_compound(v->u.arr, T_ARRAY);
           }
           break;
         case T_BUFFER:
@@ -144,7 +200,7 @@ void int_free_svalue(svalue_t* v)
           }
           break;
         case T_MAPPING:
-          dealloc_mapping(v->u.map);
+          free_compound(v->u.map, T_MAPPING);
           break;
         case T_FUNCTION:
           dealloc_funp(v->u.fp);
