@@ -579,6 +579,9 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
         if (rhs == 0) {
           ifexpr_set_error(st, "division by 0 in #if");
           lhs = 0;
+        } else if (rhs == -1) {
+          // x / -1 == -x; direct division traps (SIGFPE) for LONG_MIN.
+          lhs = (long)(0ULL - (unsigned long)lhs);
         } else {
           lhs = lhs / rhs;
         }
@@ -587,6 +590,8 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
         if (rhs == 0) {
           ifexpr_set_error(st, "modulo by 0 in #if");
           lhs = 0;
+        } else if (rhs == -1) {
+          lhs = 0;  // x % -1 == 0; direct computation traps for LONG_MIN.
         } else {
           lhs = lhs % rhs;
         }
