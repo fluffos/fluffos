@@ -50,6 +50,11 @@ void f_translate() {
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
   }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
+  }
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
@@ -98,6 +103,11 @@ void f_scale() {
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
   }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
+  }
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
@@ -139,6 +149,11 @@ void f_rotate_x() {
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
   }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
+  }
   angle = (sp--)->u.real;
   /*
    * convert vec matrix to float matrix.
@@ -177,6 +192,11 @@ void f_rotate_y() {
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
   }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
+  }
   angle = (sp--)->u.real;
   /*
    * convert vec matrix to float matrix.
@@ -214,6 +234,11 @@ void f_rotate_z() {
   matrix = (sp - 1)->u.arr;
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
+  }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
   }
   angle = (sp--)->u.real;
   /*
@@ -258,6 +283,11 @@ void f_lookat_rotate() {
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
   }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
+  }
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
@@ -299,6 +329,11 @@ void f_lookat_rotate2(void) {
   matrix = (sp - 6)->u.arr;
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
+  }
+  for (i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
   }
   ex = (sp - 5)->u.real;
   ey = (sp - 4)->u.real;
