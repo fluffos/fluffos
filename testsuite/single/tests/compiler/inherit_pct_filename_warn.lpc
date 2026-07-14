@@ -16,9 +16,13 @@ void do_tests() {
     child_name = "/gen_tf_child";
     tag = "TAG%sEND";
 
-    parent_src = "int foo() { return 1; }\n";
+    // A function name unique to this test file (not just "foo") avoids
+    // colliding with the many other unrelated test files that also
+    // declare a function of that name -- the compiler's identifier table
+    // is shared process-wide across every file compiled in one suite run.
+    parent_src = "int pct_warn_probe_fn() { return 1; }\n";
     child_src = "inherit \"" + parent_name + "\";\n"
-                "string foo() { return \"x\"; }\n";
+                "string pct_warn_probe_fn() { return \"x\"; }\n";
 
     rm(parent_name + ".c");
     rm(child_name + ".c");
