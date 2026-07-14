@@ -3239,7 +3239,11 @@ void f_memory_info() {
 #ifdef F_RELOAD_OBJECT
 void f_reload_object() {
   reload_object(sp->u.ob);
-  free_object(&(sp--)->u.ob, "f_reload_object");
+  // The target may have destructed itself during reload (call___INIT()/
+  // create() can call destruct(this_object())): destruct sweeps the VM
+  // stack, so sp may hold a plain 0 instead of the object reference by now.
+  free_svalue(sp, "f_reload_object");
+  sp--;
 }
 #endif
 

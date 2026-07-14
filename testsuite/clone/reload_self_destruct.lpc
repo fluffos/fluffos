@@ -1,0 +1,13 @@
+// Fixture for testsuite/single/tests/efuns/reload_object_self_destruct.lpc:
+// self-destructs on its SECOND create() (i.e. the one reload_object()
+// triggers), leaving f_reload_object()'s own VM-stack argument slot
+// swept to a plain 0 mid-call.
+void create() {
+    object counter = find_object("/clone/reload_counter");
+    if (!counter) {
+        counter = load_object("/clone/reload_counter");
+    }
+    if (counter->bump() > 1) {
+        destruct(this_object());
+    }
+}
