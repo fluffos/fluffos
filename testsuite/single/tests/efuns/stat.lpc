@@ -1,0 +1,48 @@
+// Issue #1271: f_stat() read its flag argument via (sp + 1)->u.number
+// *after* calling check_valid_path(), which runs the valid_read master
+// apply -- that apply pushes its own arguments into exactly the stack
+// slot the flag was still sitting in, so the flag was clobbered before
+// f_stat() ever read it. The upshot: stat(path, flag) silently behaved
+// as if flag was whatever garbage the apply left behind, instead of what
+// the caller passed, for any directory or glob path (regular files have
+// their own code path and were unaffected).
+//
+// stat()'s directory/glob branch simply forwards to get_dir() with the
+// (correctly read) flag, so the two must agree exactly for the same
+// path + flag.
+void do_tests() {
+    // Directory, every flag shape.
+    ASSERT_EQ(get_dir("/std", 0), stat("/std", 0));
+    ASSERT_EQ(get_dir("/std", 1), stat("/std", 1));
+    ASSERT_EQ(get_dir("/std", -1), stat("/std", -1));
+
+    // Trailing slash must not change the outcome either way.
+    ASSERT_EQ(get_dir("/std/", -1), stat("/std/", -1));
+
+    // Glob pattern.
+    ASSERT_EQ(get_dir("/std/*.lpc", -1), stat("/std/*.lpc", -1));
+
+    // Default flag (0) when omitted.
+    ASSERT_EQ(get_dir("/std", 0), stat("/std"));
+
+    // The -1 shape carries per-entry ({name, size-or-dirflag, mtime}).
+    mixed *info = stat("/std", -1);
+    ASSERT(pointerp(info));
+    ASSERT(sizeof(info) > 0);
+    foreach (mixed entry in info) {
+        ASSERT(pointerp(entry));
+        ASSERT_EQ(3, sizeof(entry));
+        ASSERT(stringp(entry[0]));
+    }
+
+    // Regular files keep using their own dedicated code path regardless
+    // of flag (size/mtime/load-time/ctime), unaffected by this bug.
+    string str = "stat test file for issue 1271";
+    string fname = "/stat_test_file";
+    rm(fname);
+    write_file(fname, str);
+    mixed *finfo = stat(fname, -1);
+    ASSERT(pointerp(finfo));
+    ASSERT_EQ(strlen(str), finfo[0]);
+    rm(fname);
+}

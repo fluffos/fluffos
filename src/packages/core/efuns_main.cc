@@ -2551,7 +2551,11 @@ void f_stat() {
   array_t* v;
   object_t* ob;
 
-  path = check_valid_path((--sp)->u.string, current_object, "stat", 0);
+  // Capture the flag before check_valid_path(): the valid_read apply it
+  // runs pushes its arguments right where the flag sits (issue #1271).
+  LPC_INT const flag = (sp--)->u.number;
+
+  path = check_valid_path(sp->u.string, current_object, "stat", 0);
   if (!path) {
     free_string_svalue(sp);
     *sp = const0;
@@ -2587,7 +2591,7 @@ void f_stat() {
       return;
     }
   }
-  v = get_dir(sp->u.string, (sp + 1)->u.number);
+  v = get_dir(sp->u.string, flag);
   free_string_svalue(sp);
   if (v) {
     put_array(v);
