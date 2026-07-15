@@ -21,8 +21,12 @@ string object_name() {
 }
 
 void do_tests() {
-  object* obs = objects();
-  foreach(object ob in obs) {
-    write(sprintf("%O: %d\n", ob, refs(ob)));
-  }
+  // Issue #750: name()/object_name() erroring must not crash the driver,
+  // even though the driver's own error/trace printer needs to represent
+  // this same object via %O while it unwinds. this_object() alone is
+  // enough to hit that path -- looping sprintf("%O") over every objects()
+  // in the game (the original report's exact code) only adds output
+  // proportional to however many objects happen to be loaded elsewhere in
+  // a full suite run, without exercising anything extra.
+  write(sprintf("%O: %d\n", this_object(), refs(this_object())));
 }
