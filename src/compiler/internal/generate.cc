@@ -3,6 +3,7 @@
 #include "generate.h"
 
 #include <cstdio>
+#include <vector>
 
 #include "include/function.h"  // for F_SIMUL etc , FIXME
 #include "efuns.autogen.h"
@@ -50,10 +51,32 @@ static void optimize_lvalue_list(parse_node_t* expr) {
 #define OPTIMIZER_IN_COND 2 /* switch or if or ?: */
 static int optimizer_state = 0;
 
+namespace {
+// Mirrors the guard in icode.cc's i_generate_node(): a left-nested chain
+// of binary/unary/ternary operators builds a parse tree as deep as the
+// input, with no bound from the grammar/parser. The NODE_TWO_VALUES case
+// below walks its own chain (one node per top-level definition/statement)
+// iteratively rather than recursing, so this cap bounds genuine
+// expression nesting only -- never an object's definition or statement
+// count (github.com/fluffos/fluffos/issues/1267).
+//
+// Unlike i_generate_node(), going over is not a compile error: skipping
+// optimization of a subtree still leaves correct (just less tight)
+// bytecode, so this only warns and gives up on that subtree.
+int g_optimize_depth = 0;
+constexpr int kMaxOptimizeDepth = 500;
+}  // namespace
+
 static parse_node_t* optimize(parse_node_t* expr) {
   if (!expr) {
     return nullptr;
   }
+  if (++g_optimize_depth > kMaxOptimizeDepth) {
+    --g_optimize_depth;
+    yywarn("Expression nested too deeply to fully optimize.");
+    return expr;
+  }
+  DEFER { --g_optimize_depth; };
 
   switch (expr->kind) {
     case NODE_TERNARY_OP:
@@ -138,10 +161,26 @@ static parse_node_t* optimize(parse_node_t* expr) {
     case NODE_CALL:
       optimize_expr_list(expr->r.expr);
       break;
-    case NODE_TWO_VALUES:
-      OPT(expr->l.expr);
-      OPT(expr->r.expr);
+    case NODE_TWO_VALUES: {
+      // Same chain, same reason to flatten it, as icode.cc's
+      // i_generate_node() (see there). optimize() never replaces a
+      // NODE_TWO_VALUES node's identity, so a stack of *slots* (rather
+      // than values), with each leaf's optimized replacement written
+      // back into its own slot, is equivalent to the recursive form.
+      std::vector<parse_node_t**> work{&expr->r.expr, &expr->l.expr};
+      while (!work.empty()) {
+        parse_node_t** slot = work.back();
+        work.pop_back();
+        parse_node_t* node = *slot;
+        if (node && node->kind == NODE_TWO_VALUES) {
+          work.push_back(&node->r.expr);
+          work.push_back(&node->l.expr);
+        } else {
+          OPT(*slot);
+        }
+      }
       break;
+    }
     case NODE_CONTROL_JUMP:
     case NODE_PARAMETER:
     case NODE_PARAMETER_LVALUE:

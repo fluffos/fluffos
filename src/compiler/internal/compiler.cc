@@ -2781,6 +2781,20 @@ static program_t* epilog(void) {
 
   current_tree = TREE_MAIN;
 
+  if (num_parse_error > 0) {
+    /* i_generate_node() can raise errors after the check at the top of
+       this function already passed -- e.g. a pathologically deep
+       expression tripping its recursion-depth cap, or the pre-existing
+       branch-limit-exceeded checks. Bail out the same way the
+       top-of-function check does rather than handing back a program
+       built from a codegen pass that stopped partway through. */
+    clean_parser();
+    end_new_file();
+    free_string(current_file);
+    current_file = nullptr;
+    return nullptr;
+  }
+
   generate_final_program(0);
   UPDATE_PROGRAM_SIZE;
 

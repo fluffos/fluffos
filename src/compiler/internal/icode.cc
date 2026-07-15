@@ -6,6 +6,7 @@
 #include "icode.h"
 
 #include <cstdio>  // for printf
+#include <vector>
 
 #include "include/function.h"
 #include "efuns.autogen.h"
@@ -357,10 +358,31 @@ static int try_to_push(int kind, int value) {
   return 0;
 }
 
+namespace {
+// A left-nested chain of binary/unary/ternary operators (e.g. tens of
+// thousands of '+' terms) builds a parse tree of matching depth with no
+// bound from the grammar/parser -- walking it here recurses just as deep.
+// Cap it so pathological input errors cleanly instead of overflowing the
+// C stack (mirrors MAX_INCLUDE_DEPTH's role for #include nesting).
+// NODE_TWO_VALUES chains (top-level definitions, statement lists) are
+// walked iteratively below instead of recursed, so they never count
+// against this -- the cap only ever bounds genuine expression nesting
+// (github.com/fluffos/fluffos/issues/1267).
+int g_generate_node_depth = 0;
+constexpr int kMaxGenerateNodeDepth = 500;
+}  // namespace
+
 void i_generate_node(parse_node_t* expr) {
   if (!expr) {
     return;
   }
+
+  if (++g_generate_node_depth > kMaxGenerateNodeDepth) {
+    --g_generate_node_depth;
+    yyerror("Expression nested too deeply.");
+    return;
+  }
+  DEFER { --g_generate_node_depth; };
 
   if (expr->line && expr->line != line_being_generated) {
     switch_to_line(expr->line);
@@ -535,10 +557,30 @@ void i_generate_node(parse_node_t* expr) {
       ins_byte(expr->v.number);
       ins_short(expr->l.number);
       break;
-    case NODE_TWO_VALUES:
-      i_generate_node(expr->l.expr);
-      i_generate_node(expr->r.expr);
+    case NODE_TWO_VALUES: {
+      // rule_program_append() chains one node per top-level definition
+      // via l.expr; the statements: rule chains one per statement via
+      // r.expr. Neither is safe to recurse: l.expr isn't a tail call
+      // (r.expr's own work follows it), and r.expr only looks
+      // tail-callable -- the depth-guard's DEFER above still has to run
+      // after it returns, which defeats that. Flatten with an explicit
+      // stack instead, in whichever direction the chain nests;
+      // i_generate_node() is still called (and still depth-capped) per
+      // leaf, so a genuinely deep expression inside one
+      // definition/statement is still caught.
+      std::vector<parse_node_t*> work{expr->r.expr, expr->l.expr};
+      while (!work.empty()) {
+        parse_node_t* node = work.back();
+        work.pop_back();
+        if (node && node->kind == NODE_TWO_VALUES) {
+          work.push_back(node->r.expr);
+          work.push_back(node->l.expr);
+        } else {
+          i_generate_node(node);
+        }
+      }
       break;
+    }
     case NODE_CONTROL_JUMP: {
       int kind = expr->v.number;
       end_pushes();
