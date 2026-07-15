@@ -8,12 +8,24 @@
 // FIXME: for svalue_to_string
 #include "packages/core/sprintf.h"
 
+#include "thirdparty/scope_guard/scope_guard.hpp"
+
 // Dump a stack trace at current location.
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
 
 namespace {
+
+// Formatting a frame's arguments/locals (below) can itself call error() --
+// e.g. an object whose object_name() apply always throws -- which re-enters
+// dump_trace() while the outer call is still walking the stack. Without a
+// guard, each re-entry re-dumps and thus re-embeds the still-in-progress
+// outer trace's text (itself containing the trace before that, ...), so the
+// output grows combinatorially with recursion depth instead of linearly.
+// Let the inner error just report "trace suppressed" (see error_handler()
+// in simulate.cc) and let the outer, already-in-progress dump continue.
+bool dump_trace_in_progress = false;
 
 void get_trace_details(const program_t* prog, long findex, const char** fname, int* na, int* nl) {
   function_t* cfp = &prog->function_table[findex];
@@ -63,6 +75,11 @@ const char* dump_trace(int how) {
   if (csp < &control_stack[0]) {
     return nullptr;
   }
+  if (dump_trace_in_progress) {
+    return nullptr;
+  }
+  dump_trace_in_progress = true;
+  DEFER { dump_trace_in_progress = false; };
 
   if (how) {
     last_instructions();
