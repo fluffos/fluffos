@@ -250,7 +250,9 @@ int    ffi_address(buffer mem);          /* address of the buffer's bytes
 /* Copy nbytes from a raw foreign address (e.g. a char* returned by a C
  * function) into an owned buffer -- the only way foreign bytes become an
  * LPC value. Pass -1 to read a NUL-terminated C string (capped at the
- * "maximum buffer size" config). Then string_decode() it if it is text. */
+ * "maximum buffer size" config). Then string_decode() it if it is text.
+ * Gated by valid_ffi("peek", address, caller): an arbitrary-address
+ * read is a disclosure primitive even though no foreign code runs. */
 buffer ffi_peek(int address, int nbytes);
 
 /* --- typed peek/poke into a buffer at an offset ------------------- */
@@ -520,15 +522,20 @@ handle for the object's lifetime).
    master object, every load/prepare/callback errors. A mud that wants
    the efuns gone entirely builds with `-DPACKAGE_FFI=OFF` (the WASM
    target forces it off — there is no `dlopen` in the browser).
-2. `ffi_load`, `ffi_symbol`, `ffi_prepare`, and `ffi_callback` each call
-   a master apply
+2. `ffi_load`, `ffi_symbol`, `ffi_prepare`, `ffi_callback`, and
+   `ffi_peek` each call a master apply
    **`valid_ffi(string operation, mixed arg, object caller)`**
    (mirroring `valid_database`, `valid_link`, `get_include_path`): the
    mudlib decides which libraries and symbols are permitted, keyed on
    the calling object. Default master (no apply) returns 0 → denied.
    The operation is `"load"` (arg: the library path), `"symbol"` /
-   `"prepare"` (arg: the symbol name), or `"callback"` (arg: 0). A
-   restrictive implementation:
+   `"prepare"` (arg: the symbol name), `"peek"` (arg: the address —
+   gated because reading arbitrary process memory is a disclosure
+   primitive on its own, no foreign code required), or `"callback"`
+   (arg: 0). The other efuns need no gate: they operate on LPC-owned
+   buffers and handles only (`ffi_address` reveals a buffer's own
+   address, which is inert without a peek/call grant). A restrictive
+   implementation:
 
    ```c
    // master.c -- only one privileged daemon may reach native code.
@@ -536,7 +543,7 @@ handle for the object's lifetime).
        if (base_name(caller) != "/daemon/ffi") return 0;
        if (op == "load")
            return member_array(arg, ({ "" })) != -1;   // driver's own libc only
-       return 1;   // symbol/prepare/callback by the daemon are fine
+       return 1;   // symbol/prepare/callback/peek by the daemon are fine
    }
    ```
 
@@ -593,7 +600,8 @@ of truth, exactly like `lpc-grammar.json`.
   (`ffi_load("")`) to reach libc symbols portably, call scalar/pointer
   functions, allocate a buffer, write/read a struct, round-trip a
   `char*` (pinning that strings only cross as buffers), drive an LPC
-  callback back from C, and assert `valid_ffi` denial is enforced;
+  callback back from C, and assert `valid_ffi` denial is enforced (for
+  both a "load" path sentinel and a "peek" address sentinel);
   `ffi_doc_examples.lpc` pins every snippet in §6 verbatim. The suite's
   per-file `check_memory()` gate (which caught seven leaks this cycle)
   validates the allocation/handle accounting.

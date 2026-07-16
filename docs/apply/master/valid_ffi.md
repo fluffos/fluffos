@@ -13,20 +13,27 @@ title: master / valid_ffi
 
 ### DESCRIPTION
 
-    Every package_ffi operation -- ffi_load(), ffi_symbol(), ffi_prepare()
-    and ffi_callback() -- is gated by this master apply.  The driver calls
-    valid_ffi() before performing the operation and refuses to proceed
-    unless it returns a true value.
+    Every package_ffi operation -- ffi_load(), ffi_symbol(), ffi_prepare(),
+    ffi_callback() and ffi_peek() -- is gated by this master apply.  The
+    driver calls valid_ffi() before performing the operation and refuses
+    to proceed unless it returns a true value.
 
     Three arguments are passed:
 
     - `op`     - which operation is being attempted, one of the strings
-                 "load", "symbol", "prepare" or "callback".
+                 "load", "symbol", "prepare", "callback" or "peek".
     - `arg`    - the operation's principal argument: the library path for
                  "load", the symbol name for "symbol", the function name
-                 for "prepare", and 0 for "callback" (which has no such
-                 argument).
+                 for "prepare", the address to read for "peek", and 0 for
+                 "callback" (which has no such argument).
     - `caller` - the object that invoked the efun (its previous_object()).
+
+    "peek" is gated even though it runs no foreign code: ffi_peek() reads
+    arbitrary process memory, a disclosure primitive on its own.  (An
+    unmapped address would also crash the driver, so only grant it to
+    objects that compute addresses from FFI results, and expect the gate
+    to be called once per read -- including from inside C->LPC callback
+    comparators.)
 
     Return a nonzero value to allow the operation; return 0 to deny it, in
     which case the efun raises the runtime error "FFI security violation:

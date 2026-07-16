@@ -18,6 +18,11 @@ void do_tests() {
     got = ffi_peek(addr, -1);
     ASSERT_EQ(3, sizeof(got));
     ASSERT(catch(ffi_peek(0, 4)));    // NULL address errors
+    // valid_ffi("peek", addr, caller) gates the read BEFORE any memory
+    // is touched -- the master denies the -0xDEAD sentinel (an address
+    // that would otherwise be an unmapped-memory crash).
+    ASSERT_EQ("*FFI security violation: 'peek' denied by master::valid_ffi.\n",
+              catch(ffi_peek(-0xDEAD, 4)));
 #endif
     ASSERT(1);
 }
