@@ -3511,6 +3511,12 @@
       },
       {
         "type": "doc",
+        "id": "stdlib/ffi_util",
+        "key": "stdlib/ffi_util",
+        "label": "FFI Utilities"
+      },
+      {
+        "type": "doc",
         "id": "stdlib/tui",
         "key": "stdlib/tui",
         "label": "TUI Toolkit"

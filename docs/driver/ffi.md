@@ -362,6 +362,11 @@ buffer cstr(string s) {
 }
 ```
 
+(`cstr()` and the rest of the boundary boilerplate — reading returned
+`char*`s, out-parameter blocks, argv arrays, struct-field access — ship
+as the pure-LPC library [`/std/ffi_util`](../stdlib/ffi_util) in the
+testsuite mudlib, portable to any mudlib.)
+
 ### Scalars: `sqrt`, `pow`, `abs`
 
 Numeric arguments and returns marshal directly between LPC `int`/`float`
@@ -602,9 +607,10 @@ of truth, exactly like `lpc-grammar.json`.
   `char*` (pinning that strings only cross as buffers), drive an LPC
   callback back from C, and assert `valid_ffi` denial is enforced (for
   both a "load" path sentinel and a "peek" address sentinel);
-  `ffi_doc_examples.lpc` pins every snippet in §6 verbatim. The suite's
-  per-file `check_memory()` gate (which caught seven leaks this cycle)
-  validates the allocation/handle accounting.
+  `ffi_doc_examples.lpc` pins every snippet in §6 verbatim, and
+  `tests/std/ffi_util.lpc` covers the `/std/ffi_util` helper library.
+  The suite's per-file `check_memory()` gate (which caught seven leaks
+  this cycle) validates the allocation/handle accounting.
 - `tools/ffi/test.py` runs the generator over `test_sample.h` and checks
   the emitted LPC/struct output, run in CI like `tools/lpc-syntax/test.mjs`.
 

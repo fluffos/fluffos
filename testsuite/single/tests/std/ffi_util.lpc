@@ -1,0 +1,89 @@
+// Tests for /std/ffi_util (docs/stdlib/ffi_util): the FFI-boundary
+// helper library. Everything runs against libc via ffi_load("") like
+// the ffi_* efun tests, and skips cleanly where native calls are
+// unavailable.
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+inherit "/std/ffi_util";
+
+private int near(float a, float b) { return (a > b ? a - b : b - a) < 1e-9; }
+#endif
+
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+    int lib, f, addr, psz, pcode;
+    mixed *av;
+    buffer b;
+
+    // --- pure byte helpers need no native calls ------------------------
+    b = cstr("hi");
+    ASSERT_EQ(3, sizeof(b));
+    ASSERT_EQ('h', b[0]);
+    ASSERT_EQ(0, b[2]);
+    b = cstr_enc("café", "latin-1");          // é is ONE latin-1 byte
+    ASSERT_EQ(5, sizeof(b));
+    ASSERT_EQ(0xE9, b[3]);
+    ASSERT_EQ(0, b[4]);
+    ASSERT_EQ(0, c_string(0));                // NULL -> 0, no error
+    ASSERT_EQ(ffi_sizeof(FFI_INT64), sizeof(c_out(FFI_INT64)));
+
+    // c_argv: NULL-terminated pointer array + kept-alive string buffers.
+    psz = ffi_sizeof(FFI_POINTER);
+    pcode = psz == 8 ? FFI_UINT64 : FFI_UINT32;
+    av = c_argv(({ "ls", "-l" }));
+    ASSERT_EQ(2, sizeof(av));
+    ASSERT_EQ(3 * psz, sizeof(av[0]));
+    ASSERT_EQ(2, sizeof(av[1]));
+    ASSERT_EQ(ffi_address(av[1][0]), ffi_read(av[0], 0, pcode));
+    ASSERT_EQ(ffi_address(av[1][1]), ffi_read(av[0], psz, pcode));
+    ASSERT_EQ(0, ffi_read(av[0], 2 * psz, pcode));
+
+    // c_field / c_field_set on our own struct block.
+    {
+        mixed *lay = ffi_struct_layout(({ FFI_INT8, FFI_INT32, FFI_INT16 }));
+        buffer data = ffi_alloc(lay[0]);
+        c_field_set(data, lay, 1, FFI_INT32, -70000);
+        c_field_set(data, lay, 2, FFI_INT16, 999);
+        ASSERT_EQ(-70000, c_field(data, lay, 1, FFI_INT32));
+        ASSERT_EQ(999, c_field(data, lay, 2, FFI_INT16));
+    }
+
+    // --- the rest exercises real libc calls ----------------------------
+    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+    lib = ffi_load("");
+
+    // cstr()/cstr_enc() feed char* parameters.
+    f = ffi_prepare(lib, "strlen", FFI_UINT64, ({ FFI_POINTER }));
+    ASSERT_EQ(5, ffi_call(f, ({ cstr("café") })));       // UTF-8: 5 bytes
+    ASSERT_EQ(4, ffi_call(f, ({ cstr_enc("café", "latin-1") })));
+
+    // c_string() reads a returned char* (gated by valid_ffi("peek")).
+    f = ffi_prepare(lib, "getenv", FFI_POINTER, ({ FFI_POINTER }));
+    addr = ffi_call(f, ({ cstr("PATH") }));
+    if (addr) ASSERT(sizeof(c_string(addr)) > 0);
+    ASSERT_EQ(0, c_string(ffi_call(f, ({ cstr("FFI_UTIL_NO_SUCH_VAR") }))));
+
+    // c_out() as a scalar out-parameter (frexp's int *exp).
+    f = ffi_prepare(lib, "frexp", FFI_DOUBLE, ({ FFI_DOUBLE, FFI_POINTER }));
+    b = c_out(FFI_INT);
+    ASSERT(near(0.5, ffi_call(f, ({ 8.0, b }))));
+    ASSERT_EQ(4, ffi_read(b, 0, FFI_INT));
+
+    // c_out(FFI_POINTER) as a pointer out-parameter, read back with
+    // c_string(): strtol's char **endptr lands mid-way into our cstr.
+    {
+        buffer nptr = cstr("123abc");
+        buffer endp = c_out(FFI_POINTER);
+        int val;
+
+        f = ffi_prepare(lib, "strtol", FFI_LONG,
+                        ({ FFI_POINTER, FFI_POINTER, FFI_INT }));
+        val = ffi_call(f, ({ nptr, endp, 10 }));
+        ASSERT_EQ(123, val);
+        ASSERT_EQ("abc", c_string(ffi_read(endp, 0, pcode)));
+    }
+
+    ffi_unload(lib);
+#endif
+    ASSERT(1);
+}

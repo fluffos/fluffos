@@ -132,7 +132,8 @@
     "label": "Standard Library",
     "description": "Pure-LPC helper functions and libraries shipped with the FluffOS testsuite mudlib (not driver efuns), organized by data type and domain.",
     "labels": {
-      "tui": "TUI Toolkit"
+      "tui": "TUI Toolkit",
+      "ffi_util": "FFI Utilities"
     }
   },
   "stdlib/arrays": {
