@@ -246,6 +246,14 @@ void f_set_malloc_mask() { set_malloc_mask((sp--)->u.number); }
 #ifdef F_CHECK_MEMORY
 void f_check_memory() { check_all_blocks((sp--)->u.number); }
 #endif
+
+#ifdef F_FIND_ORPHANED_CYCLES
+void f_find_orphaned_cycles() {
+  // any nonzero LPC int means collect (don't truncate the 64-bit argument)
+  int const collect = (sp--)->u.number != 0;
+  push_number(md_scan_orphaned_cycles(collect, nullptr));
+}
+#endif
 #endif /* (defined(DEBUGMALLOC) && \
         * defined(DEBUGMALLOC_EXTENSIONS)) */
 

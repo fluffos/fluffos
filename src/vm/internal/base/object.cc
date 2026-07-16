@@ -41,8 +41,15 @@ namespace fs = ghc::filesystem;
 #include "packages/sockets/socket_efuns.h"  // for check_valid_path
 #endif
 
-#define too_deep_save_error() \
-  error("Mappings and/or arrays nested too deep (%d) for save_object\n", MAX_SAVE_SVALUE_DEPTH);
+// Only point at has_cycle() when the contrib package actually provides it.
+#ifdef PACKAGE_CONTRIB
+#define TOO_DEEP_SAVE_HINT " -- possibly a reference loop; see has_cycle()"
+#else
+#define TOO_DEEP_SAVE_HINT " -- possibly a reference loop"
+#endif
+#define too_deep_save_error()                                                                 \
+  error("Mappings and/or arrays nested too deep (%d) for save_object" TOO_DEEP_SAVE_HINT "\n", \
+        MAX_SAVE_SVALUE_DEPTH);
 
 object_t* previous_ob;
 

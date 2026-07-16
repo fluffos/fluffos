@@ -59,3 +59,11 @@ mixed *classes(object, int default : 0);
 int test_load(string);
 string get_os_env(string);
 int set_os_env(string, string | void);
+
+/*
+ * Reference-loop (cycle) introspection -- see cycles.cc and
+ * docs/concepts/general/reference_loops.md.
+ */
+int has_cycle(mixed);
+string *find_cycles(mixed);
+int break_cycles(mixed);

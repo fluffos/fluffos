@@ -38,6 +38,10 @@
 #include "packages/jsbridge/jsbridge.h"
 #endif
 
+#include <functional>
+#include <unordered_map>
+#include <vector>
+
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 
 void mark_svalue(struct svalue_t*);
@@ -1070,11 +1074,289 @@ void check_all_blocks(int flag) {
     }
   }
   if (!(flag & 2)) {
+    // A detached reference loop is invisible to the ref-count comparison
+    // above (a cycle is perfectly self-consistent), so hunt for it
+    // separately -- skippable via flag bit 2 (value 4) since it is a full
+    // extra pass over every compound block. Report only; collection is the
+    // mudlib's explicit call via find_orphaned_cycles(1).
+    if (!(flag & 4)) {
+      int orphans = md_scan_orphaned_cycles(0, &out);
+      if (orphans) {
+        outbuf_addv(&out,
+                    "WARNING: %d unreachable data block(s) kept alive only by "
+                    "reference loop(s); reclaim with find_orphaned_cycles(1)\n",
+                    orphans);
+      }
+    }
     outbuf_push(&out);
   } else {
     FREE_MSTR(out.buffer);
     push_number(0);
   }
+}
+
+/*
+ * Orphaned reference-loop detection and collection, via trial deletion
+ * (the same idea CPython's gc uses):
+ *
+ *   For every cycle-capable data block (array, class, mapping, funptr),
+ *   count how many of its references come from OTHER data blocks
+ *   ("internal"). external = ref - internal. A block with external > 0 is
+ *   held by something that is not plain data -- an object's variables, the
+ *   VM stack, a call_out, a C++-side holder -- and is therefore a live
+ *   root; liveness then propagates along data edges. Whatever remains is
+ *   reachable only from itself: garbage that pure reference counting can
+ *   never reclaim, which (in a finite graph) always contains at least one
+ *   reference loop.
+ *
+ * Because the verdict is computed from real ref counts, there is no root
+ * enumeration to get wrong: any holder that took a legitimate reference --
+ * including package internals invisible to the mark phase -- shows up as an
+ * external ref and keeps its data alive.
+ *
+ * Collection mirrors what free-ing the loop by hand would do, in an order
+ * that can never touch freed memory:
+ *   1. take a reference on every dead block (so nothing deallocates early),
+ *   2. sever: clear every dead block's child slots (releasing strings,
+ *      objects, buffers, and live values normally, and unlinking the dead
+ *      blocks from each other; a dead funptr just drops its args array),
+ *   3. release the held references -- each dead block is now at ref 1 and
+ *      deallocates cleanly with nothing left to cascade into.
+ */
+int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
+  struct Cand {
+    int tag;
+    int internal = 0;
+    bool live = false;
+  };
+  std::unordered_map<void*, Cand> cands;
+  cands.reserve(blocks[TAG_ARRAY & 0xff] + blocks[TAG_CLASS & 0xff] +
+                blocks[TAG_MAPPING & 0xff] + blocks[TAG_FUNP & 0xff]);
+
+  for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
+    for (md_node_t* entry = table[hsh]; entry; entry = entry->next) {
+      switch (entry->tag) {
+        case TAG_ARRAY:
+        case TAG_CLASS:
+          cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
+          break;
+        case TAG_MAPPING:
+          cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
+          break;
+        case TAG_FUNP:
+          cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
+          break;
+      }
+    }
+  }
+
+  auto ref_of = [](void* p, int tag) -> LPC_INT {
+    switch (tag) {
+      case TAG_ARRAY:
+      case TAG_CLASS:
+        return reinterpret_cast<array_t*>(p)->ref;
+      case TAG_MAPPING:
+        return reinterpret_cast<mapping_t*>(p)->ref;
+      case TAG_FUNP:
+        return reinterpret_cast<funptr_t*>(p)->hdr.ref;
+    }
+    return 0;
+  };
+
+  auto data_child = [](svalue_t* sv) -> void* {
+    switch (sv->type) {
+      case T_ARRAY:
+      case T_CLASS:
+        return reinterpret_cast<void*>(sv->u.arr);
+      case T_MAPPING:
+        return reinterpret_cast<void*>(sv->u.map);
+      case T_FUNCTION:
+        return reinterpret_cast<void*>(sv->u.fp);
+    }
+    return nullptr;
+  };
+
+  // cb receives each data-block pointer this block holds a reference to.
+  // (Generic lambda so the per-element callback inlines -- this runs over
+  // every slot of every compound block in the heap, twice.)
+  // NOTE: this edge set (array/class items, mapping keys AND values,
+  // fp->hdr.args; objects are leaves) must stay in sync with the walker in
+  // src/packages/contrib/cycles.cc (cycle_walk), or has_cycle()/
+  // break_cycles() and this scan will disagree about what a loop is.
+  auto each_child = [&](void* p, int tag, auto&& cb) {
+    switch (tag) {
+      case TAG_ARRAY:
+      case TAG_CLASS: {
+        auto* arr = reinterpret_cast<array_t*>(p);
+        for (int i = 0; i < arr->size; i++) {
+          if (void* c = data_child(&arr->item[i])) {
+            cb(c);
+          }
+        }
+        break;
+      }
+      case TAG_MAPPING: {
+        auto* map = reinterpret_cast<mapping_t*>(p);
+        for (int i = 0; i <= static_cast<int>(map->table_size); i++) {
+          for (mapping_node_t* node = map->table[i]; node; node = node->next) {
+            if (void* c = data_child(&node->values[0])) {
+              cb(c);
+            }
+            if (void* c = data_child(&node->values[1])) {
+              cb(c);
+            }
+          }
+        }
+        break;
+      }
+      case TAG_FUNP: {
+        auto* fp = reinterpret_cast<funptr_t*>(p);
+        if (fp->hdr.args) {
+          cb(reinterpret_cast<void*>(fp->hdr.args));
+        }
+        break;
+      }
+    }
+  };
+
+  // internal = references held by other data blocks
+  for (auto& kv : cands) {
+    each_child(kv.first, kv.second.tag, [&](void* c) {
+      auto it = cands.find(c);
+      if (it != cands.end()) {
+        it->second.internal++;
+      }
+    });
+  }
+
+  // seeds: any block some non-data holder references (conservatively
+  // including anything whose counts look inconsistent), then propagate
+  std::vector<std::pair<void*, int>> work;  // (block, tag) -- avoids a re-lookup per pop
+  for (auto& kv : cands) {
+    if (ref_of(kv.first, kv.second.tag) != kv.second.internal) {
+      kv.second.live = true;
+      work.emplace_back(kv.first, kv.second.tag);
+    }
+  }
+  while (!work.empty()) {
+    auto [p, tag] = work.back();
+    work.pop_back();
+    each_child(p, tag, [&](void* c) {
+      auto it = cands.find(c);
+      if (it != cands.end() && !it->second.live) {
+        it->second.live = true;
+        work.emplace_back(c, it->second.tag);
+      }
+    });
+  }
+
+  int dead = 0, n_arr = 0, n_cls = 0, n_map = 0, n_fp = 0;
+  for (auto& kv : cands) {
+    if (!kv.second.live) {
+      dead++;
+      switch (kv.second.tag) {
+        case TAG_ARRAY:
+          n_arr++;
+          break;
+        case TAG_CLASS:
+          n_cls++;
+          break;
+        case TAG_MAPPING:
+          n_map++;
+          break;
+        case TAG_FUNP:
+          n_fp++;
+          break;
+      }
+    }
+  }
+  if (dead && ob) {
+    outbuf_addv(ob, "orphaned by reference loops: %d array(s), %d class(es), %d mapping(s), %d function pointer(s)\n",
+                n_arr, n_cls, n_map, n_fp);
+  }
+
+  if (dead && collect) {
+    // 1. hold
+    for (auto& kv : cands) {
+      if (kv.second.live) {
+        continue;
+      }
+      switch (kv.second.tag) {
+        case TAG_ARRAY:
+        case TAG_CLASS:
+          reinterpret_cast<array_t*>(kv.first)->ref++;
+          break;
+        case TAG_MAPPING:
+          reinterpret_cast<mapping_t*>(kv.first)->ref++;
+          break;
+        case TAG_FUNP:
+          reinterpret_cast<funptr_t*>(kv.first)->hdr.ref++;
+          break;
+      }
+    }
+    // 2. sever
+    for (auto& kv : cands) {
+      if (kv.second.live) {
+        continue;
+      }
+      switch (kv.second.tag) {
+        case TAG_ARRAY:
+        case TAG_CLASS: {
+          auto* arr = reinterpret_cast<array_t*>(kv.first);
+          for (int i = 0; i < arr->size; i++) {
+            free_svalue(&arr->item[i], "collect_cycles");
+            arr->item[i] = const0;
+          }
+          break;
+        }
+        case TAG_MAPPING: {
+          // The mapping is garbage; nobody can look anything up in it, so
+          // zeroing keys in place (hash invariants be damned) is fine --
+          // dealloc_mapping just walks the table.
+          auto* map = reinterpret_cast<mapping_t*>(kv.first);
+          for (int i = 0; i <= static_cast<int>(map->table_size); i++) {
+            for (mapping_node_t* node = map->table[i]; node; node = node->next) {
+              free_svalue(&node->values[0], "collect_cycles");
+              node->values[0] = const0;
+              free_svalue(&node->values[1], "collect_cycles");
+              node->values[1] = const0;
+            }
+          }
+          break;
+        }
+        case TAG_FUNP: {
+          auto* fp = reinterpret_cast<funptr_t*>(kv.first);
+          if (fp->hdr.args) {
+            free_array(fp->hdr.args);
+            fp->hdr.args = nullptr;
+          }
+          break;
+        }
+      }
+    }
+    // 3. release
+    for (auto& kv : cands) {
+      if (kv.second.live) {
+        continue;
+      }
+      switch (kv.second.tag) {
+        case TAG_ARRAY:
+          free_array(reinterpret_cast<array_t*>(kv.first));
+          break;
+        case TAG_CLASS:
+          free_class(reinterpret_cast<array_t*>(kv.first));
+          break;
+        case TAG_MAPPING:
+          free_mapping(reinterpret_cast<mapping_t*>(kv.first));
+          break;
+        case TAG_FUNP:
+          free_funp(reinterpret_cast<funptr_t*>(kv.first));
+          break;
+      }
+    }
+  }
+
+  return dead;
 }
 
 #endif /* DEBUGMALLOC_EXTENSIONS */

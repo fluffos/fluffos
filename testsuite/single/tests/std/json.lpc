@@ -334,6 +334,7 @@ void test_encode_circular_references() {
   m1 = (["key":"value"]);
   m1["self"] = m1;
   ASSERT(strsrch(json_encode(m1), "\"self\":null") != -1);
+  map_delete(m1, "self");  // break the loop before dropping m1, or it leaks
 
   // Circular array reference. Note: `arr1 += ({arr1})` would NOT be
   // circular (LPC array '+' builds a new array, so the element would
@@ -351,6 +352,11 @@ void test_encode_circular_references() {
   m1["ref"] = m2;
   // Should encode with null for circular part
   ASSERT(json_encode(m1));
+
+  // break the loops before the locals go out of scope -- a dropped
+  // reference loop is unreclaimable and now fails check_memory()
+  arr1[3] = 0;
+  map_delete(m1, "ref");
 }
 
 void test_roundtrip() {
@@ -534,6 +540,7 @@ void test_performance_large_strings() {
 }
 
 void do_tests() {
+  string err;
   if(!find_object("/std/json")) {
     write("json not loaded, skipped");
     return;
@@ -577,7 +584,14 @@ void do_tests() {
   test_encode_non_string_keys();
   write("✓ Non-string key tests passed\n");
 
-  test_encode_circular_references();
+  // catch + unconditional collect: an uncaught error inside would strand
+  // the deliberately-cyclic fixtures as orphans, which the harness's
+  // post-file check_memory() now hard-fails on
+  err = catch(test_encode_circular_references());
+#if efun_defined(find_orphaned_cycles)
+  find_orphaned_cycles(1);
+#endif
+  if (err) error(err);
   write("✓ Circular reference tests passed\n");
 
   write("\n=== Round-trip Tests ===\n");

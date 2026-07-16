@@ -1,0 +1,111 @@
+// find_orphaned_cycles(int collect): Debug-build (DEBUGMALLOC_EXTENSIONS)
+// garbage detector for reference loops that have already been dropped --
+// data blocks kept alive only by a loop, unreachable from any variable, so
+// no LPC-level tool (refs(), break_cycles()) can reach them anymore.
+// Detection is trial deletion: a block whose every reference comes from
+// other data blocks, with no path from an externally-held block, is
+// garbage. With collect=1 the garbage is reclaimed safely.
+//
+// Counts are asserted relative to a baseline snapshot so the test is
+// insensitive to whatever the surrounding suite state holds. If this test
+// itself failed to clean up, the harness's post-file check_memory() would
+// now also flag the orphans ("unreachable data block(s)") -- that report
+// line is new alongside this efun.
+
+class Ring {
+  mixed next;
+}
+
+void make_orphans() {
+  // in a helper so its locals are provably off the stack when we scan
+  mixed *a;
+  mapping m1, m2;
+  function f;
+  class Ring c1, c2;
+
+  // self-referential array, dropped: 1 orphaned block. The buffer riding
+  // inside is NOT cycle-capable (not counted), but collection must release
+  // it via the sever pass -- a buffer leak here trips the harness's
+  // post-file ref-count gate.
+  a = ({ 0, allocate_buffer(64) });
+  a[0] = a;
+  a = 0;
+
+  // mutual mapping pair (value edges), dropped: 2 orphaned blocks
+  m1 = ([]);
+  m2 = ([]);
+  m1["peer"] = m2;
+  m2["peer"] = m1;
+  m1 = 0;
+  m2 = 0;
+
+  // mutual mapping pair closed in KEY position, dropped: 2 orphaned
+  // blocks -- exercises the collector's key-slot sever path (zeroing a
+  // node's key in place), which break_cycles() never uses
+  m1 = ([]);
+  m2 = ([]);
+  m1[m2] = "v1";
+  m2[m1] = "v2";
+  m1 = 0;
+  m2 = 0;
+
+  // circular class list, dropped: 2 orphaned blocks (TAG_CLASS candidate,
+  // hold, sever, and free_class release paths)
+  c1 = new(class Ring);
+  c2 = new(class Ring);
+  c1.next = c2;
+  c2.next = c1;
+  c1 = 0;
+  c2 = 0;
+
+  // array -> funptr -> captured-args -> array ring, dropped: 3 blocks
+  // (the array, the function pointer, and its args array)
+  a = ({ 0 });
+  f = (: member_array, 0, a :);
+  a[0] = f;
+  a = 0;
+  f = 0;
+}
+
+private void run_checks() {
+#if efun_defined(find_orphaned_cycles)
+  int base, n;
+  mixed *live;
+
+  base = find_orphaned_cycles(0);   // whatever the suite already leaked
+
+  make_orphans();
+  n = find_orphaned_cycles(0);      // detect only, nothing reclaimed
+  ASSERT_EQ(base + 10, n);
+  ASSERT_EQ(base + 10, find_orphaned_cycles(0));  // detection is idempotent
+
+  // a loop still reachable from a variable is NOT orphaned garbage
+  live = ({ 0 });
+  live[0] = live;
+  ASSERT_EQ(base + 10, find_orphaned_cycles(0));
+
+  // collect: our 6 blocks (plus any pre-existing orphans) are reclaimed
+  ASSERT_EQ(base + 10, find_orphaned_cycles(1));
+  ASSERT_EQ(0, find_orphaned_cycles(0));
+
+  // the reachable loop survived the collection intact
+  ASSERT(live[0] == live);
+#if efun_defined(break_cycles)
+  break_cycles(live);
+#else
+  live[0] = 0;
+#endif
+#endif
+  ASSERT(1);
+}
+
+void do_tests() {
+  // unconditional teardown (AGENTS.md section 7): an uncaught error after
+  // make_orphans() would otherwise strand the orphans, and the harness's
+  // post-file check_memory() now hard-fails on them
+  string err = catch(run_checks());
+#if efun_defined(find_orphaned_cycles)
+  find_orphaned_cycles(1);
+#endif
+  if (err) error(err);
+}

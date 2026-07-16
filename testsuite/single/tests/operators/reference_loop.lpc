@@ -1,0 +1,128 @@
+// Reference loops (cyclic data structures) and the reference-counting VM.
+//
+// FluffOS manages arrays / mappings / classes / buffers / function pointers
+// purely by reference counting (free_svalue -> dealloc_* at ref 0, see
+// src/vm/internal/base/svalue.cc); there is NO cycle collector. A structure
+// that reaches itself keeps its own ref >= 1 forever, so the moment the last
+// OUTSIDE reference is dropped the whole loop becomes unreachable-but-alive:
+// memory that can never be reclaimed until the driver shuts down. The leak is
+// even invisible to the Debug ref-count checker (check_memory), because a
+// detached cycle is perfectly self-consistent -- every internal reference is
+// marked by another member of the loop.
+//
+// This test pins what IS guaranteed around cycles:
+//   1. building and traversing them is legal (assignment is pointer copy),
+//   2. refs() exposes the extra self-reference (the leak-detection tool),
+//   3. the recursion-guarded consumers survive them: sprintf("%O") truncates
+//      with "...", save_variable()/save_object() and copy() error cleanly at
+//      MAX_SAVE_SVALUE_DEPTH instead of overflowing the C stack,
+//   4. destruct() breaks any loop that passes through an object's global
+//      variables (destruct2() zeroes the variable block for exactly this
+//      reason -- see src/vm/internal/simulate.cc), and
+//   5. explicitly overwriting the back-reference really releases the loop.
+//
+// Every cycle built below is broken before the test returns: that is the
+// documented prevention pattern, and it keeps Debug/ASan suite runs
+// leak-free.
+
+#include <lpctypes.h>
+
+class Node {
+  mixed data;
+  mixed next;
+}
+
+// fixture state for the destruct demo (only used on clones of this file)
+mixed stash;
+void set_stash(mixed v) { stash = v; }
+mixed query_stash() { return stash; }
+
+private void run_checks() {
+  mixed *a, *plain;
+  mapping m1, m2;
+  class Node n1, n2;
+  mapping outer;
+  object ob;
+  string err, dump;
+
+  // --- 1. cycles are legal to build and traverse ------------------------
+  a = ({ 0 });
+  a[0] = a;                       // self-referential array
+  ASSERT(a[0] == a);              // == on arrays is pointer identity
+  ASSERT(a[0][0][0] == a);        // traversal never ends, one hop at a time
+
+  m1 = ([]);
+  m2 = ([]);
+  m1["peer"] = m2;                // mutual mapping cycle
+  m2["peer"] = m1;
+  ASSERT(m1["peer"]["peer"] == m1);
+
+  n1 = new(class Node, data: 1);
+  n2 = new(class Node, data: 2);
+  n1.next = n2;                   // two-node circular list
+  n2.next = n1;
+  ASSERT(n1.next.next == n1);
+
+  // --- 2. refs() shows the extra self-reference -------------------------
+#if efun_defined(refs)
+  plain = ({ 0 });
+  ASSERT_EQ(1, refs(plain));      // held only by the local variable
+  ASSERT_EQ(2, refs(a));          // local variable + the cycle's own ref:
+                                  // dropping `a` leaves ref at 1 forever
+#endif
+
+  // --- 3. recursion-guarded consumers survive cycles ---------------------
+  // sprintf("%O") truncates self-referential structures with "..."
+  dump = sprintf("%O", a);
+  ASSERT(strsrch(dump, "...") != -1);
+  dump = sprintf("%O", m1);
+  ASSERT(strsrch(dump, "...") != -1);
+
+  // save_variable() hits the MAX_SAVE_SVALUE_DEPTH cap and errors cleanly
+  err = catch(save_variable(a));
+  ASSERT(err && strsrch(err, "too deep") != -1);
+  err = catch(save_variable(m1));
+  ASSERT(err && strsrch(err, "too deep") != -1);
+
+  // copy() (deep copy) also errors at the depth cap instead of recursing
+  // the C stack into the ground
+  err = catch(copy(a));
+  ASSERT(err && strsrch(err, "too deep") != -1);
+  err = catch(copy(n1));
+  ASSERT(err && strsrch(err, "too deep") != -1);
+
+  // --- 4. destruct() breaks loops through object variables ---------------
+  // The driver zeroes an object's global variables at destruct time
+  // precisely so that "an object with a variable pointing to itself would
+  // never be freed" cannot happen. A loop routed through an object is
+  // therefore reclaimable: destruct the object and the loop falls apart.
+  ob = new(__FILE__);
+  outer = ([ "owner": ob ]);
+  ob->set_stash(outer);           // ob.stash -> outer -> ob : a cycle
+  ASSERT(ob->query_stash()["owner"] == ob);
+  destruct(ob);
+  ASSERT(!ob);                    // the object really died...
+  ASSERT(!outer["owner"]);        // ...and the loop edge in `outer` is now 0
+  map_delete(outer, "owner");
+
+  // --- 5. prevention: break the loop before dropping it ------------------
+  a[0] = 0;                       // overwrite the back-reference
+#if efun_defined(refs)
+  ASSERT_EQ(1, refs(a));          // only the local variable holds it again
+#endif
+  map_delete(m1, "peer");         // one deleted edge un-loops both mappings
+  n2.next = 0;                    // same for the circular list
+}
+
+void do_tests() {
+  // unconditional teardown (AGENTS.md section 7): if anything above errors
+  // uncaught mid-test, locally-built cycles unwind into orphans that the
+  // harness's post-file check_memory() now hard-fails on -- collect them
+  // so one regression stays one [ FAILED ] entry instead of aborting the
+  // whole randomized run
+  string err = catch(run_checks());
+#if efun_defined(find_orphaned_cycles)
+  find_orphaned_cycles(1);
+#endif
+  if (err) error(err);
+}
