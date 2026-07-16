@@ -297,6 +297,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/contrib/break_cycles",
+            "key": "efun/contrib/break_cycles",
+            "label": "break_cycles"
+          },
+          {
+            "type": "doc",
             "id": "efun/contrib/classes",
             "key": "efun/contrib/classes",
             "label": "classes"
@@ -351,6 +357,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/contrib/find_cycles",
+            "key": "efun/contrib/find_cycles",
+            "label": "find_cycles"
+          },
+          {
+            "type": "doc",
             "id": "efun/contrib/function_owner",
             "key": "efun/contrib/function_owner",
             "label": "function_owner"
@@ -372,6 +384,12 @@
             "id": "efun/contrib/get_os_env",
             "key": "efun/contrib/get_os_env",
             "label": "get_os_env"
+          },
+          {
+            "type": "doc",
+            "id": "efun/contrib/has_cycle",
+            "key": "efun/contrib/has_cycle",
+            "label": "has_cycle"
           },
           {
             "type": "doc",
@@ -1727,6 +1745,12 @@
             "id": "efun/internals/dumpallobj",
             "key": "efun/internals/dumpallobj",
             "label": "dumpallobj"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/find_orphaned_cycles",
+            "key": "efun/internals/find_orphaned_cycles",
+            "label": "find_orphaned_cycles"
           },
           {
             "type": "doc",
@@ -3592,6 +3616,12 @@
             "id": "concepts/general/message_doc",
             "key": "concepts/general/message_doc",
             "label": "The message() System"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/reference_loops",
+            "key": "concepts/general/reference_loops",
+            "label": "Reference Loops"
           },
           {
             "type": "doc",

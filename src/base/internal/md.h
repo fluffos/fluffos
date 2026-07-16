@@ -31,6 +31,12 @@ typedef struct md_node_s {
 #define MD_OVERHEAD (sizeof(md_node_t))
 #endif
 void check_all_blocks(int);
+#ifdef DEBUGMALLOC_EXTENSIONS
+// Orphaned reference-loop scan (trial deletion); see checkmemory.cc.
+// Returns the number of unreachable array/class/mapping/funptr blocks;
+// reclaims them when collect is nonzero. ob (nullable) receives detail.
+int md_scan_orphaned_cycles(int collect, outbuffer_t* ob);
+#endif
 
 #define MD_TABLE_BITS 14u
 #define MD_TABLE_SIZE (1u << MD_TABLE_BITS)

@@ -18,6 +18,9 @@
     string debugmalloc(string, int default: 0);
     void set_malloc_mask(int);
     string check_memory(int default: 0);
+/* count (and with arg 1, reclaim) data blocks that are unreachable because
+   only a reference loop keeps them alive -- see checkmemory.cc */
+    int find_orphaned_cycles(int default: 0);
 #endif
     string dump_stralloc(string);
 #ifdef DEBUG

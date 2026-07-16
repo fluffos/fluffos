@@ -2678,5 +2678,33 @@
   "sidebar.docs.doc.Build (v2017, legacy)": {
     "message": "构建（v2017，旧版）",
     "description": "The label for the doc item 'Build (v2017, legacy)' in sidebar 'docs', linking to the doc build_v2017"
+  },
+  "sidebar.docs.doc.efun/buffers/to_buffer": {
+    "message": "to_buffer",
+    "description": "The label for the doc item 'to_buffer' in sidebar 'docs', linking to the doc efun/buffers/to_buffer"
+  },
+  "sidebar.docs.doc.efun/contrib/break_cycles": {
+    "message": "break_cycles",
+    "description": "The label for the doc item 'break_cycles' in sidebar 'docs', linking to the doc efun/contrib/break_cycles"
+  },
+  "sidebar.docs.doc.efun/contrib/find_cycles": {
+    "message": "find_cycles",
+    "description": "The label for the doc item 'find_cycles' in sidebar 'docs', linking to the doc efun/contrib/find_cycles"
+  },
+  "sidebar.docs.doc.efun/contrib/has_cycle": {
+    "message": "has_cycle",
+    "description": "The label for the doc item 'has_cycle' in sidebar 'docs', linking to the doc efun/contrib/has_cycle"
+  },
+  "sidebar.docs.doc.efun/internals/find_orphaned_cycles": {
+    "message": "find_orphaned_cycles",
+    "description": "The label for the doc item 'find_orphaned_cycles' in sidebar 'docs', linking to the doc efun/internals/find_orphaned_cycles"
+  },
+  "sidebar.docs.doc.apply/master/valid_ffi": {
+    "message": "valid_ffi",
+    "description": "The label for the doc item 'valid_ffi' in sidebar 'docs', linking to the doc apply/master/valid_ffi"
+  },
+  "sidebar.docs.doc.concepts/general/reference_loops": {
+    "message": "Reference Loops",
+    "description": "The label for the doc item 'Reference Loops' in sidebar 'docs', linking to the doc concepts/general/reference_loops"
   }
 }

@@ -2,6 +2,8 @@
 
 #include <sys/stat.h>  // for struct stat
 
+#include <memory>  // for std::unique_ptr (deep_copy_* error-unwind guards)
+
 #include "packages/core/heartbeat.h"
 #include "packages/core/add_action.h"
 #include "packages/core/file.h"
@@ -220,28 +222,29 @@ static int depth;
 
 static void deep_copy_svalue(svalue_t* /*from*/, svalue_t* /*to*/);
 
+// The deep_copy_* helpers must survive an error() unwind from a nested
+// deep_copy_svalue() -- the MAX_SAVE_SVALUE_DEPTH cap fires on every
+// self-referential (cyclic) structure, and mapping_too_large() can fire from
+// doCopy(). Two rules keep that safe: allocate the destination ZEROED (the
+// _empty_ allocators leave svalues uninitialized, which the Debug memory
+// checker would then walk), and hold it in a unique_ptr so the half-built
+// copy is freed instead of leaking with borrowed pointers inside.
 static array_t* deep_copy_array(array_t* arg) {
-  array_t* vec;
-  int i;
-
-  vec = allocate_empty_array(arg->size);
-  for (i = 0; i < arg->size; i++) {
+  std::unique_ptr<array_t, void (*)(array_t*)> vec(allocate_array(arg->size), free_array);
+  for (int i = 0; i < arg->size; i++) {
     deep_copy_svalue(&arg->item[i], &vec->item[i]);
   }
 
-  return vec;
+  return vec.release();
 }
 
 static array_t* deep_copy_class(array_t* arg) {
-  array_t* vec;
-  int i;
-
-  vec = allocate_empty_class_by_size(arg->size);
-  for (i = 0; i < arg->size; i++) {
+  std::unique_ptr<array_t, void (*)(array_t*)> vec(allocate_class_by_size(arg->size), free_class);
+  for (int i = 0; i < arg->size; i++) {
     deep_copy_svalue(&arg->item[i], &vec->item[i]);
   }
 
-  return vec;
+  return vec.release();
 }
 
 static int doCopy(mapping_t* /*map*/, mapping_node_t* elt, void* dest) {
@@ -258,48 +261,44 @@ static int doCopy(mapping_t* /*map*/, mapping_node_t* elt, void* dest) {
 }
 
 static mapping_t* deep_copy_mapping(mapping_t* arg) {
-  mapping_t* map;
-
-  map = allocate_mapping(0);     /* this should be fixed.  -Beek */
-  mapTraverse(arg, doCopy, map); /* Not horridly efficient either */
-  return map;
+  std::unique_ptr<mapping_t, void (*)(mapping_t*)> map(allocate_mapping(0), free_mapping);
+  mapTraverse(arg, doCopy, map.get()); /* Not horridly efficient either */
+  return map.release();
 }
 
+// Copy the child FIRST, then write the destination slot in one go: `to`
+// points into a container that outlives an error() unwind (freed by the
+// guards above), so it must never hold `from`'s pointer without owning a
+// reference while a nested copy can still throw.
 static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
   switch (from->type) {
     case T_ARRAY:
-      depth++;
-      if (depth > MAX_SAVE_SVALUE_DEPTH) {
-        depth = 0;
-        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-              MAX_SAVE_SVALUE_DEPTH);
-      }
-      *to = *from;
-      to->u.arr = deep_copy_array(from->u.arr);
-      depth--;
-      break;
     case T_CLASS:
+    case T_MAPPING: {
       depth++;
       if (depth > MAX_SAVE_SVALUE_DEPTH) {
         depth = 0;
-        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-              MAX_SAVE_SVALUE_DEPTH);
+        error(
+            "Mappings, arrays and/or classes nested too deep (%d) for copy() "
+            "-- possibly a reference loop; see has_cycle()\n",
+            MAX_SAVE_SVALUE_DEPTH);
       }
-      *to = *from;
-      to->u.arr = deep_copy_class(from->u.arr);
+      svalue_t nv = *from;
+      switch (from->type) {
+        case T_ARRAY:
+          nv.u.arr = deep_copy_array(from->u.arr);
+          break;
+        case T_CLASS:
+          nv.u.arr = deep_copy_class(from->u.arr);
+          break;
+        case T_MAPPING:
+          nv.u.map = deep_copy_mapping(from->u.map);
+          break;
+      }
+      *to = nv;
       depth--;
       break;
-    case T_MAPPING:
-      depth++;
-      if (depth > MAX_SAVE_SVALUE_DEPTH) {
-        depth = 0;
-        error("Mappings, arrays and/or classes nested too deep (%d) for copy()\n",
-              MAX_SAVE_SVALUE_DEPTH);
-      }
-      *to = *from;
-      to->u.map = deep_copy_mapping(from->u.map);
-      depth--;
-      break;
+    }
     case T_BUFFER:
       *to = *from;
       to->u.buf = allocate_buffer(from->u.buf->size);

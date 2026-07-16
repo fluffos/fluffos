@@ -24,10 +24,20 @@ title: internals / check_memory
                      down by allocation source.
     Bit 1 (value 2)  Runs silently -- suppresses the warnings and report
                      and returns 0 instead of the report string.
+    Bit 2 (value 4)  Skips the orphaned-reference-loop scan (see below).
+
+    Unless bit 1 or bit 2 is set, the report also includes a scan for
+    data blocks that are unreachable because only a reference loop keeps
+    them alive (`unreachable data block(s) kept alive only by reference
+    loop(s)`) -- garbage that pure reference counting can never reclaim
+    and that the plain ref-count comparison cannot see. Reclaim such
+    blocks with find_orphaned_cycles(1). The driver testsuite calls
+    check_memory() after every test file, so a test that drops a cyclic
+    structure without breaking it first now fails with that warning.
 
     This efun is available only in DEBUGMALLOC builds (compiled with
     DEBUGMALLOC_EXTENSIONS); it does not exist in ordinary builds.
 
 ### SEE ALSO
 
-    dump_stralloc(3), reclaim_objects(3)
+    find_orphaned_cycles(3), dump_stralloc(3), reclaim_objects(3)
