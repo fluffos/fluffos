@@ -231,6 +231,13 @@ void look_for_objects_to_swap() {
         if (ready_for_clean_up && (ob->flags & O_WILL_CLEAN_UP)) {
           int const save_reset_state = ob->flags & O_RESET_STATE;
 
+          /*
+           * Set O_RESET_STATE during the apply so LAZY_RESETS' try_reset()
+           * doesn't fire an overdue reset() on an object that may be about to
+           * destruct; the pending reset fires on the next real touch instead.
+           */
+          ob->flags |= O_RESET_STATE;
+
           debug(d_flag, "clean up /%s\n", ob->obname);
 
           /*
@@ -256,7 +263,7 @@ void look_for_objects_to_swap() {
           if (!svp || (svp->type == T_NUMBER && svp->u.number == 0)) {
             ob->flags &= ~O_WILL_CLEAN_UP;
           }
-          ob->flags |= save_reset_state;
+          ob->flags = (ob->flags & ~O_RESET_STATE) | save_reset_state;
         }
       }
       last_good_ob = ob;
