@@ -122,6 +122,23 @@ Three unwinding hazards that recur beyond raw heap pointers:
 * **Committed scanner/parser are version-pinned and hash-stamped.** The committed `grammar.autogen.cc/.h` and `lexer.autogen.cc` pin the generator that produced them (the "made by GNU Bison X.Y.Z" banner / `YY_FLEX_*_VERSION` defines): a host with an OLDER bison/flex does not regenerate and builds from the committed copy; hosts at/above the pin regenerate normally (so CI still validates `grammar.y`/`lexer.l`). The post-build copy-back into the source tree is additionally gated on the sha256 of the INPUT, recorded in a trailing `/* FluffOS generated-from <file> sha256=... */` stamp — generator builds that emit cosmetically different code (distro-patched bison reporting the same version) can never churn the committed files; only a real `.y`/`.l` edit updates them. Do not hand-edit the stamp; do not commit locally-regenerated autogen files unless you actually changed the grammar/lexer. Machinery: `cmake/util.cmake` + the `FLUFFOS_PINNED_*`/`FLUFFOS_*_REGEN` logic in `src/CMakeLists.txt`.
 * **WASM / Emscripten build**: the driver cross-compiles to WebAssembly and runs a full mudlib in the browser (the page is the telnet client). **`src/wasm/README.md` is the architecture doc** (Transport interface, host-driven tick loop, per-target implementation files, package on/off matrix, roadmap); **`docs/build-wasm.md` is the user workflow** (deps via `tools/wasm/build-deps.sh`, the `native-tools` + `wasm` CMake presets, mudlib packaging via `tools/wasm/pack-mudlib.sh`). Per-connection byte transport is the `Transport` interface (`src/net/transport.h`); per-target singletons (event loop, TLS, DNS resolver, crash handler) are selected at link time (`*_libevent.cc` vs `src/wasm/*.cc` / `*_stub.cc`) -- do not add `#ifdef __EMSCRIPTEN__` to shared logic files. CI's `wasm` job runs the LPC testsuite inside the wasm driver under node; testsuite files for optional packages must guard themselves with `#ifdef __PACKAGE_*__`.
 
+### Local build quickstart (Debian/Ubuntu)
+
+Don't rediscover the dependency list one CMake configure failure at a time. CI's `packages:` lines in `.github/workflows/ci.yml` look authoritative but assume a GitHub runner image, which preinstalls cmake, ninja, and libicu-dev — a bare container needs those too. Verified minimal setup:
+
+```bash
+sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+  bison flex libicu-dev libssl-dev zlib1g-dev libpcre3-dev \
+  libjemalloc-dev libgtest-dev libffi-dev libmysqlclient-dev
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo   # or Debug
+ninja -C build driver
+```
+
+* **The binary is `build/src/driver`** — there is no `build/bin/`.
+* **No MySQL client dev package on the host?** Configure with `-DPACKAGE_DB=OFF` instead of hunting for one (`FindMySQL` hard-fails the configure otherwise; Debian's metapackage name is `default-libmysqlclient-dev`). `libpq-dev`/`libsqlite3-dev` are only needed for the non-default DB backends.
+* **libevent is vendored** (`src/thirdparty/libevent`) — no system libevent needed. GTest is optional: configure proceeds without it, you just lose the unit-test targets.
+* Run the LPC suite from `testsuite/`: `../build/src/driver etc/config.test -ftest` (full run) or `-ftest:single/tests/efuns/foo.lpc` (one file); `ctest -R testsuite` from `build/` wraps the same run (see §7 for the pass signals). When scripting it, don't read the exit status through a pipe — `driver ... | tail` reports tail's status, not the driver's; redirect output to a file and check `$?`.
+
 ---
 
 ## 6. Continuous Integration (CI) Environment
