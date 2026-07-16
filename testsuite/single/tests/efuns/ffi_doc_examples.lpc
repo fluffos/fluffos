@@ -1,4 +1,4 @@
-// Pins every worked example in docs/driver/ffi-plan.md ("Worked
+// Pins every worked example in docs/driver/ffi.md ("Worked
 // examples: calling libc"), including the buffer-promotion idioms the
 // doc builds on (string -> buffer, += ({ 0 }), range assignment,
 // foreach over a peeked buffer). If this fails, fix the doc too.

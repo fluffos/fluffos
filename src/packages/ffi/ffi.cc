@@ -5,7 +5,7 @@
  * functions whose signatures are described at runtime, plus LPC function
  * pointers exposed to C as callbacks (libffi closures).
  *
- * Design & security model: docs/driver/ffi-plan.md. The short version:
+ * Design & security model: docs/driver/ffi.md. The short version:
  *  - All pointer/byte data crosses as `buffer`; raw pointer VALUES
  *    (returned pointers, buffer addresses, callback code addresses) are
  *    ints. LPC strings are UTF-8-native and NEVER implicitly marshalled.

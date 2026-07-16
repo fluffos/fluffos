@@ -3,7 +3,7 @@
 Generates ready-to-use LPC bindings for a native library from its C
 header, targeting the FFI package (`src/packages/ffi`, efuns declared in
 `<ffi.h>`). See the full design in
-[docs/driver/ffi-plan.md](../../docs/driver/ffi-plan.md).
+[docs/driver/ffi.md](../../docs/driver/ffi.md).
 
 ## Usage
 

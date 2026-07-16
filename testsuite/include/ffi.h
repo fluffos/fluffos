@@ -3,7 +3,7 @@
  *
  * Copy this file to your mudlib include dir. The codes describe the C
  * type of an argument or return value to ffi_prepare()/ffi_call() and
- * the scalar type for ffi_read()/ffi_write(). See docs/driver/ffi-plan.md.
+ * the scalar type for ffi_read()/ffi_write(). See docs/driver/ffi.md.
  *
  * The boundary is BYTES: LPC strings are UTF-8-native and are NEVER
  * marshalled implicitly to C char*. All pointer/data crosses as a

@@ -3652,9 +3652,9 @@
       },
       {
         "type": "doc",
-        "id": "driver/ffi-plan",
-        "key": "driver/ffi-plan",
-        "label": "FFI Package Design"
+        "id": "driver/ffi",
+        "key": "driver/ffi",
+        "label": "FFI Package"
       },
       {
         "type": "doc",

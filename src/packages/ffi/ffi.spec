@@ -7,7 +7,7 @@
  * are UTF-8-native and never implicitly marshalled to char*. Every load
  * and prepare is gated by the master apply valid_ffi().
  *
- * See docs/driver/ffi-plan.md and the LPC header <ffi.h>.
+ * See docs/driver/ffi.md and the LPC header <ffi.h>.
  */
 
 /* --- library & symbol --------------------------------------------- */

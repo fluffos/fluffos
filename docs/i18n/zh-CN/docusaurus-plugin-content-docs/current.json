@@ -2627,9 +2627,9 @@
     "message": "Adding Efuns",
     "description": "The label for the doc item 'Adding Efuns' in sidebar 'docs', linking to the doc driver/adding_efuns"
   },
-  "sidebar.docs.doc.driver/ffi-plan": {
-    "message": "FFI Package Design",
-    "description": "The label for the doc item 'FFI Package Design' in sidebar 'docs', linking to the doc driver/ffi-plan"
+  "sidebar.docs.doc.driver/ffi": {
+    "message": "FFI Package",
+    "description": "The label for the doc item 'FFI Package' in sidebar 'docs', linking to the doc driver/ffi"
   },
   "sidebar.docs.doc.driver/call_into_vm": {
     "message": "Calling Into the VM",
