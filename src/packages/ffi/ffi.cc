@@ -5,14 +5,14 @@
  * functions whose signatures are described at runtime, plus LPC function
  * pointers exposed to C as callbacks (libffi closures).
  *
- * Design & security model: docs/driver/ffi-plan.md. The short version:
+ * Design & security model: docs/driver/ffi.md. The short version:
  *  - All pointer/byte data crosses as `buffer`; raw pointer VALUES
  *    (returned pointers, buffer addresses, callback code addresses) are
  *    ints. LPC strings are UTF-8-native and NEVER implicitly marshalled.
- *  - Every ffi_load / ffi_symbol / ffi_prepare / ffi_callback is gated
- *    by the master apply valid_ffi(op, arg, caller); a missing apply
- *    denies (secure default). An optional config allow-list
- *    ("ffi allowed libraries") is enforced first.
+ *  - Every ffi_load / ffi_symbol / ffi_prepare / ffi_callback /
+ *    ffi_peek is gated by the master apply valid_ffi(op, arg, caller);
+ *    a missing apply denies (secure default). An optional config
+ *    allow-list ("ffi allowed libraries") is enforced first.
  *  - Native memory is a `buffer` whose bytes ARE the storage, so the GC
  *    tracks the lifetime.
  */
@@ -597,6 +597,10 @@ void f_ffi_sizeof() {
 
 #ifdef F_FFI_PEEK
 void f_ffi_peek() {
+  // Gated like load/prepare: reading an arbitrary native address is a
+  // process-memory disclosure primitive, so the master must approve it
+  // even though no foreign code runs.
+  check_valid_ffi("peek", sp - 1);
   int nbytes = sp->u.number;
   auto addr = static_cast<intptr_t>((sp - 1)->u.number);
   if (addr == 0) {

@@ -20,6 +20,13 @@ title: ffi / ffi_peek
     an internal cap. Decode text with string_decode() once you have the
     bytes.
 
+    Every call is gated by the master apply valid_ffi("peek", address,
+    caller) before any memory is touched: reading an arbitrary native
+    address is a process-memory disclosure primitive (and an unmapped
+    address would crash the driver), so the master must approve it even
+    though no foreign code runs.
+
 ### SEE ALSO
 
-    ffi_call(3), ffi_symbol(3), ffi_address(3), string_decode(3)
+    ffi_call(3), ffi_symbol(3), ffi_address(3), string_decode(3),
+    valid_ffi(4)

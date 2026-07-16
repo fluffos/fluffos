@@ -4,10 +4,11 @@
  * Loads native shared libraries and calls C functions with signatures
  * described at runtime (via libffi), including LPC function pointers as
  * C callbacks. All pointer/byte data crosses as `buffer` -- LPC strings
- * are UTF-8-native and never implicitly marshalled to char*. Every load
- * and prepare is gated by the master apply valid_ffi().
+ * are UTF-8-native and never implicitly marshalled to char*. Every
+ * load, symbol, prepare, callback, and peek is gated by the master
+ * apply valid_ffi().
  *
- * See docs/driver/ffi-plan.md and the LPC header <ffi.h>.
+ * See docs/driver/ffi.md and the LPC header <ffi.h>.
  */
 
 /* --- library & symbol --------------------------------------------- */

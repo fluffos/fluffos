@@ -132,7 +132,8 @@
     "label": "Standard Library",
     "description": "Pure-LPC helper functions and libraries shipped with the FluffOS testsuite mudlib (not driver efuns), organized by data type and domain.",
     "labels": {
-      "tui": "TUI Toolkit"
+      "tui": "TUI Toolkit",
+      "ffi_util": "FFI Utilities"
     }
   },
   "stdlib/arrays": {
@@ -204,7 +205,7 @@
       "config",
       "wasm",
       "adding_efuns",
-      "ffi-plan",
+      "ffi",
       "call_into_vm",
       "stackmachine",
       "parse_tree",
@@ -214,7 +215,7 @@
       "config": "Runtime Configuration",
       "wasm": "WASM Driver Cookbook",
       "adding_efuns": "Adding Efuns",
-      "ffi-plan": "FFI Package Design",
+      "ffi": "FFI Package",
       "call_into_vm": "Calling Into the VM",
       "stackmachine": "Stack Machine",
       "parse_tree": "Parse Tree Nodes",
