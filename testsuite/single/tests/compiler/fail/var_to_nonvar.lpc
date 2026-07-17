@@ -1,8 +1,7 @@
 TYPETEST
 
-void foo(int x) {
-}
+void foo(int x) {}
 
 void bar() {
-    foo( ({ })...);
+  foo(({})...);
 }

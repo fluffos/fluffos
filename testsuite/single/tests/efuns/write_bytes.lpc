@@ -1,7 +1,7 @@
 void do_tests() {
-    rm("/wb_test.bin");
-    write_file("/wb_test.bin", "AAAAAAAA", 1);
-    ASSERT_EQ(1, write_bytes("/wb_test.bin", 2, "xy"));
-    ASSERT_EQ("AAxyAAAA", read_file("/wb_test.bin"));
-    rm("/wb_test.bin");
+  rm("/wb_test.bin");
+  write_file("/wb_test.bin", "AAAAAAAA", 1);
+  ASSERT_EQ(1, write_bytes("/wb_test.bin", 2, "xy"));
+  ASSERT_EQ("AAxyAAAA", read_file("/wb_test.bin"));
+  rm("/wb_test.bin");
 }

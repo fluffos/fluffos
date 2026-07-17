@@ -6,37 +6,36 @@
 
 private nosave string LIB_PATH = "";
 private nosave int _lib = 0;
-private nosave mapping _h = ([ ]);
+private nosave mapping _h = ([]);
 
 private int _lib_handle() {
-    if (!_lib) _lib = ffi_load(LIB_PATH);
-    return _lib;
+  if (!_lib) _lib = ffi_load(LIB_PATH);
+  return _lib;
 }
 
 private int _h_sqrt() {
-    if (undefinedp(_h["sqrt"]))
-        _h["sqrt"] = ffi_prepare(_lib_handle(), "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE }));
-    return _h["sqrt"];
+  if (undefinedp(_h["sqrt"]))
+    _h["sqrt"] = ffi_prepare(_lib_handle(), "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE }));
+  return _h["sqrt"];
 }
 float sqrt(float a0) {
-    return ffi_call(_h_sqrt(), ({ a0 }));
+  return ffi_call(_h_sqrt(), ({ a0 }));
 }
 
 private int _h_pow() {
-    if (undefinedp(_h["pow"]))
-        _h["pow"] = ffi_prepare(_lib_handle(), "pow", FFI_DOUBLE, ({ FFI_DOUBLE, FFI_DOUBLE }));
-    return _h["pow"];
+  if (undefinedp(_h["pow"]))
+    _h["pow"] = ffi_prepare(_lib_handle(), "pow", FFI_DOUBLE, ({ FFI_DOUBLE, FFI_DOUBLE }));
+  return _h["pow"];
 }
 float pow(float a0, float a1) {
-    return ffi_call(_h_pow(), ({ a0, a1 }));
+  return ffi_call(_h_pow(), ({ a0, a1 }));
 }
 
 private int _h_abs() {
-    if (undefinedp(_h["abs"]))
-        _h["abs"] = ffi_prepare(_lib_handle(), "abs", FFI_INT32, ({ FFI_INT32 }));
-    return _h["abs"];
+  if (undefinedp(_h["abs"]))
+    _h["abs"] = ffi_prepare(_lib_handle(), "abs", FFI_INT32, ({ FFI_INT32 }));
+  return _h["abs"];
 }
 int abs(int a0) {
-    return ffi_call(_h_abs(), ({ a0 }));
+  return ffi_call(_h_abs(), ({ a0 }));
 }
-

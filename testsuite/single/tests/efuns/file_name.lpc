@@ -1,4 +1,3 @@
 void do_tests() {
-    ASSERT(file_name() + ".lpc" == __FILE__);
+  ASSERT(file_name() + ".lpc" == __FILE__);
 }
-

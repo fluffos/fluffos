@@ -11,38 +11,38 @@
 // (correctly read) flag, so the two must agree exactly for the same
 // path + flag.
 void do_tests() {
-    // Directory, every flag shape.
-    ASSERT_EQ(get_dir("/std", 0), stat("/std", 0));
-    ASSERT_EQ(get_dir("/std", 1), stat("/std", 1));
-    ASSERT_EQ(get_dir("/std", -1), stat("/std", -1));
+  // Directory, every flag shape.
+  ASSERT_EQ(get_dir("/std", 0), stat("/std", 0));
+  ASSERT_EQ(get_dir("/std", 1), stat("/std", 1));
+  ASSERT_EQ(get_dir("/std", -1), stat("/std", -1));
 
-    // Trailing slash must not change the outcome either way.
-    ASSERT_EQ(get_dir("/std/", -1), stat("/std/", -1));
+  // Trailing slash must not change the outcome either way.
+  ASSERT_EQ(get_dir("/std/", -1), stat("/std/", -1));
 
-    // Glob pattern.
-    ASSERT_EQ(get_dir("/std/*.lpc", -1), stat("/std/*.lpc", -1));
+  // Glob pattern.
+  ASSERT_EQ(get_dir("/std/*.lpc", -1), stat("/std/*.lpc", -1));
 
-    // Default flag (0) when omitted.
-    ASSERT_EQ(get_dir("/std", 0), stat("/std"));
+  // Default flag (0) when omitted.
+  ASSERT_EQ(get_dir("/std", 0), stat("/std"));
 
-    // The -1 shape carries per-entry ({name, size-or-dirflag, mtime}).
-    mixed *info = stat("/std", -1);
-    ASSERT(pointerp(info));
-    ASSERT(sizeof(info) > 0);
-    foreach (mixed entry in info) {
-        ASSERT(pointerp(entry));
-        ASSERT_EQ(3, sizeof(entry));
-        ASSERT(stringp(entry[0]));
-    }
+  // The -1 shape carries per-entry ({name, size-or-dirflag, mtime}).
+  mixed *info = stat("/std", -1);
+  ASSERT(pointerp(info));
+  ASSERT(sizeof(info) > 0);
+  foreach (mixed entry in info) {
+    ASSERT(pointerp(entry));
+    ASSERT_EQ(3, sizeof(entry));
+    ASSERT(stringp(entry[0]));
+  }
 
-    // Regular files keep using their own dedicated code path regardless
-    // of flag (size/mtime/load-time/ctime), unaffected by this bug.
-    string str = "stat test file for issue 1271";
-    string fname = "/stat_test_file";
-    rm(fname);
-    write_file(fname, str);
-    mixed *finfo = stat(fname, -1);
-    ASSERT(pointerp(finfo));
-    ASSERT_EQ(strlen(str), finfo[0]);
-    rm(fname);
+  // Regular files keep using their own dedicated code path regardless
+  // of flag (size/mtime/load-time/ctime), unaffected by this bug.
+  string str = "stat test file for issue 1271";
+  string fname = "/stat_test_file";
+  rm(fname);
+  write_file(fname, str);
+  mixed *finfo = stat(fname, -1);
+  ASSERT(pointerp(finfo));
+  ASSERT_EQ(strlen(str), finfo[0]);
+  rm(fname);
 }

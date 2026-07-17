@@ -1,5 +1,5 @@
 void do_tests() {
-    ASSERT(intp(uptime()));
-    ASSERT(uptime() >= 0);
-    ASSERT(uptime() < 86400);        // test boot is fresh
+  ASSERT(intp(uptime()));
+  ASSERT(uptime() >= 0);
+  ASSERT(uptime() < 86400);        // test boot is fresh
 }

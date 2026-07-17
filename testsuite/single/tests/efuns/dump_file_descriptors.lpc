@@ -1,3 +1,3 @@
 void do_tests() {
-    ASSERT(stringp(dump_file_descriptors()));
+  ASSERT(stringp(dump_file_descriptors()));
 }

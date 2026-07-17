@@ -1,9 +1,9 @@
 void do_tests() {
-    int i;
-    // Always returns a member of the array.
-    for (i = 0; i < 20; i++) {
-        ASSERT(member_array(element_of(({ 1, 2, 3 })), ({ 1, 2, 3 })) != -1);
-    }
-    ASSERT_EQ(42, element_of(({ 42 })));
-    ASSERT(catch(element_of(({ }))));
+  int i;
+  // Always returns a member of the array.
+  for (i = 0; i < 20; i++) {
+    ASSERT(member_array(element_of(({ 1, 2, 3 })), ({ 1, 2, 3 })) != -1);
+  }
+  ASSERT_EQ(42, element_of(({ 42 })));
+  ASSERT(catch(element_of(({}))));
 }

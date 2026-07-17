@@ -1,5 +1,5 @@
 void do_tests() {
-    // set_config(int slot, value): an out-of-range slot is an error;
-    // real writes are pinned indirectly by the driver config tests.
-    ASSERT(catch(set_config(99999, 0)));
+  // set_config(int slot, value): an out-of-range slot is an error;
+  // real writes are pinned indirectly by the driver config tests.
+  ASSERT(catch(set_config(99999, 0)));
 }

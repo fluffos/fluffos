@@ -1,11 +1,11 @@
-void rcb(int fd) { }
+void rcb(int fd) {}
 void do_tests() {
 #ifdef __PACKAGE_EXTERNAL__
-    // Slot 5 is not configured in etc/config.test: must fail cleanly
-    // (error or negative), never crash. (Slot 1 is curl; starting real
-    // processes is not something the autotest should do.)
-    mixed err = catch(external_start(5, ({ "x" }), "rcb", "rcb"));
-    ASSERT(err || 1);
+  // Slot 5 is not configured in etc/config.test: must fail cleanly
+  // (error or negative), never crash. (Slot 1 is curl; starting real
+  // processes is not something the autotest should do.)
+  mixed err = catch(external_start(5, ({ "x" }), "rcb", "rcb"));
+  ASSERT(err || 1);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

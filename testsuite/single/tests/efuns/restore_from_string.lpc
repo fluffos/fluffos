@@ -1,20 +1,20 @@
 int rv1;
 string rv2;
 void do_tests() {
-    rv1 = 0; rv2 = 0;
-    restore_from_string("rv1 42\nrv2 \"hello\"\n");
-    ASSERT_EQ(42, rv1);
-    ASSERT_EQ("hello", rv2);
+  rv1 = 0; rv2 = 0;
+  restore_from_string("rv1 42\nrv2 \"hello\"\n");
+  ASSERT_EQ(42, rv1);
+  ASSERT_EQ("hello", rv2);
 
-    // Default form zeroes variables the string does not mention...
-    rv1 = 5;
-    restore_from_string("rv2 \"only\"\n");
-    ASSERT_EQ(0, rv1);
-    ASSERT_EQ("only", rv2);
+  // Default form zeroes variables the string does not mention...
+  rv1 = 5;
+  restore_from_string("rv2 \"only\"\n");
+  ASSERT_EQ(0, rv1);
+  ASSERT_EQ("only", rv2);
 
-    // ...the flag form leaves them alone.
-    rv1 = 5;
-    restore_from_string("rv2 \"keep\"\n", 1);
-    ASSERT_EQ(5, rv1);
-    ASSERT_EQ("keep", rv2);
+  // ...the flag form leaves them alone.
+  rv1 = 5;
+  restore_from_string("rv2 \"keep\"\n", 1);
+  ASSERT_EQ(5, rv1);
+  ASSERT_EQ("keep", rv2);
 }

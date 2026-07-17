@@ -1,7 +1,7 @@
 void do_tests() {
-    // The runner sets a huge limit; exercise the query forms.
-    set_eval_limit(0x7fffffff);
-    ASSERT(intp(set_eval_limit(-1)));   // -1 queries the remaining budget
-    ASSERT(set_eval_limit(0) > 0);      // 0 queries the configured maximum
-    set_eval_limit(0x7fffffff);
+  // The runner sets a huge limit; exercise the query forms.
+  set_eval_limit(0x7fffffff);
+  ASSERT(intp(set_eval_limit(-1)));   // -1 queries the remaining budget
+  ASSERT(set_eval_limit(0) > 0);      // 0 queries the configured maximum
+  set_eval_limit(0x7fffffff);
 }

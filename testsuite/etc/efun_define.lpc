@@ -1,1 +1,1 @@
-mixed this_object(){}
+mixed this_object() {}

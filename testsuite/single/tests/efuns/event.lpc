@@ -1,10 +1,10 @@
 void do_tests() {
-    object ob = clone_object("/clone/event_probe");
-    // event() calls event_<name>(origin, args...) on the targets.
-    event(ob, "ping", 41);
-    ASSERT_EQ(42, ob->got());
-    ASSERT_EQ(this_object(), ob->from());
-    event(({ ob }), "ping", 99);
-    ASSERT_EQ(100, ob->got());
-    destruct(ob);
+  object ob = clone_object("/clone/event_probe");
+  // event() calls event_<name>(origin, args...) on the targets.
+  event(ob, "ping", 41);
+  ASSERT_EQ(42, ob->got());
+  ASSERT_EQ(this_object(), ob->from());
+  event(({ ob }), "ping", 99);
+  ASSERT_EQ(100, ob->got());
+  destruct(ob);
 }

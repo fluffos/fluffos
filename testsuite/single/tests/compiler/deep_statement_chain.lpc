@@ -9,25 +9,25 @@
 // optimize() must walk it without recursing one C stack frame per
 // statement.
 void do_tests() {
-    string src;
-    object ob;
-    int i;
+  string src;
+  object ob;
+  int i;
 
-    src = "int x;\nint f() {\n    x = 0;\n";
-    for (i = 0; i < 5000; i++) {
-        src += "    x = x + 1;\n";
-    }
-    src += "    return x;\n}\n";
+  src = "int x;\nint f() {\n    x = 0;\n";
+  for (i = 0; i < 5000; i++) {
+    src += "    x = x + 1;\n";
+  }
+  src += "    return x;\n}\n";
 
-    rm("/gen_deep_stmts.c");
-    write_file("/gen_deep_stmts.c", src);
+  rm("/gen_deep_stmts.c");
+  write_file("/gen_deep_stmts.c", src);
 
-    ob = load_object("/gen_deep_stmts");
-    ASSERT2(objectp(ob), "function with 5000 sequential statements should compile");
-    if (objectp(ob)) {
-        ASSERT_EQ(5000, ob->f());
-        destruct(ob);
-    }
+  ob = load_object("/gen_deep_stmts");
+  ASSERT2(objectp(ob), "function with 5000 sequential statements should compile");
+  if (objectp(ob)) {
+    ASSERT_EQ(5000, ob->f());
+    destruct(ob);
+  }
 
-    rm("/gen_deep_stmts.c");
+  rm("/gen_deep_stmts.c");
 }

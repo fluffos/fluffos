@@ -1,7 +1,7 @@
 void do_tests() {
 #if efun_defined(debugmalloc)
-    catch(debugmalloc("/dm_test.out", 0));
-    rm("/dm_test.out");
+  catch(debugmalloc("/dm_test.out", 0));
+  rm("/dm_test.out");
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

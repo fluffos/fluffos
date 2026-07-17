@@ -1,8 +1,8 @@
 class foo {
-    int x;
+  int x;
 }
 
 void foo() {
-    foo y;
-    y->z;
+  foo y;
+  y->z;
 }

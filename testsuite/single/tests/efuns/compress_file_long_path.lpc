@@ -6,15 +6,15 @@
 // otherwise valid) path overflows that buffer before any filesystem check
 // runs -- the target file does not need to exist.
 void do_tests() {
-    string long_name;
+  string long_name;
 
-    long_name = "/" + repeat_string("a", 1100);
+  long_name = "/" + repeat_string("a", 1100);
 
-    // Surviving these calls cleanly (returning 0, since the path is too
-    // long) is the regression signal -- an undersized buffer overflows the
-    // stack and ASan-aborts the whole process before any of that logic
-    // runs.
-    ASSERT_EQ(0, compress_file(long_name));
-    ASSERT_EQ(0, uncompress_file(long_name + ".gz"));
+  // Surviving these calls cleanly (returning 0, since the path is too
+  // long) is the regression signal -- an undersized buffer overflows the
+  // stack and ASan-aborts the whole process before any of that logic
+  // runs.
+  ASSERT_EQ(0, compress_file(long_name));
+  ASSERT_EQ(0, uncompress_file(long_name + ".gz"));
 }
 #endif

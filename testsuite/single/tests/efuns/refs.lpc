@@ -1,8 +1,8 @@
 void do_tests() {
 #if efun_defined(refs)
-    mixed *arr = ({ 1 });
-    ASSERT(intp(refs(arr)));
-    ASSERT(refs(arr) >= 1);
+  mixed *arr = ({ 1 });
+  ASSERT(intp(refs(arr)));
+  ASSERT(refs(arr) >= 1);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

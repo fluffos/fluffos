@@ -15,81 +15,81 @@
 #ifdef __PACKAGE_JSBRIDGE__
 
 private void on_fetch(object me, string result, int success, int id) {
-    if (!me) return;
-    if (!success) {
-        tell_object(me, sprintf("fetch #%d failed: %s\n", id, result));
-        return;
-    }
-    tell_object(me, sprintf("fetch #%d returned %d bytes:\n%s%s\n",
-                            id, strlen(result), result[0..400],
-                            strlen(result) > 400 ? "\n...(truncated)" : ""));
+  if (!me) return;
+  if (!success) {
+    tell_object(me, sprintf("fetch #%d failed: %s\n", id, result));
+    return;
+  }
+  tell_object(me, sprintf("fetch #%d returned %d bytes:\n%s%s\n",
+    id, strlen(result), result[0..400],
+    strlen(result) > 400 ? "\n...(truncated)" : ""));
 }
 
 private void on_canvas(object me, string result, int success, int id) {
-    if (!me) return;
-    tell_object(me, sprintf("canvas: %s\n",
-                            success ? "drawn (" + result + ")"
-                                    : "failed: " + result));
+  if (!me) return;
+  tell_object(me, sprintf("canvas: %s\n",
+    success ? "drawn (" + result + ")"
+    : "failed: " + result));
 }
 
 // The reverse direction: the page calls THIS through
 // fluffos.callLPC("add", "2", "3") after `jsdemo export`.
 private mixed lpc_add(string *args, int id) {
-    int total = 0;
-    foreach (string a in args) total += to_int(a);
-    return total;
+  int total = 0;
+  foreach (string a in args) total += to_int(a);
+  return total;
 }
 
 int main(string arg) {
-    string what, rest;
-    object me = this_player();
+  string what, rest;
+  object me = this_player();
 
-    if (!arg || sscanf(arg, "%s %s", what, rest) < 1) {
-        what = arg;
+  if (!arg || sscanf(arg, "%s %s", what, rest) < 1) {
+    what = arg;
+  }
+
+  switch (what) {
+    case "eval":
+      if (!rest) {
+        write("usage: jsdemo eval <js code>\n");
+        return 1;
+      }
+      printf("js_eval => %s\n", js_eval(rest));
+      return 1;
+
+    case "fetch":
+      if (!rest) {
+        write("usage: jsdemo fetch <url>\n");
+        return 1;
+      }
+      printf("fetch #%d started...\n",
+        js_call("fetch_text", ({ rest }), (: on_fetch, me :)));
+      return 1;
+
+    case "canvas": {
+      // Draw a little scene: LPC decides what to draw, JS renders it.
+      int i;
+      js_call("canvas_draw", ({ "clear" }));
+      for (i = 0; i < 12; i++) {
+        js_call("canvas_draw",
+          ({ "circle", "" + (20 + i * 22), "" + (40 + (i % 4) * 25),
+            "" + (6 + random(14)) }));
+      }
+      js_call("canvas_draw", ({ "text", "10", "115", "drawn from LPC!" }),
+        (: on_canvas, me :));
+      return 1;
     }
 
-    switch (what) {
-        case "eval":
-            if (!rest) {
-                write("usage: jsdemo eval <js code>\n");
-                return 1;
-            }
-            printf("js_eval => %s\n", js_eval(rest));
-            return 1;
+    case "export":
+      js_export("add", (: lpc_add :));
+      write("Registered LPC export \"add\". In the browser devtools:\n"
+        "  await fluffos.callLPC(\"add\", \"2\", \"3\")   // -> \"5\"\n");
+      return 1;
+  }
 
-        case "fetch":
-            if (!rest) {
-                write("usage: jsdemo fetch <url>\n");
-                return 1;
-            }
-            printf("fetch #%d started...\n",
-                   js_call("fetch_text", ({ rest }), (: on_fetch, me :)));
-            return 1;
-
-        case "canvas": {
-            // Draw a little scene: LPC decides what to draw, JS renders it.
-            int i;
-            js_call("canvas_draw", ({ "clear" }));
-            for (i = 0; i < 12; i++) {
-                js_call("canvas_draw",
-                        ({ "circle", "" + (20 + i * 22), "" + (40 + (i % 4) * 25),
-                           "" + (6 + random(14)) }));
-            }
-            js_call("canvas_draw", ({ "text", "10", "115", "drawn from LPC!" }),
-                    (: on_canvas, me :));
-            return 1;
-        }
-
-        case "export":
-            js_export("add", (: lpc_add :));
-            write("Registered LPC export \"add\". In the browser devtools:\n"
-                  "  await fluffos.callLPC(\"add\", \"2\", \"3\")   // -> \"5\"\n");
-            return 1;
-    }
-
-    write("usage: jsdemo eval <code> | jsdemo fetch <url> | jsdemo canvas"
-          " | jsdemo export\n");
-    return 1;
+  write("usage: jsdemo eval <code> | jsdemo fetch <url> | jsdemo canvas"
+    " | jsdemo export\n");
+  return 1;
 }
 
 #endif

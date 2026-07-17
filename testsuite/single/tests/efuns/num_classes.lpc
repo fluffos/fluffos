@@ -3,5 +3,5 @@ class B { int y; }
 mixed keep_a() { return new(class A); }
 mixed keep_b() { return new(class B); }
 void do_tests() {
-    ASSERT_EQ(2, num_classes(this_object()));
+  ASSERT_EQ(2, num_classes(this_object()));
 }

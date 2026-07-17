@@ -1,4 +1,3 @@
 void foo() {
-    for (int x += 1; ; ) ;
+  for (int x += 1; ; );
 }
-    

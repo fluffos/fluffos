@@ -211,7 +211,7 @@ varargs string p_chart(mixed series, mapping opts) {
     cv->c_plot(s[1], lo, hi, stringp(s[2]) ? s[2] : "");
     if (stringp(s[0]) && s[0] != "") {
       legend += ({ (stringp(s[2]) && s[2] != "" ? ansi_sgr(s[2]) + "●" + ansi_reset() : "●") +
-                   " " + s[0] });
+        " " + s[0] });
     }
   }
   rows = cv->c_rows();
@@ -244,8 +244,22 @@ varargs string p_heatmap(mixed *grid, mapping opts) {
 
   if (!arrayp(grid) || !sizeof(grid)) return "";
   if (!mapp(opts)) opts = ([]);
-  ramp = arrayp(opts["ramp"]) ? opts["ramp"]
-                              : ({ 17, 18, 19, 20, 26, 32, 38, 44, 50, 220, 214, 208, 202, 196 });
+  ramp = arrayp(opts["ramp"]) ? opts["ramp"] : ({
+    17,
+    18,
+    19,
+    20,
+    26,
+    32,
+    38,
+    44,
+    50,
+    220,
+    214,
+    208,
+    202,
+    196
+  });
   cellw = opts["cellw"] > 0 ? opts["cellw"] : 2;
   ylab = arrayp(opts["ylabels"]) ? opts["ylabels"] : 0;
 
@@ -307,8 +321,7 @@ varargs string p_progress(int pct, int width, mapping opts) {
   if (pct < 0) pct = 0;
   if (pct > 100) pct = 100;
   filled = width * pct / 100;
-  return repeat_string("█", filled) + repeat_string("░", width - filled) +
-         sprintf(" %3d%%", pct);
+  return repeat_string("█", filled) + repeat_string("░", width - filled) + sprintf(" %3d%%", pct);
 }
 
 // A titled box around body text.
@@ -330,10 +343,15 @@ varargs string p_panel(string title, string body, mapping opts) {
   if (visible_width(title) + 2 > inner) inner = visible_width(title) + 2;
   if (opts["width"] > inner) inner = opts["width"];
 
-  out = chars[0] + chars[9] + title +
-        repeat_string(chars[9], inner - visible_width(title) + 1) + chars[1] + "\n";
+  out = chars[0] + chars[9] + title + repeat_string(
+    chars[9],
+    inner - visible_width(title) + 1
+  ) + chars[1] + "\n";
   foreach (string l in lines) {
-    out += chars[10] + " " + l + repeat_string(" ", inner - visible_width(l)) + " " + chars[10] + "\n";
+    out += chars[10] + " " + l + repeat_string(
+      " ",
+      inner - visible_width(l)
+    ) + " " + chars[10] + "\n";
   }
   out += chars[2] + repeat_string(chars[9], inner + 2) + chars[3] + "\n";
   return out;
@@ -362,8 +380,10 @@ varargs string p_header(string text, int width, string attr) {
   if (width < visible_width(text) + 2) width = visible_width(text) + 2;
   if (!stringp(attr)) attr = "1;7";
   pad = (width - visible_width(text)) / 2;
-  return ansi_sgr(attr) + repeat_string(" ", pad) + text +
-         repeat_string(" ", width - pad - visible_width(text)) + ansi_reset() + "\n";
+  return ansi_sgr(attr) + repeat_string(
+    " ",
+    pad
+  ) + text + repeat_string(" ", width - pad - visible_width(text)) + ansi_reset() + "\n";
 }
 
 // pterm-style prefix printers.
@@ -381,7 +401,7 @@ string p_error(string text) { return prefixed("FAIL", "97;41", text); }
 varargs string p_bigtext(string text, string fcolor) {
   string big;
 
-  if (catch (big = (string)"/std/bitmap_font"->bitmap_font(text, 12, "█", " ", fcolor, ""))) {
+  if (catch(big = (string)"/std/bitmap_font"->bitmap_font(text, 12, "█", " ", fcolor, ""))) {
     return text + "\n";
   }
   return stringp(big) ? big : text + "\n";

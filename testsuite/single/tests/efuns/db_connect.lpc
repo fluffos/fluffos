@@ -1,9 +1,9 @@
 void do_tests() {
 #ifdef __PACKAGE_DB__
-    // Guaranteed-unreachable target: failure must be a clean error or a
-    // non-positive handle, never a crash.
-    mixed err = catch(db_connect("256.256.256.256", "no_such_db"));
-    ASSERT(err || 1);
+  // Guaranteed-unreachable target: failure must be a clean error or a
+  // non-positive handle, never a crash.
+  mixed err = catch(db_connect("256.256.256.256", "no_such_db"));
+  ASSERT(err || 1);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

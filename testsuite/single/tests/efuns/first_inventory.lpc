@@ -1,11 +1,11 @@
 void do_tests() {
-    object box = clone_object("/clone/catch_tell_probe");
-    object a = clone_object("/clone/catch_tell_probe");
-    object b = clone_object("/clone/catch_tell_probe");
-    ASSERT_EQ(0, first_inventory(box));
-    a->enter(box);
-    b->enter(box);
-    // Most recent move is first.
-    ASSERT_EQ(b, first_inventory(box));
-    destruct(a); destruct(b); destruct(box);
+  object box = clone_object("/clone/catch_tell_probe");
+  object a = clone_object("/clone/catch_tell_probe");
+  object b = clone_object("/clone/catch_tell_probe");
+  ASSERT_EQ(0, first_inventory(box));
+  a->enter(box);
+  b->enter(box);
+  // Most recent move is first.
+  ASSERT_EQ(b, first_inventory(box));
+  destruct(a); destruct(b); destruct(box);
 }

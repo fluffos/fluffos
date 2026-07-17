@@ -50,7 +50,7 @@ int handle_key(mixed ev) {
 
   // leave focus / app navigation to the container
   if (ev == TUI_KEY_TAB || ev == (TUI_MOD_SHIFT | TUI_KEY_TAB) || ev == TUI_KEY_ESC ||
-      ev == TUI_KEY_UP || ev == TUI_KEY_DOWN) {
+    ev == TUI_KEY_UP || ev == TUI_KEY_DOWN) {
     return 0;
   }
   if (!stringp(ev) && !intp(ev)) return 0;

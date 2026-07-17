@@ -14,7 +14,7 @@ private void run_checks() {
 
   // P1: empty array for inherit_program -> clean compile error (empty
   // program has no code), never a crash.
-  hook->set_inherit_rule("/clone/adv_empty_parent", ({ }));
+  hook->set_inherit_rule("/clone/adv_empty_parent", ({}));
   err = catch(load_object("/clone/adv_child_empty"));
   ASSERT2(stringp(err), "empty-array inherit must fail cleanly, got: " + sprintf("%O", err));
 
@@ -44,7 +44,7 @@ private void run_checks() {
 
   // P6: include content with embedded newlines in ONE element.
   hook->set_include_rule("adv_multiline.h",
-                         ({ "#define A 1\n#define B 2", "#define C (A+B)" }));
+    ({ "#define A 1\n#define B 2", "#define C (A+B)" }));
   ASSERT_EQ(3, load_object("/clone/adv_inc_multiline")->fn());
 
   // P7: apply throwing a runtime error mid-compile -> safe_apply

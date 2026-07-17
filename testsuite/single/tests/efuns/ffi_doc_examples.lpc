@@ -8,9 +8,9 @@
 // A NUL-terminated C string from an LPC string, via buffer promotion:
 // the string contributes its raw UTF-8 bytes, then a NUL is appended.
 private buffer cstr(string s) {
-    buffer b = s;        // promotes: raw UTF-8 bytes
-    b += ({ 0 });        // NUL terminator
-    return b;
+  buffer b = s;        // promotes: raw UTF-8 bytes
+  b += ({ 0 });        // NUL terminator
+  return b;
 }
 
 private int near(float a, float b) { return (a > b ? a - b : b - a) < 1e-9; }
@@ -18,106 +18,105 @@ private int near(float a, float b) { return (a > b ? a - b : b - a) < 1e-9; }
 // qsort comparator implemented in LPC, invoked from C via a libffi
 // closure: a/b are const void* (here int*) addresses.
 private int cmp_ints(int a_addr, int b_addr) {
-    return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT) -
-           ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT);
+  return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT) - ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT);
 }
 #endif
 
 void do_tests() {
 #ifdef __PACKAGE_FFI__
-    int lib, f, addr, sum;
-    buffer buf;
-    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
-    lib = ffi_load("");
+  int lib, f, addr, sum;
+  buffer buf;
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  lib = ffi_load("");
 
-    // --- scalars: double sqrt(double), int abs(int) -------------------
-    f = ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE }));
-    ASSERT(near(3.0, ffi_call(f, ({ 9.0 }))));
-    f = ffi_prepare(lib, "abs", FFI_INT, ({ FFI_INT }));
-    ASSERT_EQ(42, ffi_call(f, ({ -42 })));
+  // --- scalars: double sqrt(double), int abs(int) -------------------
+  f = ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE }));
+  ASSERT(near(3.0, ffi_call(f, ({ 9.0 }))));
+  f = ffi_prepare(lib, "abs", FFI_INT, ({ FFI_INT }));
+  ASSERT_EQ(42, ffi_call(f, ({ -42 })));
 
-    // --- strings in: size_t strlen(const char *) ----------------------
-    f = ffi_prepare(lib, "strlen", FFI_UINT64, ({ FFI_POINTER }));
-    ASSERT_EQ(5, ffi_call(f, ({ cstr("hello") })));
-    ASSERT_EQ(5, ffi_call(f, ({ cstr("café") })));  // é is 2 UTF-8 bytes
+  // --- strings in: size_t strlen(const char *) ----------------------
+  f = ffi_prepare(lib, "strlen", FFI_UINT64, ({ FFI_POINTER }));
+  ASSERT_EQ(5, ffi_call(f, ({ cstr("hello") })));
+  ASSERT_EQ(5, ffi_call(f, ({ cstr("café") })));  // é is 2 UTF-8 bytes
 
-    // A string does NOT promote inside the args array -- the byte
-    // boundary stays explicit at the call site.
-    ASSERT(catch(ffi_call(f, ({ "hello" }))));
+  // A string does NOT promote inside the args array -- the byte
+  // boundary stays explicit at the call site.
+  ASSERT(catch(ffi_call(f, ({ "hello" }))));
 
-    // Range assignment fills a zeroed native block with raw UTF-8
-    // bytes; the byte past the text is still 0 from ffi_alloc.
-    buf = ffi_alloc(6);
-    buf[0..4] = "hello";
-    ASSERT_EQ(5, ffi_call(f, ({ buf })));
+  // Range assignment fills a zeroed native block with raw UTF-8
+  // bytes; the byte past the text is still 0 from ffi_alloc.
+  buf = ffi_alloc(6);
+  buf[0..4] = "hello";
+  ASSERT_EQ(5, ffi_call(f, ({ buf })));
 
-    // --- strings out: char *getenv(const char *) ----------------------
-    f = ffi_prepare(lib, "getenv", FFI_POINTER, ({ FFI_POINTER }));
-    addr = ffi_call(f, ({ cstr("PATH") }));
-    if (addr) {
-        string path = string_decode(ffi_peek(addr, -1), "utf-8");
-        ASSERT(sizeof(path) > 0);
-    }
-    // An unset variable returns NULL (0); never ffi_peek a 0 address.
-    ASSERT_EQ(0, ffi_call(f, ({ cstr("FLUFFOS_NO_SUCH_VAR_42") })));
+  // --- strings out: char *getenv(const char *) ----------------------
+  f = ffi_prepare(lib, "getenv", FFI_POINTER, ({ FFI_POINTER }));
+  addr = ffi_call(f, ({ cstr("PATH") }));
+  if (addr) {
+    string path = string_decode(ffi_peek(addr, -1), "utf-8");
+    ASSERT(sizeof(path) > 0);
+  }
+  // An unset variable returns NULL (0); never ffi_peek a 0 address.
+  ASSERT_EQ(0, ffi_call(f, ({ cstr("FLUFFOS_NO_SUCH_VAR_42") })));
 
-    // --- out-parameter: double frexp(double, int *exp) ----------------
-    f = ffi_prepare(lib, "frexp", FFI_DOUBLE, ({ FFI_DOUBLE, FFI_POINTER }));
-    buf = ffi_alloc(ffi_sizeof(FFI_INT));
-    ASSERT(near(0.5, ffi_call(f, ({ 8.0, buf }))));
-    ASSERT_EQ(4, ffi_read(buf, 0, FFI_INT));        // 8.0 == 0.5 * 2^4
+  // --- out-parameter: double frexp(double, int *exp) ----------------
+  f = ffi_prepare(lib, "frexp", FFI_DOUBLE, ({ FFI_DOUBLE, FFI_POINTER }));
+  buf = ffi_alloc(ffi_sizeof(FFI_INT));
+  ASSERT(near(0.5, ffi_call(f, ({ 8.0, buf }))));
+  ASSERT_EQ(4, ffi_read(buf, 0, FFI_INT));        // 8.0 == 0.5 * 2^4
 
-    // --- struct via pointer: struct tm *localtime(const time_t *) -----
-    {
-        mixed *lay;
-        buffer tbuf, tm;
-        int t, lt, year;
+  // --- struct via pointer: struct tm *localtime(const time_t *) -----
+  {
+    mixed *lay;
+    buffer tbuf, tm;
+    int t, lt, year;
 
-        f = ffi_prepare(lib, "time", FFI_INT64, ({ FFI_POINTER }));
-        t = ffi_call(f, ({ 0 }));                    // 0 -> NULL pointer
-        ASSERT(t > 0);
-        tbuf = ffi_alloc(ffi_sizeof(FFI_LONG));      // time_t
-        ffi_write(tbuf, 0, FFI_INT64, t);
-        lt = ffi_prepare(lib, "localtime", FFI_POINTER, ({ FFI_POINTER }));
-        addr = ffi_call(lt, ({ tbuf }));
-        ASSERT(addr != 0);
-        // struct tm leads with 9 ints: sec min hour mday mon year ...
-        lay = ffi_struct_layout(({ FFI_INT, FFI_INT, FFI_INT, FFI_INT,
-                                   FFI_INT, FFI_INT, FFI_INT, FFI_INT,
-                                   FFI_INT }));
-        tm = ffi_peek(addr, lay[0]);
-        year = 1900 + ffi_read(tm, lay[1][5], FFI_INT);
-        ASSERT(year >= 2026);
-    }
+    f = ffi_prepare(lib, "time", FFI_INT64, ({ FFI_POINTER }));
+    t = ffi_call(f, ({ 0 }));                    // 0 -> NULL pointer
+    ASSERT(t > 0);
+    tbuf = ffi_alloc(ffi_sizeof(FFI_LONG));      // time_t
+    ffi_write(tbuf, 0, FFI_INT64, t);
+    lt = ffi_prepare(lib, "localtime", FFI_POINTER, ({ FFI_POINTER }));
+    addr = ffi_call(lt, ({ tbuf }));
+    ASSERT(addr != 0);
+    // struct tm leads with 9 ints: sec min hour mday mon year ...
+    lay = ffi_struct_layout(({ FFI_INT, FFI_INT, FFI_INT, FFI_INT,
+      FFI_INT, FFI_INT, FFI_INT, FFI_INT,
+      FFI_INT }));
+    tm = ffi_peek(addr, lay[0]);
+    year = 1900 + ffi_read(tm, lay[1][5], FFI_INT);
+    ASSERT(year >= 2026);
+  }
 
-    // --- callback: qsort with an LPC comparator ------------------------
-    {
-        int qs, cb, i;
-        int *vals = ({ 30, 10, 40, 20, 50 });
+  // --- callback: qsort with an LPC comparator ------------------------
+  {
+    int qs, cb, i;
+    int *vals = ({ 30, 10, 40, 20, 50 });
 
-        qs = ffi_prepare(lib, "qsort", FFI_VOID,
-                         ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
-        buf = ffi_alloc(sizeof(vals) * ffi_sizeof(FFI_INT));
-        for (i = 0; i < sizeof(vals); i++)
-            ffi_write(buf, i * 4, FFI_INT, vals[i]);
-        cb = ffi_callback((: cmp_ints :), FFI_INT, ({ FFI_POINTER, FFI_POINTER }));
-        ffi_call(qs, ({ buf, sizeof(vals), ffi_sizeof(FFI_INT),
-                        ffi_callback_addr(cb) }));
-        for (i = 0; i < sizeof(vals); i++)
-            ASSERT_EQ(({ 10, 20, 30, 40, 50 })[i], ffi_read(buf, i * 4, FFI_INT));
-        ffi_callback_free(cb);
-    }
+    qs = ffi_prepare(lib, "qsort", FFI_VOID,
+      ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
+    buf = ffi_alloc(sizeof(vals) * ffi_sizeof(FFI_INT));
+    for (i = 0; i < sizeof(vals); i++)
+      ffi_write(buf, i * 4, FFI_INT, vals[i]);
+    cb = ffi_callback((: cmp_ints :), FFI_INT, ({ FFI_POINTER, FFI_POINTER }));
+    ffi_call(qs, ({ buf, sizeof(vals), ffi_sizeof(FFI_INT),
+      ffi_callback_addr(cb) }));
+    for (i = 0; i < sizeof(vals); i++)
+      ASSERT_EQ(({ 10, 20, 30, 40, 50 })[i], ffi_read(buf, i * 4, FFI_INT));
+    ffi_callback_free(cb);
+  }
 
-    // --- foreach over foreign bytes ------------------------------------
-    f = ffi_prepare(lib, "getenv", FFI_POINTER, ({ FFI_POINTER }));
-    addr = ffi_call(f, ({ cstr("PATH") }));
-    if (addr) {
-        sum = 0;
-        foreach (int byte in ffi_peek(addr, -1)) sum += byte;
-        ASSERT(sum > 0);
-    }
+  // --- foreach over foreign bytes ------------------------------------
+  f = ffi_prepare(lib, "getenv", FFI_POINTER, ({ FFI_POINTER }));
+  addr = ffi_call(f, ({ cstr("PATH") }));
+  if (addr) {
+    sum = 0;
+    foreach (int byte in ffi_peek(addr, -1)) sum += byte;
+    ASSERT(sum > 0);
+  }
 
-    ffi_unload(lib);
+  ffi_unload(lib);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

@@ -17,9 +17,11 @@ what the driver actually accepts.
   `lib/lint.mjs`, a generated copy of the grammar-driven linter).
 * **Format Document / format-on-save** — brace-depth reindentation,
   operator spacing, directives at column 0, comments/strings/text
-  blocks left verbatim (from `lib/format.mjs`, a generated copy of the
-  grammar-driven formatter). A formatting error never blocks a save;
-  the document is just left unchanged.
+  blocks left verbatim, and bracket/comma-aware line wrapping past
+  `lpc.format.printWidth` (from `lib/format.mjs`, a generated copy of the
+  grammar-driven formatter at `tools/lpc-syntax/format.mjs` — the same
+  engine `testsuite/format.sh` runs, see its README). A formatting error never
+  blocks a save; the document is just left unchanged.
 * **Real compiler errors on save** (optional) — set the two `lpcc`
   settings and the file is compiled with the actual FluffOS front-end;
   its clang-style errors and warnings appear inline, including in
@@ -31,6 +33,8 @@ what the driver actually accepts.
 |---|---|
 | `lpc.lint.enabled` | Toggle the built-in structural lint (default on). |
 | `lpc.format.enabled` | Toggle the built-in formatter for Format Document / format-on-save (default on). |
+| `lpc.format.printWidth` | Preferred maximum line length before wrapping call/declaration argument lists and array/mapping literals one element per line (default 100, matching `ColumnLimit` in `src/.clang-format`). |
+| `lpc.format.indentSize` | Number of spaces per indent level (default 2). |
 | `lpc.lpcc.path` | Path to the `lpcc` binary (build target `lpcc`). |
 | `lpc.lpcc.configFile` | Driver config file passed to `lpcc`. |
 | `lpc.mudlibRoot` | Mudlib root; files are compiled by their path relative to it (default: the workspace folder). |

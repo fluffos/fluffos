@@ -1,3 +1,3 @@
 void foo() {
-    new(class foo);
+  new(class foo);
 }

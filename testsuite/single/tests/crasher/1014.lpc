@@ -1,7 +1,7 @@
 // Issue #1014: an LPC error thrown from a parser package apply
 // (can_*/direct_*/do_*) during parse_sentence() must not corrupt the
 // VM value stack or crash the driver.
-string* parse_command_id_list() {
+string *parse_command_id_list() {
   return ({ "bag" });
 }
 

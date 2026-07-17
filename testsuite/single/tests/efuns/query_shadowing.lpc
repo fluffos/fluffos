@@ -1,10 +1,10 @@
 void do_tests() {
-    object victim = clone_object("/clone/catch_tell_probe");
-    object sh = clone_object("/clone/shadow_probe");
-    ASSERT_EQ(0, query_shadowing(sh));
-    ASSERT(sh->start(victim));
-    ASSERT_EQ(victim, query_shadowing(sh));
-    ASSERT_EQ("hi", victim->last_message() || "hi");   // chain still callable
-    destruct(sh);
-    destruct(victim);
+  object victim = clone_object("/clone/catch_tell_probe");
+  object sh = clone_object("/clone/shadow_probe");
+  ASSERT_EQ(0, query_shadowing(sh));
+  ASSERT(sh->start(victim));
+  ASSERT_EQ(victim, query_shadowing(sh));
+  ASSERT_EQ("hi", victim->last_message() || "hi");   // chain still callable
+  destruct(sh);
+  destruct(victim);
 }

@@ -1,4 +1,4 @@
 void foo() {
-    int x;
-    (: x :);
+  int x;
+  (: x :);
 }

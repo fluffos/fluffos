@@ -3,16 +3,16 @@
 // End-to-end pin for the tools/ffi generator: the emitted binding object
 // (/clone/ffi_genmath, generated from a C header) compiles and its
 // wrappers call real native functions.
-private int near(float a, float b) { return (a>b?a-b:b-a) < 1e-9; }
+private int near(float a, float b) { return (a > b ? a - b : b - a) < 1e-9; }
 #endif
 void do_tests() {
 #ifdef __PACKAGE_FFI__
-    object m;
-    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
-    m = load_object("/clone/ffi_genmath");
-    ASSERT(near(3.0, m->sqrt(9.0)));
-    ASSERT(near(8.0, m->pow(2.0, 3.0)));
-    ASSERT_EQ(5, m->abs(-5));
+  object m;
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  m = load_object("/clone/ffi_genmath");
+  ASSERT(near(3.0, m->sqrt(9.0)));
+  ASSERT(near(8.0, m->pow(2.0, 3.0)));
+  ASSERT_EQ(5, m->abs(-5));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

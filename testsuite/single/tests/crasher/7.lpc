@@ -1,6 +1,5 @@
 void do_tests() {
-  save_object(  -40,
-      -32
-      );
+  save_object(-40,
+    -32
+  );
 }
-

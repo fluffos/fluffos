@@ -9,6 +9,6 @@
 #include "/include/trailing_comment_pin.h" // quoted form with line-comment tail
 
 void do_tests() {
-    ASSERT_EQ(42, TRAILING_PIN_VALUE);
-    ASSERT_EQ("pinned", TRAILING_PIN_NAME);
+  ASSERT_EQ(42, TRAILING_PIN_VALUE);
+  ASSERT_EQ("pinned", TRAILING_PIN_NAME);
 }

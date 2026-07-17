@@ -1,6 +1,6 @@
 void do_tests() {
 #ifdef __PACKAGE_MUDLIB_STATS__
-    ASSERT(mapp(domain_stats()));
+  ASSERT(mapp(domain_stats()));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

@@ -162,7 +162,9 @@ function activate(ctx) {
         if (!cfg.get('format.enabled', true)) return [];
         try {
           const formatLPC = await loadFormat(ctx);
-          const formatted = formatLPC(doc.getText());
+          const printWidth = cfg.get('format.printWidth', 100);
+          const indentSize = cfg.get('format.indentSize', 2);
+          const formatted = formatLPC(doc.getText(), { printWidth, indentSize });
           if (!formatted || formatted === doc.getText()) return [];
           const fullRange = new vscode.Range(
             doc.positionAt(0), doc.positionAt(doc.getText().length));

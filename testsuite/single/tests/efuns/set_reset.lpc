@@ -1,9 +1,9 @@
 void do_tests() {
-    object ob = clone_object("/clone/catch_tell_probe");
-    // Schedules the next reset() that many seconds out; a queried
-    // second arg of -1 returns the pending delay. Contract here:
-    // accepts the call and does not error.
-    ASSERT_EQ(0, catch(set_reset(ob)));
-    ASSERT_EQ(0, catch(set_reset(ob, 3600)));
-    destruct(ob);
+  object ob = clone_object("/clone/catch_tell_probe");
+  // Schedules the next reset() that many seconds out; a queried
+  // second arg of -1 returns the pending delay. Contract here:
+  // accepts the call and does not error.
+  ASSERT_EQ(0, catch(set_reset(ob)));
+  ASSERT_EQ(0, catch(set_reset(ob, 3600)));
+  destruct(ob);
 }

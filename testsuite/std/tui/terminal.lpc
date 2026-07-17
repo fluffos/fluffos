@@ -282,7 +282,7 @@ varargs void tui_open(object app, mapping opts) {
   cur_app = app;
   tui_mode = MODE_APP;
   tui_send(ansi_alt_screen(1) + ansi_cursor_visible(0) + ansi_bracketed_paste(1) +
-           (opts["mouse"] ? ansi_mouse(1) : ""));
+    (opts["mouse"] ? ansi_mouse(1) : ""));
   app->on_open(this_object(), term_w, term_h);
   tui_send(app->render());
   arm();
@@ -293,7 +293,7 @@ void tui_close() {
 
   if (tui_mode == MODE_APP) {
     tui_send(ansi_mouse(0) + ansi_bracketed_paste(0) + ansi_cursor_visible(1) +
-             ansi_sgr("0") + ansi_alt_screen(0));
+      ansi_sgr("0") + ansi_alt_screen(0));
   } else if (tui_mode == MODE_RL) {
     tui_send(ansi_bracketed_paste(0) + "\r\n");
   }

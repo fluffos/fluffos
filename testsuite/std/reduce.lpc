@@ -34,36 +34,28 @@
 //
 //Inspired by Javascript's Array.reduce()
 
-varargs mixed reduce( mixed *elements, mixed fun, mixed initial, mixed args... )
-{
-    mixed result ;
-    int num_elements, element ;
+varargs mixed reduce(mixed *elements, mixed fun, mixed initial, mixed args...) {
+  mixed result;
+  int num_elements, element;
 
-    if(nullp(elements)) error("Missing argument 1 to reduce.\n") ;
-    if(nullp(fun)) error("Missing argument 2 to reduce.\n") ;
+  if (nullp(elements)) error("Missing argument 1 to reduce.\n");
+  if (nullp(fun)) error("Missing argument 2 to reduce.\n");
 
-    result = initial ;
+  result = initial;
 
-    if( functionp( fun ) )
-    {
-        for( element = 0, num_elements = sizeof( elements ); element < num_elements; element++ )
-        {
-            result = evaluate( fun, result, elements[ element ], element, elements, args... ) ;
-        }
+  if (functionp(fun)) {
+    for (element = 0, num_elements = sizeof(elements); element < num_elements; element++) {
+      result = evaluate(fun, result, elements[element], element, elements, args...);
     }
-    else if( stringp( fun ) )
-    {
-        object ob = previous_object() ;
+  } else if (stringp(fun)) {
+    object ob = previous_object();
 
-        for( element = 0, num_elements = sizeof( elements ); element < num_elements; element++ )
-        {
-            result = call_other ( ob, fun, result, elements[ element ], element, elements, args... ) ;
-        }
+    for (element = 0, num_elements = sizeof(elements); element < num_elements; element++) {
+      result = call_other(ob, fun, result, elements[element], element, elements, args...);
     }
-    else
-    {
-        error("Bad argument 2 to reduce.\n") ;
-    }
+  } else {
+    error("Bad argument 2 to reduce.\n");
+  }
 
-    return result ;
+  return result;
 }

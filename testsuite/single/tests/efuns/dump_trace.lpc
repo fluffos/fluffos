@@ -1,10 +1,10 @@
 private mixed deeper() { return dump_trace(); }
 void do_tests() {
-    mixed *t = deeper();
-    ASSERT(arrayp(t));
-    ASSERT(sizeof(t) >= 2);
-    // Innermost frames name this program and both functions.
-    ASSERT_EQ("/single/tests/efuns/dump_trace.lpc", t[<1]["program"]);
-    ASSERT_EQ("deeper", t[<1]["function"]);
-    ASSERT_EQ("do_tests", t[<2]["function"]);
+  mixed *t = deeper();
+  ASSERT(arrayp(t));
+  ASSERT(sizeof(t) >= 2);
+  // Innermost frames name this program and both functions.
+  ASSERT_EQ("/single/tests/efuns/dump_trace.lpc", t[<1]["program"]);
+  ASSERT_EQ("deeper", t[<1]["function"]);
+  ASSERT_EQ("do_tests", t[<2]["function"]);
 }

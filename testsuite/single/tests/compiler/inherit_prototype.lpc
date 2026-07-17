@@ -5,6 +5,6 @@
 inherit "/single/tests/compiler/helper/proto_mid";
 
 void do_tests() {
-    ASSERT_EQ(42, proto_mid::proto_fn());
-    ASSERT_EQ(42, ::proto_fn());
+  ASSERT_EQ(42, proto_mid::proto_fn());
+  ASSERT_EQ(42, ::proto_fn());
 }

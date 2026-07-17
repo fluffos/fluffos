@@ -1,7 +1,7 @@
 void do_tests() {
   string tmp;
 
-  if(!this_player()) {
+  if (!this_player()) {
     write("No this_player(), will not be effective.\n");
 
     // no effect
@@ -13,7 +13,7 @@ void do_tests() {
     // reset also has no effect
     ASSERT_EQ("utf-8", set_encoding());
     ASSERT_EQ("utf-8", query_encoding());
-    return ;
+    return;
   }
 
   // default

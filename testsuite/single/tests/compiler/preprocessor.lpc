@@ -86,58 +86,58 @@ this is not code and must never be compiled
 #undef UNDEF_ME // gone
 
 void do_tests() {
-    // ## token paste builds an identifier.
-    int GLUE(fo, o) = 42;
-    ASSERT_EQ(42, foo);
+  // ## token paste builds an identifier.
+  int GLUE(fo, o) = 42;
+  ASSERT_EQ(42, foo);
 
-    // # stringizes the raw argument spelling.
-    ASSERT_EQ("hello", STR(hello));
-    ASSERT_EQ("1+2", STR(1+2));
+  // # stringizes the raw argument spelling.
+  ASSERT_EQ("hello", STR(hello));
+  ASSERT_EQ("1+2", STR(1+2));
 
-    // Function-like expansion; parenthesized body.
-    ASSERT_EQ(8, TWICE(4));
+  // Function-like expansion; parenthesized body.
+  ASSERT_EQ(8, TWICE(4));
 
-    // Commas nested in parentheses do not split arguments.
-    ASSERT_EQ(({ ({ 1, 2 }), 3 }), PAIR(({ 1, 2 }), 3));
+  // Commas nested in parentheses do not split arguments.
+  ASSERT_EQ(({ ({ 1, 2 }), 3 }), PAIR(({ 1, 2 }), 3));
 
-    // Multi-line (backslash-continued) macro.
-    ASSERT_EQ(21, ML(7));
+  // Multi-line (backslash-continued) macro.
+  ASSERT_EQ(21, ML(7));
 
-    // Self-referencing macro stops expanding at the self-reference, so
-    // SELF is usable as an ordinary identifier.
-    int SELF = 7;
-    ASSERT_EQ(7, SELF);
+  // Self-referencing macro stops expanding at the self-reference, so
+  // SELF is usable as an ordinary identifier.
+  int SELF = 7;
+  ASSERT_EQ(7, SELF);
 
-    // Redefinition took effect (and did not fail the compile).
-    ASSERT_EQ(2, REDEF);
+  // Redefinition took effect (and did not fail the compile).
+  ASSERT_EQ(2, REDEF);
 
-    // Conditionals evaluated as expected.
-    ASSERT_EQ(1, COND_OK);
-    ASSERT_EQ(1, NOTDEF_OK);
-    ASSERT_EQ(1, PRECEDENCE_OK);
+  // Conditionals evaluated as expected.
+  ASSERT_EQ(1, COND_OK);
+  ASSERT_EQ(1, NOTDEF_OK);
+  ASSERT_EQ(1, PRECEDENCE_OK);
 
-    // #1236 -- directive-line comments spanning physical lines.
-    ASSERT_EQ(1, WARNING_LEVEL);
-    ASSERT_EQ(15, CMT_TAIL);
-    ASSERT_EQ(1, CMT_IF_OK);
-    ASSERT_EQ("a/*b", CMT_STR);
+  // #1236 -- directive-line comments spanning physical lines.
+  ASSERT_EQ(1, WARNING_LEVEL);
+  ASSERT_EQ(15, CMT_TAIL);
+  ASSERT_EQ(1, CMT_IF_OK);
+  ASSERT_EQ("a/*b", CMT_STR);
 
-    // #1240 -- trailing comments on directives are whitespace.
-    mapping economies = ([ "e" : ([ "credits" : 100 ]) ]);
-    ASSERT_EQ(42, MIN2(42, economies["e"][CREDITS_KEY]));
-    ASSERT_EQ(2, DOUBLE_NEG);
-    ASSERT_EQ(1, IFDEF_CMT_OK);
-    int UNDEF_ME = 9;
-    ASSERT_EQ(9, UNDEF_ME);
+  // #1240 -- trailing comments on directives are whitespace.
+  mapping economies = ([ "e": ([ "credits": 100 ]) ]);
+  ASSERT_EQ(42, MIN2(42, economies["e"][CREDITS_KEY]));
+  ASSERT_EQ(2, DOUBLE_NEG);
+  ASSERT_EQ(1, IFDEF_CMT_OK);
+  int UNDEF_ME = 9;
+  ASSERT_EQ(9, UNDEF_ME);
 
-    // Builtin macros: __FILE__ / __DIR__ / __LINE__.
-    ASSERT_EQ("/single/tests/compiler/preprocessor.lpc", __FILE__);
-    ASSERT_EQ("/single/tests/compiler/", __DIR__);
-    ASSERT(__LINE__ > 60);
+  // Builtin macros: __FILE__ / __DIR__ / __LINE__.
+  ASSERT_EQ("/single/tests/compiler/preprocessor.lpc", __FILE__);
+  ASSERT_EQ("/single/tests/compiler/", __DIR__);
+  ASSERT(__LINE__ > 60);
 
-    // #undef makes the name ordinary again.
+  // #undef makes the name ordinary again.
 #define GONE 5
 #undef GONE
-    int GONE = 6;
-    ASSERT_EQ(6, GONE);
+  int GONE = 6;
+  ASSERT_EQ(6, GONE);
 }

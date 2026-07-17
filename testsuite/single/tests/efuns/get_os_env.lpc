@@ -1,24 +1,24 @@
 void do_tests() {
-    // PATH is on the read allow-list and always set by the environment.
-    ASSERT(stringp(get_os_env("PATH")));
+  // PATH is on the read allow-list and always set by the environment.
+  ASSERT(stringp(get_os_env("PATH")));
 
-    // Allow-listed but unset: undefined.
-    ASSERT(undefinedp(get_os_env("FLUFFOS_TEST_RO")));
+  // Allow-listed but unset: undefined.
+  ASSERT(undefinedp(get_os_env("FLUFFOS_TEST_RO")));
 
-    // Not allow-listed: error.
-    ASSERT(catch(get_os_env("HOME")));
-    ASSERT(catch(get_os_env("")));
+  // Not allow-listed: error.
+  ASSERT(catch(get_os_env("HOME")));
+  ASSERT(catch(get_os_env("")));
 
-    // Writable names are implicitly readable.
-    ASSERT(set_os_env("FLUFFOS_TEST_RW", "hello"));
-    ASSERT_EQ("hello", get_os_env("FLUFFOS_TEST_RW"));
+  // Writable names are implicitly readable.
+  ASSERT(set_os_env("FLUFFOS_TEST_RW", "hello"));
+  ASSERT_EQ("hello", get_os_env("FLUFFOS_TEST_RW"));
 
-    // Unset via the single-argument form.
-    ASSERT(set_os_env("FLUFFOS_TEST_RW"));
-    ASSERT(undefinedp(get_os_env("FLUFFOS_TEST_RW")));
+  // Unset via the single-argument form.
+  ASSERT(set_os_env("FLUFFOS_TEST_RW"));
+  ASSERT(undefinedp(get_os_env("FLUFFOS_TEST_RW")));
 
-    // Read-only names cannot be written.
-    ASSERT(catch(set_os_env("PATH", "/tmp")));
-    // Unlisted names cannot be written.
-    ASSERT(catch(set_os_env("FLUFFOS_EVIL", "x")));
+  // Read-only names cannot be written.
+  ASSERT(catch(set_os_env("PATH", "/tmp")));
+  // Unlisted names cannot be written.
+  ASSERT(catch(set_os_env("FLUFFOS_EVIL", "x")));
 }

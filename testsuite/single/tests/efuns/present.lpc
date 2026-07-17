@@ -76,8 +76,8 @@ void do_tests() {
   // check if object is in this object's inventory, or as a sibling in
   // this object's evnironemnt's inventory, returns object's parent.
   // FIXME: this looks like a mis-feature.
-  ASSERT_EQ(this_object(), present(o2)); // direct children
-  ASSERT_EQ(previous_object(), present(o4)); // sibiling
+  ASSERT_EQ(this_object(), present(o2));  // direct children
+  ASSERT_EQ(previous_object(), present(o4));  // sibiling
 
   // if first argument is object, second argument is object,
   // check if object1 is in object2 inventory, return object1 if true.

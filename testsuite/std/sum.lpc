@@ -6,27 +6,24 @@
 
 #include <lpctypes.h>
 
-mixed sum(mixed *numbers...)
-{ 
-    mixed number, result = 0;
+mixed sum(mixed *numbers...) {
+  mixed number, result = 0;
 
-    foreach(number in numbers)
-    {
-        switch(typeof(number))
-        {
-            case INT : 
-                result += number ;
-                break ;
-            case FLOAT :
-                result = to_float(result) + number ;
-                break ;
-            default:
-                error("Argument must be an array of int or float.\n");
-        }
-        
-    } 
+  foreach (number in numbers) {
+    switch (typeof(number)) {
+      case INT:
+        result += number;
+        break;
+      case FLOAT:
+        result = to_float(result) + number;
+        break;
+      default:
+        error("Argument must be an array of int or float.\n");
+    }
 
-    return result; 
+  }
+
+  return result;
 }
 
 /**
@@ -35,7 +32,6 @@ mixed sum(mixed *numbers...)
  * DESCRIPTION: Returns the sum of all values in the passed array.
  */
 
-mixed array_sum(mixed *numbers)
-{ 
-    return sum(numbers...) ;
+mixed array_sum(mixed *numbers) {
+  return sum(numbers...);
 }

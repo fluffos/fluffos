@@ -6,5 +6,5 @@
 #include <inherit_via_include_parent.h>
 
 void do_tests() {
-    ASSERT_EQ(77, parent_value());
+  ASSERT_EQ(77, parent_value());
 }

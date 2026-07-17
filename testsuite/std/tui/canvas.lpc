@@ -109,7 +109,7 @@ varargs void c_plot(int *values, int lo, int hi, string attr) {
   }
   for (i = 0; i + 1 < n; i++) {
     c_line(i * wd / (n - 1), hd - (values[i] - lo) * hd / (hi - lo),
-           (i + 1) * wd / (n - 1), hd - (values[i + 1] - lo) * hd / (hi - lo), attr);
+      (i + 1) * wd / (n - 1), hd - (values[i + 1] - lo) * hd / (hi - lo), attr);
   }
 }
 

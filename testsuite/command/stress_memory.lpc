@@ -13,9 +13,9 @@ int main(string arg) {
 
   write("populate Map... \n\n");
 
-  for(int i=0; i<100; i++) {
+  for (int i = 0; i < 100; i++) {
     HOLDER->populate_mixed(1);
-    if(find_object(HOLDER)) {
+    if (find_object(HOLDER)) {
       destruct(find_object(HOLDER));
     }
   }

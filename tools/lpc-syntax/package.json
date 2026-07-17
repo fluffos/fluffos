@@ -1,0 +1,15 @@
+{
+  "name": "lpc-syntax",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Grammar-driven LPC tokenizer/highlighter/formatter/linter tooling. Dependency-free (node >= 18); see ../../testsuite/format.sh for the corpus formatter CLI.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test.mjs",
+    "format": "bash ../../testsuite/format.sh",
+    "check": "bash ../../testsuite/format.sh --check"
+  }
+}

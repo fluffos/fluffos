@@ -7,7 +7,7 @@
 // the object matched by the sentence, so its direct_ apply destructs the
 // handler at the swap point.
 
-string* parse_command_id_list() {
+string *parse_command_id_list() {
   return ({ "bag" });
 }
 

@@ -17,4 +17,3 @@ void do_tests() {
   called++;
   ASSERT_EQ(3, called);
 }
-

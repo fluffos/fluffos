@@ -38,7 +38,7 @@ private void got_line(mixed line, int st) {
   }
   if (line != "") write("you typed: " + line + "\n");
   me->tui_readline((: got_line :),
-                   ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
+    ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
 }
 
 // --- select / multiselect / confirm showcase -----------------------------
@@ -53,7 +53,7 @@ private void chose_skills(int *idx, string *items, int st) {
     return;
   }
   this_player()->tui_confirm((: confirmed :),
-                             "Create with " + implode(items, ", ") + "?", 1);
+    "Create with " + implode(items, ", ") + "?", 1);
 }
 
 private void chose_class(int idx, string item, int st) {
@@ -62,9 +62,9 @@ private void chose_class(int idx, string item, int st) {
     return;
   }
   this_player()->tui_multiselect((: chose_skills :), "Pick skills for the " + item + ":",
-                                 ({ "swords", "archery", "alchemy", "lockpicking",
-                                    "diplomacy", "cartography" }),
-                                 ([ "height": 4 ]));
+    ({ "swords", "archery", "alchemy", "lockpicking",
+      "diplomacy", "cartography" }),
+    ([ "height": 4 ]));
 }
 
 // --- inline printers showcase ---------------------------------------------
@@ -79,17 +79,17 @@ private void show_print() {
   write(p_error("and p_error() like this"));
   write("\n");
   write(p_panel("panel", "Boxed content, width-aware —\nwide chars work: 你好世界",
-                ([ "style": TUI_BOX_ROUND ])));
+    ([ "style": TUI_BOX_ROUND ])));
   write(p_table(({ ({ "efun", "package", "notes" }),
-                   ({ "strwidth", "core", "display columns" }),
-                   ({ "terminal_colour", "contrib", "%^TOKEN%^ + wrapping" }),
-                   ({ "你好", "unicode", "double width" }) }),
-                ([ "header": 1 ])));
+    ({ "strwidth", "core", "display columns" }),
+    ({ "terminal_colour", "contrib", "%^TOKEN%^ + wrapping" }),
+    ({ "你好", "unicode", "double width" }) }),
+    ([ "header": 1 ])));
   write(p_tree(({ ({ "std", ({ ({ "tui", ({ "ansi.lpc", "keys.lpc", "readline.lpc",
-                                            ({ "w", ({ "list.lpc", "table.lpc", "tree.lpc" }) }) }) }) }) }) })));
+    ({ "w", ({ "list.lpc", "table.lpc", "tree.lpc" }) }) }) }) }) }) })));
   write("\n");
   write(p_bars(({ ({ "orcs", 24 }), ({ "elves", 13 }), ({ "dwarves", 31 }) }),
-               ([ "width": 30, "attr": "36" ])));
+    ([ "width": 30, "attr": "36" ])));
   write("\nsparkline  " + p_spark(({ 1, 3, 2, 8, 4, 6, 7, 2, 5, 8, 3, 1 })) + "\n");
   write("progress   " + p_progress(64, 30) + "\n\n");
   write(p_bullets(({ "bullet lists", ({ 1, "nest by depth" }), ({ 2, "three markers" }) })));
@@ -101,18 +101,18 @@ private void show_charts() {
   write(p_header("charts", 62));
   write("\np_vbars — vertical bars with eighth-block tops:\n\n");
   write(p_vbars(({ ({ "mon", 3 }), ({ "tue", 8 }), ({ "wed", 5 }),
-                   ({ "thu", 9 }), ({ "fri", 6 }) }),
-                ([ "height": 5, "values": 1, "attr": "33" ])));
+    ({ "thu", 9 }), ({ "fri", 6 }) }),
+    ([ "height": 5, "values": 1, "attr": "33" ])));
   write("\np_chart — braille line chart, two series:\n\n");
   write(p_chart(({ ({ "hp", ({ 50, 52, 60, 55, 70, 65, 80, 90, 85, 95 }), "32" }),
-                   ({ "mana", ({ 90, 80, 82, 70, 65, 60, 50, 55, 40, 35 }), "36" }) }),
-                ([ "width": 50, "height": 8 ])));
+    ({ "mana", ({ 90, 80, 82, 70, 65, 60, 50, 55, 40, 35 }), "36" }) }),
+    ([ "width": 50, "height": 8 ])));
   write("\np_heatmap — logins per weekday/hour:\n\n");
   write(p_heatmap(({ ({ 1, 3, 7, 4 }), ({ 2, 8, 9, 5 }), ({ 0, 4, 6, 2 }) }),
-                  ([ "ylabels": ({ "mon", "tue", "wed" }),
-                     "xlabels": ({ "00", "06", "12", "18" }), "cellw": 4 ])));
+    ([ "ylabels": ({ "mon", "tue", "wed" }),
+      "xlabels": ({ "00", "06", "12", "18" }), "cellw": 4 ])));
   write("\np_spark — inline sparkline: " +
-        p_spark(({ 1, 3, 2, 8, 4, 6, 7, 2, 5, 8, 3, 1 })) + "\n");
+    p_spark(({ 1, 3, 2, 8, 4, 6, 7, 2, 5, 8, 3, 1 })) + "\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -139,13 +139,13 @@ int main(string arg) {
       return 1;
     case "select":
       me->tui_select((: chose_class :), "Pick a class:",
-                     ({ "warrior", "mage", "thief", "cleric", "ranger" }));
+        ({ "warrior", "mage", "thief", "cleric", "ranger" }));
       return 1;
   }
   write("TUI readline demo: editing keys, Up/Down history, Ctrl-R search,\n"
-        "Tab completion.  'quit' or Ctrl-D exits.\n"
-        "Also try: tuidemo select | print | charts | app | dashboard | form\n");
+    "Tab completion.  'quit' or Ctrl-D exits.\n"
+    "Also try: tuidemo select | print | charts | app | dashboard | form\n");
   me->tui_readline((: got_line :),
-                   ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
+    ([ "prompt": "tui> ", "completer": (: complete_verb :) ]));
   return 1;
 }

@@ -5,33 +5,33 @@
 // deep-nested array overflows the C stack before any filesystem/object
 // check runs.
 void create() {
-    parse_init();
-    if (clonep()) {
-        move_object(__FILE__);
-    }
+  parse_init();
+  if (clonep()) {
+    move_object(__FILE__);
+  }
 }
 
 void do_tests() {
 #ifndef __PACKAGE_PARSER__
-    write("no package parser, skipped.\n");
+  write("no package parser, skipped.\n");
 #else
-    mixed env;
-    int i;
+  mixed env;
+  int i;
 
-    clone_object(__FILE__);
-    // Needs an OBJ-type token so the verb entry is flagged VB_HAS_OBJ --
-    // otherwise load_objects() (and get_objects_from_array()) is never
-    // called at all for this verb.
-    parse_add_rule("frob", "STR OBJ");
+  clone_object(__FILE__);
+  // Needs an OBJ-type token so the verb entry is flagged VB_HAS_OBJ --
+  // otherwise load_objects() (and get_objects_from_array()) is never
+  // called at all for this verb.
+  parse_add_rule("frob", "STR OBJ");
 
-    env = ({});
-    for (i = 0; i < 100000; i++) {
-        env = ({ env });
-    }
+  env = ({});
+  for (i = 0; i < 100000; i++) {
+    env = ({ env });
+  }
 
-    // Just surviving this call is the regression signal -- an unbounded
-    // recursion overflows the C stack and ASan-aborts the whole process.
-    catch(parse_sentence("frob hello", 0, env));
-    ASSERT(1);
+  // Just surviving this call is the regression signal -- an unbounded
+  // recursion overflows the C stack and ASan-aborts the whole process.
+  catch(parse_sentence("frob hello", 0, env));
+  ASSERT(1);
 #endif
 }

@@ -1,12 +1,12 @@
 void do_tests() {
 #ifdef __DWLIB__
-    // The second argument is an even-length array of marker/replacement
-    // pairs, not positional values.
-    ASSERT_EQ("hi bob!", replace_dollars("hi $name!", ({ "$name", "bob" })));
-    ASSERT_EQ("bob meets alice",
-              replace_dollars("$a meets $b", ({ "$a", "bob", "$b", "alice" })));
-    // No matching marker: the string is returned unchanged.
-    ASSERT_EQ("no marker", replace_dollars("no marker", ({ "$x", "y" })));
+  // The second argument is an even-length array of marker/replacement
+  // pairs, not positional values.
+  ASSERT_EQ("hi bob!", replace_dollars("hi $name!", ({ "$name", "bob" })));
+  ASSERT_EQ("bob meets alice",
+    replace_dollars("$a meets $b", ({ "$a", "bob", "$b", "alice" })));
+  // No matching marker: the string is returned unchanged.
+  ASSERT_EQ("no marker", replace_dollars("no marker", ({ "$x", "y" })));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

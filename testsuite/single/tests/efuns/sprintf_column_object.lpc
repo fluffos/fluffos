@@ -4,23 +4,23 @@
 // now owns a copy. Exercise column and table modes with rendered arguments.
 
 void do_tests() {
-    string r;
+  string r;
 
-    // Column mode with an array %O: the rendered string is long enough to
-    // wrap across several column emissions.
-    r = sprintf("%-=20O", ({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }));
-    ASSERT(stringp(r));
-    ASSERT(strlen(r) > 0);
+  // Column mode with an array %O: the rendered string is long enough to
+  // wrap across several column emissions.
+  r = sprintf("%-=20O", ({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }));
+  ASSERT(stringp(r));
+  ASSERT(strlen(r) > 0);
 
-    // Table mode with a rendered argument.
-    r = sprintf("%-=40O", ({ "alpha", "beta", "gamma", "delta", "epsilon" }));
-    ASSERT(stringp(r));
+  // Table mode with a rendered argument.
+  r = sprintf("%-=40O", ({ "alpha", "beta", "gamma", "delta", "epsilon" }));
+  ASSERT(stringp(r));
 
-    // Two column specs from %O in one format: the first column must survive
-    // while the second %O reuses the clean buffer.
-    r = sprintf("%-=15O%-=15O", ({ 1, 2, 3, 4, 5 }), ({ 6, 7, 8, 9, 10 }));
-    ASSERT(stringp(r));
+  // Two column specs from %O in one format: the first column must survive
+  // while the second %O reuses the clean buffer.
+  r = sprintf("%-=15O%-=15O", ({ 1, 2, 3, 4, 5 }), ({ 6, 7, 8, 9, 10 }));
+  ASSERT(stringp(r));
 
-    // Plain-string column still works.
-    ASSERT(stringp(sprintf("%-=10s", "a fairly long string that wraps")));
+  // Plain-string column still works.
+  ASSERT(stringp(sprintf("%-=10s", "a fairly long string that wraps")));
 }

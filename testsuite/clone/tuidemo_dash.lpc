@@ -100,10 +100,10 @@ private void tick() {
 
   if (tick_no % 4 == 1) {
     logw->add_line(sprintf("[%d] %s enters room%d", tick_no,
-                           names[random(sizeof(names))], 1 + random(7)));
+      names[random(sizeof(names))], 1 + random(7)));
   }
   status->set_text(sprintf(" %dx%d  tick %d ", app_screen()->scr_width(),
-                           app_screen()->scr_height(), tick_no));
+    app_screen()->scr_height(), tick_no));
 
   app_terminal()->tui_send(render());
   co = call_out_walltime((: tick :), 0.25);

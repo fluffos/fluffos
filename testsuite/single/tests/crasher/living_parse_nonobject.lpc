@@ -5,11 +5,11 @@
 
 void do_tests() {
 #ifdef __PACKAGE_OPS__
-    object target;
+  object target;
 
-    // oblist contains a non-object (0); must not crash.
-    ASSERT_EQ(0, catch(parse_command("get all", ({ 0 }), "'get' %l", target)));
-    ASSERT_EQ(0, catch(parse_command("get all", ({ 0, this_object() }), "'get' %l", target)));
+  // oblist contains a non-object (0); must not crash.
+  ASSERT_EQ(0, catch(parse_command("get all", ({ 0 }), "'get' %l", target)));
+  ASSERT_EQ(0, catch(parse_command("get all", ({ 0, this_object() }), "'get' %l", target)));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

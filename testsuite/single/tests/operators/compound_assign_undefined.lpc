@@ -6,57 +6,57 @@
 // == 1 after a real arithmetic compound-assign computed a genuine
 // result. (Plain += already got this right, in the VM's F_ADD_EQ.)
 void do_tests() {
-    mapping m = ([ "k": 0 ]);
-    mixed u;
+  mapping m = ([ "k": 0 ]);
+  mixed u;
 
-    u = m["missing"];
-    ASSERT_EQ(1, undefinedp(u));
-    u &= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(0, u);
+  u = m["missing"];
+  ASSERT_EQ(1, undefinedp(u));
+  u &= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(0, u);
 
-    u = m["missing"];
-    u |= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(5, u);
+  u = m["missing"];
+  u |= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(5, u);
 
-    u = m["missing"];
-    u ^= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(5, u);
+  u = m["missing"];
+  u ^= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(5, u);
 
-    u = m["missing"];
-    u -= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(-5, u);
+  u = m["missing"];
+  u -= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(-5, u);
 
-    u = m["missing"];
-    u *= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(0, u);
+  u = m["missing"];
+  u *= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(0, u);
 
-    u = m["missing"];
-    u /= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(0, u);
+  u = m["missing"];
+  u /= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(0, u);
 
-    u = m["missing"];
-    u %= 5;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(0, u);
+  u = m["missing"];
+  u %= 5;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(0, u);
 
-    u = m["missing"];
-    u <<= 3;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(0, u);
+  u = m["missing"];
+  u <<= 3;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(0, u);
 
-    u = m["missing"];
-    u >>= 3;
-    ASSERT_EQ(0, undefinedp(u));
-    ASSERT_EQ(0, u);
+  u = m["missing"];
+  u >>= 3;
+  ASSERT_EQ(0, undefinedp(u));
+  ASSERT_EQ(0, u);
 
-    // Plain (non-assign) `|` on an undefined operand must not carry the
-    // "undefined" subtype into a real computed result either.
-    u = m["missing"];
-    ASSERT_EQ(0, undefinedp(u | 5));
+  // Plain (non-assign) `|` on an undefined operand must not carry the
+  // "undefined" subtype into a real computed result either.
+  u = m["missing"];
+  ASSERT_EQ(0, undefinedp(u | 5));
 }

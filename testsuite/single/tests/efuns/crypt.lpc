@@ -45,7 +45,10 @@ void test_crypt(string key) {
   ASSERT_EQ(result, crypt(key, result));
 
   result = crypt(key, "$6$DSVWtVeRU/71A");
-  ASSERT_EQ("$6$DSVWtVeRU/71A$GvRozPOkmWEd3wTR7wMMQhug5wM5rrEM/cle4VEZD1yDEGf1iq6JST0PDN1Ua6QaQslVK2jAzIBKOamxi5dt1.", result);
+  ASSERT_EQ(
+    "$6$DSVWtVeRU/71A$GvRozPOkmWEd3wTR7wMMQhug5wM5rrEM/cle4VEZD1yDEGf1iq6JST0PDN1Ua6QaQslVK2jAzIBKOamxi5dt1.",
+    result
+  );
   ASSERT_EQ(result, crypt(key, result));
 
   // $2$ on the other hand, is wrong format

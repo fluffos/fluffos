@@ -1,5 +1,5 @@
 TYPETEST
 
 int foo() {
-    return "hi";
+  return "hi";
 }

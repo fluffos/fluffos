@@ -1,7 +1,7 @@
 void do_tests() {
-    ASSERT_EQ(1, test_load("/clone/catch_tell_probe"));
-    ASSERT_EQ(0, test_load("/no/such/file"));
-    // A file that EXISTS but fails to compile throws (the handler still
-    // restores the probed object names -- pinned by crasher/1063).
-    ASSERT(catch(test_load("/single/tests/compiler/fail/local_redef")));
+  ASSERT_EQ(1, test_load("/clone/catch_tell_probe"));
+  ASSERT_EQ(0, test_load("/no/such/file"));
+  // A file that EXISTS but fails to compile throws (the handler still
+  // restores the probed object names -- pinned by crasher/1063).
+  ASSERT(catch(test_load("/single/tests/compiler/fail/local_redef")));
 }

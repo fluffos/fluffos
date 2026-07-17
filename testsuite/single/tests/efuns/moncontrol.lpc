@@ -1,6 +1,6 @@
 void do_tests() {
 #if efun_defined(moncontrol)
-    catch(moncontrol(0));
+  catch(moncontrol(0));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

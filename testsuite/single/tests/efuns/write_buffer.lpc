@@ -1,9 +1,9 @@
 void do_tests() {
-    buffer b;
-    rm("/wbuf_test.bin");
-    write_file("/wbuf_test.bin", "12345678", 1);
-    b = string_encode("zz", "utf-8");
-    ASSERT_EQ(1, write_buffer("/wbuf_test.bin", 3, b));
-    ASSERT_EQ("123zz678", read_file("/wbuf_test.bin"));
-    rm("/wbuf_test.bin");
+  buffer b;
+  rm("/wbuf_test.bin");
+  write_file("/wbuf_test.bin", "12345678", 1);
+  b = string_encode("zz", "utf-8");
+  ASSERT_EQ(1, write_buffer("/wbuf_test.bin", 3, b));
+  ASSERT_EQ("123zz678", read_file("/wbuf_test.bin"));
+  rm("/wbuf_test.bin");
 }

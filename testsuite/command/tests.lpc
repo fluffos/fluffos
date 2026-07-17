@@ -25,7 +25,7 @@
 //                                     (suffix-anchored) glob
 
 private int total_files = 0;
-private string *failed_files = ({ });
+private string *failed_files = ({});
 private string filter_re = 0;
 
 private void check_leaks(string what) {
@@ -92,9 +92,8 @@ private void recurse(string dir) {
     run_one(dir + file, 0);
   }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
-          (: $1[1] == -2 :)),
-        (: $1[0] :)) - ({ ".", ".." }))
-  {
+    (: $1[1] == -2 :)),
+    (: $1[0] :)) - ({ ".", ".." })) {
     if (subdir == "fail") {
       foreach (string fn in get_dir(dir + "fail/*.lpc")) {
         run_one(dir + "fail/" + fn, 1);
@@ -142,29 +141,28 @@ private int report(int total_ms) {
   string *failures = "/single/master"->query_failures();
 
   write("[==========] " + "/single/master"->query_num_checks() + " checks from " +
-        total_files + " file(s) ran. (" + total_ms + " ms total)\n");
+    total_files + " file(s) ran. (" + total_ms + " ms total)\n");
   if (!sizeof(failed_files) && !sizeof(failures)) {
     write("[  PASSED  ] " + total_files + " file(s).\n");
     write("Checks succeeded.\n");
     return 1;
   }
   write("[  FAILED  ] " + sizeof(failed_files) + " file(s), " +
-        sizeof(failures) + " failed check(s), listed below:\n");
+    sizeof(failures) + " failed check(s), listed below:\n");
   foreach (string f in failed_files) {
     write("[  FAILED  ] " + f + "\n");
   }
   return 0;
 }
 
-int execute(string fun, int single_test: (: 0 :))
-{
+int execute(string fun, int single_test: (: 0 :)) {
   int t0;
   int plain_single = 0;
 
   set_eval_limit(0x7fffffff);
   "/single/master"->reset_test_stats();
   total_files = 0;
-  failed_files = ({ });
+  failed_files = ({});
   filter_re = 0;
 
   t0 = perf_counter_ns();
@@ -194,7 +192,7 @@ int execute(string fun, int single_test: (: 0 :))
   if (single_test) {
     // A full suite run eventually hits the shutdown test, which schedules
     // the clean exit; a single/filtered run must schedule it itself.
-    "single/tests/efuns/shutdown"->do_the_nasty_deed(); // 🤨
+    "single/tests/efuns/shutdown"->do_the_nasty_deed();  // 🤨
   }
 
   return 1;

@@ -1,6 +1,6 @@
 void do_tests() {
   int x;
-  mixed* l;
+  mixed *l;
   x = time();
 
   l = localtime(x);

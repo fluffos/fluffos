@@ -95,7 +95,7 @@ void do_tests() {
   // --- menu: width clipping keeps every line inside the terminal ----------
   m = clone_object(TUI_MENU);
   o = m->m_begin("Pick:", ({ "short", repeat_string("x", 100) }),
-                 ([ "width": 20 ]));
+    ([ "width": 20 ]));
   foreach (string line in explode(o, "\r\n")) {
     ASSERT(a->visible_width(line) < 20);
   }
@@ -136,7 +136,7 @@ void do_tests() {
 
   // --- menu: scroll indicator above AND below ------------------------------
   m->m_begin("S:", ({ "one", "two", "three", "four", "five", "six" }),
-             ([ "height": 2 ]));
+    ([ "height": 2 ]));
   m->m_take_output();
   m->m_feed(TUI_KEY_END);
   o = m->m_take_output();
@@ -220,10 +220,10 @@ void do_tests() {
 
   // --- app: terminal-initiated close tears the app down (no clone leak) ---
   write_file("/data/tui_mock_term.c",
-             "object app;\n" +
-             "void set_app(object a) { app = a; }\n" +
-             "void tui_close() { object a = app; app = 0; if (a) a->app_quit(); }\n",
-             1);
+    "object app;\n" +
+    "void set_app(object a) { app = a; }\n" +
+    "void tui_close() { object a = app; app = 0; if (a) a->app_quit(); }\n",
+    1);
   mock = load_object("/data/tui_mock_term");
   app = new(TUI_APP);
   w = app->app_add(new("/std/tui/w/button"));

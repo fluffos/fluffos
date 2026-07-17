@@ -1,8 +1,8 @@
 void do_tests() {
 #ifdef __PACKAGE_PARSER__
-    parse_init();
-    catch(parse_my_rules(this_object(), "smile"));
-    ASSERT(1);
+  parse_init();
+  catch(parse_my_rules(this_object(), "smile"));
+  ASSERT(1);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

@@ -62,15 +62,18 @@ void socket_shutdown(int fd) {
 }
 
 void receive_data(int fd, mixed result) {
-    tell_object(receiver, sprintf("fd %d received %d bytes.\n", fd, sizeof(result)));
-    status[fd]["result"] += result;
+  tell_object(receiver, sprintf("fd %d received %d bytes.\n", fd, sizeof(result)));
+  status[fd]["result"] += result;
 }
 
 void write_data(int fd) {
   status[fd]["status"] = STATE_CONNECTED;
   tell_object(receiver, sprintf("write_data: %O\n", status));
 
-  socket_write(fd, "GET " + status[fd]["path"] + " HTTP/1.0\nHost: " + status[fd]["host"] + "\n\r\n\r");
+  socket_write(
+    fd,
+    "GET " + status[fd]["path"] + " HTTP/1.0\nHost: " + status[fd]["host"] + "\n\r\n\r"
+  );
 }
 
 void on_resolve(string host, string addr, int key) {
@@ -79,15 +82,14 @@ void on_resolve(string host, string addr, int key) {
 
   tell_object(receiver, sprintf("%s: %s\n", host, addr));
 
-  if (addr)
-  {
+  if (addr) {
     fd = hostname_to_fd[host];
 
     ret = socket_connect(fd, addr + " " + status[fd]["port"], "receive_data", "write_data");
-    if(ret != EESUCCESS){
+    if (ret != EESUCCESS) {
       tell_object(receiver, "unable to connect: " + socket_error(ret) + "\n");
       socket_close(fd);
-      return ;
+      return;
     }
 
     status[fd]["status"] = STATE_CONNECTING;

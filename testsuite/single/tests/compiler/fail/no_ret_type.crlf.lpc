@@ -1,4 +1,3 @@
 #pragma strict_types
 
-foo() {
-}
+foo() {}

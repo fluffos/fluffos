@@ -13,50 +13,50 @@
 private object expected;
 
 private string my_file() {
-    return "/atp_test_" + (clonep() ? "clone" : "blueprint") + ".txt";
+  return "/atp_test_" + (clonep() ? "clone" : "blueprint") + ".txt";
 }
 
 void got_read(mixed res) {
-    ASSERT_EQ(expected, this_player());
+  ASSERT_EQ(expected, this_player());
 }
 
 void got_write(mixed res) {
-    ASSERT_EQ(expected, this_player());
-    rm(my_file());
+  ASSERT_EQ(expected, this_player());
+  rm(my_file());
 }
 
 int atp_action() {
-    // Inside a command, this_player() is this living object.
-    expected = this_player();
-    ASSERT_EQ(this_object(), expected);
+  // Inside a command, this_player() is this living object.
+  expected = this_player();
+  ASSERT_EQ(this_object(), expected);
 
-    write_file(my_file(), "async this_player payload\n", 1);
-    ASSERT_EQ(0, catch(async_read(my_file(), (: got_read :))));
-    ASSERT_EQ(0, catch(async_write(my_file(), "more\n", 0, (: got_write :))));
-    return 1;
+  write_file(my_file(), "async this_player payload\n", 1);
+  ASSERT_EQ(0, catch(async_read(my_file(), (: got_read :))));
+  ASSERT_EQ(0, catch(async_write(my_file(), "more\n", 0, (: got_write :))));
+  return 1;
 }
 
 void setup() {
-    enable_commands();
-    add_action((: atp_action :), "atp");
-    ASSERT(command("atp"));
-    // Leaving a living object behind confuses the test runner's
-    // shutdown; the object itself must stay alive for the callbacks.
-    disable_commands();
+  enable_commands();
+  add_action((: atp_action :), "atp");
+  ASSERT(command("atp"));
+  // Leaving a living object behind confuses the test runner's
+  // shutdown; the object itself must stay alive for the callbacks.
+  disable_commands();
 }
 
 void do_tests() {
-    object peer;
+  object peer;
 
-    setup();
-    peer = clone_object(__FILE__);
-    peer->setup();
+  setup();
+  peer = clone_object(__FILE__);
+  peer->setup();
 }
 
 #else
 
 void do_tests() {
-    ASSERT(1);
+  ASSERT(1);
 }
 
 #endif

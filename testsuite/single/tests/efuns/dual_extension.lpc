@@ -7,70 +7,70 @@
 //     extension and find_object() strips either spelling
 // Fixtures live in /clone/dual_*.
 void do_tests() {
-    object ob;
+  object ob;
 
-    // An explicit extension never falls back to the other spelling on
-    // disk: the load fails (0; the master's compile_object virtual hook
-    // is consulted with the stripped name and declines). These must run
-    // before the fixtures get loaded -- once loaded, any spelling finds
-    // the object (pinned at the end).
-    ASSERT_EQ(0, load_object("/clone/dual_only_lpc.c"));
-    ASSERT_EQ(0, load_object("/clone/dual_only_c.lpc"));
+  // An explicit extension never falls back to the other spelling on
+  // disk: the load fails (0; the master's compile_object virtual hook
+  // is consulted with the stripped name and declines). These must run
+  // before the fixtures get loaded -- once loaded, any spelling finds
+  // the object (pinned at the end).
+  ASSERT_EQ(0, load_object("/clone/dual_only_lpc.c"));
+  ASSERT_EQ(0, load_object("/clone/dual_only_c.lpc"));
 
-    // An explicit extension picks that source even when both exist.
-    ob = load_object("/clone/dual_pick_c.c");
-    ASSERT_EQ("c", ob->which());
-    ASSERT_EQ("/clone/dual_pick_c", file_name(ob));
-    ob = load_object("/clone/dual_pick_lpc.lpc");
-    ASSERT_EQ("lpc", ob->which());
+  // An explicit extension picks that source even when both exist.
+  ob = load_object("/clone/dual_pick_c.c");
+  ASSERT_EQ("c", ob->which());
+  ASSERT_EQ("/clone/dual_pick_c", file_name(ob));
+  ob = load_object("/clone/dual_pick_lpc.lpc");
+  ASSERT_EQ("lpc", ob->which());
 
-    // The inherit-retry loop keeps the caller's exact spelling: the
-    // ".c" twin inherits an UNLOADED parent, forcing load_object to
-    // load the parent and then reload the child -- the reload must
-    // still compile the ".c" file, not fall back to the .lpc twin.
-    ob = load_object("/clone/dual_retry_child.c");
-    ASSERT_EQ("c", ob->which());
-    ASSERT_EQ("parent", ob->pwhich());
+  // The inherit-retry loop keeps the caller's exact spelling: the
+  // ".c" twin inherits an UNLOADED parent, forcing load_object to
+  // load the parent and then reload the child -- the reload must
+  // still compile the ".c" file, not fall back to the .lpc twin.
+  ob = load_object("/clone/dual_retry_child.c");
+  ASSERT_EQ("c", ob->which());
+  ASSERT_EQ("parent", ob->pwhich());
 
-    // function_exists() strips the defining program's real suffix --
-    // ".c" here, since the .c spelling won the pick above.
-    ASSERT_EQ("/clone/dual_pick_c",
-              function_exists("which", find_object("/clone/dual_pick_c")));
+  // function_exists() strips the defining program's real suffix --
+  // ".c" here, since the .c spelling won the pick above.
+  ASSERT_EQ("/clone/dual_pick_c",
+    function_exists("which", find_object("/clone/dual_pick_c")));
 
-    // Extension-less names prefer ".lpc" when both exist ...
-    ob = load_object("/clone/dual_pick_default");
-    ASSERT_EQ("lpc", ob->which());
-    // ... and fall back to ".c" when only that spelling exists.
-    ob = load_object("/clone/dual_only_c");
-    ASSERT_EQ("c", ob->which());
-    ASSERT_EQ("/clone/dual_only_c", file_name(ob));
+  // Extension-less names prefer ".lpc" when both exist ...
+  ob = load_object("/clone/dual_pick_default");
+  ASSERT_EQ("lpc", ob->which());
+  // ... and fall back to ".c" when only that spelling exists.
+  ob = load_object("/clone/dual_only_c");
+  ASSERT_EQ("c", ob->which());
+  ASSERT_EQ("/clone/dual_only_c", file_name(ob));
 
-    // The ".lpc" file is reachable by its exact name.
-    ob = load_object("/clone/dual_only_lpc.lpc");
-    ASSERT_EQ("lpc", ob->which());
+  // The ".lpc" file is reachable by its exact name.
+  ob = load_object("/clone/dual_only_lpc.lpc");
+  ASSERT_EQ("lpc", ob->which());
 
-    // Identity is extension-blind: any spelling finds the loaded object.
-    ASSERT(ob == find_object("/clone/dual_only_lpc"));
-    ASSERT(ob == find_object("/clone/dual_only_lpc.c"));
-    ASSERT(ob == find_object("/clone/dual_only_lpc.lpc"));
+  // Identity is extension-blind: any spelling finds the loaded object.
+  ASSERT(ob == find_object("/clone/dual_only_lpc"));
+  ASSERT(ob == find_object("/clone/dual_only_lpc.c"));
+  ASSERT(ob == find_object("/clone/dual_only_lpc.lpc"));
 
-    // Same rule on the load path: the registry is consulted before the
-    // filesystem, so the exact ".c" spelling that failed above now
-    // resolves to the loaded object by identity.
-    ASSERT(load_object("/clone/dual_only_lpc.c") == ob);
-    ASSERT(load_object("/clone/dual_pick_c.lpc") ==
-           find_object("/clone/dual_pick_c"));
+  // Same rule on the load path: the registry is consulted before the
+  // filesystem, so the exact ".c" spelling that failed above now
+  // resolves to the loaded object by identity.
+  ASSERT(load_object("/clone/dual_only_lpc.c") == ob);
+  ASSERT(load_object("/clone/dual_pick_c.lpc") ==
+    find_object("/clone/dual_pick_c"));
 
-    // children() is extension-blind too: every spelling names the same
-    // family (the loaded blueprint itself counts as a child).
-    ASSERT_EQ(children("/clone/dual_pick_c"), children("/clone/dual_pick_c.c"));
-    ASSERT_EQ(children("/clone/dual_pick_c"), children("/clone/dual_pick_c.lpc"));
-    ASSERT(sizeof(children("/clone/dual_pick_c.lpc")) >= 1);
+  // children() is extension-blind too: every spelling names the same
+  // family (the loaded blueprint itself counts as a child).
+  ASSERT_EQ(children("/clone/dual_pick_c"), children("/clone/dual_pick_c.c"));
+  ASSERT_EQ(children("/clone/dual_pick_c"), children("/clone/dual_pick_c.lpc"));
+  ASSERT(sizeof(children("/clone/dual_pick_c.lpc")) >= 1);
 
-    // The registry satisfies INHERIT by identity as well: with
-    // dual_only_lpc loaded (above), a ".c"-spelled inherit of it
-    // compiles (the never-loaded case must fail instead -- pinned by
-    // compiler/fail/inherit_exact_ext.lpc).
-    ob = load_object("/clone/dual_inherit_c_spelling");
-    ASSERT_EQ("lpc", ob->parent_which());
+  // The registry satisfies INHERIT by identity as well: with
+  // dual_only_lpc loaded (above), a ".c"-spelled inherit of it
+  // compiles (the never-loaded case must fail instead -- pinned by
+  // compiler/fail/inherit_exact_ext.lpc).
+  ob = load_object("/clone/dual_inherit_c_spelling");
+  ASSERT_EQ("lpc", ob->parent_which());
 }

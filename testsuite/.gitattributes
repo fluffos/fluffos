@@ -3,3 +3,12 @@ test_file text eol=lf
 *.o text eol=lf
 *.lf binary
 *.crlf binary
+# Deliberately invalid UTF-8 byte sequences (pinned by tests in
+# single/tests/compiler/fail/) -- root .gitattributes' `* text=auto`
+# heuristic misdetects stray 0x0D/0x0A byte patterns inside these as
+# CRLF line endings and normalizes them on checkout, corrupting the
+# fixture (observed: git checkout <ref> -- testsuite/ grew
+# bad_utf8_string.lpc from 22867 to 23623 bytes). `binary` disables
+# all text/eol handling for them.
+single/tests/compiler/fail/bad_utf8_string.lpc binary
+single/tests/compiler/fail/bad_utf8_arrayblock.lpc binary

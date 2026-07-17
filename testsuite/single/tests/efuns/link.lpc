@@ -1,13 +1,13 @@
 void do_tests() {
 #if efun_defined(link)
-    // link() (POSIX hard link; not present on Windows) is gated by
-    // master::valid_link, absent here, so the link is denied. Require
-    // only that it does not crash and the source survives.
-    write_file("/ln_src.txt", "x\n", 1);
-    catch(link("/ln_src.txt", "/ln_dst.txt"));
-    ASSERT(file_size("/ln_src.txt") != -1);
-    rm("/ln_src.txt");
-    rm("/ln_dst.txt");
+  // link() (POSIX hard link; not present on Windows) is gated by
+  // master::valid_link, absent here, so the link is denied. Require
+  // only that it does not crash and the source survives.
+  write_file("/ln_src.txt", "x\n", 1);
+  catch(link("/ln_src.txt", "/ln_dst.txt"));
+  ASSERT(file_size("/ln_src.txt") != -1);
+  rm("/ln_src.txt");
+  rm("/ln_dst.txt");
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

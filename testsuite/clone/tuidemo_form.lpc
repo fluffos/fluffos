@@ -12,11 +12,11 @@ private object skills_lbl, skills_chk, ok_btn, cancel_btn, result;
 private void on_widget_event(object w, string what, mixed arg) {
   if (w == ok_btn && what == "press") {
     result->set_text(sprintf("→ %s the %s (%s)",
-                             name_fld->query_text() == "" ? "nameless" : name_fld->query_text(),
-                             class_rad->query_picked_item(),
-                             sizeof(skills_chk->query_checked_items())
-                                 ? implode(skills_chk->query_checked_items(), ", ")
-                                 : "no skills"));
+      name_fld->query_text() == "" ? "nameless" : name_fld->query_text(),
+      class_rad->query_picked_item(),
+      sizeof(skills_chk->query_checked_items())
+      ? implode(skills_chk->query_checked_items(), ", ")
+      : "no skills"));
   } else if (w == cancel_btn && what == "press") {
     app_quit();
   }

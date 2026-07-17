@@ -1,5 +1,5 @@
 TYPETEST
 
 void foo() {
-    return 1;
+  return 1;
 }

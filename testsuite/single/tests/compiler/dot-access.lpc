@@ -10,7 +10,7 @@ private void bump_by_ref(int ref r) {
 
 void do_tests() {
   int num = 1, num2 = 2;
-  int *nums = ({1,3,4});
+  int *nums = ({ 1, 3, 4 });
   string fluffos = "FluffOS";
   object tp = this_player();
   mapping m = ([
@@ -20,9 +20,9 @@ void do_tests() {
       "another key": ([
         "finalKey": "Sup?"
       ]),
-      "largo" : ([
+      "largo": ([
         "montego": ([
-          "baby" : "why",
+          "baby": "why",
           "don't": "we go?"
         ])
       ])
@@ -35,138 +35,138 @@ void do_tests() {
   ASSERT_EQ(nums, m[this_player()]);
 
   ASSERT_EQ(([
-      "another key": ([
-        "finalKey": "Sup?"
-      ]),
-      "largo" : ([
-        "montego": ([
-          "baby" : "why",
-          "don't": "we go?"
-        ])
-      ])
+    "another key": ([
+      "finalKey": "Sup?"
     ]),
+    "largo": ([
+      "montego": ([
+        "baby": "why",
+        "don't": "we go?"
+      ])
+    ])
+  ]),
     m["key"]
   );
   ASSERT_EQ(([
-      "another key": ([
-        "finalKey": "Sup?"
-      ]),
-      "largo" : ([
-        "montego": ([
-          "baby" : "why",
-          "don't": "we go?"
-        ])
-      ])
+    "another key": ([
+      "finalKey": "Sup?"
     ]),
-  m.key
+    "largo": ([
+      "montego": ([
+        "baby": "why",
+        "don't": "we go?"
+      ])
+    ])
+  ]),
+    m.key
   );
 
   ASSERT_EQ(([
-      "finalKey": "Sup?"
-    ]),
+    "finalKey": "Sup?"
+  ]),
     m["key"]["another key"]
   );
   ASSERT_EQ(([
-      "finalKey": "Sup?"
-    ]),
+    "finalKey": "Sup?"
+  ]),
     m.key["another key"]
   );
 
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     m["key"]["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     m.key["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     m.key.largo
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     m["key"].largo
   );
 
   // Above, but with spaces
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    m["key"] ["largo"]
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    m["key"]["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    m . key["largo"]
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    m.key["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    m . key . largo
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    m.key.largo
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    m ["key"] . largo
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    m["key"].largo
   );
 
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     m["key"]["largo"]["montego"]
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     m.key["largo"]["montego"]
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     m.key.largo["montego"]
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     m.key.largo.montego
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     m.key["largo"].montego
   );
 
@@ -194,138 +194,138 @@ void do_tests() {
   ASSERT_EQ(nums, testClass.m[this_player()]);
 
   ASSERT_EQ(([
-      "another key": ([
-        "finalKey": "Sup?"
-      ]),
-      "largo" : ([
-        "montego": ([
-          "baby" : "why",
-          "don't": "we go?"
-        ])
-      ])
+    "another key": ([
+      "finalKey": "Sup?"
     ]),
+    "largo": ([
+      "montego": ([
+        "baby": "why",
+        "don't": "we go?"
+      ])
+    ])
+  ]),
     testClass.m["key"]
   );
   ASSERT_EQ(([
-      "another key": ([
-        "finalKey": "Sup?"
-      ]),
-      "largo" : ([
-        "montego": ([
-          "baby" : "why",
-          "don't": "we go?"
-        ])
-      ])
+    "another key": ([
+      "finalKey": "Sup?"
     ]),
+    "largo": ([
+      "montego": ([
+        "baby": "why",
+        "don't": "we go?"
+      ])
+    ])
+  ]),
     testClass.m.key
   );
 
   ASSERT_EQ(([
-      "finalKey": "Sup?"
-    ]),
+    "finalKey": "Sup?"
+  ]),
     m["key"]["another key"]
   );
   ASSERT_EQ(([
-      "finalKey": "Sup?"
-    ]),
+    "finalKey": "Sup?"
+  ]),
     testClass.m.key["another key"]
   );
 
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     testClass.m["key"]["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     testClass.m.key["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     testClass.m.key.largo
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
     testClass.m["key"].largo
   );
 
   // Above, but with spaces
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    testClass . m["key"] ["largo"]
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    testClass.m["key"]["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    testClass. m . key["largo"]
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    testClass.m.key["largo"]
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    testClass . m . key . largo
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    testClass.m.key.largo
   );
   ASSERT_EQ(([
-      "montego": ([
-        "baby" : "why",
-        "don't": "we go?"
-      ])
-    ]),
-    testClass . m ["key"] . largo
+    "montego": ([
+      "baby": "why",
+      "don't": "we go?"
+    ])
+  ]),
+    testClass.m["key"].largo
   );
 
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     testClass.m["key"]["largo"]["montego"]
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     testClass.m.key["largo"]["montego"]
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     testClass.m.key.largo["montego"]
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     testClass.m.key.largo.montego
   );
   ASSERT_EQ(([
-      "baby" : "why",
-      "don't": "we go?"
-    ]),
+    "baby": "why",
+    "don't": "we go?"
+  ]),
     testClass.m.key["largo"].montego
   );
 
@@ -357,7 +357,7 @@ void do_tests() {
   wm2.a.b = "nested";
   ASSERT_EQ(wm2.a.b, "nested");
 
-  mapping wm3 = (["a": ([]) ]);
+  mapping wm3 = ([ "a": ([]) ]);
   wm3["a"].b = "bracket-then-dot";
   ASSERT_EQ(wm3["a"]["b"], "bracket-then-dot");
 
@@ -366,16 +366,16 @@ void do_tests() {
   wm4.a["b"] = "dot-then-bracket";
   ASSERT_EQ(wm4.a.b, "dot-then-bracket");
 
-  mapping wm5 = (["count": 0]);
+  mapping wm5 = ([ "count": 0 ]);
   wm5.count += 5;
   ASSERT_EQ(wm5.count, 5);
 
   mapping wm6 = ([]);
   wm6.list = ({});
-  wm6.list += ({1, 2, 3});
-  ASSERT_EQ(wm6.list, ({1, 2, 3}));
+  wm6.list += ({ 1, 2, 3 });
+  ASSERT_EQ(wm6.list, ({ 1, 2, 3 }));
 
-  mapping wm7 = (["count": 10]);
+  mapping wm7 = ([ "count": 10 ]);
   bump_by_ref(ref wm7.count);
   ASSERT_EQ(wm7.count, 11);
 }

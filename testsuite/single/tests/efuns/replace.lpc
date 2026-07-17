@@ -1,8 +1,8 @@
 void do_tests() {
 #ifdef __DWLIB__
-    ASSERT_EQ("hero", replace("zero", "z", "h"));
-    // Array form: pairwise from/to list.
-    ASSERT_EQ("cd", replace("ab", ({ "a", "c", "b", "d" })));
+  ASSERT_EQ("hero", replace("zero", "z", "h"));
+  // Array form: pairwise from/to list.
+  ASSERT_EQ("cd", replace("ab", ({ "a", "c", "b", "d" })));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

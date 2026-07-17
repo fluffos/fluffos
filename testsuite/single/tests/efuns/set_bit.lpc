@@ -1,5 +1,5 @@
 void do_tests() {
-    /*
+  /*
     string str;
     
     ASSERT(catch(set_bit("", 10000000000000)));

@@ -1,6 +1,6 @@
 void do_tests() {
-    string bits = set_bit(set_bit("", 3), 10);
-    ASSERT_EQ(3, next_bit(bits, -1));
-    ASSERT_EQ(10, next_bit(bits, 3));
-    ASSERT_EQ(-1, next_bit(bits, 10));
+  string bits = set_bit(set_bit("", 3), 10);
+  ASSERT_EQ(3, next_bit(bits, -1));
+  ASSERT_EQ(10, next_bit(bits, 3));
+  ASSERT_EQ(-1, next_bit(bits, 10));
 }

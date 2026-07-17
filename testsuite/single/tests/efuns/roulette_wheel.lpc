@@ -1,11 +1,11 @@
 void do_tests() {
 #ifdef __DWLIB__
-    int i;
-    for (i = 0; i < 10; i++) {
-        mixed pick = roulette_wheel(([ "a" : 1, "b" : 3 ]));
-        ASSERT(pick == "a" || pick == "b");
-    }
-    ASSERT_EQ("only", roulette_wheel(([ "only" : 5 ])));
+  int i;
+  for (i = 0; i < 10; i++) {
+    mixed pick = roulette_wheel(([ "a": 1, "b": 3 ]));
+    ASSERT(pick == "a" || pick == "b");
+  }
+  ASSERT_EQ("only", roulette_wheel(([ "only": 5 ])));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

@@ -1,7 +1,7 @@
 object tp;
 int *result;
 
-void my_func(int num){
+void my_func(int num) {
   result += ({ num });
 
   // this_player check.
@@ -17,7 +17,7 @@ void my_func(int num){
 }
 
 void do_tests() {
-  result = ({ });
+  result = ({});
   tp = this_player();
 
   // In normal mode, second defer is executed first.

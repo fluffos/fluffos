@@ -9,8 +9,7 @@ int func1(string moo, mixed args...) {
   return 1;
 }
 
-void do_tests()
-{
+void do_tests() {
   // FIXME: in compiler.cc, the function table is sorted using pointer address, so the return result here
   // is not deterministic
   ASSERT_EQ(
@@ -47,9 +46,9 @@ void do_tests()
         "mixed"
       }),
       ({ /* sizeof() == 3 */
-         "query_test_info",
-         0,
-         "string"
+        "query_test_info",
+        0,
+        "string"
       }),
     }), sort_array(functions(this_object(), 1), (: strcmp($1[0], $2[0]) :)));
   ASSERT_EQ(

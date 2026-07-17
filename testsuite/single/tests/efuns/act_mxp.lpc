@@ -1,6 +1,6 @@
 void do_tests() {
-    // Sends the MXP activation sequence to this_player(); with no
-    // interactive it must fail gracefully.
-    catch(act_mxp());
-    ASSERT(1);
+  // Sends the MXP activation sequence to this_player(); with no
+  // interactive it must fail gracefully.
+  catch(act_mxp());
+  ASSERT(1);
 }

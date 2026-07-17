@@ -3,26 +3,26 @@
 #endif
 void do_tests() {
 #ifdef __PACKAGE_FFI__
-    buffer src, got;
-    int addr, i;
-    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
-    // Peek copies foreign bytes (here: our own buffer via its address).
-    src = ffi_alloc(4);
-    ffi_write(src, 0, FFI_INT32, 0x0A0B0C0D);
-    addr = ffi_address(src);
-    got = ffi_peek(addr, 4);
-    ASSERT_EQ(4, sizeof(got));
-    ASSERT_EQ(0x0A0B0C0D, ffi_read(got, 0, FFI_INT32));
-    // -1: read as a NUL-terminated C string, then decode.
-    ffi_write(src, 3, FFI_INT8, 0);   // NUL-terminate 3 bytes in
-    got = ffi_peek(addr, -1);
-    ASSERT_EQ(3, sizeof(got));
-    ASSERT(catch(ffi_peek(0, 4)));    // NULL address errors
-    // valid_ffi("peek", addr, caller) gates the read BEFORE any memory
-    // is touched -- the master denies the -0xDEAD sentinel (an address
-    // that would otherwise be an unmapped-memory crash).
-    ASSERT_EQ("*FFI security violation: 'peek' denied by master::valid_ffi.\n",
-              catch(ffi_peek(-0xDEAD, 4)));
+  buffer src, got;
+  int addr, i;
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  // Peek copies foreign bytes (here: our own buffer via its address).
+  src = ffi_alloc(4);
+  ffi_write(src, 0, FFI_INT32, 0x0A0B0C0D);
+  addr = ffi_address(src);
+  got = ffi_peek(addr, 4);
+  ASSERT_EQ(4, sizeof(got));
+  ASSERT_EQ(0x0A0B0C0D, ffi_read(got, 0, FFI_INT32));
+  // -1: read as a NUL-terminated C string, then decode.
+  ffi_write(src, 3, FFI_INT8, 0);   // NUL-terminate 3 bytes in
+  got = ffi_peek(addr, -1);
+  ASSERT_EQ(3, sizeof(got));
+  ASSERT(catch(ffi_peek(0, 4)));    // NULL address errors
+  // valid_ffi("peek", addr, caller) gates the read BEFORE any memory
+  // is touched -- the master denies the -0xDEAD sentinel (an address
+  // that would otherwise be an unmapped-memory crash).
+  ASSERT_EQ("*FFI security violation: 'peek' denied by master::valid_ffi.\n",
+    catch(ffi_peek(-0xDEAD, 4)));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

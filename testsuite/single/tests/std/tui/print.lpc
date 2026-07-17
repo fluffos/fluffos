@@ -9,10 +9,10 @@ void do_tests() {
   // table: width-aware cells (你 is 2 columns wide), header rule
   o = p->p_table(({ ({ "a", "bb" }), ({ "你", "c" }) }), ([ "header": 1 ]));
   ASSERT_EQ("┌────┬────┐\n"
-            "│ a  │ bb │\n"
-            "├────┼────┤\n"
-            "│ 你 │ c  │\n"
-            "└────┴────┘\n", o);
+    "│ a  │ bb │\n"
+    "├────┼────┤\n"
+    "│ 你 │ c  │\n"
+    "└────┴────┘\n", o);
   o = p->p_table(({ ({ "x" }) }), ([ "style": TUI_BOX_ASCII ]));
   ASSERT_EQ("+---+\n| x |\n+---+\n", o);
   ASSERT_EQ("", p->p_table(({}), 0));

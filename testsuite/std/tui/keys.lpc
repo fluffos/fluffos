@@ -114,7 +114,7 @@ private mixed *csi_final(string p, int c) {
     string *parts = explode(p[1..], ";");
     if (sizeof(parts) == 3) {
       return ({ ({ TUI_EV_MOUSE, to_int(parts[0]), to_int(parts[1]) - 1,
-                   to_int(parts[2]) - 1, c == 'M' }) });
+        to_int(parts[2]) - 1, c == 'M' }) });
     }
     return ({ TUI_KEY_UNKNOWN });
   }

@@ -1,7 +1,7 @@
 void do_tests() {
 #ifdef __PACKAGE_UIDS__
-    ASSERT(stringp(getuid()));
-    ASSERT(stringp(getuid(this_object())));
+  ASSERT(stringp(getuid()));
+  ASSERT(stringp(getuid(this_object())));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

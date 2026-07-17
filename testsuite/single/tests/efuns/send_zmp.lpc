@@ -1,4 +1,4 @@
 void do_tests() {
-    catch(send_zmp("zmp.ping", ({ })));
-    ASSERT(1);
+  catch(send_zmp("zmp.ping", ({})));
+  ASSERT(1);
 }

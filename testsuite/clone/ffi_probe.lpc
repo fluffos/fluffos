@@ -6,12 +6,12 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
 int available() {
-    int lib, ok;
-    lib = ffi_load("");
-    if (lib <= 0) return 0;
-    ok = !catch(ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE })));
-    ffi_unload(lib);
-    return ok;
+  int lib, ok;
+  lib = ffi_load("");
+  if (lib <= 0) return 0;
+  ok = !catch(ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE })));
+  ffi_unload(lib);
+  return ok;
 }
 int libc() { return ffi_load(""); }
 #else

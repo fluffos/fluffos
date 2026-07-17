@@ -1,7 +1,7 @@
 void do_tests() {
 #if efun_defined(dump_stralloc)
-    catch(dump_stralloc("/ds_test.out"));
-    rm("/ds_test.out");
+  catch(dump_stralloc("/ds_test.out"));
+  rm("/ds_test.out");
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

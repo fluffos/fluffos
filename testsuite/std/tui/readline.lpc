@@ -34,7 +34,7 @@ private int scroll = 0;           // viewport start column
 private int began = 0;
 private string kill_buf = "";
 private int last_tab = 0;
-private mixed *undo_stack = ({}); // ({ buf, pos }) snapshots, oldest first
+private mixed *undo_stack = ({});  // ({ buf, pos }) snapshots, oldest first
 #define UNDO_MAX 200
 
 // --- history ---
@@ -63,8 +63,7 @@ private string pre(string s, int i) { return i <= 0 ? "" : (i >= strlen(s) ? s :
 private string post(string s, int i) { return i >= strlen(s) ? "" : (i <= 0 ? s : s[i..]); }
 
 private int is_word(int c) {
-  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-         c == '_' || c > 127;
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c > 127;
 }
 
 private int word_back() {
@@ -87,8 +86,7 @@ private int word_fwd() {
 // rendering
 
 private string isearch_prompt() {
-  return (is_fail ? "(failed " : "(") + (is_dir < 0 ? "reverse-i-search" : "i-search") +
-         ")`" + is_q + "': ";
+  return (is_fail ? "(failed " : "(") + (is_dir < 0 ? "reverse-i-search" : "i-search") + ")`" + is_q + "': ";
 }
 
 // Repaint the whole line: \r prompt view EL, then park the cursor.
@@ -118,9 +116,7 @@ private void render() {
     int lm = scroll > 0;
     int rm = total - scroll > avail;
 
-    view = (lm ? "<" : "") +
-           wslice(disp, scroll + lm, avail - lm - rm) +
-           (rm ? ">" : "");
+    view = (lm ? "<" : "") + wslice(disp, scroll + lm, avail - lm - rm) + (rm ? ">" : "");
   }
 
   out += "\r" + pfx + view + ansi_el(0) + "\r" + ansi_fwd(pw + cur - scroll);

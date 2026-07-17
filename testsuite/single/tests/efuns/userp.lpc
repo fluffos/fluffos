@@ -1,4 +1,4 @@
 void do_tests() {
-    // No object here is an interactive user.
-    ASSERT_EQ(0, userp(this_object()));
+  // No object here is an interactive user.
+  ASSERT_EQ(0, userp(this_object()));
 }

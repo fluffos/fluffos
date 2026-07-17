@@ -12,33 +12,33 @@ int got_string_cb_error;
 int conn;
 
 void bound_arg_cb(int rows, string extra) {
-    got_bound_arg = (extra == "hello-bound-arg");
+  got_bound_arg = (extra == "hello-bound-arg");
 }
 
 void do_tests() {
 #if defined(__PACKAGE_ASYNC__) && defined(__PACKAGE_DB__) && defined(__USE_SQLITE3__)
-    conn = db_connect("", "/test_async_bound.sqlite", "", __USE_SQLITE3__);
-    ASSERT_NE(0, conn);
-    db_exec(conn, "DROP TABLE IF EXISTS async_bound_tbl");
-    db_exec(conn, "create table async_bound_tbl(one varchar(10));");
+  conn = db_connect("", "/test_async_bound.sqlite", "", __USE_SQLITE3__);
+  ASSERT_NE(0, conn);
+  db_exec(conn, "DROP TABLE IF EXISTS async_bound_tbl");
+  db_exec(conn, "create table async_bound_tbl(one varchar(10));");
 
-    // A string callback name must be a clean, catchable error, not a
-    // type-confused memory write.
-    mixed err = catch(async_db_exec(conn, "select 1", "bound_arg_cb"));
-    ASSERT(err);
-    got_string_cb_error = 1;
+  // A string callback name must be a clean, catchable error, not a
+  // type-confused memory write.
+  mixed err = catch(async_db_exec(conn, "select 1", "bound_arg_cb"));
+  ASSERT(err);
+  got_string_cb_error = 1;
 
-    // A trailing bound arg must survive to the callback, delivered
-    // after the primary result, and not read stale/garbage stack memory.
-    async_db_exec(conn, "insert into async_bound_tbl values('x');",
-                  (: bound_arg_cb :), "hello-bound-arg");
+  // A trailing bound arg must survive to the callback, delivered
+  // after the primary result, and not read stale/garbage stack memory.
+  async_db_exec(conn, "insert into async_bound_tbl values('x');",
+    (: bound_arg_cb :), "hello-bound-arg");
 
-    call_out(function() {
-        ASSERT_EQ(1, got_string_cb_error);
-        ASSERT_EQ(1, got_bound_arg);
-        db_close(conn);
-    }, 1);
+  call_out(function() {
+    ASSERT_EQ(1, got_string_cb_error);
+    ASSERT_EQ(1, got_bound_arg);
+    db_close(conn);
+  }, 1);
 #else
-    ASSERT(1);
+  ASSERT(1);
 #endif
 }

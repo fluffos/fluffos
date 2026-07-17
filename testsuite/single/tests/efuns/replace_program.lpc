@@ -4,23 +4,23 @@
 // an inherited program. Fixtures: /clone/replace_parent (.lpc),
 // /clone/replace_child (inherits it, exposes do_replace()).
 void do_tests() {
-    object ob;
+  object ob;
 
-    // Extension-less: resolves the inherited program's real ".lpc" file.
-    ob = clone_object("/clone/replace_child");
-    ASSERT_EQ(0, ob->do_replace("/clone/replace_parent"));
-    destruct(ob);
+  // Extension-less: resolves the inherited program's real ".lpc" file.
+  ob = clone_object("/clone/replace_child");
+  ASSERT_EQ(0, ob->do_replace("/clone/replace_parent"));
+  destruct(ob);
 
-    // Explicit ".lpc" matches the program name exactly.
-    ob = clone_object("/clone/replace_child");
-    ASSERT_EQ(0, ob->do_replace("/clone/replace_parent.lpc"));
-    destruct(ob);
+  // Explicit ".lpc" matches the program name exactly.
+  ob = clone_object("/clone/replace_child");
+  ASSERT_EQ(0, ob->do_replace("/clone/replace_parent.lpc"));
+  destruct(ob);
 
-    ob = clone_object("/clone/replace_child");
-    // Explicit ".c" is exact and does NOT match the .lpc-compiled
-    // parent: no such inherited program -> error.
-    ASSERT(ob->do_replace("/clone/replace_parent.c"));
-    // A program that is not inherited at all errors too.
-    ASSERT(ob->do_replace("/clone/replaceable_inh"));
-    destruct(ob);
+  ob = clone_object("/clone/replace_child");
+  // Explicit ".c" is exact and does NOT match the .lpc-compiled
+  // parent: no such inherited program -> error.
+  ASSERT(ob->do_replace("/clone/replace_parent.c"));
+  // A program that is not inherited at all errors too.
+  ASSERT(ob->do_replace("/clone/replaceable_inh"));
+  destruct(ob);
 }

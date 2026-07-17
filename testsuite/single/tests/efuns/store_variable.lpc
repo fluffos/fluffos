@@ -10,12 +10,12 @@ void do_tests() {
     MIN_FLOAT,
     "test123",
     ({ "123", "345" }),
-    ([ 1: ({"123"}), "123": 4 ]),
+    ([ 1: ({ "123" }), "123": 4 ]),
     this_object(),
   });
   object target;
 
-  foreach(mixed v in values) {
+  foreach (mixed v in values) {
     store_variable("var", v);
     ASSERT_EQ(var, v);
   }
@@ -23,7 +23,7 @@ void do_tests() {
   target = new(__FILE__);
 
   store_variable("var", 0);
-  foreach(mixed v in values) {
+  foreach (mixed v in values) {
     store_variable("var", v, target);
     ASSERT_EQ(fetch_variable("var", target), v);
     ASSERT_EQ(fetch_variable("var"), 0);

@@ -1,62 +1,62 @@
 // Tests for the std/decimal library (exact fixed-point decimal in LPC).
 void do_tests() {
-    int *a;
+  int *a;
 
-    // Construction + round-trip formatting (scale preserved).
-    ASSERT_EQ("12.34", decimal_to_string(to_decimal("12.34")));
-    ASSERT_EQ("0.05", decimal_to_string(to_decimal("0.05")));
-    ASSERT_EQ("-3.140", decimal_to_string(to_decimal("-3.140")));
-    ASSERT_EQ("42", decimal_to_string(to_decimal(42)));
-    ASSERT_EQ("1000", decimal_to_string(to_decimal("1_000")));
-    ASSERT_EQ("100", decimal_to_string(to_decimal(100)));
-    ASSERT(decimalp(to_decimal("1.5")));
-    ASSERT(!decimalp(({ 1, 2, 3 })));
-    ASSERT(!decimalp("1.5"));
+  // Construction + round-trip formatting (scale preserved).
+  ASSERT_EQ("12.34", decimal_to_string(to_decimal("12.34")));
+  ASSERT_EQ("0.05", decimal_to_string(to_decimal("0.05")));
+  ASSERT_EQ("-3.140", decimal_to_string(to_decimal("-3.140")));
+  ASSERT_EQ("42", decimal_to_string(to_decimal(42)));
+  ASSERT_EQ("1000", decimal_to_string(to_decimal("1_000")));
+  ASSERT_EQ("100", decimal_to_string(to_decimal(100)));
+  ASSERT(decimalp(to_decimal("1.5")));
+  ASSERT(!decimalp(({ 1, 2, 3 })));
+  ASSERT(!decimalp("1.5"));
 
-    // Exact addition/subtraction where binary float would drift
-    // (0.1 + 0.2 == 0.3 exactly).
-    ASSERT_EQ("0.3", decimal_to_string(decimal_add(to_decimal("0.1"), to_decimal("0.2"))));
-    ASSERT_EQ("18.00", decimal_to_string(decimal_add(to_decimal("12.34"), to_decimal("5.66"))));
-    ASSERT_EQ("6.66", decimal_to_string(decimal_sub(to_decimal("10.00"), to_decimal("3.34"))));
-    // Scale alignment: 1.5 vs 1.50 compare and add correctly.
-    ASSERT_EQ(0, decimal_cmp(to_decimal("1.5"), to_decimal("1.50")));
+  // Exact addition/subtraction where binary float would drift
+  // (0.1 + 0.2 == 0.3 exactly).
+  ASSERT_EQ("0.3", decimal_to_string(decimal_add(to_decimal("0.1"), to_decimal("0.2"))));
+  ASSERT_EQ("18.00", decimal_to_string(decimal_add(to_decimal("12.34"), to_decimal("5.66"))));
+  ASSERT_EQ("6.66", decimal_to_string(decimal_sub(to_decimal("10.00"), to_decimal("3.34"))));
+  // Scale alignment: 1.5 vs 1.50 compare and add correctly.
+  ASSERT_EQ(0, decimal_cmp(to_decimal("1.5"), to_decimal("1.50")));
 
-    // Multiplication (scales add).
-    ASSERT_EQ("6.00", decimal_to_string(decimal_mul(to_decimal("2.0"), to_decimal("3.0"))));
-    ASSERT_EQ("1.2100", decimal_to_string(decimal_mul(to_decimal("1.10"), to_decimal("1.10"))));
+  // Multiplication (scales add).
+  ASSERT_EQ("6.00", decimal_to_string(decimal_mul(to_decimal("2.0"), to_decimal("3.0"))));
+  ASSERT_EQ("1.2100", decimal_to_string(decimal_mul(to_decimal("1.10"), to_decimal("1.10"))));
 
-    // Division: exact quotient trims trailing zeros; repeating truncates.
-    ASSERT_EQ("3", decimal_to_string(decimal_div(to_decimal("6"), to_decimal("2"))));
-    ASSERT_EQ("2.5", decimal_to_string(decimal_div(to_decimal("5"), to_decimal("2"))));
-    a = decimal_div(to_decimal("1"), to_decimal("3"));
-    ASSERT_EQ("0.333333333333", decimal_to_string(a));   // DECIMAL_DIV_SCALE places
-    ASSERT(catch(decimal_div(to_decimal("1"), to_decimal("0"))));
+  // Division: exact quotient trims trailing zeros; repeating truncates.
+  ASSERT_EQ("3", decimal_to_string(decimal_div(to_decimal("6"), to_decimal("2"))));
+  ASSERT_EQ("2.5", decimal_to_string(decimal_div(to_decimal("5"), to_decimal("2"))));
+  a = decimal_div(to_decimal("1"), to_decimal("3"));
+  ASSERT_EQ("0.333333333333", decimal_to_string(a));   // DECIMAL_DIV_SCALE places
+  ASSERT(catch(decimal_div(to_decimal("1"), to_decimal("0"))));
 
-    // Modulo.
-    ASSERT_EQ("1.00", decimal_to_string(decimal_mod(to_decimal("7.00"), to_decimal("3.00"))));
+  // Modulo.
+  ASSERT_EQ("1.00", decimal_to_string(decimal_mod(to_decimal("7.00"), to_decimal("3.00"))));
 
-    // Negation.
-    ASSERT_EQ("-2.50", decimal_to_string(decimal_neg(to_decimal("2.50"))));
-    ASSERT_EQ("2.50", decimal_to_string(decimal_neg(to_decimal("-2.50"))));
+  // Negation.
+  ASSERT_EQ("-2.50", decimal_to_string(decimal_neg(to_decimal("2.50"))));
+  ASSERT_EQ("2.50", decimal_to_string(decimal_neg(to_decimal("-2.50"))));
 
-    // Comparisons.
-    ASSERT(decimal_lt(to_decimal("1.9"), to_decimal("1.95")));
-    ASSERT(decimal_gt(to_decimal("2"), to_decimal("1.999")));
-    ASSERT(decimal_eq(to_decimal("2.0"), to_decimal("2")));
-    ASSERT_EQ(-1, decimal_cmp(to_decimal("-1"), to_decimal("0")));
+  // Comparisons.
+  ASSERT(decimal_lt(to_decimal("1.9"), to_decimal("1.95")));
+  ASSERT(decimal_gt(to_decimal("2"), to_decimal("1.999")));
+  ASSERT(decimal_eq(to_decimal("2.0"), to_decimal("2")));
+  ASSERT_EQ(-1, decimal_cmp(to_decimal("-1"), to_decimal("0")));
 
-    // Conversions out.
-    ASSERT_EQ(12, decimal_to_int(to_decimal("12.99")));   // truncates toward zero
-    ASSERT_EQ(-3, decimal_to_int(to_decimal("-3.99")));
-    ASSERT(decimal_to_float(to_decimal("1.25")) == 1.25);
+  // Conversions out.
+  ASSERT_EQ(12, decimal_to_int(to_decimal("12.99")));   // truncates toward zero
+  ASSERT_EQ(-3, decimal_to_int(to_decimal("-3.99")));
+  ASSERT(decimal_to_float(to_decimal("1.25")) == 1.25);
 
-    // Float construction (lossy but sane).
-    ASSERT_EQ(0, decimal_cmp(to_decimal(1.5), to_decimal("1.5")));
+  // Float construction (lossy but sane).
+  ASSERT_EQ(0, decimal_cmp(to_decimal(1.5), to_decimal("1.5")));
 
-    // Overflow is raised, not silently wrapped.
-    ASSERT(catch(decimal_mul(to_decimal("9999999999"), to_decimal("9999999999"))));
+  // Overflow is raised, not silently wrapped.
+  ASSERT(catch(decimal_mul(to_decimal("9999999999"), to_decimal("9999999999"))));
 
-    // Bad input errors cleanly.
-    ASSERT(catch(to_decimal("1.2.3")));
-    ASSERT(catch(to_decimal("abc")));
+  // Bad input errors cleanly.
+  ASSERT(catch(to_decimal("1.2.3")));
+  ASSERT(catch(to_decimal("abc")));
 }

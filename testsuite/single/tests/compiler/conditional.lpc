@@ -17,13 +17,13 @@ void do_tests() {
   mixed maybe;
 
   tmp = 1;
-  if(0.0) {
+  if (0.0) {
     tmp = 0;
   }
   ASSERT_EQ(1, tmp);
 
   tmp = 1;
-  if(0.0000000000000) {
+  if (0.0000000000000) {
     tmp = 0;
   }
   ASSERT_EQ(1, tmp);
@@ -45,15 +45,15 @@ void do_tests() {
   tmp = 1;
   do {
     tmp++;
-    if(tmp >= 3) break;
-  } while(0.0);
+    if (tmp >= 3) break;
+  } while (0.0);
   ASSERT_EQ(2, tmp);
 
   tmp = 1;
   do {
     tmp++;
-    if(tmp >= 3) break;
-  } while(0.0000000000000);
+    if (tmp >= 3) break;
+  } while (0.0000000000000);
   ASSERT_EQ(2, tmp);
 
   // this will never be true since they are compared by type.
@@ -82,7 +82,7 @@ void do_tests() {
   ASSERT_EQ("", "" ?? "fallback");
 
   // empty array should NOT use fallback
-  ASSERT_EQ(({ }), ({ }) ?? ({ 1, 2, 3 }));
+  ASSERT_EQ(({}), ({}) ?? ({ 1, 2, 3 }));
 
   // defined mapping value (even if 0) should NOT use fallback
   m["key"] = 0;
@@ -95,8 +95,8 @@ void do_tests() {
   // Difference between || and ??
   ASSERT_EQ(42, 0 || 42);       // || treats 0 as falsy
   ASSERT_EQ(0, 0 ?? 42);        // ?? only treats undefined as trigger
-  ASSERT_EQ("", "" || "yes"); // || treats "" as truthy
-  ASSERT_EQ("yes", ([])[0] || "yes"); // || treats undefined as falsy
+  ASSERT_EQ("", "" || "yes");  // || treats "" as truthy
+  ASSERT_EQ("yes", ([])[0] || "yes");  // || treats undefined as falsy
   ASSERT_EQ("", "" ?? "yes");   // ?? does not treat "" as trigger
 
   // Logical assignment operators (||=, &&=, ??=)
@@ -148,37 +148,37 @@ void do_tests() {
   // Test ternary operator without spaces (issue #1170)
   // These should all work without requiring spaces around ? and :
   string icon;
-  icon = (1)?"yes":"no";
+  icon = (1) ? "yes" : "no";
   ASSERT_EQ("yes", icon);
 
-  icon = (0)?"yes":"no";
+  icon = (0) ? "yes" : "no";
   ASSERT_EQ("no", icon);
 
   // Nested ternary without spaces
-  icon = (1)?"a":(0)?"b":"c";
+  icon = (1) ? "a" : (0) ? "b" : "c";
   ASSERT_EQ("a", icon);
 
-  icon = (0)?"a":(1)?"b":"c";
+  icon = (0) ? "a" : (1) ? "b" : "c";
   ASSERT_EQ("b", icon);
 
-  icon = (0)?"a":(0)?"b":"c";
+  icon = (0) ? "a" : (0) ? "b" : "c";
   ASSERT_EQ("c", icon);
 
   // Mixed with and without spaces
-  icon = (1) ? "yes":"no";
+  icon = (1) ? "yes" : "no";
   ASSERT_EQ("yes", icon);
 
-  icon = (1)?"yes" : "no";
+  icon = (1) ? "yes" : "no";
   ASSERT_EQ("yes", icon);
 
   // Test with other single-char tokens before ?
   int num = 5;
-  icon = num>3?"big":"small";
+  icon = num > 3 ? "big" : "small";
   ASSERT_EQ("big", icon);
 
-  icon = (num)?"yes":"no";
+  icon = (num) ? "yes" : "no";
   ASSERT_EQ("yes", icon);
 
-  icon = ({1,2,3})[0]?"yes":"no";
+  icon = ({ 1, 2, 3 })[0] ? "yes" : "no";
   ASSERT_EQ("yes", icon);
 }

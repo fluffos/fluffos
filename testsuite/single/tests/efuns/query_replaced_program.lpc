@@ -1,5 +1,5 @@
 void do_tests() {
-    // Nothing queued a replacement for this object.
-    ASSERT_EQ(0, query_replaced_program());
-    ASSERT_EQ(0, query_replaced_program(this_object()));
+  // Nothing queued a replacement for this object.
+  ASSERT_EQ(0, query_replaced_program());
+  ASSERT_EQ(0, query_replaced_program(this_object()));
 }

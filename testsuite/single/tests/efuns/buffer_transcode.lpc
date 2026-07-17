@@ -1,6 +1,6 @@
 void do_tests() {
-    buffer utf8 = string_encode("hé", "utf-8");
-    buffer latin1 = buffer_transcode(utf8, "utf-8", "iso-8859-1");
-    ASSERT_EQ(2, sizeof(latin1));       // é is one byte in latin-1
-    ASSERT_EQ("hé", string_decode(buffer_transcode(latin1, "iso-8859-1", "utf-8"), "utf-8"));
+  buffer utf8 = string_encode("hé", "utf-8");
+  buffer latin1 = buffer_transcode(utf8, "utf-8", "iso-8859-1");
+  ASSERT_EQ(2, sizeof(latin1));       // é is one byte in latin-1
+  ASSERT_EQ("hé", string_decode(buffer_transcode(latin1, "iso-8859-1", "utf-8"), "utf-8"));
 }

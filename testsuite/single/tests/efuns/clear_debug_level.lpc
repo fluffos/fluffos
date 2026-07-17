@@ -1,5 +1,5 @@
 void do_tests() {
-    set_debug_level("d_flag");
-    clear_debug_level("d_flag");
-    ASSERT_EQ(0, debug_levels()["d_flag"]);
+  set_debug_level("d_flag");
+  clear_debug_level("d_flag");
+  ASSERT_EQ(0, debug_levels()["d_flag"]);
 }

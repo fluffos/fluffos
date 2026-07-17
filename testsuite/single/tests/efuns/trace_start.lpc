@@ -1,9 +1,9 @@
 void do_tests() {
-    trace_start("/trace_test.json", 5);
-    trace_end();
-    // The dump is handed to a separate writer thread, so file existence
-    // cannot be asserted deterministically here -- the error-free
-    // start/end round trip is the synchronous contract.
-    ASSERT(1);
-    rm("/trace_test.json");
+  trace_start("/trace_test.json", 5);
+  trace_end();
+  // The dump is handed to a separate writer thread, so file existence
+  // cannot be asserted deterministically here -- the error-free
+  // start/end round trip is the synchronous contract.
+  ASSERT(1);
+  rm("/trace_test.json");
 }

@@ -1,6 +1,6 @@
 void do_tests() {
-    buffer b = string_encode("héllo", "utf-8");
-    ASSERT_EQ("héllo", string_decode(b, "utf-8"));
-    ASSERT_EQ("", string_decode(allocate_buffer(0), "utf-8"));
-    ASSERT(catch(string_decode(b, "no-such-charset")));
+  buffer b = string_encode("héllo", "utf-8");
+  ASSERT_EQ("héllo", string_decode(b, "utf-8"));
+  ASSERT_EQ("", string_decode(allocate_buffer(0), "utf-8"));
+  ASSERT(catch(string_decode(b, "no-such-charset")));
 }
