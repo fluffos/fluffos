@@ -65,6 +65,7 @@
 #include <vector>
 
 #include "compiler/internal/compiler.h"
+#include "compiler/internal/lexer_utils.h"
 #include "mainlib.h"
 #include "vm/vm.h"
 #include "vm/internal/apply.h"
@@ -475,6 +476,21 @@ int main(int argc, char** argv) try {
 
   auto config = get_argument(0, argc, argv);
   init_main(config);
+
+  // Let the mudlib tell it is being compiled for the shell rather than for
+  // a live driver, so it can skip whatever only makes sense with players
+  // attached (boot chatter, port-bound daemons, ...).
+  //
+  // This has to be a PREDEFINE rather than a master::flag() call: the
+  // master does not exist until vm_start() loads it, and vm_start() runs
+  // preload_objects() -> master::epilog() in the same breath, so there is
+  // no window in between from which to apply to it. A predefine registered
+  // here is in place when vm_start() compiles the master -- add_predefines()
+  // (vm.cc, called from vm_start) only ever adds to the table, never clears
+  // it, so this survives. Defined to 1 so both `#ifdef __LPCSHELL__` and
+  // `#if __LPCSHELL__` work.
+  add_predefine("__LPCSHELL__", -1, "1");
+
   vm_start();
   current_object = master_ob;
 
