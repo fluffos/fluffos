@@ -14,8 +14,21 @@
 //     unchanged, at the cost of not sharing a persistent symbol table
 //     across statements (that would need real compiler surgery -- see the
 //     plan's open Phase 3 item). A bare expression like `1 + 1` is tried
-//     first (auto-printed, like Python); if that fails to parse, the same
+//     first (auto-printed, like Python); if that fails to PARSE, the same
 //     text is retried wrapped as a statement body instead (no auto-print).
+//     A trial that parsed and then errored at RUNTIME is never retried:
+//     the text is a valid expression, so the statement form would only
+//     re-run whatever side effects it already had and then report a bogus
+//     syntax error (a bare expression has no terminating ';' as a
+//     statement) on top of the real one.
+//
+//   - Every attempt's body is wrapped in an LPC-level catch(), so a runtime
+//     error arrives as a VALUE rather than unwinding out of the apply. It
+//     cannot be recovered any other way: error() hands the text to the
+//     mudlib's error_handler apply and then throws the generic "error
+//     handler error" (see simulate.cc), so against a mudlib that routes its
+//     errors somewhere other than stdout the REPL is left with nothing to
+//     report.
 //
 //   - Variable VALUES persist across statements via the existing
 //     save_variable()/restore_variable() efuns, called from LPC source
@@ -186,15 +199,43 @@ bool MatchSingleDeclaration(const std::string& stmt, std::string* name, std::str
   return true;
 }
 
+// Renders whatever catch() handed back. A standard error is a string with a
+// leading '*' (and usually a trailing newline) -- strip both. throw() can
+// hand back any non-zero value, though, so fall back to %O for the rest.
+std::string FormatCaughtError(svalue_t* err) {
+  if (err->type == T_STRING) {
+    std::string s = err->u.string;
+    if (!s.empty() && s[0] == '*') s.erase(0, 1);
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+    return s;
+  }
+  char* formatted = string_print_formatted("%O", 1, err);
+  if (!formatted) return "runtime error";
+  std::string s = formatted;
+  FREE_MSTR(formatted);
+  return s;
+}
+
 // ---------------------------------------------------------------------------
 // Compile-and-run one attempt. Returns the applied function's result via
 // `*result` (only meaningful when `want_result` is true and this returns
-// true) and updates `session`'s saved variable values on success. Throws
-// nothing -- LPC-level errors are caught and reported via return false.
+// kOk) and updates `session`'s saved variable values on success. Throws
+// nothing -- LPC-level errors come back as kRuntimeError with the message
+// in `*error_message`.
+//
+// Distinguishing "didn't compile" from "compiled but errored" is what lets
+// Eval() decide whether retrying in another form is meaningful or merely
+// destructive; see the caller.
 // ---------------------------------------------------------------------------
 
-bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
-                std::string* printed_result, std::string* error_message) {
+enum class Attempt {
+  kOk,            // compiled, ran, and returned cleanly
+  kCompileError,  // never ran: the text does not compile in this form
+  kRuntimeError,  // compiled and ran, but error()ed -- *error_message is set
+};
+
+Attempt RunAttempt(Session* session, const std::string& body_src, bool want_result,
+                   std::string* printed_result, std::string* error_message) {
   std::string name = "/lpcshell#" + std::to_string(session->counter++);
 
   // __lpcshell_snapshot() is defined FIRST and __lpcshell_eval() (which
@@ -204,8 +245,16 @@ bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
   // textually follows it in the same compile unit (a bogus "unexpected
   // '}'" pointing at the next function's signature). Putting the
   // user's code last means there's nothing after it left to corrupt.
+  //
+  // body_src assigns the caught error to __lpcshell_error and (expression
+  // form only) the value to __lpcshell_value; __lpcshell_outcome() reads
+  // both back out. They are globals rather than __lpcshell_eval()'s return
+  // value so that a user-typed `return ...;` still returns from
+  // __lpcshell_eval() harmlessly, exactly as it did before.
   std::string src = session->Preamble();
+  src += "mixed __lpcshell_value, __lpcshell_error;\n";
   src += "mixed *__lpcshell_snapshot() {\n  return " + session->SnapshotExpr() + ";\n}\n";
+  src += "mixed *__lpcshell_outcome() {\n  return ({ __lpcshell_error, __lpcshell_value });\n}\n";
   src += "mixed __lpcshell_eval() {\n";
   src += session->RestoreStatements();
   src += body_src;
@@ -228,25 +277,38 @@ bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
     restore_context(&econ);
     pop_context(&econ);
     *error_message = e ? e : "compile error";
-    return false;
+    return Attempt::kCompileError;
   }
   compiler_diags_quiet = false;
   pop_context(&econ);
 
   if (!ob) {
     *error_message = "compile error";
-    return false;
+    return Attempt::kCompileError;
   }
 
   current_object = ob;
   save_context(&econ);
+  Attempt outcome = Attempt::kOk;
   try {
-    svalue_t* ret = apply("__lpcshell_eval", ob, 0, ORIGIN_DRIVER);
-    if (want_result && ret) {
-      char* formatted = string_print_formatted("%O", 1, ret);
-      if (formatted) {
-        *printed_result = formatted;
-        FREE_MSTR(formatted);
+    apply("__lpcshell_eval", ob, 0, ORIGIN_DRIVER);
+
+    // The body's catch() already contained any error, so this reads back a
+    // plain value; only an uncatchable error (eval cost, too-deep
+    // recursion) reaches the handler below.
+    svalue_t* out = apply("__lpcshell_outcome", ob, 0, ORIGIN_DRIVER);
+    if (out && out->type == T_ARRAY && out->u.arr->size == 2) {
+      svalue_t* err = &out->u.arr->item[0];
+      svalue_t* val = &out->u.arr->item[1];
+      if (err->type != T_NUMBER || err->u.number != 0) {
+        outcome = Attempt::kRuntimeError;
+        *error_message = FormatCaughtError(err);
+      } else if (want_result) {
+        char* formatted = string_print_formatted("%O", 1, val);
+        if (formatted) {
+          *printed_result = formatted;
+          FREE_MSTR(formatted);
+        }
       }
     }
 
@@ -267,12 +329,12 @@ bool RunAttempt(Session* session, const std::string& body_src, bool want_result,
     pop_context(&econ);
     if (!(ob->flags & O_DESTRUCTED)) destruct_object(ob);
     *error_message = e ? e : "runtime error";
-    return false;
+    return Attempt::kRuntimeError;
   }
   pop_context(&econ);
 
   if (!(ob->flags & O_DESTRUCTED)) destruct_object(ob);
-  return true;
+  return outcome;
 }
 
 // Strips one trailing ';' (and surrounding whitespace) if present, so a
@@ -282,6 +344,19 @@ std::string StripTrailingSemicolon(std::string s) {
   size_t end = s.find_last_not_of(" \t\r\n");
   if (end != std::string::npos && s[end] == ';') {
     s.erase(end);
+  }
+  return s;
+}
+
+// The mirror image, for the statement form: `write("a"); write("b")` is a
+// perfectly good statement sequence that the user simply didn't terminate,
+// and without this it would land inside the generated block unterminated
+// and report a syntax error against the block's own closing brace. A body
+// already ending in ';' or '}' (`if (x) { ... }`) needs nothing.
+std::string EnsureTrailingSemicolon(std::string s) {
+  size_t end = s.find_last_not_of(" \t\r\n");
+  if (end != std::string::npos && s[end] != ';' && s[end] != '}') {
+    s.insert(end + 1, ";");
   }
   return s;
 }
@@ -313,40 +388,64 @@ bool Eval(Session* session, std::string stmt) {
   bool try_expression_first = !std::regex_search(stmt, statement_leader);
 
   if (try_expression_first) {
-    std::string expr_body = "return (" + StripTrailingSemicolon(stmt) + ");";
-    if (RunAttempt(session, expr_body, /*want_result=*/true, &result, &error_message)) {
-      std::cout << result << "\n";
-      return true;
+    // The user's text goes on its OWN line, so a diagnostic against it
+    // quotes the line the user actually typed at the column they typed it,
+    // rather than the generated wrapper. (It also keeps a trailing `//`
+    // comment in the input from swallowing the wrapper's closing tokens.)
+    std::string expr_body =
+        "__lpcshell_error = catch(__lpcshell_value = (\n" + StripTrailingSemicolon(stmt) + "\n));";
+    switch (RunAttempt(session, expr_body, /*want_result=*/true, &result, &error_message)) {
+      case Attempt::kOk:
+        std::cout << result << "\n";
+        return true;
+      case Attempt::kRuntimeError:
+        // It parsed and it ran -- the text IS an expression, it just
+        // errored. Retrying it as a statement would re-execute whatever
+        // side effects it already had and bury the real error under a
+        // bogus one, so report it and stop here.
+        std::cout << "error: " << error_message << "\n";
+        return false;
+      case Attempt::kCompileError:
+        // Not an expression at all. Fall through and retry as a statement.
+        // The trial's diagnostics stay unprinted (compiles run with
+        // compiler_diags_quiet, and the retry's own compile clears
+        // compiler_diags), so the doomed trial never reaches the user.
+        break;
     }
-    // Trial failed silently (compiles run with compiler_diags_quiet); the
-    // statement-form retry below clears compiler_diags via its own
-    // compile, so the doomed trial's errors never reach the user.
   }
 
   // Fall back to statement form (e.g. `if (x) write(...)`, assignments,
   // loops -- anything that isn't itself an expression).
-  if (RunAttempt(session, stmt, /*want_result=*/false, &result, &error_message)) {
-    // Success may still have produced warnings worth showing.
-    for (const auto& d : compiler_diags) {
-      if (d.is_warning) std::cout << render_diagnostic(d, isatty(1)) << "\n";
-    }
-    return true;
+  std::string stmt_body = "__lpcshell_error = catch {\n" + EnsureTrailingSemicolon(stmt) + "\n};";
+  switch (RunAttempt(session, stmt_body, /*want_result=*/false, &result, &error_message)) {
+    case Attempt::kOk:
+      // Success may still have produced warnings worth showing.
+      for (const auto& d : compiler_diags) {
+        if (d.is_warning) std::cout << render_diagnostic(d, isatty(1)) << "\n";
+      }
+      return true;
+    case Attempt::kRuntimeError:
+      std::cout << "error: " << error_message << "\n";
+      return false;
+    case Attempt::kCompileError:
+      break;
   }
 
-  // Both attempts failed. Render the FINAL attempt's structured
-  // diagnostics ourselves, clang-style with the full include/macro
-  // provenance chains (compiler_diags holds exactly the last compile's
-  // records -- each compile clears the previous one's). error_message
-  // itself stays unprinted: error()'s C++-exception unwinding path always
-  // throws the generic "error handler error", not the diagnostic text.
+  // The text compiles in neither form, so it is a genuine syntax/semantic
+  // error. Render the FINAL attempt's structured diagnostics ourselves,
+  // clang-style with the full include/macro provenance chains
+  // (compiler_diags holds exactly the last compile's records -- each
+  // compile clears the previous one's). Runtime failures never reach here:
+  // both switches above report and return on kRuntimeError.
   bool printed = false;
   for (const auto& d : compiler_diags) {
     std::cout << render_diagnostic(d, isatty(1)) << "\n";
     printed = true;
   }
   if (!printed) {
-    // No compile diagnostics: the failure was at runtime (the driver's
-    // own error logging already reported it to the console).
+    // A compile that failed without recording a diagnostic would otherwise
+    // fail mutely; error_message is all there is to go on.
+    std::cout << "error: " << error_message << "\n";
   }
   return false;
 }
