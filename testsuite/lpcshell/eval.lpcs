@@ -1,0 +1,7 @@
+1 + 1
+int x = 5;
+x = x * 2;
+write("a\n"); write("b\n")
+1 + 1 // a trailing comment must not swallow the generated wrapper
+if(x == 10) write("ten\n");
+x == 10 ? "EVAL_OK" : "EVAL_BAD"

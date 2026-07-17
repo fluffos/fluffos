@@ -129,3 +129,36 @@ set_tests_properties(testsuite PROPERTIES
         FAIL_REGULAR_EXPRESSION "\\[  FAILED  \\]"
         TIMEOUT 600
         LABELS "testsuite")
+
+# lpcshell drives the REPL binary itself in script mode against the same
+# mudlib: the wrapping it is being tested for (deciding whether typed text
+# is an expression or a statement, and reporting what happened) lives in
+# C++ in main_lpcshell.cc, so the LPC testsuite above cannot reach it.
+# `ctest -L lpcshell` runs just these.
+#
+# Both assert on OUTPUT rather than exit status -- lpcshell-errors evaluates
+# deliberately-failing statements and so exits nonzero by design, and CMake
+# ignores the exit code once PASS_REGULAR_EXPRESSION is set.
+add_test(NAME lpcshell-eval
+        COMMAND $<TARGET_FILE:lpcshell> etc/config.test lpcshell/eval.lpcs
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(lpcshell-eval PROPERTIES
+        PASS_REGULAR_EXPRESSION "EVAL_OK"
+        FAIL_REGULAR_EXPRESSION "EVAL_BAD;syntax error"
+        TIMEOUT 120
+        LABELS "lpcshell")
+
+# The regression guard. A bare expression that error()s must report the
+# real message and must NOT be retried in statement form: the retry would
+# re-run whatever side effects the expression already had (asserted via
+# n=1 -- n=2 means it ran twice) and report a bogus "syntax error,
+# unexpected '}'" against the generated wrapper's closing brace, burying
+# the real error entirely.
+add_test(NAME lpcshell-errors
+        COMMAND $<TARGET_FILE:lpcshell> etc/config.test lpcshell/errors.lpcs
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(lpcshell-errors PROPERTIES
+        PASS_REGULAR_EXPRESSION "error: boom"
+        FAIL_REGULAR_EXPRESSION "syntax error;n=0;n=2"
+        TIMEOUT 120
+        LABELS "lpcshell")

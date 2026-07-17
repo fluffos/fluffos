@@ -1,0 +1,6 @@
+error("boom")
+"AFTER_ERROR"
+int n;
+n = 0;
+(n = n + 1, error("bang"));
+"n=" + n
