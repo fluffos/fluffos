@@ -1,4 +1,4 @@
 void do_tests() {
-    ASSERT(master());
-    ASSERT(objectp(master()));
+  ASSERT(master());
+  ASSERT(objectp(master()));
 }

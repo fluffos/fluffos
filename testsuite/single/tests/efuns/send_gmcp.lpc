@@ -1,5 +1,5 @@
 void do_tests() {
-    // Sends to this_player(); no interactive in autotest.
-    catch(send_gmcp("Core.Ping"));
-    ASSERT(1);
+  // Sends to this_player(); no interactive in autotest.
+  catch(send_gmcp("Core.Ping"));
+  ASSERT(1);
 }

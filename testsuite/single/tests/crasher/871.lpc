@@ -1,5 +1,5 @@
 void do_tests() {
-  read_file("""This command will show the most favored religion of Threshold. All other
+  read_file("" "This command will show the most favored religion of Threshold. All other
 churches are listed in order of their approach to this esteemed position
 as well.
 
@@ -13,5 +13,5 @@ is only a mechanic of partying. It is to encourage grouping with your faith-
 mates, but it will work regardless of the religious makeup of the party.
 
 Your church's progress can be seen via the religion command (help religion).
-""");
+" "");
 }

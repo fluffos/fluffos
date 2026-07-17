@@ -43,7 +43,7 @@ private void run_checks() {
   ob = load_object("/clone/if_nested");
   ASSERT_EQ(7, ob->fn());
   calls = filter(hook->query_include_calls(),
-                 (: $1[2] == "if_magic.h" && $1[0] == "/clone/if_nested.lpc" :));
+    (: $1[2] == "if_magic.h" && $1[0] == "/clone/if_nested.lpc" :));
   ASSERT(sizeof(calls) > 0);
   ASSERT_EQ("/clone/if_outer.h", calls[<1][1]);
 

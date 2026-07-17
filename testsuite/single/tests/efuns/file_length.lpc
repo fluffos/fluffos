@@ -1,8 +1,8 @@
 void do_tests() {
-    write_file("/fl_test.txt", "a\nbb\nccc\n", 1);
-    // Line count for files.
-    ASSERT_EQ(3, file_length("/fl_test.txt"));
-    ASSERT_EQ(-1, file_length("/no/such/file"));
-    ASSERT_EQ(-2, file_length("/single"));      // directory
-    rm("/fl_test.txt");
+  write_file("/fl_test.txt", "a\nbb\nccc\n", 1);
+  // Line count for files.
+  ASSERT_EQ(3, file_length("/fl_test.txt"));
+  ASSERT_EQ(-1, file_length("/no/such/file"));
+  ASSERT_EQ(-2, file_length("/single"));      // directory
+  rm("/fl_test.txt");
 }

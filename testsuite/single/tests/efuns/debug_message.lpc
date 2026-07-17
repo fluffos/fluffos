@@ -1,4 +1,4 @@
 void do_tests() {
-    // Writes to the debug log; observable contract is "does not error".
-    ASSERT_EQ(0, catch(debug_message("debug_message efun test")));
+  // Writes to the debug log; observable contract is "does not error".
+  ASSERT_EQ(0, catch(debug_message("debug_message efun test")));
 }

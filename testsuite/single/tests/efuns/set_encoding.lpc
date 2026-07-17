@@ -1,4 +1,4 @@
 void do_tests() {
-    catch(set_encoding("utf-8"));
-    ASSERT(1);
+  catch(set_encoding("utf-8"));
+  ASSERT(1);
 }

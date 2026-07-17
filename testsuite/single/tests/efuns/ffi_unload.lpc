@@ -3,12 +3,12 @@
 #endif
 void do_tests() {
 #ifdef __PACKAGE_FFI__
-    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
-    int lib = ffi_load("");
-    ffi_unload(lib);
-    // Unloading an unknown/already-unloaded handle is a harmless no-op.
-    ffi_unload(lib);
-    ffi_unload(999999);
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  int lib = ffi_load("");
+  ffi_unload(lib);
+  // Unloading an unknown/already-unloaded handle is a harmless no-op.
+  ffi_unload(lib);
+  ffi_unload(999999);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

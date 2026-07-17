@@ -1,8 +1,8 @@
 void do_tests() {
 #ifdef __PACKAGE_PARSER__
-    parse_init();
-    parse_add_rule("wave", "");
-    ASSERT_EQ(0, catch(parse_remove("wave")));
+  parse_init();
+  parse_add_rule("wave", "");
+  ASSERT_EQ(0, catch(parse_remove("wave")));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

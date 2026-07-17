@@ -1,3 +1,3 @@
 class foo {
-    void x;
+  void x;
 }

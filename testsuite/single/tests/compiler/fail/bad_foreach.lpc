@@ -1,3 +1,3 @@
 void foo() {
-    foreach (x in ({})) ;
+  foreach (x in ({}));
 }

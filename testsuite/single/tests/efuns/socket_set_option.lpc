@@ -1,11 +1,11 @@
 #ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
 #include <socket_err.h>
-void rcb(int fd) { }
+void rcb(int fd) {}
 void do_tests() {
-    int fd = socket_create(STREAM, "rcb");
-    catch(socket_set_option(fd, SO_TLS_VERIFY_PEER, 0));
-    socket_close(fd);
-    ASSERT(1);
+  int fd = socket_create(STREAM, "rcb");
+  catch(socket_set_option(fd, SO_TLS_VERIFY_PEER, 0));
+  socket_close(fd);
+  ASSERT(1);
 }
 #endif

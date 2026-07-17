@@ -1,6 +1,6 @@
 void do_tests() {
-    // Telnet negotiation helpers need an interactive; graceful no-op or
-    // error without one.
-    catch(request_term_size());
-    ASSERT(1);
+  // Telnet negotiation helpers need an interactive; graceful no-op or
+  // error without one.
+  catch(request_term_size());
+  ASSERT(1);
 }

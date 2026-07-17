@@ -1,17 +1,17 @@
 #ifdef __PACKAGE_PCRE__
 void do_tests() {
-    // Array form filters to matching members; string form is a boolean.
-    ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca"));
-    ASSERT(pcre_match("hello world", "wor"));
-    ASSERT(!pcre_match("hello", "^world$"));
-    ASSERT(catch(pcre_match("x", "(unclosed")));
+  // Array form filters to matching members; string form is a boolean.
+  ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca"));
+  ASSERT(pcre_match("hello world", "wor"));
+  ASSERT(!pcre_match("hello", "^world$"));
+  ASSERT(catch(pcre_match("x", "(unclosed")));
 
-    // Array form with a 3rd (flag) argument: is_string used to be computed
-    // from the wrong stack slot for any 3-argument call, misrouting this
-    // into the string-only path (type confusion / wrong result type).
-    // flag 2 inverts the match (returns non-matching elements).
-    ASSERT_EQ(({ "dog" }), pcre_match(({ "cat", "dog", "car" }), "^ca", 2));
-    // Array form with all 4 arguments (flag + pcre_flags).
-    ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca", 0, 0));
+  // Array form with a 3rd (flag) argument: is_string used to be computed
+  // from the wrong stack slot for any 3-argument call, misrouting this
+  // into the string-only path (type confusion / wrong result type).
+  // flag 2 inverts the match (returns non-matching elements).
+  ASSERT_EQ(({ "dog" }), pcre_match(({ "cat", "dog", "car" }), "^ca", 2));
+  // Array form with all 4 arguments (flag + pcre_flags).
+  ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca", 0, 0));
 }
 #endif

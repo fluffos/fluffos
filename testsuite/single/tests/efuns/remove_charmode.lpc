@@ -1,4 +1,4 @@
 void do_tests() {
-    catch(remove_charmode(this_object()));
-    ASSERT(1);
+  catch(remove_charmode(this_object()));
+  ASSERT(1);
 }

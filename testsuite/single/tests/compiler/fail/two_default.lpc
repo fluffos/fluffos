@@ -1,6 +1,6 @@
 void foo() {
-    switch (1) {
+  switch (1) {
     default:
     default:
-    }
+  }
 }

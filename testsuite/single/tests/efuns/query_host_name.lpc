@@ -1,4 +1,4 @@
 void do_tests() {
-    ASSERT(stringp(query_host_name()));
-    ASSERT(strlen(query_host_name()) > 0);
+  ASSERT(stringp(query_host_name()));
+  ASSERT(strlen(query_host_name()) > 0);
 }

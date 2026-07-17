@@ -1,11 +1,11 @@
 void do_tests() {
-    mixed *arr = ({ 1, ({ 2, 3 }), ([ "k" : ({ 4 }) ]) });
-    mixed *dup = copy(arr);
-    ASSERT_EQ(arr, dup);            // structurally equal
-    dup[1][0] = 99;                 // ...but deeply independent
-    dup[2]["k"][0] = 99;
-    ASSERT_EQ(2, arr[1][0]);
-    ASSERT_EQ(4, arr[2]["k"][0]);
-    ASSERT_EQ(7, copy(7));
-    ASSERT_EQ("s", copy("s"));
+  mixed *arr = ({ 1, ({ 2, 3 }), ([ "k": ({ 4 }) ]) });
+  mixed *dup = copy(arr);
+  ASSERT_EQ(arr, dup);            // structurally equal
+  dup[1][0] = 99;                 // ...but deeply independent
+  dup[2]["k"][0] = 99;
+  ASSERT_EQ(2, arr[1][0]);
+  ASSERT_EQ(4, arr[2]["k"][0]);
+  ASSERT_EQ(7, copy(7));
+  ASSERT_EQ("s", copy("s"));
 }

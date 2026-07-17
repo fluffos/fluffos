@@ -1,5 +1,5 @@
 void do_tests() {
-    ASSERT_EQ(2.0, ceil(1.2));
-    ASSERT_EQ(-1.0, ceil(-1.8));
-    ASSERT_EQ(3.0, ceil(3.0));
+  ASSERT_EQ(2.0, ceil(1.2));
+  ASSERT_EQ(-1.0, ceil(-1.8));
+  ASSERT_EQ(3.0, ceil(3.0));
 }

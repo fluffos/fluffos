@@ -1,10 +1,9 @@
-int main(string arg)
-{
+int main(string arg) {
   int msdp_enabled = has_msdp(this_player());
 
   write("MSDP status: " + msdp_enabled + "\n");
 
-  if(msdp_enabled) {
+  if (msdp_enabled) {
     write("MSDP sending int named hp value of 100.");
     this_player()->send_msdp_variable("hp", 100);
     write("MSDP sending name named name value of name.");

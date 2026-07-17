@@ -1,7 +1,7 @@
 void do_tests() {
 #if efun_defined(check_memory)
-    // The suite's own leak gate; here just pin the report shape.
-    ASSERT(stringp(check_memory()));
+  // The suite's own leak gate; here just pin the report shape.
+  ASSERT(stringp(check_memory()));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

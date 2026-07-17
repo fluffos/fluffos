@@ -5,10 +5,10 @@ int my_dummy() { return 1; }
 
 void do_tests() {
 #ifdef __PACKAGE_CONTRIB__
-    // Empty ignore array must not crash; create/__INIT are always ignored so
-    // an object with only create()/a plain function is still replaceable.
-    ASSERT_EQ(0, catch(replaceable(this_object(), ({}))));
-    ASSERT_EQ(0, catch(replaceable(this_object(), ({ "my_dummy" }))));
+  // Empty ignore array must not crash; create/__INIT are always ignored so
+  // an object with only create()/a plain function is still replaceable.
+  ASSERT_EQ(0, catch(replaceable(this_object(), ({}))));
+  ASSERT_EQ(0, catch(replaceable(this_object(), ({ "my_dummy" }))));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

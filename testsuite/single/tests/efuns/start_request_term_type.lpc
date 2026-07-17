@@ -1,4 +1,4 @@
 void do_tests() {
-    catch(start_request_term_type());
-    ASSERT(1);
+  catch(start_request_term_type());
+  ASSERT(1);
 }

@@ -1,21 +1,21 @@
 #ifdef __PACKAGE_PCRE__
 void do_tests() {
-    // Replacements substitute the CAPTURE GROUPS of the first match,
-    // one replacement string per group.
-    ASSERT_EQ("X1-Y2-", pcre_replace("a1-b2-", "([a-z])[0-9]-([a-z])[0-9]-", ({ "X", "Y" })));
-    // Group count and replacement count must agree.
-    ASSERT(catch(pcre_replace("a1", "[a-z][0-9]", ({ "X", "Y" }))));
+  // Replacements substitute the CAPTURE GROUPS of the first match,
+  // one replacement string per group.
+  ASSERT_EQ("X1-Y2-", pcre_replace("a1-b2-", "([a-z])[0-9]-([a-z])[0-9]-", ({ "X", "Y" })));
+  // Group count and replacement count must agree.
+  ASSERT(catch(pcre_replace("a1", "[a-z][0-9]", ({ "X", "Y" }))));
 
-    // Nested capture groups: the size pass and copy pass used divergent group
-    // selection, overrunning the output buffer. Only the non-nested (outer)
-    // group is selected, matching the allocation.
-    ASSERT_EQ("X", pcre_replace("a", "((a))", ({ "X", "YYYY" })));
-    ASSERT_EQ("Xc", pcre_replace("abc", "((ab))", ({ "X", "Y" })));
+  // Nested capture groups: the size pass and copy pass used divergent group
+  // selection, overrunning the output buffer. Only the non-nested (outer)
+  // group is selected, matching the allocation.
+  ASSERT_EQ("X", pcre_replace("a", "((a))", ({ "X", "YYYY" })));
+  ASSERT_EQ("Xc", pcre_replace("abc", "((ab))", ({ "X", "Y" })));
 
-    // A replacement much longer than its match must not overflow.
-    ASSERT_EQ("[LONGREPLACEMENT]", pcre_replace("[x]", "(x)", ({ "LONGREPLACEMENT" })));
+  // A replacement much longer than its match must not overflow.
+  ASSERT_EQ("[LONGREPLACEMENT]", pcre_replace("[x]", "(x)", ({ "LONGREPLACEMENT" })));
 
-    // Text outside groups is preserved around a single group.
-    ASSERT_EQ("aXc", pcre_replace("abc", "(b)", ({ "X" })));
+  // Text outside groups is preserved around a single group.
+  ASSERT_EQ("aXc", pcre_replace("abc", "(b)", ({ "X" })));
 }
 #endif

@@ -1,5 +1,5 @@
 void do_tests() {
-    ASSERT_EQ(2.0, round(1.5));
-    ASSERT_EQ(1.0, round(1.4));
-    ASSERT_EQ(-2.0, round(-1.5));   // rounds away from zero
+  ASSERT_EQ(2.0, round(1.5));
+  ASSERT_EQ(1.0, round(1.4));
+  ASSERT_EQ(-2.0, round(-1.5));   // rounds away from zero
 }

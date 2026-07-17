@@ -1,11 +1,11 @@
-string* parse_command_id_list() {
+string *parse_command_id_list() {
   return ({ "bag" });
 }
 
 void create() {
   parse_init();
 
-  if(clonep()) {
+  if (clonep()) {
     move_object(__FILE__);
   }
 }

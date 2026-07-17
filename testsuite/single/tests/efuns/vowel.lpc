@@ -1,8 +1,8 @@
 void do_tests() {
 #ifdef __DWLIB__
-    ASSERT_EQ(1, vowel('a'));
-    ASSERT_EQ(1, vowel('E'));
-    ASSERT_EQ(0, vowel('b'));
+  ASSERT_EQ(1, vowel('a'));
+  ASSERT_EQ(1, vowel('E'));
+  ASSERT_EQ(0, vowel('b'));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

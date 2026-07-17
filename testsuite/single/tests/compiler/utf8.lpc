@@ -6,7 +6,7 @@
 // Mathematics and Sciences
 string text1 = "∮ E⋅da = Q,  n → ∞, ∑ f(i) = ∏ g(i), ∀x∈ℝ: ⌈x⌉ = −⌊−x⌋, α ∧ ¬β = ¬(¬α ∨ β)";
 string text2 = "ℕ ⊆ ℕ₀ ⊂ ℤ ⊂ ℚ ⊂ ℝ ⊂ ℂ, ⊥" + " < a ≠ b ≡ c ≤ d ≪ ⊤ ⇒ (A ⇔ B)" +
-"2H₂ + O₂ ⇌ 2H₂O, R = 4.7 kΩ, ⌀ 200 mm";
+  "2H₂ + O₂ ⇌ 2H₂O, R = 4.7 kΩ, ⌀ 200 mm";
 
 // Linguistics and dictionaries:
 string text3 = @UTF8
@@ -1160,7 +1160,7 @@ string text8_cp1 = @UNICODE
 \U0001f600
 UNICODE;
 
-string* text8_cp2 = @@UNICODE
+string *text8_cp2 = @@UNICODE
 \uD83D
 UNICODE;
 
@@ -1241,8 +1241,8 @@ void do_tests() {
     int count = 0;
 
     tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
-    foreach(int x in tmp) {
-      count ++;
+    foreach (int x in tmp) {
+      count++;
     }
 
     ASSERT_EQ(strlen(tmp), count);
@@ -1253,9 +1253,9 @@ void do_tests() {
     int count = 0;
 
     tmp = "欲穷千里目🍆🍠🧮😊👌💩更上一层楼";
-    foreach(int ref x in tmp) {
+    foreach (int ref x in tmp) {
       x++;
-      count ++;
+      count++;
     }
 
     ASSERT_EQ(strlen(tmp), count);
@@ -1311,7 +1311,7 @@ void do_tests() {
   ASSERT_EQ("欲穷千里目", sprintf("%1.10s", tmp));
 
   // https://github.com/fluffos/fluffos/issues/590
-  ASSERT_EQ("测试ab", sprintf("%.6s","测试abcd 啊看 is abc sentence 好 不好\n"));
+  ASSERT_EQ("测试ab", sprintf("%.6s", "测试abcd 啊看 is abc sentence 好 不好\n"));
 
   // left, center, and right adjustment,
   // and count CJK chars and emojis as 2 width,  40 - 16 * 2 = 8
@@ -1357,138 +1357,138 @@ void do_tests() {
 
   // perfect case
   ASSERT_EQ("一四七十丙\n"
-            "二五八甲丁\n"
-            "三六九乙戊",
-            sprintf("%#10.5s", tmp));
+    "二五八甲丁\n"
+    "三六九乙戊",
+    sprintf("%#10.5s", tmp));
 
   ASSERT_EQ("一六甲\n"
-            "二七乙\n"
-            "三八丙\n"
-            "四九丁\n"
-            "五十戊",
-            sprintf("%#6.3s", tmp));
+    "二七乙\n"
+    "三八丙\n"
+    "四九丁\n"
+    "五十戊",
+    sprintf("%#6.3s", tmp));
 
   // less perfect cases: not enough items
   ASSERT_EQ("一五九丙\n"
-            "二六十丁\n"
-            "三七甲戊\n"
-            "四八乙",
-            sprintf("%#8.4s", tmp));
+    "二六十丁\n"
+    "三七甲戊\n"
+    "四八乙",
+    sprintf("%#8.4s", tmp));
   ASSERT_EQ(sprintf("%#8.4s", tmp), sprintf("%#10.4s", tmp));
 
   ASSERT_EQ("一四七十丙  \n"
-            "二五八甲丁\n"
-            "三六九乙戊",
-            sprintf("%#12.6s", tmp));
+    "二五八甲丁\n"
+    "三六九乙戊",
+    sprintf("%#12.6s", tmp));
 
   ASSERT_EQ("一四七十丙    \n"
-            "二五八甲丁\n"
-            "三六九乙戊",
-            sprintf("%#14.7s", tmp));
+    "二五八甲丁\n"
+    "三六九乙戊",
+    sprintf("%#14.7s", tmp));
 
   ASSERT_EQ("一三五七九甲丙戊\n"
-            "二四六八十乙丁",
-            sprintf("%#16.8s", tmp));
+    "二四六八十乙丁",
+    sprintf("%#16.8s", tmp));
 
   ASSERT_EQ("一三五七九甲丙戊  \n"
-            "二四六八十乙丁",
-            sprintf("%#18.9s", tmp));
+    "二四六八十乙丁",
+    sprintf("%#18.9s", tmp));
 
   ASSERT_EQ("一三五七九甲丙戊    \n"
-            "二四六八十乙丁",
-            sprintf("%#20.10s", tmp));
+    "二四六八十乙丁",
+    sprintf("%#20.10s", tmp));
 
   ASSERT_EQ("一三五七九甲丙戊      \n"
-            "二四六八十乙丁",
-            sprintf("%#22.11s", tmp));
+    "二四六八十乙丁",
+    sprintf("%#22.11s", tmp));
 
   ASSERT_EQ("一二三四五六七八九十甲乙丙丁戊",
-            sprintf("%#30.15s", tmp));
+    sprintf("%#30.15s", tmp));
 
   ASSERT_EQ("一二三四五六七八九十甲乙丙丁戊",
-            sprintf("%#32.16s", tmp));
+    sprintf("%#32.16s", tmp));
 
   ASSERT_EQ("一九\n"
-            "二十\n"
-            "三甲\n"
-            "四乙\n"
-            "五丙\n"
-            "六丁\n"
-            "七戊\n"
-            "八",
-            sprintf("%#4.2s", tmp));
+    "二十\n"
+    "三甲\n"
+    "四乙\n"
+    "五丙\n"
+    "六丁\n"
+    "七戊\n"
+    "八",
+    sprintf("%#4.2s", tmp));
 
   // adjustment
   ASSERT_EQ("  一  四  七  十  丙\n"
-            "  二  五  八  甲  丁\n"
-            "  三  六  九  乙  戊",
-            sprintf("%#20.5s", tmp));
+    "  二  五  八  甲  丁\n"
+    "  三  六  九  乙  戊",
+    sprintf("%#20.5s", tmp));
 
   ASSERT_EQ(" 一 四 七 十 丙\n"
-            " 二 五 八 甲 丁\n"
-            " 三 六 九 乙 戊",
-            sprintf("%#19.5s", tmp));
+    " 二 五 八 甲 丁\n"
+    " 三 六 九 乙 戊",
+    sprintf("%#19.5s", tmp));
 
   ASSERT_EQ("  一  四  七  十  丙\n"
-            "  二  五  八  甲  丁\n"
-            "  三  六  九  乙  戊",
-            sprintf("%#21.5s", tmp));
+    "  二  五  八  甲  丁\n"
+    "  三  六  九  乙  戊",
+    sprintf("%#21.5s", tmp));
 
   // truncation
   tmp = "一一\n二二\n三三\n四四\n五五\n六六\n七七\n八八\n九九\n十十\n甲甲\n乙乙\n丙丙\n丁丁\n戊戊";
   ASSERT_EQ("一一四四七七十十丙丙\n"
-            "二二五五八八甲甲丁丁\n"
-            "三三六六九九乙乙戊戊",
-            sprintf("%#20.5s", tmp));
+    "二二五五八八甲甲丁丁\n"
+    "三三六六九九乙乙戊戊",
+    sprintf("%#20.5s", tmp));
 
   ASSERT_EQ(" 一 四 七 十 丙\n"
-            " 二 五 八 甲 丁\n"
-            " 三 六 九 乙 戊",
-            sprintf("%#19.5s", tmp));
-  for(int i = 18; i > 14; i--) {
+    " 二 五 八 甲 丁\n"
+    " 三 六 九 乙 戊",
+    sprintf("%#19.5s", tmp));
+  for (int i = 18; i > 14; i--) {
     ASSERT_EQ(sprintf("%#19.5s", tmp), sprintf("%#*.5s", i, tmp));
   }
 
   ASSERT_EQ("一四七十丙\n"
-            "二五八甲丁\n"
-            "三六九乙戊",
-            sprintf("%#10.5s", tmp));
-  for(int i = 14; i > 0; i--) {
+    "二五八甲丁\n"
+    "三六九乙戊",
+    sprintf("%#10.5s", tmp));
+  for (int i = 14; i > 0; i--) {
     ASSERT_EQ(sprintf("%#10.5s", tmp), sprintf("%#*.5s", i, tmp));
   }
 
   ASSERT_EQ("我 看 \n"
-            "测 效 ", sprintf("%#-10.3s","我说就是\n测试\n看看\n效果如何"));
+    "测 效 ", sprintf("%#-10.3s", "我说就是\n测试\n看看\n效果如何"));
 
   // auto columns
   // max_width = 8, fs= 8: col = 1
   ASSERT_EQ("我说就是\n"
-            "    测试\n"
-            "    看看\n"
-            "效果如何", sprintf("%#8s","我说就是\n测试\n看看\n效果如何"));
+    "    测试\n"
+    "    看看\n"
+    "效果如何", sprintf("%#8s", "我说就是\n测试\n看看\n效果如何"));
 
   // col = 1
   ASSERT_EQ(" 我说就是\n"
-            "     测试\n"
-            "     看看\n"
-            " 效果如何", sprintf("%#9s","我说就是\n测试\n看看\n效果如何"));
+    "     测试\n"
+    "     看看\n"
+    " 效果如何", sprintf("%#9s", "我说就是\n测试\n看看\n效果如何"));
 
   // col = 1, with truncation
   ASSERT_EQ(" 我说就\n"
-            "   测试\n"
-            "   看看\n"
-            " 效果如", sprintf("%#7s","我说就是\n测试\n看看\n效果如何"));
+    "   测试\n"
+    "   看看\n"
+    " 效果如", sprintf("%#7s", "我说就是\n测试\n看看\n效果如何"));
 
   // col = 2
   ASSERT_EQ("  我说就是      看看\n"
-            "      测试  效果如何", sprintf("%#20s","我说就是\n测试\n看看\n效果如何"));
+    "      测试  效果如何", sprintf("%#20s", "我说就是\n测试\n看看\n效果如何"));
 
   // col = 3 will leave 1 item on next line, so back to col = 2
   ASSERT_EQ("       我说就是           看看\n"
-            "           测试       效果如何", sprintf("%#30s","我说就是\n测试\n看看\n效果如何"));
+    "           测试       效果如何", sprintf("%#30s", "我说就是\n测试\n看看\n效果如何"));
 
   // col = 4
-  ASSERT_EQ("  我说就是      测试      看看  效果如何", sprintf("%#40s","我说就是\n测试\n看看\n效果如何"));
+  ASSERT_EQ("  我说就是      测试      看看  效果如何", sprintf("%#40s", "我说就是\n测试\n看看\n效果如何"));
 
   // padding with utf8 chars!
   tmp = "测试";
@@ -1521,13 +1521,13 @@ void do_tests() {
 
   tmp = "一\n二\n三\n四\n五\n六\n七\n八\n九\n十\n甲\n乙\n丙\n丁\n戊";
   ASSERT_EQ("田一田四田七田十田丙\n"
-            "田二田五田八田甲田丁\n"
-            "田三田六田九田乙田戊",
-            sprintf("%#'田'20.5s", tmp));
+    "田二田五田八田甲田丁\n"
+    "田三田六田九田乙田戊",
+    sprintf("%#'田'20.5s", tmp));
   ASSERT_EQ("田一田四田七田十田丙 \n"
-            "田二田五田八田甲田丁 \n"
-            "田三田六田九田乙田戊 ",
-            sprintf("%#'田'21.5s", tmp));
+    "田二田五田八田甲田丁 \n"
+    "田三田六田九田乙田戊 ",
+    sprintf("%#'田'21.5s", tmp));
 
   // char
   ASSERT_EQ(tmp[0..0], sprintf("%c", tmp[0]));
@@ -1563,23 +1563,32 @@ void do_tests() {
   ASSERT(catch(strsrch(tmp, 999999999999)));
   ASSERT(catch(strsrch(tmp, 999999999999, 1)));
 
-  ASSERT_EQ(({"一", "二", "三"}), explode("一二三", ""));
-  ASSERT_EQ(({"一", "a", "二", "b", "三", "c"}), explode("一a二b三c", ""));
-  ASSERT_EQ(({"一", "二", "三", "四"}), explode("一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四", "👩‍👩‍👧‍👧"));
+  ASSERT_EQ(({ "一", "二", "三" }), explode("一二三", ""));
+  ASSERT_EQ(({ "一", "a", "二", "b", "三", "c" }), explode("一a二b三c", ""));
+  ASSERT_EQ(
+    ({ "一", "二", "三", "四" }),
+    explode("一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四", "👩‍👩‍👧‍👧")
+  );
   // explode also only works on EGCs, not codepoints
-  ASSERT_EQ(({"一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四"}), explode("一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四", "‍"));
+  ASSERT_EQ(
+    ({ "一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四" }),
+    explode("一👩‍👩‍👧‍👧二👩‍👩‍👧‍👧三👩‍👩‍👧‍👧四", "‍")
+  );
 
   tmp = "甲甲甲一甲甲二甲甲三甲甲四甲甲甲";
 #ifndef __REVERSIBLE_EXPLODE_STRING__
 #ifdef __SANE_EXPLODE_STRING__
-  ASSERT_EQ(({"", "", "一", "", "二", "", "三", "", "四", "", ""}), explode(tmp, "甲"));
+  ASSERT_EQ(({ "", "", "一", "", "二", "", "三", "", "四", "", "" }), explode(tmp, "甲"));
 #else
-  ASSERT_EQ(({"一", "二", "三", "四"}), explode(tmp, "甲"));
+  ASSERT_EQ(({ "一", "二", "三", "四" }), explode(tmp, "甲"));
 #endif
 #else
-  ASSERT_EQ(({"", "", "", "一", "", "二", "", "三", "", "四", "", "", ""}), explode(tmp, "甲"));
+  ASSERT_EQ(({ "", "", "", "一", "", "二", "", "三", "", "四", "", "", "" }), explode(tmp, "甲"));
 #endif
-  ASSERT_EQ(({"", "", "", "一", "", "二", "", "三", "", "四", "", "", ""}), explode_reversible(tmp, "甲"));
+  ASSERT_EQ(
+    ({ "", "", "", "一", "", "二", "", "三", "", "四", "", "", "" }),
+    explode_reversible(tmp, "甲")
+  );
   ASSERT_EQ(tmp, implode(explode_reversible(tmp, "甲"), "甲"));
 
   ASSERT_NE("一二三四", implode(explode_reversible(tmp, "甲"), "‍"));

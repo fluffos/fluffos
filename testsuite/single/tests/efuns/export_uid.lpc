@@ -1,14 +1,14 @@
 void do_tests() {
 #ifdef __PACKAGE_UIDS__
-    object ob = clone_object("/clone/catch_tell_probe");
-    int r;
-    seteuid(getuid());
-    // Succeeds only when the target's euid is unset; either way it must
-    // answer 0/1 and leave the target with a string uid.
-    r = export_uid(ob);
-    ASSERT(r == 0 || r == 1);
-    ASSERT(stringp(getuid(ob)));
-    destruct(ob);
+  object ob = clone_object("/clone/catch_tell_probe");
+  int r;
+  seteuid(getuid());
+  // Succeeds only when the target's euid is unset; either way it must
+  // answer 0/1 and leave the target with a string uid.
+  r = export_uid(ob);
+  ASSERT(r == 0 || r == 1);
+  ASSERT(stringp(getuid(ob)));
+  destruct(ob);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

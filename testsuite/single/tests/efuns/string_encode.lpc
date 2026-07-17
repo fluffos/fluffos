@@ -1,9 +1,9 @@
 void do_tests() {
-    buffer b = string_encode("hi", "utf-8");
-    ASSERT(bufferp(b));
-    ASSERT_EQ(2, sizeof(b));
-    ASSERT_EQ('h', b[0]);
-    // Transcoding to a wider charset changes the byte count.
-    ASSERT_EQ(4, sizeof(string_encode("hi", "utf-16le")));
-    ASSERT(catch(string_encode("hi", "no-such-charset")));
+  buffer b = string_encode("hi", "utf-8");
+  ASSERT(bufferp(b));
+  ASSERT_EQ(2, sizeof(b));
+  ASSERT_EQ('h', b[0]);
+  // Transcoding to a wider charset changes the byte count.
+  ASSERT_EQ(4, sizeof(string_encode("hi", "utf-16le")));
+  ASSERT(catch(string_encode("hi", "no-such-charset")));
 }

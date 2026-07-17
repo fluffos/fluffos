@@ -118,7 +118,7 @@ private mapping closure_files(string prog, mapping seen) {
 // against, so a changed grandparent must be fresh before a changed
 // parent recompiles, or the parent would bake the stale grandparent in.
 private string *ancestors(string prog, mapping seen) {
-  string *out = ({ });
+  string *out = ({});
 
   if (!inherit_deps[prog]) return out;
   foreach (string parent in keys(inherit_deps[prog])) {
@@ -316,8 +316,7 @@ public void enable(int interval) {
 
 public void disable() {
   poll_interval = 0;
-  while (remove_call_out("poll") != -1) {
-  }
+  while (remove_call_out("poll") != -1) {}
   if (MASTER->query_compile_hooks() == this_object()) {
     MASTER->set_compile_hooks(0);
   }

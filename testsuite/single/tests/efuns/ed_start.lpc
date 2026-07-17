@@ -1,9 +1,9 @@
 void do_tests() {
 #if efun_defined(ed_start)
-    catch(ed_start());
+  catch(ed_start());
 #endif
 #if !efun_defined(ed_start) && !efun_defined(ed)
-    ASSERT2(0, "neither ed() nor ed_start() exists");
+  ASSERT2(0, "neither ed() nor ed_start() exists");
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

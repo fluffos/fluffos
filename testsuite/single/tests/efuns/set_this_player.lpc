@@ -1,15 +1,15 @@
 void do_tests() {
 #if efun_defined(set_this_player)
-    object saved = this_player();
-    object ob = clone_object("/single/void");
-    set_this_player(ob);
-    ASSERT_EQ(ob, this_player());
-    set_this_player(saved);
-    ASSERT_EQ(saved, this_player());
-    destruct(ob);
+  object saved = this_player();
+  object ob = clone_object("/single/void");
+  set_this_player(ob);
+  ASSERT_EQ(ob, this_player());
+  set_this_player(saved);
+  ASSERT_EQ(saved, this_player());
+  destruct(ob);
 #else
-    // set_this_player() exists only in NO_ADD_ACTION builds; this build
-    // compiles the add_action system instead.
-    ASSERT(1);
+  // set_this_player() exists only in NO_ADD_ACTION builds; this build
+  // compiles the add_action system instead.
+  ASSERT(1);
 #endif
 }

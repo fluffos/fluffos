@@ -4,14 +4,14 @@ int noop() { return 0; }
 #endif
 void do_tests() {
 #ifdef __PACKAGE_FFI__
-    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
-    int cb = ffi_callback((: noop :), FFI_INT32, ({ }));
-    ffi_callback_free(cb);
-    // The handle is gone now.
-    ASSERT(catch(ffi_callback_addr(cb)));
-    // Freeing an unknown handle is a harmless no-op.
-    ffi_callback_free(cb);
-    ffi_callback_free(999999);
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  int cb = ffi_callback((: noop :), FFI_INT32, ({}));
+  ffi_callback_free(cb);
+  // The handle is gone now.
+  ASSERT(catch(ffi_callback_addr(cb)));
+  // Freeing an unknown handle is a harmless no-op.
+  ffi_callback_free(cb);
+  ffi_callback_free(999999);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

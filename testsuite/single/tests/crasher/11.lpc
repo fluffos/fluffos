@@ -1,5 +1,5 @@
-void do_tests(){
+void do_tests() {
   localtime(
-      9223372036854775807
-      );
+    9223372036854775807
+  );
 }

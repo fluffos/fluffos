@@ -8,31 +8,31 @@
 // "-- of non-numeric argument" (F_PRE_DEC had no T_LVALUE_CODEPOINT
 // case at all).
 void do_tests() {
-    string s;
-    int x;
+  string s;
+  int x;
 
-    s = "ab";
-    x = s[0]++;
-    ASSERT_EQ('a', x);
-    ASSERT_EQ("bb", s);
+  s = "ab";
+  x = s[0]++;
+  ASSERT_EQ('a', x);
+  ASSERT_EQ("bb", s);
 
-    s = "ab";
-    x = ++s[0];
-    ASSERT_EQ('b', x);
-    ASSERT_EQ("bb", s);
+  s = "ab";
+  x = ++s[0];
+  ASSERT_EQ('b', x);
+  ASSERT_EQ("bb", s);
 
-    s = "ab";
-    x = s[1]--;
-    ASSERT_EQ('b', x);
-    ASSERT_EQ("aa", s);
+  s = "ab";
+  x = s[1]--;
+  ASSERT_EQ('b', x);
+  ASSERT_EQ("aa", s);
 
-    s = "ab";
-    x = --s[1];
-    ASSERT_EQ('a', x);
-    ASSERT_EQ("aa", s);
+  s = "ab";
+  x = --s[1];
+  ASSERT_EQ('a', x);
+  ASSERT_EQ("aa", s);
 
-    // Bare statement form (result discarded) must still work.
-    s = "ab";
-    s[0]++;
-    ASSERT_EQ("bb", s);
+  // Bare statement form (result discarded) must still work.
+  s = "ab";
+  s[0]++;
+  ASSERT_EQ("bb", s);
 }

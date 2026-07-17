@@ -1,11 +1,11 @@
-void probe() { }
+void probe() {}
 void do_tests() {
-    // Wall-clock call_out: schedules like call_out but on real time;
-    // it must hand back a removable handle.
-    int h = call_out_walltime((: probe :), 60);
-    ASSERT(intp(h));
-    ASSERT(remove_call_out(h) >= 0);
-    // Fractional delays are the point of the walltime variant.
-    h = call_out_walltime((: probe :), 0.5);
-    ASSERT(remove_call_out(h) >= 0);
+  // Wall-clock call_out: schedules like call_out but on real time;
+  // it must hand back a removable handle.
+  int h = call_out_walltime((: probe :), 60);
+  ASSERT(intp(h));
+  ASSERT(remove_call_out(h) >= 0);
+  // Fractional delays are the point of the walltime variant.
+  h = call_out_walltime((: probe :), 0.5);
+  ASSERT(remove_call_out(h) >= 0);
 }

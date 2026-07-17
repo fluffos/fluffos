@@ -1,27 +1,27 @@
 #ifdef __PACKAGE_PCRE__
 void do_tests() {
-    mixed r = pcre_match_all("a1 b2 c3", "([a-z])([0-9])");
-    ASSERT_EQ(3, sizeof(r));
-    ASSERT_EQ(({ "a1", "a", "1" }), r[0]);
+  mixed r = pcre_match_all("a1 b2 c3", "([a-z])([0-9])");
+  ASSERT_EQ(3, sizeof(r));
+  ASSERT_EQ(({ "a1", "a", "1" }), r[0]);
 
-    // Patterns that can match the empty string must not loop forever
-    // at the same offset (issue #927).
-    r = pcre_match_all("hi there", "(\\w*)");
-    ASSERT_EQ(3, sizeof(r));
-    ASSERT_EQ(({ "hi", "hi" }), r[0]);
-    ASSERT_EQ(({ "", "" }), r[1]);
-    ASSERT_EQ(({ "there", "there" }), r[2]);
+  // Patterns that can match the empty string must not loop forever
+  // at the same offset (issue #927).
+  r = pcre_match_all("hi there", "(\\w*)");
+  ASSERT_EQ(3, sizeof(r));
+  ASSERT_EQ(({ "hi", "hi" }), r[0]);
+  ASSERT_EQ(({ "", "" }), r[1]);
+  ASSERT_EQ(({ "there", "there" }), r[2]);
 
-    // All-empty matches terminate too.
-    r = pcre_match_all("abc", "x*");
-    ASSERT_EQ(3, sizeof(r));
-    ASSERT_EQ(({ "" }), r[0]);
+  // All-empty matches terminate too.
+  r = pcre_match_all("abc", "x*");
+  ASSERT_EQ(3, sizeof(r));
+  ASSERT_EQ(({ "" }), r[0]);
 
-    // Zero-width advance is UTF-8 aware: multibyte character between matches.
-    r = pcre_match_all("a中b", "([ab]*)");
-    ASSERT_EQ(3, sizeof(r));
-    ASSERT_EQ(({ "a", "a" }), r[0]);
-    ASSERT_EQ(({ "", "" }), r[1]);
-    ASSERT_EQ(({ "b", "b" }), r[2]);
+  // Zero-width advance is UTF-8 aware: multibyte character between matches.
+  r = pcre_match_all("a中b", "([ab]*)");
+  ASSERT_EQ(3, sizeof(r));
+  ASSERT_EQ(({ "a", "a" }), r[0]);
+  ASSERT_EQ(({ "", "" }), r[1]);
+  ASSERT_EQ(({ "b", "b" }), r[2]);
 }
 #endif

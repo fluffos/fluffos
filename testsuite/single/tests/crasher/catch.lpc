@@ -6,317 +6,317 @@ void do_tests() {
 
 
 
-// line 10 - 150 catches.
-ASSERT_EQ(0, catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-catch(
-// now we have 160-10+1=151 frames.
+  // line 10 - 150 catches.
+  ASSERT_EQ(0, catch(
+    catch(
+      catch(
+        catch(
+          catch(
+            catch(
+              catch(
+                catch(
+                  catch(
+                    catch(
+                      catch(
+                        catch(
+                          catch(
+                            catch(
+                              catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                catch(
+                                // now we have 160-10+1=151 frames.
 
 
 
-nothing()
+                                nothing()
 
 
 
-// need 151 ), line 170-320.
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-); // ASSERT_EQ
+                                // need 151 ), line 170-320.
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                                )
+                              )
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+  );  // ASSERT_EQ
 }

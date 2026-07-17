@@ -26,9 +26,9 @@
 // raw UTF-8 bytes (buffer promotion) plus a NUL terminator. Pass the
 // result as an FFI_POINTER argument.
 buffer cstr(string s) {
-    buffer b = s;
-    b += ({ 0 });
-    return b;
+  buffer b = s;
+  b += ({ 0 });
+  return b;
 }
 
 // Same, via an explicit encoding (string_encode). The terminator is a
@@ -36,9 +36,9 @@ buffer cstr(string s) {
 // (UTF-8, Latin-1, ...); wide encodings like UTF-16 need a wider
 // terminator -- build those by hand.
 buffer cstr_enc(string s, string encoding) {
-    buffer b = string_encode(s, encoding);
-    b += ({ 0 });
-    return b;
+  buffer b = string_encode(s, encoding);
+  b += ({ 0 });
+  return b;
 }
 
 // Read a NUL-terminated C string at a raw foreign address (e.g. a
@@ -46,21 +46,21 @@ buffer cstr_enc(string s, string encoding) {
 // rather than an error, matching the C convention. Calls ffi_peek(),
 // so the master's valid_ffi("peek", ...) must allow this object.
 string c_string(int addr) {
-    if (!addr) return 0;
-    return string_decode(ffi_peek(addr, -1), "utf-8");
+  if (!addr) return 0;
+  return string_decode(ffi_peek(addr, -1), "utf-8");
 }
 
 // Same, decoding with an explicit encoding.
 string c_string_enc(int addr, string encoding) {
-    if (!addr) return 0;
-    return string_decode(ffi_peek(addr, -1), encoding);
+  if (!addr) return 0;
+  return string_decode(ffi_peek(addr, -1), encoding);
 }
 
 // A zeroed out-parameter block sized for one scalar of the given
 // FFI_* type code: pass where C wants `T *out`, then
 // ffi_read(out, 0, code) the result.
 buffer c_out(int type_code) {
-    return ffi_alloc(ffi_sizeof(type_code));
+  return ffi_alloc(ffi_sizeof(type_code));
 }
 
 // Build a C `char *argv[]` (NULL-terminated pointer array) from LPC
@@ -70,26 +70,26 @@ buffer c_out(int type_code) {
 // addresses of the per-string buffers in element 1, and those
 // addresses die when the buffers are collected.
 mixed *c_argv(string *args) {
-    int psz = ffi_sizeof(FFI_POINTER);
-    int pcode = psz == 8 ? FFI_UINT64 : FFI_UINT32;
-    buffer *bufs = allocate(sizeof(args));
-    buffer ptrs = ffi_alloc((sizeof(args) + 1) * psz);  // trailing NULL slot
+  int psz = ffi_sizeof(FFI_POINTER);
+  int pcode = psz == 8 ? FFI_UINT64 : FFI_UINT32;
+  buffer *bufs = allocate(sizeof(args));
+  buffer ptrs = ffi_alloc((sizeof(args) + 1) * psz);  // trailing NULL slot
 
-    for (int i = 0; i < sizeof(args); i++) {
-        bufs[i] = cstr(args[i]);
-        ffi_write(ptrs, i * psz, pcode, ffi_address(bufs[i]));
-    }
-    return ({ ptrs, bufs });
+  for (int i = 0; i < sizeof(args); i++) {
+    bufs[i] = cstr(args[i]);
+    ffi_write(ptrs, i * psz, pcode, ffi_address(bufs[i]));
+  }
+  return ({ ptrs, bufs });
 }
 
 // Read/write one field of a C struct held in `data`, using a layout
 // from ffi_struct_layout(): field `idx`'s offset is layout[1][idx].
 mixed c_field(buffer data, mixed *layout, int idx, int type_code) {
-    return ffi_read(data, layout[1][idx], type_code);
+  return ffi_read(data, layout[1][idx], type_code);
 }
 
 void c_field_set(buffer data, mixed *layout, int idx, int type_code, mixed value) {
-    ffi_write(data, layout[1][idx], type_code, value);
+  ffi_write(data, layout[1][idx], type_code, value);
 }
 
 #endif /* __PACKAGE_FFI__ */

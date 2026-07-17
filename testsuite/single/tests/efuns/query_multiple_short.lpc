@@ -1,6 +1,6 @@
 void do_tests() {
 #ifdef __DWLIB__
-    ASSERT(stringp(query_multiple_short(({ "a sword", "a shield" }))));
+  ASSERT(stringp(query_multiple_short(({ "a sword", "a shield" }))));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

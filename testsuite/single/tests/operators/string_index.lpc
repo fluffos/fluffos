@@ -158,7 +158,7 @@ void do_tests() {
   // lvalue out of bound
   ASSERT(catch(tmp[0..strlen(tmp)] = ""));
   ASSERT(catch(tmp[0..999] = ""));
-  ASSERT(catch(tmp[strlen(tmp)..strlen(tmp)]  = ""));
+  ASSERT(catch(tmp[strlen(tmp)..strlen(tmp)] = ""));
   ASSERT(catch(tmp[999..0] = ""));
 
   ASSERT(catch(tmp[<0..<1] = ""));

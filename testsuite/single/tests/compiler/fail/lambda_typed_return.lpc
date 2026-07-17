@@ -1,4 +1,4 @@
 // Anonymous functions accept only the 'function' return type; any
 // concrete type is rejected ("Reserved type name unexpected", see
 // rule_lambda_return_type).
-mixed f = int (int x) { return x; };
+mixed f = int(int x) { return x; };

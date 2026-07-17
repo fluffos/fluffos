@@ -16,21 +16,21 @@ int direct_frob_wrd_obj() { return 1; }
 // Deliberately no do_frob_wrd_obj() (or any of its siblings): do_the_call()
 // must fail to find any of them.
 
-string* parse_command_id_list() { return ({ "thing" }); }
+string *parse_command_id_list() { return ({ "thing" }); }
 
 void create() {
-    parse_init();
-    if (clonep()) {
-        move_object(__FILE__);
-    }
+  parse_init();
+  if (clonep()) {
+    move_object(__FILE__);
+  }
 }
 
 void do_tests() {
 #ifndef __PACKAGE_PARSER__
-    write("no package parser, skipped.\n");
+  write("no package parser, skipped.\n");
 #else
-    clone_object(__FILE__);
-    parse_add_rule("frob", "WRD OBJ");
-    ASSERT(catch(parse_sentence("frob at thing", 0, all_inventory())));
+  clone_object(__FILE__);
+  parse_add_rule("frob", "WRD OBJ");
+  ASSERT(catch(parse_sentence("frob at thing", 0, all_inventory())));
 #endif
 }

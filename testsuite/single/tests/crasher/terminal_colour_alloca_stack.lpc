@@ -9,18 +9,18 @@
 // the end of the efun.
 
 string terminal_colour_replace(string s) {
-    return repeat_string("x", 4000);
+  return repeat_string("x", 4000);
 }
 
 void do_tests() {
 #ifdef __PACKAGE_CONTRIB__
-    mapping codes = ([ "RED" : "<r>", "RESET" : "<0>" ]);
-    // 1000 repetitions * 3 parts/rep * ~4000 bytes/part =~ 12MB of would-be
-    // alloca()'d stack -- past the default 8MB thread stack. Surviving this
-    // call cleanly is the regression signal; the unfixed driver stack
-    // overflows and crashes (ASan: stack-overflow) before returning.
-    string text = repeat_string("%^RED%^hot%^RESET%^", 1000);
-    ASSERT(stringp(terminal_colour(text, codes)));
+  mapping codes = ([ "RED": "<r>", "RESET": "<0>" ]);
+  // 1000 repetitions * 3 parts/rep * ~4000 bytes/part =~ 12MB of would-be
+  // alloca()'d stack -- past the default 8MB thread stack. Surviving this
+  // call cleanly is the regression signal; the unfixed driver stack
+  // overflows and crashes (ASan: stack-overflow) before returning.
+  string text = repeat_string("%^RED%^hot%^RESET%^", 1000);
+  ASSERT(stringp(terminal_colour(text, codes)));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

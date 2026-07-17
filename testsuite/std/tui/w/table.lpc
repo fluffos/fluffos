@@ -78,7 +78,7 @@ void draw(object scr) {
     string line = idx < sizeof(rows) ? fmt_row(rows[idx], w) : "";
 
     scr->scr_put(wx, wy + (sizeof(columns) ? 1 : 0) + i, wpad(line, ww),
-                 (idx == sel && idx < sizeof(rows) && w_focused) ? sel_attr : attr);
+      (idx == sel && idx < sizeof(rows) && w_focused) ? sel_attr : attr);
   }
 }
 
@@ -130,7 +130,7 @@ int handle_mouse(mixed *ev) {
     return 1;
   }
   if (b < 3 && y >= wy + header && y < wy + wh &&
-      top + y - wy - header < sizeof(rows)) {
+    top + y - wy - header < sizeof(rows)) {
     sel = top + y - wy - header;
     emit_event("change", sel);
     return 1;

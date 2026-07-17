@@ -3,7 +3,8 @@
 // compile error, not a silently unknown-typed variable.
 class Person {
   string name;
-} Me;
+}
+Me;
 
 void create() {
   Me = new(class Person);

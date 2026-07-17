@@ -1,21 +1,21 @@
 private int near(float a, float b) { return (a > b ? a - b : b - a) < 1e-9; }
 void do_tests() {
-    ASSERT(near(11.0, dotprod(({ 1, 2 }), ({ 3, 4 }))));
-    ASSERT(near(0.0, dotprod(({ 1, 0 }), ({ 0, 1 }))));
+  ASSERT(near(11.0, dotprod(({ 1, 2 }), ({ 3, 4 }))));
+  ASSERT(near(0.0, dotprod(({ 1, 0 }), ({ 0, 1 }))));
 
-    // Regression: math.cc used to signal errors from dotprod()'s internal
-    // vector_op() by returning sentinel float values (-INT_MAX, -INT_MAX+1,
-    // -INT_MAX+2) instead of the real result -- so a legitimate dotprod()
-    // landing exactly on one of those values was misreported as "invalid
-    // arg" instead of being returned. -INT_MAX+1 == -2147483646.
-    ASSERT(near(-2147483646.0, dotprod(({ -2147483646, 0 }), ({ 1, 0 }))));
-    // -INT_MAX+2 == -2147483645.
-    ASSERT(near(-2147483645.0, dotprod(({ -2147483645, 0 }), ({ 1, 0 }))));
-    // -INT_MAX == -2147483647 (used to collide with the "different sizes"
-    // sentinel for same-size vectors).
-    ASSERT(near(-2147483647.0, dotprod(({ -2147483647, 0 }), ({ 1, 0 }))));
+  // Regression: math.cc used to signal errors from dotprod()'s internal
+  // vector_op() by returning sentinel float values (-INT_MAX, -INT_MAX+1,
+  // -INT_MAX+2) instead of the real result -- so a legitimate dotprod()
+  // landing exactly on one of those values was misreported as "invalid
+  // arg" instead of being returned. -INT_MAX+1 == -2147483646.
+  ASSERT(near(-2147483646.0, dotprod(({ -2147483646, 0 }), ({ 1, 0 }))));
+  // -INT_MAX+2 == -2147483645.
+  ASSERT(near(-2147483645.0, dotprod(({ -2147483645, 0 }), ({ 1, 0 }))));
+  // -INT_MAX == -2147483647 (used to collide with the "different sizes"
+  // sentinel for same-size vectors).
+  ASSERT(near(-2147483647.0, dotprod(({ -2147483647, 0 }), ({ 1, 0 }))));
 
-    // Still errors cleanly on genuinely mismatched types/sizes.
-    ASSERT(catch(dotprod(({ 1, 2 }), ({ 1 }))));
-    ASSERT(catch(dotprod(({ 1, "x" }), ({ 1, 2 }))));
+  // Still errors cleanly on genuinely mismatched types/sizes.
+  ASSERT(catch(dotprod(({ 1, 2 }), ({ 1 }))));
+  ASSERT(catch(dotprod(({ 1, "x" }), ({ 1, 2 }))));
 }

@@ -1,9 +1,9 @@
 void do_tests() {
-    object ob = clone_object("/clone/catch_tell_probe");
-    tell_object(ob, "before");
-    ASSERT_EQ("before", ob->last_message());
-    // reload_object wipes the object's variables back to defaults.
-    reload_object(ob);
-    ASSERT_EQ(0, ob->last_message());
-    destruct(ob);
+  object ob = clone_object("/clone/catch_tell_probe");
+  tell_object(ob, "before");
+  ASSERT_EQ("before", ob->last_message());
+  // reload_object wipes the object's variables back to defaults.
+  reload_object(ob);
+  ASSERT_EQ(0, ob->last_message());
+  destruct(ob);
 }

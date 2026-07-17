@@ -1,20 +1,14 @@
 // valid
 public:
 
-void test() {
-
-}
+void test() {}
 
 // okay
 nomask private:
 
-void test1() {
-
-}
+void test1() {}
 
 // fail
 private public:
 
-void test2() {
-
-}
+void test2() {}

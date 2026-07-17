@@ -1,6 +1,6 @@
 void do_tests() {
 #ifdef __DWLIB__
-    ASSERT(stringp(replace_mxp("plain")));
+  ASSERT(stringp(replace_mxp("plain")));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

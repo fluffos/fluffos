@@ -13,6 +13,17 @@ env:
   VERBOSE: 1
 
 jobs:
+  lpc-syntax:
+    name: lpc-syntax (tests + corpus format check)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run lpc-syntax test suite
+        run: node tools/lpc-syntax/test.mjs
+      - name: Verify testsuite corpus is formatted
+        run: testsuite/format.sh --check
+
   build-and-test:
     name: ${{ matrix.platform }} (${{ matrix.compiler || 'default' }}${{ matrix.sanitizer && '+sanitizer' || '' }}, ${{ matrix.build }})
     runs-on: ${{ matrix.os }}

@@ -1,7 +1,7 @@
-void done(int ok) { }
+void done(int ok) {}
 void do_tests() {
 #ifdef __PACKAGE_ASYNC__
-    ASSERT_EQ(0, catch(async_write("/aw_test.txt", "async write payload\n", 0, (: done :))));
+  ASSERT_EQ(0, catch(async_write("/aw_test.txt", "async write payload\n", 0, (: done :))));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

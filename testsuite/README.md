@@ -123,6 +123,24 @@ Efun tests are named after the efun (`single/tests/efuns/<efun>.lpc`)
 and should aim to cover every branch of the C++ implementation,
 including error paths (`catch(...)`).
 
+## Formatting
+
+The corpus is kept formatted with the grammar-driven LPC formatter in
+`tools/lpc-syntax/` (see its README). From the repo root:
+
+```bash
+testsuite/format.sh            # format testsuite/**/*.lpc,*.c in place
+testsuite/format.sh --check    # exit 1 if anything is unformatted (CI)
+```
+
+Dependency-free (node ≥ 18 only). The script excludes the two
+deliberately-malformed UTF-8 fixtures under
+`single/tests/compiler/fail/` (raw byte fixtures — see the exclusion
+note in the script and AGENTS.md §7), and refuses to write any file
+whose formatted output isn't token-sequence-equivalent to the input,
+literal-content byte-identical, and idempotent. After a corpus reformat, run the driver suite before
+committing.
+
 ## Layout
 
 | Path | What |

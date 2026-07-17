@@ -8,7 +8,7 @@
 // LeakSanitizer output across a run exercising this call many times).
 #ifdef __PACKAGE_PCRE__
 void do_tests() {
-    mixed err = catch(pcre_replace_callback("ab", "(a)(b)", 0));
-    ASSERT(err);
+  mixed err = catch(pcre_replace_callback("ab", "(a)(b)", 0));
+  ASSERT(err);
 }
 #endif

@@ -1,6 +1,6 @@
 void do_tests() {
-    ASSERT_EQ("ababab", repeat_string("ab", 3));
-    ASSERT_EQ("", repeat_string("ab", 0));
-    ASSERT_EQ("", repeat_string("ab", -1));
-    ASSERT_EQ("x", repeat_string("x", 1));
+  ASSERT_EQ("ababab", repeat_string("ab", 3));
+  ASSERT_EQ("", repeat_string("ab", 0));
+  ASSERT_EQ("", repeat_string("ab", -1));
+  ASSERT_EQ("x", repeat_string("x", 1));
 }

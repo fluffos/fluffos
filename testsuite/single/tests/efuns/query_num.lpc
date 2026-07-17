@@ -1,6 +1,6 @@
 void do_tests() {
-    ASSERT_EQ("one", query_num(1));
-    ASSERT_EQ("twelve", query_num(12));
-    ASSERT_EQ("twenty-one", query_num(21));
-    ASSERT_EQ("zero", query_num(0));
+  ASSERT_EQ("one", query_num(1));
+  ASSERT_EQ("twelve", query_num(12));
+  ASSERT_EQ("twenty-one", query_num(21));
+  ASSERT_EQ("zero", query_num(0));
 }

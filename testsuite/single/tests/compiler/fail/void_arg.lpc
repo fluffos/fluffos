@@ -1,2 +1,1 @@
-void foo(void x) {
-}
+void foo(void x) {}

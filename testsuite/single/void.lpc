@@ -8,6 +8,4 @@ int get_called() {
   return called;
 }
 
-void dummy()
-{
-}
+void dummy() {}

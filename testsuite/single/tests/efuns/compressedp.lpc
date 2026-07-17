@@ -1,6 +1,6 @@
 #ifdef __PACKAGE_COMPRESS__
 void do_tests() {
-    // Objects here are not loaded from compressed sources.
-    ASSERT_EQ(0, compressedp(this_object()));
+  // Objects here are not loaded from compressed sources.
+  ASSERT_EQ(0, compressedp(this_object()));
 }
 #endif

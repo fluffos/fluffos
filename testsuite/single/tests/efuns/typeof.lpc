@@ -1,12 +1,12 @@
 class C { int v; }
 void do_tests() {
-    ASSERT_EQ("int", typeof(1));
-    ASSERT_EQ("float", typeof(1.5));
-    ASSERT_EQ("string", typeof("s"));
-    ASSERT_EQ("array", typeof(({ })));
-    ASSERT_EQ("mapping", typeof(([ ])));
-    ASSERT_EQ("object", typeof(this_object()));
-    ASSERT_EQ("function", typeof((: 1 :)));
-    ASSERT_EQ("buffer", typeof(allocate_buffer(1)));
-    ASSERT_EQ("class", typeof(new(class C)));
+  ASSERT_EQ("int", typeof(1));
+  ASSERT_EQ("float", typeof(1.5));
+  ASSERT_EQ("string", typeof("s"));
+  ASSERT_EQ("array", typeof(({})));
+  ASSERT_EQ("mapping", typeof(([])));
+  ASSERT_EQ("object", typeof(this_object()));
+  ASSERT_EQ("function", typeof((: 1 :)));
+  ASSERT_EQ("buffer", typeof(allocate_buffer(1)));
+  ASSERT_EQ("class", typeof(new(class C)));
 }

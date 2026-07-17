@@ -1,46 +1,46 @@
 int called;
 
 void first_call() {
-    called = 1;
+  called = 1;
 }
 
 void third_call() {
-    ASSERT(!called);
+  ASSERT(!called);
 }
 
 void second_call() {
-    ASSERT(!called);
-    call_out( (: first_call :), 0);
-    remove_call_out();
-    call_out( (: third_call :), 1);
+  ASSERT(!called);
+  call_out((: first_call :), 0);
+  remove_call_out();
+  call_out((: third_call :), 1);
 }
 
 void do_tests() {
-    int h, i, old;
-    int *newer;
+  int h, i, old;
+  int *newer;
 
-    called = 0;
-    h = call_out( "first_call", 0);
-    ASSERT(remove_call_out(h) != -1);
-    ASSERT(remove_call_out(12345) == -1);
-    ASSERT(remove_call_out(0) == -1);
+  called = 0;
+  h = call_out("first_call", 0);
+  ASSERT(remove_call_out(h) != -1);
+  ASSERT(remove_call_out(12345) == -1);
+  ASSERT(remove_call_out(0) == -1);
 
-    call_out( "first_call", 0);
-    call_out( "second_call", 1);
-    ASSERT(remove_call_out("first_call") != -1);
-    ASSERT(remove_call_out("foo") == -1);
+  call_out("first_call", 0);
+  call_out("second_call", 1);
+  ASSERT(remove_call_out("first_call") != -1);
+  ASSERT(remove_call_out("foo") == -1);
 
-    // A handle must stay removable no matter how many newer call_outs were
-    // created after it: the driver used to reject any handle below its
-    // internal allocation counter as invalid (PR #1068).
-    old = call_out("first_call", 100);
-    newer = ({});
-    for (i = 0; i < 150; i++) {
-        newer += ({ call_out("first_call", 100) });
-    }
-    ASSERT(remove_call_out(old) != -1);
-    ASSERT(remove_call_out(old) == -1);
-    for (i = 0; i < sizeof(newer); i++) {
-        ASSERT(remove_call_out(newer[i]) != -1);
-    }
+  // A handle must stay removable no matter how many newer call_outs were
+  // created after it: the driver used to reject any handle below its
+  // internal allocation counter as invalid (PR #1068).
+  old = call_out("first_call", 100);
+  newer = ({});
+  for (i = 0; i < 150; i++) {
+    newer += ({ call_out("first_call", 100) });
+  }
+  ASSERT(remove_call_out(old) != -1);
+  ASSERT(remove_call_out(old) == -1);
+  for (i = 0; i < sizeof(newer); i++) {
+    ASSERT(remove_call_out(newer[i]) != -1);
+  }
 }

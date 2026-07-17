@@ -1,6 +1,6 @@
 void do_tests() {
-    // Direct parents only (deep_inherit_list covers the closure).
-    string *l = shallow_inherit_list(load_object("/clone/inh2"));
-    ASSERT_EQ(({ "/clone/inh1.lpc" }), l);
-    ASSERT_EQ(({ }), shallow_inherit_list(load_object("/clone/inh0")));
+  // Direct parents only (deep_inherit_list covers the closure).
+  string *l = shallow_inherit_list(load_object("/clone/inh2"));
+  ASSERT_EQ(({ "/clone/inh1.lpc" }), l);
+  ASSERT_EQ(({}), shallow_inherit_list(load_object("/clone/inh0")));
 }

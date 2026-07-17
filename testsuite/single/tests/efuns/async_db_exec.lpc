@@ -1,9 +1,9 @@
-void got(mixed h) { }
+void got(mixed h) {}
 void do_tests() {
 #if defined(__PACKAGE_ASYNC__) && defined(__PACKAGE_DB__)
-    // No live db handle 1; the failure must be clean (sync error or
-    // errored callback), never a crash.
-    catch(async_db_exec(1, "SELECT 1", (: got :)));
+  // No live db handle 1; the failure must be clean (sync error or
+  // errored callback), never a crash.
+  catch(async_db_exec(1, "SELECT 1", (: got :)));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

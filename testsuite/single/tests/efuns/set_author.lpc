@@ -1,6 +1,6 @@
 void do_tests() {
 #ifdef __PACKAGE_MUDLIB_STATS__
-    ASSERT_EQ(0, catch(set_author("testauthor")));
+  ASSERT_EQ(0, catch(set_author("testauthor")));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

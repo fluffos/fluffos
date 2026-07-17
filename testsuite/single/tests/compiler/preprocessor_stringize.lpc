@@ -1,0 +1,64 @@
+// Stringize (`#param`) shapes whose call-site arguments must keep their
+// EXACT source spelling -- and that tools/lpc-syntax/format.mjs therefore
+// must never re-space. Each shape here was driver-verified to break (wrong
+// stringize output) under an earlier formatter that analyzed the raw
+// directive text instead of mirroring the driver's preprocessing
+// (fold_backslash_newlines + strip_directive_comments + substitute() in
+// lexer_rules_pp.cc). This file doubles as a canary: it is part of the
+// formatted corpus, so a future formatter regression that re-spaces any of
+// these arguments fails THIS driver test, not just the JS self-checks.
+// Reference: docs/lpc/preprocessor/; JS-level pins in
+// tools/lpc-syntax/test.mjs.
+
+// A comment between '#' and the parameter is whitespace to the driver.
+#define SC(x) #/*c*/x
+
+// A backslash continuation between '#' and the parameter folds away.
+#define SL(x) # \
+x
+
+// A backslash continuation INSIDE the parameter list folds away too.
+#define SP(a, \
+            b) #b
+
+// substitute() consumes '#' PAIRS as token paste first; a leftover odd
+// '#' stringizes -- so '###b' pastes then stringizes ("x" "1+2" are
+// adjacent literals, concatenated).
+#define TH(a, b) a ###b
+
+// A dead #if-0 redefinition never reaches the driver; the live
+// definition still stringizes.
+#define DEAD(x) #x
+#if 0
+#define DEAD(x) x
+#endif
+
+// Macros resolve BEFORE reserved-word lookup, so a macro named like a
+// type keyword expands (and stringizes) at word(...) call sites.
+#define string(x) #x
+
+// The driver's macro-argument collector nests only the '(' character:
+// a comma inside x[...] really splits arguments (b becomes "y+3]"), while
+// a comma inside a functional literal does not ('(:'/':)' contain raw
+// parens).
+#define FB(a, b) #b
+
+// A quote in a directive body is inert and never extends the directive
+// past its physical line (the next line must compile as ordinary code).
+#define Q it'
+
+void do_tests() {
+  int x = 1 + 2;
+  mixed y = ({ 3 });
+
+  ASSERT_EQ("1+2", SC(1+2));
+  ASSERT_EQ("1+2", SL(1+2));
+  // (arg `a` is NOT stringized, so the formatter is free to re-space it
+  // -- only `b`'s spelling is frozen)
+  ASSERT_EQ("3+4", SP(1 + 2, 3+4));
+  ASSERT_EQ("x1+2", TH("x", 1+2));
+  ASSERT_EQ("1+2", DEAD(1+2));
+  ASSERT_EQ("5+6", string(5+6));
+  ASSERT_EQ("y+3]", FB(x[1+2,y+3], 9));
+  ASSERT_EQ("3+4", FB((: x, 1, 2 :), 3+4));
+}

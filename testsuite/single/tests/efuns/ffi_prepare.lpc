@@ -3,14 +3,14 @@
 #endif
 void do_tests() {
 #ifdef __PACKAGE_FFI__
-    if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
-    int lib = ffi_load("");
-    ASSERT(ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE })) > 0);
-    // A missing symbol errors.
-    ASSERT(catch(ffi_prepare(lib, "no_such_fn", FFI_INT, ({ }))));
-    // An invalid type code errors.
-    ASSERT(catch(ffi_prepare(lib, "sqrt", 999, ({ }))));
-    ffi_unload(lib);
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  int lib = ffi_load("");
+  ASSERT(ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE })) > 0);
+  // A missing symbol errors.
+  ASSERT(catch(ffi_prepare(lib, "no_such_fn", FFI_INT, ({}))));
+  // An invalid type code errors.
+  ASSERT(catch(ffi_prepare(lib, "sqrt", 999, ({}))));
+  ffi_unload(lib);
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

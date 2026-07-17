@@ -4,20 +4,20 @@
 // forever, hanging the driver. Must terminate and report no match.
 
 void do_tests() {
-    // haystack = "ab" + U+0301 (combining acute, attaches to b) + "c".
-    // Clusters: "a"(0), "b\u0301"(1..3), "c"(4). Needle "ab" ends at offset 2,
-    // which is mid-cluster, so no grapheme-aligned match exists.
-    string haystack = "ab́c";
+  // haystack = "ab" + U+0301 (combining acute, attaches to b) + "c".
+  // Clusters: "a"(0), "b\u0301"(1..3), "c"(4). Needle "ab" ends at offset 2,
+  // which is mid-cluster, so no grapheme-aligned match exists.
+  string haystack = "ab́c";
 
-    // Reverse search: must return -1 (no boundary-aligned match), not hang.
-    // This is the regression: the reverse scan used to decrement pos below 0
-    // to npos and re-find offset 0 forever.
-    ASSERT_EQ(-1, strsrch(haystack, "ab", -1));
+  // Reverse search: must return -1 (no boundary-aligned match), not hang.
+  // This is the regression: the reverse scan used to decrement pos below 0
+  // to npos and re-find offset 0 forever.
+  ASSERT_EQ(-1, strsrch(haystack, "ab", -1));
 
-    // A genuine boundary-aligned reverse match still works (last occurrence).
-    ASSERT_EQ(0, strsrch("abc", "a", -1));
-    ASSERT_EQ(5, strsrch("abcabc", "c", -1));
-    ASSERT_EQ(3, strsrch("abcabc", "ab", -1));
-    // A reverse multi-char needle that never matches terminates with -1.
-    ASSERT_EQ(-1, strsrch("abcabc", "xy", -1));
+  // A genuine boundary-aligned reverse match still works (last occurrence).
+  ASSERT_EQ(0, strsrch("abc", "a", -1));
+  ASSERT_EQ(5, strsrch("abcabc", "c", -1));
+  ASSERT_EQ(3, strsrch("abcabc", "ab", -1));
+  // A reverse multi-char needle that never matches terminates with -1.
+  ASSERT_EQ(-1, strsrch("abcabc", "xy", -1));
 }

@@ -1,5 +1,5 @@
 void do_tests() {
-    int n = reclaim_objects();
-    ASSERT(intp(n));
-    ASSERT(n >= 0);
+  int n = reclaim_objects();
+  ASSERT(intp(n));
+  ASSERT(n >= 0);
 }

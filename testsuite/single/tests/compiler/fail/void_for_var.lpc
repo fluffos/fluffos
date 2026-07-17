@@ -1,3 +1,3 @@
 void foo() {
-    for (void x = 1; ; ) ;
+  for (void x = 1; ; );
 }

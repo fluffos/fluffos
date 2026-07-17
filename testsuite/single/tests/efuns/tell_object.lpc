@@ -1,6 +1,6 @@
 void do_tests() {
-    object ob = clone_object("/clone/catch_tell_probe");
-    tell_object(ob, "ping");
-    ASSERT_EQ("ping", ob->last_message());
-    destruct(ob);
+  object ob = clone_object("/clone/catch_tell_probe");
+  tell_object(ob, "ping");
+  ASSERT_EQ("ping", ob->last_message());
+  destruct(ob);
 }

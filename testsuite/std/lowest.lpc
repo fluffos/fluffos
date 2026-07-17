@@ -6,25 +6,22 @@
 
 #include <lpctypes.h>
 
-mixed lowest(mixed *numbers...)
-{
-    mixed number, result ;
+mixed lowest(mixed *numbers...) {
+  mixed number, result;
 
-    if( sizeof(numbers) == 0 ) error("Missing at least one argument of type int or float.\n");
+  if (sizeof(numbers) == 0) error("Missing at least one argument of type int or float.\n");
 
-    // seed result with the first element for comparison
-    result = numbers[0];
-    
-    foreach(number in numbers)
-    {
-        switch(typeof(number))
-        {            
-            case INT : case FLOAT :
-                result = number < result ? number : result ;
-                break ;
-            default: error("All argument values must be of type int or float.\n");
-        }
+  // seed result with the first element for comparison
+  result = numbers[0];
+
+  foreach (number in numbers) {
+    switch (typeof(number)) {
+      case INT: case FLOAT:
+        result = number < result ? number : result;
+        break;
+      default: error("All argument values must be of type int or float.\n");
     }
+  }
 
-    return result ;
+  return result;
 }

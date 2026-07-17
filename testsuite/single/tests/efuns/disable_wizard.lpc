@@ -1,6 +1,6 @@
 void do_tests() {
-    // Operates on this_player(); with no interactive it must fail
-    // gracefully rather than crash.
-    catch(disable_wizard());
-    ASSERT_EQ(0, wizardp(this_object()));
+  // Operates on this_player(); with no interactive it must fail
+  // gracefully rather than crash.
+  catch(disable_wizard());
+  ASSERT_EQ(0, wizardp(this_object()));
 }

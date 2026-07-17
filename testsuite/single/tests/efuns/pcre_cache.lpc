@@ -1,8 +1,8 @@
 #ifdef __PACKAGE_PCRE__
 void do_tests() {
-    // Warm the cache with a distinctive pattern, then observe it.
-    pcre_match("warmup", "warm_pattern_[0-9]+");
-    ASSERT(mapp(pcre_cache()));
-    ASSERT(sizeof(pcre_cache()) >= 1);
+  // Warm the cache with a distinctive pattern, then observe it.
+  pcre_match("warmup", "warm_pattern_[0-9]+");
+  ASSERT(mapp(pcre_cache()));
+  ASSERT(sizeof(pcre_cache()) >= 1);
 }
 #endif

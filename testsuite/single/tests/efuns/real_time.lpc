@@ -1,6 +1,6 @@
 void do_tests() {
-    int t = real_time();
-    ASSERT(intp(t));
-    ASSERT(t > 1500000000);          // sometime after 2017
-    ASSERT(t - time() < 2 && time() - t < 2);
+  int t = real_time();
+  ASSERT(intp(t));
+  ASSERT(t > 1500000000);          // sometime after 2017
+  ASSERT(t - time() < 2 && time() - t < 2);
 }

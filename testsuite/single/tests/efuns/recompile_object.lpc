@@ -24,8 +24,8 @@ private void write_src2(string file, string body) {
 
 private void cleanup() {
   foreach (string prog in ({ THING, DIR + "/seppuku", DIR + "/rp_thing",
-                             DIR + "/rp_parent", DIR + "/virt",
-                             DIR + "/vbase", DIR + "/initbad" })) {
+    DIR + "/rp_parent", DIR + "/virt",
+    DIR + "/vbase", DIR + "/initbad" })) {
     foreach (object o in children(prog)) {
       if (o) destruct(o);
     }
@@ -48,13 +48,13 @@ private void run_checks() {
   ASSERT(mkdir(DIR) || file_size(DIR) == -2);
 
   write_src(
-      "int count;\n" +
-      "private int secret = 3;\n" +
-      "int gone = 1;\n" +
-      "int bump() { return ++count; }\n" +
-      "int peek() { return secret; }\n" +
-      "void poke(int v) { secret = v; }\n" +
-      "string version() { return \"v1\"; }\n");
+    "int count;\n" +
+    "private int secret = 3;\n" +
+    "int gone = 1;\n" +
+    "int bump() { return ++count; }\n" +
+    "int peek() { return secret; }\n" +
+    "void poke(int v) { secret = v; }\n" +
+    "string version() { return \"v1\"; }\n");
 
   ob = load_object(THING);
   c1 = new(THING);
@@ -69,19 +69,19 @@ private void run_checks() {
   // v2: new code, a new variable with an initializer, one variable
   // removed, count/secret kept.
   write_src(
-      "int count;\n" +
-      "private int secret = 3;\n" +
-      "int extra = 7;\n" +
-      "int bump() { return ++count; }\n" +
-      "int peek() { return secret; }\n" +
-      "void poke(int v) { secret = v; }\n" +
-      "int query_extra() { return extra; }\n" +
-      "function get_bump_fp() { return (: bump :); }\n" +
-      "void arm() { call_out(\"tick\", 100); }\n" +
-      "void disarm() { remove_call_out(\"tick\"); }\n" +
-      "int armed() { return find_call_out(\"tick\") != -1; }\n" +
-      "void tick() { }\n" +
-      "string version() { return \"v2\"; }\n");
+    "int count;\n" +
+    "private int secret = 3;\n" +
+    "int extra = 7;\n" +
+    "int bump() { return ++count; }\n" +
+    "int peek() { return secret; }\n" +
+    "void poke(int v) { secret = v; }\n" +
+    "int query_extra() { return extra; }\n" +
+    "function get_bump_fp() { return (: bump :); }\n" +
+    "void arm() { call_out(\"tick\", 100); }\n" +
+    "void disarm() { remove_call_out(\"tick\"); }\n" +
+    "int armed() { return find_call_out(\"tick\") != -1; }\n" +
+    "void tick() { }\n" +
+    "string version() { return \"v2\"; }\n");
 
   // The master copy AND both clones update in one call.
   n = recompile_object(ob);
@@ -123,17 +123,17 @@ private void run_checks() {
 
   // v3: another swap on top.
   write_src(
-      "int count;\n" +
-      "private int secret = 3;\n" +
-      "int extra = 7;\n" +
-      "int bump() { return ++count; }\n" +
-      "int peek() { return secret; }\n" +
-      "int query_extra() { return extra; }\n" +
-      "void disarm() { remove_call_out(\"tick\"); }\n" +
-      "int armed() { return find_call_out(\"tick\") != -1; }\n" +
-      "void tick() { }\n" +
-      "int self_update() { return recompile_object(this_object()); }\n" +
-      "string version() { return \"v3\"; }\n");
+    "int count;\n" +
+    "private int secret = 3;\n" +
+    "int extra = 7;\n" +
+    "int bump() { return ++count; }\n" +
+    "int peek() { return secret; }\n" +
+    "int query_extra() { return extra; }\n" +
+    "void disarm() { remove_call_out(\"tick\"); }\n" +
+    "int armed() { return find_call_out(\"tick\") != -1; }\n" +
+    "void tick() { }\n" +
+    "int self_update() { return recompile_object(this_object()); }\n" +
+    "string version() { return \"v3\"; }\n");
   ASSERT_EQ(3, recompile_object(ob));
   ASSERT_EQ("v3", ob->version());
   ASSERT_EQ(4, ob->bump());  // state still riding along
@@ -160,9 +160,9 @@ private void run_checks() {
   // backing source and swaps it in, keeping the virtual identity,
   // name, flag and state.
   write_src2(DIR + "/vbase.lpc",
-             "int n;\n" +
-             "int bump() { return ++n; }\n" +
-             "string vv() { return \"vb1\"; }\n");
+    "int n;\n" +
+    "int bump() { return ++n; }\n" +
+    "string vv() { return \"vb1\"; }\n");
   ob = load_object(DIR + "/virt");  // via master::compile_object
   ASSERT(objectp(ob));
   ASSERT(virtualp(ob));
@@ -170,9 +170,9 @@ private void run_checks() {
   ob->bump();
   ASSERT_EQ(2, ob->bump());
   write_src2(DIR + "/vbase.lpc",
-             "int n;\n" +
-             "int bump() { return ++n; }\n" +
-             "string vv() { return \"vb2 bigger\"; }\n");
+    "int n;\n" +
+    "int bump() { return ++n; }\n" +
+    "string vv() { return \"vb2 bigger\"; }\n");
   ASSERT(recompile_object(ob) >= 1);
   ASSERT(ob == find_object(DIR + "/virt"));
   ASSERT(virtualp(ob));
@@ -185,24 +185,24 @@ private void run_checks() {
   // the backend sweep would later corrupt the fresh variable block.
   // The rest of this suite run doubles as the sweep detector.
   write_src2(DIR + "/rp_parent.lpc",
-             "int p1;\nint p2;\nint p3;\n" +
-             "int get_p3() { return p3; }\n");
+    "int p1;\nint p2;\nint p3;\n" +
+    "int get_p3() { return p3; }\n");
   write_src2(DIR + "/rp_thing.lpc",
-             "inherit \"" + DIR + "/rp_parent\";\n" +
-             "int a1;\n" +
-             "void do_rp() { replace_program(\"" + DIR + "/rp_parent\"); }\n" +
-             "string version() { return \"rp1\"; }\n");
+    "inherit \"" + DIR + "/rp_parent\";\n" +
+    "int a1;\n" +
+    "void do_rp() { replace_program(\"" + DIR + "/rp_parent\"); }\n" +
+    "string version() { return \"rp1\"; }\n");
   ob = load_object(DIR + "/rp_thing");
   c1 = new(DIR + "/rp_thing");
   write_src2(DIR + "/rp_thing.lpc",
-             "int x = 1;\n" +
-             "int kicked = kick();\n" +
-             "int kick() {\n" +
-             "  foreach (object o in children(\"" + DIR + "/rp_thing\"))\n" +
-             "    if (o != this_object()) catch(o->do_rp());\n" +
-             "  return 1;\n" +
-             "}\n" +
-             "string version() { return \"rp2\"; }\n");
+    "int x = 1;\n" +
+    "int kicked = kick();\n" +
+    "int kick() {\n" +
+    "  foreach (object o in children(\"" + DIR + "/rp_thing\"))\n" +
+    "    if (o != this_object()) catch(o->do_rp());\n" +
+    "  return 1;\n" +
+    "}\n" +
+    "string version() { return \"rp2\"; }\n");
   ASSERT_EQ(2, recompile_object(ob));
   ASSERT_EQ("rp2", ob->version());
   ASSERT_EQ("rp2", c1->version());
@@ -212,15 +212,15 @@ private void run_checks() {
   // swept cleanly, and destructed objects drop out of the updated
   // count.
   write_src2(DIR + "/seppuku.lpc",
-             "int x = 1;\n" +
-             "string version() { return \"s1\"; }\n");
+    "int x = 1;\n" +
+    "string version() { return \"s1\"; }\n");
   ob = load_object(DIR + "/seppuku");
   c1 = new(DIR + "/seppuku");
   write_src2(DIR + "/seppuku.lpc",
-             "int x = 2;\n" +
-             "int boom = go();\n" +
-             "int go() { destruct(this_object()); return 0; }\n" +
-             "string version() { return \"s2\"; }\n");
+    "int x = 2;\n" +
+    "int boom = go();\n" +
+    "int go() { destruct(this_object()); return 0; }\n" +
+    "string version() { return \"s2\"; }\n");
   ASSERT_EQ(0, recompile_object(ob));
   ASSERT(!objectp(ob));
   ASSERT(!objectp(c1));
@@ -233,18 +233,18 @@ private void run_checks() {
   // ref/variable-block leak (the debug-build memory checker after this
   // file is the detector).
   write_src2(DIR + "/initbad.lpc",
-             "int n = 1;\n" +
-             "int set_n(int v) { return n = v; }\n" +
-             "string version() { return \"ib1\"; }\n");
+    "int n = 1;\n" +
+    "int set_n(int v) { return n = v; }\n" +
+    "string version() { return \"ib1\"; }\n");
   ob = load_object(DIR + "/initbad");
   c1 = new(DIR + "/initbad");
   c1->set_n(7);
   write_src2(DIR + "/initbad.lpc",
-             "int n = 1;\n" +
-             "int boom = go();\n" +
-             "int go() { error(\"init boom\\n\"); return 0; }\n" +
-             "int set_n(int v) { return n = v; }\n" +
-             "string version() { return \"ib2\"; }\n");
+    "int n = 1;\n" +
+    "int boom = go();\n" +
+    "int go() { error(\"init boom\\n\"); return 0; }\n" +
+    "int set_n(int v) { return n = v; }\n" +
+    "string version() { return \"ib2\"; }\n");
   // Both blueprint and clone update; each __INIT errors but is caught.
   ASSERT_EQ(0, recompile_object(ob));
   ASSERT(objectp(ob) && objectp(c1));      // neither leaked/immortalized
@@ -283,7 +283,7 @@ protected void master_recompile_check() {
   // the rebuilt apply table dispatches (valid_write runs on the new
   // program for this write_file).
   if (!"/single/master"->query_num_checks() ||
-      !write_file("/data/master_recheck.tmp", "x", 1)) {
+    !write_file("/data/master_recheck.tmp", "x", 1)) {
     debug_message("POST-RUN master recompile: state or applies broken\n");
     shutdown(-1);
     return;

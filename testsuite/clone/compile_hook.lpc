@@ -7,8 +7,8 @@
 
 private mapping inherit_rules = ([]);
 private mapping include_rules = ([]);
-private mixed *inherit_calls = ({ });
-private mixed *include_calls = ({ });
+private mixed *inherit_calls = ({});
+private mixed *include_calls = ({});
 
 void set_inherit_rule(string path, mixed result) { inherit_rules[path] = ({ result }); }
 

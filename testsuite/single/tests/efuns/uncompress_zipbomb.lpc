@@ -17,14 +17,14 @@
 // buffer size" of 400000) is rejected with a clean catchable error rather
 // than succeeding or crashing.
 void do_tests() {
-    buffer bomb;
-    mixed err;
+  buffer bomb;
+  mixed err;
 
-    bomb = to_buffer(read_bytes("/data/compress/zipbomb.zbin"));
-    ASSERT(bufferp(bomb));
-    ASSERT(sizeof(bomb) > 0);
+  bomb = to_buffer(read_bytes("/data/compress/zipbomb.zbin"));
+  ASSERT(bufferp(bomb));
+  ASSERT(sizeof(bomb) > 0);
 
-    err = catch(uncompress(bomb));
-    ASSERT(stringp(err));
+  err = catch(uncompress(bomb));
+  ASSERT(stringp(err));
 }
 #endif

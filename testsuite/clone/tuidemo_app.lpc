@@ -49,6 +49,6 @@ void on_open(object t, int w, int h) {
 
 string render() {
   status->set_text(sprintf(" %dx%d  %s ", app_screen()->scr_width(),
-                           app_screen()->scr_height(), last_event));
+    app_screen()->scr_height(), last_event));
   return ::render();
 }

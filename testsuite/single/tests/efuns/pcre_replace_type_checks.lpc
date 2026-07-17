@@ -7,18 +7,18 @@
 // well-typed case must keep working exactly as before.
 #ifdef __PACKAGE_PCRE__
 void do_tests() {
-    mixed err;
-    mixed non_array;
-    mixed bad_elems;
+  mixed err;
+  mixed non_array;
+  mixed bad_elems;
 
-    non_array = 5;
-    err = catch(pcre_replace("ab cd", "(\\w+) (\\w+)", non_array));
-    ASSERT(err);
+  non_array = 5;
+  err = catch(pcre_replace("ab cd", "(\\w+) (\\w+)", non_array));
+  ASSERT(err);
 
-    bad_elems = ({1, 2});
-    err = catch(pcre_replace("ab cd", "(\\w+) (\\w+)", bad_elems));
-    ASSERT(err);
+  bad_elems = ({ 1, 2 });
+  err = catch(pcre_replace("ab cd", "(\\w+) (\\w+)", bad_elems));
+  ASSERT(err);
 
-    ASSERT_EQ("cd ab", pcre_replace("ab cd", "(\\w+) (\\w+)", ({"cd", "ab"})));
+  ASSERT_EQ("cd ab", pcre_replace("ab cd", "(\\w+) (\\w+)", ({ "cd", "ab" })));
 }
 #endif

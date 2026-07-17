@@ -6,16 +6,16 @@
 // completely unrelated string -- retargets the shared slot and
 // silently corrupts what the ref reads next.
 void do_tests() {
-    string outer, inner, got;
+  string outer, inner, got;
 
-    outer = "AB";
-    inner = "xy";
-    got = "";
-    foreach (int ref c in outer) {
-        inner[0]++;  // unrelated string-char lvalue op, same shared VM slot
-        got += sprintf("%c", c);
-    }
-    ASSERT_EQ("AB", got);
-    // inner[0] incremented once per outer-loop iteration: 'x'->'y'->'z'.
-    ASSERT_EQ("zy", inner);
+  outer = "AB";
+  inner = "xy";
+  got = "";
+  foreach (int ref c in outer) {
+    inner[0]++;  // unrelated string-char lvalue op, same shared VM slot
+    got += sprintf("%c", c);
+  }
+  ASSERT_EQ("AB", got);
+  // inner[0] incremented once per outer-loop iteration: 'x'->'y'->'z'.
+  ASSERT_EQ("zy", inner);
 }

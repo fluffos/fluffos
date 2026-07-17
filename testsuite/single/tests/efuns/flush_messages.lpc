@@ -1,7 +1,7 @@
 void do_tests() {
-    // Flushing a non-interactive (or everyone, with none connected)
-    // must not crash; an error about the non-interactive is acceptable.
-    catch(flush_messages());
-    catch(flush_messages(this_object()));
-    ASSERT(1);
+  // Flushing a non-interactive (or everyone, with none connected)
+  // must not crash; an error about the non-interactive is acceptable.
+  catch(flush_messages());
+  catch(flush_messages(this_object()));
+  ASSERT(1);
 }

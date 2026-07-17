@@ -5,44 +5,43 @@ inherit "/inherit/clean_up";
 object prev;
 
 void create() {
-    prev = previous_object();
+  prev = previous_object();
 }
 
-nomask void i_am_bad() {
-}
+nomask void i_am_bad() {}
 
 void do_tests() {
-    object ob;
+  object ob;
 #ifndef __NO_SHADOWS__
-    ASSERT(catch(shadow(this_object())));
-    ASSERT(catch(shadow(master())));
-    new(__DIR__ "badshad", 1);
+  ASSERT(catch(shadow(this_object())));
+  ASSERT(catch(shadow(master())));
+  new(__DIR__ "badshad", 1);
 
-    ASSERT(shadow(this_object(), 0) == 0);
-    ASSERT((object)this_object()->foo() == this_object());
+  ASSERT(shadow(this_object(), 0) == 0);
+  ASSERT((object)this_object()->foo() == this_object());
 
-    new(__DIR__ "badshad2", 1);
+  new(__DIR__ "badshad2", 1);
 
-    ASSERT(shadow(this_object(), 0) == 0);
-    ASSERT((object)this_object()->foo() == this_object());
+  ASSERT(shadow(this_object(), 0) == 0);
+  ASSERT((object)this_object()->foo() == this_object());
 
-    ob = new(__DIR__ "goodshad", 1);
-    ASSERT(shadow(this_object(), 0) == ob);
-    ASSERT((object)this_object()->foo() == ob);
-    ASSERT((object)new(__FILE__)->bar() == ob);
-    ASSERT(catch(shadow(ob)));
-    ASSERT(catch(shadow(new(__FILE__))));
+  ob = new(__DIR__ "goodshad", 1);
+  ASSERT(shadow(this_object(), 0) == ob);
+  ASSERT((object)this_object()->foo() == ob);
+  ASSERT((object)new(__FILE__)->bar() == ob);
+  ASSERT(catch(shadow(ob)));
+  ASSERT(catch(shadow(new(__FILE__))));
 
-    // clean up.
-    destruct(ob);
+  // clean up.
+  destruct(ob);
 #endif
 }
 
 object foo() {
-    printf("%O\n", file_name());
-    return this_object();
+  printf("%O\n", file_name());
+  return this_object();
 }
 
 object bar() {
-    return (object)prev->foo();
+  return (object)prev->foo();
 }

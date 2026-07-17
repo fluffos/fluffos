@@ -1,6 +1,6 @@
 void do_tests() {
-    // This object is not virtual; the master's compile_object hook makes
-    // /test/virtual one.
-    ASSERT_EQ(0, virtualp(this_object()));
-    ASSERT_EQ(1, virtualp(load_object("/test/virtual")));
+  // This object is not virtual; the master's compile_object hook makes
+  // /test/virtual one.
+  ASSERT_EQ(0, virtualp(this_object()));
+  ASSERT_EQ(1, virtualp(load_object("/test/virtual")));
 }

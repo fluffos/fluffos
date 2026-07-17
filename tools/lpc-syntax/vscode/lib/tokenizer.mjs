@@ -41,11 +41,17 @@ function skipStringSpan(src, i) {
 }
 
 function skipCharSpan(src, i) {
+  // Scan to the CLOSING quote like skipStringSpan -- char literals carry
+  // variable-length escapes (`'\x41'`, `'\101'`), and the old fixed
+  // 2-char assumption made findInterpEnd swallow an interpolation's `}`
+  // right after such a literal, tearing the template apart (literal
+  // corruption on valid LPC).
   let j = i + 1;
-  if (src[j] === '\\') j++;
-  j++;
-  if (src[j] === "'") j++;
-  return j;
+  while (j < src.length && src[j] !== "'") {
+    if (src[j] === '\\') j++;
+    j++;
+  }
+  return Math.min(j + 1, src.length);
 }
 
 function findInterpEnd(src, start) {
@@ -84,15 +90,70 @@ function skipTemplateSpan(src, i) {
   return j;
 }
 
+// A directive's raw '\n' terminator, scanning from `j` (inside the
+// directive, past its '#'). A '/* ... */' block comment opened on a
+// directive line is invisible whitespace to the directive and may close
+// on a LATER physical line (docs/lpc/preprocessor/) -- the newline(s)
+// inside it don't end the directive; keep scanning past the comment's
+// close for the directive's REAL terminating newline instead. A '//'
+// comment (which always runs to end of physical line) or a string/char
+// literal's own '/*'-or-'//'-shaped content must not be misread as a
+// real comment start, hence routing through skipStringSpan/skipCharSpan.
+function directiveLineEnd(src, j) {
+  let k = j;
+  while (k < src.length && src[k] !== '\n') {
+    const c = src[k];
+    // String/char spans are only skipped WITHIN the physical line: the
+    // driver's directive capture is strictly line-based (quotes never
+    // extend a directive -- an unterminated '"' or a bare "'" in a
+    // #define body is legal and inert), so a span that would run past
+    // the newline means the directive ends at that newline instead.
+    // Without the bound, `#define Q it'` swallowed the entire next
+    // source line into the directive token, and `#define BAD "abc`
+    // swallowed everything up to the next '"' anywhere in the file. (A
+    // backslash-newline inside the span still continues the directive:
+    // the caller's '\'-continuation check sees the '\' before this
+    // returned newline, matching the driver's splice-first folding.)
+    if (c === '"' || c === "'") {
+      const e = c === '"' ? skipStringSpan(src, k) : skipCharSpan(src, k);
+      const nl = src.indexOf('\n', k);
+      if (nl >= 0 && nl < e) return nl;
+      k = e;
+      continue;
+    }
+    if (c === '/' && src[k + 1] === '*') {
+      const e = src.indexOf('*/', k + 2);
+      k = e < 0 ? src.length : e + 2;
+      continue;
+    }
+    if (c === '/' && src[k + 1] === '/') {
+      const nl = src.indexOf('\n', k);
+      k = nl < 0 ? src.length : nl;
+      continue;
+    }
+    k++;
+  }
+  return k;
+}
+
 export function tokenize(src) {
   const toks = [];
   let i = 0;
   let line = 1;
   let col = 1;
   let atLineStart = true;
+  // Absolute char offset, threaded independently of `i`/`j` (the template
+  // branch below does some confusing pre/post-increment bookkeeping on `i`
+  // that is only used to decide where scanning resumes -- it is off by one
+  // relative to actual text boundaries at times). `pos` instead mirrors the
+  // line/col tracking exactly: advanced by push()'s text length, plus the
+  // inner-interpolation catch-up, so it always lines up with real source
+  // offsets regardless of what `i`/`j` are doing.
+  let pos = 0;
 
   const push = (kind, text) => {
-    toks.push({ kind, text, line, col });
+    toks.push({ kind, text, line, col, start: pos, end: pos + text.length });
+    pos += text.length;
     for (const ch of text) {
       if (ch === '\n') { line++; col = 1; } else { col++; }
     }
@@ -133,12 +194,13 @@ export function tokenize(src) {
       continue;
     }
 
-    // preprocessor directive: '#' at line start; '\'-continuations join
+    // preprocessor directive: '#' at line start; '\'-continuations join,
+    // and so does an unclosed '/* ... */' comment (see directiveLineEnd).
     if (c === '#' && atLineStart) {
       let j = i;
       for (;;) {
-        let nl = src.indexOf('\n', j);
-        if (nl < 0) { j = src.length; break; }
+        let nl = directiveLineEnd(src, j);
+        if (nl >= src.length) { j = src.length; break; }
         let k = nl - 1;
         while (k > j && src[k] === '\r') k--;
         if (src[k] === '\\') { j = nl + 1; continue; }
@@ -193,13 +255,15 @@ export function tokenize(src) {
           // scan interpolation with brace tracking, recursively tokenized
           const k = findInterpEnd(src, i);
           const inner = src.slice(i, k);
+          const innerBase = pos;
           for (const t of tokenize(inner)) {
-            toks.push({ ...t, line: 0, col: 0 });
+            toks.push({ ...t, line: 0, col: 0, start: t.start + innerBase, end: t.end + innerBase });
           }
           // account positions for inner text
           for (const ch of inner) {
             if (ch === '\n') { line++; col = 1; } else { col++; }
           }
+          pos += inner.length;
           i = k;
           frag = '}';
           j = i + 1;

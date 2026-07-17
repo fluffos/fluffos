@@ -2,6 +2,6 @@
 // the parameters) used to spin the preprocessor's parameter loop forever,
 // hanging the compiler. It must now report a compile error instead.
 void do_tests() {
-    string err = catch(load_object("/clone/bad_macro_params"));
-    ASSERT_NE(0, err);
+  string err = catch(load_object("/clone/bad_macro_params"));
+  ASSERT_NE(0, err);
 }

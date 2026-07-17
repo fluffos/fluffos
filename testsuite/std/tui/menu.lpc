@@ -109,8 +109,8 @@ private void render() {
   int i, n = sizeof(vmap);
 
   lines = ({ clip("? " + prompt +
-                  (filter != "" ? " " + ansi_sgr("2") + filter + ansi_reset() : ""),
-                  filter != "" ? 9 : 0) });
+    (filter != "" ? " " + ansi_sgr("2") + filter + ansi_reset() : ""),
+    filter != "" ? 9 : 0) });
   if (sel < top) top = sel;
   if (sel >= top + height) top = sel - height + 1;
   if (top < 0) top = 0;
@@ -141,8 +141,7 @@ private void finish() {
   string answer = answer_text();
 
   if (width > 0) answer = wslice(answer, 0, width - 1 - visible_width(head));
-  out += "\r" + ansi_up(drawn) + head + ansi_sgr("1;36") + answer +
-         ansi_reset() + ansi_el(0) + "\r\n" + ansi_ed(0);
+  out += "\r" + ansi_up(drawn) + head + ansi_sgr("1;36") + answer + ansi_reset() + ansi_el(0) + "\r\n" + ansi_ed(0);
   drawn = 0;
   began = 0;
 }

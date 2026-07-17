@@ -1,5 +1,5 @@
 int switch1(string x) {
-  switch(x) {
+  switch (x) {
     case "a":
       return 1;
     case "obj":
@@ -17,7 +17,7 @@ int switch1(string x) {
 }
 
 int switch2(int x) {
-  switch(x) {
+  switch (x) {
     case 0:
       return 0;
     case 1:
@@ -45,7 +45,7 @@ int switch2(int x) {
 }
 
 int switch3(int x) {
-  switch(x) {
+  switch (x) {
     case 0..0:
       return 0;
     case 11..20:
@@ -58,7 +58,7 @@ int switch3(int x) {
 }
 
 int switch4(int x) {
-  switch(x) {
+  switch (x) {
     case ..20:
       return 1;
     default:
@@ -68,7 +68,7 @@ int switch4(int x) {
 
 /* direct lookup switch.*/
 int switch5(int x) {
-  switch(x) {
+  switch (x) {
     case 1:
       return 1;
     case 2:
@@ -105,22 +105,22 @@ void do_tests() {
 
   // range tests
   ASSERT_EQ(0, switch3(0));
-  for(int i=1; i<=10; i++) {
+  for (int i = 1; i <= 10; i++) {
     ASSERT_EQ(1, switch3(i));
   }
-  for(int i=11; i<=20; i++) {
+  for (int i = 11; i <= 20; i++) {
     ASSERT_EQ(2, switch3(i));
   }
-  for(int i=21; i<=100; i++) {
+  for (int i = 21; i <= 100; i++) {
     ASSERT_EQ(999, switch3(i));
   }
   ASSERT_EQ(999, switch3(MAX_INT));
 
   // range test 2
-  for(int i=-20; i<=20; i++) {
+  for (int i = -20; i <= 20; i++) {
     ASSERT_EQ(1, switch4(i));
   }
-  for(int i=21; i<=100; i++) {
+  for (int i = 21; i <= 100; i++) {
     ASSERT_EQ(999, switch4(i));
   }
   ASSERT_EQ(999, switch4(MAX_INT));

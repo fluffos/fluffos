@@ -59,14 +59,13 @@ int *flag_seen;
 
 void iter_flag_collect() {
   flag_seen = ({});
-  foreach(int ref c in flag_str) {
+  foreach (int ref c in flag_str) {
     flag_seen += ({ c });
   }
 }
 
 void iter_flag_empty_body() {
-  foreach(int ref c in flag_str) {
-  }
+  foreach (int ref c in flag_str) {}
 }
 
 string gen_load_error(string name, string src) {
@@ -217,7 +216,7 @@ void do_tests() {
   // Test & in foreach over an array (mutates in place)
   {
     int *nums = ({ 1, 2, 3 });
-    foreach(int & n in nums) {
+    foreach (int & n in nums) {
       n *= 2;
     }
     ASSERT_EQ(({ 2, 4, 6 }), nums);
@@ -226,7 +225,7 @@ void do_tests() {
   // Test ref keyword in foreach
   {
     int *nums = ({ 1, 2, 3 });
-    foreach(int ref n in nums) {
+    foreach (int ref n in nums) {
       n += 10;
     }
     ASSERT_EQ(({ 11, 12, 13 }), nums);
@@ -238,13 +237,13 @@ void do_tests() {
     mapping m = ([ "a": 1, "b": 2 ]);
     mapping mm = ([ "s": "x", "arr": ({ 1 }) ]);
 
-    foreach(string k, int ref v in m) {
+    foreach (string k, int ref v in m) {
       v *= 10;
     }
     ASSERT_EQ(10, m["a"]);
     ASSERT_EQ(20, m["b"]);
 
-    foreach(string k, mixed ref v in mm) {
+    foreach (string k, mixed ref v in mm) {
       v = k;
     }
     ASSERT_EQ("s", mm["s"]);
@@ -257,19 +256,19 @@ void do_tests() {
     buffer b = allocate_buffer(3);
 
     b[0] = 1; b[1] = 2; b[2] = 3;
-    foreach(int ref v in b) {
+    foreach (int ref v in b) {
       v = v * 2;   // read + assign through the ref
     }
     ASSERT_EQ(2, b[0]);
     ASSERT_EQ(4, b[1]);
     ASSERT_EQ(6, b[2]);
 
-    foreach(int ref v in b) {
+    foreach (int ref v in b) {
       v++;
     }
     ASSERT_EQ(3, b[0]);
 
-    foreach(int ref v in b) {
+    foreach (int ref v in b) {
       v += 2;
     }
     ASSERT_EQ(5, b[0]);
@@ -283,16 +282,16 @@ void do_tests() {
     int got;
 
     b[0] = 200; b[1] = 255;
-    foreach(int ref v in b) {
+    foreach (int ref v in b) {
       got = v;
     }
     ASSERT_EQ(255, got);   // read the actual unsigned value
 
-    foreach(int ref v in b) {
+    foreach (int ref v in b) {
       ASSERT_EQ(range_err, catch(v = 256));
       break;
     }
-    foreach(int ref v in b) {
+    foreach (int ref v in b) {
       ASSERT_EQ(range_err, catch(v = -1));
       break;
     }
@@ -307,8 +306,8 @@ void do_tests() {
     buffer b1 = allocate_buffer(2), b2 = allocate_buffer(2);
     buffer o = allocate_buffer(1);
 
-    foreach(int ref x in b1) {
-      foreach(int ref y in b2) {
+    foreach (int ref x in b1) {
+      foreach (int ref y in b2) {
         y++;
       }
       o[0]++;      // arms the shared b[i] lvalue mid-loop
@@ -326,8 +325,8 @@ void do_tests() {
   {
     int *a1 = ({ 0, 0 }), *a2 = ({ 0, 0 });
 
-    foreach(int ref x in a1) {
-      foreach(int ref y in a2) {
+    foreach (int ref x in a1) {
+      foreach (int ref y in a2) {
         y++;
       }
       x = 9;
@@ -341,7 +340,7 @@ void do_tests() {
   // Reads deliver the actual characters (used to be off by one)
   {
     int r = 0;
-    foreach(int ref c in "abc") {
+    foreach (int ref c in "abc") {
       r = r * 1000 + c;
     }
     ASSERT_EQ(97098099, r);
@@ -350,7 +349,7 @@ void do_tests() {
   // Multi-byte, single-codepoint EGCs read fine through a ref
   {
     int *seen = ({});
-    foreach(int ref c in "héé🍆") {
+    foreach (int ref c in "héé🍆") {
       seen += ({ c });
     }
     ASSERT_EQ(({ 'h', 233, 233, 127814 }), seen);
@@ -360,15 +359,15 @@ void do_tests() {
   // loop's by-value copy: the iterated variable never changes
   {
     string s = "abc";
-    foreach(int ref c in s) {
+    foreach (int ref c in s) {
       c = 'z';
     }
     ASSERT_EQ("abc", s);
-    foreach(int ref c in s) {
+    foreach (int ref c in s) {
       c++;
     }
     ASSERT_EQ("abc", s);
-    foreach(int ref c in s) {
+    foreach (int ref c in s) {
       c += 5;
     }
     ASSERT_EQ("abc", s);
@@ -381,11 +380,11 @@ void do_tests() {
     string zero_byte = "*Strings cannot contain 0 byte.\n";
     string bad_cp = "*Strings cannot contain invalid utf8 codepoint.\n";
 
-    foreach(int ref c in "abc") {
+    foreach (int ref c in "abc") {
       ASSERT_EQ(zero_byte, catch(c = 0));
       break;
     }
-    foreach(int ref c in "abc") {
+    foreach (int ref c in "abc") {
       ASSERT_EQ(bad_cp, catch(c = 0x110000));
       break;
     }
@@ -400,7 +399,7 @@ void do_tests() {
 
     ASSERT_EQ(3, strlen(s));
     ASSERT_EQ('e', s[1]);
-    foreach(int ref c in s) {
+    foreach (int ref c in s) {
       seen += ({ c });
       c += 1;
     }
@@ -425,7 +424,7 @@ void do_tests() {
 
     // the non-ref form still iterates (delivering -1 for the wide EGC)
     seen = ({});
-    foreach(int c in s) {
+    foreach (int c in s) {
       seen += ({ c });
     }
     ASSERT_EQ(({ 'a', -1, 'b' }), seen);
@@ -439,20 +438,20 @@ void do_tests() {
 
   // a reference to a range is a compile error
   ASSERT(gen_load_error("gen_ref_range",
-                        "void g(mixed ref v) {}\n"
-                        "void f() { string s = \"abc\"; g(ref s[0..1]); }\n"));
+    "void g(mixed ref v) {}\n"
+    "void f() { string s = \"abc\"; g(ref s[0..1]); }\n"));
 
   // a mapping KEY may not be a ref in foreach (keys are hashed; mutating
   // one in place would corrupt the mapping) -- compile error
   ASSERT(gen_load_error(
-      "gen_ref_mapkey",
-      "void f() { mapping m = ([ \"a\": 1 ]); foreach(string ref k, int v in m) {} }\n"));
+    "gen_ref_mapkey",
+    "void f() { mapping m = ([ \"a\": 1 ]); foreach(string ref k, int v in m) {} }\n"));
 
   // Bitwise & and &= still parse and evaluate as binary AND
   {
     int a = 6, b = 3;
     ASSERT_EQ(2, a & b);
-    ASSERT_EQ(2, 6&3);
+    ASSERT_EQ(2, 6 & 3);
     a &= b;
     ASSERT_EQ(2, a);
     ASSERT_EQ(6, 4 | 6 & 3);

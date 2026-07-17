@@ -1,7 +1,7 @@
 class foo {
-    int x;
+  int x;
 }
 
 class foo {
-    string y;
+  string y;
 }

@@ -68,7 +68,7 @@ private void run_checks() {
   plain = ({ 0 });
   ASSERT_EQ(1, refs(plain));      // held only by the local variable
   ASSERT_EQ(2, refs(a));          // local variable + the cycle's own ref:
-                                  // dropping `a` leaves ref at 1 forever
+  // dropping `a` leaves ref at 1 forever
 #endif
 
   // --- 3. recursion-guarded consumers survive cycles ---------------------

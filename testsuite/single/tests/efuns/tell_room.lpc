@@ -1,22 +1,22 @@
 void do_tests() {
-    object tp;
-    object room = clone_object("/clone/catch_tell_probe");
-    object l1 = clone_object("/clone/catch_tell_probe");
-    object l2 = clone_object("/clone/catch_tell_probe");
+  object tp;
+  object room = clone_object("/clone/catch_tell_probe");
+  object l1 = clone_object("/clone/catch_tell_probe");
+  object l2 = clone_object("/clone/catch_tell_probe");
 
-    SAVETP;
-    l1->enter(room);
-    l2->enter(room);
-    // Only LIVING objects hear tell_room.
-    l1->make_living();
-    l2->make_living();
-    tell_room(room, "hello room");
-    ASSERT_EQ("hello room", l1->last_message());
-    ASSERT_EQ("hello room", l2->last_message());
-    // Exclusion list.
-    tell_room(room, "second", ({ l2 }));
-    ASSERT_EQ("second", l1->last_message());
-    ASSERT_EQ("hello room", l2->last_message());
-    destruct(l1); destruct(l2); destruct(room);
-    RESTORETP;
+  SAVETP;
+  l1->enter(room);
+  l2->enter(room);
+  // Only LIVING objects hear tell_room.
+  l1->make_living();
+  l2->make_living();
+  tell_room(room, "hello room");
+  ASSERT_EQ("hello room", l1->last_message());
+  ASSERT_EQ("hello room", l2->last_message());
+  // Exclusion list.
+  tell_room(room, "second", ({ l2 }));
+  ASSERT_EQ("second", l1->last_message());
+  ASSERT_EQ("hello room", l2->last_message());
+  destruct(l1); destruct(l2); destruct(room);
+  RESTORETP;
 }

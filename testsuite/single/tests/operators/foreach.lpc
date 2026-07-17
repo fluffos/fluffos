@@ -1,16 +1,15 @@
 void iter_buffer_two_vars() {
   buffer b = allocate_buffer(2);
-  foreach(string k, int v in b) {
-  }
+  foreach (string k, int v in b) {}
 }
 
 void do_tests() {
-  int* x = ({1, 2, 3, 4});
-  int* x_orig = ({1, 2, 3, 4});
+  int *x = ({ 1, 2, 3, 4 });
+  int *x_orig = ({ 1, 2, 3, 4 });
   int count = 0;
   string str = "abcdefg";
 
-  foreach(int i in x) {
+  foreach (int i in x) {
     count++;
   }
 
@@ -18,21 +17,21 @@ void do_tests() {
   ASSERT_EQ(x_orig, x);
 
   count = 0;
-  foreach(int ref i in x) {
+  foreach (int ref i in x) {
     i++;
     count++;
   }
 
   ASSERT_EQ(sizeof(x), count);
-  ASSERT_EQ(({2, 3, 4, 5}), x);
+  ASSERT_EQ(({ 2, 3, 4, 5 }), x);
 
   {
     mapping tmp = ([ "x": 1,
-                     "y": 2,
-                     "z": 3 ]);
+      "y": 2,
+      "z": 3 ]);
 
     count = 0;
-    foreach(string key, string val in tmp) {
+    foreach (string key, string val in tmp) {
       write(key + ":" + val + "\n");
       count++;
     }
@@ -43,7 +42,7 @@ void do_tests() {
   {
     string tmp = "";
 
-    foreach(int c in str) {
+    foreach (int c in str) {
       tmp += sprintf("%c", c);
     }
 
@@ -51,11 +50,11 @@ void do_tests() {
   }
 
   {
-    foreach(int ref c in str) {
+    foreach (int ref c in str) {
       c++;
     }
 
-    ASSERT_EQ("abcdefg", str); // not suppose to change
+    ASSERT_EQ("abcdefg", str);  // not suppose to change
   }
 
   // A ref loop variable over a string must read the actual characters.
@@ -63,7 +62,7 @@ void do_tests() {
   // so every read through the ref was off by one.
   {
     int r = 0;
-    foreach(int ref c in "abc") {
+    foreach (int ref c in "abc") {
       r = r * 1000 + c;
     }
     ASSERT_EQ(97098099, r);
@@ -74,8 +73,8 @@ void do_tests() {
   // outer loop and crash the driver.
   {
     string r = "";
-    foreach(int a in "ab") {
-      foreach(int b in "xy") {
+    foreach (int a in "ab") {
+      foreach (int b in "xy") {
         r += sprintf("%c%c ", a, b);
       }
     }
@@ -86,8 +85,8 @@ void do_tests() {
   // loop's own character across the inner loop.
   {
     string r = "";
-    foreach(int ref a in "ab") {
-      foreach(int b in "xy") {
+    foreach (int ref a in "ab") {
+      foreach (int b in "xy") {
         r += sprintf("%c%c ", a, b);
       }
     }
@@ -97,8 +96,8 @@ void do_tests() {
   // Nested string foreach with multi-byte UTF-8 EGCs.
   {
     int n = 0;
-    foreach(int a in "héé") {
-      foreach(int b in "🍆🍠") {
+    foreach (int a in "héé") {
+      foreach (int b in "🍆🍠") {
         n++;
       }
     }
@@ -111,7 +110,7 @@ void do_tests() {
     int *seen = ({});
 
     b[0] = 0; b[1] = 1; b[2] = 200; b[3] = 255;
-    foreach(int v in b) {
+    foreach (int v in b) {
       seen += ({ v });
     }
     ASSERT_EQ(({ 0, 1, 200, 255 }), seen);
@@ -120,7 +119,7 @@ void do_tests() {
   // empty buffer: zero iterations
   {
     int n = 0;
-    foreach(int v in allocate_buffer(0)) {
+    foreach (int v in allocate_buffer(0)) {
       n++;
     }
     ASSERT_EQ(0, n);
@@ -132,8 +131,8 @@ void do_tests() {
     int n = 0;
 
     b1[0] = 1; b1[1] = 2; b2[0] = 3; b2[1] = 4;
-    foreach(int bx in b1) {
-      foreach(int by in b2) {
+    foreach (int bx in b1) {
+      foreach (int by in b2) {
         n += bx * by;
       }
     }
@@ -156,14 +155,14 @@ void do_tests() {
 
     big = allocate(65536, 1);
     bigcount = 0;
-    foreach(int v in big) {
+    foreach (int v in big) {
       bigcount += v;
     }
     ASSERT_EQ(65536, bigcount);
 
     big = allocate(70000, 1);
     bigcount = 0;
-    foreach(int v in big) {
+    foreach (int v in big) {
       bigcount += v;
     }
     ASSERT_EQ(70000, bigcount);
@@ -173,7 +172,7 @@ void do_tests() {
     }
     ASSERT_EQ(70000, sizeof(bigmap));
     bigcount = 0;
-    foreach(int k, int v in bigmap) {
+    foreach (int k, int v in bigmap) {
       bigcount += v;
     }
     ASSERT_EQ(70000, bigcount);

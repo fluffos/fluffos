@@ -1,3 +1,3 @@
-void do_tests(){
+void do_tests() {
   send_gmcp("^^^^^^");
 }

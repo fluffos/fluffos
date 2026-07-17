@@ -10,39 +10,39 @@
 // (as a clean "no match", same as any other exhausted search) once
 // parse_rule()'s step cap trips.
 void create() {
-    parse_init();
-    if (clonep()) {
-        move_object(__FILE__);
-    }
+  parse_init();
+  if (clonep()) {
+    move_object(__FILE__);
+  }
 }
 
 void do_tests() {
 #ifndef __PACKAGE_PARSER__
-    write("no package parser, skipped.\n");
+  write("no package parser, skipped.\n");
 #else
-    string sentence;
-    int i;
-    int start_ns, elapsed_ms;
+  string sentence;
+  int i;
+  int start_ns, elapsed_ms;
 
-    clone_object(__FILE__);
-    // No object exists that the final OBJ token could ever match (empty
-    // inventory), so no split of the preceding STR tokens can ever
-    // complete the match -- forcing the unfixed driver to exhaustively
-    // backtrack through every way to divide the sentence's words among
-    // the 8 STR tokens before giving up.
-    parse_add_rule("frob", "STR STR STR STR STR STR STR STR OBJ");
+  clone_object(__FILE__);
+  // No object exists that the final OBJ token could ever match (empty
+  // inventory), so no split of the preceding STR tokens can ever
+  // complete the match -- forcing the unfixed driver to exhaustively
+  // backtrack through every way to divide the sentence's words among
+  // the 8 STR tokens before giving up.
+  parse_add_rule("frob", "STR STR STR STR STR STR STR STR OBJ");
 
-    sentence = "frob";
-    for (i = 0; i < 40; i++) {
-        sentence += " word" + i;
-    }
+  sentence = "frob";
+  for (i = 0; i < 40; i++) {
+    sentence += " word" + i;
+  }
 
-    // No rule the parser knows about can match this sentence, so this is
-    // "no match" either way -- the regression signal is how long it takes
-    // to get there, not the return value itself.
-    start_ns = time_ns();
-    ASSERT_EQ(0, parse_sentence(sentence, 0, all_inventory()));
-    elapsed_ms = (time_ns() - start_ns) / 1000000;
-    ASSERT(elapsed_ms < 2000);
+  // No rule the parser knows about can match this sentence, so this is
+  // "no match" either way -- the regression signal is how long it takes
+  // to get there, not the return value itself.
+  start_ns = time_ns();
+  ASSERT_EQ(0, parse_sentence(sentence, 0, all_inventory()));
+  elapsed_ms = (time_ns() - start_ns) / 1000000;
+  ASSERT(elapsed_ms < 2000);
 #endif
 }

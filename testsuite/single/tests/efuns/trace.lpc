@@ -1,3 +1,3 @@
 void do_tests() {
-    ASSERT(dump_trace());
+  ASSERT(dump_trace());
 }

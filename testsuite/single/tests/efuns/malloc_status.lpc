@@ -1,3 +1,3 @@
 void do_tests() {
-    ASSERT(stringp(malloc_status()));
+  ASSERT(stringp(malloc_status()));
 }

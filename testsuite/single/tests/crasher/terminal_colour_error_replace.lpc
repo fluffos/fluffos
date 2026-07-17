@@ -4,14 +4,14 @@
 // replacement -- no leak (the per-file leak gate would catch a regression).
 
 string terminal_colour_replace(string s) {
-    error("boom from terminal_colour_replace");
+  error("boom from terminal_colour_replace");
 }
 
 void do_tests() {
 #ifdef __PACKAGE_CONTRIB__
-    mapping codes = ([ "RED" : "<r>", "RESET" : "<0>" ]);
-    // The replace apply errors on every part; must not leak or propagate.
-    ASSERT_EQ(0, catch(terminal_colour("%^RED%^hello world%^RESET%^", codes)));
+  mapping codes = ([ "RED": "<r>", "RESET": "<0>" ]);
+  // The replace apply errors on every part; must not leak or propagate.
+  ASSERT_EQ(0, catch(terminal_colour("%^RED%^hello world%^RESET%^", codes)));
 #endif
-    ASSERT(1);
+  ASSERT(1);
 }

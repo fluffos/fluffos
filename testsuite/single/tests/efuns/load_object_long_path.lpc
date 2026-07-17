@@ -6,17 +6,17 @@
 // This does not need the target file to exist: the overflow happens in
 // the strcpy/strcat calls before any filesystem check.
 void do_tests() {
-    string long_name;
-    int i;
+  string long_name;
+  int i;
 
-    long_name = "/";
-    for (i = 0; i < 399; i++) {
-        long_name += "a";
-    }
+  long_name = "/";
+  for (i = 0; i < 399; i++) {
+    long_name += "a";
+  }
 
-    // Just surviving this call (whether it errors cleanly because the
-    // file doesn't exist, or returns 0) is the regression signal -- an
-    // undersized buffer overflows the stack and ASan-aborts the whole
-    // process before any of that logic runs.
-    catch(load_object(long_name));
+  // Just surviving this call (whether it errors cleanly because the
+  // file doesn't exist, or returns 0) is the regression signal -- an
+  // undersized buffer overflows the stack and ASan-aborts the whole
+  // process before any of that logic runs.
+  catch(load_object(long_name));
 }

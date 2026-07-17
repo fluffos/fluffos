@@ -11,26 +11,26 @@
 // now flatten this particular chain iteratively instead of recursing it,
 // so a large object must compile regardless of its definition count.
 void do_tests() {
-    string src;
-    object ob;
-    int i;
+  string src;
+  object ob;
+  int i;
 
-    src = "";
-    for (i = 0; i < 5000; i++) {
-        src += "int f" + i + "() { return " + i + "; }\n";
-    }
+  src = "";
+  for (i = 0; i < 5000; i++) {
+    src += "int f" + i + "() { return " + i + "; }\n";
+  }
 
-    rm("/gen_deep_defs.c");
-    write_file("/gen_deep_defs.c", src);
+  rm("/gen_deep_defs.c");
+  write_file("/gen_deep_defs.c", src);
 
-    ob = load_object("/gen_deep_defs");
-    ASSERT2(objectp(ob), "object with 5000 top-level functions should compile");
-    if (objectp(ob)) {
-        ASSERT_EQ(0, ob->f0());
-        ASSERT_EQ(2500, ob->f2500());
-        ASSERT_EQ(4999, ob->f4999());
-        destruct(ob);
-    }
+  ob = load_object("/gen_deep_defs");
+  ASSERT2(objectp(ob), "object with 5000 top-level functions should compile");
+  if (objectp(ob)) {
+    ASSERT_EQ(0, ob->f0());
+    ASSERT_EQ(2500, ob->f2500());
+    ASSERT_EQ(4999, ob->f4999());
+    destruct(ob);
+  }
 
-    rm("/gen_deep_defs.c");
+  rm("/gen_deep_defs.c");
 }

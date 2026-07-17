@@ -14,13 +14,13 @@ private void cleanup() {
   // NOTE: the /data/hu3/co object deliberately survives -- its pending
   // call_outs must fire after the run (see verify_callouts).
   foreach (string prog in ({ DIR + "/ct", DIR + "/sh_target", DIR + "/sh_shadow",
-                             DIR + "/act" })) {
+    DIR + "/act" })) {
     foreach (object o in children(prog)) {
       if (o) destruct(o);
     }
   }
   foreach (string f in ({ "/ct.lpc", "/sh_target.lpc", "/sh_shadow.lpc",
-                          "/act.lpc" })) {
+    "/act.lpc" })) {
     rm(DIR + f);
   }
   // co.lpc and DIR are removed by verify_callouts, which fires after
@@ -35,34 +35,34 @@ private void run_checks() {
 
   // --- catch_tell: routed by name, state accumulates across the swap.
   write_src(DIR + "/ct.lpc",
-            "string *msgs = ({ });\n" +
-            "void catch_tell(string s) { msgs += ({ \"v1:\" + s }); }\n" +
-            "string *q() { return msgs; }\n");
+    "string *msgs = ({ });\n" +
+    "void catch_tell(string s) { msgs += ({ \"v1:\" + s }); }\n" +
+    "string *q() { return msgs; }\n");
   ob = load_object(DIR + "/ct");
   tell_object(ob, "hello");
   write_src(DIR + "/ct.lpc",
-            "string *msgs = ({ });\n" +
-            "void catch_tell(string s) { msgs += ({ \"v2:\" + s }); }\n" +
-            "string *q() { return msgs; }\n");
+    "string *msgs = ({ });\n" +
+    "void catch_tell(string s) { msgs += ({ \"v2:\" + s }); }\n" +
+    "string *q() { return msgs; }\n");
   ASSERT_EQ(1, recompile_object(ob));
   tell_object(ob, "again");
   ASSERT_EQ(({ "v1:hello", "v2:again" }), ob->q());
 
   // --- shadows: the chain survives updating the SHADOWED object...
   write_src(DIR + "/sh_target.lpc",
-            "string who() { return \"t1\"; }\n" +
-            "string info() { return \"i1\"; }\n");
+    "string who() { return \"t1\"; }\n" +
+    "string info() { return \"i1\"; }\n");
   write_src(DIR + "/sh_shadow.lpc",
-            "string who() { return \"shadowed\"; }\n" +
-            "int attach(object t) { return shadow(t, 1) != 0; }\n");
+    "string who() { return \"shadowed\"; }\n" +
+    "int attach(object t) { return shadow(t, 1) != 0; }\n");
   ob = load_object(DIR + "/sh_target");
   sh = load_object(DIR + "/sh_shadow");
   ASSERT(sh->attach(ob));
   ASSERT_EQ("shadowed", ob->who());
   ASSERT_EQ("i1", ob->info());
   write_src(DIR + "/sh_target.lpc",
-            "string who() { return \"t2\"; }\n" +
-            "string info() { return \"i2 bigger\"; }\n");
+    "string who() { return \"t2\"; }\n" +
+    "string info() { return \"i2 bigger\"; }\n");
   ASSERT_EQ(1, recompile_object(ob));
   ASSERT(query_shadowing(sh) == ob);           // chain intact
   ASSERT_EQ("shadowed", ob->who());            // still intercepted
@@ -70,8 +70,8 @@ private void run_checks() {
 
   // ... and updating the SHADOW itself while attached.
   write_src(DIR + "/sh_shadow.lpc",
-            "string who() { return \"shadowed v2\"; }\n" +
-            "int attach(object t) { return shadow(t, 1) != 0; }\n");
+    "string who() { return \"shadowed v2\"; }\n" +
+    "int attach(object t) { return shadow(t, 1) != 0; }\n");
   ASSERT_EQ(1, recompile_object(sh));
   ASSERT(query_shadowing(sh) == ob);
   ASSERT_EQ("shadowed v2", ob->who());
@@ -86,17 +86,17 @@ private void run_checks() {
   rm(MARK);
   rm(MARK + "_fp");
   write_src(DIR + "/co.lpc",
-            "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
-            "void late_tick() { write_file(\"" + MARK + "\", \"v1 ran\", 1); }\n" +
-            "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
-            "int pending() { return find_call_out(\"late_tick\"); }\n");
+    "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
+    "void late_tick() { write_file(\"" + MARK + "\", \"v1 ran\", 1); }\n" +
+    "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
+    "int pending() { return find_call_out(\"late_tick\"); }\n");
   ob = load_object(DIR + "/co");
   ob->arm();
   write_src(DIR + "/co.lpc",
-            "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
-            "void late_tick() { write_file(\"" + MARK + "\", \"v2 code ran\", 1); }\n" +
-            "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
-            "int pending() { return find_call_out(\"late_tick\"); }\n");
+    "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
+    "void late_tick() { write_file(\"" + MARK + "\", \"v2 code ran\", 1); }\n" +
+    "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
+    "int pending() { return find_call_out(\"late_tick\"); }\n");
   ASSERT_EQ(1, recompile_object(ob));
   ASSERT(ob->pending() >= 0);  // still scheduled after the swap
   call_out("verify_callouts", 1);
@@ -105,13 +105,13 @@ private void run_checks() {
   // --- add_action sentences (registered by v1 code) and heart_beat
   // survive; the verb dispatches by name into the NEW program.
   write_src(DIR + "/act.lpc",
-            "int hits;\n" +
-            "void arm() { enable_commands(); add_action(\"do_x\", \"xyzzy\");\n" +
-            "             set_heart_beat(1); }\n" +
-            "int do_x(string s) { hits += 1; return 1; }\n" +
-            "int try() { return command(\"xyzzy\"); }\n" +
-            "int q() { return hits; }\n" +
-            "void heart_beat() { }\n");
+    "int hits;\n" +
+    "void arm() { enable_commands(); add_action(\"do_x\", \"xyzzy\");\n" +
+    "             set_heart_beat(1); }\n" +
+    "int do_x(string s) { hits += 1; return 1; }\n" +
+    "int try() { return command(\"xyzzy\"); }\n" +
+    "int q() { return hits; }\n" +
+    "void heart_beat() { }\n");
   ob = load_object(DIR + "/act");
   SAVETP;
   ob->arm();
@@ -120,13 +120,13 @@ private void run_checks() {
   ASSERT_EQ(1, ob->q());
   ASSERT_EQ(1, query_heart_beat(ob));
   write_src(DIR + "/act.lpc",
-            "int hits;\n" +
-            "void arm() { enable_commands(); add_action(\"do_x\", \"xyzzy\");\n" +
-            "             set_heart_beat(1); }\n" +
-            "int do_x(string s) { hits += 10; return 1; }\n" +
-            "int try() { return command(\"xyzzy\"); }\n" +
-            "int q() { return hits; }\n" +
-            "void heart_beat() { }\n");
+    "int hits;\n" +
+    "void arm() { enable_commands(); add_action(\"do_x\", \"xyzzy\");\n" +
+    "             set_heart_beat(1); }\n" +
+    "int do_x(string s) { hits += 10; return 1; }\n" +
+    "int try() { return command(\"xyzzy\"); }\n" +
+    "int q() { return hits; }\n" +
+    "void heart_beat() { }\n");
   ASSERT_EQ(1, recompile_object(ob));
   ASSERT_EQ(1, query_heart_beat(ob));          // registration survived
   ASSERT(ob->try());                           // v1's sentence still fires...
@@ -142,7 +142,7 @@ protected void verify_callouts() {
   // The name-based call_out must have dispatched into the NEW program.
   if (!mark || strsrch(mark, "v2 code ran") == -1) {
     debug_message("POST-RUN callout check: name call_out did not run v2 code: " +
-                  sprintf("%O", mark));
+      sprintf("%O", mark));
     shutdown(-1);
     return;
   }

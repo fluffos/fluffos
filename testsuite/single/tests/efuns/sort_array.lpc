@@ -4,7 +4,7 @@ int func(int x, int y) {
 
 void do_tests() {
   mixed *tmp;
-  tmp = ({ 4, 3, 2 , 1 });
+  tmp = ({ 4, 3, 2, 1 });
 
   // sort with built-in sorter
   ASSERT_EQ(({ 1, 2, 3, 4 }), sort_array(tmp, 1));

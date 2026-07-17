@@ -1,7 +1,7 @@
-inherit __DIR__"0default_args_1.lpc";
+inherit __DIR__ "0default_args_1.lpc";
 
 // Original test - single default argument
-int id (string id: (: "" :)) {
+int id(string id: (: "" :)) {
   return member_array(id, query_id()) > -1;
 }
 
@@ -16,7 +16,7 @@ float test_float(float x, float y: (: 1.5 :), float z: (: 2.5 :)) {
 }
 
 // Test with array defaults
-int* test_array(int base, int* arr: (: ({ 1, 2, 3 }) :)) {
+int *test_array(int base, int *arr: (: ({ 1, 2, 3 }) :)) {
   return ({ base }) + arr;
 }
 
