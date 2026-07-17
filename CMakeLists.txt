@@ -162,3 +162,16 @@ set_tests_properties(lpcshell-errors PROPERTIES
         FAIL_REGULAR_EXPRESSION "syntax error;n=0;n=2"
         TIMEOUT 120
         LABELS "lpcshell")
+
+# lpcshell predefines __LPCSHELL__ so a mudlib can tell it is being compiled
+# for the shell rather than a live driver. It has to be visible by the time
+# the MASTER compiles -- early enough to branch on in epilog() -- which is
+# why it cannot be a master::flag() call; see single/master.lpc's epilog(),
+# which prints this marker under the guard.
+add_test(NAME lpcshell-predefine
+        COMMAND $<TARGET_FILE:lpcshell> etc/config.test lpcshell/eval.lpcs
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(lpcshell-predefine PROPERTIES
+        PASS_REGULAR_EXPRESSION "LPCSHELL_PREDEFINED"
+        TIMEOUT 120
+        LABELS "lpcshell")

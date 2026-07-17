@@ -190,6 +190,16 @@ string* epilog(int)
 {
   string *items;
 
+#ifdef __LPCSHELL__
+  // Proves lpcshell's __LPCSHELL__ predefine is already in place when the
+  // MASTER is compiled -- i.e. early enough for a mudlib to branch on it
+  // here, in epilog(), which is the whole point of it being a predefine.
+  // master::flag() cannot carry this signal: the driver only calls flag()
+  // after vm_start(), by which time epilog() has already run. Compiles to
+  // nothing under the real driver.
+  debug_message("LPCSHELL_PREDEFINED\n");
+#endif
+
   items = update_file(CONFIG_DIR + "/preload");
   return items;
 }
