@@ -1966,6 +1966,19 @@ void dealloc_object(object_t* ob, const char* from) {
     SETOBNAME(ob, nullptr);
   }
 #ifdef DEBUG
+  // obj_list_destruct (destruct_object()'s "not yet swept by
+  // remove_destructed_objects()" queue, simulate.cc) is NOT gated by
+  // DEBUG, unlike obj_list_dangling below -- but in a DEBUG build the two
+  // lists happen to share this object's next_all/prev_all storage
+  // (destruct_object() pushes onto both, one right after the other, so
+  // the two chains are always structurally identical until something is
+  // unlinked). The neighbor fixup the obj_list_dangling unlink below
+  // performs therefore already keeps the underlying chain correct for
+  // obj_list_destruct's own forward walk too; only its separate head
+  // *variable* needs updating here.
+  if (obj_list_destruct == ob) {
+    obj_list_destruct = ob->next_all;
+  }
   prev_all = ob->prev_all;
   if (prev_all) {
     prev_all->next_all = ob->next_all;
@@ -1981,6 +1994,27 @@ void dealloc_object(object_t* ob, const char* from) {
   ob->next_all = 0;
   ob->prev_all = 0;
   tot_dangling_object--;
+#else
+  // No obj_list_dangling bookkeeping exists in this build to perform the
+  // equivalent neighbor fixup as a side effect (see the DEBUG branch
+  // above), so unlink from obj_list_destruct explicitly here. Otherwise a
+  // later destruct_object() call anywhere in the driver can dereference
+  // this object's now-freed address via a stale obj_list_destruct head or
+  // a neighbor's stale next_all/prev_all -- a real, ASan-confirmed
+  // heap-use-after-free (reachable via reclaim_objects() freeing a stray
+  // reference to a destructed object still queued mid-chain, or simply an
+  // object whose only reference drops immediately after destruct()).
+  if (obj_list_destruct == ob) {
+    obj_list_destruct = ob->next_all;
+    if (obj_list_destruct) {
+      obj_list_destruct->prev_all = nullptr;
+    }
+  } else if (ob->prev_all) {
+    ob->prev_all->next_all = ob->next_all;
+    if (ob->next_all) {
+      ob->next_all->prev_all = ob->prev_all;
+    }
+  }
 #endif
   tot_alloc_object--;
   FREE((char*)ob);

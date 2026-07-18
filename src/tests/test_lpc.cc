@@ -5,6 +5,28 @@
 
 #include "compiler/internal/compiler.h"
 
+namespace {
+// Runs `fn` (arbitrary LPC-triggering driver code -- load_object_from_source,
+// destruct_object, free_object, ... can all run create()/__INIT/applies)
+// under a proper recovery point, matching the pattern DriverTest's other
+// tests use inline. Without this, an error() thrown with no established
+// error_context hits the driver's fatal() fallback and aborts the whole
+// test binary instead of failing just one check.
+template <typename F>
+void RunGuarded(F&& fn) {
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    fn();
+  } catch (...) {
+    restore_context(&econ);
+    ADD_FAILURE() << "unexpected error() during test";
+    return;
+  }
+  pop_context(&econ);
+}
+}  // namespace
+
 // Test fixture class
 class DriverTest : public ::testing::Test {
  public:
@@ -226,4 +248,74 @@ TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
   // is the static the_null_array; nothing to free.)
   v = explode_string("a", 1, "a", 1, false);
   EXPECT_EQ(v->size, 0);
+}
+
+// Regression test for a heap-use-after-free in dealloc_object()
+// (src/vm/internal/base/object.cc): destruct_object() pushes the object
+// onto the global obj_list_destruct queue (simulate.cc); on the unfixed
+// binary, dealloc_object() never unlinked the object from that queue when
+// its ref count hit 0, so a same-call-sequence destruct+free of object A
+// left obj_list_destruct pointing at freed memory. The very next
+// destruct_object() call anywhere -- here, on an unrelated object B --
+// then wrote through that dangling head pointer. Fails under ASan on the
+// unfixed binary; on a plain build it would silently corrupt whatever
+// memory A's address gets reused for.
+TEST_F(DriverTest, DestructThenImmediateFreeDoesNotDangleObjListDestruct) {
+  object_t* a = nullptr;
+  object_t* b = nullptr;
+  RunGuarded([&] { a = load_object_from_source("void bump() {}\n", "lifecycle_head_a", 0); });
+  RunGuarded([&] { b = load_object_from_source("void bump() {}\n", "lifecycle_head_b", 0); });
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+
+  RunGuarded([&] {
+    destruct_object(a);
+    free_object(&a, "DestructThenImmediateFreeDoesNotDangleObjListDestruct");
+  });
+  RunGuarded([&] {
+    destruct_object(b);
+    free_object(&b, "DestructThenImmediateFreeDoesNotDangleObjListDestruct");
+  });
+}
+
+// Regression test for the general (not just head) case of the same bug:
+// destructing A, B, C in order chains obj_list_destruct as C -> B -> A.
+// Freeing the MIDDLE object (B) directly -- exactly what reclaim_objects()
+// does when it finds a stray reference to an already-destructed object --
+// must correctly relink C's neighbor pointer to skip the freed B, or a
+// later destruct_object() call (which touches the current head's
+// neighbor pointers) dereferences freed memory.
+TEST_F(DriverTest, MidChainFreeKeepsObjListDestructWalkable) {
+  object_t* a = nullptr;
+  object_t* b = nullptr;
+  object_t* c = nullptr;
+  object_t* d = nullptr;
+  RunGuarded([&] { a = load_object_from_source("void bump() {}\n", "lifecycle_mid_a", 0); });
+  RunGuarded([&] { b = load_object_from_source("void bump() {}\n", "lifecycle_mid_b", 0); });
+  RunGuarded([&] { c = load_object_from_source("void bump() {}\n", "lifecycle_mid_c", 0); });
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(c, nullptr);
+
+  RunGuarded([&] { destruct_object(a); });
+  RunGuarded([&] { destruct_object(b); });
+  RunGuarded([&] { destruct_object(c); });
+
+  // Free the middle object directly, simulating reclaim_objects() dropping
+  // a stray reference to a destructed object mid-queue.
+  RunGuarded([&] { free_object(&b, "MidChainFreeKeepsObjListDestructWalkable"); });
+
+  // Destructing (and freeing) a 4th object exercises the current
+  // obj_list_destruct head's neighbor pointers -- on the unfixed binary
+  // this is where the stale link left by the mid-chain free above would
+  // be dereferenced.
+  RunGuarded([&] { d = load_object_from_source("void bump() {}\n", "lifecycle_mid_d", 0); });
+  ASSERT_NE(d, nullptr);
+  RunGuarded([&] {
+    destruct_object(d);
+    free_object(&d, "MidChainFreeKeepsObjListDestructWalkable");
+  });
+
+  RunGuarded([&] { free_object(&c, "MidChainFreeKeepsObjListDestructWalkable"); });
+  RunGuarded([&] { free_object(&a, "MidChainFreeKeepsObjListDestructWalkable"); });
 }
