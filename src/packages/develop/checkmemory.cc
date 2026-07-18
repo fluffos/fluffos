@@ -852,10 +852,14 @@ void check_all_blocks(int flag) {
               prog->inherit[i].prog->extra_ref++;
             }
 
-            for (i = 0; i < prog->num_functions_defined; i++)
+            for (i = 0; i < prog->num_functions_defined; i++) {
               if (prog->function_table[i].funcname) {
                 EXTRA_REF(BLOCK(prog->function_table[i].funcname))++;
               }
+              if (prog->function_table[i].local_names) {
+                DO_MARK(prog->function_table[i].local_names, TAG_LOCAL_NAMES);
+              }
+            }
 
             for (i = 0; i < prog->num_strings; i++) {
               EXTRA_REF(BLOCK(prog->strings[i]))++;
@@ -956,6 +960,10 @@ void check_all_blocks(int flag) {
           case TAG_LINENUMBERS:
             outbuf_addv(&out, "WARNING: Found orphan line number block: %s %04x\n", entry->desc,
                         entry->tag);
+            break;
+          case TAG_LOCAL_NAMES:
+            outbuf_addv(&out, "WARNING: Found orphan debugger local-names block: %s %04x\n",
+                        entry->desc, entry->tag);
             break;
           case TAG_OBJ_NAME:
             outbuf_addv(&out, "WARNING: Found orphan object name: %s %04x\n", entry->desc,

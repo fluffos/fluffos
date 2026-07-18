@@ -51,6 +51,17 @@ See [Configuration](../../driver/config.md) for the full option reference
 - Object and file browsing (`fluffos/objects`, `fluffos/object`,
   `fluffos/files` custom DAP requests) work while the VM is **running** —
   you don't need to pause the mud to inspect what's loaded.
+- Function arguments and locals show their real source names, not `arg0`/
+  `local0` placeholders — the compiler captures them automatically whenever
+  `debugger port` is set. (A local declared inside a `for`/`switch` block
+  that has already exited by the time its function finishes compiling can't
+  be recovered this way and falls back to an index name; everything else —
+  including object variables — always shows real names.)
+- Values can be edited while stopped (DAP `setVariable`): frame arguments
+  and locals, object variables, array elements, and mapping values accept a
+  new integer, float, or double-quoted string literal. Arrays, mappings,
+  objects, and function values aren't assignable this way (that needs a real
+  expression evaluator, not yet implemented).
 
 ## Connecting from VS Code
 
@@ -88,10 +99,11 @@ void process_order(mapping order) {
 
 ## Security
 
-The debugger operates at driver level: it can read (and, in later phases,
-write) any object's variables regardless of mudlib `valid_read`/
-`valid_write` policy, and can execute arbitrary code once expression
-evaluation ships. Treat `debugger port` like a root shell on the mudlib:
+The debugger operates at driver level: it can read and write any object's
+variables regardless of mudlib `valid_read`/`valid_write` policy (see
+`setVariable` above), and will be able to execute arbitrary code once
+expression evaluation ships. Treat `debugger port` like a root shell on the
+mudlib:
 
 - Leave it disabled (the default) on production/shared servers.
 - Prefer loopback-only binding plus an SSH tunnel over exposing it

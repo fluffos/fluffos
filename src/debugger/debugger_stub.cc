@@ -17,3 +17,4 @@ void lpc_debugger_on_program_loaded(program_t* /*prog*/) {}
 void lpc_debugger_on_program_freed(program_t* /*prog*/) {}
 int lpc_debugger_attached() { return 0; }
 void lpc_debugger_break() {}
+int lpc_debugger_wants_local_names() { return 0; }

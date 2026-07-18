@@ -51,6 +51,7 @@ djson capabilities() {
       {"supportsLoadedSourcesRequest", true},
       {"supportsDelayedStackTraceLoading", true},
       {"supportsVariablePaging", true},
+      {"supportsSetVariable", true},
       {"exceptionBreakpointFilters",
        djson::array({djson{{"filter", "uncaught"},
                            {"label", "Uncaught LPC Errors"},
@@ -196,6 +197,18 @@ void handle_request(const djson& msg) {
                     build_variables(args.value("variablesReference", 0), args.value("start", 0),
                                     args.value("count", 0)),
                     nullptr);
+    }
+  } else if (cmd == "setVariable") {
+    if (!s.stopped) {
+      send_response(msg, false, nullptr, "not stopped");
+    } else {
+      std::string err;
+      djson body = set_variable_request(args, err);
+      if (body.is_null()) {
+        send_response(msg, false, nullptr, err.c_str());
+      } else {
+        send_response(msg, true, body, nullptr);
+      }
     }
   } else if (cmd == "exceptionInfo") {
     send_response(msg, true,
@@ -506,6 +519,15 @@ void lpc_debugger_on_program_freed(program_t* prog) {
 }
 
 int lpc_debugger_attached() { return dbg::g_session.attached ? 1 : 0; }
+
+int lpc_debugger_wants_local_names() {
+  // Deliberately keyed on the raw config value, not g_session.enabled: the
+  // documented contract (rc.cc, DESIGN.md §9) is "on whenever 'debugger
+  // port' is set", independent of whether the listener actually managed to
+  // bind. Keeping this a pure config predicate also makes it exercisable
+  // from a unit test without standing up a real socket.
+  return CONFIG_INT(__RC_DEBUGGER_PORT__) > 0 ? 1 : 0;
+}
 
 void lpc_debugger_break() {
   auto& s = dbg::g_session;

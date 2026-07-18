@@ -304,6 +304,39 @@ async function main() {
   check('object variables include a known master.lpc global',
         !!hasErrorVar && hasErrorVar.type === 'int', JSON.stringify(hasErrorVar));
 
+  // 3b. Locals scope: connect() declares `object login_ob; mixed err;` --
+  // with "debugger port" set (as this config always has it), the compiler
+  // captures real local names (DESIGN.md §9), so these must show as
+  // "login_ob"/"err", never "local0"/"local1".
+  const localsScope = scopes.body.scopes.find((s) => s.name === 'Locals');
+  const localsBefore = await c.request('variables', { variablesReference: localsScope.variablesReference });
+  const localNames = (localsBefore.body.variables || []).map((v) => v.name);
+  check('Locals scope shows the compiler-captured real names',
+        localNames.includes('login_ob') && localNames.includes('err'),
+        JSON.stringify(localNames));
+
+  // setVariable against a real stopped frame (the GTest suite can only
+  // reach the object-global/array/mapping paths, not this one -- there's no
+  // live csp/fp outside a real stopped VM). Restore `err` to falsy 0
+  // afterward so connect()'s `if (err) destruct(this_object())` below --
+  // this_object() being the MASTER object here -- never fires; the rest of
+  // this script's telnet/continue checks depend on the master staying alive.
+  const setVar = await c.request('setVariable', {
+    variablesReference: localsScope.variablesReference, name: 'err', value: '"probed-by-dap-smoke"',
+  });
+  check('setVariable writes a real local by its captured name',
+        setVar.success && setVar.body.value === '"probed-by-dap-smoke"', JSON.stringify(setVar));
+  const localsAfterWrite = await c.request('variables', { variablesReference: localsScope.variablesReference });
+  const errAfterWrite = (localsAfterWrite.body.variables || []).find((v) => v.name === 'err');
+  check('the write is visible in a subsequent variables fetch',
+        !!errAfterWrite && errAfterWrite.value === '"probed-by-dap-smoke"', JSON.stringify(errAfterWrite));
+
+  const restoreVar = await c.request('setVariable', {
+    variablesReference: localsScope.variablesReference, name: 'err', value: '0',
+  });
+  check('setVariable restores err to falsy 0 (also exercises a string->int type change)',
+        restoreVar.success && restoreVar.body.value === '0', JSON.stringify(restoreVar));
+
   // 4. step, then continue -- the world must resume (telnet data flows).
   c.clearMsgs();
   await c.request('next', { threadId: 1 });

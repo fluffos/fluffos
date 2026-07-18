@@ -49,4 +49,13 @@ void lpc_debugger_on_program_freed(program_t* prog);
 int lpc_debugger_attached();
 void lpc_debugger_break();
 
+// True when the compiler should emit a local/argument name table for the
+// debugger's variable inspector (DESIGN.md §9): "debugger port" is set.
+// Checked once per compiled function (rule_func(),
+// compiler/internal/grammar_rules.cc) -- deliberately keyed on the config
+// value, not on a client currently being attached, since names are baked
+// into the program at compile time and a client may attach to an
+// already-running mud later.
+int lpc_debugger_wants_local_names();
+
 #endif  // DEBUGGER_DEBUG_HOOK_H

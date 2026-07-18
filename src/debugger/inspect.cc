@@ -179,6 +179,29 @@ std::string preview(const svalue_t* sv) {
   }
 }
 
+// Real name for frame slot `slot` (0..num_arg-1 = arguments, num_arg.. =
+// locals), if the compiler captured one (DESIGN.md §9, gated on "debugger
+// port" being set at COMPILE time); nullptr means fall back to the
+// argN/localN index name -- either "debugger port" was 0 when this program
+// compiled, this is a FRAME_FUNP frame (lambdas: rule_func() is the only
+// capture site), or the slot belonged to a for/switch-scoped local whose
+// block had already closed by the time the function finished compiling
+// (see the "Scoping honesty" note in the design doc).
+const char* local_name_for(const FrameRegs& f, int slot) {
+  if ((f.entry->framekind & FRAME_MASK) != FRAME_FUNCTION) {
+    return nullptr;
+  }
+  function_t* fn = &f.prog->function_table[f.entry->fr.table_index];
+  if (!fn->local_names || slot < 0 || slot >= fn->num_arg + fn->num_local) {
+    return nullptr;
+  }
+  short idx = fn->local_names[slot];
+  if (idx < 0 || idx >= f.prog->num_strings) {
+    return nullptr;
+  }
+  return f.prog->strings[idx];
+}
+
 int make_handle(VarHandle h) {
   auto& s = g_session;
   s.handles.push_back(h);
@@ -245,6 +268,226 @@ void render_globals(object_t* ob, int start, int count, djson& out) {
     std::string name = vname ? vname : ("global" + std::to_string(i));
     out.push_back(render_var(name, &ob->variables[i]));
   }
+}
+
+// Resolve an object global by its display name (variable_name() over the
+// inherited layout, same pairing render_globals() uses).
+svalue_t* resolve_global(object_t* ob, const std::string& name, std::string& err) {
+  if (!ob || (ob->flags & O_DESTRUCTED) || !ob->prog || !ob->variables) {
+    err = "object is gone";
+    return nullptr;
+  }
+  int total = ob->prog->num_variables_total;
+  for (int i = 0; i < total; i++) {
+    char* vname = variable_name(ob->prog, i);
+    if (vname && name == vname) {
+      return &ob->variables[i];
+    }
+  }
+  err = "no such variable: " + name;
+  return nullptr;
+}
+
+// Inverse of build_variables()'s array/class naming ("[3]" / "member [3]").
+bool parse_index_name(const std::string& name, bool is_class, int& out) {
+  std::string s = name;
+  const std::string prefix = is_class ? "member [" : "[";
+  if (s.compare(0, prefix.size(), prefix) != 0 || s.empty() || s.back() != ']') {
+    return false;
+  }
+  s = s.substr(prefix.size(), s.size() - prefix.size() - 1);
+  if (s.empty()) {
+    return false;
+  }
+  for (char c : s) {
+    if (!isdigit(static_cast<unsigned char>(c))) {
+      return false;
+    }
+  }
+  out = std::stoi(s);
+  return true;
+}
+
+// Re-walks the same container cases build_variables() renders, returning a
+// pointer to the ONE child matching `name` instead of the whole page --
+// setVariable's DAP contract identifies the target by the exact `name` a
+// prior `variables` response rendered for this same variablesReference.
+// Only reachable while stopped (debug_server.cc gates the request), so
+// nothing can mutate the frozen world out from under this lookup.
+svalue_t* resolve_lvalue(int ref, const std::string& name, std::string& err) {
+  auto& s = g_session;
+  int idx = ref - kHandleBase;
+  if (idx < 0 || idx >= static_cast<int>(s.handles.size())) {
+    err = "unknown variablesReference";
+    return nullptr;
+  }
+  VarHandle h = s.handles[idx];
+  switch (h.kind) {
+    case VarHandle::kScopeArgs:
+    case VarHandle::kScopeLocals: {
+      FrameRegs f;
+      if (!get_frame(h.frame, f) || !f.fp_) {
+        err = "stale frame";
+        return nullptr;
+      }
+      std::string fname;
+      int na, nl;
+      frame_func(f, fname, na, nl);
+      if (na < 0) {
+        err = "frame has no variables";
+        return nullptr;
+      }
+      bool args = (h.kind == VarHandle::kScopeArgs);
+      int n = args ? na : (nl < 0 ? 0 : nl);
+      const char* prefix = args ? "arg" : "local";
+      svalue_t* base = args ? f.fp_ : f.fp_ + na;
+      for (int i = 0; i < n; i++) {
+        int slot = args ? i : (na + i);
+        const char* real = local_name_for(f, slot);
+        std::string candidate = real ? real : (prefix + std::to_string(i));
+        if (candidate == name) {
+          return &base[i];
+        }
+      }
+      err = "no such variable: " + name;
+      return nullptr;
+    }
+    case VarHandle::kScopeGlobals: {
+      FrameRegs f;
+      if (!get_frame(h.frame, f)) {
+        err = "stale frame";
+        return nullptr;
+      }
+      return resolve_global(f.ob, name, err);
+    }
+    case VarHandle::kObject:
+      return resolve_global(static_cast<object_t*>(h.ptr), name, err);
+    case VarHandle::kArray:
+    case VarHandle::kClass: {
+      auto* arr = static_cast<array_t*>(h.ptr);
+      int wanted;
+      if (!parse_index_name(name, h.kind == VarHandle::kClass, wanted) || wanted < 0 ||
+          wanted >= arr->size) {
+        err = "no such element: " + name;
+        return nullptr;
+      }
+      return &arr->item[wanted];
+    }
+    case VarHandle::kMapping: {
+      // Keys are matched against the same (truncated) preview text
+      // build_variables() renders as the DAP `name` -- exact for typical
+      // int/string keys, but not a true identity: a preview collision
+      // (two keys rendering identically, or a >60-char key indistinguishable
+      // from its truncation) is rejected rather than risking a write to the
+      // wrong entry.
+      auto* m = static_cast<mapping_t*>(h.ptr);
+      svalue_t* found = nullptr;
+      int matches = 0;
+      for (unsigned int b = 0; b < m->table_size; b++) {
+        for (mapping_node_t* node = m->table[b]; node; node = node->next) {
+          std::string key = preview(&node->values[0]);
+          if (key.size() > 60) {
+            key.resize(60);
+            key += "…";
+          }
+          if (key == name) {
+            matches++;
+            found = &node->values[1];
+          }
+        }
+      }
+      if (matches == 0) {
+        err = "no such key: " + name;
+        return nullptr;
+      }
+      if (matches > 1) {
+        err = "key preview '" + name +
+              "' is ambiguous (multiple keys render identically); not editable via setVariable";
+        return nullptr;
+      }
+      return found;
+    }
+    default:
+      err = "this variable is not editable";
+      return nullptr;
+  }
+}
+
+// Deliberately minimal: integer, float, or a double-quoted string literal
+// (with the common \\ \" \n \t \r escapes) -- never arrays/mappings/objects/
+// function literals, which would need the compiler (phase 3's `evaluate`).
+bool parse_literal(const std::string& text, svalue_t& out, std::string& err) {
+  size_t b = text.find_first_not_of(" \t\r\n");
+  size_t e = text.find_last_not_of(" \t\r\n");
+  if (b == std::string::npos) {
+    err = "empty value";
+    return false;
+  }
+  std::string t = text.substr(b, e - b + 1);
+
+  if (t.size() >= 2 && t.front() == '"' && t.back() == '"') {
+    std::string decoded;
+    for (size_t i = 1; i + 1 < t.size(); i++) {
+      char c = t[i];
+      if (c == '\\' && i + 2 < t.size()) {
+        char n = t[i + 1];
+        switch (n) {
+          case 'n':
+            decoded += '\n';
+            i++;
+            break;
+          case 't':
+            decoded += '\t';
+            i++;
+            break;
+          case 'r':
+            decoded += '\r';
+            i++;
+            break;
+          case '"':
+            decoded += '"';
+            i++;
+            break;
+          case '\\':
+            decoded += '\\';
+            i++;
+            break;
+          default:
+            decoded += c;
+            break;
+        }
+      } else {
+        decoded += c;
+      }
+    }
+    out.type = T_STRING;
+    out.subtype = STRING_MALLOC;
+    out.u.string = string_copy(decoded.c_str(), "dbg setVariable");
+    return true;
+  }
+
+  char* endp = nullptr;
+  long long ival = strtoll(t.c_str(), &endp, 10);
+  if (endp == t.c_str() + t.size() && endp != t.c_str()) {
+    out.type = T_NUMBER;
+    out.subtype = 0;
+    out.u.number = static_cast<LPC_INT>(ival);
+    return true;
+  }
+
+  endp = nullptr;
+  double fval = strtod(t.c_str(), &endp);
+  if (endp == t.c_str() + t.size() && endp != t.c_str()) {
+    out.type = T_REAL;
+    out.subtype = 0;
+    out.u.real = fval;
+    return true;
+  }
+
+  err =
+      "unsupported value syntax; only an integer, float, or double-quoted string literal is "
+      "supported here (arrays/mappings/objects/functions need the phase-3 expression evaluator)";
+  return false;
 }
 
 bool sanitize_mudlib_path(const std::string& in, std::string& rel) {
@@ -392,7 +635,10 @@ djson build_variables(int ref, int start, int count) {
       svalue_t* base = args ? f.fp_ : f.fp_ + na;
       int end = std::min(n, start + count);
       for (int i = start; i < end; i++) {
-        vars.push_back(render_var(prefix + std::to_string(i), &base[i]));
+        int slot = args ? i : (na + i);
+        const char* real = local_name_for(f, slot);
+        std::string name = real ? real : (prefix + std::to_string(i));
+        vars.push_back(render_var(name, &base[i]));
       }
       break;
     }
@@ -450,6 +696,27 @@ djson build_variables(int ref, int start, int count) {
     }
   }
   return djson{{"variables", vars}};
+}
+
+djson set_variable_request(const djson& args, std::string& err) {
+  int ref = args.value("variablesReference", 0);
+  std::string name = args.value("name", "");
+  std::string value_text = args.value("value", "");
+
+  svalue_t* target = resolve_lvalue(ref, name, err);
+  if (!target) {
+    return djson();
+  }
+
+  svalue_t new_val{};
+  if (!parse_literal(value_text, new_val, err)) {
+    return djson();
+  }
+
+  assign_svalue(target, &new_val);
+  free_svalue(&new_val, "dbg setVariable");
+
+  return djson{{"value", preview(target)}, {"type", type_name(target)}, {"variablesReference", 0}};
 }
 
 djson build_loaded_sources() {

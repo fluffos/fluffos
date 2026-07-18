@@ -20,10 +20,13 @@ void deallocate_program(program_t* progp) {
   total_prog_block_size -= progp->total_size;
   total_num_prog_blocks -= 1;
 
-  /* Free all function names. */
+  /* Free all function names (and any debugger local-name table). */
   for (i = 0; i < progp->num_functions_defined; i++) {
     if (progp->function_table[i].funcname) {
       free_string(progp->function_table[i].funcname);
+    }
+    if (progp->function_table[i].local_names) {
+      FREE(progp->function_table[i].local_names);
     }
   }
   /* Free all strings */

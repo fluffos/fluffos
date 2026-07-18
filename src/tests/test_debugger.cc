@@ -32,12 +32,18 @@ class DebuggerTest : public ::testing::Test {
   // error() thrown with no established error_context hits the driver's
   // fatal() fallback and aborts the whole test binary instead of failing
   // just this one check.
-  object_t* LoadFixture(const std::string& source, const char* virtual_name) {
+  // callcreate=false (the default) skips create()/__INIT -- fine for tests
+  // that only need the compiled program shape. Tests that read an actual
+  // global VALUE (setVariable's array/mapping-element cases below need a
+  // real array_t*/mapping_t*, not the uninitialized T_NUMBER(0) every
+  // global starts as) must pass callcreate=true to run initializers.
+  object_t* LoadFixture(const std::string& source, const char* virtual_name,
+                        bool callcreate = false) {
     object_t* ob = nullptr;
     error_context_t econ{};
     save_context(&econ);
     try {
-      ob = load_object_from_source(source, virtual_name, 0);
+      ob = load_object_from_source(source, virtual_name, callcreate ? 1 : 0);
     } catch (...) {
       restore_context(&econ);
       ADD_FAILURE() << "load_object_from_source(" << virtual_name << ") threw";
@@ -58,6 +64,31 @@ class DebuggerTest : public ::testing::Test {
   // destruct_object() call elsewhere can dereference the stale head --
   // unrelated to this feature and out of scope to fix here.)
 };
+
+// Regression for a real bug found while implementing local-name capture:
+// debugmalloc.h's own comment says "the digit after + must be unique,
+// range is 0-255" -- a GLOBAL id shared across every TAG_* category, not
+// just within TAG_PERMANENT, because packages/develop/checkmemory.cc's
+// check_string_stats() reads blocks[TAG_SHARED_STRING & 0xff] and
+// blocks[TAG_MALLOC_STRING & 0xff], which folds away the category (high
+// byte). TAG_LOCAL_NAMES was first picked as TAG_PERMANENT + 41, silently
+// colliding with TAG_MALLOC_STRING (TAG_DATA + 41): every local-names
+// block then got counted as a live malloc-string, and check_string_stats()
+// failed the moment ANY program with captured names (e.g. master.lpc's
+// connect()) was still loaded when a Debug-build LPC testsuite run's
+// post-file check_memory() fired -- a hard, whole-suite-failing bug that
+// only manifests with "debugger port" set, so it's easy to miss in normal
+// CI. This doesn't re-run the full check (that needs a live driver boot,
+// covered by manual validation -- see the fix commit message); it pins
+// the specific arithmetic mistake so it can't silently come back.
+TEST_F(DebuggerTest, LocalNamesTagDoesNotCollideWithAnotherCategory) {
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_MALLOC_STRING & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_SHARED_STRING & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_STRING & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_OBJ_VARS & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_LINENUMBERS & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_PROGRAM & 0xff);
+}
 
 TEST_F(DebuggerTest, CanonicalPathIsExtensionAndSlashBlind) {
   EXPECT_EQ(dbg::canonical_lpc_path("/std/room.c"), "std/room");
@@ -150,4 +181,375 @@ TEST_F(DebuggerTest, ProgramFreeInvalidatesItsBreakpointAddresses) {
   EXPECT_TRUE(dbg::g_session.bp_addrs.empty())
       << "addresses into a freed program must not remain in the live lookup table";
   EXPECT_TRUE(dbg::g_session.bp_by_prog.empty());
+}
+
+namespace {
+function_t* find_function(program_t* prog, const char* name) {
+  for (int i = 0; i < prog->num_functions_defined; i++) {
+    if (prog->function_table[i].funcname && std::string(prog->function_table[i].funcname) == name) {
+      return &prog->function_table[i];
+    }
+  }
+  return nullptr;
+}
+
+std::string local_name_str(program_t* prog, function_t* fn, int slot) {
+  short idx = fn->local_names[slot];
+  if (idx < 0 || idx >= prog->num_strings) {
+    return "";
+  }
+  return prog->strings[idx];
+}
+}  // namespace
+
+// Regression coverage for the compiler-emitted local/argument name table
+// (DESIGN.md §9): captured in rule_func() (grammar_rules.cc) whenever
+// "debugger port" is set, consumed by inspect.cc's local_name_for().
+// Exercised at the compiler level (program_t::function_table[i].local_names)
+// rather than through a live stopped-VM session -- inspect.cc's own logic
+// for resolving it at a real breakpoint is a thin, separately-reviewed
+// lookup over this same table.
+TEST_F(DebuggerTest, LocalNamesAreCapturedWhenEnabled) {
+  auto saved_port = CONFIG_INT(__RC_DEBUGGER_PORT__);
+  CONFIG_INT(__RC_DEBUGGER_PORT__) = 4711;
+
+  program_t* prog = compile_file(
+      "int add(int first, int second) {\n"
+      "  int total;\n"
+      "  total = first + second;\n"
+      "  return total;\n"
+      "}\n",
+      "dbgtest_local_names");
+
+  CONFIG_INT(__RC_DEBUGGER_PORT__) = saved_port;
+
+  ASSERT_NE(prog, nullptr);
+  function_t* fn = find_function(prog, "add");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_EQ(fn->num_arg, 2);
+  ASSERT_EQ(fn->num_local, 1);
+  ASSERT_NE(fn->local_names, nullptr);
+
+  EXPECT_EQ(local_name_str(prog, fn, 0), "first");
+  EXPECT_EQ(local_name_str(prog, fn, 1), "second");
+  EXPECT_EQ(local_name_str(prog, fn, 2), "total");
+
+  deallocate_program(prog);
+}
+
+// The feature's whole point is zero behavior/cost change when unused:
+// "debugger port" 0 (the default) must produce no local-name table at all.
+TEST_F(DebuggerTest, LocalNamesNotCapturedWhenDebuggerPortIsZero) {
+  auto saved_port = CONFIG_INT(__RC_DEBUGGER_PORT__);
+  CONFIG_INT(__RC_DEBUGGER_PORT__) = 0;
+
+  program_t* prog =
+      compile_file("int add(int first, int second) { return first + second; }\n",
+                   "dbgtest_local_names_off");
+
+  CONFIG_INT(__RC_DEBUGGER_PORT__) = saved_port;
+
+  ASSERT_NE(prog, nullptr);
+  ASSERT_GT(prog->num_functions_defined, 0);
+  for (int i = 0; i < prog->num_functions_defined; i++) {
+    EXPECT_EQ(prog->function_table[i].local_names, nullptr);
+  }
+  deallocate_program(prog);
+}
+
+// Scoping caveat pinned by DESIGN.md §9's "Scoping honesty" note: a local
+// declared inside a for() block goes out of scope via pop_n_locals() before
+// the function ends, so rule_func()'s capture (which only sees
+// locals_ptr[0..current_number_of_locals) at the very end) can't recover its
+// name -- but the runtime SLOT it used stays permanently reserved
+// (max_num_locals never shrinks), so a later top-level local can land at a
+// higher slot number, leaving a real gap in the middle of the table. Must
+// not crash walking that gap, and locals declared after it must still
+// resolve correctly.
+TEST_F(DebuggerTest, LocalNamesLeaveGapForScopedOutLoopVariable) {
+  auto saved_port = CONFIG_INT(__RC_DEBUGGER_PORT__);
+  CONFIG_INT(__RC_DEBUGGER_PORT__) = 4711;
+
+  program_t* prog = compile_file(
+      "int scoped() {\n"
+      "  int total;\n"
+      "  for (int i = 0; i < 3; i++) {\n"
+      "    total += i;\n"
+      "  }\n"
+      "  int after;\n"
+      "  after = total;\n"
+      "  return after;\n"
+      "}\n",
+      "dbgtest_local_names_scoped");
+
+  CONFIG_INT(__RC_DEBUGGER_PORT__) = saved_port;
+
+  ASSERT_NE(prog, nullptr);
+  function_t* fn = find_function(prog, "scoped");
+  ASSERT_NE(fn, nullptr);
+  ASSERT_NE(fn->local_names, nullptr);
+
+  EXPECT_EQ(local_name_str(prog, fn, 0), "total");
+
+  int total_slots = fn->num_arg + fn->num_local;
+  bool found_after = false;
+  for (int slot = 1; slot < total_slots; slot++) {
+    if (local_name_str(prog, fn, slot) == "after") {
+      found_after = true;
+    }
+  }
+  EXPECT_TRUE(found_after) << "a local declared after the closed for-loop scope must still "
+                              "resolve, even though the loop variable's slot does not";
+
+  deallocate_program(prog);
+}
+
+namespace {
+svalue_t* fixture_global(object_t* ob, const char* name) {
+  unsigned short type;
+  int idx = find_global_variable(ob->prog, name, &type, 0);
+  return idx == -1 ? nullptr : &ob->variables[idx];
+}
+}  // namespace
+
+// setVariable's object-global path (VarHandle::kObject), which -- unlike
+// the frame-scoped arg/local path -- needs no live/stopped VM frame, just a
+// resolvable object_t*, so it's exercisable directly here. The frame-scoped
+// path is covered end-to-end by tools/dap-smoke.js (a real breakpoint hit
+// against a real stopped VM).
+TEST_F(DebuggerTest, SetVariableWritesObjectGlobal) {
+  object_t* ob = LoadFixture("int counter = 10;\n", "dbgtest_setvar_global", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* counter = fixture_global(ob, "counter");
+  ASSERT_NE(counter, nullptr);
+  ASSERT_EQ(counter->type, T_NUMBER);
+  ASSERT_EQ(counter->u.number, 10);
+
+  dbg::g_session.handles.push_back({dbg::VarHandle::kObject, 0, ob});
+  int ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  std::string err;
+  dbg::djson body =
+      dbg::set_variable_request({{"variablesReference", ref}, {"name", "counter"}, {"value", "42"}},
+                                err);
+  EXPECT_FALSE(body.is_null()) << "err: " << err;
+  EXPECT_EQ(body["value"].get<std::string>(), "42");
+  EXPECT_EQ(counter->type, T_NUMBER);
+  EXPECT_EQ(counter->u.number, 42);
+
+  // A string literal must also work, and must correctly release the old
+  // (now-overwritten) T_NUMBER value -- nothing to free there, but this
+  // pins that assign_svalue(), not a hand-rolled overwrite, is used.
+  body = dbg::set_variable_request(
+      {{"variablesReference", ref}, {"name", "counter"}, {"value", "\"hello\""}}, err);
+  EXPECT_FALSE(body.is_null()) << "err: " << err;
+  ASSERT_EQ(counter->type, T_STRING);
+  EXPECT_STREQ(counter->u.string, "hello");
+
+  dbg::g_session.handles.clear();
+}
+
+TEST_F(DebuggerTest, SetVariableRejectsUnsupportedSyntaxAndLeavesValueUnchanged) {
+  object_t* ob = LoadFixture("int counter = 10;\n", "dbgtest_setvar_reject", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* counter = fixture_global(ob, "counter");
+  ASSERT_NE(counter, nullptr);
+
+  dbg::g_session.handles.push_back({dbg::VarHandle::kObject, 0, ob});
+  int ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  std::string err;
+  dbg::djson body = dbg::set_variable_request(
+      {{"variablesReference", ref}, {"name", "counter"}, {"value", "({1,2,3})"}}, err);
+  EXPECT_TRUE(body.is_null());
+  EXPECT_FALSE(err.empty());
+  EXPECT_EQ(counter->type, T_NUMBER);
+  EXPECT_EQ(counter->u.number, 10) << "a rejected write must not touch the target";
+
+  dbg::g_session.handles.clear();
+}
+
+TEST_F(DebuggerTest, SetVariableWritesArrayElement) {
+  object_t* ob = LoadFixture("mixed *arr = ({100, 200, 300});\n", "dbgtest_setvar_array",
+                             /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* arr_sv = fixture_global(ob, "arr");
+  ASSERT_NE(arr_sv, nullptr);
+  ASSERT_EQ(arr_sv->type, T_ARRAY);
+
+  dbg::g_session.handles.push_back({dbg::VarHandle::kArray, 0, arr_sv->u.arr});
+  int ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  std::string err;
+  dbg::djson body = dbg::set_variable_request(
+      {{"variablesReference", ref}, {"name", "[1]"}, {"value", "999"}}, err);
+  EXPECT_FALSE(body.is_null()) << "err: " << err;
+  EXPECT_EQ(arr_sv->u.arr->item[0].u.number, 100) << "only index 1 should change";
+  EXPECT_EQ(arr_sv->u.arr->item[1].u.number, 999);
+  EXPECT_EQ(arr_sv->u.arr->item[2].u.number, 300);
+
+  dbg::g_session.handles.clear();
+}
+
+TEST_F(DebuggerTest, SetVariableWritesMappingValue) {
+  object_t* ob = LoadFixture("mapping m = ([\"hello\": \"world\"]);\n", "dbgtest_setvar_mapping",
+                             /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* map_sv = fixture_global(ob, "m");
+  ASSERT_NE(map_sv, nullptr);
+  ASSERT_EQ(map_sv->type, T_MAPPING);
+
+  dbg::g_session.handles.push_back({dbg::VarHandle::kMapping, 0, map_sv->u.map});
+  int ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  std::string err;
+  // The DAP `name` for a mapping entry is the KEY's preview text (a quoted
+  // string here), matching what build_variables() renders.
+  dbg::djson body = dbg::set_variable_request(
+      {{"variablesReference", ref}, {"name", "\"hello\""}, {"value", "\"there\""}}, err);
+  EXPECT_FALSE(body.is_null()) << "err: " << err;
+
+  svalue_t* val = find_string_in_mapping(map_sv->u.map, "hello");
+  ASSERT_NE(val, nullptr);
+  ASSERT_EQ(val->type, T_STRING);
+  EXPECT_STREQ(val->u.string, "there");
+
+  dbg::g_session.handles.clear();
+}
+
+// Object/file introspection (fluffos_objects / fluffos_object / fluffos_files
+// custom DAP requests, §8.3): unlike everything above, these work on a
+// LIVE, RUNNING mud -- no stopped frame or handle table involved -- so
+// they're exercised directly against build_objects_list()/build_object_info()
+// without any g_session setup. tools/dap-smoke.js covers the same requests
+// end-to-end over the wire; these pin the underlying obj_list-walk logic in
+// isolation.
+TEST_F(DebuggerTest, BuildObjectsListFindsLoadedObjectByFilter) {
+  object_t* ob = LoadFixture("int x;\n", "dbgtest_objlist_probe");
+  ASSERT_NE(ob, nullptr);
+  ASSERT_NE(ob->obname, nullptr);
+
+  dbg::djson resp = dbg::build_objects_list("dbgtest_objlist_probe", 0, 0);
+  ASSERT_TRUE(resp.contains("objects"));
+  auto& objs = resp["objects"];
+  ASSERT_EQ(objs.size(), 1u) << resp.dump();
+  EXPECT_EQ(objs[0]["name"].get<std::string>(), std::string("/") + ob->obname);
+  EXPECT_EQ(objs[0]["program"].get<std::string>(), std::string("/") + ob->prog->filename);
+  EXPECT_FALSE(objs[0]["clone"].get<bool>());
+
+  // A filter matching nothing must report zero matches, not everything.
+  dbg::djson miss = dbg::build_objects_list("no_such_object_should_exist_zzz", 0, 0);
+  EXPECT_EQ(miss["objects"].size(), 0u);
+  EXPECT_EQ(miss["total"].get<int>(), 0);
+}
+
+TEST_F(DebuggerTest, BuildObjectsListPaginatesWithStartAndCount) {
+  // Two objects sharing a filterable prefix so pagination has >1 match to
+  // page across; unfiltered would also match every other object already
+  // loaded by prior tests/fixtures in this same (long-lived) driver
+  // process, which is exactly why a real total/pagination check needs its
+  // own distinguishing filter rather than assuming a clean obj_list.
+  ASSERT_NE(LoadFixture("int x;\n", "dbgtest_objpage_a"), nullptr);
+  ASSERT_NE(LoadFixture("int x;\n", "dbgtest_objpage_b"), nullptr);
+
+  dbg::djson page0 = dbg::build_objects_list("dbgtest_objpage_", 0, 1);
+  EXPECT_EQ(page0["objects"].size(), 1u);
+  EXPECT_EQ(page0["total"].get<int>(), 2);
+
+  dbg::djson page1 = dbg::build_objects_list("dbgtest_objpage_", 1, 1);
+  EXPECT_EQ(page1["objects"].size(), 1u);
+  EXPECT_NE(page0["objects"][0]["name"].get<std::string>(),
+            page1["objects"][0]["name"].get<std::string>())
+      << "different pages must return different objects, not the same one twice";
+}
+
+TEST_F(DebuggerTest, BuildObjectInfoReportsFunctionsAndVariables) {
+  // Both globals are given real initializers and loaded with callcreate=true
+  // so __INIT() actually runs -- an uninitialized LPC variable's RUNTIME
+  // representation is always the generic undefined value (T_NUMBER 0)
+  // regardless of its declared static type, so an uninitialized `string`
+  // would render as type "int" here, not "string".
+  object_t* ob = LoadFixture(
+      "int counter = 5;\n"
+      "string label = \"hi\";\n"
+      "int bump() { return ++counter; }\n"
+      "int other() { return 0; }\n",
+      "dbgtest_objinfo_probe", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+
+  dbg::djson info = dbg::build_object_info(std::string("/") + ob->obname);
+  ASSERT_TRUE(info["found"].get<bool>()) << info.dump();
+  EXPECT_EQ(info["name"].get<std::string>(), std::string("/") + ob->obname);
+  EXPECT_EQ(info["program"].get<std::string>(), std::string("/") + ob->prog->filename);
+  EXPECT_FALSE(info["clone"].get<bool>());
+  EXPECT_GE(info["functions"].get<int>(), 2) << "bump() and other() must both be counted";
+
+  auto& vars = info["variables"];
+  bool found_counter = false, found_label = false;
+  for (auto& v : vars) {
+    if (v["name"] == "counter") {
+      found_counter = true;
+      EXPECT_EQ(v["type"], "int");
+    }
+    if (v["name"] == "label") {
+      found_label = true;
+      EXPECT_EQ(v["type"], "string");
+    }
+  }
+  EXPECT_TRUE(found_counter) << vars.dump();
+  EXPECT_TRUE(found_label) << vars.dump();
+
+  // A leading-slash-optional, non-existent, or destructed object must
+  // report found:false cleanly rather than crashing (the object is
+  // re-looked-up by name per request, precisely so destruction between two
+  // fluffos/object calls is a clean miss, never a dangling pointer -- §8.3).
+  dbg::djson missing = dbg::build_object_info("dbgtest_objinfo_probe_does_not_exist");
+  EXPECT_FALSE(missing["found"].get<bool>());
+
+  {
+    // destruct_object() can run clean_up()/remove()-style LPC, so it needs
+    // the same recovery-point guard as LoadFixture() above.
+    error_context_t econ{};
+    save_context(&econ);
+    try {
+      destruct_object(ob);
+      pop_context(&econ);
+    } catch (...) {
+      restore_context(&econ);
+      ADD_FAILURE() << "destruct_object() threw";
+    }
+  }
+  dbg::djson afterDestruct = dbg::build_object_info(std::string("/") + ob->obname);
+  EXPECT_FALSE(afterDestruct["found"].get<bool>())
+      << "a destructed object must not be reported as found";
+}
+
+TEST_F(DebuggerTest, BuildFileListListsKnownTestsuiteDirectory) {
+  dbg::djson resp = dbg::build_file_list("/single");
+  ASSERT_TRUE(resp.contains("files"));
+  bool found_master = false;
+  for (auto& f : resp["files"]) {
+    if (f["name"] == "master.lpc") {
+      found_master = true;
+      EXPECT_FALSE(f["directory"].get<bool>());
+    }
+  }
+  EXPECT_TRUE(found_master) << resp.dump();
+}
+
+TEST_F(DebuggerTest, BuildFileListRejectsPathTraversal) {
+  dbg::djson resp = dbg::build_file_list("/../../../etc");
+  EXPECT_TRUE(resp.contains("error"));
+  ASSERT_TRUE(resp.contains("files"));
+  EXPECT_EQ(resp["files"].size(), 0u);
+}
+
+TEST_F(DebuggerTest, ReadMudlibFileReturnsRealContentAndRejectsTraversal) {
+  std::string content, err;
+  ASSERT_TRUE(dbg::read_mudlib_file("/single/master.lpc", content, err)) << err;
+  EXPECT_NE(content.find("object connect()"), std::string::npos);
+
+  std::string content2, err2;
+  EXPECT_FALSE(dbg::read_mudlib_file("/../../../../etc/passwd", content2, err2));
+  EXPECT_FALSE(err2.empty());
 }

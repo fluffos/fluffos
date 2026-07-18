@@ -192,7 +192,7 @@ const FlagEntry INT_FLAGS[] = {
      "Advertise and enable the MSDP telnet protocol."},
     {"debugger port", __RC_DEBUGGER_PORT__, 0, 0, 65535, "Debugger",
      "WebSocket (DAP) source-level debugger listen port; 0 (the default) disables the debugger "
-     "entirely (see src/debugger/DESIGN.md)."},
+     "entirely, including compiler local/argument name capture (see src/debugger/DESIGN.md)."},
 };
 
 /*

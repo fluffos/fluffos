@@ -238,7 +238,9 @@ ranges; regenerate `docs/driver/config.md` with `docs/gen_config_docs.py`; add t
 | `debugger port` | `CFG_INT(66)`, 0–65535 | `0` | 0 = feature fully disabled; otherwise ws listen port |
 | `debugger address` | `CFG_STR(19)` | `127.0.0.1` | bind address for the listener |
 | `debugger password` | `CFG_STR(20)` | empty | shared secret checked at attach; **required if `debugger address` is non-loopback** (driver refuses to boot the listener otherwise) |
-| `debugger local names` | `CFG_INT(67)` | `1` | phase 2: emit local-variable name tables when compiling (only consulted when `debugger port` ≠ 0) |
+
+Local/argument name capture (§9) has no separate rc option: it's always on whenever `debugger port`
+≠ 0, so there's exactly one knob to remember instead of two.
 
 TLS (`debugger tls : cert=… key=…`, mirroring `external_port_N_tls`) is phase 2; primary use is
 loopback/SSH-tunneled.
@@ -478,9 +480,17 @@ Value tree:
   This deliberately keeps the debugger invisible to the Debug-build ref-count checker (AGENTS §3):
   no `*_mark` machinery needed until phase 3's evaluate results (which are freed before resume).
 
-`setVariable` (phase 2): scalar writes into frame slots / globals / array elements / mapping
-values via `assign_svalue` (proper ref handling); rejects writes that would need compilation
-(function literals etc.).
+`setVariable` (phase 2 -- IMPLEMENTED): re-walks the same container cases `variables` renders to
+resolve the target `svalue_t*` by the exact `name` a prior `variables` response gave it (frame
+args/locals by name -- real if captured, §9, else `argN`/`localN` -- object globals by name, array
+and class elements by their `"[i]"`/`"member [i]"` display text, mapping VALUES by their KEY's
+(possibly-truncated) preview text). The mapping case is therefore best-effort: a preview collision
+(two keys rendering identical or truncated-identical text) is rejected as ambiguous rather than
+risking a write to the wrong entry. The new value is parsed by a deliberately tiny literal grammar
+-- integer, float, or a double-quoted string (with `\" \\ \n \t \r` escapes) -- covering "rejects
+writes that would need compilation" by construction: arrays/mappings/objects/function literals
+have no textual form here and always fail cleanly (phase 3's `evaluate` is the real answer for
+those). Assignment goes through `assign_svalue()` for correct ref handling, exactly as sketched.
 
 ### 8.3 Objects & files (custom requests + standard bits)
 
@@ -518,21 +528,38 @@ its own config/attach capability because it is arbitrary code execution by desig
 
 ---
 
-## 9. Compiler addition: local variable name tables (phase 2)
+## 9. Compiler addition: local variable name tables (phase 2 -- IMPLEMENTED)
 
-Problem: names die at `free_all_local_names()` (compiler.cc:380). Plan:
+Problem: names die at `free_all_local_names()` (compiler.cc:380). Shipped design (simpler than the
+original sketch below the line):
 
-- When enabled (`debugger local names`, consulted at compile time), record for each compiled
-  function a table of `(runtime_slot, name_string_index, kind: arg|local)` entries, names interned
-  via `store_prog_string` (shared strings — cheap). Stored as a new program block parallel to
-  `A_LINENUMBERS` (new `A_LOCAL_NAMES` section; bumps program layout — guard save/restore of
-  binaries if/where applicable).
-- **Scoping honesty**: LPC reuses runtime slots across sibling blocks and allows shadowing; a
-  flat per-function table is therefore an approximation. v2 of the table adds pc-range validity
-  per entry (DWARF-lite) if the approximation annoys in practice; the design reserves a
-  `pc_from/pc_to` field from day one so the format doesn't churn.
-- Programs compiled without the option (or before attach) simply show index names — the debugger
-  degrades gracefully per-program. `functions()`-style reflection is untouched.
+- `rule_func()` (`compiler/internal/grammar_rules.cc`), right at the top of its `fun != -1` branch
+  (before any early-return in the default-argument-closure loop can skip it, and well before
+  `free_all_local_names()` fires later in the same function), snapshots `locals_ptr[]` into a plain
+  `short* function_t::local_names` array sized `num_arg + num_local`, indexed by
+  `locals_ptr[i].runtime_index` (NOT array position -- see "Scoping honesty" below), one
+  `store_prog_string()`-interned string-pool index per slot, `-1` for an uncaptured slot. Gated on
+  `lpc_debugger_wants_local_names()` (`debug_hook.h`) alone, which is `debugger port ≠ 0` -- no
+  separate rc option (open question 8 resolved: always-on, not opt-in).
+- **Not a new `A_LOCAL_NAMES` program section.** Unlike line numbers/classes/etc., functions get
+  *sorted* between compile-time and final program order (`func_index_map[]` in `epilog()`), so a
+  section needing that same reordering is more naturally carried as a field directly on
+  `function_t` -- it rides through `prog->function_table[i] = *FUNC(func_index_map[i]);`'s
+  struct-copy for free, exactly like `funcname` already does. The array itself is its own
+  heap block (`TAG_LOCAL_NAMES`, `src/base/internal/debugmalloc.h`), freed in
+  `deallocate_program()` and in `epilog()`'s superseded-entry cleanup, marked in
+  `checkmemory.cc`'s `TAG_PROGRAM` case (Debug builds) so it doesn't show up as an orphan block.
+- **Scoping honesty**: a local declared inside a `for()`/`switch()` block calls `pop_n_locals()`
+  when that block closes, which drops it from `locals_ptr[]` (unrecoverable by the time
+  `rule_func()` captures) *without* giving its runtime slot back (`max_num_locals` only grows) --
+  so the table can have real gaps (`-1`) in the middle for slots later locals never reuse. No
+  pc-range refinement was needed to make this tolerable in practice; the debugger just falls back
+  to `argN`/`localN` for a gapped slot. `src/tests/test_debugger.cc`'s
+  `LocalNamesLeaveGapForScopedOutLoopVariable` pins this shape.
+- Programs compiled with `debugger port` unset simply show index names — the debugger degrades
+  gracefully per-program. `functions()`-style reflection is untouched. Anonymous/lambda functions
+  (`rule_primary_expr_anon_func()`) are not instrumented -- `rule_func()` is the only capture
+  site -- so funptr frames always show index names, a known v1 gap.
 
 ---
 
@@ -638,7 +665,7 @@ a blocker by definition.
 |---|---|---|
 | **0 — Foundation** | rc options, listener + standalone lws context + `dap` subprotocol, DAP handshake/capabilities, session state machine, instruction hook + flags word, pause/continue, eval-timer suspend/restore, `debug_break()` + `debugger_attached()` efuns, auto-detach safety | VS Code attaches, `debug_break()` stops the mud, continue resumes it, killing the client un-freezes the mud |
 | **1 — Core debugging (MVP)** | breakpoint store + resolution + pending + rebinding, stepping engine, stackTrace/scopes/variables (index-named locals, named globals), `source`/`loadedSources`, dap-smoke e2e in CI | set a breakpoint in VS Code, hit it from a player command, step through a heart_beat, inspect values |
-| **2 — Quality** | compiler local-name tables, `setVariable`, exception filters (uncaught/all), object explorer + file browsing custom requests + TreeView, hit-count conditions, master `valid_debugger` veto, TLS option, header-file breakpoints | daily-driver debugging UX |
+| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), hit-count conditions, master `valid_debugger` veto, TLS option, header-file breakpoints | daily-driver debugging UX |
 | **3 — Advanced** | `evaluate`/watch/hover/REPL (lpcshell-derived), conditional breakpoints, logpoints, `disassemble` view (dump_prog), edit-and-continue flow with the hot-reload daemon (breakpoints re-verify after `recompile_object`), raw-TCP DAP listener, wasm/jsbridge transport exploration | power-user parity |
 
 Rough shape: each phase is a reviewable PR series; phase 0+1 are the meaningful MVP.
@@ -692,8 +719,9 @@ Highest-leverage first; each with the recommendation the plan currently assumes.
    (kicking the old one)? Recommendation: reject; takeover is a two-line change later.
 7. **Step-past-event-boundary default (§6.4)** — when a step reaches the end of the outermost
    frame, stop at the next LPC entry (recommended) or continue free?
-8. **`debugger local names` cost** (§9) — opt-in rc flag as proposed, or always-on when
-   `debugger port` is set (simpler story, slightly more memory for every program)?
+8. ~~**`debugger local names` cost` (§9)**~~ — **Resolved**: always-on whenever `debugger port` is
+   set, no separate rc flag. One knob instead of two; the memory cost (one `short` per local slot,
+   only for programs compiled while a debugger port is configured) wasn't worth a second option.
 9. **Break-on-error default** — ship with `uncaught` filter pre-enabled on attach (recommended) or
    fully opt-in per session?
 10. **Port number convention** — any preferred default suggestion for docs/examples (the plan uses

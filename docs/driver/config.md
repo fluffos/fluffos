@@ -200,7 +200,7 @@ they always match the options it actually recognizes.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `debugger port` | int | 0 | WebSocket (DAP) source-level debugger listen port; 0 (the default) disables the debugger "
-     "entirely (see src/debugger/DESIGN.md). _(max 65535)_ |
+     "entirely, including compiler local/argument name capture (see src/debugger/DESIGN.md). _(max 65535)_ |
 | `debugger address` | string | — | Bind address for 'debugger port'; defaults to 127.0.0.1 (loopback only). A non-loopback "
      "address additionally requires 'debugger password'. |
 | `debugger password` | string | — | Shared secret a debugger client must present in its attach request; required when "

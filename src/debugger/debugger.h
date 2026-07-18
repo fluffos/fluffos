@@ -141,6 +141,9 @@ int frame_count();
 djson build_stack_trace(int start, int levels);
 djson build_scopes(int frame_id);
 djson build_variables(int ref, int start, int count);
+// Returns a null djson (and sets `err`) on failure; caller (debug_server.cc)
+// turns that into a DAP error response instead of a success body.
+djson set_variable_request(const djson& args, std::string& err);
 djson build_loaded_sources();
 djson build_objects_list(const std::string& filter, int start, int count);
 djson build_object_info(const std::string& name);
