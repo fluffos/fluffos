@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 #include "base/package_api.h"
 
+#include <cstdio>
+#include <fstream>
+
 #include "mainlib.h"
 
 #include "debugger/debug_hook.h"
@@ -181,6 +184,58 @@ TEST_F(DebuggerTest, ProgramFreeInvalidatesItsBreakpointAddresses) {
   EXPECT_TRUE(dbg::g_session.bp_addrs.empty())
       << "addresses into a freed program must not remain in the live lookup table";
   EXPECT_TRUE(dbg::g_session.bp_by_prog.empty());
+}
+
+// KNOWN LIMITATION, pinned rather than fixed: a breakpoint set inside an
+// #include'd HEADER file does not currently resolve, even though
+// breakpoints.cc's file_ids_for()/line_run_starts() are written generically
+// (they walk every file referenced in a program's file_info table, not just
+// prog->filename, and canonical_lpc_path()'s strip_ext() only touches
+// .lpc/.c, leaving a .h path equally untouched on both the request and
+// compiled-program sides -- so the debugger-side machinery is not the
+// problem). Root-caused empirically: the FIRST function generated
+// immediately after an #include boundary gets its bytecode attributed to
+// abs_line 0 in the program's line_info table (verified via dump_prog() +a
+// manual file_info/line_info walk during investigation), which
+// translate_absolute_line() resolves to a bogus (includer file, line 0)
+// pair instead of the header's real line -- i.e. this is a compiler
+// line-attribution gap (i_generate_node()'s `if (expr->line && ...)` guard
+// in icode.cc skips switch_to_line() whenever a node's line is 0), not a
+// debugger bug, and well outside this feature's scope to fix blind. See
+// DESIGN.md's "header-file breakpoints" phase-2 entry for the tracking
+// note. If this is ever fixed compiler-side, this test's EXPECT_FALSE
+// should flip to EXPECT_TRUE -- that's the signal to update it.
+TEST_F(DebuggerTest, BreakpointInsideIncludedHeaderFileDoesNotYetResolve) {
+  const char* header_path = "data/dbgtest_header_probe.h";
+  {
+    std::ofstream out(header_path);
+    ASSERT_TRUE(out.good());
+    out << "int header_fn() {\n"  // line 1
+        << "  return 42;\n"       // line 2: the (currently unreachable) target
+        << "}\n";                 // line 3
+  }
+
+  object_t* ob = LoadFixture(
+      "#include \"/data/dbgtest_header_probe.h\"\n"
+      "int use_it() { return header_fn(); }\n",
+      "dbgtest_header_includer");
+  ASSERT_NE(ob, nullptr);
+  ASSERT_NE(ob->prog, nullptr);
+
+  dbg::djson args = {
+      {"source", {{"path", "/data/dbgtest_header_probe.h"}}},
+      {"breakpoints", dbg::djson::array({{{"line", 2}}})},
+  };
+  dbg::djson resp = dbg::set_breakpoints_request(args);
+  ASSERT_TRUE(resp.contains("breakpoints"));
+  auto& bps = resp["breakpoints"];
+  ASSERT_EQ(bps.size(), 1u) << resp.dump();
+  EXPECT_FALSE(bps[0]["verified"].get<bool>())
+      << "if this now passes, the compiler line-attribution gap described "
+         "above was fixed -- flip this to EXPECT_TRUE and check the line "
+         "number too, per the comment on this test";
+
+  std::remove(header_path);
 }
 
 namespace {

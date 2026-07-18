@@ -666,10 +666,29 @@ a blocker by definition.
 |---|---|---|
 | **0 — Foundation** | rc options, listener + standalone lws context + `dap` subprotocol, DAP handshake/capabilities, session state machine, instruction hook + flags word, pause/continue, eval-timer suspend/restore, `debug_break()` + `debugger_attached()` efuns, auto-detach safety | VS Code attaches, `debug_break()` stops the mud, continue resumes it, killing the client un-freezes the mud |
 | **1 — Core debugging (MVP)** | breakpoint store + resolution + pending + rebinding, stepping engine, stackTrace/scopes/variables (index-named locals, named globals), `source`/`loadedSources`, dap-smoke e2e in CI | set a breakpoint in VS Code, hit it from a player command, step through a heart_beat, inspect values |
-| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), hit-count conditions, master `valid_debugger` veto, TLS option, header-file breakpoints | daily-driver debugging UX |
+| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), hit-count conditions, master `valid_debugger` veto, TLS option, header-file breakpoints (BLOCKED, see note) | daily-driver debugging UX |
 | **3 — Advanced** | `evaluate`/watch/hover/REPL (lpcshell-derived), conditional breakpoints, logpoints, `disassemble` view (dump_prog), edit-and-continue flow with the hot-reload daemon (breakpoints re-verify after `recompile_object`), raw-TCP DAP listener, wasm/jsbridge transport exploration | power-user parity |
 
 Rough shape: each phase is a reviewable PR series; phase 0+1 are the meaningful MVP.
+
+**Header-file breakpoints, root-caused (not a debugger-side gap):** investigated during phase 2
+and found NOT to be missing debugger machinery -- `breakpoints.cc`'s `file_ids_for()`/
+`line_run_starts()` already walk every file referenced in a program's `file_info` table generically
+(not just `prog->filename`), and `canonical_lpc_path()`'s `strip_ext()` only touches `.lpc`/`.c`,
+leaving a `.h` path's extension untouched symmetrically on both the client-request and
+compiled-program sides. The actual blocker is a **compiler line-attribution bug**: the first
+function generated immediately after an `#include` boundary gets its bytecode attributed to
+`abs_line 0` in `line_info` (confirmed via `dump_prog()` and a manual `file_info`/`line_info` walk
+against a minimal `#include "x.h"` + trailing function repro), which `translate_absolute_line()`
+then resolves to a bogus `(includer file, line 0)` pair instead of the header's real line --
+`i_generate_node()`'s `if (expr->line && expr->line != line_being_generated)` guard
+(`compiler/internal/icode.cc`) skips `switch_to_line()` whenever a node's line is 0, and something
+about the include-boundary transition leaves the first post-include node with `line == 0`. This is
+a pre-existing compiler bug (not introduced by the debugger work), well outside a debugger PR's
+blast radius to fix blind -- flagged here rather than fixed. Pinned as a known-current-limitation
+(not a "should work" regression) by `BreakpointInsideIncludedHeaderFileDoesNotYetResolve` in
+`test_debugger.cc`; if a future compiler fix corrects this, that test's `EXPECT_FALSE` should flip
+to `EXPECT_TRUE` (its own comment says so).
 
 ## 16. File-by-file change inventory (phases 0–1)
 
