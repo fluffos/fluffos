@@ -1952,6 +1952,28 @@ do_more_inside_frame:
 
 		assert(encap != wsi);
 
+#if !defined(LWS_WITHOUT_EXTENSIONS)
+		/*
+		 * The h1 path fires LWS_EXT_CB_PACKET_TX_PRESEND from
+		 * lws_issue_raw_ext_access(); this encapsulated path used to
+		 * bypass it, so permessage-deflate never got to set RSV1 (or
+		 * fix up the first-frame opcode) on the compressed frame it
+		 * already produced above -- peers then treated the deflated
+		 * payload as plain text.  Give active extensions the same
+		 * look at the assembled frame here.
+		 */
+		{
+			struct lws_tokens ebuf;
+
+			ebuf.token = buf - pre;
+			ebuf.len = (int)(len + (unsigned int)pre);
+
+			if (lws_ext_cb_active(wsi, LWS_EXT_CB_PACKET_TX_PRESEND,
+					      &ebuf, 0) < 0)
+				return -1;
+		}
+#endif
+
 		return lws_rops_func_fidx(encap->role_ops,
 				   LWS_ROPS_write_role_protocol).
 					write_role_protocol(wsi, buf - pre,
@@ -2044,6 +2066,15 @@ rops_callback_on_writable_ws(struct lws *wsi)
 						     encapsulation_parent(wsi);
 
 		assert(enc);
+		if (!enc)
+			/*
+			 * Mid-teardown: close_kill_connection already unlinked
+			 * us from the h2 parent (the close callback fires
+			 * after that).  Nothing can be scheduled any more; on
+			 * release builds the assert above is compiled out and
+			 * this used to segfault.
+			 */
+			return 1;
 		if (lws_rops_func_fidx(enc->role_ops,
 				       LWS_ROPS_callback_on_writable).
 						callback_on_writable(wsi))
@@ -2051,6 +2082,26 @@ rops_callback_on_writable_ws(struct lws *wsi)
 	}
 #endif
 	return 0;
+}
+
+static int
+rops_tx_credit_ws(struct lws *wsi, char peer_to_us, int add)
+{
+#if defined(LWS_WITH_HTTP2)
+	/*
+	 * ws-over-h2: flow control belongs to the encapsulating h2 stream.
+	 * Delegate so lws_get_peer_write_allowance() gives user code real
+	 * guidance (writing DATA past the peer's window is a connection-fatal
+	 * protocol error the ws layer otherwise can't see coming).
+	 */
+	if (lwsi_role_h2_ENCAPSULATION(wsi))
+		return lws_rops_func_fidx(&role_ops_h2, LWS_ROPS_tx_credit).
+					tx_credit(wsi, peer_to_us, add);
+#endif
+	(void)peer_to_us;
+	(void)add;
+
+	return -1; /* no guidance, like the rops being absent */
 }
 
 static int
@@ -2185,6 +2236,7 @@ static const lws_rops_t rops_table_ws[] = {
 	/* 10 */ { .close_kill_connection   = rops_close_kill_connection_ws },
 	/* 11 */ { .destroy_role	    = rops_destroy_role_ws },
 	/* 12 */ { .issue_keepalive	    = rops_issue_keepalive_ws },
+	/* 13 */ { .tx_credit		    = rops_tx_credit_ws },
 };
 
 const struct lws_role_ops role_ops_ws = {
@@ -2202,7 +2254,7 @@ const struct lws_role_ops role_ops_ws = {
 	  /* LWS_ROPS_handle_POLLOUT */
 	  /* LWS_ROPS_perform_user_POLLOUT */		0x50,
 	  /* LWS_ROPS_callback_on_writable */
-	  /* LWS_ROPS_tx_credit */			0x60,
+	  /* LWS_ROPS_tx_credit */			0x6d,
 	  /* LWS_ROPS_write_role_protocol */
 	  /* LWS_ROPS_encapsulation_parent */		0x70,
 	  /* LWS_ROPS_alpn_negotiated */
