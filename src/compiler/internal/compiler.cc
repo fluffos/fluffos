@@ -3194,19 +3194,27 @@ static void clean_parser() {
 
 char* the_file_name(const char* name) {
   char* tmp;
-  int len;
+  const char* slash;
+  const char* dot;
+  int base;
 
-  len = strlen(name);
-  if (len < 3) {
-    return string_copy(name, "the_file_name");
-  }
-  tmp = new_string(len - 1, "the_file_name");
+  /* Return the leading-slash object name with its source extension
+   * stripped. Strip the actual extension rather than a fixed number of
+   * bytes: this used to chop the trailing two characters, which was only
+   * correct while ".c" was the sole source extension -- ".lpc" and any
+   * other length left a mangled tail (e.g. "/foo.l"). Only a dot in the
+   * basename counts as an extension. */
+  slash = strrchr(name, '/');
+  dot = strrchr(name, '.');
+  base = (dot && (!slash || dot > slash)) ? (int)(dot - name) : (int)strlen(name);
+
+  tmp = new_string(base + 1, "the_file_name");
   if (!tmp) {
     return string_copy(name, "the_file_name");
   }
   tmp[0] = '/';
-  strncpy(tmp + 1, name, len - 2);
-  tmp[len - 1] = '\0';
+  strncpy(tmp + 1, name, base);
+  tmp[base + 1] = '\0';
   return tmp;
 }
 
