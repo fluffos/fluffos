@@ -80,6 +80,11 @@ struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
   info.options = LWS_SERVER_OPTION_LIBEVENT | LWS_SERVER_OPTION_VALIDATE_UTF8;
 
   if (!port->tls_cert.empty() && !port->tls_key.empty()) {
+    // Never negotiate h2 via ALPN: the ws output/teardown path only supports
+    // HTTP/1.1-upgrade websockets. An h2-encapsulated ws (RFC 8441 extended
+    // CONNECT) garbles output and segfaults in lws's close path
+    // (rops_callback_on_writable_ws derefs a NULL h2 parent).
+    info.alpn = "http/1.1";
     info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
     info.options |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
     info.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
