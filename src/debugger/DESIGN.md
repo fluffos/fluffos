@@ -671,29 +671,42 @@ a blocker by definition.
 |---|---|---|
 | **0 — Foundation** | rc options, listener + standalone lws context + `dap` subprotocol, DAP handshake/capabilities, session state machine, instruction hook + flags word, pause/continue, eval-timer suspend/restore, `debug_break()` + `debugger_attached()` efuns, auto-detach safety | VS Code attaches, `debug_break()` stops the mud, continue resumes it, killing the client un-freezes the mud |
 | **1 — Core debugging (MVP)** | breakpoint store + resolution + pending + rebinding, stepping engine, stackTrace/scopes/variables (index-named locals, named globals), `source`/`loadedSources`, dap-smoke e2e in CI | set a breakpoint in VS Code, hit it from a player command, step through a heart_beat, inspect values |
-| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~, ~~hit-count conditions~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), master `valid_debugger` veto, TLS option, header-file breakpoints (BLOCKED, see note) | daily-driver debugging UX |
+| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~, ~~hit-count conditions~~, ~~header-file breakpoints~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), master `valid_debugger` veto, TLS option | daily-driver debugging UX |
 | **3 — Advanced** | `evaluate`/watch/hover/REPL (lpcshell-derived), conditional breakpoints, logpoints, `disassemble` view (dump_prog), edit-and-continue flow with the hot-reload daemon (breakpoints re-verify after `recompile_object`), raw-TCP DAP listener, wasm/jsbridge transport exploration | power-user parity |
 
 Rough shape: each phase is a reviewable PR series; phase 0+1 are the meaningful MVP.
 
-**Header-file breakpoints, root-caused (not a debugger-side gap):** investigated during phase 2
-and found NOT to be missing debugger machinery -- `breakpoints.cc`'s `file_ids_for()`/
-`line_run_starts()` already walk every file referenced in a program's `file_info` table generically
-(not just `prog->filename`), and `canonical_lpc_path()`'s `strip_ext()` only touches `.lpc`/`.c`,
-leaving a `.h` path's extension untouched symmetrically on both the client-request and
-compiled-program sides. The actual blocker is a **compiler line-attribution bug**: the first
-function generated immediately after an `#include` boundary gets its bytecode attributed to
-`abs_line 0` in `line_info` (confirmed via `dump_prog()` and a manual `file_info`/`line_info` walk
-against a minimal `#include "x.h"` + trailing function repro), which `translate_absolute_line()`
-then resolves to a bogus `(includer file, line 0)` pair instead of the header's real line --
-`i_generate_node()`'s `if (expr->line && expr->line != line_being_generated)` guard
-(`compiler/internal/icode.cc`) skips `switch_to_line()` whenever a node's line is 0, and something
-about the include-boundary transition leaves the first post-include node with `line == 0`. This is
-a pre-existing compiler bug (not introduced by the debugger work), well outside a debugger PR's
-blast radius to fix blind -- flagged here rather than fixed. Pinned as a known-current-limitation
-(not a "should work" regression) by `BreakpointInsideIncludedHeaderFileDoesNotYetResolve` in
-`test_debugger.cc`; if a future compiler fix corrects this, that test's `EXPECT_FALSE` should flip
-to `EXPECT_TRUE` (its own comment says so).
+**Header-file breakpoints, root-caused and fixed (was a compiler-side gap, not a debugger one):**
+investigated during phase 2 and found NOT to be missing debugger machinery -- `breakpoints.cc`'s
+`file_ids_for()`/`line_run_starts()` already walk every file referenced in a program's `file_info`
+table generically (not just `prog->filename`), and `canonical_lpc_path()`'s `strip_ext()` only
+touches `.lpc`/`.c`, leaving a `.h` path's extension untouched symmetrically on both the
+client-request and compiled-program sides. The actual bug was in the compiler: a `return
+<constant>;`/`return;` statement can be built ENTIRELY from `new_node_no_line()` nodes --
+`CREATE_RETURN` (`compiler/internal/trees.h`) wrapping a `CREATE_NUMBER`/`CREATE_REAL`/
+`CREATE_STRING` leaf, or nothing at all -- so `i_generate_node()`'s `if (expr->line &&
+expr->line != line_being_generated)` guard (`compiler/internal/icode.cc`) never called
+`switch_to_line()` anywhere in that statement's codegen, and its bytecode silently inherited
+whichever line was already active. That's `abs_line 0` (the compile-start sentinel value of
+`line_being_generated`) whenever the statement is the first thing generated in the whole compile
+unit -- exactly what happens when a trivial function is the first thing defined in an `#include`d
+header, since the compiler's implicit global-include-file prologue contributes no codegen of its
+own. A closely related gap hit functions with no explicit `return` at all (an implicit `return 0;`
+that `rule_func()` synthesizes well after the body has finished parsing, at a point where
+`current_line` may have already drifted past the function -- even into a different file, across an
+`#include` pop).
+
+Fixed in two parts (`grammar_rules_loops.cc`, `grammar_rules.cc`): `rule_return_void()`/
+`rule_return_expr()` now stamp a real, accurate line onto every EXPLICIT, user-written `return`
+statement right after `CREATE_RETURN`. `CREATE_RETURN` itself deliberately stays
+`new_node_no_line()` by default, since it also synthesizes those implicit returns and giving *that*
+call site a line risked stamping a misleading one from post-body parser lookahead. Those get a
+safety net instead: `rule_func()` stamps the function's own declaration line -- captured early and
+safely in `rule_func_type()`, before any lookahead can drift -- onto the `NODE_FUNCTION` wrapper
+node itself, so `i_generate_node()`'s existing line-switch guard fires at function entry regardless
+of what (if anything) is inside. Regression-tested by `BreakpointInsideIncludedHeaderFileResolves`
+(explicit-return case) and `BreakpointOnImplicitReturnHeaderFunctionResolves` (implicit-return
+case) in `test_debugger.cc`; both were confirmed to fail on the pre-fix binary.
 
 ## 16. File-by-file change inventory (phases 0–1)
 

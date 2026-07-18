@@ -270,26 +270,39 @@ TEST_F(DebuggerTest, ProgramFreeInvalidatesItsBreakpointAddresses) {
   EXPECT_TRUE(dbg::g_session.bp_by_prog.empty());
 }
 
-// KNOWN LIMITATION, pinned rather than fixed: a breakpoint set inside an
-// #include'd HEADER file does not currently resolve, even though
-// breakpoints.cc's file_ids_for()/line_run_starts() are written generically
-// (they walk every file referenced in a program's file_info table, not just
-// prog->filename, and canonical_lpc_path()'s strip_ext() only touches
-// .lpc/.c, leaving a .h path equally untouched on both the request and
-// compiled-program sides -- so the debugger-side machinery is not the
-// problem). Root-caused empirically: the FIRST function generated
-// immediately after an #include boundary gets its bytecode attributed to
-// abs_line 0 in the program's line_info table (verified via dump_prog() +a
-// manual file_info/line_info walk during investigation), which
-// translate_absolute_line() resolves to a bogus (includer file, line 0)
-// pair instead of the header's real line -- i.e. this is a compiler
-// line-attribution gap (i_generate_node()'s `if (expr->line && ...)` guard
-// in icode.cc skips switch_to_line() whenever a node's line is 0), not a
-// debugger bug, and well outside this feature's scope to fix blind. See
-// DESIGN.md's "header-file breakpoints" phase-2 entry for the tracking
-// note. If this is ever fixed compiler-side, this test's EXPECT_FALSE
-// should flip to EXPECT_TRUE -- that's the signal to update it.
-TEST_F(DebuggerTest, BreakpointInsideIncludedHeaderFileDoesNotYetResolve) {
+// Regression test for a compiler line-attribution bug (now fixed) that
+// used to make a breakpoint set inside an #include'd HEADER file never
+// resolve. breakpoints.cc's file_ids_for()/line_run_starts() were always
+// written generically (they walk every file referenced in a program's
+// file_info table, not just prog->filename, and canonical_lpc_path()'s
+// strip_ext() only touches .lpc/.c, leaving a .h path equally untouched on
+// both the request and compiled-program sides) -- the debugger-side
+// machinery was never the problem.
+//
+// Root cause (compiler-side): a `return <constant>;`/`return;` statement
+// can be built ENTIRELY from new_node_no_line() nodes -- CREATE_RETURN
+// wrapping a CREATE_NUMBER/CREATE_REAL/CREATE_STRING leaf, or nothing at
+// all -- so i_generate_node()'s `if (expr->line && ...)` guard in icode.cc
+// never calls switch_to_line() anywhere in that statement's codegen. Its
+// bytecode then silently inherits whichever line was already active
+// (line_being_generated), which is still its compile-start sentinel value
+// of 0 if the statement is the first thing generated in the whole compile
+// unit -- exactly what happens when a trivial function is the first thing
+// defined in an #include'd header, since the compiler's implicit
+// global-include-file prologue contributes no codegen of its own.
+// translate_absolute_line() then resolves that bogus abs_line 0 to
+// (includer file, line 0) instead of the header's real line.
+//
+// Fixed by having rule_return_void()/rule_return_expr()
+// (grammar_rules_loops.cc) stamp a real line onto every EXPLICIT,
+// user-written return statement right after CREATE_RETURN. CREATE_RETURN
+// itself deliberately stays new_node_no_line() by default: it also
+// synthesizes IMPLICIT returns (rule_func(), rule_primary_expr_anon_func())
+// appended well after a body has finished parsing -- sometimes after an
+// #include pop into a different file entirely -- where current_line no
+// longer means anything for that body, so those call sites must not be
+// given a line here.
+TEST_F(DebuggerTest, BreakpointInsideIncludedHeaderFileResolves) {
   const char* header_path = "data/dbgtest_header_probe.h";
   {
     std::ofstream out(header_path);
@@ -314,10 +327,51 @@ TEST_F(DebuggerTest, BreakpointInsideIncludedHeaderFileDoesNotYetResolve) {
   ASSERT_TRUE(resp.contains("breakpoints"));
   auto& bps = resp["breakpoints"];
   ASSERT_EQ(bps.size(), 1u) << resp.dump();
-  EXPECT_FALSE(bps[0]["verified"].get<bool>())
-      << "if this now passes, the compiler line-attribution gap described "
-         "above was fixed -- flip this to EXPECT_TRUE and check the line "
-         "number too, per the comment on this test";
+  EXPECT_TRUE(bps[0]["verified"].get<bool>()) << resp.dump();
+  EXPECT_EQ(bps[0]["line"].get<int>(), 2) << resp.dump();
+
+  std::remove(header_path);
+}
+
+// Companion regression test for the OTHER half of the fix: a function with
+// NO explicit return has only the IMPLICIT `return 0;` that rule_func()
+// itself synthesizes via CREATE_RETURN -- which deliberately keeps
+// new_node_no_line() (see the comment on BreakpointInsideIncludedHeaderFileResolves
+// above), since capturing current_line there would risk stamping a
+// misleading line from whatever rule_func()'s reduction lookahead has
+// already advanced past. Without a further fix this function's whole body
+// would still resolve to abs_line 0. rule_func() (grammar_rules.cc) closes
+// that gap by stamping the FUNCTION's own declaration line -- captured
+// early and safely in rule_func_type(), before any lookahead can drift --
+// onto the NODE_FUNCTION wrapper node itself, so i_generate_node()'s
+// existing line-switch guard fires at function entry regardless of what
+// (if anything) is inside.
+TEST_F(DebuggerTest, BreakpointOnImplicitReturnHeaderFunctionResolves) {
+  const char* header_path = "data/dbgtest_header_probe2.h";
+  {
+    std::ofstream out(header_path);
+    ASSERT_TRUE(out.good());
+    out << "void header_fn_empty() {\n"  // line 1: no explicit return
+        << "}\n";                        // line 2
+  }
+
+  object_t* ob = LoadFixture(
+      "#include \"/data/dbgtest_header_probe2.h\"\n"
+      "int use_it() { header_fn_empty(); return 1; }\n",
+      "dbgtest_header_includer2");
+  ASSERT_NE(ob, nullptr);
+  ASSERT_NE(ob->prog, nullptr);
+
+  dbg::djson args = {
+      {"source", {{"path", "/data/dbgtest_header_probe2.h"}}},
+      {"breakpoints", dbg::djson::array({{{"line", 1}}})},
+  };
+  dbg::djson resp = dbg::set_breakpoints_request(args);
+  ASSERT_TRUE(resp.contains("breakpoints"));
+  auto& bps = resp["breakpoints"];
+  ASSERT_EQ(bps.size(), 1u) << resp.dump();
+  EXPECT_TRUE(bps[0]["verified"].get<bool>()) << resp.dump();
+  EXPECT_EQ(bps[0]["line"].get<int>(), 1) << resp.dump();
 
   std::remove(header_path);
 }

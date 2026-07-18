@@ -51,9 +51,8 @@ See [Configuration](../../driver/config.md) for the full option reference
   automatically once a matching program is compiled. A breakpoint can also
   carry a hit count condition (VS Code's "Edit Breakpoint" → "Hit Count"):
   an optional comparator (`> >= < <= == !=` or `%`) followed by a number,
-  e.g. `>= 3` or `% 2`; a bare number means `>= N`. A breakpoint set inside
-  an `#include`d header file does not currently resolve (a compiler
-  line-attribution limitation, not a debugger one).
+  e.g. `>= 3` or `% 2`; a bare number means `>= N`. Breakpoints work inside
+  `#include`d header files too, not just the top-level source file.
 - Object and file browsing (`fluffos/objects`, `fluffos/object`,
   `fluffos/files` custom DAP requests) work while the VM is **running** —
   you don't need to pause the mud to inspect what's loaded.
