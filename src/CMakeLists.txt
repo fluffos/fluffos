@@ -812,6 +812,27 @@ if (EMSCRIPTEN)
     "-g0"
     "--profiling-funcs"
   )
+
+  # lpcc for node: the compiler front-end (diagnostics + -E/--tokens/--ast/
+  # -O0/--json stage outputs) as a plain node CLI program. NODERAWFS maps
+  # the wasm FS straight onto the host filesystem, so
+  # `node lpcc.js <config> <file>` behaves exactly like the native binary
+  # -- this is the artifact the fluffos-vscode extension ships so its
+  # Compiler Explorer and save-time diagnostics need no native build.
+  add_executable(lpcc-web "main_lpcc.cc")
+  target_link_libraries(lpcc-web PUBLIC ${FLUFFOS_LINK})
+  set_target_properties(lpcc-web PROPERTIES OUTPUT_NAME "lpcc" SUFFIX ".js")
+  target_link_options(lpcc-web PRIVATE
+    "SHELL:-s ALLOW_MEMORY_GROWTH=1"
+    "SHELL:-s INITIAL_MEMORY=64MB"
+    "${FLUFFOS_WASM_STACK_FLAG}"
+    "SHELL:-s NODERAWFS=1"
+    "SHELL:-s ENVIRONMENT=node"
+    "SHELL:-s EXIT_RUNTIME=1"
+    # Same DWARF note as driver-web: keep names, drop debug sections.
+    "-g0"
+    "--profiling-funcs"
+  )
 else ()
   add_executable(driver "main.cc")
   target_link_libraries(driver PUBLIC ${FLUFFOS_LINK})

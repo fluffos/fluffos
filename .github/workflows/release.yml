@@ -270,6 +270,7 @@ jobs:
           ASSET_NAME="fluffos-${VERSION}-wasm.zip"
           STAGE=$(mktemp -d)
           cp build-wasm/src/fluffos.js build-wasm/src/fluffos.wasm "$STAGE/"
+          cp build-wasm/src/lpcc.js build-wasm/src/lpcc.wasm "$STAGE/"
           cp src/www/wasm/index.html "$STAGE/"
           cp src/www/telnet.js "$STAGE/"
           cp -r src/www/vendor "$STAGE/"

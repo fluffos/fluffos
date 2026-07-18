@@ -81,3 +81,14 @@ runs:
     - name: Run LPC testsuite in the wasm driver
       shell: bash
       run: node tools/wasm/run-testsuite.js
+
+    # The wasm lpcc (NODERAWFS node CLI, shipped by the fluffos-vscode
+    # extension): compile a real testsuite file and check the --json
+    # tokens envelope comes back.
+    - name: Smoke-test wasm lpcc
+      shell: bash
+      run: |
+        cd testsuite
+        node ../build-wasm/src/lpcc.js --json --tokens etc/config.test single/tests/efuns/dual_extension.lpc \
+          | grep -q '"fluffos_lpcc"'
+        echo "wasm lpcc OK"

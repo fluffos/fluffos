@@ -4270,4 +4270,13 @@ yypushreturn:
 #undef yyes_capacity
 #line 1159 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
-/* FluffOS generated-from grammar.y sha256=1e0b0dc0115624b2604b675a147b6ef88d5e9f72cbc76dc9e48b661f1a4eeacc */
+
+// Public accessor for the parser's symbol-name table: maps a raw yylex
+// token number (what lpcc --tokens prints) to its grammar spelling
+// ("L_IDENTIFIER", "'{'"). Lives in the epilogue because yysymbol_name()
+// and YYTRANSLATE are file-static in the generated parser; consumed by
+// the lpcc --json staged outputs (stage_output.cc).
+const char* lpc_token_name(int token) {
+  return yysymbol_name(YY_CAST(yysymbol_kind_t, YYTRANSLATE(token)));
+}
+/* FluffOS generated-from grammar.y sha256=728753a714187bc4267cb6913374a16543a24935e9017960519fd14e02f3fcb5 */

@@ -19,4 +19,11 @@
 // Returns false if the stream failed to load.
 bool lpc_dump_stage_tokens(int fd, const char* name, bool pp_form, FILE* out);
 
+// lpcc --json --tokens: same scan, machine-readable. Emits ONE line:
+//   {"fluffos_lpcc":1,"stage":"tokens","file":...,
+//    "tokens":[{"l":line,"c":col,"k":kind,"n":"L_IDENTIFIER","t":"spelling"},...]}
+// so consumers can find the payload in mixed stdout by the "fluffos_lpcc"
+// envelope marker instead of scraping the human format.
+bool lpc_dump_stage_tokens_json(int fd, const char* name, FILE* out);
+
 #endif
