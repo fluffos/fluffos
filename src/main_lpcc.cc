@@ -107,11 +107,29 @@ int main(int argc, char** argv) {
     error_context_t econ{};
     save_context(&econ);
     try {
-      obj = find_object(file);
+      if (flag_ast) {
+        // The AST only exists during an actual compile. An object that was
+        // already loaded during boot (the master, the simul_efun object, and
+        // everything they inherit) would produce no --ast output at all, so
+        // force a fresh compile of those through the hot-reload path.
+        obj = find_object2(file);
+        if (obj != nullptr && obj->prog != nullptr) {
+          // recompile_object() refuses while current_object executes the old
+          // program, which would reject the master itself; nothing is
+          // executing here, so drop the context for the duration.
+          current_object = nullptr;
+          recompile_object(obj);
+        }
+      }
+      if (obj == nullptr || obj->prog == nullptr) {
+        current_object = master_ob;
+        obj = find_object(file);
+      }
     } catch (...) {
       restore_context(&econ);
     }
     pop_context(&econ);
+    current_object = master_ob;
   }
 
   if (obj == nullptr || obj->prog == nullptr) {
