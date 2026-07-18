@@ -83,12 +83,20 @@ runs:
       run: node tools/wasm/run-testsuite.js
 
     # The wasm lpcc (NODERAWFS node CLI, shipped by the fluffos-vscode
-    # extension): compile a real testsuite file and check the --json
-    # tokens envelope comes back.
+    # extension): every stage output against real testsuite files.
+    #   --tokens        : lexer stage envelope
+    #   bytecode dump   : switch.lpc's STRING switch pins the wasm32 table
+    #                     stride (keys are 8-byte ins_int, not sizeof(char*)
+    #                     -- a pointer-width walk desyncs and traps on wasm)
+    #   --ast on master : boot-loaded objects must recompile for their AST
     - name: Smoke-test wasm lpcc
       shell: bash
       run: |
         cd testsuite
         node ../build-wasm/src/lpcc.js --json --tokens etc/config.test single/tests/efuns/dual_extension.lpc \
           | grep -q '"fluffos_lpcc"'
+        node ../build-wasm/src/lpcc.js --json etc/config.test single/tests/operators/switch.lpc \
+          | grep -q '"stage":"bytecode"'
+        node ../build-wasm/src/lpcc.js --json --ast etc/config.test single/master.lpc \
+          | grep -q '"stage":"ast"'
         echo "wasm lpcc OK"
