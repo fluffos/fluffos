@@ -2,11 +2,12 @@
 
 #include <cstdlib>
 #include <cstdio>
-#include <event2/event.h>
 #include <iostream>
 #include <unistd.h>
 
 #include "mainlib.h"
+
+#include <nlohmann/json.hpp>
 
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "compiler/internal/disassembler.h"
@@ -30,7 +31,13 @@ int main(int argc, char** argv) {
   //   --ast     dump parse trees before codegen (then compile as usual)
   //   -O0       compile with the tree optimizer off -> the dump_prog
   //             output is PRE-optimization bytecode
+  //   --json    machine-readable variant of a stage output (--tokens, --ast,
+  //             and the default/-O0 bytecode dump). The payload is ONE line
+  //             starting with {"fluffos_lpcc":1,...} so consumers can find
+  //             it in mixed stdout. The bytecode model comes from the same
+  //             disassembler switch as the text dump (DisSink json backend).
   bool flag_pp = false, flag_tokens = false, flag_ast = false, flag_noopt = false;
+  bool flag_json = false;
   const char* pos[3] = {argv[0], nullptr, nullptr};
   int npos = 1;
   for (int i = 1; i < argc; i++) {
@@ -43,11 +50,17 @@ int main(int argc, char** argv) {
       flag_ast = true;
     else if (a == "-O0")
       flag_noopt = true;
+    else if (a == "--json")
+      flag_json = true;
     else if (npos < 3)
       pos[npos++] = argv[i];
   }
   if (npos != 3) {
-    std::cerr << "Usage: lpcc [-E|--tokens|--ast|-O0] config_file lpc_file" << std::endl;
+    std::cerr << "Usage: lpcc [-E|--tokens|--ast|-O0] [--json] config_file lpc_file" << std::endl;
+    return 1;
+  }
+  if (flag_json && flag_pp) {
+    std::cerr << "lpcc: --json is not available for -E" << std::endl;
     return 1;
   }
   argv = const_cast<char**>(pos);
@@ -79,11 +92,13 @@ int main(int argc, char** argv) {
       fprintf(stderr, "lpcc: cannot open %s\n", file);
       return 1;
     }
-    bool ok = lpc_dump_stage_tokens(fd, file, flag_pp, stdout);
+    bool ok = flag_json ? lpc_dump_stage_tokens_json(fd, file, stdout)
+                        : lpc_dump_stage_tokens(fd, file, flag_pp, stdout);
     close(fd);
     return ok ? 0 : 1;
   }
-  g_compile.opt_dump_ast = flag_ast;
+  g_compile.opt_dump_ast = flag_ast && !flag_json;
+  g_compile.opt_dump_ast_json = flag_ast && flag_json;
   g_compile.opt_no_optimize = flag_noopt;
 
   {
@@ -104,10 +119,45 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  if (flag_json && flag_ast) {
+    // Companion envelope for --ast --json: the AST's "l" values are
+    // ABSOLUTE compilation-unit lines (includes inlined) and its
+    // (string N) atoms are string-table indices; this supplies both
+    // mappings. Consumers accumulate `segments` in order to translate an
+    // absolute line to (file, line-within-file).
+    nlohmann::json seg = nlohmann::json::array();
+    unsigned short* fi = obj->prog->file_info;
+    if (obj->prog->line_info != nullptr && fi != nullptr) {
+      auto* li_start = reinterpret_cast<unsigned char*>(fi + fi[1]);
+      for (unsigned short* p = fi + 2; p < reinterpret_cast<unsigned short*>(li_start); p += 2) {
+        seg.push_back({{"lines", p[0]}, {"file", obj->prog->strings[p[1] - 1]}});
+      }
+    }
+    nlohmann::json strs = nlohmann::json::array();
+    for (int i = 0; i < static_cast<int>(obj->prog->num_strings); i++) {
+      strs.push_back(obj->prog->strings[i]);
+    }
+    nlohmann::json envelope = {
+        {"fluffos_lpcc", 1}, {"stage", "files"}, {"segments", seg}, {"strings", strs}};
+    // LPC strings are arbitrary bytes; replace invalid UTF-8 instead of throwing.
+    printf("%s\n",
+           envelope.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str());
+  }
+
   if (!flag_ast) {
     ScopedTracer const tracer("dump_prog");
 
-    dump_prog(obj->prog, stdout, 1 | 2);
+    if (flag_json) {
+      nlohmann::json envelope = {{"fluffos_lpcc", 1},
+                                 {"stage", "bytecode"},
+                                 {"file", file},
+                                 {"optimized", !flag_noopt},
+                                 {"program", dump_prog_json(obj->prog, 1 | 2)}};
+      printf("%s\n",
+             envelope.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str());
+    } else {
+      dump_prog(obj->prog, stdout, 1 | 2);
+    }
   }
 
   Tracer::collect();

@@ -382,6 +382,10 @@ struct CompileState {
   // codegen; compile with the tree optimizer disabled (PRAGMA_OPTIMIZE
   // cleared) so dump_prog shows PRE-optimization bytecode.
   bool opt_dump_ast = false;
+  // lpcc --ast --json: same dump point, machine-readable one-line
+  // {"fluffos_lpcc":1,"stage":"ast",...} envelope with per-node source
+  // lines (the S-expression form carries no positions).
+  bool opt_dump_ast_json = false;
   bool opt_no_optimize = false;
 
   // Set to 2 when a class declaration body completes, decremented as each

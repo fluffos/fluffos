@@ -7,8 +7,23 @@
 #include "compiler/internal/icode.h"
 
 #include <fmt/format.h>
+#include <nlohmann/json.hpp>
 
-static void disassemble(FILE* f /*f*/, char* code /*code*/, int /*start*/ start, int /*end*/ end,
+// --------------------------------------------------------------------------
+// JSON-native dumps: the ONE opcode switch in disassemble() emits through a
+// DisSink with two backends -- text (the exact legacy dump format) and a
+// nlohmann::json model (lpcc --json bytecode envelope). There is no second
+// decoder to drift; the text output is a rendering of the same emissions.
+// --------------------------------------------------------------------------
+struct DisSink {
+  FILE* f = nullptr;             // text backend (legacy format) when non-null
+  nlohmann::json* fns = nullptr; // json backend: array of function objects
+  nlohmann::json* cur = nullptr; // current function's "instructions" array
+  const char* src_file = nullptr;  // current source position (json rows
+  int src_line = 0;                // carry it natively, no trailing annots)
+};
+
+static void disassemble(DisSink& sink, char* code /*code*/, int /*start*/ start, int /*end*/ end,
                         program_t* prog /*prog*/);
 static const char* disassem_string(const char* /*str*/);
 static int short_compare(const void* /*a*/, const void* /*b*/);
@@ -55,7 +70,9 @@ void dump_prog_details(program_t* prog, FILE* f, int flags) {
 
   if (flags & 1) {
     fprintf(f, "DISASSEMBLY:\n");
-    disassemble(f, prog->program, 0, prog->program_size, prog);
+    DisSink sink;
+    sink.f = f;
+    disassemble(sink, prog->program, 0, prog->program_size, prog);
   } else {
     fprintf(f, "PROGRAM:");
     for (i = 0; i < prog->program_size; i++) {
@@ -80,9 +97,92 @@ void dump_prog_details(program_t* prog, FILE* f, int flags) {
  * 1 - do disassembly
  * 2 - dump line number table
  */
+// One row of the FUNCTIONS table, computed once for the text and json
+// renderers (single source for the flag-char encodings).
+struct FnTabRow {
+  int index;
+  const char* name;
+  bool inherited;
+  char smods[4];
+  char sflags[8];
+  // inherited kind:
+  int inh_low = 0, inh_fio = 0, inh_vio = 0;
+  // defined kind:
+  int offset = 0, locals = 0, args = 0, def_args = 0;
+  std::string defmap;
+};
+
+static void fn_table_rows(program_t* prog, std::vector<FnTabRow>& rows) {
+  int num_funcs_total = prog->last_inherited + prog->num_functions_defined;
+  for (int i = 0; i < num_funcs_total; i++) {
+    FnTabRow r;
+    int flags;
+    int runtime_index;
+    function_t* func_entry = find_func_entry(prog, i);
+    int low, high, mid;
+
+    r.index = i;
+    r.name = func_entry->funcname;
+
+    flags = prog->function_flags[i];
+    if (flags & FUNC_ALIAS) {
+      runtime_index = flags & ~FUNC_ALIAS;
+      r.sflags[4] = 'a';
+    } else {
+      runtime_index = i;
+      r.sflags[4] = '-';
+    }
+
+    flags = prog->function_flags[runtime_index];
+
+    r.smods[0] = (flags & DECL_HIDDEN) ? '-' : '-';
+    r.smods[0] = (flags & DECL_PRIVATE) ? 'p' : '-';
+    r.smods[0] = (flags & DECL_PROTECTED) ? 'P' : '-';
+    r.smods[0] = (flags & DECL_PUBLIC) ? '+' : '-';
+    r.smods[1] = (flags & DECL_NOMASK) ? 'm' : '-';
+    r.smods[2] = (flags & DECL_NOSAVE) ? 's' : '-';
+    r.smods[3] = '\0';
+
+    r.sflags[0] = (flags & FUNC_INHERITED) ? 'i' : '-';
+    r.sflags[1] = (flags & FUNC_UNDEFINED) ? 'u' : '-';
+    r.sflags[2] = (flags & FUNC_STRICT_TYPES) ? 's' : '-';
+    r.sflags[3] = (flags & FUNC_PROTOTYPE) ? 'p' : '-';
+    r.sflags[5] = (flags & FUNC_TRUE_VARARGS) ? 'V' : '-';
+    r.sflags[6] = (flags & FUNC_VARARGS) ? 'v' : '-';
+    r.sflags[7] = '\0';
+
+    r.inherited = (flags & FUNC_INHERITED) != 0;
+    if (r.inherited) {
+      low = 0;
+      high = prog->num_inherited - 1;
+      while (high > low) {
+        mid = (low + high + 1) / 2;
+        if (prog->inherit[mid].function_index_offset > runtime_index) {
+          high = mid - 1;
+        } else {
+          low = mid;
+        }
+      }
+      r.inh_low = low;
+      r.inh_fio = runtime_index - prog->inherit[low].function_index_offset;
+      r.inh_vio = prog->inherit[low].variable_index_offset;
+    } else {
+      r.offset = runtime_index - prog->last_inherited;
+      r.locals = func_entry->num_local;
+      r.args = func_entry->num_arg;
+      r.def_args = func_entry->num_arg - func_entry->min_arg;
+      for (int j = 0; j < func_entry->num_arg; j++) {
+        if (func_entry->default_args_findex[j] != 0) {
+          r.defmap += fmt::format(FMT_STRING(" {}:{}"), j, func_entry->default_args_findex[j]);
+        }
+      }
+    }
+    rows.push_back(std::move(r));
+  }
+}
+
 void dump_prog(program_t* prog, FILE* f, int flags) {
   int i;
-  int num_funcs_total;
 
   fprintf(f, "NAME: /%s\n", prog->filename);
   fprintf(f, "INHERITS:\n");
@@ -100,71 +200,16 @@ void dump_prog(program_t* prog, FILE* f, int flags) {
   fprintf(f,
           "      ------------------------- ------  ----  -------  ---  --- --------  ------ "
           "----------\n");
-  num_funcs_total = prog->last_inherited + prog->num_functions_defined;
-
-  for (i = 0; i < num_funcs_total; i++) {
-    char sflags[8];
-    int flags;
-    int runtime_index;
-    function_t* func_entry = find_func_entry(prog, i);
-    int low, high, mid;
-
-    flags = prog->function_flags[i];
-    if (flags & FUNC_ALIAS) {
-      runtime_index = flags & ~FUNC_ALIAS;
-      sflags[4] = 'a';
+  std::vector<FnTabRow> rows;
+  fn_table_rows(prog, rows);
+  for (const auto& r : rows) {
+    if (r.inherited) {
+      fprintf(f, "%4d: %-24s  %6d  %4s  %7s  %3d %3d\n", r.index, r.name, r.inh_low, r.smods,
+              r.sflags, r.inh_fio, r.inh_vio);
     } else {
-      runtime_index = i;
-      sflags[4] = '-';
-    }
-
-    flags = prog->function_flags[runtime_index];
-
-    char smods[4];
-    smods[0] = (flags & DECL_HIDDEN) ? '-' : '-';
-    smods[0] = (flags & DECL_PRIVATE) ? 'p' : '-';
-    smods[0] = (flags & DECL_PROTECTED) ? 'P' : '-';
-    smods[0] = (flags & DECL_PUBLIC) ? '+' : '-';
-    smods[1] = (flags & DECL_NOMASK) ? 'm' : '-';
-    smods[2] = (flags & DECL_NOSAVE) ? 's' : '-';
-    smods[3] = '\0';
-
-    sflags[0] = (flags & FUNC_INHERITED) ? 'i' : '-';
-    sflags[1] = (flags & FUNC_UNDEFINED) ? 'u' : '-';
-    sflags[2] = (flags & FUNC_STRICT_TYPES) ? 's' : '-';
-    sflags[3] = (flags & FUNC_PROTOTYPE) ? 'p' : '-';
-    sflags[5] = (flags & FUNC_TRUE_VARARGS) ? 'V' : '-';
-    sflags[6] = (flags & FUNC_VARARGS) ? 'v' : '-';
-    sflags[7] = '\0';
-
-    if (flags & FUNC_INHERITED) {
-      low = 0;
-      high = prog->num_inherited - 1;
-      while (high > low) {
-        mid = (low + high + 1) / 2;
-        if (prog->inherit[mid].function_index_offset > runtime_index) {
-          high = mid - 1;
-        } else {
-          low = mid;
-        }
-      }
-
-      fprintf(f, "%4d: %-24s  %6d  %4s  %7s  %3d %3d\n", i, func_entry->funcname, low, smods,
-              sflags, runtime_index - prog->inherit[low].function_index_offset,
-              prog->inherit[low].variable_index_offset);
-    } else {
-      fprintf(f, "%4d: %-24s  %6d  %4s  %7s             %7d   %5d %10d", i, func_entry->funcname,
-              runtime_index - prog->last_inherited, smods, sflags, func_entry->num_local,
-              func_entry->num_arg, func_entry->num_arg - func_entry->min_arg);
-
-      std::string default_arg_findex_map;
-      for (int j = 0; j < func_entry->num_arg; j++) {
-        if (func_entry->default_args_findex[j] != 0) {
-          default_arg_findex_map +=
-              fmt::format(FMT_STRING(" {}:{}"), j, func_entry->default_args_findex[j]);
-        }
-      }
-      fprintf(f, " %s\n", default_arg_findex_map.c_str());
+      fprintf(f, "%4d: %-24s  %6d  %4s  %7s             %7d   %5d %10d", r.index, r.name, r.offset,
+              r.smods, r.sflags, r.locals, r.args, r.def_args);
+      fprintf(f, " %s\n", r.defmap.c_str());
     }
   }
 
@@ -213,22 +258,23 @@ static int short_compare(const void* a, const void* b) {
 
 static const char* pushes[] = {"string", "number", "global", "local"};
 
-static void print_function_sig(FILE* f, program_t* prog, int idx) {
+static std::string function_sig_string(program_t* prog, int idx) {
   char buf[255];
   auto end = &buf[sizeof(buf) - 1];
+  std::string out;
 
   auto funp = prog->function_table[idx];
   auto funflags = prog->function_flags[prog->last_inherited + idx];
 
   buf[0] = '\0';
   get_type_modifiers(&buf[0], end, funflags);
-  fprintf(f, "%s", buf);
+  out += buf;
 
   get_type_name(&buf[0], end, funp.type);
-  fprintf(f, "%s", buf);
-  fprintf(f, "%s", funp.funcname);
+  out += buf;
+  out += funp.funcname;
 
-  fprintf(f, "(");
+  out += "(";
   unsigned short* types;
   if (prog->type_start && prog->type_start[idx] != INDEX_START_NONE) {
     types = &prog->argument_types[prog->type_start[idx]];
@@ -240,20 +286,21 @@ static void print_function_sig(FILE* f, program_t* prog, int idx) {
       for (int i = 0; i < funp.num_arg; i++) {
         auto p = get_type_name(buf, end, types[i]);
         *(p - 1) = '\0';  // get rid of last space
-        if (i != 0) fprintf(f, ",");
-        fprintf(f, "%s", buf);
+        if (i != 0) out += ",";
+        out += buf;
       }
     } else {
-      fprintf(f, "args: %d", funp.num_arg);
+      out += fmt::format(FMT_STRING("args: {}"), funp.num_arg);
       if (funp.min_arg != funp.num_arg) {
-        fprintf(f, "min args: %d", funp.num_arg);
+        out += fmt::format(FMT_STRING("min args: {}"), funp.num_arg);
       }
     }
   }
-  fprintf(f, ")");
+  out += ")";
+  return out;
 }
 
-static void disassemble(FILE* f, char* code, int start, int end, program_t* prog) {
+static void disassemble(DisSink& sink, char* code, int start, int end, program_t* prog) {
   extern int num_simul_efun;
   short instr;
   int i, j, ri;
@@ -293,16 +340,23 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
   while ((pc - code) < end) {
     if ((next_func >= 0) && ((pc - code) >= offsets[next_func])) {
       if (next_func > 0) {
-        if (last_file && last_line > 0) {
-          fprintf(f, "; %s:%d\n", last_file, last_line);
+        if (sink.f && last_file && last_line > 0) {
+          fprintf(sink.f, "; %s:%d\n", last_file, last_line);
         }
         last_file = nullptr;
         last_line = 0;
       }
-      fprintf(f, "\n;; Function: ");
       auto func_idx = offsets[next_func + 1];
-      print_function_sig(f, prog, func_idx);
-      fprintf(f, "\n");
+      std::string sig = function_sig_string(prog, func_idx);
+      if (sink.f) {
+        fprintf(sink.f, "\n;; Function: %s\n", sig.c_str());
+      }
+      if (sink.fns) {
+        sink.fns->push_back({{"sig", sig},
+                             {"name", prog->function_table[func_idx].funcname},
+                             {"instructions", nlohmann::json::array()}});
+        sink.cur = &sink.fns->back()["instructions"];
+      }
 
       next_func += 2;
       if (next_func >= (NUM_FUNS_D * 2)) {
@@ -320,16 +374,21 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
       int new_line = 0;
       get_explicit_line_number_info(pc, prog, &new_file, &new_line);
       if (last_file != new_file || last_line != new_line) {
-        if (last_file && last_line > 0) {
-          fprintf(f, "; %s:%d\n", last_file, last_line);
+        if (sink.f && last_file && last_line > 0) {
+          fprintf(sink.f, "; %s:%d\n", last_file, last_line);
         }
         last_file = new_file;
         last_line = new_line;
       }
+      sink.src_file = new_file;
+      sink.src_line = new_line;
     }
 
-    fflush(f);
-    fprintf(f, "%04tx: ", (pc - 1) - code);  // Address
+    size_t iaddr = (pc - 1) - code;
+    if (sink.f) {
+      fflush(sink.f);
+      fprintf(sink.f, "%04tx: ", (pc - 1) - code);  // Address
+    }
 
     switch (instr) {
       case F_PUSH: {
@@ -525,14 +584,19 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
         pc++;
         break;
       case F_LOOP_COND_NUMBER:
+        // Layout per do_loop_cond_number(): 1-byte local, sizeof(LPC_INT)
+        // (8-byte) literal, 2-byte BACKWARD branch offset. This used to
+        // advance only 4 past the literal, desyncing the address stream --
+        // every later instruction in the section decoded as garbage and the
+        // next function's listing was swallowed.
         i = EXTRACT_UCHAR(pc++);
         COPY_INT(&iarg, pc);
-        pc += 4;
+        pc += sizeof(LPC_INT);
         COPY_SHORT(&sarg, pc);
         offset = (pc - code) - sarg;
         pc += 2;
-        sprintf(buff, "LV%d < %" LPC_INT_FMTSTR_P " bbranch_when_non_zero %04x (%04x)", i, iarg,
-                sarg, offset);
+        sprintf(buff, "LV%d < %" LPC_INT_FMTSTR_P " branch back %04x (%04x)", i, iarg, sarg,
+                offset);
         break;
       case F_LOOP_COND_LOCAL:
         i = EXTRACT_UCHAR(pc++);
@@ -659,14 +723,47 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
         addr = pc - code;
         aptr = pc;
 
-        fprintf(f, "switch\n");
-        fprintf(f, "      type: %02x table: %04x-%04x deflt: %04x\n", static_cast<unsigned>(ttype),
-                addr + stable, addr + etable, addr + def);
+        nlohmann::json swrow;
+        if (sink.fns) {
+          swrow = {{"a", iaddr}, {"m", "switch"}, {"cases", nlohmann::json::array()}};
+          if (sink.src_line > 0 && sink.src_file != nullptr) {
+            swrow["f"] = sink.src_file;
+            swrow["l"] = sink.src_line;
+          }
+        }
+        if (sink.f) fprintf(sink.f, "switch\n");
+        if (sink.f) {
+          fprintf(sink.f, "      type: %02x table: %04x-%04x deflt: %04x\n",
+                  static_cast<unsigned>(ttype), addr + stable, addr + etable, addr + def);
+        }
+        if (sink.fns) {
+          swrow["type"] = ttype;
+          swrow["tstart"] = addr + stable;
+          swrow["tend"] = addr + etable;
+          swrow["deflt"] = addr + def;
+          sink.cur->push_back(swrow);
+        }
+        // Body instructions between the header and the table go to the SAME
+        // sink (json rows land in the current function like any other).
         /* recursively disassemble stuff in switch */
-        disassemble(f, code, pc - code + 7, addr + stable, prog);
+        disassemble(sink, code, pc - code + 7, addr + stable, prog);
+
+        nlohmann::json* swcases = nullptr;
+        if (sink.fns && sink.cur != nullptr) {
+          // find our switch row again (the recursion may have appended rows,
+          // but our row object was copied in -- locate by address)
+          for (auto& r : *sink.cur) {
+            if (r.contains("a") && r["a"] == iaddr && r["m"] == "switch") {
+              swcases = &r["cases"];
+              break;
+            }
+          }
+        }
 
         /* now print out table - ugly... */
-        fprintf(f, "      switch table (for %04x)\n", static_cast<unsigned>(pc - code - 1));
+        if (sink.f) {
+          fprintf(sink.f, "      switch table (for %04x)\n", static_cast<unsigned>(pc - code - 1));
+        }
         if (ttype == 0xfe) {
           ttype = 0; /* direct lookup */
         } else if (ttype >> 4 == 0xf) {
@@ -682,11 +779,14 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
           // 64-bit); stop the short-offset walk before it, not 4 bytes before.
           while (pc < aptr + etable - (int)sizeof(LPC_INT)) {
             COPY_SHORT(&sarg, pc);
-            fprintf(f, "\t%2d: %04x\n", i++, addr + sarg);
+            if (sink.f) fprintf(sink.f, "\t%2d: %04x\n", i, addr + sarg);
+            if (swcases) swcases->push_back({{"i", i}, {"to", addr + sarg}});
+            i++;
             pc += 2;
           }
           COPY_INT(&iarg, pc);
-          fprintf(f, "\tminval = %" LPC_INT_FMTSTR_P "\n", iarg);
+          if (sink.f) fprintf(sink.f, "\tminval = %" LPC_INT_FMTSTR_P "\n", iarg);
+          if (swcases) swcases->push_back({{"minval", iarg}});
           pc += sizeof(LPC_INT);
         } else {
           while (pc < aptr + etable) {
@@ -694,12 +794,17 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
             COPY_SHORT(&sarg, pc + sizeof(char*));
             if (ttype == 1 || !parg) {
               if (sarg == 1) {
-                fprintf(f, "\t%-4p\t<range start>\n", parg);
+                if (sink.f) fprintf(sink.f, "\t%-4p\t<range start>\n", parg);
+                if (swcases) swcases->push_back({{"range_start", true}});
               } else {
-                fprintf(f, "\t%-4p\t%04x\n", parg, addr + sarg);
+                if (sink.f) fprintf(sink.f, "\t%-4p\t%04x\n", parg, addr + sarg);
+                if (swcases) swcases->push_back({{"to", addr + sarg}});
               }
             } else {
-              fprintf(f, "\t\"%s\"\t%04x\n", disassem_string(parg), addr + sarg);
+              if (sink.f) fprintf(sink.f, "\t\"%s\"\t%04x\n", disassem_string(parg), addr + sarg);
+              if (swcases) {
+                swcases->push_back({{"key", disassem_string(parg)}, {"to", addr + sarg}});
+              }
             }
             pc += 2 + sizeof(char*);
           }
@@ -724,7 +829,10 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
         break;
       }
       case 0:
-        fprintf(f, "*** zero opcode ***\n");
+        if (sink.f) fprintf(sink.f, "*** zero opcode ***\n");
+        if (sink.fns && sink.cur != nullptr) {
+          sink.cur->push_back({{"a", iaddr}, {"m", "*** zero opcode ***"}});
+        }
         continue;
       default:
         // fprintf(f, "*** %s (%d) ***\n", query_instr_name(instr), instr);
@@ -737,13 +845,26 @@ static void disassemble(FILE* f, char* code, int start, int end, program_t* prog
       while (saved_pc != pc) {
         p += sprintf(p, "%02hhX ", *saved_pc++);
       }
-      fprintf(f, " %-25s", tmp);  // byte code in HEX
+      if (sink.f) {
+        fprintf(sink.f, " %-25s", tmp);  // byte code in HEX
+        fprintf(sink.f, " %-35s; %s\n", query_instr_name(instr), buff);
+      }
+      if (sink.fns && sink.cur != nullptr) {
+        nlohmann::json row = {{"a", iaddr},
+                              {"x", tmp},
+                              {"m", query_instr_name(instr)},
+                              {"o", buff}};
+        if (sink.src_line > 0 && sink.src_file != nullptr) {
+          row["f"] = sink.src_file;
+          row["l"] = sink.src_line;
+        }
+        sink.cur->push_back(row);
+      }
     }
-    fprintf(f, " %-35s; %s\n", query_instr_name(instr), buff);
   }
 
   // print last line
-  fprintf(f, "; %s:%d\n", last_file, last_line);
+  if (sink.f) fprintf(sink.f, "; %s:%d\n", last_file, last_line);
 
   if (offsets) {
     free(offsets);
@@ -791,4 +912,127 @@ static void dump_line_numbers(FILE* f, program_t* prog) {
     fprintf(f, "%04x-%04x: %i\n", addr, addr + sz - 1, s);
     addr += sz;
   }
+}
+
+// ---------------------------------------------------------------------------
+// JSON-native dump (lpcc --json bytecode). Same emissions as the text form:
+// the instruction stream comes from the SAME disassemble() switch via the
+// json sink backend; the tables share fn_table_rows(); the line-table walk
+// mirrors dump_line_numbers() (kept adjacent -- change both together).
+// ---------------------------------------------------------------------------
+
+static nlohmann::json prog_details_json(program_t* prog, int flags) {
+  nlohmann::json p;
+  p["file"] = prog->filename;
+
+  p["globals"] = nlohmann::json::array();
+  for (int i = 0; i < prog->num_variables_total; i++) {
+    p["globals"].push_back({{"i", i}, {"name", variable_name(prog, i)}});
+  }
+
+  int variable_runtime_index = 0;
+  if (prog->num_inherited > 0) {
+    variable_runtime_index = prog->inherit[prog->num_inherited - 1].variable_index_offset +
+                             prog->inherit[prog->num_inherited - 1].prog->num_variables_total;
+  }
+  p["variables"] = nlohmann::json::array();
+  for (int i = 0; i < prog->num_variables_defined; i++) {
+    char buf[255];
+    auto end = &buf[sizeof(buf) - 1];
+    get_type_name(&buf[0], end, prog->variable_types[i]);
+    p["variables"].push_back({{"i", variable_runtime_index + i},
+                              {"decl", std::string(buf) + prog->variable_table[i]}});
+  }
+
+  p["strings"] = nlohmann::json::array();
+  for (int i = 0; i < prog->num_strings; i++) {
+    p["strings"].push_back({{"i", i}, {"text", prog->strings[i]}});
+  }
+
+  if (flags & 1) {
+    nlohmann::json fns = nlohmann::json::array();
+    // Preamble entry catches any rows before the first function header
+    // (dropped below if none appear).
+    fns.push_back({{"sig", ""}, {"name", ""}, {"instructions", nlohmann::json::array()}});
+    DisSink sink;
+    sink.fns = &fns;
+    sink.cur = &fns.back()["instructions"];
+    disassemble(sink, prog->program, 0, prog->program_size, prog);
+    if (!fns.empty() && fns[0]["name"] == "" && fns[0]["instructions"].empty()) {
+      fns.erase(fns.begin());
+    }
+    p["functions"] = fns;
+  }
+
+  if ((flags & 2) && prog->line_info != nullptr && prog->file_info != nullptr) {
+    // Mirrors dump_line_numbers()'s walk.
+    unsigned short* fi = prog->file_info;
+    auto* li_end = reinterpret_cast<unsigned char*>((reinterpret_cast<char*>(fi)) + fi[0]);
+    auto* li_start = reinterpret_cast<unsigned char*>(fi + fi[1]);
+
+    p["line_files"] = nlohmann::json::array();
+    for (unsigned short* q = fi + 2; q < reinterpret_cast<unsigned short*>(li_start); q += 2) {
+      p["line_files"].push_back({{"lines", q[0]}, {"file", prog->strings[q[1] - 1]}});
+    }
+
+    p["line_ranges"] = nlohmann::json::array();
+    unsigned char* li = li_start;
+    int addr = 0;
+    while (li < li_end) {
+      int sz = *li++;
+      ADDRESS_TYPE s;
+#if !defined(USE_32BIT_ADDRESSES)
+      COPY_SHORT(&s, li);
+#else
+      COPY4(&s, li);
+#endif
+      li += sizeof(ADDRESS_TYPE);
+      p["line_ranges"].push_back({{"from", addr}, {"to", addr + sz - 1}, {"line", s}});
+      addr += sz;
+    }
+  }
+  return p;
+}
+
+static void collect_programs_json(program_t* prog, int flags, nlohmann::json& out) {
+  out.push_back(prog_details_json(prog, flags));
+  for (int i = 0; i < prog->num_inherited; i++) {
+    collect_programs_json(prog->inherit[i].prog, flags, out);
+  }
+}
+
+nlohmann::json dump_prog_json(program_t* prog, int flags) {
+  nlohmann::json j;
+  j["name"] = std::string("/") + prog->filename;
+
+  j["inherits"] = nlohmann::json::array();
+  for (int i = 0; i < prog->num_inherited; i++) {
+    j["inherits"].push_back({{"name", prog->inherit[i].prog->filename},
+                             {"fio", prog->inherit[i].function_index_offset},
+                             {"vio", prog->inherit[i].variable_index_offset}});
+  }
+
+  j["functions_table"] = nlohmann::json::array();
+  std::vector<FnTabRow> rows;
+  fn_table_rows(prog, rows);
+  for (const auto& r : rows) {
+    nlohmann::json e = {{"i", r.index}, {"name", r.name}, {"mods", r.smods},
+                        {"flags", r.sflags}, {"inherited", r.inherited}};
+    if (r.inherited) {
+      e["inh"] = r.inh_low;
+      e["fio"] = r.inh_fio;
+      e["vio"] = r.inh_vio;
+    } else {
+      e["offset"] = r.offset;
+      e["locals"] = r.locals;
+      e["args"] = r.args;
+      e["def_args"] = r.def_args;
+      if (!r.defmap.empty()) e["defmap"] = r.defmap;
+    }
+    j["functions_table"].push_back(e);
+  }
+
+  j["programs"] = nlohmann::json::array();
+  collect_programs_json(prog, flags, j["programs"]);
+  return j;
 }

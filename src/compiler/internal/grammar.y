@@ -1157,3 +1157,12 @@ constant:
 ;
 
 %%
+
+// Public accessor for the parser's symbol-name table: maps a raw yylex
+// token number (what lpcc --tokens prints) to its grammar spelling
+// ("L_IDENTIFIER", "'{'"). Lives in the epilogue because yysymbol_name()
+// and YYTRANSLATE are file-static in the generated parser; consumed by
+// the lpcc --json staged outputs (stage_output.cc).
+const char* lpc_token_name(int token) {
+  return yysymbol_name(YY_CAST(yysymbol_kind_t, YYTRANSLATE(token)));
+}

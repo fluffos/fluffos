@@ -17,8 +17,11 @@ int generate_conditional_branch(struct parse_node_t*);
 
 // Tree dumping is a product feature now (lpcc --ast), not debug
 // scaffolding -- unconditional in every build type.
-void dump_expr_list(struct parse_node_t*);
 void dump_tree(struct parse_node_t*);
+// lpcc --ast --json: one-line {"fluffos_lpcc":1,"stage":"ast",...} envelope
+// covering both trees, with per-node source lines.
+void dump_program_ast_json(const char* filename, struct parse_node_t* tree_main,
+                           struct parse_node_t* tree_init);
 void lpc_tree_form(struct parse_node_t*, struct parse_node_t*);
 
 #endif

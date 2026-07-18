@@ -166,7 +166,7 @@
     {
       "name": "wasm",
       "configurePreset": "wasm",
-      "targets": ["driver-web"]
+      "targets": ["driver-web", "lpcc-web"]
     }
   ]
 }

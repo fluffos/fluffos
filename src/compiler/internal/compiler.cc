@@ -2770,6 +2770,9 @@ static program_t* epilog(void) {
     dump_tree(comp_trees[TREE_INIT]);
     printf("\n");
   }
+  if (g_compile.opt_dump_ast_json) {
+    dump_program_ast_json(g_compile.filename, comp_trees[TREE_MAIN], comp_trees[TREE_INIT]);
+  }
   generate(comp_trees[TREE_MAIN]);
   // DEBUG:
   // dump_tree(comp_trees[TREE_MAIN]);
