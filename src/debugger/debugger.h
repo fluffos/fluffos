@@ -33,6 +33,18 @@ struct SrcBp {
   int req_line = 0;     // line the client asked for
   int actual_line = 0;  // line we bound to (snap-to-next-code-line)
   bool verified = false;
+
+  // DAP hitCondition (empty = unconditional, the common case): an optional
+  // comparator (> >= < <= == = !=) or `%` followed by an integer; a bare
+  // integer means >=N. Parsed once in set_breakpoints_request(); a
+  // syntactically bad condition marks the breakpoint permanently
+  // unverified (never registers an address) rather than silently ignoring
+  // the condition. hit_count accumulates for the lifetime of this SrcBp
+  // (i.e. resets whenever the client re-sends setBreakpoints for this
+  // file, same as any other breakpoint state).
+  std::string hit_condition;
+  bool hit_condition_valid = true;
+  int hit_count = 0;
 };
 
 // A variablesReference handle.  Valid only while stopped; pointers are
@@ -102,6 +114,13 @@ struct Session {
   std::map<std::string, std::vector<SrcBp>> bps;
   std::unordered_map<char*, int> bp_addrs;  // live code address -> bp id
   std::unordered_map<program_t*, std::vector<char*>> bp_by_prog;
+  // bp id -> the owning SrcBp, for the instruction hook's hit-count check.
+  // Points into bps' vector storage; rebuilt in rebind_all() every time
+  // that storage could have changed (set_breakpoints_request always
+  // replaces a whole canonical path's vector, so pointers from a PRIOR
+  // rebind must never be trusted across one -- this map is the only
+  // consumer, and it's always refreshed synchronously before use).
+  std::unordered_map<int, SrcBp*> bp_by_id;
 
   // ---- stopped-state handles ----
   std::vector<VarHandle> handles;
@@ -135,6 +154,10 @@ djson set_breakpoints_request(const djson& args);
 void breakpoints_on_program_loaded(program_t* prog);
 void breakpoints_on_program_freed(program_t* prog);
 void breakpoints_clear_all();
+// Increments bp_id's hit_count and evaluates its hitCondition (true if
+// unconditional). Called from the instruction hook on every address match;
+// false means "matched the address, but the condition says don't stop yet."
+bool breakpoint_hit_should_stop(int bp_id);
 
 // ---- inspect.cc ----
 int frame_count();

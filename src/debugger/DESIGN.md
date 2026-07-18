@@ -388,8 +388,13 @@ identity rules (`.lpc`/`.c` both match; `filename_to_obname` semantics).
 so the *next* instruction stops (i.e. it behaves like a `debugger;` statement). Also
 `debugger_attached()` → 0/1 so mudlibs can guard expensive diagnostics.
 
-**Conditional / hit-count breakpoints**: hit-count conditions are phase 2 (pure counter);
-expression conditions depend on the evaluator, phase 3.
+**Conditional / hit-count breakpoints**: hit-count conditions shipped in phase 2 -- DAP
+`hitCondition` per source breakpoint, an optional comparator (`> >= < <= == = !=` or `%`) followed
+by an integer, bare number meaning `>=N`. `SrcBp::hit_count` accumulates for the breakpoint's
+lifetime (reset only by re-sending `setBreakpoints` for that file); a syntactically invalid
+condition marks the breakpoint permanently `verified: false` with a `message`, rather than silently
+ignoring it or registering an unconditional breakpoint. Full expression conditions (`condition`,
+not `hitCondition`) still depend on the evaluator, phase 3.
 
 ### 6.4 Stepping
 
@@ -666,7 +671,7 @@ a blocker by definition.
 |---|---|---|
 | **0 — Foundation** | rc options, listener + standalone lws context + `dap` subprotocol, DAP handshake/capabilities, session state machine, instruction hook + flags word, pause/continue, eval-timer suspend/restore, `debug_break()` + `debugger_attached()` efuns, auto-detach safety | VS Code attaches, `debug_break()` stops the mud, continue resumes it, killing the client un-freezes the mud |
 | **1 — Core debugging (MVP)** | breakpoint store + resolution + pending + rebinding, stepping engine, stackTrace/scopes/variables (index-named locals, named globals), `source`/`loadedSources`, dap-smoke e2e in CI | set a breakpoint in VS Code, hit it from a player command, step through a heart_beat, inspect values |
-| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), hit-count conditions, master `valid_debugger` veto, TLS option, header-file breakpoints (BLOCKED, see note) | daily-driver debugging UX |
+| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~, ~~hit-count conditions~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), master `valid_debugger` veto, TLS option, header-file breakpoints (BLOCKED, see note) | daily-driver debugging UX |
 | **3 — Advanced** | `evaluate`/watch/hover/REPL (lpcshell-derived), conditional breakpoints, logpoints, `disassemble` view (dump_prog), edit-and-continue flow with the hot-reload daemon (breakpoints re-verify after `recompile_object`), raw-TCP DAP listener, wasm/jsbridge transport exploration | power-user parity |
 
 Rough shape: each phase is a reviewable PR series; phase 0+1 are the meaningful MVP.

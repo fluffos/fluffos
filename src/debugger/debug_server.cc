@@ -52,6 +52,7 @@ djson capabilities() {
       {"supportsDelayedStackTraceLoading", true},
       {"supportsVariablePaging", true},
       {"supportsSetVariable", true},
+      {"supportsHitConditionalBreakpoints", true},
       {"exceptionBreakpointFilters",
        djson::array({djson{{"filter", "uncaught"},
                            {"label", "Uncaught LPC Errors"},
@@ -455,7 +456,7 @@ void lpc_debugger_instruction_hook() {
   }
   if (!reason && (flags & LPC_DEBUG_BREAKPOINTS)) {
     auto it = s.bp_addrs.find(pc);
-    if (it != s.bp_addrs.end()) {
+    if (it != s.bp_addrs.end() && dbg::breakpoint_hit_should_stop(it->second)) {
       reason = "breakpoint";
       hit_bp = it->second;
     }

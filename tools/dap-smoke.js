@@ -368,6 +368,35 @@ async function main() {
   check('source returns real file content',
         src.success && src.body.content.includes('object connect()'));
 
+  // 5b. hitCondition: re-setBreakpoints on the same line (REPLACING the
+  // unconditional breakpoint from step 3) with ">= 2" -- a fresh connection
+  // is a fresh hit of the same bytecode address, so the first of two new
+  // connections must NOT stop, only the second.
+  c.clearMsgs();
+  const hcBps = await c.request('setBreakpoints', {
+    source: { path: '/single/master.c' },
+    breakpoints: [{ line: 111, hitCondition: '>= 2' }],
+  });
+  check('setBreakpoints accepts a hitCondition and still verifies',
+        hcBps.success && hcBps.body.breakpoints.length === 1 &&
+        hcBps.body.breakpoints[0].verified === true, JSON.stringify(hcBps.body));
+
+  const telnet2 = net.connect(telnet_port, '127.0.0.1');
+  telnet2.on('error', () => {});
+  const notStoppedYet = await c.event('stopped', 3000).catch(() => null);
+  check('hitCondition ">= 2" does not stop on the first hit', notStoppedYet === null);
+
+  const telnet3 = net.connect(telnet_port, '127.0.0.1');
+  telnet3.on('error', () => {});
+  const stoppedOnSecond = await c.event('stopped', 15000).catch(() => null);
+  check('hitCondition ">= 2" stops on the second hit',
+        !!stoppedOnSecond && stoppedOnSecond.body.reason === 'breakpoint' &&
+        JSON.stringify(stoppedOnSecond.body.hitBreakpointIds) ===
+          JSON.stringify([hcBps.body.breakpoints[0].id]),
+        JSON.stringify(stoppedOnSecond));
+
+  await c.request('continue', { threadId: 1 });
+
   // 6. disconnect-while-stopped safety net: arm a pause, let it stop, then
   // kill the client's raw socket (no `disconnect` request) -- the driver
   // must notice via LWS_CALLBACK_CLOSED and resume on its own.

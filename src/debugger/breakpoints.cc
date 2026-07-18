@@ -13,6 +13,8 @@
 
 #include "base/std.h"
 
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <set>
 #include <unordered_set>
@@ -108,6 +110,75 @@ std::vector<RunStart> line_run_starts(program_t* p, const std::set<int>& fids) {
   return out;
 }
 
+// Parses a DAP hitCondition string: an optional comparator (> >= < <= == =
+// != %) followed by an integer; a bare integer means >=N (VS Code's typed
+// hit-count UI sends the raw text as-is, so this is a debug-adapter-defined
+// grammar, not something DAP itself mandates). Empty is valid (no
+// condition). Returns false with `err` set on anything else, including
+// trailing garbage after the number.
+bool parse_hit_condition(const std::string& cond, std::string& op, long& n, std::string& err) {
+  if (cond.empty()) {
+    op.clear();
+    return true;
+  }
+  size_t i = 0;
+  auto skip_ws = [&] {
+    while (i < cond.size() && isspace(static_cast<unsigned char>(cond[i]))) {
+      i++;
+    }
+  };
+  skip_ws();
+  if (cond.compare(i, 2, ">=") == 0) {
+    op = ">=";
+    i += 2;
+  } else if (cond.compare(i, 2, "<=") == 0) {
+    op = "<=";
+    i += 2;
+  } else if (cond.compare(i, 2, "==") == 0) {
+    op = "==";
+    i += 2;
+  } else if (cond.compare(i, 2, "!=") == 0) {
+    op = "!=";
+    i += 2;
+  } else if (i < cond.size() && cond[i] == '>') {
+    op = ">";
+    i += 1;
+  } else if (i < cond.size() && cond[i] == '<') {
+    op = "<";
+    i += 1;
+  } else if (i < cond.size() && cond[i] == '=') {
+    op = "==";
+    i += 1;
+  } else if (i < cond.size() && cond[i] == '%') {
+    op = "%";
+    i += 1;
+  } else {
+    op = ">=";  // bare number
+  }
+  skip_ws();
+  size_t digits_start = i;
+  if (i < cond.size() && (cond[i] == '-' || cond[i] == '+')) {
+    i++;
+  }
+  size_t num_start = i;
+  while (i < cond.size() && isdigit(static_cast<unsigned char>(cond[i]))) {
+    i++;
+  }
+  if (i == num_start) {
+    err =
+        "hitCondition must be an optional comparator (> >= < <= == = != %) followed by an "
+        "integer, e.g. '>= 3' or '5'";
+    return false;
+  }
+  n = strtol(cond.c_str() + digits_start, nullptr, 10);
+  skip_ws();
+  if (i != cond.size()) {
+    err = "unexpected trailing text in hitCondition: '" + cond.substr(i) + "'";
+    return false;
+  }
+  return true;
+}
+
 void register_addr(program_t* p, int offset, int bp_id) {
   auto& s = g_session;
   char* addr = p->program + offset;
@@ -122,6 +193,16 @@ void rebind_all() {
   auto& s = g_session;
   s.bp_addrs.clear();
   s.bp_by_prog.clear();
+  // Every SrcBp, valid or not -- breakpoint_hit_should_stop() needs to find
+  // it by id. Rebuilt unconditionally since set_breakpoints_request()
+  // always replaces a whole canonical path's vector wholesale, which can
+  // move every SrcBp in it to a new address.
+  s.bp_by_id.clear();
+  for (auto& [canon, list] : s.bps) {
+    for (auto& bp : list) {
+      s.bp_by_id[bp.id] = &bp;
+    }
+  }
   if (s.bps.empty()) {
     update_flags();
     return;
@@ -145,6 +226,9 @@ void rebind_all() {
     for (auto& bp : list) {
       bp.verified = false;
       bp.actual_line = bp.req_line;
+      if (!bp.hit_condition_valid) {
+        continue;  // bad hitCondition syntax: permanently unverified
+      }
       if (runs.empty()) {
         continue;
       }
@@ -195,24 +279,37 @@ djson set_breakpoints_request(const djson& args) {
   }
   std::string canon = canonical_lpc_path(client_path.c_str());
 
-  std::vector<int> lines;
+  struct ReqBp {
+    int line = 0;
+    std::string hit_condition;
+  };
+  std::vector<ReqBp> reqs;
   if (args.contains("breakpoints")) {
     for (const auto& b : args["breakpoints"]) {
-      lines.push_back(b.value("line", 0));
+      reqs.push_back({b.value("line", 0), b.value("hitCondition", "")});
     }
   } else if (args.contains("lines")) {
     for (const auto& l : args["lines"]) {
-      lines.push_back(l.get<int>());
+      reqs.push_back({l.get<int>(), ""});
     }
   }
 
   s.bps.erase(canon);
-  if (!canon.empty() && !lines.empty()) {
+  // Parallel to the new SrcBp list: a per-entry hitCondition parse error, or
+  // empty for none. Kept separate from SrcBp itself -- it's only needed
+  // once, to build this response.
+  std::vector<std::string> hit_errs;
+  if (!canon.empty() && !reqs.empty()) {
     auto& list = s.bps[canon];
-    for (int line : lines) {
+    for (const auto& req : reqs) {
       SrcBp bp;
       bp.id = s.next_bp_id++;
-      bp.req_line = line;
+      bp.req_line = req.line;
+      bp.hit_condition = req.hit_condition;
+      std::string op, err;
+      long n = 0;
+      bp.hit_condition_valid = parse_hit_condition(req.hit_condition, op, n, err);
+      hit_errs.push_back(bp.hit_condition_valid ? "" : err);
       list.push_back(bp);
     }
   }
@@ -222,14 +319,51 @@ djson set_breakpoints_request(const djson& args) {
   if (!canon.empty()) {
     auto it = s.bps.find(canon);
     if (it != s.bps.end()) {
-      for (const auto& bp : it->second) {
-        result.push_back({{"id", bp.id},
-                          {"verified", bp.verified},
-                          {"line", bp.verified ? bp.actual_line : bp.req_line}});
+      for (size_t i = 0; i < it->second.size(); i++) {
+        const auto& bp = it->second[i];
+        djson entry = {{"id", bp.id},
+                       {"verified", bp.verified},
+                       {"line", bp.verified ? bp.actual_line : bp.req_line}};
+        if (i < hit_errs.size() && !hit_errs[i].empty()) {
+          entry["message"] = hit_errs[i];
+        }
+        result.push_back(entry);
       }
     }
   }
   return djson{{"breakpoints", result}};
+}
+
+bool breakpoint_hit_should_stop(int bp_id) {
+  auto& s = g_session;
+  auto it = s.bp_by_id.find(bp_id);
+  if (it == s.bp_by_id.end() || !it->second) {
+    return true;  // shouldn't happen; fail open rather than silently never stopping
+  }
+  SrcBp& bp = *it->second;
+  bp.hit_count++;
+  if (bp.hit_condition.empty()) {
+    return true;
+  }
+  std::string op, err;
+  long n = 0;
+  // Re-parses rather than caching the parsed op/n on SrcBp: this only runs
+  // when `pc` already matched a registered breakpoint address, i.e. it's
+  // already off the per-instruction hot path, so the cost is negligible
+  // and one grammar (parse_hit_condition) stays the single source of truth
+  // for both validation (setBreakpoints) and evaluation (here).
+  if (!parse_hit_condition(bp.hit_condition, op, n, err)) {
+    return true;  // shouldn't happen: a bad condition never gets an address registered
+  }
+  int count = bp.hit_count;
+  if (op == ">=") return count >= n;
+  if (op == ">") return count > n;
+  if (op == "<=") return count <= n;
+  if (op == "<") return count < n;
+  if (op == "==") return count == n;
+  if (op == "!=") return count != n;
+  if (op == "%") return n != 0 && (count % n) == 0;
+  return true;
 }
 
 void breakpoints_on_program_loaded(program_t* prog) {
@@ -291,6 +425,7 @@ void breakpoints_clear_all() {
   s.bps.clear();
   s.bp_addrs.clear();
   s.bp_by_prog.clear();
+  s.bp_by_id.clear();
   update_flags();
 }
 

@@ -48,7 +48,12 @@ See [Configuration](../../driver/config.md) for the full option reference
 - Breakpoints are resolved against the compiler's per-program line tables;
   a breakpoint on a line with no code snaps to the next line that has one.
   Breakpoints on a file that isn't loaded yet stay pending and bind
-  automatically once a matching program is compiled.
+  automatically once a matching program is compiled. A breakpoint can also
+  carry a hit count condition (VS Code's "Edit Breakpoint" → "Hit Count"):
+  an optional comparator (`> >= < <= == !=` or `%`) followed by a number,
+  e.g. `>= 3` or `% 2`; a bare number means `>= N`. A breakpoint set inside
+  an `#include`d header file does not currently resolve (a compiler
+  line-attribution limitation, not a debugger one).
 - Object and file browsing (`fluffos/objects`, `fluffos/object`,
   `fluffos/files` custom DAP requests) work while the VM is **running** —
   you don't need to pause the mud to inspect what's loaded.

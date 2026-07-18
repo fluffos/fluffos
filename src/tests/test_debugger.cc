@@ -151,6 +151,90 @@ TEST_F(DebuggerTest, SetBreakpointsResolvesExactAndSnapsToNextCodeLine) {
   EXPECT_FALSE(bps[2]["verified"].get<bool>()) << "a line past EOF can never verify";
 }
 
+TEST_F(DebuggerTest, SetBreakpointsAcceptsValidHitConditionSyntax) {
+  object_t* ob = LoadFixture("int c;\nvoid bump() {\n  c++;\n}\n", "dbgtest/hitcond_valid");
+  ASSERT_NE(ob, nullptr);
+
+  for (const char* cond : {">= 3", "> 3", "<= 2", "< 2", "== 3", "!= 3", "% 2", "3", ""}) {
+    dbg::djson args = {
+        {"source", {{"path", "/dbgtest/hitcond_valid.c"}}},
+        {"breakpoints", dbg::djson::array({{{"line", 3}, {"hitCondition", cond}}})},
+    };
+    dbg::djson resp = dbg::set_breakpoints_request(args);
+    auto& bps = resp["breakpoints"];
+    ASSERT_EQ(bps.size(), 1u) << "cond='" << cond << "'";
+    EXPECT_TRUE(bps[0]["verified"].get<bool>()) << "cond='" << cond << "' " << resp.dump();
+    EXPECT_FALSE(bps[0].contains("message")) << "cond='" << cond << "' " << resp.dump();
+  }
+}
+
+TEST_F(DebuggerTest, SetBreakpointsRejectsInvalidHitConditionSyntax) {
+  object_t* ob = LoadFixture("int c;\nvoid bump() {\n  c++;\n}\n", "dbgtest/hitcond_invalid");
+  ASSERT_NE(ob, nullptr);
+
+  for (const char* cond : {"abc", ">=", "3x", ">= 3 extra", "=="}) {
+    dbg::djson args = {
+        {"source", {{"path", "/dbgtest/hitcond_invalid.c"}}},
+        {"breakpoints", dbg::djson::array({{{"line", 3}, {"hitCondition", cond}}})},
+    };
+    dbg::djson resp = dbg::set_breakpoints_request(args);
+    auto& bps = resp["breakpoints"];
+    ASSERT_EQ(bps.size(), 1u) << "cond='" << cond << "'";
+    EXPECT_FALSE(bps[0]["verified"].get<bool>())
+        << "cond='" << cond << "' must never verify, even though line 3 is real code";
+    ASSERT_TRUE(bps[0].contains("message")) << "cond='" << cond << "'";
+    EXPECT_FALSE(bps[0]["message"].get<std::string>().empty());
+  }
+}
+
+// Exercises breakpoint_hit_should_stop() directly against hand-built SrcBp
+// entries -- doesn't need a real stopped VM or even a real breakpoint
+// address, since the function only touches g_session.bp_by_id/hit_count.
+// The instruction hook's own use of it (only calling it when `pc` already
+// matched bp_addrs) is covered by dap-smoke.js's repeat-connect hitCondition
+// check, which is the only place a real, repeated address hit exists.
+TEST_F(DebuggerTest, BreakpointHitShouldStopEvaluatesHitConditions) {
+  auto& s = dbg::g_session;
+  s.bps.clear();
+  s.bp_by_id.clear();
+
+  // Each condition gets its OWN single-element vector (a distinct
+  // canonical-path key) so later inserts elsewhere in s.bps can never
+  // reallocate -- and thus never invalidate -- an earlier bp's storage.
+  auto make_bp = [&](const std::string& cond) -> int {
+    dbg::SrcBp bp;
+    bp.id = s.next_bp_id++;
+    bp.hit_condition = cond;
+    bp.hit_condition_valid = true;
+    auto& list = s.bps["dbgtest/hitcount_probe_" + std::to_string(bp.id)];
+    list.push_back(bp);
+    s.bp_by_id[bp.id] = &list.back();
+    return bp.id;
+  };
+
+  auto hits = [&](int id, int n) {
+    std::vector<bool> out;
+    for (int i = 0; i < n; i++) {
+      out.push_back(dbg::breakpoint_hit_should_stop(id));
+    }
+    return out;
+  };
+
+  EXPECT_EQ(hits(make_bp(""), 3), (std::vector<bool>{true, true, true})) << "unconditional";
+  EXPECT_EQ(hits(make_bp(">= 3"), 5), (std::vector<bool>{false, false, true, true, true}));
+  EXPECT_EQ(hits(make_bp("3"), 5), (std::vector<bool>{false, false, true, true, true}))
+      << "bare number defaults to >=";
+  EXPECT_EQ(hits(make_bp("> 3"), 5), (std::vector<bool>{false, false, false, true, true}));
+  EXPECT_EQ(hits(make_bp("<= 2"), 4), (std::vector<bool>{true, true, false, false}));
+  EXPECT_EQ(hits(make_bp("< 2"), 4), (std::vector<bool>{true, false, false, false}));
+  EXPECT_EQ(hits(make_bp("== 3"), 5), (std::vector<bool>{false, false, true, false, false}));
+  EXPECT_EQ(hits(make_bp("!= 3"), 5), (std::vector<bool>{true, true, false, true, true}));
+  EXPECT_EQ(hits(make_bp("% 2"), 4), (std::vector<bool>{false, true, false, true}));
+
+  s.bps.clear();
+  s.bp_by_id.clear();
+}
+
 TEST_F(DebuggerTest, BreakpointsOnUnloadedFileStayPending) {
   dbg::djson args = {
       {"source", {{"path", "/dbgtest/never_loaded"}}},
