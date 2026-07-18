@@ -52,6 +52,6 @@ int main(int argc, char** argv) {
   }
   file << TPL_FOOTER;
 
-  std::cout << "Generate Success!";
+  std::cout << "Generate Success!" << std::endl;
   return 0;
 }
