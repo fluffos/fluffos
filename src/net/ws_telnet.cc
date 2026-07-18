@@ -196,27 +196,8 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
       // wedges for good on any burst that fills the kernel send buffer
       // while the peer reads slowly.
       static unsigned char buf[LWS_PRE + 2048];
-      bool out_of_tx_credit = false;
       while (evbuffer_get_length(pss->buffer) > 0 && !lws_send_pipe_choked(wsi)) {
-        // For ws-over-h2 (RFC 8441) the peer's h2 flow-control window also
-        // bounds what may be sent: lws_h2_frame_write() does NOT hold DATA
-        // back on its own, and overshooting the window is a connection-fatal
-        // protocol error (peers kill the session with FLOW_CONTROL_ERROR).
-        // Plain h1 websockets report no allowance (negative) -- unlimited.
-        size_t window = sizeof(buf) - LWS_PRE;
-        // The ws frame header (and any permessage-deflate framing) is part
-        // of the h2 DATA payload, so it consumes window too -- reserve
-        // headroom or a full-allowance write still overshoots by the header.
-        constexpr size_t kWsFrameOverhead = 16;
-        auto allowance = lws_get_peer_write_allowance(wsi);
-        if (allowance >= 0 && static_cast<size_t>(allowance) <= kWsFrameOverhead) {
-          out_of_tx_credit = true;
-          break;
-        }
-        if (allowance > 0 && static_cast<size_t>(allowance) - kWsFrameOverhead < window) {
-          window = static_cast<size_t>(allowance) - kWsFrameOverhead;
-        }
-        auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], window);
+        auto numbytes = evbuffer_copyout(pss->buffer, &buf[LWS_PRE], sizeof(buf) - LWS_PRE);
         if (numbytes <= 0) {
           break;
         }
@@ -228,13 +209,10 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         // framing: it must go out verbatim, without IAC scanning or hold-back.
         if (pss->user && !(pss->user->iflags & USING_COMPRESS)) {
           auto new_numbytes = static_cast<ev_ssize_t>(telnet_truncate(
-              &buf[LWS_PRE], numbytes, numbytes == static_cast<ev_ssize_t>(window)));
+              &buf[LWS_PRE], numbytes, numbytes == static_cast<ev_ssize_t>(sizeof(buf) - LWS_PRE)));
           if (new_numbytes == 0) {
-            // Only an incomplete sequence fits the current window. If the
-            // window was clipped by h2 tx credit, wait for WINDOW_UPDATE
-            // like the credit-exhausted case; otherwise the exit below keeps
+            // Only an incomplete sequence is buffered; the exit below keeps
             // a writeable callback requested until the rest of it arrives.
-            out_of_tx_credit = window < sizeof(buf) - LWS_PRE;
             break;
           }
           numbytes = new_numbytes;
@@ -242,8 +220,10 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
         // A short return means the connection failed. On success lws
         // consumed the whole payload (partials are buffered and flushed
-        // internally), and the return can EXCEED numbytes on TLS -- never
-        // use it as a drain count.
+        // internally -- for ws-over-h2 that includes whole frames parked
+        // inside lws while the peer's flow-control window is exhausted),
+        // and the return can EXCEED numbytes on TLS -- never use it as a
+        // drain count.
         if (m < static_cast<int>(numbytes)) {
           lwsl_warn("ERROR %d writing to ws socket.\n", m);
           return -1;
@@ -252,11 +232,8 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
       }
       // Data still queued: request the next writeable callback. Never rely
       // on lws to re-arm it (see above) -- this keeps the invariant that
-      // queued data always has a callback requested. Exception: when we
-      // stopped for h2 tx credit, re-requesting would just spin the POLLOUT
-      // loop hot until credit returns -- the WINDOW_UPDATE handler re-arms
-      // every mux child itself, so stay quiet until then.
-      if (!out_of_tx_credit && evbuffer_get_length(pss->buffer) > 0) {
+      // queued data always has a callback requested.
+      if (evbuffer_get_length(pss->buffer) > 0) {
         lws_callback_on_writable(wsi);
       }
       break;
