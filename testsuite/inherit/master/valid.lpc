@@ -32,9 +32,25 @@ int valid_author(string) {
 // efun:: prefix and which may not.  This function is only called at
 // object compile-time.
 //
+// The last (file, name, mainfile) triple the driver applied is recorded
+// so tests can assert on the exact arguments the compiler builds --
+// /single/tests/compiler/valid_override_file.lpc pins `file` as the
+// leading-slash, extension-less object name for every source extension.
+//
 // returns: 1 if override is allowed, 0 if not.
 
-int valid_override(string file, string name) {
+nosave mixed *last_valid_override = 0;
+
+mixed *query_last_valid_override() {
+  return last_valid_override;
+}
+
+void clear_last_valid_override() {
+  last_valid_override = 0;
+}
+
+int valid_override(string file, string name, string mainfile) {
+  last_valid_override = ({ file, name, mainfile });
   if (file == OVERRIDES_FILE) {
     return 1;
   }
