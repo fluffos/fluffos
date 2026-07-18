@@ -95,6 +95,21 @@ static block_t* alloc_new_shared_string(const char* /*string*/, int /*h*/, const
 void init_strings() {
   int x, y;
 
+  // Idempotent: a real driver process calls this exactly once (vm_init()),
+  // but a second call anywhere -- reachable in practice from a test binary
+  // that hosts both a lightweight, no-full-boot compiler harness and a
+  // real driver boot in the same process -- would otherwise silently
+  // reallocate base_table, orphaning every shared string interned so far
+  // (still live, valid memory, just unreachable from the fresh table) with
+  // no free/migration. The first free_string() of one of those orphaned
+  // strings then fails its "is this still in the table" sanity check and
+  // aborts the process. Skip rather than orphan: whichever call happens
+  // first wins, matching the invariant the driver already relies on.
+  if (base_table) {
+    debug_message("init_strings: called again, ignoring (already initialized).\n");
+    return;
+  }
+
   /* ensure that htable size is a power of 2 */
   y = CONFIG_INT(__SHARED_STRING_HASH_TABLE_SIZE__);
   /* Cap the round-up at 2^30: a larger configured value would shift past

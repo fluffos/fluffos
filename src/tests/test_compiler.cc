@@ -268,6 +268,19 @@ static std::vector<Token> TokenizeSession(bool keep_macros, const std::string& s
   // segfaulted CompileEntry tests running after any tokenizer test.
   lpc_lex_scanner_destroyed(scanner);
   yylex_destroy(scanner);
+  // Symmetric with start_new_file() above: that call arms lexer_utils.cc's
+  // file-local main_filename exactly once per top-level compile (a
+  // make_shared_string() ref), and only end_new_file() ever disarms it.
+  // Skipping this call here (as this function did before) leaves
+  // main_filename permanently pinned to THIS session's filename for the
+  // rest of the process -- harmless-looking on its own, but a real bug
+  // when a later CompileEntry test's ensure_compile_env() then
+  // re-initializes the shared-string table (see the g_test_env_inited
+  // comment above): the pin still points at a live, valid block, but one
+  // that's no longer reachable from the fresh table, so the eventual
+  // free_string() of a REAL compile's own main_filename trips "free_string
+  // called on non-shared string" against this session's stale pin.
+  end_new_file();
   free_string(const_cast<char*>(current_file));
   current_file = nullptr;
   for (int i = 0; i < NUMAREAS; i++) {
