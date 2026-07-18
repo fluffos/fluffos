@@ -164,6 +164,13 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
 
       auto* ip = pss->user;
       if (ip) {
+        // lws is already tearing this wsi down; for ws-over-h2 the stream's
+        // h2 parent is unlinked before this callback fires, so nothing may
+        // call back into lws on it. Drop the handle first: remove_interactive
+        // flushes output and runs the net_dead apply before transport close,
+        // and close_user_websocket() would request a writeable callback that
+        // derefs the missing h2 parent (SIGSEGV on release builds).
+        ip->lws = nullptr;
         remove_interactive(ip->ob, 0);
         pss->user = nullptr;
       }
@@ -213,8 +220,10 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         auto m = lws_write(wsi, buf + LWS_PRE, numbytes, LWS_WRITE_BINARY);
         // A short return means the connection failed. On success lws
         // consumed the whole payload (partials are buffered and flushed
-        // internally), and the return can EXCEED numbytes on TLS -- never
-        // use it as a drain count.
+        // internally -- for ws-over-h2 that includes whole frames parked
+        // inside lws while the peer's flow-control window is exhausted),
+        // and the return can EXCEED numbytes on TLS -- never use it as a
+        // drain count.
         if (m < static_cast<int>(numbytes)) {
           lwsl_warn("ERROR %d writing to ws socket.\n", m);
           return -1;

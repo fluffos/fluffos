@@ -112,6 +112,10 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
 
       auto* ip = pss->user;
       if (ip) {
+        // Drop the lws handle before remove_interactive so nothing calls
+        // back into lws on a wsi that is mid-teardown -- see the twin
+        // handler in ws_telnet.cc (ws-over-h2 segfault).
+        ip->lws = nullptr;
         remove_interactive(ip->ob, 0);
         pss->user = nullptr;
       }
