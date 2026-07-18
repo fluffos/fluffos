@@ -1,0 +1,88 @@
+// Regression: the `file` argument the compiler passes to the
+// valid_override master apply (built by the_file_name(), see
+// src/compiler/internal/compiler.cc) must be the leading-slash,
+// EXTENSION-LESS object name for any source extension. The old code
+// stripped a fixed two trailing bytes -- correct only for ".c" -- so
+// compiling "/data/vo_probe_l.lpc" handed valid_override
+// "/data/vo_probe_l.l" and any master matching on the documented
+// extension-less form silently failed. The testsuite master
+// (/inherit/master/valid) records the last (file, name, mainfile)
+// triple it was applied with; on the unfixed driver the .lpc
+// ASSERT_EQs below fail with the mangled ".l" tail.
+
+#define PROBE_SRC "int probe() { return efun::strlen(\"hi\"); }\n"
+
+private object *loaded = ({});
+
+private void check_one(string path, string expect_file, string expect_main) {
+  object ob;
+  mixed err;
+  mixed *rec;
+
+  master()->clear_last_valid_override();
+  err = catch(ob = load_object(path));
+  ASSERT2(!err, "loading " + path + " should not error: " + err);
+  ASSERT2(objectp(ob), "probe " + path + " should compile");
+  if (objectp(ob)) {
+    loaded += ({ ob });
+    ASSERT_EQ(2, ob->probe());
+  }
+
+  rec = master()->query_last_valid_override();
+  ASSERT2(pointerp(rec), "valid_override should have been applied compiling " + path);
+  if (pointerp(rec)) {
+    ASSERT_EQ(expect_file, rec[0]);
+    ASSERT_EQ("strlen", rec[1]);
+    ASSERT_EQ(expect_main, rec[2]);
+  }
+}
+
+void do_tests() {
+  // Fresh fixtures every run; distinct basenames so the extension-blind
+  // object registry can't satisfy the second load from the first.
+  rm("/data/vo_probe_l.lpc");
+  rm("/data/vo_probe_c.c");
+  write_file("/data/vo_probe_l.lpc", PROBE_SRC);
+  write_file("/data/vo_probe_c.c", PROBE_SRC);
+
+  // .lpc source: broken before the fix ("/data/vo_probe_l.l").
+  check_one("/data/vo_probe_l.lpc", "/data/vo_probe_l", "/data/vo_probe_l.lpc");
+
+  // .c source: the historically-correct case, must stay unchanged.
+  check_one("/data/vo_probe_c.c", "/data/vo_probe_c", "/data/vo_probe_c.c");
+
+  // A dot in a DIRECTORY name is not an extension: only the basename's
+  // trailing extension may be stripped.
+  mkdir("/data/vo_v1.2");
+  rm("/data/vo_v1.2/probe.lpc");
+  write_file("/data/vo_v1.2/probe.lpc", PROBE_SRC);
+  check_one("/data/vo_v1.2/probe.lpc", "/data/vo_v1.2/probe", "/data/vo_v1.2/probe.lpc");
+
+  // Only the LAST dot in the basename is an extension boundary.
+  rm("/data/vo_multi.dot.lpc");
+  write_file("/data/vo_multi.dot.lpc", PROBE_SRC);
+  check_one("/data/vo_multi.dot.lpc", "/data/vo_multi.dot", "/data/vo_multi.dot.lpc");
+
+  // The efun:: call sits in an #include'd file: `file` is the file being
+  // scanned (the include, its extension stripped), `mainfile` stays the
+  // outermost compile target (with extension).
+  rm("/data/vo_inc.h");
+  rm("/data/vo_incuser.lpc");
+  write_file("/data/vo_inc.h", PROBE_SRC);
+  write_file("/data/vo_incuser.lpc", "#include \"/data/vo_inc.h\"\n");
+  check_one("/data/vo_incuser.lpc", "/data/vo_inc", "/data/vo_incuser.lpc");
+
+  // Teardown: destruct probes, remove fixtures, clear the recorder.
+  foreach (object ob in loaded) {
+    if (objectp(ob)) destruct(ob);
+  }
+  loaded = ({});
+  rm("/data/vo_probe_l.lpc");
+  rm("/data/vo_probe_c.c");
+  rm("/data/vo_v1.2/probe.lpc");
+  rmdir("/data/vo_v1.2");
+  rm("/data/vo_multi.dot.lpc");
+  rm("/data/vo_inc.h");
+  rm("/data/vo_incuser.lpc");
+  master()->clear_last_valid_override();
+}
