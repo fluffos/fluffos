@@ -790,8 +790,16 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
           pc += sizeof(LPC_INT);
         } else {
           while (pc < aptr + etable) {
-            COPY_PTR(&parg, pc);
-            COPY_SHORT(&sarg, pc + sizeof(char*));
+            // Table keys are written by icode.cc as ins_int() -- an LPC_INT
+            // (8 bytes) even on 32-bit targets, where string-case pointers
+            // are WIDENED into it (the runtime f_switch walks the table the
+            // same way, SWITCH_CASE_SIZE = sizeof(LPC_INT) + sizeof(short)).
+            // A sizeof(char*) stride here happens to coincide on 64-bit
+            // hosts but desyncs on wasm32 and reads wild pointers.
+            LPC_INT key;
+            COPY_INT(&key, pc);
+            parg = reinterpret_cast<char*>(static_cast<POINTER_INT>(key));
+            COPY_SHORT(&sarg, pc + sizeof(LPC_INT));
             if (ttype == 1 || !parg) {
               if (sarg == 1) {
                 if (sink.f) fprintf(sink.f, "\t%-4p\t<range start>\n", parg);
@@ -806,7 +814,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
                 swcases->push_back({{"key", disassem_string(parg)}, {"to", addr + sarg}});
               }
             }
-            pc += 2 + sizeof(char*);
+            pc += 2 + sizeof(LPC_INT);
           }
         }
         continue;
