@@ -27,6 +27,7 @@
 #include "vm/internal/base/debug.h"
 #include "vm/internal/master.h"
 #include "vm/internal/otable.h"
+#include "debugger/debug_hook.h"
 #include "vm/internal/simul_efun.h"
 #include "compiler/internal/compiler.h"  // for compiler_next_load_reason
 #include "compiler/internal/lexer.h"     // for total_lines, FIXME
@@ -98,6 +99,7 @@ void shutdownMudOS(int exit_code) {
   jsbridge_cleanup();
 #endif
   shutdown_external_ports();
+  lpc_debugger_shutdown();
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   lpc_socks_closeall();
@@ -638,6 +640,7 @@ object_t* load_object(const char* lname, int callcreate) {
   }
   obj_list = ob;
   ObjectTable::instance().insert(ob->obname, ob); /* add name to fast object lookup table */
+  lpc_debugger_on_program_loaded(ob->prog);
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
@@ -760,6 +763,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   }
   obj_list = ob;
   ObjectTable::instance().insert(ob->obname, ob);
+  lpc_debugger_on_program_loaded(ob->prog);
 
   save_command_giver(command_giver);
   push_object(ob);
@@ -1069,6 +1073,10 @@ int recompile_object(object_t* target) {
     object_t* tmp = ob;
     free_object(&tmp, "recompile_object");
   }
+
+  // Rebind any source breakpoints against the freshly swapped-in program
+  // (the old program's addresses die with it via deallocate_program()).
+  lpc_debugger_on_program_loaded(new_prog);
 
   // Drop the compile's own reference; the updated objects hold theirs.
   free_prog(&new_prog);
@@ -2362,6 +2370,13 @@ void _error_handler(char* err) {
     debug_message_with_location(err);
     dump_trace(CONFIG_INT(__RC_TRACE_CODE__));
     fatal("error() without a context: %s", err + 1);
+  }
+
+  // Source-level debugger: optionally stop here, where the control stack is
+  // still fully intact (same reason mudlib_error_handler can collect a trace).
+  if (g_lpc_debug_flags) {
+    lpc_debugger_on_error(
+        err, ((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH);
   }
 
   if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {

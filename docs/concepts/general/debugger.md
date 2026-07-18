@@ -1,0 +1,108 @@
+---
+title: WebSocket LPC Debugger
+---
+# WebSocket LPC Debugger
+
+FluffOS can expose a source-level LPC debugger over a dedicated WebSocket
+port, speaking the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
+(DAP) — the same protocol VS Code, and many other editors, use for native
+language debuggers. When enabled, a debugger client can attach to a running
+driver, set breakpoints in mudlib source files, single-step LPC execution,
+and inspect the call stack, local variables, and any loaded object.
+
+See `src/debugger/DESIGN.md` in the repository for the full architecture and
+design rationale.
+
+## Enabling the debugger
+
+The debugger is fully disabled — no listener, no per-instruction overhead —
+unless `debugger port` is set in your config file:
+
+```
+debugger port : 4711
+```
+
+By default the listener binds to `127.0.0.1` only. To accept connections
+from another host, set `debugger password` (required for any non-loopback
+`debugger address`) so an attaching client must present a shared secret:
+
+```
+debugger port : 4711
+debugger address : 0.0.0.0
+debugger password : change-me
+```
+
+See [Configuration](../../driver/config.md) for the full option reference
+(category "Debugger").
+
+## How it works
+
+- The debugger listens on its own `libwebsockets` context, independent from
+  the player-facing telnet/websocket ports, using the `dap` subprotocol.
+- While the VM is paused at a breakpoint, the entire driver is paused with
+  it (no `heart_beat`, `call_out`, or player command is processed) — this is
+  a stop-the-world debugger, intended for development servers. If the
+  debugger client disconnects while the VM is stopped, the driver
+  automatically resumes so a dropped connection can never freeze the mud.
+- Breakpoints are resolved against the compiler's per-program line tables;
+  a breakpoint on a line with no code snaps to the next line that has one.
+  Breakpoints on a file that isn't loaded yet stay pending and bind
+  automatically once a matching program is compiled.
+- Object and file browsing (`fluffos/objects`, `fluffos/object`,
+  `fluffos/files` custom DAP requests) work while the VM is **running** —
+  you don't need to pause the mud to inspect what's loaded.
+
+## Connecting from VS Code
+
+See `tools/vscode-lpc-debug/` in the repository for the companion extension.
+A minimal `launch.json` attach configuration looks like:
+
+```json
+{
+  "type": "fluffos",
+  "request": "attach",
+  "name": "Attach to FluffOS",
+  "host": "127.0.0.1",
+  "port": 4711,
+  "token": "change-me"
+}
+```
+
+## LPC-facing efuns
+
+- `int debugger_attached()` — returns 1 while a debugger client is attached,
+  0 otherwise. Cheap to call from hot paths to guard expensive diagnostics.
+- `void debug_break()` — a programmatic breakpoint, similar to JavaScript's
+  `debugger;` statement. Pauses the VM at the next instruction when a
+  debugger is attached; an exact no-op (safe to leave in shipped code)
+  when no debugger is attached.
+
+```c
+void process_order(mapping order) {
+    if (debugger_attached() && order["total"] < 0) {
+        debug_break();  // inspect `order` interactively
+    }
+    // ...
+}
+```
+
+## Security
+
+The debugger operates at driver level: it can read (and, in later phases,
+write) any object's variables regardless of mudlib `valid_read`/
+`valid_write` policy, and can execute arbitrary code once expression
+evaluation ships. Treat `debugger port` like a root shell on the mudlib:
+
+- Leave it disabled (the default) on production/shared servers.
+- Prefer loopback-only binding plus an SSH tunnel over exposing it
+  directly, even with a password set.
+- Rotate `debugger password` like any other credential.
+
+## See Also
+
+- [Configuration](../../driver/config.md) — the `debugger port` /
+  `debugger address` / `debugger password` options
+- [Tracing and Performance Profiling](tracing.md) — a complementary,
+  non-interactive profiling tool
+- [dump_trace](../../efun/internals/dump_trace) — one-shot LPC call stack
+  dump, usable without a debugger attached

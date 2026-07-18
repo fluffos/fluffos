@@ -36,6 +36,7 @@
 #include "vm/vm.h"              // for push_constant_string, etc
 #include "comm.h"               // for init_user_conn
 #include "backend.h"            // for backend();
+#include "debugger/debug_hook.h"  // for lpc_debugger_init()
 
 // from lexer_utils.cc
 extern void print_all_predefines();
@@ -424,6 +425,9 @@ int driver_main(int argc, char** argv) {
   if (!init_user_conn()) {
     exit(1);
   }
+
+  // Source-level debugger endpoint (no-op unless "debugger port" is set).
+  lpc_debugger_init();
 
   debug_message("Initializations complete.\n\n");
   setup_signal_handlers();

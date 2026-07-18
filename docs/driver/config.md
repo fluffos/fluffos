@@ -195,6 +195,17 @@ they always match the options it actually recognizes.
 | `writable os environment variables` | string | — | Colon-separated allow-list of environment variable names that set_os_env() may modify "
      "(package_contrib); these are implicitly readable. Empty (the default) denies all writes. |
 
+### Debugger
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `debugger port` | int | 0 | WebSocket (DAP) source-level debugger listen port; 0 (the default) disables the debugger "
+     "entirely (see src/debugger/DESIGN.md). _(max 65535)_ |
+| `debugger address` | string | — | Bind address for 'debugger port'; defaults to 127.0.0.1 (loopback only). A non-loopback "
+     "address additionally requires 'debugger password'. |
+| `debugger password` | string | — | Shared secret a debugger client must present in its attach request; required when "
+     "'debugger address' is not loopback. |
+
 ## Ports and Connections
 
 The listening ports are configured with numbered `external_port_N` entries

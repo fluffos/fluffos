@@ -190,6 +190,9 @@ const FlagEntry INT_FLAGS[] = {
      "Advertise and enable the MSP telnet protocol."},
     {"enable msdp", __RC_ENABLE_MSDP__, 0, 0, INT_MAX, "Protocol Support",
      "Advertise and enable the MSDP telnet protocol."},
+    {"debugger port", __RC_DEBUGGER_PORT__, 0, 0, 65535, "Debugger",
+     "WebSocket (DAP) source-level debugger listen port; 0 (the default) disables the debugger "
+     "entirely (see src/debugger/DESIGN.md)."},
 };
 
 /*
@@ -257,6 +260,12 @@ const StrFlagEntry STR_FLAGS[] = {
      "Security",
      "Colon-separated allow-list of environment variable names that set_os_env() may modify "
      "(package_contrib); these are implicitly readable. Empty (the default) denies all writes."},
+    {"debugger address", __RC_DEBUGGER_ADDRESS__, kOptional, "config file: dba", "Debugger",
+     "Bind address for 'debugger port'; defaults to 127.0.0.1 (loopback only). A non-loopback "
+     "address additionally requires 'debugger password'."},
+    {"debugger password", __RC_DEBUGGER_PASSWORD__, kOptional, "config file: dbp", "Debugger",
+     "Shared secret a debugger client must present in its attach request; required when "
+     "'debugger address' is not loopback."},
 };
 
 bool scan_config_line(const char* fmt, void* dest, int required) {

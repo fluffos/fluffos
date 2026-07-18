@@ -1,0 +1,105 @@
+{
+  "name": "fluffos-lpc-debug",
+  "displayName": "FluffOS LPC Debugger",
+  "description": "Attach to a running FluffOS driver's WebSocket LPC debugger: breakpoints, stepping, call stack, and variable inspection for LPC.",
+  "version": "0.1.0",
+  "publisher": "fluffos",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fluffos/fluffos",
+    "directory": "tools/vscode-lpc-debug"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onDebugResolve:fluffos"
+  ],
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "lpc"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "fluffos",
+        "label": "FluffOS LPC Debugger",
+        "languages": [
+          "lpc"
+        ],
+        "configurationAttributes": {
+          "attach": {
+            "required": [
+              "port"
+            ],
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "Driver hostname or IP running the debugger listener.",
+                "default": "127.0.0.1"
+              },
+              "port": {
+                "type": "number",
+                "description": "The driver's \"debugger port\" (see the config file)."
+              },
+              "token": {
+                "type": "string",
+                "description": "Shared secret matching the driver's \"debugger password\", if set.",
+                "default": ""
+              },
+              "remoteRoot": {
+                "type": "string",
+                "description": "Mudlib-absolute root the driver's file paths are relative to.",
+                "default": "/"
+              },
+              "localRoot": {
+                "type": "string",
+                "description": "Local workspace folder that mirrors remoteRoot. Defaults to the first workspace folder.",
+                "default": "${workspaceFolder}"
+              },
+              "breakOnAttach": {
+                "type": "boolean",
+                "description": "Break on uncaught LPC errors as soon as the session attaches.",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "fluffos",
+            "request": "attach",
+            "name": "Attach to FluffOS",
+            "host": "127.0.0.1",
+            "port": 4711,
+            "token": "",
+            "remoteRoot": "/",
+            "localRoot": "${workspaceFolder}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "FluffOS: Attach to driver debugger",
+            "description": "Attach to a running driver's WebSocket LPC debugger.",
+            "body": {
+              "type": "fluffos",
+              "request": "attach",
+              "name": "Attach to FluffOS",
+              "host": "127.0.0.1",
+              "port": 4711,
+              "token": "",
+              "remoteRoot": "/",
+              "localRoot": "^\"\\${workspaceFolder}\""
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

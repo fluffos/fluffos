@@ -167,6 +167,12 @@ jobs:
         if: matrix.platform == 'Ubuntu' && matrix.compiler == 'clang' && matrix.build == 'Debug'
         run: node tools/ws-smoke.js build/src/driver testsuite
 
+      # Same gating as the websocket smoke test above: real network traffic
+      # against the native driver, only meaningful once per CI run.
+      - name: LPC debugger (DAP) smoke test
+        if: matrix.platform == 'Ubuntu' && matrix.compiler == 'clang' && matrix.build == 'Debug'
+        run: node tools/dap-smoke.js build/src/driver testsuite
+
   # Windows (MSYS2/MinGW64). Uses the same build-windows composite as the
   # release workflow, so the release build can't break in a way CI misses.
   windows:

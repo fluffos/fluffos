@@ -1688,6 +1688,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/internals/debug_break",
+            "key": "efun/internals/debug_break",
+            "label": "debug_break"
+          },
+          {
+            "type": "doc",
             "id": "efun/internals/debug_info",
             "key": "efun/internals/debug_info",
             "label": "debug_info"
@@ -1697,6 +1703,12 @@
             "id": "efun/internals/debug_levels",
             "key": "efun/internals/debug_levels",
             "label": "debug_levels"
+          },
+          {
+            "type": "doc",
+            "id": "efun/internals/debugger_attached",
+            "key": "efun/internals/debugger_attached",
+            "label": "debugger_attached"
           },
           {
             "type": "doc",
@@ -3652,6 +3664,12 @@
             "id": "concepts/general/tracing",
             "key": "concepts/general/tracing",
             "label": "Tracing"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/debugger",
+            "key": "concepts/general/debugger",
+            "label": "WebSocket LPC Debugger"
           }
         ]
       }

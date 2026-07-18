@@ -15,6 +15,7 @@ set(PACKAGE_DB_MYSQL "1" CACHE STRING "DB Type for Mysql")
 set(PACKAGE_DB_POSTGRESQL "" CACHE STRING "DB Type for POSTGRESQL")
 set(PACKAGE_DB_SQLITE "" CACHE STRING "DB Type for SQLITE")
 set(PACKAGE_DB_DEFAULT_DB "1" CACHE STRING "Default DB Handle")
+option(PACKAGE_DEBUGGER "LPC source-level debugger efuns (debug_break, debugger_attached)" ON)
 option(PACKAGE_DEVELOP "compress package" ON)
 option(PACKAGE_MATH "math package" ON)
 option(PACKAGE_MATRIX "matrix package" ON)
@@ -646,6 +647,7 @@ if (EMSCRIPTEN)
     "wasm/backend_wasm.cc"        # host-driven tick loop
     "wasm/comm_wasm.cc"           # JS byte transport (the page is the peer)
     "wasm/crash_handler_wasm.cc"  # traps reported by the JS host
+    "debugger/debugger_stub.cc"   # no debugger transport in the browser (yet)
     )
 else ()
   list(APPEND SRC
@@ -656,6 +658,10 @@ else ()
     "net/ws_ascii.cc"
     "net/ws_telnet.cc"
     "base/internal/crash_handler.cc"
+    "debugger/debug_server.cc"    # DAP-over-websocket LPC debugger
+    "debugger/transport_lws.cc"
+    "debugger/breakpoints.cc"
+    "debugger/inspect.cc"
     )
 endif ()
 
