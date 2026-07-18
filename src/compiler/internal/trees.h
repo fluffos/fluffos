@@ -109,6 +109,19 @@ typedef struct parse_node_block_s {
 #define CREATE_TERNARY_OP_1(vn, op, t, x, y, z, p)        \
   SAFE((vn) = new_node(); (vn)->kind = NODE_TERNARY_OP_1; \
        INT_CREATE_TERNARY_OP(vn, op, t, x, y, z); (vn)->r.expr->type = p;)
+// NOTE: this macro is also used to synthesize IMPLICIT returns (an
+// appended `return 0;` for a function/closure body that doesn't already
+// end in one -- see rule_func() and rule_primary_expr_anon_func()) at a
+// point where current_line no longer reflects the body at all (parsing has
+// already moved on to whatever follows, possibly across an #include pop
+// into a different file). Those call sites rely on this staying
+// new_node_no_line() and must keep working unmodified. Real, user-written
+// `return` statements get an accurate line stamped explicitly by
+// rule_return_void()/rule_return_expr() right after calling this macro --
+// see the comment there for why (a NODE_RETURN wrapping only
+// new_node_no_line() children, e.g. `return <constant>;`, would otherwise
+// never trigger switch_to_line() and its bytecode would silently inherit
+// whichever line was active beforehand).
 #define CREATE_RETURN(vn, val) \
   SAFE((vn) = new_node_no_line(); (vn)->kind = NODE_RETURN; (vn)->r.expr = val;)
 #define CREATE_LAND_LOR(vn, op, x, y)                                                        \

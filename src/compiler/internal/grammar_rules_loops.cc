@@ -198,6 +198,18 @@ void rule_return_void(parse_node_t** result) {
   if (exact_types && !IS_TYPE(exact_types, TYPE_VOID))
     yywarn("Non-void functions must return a value.");
   CREATE_RETURN(*result, 0);
+  // A real, user-written `return;` is reduced while current_line is still
+  // on the statement itself (unlike the implicit-return synthesis in
+  // rule_func()/rule_primary_expr_anon_func(), which fires after the whole
+  // body -- and possibly an #include pop -- has been consumed). Stamp it
+  // explicitly: CREATE_RETURN stays new_node_no_line() by default because
+  // a bare `return <constant-or-nothing>;` can otherwise be the ONLY node
+  // in a statement's whole codegen (every child is itself a
+  // new_node_no_line() leaf -- CREATE_NUMBER/CREATE_REAL/CREATE_STRING),
+  // so switch_to_line() would never fire for it and its bytecode would
+  // silently inherit whatever line was active beforehand (abs_line 0 if
+  // it's the first statement generated in the compile unit).
+  (*result)->line = current_line_base + current_line;
 }
 
 void rule_return_expr(parse_node_t** result, parse_node_t* expr) {
@@ -215,4 +227,6 @@ void rule_return_expr(parse_node_t** result, parse_node_t* expr) {
   } else {
     CREATE_RETURN(*result, expr);
   }
+  // See the comment in rule_return_void() above.
+  (*result)->line = current_line_base + current_line;
 }
