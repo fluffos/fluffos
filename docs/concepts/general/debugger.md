@@ -8,7 +8,8 @@ port, speaking the [Debug Adapter Protocol](https://microsoft.github.io/debug-ad
 (DAP) — the same protocol VS Code, and many other editors, use for native
 language debuggers. When enabled, a debugger client can attach to a running
 driver, set breakpoints in mudlib source files, single-step LPC execution,
-and inspect the call stack, local variables, and any loaded object.
+and inspect (and edit) the call stack, local variables, and any loaded
+object.
 
 See `src/debugger/DESIGN.md` in the repository for the full architecture and
 design rationale.

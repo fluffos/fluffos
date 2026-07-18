@@ -1,12 +1,13 @@
 # FluffOS WebSocket LPC Debugger — Design & Implementation Plan
 
-Status: **PROPOSAL / RFC** — no code yet. This document is the planning deliverable for adding a
-WebSocket-based debugger protocol to the driver so that a VS Code extension (or any DAP client) can
-attach to a running mud, introspect all objects and files, set breakpoints, single-step the LPC VM,
-and inspect the LPC value/control stacks.
-
-Open decisions are collected in [§17 Open questions](#17-open-questions--clarifying-questions);
-each has a recommendation but none is final until reviewed.
+Status: **Phases 0-2 IMPLEMENTED.** Listener, breakpoints (incl. pending-until-loaded), stepping,
+stack/scope/variable inspection with real local/argument names, `setVariable`, object and file
+browsing, exception filters, and the `debug_break()`/`debugger_attached()` efuns all ship today.
+Phase 3 (expression evaluation, conditional breakpoints/logpoints, `disassemble`, edit-and-continue,
+raw-TCP/wasm transports) remains open. This document is kept as the planning/rationale record —
+resolved open questions are struck through in [§17](#17-open-questions--clarifying-questions) rather
+than deleted, and phase/status markers are added inline at the sections they affect, but for exact
+current behavior the code (and `AGENTS.md` §15, the day-to-day facts) is the source of truth.
 
 ---
 
@@ -182,7 +183,7 @@ Each decision is **Proposed** until reviewed; §17 carries the matching open que
 | D2 | Transport | **Dedicated debugger port** (new rc option, not one of the 5 `external_port` slots), WebSocket subprotocol `dap`, served by a **standalone, manually-serviced lws context** | Extra subprotocol on player ws ports (couples lifecycles, wrong trust domain, can't be serviced while paused); raw-TCP DAP (VS Code-native, zero extension — cheap to add later behind the same session core, but not what was asked for) |
 | D3 | Pause model | **Stop-the-world**, single logical thread. Pause loop services only the debugger socket; eval timer suspended | Threaded transport + condvar handshake (more machinery, no added capability for a single-threaded VM); non-blocking observe-only mode (kept as optional phase-2 sub-mode) |
 | D4 | Hook | Always-compiled, **runtime-flag-gated check at the eval loop top** (tracer idiom); tiered fast path (detached → attached-idle → breakpoints → stepping) | `#ifdef` compile-out (loses "attach to a stock binary"; can still be added later); bytecode patching with an `F_BREAKPOINT` opcode (fastest, but invasive; deferred as an optimization) |
-| D5 | Locals names | v1 ships **index-named** locals (`arg0`, `local3`); phase 2 adds a compiler-emitted local-name table gated by an rc option | Re-parsing source at debug time (fragile); always-on name table (small but nonzero memory for all users) |
+| D5 | Locals names | v1 ships **index-named** locals (`arg0`, `local3`); phase 2 (shipped, §9) adds a compiler-emitted local-name table, **always on whenever `debugger port` is set** | Re-parsing source at debug time (fragile); a separate opt-in rc option (one more knob for marginal benefit, since the table only exists at all when a debugger port is already configured) |
 | D6 | Expression eval | Deferred to **phase 3**, design sketched (§8.4) | In v1 (pulls in compiler + security surface too early) |
 | D7 | Client policy | **Single client**; second connection rejected. Client death ⇒ auto-detach: clear breakpoints, resume, restore timer | Multi-client (no compelling use; complicates stopped-state ownership) |
 | D8 | Security default | Disabled unless `debugger port` set; binds `127.0.0.1` by default; optional shared-secret; **refuse non-loopback bind without a secret**; optional master apply veto | Open by default (unacceptable: the debugger is root-equivalent over the mudlib) |

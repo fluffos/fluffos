@@ -86,9 +86,17 @@ require('dap').adapters.fluffos = {
 
 ## Limitations (current phase)
 
-- Local variable and parameter names are not yet available from the driver
-  (a compiler limitation, tracked in `src/debugger/DESIGN.md` §9); they show
-  as `arg0`, `local1`, etc. Object globals show their real names.
+- Local variable and parameter names show as their real source names
+  (`login_ob`, `err`, ...) whenever the driver's `debugger port` is set;
+  object globals always show their real names too. A local declared inside
+  a `for`/`switch` block that has already exited by the time its function
+  finishes compiling can't be recovered this way and falls back to an
+  index name (`local3`) — see `src/debugger/DESIGN.md` §9. Anonymous/lambda
+  functions aren't instrumented at all, so their frames always show index
+  names.
+- Values can be edited while stopped (VS Code's Variables view "Set Value"),
+  but only to a new integer, float, or string literal — arrays, mappings,
+  objects, and function values aren't assignable this way yet.
 - Expression evaluation (watch, hover, debug console) is not implemented
   yet — phase 3 in the design doc.
 - The debugger is a stop-the-world debugger: pausing at a breakpoint pauses
