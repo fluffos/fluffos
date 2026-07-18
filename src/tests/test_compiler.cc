@@ -39,6 +39,7 @@
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/stage_output.h"
 #include "mainlib.h"
+#include "vm/internal/base/interpret.h"
 #include "vm/vm.h"
 
 // ---------------------------------------------------------------------------
@@ -2233,6 +2234,89 @@ TEST(CompileEntry, FatalInsideIncludeAbortsCleanly) {
   program_t* good = compile_file("int ok2() { return 3; }\n", "/after_fatal_inc");
   ASSERT_NE(good, nullptr);
   deallocate_program(good);
+}
+
+namespace {
+function_t* find_function_by_name(program_t* prog, const char* name) {
+  for (int i = 0; i < prog->num_functions_defined; i++) {
+    if (prog->function_table[i].funcname && std::string(prog->function_table[i].funcname) == name) {
+      return &prog->function_table[i];
+    }
+  }
+  return nullptr;
+}
+}  // namespace
+
+// Regression tests for a line-attribution bug: a `return <constant>;`/
+// `return;` statement can be built entirely from new_node_no_line() nodes
+// (CREATE_RETURN wrapping a CREATE_NUMBER/CREATE_REAL/CREATE_STRING leaf,
+// or nothing at all), so i_generate_node()'s line-switch guard in icode.cc
+// never fired for it, silently attributing its bytecode to whichever line
+// was already active -- abs_line 0 if it was the first thing generated in
+// the compile unit, which an #include'd header's leading function always
+// is. Fixed by rule_return_void()/rule_return_expr() (grammar_rules_loops.cc)
+// stamping a real line onto every explicit return statement, plus a
+// safety net in rule_func() (grammar_rules.cc) stamping every function's
+// own declaration line for the implicit-return case. Both were confirmed
+// to fail (wrong file and/or line 0) on the pre-fix binary. get_explicit_
+// line_number_info() is the same decoder dump_trace()/error()/backtraces
+// and the WebSocket debugger's breakpoint resolution all use, so this
+// exercises the shared root cause without depending on debugger machinery.
+TEST(CompileEntry, ReturnConstantInsideIncludedHeaderGetsCorrectLine) {
+  ensure_compile_env();
+  std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_line_attr_header.h";
+  {
+    std::ofstream inc(inc_path);
+    inc << "int header_fn() {\n"  // line 1
+        << "  return 42;\n"       // line 2: must resolve here, not line 0
+        << "}\n";                 // line 3
+  }
+  program_t* prog = compile_file(
+      "#include \"zz_line_attr_header.h\"\n"
+      "int use_it() { return header_fn(); }\n",
+      "/line_attr_return_const");
+  unlink(inc_path.c_str());
+  ASSERT_NE(prog, nullptr);
+
+  function_t* func = find_function_by_name(prog, "header_fn");
+  ASSERT_NE(func, nullptr);
+
+  const char* file = nullptr;
+  int line = 0;
+  get_explicit_line_number_info(prog->program + func->address, prog, &file, &line);
+  ASSERT_NE(file, nullptr);
+  EXPECT_STREQ(file, "zz_line_attr_header.h");
+  EXPECT_EQ(line, 2);
+
+  deallocate_program(prog);
+}
+
+TEST(CompileEntry, ImplicitReturnInsideIncludedHeaderGetsCorrectLine) {
+  ensure_compile_env();
+  std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_line_attr_header2.h";
+  {
+    std::ofstream inc(inc_path);
+    inc << "void header_fn_empty() {\n"  // line 1: must resolve here, not line 0
+        << "}\n";                        // line 2
+  }
+  program_t* prog = compile_file(
+      "#include \"zz_line_attr_header2.h\"\n"
+      "int use_it2() { header_fn_empty(); return 1; }\n",
+      "/line_attr_implicit_return");
+  unlink(inc_path.c_str());
+  ASSERT_NE(prog, nullptr);
+
+  function_t* func = find_function_by_name(prog, "header_fn_empty");
+  ASSERT_NE(func, nullptr);
+
+  const char* file = nullptr;
+  int line = 0;
+  get_explicit_line_number_info(prog->program + func->address, prog, &file, &line);
+  ASSERT_NE(file, nullptr);
+  EXPECT_STREQ(file, "zz_line_attr_header2.h");
+  EXPECT_EQ(line, 1);
+
+  deallocate_program(prog);
 }
 
 TEST(CompileEntry, FdGrowthPathViaPipe) {
