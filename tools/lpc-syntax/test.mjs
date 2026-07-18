@@ -885,6 +885,49 @@ check('clang-format parity: SpacesBeforeTrailingComments -- a trailing'
         const mid = 'int f() {\n  h(/* mid */ 1);  // tail\n}\n';
         return formatLPC(mid) === mid && formatLPC(formatLPC(mid)) === mid;
       })());
+check('docs/lpc/style-guide.md contract: every spelling the style guide'
+      + ' documents is a fixed point of the formatter (spacing table,'
+      + ' brace/switch examples, fully-empty `for (;;)` tight vs'
+      + ' partially-empty `for (i = 0; ; i++)`/`for (x = 1; ; )` spaced'
+      + ' -- the corpus\'s and clang-format\'s split), so the published'
+      + ' docs and the engine cannot drift apart',
+      (() => {
+        const fixedPoints = [
+          'int find(string name) {\n  if (!name) {\n    return -1;\n  } else {\n    return lookup(name);\n  }\n}\n',
+          'void f() {\n  do {\n    step();\n  } while (more());\n}\n',
+          'void create() {}\n',
+          'void f() { if (x) g(); while (x) g(); foreach (v in arr) g(v); }\n',
+          'void f() { for (;;) g(); }\n',
+          'void f() { for (i = 0; ; i++) g(); }\n',
+          'void f() { for (x = 1; ; ) g(); }\n',
+          'void f() { for (; i < n; i++) g(); }\n',
+          'int f() { return (x); }\n',
+          'void f() { write(msg); funcs[0](5, 5); x = f(a)(b); }\n',
+          'void f() { err = catch(g()); ob = new("/obj"); }\n',
+          'void f() { a = b + c * d; a >>= 2; x = a ? b : c; }\n',
+          'void f() { x = -a; y = !ok; z = ~bits; ++i; i++; }\n',
+          'void f() { x = (string)x; y = (mixed *)arr; }\n',
+          'int f() { return (int)v; }\n',
+          'void f() { x = arr[0]; y = m["key"]; z = s[1..<2]; }\n',
+          'void f() { ob->query(); efun::write("x"); }\n',
+          'string *names;\nint *fn(mixed *args) { return args; }\n',
+          'int *a = ({ 1, 2, 3 });\nint *b = ({});\n',
+          'mapping m = ([ "a": 1, "b": 2 ]);\nmapping n = ([]);\n',
+          'function g = (: f :);\nfunction h = (: $1 + $2 :);\n',
+          'void f(int a, string b: (: "x" :)) {}\n',
+          'void f() { g(args...); }\nvoid h(int a, ...) {}\n',
+          'int f() {\n  return 1;  // why\n}\n',
+          'void f(int x) {\n  switch (x) {\n    case 1:\n      handle_one();\n      break;\n    case LOW..HIGH:  // LPC range label\n      handle_range();\n      break;\n    default:\n      handle_rest();\n  }\n}\n',
+          'void event_ping(object from, int v) { origin = from; value = v + 1; }\n',
+          'int f(int raw) {\n  if (!raw)\n    return mask[0];\n  return 0;\n}\n',
+        ];
+        for (const src of fixedPoints) {
+          const out = formatLPC(src);
+          if (out !== src || formatLPC(out) !== out) return false;
+        }
+        return formatLPC('void f() { for (; ; ) g(); }\n') === 'void f() { for (;;) g(); }\n' &&
+               formatLPC('void f() { for (i = 0;; i++) g(); }\n') === 'void f() { for (i = 0; ; i++) g(); }\n';
+      })());
 check("a default-argument colon is tight after the parameter name"
       + ' (`string b: (: "str" :)` -- every pristine-corpus site), while'
       + ' ternary colons in argument lists keep their space',

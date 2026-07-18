@@ -5,6 +5,8 @@ title: lpc
 
 * [source files & object names](source-files)
 * [compiler diagnostics](diagnostics)
+* [style guide](style-guide)
+* [formatter](formatter)
 ## constructs
 * [for](constructs/for)
 * [function](constructs/function)

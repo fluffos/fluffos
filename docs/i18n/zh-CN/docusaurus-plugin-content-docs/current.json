@@ -2706,5 +2706,17 @@
   "sidebar.docs.doc.concepts/general/reference_loops": {
     "message": "Reference Loops",
     "description": "The label for the doc item 'Reference Loops' in sidebar 'docs', linking to the doc concepts/general/reference_loops"
+  },
+  "sidebar.docs.doc.Style Guide": {
+    "message": "代码风格指南",
+    "description": "The label for the doc item 'Style Guide' in sidebar 'docs', linking to the doc lpc/style-guide"
+  },
+  "sidebar.docs.doc.Formatter": {
+    "message": "格式化工具",
+    "description": "The label for the doc item 'Formatter' in sidebar 'docs', linking to the doc lpc/formatter"
+  },
+  "sidebar.docs.doc.stdlib/ffi_util": {
+    "message": "FFI 工具",
+    "description": "The label for the doc item 'FFI Utilities' in sidebar 'docs', linking to the doc stdlib/ffi_util"
   }
 }

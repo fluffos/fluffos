@@ -1423,11 +1423,19 @@ function renderLine(toks, mappingContext = false, pendingTernary = 0) {
       const srcGap = (t.line === prev.line && t.start > prev.end) ? t.start - prev.end : 1;
       sep = ' '.repeat(Math.max(min, srcGap));
     }
-    // ...except after another ';' or before an empty clause's ')' -- the
-    // pristine corpus spaces empty for-header clauses (`for (i = 0; ;
-    // i++)`, `for (...; i < len; )`, 6:0).
+    // ...except after another ';' when the header around it has real
+    // content -- the pristine corpus spaces a partially-empty
+    // for-header's empty clauses (`for (i = 0; ; i++)`,
+    // `for (x = 1; ; )`, 6:0) but writes the FULLY-empty header tight
+    // (`for (;;)`, its only corpus spelling, and clang-format's): tight
+    // whenever everything back to the opening '(' is semicolons.
     else if (NO_SPACE_BEFORE.has(t.text) &&
-             !((t.text === ';' || t.text === ')') && prev && prev.text === ';')) sep = '';
+             !((t.text === ';' || t.text === ')') && prev && prev.text === ';' &&
+               !(() => {
+                 let j = i - 1;
+                 while (j >= 0 && toks[j].text === ';') j--;
+                 return j >= 0 && toks[j].text === '(';
+               })())) sep = '';
     // '++'/'--' are tight-before only in POSTFIX position -- the previous
     // token must actually end an expression (`i++`, `a[0]--`, `f()++`).
     // In prefix position they keep the normal space (`return ++count;`,

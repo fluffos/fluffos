@@ -30,6 +30,8 @@ const sidebars: SidebarsConfig = {
       items: [
         { type: 'doc', id: 'lpc/source-files', label: 'Source Files & Object Names' },
         { type: 'doc', id: 'lpc/diagnostics', label: 'Compiler Diagnostics' },
+        { type: 'doc', id: 'lpc/style-guide', label: 'Style Guide' },
+        { type: 'doc', id: 'lpc/formatter', label: 'Formatter' },
         {
           type: 'category',
           label: 'Types',
