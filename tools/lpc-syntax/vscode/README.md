@@ -47,7 +47,11 @@ Legacy mudlibs that name LPC files `.c` can map them per-workspace:
 
 ## Install / develop
 
-From this directory:
+Packaged `.vsix` builds are released from
+[fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode) — the
+packaging/release repo, which pins a fluffos commit via a git submodule
+and builds this directory from that pin. Grab the latest release there,
+or build locally from this directory:
 
 ```bash
 npx @vscode/vsce package        # produces fluffos-lpc-<version>.vsix
