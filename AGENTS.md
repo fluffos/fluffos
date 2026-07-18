@@ -402,3 +402,42 @@ All third-party libraries are vendored as full source trees. Lessons from the 20
 ### Known state / deferred
 * `crypt` (musl 1.1.24 subset) and `utf8_decoder_dfa` (Hoehrmann) are intentionally frozen -- confirmed unchanged upstream through musl 1.2.6 / no upstream versioning.
 * libtelnet, libevent, widecharwidth: upgrades deliberately deferred (maintainer request, 2026-07); their unused test/doc trees are already pruned.
+
+---
+
+## 15. WebSocket LPC Debugger (`src/debugger/`)
+
+A driver-hosted source-level debugger: a WebSocket endpoint speaking the Debug Adapter Protocol (DAP) so VS Code (or any DAP client) can attach, set breakpoints, single-step the LPC VM, and inspect the call stack / variables / loaded objects. Full architecture and design rationale: `src/debugger/DESIGN.md` (read that before making structural changes; this section is the day-to-day facts).
+
+### Layout
+* **`src/debugger/`**: `debug_hook.h` is the ONLY debugger header included from core driver code (`interpret.cc`, `simulate.cc`, `program.cc`, `mainlib.cc`) -- everything else (`debugger.h` + the `.cc` files) is internal to `src/debugger/*.cc`. `debug_server.cc` (session state machine, DAP dispatch, the instruction hook, the stop loop), `transport_lws.cc` (the standalone lws context), `breakpoints.cc` (line-table resolution), `inspect.cc` (frames/scopes/variables/object/file browsing). `debugger_stub.cc` is the WASM-target no-op (per-target link-time selection, same pattern as the event loop / crash handler singletons -- no `#ifdef __EMSCRIPTEN__` in shared files).
+* **`src/packages/debugger/`**: the two LPC-visible efuns, `debug_break()` and `debugger_attached()`.
+* **`tools/dap-smoke.js`**: real end-to-end session against the native driver (auth accept/reject, breakpoint hit, stack/scope/variable inspection, stepping, continue, object/file browsing while RUNNING, source fetch, disconnect-while-stopped safety net). Gated in CI exactly like `ws-smoke.js` (Ubuntu clang Debug only -- see `.github/workflows/ci.yml`). `tools/dap-ws-bridge.js` is a generic ws<->stdio DAP transport for non-VS-Code clients (nvim-dap, etc.). `tools/vscode-lpc-debug/` is the (thin) VS Code extension -- the driver speaks DAP directly, so it only relays messages and maps mudlib-absolute paths to/from the local workspace.
+
+### Transport
+* One JSON DAP message per WebSocket TEXT frame, subprotocol `"dap"`, on a **standalone libwebsockets context bound to a PRIVATE `event_base`** (`transport_lws.cc`) -- never the main one. It is serviced from three places: a ~50ms timer on the MAIN base while idle, a periodic poll inside the eval-loop instruction hook every `kPollEvery` instructions while LPC runs (this is what lets `pause` interrupt a runaway/infinite LPC loop -- the main base alone can never reach it), and a blocking loop while stopped. Single client; a second connection is rejected.
+* **`transport_kill_client()` must never rely on lws's `PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE` to flush *our own* `outq`** -- that lws mechanism only flushes a partial write lws itself already attempted; a message still sitting in `outq` (never yet handed to `lws_write()`) is not "stored" from lws's point of view and the close can win the race, silently dropping the response. Set `pending_close` and defer the actual close to `LWS_CALLBACK_SERVER_WRITEABLE` once `outq` is empty. (Found via ASan-clean-but-functionally-broken behavior: the reject-then-close path passed every unit check yet the client never received the rejection.)
+
+### The instruction hook
+* `g_lpc_debug_flags` (`uint32_t`, `debug_hook.h`) is 0 whenever no client is attached; checked once per instruction at the TOP of `eval_instruction`'s dispatch loop (`interpret.cc`, right next to the existing `DBG_LPC` line-tracer block) -- one load+test+branch in the disabled case, same cost class as the pre-existing `DBG_LPC`/`TRACE_CODE`/`TRACE_INSTR` checks it sits beside. `lpc_debugger_instruction_hook()` only runs the real breakpoint/step/pause logic when the flags are nonzero.
+* A second hook sits at the top of `error_handler()` in `simulate.cc` (before the `FRAME_CATCH` decision, where the control stack is still fully intact) for the `setExceptionBreakpoints` (`uncaught`/`all`) feature.
+
+### Stop-the-world + the eval timer
+* While stopped, the driver services ONLY the debugger's private base -- the main `event_base` is parked up-stack inside `eval_instruction`, so no `heart_beat`, `call_out`, or user command can dispatch. This is intentional (a dev-server tool), not a bug.
+* The eval-cost limit is a wall-clock POSIX timer (`set_eval`/`get_eval`, `src/vm/internal/eval_limit.cc`), not an instruction counter. A multi-minute breakpoint pause must disarm it (`set_eval(0)`) and restore a fresh budget on resume (`enter_stopped()` in `debug_server.cc`), or the very next instruction after resume throws "Too long evaluation."
+* Client death (socket close, or an auth timeout) always auto-resumes and clears breakpoints (`detach_client()`) -- the mud can never stay frozen because a debugger client vanished. Verified by `tools/dap-smoke.js`'s "disconnect-while-stopped" check.
+
+### Breakpoints
+* Resolved by walking each candidate program's `line_info` run-length table (see `find_line()`/`get_explicit_line_number_info()` in `interpret.cc` for the forward direction this inverts) for every object reachable from `obj_list` -- there is no global program registry, so this is a real per-`setBreakpoints` walk, not a per-instruction one. Exact line match wins; otherwise it snaps to the next line that has code; a file with no matching loaded program stays `pending` (`verified: false`) and re-resolves automatically on the next `load_object`/`load_object_from_source`/`recompile_object`.
+* Addresses are invalidated (erased from the live lookup table) from a hook in `deallocate_program()` (`program.cc`) -- the program's bytecode is about to be freed, so any breakpoint pointing into it must go with it.
+
+### Known gap: local variable names
+* The compiler discards local/parameter NAMES after each function body compiles (`free_all_local_names()` in `compiler/internal/compiler.cc`) -- only the `num_arg`/`num_local` counts survive in `function_t`. Locals/args currently render as `local0`, `arg1`, etc.; object globals DO show real names (`variable_table` survives at the program level). Real local names need a new compiler-emitted name table -- not yet built (`src/debugger/DESIGN.md` §9 has the planned format).
+
+### Config & efuns
+* `debugger port` / `debugger address` / `debugger password` (`src/base/internal/rc.cc`, category "Debugger"). Zero listener and zero per-instruction cost unless `debugger port` is set; a non-loopback `debugger address` refuses to start without a password.
+* `debug_break()` is an exact no-op when nothing is attached (safe to leave in shipped mudlib code, like JavaScript's `debugger;`); `debugger_attached()` is a cheap 0/1 check. Pinned by `testsuite/single/tests/efuns/debug_break.lpc`.
+
+### Testing
+* `src/tests/test_debugger.cc` (GTest): line-table resolution (exact match / snap-to-next-line / pending-until-loaded), program-free invalidation, and the detached no-op contract for the hook API. Loading a throwaway fixture object needs the same `save_context`/`try`/`restore_context`/`pop_context` guard as `test_lpc.cc`'s `TestCompileDumpProgWorks` -- `load_object_from_source()` can run `create()`/`__INIT`/master applies, and an `error()` with no established recovery point hits the driver's `fatal()` fallback and aborts the whole test binary. A freshly-loaded object's ref count reflects it being alive in `obj_list`/otable, not a reference the caller owns -- do not `free_object()` it directly (`dealloc_object()` fatals on a non-destructed object outside one specific sentinel state); either leave it loaded (the GTest binary is short-lived) or `destruct_object()` it first.
+* `tools/dap-smoke.js` is the full-fidelity regression check -- it drives a real session over a real socket against the real driver and is the only test that exercises the transport, the stop-the-world pause, and the auto-resume safety net together. Run it against both a `RelWithDebInfo` and a Debug+ASan/UBSan driver after touching anything under `src/debugger/`.
