@@ -330,19 +330,14 @@ def _re_escape(s: str) -> str:
     return _re.escape(s)
 
 
-def emit_vscode_assets(data, script_dir):
-    """Emit the VS Code extension's generated assets from the grammar
-    contract: syntaxes/lpc.tmLanguage.json (declarative highlighting)
-    plus self-contained copies of the JS tokenizer/linter and the JSON
-    under vscode/lib/ (a packaged extension cannot reach ../)."""
-    import shutil
+def emit_tm_language(data, script_dir):
+    """Emit the declarative TextMate grammar (lpc.tmLanguage.json) from the
+    grammar contract, next to lpc-grammar.json. It is a grammar OUTPUT like
+    the EBNF and the JSON contract; the VS Code extension that consumes it
+    lives in the fluffos/fluffos-vscode repo and syncs it (plus the JS
+    tokenizer/formatter/linter here) out of a pinned fluffos submodule at
+    build time."""
     import json
-
-    vscode_dir = os.path.join(script_dir, "vscode")
-    syn_dir = os.path.join(vscode_dir, "syntaxes")
-    lib_dir = os.path.join(vscode_dir, "lib")
-    os.makedirs(syn_dir, exist_ok=True)
-    os.makedirs(lib_dir, exist_ok=True)
 
     # "class"/"struct" are type-introducing keywords (a struct/class
     # declaration), not control flow -- split them into their own scope so
@@ -356,9 +351,13 @@ def emit_vscode_assets(data, script_dir):
     mods = "|".join(sorted(data["modifierKeywords"], key=len, reverse=True))
     # Operators arrive longest-match ordered from the contract.
     ops = "|".join(_re_escape(o) for o in data["operators"])
-    # Every reserved word, for the function-call heuristic below.
+    # Every reserved word, for the function-call heuristic below. The
+    # alphabetical tie-break keeps the output deterministic: a plain
+    # key=len sort over this set union made same-length ordering depend on
+    # Python's per-process string-hash seed, churning the file on regen.
     reserved = "|".join(sorted(set(data["keywords"]) | set(data["typeKeywords"])
-                               | set(data["modifierKeywords"]), key=len, reverse=True))
+                               | set(data["modifierKeywords"]),
+                               key=lambda w: (-len(w), w)))
 
     tm = {
         "$comment": "GENERATED from lpc-grammar.json by generate_ebnf.py "
@@ -459,25 +458,11 @@ def emit_vscode_assets(data, script_dir):
         },
     }
 
-    tm_path = os.path.join(syn_dir, "lpc.tmLanguage.json")
+    tm_path = os.path.join(script_dir, "lpc.tmLanguage.json")
     print(f"Writing {tm_path} ...")
     with open(tm_path, "w") as f:
         json.dump(tm, f, indent=2, sort_keys=False)
         f.write("\n")
-
-    header = ("// GENERATED COPY -- edit tools/lpc-syntax/%s and re-run the\n"
-              "// generate_ebnf CMake target; a packaged VS Code extension\n"
-              "// cannot reach outside its own folder.\n")
-    for name in ("tokenizer.mjs", "lint.mjs", "format.mjs"):
-        src_f = os.path.join(script_dir, name)
-        dst_f = os.path.join(lib_dir, name)
-        with open(src_f) as f:
-            body = f.read()
-        print(f"Writing {dst_f} ...")
-        with open(dst_f, "w") as f:
-            f.write((header % name) + body)
-    shutil.copyfile(os.path.join(script_dir, "lpc-grammar.json"),
-                    os.path.join(lib_dir, "lpc-grammar.json"))
 
 
 def main():
@@ -517,7 +502,7 @@ def main():
     # never silently go stale again.
     if json_path is not None:
         data = emit_grammar_json(xml_path, json_path)
-        emit_vscode_assets(data, script_dir)
+        emit_tm_language(data, script_dir)
 
     # Optional validation guard
     try:

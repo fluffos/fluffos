@@ -196,7 +196,7 @@
       "match": "\\$[0-9]+"
     },
     "function-call": {
-      "match": "\\b(?!(?:time_expression|parse_command|protected|__TREE__|function|continue|private|default|foreach|mapping|inherit|varargs|buffer|public|object|sscanf|static|return|struct|nomask|switch|string|nosave|while|class|break|float|array|catch|mixed|else|case|efun|void|ref|new|for|int|do|if|in)\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "match": "\\b(?!(?:time_expression|parse_command|protected|__TREE__|continue|function|default|foreach|inherit|mapping|private|varargs|buffer|nomask|nosave|object|public|return|sscanf|static|string|struct|switch|array|break|catch|class|float|mixed|while|case|efun|else|void|for|int|new|ref|do|if|in)\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
       "captures": {
         "1": {
           "name": "entity.name.function.lpc"

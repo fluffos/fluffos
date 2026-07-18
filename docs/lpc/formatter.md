@@ -40,8 +40,11 @@ const wide = formatLPC(source, { printWidth: 120 });    // default 100
 const four = formatLPC(source, { indentSize: 4 });      // default 2
 ```
 
-In VS Code, the extension under `tools/lpc-syntax/vscode/` provides
-*Format Document* and format-on-save with the same engine, configured
+In VS Code, the extension (developed in the
+[fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode)
+repo, which builds it from this engine via a pinned fluffos submodule)
+provides *Format Document* and format-on-save with the same engine,
+configured
 by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 (default 2).
 

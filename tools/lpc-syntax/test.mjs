@@ -1308,9 +1308,11 @@ check('lint: positions are 1-based',
       (() => { const d = lintLPC('string s = "abc;\n')[0];
                return d.line === 1 && d.col === 12; })());
 
-// --- generated VS Code assets ---------------------------------------------------
+// --- generated TextMate grammar -------------------------------------------------
+// (Consumed, with the tokenizer/formatter/linter above, by the VS Code
+// extension in the fluffos/fluffos-vscode repo via a pinned submodule.)
 const here2 = dirN(f2p(import.meta.url));
-const tml = JSON.parse(readF(joinP(here2, 'vscode/syntaxes/lpc.tmLanguage.json'), 'utf8'));
+const tml = JSON.parse(readF(joinP(here2, 'lpc.tmLanguage.json'), 'utf8'));
 check('tmLanguage: scope + language wiring',
       tml.scopeName === 'source.lpc' && Array.isArray(tml.patterns));
 check('tmLanguage: keywords from grammar contract',
@@ -1331,23 +1333,5 @@ check('tmLanguage: function-call excludes reserved words (no "if (" misfire as e
 check('tmLanguage: operators longest-match ordered',
       (() => { const parts = tml.repository.operators.match.split('|');
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());
-check('vscode lib copies are marked generated AND byte-identical to their'
-      + ' parents after the 3-line header (a stale copy fails the suite,'
-      + ' not just a missing banner)',
-      ['lint.mjs', 'tokenizer.mjs', 'format.mjs'].every((name) => {
-        const copy = readF(joinP(here2, 'vscode/lib/' + name), 'utf8');
-        const parent = readF(joinP(here2, name), 'utf8');
-        return copy.startsWith('// GENERATED COPY') &&
-               copy.split('\n').slice(3).join('\n') === parent;
-      }));
-check('extension.js wires up the formatter',
-      (() => { const src = readF(joinP(here2, 'vscode/extension.js'), 'utf8');
-               return src.includes('registerDocumentFormattingEditProvider') &&
-                      src.includes('formatLPC'); })());
-const langConfig = JSON.parse(readF(joinP(here2, 'vscode/language-configuration.json'), 'utf8'));
-check('language-configuration: brackets + doc-comment continuation wired',
-      langConfig.brackets.length === 3 &&
-      Array.isArray(langConfig.onEnterRules) && langConfig.onEnterRules.length > 0);
-
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
