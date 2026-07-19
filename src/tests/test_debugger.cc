@@ -746,3 +746,58 @@ TEST_F(DebuggerTest, ReadMudlibFileReturnsRealContentAndRejectsTraversal) {
   EXPECT_FALSE(dbg::read_mudlib_file("/../../../../etc/passwd", content2, err2));
   EXPECT_FALSE(err2.empty());
 }
+
+// Optional mudlib-side veto at attach (docs/apply/master/valid_debugger.md,
+// DESIGN.md's security model, item D8). No live transport is needed to
+// exercise this: dispatch_message() is the exact entry point the real
+// WebSocket layer calls into (transport_lws.cc's LWS_CALLBACK_RECEIVE
+// handler), and transport_send()/transport_kill_client() both already
+// guard on `if (s.client)` -- with no live lws* they reduce to queuing
+// into g_session.outq / a no-op, so the response can be read straight back
+// out of outq. single/master.lpc's valid_debugger() approves everything
+// except a "DENY_ME_DEBUGGER" sentinel, which a real client can never
+// present (lws_get_peer_simple() always returns an actual peer address).
+TEST_F(DebuggerTest, AttachSucceedsWhenValidDebuggerApproves) {
+  auto& s = dbg::g_session;
+  s.attached = false;
+  s.authed = false;
+  s.outq.clear();
+  s.client_addr = "203.0.113.7";  // an arbitrary non-sentinel "real" peer IP
+
+  dbg::dispatch_message(R"({"type":"request","seq":1,"command":"attach","arguments":{}})");
+
+  // A successful attach queues the response FIRST, then an "initialized"
+  // event (handle_request()'s attach branch) -- outq.front() is the
+  // response; outq.back() would be the event, which has no "success" key.
+  ASSERT_FALSE(s.outq.empty());
+  dbg::djson resp = dbg::djson::parse(s.outq.front());
+  EXPECT_TRUE(resp["success"].get<bool>()) << resp.dump();
+  EXPECT_TRUE(s.attached);
+
+  // Leave the session as this test found it: update_flags() recomputes
+  // g_lpc_debug_flags purely from session state, so a bare `s.attached =
+  // false` without it would leave the real (eval-loop-hot-path) flag
+  // stuck reporting ATTACHED after this test returns.
+  s.attached = false;
+  s.authed = false;
+  s.outq.clear();
+  dbg::update_flags();
+}
+
+TEST_F(DebuggerTest, AttachDeniedWhenValidDebuggerRejects) {
+  auto& s = dbg::g_session;
+  s.attached = false;
+  s.authed = false;
+  s.outq.clear();
+  s.client_addr = "DENY_ME_DEBUGGER";
+
+  dbg::dispatch_message(R"({"type":"request","seq":1,"command":"attach","arguments":{}})");
+
+  ASSERT_FALSE(s.outq.empty());
+  dbg::djson resp = dbg::djson::parse(s.outq.back());
+  EXPECT_FALSE(resp["success"].get<bool>()) << resp.dump();
+  EXPECT_FALSE(s.attached) << "master::valid_debugger() denial must not attach the session";
+  EXPECT_FALSE(s.authed);
+
+  s.outq.clear();
+}

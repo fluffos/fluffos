@@ -114,11 +114,18 @@ mudlib:
 - Prefer loopback-only binding plus an SSH tunnel over exposing it
   directly, even with a password set.
 - Rotate `debugger password` like any other credential.
+- Optionally define `master::valid_debugger(remote_ip)` to add mudlib-side
+  policy (an IP allowlist, logging, rate-limiting) on top of the password
+  check — see [valid_debugger](../../apply/master/valid_debugger). It's
+  consulted once per attach and, if undefined, doesn't change behavior at
+  all — the password/loopback gates above already apply either way.
 
 ## See Also
 
 - [Configuration](../../driver/config.md) — the `debugger port` /
   `debugger address` / `debugger password` options
+- [valid_debugger](../../apply/master/valid_debugger) — optional
+  mudlib-side veto over attachment
 - [Tracing and Performance Profiling](tracing.md) — a complementary,
   non-interactive profiling tool
 - [dump_trace](../../efun/internals/dump_trace) — one-shot LPC call stack

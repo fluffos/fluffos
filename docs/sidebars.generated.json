@@ -3171,6 +3171,12 @@
           },
           {
             "type": "doc",
+            "id": "apply/master/valid_debugger",
+            "key": "apply/master/valid_debugger",
+            "label": "valid_debugger"
+          },
+          {
+            "type": "doc",
             "id": "apply/master/valid_ffi",
             "key": "apply/master/valid_ffi",
             "label": "valid_ffi"

@@ -4,12 +4,15 @@
 #include "base/std.h"
 
 #include <event2/event.h>
+#include <libwebsockets.h>
 
 #include <cstring>
 #include <ctime>
 
+#include "applies_table.autogen.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/eval_limit.h"
+#include "vm/internal/master.h"
 #include "vm/internal/simulate.h"
 #include "backend.h"
 
@@ -109,6 +112,27 @@ void handle_request(const djson& msg) {
       if (token != pw) {
         debug_message("Debugger: attach rejected (bad token).\n");
         send_response(msg, false, nullptr, "authentication failed");
+        transport_kill_client(true);
+        return;
+      }
+    }
+    // Optional mudlib-side veto, layered on top of the password/loopback
+    // gates above (DESIGN.md's security model, D8). Permissive when
+    // master::valid_debugger() isn't defined -- same convention as
+    // valid_object() -- so upgrading the driver never silently locks out a
+    // mudlib that already configured "debugger port"/"debugger password"
+    // without expecting a new master apply to exist. Gated on !s.attached:
+    // handle_request() doesn't otherwise reject a redundant second `attach`
+    // on an already-attached session, and that path can run from inside the
+    // stop loop (a nested eval_instruction(), safe per DESIGN.md §2.1) --
+    // there's no reason to double-invoke the veto for it.
+    if (!s.attached) {
+      push_constant_string(s.client_addr.c_str());
+      svalue_t* mret = safe_apply_master_ob(APPLY_VALID_DEBUGGER, 1);
+      if (mret && !MASTER_APPROVED(mret)) {
+        debug_message("Debugger: attach denied by master::valid_debugger() for %s.\n",
+                      s.client_addr.c_str());
+        send_response(msg, false, nullptr, "attach denied");
         transport_kill_client(true);
         return;
       }
@@ -289,7 +313,10 @@ void on_client_established(struct lws* wsi) {
   s.inbuf.clear();
   s.outq.clear();
   s.pending_close = false;
-  debug_message("Debugger: client connected, waiting for attach.\n");
+  char addr[64] = {0};
+  lws_get_peer_simple(wsi, addr, sizeof(addr));
+  s.client_addr = addr;
+  debug_message("Debugger: client connected from %s, waiting for attach.\n", s.client_addr.c_str());
 }
 
 void on_client_closed(struct lws* wsi) {

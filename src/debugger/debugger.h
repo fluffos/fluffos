@@ -77,6 +77,7 @@ struct Session {
   struct event* pump_ev = nullptr;  // recurring pump on the MAIN base
   struct event* tick_ev = nullptr;  // recurring wakeup on the private base
   struct lws* client = nullptr;     // the single attached client, if any
+  std::string client_addr;          // peer IP (lws_get_peer_simple), for valid_debugger()
   bool authed = false;
   int64_t connect_time = 0;
   std::string inbuf;                // ws fragment reassembly

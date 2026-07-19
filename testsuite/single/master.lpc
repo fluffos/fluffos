@@ -402,6 +402,19 @@ int valid_database(object ob, string action, mixed *info) {
   return 1;
 }
 
+// Optional veto consulted at debugger attach (docs/apply/master/valid_debugger.md).
+// A missing apply approves by default; the testsuite approves everything
+// except a deny sentinel so the denial path is testable
+// (DebuggerTest.AttachDeniedWhenValidDebuggerRejects in test_debugger.cc,
+// which sets dbg::g_session.client_addr directly -- a real client always
+// presents an actual peer IP, never this sentinel).
+int valid_debugger(string remote_ip) {
+  if (remote_ip == "DENY_ME_DEBUGGER") {
+    return 0;
+  }
+  return 1;
+}
+
 // Security gate for package_ffi (op: "load"/"symbol"/"prepare"/
 // "callback"/"peek"). A missing apply denies by default; the testsuite
 // allows everything so the ffi_* tests can exercise real native calls.

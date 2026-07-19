@@ -598,8 +598,18 @@ phase 2 writes them, phase 3 executes arbitrary code. Therefore:
    TLS optional in phase 2 for non-tunneled remote use.
 3. Shared-secret check inside the DAP `attach` request; failures close the socket (rate-limited
    logging, no oracle).
-4. Optional master apply veto (phase 2): `valid_debugger(remote_ip)` consulted at attach —
-   mudlibs can layer policy without driver rebuilds.
+4. Optional master apply veto: `valid_debugger(remote_ip)` (`docs/apply/master/valid_debugger.md`)
+   consulted at attach, after the password check succeeds but before the session is marked
+   attached — mudlibs can layer policy (IP allowlisting, logging, rate-limiting) without driver
+   rebuilds. Permissive when undefined (same convention as `valid_object`'s
+   `if (mret && !MASTER_APPROVED(mret))` guard, not the restrictive `valid_socket`-style bare
+   check): a mudlib that already configured `debugger port`/`debugger password` without knowing
+   about this apply is never silently locked out by a driver upgrade. `remote_ip` comes from
+   `lws_get_peer_simple()` (no reverse DNS), captured once at `LWS_CALLBACK_ESTABLISHED` into
+   `Session::client_addr` — there is no per-connection address anywhere else in the transport.
+   Gated on `!s.attached` in `handle_request()` (`debug_server.cc`) so a redundant second
+   `attach` on an already-attached session — reachable from inside the stop loop, since DAP
+   requests are still serviced while stopped — never double-invokes the apply.
 5. Single client (D7); attach/detach events logged via `debug_message` and a `debug_level`
    channel (`DBG_debugger` bit) for auditability.
 6. The debugger deliberately bypasses `valid_read`/`valid_write` (§8.3) — documented, not hidden.
@@ -671,7 +681,7 @@ a blocker by definition.
 |---|---|---|
 | **0 — Foundation** | rc options, listener + standalone lws context + `dap` subprotocol, DAP handshake/capabilities, session state machine, instruction hook + flags word, pause/continue, eval-timer suspend/restore, `debug_break()` + `debugger_attached()` efuns, auto-detach safety | VS Code attaches, `debug_break()` stops the mud, continue resumes it, killing the client un-freezes the mud |
 | **1 — Core debugging (MVP)** | breakpoint store + resolution + pending + rebinding, stepping engine, stackTrace/scopes/variables (index-named locals, named globals), `source`/`loadedSources`, dap-smoke e2e in CI | set a breakpoint in VS Code, hit it from a player command, step through a heart_beat, inspect values |
-| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~, ~~hit-count conditions~~, ~~header-file breakpoints~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), master `valid_debugger` veto, TLS option | daily-driver debugging UX |
+| **2 — Quality** | ~~compiler local-name tables~~, ~~`setVariable`~~, ~~exception filters (uncaught/all)~~, ~~object explorer + file browsing custom requests~~, ~~hit-count conditions~~, ~~header-file breakpoints~~, ~~master `valid_debugger` veto~~ (all IMPLEMENTED) -- remaining: TreeView (extension-side UI), TLS option | daily-driver debugging UX |
 | **3 — Advanced** | `evaluate`/watch/hover/REPL (lpcshell-derived), conditional breakpoints, logpoints, `disassemble` view (dump_prog), edit-and-continue flow with the hot-reload daemon (breakpoints re-verify after `recompile_object`), raw-TCP DAP listener, wasm/jsbridge transport exploration | power-user parity |
 
 Rough shape: each phase is a reviewable PR series; phase 0+1 are the meaningful MVP.
