@@ -135,10 +135,12 @@ static void fn_table_rows(program_t* prog, std::vector<FnTabRow>& rows) {
 
     flags = prog->function_flags[runtime_index];
 
-    r.smods[0] = (flags & DECL_HIDDEN) ? '-' : '-';
-    r.smods[0] = (flags & DECL_PRIVATE) ? 'p' : '-';
-    r.smods[0] = (flags & DECL_PROTECTED) ? 'P' : '-';
-    r.smods[0] = (flags & DECL_PUBLIC) ? '+' : '-';
+    // One access-level char, most restrictive modifier wins.
+    r.smods[0] = (flags & DECL_HIDDEN)      ? 'h'
+                 : (flags & DECL_PRIVATE)   ? 'p'
+                 : (flags & DECL_PROTECTED) ? 'P'
+                 : (flags & DECL_PUBLIC)    ? '+'
+                                            : '-';
     r.smods[1] = (flags & DECL_NOMASK) ? 'm' : '-';
     r.smods[2] = (flags & DECL_NOSAVE) ? 's' : '-';
     r.smods[3] = '\0';
@@ -524,7 +526,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
       case F_NEW_EMPTY_CLASS:
       case F_NEW_CLASS: {
         int which = EXTRACT_UCHAR(pc++);
-        strcpy(buff, STRS[CLSS[which].classname]);
+        snprintf(buff, sizeof(buff), "%s", STRS[CLSS[which].classname]);
         break;
       }
 
@@ -533,7 +535,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         pc += sizeof(short);
         const uint8_t args = EXTRACT_UCHAR(pc++);
         if (sarg < NUM_FUNS) {
-          sprintf(buff, "%s, pushed_args:%d", function_name(prog, sarg), args);
+          snprintf(buff, sizeof(buff), "%s, pushed_args:%d", function_name(prog, sarg), args);
         } else {
           sprintf(buff, "<out of range %d>", sarg);
         }
@@ -546,9 +548,10 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         COPY_SHORT(&sarg, pc);
         pc += 3;
         if (sarg < (newprog->num_functions_defined + newprog->last_inherited)) {
-          sprintf(buff, "%30s::%-12s %5d", newprog->filename, function_name(newprog, sarg), sarg);
+          snprintf(buff, sizeof(buff), "%30s::%-12s %5d", newprog->filename,
+                   function_name(newprog, sarg), sarg);
         } else {
-          sprintf(buff, "<out of range in %30s - %d>", newprog->filename, sarg);
+          snprintf(buff, sizeof(buff), "<out of range in %30s - %d>", newprog->filename, sarg);
         }
         break;
       }
@@ -557,7 +560,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         short iarg;
         LOAD2(iarg, pc);
         if (iarg < NUM_VARS) {
-          sprintf(buff, "%s(%d)", variable_name(prog, iarg), iarg);
+          snprintf(buff, sizeof(buff), "%s(%d)", variable_name(prog, iarg), iarg);
         } else {
           sprintf(buff, "<out of range %d >", iarg);
         }
@@ -629,7 +632,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         if (sarg >= num_simul_efun || !simuls[sarg].func) {
           sprintf(buff, "<invalid %d> %d\n", sarg, pc[2]);
         } else {
-          sprintf(buff, "\"%s\" args: %d", simuls[sarg].func->funcname, pc[2]);
+          snprintf(buff, sizeof(buff), "\"%s\" args: %d", simuls[sarg].func->funcname, pc[2]);
         }
         pc += 3;
         break;
@@ -638,9 +641,9 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         switch (EXTRACT_UCHAR(pc++)) {
           case FP_SIMUL:
             LOAD_SHORT(sarg, pc);
-            sprintf(buff, "<simul_efun> \"%s\"",
-                    (sarg < num_simul_efun && simuls[sarg].func) ? simuls[sarg].func->funcname
-                                                                 : "<removed>");
+            snprintf(buff, sizeof(buff), "<simul_efun> \"%s\"",
+                     (sarg < num_simul_efun && simuls[sarg].func) ? simuls[sarg].func->funcname
+                                                                  : "<removed>");
             break;
           case FP_EFUN:
             LOAD_SHORT(sarg, pc);
@@ -649,7 +652,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
           case FP_LOCAL:
             LOAD_SHORT(sarg, pc);
             if (sarg < NUM_FUNS) {
-              sprintf(buff, "<local_fun> %s", function_name(prog, sarg));
+              snprintf(buff, sizeof(buff), "<local_fun> %s", function_name(prog, sarg));
             } else {
               sprintf(buff, "<local_fun> <out of range %d>", sarg);
             }
