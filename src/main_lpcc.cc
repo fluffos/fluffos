@@ -18,7 +18,7 @@
 #include "base/internal/tracing.h"
 #include "vm/vm.h"
 
-int main(int argc, char** argv) {
+static int lpcc_main(int argc, char** argv) {
   Tracer::start("trace_lpcc.json");
 
   Tracer::setThreadName("lpcc main");
@@ -183,4 +183,19 @@ int main(int argc, char** argv) {
   clear_state();
 
   return 0;
+}
+
+int main(int argc, char** argv) {
+  // Nothing may throw past main() (json serialization errors, an LPC
+  // error() unwind escaping the guarded compile) -- that would be
+  // std::terminate/abort instead of a clean CLI failure.
+  try {
+    return lpcc_main(argc, argv);
+  } catch (const std::exception& e) {
+    fprintf(stderr, "lpcc: fatal: %s\n", e.what());
+    return 1;
+  } catch (...) {
+    fprintf(stderr, "lpcc: fatal: unhandled exception\n");
+    return 1;
+  }
 }
