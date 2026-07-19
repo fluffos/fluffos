@@ -9,6 +9,7 @@
 
 #include "include/function.h"  // for F_SIMUL etc , FIXME
 #include "efuns.autogen.h"
+#include "keyword.h"                  // predefs[]: FP_EFUN name resolution
 #include "vm/internal/base/number.h"  // for formatting lpc int
 
 #include "compiler.h"  // for CURRENT_PROGRAM_SIZE
@@ -730,7 +731,11 @@ static nlohmann::json ast_json(parse_node_t* expr) {
       if (expr->r.expr) ast_json_children(n, expr->r.expr);
       switch (expr->v.number & 0xff) {
         case FP_EFUN:
-          n["a"].push_back(instr_name(expr->v.number >> 8));
+          // At AST time v.number>>8 is a predefs[] index (icode translates
+          // it to the instruction via predefs[idx].token when emitting).
+          // Resolving it against instrs[] directly printed an unrelated,
+          // build-dependent opcode name for every (: efun :) node.
+          n["a"].push_back(predefs[expr->v.number >> 8].word);
           break;
         case FP_FUNCTIONAL:
         case FP_FUNCTIONAL | FP_NOT_BINDABLE:
