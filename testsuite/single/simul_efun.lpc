@@ -237,3 +237,7 @@ string author_file(string) {
 }
 
 void simul() {}
+
+// Simul_efun with a default argument: call_direct() must fill it (pinned by
+// tests/compiler/default_args_inherit.lpc -- simuls used to see 0).
+int defarg_simul(int a: (: 77 :)) { return a; }

@@ -297,9 +297,20 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
               return;
             }
             FUNCTION_DEF(fun)->min_arg--;
-            // TODO: generate a unique name for the function
-            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), get_current_time(), identifier,
-                                        local.ihe->name, local.ihe->name);
+            // The helper's name must be unique across the whole inherit
+            // chain: it is defined DECL_NOMASK, so a parent and child both
+            // defining foo(int a: (: ... :)) with colliding helper names is
+            // an "Illegal to redefine 'nomask' function" compile error.
+            // A wall-clock timestamp only disambiguated compiles that
+            // happened in DIFFERENT seconds -- overriding an inherited
+            // default-arg function failed whenever parent and child
+            // compiled within the same second (the normal case), and
+            // compiles were unreproducible byte-wise. A process-global
+            // counter is unique for every compile in the process and
+            // deterministic given compile order.
+            static uint64_t default_arg_seq = 0;
+            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), ++default_arg_seq, identifier,
+                                        local.ihe->name);
             // the funcnum here will change in epilog().
             auto funcnum = define_new_function(
                 funcname.c_str(), 0, 0,

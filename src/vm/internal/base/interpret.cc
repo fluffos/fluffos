@@ -1587,6 +1587,76 @@ std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex) {
   return std::make_pair(prog, findex);
 }
 
+/* Fill missing trailing arguments for a direct call to `funcp` (defined in
+ * `progp`): pad a varargs callee with undefineds up to min_arg, then run the
+ * generated default-argument helpers ("#__..." functions, one per defaulted
+ * parameter, each returning a functional that is evaluated for the value).
+ * Following apply()'s precedent, the helpers run in the CALLER's context --
+ * current_object is deliberately not switched. Returns the new argument
+ * count.
+ *
+ * Shared by F_CALL_FUNCTION_BY_ADDRESS, F_CALL_INHERITED, FP_LOCAL function
+ * pointers and call_direct() (simul_efuns): the last three used to skip
+ * default filling entirely, so `::foo()`, `(: foo :)()` and simul calls
+ * silently ran the callee with zeros in place of its declared defaults. */
+int fill_default_args(program_t* progp, function_t* funcp, int funflags, int num_arg) {
+  if ((funflags & FUNC_TRUE_VARARGS) || funcp->min_arg == funcp->num_arg) {
+    return num_arg;
+  }
+  if (num_arg < funcp->min_arg) {
+    if (funflags & FUNC_VARARGS) {
+      push_undefineds(funcp->min_arg - num_arg);
+      num_arg = funcp->min_arg;
+    } else {
+#ifdef DEBUG
+      dump_vm_state();
+#endif
+      error("Not enough arguments to function %s, expected at least %d args, actual %d args.\n",
+            funcp->funcname, funcp->min_arg, num_arg);
+    }
+  }
+  if (num_arg == funcp->num_arg) {
+    return num_arg;
+  }
+  auto* saved_fp = fp;
+  /* NOTE: this assumes default-argument helpers are always generated right
+   * after the function, in parameter order. */
+  for (int i = num_arg; i < funcp->num_arg; i++) {
+    auto* current_sp = sp;
+    auto* default_funcp = progp->function_table + funcp->default_args_findex[i];
+    if (default_funcp->funcname[0] != APPLY___INIT_SPECIAL_CHAR) {
+#ifdef DEBUG
+      dump_vm_state();
+      dump_prog(progp, stdout, 1 | 2);
+#endif
+      error("Driver Bug: Illegal default argument function name %s in %s\n",
+            default_funcp->funcname, progp->filename);
+    }
+    fp = sp + 1; /* the helper takes zero args */
+    push_control_stack(FRAME_FUNCTION);
+    caller_type = ORIGIN_LOCAL;
+    csp->pc = pc;
+    csp->num_local_variables = 0;
+    csp->fr.table_index = funcp->default_args_findex[i];
+    current_prog = progp;
+    call_program(progp, default_funcp->address);
+
+    if (sp - current_sp != 1 || sp->type != T_FUNCTION || sp->u.fp == nullptr) {
+      error("Driver Bug: Bad stack after default arguments call.\n");
+    }
+    /* take the returned closure, then evaluate it for the real value */
+    svalue_t sv_funcp;
+    assign_svalue_no_free(&sv_funcp, sp);
+    pop_stack();
+    push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
+    free_svalue(&sv_funcp, "fill_default_args");
+    DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(),
+                "Bad stack after default arguments call.");
+  }
+  fp = saved_fp;
+  return funcp->num_arg;
+}
+
 function_t* setup_new_frame(int findex) {
   function_t* func_entry;
   int low, high, mid;
@@ -3320,86 +3390,12 @@ void eval_instruction(char* p) {
 
         auto pushed_args = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
-        auto saved_pc = pc;
 
         auto result = get_function_at_index(current_object->prog, offset);
         auto* progp = result.first;
         auto* funcp = &progp->function_table[result.second];
         DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
-        if (!(funflags & FUNC_TRUE_VARARGS) && funcp->min_arg != funcp->num_arg) {
-          if (pushed_args < funcp->min_arg) {
-            if (funflags & FUNC_VARARGS) {
-              push_undefineds(funcp->min_arg - pushed_args);
-              pushed_args = funcp->min_arg;
-            } else {
-#ifdef DEBUG
-              dump_vm_state();
-#endif
-              error(
-                  "Not enough arguments to function %s, expected at least %d args, actual %d "
-                  "args.\n",
-                  funcp->funcname, funcp->min_arg, pushed_args);
-            }
-          }
-          // for functions with default argument values, we want to invoke the closure to
-          // fill in the arguments
-          if (pushed_args != funcp->num_arg) {
-            // NOTE: this assumes default arguments closure are always generated right after the
-            // function in order
-            for (int i = pushed_args; i < funcp->num_arg; i++) {
-              auto* current_sp = sp;
-
-              auto* default_funcp = progp->function_table + funcp->default_args_findex[i];
-              if (default_funcp->funcname[0] != '#') {
-#ifdef DEBUG
-                dump_vm_state();
-                dump_prog(progp, stdout, 1 | 2);
-#endif
-                error("Illegal default argument function name %s in %s\n", default_funcp->funcname,
-                      progp->filename);
-              }
-
-              push_control_stack(FRAME_FUNCTION);
-              fp = sp + 1;  // zero args
-              caller_type = ORIGIN_LOCAL;
-              csp->pc = saved_pc;
-              csp->num_local_variables = 0;
-              csp->fr.table_index = funcp->default_args_findex[i];
-              current_prog = progp;
-              call_program(progp, default_funcp->address);
-
-              DEBUG_CHECK((sp - current_sp != 1) && dump_vm_state(),
-                          "F_CALL_FUNCTION_BYADDRESS: bad stack after calling arg closure.");
-
-              // get the returned closure then evaluate for the real value
-              svalue_t sv_funcp;
-              assign_svalue_no_free(&sv_funcp, sp);
-              pop_stack();
-
-              DEBUG_CHECK(
-                  (sv_funcp.type != T_FUNCTION || sv_funcp.u.fp == nullptr) && dump_vm_state(),
-                  "F_CALL_FUNCTION_BYADDRESS: default args closure returned null.");
-
-              if (sv_funcp.u.refed->ref != 1) {
-                fatal("F_CALL_FUNCTION_BYADDRESS: default args closure ref count %d != 1.\n",
-                      sv_funcp.u.refed->ref);
-              }
-
-              // evaluate the closure in current context
-              push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
-
-              if (sv_funcp.u.refed->ref != 1) {
-                fatal("F_CALL_FUNCTION_BYADDRESS: default args closure ref count %d != 1.\n",
-                      sv_funcp.u.refed->ref);
-              }
-              free_svalue(&sv_funcp, "F_CALL_FUNCTION_BYADDRESS: default args closure");
-
-              DEBUG_CHECK(sp - current_sp != 1, "Bad stack after default arguments call.");
-            }
-
-            pushed_args = funcp->num_arg;
-          }
-        }
+        pushed_args = fill_default_args(progp, funcp, funflags, pushed_args);
 
         /* Save all important global stack machine registers */
         push_control_stack(FRAME_FUNCTION);
@@ -3427,13 +3423,33 @@ void eval_instruction(char* p) {
 
         LOAD_SHORT(offset, pc);
 
+        int pushed_args = EXTRACT_UCHAR(pc++) + num_varargs;
+        num_varargs = 0;
+
+        /* `::`-qualified calls must fill default arguments exactly like
+         * F_CALL_FUNCTION_BY_ADDRESS -- this path used to skip them, so the
+         * parent function ran with zeros instead of its declared defaults. */
+        {
+          int roff = offset;
+          if (temp_prog->function_flags[roff] & FUNC_ALIAS) {
+            roff = temp_prog->function_flags[roff] & ~FUNC_ALIAS;
+          }
+          auto rflags = temp_prog->function_flags[roff];
+          if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
+            auto result = get_function_at_index(temp_prog, roff);
+            if (result.first != nullptr) {
+              pushed_args = fill_default_args(
+                  result.first, &result.first->function_table[result.second], rflags, pushed_args);
+            }
+          }
+        }
+
         push_control_stack(FRAME_FUNCTION);
         current_prog = temp_prog;
 
         caller_type = ORIGIN_LOCAL;
 
-        csp->num_local_variables = EXTRACT_UCHAR(pc++) + num_varargs;
-        num_varargs = 0;
+        csp->num_local_variables = pushed_args;
 
         function_index_offset += ip->function_index_offset;
         variable_index_offset += ip->variable_index_offset;
@@ -4730,6 +4746,22 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   program_t* prog = ob->prog;
 
   ob->time_of_ref = g_current_gametick;
+  /* Direct calls (simul_efuns, heart_beat) must fill default arguments too;
+   * simul_efuns with defaults used to run with zeros. */
+  {
+    int roff = offset;
+    if (prog->function_flags[roff] & FUNC_ALIAS) {
+      roff = prog->function_flags[roff] & ~FUNC_ALIAS;
+    }
+    auto rflags = prog->function_flags[roff];
+    if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
+      auto result = get_function_at_index(prog, roff);
+      if (result.first != nullptr) {
+        num_arg = fill_default_args(result.first, &result.first->function_table[result.second],
+                                    rflags, num_arg);
+      }
+    }
+  }
   push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
   caller_type = origin;
   csp->num_local_variables = num_arg;
