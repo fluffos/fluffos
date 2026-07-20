@@ -1219,7 +1219,10 @@ object_t* object_present(svalue_t* v, object_t* ob) {
   if (ob->super) {
     push_svalue(v);
     ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
-    if (ob->super->flags & O_DESTRUCTED) {
+    /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
+       sets ob->super to nullptr (destruct_object), or destruct the
+       environment. */
+    if ((ob->flags & O_DESTRUCTED) || !ob->super || (ob->super->flags & O_DESTRUCTED)) {
       return nullptr;
     }
     if (!IS_ZERO(ret)) {
