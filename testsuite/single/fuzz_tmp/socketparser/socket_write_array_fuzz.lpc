@@ -1,0 +1,155 @@
+// Adversarial socket_write() fuzzing over a REAL connected STREAM socket
+// (loopback self-connect), to reach the STREAM T_ARRAY / T_BUFFER code
+// paths in src/packages/sockets/socket_efuns.cc that the "not connected"
+// early-return in the stock efun tests never exercises.
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+
+nosave int server_fd = -1;
+nosave int client_fd = -1;
+nosave int accepted_fd = -1;
+nosave int test_completed = 0;
+nosave int step = 0;
+
+void cleanup() {
+  if (accepted_fd != -1) { socket_close(accepted_fd); accepted_fd = -1; }
+  if (client_fd != -1) { socket_close(client_fd); client_fd = -1; }
+  if (server_fd != -1) { socket_close(server_fd); server_fd = -1; }
+}
+
+void timeout_fail() {
+  if (!test_completed) {
+    cleanup();
+    ASSERT2(0, "socket_write array fuzz test timed out");
+  }
+}
+
+void server_conn_read(int fd, mixed msg) {
+  // We don't care about correctness of decoded content, just that
+  // nothing crashes.
+}
+
+void server_conn_write(int fd) {}
+
+void server_accept_ready(int fd) {
+  int new_fd;
+  new_fd = socket_accept(fd, "server_conn_read", "server_conn_write");
+  if (new_fd >= 0) {
+    accepted_fd = new_fd;
+  }
+}
+
+void do_next_write();
+
+void client_write(int fd) {
+  // Called once connected (and after each successful write drains).
+  call_out("do_next_write", 0);
+}
+
+void client_read(int fd, mixed msg) {}
+
+void client_close(int fd) {}
+
+void finish() {
+  test_completed = 1;
+  ASSERT(1);
+  cleanup();
+}
+
+void do_next_write() {
+  mixed *payload;
+  int ret;
+  int i;
+
+  step++;
+  switch (step) {
+    case 1:
+      // Mixed valid/invalid element types in one array.
+      payload = ({ 1, 2.5, "bad", ({1,2}), ([ "a":1 ]), this_object(), 0, -1, 0x7fffffff });
+      ret = socket_write(client_fd, payload);
+      call_out("do_next_write", 0);
+      return;
+    case 2:
+      // All-invalid-type array (every slot must be zero-filled, not leaked).
+      payload = allocate(64);
+      for (i = 0; i < 64; i++) payload[i] = "x";
+      ret = socket_write(client_fd, payload);
+      call_out("do_next_write", 0);
+      return;
+    case 3:
+      // Large numeric array.
+      payload = allocate(5000);
+      for (i = 0; i < 5000; i++) payload[i] = i;
+      ret = socket_write(client_fd, payload);
+      call_out("do_next_write", 0);
+      return;
+    case 4:
+      // Empty array (0-length fast path).
+      ret = socket_write(client_fd, ({}));
+      call_out("do_next_write", 0);
+      return;
+    case 5:
+      // Buffer payload of various sizes including 0 and large.
+      ret = socket_write(client_fd, allocate_buffer(0));
+      call_out("do_next_write", 0);
+      return;
+    case 6:
+      ret = socket_write(client_fd, allocate_buffer(65536));
+      call_out("do_next_write", 0);
+      return;
+    case 7:
+      // Very long string.
+      ret = socket_write(client_fd, repeat_string("A", 200000));
+      call_out("do_next_write", 0);
+      return;
+    case 8:
+      // Nested array (elements that are themselves arrays/mappings -- must
+      // be zero-filled per element, not recursed).
+      payload = allocate(10);
+      for (i = 0; i < 10; i++) {
+        payload[i] = ({ ({1,2,3}), ([1:2]), "str", 3.14, i })[i % 5];
+      }
+      ret = socket_write(client_fd, payload);
+      call_out("finish", 0);
+      return;
+  }
+}
+
+void start_client(int port) {
+  client_fd = socket_create(STREAM, "client_read", "client_close");
+  ASSERT2(client_fd >= 0, "failed to create client socket");
+  socket_connect(client_fd, sprintf("127.0.0.1 %d", port), "client_read", "client_write");
+}
+
+void begin_test() {
+  string local;
+  string *parts;
+  int port;
+
+  local = socket_address(server_fd, 1);
+  parts = explode(local, " ");
+  port = to_int(parts[1]);
+  start_client(port);
+}
+
+void do_tests() {
+  int ret;
+
+  server_fd = socket_create(STREAM, "server_accept_ready");
+  ASSERT2(server_fd >= 0, "failed to create server socket");
+
+  ret = socket_bind(server_fd, 0);
+  ASSERT_EQ(EESUCCESS, ret);
+
+  ret = socket_listen(server_fd, "server_accept_ready");
+  ASSERT_EQ(EESUCCESS, ret);
+
+  call_out("begin_test", 0);
+  call_out("timeout_fail", 8);
+}
+#else
+void do_tests() {
+  write("PACKAGE_SOCKETS not available, skipping.\n");
+}
+#endif

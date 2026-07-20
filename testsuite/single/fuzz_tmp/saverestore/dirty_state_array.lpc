@@ -1,0 +1,51 @@
+// Probe: restore_array()'s call to allocate_array(size) for a NESTED array can
+// throw a genuine error() ("Illegal array size.") when size > max_array_size.
+// Unlike restore_mapping's two error() call sites (out-of-memory, mapping-too-large)
+// which are guarded by reset_restore_scratch() (see AGENTS.md section 3/4 and
+// src/vm/internal/base/object.cc lines ~881/891), this allocate_array() call in
+// restore_array() has NO such guard. If it fires while save_svalue_depth > 0
+// (i.e. from inside a NESTED restore_array/restore_mapping/restore_class call),
+// the throw skips restore_svalue's own save_svalue_depth/sizes reset (which only
+// runs on a normal return), leaving `save_svalue_depth` and the `sizes` global
+// dirty for the NEXT, unrelated restore_svalue() call.
+//
+// This builds a string like  ({ ({ 0,0,0,....,0(15001 times) }) })
+// so the outer array has ONE element (the inner array), forcing save_svalue_depth
+// to be nonzero (1) at the moment the inner allocate_array(15001) call errors.
+
+void do_tests() {
+  string huge_inner;
+  int i;
+  mixed x;
+
+  // testsuite/etc/config.test sets "maximum array size" to 100000.
+  // Use bare commas (each comma is a complete "default to 0" element token by
+  // itself -- see the "({,})" => ({0}) case already pinned in
+  // restore_variable.lpc) to keep the crafted string well under "maximum
+  // string length" (200000) while still exceeding the 100000 element cap.
+  // Build 100001 commas via doubling (O(log n) concatenations).
+  huge_inner = ",";
+  while (strlen(huge_inner) < 100001) {
+    huge_inner += huge_inner;
+  }
+  huge_inner = huge_inner[0..100000];  // exactly 100001 commas
+  // outer array containing exactly one element: the oversized inner array
+  string poison = "({({" + huge_inner + "}),})";
+
+  // Step 1: trigger the error via allocate_array()'s size check while nested.
+  ASSERT2(catch(restore_variable(poison)), "Oversized nested array should be a catchable error, not silently succeed");
+
+  // Step 2: a subsequent, totally unrelated, well-formed restore call.
+  // If save_svalue_depth/sizes are left dirty by step 1, this may read a stale
+  // sizes[] entry instead of properly re-sizing this new string, potentially
+  // driving a bogus size into allocate_array()/allocate_class_by_size() or
+  // walking past the end of this (short) string.
+  for (i = 0; i < 20; i++) {
+    catch(x = restore_variable("({1,2,3})"));
+    catch(x = restore_variable("(/1,2,3/)"));
+    catch(x = restore_variable("([1:2,3:4])"));
+    catch(x = restore_variable("({1,({2,3}),4})"));
+  }
+
+  ASSERT2(1, "reached end without crashing");
+}

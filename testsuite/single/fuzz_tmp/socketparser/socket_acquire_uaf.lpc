@@ -1,0 +1,138 @@
+// socket_acquire() (src/packages/sockets/socket_efuns.cc) sets
+// lpc_socks[fd].owner_ob = current_object but, unlike socket_create()/
+// socket_accept()/socket_connect(), never sets current_object->flags |=
+// O_EFUN_SOCKET. destruct_object() only force-closes a destructed object's
+// open efun sockets when O_EFUN_SOCKET is set
+// (src/vm/internal/simulate.cc close_referencing_sockets() call), so a
+// socket acquired (not created/accepted/connected) by an object, then left
+// open when that object is destructed, is never cleaned up: owner_ob keeps
+// pointing at freed object memory. The next network event on that socket
+// (call_callback() -> safe_apply(callback.s, lpc_socks[fd].owner_ob, ...))
+// dereferences it -- safe_apply()'s very first line reads `ob->flags`.
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+
+nosave int server_fd = -1;
+nosave int client_fd = -1;
+nosave int accepted_fd = -1;
+nosave object victim = 0;
+nosave int test_completed = 0;
+
+void cleanup() {
+  if (accepted_fd != -1) { catch(socket_close(accepted_fd)); accepted_fd = -1; }
+  if (client_fd != -1) { catch(socket_close(client_fd)); client_fd = -1; }
+  if (server_fd != -1) { catch(socket_close(server_fd)); server_fd = -1; }
+}
+
+void timeout_fail() {
+  if (!test_completed) {
+    cleanup();
+    ASSERT2(0, "socket_acquire UAF repro timed out (see if it crashed instead)");
+  }
+}
+
+// --- victim object: this is the "acquirer" that will be destructed while
+// still owning the socket. ---
+void release_ready(int fd, object ob) {
+  // Called synchronously from socket_release()'s callback, with
+  // current_object == this victim object.
+  int ret = socket_acquire(fd, "victim_read", 0, 0);
+  ASSERT_EQ(EESUCCESS, ret);
+}
+
+void victim_read(int fd, mixed msg) {
+  // If we get here without crashing, the driver is NOT vulnerable (or the
+  // repro didn't line up); either way, record it.
+  write("victim_read invoked (fd " + fd + ") -- socket callback ran without UAF\n");
+}
+
+// --- driver object (this file's non-clone instance) ---
+void server_conn_read(int fd, mixed msg) {}
+void server_conn_write(int fd) {}
+
+void server_accept_ready(int fd) {
+  int new_fd;
+  new_fd = socket_accept(fd, "server_conn_read", "server_conn_write");
+  if (new_fd < 0) {
+    return;
+  }
+  accepted_fd = new_fd;
+
+  // Hand the freshly accepted socket off to a throwaway clone that has
+  // never itself created/accepted/connected any socket, so it has no
+  // O_EFUN_SOCKET flag of its own.
+  victim = clone_object(__FILE__);
+  ASSERT(victim != 0);
+
+  ASSERT_EQ(EESUCCESS, socket_release(accepted_fd, victim, "release_ready"));
+
+  // Now destroy the new owner while it still owns the (open, un-acquired-
+  // back) socket, and drop our only remaining reference.
+  destruct(victim);
+  victim = 0;
+
+  // Give the peer a nudge so a read event fires on accepted_fd after the
+  // owner is gone.
+  call_out("trigger_peer_write", 0);
+}
+
+void trigger_peer_write() {
+  socket_write(client_fd, "trigger read event on the orphaned socket");
+  call_out("finish", 1);
+}
+
+void finish() {
+  test_completed = 1;
+  // Surviving without an ASan abort means either the bug is already fixed,
+  // or this particular timing didn't line up -- either way, done.
+  ASSERT(1);
+  cleanup();
+}
+
+void client_write(int fd) {}
+void client_read(int fd, mixed msg) {}
+void client_close(int fd) {}
+
+void start_client(int port) {
+  client_fd = socket_create(STREAM, "client_read", "client_close");
+  ASSERT2(client_fd >= 0, "failed to create client socket");
+  socket_connect(client_fd, sprintf("127.0.0.1 %d", port), "client_read", "client_write");
+}
+
+void begin_test() {
+  string local;
+  string *parts;
+  int port;
+
+  local = socket_address(server_fd, 1);
+  parts = explode(local, " ");
+  port = to_int(parts[1]);
+  start_client(port);
+}
+
+void create() {
+  // Distinguish the clone (victim) from the master (test driver) instance:
+  // only the master runs do_tests().
+}
+
+void do_tests() {
+  int ret;
+
+  server_fd = socket_create(STREAM, "server_accept_ready");
+  ASSERT2(server_fd >= 0, "failed to create server socket");
+
+  ret = socket_bind(server_fd, 0);
+  ASSERT_EQ(EESUCCESS, ret);
+
+  ret = socket_listen(server_fd, "server_accept_ready");
+  ASSERT_EQ(EESUCCESS, ret);
+
+  call_out("begin_test", 0);
+  call_out("timeout_fail", 8);
+}
+#else
+void do_tests() {
+  write("PACKAGE_SOCKETS not available, skipping.\n");
+}
+#endif

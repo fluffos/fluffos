@@ -1,0 +1,6 @@
+void do_tests() {
+  mixed x;
+  string err = catch(x = restore_variable("(/1,2,3/)"));
+  debug_message(sprintf("DBG clean class err=%O x=%O\n", err, x));
+  ASSERT2(1,"done");
+}

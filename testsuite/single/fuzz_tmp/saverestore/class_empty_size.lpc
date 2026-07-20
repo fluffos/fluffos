@@ -1,0 +1,22 @@
+// Probe: does restore_variable() on an empty class literal "(//)" crash?
+// allocate_class_by_size() (src/vm/internal/base/class.cc) computes
+//   sizeof(array_t) + sizeof(svalue_t) * (size - 1)
+// with NO validation of `size` at all (unlike allocate_array()/allocate_empty_array()
+// which reject size<0 or size>max_array_size via error()). For size==0 this is an
+// intentional-looking edge case (empty class), but the arithmetic underflows before
+// wrapping back, and it's worth confirming empirically that this specific reachable
+// value doesn't corrupt anything.
+
+void do_tests() {
+  mixed x;
+  int ok = 0;
+  if (catch(x = restore_variable("(//)")) ) {
+    ok = 0;
+  } else {
+    ok = 1;
+  }
+  ASSERT2(ok, "restore_variable(\"(//)\") should either succeed cleanly or throw a catchable error");
+  if (ok) {
+    ASSERT_EQ(0, sizeof(x));
+  }
+}
