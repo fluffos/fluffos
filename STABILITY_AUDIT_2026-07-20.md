@@ -170,6 +170,79 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   still reference it, or invalidate them at unload time and have
   `ffi_call()` check.
 
+### 6. `fill_default_args()` is not exception-safe — corrupts the VM value stack ★ matches the original report almost exactly
+
+- **File**: `src/vm/internal/base/interpret.cc:1602-1662`, `fill_default_args()`
+  (new this cycle, commit `aec12ca`, "Default arguments: fix helper-name
+  collisions and fill on all direct-call paths").
+- **Root cause**: a defaulted parameter's value is computed by calling a
+  closure: `push_svalue(call_function_pointer(sv_funcp.u.fp, 0));` followed
+  by `free_svalue(&sv_funcp, ...)`. If evaluating that closure calls
+  `error()` — a real C++ `throw` per AGENTS.md §4 — the throw unwinds past
+  this line: `push_svalue`'s pending push never completes, `free_svalue`
+  never runs (leaked ref), and the enclosing loop's normal-path-only
+  `fp = saved_fp;` restore is skipped too. The VM's global `sp` is left
+  pointing into a stack region the closure's own (now-unwound) frame left
+  in an inconsistent state. When the nearest error handler later does
+  `pop_n_elems(sp - econ->save_sp)`, it walks and frees a corrupted slot;
+  `int_free_svalue()` writes through a garbage pointer and crashes.
+  The pre-refactor code had explicit `fatal()` sanity checks around this
+  exact sequence that did not carry over into the new shared helper.
+  Reachable through **every** caller: `F_CALL_FUNCTION_BY_ADDRESS` (plain
+  direct calls), `F_CALL_INHERITED`, and `FP_LOCAL` function-pointer calls.
+- **This is functionally the same class of bug as the #1295 report that
+  commit `ec9b6a4` fixed earlier today** (an eval-stack corruption
+  triggered from perfectly ordinary LPC), just in the brand-new
+  default-arguments code path instead of string/object concatenation — and
+  it doesn't even need a `catch()` to trigger, just an ordinary uncaught
+  `error()` in a default-argument expression.
+- **Repro** (`testsuite/single/fuzz_tmp/defargs_pp/min3_nocatch.lpc`,
+  independently re-verified — SIGSEGV, exit 139, "Invalid permissions for
+  mapped object" i.e. a write through a corrupted pointer):
+  ```lpc
+  int foo(int a: (: error("boom\n") :)) { return a; }
+  void create() {
+      foo();
+      write("after\n");
+  }
+  ```
+  ```
+  cd testsuite && ../build-asan/src/driver etc/config.test \
+      -ftest:single/fuzz_tmp/defargs_pp/min3_nocatch.lpc
+  ```
+- **Fix shape**: wrap the closure call + push + free in an RAII guard (or
+  restructure so `sv_funcp`'s ref and `sp`'s position are both restored on
+  the unwind path), matching the pattern AGENTS.md §4 already prescribes for
+  every other error()-adjacent cleanup in this codebase.
+
+### 7. Macro-expansion nesting cap (`MAX_EXPANSION_NESTING = 128`) is too high for the instrumented build — real C-stack overflow at ~75-80 levels
+
+- **File**: `src/compiler/internal/lexer_utils.cc:591`
+  (`#define MAX_EXPANSION_NESTING 128`) and the mutual recursion
+  `lpc_lex_resolve_identifier()` → `return yylex(...)` (~line 708).
+- **Root cause**: each level of object-like macro expansion recurses one
+  more `yylex()`/`lpc_lex_resolve_identifier()` C-stack frame pair. The
+  256-level cap is checked, but on the ASan-instrumented build (redzone
+  overhead inflates each Flex-generated frame) the process's stack is
+  exhausted well before reaching it — bisected boundary: 70 levels survive,
+  80 crash, i.e. the cap is only ~60% of the way to the real limit on this
+  build configuration, which is one of the configurations CI itself runs
+  (`ubuntu-24.04` + Clang + `ENABLE_SANITIZER=ON`, per AGENTS.md §6).
+- **Repro**: `testsuite/single/fuzz_tmp/defargs_pp/pp/chain_80.lpc` — 80
+  linear `#define M<n> M<n+1>` chained macros (nothing exotic; comparable to
+  what layered mudlib headers could plausibly produce). Independently
+  re-verified: exit 139 at depth 80, exit 0 (clean) at depth 70.
+  ```
+  cd testsuite && ../build-asan/src/driver etc/config.test \
+      -ftest:single/fuzz_tmp/defargs_pp/pp/chain_80.lpc
+  ```
+- **Fix shape**: lower `MAX_EXPANSION_NESTING` to a value verified safe
+  under the sanitizer build (mirroring how `kMaxOptimizeDepth`/
+  `kMaxGenerateNodeDepth` were deliberately set to 500, not some larger
+  "plausible" number, specifically because ASan frames are much larger —
+  see commit `117cbc1`'s reasoning), or convert the recursive rescan to an
+  explicit-stack iterative form.
+
 ## Areas audited with no crash found (real negative results, not gaps)
 
 - **`src/packages/math/math.cc` / `src/packages/matrix/matrix.cc`**: thorough
@@ -180,7 +253,7 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
 
 ## Status
 
-5 confirmed, independently-verified crashing bugs so far (3 compiler
-front-end, 2 FFI package). Audit continuing across save/restore_object,
-sockets/parser, reference-loops/hot-reload, and default-arguments/
-preprocessor; this file will be updated as further findings are confirmed.
+7 confirmed, independently-verified crashing bugs so far (4 compiler
+front-end / VM core, 2 FFI package, 1 hitting both). Audit continuing
+across save/restore_object, sockets/parser, and reference-loops/hot-reload;
+this file will be updated as further findings are confirmed.
