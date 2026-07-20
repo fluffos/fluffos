@@ -17,12 +17,12 @@ void do_tests() {
   ASSERT_EQ(12, ob->go());   // child override: its own default (2) + 10
   ASSERT_EQ(12, ob->foo());  // external call dispatches the override too
   ASSERT_EQ(1, ob->gop());   // ::foo() keeps the PARENT's default (1)
-  ASSERT_EQ(15, ob->foo(5)); // explicit arg still wins
+  ASSERT_EQ(15, ob->foo(5));  // explicit arg still wins
   destruct(ob);
 
   object fpob = clone_object("/clone/defarg_fp");
   ASSERT_EQ(42, fpob->go_fp());  // (: foo :) stored then called
-  ASSERT_EQ(42, fpob->go_fp2()); // immediate (: foo :)()
+  ASSERT_EQ(42, fpob->go_fp2());  // immediate (: foo :)()
   destruct(fpob);
 
   ASSERT_EQ(77, defarg_simul());  // simul_efun default via call_direct

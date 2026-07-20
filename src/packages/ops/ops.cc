@@ -367,6 +367,7 @@ void f_lsh() {
   LPC_INT count = sp->u.number & 63;
   sp--;
   sp->u.number <<= count;
+  sp->subtype = 0;
 }
 
 void f_lsh_eq() {
@@ -892,6 +893,7 @@ void f_rsh() {
   LPC_INT count = sp->u.number & 63;
   sp--;
   sp->u.number >>= count;
+  sp->subtype = 0;
 }
 
 void f_rsh_eq() {
@@ -1201,6 +1203,7 @@ void f_xor() {
   CHECK_TYPES(sp, T_NUMBER, 2, F_XOR);
   sp--;
   sp->u.number ^= (sp + 1)->u.number;
+  sp->subtype = 0;
 }
 
 void f_xor_eq() {
