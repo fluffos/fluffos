@@ -5,6 +5,8 @@
 #include <cctype>
 #include <cstdlib>
 
+#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
+
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_utils.h"
@@ -407,8 +409,20 @@ struct IfTok {
 struct IfTokState {
   const std::vector<IfTok>* toks;
   size_t pos = 0;
+  int depth = 0;  // recursion depth of the recursive-descent evaluator below
   ScratchString error;  // first error wins; empty means no error yet
 };
+
+// The #if/#elif evaluator (ifexpr_atom/binop/top) is recursive-descent; its
+// recursion depth tracks paren / unary-operator / ternary nesting, which is
+// attacker-controlled with no bound from the token count. Cap it so a
+// pathological `#if ((((...))))` fails with a clean diagnostic instead of
+// overflowing the C stack. Every recursion path passes through ifexpr_atom
+// (top->binop->atom always; a '(' or unary re-enters atom; a ternary
+// re-enters top->binop->atom), so guarding atom bounds the whole evaluator.
+// Sized well under the ASan build's measured overflow boundary (~15-18k),
+// matching the parse-tree walkers' 500-deep caps (§13).
+static constexpr int kMaxIfExprDepth = 500;
 
 bool ifexpr_at_end(const IfTokState* st) { return st->pos >= st->toks->size(); }
 
@@ -422,6 +436,12 @@ long ifexpr_top(IfTokState* st);
 
 long ifexpr_atom(IfTokState* st) {
   if (ifexpr_at_end(st)) return 0;
+  if (++st->depth > kMaxIfExprDepth) {
+    --st->depth;
+    ifexpr_set_error(st, "#if expression nested too deeply");
+    return 0;
+  }
+  DEFER { --st->depth; };
   const IfTok& t = (*st->toks)[st->pos];
   if (t.op == 0) {
     st->pos++;
@@ -861,6 +881,23 @@ bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
 
 ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard) {
   if (!g_compile.pp_active) return ScratchString(text);
+  // `guard` only stops a macro from expanding ITSELF; a chain of DISTINCT
+  // macros (A->B->C->...) recurses one C-frame per link with no bound. This
+  // is the textual sibling of the rescan path (which caps at
+  // MAX_EXPANSION_NESTING); cap it the same way so a pathological chain fails
+  // with a clean diagnostic instead of overflowing the C stack. The counter
+  // is single-threaded (one lexer per compile) and self-balances via DEFER,
+  // including on an exception unwind. Value matches the rescan cap (64), far
+  // under the measured ~3.5-5k overflow boundary.
+  static constexpr int kMaxExpandStringDepth = 64;
+  static int expand_depth = 0;
+  if (expand_depth >= kMaxExpandStringDepth) {
+    lexerror("Macro expansion nested too deep");
+    return ScratchString(text);
+  }
+  expand_depth++;
+  DEFER { expand_depth--; };
+
   ScratchString result;
   size_t i = 0;
   while (i < text.size()) {
