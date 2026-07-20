@@ -1,0 +1,5 @@
+inherit "/single/fuzz_tmp/defargs_pp/inc/errbase";
+void create() {
+  gop();
+  write("after\n");
+}

@@ -1,0 +1,5 @@
+int foo(int a: (: error("boom\n") :)) { return a; }
+void create() {
+  foo();
+  write("after\n");
+}

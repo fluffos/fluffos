@@ -1,0 +1,8 @@
+int boom() { error("boom\n"); }
+int foo(int a: (: boom() :)) { return a; }
+void create() {
+  mixed err = catch(foo());
+  write("caught: " + err + "\n");
+  write(foo(5));
+  write("\n");
+}

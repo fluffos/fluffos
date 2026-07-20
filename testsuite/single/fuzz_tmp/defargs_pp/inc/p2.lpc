@@ -1,0 +1,2 @@
+inherit "/single/fuzz_tmp/defargs_pp/inc/gp";
+int foo(int a: (: 3 :)) { return a + 200; }

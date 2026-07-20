@@ -1,0 +1,2 @@
+int foo(int a: (: 5 :)) { return a; }
+void create() { dump_value(foo()); }

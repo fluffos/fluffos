@@ -1,0 +1,14 @@
+int depth = 0;
+int recur() {
+  depth++;
+  return recur();
+}
+int foo(int a: (: recur() :)) { return a; }
+void create() {
+  mixed err = catch(foo());
+  write("caught: " + err + " depth=" + depth + "\n");
+  // now exercise normal call path after the catch to see if fp/sp got corrupted
+  write("check: " + (1+2+3) + "\n");
+  write(foo(5));
+  write("\n");
+}
