@@ -1,0 +1,63 @@
+// Regression test for https://github.com/fluffos/fluffos/issues/1295
+// (string/object concatenation in F_ADD / F_ADD_EQ / F_VOID_ADD_EQ).
+//
+// Two defects lived in these opcodes:
+//
+// 1. "str" + ob and str += ob captured ob->obname, then dropped the stack's
+//    object reference with free_object() BEFORE appending the name. If the
+//    stack held the last reference to a destructed object (possible once
+//    destruct2() has released the destruct-list reference, minutes after
+//    destruction), the object -- and obname with it -- was deallocated and
+//    the append read freed memory. destruct2() cannot be forced from a
+//    synchronous testsuite run, so that half is pinned behaviorally: the
+//    append must happen before the reference is dropped.
+//
+// 2. str += ob additionally popped one stack slot too many (the object
+//    branch did sp-- where every sibling branch leaves sp on the consumed
+//    RHS slot), so the trailing rvalue store wrote one slot below the
+//    operands -- clobbering a live local / temporary. The guard variables
+//    below detect exactly that: on the broken driver they end up holding
+//    fragments of unrelated values.
+
+mapping m = ([]);
+
+// Returns the stashed object while removing the mapping's reference.
+object take() {
+  object r = m["k"];
+  map_delete(m, "k");
+  return r;
+}
+
+void do_tests() {
+  object o = new(__FILE__);
+  string expected, s, t;
+  mixed u;
+  int guard1 = 111;
+  int guard2 = 222;
+
+  // Baseline: "str" + live object appends "/" + obname.
+  expected = "x" + o;
+  ASSERT(stringp(expected));
+  ASSERT_EQ("x/" + file_name(o)[1..], expected);
+
+  // str += ob (statement => F_VOID_ADD_EQ): must not unbalance the stack.
+  s = "x";
+  s += o;
+  ASSERT_EQ(expected, s);
+
+  // str += ob as an rvalue (F_ADD_EQ): result lands in the right slot and
+  // the guards/live locals survive.
+  t = "x";
+  u = (t += o);
+  ASSERT_EQ(expected, t);
+  ASSERT_EQ(expected, u);
+  ASSERT_EQ(111, guard1);
+  ASSERT_EQ(222, guard2);
+
+  // A destructed object read back out of a container is fetched as 0, so
+  // concatenation sees a number, not a stale object.
+  m["k"] = o;
+  destruct(o);
+  ASSERT_EQ("x0", "x" + take());
+  ASSERT_EQ(0, m["k"]);
+}

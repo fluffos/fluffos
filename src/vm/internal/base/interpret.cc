@@ -2691,7 +2691,7 @@ void eval_instruction(char* p) {
               case T_OBJECT: {
                 char buff[1024];
                 object_t* ob = (sp - 1)->u.ob;
-                sprintf(buff, "/%s", ob->obname);
+                snprintf(buff, sizeof(buff), "/%s", ob->obname);
                 SVALUE_STRING_ADD_LEFT(buff, "f_add: 3");
                 free_object(&ob, "f_add: 3");
                 break;
@@ -2735,10 +2735,12 @@ void eval_instruction(char* p) {
           case T_OBJECT:
             switch ((sp - 1)->type) {
               case T_STRING: {
-                const char* fname = sp->u.ob->obname;
+                /* Extend before dropping the ref: if the stack holds the last
+                   reference to a destructed object, free_object() deallocates
+                   it immediately, freeing obname with it. */
+                EXTEND_SVALUE_STRING(sp - 1, "/", "f_add: str ob");
+                EXTEND_SVALUE_STRING(sp - 1, sp->u.ob->obname, "f_add: str ob");
                 free_object(&(sp--)->u.ob, "f_add: str+ob");
-                EXTEND_SVALUE_STRING(sp, "/", "f_add: str ob");
-                EXTEND_SVALUE_STRING(sp, fname, "f_add: str ob");
                 break;
               }
               default:
@@ -2793,10 +2795,13 @@ void eval_instruction(char* p) {
               sprintf(buff, "%" LPC_FLOAT_FMTSTR_P, sp->u.real);
               EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
             } else if (sp->type == T_OBJECT) {
-              const char* fname = sp->u.ob->obname;
-              free_object(&(sp--)->u.ob, "f_add_eq: 2");
-              EXTEND_SVALUE_STRING(lval, "/", "f_add: str ob");
-              EXTEND_SVALUE_STRING(lval, fname, "f_add_eq: 2");
+              /* Extend before dropping the ref (obname dies with the object's
+                 last reference), and leave sp on the consumed RHS slot like
+                 the other branches: the extra sp-- here unbalanced the stack,
+                 making the trailing rvalue store below clobber a live slot. */
+              EXTEND_SVALUE_STRING(lval, "/", "f_add_eq: 2");
+              EXTEND_SVALUE_STRING(lval, sp->u.ob->obname, "f_add_eq: 2");
+              free_object(&sp->u.ob, "f_add_eq: 2");
             } else {
               bad_argument(sp, T_OBJECT | T_STRING | T_NUMBER | T_REAL, 2, instruction);
             }
