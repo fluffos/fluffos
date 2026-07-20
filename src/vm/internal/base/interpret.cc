@@ -1619,6 +1619,13 @@ int fill_default_args(program_t* progp, function_t* funcp, int funflags, int num
     return num_arg;
   }
   auto* saved_fp = fp;
+  // fp gets manually repointed at a fake zero-arg frame per iteration below
+  // (no push_control_stack of fill_default_args's own is ever popped to
+  // undo it -- each iteration's push/pop pair is for the helper call only,
+  // matched before the interesting call_function_pointer() below even
+  // runs). Restore it unconditionally, including on an exception unwinding
+  // out of this function, instead of only on normal fall-through.
+  DEFER { fp = saved_fp; };
   /* NOTE: this assumes default-argument helpers are always generated right
    * after the function, in parameter order. */
   for (int i = num_arg; i < funcp->num_arg; i++) {
@@ -1648,12 +1655,23 @@ int fill_default_args(program_t* progp, function_t* funcp, int funflags, int num
     svalue_t sv_funcp;
     assign_svalue_no_free(&sv_funcp, sp);
     pop_stack();
-    push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
-    free_svalue(&sv_funcp, "fill_default_args");
+    // Always drop sv_funcp's ref on the way out, including if
+    // call_function_pointer() below throws (a default-argument expression
+    // calling error() is ordinary, not exceptional) -- AGENTS.md section 4.
+    DEFER { free_svalue(&sv_funcp, "fill_default_args"); };
+    // Evaluate the closure into a local BEFORE pushing: push_svalue(x) is
+    // the macro `STACK_INC; assign_svalue_no_free(sp, x);`, so pushing
+    // call_function_pointer(...)'s result directly would run STACK_INC
+    // before its argument is even evaluated. If that call throws, sp is
+    // left one slot ahead pointing at an uninitialized svalue_t -- the
+    // "half-initialized VM stack slot" hazard AGENTS.md section 4 warns
+    // about, and the actual mechanism behind this bug's observed crash
+    // (the next pop_n_elems() during unwind frees that garbage slot).
+    svalue_t* result = call_function_pointer(sv_funcp.u.fp, 0);
+    push_svalue(result);
     DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(),
                 "Bad stack after default arguments call.");
   }
-  fp = saved_fp;
   return funcp->num_arg;
 }
 

@@ -3,13 +3,16 @@
 Triggered by a report that the driver is unstable ("stack corruption in the
 VM"). This audit reviewed all 2026 commits, built an ASan+UBSan Debug
 driver, and stress-tested/fuzzed the compiler front-end and several
-packages. Bugs 1-8 below are **confirmed, reproducible crashes** — each
-independently re-run against the unmodified binary to rule out flakes.
-Bugs 9-10 are real, well-evidenced findings at a distinct, explicitly
-lower evidence tier (see their own sections) — one is a statically
-unambiguous bug not yet reproduced as a live crash, the other is a
-confirmed leak rather than a crash. See "Status — audit complete" at the
-bottom for the final tally.
+packages. Bugs 1-8 below were **confirmed, reproducible crashes** against
+the unmodified binary — each independently re-run to rule out flakes.
+Bugs 9-10 were real, well-evidenced findings at a distinct, explicitly
+lower evidence tier (see their own sections) — one a statically
+unambiguous bug not reproduced as a live crash, the other a confirmed leak
+rather than a crash.
+
+**All 10 are now fixed, on this branch.** See "Fixes applied" below for
+what changed and how each was re-verified; "Status — audit complete" at
+the bottom has the original find-phase tally for reference.
 
 ## Method
 
@@ -465,3 +468,118 @@ cycle efuns/orphan collector, `recompile_object()` hot-reload,
 sub-investigation was blocked by an automated safety classifier on its
 adversarial-sounding brief; picked up directly by hand afterward, which is
 where #9 came from).
+
+## Fixes applied
+
+All 10 findings above are fixed on this branch. Each fix was independently
+re-verified against its own repro (crash → clean error/pass), and the full
+LPC testsuite was run to completion **4× on the ASan+UBSan Debug build and
+1× on a RelWithDebInfo build** — all five runs report `Checks succeeded.`
+with zero ASan/UBSan reports and zero failed checks (611 files / ~5800
+checks each run; the exact check count varies a few dozen between the two
+build types since some checks are Debug-only).
+
+1. **`disassemble()` F_PUSH overflow** — bounded the accumulation loop
+   against `buff`'s remaining space (`fmt::format_to_n`, clamped, explicitly
+   null-terminated). A **second, previously-undocumented overflow of the
+   same shape** was found one frame later in the same function while
+   re-verifying this fix: the instruction's raw-hex-byte dump (`tmp[257]`)
+   overflows the identical way for a long instruction, and needed the
+   identical treatment (bounded, explicitly terminated — `fmt::format_to_n`
+   does not null-terminate on its own, which the first pass at this fix got
+   wrong once before the null-termination was made explicit).
+   `src/compiler/internal/disassembler.cc`.
+2. **`push_function_context()`/`pop_function_context()` asymmetry** — added
+   a `failed_function_context_pushes` counter: a push past the depth cap
+   increments it instead of silently no-op'ing, and a pop consumes that
+   budget first (closing brackets reduce innermost-first, i.e. in exactly
+   the reverse order pushes were attempted, so failed-push pops always
+   arrive before real ones) before touching the real stack.
+   `src/compiler/internal/lexer_utils.cc`.
+3. **`ast_json()`/`dump_tree()` missing recursion cap** — mirrored
+   `optimize()`'s `g_optimize_depth`/`kMaxOptimizeDepth` guard (a `{"k":
+   "too_deep"}` sentinel past depth 500), and converted `ast_json_seq()`'s
+   `NODE_TWO_VALUES` chain walk from recursion to an explicit work-stack,
+   matching how `optimize()`/`i_generate_node()` already flatten that same
+   chain (so this cap bounds genuine expression nesting only, never an
+   object's definition/statement count). `src/compiler/internal/generate.cc`.
+4. **FFI callback use-after-free** — capture `ret_code` into a local before
+   calling into LPC. Re-verification (via the full suite) surfaced a
+   **deeper, related issue** the first fix didn't cover: a callback freeing
+   its own handle mid-dispatch also frees the libffi trampoline
+   (`ffi_closure_free`) that is *currently executing* to have reached the
+   call at all, crashing inside libffi itself rather than on the later
+   struct read. Fixed by tracking a `dispatching` flag on `FfiCallback` and
+   having `ffi_callback_free()` refuse (clean `error()`) to free a callback
+   that's currently dispatching — freeing a callback from its own body has
+   no legitimate use, so refusing it doesn't cost any real functionality.
+   `src/packages/ffi/ffi.cc`.
+5. **FFI call-after-unload** — first attempt made `ffi_unload()` refuse to
+   run at all while any function was ever prepared from that library; the
+   full-suite run caught that this broke the ordinary prepare-call-unload
+   lifecycle (13 existing FFI tests regressed, since `ffi_prepare()` has no
+   matching "un-prepare" to balance a refcount against). Corrected to the
+   originally-documented alternative fix shape: `FfiLibrary` now tracks the
+   IDs of every `FfiFunc` prepared from it; `ffi_unload()` marks each
+   `valid = false` and proceeds with the unload (no refusal), and
+   `ffi_call()` checks `valid` and errors cleanly instead of dereferencing
+   the now-stale address. `src/packages/ffi/ffi.cc`.
+6. **`fill_default_args()` VM eval-stack corruption** — root cause was
+   `push_svalue(x)`'s `STACK_INC; assign_svalue_no_free(sp, x);` expansion
+   running `STACK_INC` before `x` (`call_function_pointer(...)`) is even
+   evaluated; fixed by evaluating the closure's result into a local first,
+   *then* pushing the already-computed value. Also wrapped `sv_funcp`'s ref
+   release and the `fp = saved_fp;` restore in `DEFER` so both happen
+   unconditionally (including when the default-argument expression's
+   `error()` unwinds out), not only on the normal-return path.
+   `src/vm/internal/base/interpret.cc`.
+7. **`MAX_EXPANSION_NESTING` too high for the sanitizer build** — lowered
+   128 → 64, comfortably under the measured 70-survives/80-crashes
+   boundary, mirroring why `kMaxOptimizeDepth`/`kMaxGenerateNodeDepth` were
+   deliberately kept small rather than "plausible"-sized.
+   `src/compiler/internal/lexer_utils.cc`.
+8. **`restore_object()` uninitialized-size abort** — guarded the
+   previously-unguarded array/class oversized-size `error()` paths in
+   `restore_array()`/`restore_class()` with `reset_restore_scratch()`
+   (matching the two mapping error sites that already did this), and added
+   the bounds check `allocate_class_by_size()`/`allocate_empty_class_by_size()`
+   were missing entirely (unlike `allocate_array()`, which already had
+   one), as defense in depth. Also fixed the two related, lower-severity
+   findings noted alongside this one: added the missing `ROB_CLASS_ERROR`
+   branch to `restore_variable()`'s error dispatch (previously silently
+   resolved to `0`), and converted `restore_array()`/`restore_class()`'s
+   raw `array_t* v` to a `std::unique_ptr` so a nested restore call
+   throwing no longer leaks the outer (partially-built) array/class — this
+   fully eliminated the "Bad ref count for array" leak the debug checker
+   was still reporting after the crash fix alone.
+   `src/vm/internal/base/object.cc`, `src/vm/internal/base/class.cc`.
+9. **`socket_acquire()` missing `O_EFUN_SOCKET`** — added the one-line flag
+   set, matching its three siblings (`socket_create()`/`socket_accept()`/
+   `socket_connect()`) exactly. `src/packages/sockets/socket_efuns.cc`.
+10. **`mudlib_error_handler()` diagnostic-mapping leak** — wrapped the
+    mapping itself in a `std::unique_ptr` (released only at the successful
+    `push_refed_mapping` handoff). Re-verification showed this alone wasn't
+    sufficient — the original repro still leaked a shared-string key and a
+    malloc'd filename string — tracing those down surfaced **two further,
+    more general leaks** in the mapping subsystem itself, both fixed:
+    `insert_in_mapping()` (`mapping.cc`) didn't release the shared-string
+    conversion of its key on the `mapping_too_large()`/OOM throw path
+    (affects every `add_mapping_*()` caller, not just this one); and
+    `load_mapping_from_aggregate()` (`mapping.cc`, backing LPC mapping
+    *literals* like `(["x":1,"y":2])`) doesn't free the current/remaining
+    key-value pairs on its own `mapping_too_large()`/OOM throw paths, since
+    the caller (`F_AGGREGATE_ASSOC` in `interpret.cc`) already moves the
+    VM's real `sp` below the whole aggregate *before* calling in — making
+    those elements invisible to the normal error-unwind's stack sweep.
+    Also applied the matching malloc'd-string RAII fix at the two
+    `add_slash(...)` call sites inside `mudlib_error_handler()` itself
+    (the argument is allocated before the call that might reject it).
+    `src/vm/internal/simulate.cc`, `src/vm/internal/base/mapping.cc`.
+
+**Honesty note on the fix process**: three of the ten (1, 4, 5, 10 — FFI and
+the two leak-adjacent fixes) needed a second iteration after the first
+attempt was shown incomplete or actively regressive by re-running the
+repro/full-suite rather than by inspection alone. That's recorded here
+deliberately rather than only presenting the final diffs, since it's the
+same "don't trust it until you've run it" discipline this audit's find
+phase depended on.

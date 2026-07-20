@@ -110,6 +110,16 @@ static std::vector<IncState> inc_stack;
 static function_context_t function_context_stack[MAX_FUNCTION_DEPTH];
 static int last_function_context;
 function_context_t* current_function_context = nullptr;
+// Every push_function_context() call is matched by exactly one
+// pop_function_context() call from the grammar (one per closing `(: :)`),
+// but a push past MAX_FUNCTION_DEPTH is a silent no-op (see
+// push_function_context()) -- the grammar has no way to know a given push
+// didn't happen. Track how many pushes were skipped so pop_function_context()
+// can consume that budget first instead of walking past the real stack.
+// Closing brackets reduce innermost-first, i.e. in the exact reverse order
+// pushes were attempted, so the pops that correspond to failed (deepest)
+// pushes always arrive before the pops that correspond to real ones.
+static int failed_function_context_pushes = 0;
 
 int arrow_efun, evaluate_efun, this_efun, to_float_efun, to_int_efun, to_buffer_efun, new_efun;
 
@@ -485,6 +495,7 @@ void push_function_context() {
 
   if (last_function_context == MAX_FUNCTION_DEPTH - 1) {
     lexerror("Function pointers nested too deep.");
+    ++failed_function_context_pushes;
     return;
   }
   fc = &function_context_stack[++last_function_context];
@@ -502,6 +513,14 @@ void push_function_context() {
 }
 
 void pop_function_context() {
+  // Closing brackets past the depth cap reduce first (innermost-first) and
+  // correspond to pushes that silently no-op'd -- consume that budget
+  // before touching the real stack, so the pop that actually matches the
+  // deepest SUCCESSFUL push is the first one to walk current_function_context.
+  if (failed_function_context_pushes > 0) {
+    --failed_function_context_pushes;
+    return;
+  }
   current_function_context = current_function_context->parent;
   last_function_context--;
 }
@@ -587,8 +606,16 @@ static bool lpc_lex_name_guarded(std::string_view name) {
 
 // Nested rescans stack one Flex buffer + one yylex() frame per level; a
 // pathological chain (#define A0 A1 A1 / ...) must fail cleanly, not
-// blow the C stack.
-#define MAX_EXPANSION_NESTING 128
+// blow the C stack. 128 was measured to still overflow the C stack under
+// this build's ASan instrumentation (each yylex()/lpc_lex_resolve_identifier()
+// frame pair is much larger there): bisection found the real crash boundary
+// at 70 (survives) / 80 (crashes) levels deep, i.e. under sanitizer builds
+// the cap itself was never reached before the process died. Set well below
+// that measured boundary, mirroring how kMaxOptimizeDepth/
+// kMaxGenerateNodeDepth (generate.cc/icode.cc) were deliberately kept small
+// for the same reason (see commit 117cbc1's reasoning) rather than picking
+// a larger "plausible" number.
+#define MAX_EXPANSION_NESTING 64
 
 // Pushes a frame for an expansion buffer about to be pushed. Zero-length
 // expansions push nothing (no buffer, no frame). The invocation position
@@ -1266,6 +1293,7 @@ static void start_new_file_prepared(char* prepared_base, size_t prepared_body, v
   inc_stack.clear();
   last_function_context = -1;
   current_function_context = nullptr;
+  failed_function_context_pushes = 0;
   active_scanner = yyscanner;
   pragmas = DEFAULT_PRAGMAS;
   current_line = 1;
