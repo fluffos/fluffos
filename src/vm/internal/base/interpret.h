@@ -147,6 +147,11 @@ LPC_INT codepoint_lvalue_add(LPC_INT delta);
 buffer_t* svalue_to_buffer_bytes(svalue_t* from);
 
 void call_direct(object_t*, int, int, int);
+std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex);
+// Pad varargs callees + evaluate default-argument helper closures (caller
+// context) before a direct call; returns the new argument count. See
+// interpret.cc for the paths that share it.
+int fill_default_args(program_t* progp, function_t* funcp, int funflags, int num_arg);
 void eval_instruction(char* p);
 
 function_t* setup_inherited_frame(int);

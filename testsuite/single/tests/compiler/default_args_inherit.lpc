@@ -1,0 +1,30 @@
+// Default arguments across every direct-call dispatch path. These used to
+// fail in two distinct ways:
+//
+// 1. Overriding an inherited function that has a default argument (same
+//    parameter name) was a same-second-flaky COMPILE FAILURE: the generated
+//    helper was named #__<wall-clock-seconds>_<fn>_<param> and defined
+//    nomask, so a parent and child compiling within the same second
+//    collided -- "Illegal to redefine 'nomask' function". Names are a
+//    process-global sequence now, unique across the inherit chain.
+//
+// 2. Only F_CALL_FUNCTION_BY_ADDRESS and apply() filled defaults at all:
+//    `::`-qualified calls, local function-pointer calls and simul_efun
+//    calls (call_direct) ran the callee with ZEROS in place of its
+//    declared defaults.
+void do_tests() {
+  object ob = clone_object("/clone/defarg_child");
+  ASSERT_EQ(12, ob->go());   // child override: its own default (2) + 10
+  ASSERT_EQ(12, ob->foo());  // external call dispatches the override too
+  ASSERT_EQ(1, ob->gop());   // ::foo() keeps the PARENT's default (1)
+  ASSERT_EQ(15, ob->foo(5)); // explicit arg still wins
+  destruct(ob);
+
+  object fpob = clone_object("/clone/defarg_fp");
+  ASSERT_EQ(42, fpob->go_fp());  // (: foo :) stored then called
+  ASSERT_EQ(42, fpob->go_fp2()); // immediate (: foo :)()
+  destruct(fpob);
+
+  ASSERT_EQ(77, defarg_simul());  // simul_efun default via call_direct
+  ASSERT_EQ(5, defarg_simul(5));  // explicit arg still wins
+}
