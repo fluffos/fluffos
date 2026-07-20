@@ -243,6 +243,45 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   see commit `117cbc1`'s reasoning), or convert the recursive rescan to an
   explicit-stack iterative form.
 
+## High-confidence finding, statically verified, not yet triggered with a live crash
+
+### 8. `socket_acquire()` never sets `O_EFUN_SOCKET` → dangling `owner_ob` after the acquiring object is destructed
+
+- **Files**: `src/packages/sockets/socket_efuns.cc` — compare `socket_acquire()`
+  (~line 1822-1845: sets `lpc_socks[fd].owner_ob = current_object;` only)
+  against `socket_create()` (~line 505-515), `socket_accept()` (~line 682,
+  803), `socket_connect()` (~line 855), which all pair that assignment with
+  `current_object->flags |= O_EFUN_SOCKET;`. `src/vm/internal/simulate.cc:1334`
+  (`destruct_object()`): `if (ob->flags & O_EFUN_SOCKET) close_referencing_sockets(ob);`
+  — the force-close-on-destruct pass is gated entirely on that flag.
+- **Root cause**: an object that receives a socket via `socket_acquire()`
+  (having never itself called `socket_create`/`socket_accept`/`socket_connect`,
+  so it has no `O_EFUN_SOCKET` flag of its own) becomes `lpc_socks[fd].owner_ob`
+  without the flag ever getting set. If that object is destructed while it
+  still owns the socket, `destruct_object()` skips `close_referencing_sockets()`
+  entirely — the socket is never force-closed and `owner_ob` is left pointing
+  at freed object memory. The next network event on that fd calls
+  `safe_apply(callback, lpc_socks[fd].owner_ob, ...)`, whose very first
+  action is to read `ob->flags` through the dangling pointer.
+- **Evidence tier — different from bugs 1-7**: this is a static-analysis
+  finding backed by direct code reading (the asymmetry between
+  `socket_acquire()` and its three siblings, and the exact flag
+  `destruct_object()` gates on, are unambiguous), **not yet reproduced as a
+  live crash**. A repro was written
+  (`testsuite/single/fuzz_tmp/socketparser/socket_acquire_uaf.lpc`:
+  server/client loopback sockets, `socket_release()`/`socket_acquire()` to
+  hand a socket to a throwaway clone, `destruct()` the clone, then trigger a
+  read event on the orphaned fd) but it depends on real async TCP I/O +
+  `call_out()`-scheduled steps, and single-file `-ftest:` runs shut down
+  synchronously without servicing the backend event loop or pending
+  call_outs (a harness limitation documented in AGENTS.md §7 — "call_outs
+  only fire after the suite in FULL runs, never in single-file runs"), so
+  the timing never lined up in that mode. Confirming this one with an actual
+  crash needs either a full-suite run or a harness that drives the event
+  loop directly.
+- **Fix shape**: add `current_object->flags |= O_EFUN_SOCKET;` to
+  `socket_acquire()`, matching its three siblings.
+
 ## Areas audited with no crash found (real negative results, not gaps)
 
 - **`src/packages/math/math.cc` / `src/packages/matrix/matrix.cc`**: thorough
