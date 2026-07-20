@@ -71,12 +71,11 @@ void rule_new_name(LPC_INT star_modifier, const ScratchString* identifier) {
 
   int var_index = define_new_variable(identifier, current_type | star_modifier);
 
-  /* A scalar `float` global with no initializer is otherwise zero-filled
-   * generically as the integer 0 (allocate_object_variables() zeroes all
-   * object-variable storage uniformly, with no per-slot type awareness), so
-   * it would sit at runtime as T_NUMBER until first assigned. Synthesize an
-   * implicit `= 0.0` here so it starts life as a genuine T_REAL, exactly
-   * like an explicit `float f = 0.0;` produces -- see #993/#1303. */
+  /* allocate_object_variables() zero-fills every object variable as plain
+   * int 0, with no per-slot type awareness -- a scalar `float` global with
+   * no initializer would otherwise sit at runtime as T_NUMBER until first
+   * assigned. Synthesize an implicit `= 0.0` so it's a real T_REAL from
+   * birth, like `float f = 0.0;` would produce. */
   if (!star_modifier && (current_type & ~DECL_MODS) == TYPE_REAL) {
     parse_node_t *expr_node, *real_node, *newnode;
     CREATE_REAL(real_node, 0.0);
@@ -148,12 +147,9 @@ parse_node_t* rule_new_local_def(const ScratchString* name, LPC_INT type_star) {
   }
   int local_num = add_local_name(name, current_type | type_star | LOCAL_MOD_UNUSED);
 
-  /* A scalar `float` local with no initializer is otherwise zero-filled
-   * generically as the integer 0 (push_undefineds() at function entry has
-   * no per-slot type awareness), so it would sit at runtime as T_NUMBER
-   * until first assigned. Synthesize an implicit `= 0.0` here so it starts
-   * life as a genuine T_REAL, exactly like an explicit `float f = 0.0;`
-   * produces -- see #993/#1303. */
+  /* Same reasoning as the global-variable case in rule_new_name() above:
+   * push_undefineds() zero-fills locals as plain int 0, so synthesize an
+   * implicit `= 0.0` for a scalar `float` local with no initializer. */
   if (!type_star && (current_type & ~DECL_MODS) == TYPE_REAL) {
     parse_node_t *res, *real_node;
     CREATE_REAL(real_node, 0.0);

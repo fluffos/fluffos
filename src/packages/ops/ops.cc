@@ -80,14 +80,11 @@ void f_div_eq() {
         if (sp->u.real == 0.0) {
           error("Division by 0nr\n");
         }
-        /* int /= float truncates back to int, matching C/C++ compound-
-         * assignment semantics; see the T_NUMBER case of F_ADD_EQ in
-         * interpret.cc for the full rationale. A properly declared `float`
-         * lvalue is never T_NUMBER here (zero-initialized as T_REAL from
-         * birth) -- this path is reached only by dynamically-typed lvalues
-         * (mixed locals/globals, mapping values, array elements); see
-         * #1303. */
-        sp->u.real = argp->u.number /= sp->u.real;
+        /* Untyped lvalue (mixed/mapping value): promote to float. See the
+         * T_NUMBER case of F_ADD_EQ in interpret.cc for the full rationale. */
+        argp->type = T_REAL;
+        argp->u.real = argp->u.number / sp->u.real;
+        sp->u.real = argp->u.real;
       }
       break;
     }
@@ -431,14 +428,11 @@ void f_mult_eq() {
         sp->type = T_REAL;
         sp->u.real = argp->u.real *= sp->u.number;
       } else {
-        /* int *= float truncates back to int, matching C/C++ compound-
-         * assignment semantics; see the T_NUMBER case of F_ADD_EQ in
-         * interpret.cc for the full rationale. A properly declared `float`
-         * lvalue is never T_NUMBER here (zero-initialized as T_REAL from
-         * birth) -- this path is reached only by dynamically-typed lvalues
-         * (mixed locals/globals, mapping values, array elements); see
-         * #1303. */
-        sp->u.real = argp->u.number *= sp->u.real;
+        /* Untyped lvalue (mixed/mapping value): promote to float. See the
+         * T_NUMBER case of F_ADD_EQ in interpret.cc for the full rationale. */
+        argp->type = T_REAL;
+        argp->u.real = argp->u.number * sp->u.real;
+        sp->u.real = argp->u.real;
       }
       break;
     }
@@ -939,14 +933,11 @@ void f_sub_eq() {
         sp->type = T_REAL;
         sp->u.real = argp->u.real -= sp->u.number;
       } else {
-        /* int -= float truncates back to int, matching C/C++ compound-
-         * assignment semantics; see the T_NUMBER case of F_ADD_EQ in
-         * interpret.cc for the full rationale. A properly declared `float`
-         * lvalue is never T_NUMBER here (zero-initialized as T_REAL from
-         * birth) -- this path is reached only by dynamically-typed lvalues
-         * (mixed locals/globals, mapping values, array elements); see
-         * #1303. */
-        sp->u.real = argp->u.number -= sp->u.real;
+        /* Untyped lvalue (mixed/mapping value): promote to float. See the
+         * T_NUMBER case of F_ADD_EQ in interpret.cc for the full rationale. */
+        argp->type = T_REAL;
+        argp->u.real = argp->u.number - sp->u.real;
+        sp->u.real = argp->u.real;
       }
       break;
     }

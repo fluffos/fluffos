@@ -2882,20 +2882,15 @@ void eval_instruction(char* p) {
               lval->subtype = 0;
               /* both sides are numbers, no freeing required */
             } else if (sp->type == T_REAL) {
-              /* int += float truncates back to int, matching C/C++ compound-
-               * assignment semantics (E1 op= E2 computes in the wider type
-               * then converts the result back to E1's own type -- the plain
-               * '+=' compound C operator below does exactly that: the sum is
-               * computed in double via the usual arithmetic conversion, then
-               * truncated on assignment back to the LPC_INT). A properly
-               * declared `float` variable is never T_NUMBER here -- it's
-               * zero-initialized as T_REAL from birth (see rule_new_name/
-               * rule_new_local_def in grammar_rules_decls.cc) -- so this
-               * path is reached only by dynamically-typed lvalues (mixed
-               * locals/globals, mapping values, array elements) whose
-               * runtime type happens to currently be int; see #1303. */
-              lval->u.number += sp->u.real;
-              lval->subtype = 0;
+              /* A statically int/float-typed lvalue never reaches here with
+               * a float rhs -- the compiler already coerced the rhs to int
+               * (rule_expr_assign, grammar_rules_exprs.cc). This is an
+               * untyped lvalue (mixed variable, mapping value): promote it
+               * to float, since op= is the only way such a slot can ever
+               * become one. */
+              LPC_FLOAT result = lval->u.number + sp->u.real;
+              lval->type = T_REAL;
+              lval->u.real = result;
               /* both sides are numbers, no freeing required */
             } else {
               error(
