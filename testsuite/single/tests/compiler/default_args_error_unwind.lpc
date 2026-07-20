@@ -34,6 +34,12 @@ void do_tests() {
   err = catch(evaluate((: direct :)));
   ASSERT2(stringp(err), "expected error() through a (: :) fp too");
 
+  // 2b. EXTERNAL call (call_other) -- routes through apply_low() in apply.cc,
+  // which has its OWN inline default-args fill loop separate from
+  // interpret.cc's fill_default_args(). This is the ordinary ob->foo() shape.
+  err = catch(this_object()->direct());
+  ASSERT2(stringp(err), "expected error() through apply_low (call_other) default fill");
+
   // 3. inherited call (F_CALL_INHERITED) -- build a parent with the erroring
   // default and a child that reaches it via ::parent_fn().
   rm("/gen_defarg_parent.c");
