@@ -69,7 +69,22 @@ void rule_new_name(LPC_INT star_modifier, const ScratchString* identifier) {
   if ((current_type & ~DECL_MODS) == TYPE_VOID)
     yyerror("Illegal to declare global variable of type void.");
 
-  define_new_variable(identifier, current_type | star_modifier);
+  int var_index = define_new_variable(identifier, current_type | star_modifier);
+
+  /* A scalar `float` global with no initializer is otherwise zero-filled
+   * generically as the integer 0 (allocate_object_variables() zeroes all
+   * object-variable storage uniformly, with no per-slot type awareness), so
+   * it would sit at runtime as T_NUMBER until first assigned. Synthesize an
+   * implicit `= 0.0` here so it starts life as a genuine T_REAL, exactly
+   * like an explicit `float f = 0.0;` produces -- see #993/#1303. */
+  if (!star_modifier && (current_type & ~DECL_MODS) == TYPE_REAL) {
+    parse_node_t *expr_node, *real_node, *newnode;
+    CREATE_REAL(real_node, 0.0);
+    CREATE_BINARY_OP(expr_node, F_VOID_ASSIGN, 0, real_node, 0);
+    CREATE_OPCODE_1(expr_node->r.expr, F_GLOBAL_LVALUE, 0, var_index);
+    newnode = comp_trees[TREE_INIT];
+    CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0, newnode, expr_node);
+  }
 }
 
 void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identifier,
@@ -131,7 +146,20 @@ parse_node_t* rule_new_local_def(const ScratchString* name, LPC_INT type_star) {
     yyerror("Illegal to declare local variable as reference");
     current_type &= ~LOCAL_MOD_REF;
   }
-  add_local_name(name, current_type | type_star | LOCAL_MOD_UNUSED);
+  int local_num = add_local_name(name, current_type | type_star | LOCAL_MOD_UNUSED);
+
+  /* A scalar `float` local with no initializer is otherwise zero-filled
+   * generically as the integer 0 (push_undefineds() at function entry has
+   * no per-slot type awareness), so it would sit at runtime as T_NUMBER
+   * until first assigned. Synthesize an implicit `= 0.0` here so it starts
+   * life as a genuine T_REAL, exactly like an explicit `float f = 0.0;`
+   * produces -- see #993/#1303. */
+  if (!type_star && (current_type & ~DECL_MODS) == TYPE_REAL) {
+    parse_node_t *res, *real_node;
+    CREATE_REAL(real_node, 0.0);
+    CREATE_UNARY_OP_1(res, F_VOID_ASSIGN_LOCAL, 0, real_node, local_num);
+    return res;
+  }
   return nullptr;
 }
 

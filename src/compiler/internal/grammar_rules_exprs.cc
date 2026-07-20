@@ -338,17 +338,30 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
 
     if (opcode == F_ASSIGN) (*result)->l.expr = do_promotions(rval, lval->type);
 
-    /* For arithmetic compound assigns, coerce the RHS to the declared type of
-     * the lvalue, mirroring what '=' does above. This keeps 'float f; f += 1'
-     * a float even when f still holds the integer 0 it was initialized with,
-     * and keeps 'int i; i += 1.5' an int. */
+    /* For arithmetic compound assigns, coerce a NUMBER rhs to REAL when the
+     * lvalue's declared type is float, mirroring what '=' does above. This
+     * keeps 'float f; f += 1' a float even when f still holds whatever
+     * value it was initialized with -- though as of #1303, a declared
+     * float variable is zero-initialized as a genuine T_REAL from birth
+     * (see rule_new_name/rule_new_local_def), so the runtime T_REAL lvalue
+     * branch of F_ADD_EQ/f_*_eq() already widens a NUMBER rhs correctly on
+     * its own and this coercion is now redundant-but-harmless for that
+     * case; kept for clarity/directness.
+     *
+     * There is deliberately no int += float branch here (removed in
+     * #1303): pre-truncating the RHS alone (to_int(rhs)) before the add
+     * does NOT match C/C++ compound-assignment semantics for a negative
+     * RHS -- 'int i = 2; i += -1.9;' must compute in the wider type first
+     * (2 + -1.9 = 0.1) and truncate the SUM (-> 0), not truncate the RHS
+     * first (to_int(-1.9) = -1) and add (-> 1). The runtime T_NUMBER
+     * lvalue branch already does this correctly by computing entirely in
+     * LPC_FLOAT before truncating on assignment back to LPC_INT; adding a
+     * compile-time RHS-only truncation ahead of it would only reintroduce
+     * that rounding bug. */
     if (opcode == F_ADD_EQ || opcode == F_SUB_EQ || opcode == F_MULT_EQ || opcode == F_DIV_EQ) {
       if (lval->type == TYPE_REAL && rval->type == TYPE_NUMBER) {
         (*result)->l.expr = promote_to_float(rval);
         (*result)->type = TYPE_REAL;
-      } else if (lval->type == TYPE_NUMBER && rval->type == TYPE_REAL) {
-        (*result)->l.expr = promote_to_int(rval);
-        (*result)->type = TYPE_NUMBER;
       } else if (opcode == F_ADD_EQ && lval->type == TYPE_BUFFER &&
                  (rval->type == TYPE_STRING || (rval->type & TYPE_MOD_ARRAY))) {
         (*result)->l.expr = promote_to_buffer(rval);
