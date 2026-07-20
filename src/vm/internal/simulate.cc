@@ -3,6 +3,7 @@
 #include "vm/internal/simulate.h"
 
 #include <fcntl.h>     // for O_RDONLY
+#include <memory>      // for unique_ptr
 #include <stdlib.h>    // for exit
 #include <sys/stat.h>  // for load_object struct stat
 #include <stdarg.h>    // for va_start
@@ -2261,15 +2262,31 @@ static void add_message_with_location(char* err) {
 }
 
 static void mudlib_error_handler(char* err, int katch) {
-  mapping_t* m;
   const char* file = nullptr;
   int line = 0;
   svalue_t* mret;
 
-  m = allocate_mapping(6);
+  // A raw m + only-on-success push_refed_mapping(m) would leak m (and
+  // everything already inserted into it) if any add_mapping_*() call below
+  // itself error()s -- e.g. mapping_too_large() when __MAX_MAPPING_SIZE__
+  // is configured smaller than this diagnostic mapping needs. That's a
+  // second error() firing while already inside error handling for a first
+  // one; per AGENTS.md section 4 this needs the same RAII treatment as any
+  // other error()-adjacent allocation.
+  std::unique_ptr<mapping_t, void (*)(mapping_t*)> m_owned(allocate_mapping(6), free_mapping);
+  mapping_t* m = m_owned.get();
   add_mapping_string(m, "error", err);
   if (current_prog) {
-    add_mapping_malloced_string(m, "program", add_slash(current_prog->filename));
+    // add_mapping_malloced_string() only takes ownership of this malloc'd
+    // string if the insert actually succeeds -- if the mapping is already
+    // at its configured size limit it error()s before ever storing the
+    // pointer, leaking it (add_slash()'s allocation already happened, as
+    // the call argument, before add_mapping_malloced_string ran at all).
+    // Hold it via RAII and only relinquish that once the insert succeeds.
+    std::unique_ptr<char, void (*)(char*)> program_str(add_slash(current_prog->filename),
+                                                        [](char* s) { FREE_MSTR(s); });
+    add_mapping_malloced_string(m, "program", program_str.get());
+    program_str.release();
   }
   if (current_object) {
     add_mapping_object(m, "object", current_object);
@@ -2279,13 +2296,15 @@ static void mudlib_error_handler(char* err, int katch) {
     get_line_number_info(&file, &line);
   }
   if (file) {
-    add_mapping_malloced_string(m, "file", add_slash(file));
+    std::unique_ptr<char, void (*)(char*)> file_str(add_slash(file), [](char* s) { FREE_MSTR(s); });
+    add_mapping_malloced_string(m, "file", file_str.get());
+    file_str.release();
   }
   if (line) {
     add_mapping_pair(m, "line", line);
   }
 
-  push_refed_mapping(m);
+  push_refed_mapping(m_owned.release());
   if (katch) {
     STACK_INC;
     *sp = const1;

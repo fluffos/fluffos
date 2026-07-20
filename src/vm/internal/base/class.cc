@@ -52,6 +52,16 @@ array_t* allocate_class(class_def_t* cld, int has_values) {
 array_t* allocate_class_by_size(int size) {
   array_t* p;
 
+  // Unlike allocate_array()/allocate_empty_array(), this took `size`
+  // straight into a DMALLOC() byte-count computation with no validation at
+  // all -- a garbage or out-of-range size (e.g. uninitialized restore-scratch
+  // state reaching restore_class()) produced a garbage byte count and
+  // crashed the debug allocator's own "illegal size" check instead of
+  // failing cleanly. Match allocate_empty_array()'s bound.
+  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    error("Illegal class size.\n");
+  }
+
   num_classes++;
   total_class_size += sizeof(array_t) + sizeof(svalue_t) * (size - 1);
 
@@ -69,6 +79,10 @@ array_t* allocate_class_by_size(int size) {
 
 array_t* allocate_empty_class_by_size(int size) {
   array_t* p;
+
+  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    error("Illegal class size.\n");
+  }
 
   num_classes++;
   total_class_size += sizeof(array_t) + sizeof(svalue_t) * (size - 1);

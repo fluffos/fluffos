@@ -1837,6 +1837,12 @@ int socket_acquire(int fd, svalue_t* read_callback, svalue_t* write_callback,
   lpc_socks[fd].flags &= ~S_RELEASE;
   lpc_socks[fd].owner_ob = current_object;
   lpc_socks[fd].release_ob = nullptr;
+  // Match socket_create()/socket_accept()/socket_connect(): destruct_object()
+  // only force-closes an object's sockets (close_referencing_sockets()) when
+  // O_EFUN_SOCKET is set. Without it, destructing the acquiring object while
+  // it still owns this fd leaves owner_ob dangling -- the next network event
+  // on this fd would dereference freed object memory.
+  current_object->flags |= O_EFUN_SOCKET;
 
   set_read_callback(fd, read_callback);
   set_write_callback(fd, write_callback);
