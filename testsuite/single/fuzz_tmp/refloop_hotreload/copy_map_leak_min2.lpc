@@ -1,0 +1,29 @@
+#define CFG_MAX_MAPPING_SIZE 269
+
+void do_tests() {
+  mixed orig_max = get_config(CFG_MAX_MAPPING_SIZE);
+  mapping big;
+  string err;
+  int i;
+
+  // Build the SOURCE mapping fully under the default (large) limit so its
+  // own construction never touches mapping_too_large() -- isolates the
+  // failure to copy()'s internal deep_copy_mapping()/doCopy() path.
+  big = ([]);
+  for (i = 0; i < 15; i++) {
+    big["k" + i] = i;
+  }
+  ASSERT_EQ(15, sizeof(big));
+
+  // Shrink to 10: still comfortably above what the driver's own
+  // mudlib_error_handler() needs for its diagnostic mapping (<=6 keys), so
+  // the error() we trigger here does not itself cascade into a SECOND,
+  // unrelated mapping_too_large() while building the backtrace -- isolates
+  // this from that separate (pre-existing, out of scope) code path.
+  set_config(CFG_MAX_MAPPING_SIZE, 10);
+  err = catch(copy(big));
+  set_config(CFG_MAX_MAPPING_SIZE, orig_max);
+
+  ASSERT2(stringp(err) && strsrch(err, "exceeded maximum allowed size") != -1,
+    "expected mapping_too_large from copy(): " + err);
+}

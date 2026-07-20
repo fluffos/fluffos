@@ -1,0 +1,67 @@
+// Adversarial math.cc probes: NaN/Inf/extreme values, zero-length &
+// nested-array elements, size-0 vectors, boundary asin/acos/log/sqrt args.
+void do_tests() {
+  mixed err;
+
+  // norm/dotprod/distance/angle with zero-length vectors
+  err = catch(norm(({})));
+  ASSERT(!err);
+  err = catch(dotprod(({}), ({})));
+  ASSERT(!err);
+  err = catch(distance(({}), ({})));
+  ASSERT(!err);
+  err = catch(angle(({}), ({})));
+  ASSERT(!err); // division by zero norms -> NaN result, not a crash
+
+  // nested array element inside a numeric vector
+  err = catch(norm(({ 1, ({ 2, 3 }) })));
+  ASSERT(err);
+  err = catch(dotprod(({ 1, ({ 2 }) }), ({ 1, 2 })));
+  ASSERT(err);
+
+  // object/function/mapping elements
+  err = catch(norm(({ 1, this_object() })));
+  ASSERT(err);
+  err = catch(dotprod(({ 1, (: 1 :) }), ({ 1, 2 })));
+  ASSERT(err);
+  err = catch(distance(({ 1, (["x":1]) }), ({ 1, 2 })));
+  ASSERT(err);
+
+  // huge vector (100000 numeric elements), matched sizes
+  mixed a = allocate(100000, 1);
+  mixed b = allocate(100000, 1);
+  err = catch(norm(a));
+  ASSERT(!err);
+  err = catch(dotprod(a, b));
+  ASSERT(!err);
+
+  // extreme floats through pow/sqrt/log family -- inf/NaN outputs, no crash
+  err = catch(pow(1e300, 1e300));
+  ASSERT(!err);
+  err = catch(pow(-1.0, 0.5));
+  ASSERT(!err);
+  err = catch(pow(0.0, -1.0));
+  ASSERT(!err);
+  float inf = pow(10.0, 400.0);
+  err = catch(sqrt(inf));
+  ASSERT(!err);
+
+  // boundary asin/acos -- must error cleanly, not crash
+  err = catch(asin(1.0000001));
+  ASSERT(err);
+  err = catch(acos(-1.0000001));
+  ASSERT(err);
+  err = catch(log(-1.0));
+  ASSERT(err);
+  err = catch(log(0.0));
+  ASSERT(err);
+  err = catch(sqrt(-1.0));
+  ASSERT(err);
+
+  // mixed variable holding int passed where "float"-only spec'd (no |int)
+  mixed m = 5;
+  err = catch(cos(m));
+  // either coerces or errors cleanly -- must not crash either way
+
+  debug_message("fz_math_edge: all probes completed without crash\n");
+}

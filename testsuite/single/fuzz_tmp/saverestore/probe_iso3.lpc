@@ -1,0 +1,11 @@
+void do_tests() {
+  string huge_inner = ",";
+  while (strlen(huge_inner) < 100001) {
+    huge_inner += huge_inner;
+  }
+  huge_inner = huge_inner[0..100000];
+  string poison = "({({" + huge_inner + "}),})";
+  string err1 = catch(restore_variable(poison));
+  debug_message(sprintf("DBG poison err=%O\n", err1));
+  ASSERT2(1,"done");
+}

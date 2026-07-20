@@ -1,0 +1,9 @@
+void do_tests() {
+  object tp = this_player();
+  write("this_player() = " + (tp ? file_name(tp) : "0") + "\n");
+  if (tp) {
+    object env = environment(tp);
+    write("environment(tp) = " + (env ? file_name(env) : "0") + "\n");
+  }
+  ASSERT(1);
+}

@@ -1,0 +1,17 @@
+string huge_inner;
+int i;
+
+void do_tests() {
+  mixed x;
+  huge_inner = ",";
+  while (strlen(huge_inner) < 100001) {
+    huge_inner += huge_inner;
+  }
+  huge_inner = huge_inner[0..100000];
+  string poison = "({({" + huge_inner + "}),})";
+  string err1 = catch(restore_variable(poison));
+  debug_message(sprintf("DBG poison err=%O\n", err1));
+  string err2 = catch(x = restore_variable("({1,({2,3}),4})"));
+  debug_message(sprintf("DBG followup(%s) err=%O x=%O\n", "({1,({2,3}),4})", err2, x));
+  ASSERT2(1,"done");
+}

@@ -1,0 +1,12 @@
+int cmp(mixed a, mixed b) {
+    // mutate the array being sorted, from inside the comparator
+    g_arr = ({});
+    return a - b;
+}
+mixed *g_arr;
+void do_tests() {
+    int i;
+    g_arr = allocate(200);
+    for (i = 0; i < 200; i++) g_arr[i] = 200 - i;
+    sort_array(g_arr, "cmp", this_object());
+}
