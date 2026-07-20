@@ -141,7 +141,7 @@ void do_tests() {
   // Mapping values and array elements: the actual reported regression
   // (#1303). An int stored in a mapping/array must stay an int across
   // op= with a float RHS, exactly like a plain int local.
-  mapping map = (["count": 5]);
+  mapping map = ([ "count": 5 ]);
   map["count"] += 1.5;
   ASSERT_EQ(1, intp(map["count"]));
   ASSERT_EQ(6, map["count"]);
