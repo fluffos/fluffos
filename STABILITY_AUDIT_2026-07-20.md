@@ -282,7 +282,58 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
 - **Fix shape**: add `current_object->flags |= O_EFUN_SOCKET;` to
   `socket_acquire()`, matching its three siblings.
 
+### 9. `mudlib_error_handler()` leaks its diagnostic mapping when building it triggers a second error (confirmed via the debug ref-count checker, not a segfault)
+
+- **File**: `src/vm/internal/simulate.cc:2263` onward, `mudlib_error_handler()`.
+- **Root cause**: the function builds a diagnostic mapping with a raw,
+  non-RAII pointer (`m = allocate_mapping(6); add_mapping_string(m, "error", err); ...`)
+  and only reaches `push_refed_mapping(m)` on the success path. If
+  `__MAX_MAPPING_SIZE__` has been configured (legitimately, via
+  `set_config()`) below what this diagnostic mapping needs (~6 entries), one
+  of the `add_mapping_*()` calls trips `mapping_too_large()` → `error()` a
+  *second* time while already inside error handling for a first error. That
+  second `error()` unwinds straight out with `m` un-freed — the mapping and
+  every string it's holding onto (an add_slash'd malloced filename, the
+  shared strings `"program"` and the mapping's key) leak permanently, one
+  set per such error, unreachable to any later GC or LPC code.
+- **Different evidence tier from crashes 1-7**: found and confirmed via the
+  driver's own DEBUG ref-count checker (`check_memory()`), which AGENTS.md
+  documents as "a hard CI gate (gcc/clang Debug)" — it is a real,
+  deterministic bug the project's own CI would catch, but it manifests as a
+  leaked-reference report, not a segfault/ASan abort.
+- **Repro** (`testsuite/single/fuzz_tmp/refloop_hotreload/copy_map_leak_min.lpc`
+  — independently re-verified, deterministic, 4 leaked-reference lines every
+  run):
+  ```
+  cd testsuite && ../build-asan/src/driver etc/config.test \
+      -ftest:single/fuzz_tmp/refloop_hotreload/copy_map_leak_min.lpc
+  ```
+  ```
+  Bad ref count for mapping, is 1 - should be 0
+  Bad ref count for malloc string ".../copy_map_leak_min.lpc" add_slash 0429, is 1 - should be 0
+  Bad ref count for shared string "program", is 2 - should be 1
+  Bad ref count for shared string "y", is 2 - should be 1
+  ```
+- **Predates and is unrelated to the reference-loop/hot-reload commit** this
+  was found while auditing — it's pre-existing code, surfaced as a
+  side-effect of probing `copy()`'s interaction with mapping-size limits.
+- **Fix shape**: build the diagnostic mapping through an RAII wrapper (per
+  AGENTS.md §4's standard remedy for this exact hazard shape), or
+  pre-validate against the configured max-mapping-size before starting to
+  populate it.
+
 ## Areas audited with no crash found (real negative results, not gaps)
+
+- **Reference-loop cycle efuns / orphan collector** (`src/packages/contrib/cycles.cc`,
+  `src/packages/develop/checkmemory.cc`, commit `86d13cd`) and
+  **`recompile_object()` hot-reload** (`src/vm/internal/simulate.cc`):
+  extensive adversarial testing (multi-edge cycles into shared ancestors,
+  cycle detection from inside `foreach`/`foreach ref` on the container being
+  iterated, `FP_FUNCTIONAL` staleness across recompiles, recompiling a
+  parent while a child executes its inherited code, nested/reentrant
+  `recompile_object()` calls, self-cyclic variables carried across a swap)
+  found no crash, ASan/UBSan report, or ref-count corruption in either
+  subsystem. Matches the commit's own documented round-2 self-review.
 
 - **`src/packages/math/math.cc` / `src/packages/matrix/matrix.cc`**: thorough
   static review + adversarial dynamic fuzzing (malformed/oversized/NaN/Inf
