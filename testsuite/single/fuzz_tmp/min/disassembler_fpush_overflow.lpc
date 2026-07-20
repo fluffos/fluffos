@@ -1,0 +1,11 @@
+void do_tests() {
+    string src, idx;
+    int i;
+    idx = "";
+    for (i = 0; i < 200; i++) idx += "[0]";
+    src = "mixed a;\nint f() { mixed v = a" + idx + "; return 1; }\n";
+    rm("/gen_dumpprog_target2.c");
+    write_file("/gen_dumpprog_target2.c", src);
+    object ob = load_object("/gen_dumpprog_target2");
+    dump_prog(ob, 1);
+}
