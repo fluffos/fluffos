@@ -1,0 +1,70 @@
+// Regression for two FFI lifetime bugs (src/packages/ffi/ffi.cc):
+//
+// 1. A callback that frees its own handle mid-dispatch. closure_dispatch()
+//    read cb->ret_code after safe_call_function_pointer() returned, but that
+//    LPC call can invoke ffi_callback_free() on this very callback -- freeing
+//    the FfiCallback (and the libffi trampoline currently executing). Now
+//    closure_dispatch() copies ret_code before calling into LPC, and
+//    ffi_callback_free() refuses (clean error) to free a callback while it is
+//    dispatching. The comparator below tries to free itself on its first
+//    call; the sort must complete without a use-after-free.
+//
+// 2. Calling a prepared function after its library was ffi_unload()ed.
+//    FfiFunc cached a raw dlsym() address with no link back to the library;
+//    unloading dlclose()d the handle, so a later ffi_call() jumped into
+//    unmapped memory. ffi_unload() now invalidates every FfiFunc prepared
+//    from the library, and ffi_call() errors cleanly on an invalidated one.
+
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+
+int g_cb;
+int freed_ok;
+
+// qsort comparator that tries to free its own callback handle on first call.
+int cmp(int a_addr, int b_addr) {
+  if (!freed_ok) {
+    // Freeing a callback from inside its own dispatch is refused cleanly now;
+    // the point is that attempting it does not crash the driver.
+    freed_ok = catch(ffi_callback_free(g_cb)) ? 1 : -1;
+  }
+  return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT32) - ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT32);
+}
+#endif
+
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+
+  int lib, qs, i;
+  int *src = ({ 30, 10, 40, 20, 50 });
+  buffer data;
+
+  // --- bug 1: self-free mid-dispatch ---
+  lib = ffi_load("");
+  qs = ffi_prepare(lib, "qsort", FFI_VOID,
+    ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
+  data = ffi_alloc(5 * 4);
+  for (i = 0; i < 5; i++) ffi_write(data, i * 4, FFI_INT32, src[i]);
+  freed_ok = 0;
+  g_cb = ffi_callback((: cmp :), FFI_INT32, ({ FFI_POINTER, FFI_POINTER }));
+  // The comparator attempts to free itself on the first call; surviving this
+  // (and sorting correctly) is the regression signal.
+  ffi_call(qs, ({ data, 5, 4, ffi_callback_addr(g_cb) }));
+  for (i = 0; i < 5; i++)
+    ASSERT_EQ(({ 10, 20, 30, 40, 50 })[i], ffi_read(data, i * 4, FFI_INT32));
+  ASSERT2(freed_ok == 1, "self-free during dispatch should be refused cleanly");
+  // The callback still exists (self-free was refused), so freeing it now,
+  // outside dispatch, succeeds.
+  ffi_callback_free(g_cb);
+  ffi_unload(lib);
+
+  // --- bug 2: call after unload ---
+  lib = ffi_load("");
+  qs = ffi_prepare(lib, "sqrt", FFI_DOUBLE, ({ FFI_DOUBLE }));
+  ffi_unload(lib);  // succeeds; invalidates qs
+  ASSERT2(catch(ffi_call(qs, ({ 4.0 }))),
+    "calling a function whose library was unloaded must error, not crash");
+#endif
+  ASSERT(1);
+}

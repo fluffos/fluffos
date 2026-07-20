@@ -1,9 +1,0 @@
-int foo(int a: (: helper() :)) { return a; }
-int helper() { return 99; }
-void create() {
-  function f = (: foo :);
-  write(f());
-  write("\n");
-  write(evaluate((: foo :)));
-  write("\n");
-}

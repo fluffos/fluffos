@@ -1,6 +1,0 @@
-inherit "/single/fuzz_tmp/defargs_pp/inc/errbase";
-int gop() { return ::foo(); }
-void create() {
-  gop();
-  write("after\n");
-}
