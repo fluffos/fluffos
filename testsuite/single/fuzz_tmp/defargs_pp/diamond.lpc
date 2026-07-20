@@ -1,2 +1,0 @@
-// diamond inheritance: two parents each declare foo() with default args,
-// child inherits both then overrides.

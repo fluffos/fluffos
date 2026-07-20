@@ -34,7 +34,7 @@ void do_tests() {
   // LITERAL with more entries than the (now-shrunk) limit allows, via
   // load_mapping_from_aggregate(). No copy()/cycle efun involved.
   set_config(CFG_MAX_MAPPING_SIZE, 1);
-  catch((["a": 1, "b": 2])); // 2-entry mapping literal vs limit 1
+  catch(([ "a": 1, "b": 2 ]));  // 2-entry mapping literal vs limit 1
   set_config(CFG_MAX_MAPPING_SIZE, orig_max);
 
   ASSERT(1);

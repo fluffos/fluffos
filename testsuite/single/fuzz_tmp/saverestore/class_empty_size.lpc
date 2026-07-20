@@ -10,12 +10,15 @@
 void do_tests() {
   mixed x;
   int ok = 0;
-  if (catch(x = restore_variable("(//)")) ) {
+  if (catch(x = restore_variable("(//)"))) {
     ok = 0;
   } else {
     ok = 1;
   }
-  ASSERT2(ok, "restore_variable(\"(//)\") should either succeed cleanly or throw a catchable error");
+  ASSERT2(
+    ok,
+    "restore_variable(\"(//)\") should either succeed cleanly or throw a catchable error"
+  );
   if (ok) {
     ASSERT_EQ(0, sizeof(x));
   }

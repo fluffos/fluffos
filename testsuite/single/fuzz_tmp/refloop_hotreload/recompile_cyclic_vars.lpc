@@ -109,18 +109,18 @@ private void run_checks() {
   ASSERT_EQ(1, recompile_object(ob));
   ASSERT(ob->get_ring()[0] == ob->get_ring());
   destruct(ob);  // nothing external ever held the ring; must eventually
-                 // become garbage cleanly, not a dangling/UAF reference.
-                 // Note: destruct2() (which actually zeroes the variable
-                 // block, dropping this object's ref into the ring) runs
-                 // later from the idle backend loop, NOT synchronously
-                 // here -- a single-file -ftest: run never reaches that
-                 // idle point, so the ring is still externally-held (via
-                 // ob->variables[], not yet zeroed) as far as
-                 // find_orphaned_cycles() can see; do not assert it's
-                 // collectible yet. This block's only real assertion is
-                 // that destruct() + a still-live self-cycle across a
-                 // recompile_object() swap doesn't crash / corrupt refs --
-                 // the harness's own post-file check_memory() is the gate.
+  // become garbage cleanly, not a dangling/UAF reference.
+  // Note: destruct2() (which actually zeroes the variable
+  // block, dropping this object's ref into the ring) runs
+  // later from the idle backend loop, NOT synchronously
+  // here -- a single-file -ftest: run never reaches that
+  // idle point, so the ring is still externally-held (via
+  // ob->variables[], not yet zeroed) as far as
+  // find_orphaned_cycles() can see; do not assert it's
+  // collectible yet. This block's only real assertion is
+  // that destruct() + a still-live self-cycle across a
+  // recompile_object() swap doesn't crash / corrupt refs --
+  // the harness's own post-file check_memory() is the gate.
 
   ASSERT(1);
 }

@@ -1,12 +1,12 @@
 void do_tests() {
-    mixed *a = allocate(10);
-    mixed s;
-    // extreme range indices
-    catch(s = a[-1000000000000..1000000000000]);
-    catch(s = a[1000000000000..-1000000000000]);
-    catch(s = a[-1..-1]);
-    catch(a[-1000000000000..1000000000000] = ({1,2,3}));
-    string str = "hello";
-    catch(s = str[-1000000000000..1000000000000]);
-    catch(str[2..1000000000000] = "X");
+  mixed *a = allocate(10);
+  mixed s;
+  // extreme range indices
+  catch(s = a[-1000000000000..1000000000000]);
+  catch(s = a[1000000000000..-1000000000000]);
+  catch(s = a[-1..-1]);
+  catch(a[-1000000000000..1000000000000] = ({ 1, 2, 3 }));
+  string str = "hello";
+  catch(s = str[-1000000000000..1000000000000]);
+  catch(str[2..1000000000000] = "X");
 }

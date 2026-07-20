@@ -1,10 +1,15 @@
 # Driver stability audit — 2026-07-20
 
-Triggered by a report that the driver is unstable ("stack corruption in the VM").
-This audit reviewed all 2026 commits, built an ASan+UBSan Debug driver, and
-stress-tested/fuzzed the compiler front-end and several packages. Findings
-below are **confirmed, reproducible crashes**, each independently re-run to
-rule out flakes. Work is ongoing; this file is updated as more findings land.
+Triggered by a report that the driver is unstable ("stack corruption in the
+VM"). This audit reviewed all 2026 commits, built an ASan+UBSan Debug
+driver, and stress-tested/fuzzed the compiler front-end and several
+packages. Bugs 1-8 below are **confirmed, reproducible crashes** — each
+independently re-run against the unmodified binary to rule out flakes.
+Bugs 9-10 are real, well-evidenced findings at a distinct, explicitly
+lower evidence tier (see their own sections) — one is a statically
+unambiguous bug not yet reproduced as a live crash, the other is a
+confirmed leak rather than a crash. See "Status — audit complete" at the
+bottom for the final tally.
 
 ## Method
 
@@ -189,7 +194,9 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   The pre-refactor code had explicit `fatal()` sanity checks around this
   exact sequence that did not carry over into the new shared helper.
   Reachable through **every** caller: `F_CALL_FUNCTION_BY_ADDRESS` (plain
-  direct calls), `F_CALL_INHERITED`, and `FP_LOCAL` function-pointer calls.
+  direct calls, interpret.cc:3403), `F_CALL_INHERITED` (interpret.cc:3446),
+  and `FP_LOCAL` function-pointer calls (interpret.cc:4765) — all three
+  independently reproduced below, same crash signature on each.
 - **This is functionally the same class of bug as the #1295 report that
   commit `ec9b6a4` fixed earlier today** (an eval-stack corruption
   triggered from perfectly ordinary LPC), just in the brand-new
@@ -210,6 +217,15 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   cd testsuite && ../build-asan/src/driver etc/config.test \
       -ftest:single/fuzz_tmp/defargs_pp/min3_nocatch.lpc
   ```
+  The `F_CALL_INHERITED` and `FP_LOCAL` variants crash identically (same
+  "Invalid permissions for mapped object" SIGSEGV signature), independently
+  re-verified:
+  ```
+  cd testsuite && ../build-asan/src/driver etc/config.test \
+      -ftest:single/fuzz_tmp/defargs_pp/inherited_err.lpc     # ::foo() — F_CALL_INHERITED
+  cd testsuite && ../build-asan/src/driver etc/config.test \
+      -ftest:single/fuzz_tmp/defargs_pp/fp_local_err.lpc      # (: foo :)() — FP_LOCAL
+  ```
 - **Fix shape**: wrap the closure call + push + free in an RAII guard (or
   restructure so `sv_funcp`'s ref and `sp`'s position are both restored on
   the unwind path), matching the pattern AGENTS.md §4 already prescribes for
@@ -222,7 +238,7 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   `lpc_lex_resolve_identifier()` → `return yylex(...)` (~line 708).
 - **Root cause**: each level of object-like macro expansion recurses one
   more `yylex()`/`lpc_lex_resolve_identifier()` C-stack frame pair. The
-  256-level cap is checked, but on the ASan-instrumented build (redzone
+  128-level cap is checked, but on the ASan-instrumented build (redzone
   overhead inflates each Flex-generated frame) the process's stack is
   exhausted well before reaching it — bisected boundary: 70 levels survive,
   80 crash, i.e. the cap is only ~60% of the way to the real limit on this
@@ -243,7 +259,20 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   see commit `117cbc1`'s reasoning), or convert the recursive rescan to an
   explicit-stack iterative form.
 
-### 8. `restore_object()`/`restore_variable()`: dirty sizing scratch state → uninitialized heap memory used as an allocation size in `allocate_class_by_size()`
+### 8. `restore_object()`/`restore_variable()`: dirty sizing scratch state → uninitialized heap memory used as an allocation size in `allocate_class_by_size()` ★ remotely reachable, not just in-game
+
+- **Network attack surface, verified directly (not just cited from the
+  investigation)**: `restore_svalue()` is called on **raw, unauthenticated
+  network bytes** with no sanitization beyond a length-prefix bound check —
+  `src/net/transport_libevent.cc:453`, the `PORT_TYPE_MUD` connection type:
+  a peer sends a 4-byte big-endian length prefix followed by that many
+  bytes, which go straight into `restore_svalue(ip->text + 4, &value)`.
+  `src/packages/sockets/socket_efuns.cc:1413` has the same pattern for
+  MUD-mode `efun` sockets. Neither requires any authentication or a logged-in
+  player — just a TCP connection to a MUD-mode port. This means the bug
+  below is not only triggerable by malicious in-game LPC
+  (`restore_variable()`), it's a remote pre-auth crash if a MUD-mode port
+  is exposed.
 
 - **Files**: `src/vm/internal/base/object.cc` — `restore_array()` (size
   check ~line 1031), `grow_restore_sizes()` (~line 271-292), the
@@ -269,10 +298,6 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
      clamps). Whatever garbage value comes out of step 2 flows straight
      into a `DMALLOC()` byte-count computation, which the debug allocator's
      own `if (size <= 0) fatal(...)` turns into a hard process abort.
-  Reachable purely through `restore_svalue()`/`restore_variable()`, which
-  is also fed directly from attacker-controlled network save-data
-  (`net/transport_libevent.cc`, `packages/sockets/socket_efuns.cc`), not
-  just from a two-call in-game sequence.
 - **Repro** (`testsuite/single/fuzz_tmp/saverestore/dirty_state_uninit_probe.lpc`
   — independently re-verified, exit 134/SIGABRT, deterministic): call 1
   poisons the scratch state with a wide array whose last element is an
@@ -287,6 +312,14 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   DBG poison err="*Illegal array size.\n"
   ******** FATAL ERROR: illegal size in debugmalloc()
   ```
+  This repro drives both calls through the `restore_variable()` LPC efun
+  for a simpler, debuggable reproduction — it does **not** independently
+  verify the raw-network two-packet variant. But since the poisoned
+  `save_svalue_depth`/`sizes[]` state is file-scope global and every
+  `restore_svalue()` caller shares it, two consecutive malicious
+  `PORT_TYPE_MUD` packets (no LPC execution needed at all) are plausible
+  by the same mechanism — flagged here as a reasonable inference from the
+  verified root cause, not as something separately tested.
 - **Fix shape**: guard the array-size throw the same way the two mapping
   error sites already are (`reset_restore_scratch()` before erroring), and
   add a bounds check to `allocate_class_by_size()` matching

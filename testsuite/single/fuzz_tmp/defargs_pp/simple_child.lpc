@@ -1,4 +1,0 @@
-inherit "/single/fuzz_tmp/defargs_pp/inc/q1";
-inherit "/single/fuzz_tmp/defargs_pp/inc/q2";
-int test() { return bar() + baz(); }
-void create() { write(test()); write("\n"); }

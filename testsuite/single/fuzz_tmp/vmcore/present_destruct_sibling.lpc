@@ -6,32 +6,32 @@ object *g_siblings;
 int g_destruct_next;
 
 int id(string name) {
-    if (g_destruct_next && g_siblings && sizeof(g_siblings)) {
-        object victim = g_siblings[0];
-        g_siblings = g_siblings[1..];
-        if (victim && victim != this_object()) {
-            destruct(victim);
-        }
+  if (g_destruct_next && g_siblings && sizeof(g_siblings)) {
+    object victim = g_siblings[0];
+    g_siblings = g_siblings[1..];
+    if (victim && victim != this_object()) {
+      destruct(victim);
     }
-    return 0;
+  }
+  return 0;
 }
 
 void do_tests() {
-    object env, searcher;
-    int i;
-    env = new(__FILE__);
-    g_env = env;
-    g_siblings = ({});
-    for (i = 0; i < 20; i++) {
-        object o = new(__FILE__);
-        o->move_self(env);
-        g_siblings += ({ o });
-    }
-    searcher = new(__FILE__);
-    searcher->move_self(env);
-    g_destruct_next = 1;
-    catch(searcher->probe("nonexistent"));
-    catch(present("nonexistent", env));
+  object env, searcher;
+  int i;
+  env = new(__FILE__);
+  g_env = env;
+  g_siblings = ({});
+  for (i = 0; i < 20; i++) {
+    object o = new(__FILE__);
+    o->move_self(env);
+    g_siblings += ({ o });
+  }
+  searcher = new(__FILE__);
+  searcher->move_self(env);
+  g_destruct_next = 1;
+  catch(searcher->probe("nonexistent"));
+  catch(present("nonexistent", env));
 }
 
 void move_self(object dest) { move_object(dest); }

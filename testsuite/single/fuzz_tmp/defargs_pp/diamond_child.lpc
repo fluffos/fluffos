@@ -1,5 +1,0 @@
-inherit "/single/fuzz_tmp/defargs_pp/inc/p1";
-inherit "/single/fuzz_tmp/defargs_pp/inc/p2";
-int foo(int a: (: 4 :)) { return a + 1000; }
-int test() { return foo(); }
-void create() { write(test()); write("\n"); }

@@ -1,3 +1,0 @@
-#include "inc_chain/h0.h"
-int x = LEAF_VAL;
-void create() { write(x); write("\n"); }

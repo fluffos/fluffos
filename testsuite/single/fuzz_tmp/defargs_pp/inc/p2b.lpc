@@ -1,2 +1,0 @@
-inherit "/single/fuzz_tmp/defargs_pp/inc/gp";
-int foo(int b: (: 3 :)) { return b + 200; }

@@ -33,7 +33,10 @@ void do_tests() {
   string poison = "({({" + huge_inner + "}),})";
 
   // Step 1: trigger the error via allocate_array()'s size check while nested.
-  ASSERT2(catch(restore_variable(poison)), "Oversized nested array should be a catchable error, not silently succeed");
+  ASSERT2(
+    catch(restore_variable(poison)),
+    "Oversized nested array should be a catchable error, not silently succeed"
+  );
 
   // Step 2: a subsequent, totally unrelated, well-formed restore call.
   // If save_svalue_depth/sizes are left dirty by step 1, this may read a stale
