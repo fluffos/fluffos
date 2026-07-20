@@ -1,0 +1,35 @@
+// PoC: LPC callback frees its own ffi_callback() handle mid-dispatch.
+// closure_dispatch() in src/packages/ffi/ffi.cc holds a raw FfiCallback*
+// captured before calling into LPC (safe_call_function_pointer). If the
+// LPC callback body calls ffi_callback_free() on its own handle, the
+// FfiCallback struct is `delete`d while closure_dispatch is still running,
+// and the subsequent `lpc_return_to_c(cb->ret_code, ...)` is a
+// heap-use-after-free read.
+#ifdef __PACKAGE_FFI__
+#include <ffi.h>
+int g_cb;
+int cmp(int a_addr, int b_addr) {
+  // Free our own callback handle while libffi is still inside the
+  // trampoline that is calling us right now.
+  ffi_callback_free(g_cb);
+  return 0;
+}
+#endif
+void do_tests() {
+#ifdef __PACKAGE_FFI__
+  int lib, qs;
+  buffer data;
+  if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
+  lib = ffi_load("");
+  qs = ffi_prepare(lib, "qsort", FFI_VOID,
+    ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
+  data = ffi_alloc(2 * 4);
+  ffi_write(data, 0, FFI_INT32, 30);
+  ffi_write(data, 4, FFI_INT32, 10);
+  g_cb = ffi_callback((: cmp :), FFI_INT32, ({ FFI_POINTER, FFI_POINTER }));
+  // qsort on 2 elements guarantees exactly one call to the comparator.
+  ffi_call(qs, ({ data, 2, 4, ffi_callback_addr(g_cb) }));
+  ffi_unload(lib);
+#endif
+  ASSERT(1);
+}
