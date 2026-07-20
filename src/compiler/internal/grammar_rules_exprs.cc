@@ -338,10 +338,15 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
 
     if (opcode == F_ASSIGN) (*result)->l.expr = do_promotions(rval, lval->type);
 
-    /* For arithmetic compound assigns, coerce the RHS to the declared type of
-     * the lvalue, mirroring what '=' does above. This keeps 'float f; f += 1'
-     * a float even when f still holds the integer 0 it was initialized with,
-     * and keeps 'int i; i += 1.5' an int. */
+    /* For arithmetic compound assigns, coerce the RHS to the lvalue's
+     * declared type, mirroring what '=' does above -- this is what keeps a
+     * statically int/float-typed lvalue (a declared variable, or an
+     * element of a typed array like `int *`) at its declared type across
+     * op=. An untyped lvalue (a `mixed` variable, a mapping value) has no
+     * declared type to enforce here and falls through unchanged; the
+     * runtime opcode (F_ADD_EQ/f_*_eq()) then promotes it to float on a
+     * float RHS, since that's the only way such a slot can ever become a
+     * float at all. */
     if (opcode == F_ADD_EQ || opcode == F_SUB_EQ || opcode == F_MULT_EQ || opcode == F_DIV_EQ) {
       if (lval->type == TYPE_REAL && rval->type == TYPE_NUMBER) {
         (*result)->l.expr = promote_to_float(rval);

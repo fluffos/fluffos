@@ -2882,7 +2882,12 @@ void eval_instruction(char* p) {
               lval->subtype = 0;
               /* both sides are numbers, no freeing required */
             } else if (sp->type == T_REAL) {
-              /* int += float promotes to float, matching int + float */
+              /* A statically int/float-typed lvalue never reaches here with
+               * a float rhs -- the compiler already coerced the rhs to int
+               * (rule_expr_assign, grammar_rules_exprs.cc). This is an
+               * untyped lvalue (mixed variable, mapping value): promote it
+               * to float, since op= is the only way such a slot can ever
+               * become one. */
               LPC_FLOAT result = lval->u.number + sp->u.real;
               lval->type = T_REAL;
               lval->u.real = result;

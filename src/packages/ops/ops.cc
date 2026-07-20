@@ -80,7 +80,8 @@ void f_div_eq() {
         if (sp->u.real == 0.0) {
           error("Division by 0nr\n");
         }
-        /* int /= float promotes to float, matching int / float */
+        /* Untyped lvalue (mixed/mapping value): promote to float. See the
+         * T_NUMBER case of F_ADD_EQ in interpret.cc for the full rationale. */
         argp->type = T_REAL;
         argp->u.real = argp->u.number / sp->u.real;
         sp->u.real = argp->u.real;
@@ -427,7 +428,8 @@ void f_mult_eq() {
         sp->type = T_REAL;
         sp->u.real = argp->u.real *= sp->u.number;
       } else {
-        /* int *= float promotes to float, matching int * float */
+        /* Untyped lvalue (mixed/mapping value): promote to float. See the
+         * T_NUMBER case of F_ADD_EQ in interpret.cc for the full rationale. */
         argp->type = T_REAL;
         argp->u.real = argp->u.number * sp->u.real;
         sp->u.real = argp->u.real;
@@ -931,7 +933,8 @@ void f_sub_eq() {
         sp->type = T_REAL;
         sp->u.real = argp->u.real -= sp->u.number;
       } else {
-        /* int -= float promotes to float, matching int - float */
+        /* Untyped lvalue (mixed/mapping value): promote to float. See the
+         * T_NUMBER case of F_ADD_EQ in interpret.cc for the full rationale. */
         argp->type = T_REAL;
         argp->u.real = argp->u.number - sp->u.real;
         sp->u.real = argp->u.real;

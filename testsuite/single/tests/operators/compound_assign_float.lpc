@@ -1,13 +1,27 @@
-// Issue #993: compound assignment must not silently coerce floats to ints.
+// Compound assignment (+= -= *= /=) with a float RHS on an int-holding
+// lvalue: whether the lvalue promotes to float or truncates and stays int
+// depends on whether its type is statically known.
+//
+// A declared int/float variable, or an element of a typed array (`int *`),
+// has a real type contract the compiler can see, so the RHS is coerced to
+// match it at compile time (rule_expr_assign, grammar_rules_exprs.cc) and
+// the lvalue always keeps its declared type.
+//
+// A `mixed` variable or a mapping value has no declared type to enforce.
+// Compound-assign is the only way such a slot can ever become a float, so
+// the runtime opcode (F_ADD_EQ/f_sub_eq/f_mult_eq/f_div_eq) promotes it
+// instead of truncating.
 float global_f;
 
 void do_tests() {
   float f;
-  mixed m;
   int i;
 
-  // An uninitialized float variable holds integer 0; += must still
-  // produce a float (the compiler coerces the int RHS to float).
+  // A declared float starts as a genuine float from birth (T_REAL 0.0),
+  // not integer 0.
+  ASSERT_EQ(1, floatp(f));
+  ASSERT_EQ(1, floatp(global_f));
+
   f += 1;
   ASSERT_EQ(1, floatp(f));
   ASSERT_EQ(1.0, f);
@@ -16,7 +30,6 @@ void do_tests() {
   ASSERT_EQ(1, floatp(global_f));
   ASSERT_EQ(1.0, global_f);
 
-  // Same for the other arithmetic compound assigns.
   f = 0;
   f -= 1;
   ASSERT_EQ(1, floatp(f));
@@ -32,14 +45,37 @@ void do_tests() {
   ASSERT_EQ(1, floatp(f));
   ASSERT_EQ(0.5, f);
 
-  // Once a float, always a float: adding an int keeps the float type.
-  f = 0;
+  // float lvalue with int RHS stays float, in both directions.
+  f = 1.5;
   f += 1;
-  f += 0.0;
   ASSERT_EQ(1, floatp(f));
+  ASSERT_EQ(2.5, f);
 
-  // At runtime, int op= float promotes to float, matching int op float.
-  m = 1;
+  // A declared int keeps its type: the RHS is coerced to int at compile
+  // time, exactly like 'int i = 1.5' truncates on plain assignment.
+  i = 10;
+  i += 1.5;
+  ASSERT_EQ(1, intp(i));
+  ASSERT_EQ(11, i);
+
+  i = 10;
+  i -= 1.5;
+  ASSERT_EQ(1, intp(i));
+  ASSERT_EQ(9, i);
+
+  i = 3;
+  i *= 1.5;
+  ASSERT_EQ(1, intp(i));
+  ASSERT_EQ(3, i);
+
+  i = 7;
+  i /= 2.0;
+  ASSERT_EQ(1, intp(i));
+  ASSERT_EQ(3, i);
+
+  // A `mixed` variable promotes to float -- the only way it can ever
+  // become one, since it has no declared type to enforce.
+  mixed m = 1;
   m += 0.5;
   ASSERT_EQ(1, floatp(m));
   ASSERT_EQ(1.5, m);
@@ -59,16 +95,26 @@ void do_tests() {
   ASSERT_EQ(1, floatp(m));
   ASSERT_EQ(2.0, m);
 
-  // float lvalue with int RHS stays float (unchanged behavior).
-  m = 1.5;
-  m += 1;
-  ASSERT_EQ(1, floatp(m));
-  ASSERT_EQ(2.5, m);
+  // Mapping values promote the same way.
+  mapping map = ([ "count": 5 ]);
+  map["count"] += 1.5;
+  ASSERT_EQ(1, floatp(map["count"]));
+  ASSERT_EQ(6.5, map["count"]);
 
-  // A declared int keeps its type: the RHS is coerced to int, exactly
-  // like 'int i = 1.5' stores 1.
-  i = 10;
-  i += 1.5;
-  ASSERT_EQ(1, intp(i));
-  ASSERT_EQ(11, i);
+  map["fresh"] += 1.5;  // missing key reads as undefined int 0
+  ASSERT_EQ(1, floatp(map["fresh"]));
+  ASSERT_EQ(1.5, map["fresh"]);
+
+  // A typed array element keeps the array's declared element type...
+  int *arr = ({ 5 });
+  arr[0] += 1.5;
+  ASSERT_EQ(1, intp(arr[0]));
+  ASSERT_EQ(6, arr[0]);
+
+  // ...but an untyped (mixed) array element promotes like any other
+  // dynamically-typed lvalue.
+  mixed *marr = ({ 5 });
+  marr[0] += 1.5;
+  ASSERT_EQ(1, floatp(marr[0]));
+  ASSERT_EQ(6.5, marr[0]);
 }
