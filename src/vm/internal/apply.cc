@@ -6,6 +6,7 @@
 #include <cstdio>     // for sprintf
 
 #include "base/internal/tracing.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/base/debug.h"
@@ -262,6 +263,10 @@ retry_for_shadow:
         if (num_arg != funcp->num_arg) {
           auto* saved_fp = fp;
           fp = sp;  // leave the already pushed args on the stack
+          // fp is manually repointed per iteration below; restore it
+          // unconditionally, including if a default-argument closure error()s
+          // and unwinds out of here (AGENTS.md section 4).
+          DEFER { fp = saved_fp; };
 
           // NOTE: this assumes default arguments closure are always generated right after the
           // function in order
@@ -294,20 +299,28 @@ retry_for_shadow:
             svalue_t sv_funcp;
             assign_svalue_no_free(&sv_funcp, sp);
             pop_stack();
+            // Drop sv_funcp's ref on every path, including if the closure
+            // below error()s (AGENTS.md section 4).
+            DEFER { free_svalue(&sv_funcp, "apply_low: default args closure"); };
 
             DEBUG_CHECK(
                 (sv_funcp.type != T_FUNCTION || sv_funcp.u.fp == nullptr) && dump_vm_state(),
                 "apply_low: default args closure returned null.");
 
-            // evaluate the closure in current context
-            push_svalue(call_function_pointer(sv_funcp.u.fp, 0));
-            free_svalue(&sv_funcp, "apply_low: default args closure");
+            // Evaluate the closure into a local BEFORE pushing: push_svalue(x)
+            // is `STACK_INC; assign_svalue_no_free(sp, x);`, so pushing
+            // call_function_pointer(...) directly runs STACK_INC before the
+            // call -- if it throws (an ordinary default expression calling
+            // error()), sp is left one slot high pointing at garbage and the
+            // unwind's pop_n_elems() frees it and crashes. (Sibling of the
+            // same fix in interpret.cc's fill_default_args().)
+            svalue_t* result = call_function_pointer(sv_funcp.u.fp, 0);
+            push_svalue(result);
 
             DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(),
                         "Bad stack after default arguments call.");
           }
 
-          fp = saved_fp;
           num_arg = funcp->num_arg;
         }
       }
