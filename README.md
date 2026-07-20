@@ -67,6 +67,7 @@ FluffOS is the engine. It sits between your LPC source files and the operating s
 - **Simul-efuns** — your mudlib can wrap or replace any efun with an LPC function of the same name, transparently extending the language for all objects.
 - **Applies** — the driver calls standard LPC functions on objects at lifecycle events: `create()` when an object is born, `heart_beat()` on a timer, `init()` when a player enters a room, `clean_up()` during garbage collection.
 - **Networking** — simultaneous Telnet, WebSocket, and TLS connections; IAC option negotiation; MXP/MSP support.
+- **WebSocket LPC debugger** — a source-level debugger (breakpoints, single-stepping, call stack and variable inspection/editing with real names) that any [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) client — including the bundled VS Code extension — can attach to over WebSocket. See [Debugging](#debugging).
 - **Async database I/O** — SQLite3, MySQL, and PostgreSQL queries run in a thread pool so the game loop never blocks.
 - **Modern runtime** — jemalloc allocator, async DNS, event loop based on libevent, cross-platform (Linux, macOS, Windows/MSYS2).
 - **Runs in the browser** — the driver cross-compiles to WebAssembly: a full mudlib boots inside a webpage (the page is the telnet client), with an LPC ↔ JavaScript bridge for `fetch()`, canvas/WebGL and page-driven UIs. See [Building for WebAssembly](#building-for-webassembly-browser).
@@ -339,8 +340,10 @@ The driver processes untrusted input (mudlib code, network bytes, save files), s
   - `simulate.cc`: Game object lifecycle and simulation functions.
 - **`src/compiler/`**: LPC parsing engine (`grammar.y`, `lex.cc`, `generate.cc`).
 - **`src/packages/`**: Modular efun features (math, db, crypto, sockets, jsbridge, etc.).
+- **`src/debugger/`**: The WebSocket LPC debugger — DAP session/transport, breakpoint resolution, stack/variable inspection (see [AGENTS.md §15](AGENTS.md) and [src/debugger/DESIGN.md](src/debugger/DESIGN.md)).
 - **`src/thirdparty/`**: Vendored third-party libraries (libwebsockets, libevent, fmt, nlohmann/json, backward-cpp, …), each a byte-exact copy of an upstream release tag plus a small set of documented FluffOS-local patches; unused test/example/doc trees are pruned. Update one dependency per commit, vendoring from a `git clone` of the upstream tag and re-applying the local patches — the full workflow, the local-patch inventory, and the platform traps (clang configure probes, musl, MinGW runtime DLLs) are documented in [AGENTS.md §14](AGENTS.md).
 - **`tools/wasm/`**: WebAssembly tooling — dependency cross-build, end-to-end build, mudlib packer, node testsuite runner.
+- **`tools/vscode-lpc-debug/`**: VS Code extension for the LPC debugger; `tools/dap-ws-bridge.js` bridges other DAP clients.
 - **`testsuite/`**: Official testsuite containing LPC tests and configurations.
 - **`docs/`**: Documentation site (Markdown, built with Docusaurus — see [docs/README.md](docs/README.md)).
 
@@ -368,6 +371,12 @@ The committed Bison/Flex outputs (`src/compiler/internal/*.autogen.*`) are pinne
 - `recompile_object()` efun: recompile a source file and swap the new program into the live master copy and every clone — no destruct, object identity and variable state preserved (works for the master object, the simul_efun object, and virtual objects too).
 - Compile-time master applies `inherit_program()` and `include_file()` expose the full dependency graph (and can redirect, synthesize, or deny inherits/includes).
 - A reference auto-hot-reload daemon (watch files, reload on change, dependency-ordered) ships in the testsuite; see the [hot reload guide](https://www.fluffos.info/concepts/general/hot_reload).
+
+### Debugging
+- A source-level LPC debugger built into the driver: set breakpoints, single-step, and inspect and edit the call stack, variables (shown with their real source names, not `arg0`/`local0`), and any loaded object — all live, over the network, on a running mud.
+- Speaks the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) over WebSocket, so any DAP client can attach — including the bundled [VS Code extension](tools/vscode-lpc-debug) and, for other editors, a generic ws↔stdio bridge (`tools/dap-ws-bridge.js`).
+- `debug_break()` / `debugger_attached()` efuns for programmatic breakpoints — `debug_break()` is a no-op when nothing is attached, safe to leave in shipped mudlib code.
+- Disabled and zero-cost by default; enable with `debugger port : <port>` in your config file. See the [WebSocket LPC Debugger guide](https://www.fluffos.info/concepts/general/debugger) for setup, security notes, and current limitations.
 
 ### Networking
 - TLS support.

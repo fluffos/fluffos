@@ -21,6 +21,7 @@
 #include "vm/internal/simul_efun.h"
 #include "compiler/internal/icode.h"  // for PUSH_WHAT
 #include "compiler/internal/lexer.h"  // for insstr, FIXME
+#include "debugger/debug_hook.h"
 #include "packages/core/sprintf.h"    // FIXME
 #include "packages/core/regexp.h"     // FIXME
 #include "packages/ops/ops.h"         // FIXME
@@ -2151,6 +2152,11 @@ void eval_instruction(char* p) {
       /* this could be much more efficient ... */
       get_line_number_info((const char**)&f, &l);
       show_lpc_line(f, l);
+    }
+    // Source-level debugger (src/debugger/): breakpoints, stepping, pause.
+    // One load+test+branch when no client is attached (flags == 0).
+    if (g_lpc_debug_flags) {
+      lpc_debugger_instruction_hook();
     }
     instruction = EXTRACT_UCHAR(pc++);
     if (CONFIG_INT(__RC_TRACE_CODE__)) {

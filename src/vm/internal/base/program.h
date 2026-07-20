@@ -169,6 +169,32 @@ struct function_t {
   uint8_t min_arg;
   unsigned char num_local;
   ADDRESS_TYPE address;
+  // Debugger local/argument name table (DESIGN.md §9), captured by
+  // rule_func() (compiler/internal/grammar_rules.cc) whenever "debugger
+  // port" is set. local_names[slot] for slot in [0, num_arg+num_local) is a
+  // program_t::strings index naming that frame slot (args first, then
+  // locals), or -1 if that slot's name wasn't captured -- "debugger port"
+  // was 0 at compile time, this is an anonymous/lambda function (rule_func()
+  // is the only capture site), or the slot belonged to a for/switch-scoped
+  // local whose block had already closed by the time the function finished
+  // compiling (see the "Scoping honesty" note in the design doc). nullptr
+  // when nothing was captured at all; NOT
+  // default-constructed to nullptr by the allocator (function_t entries are
+  // carved out of a realloc'd mem_block, never placement-new'd), so every
+  // code path that allocates a fresh entry (define_new_function()) must set
+  // it explicitly. Heap block tagged TAG_LOCAL_NAMES; freed alongside this
+  // function_t entry in the three places that already do the same for
+  // funcname: deallocate_program() (normal program teardown), epilog()'s
+  // superseded-entry cleanup (a successful compile with duplicate/dead
+  // function_t slots), and clean_parser() (an ABORTED compile -- a parse
+  // error, or an inherit/include denied by a master apply -- discards
+  // every entry in mem_block[A_FUNCTIONS], not just the superseded tail).
+  // Missing the clean_parser() case was a real leak, caught by the Debug
+  // checkmemory.cc sweep only once "debugger port" was set for a full
+  // testsuite run (single/tests/compiler/include_file.lpc's deliberate
+  // include-denial fixtures trip it) -- add any FUTURE local_names free
+  // site here too if function_t ever gains a fourth teardown path.
+  short* local_names;
   // Default args can only be specified in a continuous trailing format
   // and because their function is always generated after the original function
   // the findex value can never be 0, we can use 0 as null value for easy initialization.
