@@ -3,7 +3,8 @@
 // __MAX_MAPPING_SIZE__. Reported separately since it's a real,
 // reproducible ref-count leak, but the root cause lives in PRE-EXISTING
 // driver code (mudlib_error_handler(), src/vm/internal/simulate.cc ~2262),
-// unrelated to the 86d13cd commit.
+// unrelated to the 86d13cd commit -- copy()'s own error/unwind path
+// (verified separately, see copy_map_leak_min2.lpc) is clean.
 //
 // mudlib_error_handler() builds its own diagnostic mapping for
 // master::error_handler() out of a raw (non-RAII) `mapping_t* m`:
@@ -29,15 +30,11 @@ void do_tests() {
 
   // Shrink below what mudlib_error_handler()'s own diagnostic mapping
   // needs (6 slots: error/program/object/trace/file/line), then trigger
-  // ANY ordinary LPC error while current_prog is set (so the handler
-  // actually tries to populate "program"/"trace"/etc). No copy()/cycle
-  // efun involved at all -- a plain array-bounds error is enough.
+  // an ordinary LPC error while current_prog is set: building a mapping
+  // LITERAL with more entries than the (now-shrunk) limit allows, via
+  // load_mapping_from_aggregate(). No copy()/cycle efun involved.
   set_config(CFG_MAX_MAPPING_SIZE, 1);
-  {
-    mixed *empty = ({});
-    int idx = 0;
-    catch(empty[idx]);       // ordinary "Array index out of bounds" error
-  }
+  catch((["a": 1, "b": 2])); // 2-entry mapping literal vs limit 1
   set_config(CFG_MAX_MAPPING_SIZE, orig_max);
 
   ASSERT(1);
