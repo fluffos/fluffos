@@ -41,6 +41,47 @@ private string build_macro_chain(int n) {
   return s;
 }
 
+// A #if whose condition is n-deep nested parens -- drives the recursive
+// #if/#elif evaluator (ifexpr_atom/binop/top in lexer_rules_pp.cc).
+private string build_if_parens(int n) {
+  string s = "#if ";
+  int i;
+  for (i = 0; i < n; i++) {
+    s += "(";
+  }
+  s += "1";
+  for (i = 0; i < n; i++) {
+    s += ")";
+  }
+  s += "\n#endif\nint gate() { return 1; }\n";
+  return s;
+}
+
+// A distinct-macro chain reached through a function-like macro's ARGUMENT --
+// drives lpc_lex_expand_string()'s textual expansion recursion, a different
+// path from build_macro_chain()'s rescan path. Written to the file in chunks
+// (write_file appends): the full source for a large n exceeds
+// __MAX_STRING_LENGTH__ if built as one LPC string.
+private void write_macro_arg_chain(string path, int n) {
+  string chunk;
+  int i;
+  rm(path);
+  write_file(path, "#define M0 1\n");
+  chunk = "";
+  for (i = 1; i < n; i++) {
+    chunk += "#define M" + i + " M" + (i - 1) + "\n";
+    if (sizeof(chunk) > 2000) {
+      write_file(path, chunk);
+      chunk = "";
+    }
+  }
+  if (sizeof(chunk)) {
+    write_file(path, chunk);
+  }
+  write_file(path, "#define WRAP(x) x\n");
+  write_file(path, "int arg_val() { return WRAP(M" + (n - 1) + "); }\n");
+}
+
 void do_tests() {
   object ob;
 
@@ -69,6 +110,26 @@ void do_tests() {
   }
   rm("/gen_deep_macros.c");
 
+  // 20000-deep nested #if parens: must reject the compile cleanly, not
+  // overflow the C stack in the recursive #if evaluator.
+  rm("/gen_deep_if.c");
+  write_file("/gen_deep_if.c", build_if_parens(20000));
+  ob = catch(load_object("/gen_deep_if")) ? 0 : find_object("/gen_deep_if");
+  if (objectp(ob)) {
+    destruct(ob);
+  }
+  rm("/gen_deep_if.c");
+
+  // 20000-deep distinct-macro chain through a function-like macro argument:
+  // must reject the compile cleanly, not overflow the C stack in
+  // lpc_lex_expand_string().
+  write_macro_arg_chain("/gen_deep_argmac.c", 20000);
+  ob = catch(load_object("/gen_deep_argmac")) ? 0 : find_object("/gen_deep_argmac");
+  if (objectp(ob)) {
+    destruct(ob);
+  }
+  rm("/gen_deep_argmac.c");
+
   // A shallow closure nest and a shallow macro chain still compile fine --
   // proves the caps didn't over-reject ordinary code. (A 3-deep (: :) nest
   // is a function returning a function returning a function; we only need it
@@ -91,4 +152,20 @@ void do_tests() {
   ASSERT_EQ(42, ob->val());
   destruct(ob);
   rm("/gen_ok_macros.c");
+
+  // A shallow #if paren nest and a shallow macro-arg chain still compile.
+  rm("/gen_ok_if.c");
+  write_file("/gen_ok_if.c", build_if_parens(20));
+  ob = load_object("/gen_ok_if");
+  ASSERT(objectp(ob));
+  ASSERT_EQ(1, ob->gate());
+  destruct(ob);
+  rm("/gen_ok_if.c");
+
+  write_macro_arg_chain("/gen_ok_argmac.c", 10);
+  ob = load_object("/gen_ok_argmac");
+  ASSERT(objectp(ob));
+  ASSERT_EQ(1, ob->arg_val());
+  destruct(ob);
+  rm("/gen_ok_argmac.c");
 }
