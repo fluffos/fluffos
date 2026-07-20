@@ -1,0 +1,48 @@
+// Regression: restore_object()/restore_variable() (src/vm/internal/base/
+// object.cc) share file-scope sizing-scratch state (save_svalue_depth +
+// the sizes[] buffer). restore_array()'s oversized-array error() path was
+// unguarded (unlike the two restore_mapping() error sites), so it left that
+// scratch state dirty for the NEXT restore_svalue() call; combined with
+// grow_restore_sizes() not zero-filling realloc'd space and
+// allocate_class_by_size() doing zero size validation, a following nested
+// class literal could read an uninitialized sizes[] entry and feed it
+// straight into a DMALLOC() byte count -- aborting the process
+// ("illegal size in debugmalloc()"). Reachable purely through
+// restore_svalue(), which also parses raw network save-data. Both the
+// oversized-array error path (now guarded with reset_restore_scratch()) and
+// allocate_class_by_size() (now bounds-checked) are fixed; every case below
+// must raise a clean, catchable error instead of crashing.
+void do_tests() {
+  string huge_inner, poison;
+  int i;
+
+  // A wide array whose last element is an oversized (> __MAX_ARRAY_SIZE__)
+  // nested array: throws "Illegal array size" mid-restore. Must be catchable
+  // and must NOT leave the sizing scratch state dirty.
+  huge_inner = ",";
+  while (strlen(huge_inner) < 100001) {
+    huge_inner += huge_inner;
+  }
+  huge_inner = huge_inner[0..100000];
+  poison = "({";
+  for (i = 0; i < 150; i++) {
+    poison += "({0,}),";
+  }
+  poison += "({" + huge_inner + "}),})";
+  ASSERT2(catch(restore_variable(poison)), "oversized nested array must error cleanly");
+
+  // Immediately follow with a truncated, doubly-nested class literal -- the
+  // exact shape that used to read the stale/uninitialized sizes[] entry into
+  // allocate_class_by_size(). Must also error cleanly, not crash.
+  ASSERT2(catch(restore_variable("(/(/9")), "truncated nested class must error cleanly");
+
+  // A well-formed restore right after the two errors must still work, proving
+  // the scratch state was reset rather than left dirty.
+  ASSERT_EQ(7, restore_variable("7"));
+  ASSERT_EQ(3, sizeof(restore_variable("({1,2,3,})")));
+
+  // A malformed class literal passed to restore_variable() alone now raises a
+  // catchable ROB_CLASS_ERROR (it used to silently resolve to 0, since
+  // restore_variable()'s error dispatch had no ROB_CLASS_ERROR branch).
+  ASSERT2(catch(restore_variable("(/(/9")), "malformed class must be catchable, not silent 0");
+}
