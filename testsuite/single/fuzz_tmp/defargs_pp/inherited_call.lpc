@@ -1,2 +1,0 @@
-int foo(int a: (: 7 :)) { return a; }
-int gop() { return ::foo(); }

@@ -39,7 +39,7 @@ private void run_checks() {
     "  return (: g :);\n" +          // captures global g -> FP_FUNCTIONAL, vio-relative
     "}\n" +
     "function make_bound_closure() {\n" +
-    "  return (: g + h + $1 :);\n" + // globals + a bound positional param
+    "  return (: g + h + $1 :);\n" +  // globals + a bound positional param
     "}\n" +
     "function make_local_fp() { return (: bump :); }\n" +
     "int bump() { return g++; }\n" +

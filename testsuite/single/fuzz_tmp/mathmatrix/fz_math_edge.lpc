@@ -11,7 +11,7 @@ void do_tests() {
   err = catch(distance(({}), ({})));
   ASSERT(!err);
   err = catch(angle(({}), ({})));
-  ASSERT(!err); // division by zero norms -> NaN result, not a crash
+  ASSERT(!err);  // division by zero norms -> NaN result, not a crash
 
   // nested array element inside a numeric vector
   err = catch(norm(({ 1, ({ 2, 3 }) })));
@@ -24,7 +24,7 @@ void do_tests() {
   ASSERT(err);
   err = catch(dotprod(({ 1, (: 1 :) }), ({ 1, 2 })));
   ASSERT(err);
-  err = catch(distance(({ 1, (["x":1]) }), ({ 1, 2 })));
+  err = catch(distance(({ 1, ([ "x": 1 ]) }), ({ 1, 2 })));
   ASSERT(err);
 
   // huge vector (100000 numeric elements), matched sizes

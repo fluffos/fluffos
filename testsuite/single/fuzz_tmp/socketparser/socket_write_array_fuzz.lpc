@@ -66,7 +66,7 @@ void do_next_write() {
   switch (step) {
     case 1:
       // Mixed valid/invalid element types in one array.
-      payload = ({ 1, 2.5, "bad", ({1,2}), ([ "a":1 ]), this_object(), 0, -1, 0x7fffffff });
+      payload = ({ 1, 2.5, "bad", ({ 1, 2 }), ([ "a": 1 ]), this_object(), 0, -1, 0x7fffffff });
       ret = socket_write(client_fd, payload);
       call_out("do_next_write", 0);
       return;
@@ -108,7 +108,7 @@ void do_next_write() {
       // be zero-filled per element, not recursed).
       payload = allocate(10);
       for (i = 0; i < 10; i++) {
-        payload[i] = ({ ({1,2,3}), ([1:2]), "str", 3.14, i })[i % 5];
+        payload[i] = ({ ({ 1, 2, 3 }), ([ 1: 2 ]), "str", 3.14, i })[i % 5];
       }
       ret = socket_write(client_fd, payload);
       call_out("finish", 0);

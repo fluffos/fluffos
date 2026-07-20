@@ -1,2 +1,1 @@
 int foo(int a: (: error("boom\n") :)) { return a; }
-int gop() { return ::foo(); }

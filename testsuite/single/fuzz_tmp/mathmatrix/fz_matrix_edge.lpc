@@ -35,13 +35,13 @@ void do_tests() {
   ASSERT(err);
 
   // mapping instead of array entirely
-  mixed notarr = (["a":1]);
+  mixed notarr = ([ "a": 1 ]);
   err = catch(translate(notarr, 0.0, 0.0, 0.0));
   ASSERT(err);
 
   // NaN/Inf transform args (not array elements) -- must not crash
   float inf = pow(10.0, 400.0);
-  float nan = pow(-1.0, 0.5); // NaN via math.cc itself, no div-by-zero trap
+  float nan = pow(-1.0, 0.5);  // NaN via math.cc itself, no div-by-zero trap
   arr = allocate(16, 1.0);
   err = catch(translate(arr, inf, 0.0, 0.0));
   ASSERT(!err);

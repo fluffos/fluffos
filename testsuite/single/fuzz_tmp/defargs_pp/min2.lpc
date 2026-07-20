@@ -1,5 +1,0 @@
-int foo(int a: (: error("boom\n") :)) { return a; }
-void create() {
-  mixed err = catch(foo());
-  write("caught: " + err + "\n");
-}

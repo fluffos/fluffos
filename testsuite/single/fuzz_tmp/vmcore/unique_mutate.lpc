@@ -1,11 +1,11 @@
 mixed *g_arr;
 mixed keyf(mixed x) {
-    g_arr = ({});
-    return x;
+  g_arr = ({});
+  return x;
 }
 void do_tests() {
-    int i;
-    g_arr = allocate(200);
-    for (i = 0; i < 200; i++) g_arr[i] = i % 20;
-    catch(unique_array(g_arr, "keyf"));
+  int i;
+  g_arr = allocate(200);
+  for (i = 0; i < 200; i++) g_arr[i] = i % 20;
+  catch(unique_array(g_arr, "keyf"));
 }
