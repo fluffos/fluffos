@@ -243,9 +243,66 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   see commit `117cbc1`'s reasoning), or convert the recursive rescan to an
   explicit-stack iterative form.
 
+### 8. `restore_object()`/`restore_variable()`: dirty sizing scratch state → uninitialized heap memory used as an allocation size in `allocate_class_by_size()`
+
+- **Files**: `src/vm/internal/base/object.cc` — `restore_array()` (size
+  check ~line 1031), `grow_restore_sizes()` (~line 271-292), the
+  `save_svalue_depth`/`sizes[]` scratch globals (~line 74-75);
+  `src/vm/internal/base/class.cc:52`, `allocate_class_by_size(int size)`.
+- **Root cause, a 3-part chain**:
+  1. `restore_array()`'s "too many elements" path throws a genuine C++
+     `error()` ("Illegal array size.") from inside `allocate_array()`. Unlike
+     the two `restore_mapping()` error sites (already guarded by
+     `reset_restore_scratch()`, the fix behind AGENTS.md's documented
+     "stale sizes" lesson), this array-size throw is **not** guarded, so it
+     skips `restore_svalue()`'s own cleanup and leaves the file-scope
+     `save_svalue_depth`/`sizes[]` scratch state dirty for whatever
+     `restore_svalue()` call happens next.
+  2. `grow_restore_sizes()` grows `sizes[]` via `realloc()` without
+     zero-filling the newly-extended region (only the very first allocation
+     is zeroed). Once the dirtied `save_svalue_depth` walks past the
+     highest index a call actually wrote, reading `sizes[save_svalue_depth - 1]`
+     returns genuine uninitialized heap memory.
+  3. `allocate_class_by_size(int size)` performs **zero validation** of
+     `size` — no bounds check at all, unlike `allocate_array()` (which
+     cleanly errors on an oversized count) or `allocate_mapping()` (which
+     clamps). Whatever garbage value comes out of step 2 flows straight
+     into a `DMALLOC()` byte-count computation, which the debug allocator's
+     own `if (size <= 0) fatal(...)` turns into a hard process abort.
+  Reachable purely through `restore_svalue()`/`restore_variable()`, which
+  is also fed directly from attacker-controlled network save-data
+  (`net/transport_libevent.cc`, `packages/sockets/socket_efuns.cc`), not
+  just from a two-call in-game sequence.
+- **Repro** (`testsuite/single/fuzz_tmp/saverestore/dirty_state_uninit_probe.lpc`
+  — independently re-verified, exit 134/SIGABRT, deterministic): call 1
+  poisons the scratch state with a wide array whose last element is an
+  oversized (>100000-element) nested array; call 2 is a small truncated
+  nested class literal (`"(/(/9"`) whose own one-level-deeper nesting reads
+  straight into the poisoned, uninitialized region.
+  ```
+  cd testsuite && ../build-asan/src/driver etc/config.test \
+      -ftest:single/fuzz_tmp/saverestore/dirty_state_uninit_probe.lpc
+  ```
+  ```
+  DBG poison err="*Illegal array size.\n"
+  ******** FATAL ERROR: illegal size in debugmalloc()
+  ```
+- **Fix shape**: guard the array-size throw the same way the two mapping
+  error sites already are (`reset_restore_scratch()` before erroring), and
+  add a bounds check to `allocate_class_by_size()` matching
+  `allocate_array()`'s, as defense in depth.
+- **Related, lower-severity findings from the same investigation** (not
+  separately counted): `restore_variable()` has no `ROB_CLASS_ERROR` branch
+  (unlike `restore_object_from_line()`, which does), so a malformed class
+  literal passed to `restore_variable()` alone silently resolves to `0`
+  instead of raising a catchable error; and a single oversized-nested-array
+  `restore_variable()` call leaks the outer `array_t` on the same unguarded
+  throw path (confirmed via the debug ref-count checker, see
+  `testsuite/single/fuzz_tmp/saverestore/dirty_state_array.lpc`).
+
 ## High-confidence finding, statically verified, not yet triggered with a live crash
 
-### 8. `socket_acquire()` never sets `O_EFUN_SOCKET` → dangling `owner_ob` after the acquiring object is destructed
+### 9. `socket_acquire()` never sets `O_EFUN_SOCKET` → dangling `owner_ob` after the acquiring object is destructed
 
 - **Files**: `src/packages/sockets/socket_efuns.cc` — compare `socket_acquire()`
   (~line 1822-1845: sets `lpc_socks[fd].owner_ob = current_object;` only)
@@ -282,7 +339,7 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
 - **Fix shape**: add `current_object->flags |= O_EFUN_SOCKET;` to
   `socket_acquire()`, matching its three siblings.
 
-### 9. `mudlib_error_handler()` leaks its diagnostic mapping when building it triggers a second error (confirmed via the debug ref-count checker, not a segfault)
+### 10. `mudlib_error_handler()` leaks its diagnostic mapping when building it triggers a second error (confirmed via the debug ref-count checker, not a segfault)
 
 - **File**: `src/vm/internal/simulate.cc:2263` onward, `mudlib_error_handler()`.
 - **Root cause**: the function builds a diagnostic mapping with a raw,
@@ -341,9 +398,37 @@ rule out flakes. Work is ongoing; this file is updated as more findings land.
   already carry the 2026 hardening (per-element type checks, out-of-band
   status codes replacing the old sentinel-float bug). Clean.
 
-## Status
+## Status — audit complete
 
-7 confirmed, independently-verified crashing bugs so far (4 compiler
-front-end / VM core, 2 FFI package, 1 hitting both). Audit continuing
-across save/restore_object, sockets/parser, and reference-loops/hot-reload;
-this file will be updated as further findings are confirmed.
+**8 confirmed, independently-verified crashing bugs** (each reproduced by a
+second, independent run — most against the exact same commit,
+`dca0eae`/`aec12ca`-era tip):
+
+1. `disassemble()` stack-buffer-overflow — live-driver reachable via
+   `dump_prog()` (package `develop`).
+2. `push_function_context()`/`pop_function_context()` depth-cap asymmetry —
+   null-pointer deref, 11 nested closures.
+3. `ast_json()`/`dump_tree()` missing recursion cap — `lpcc --ast` segfault.
+4. FFI callback use-after-free (callback frees its own handle mid-dispatch).
+5. FFI call-after-unload SIGSEGV.
+6. `fill_default_args()` VM eval-stack corruption — **the closest match to
+   the original report**, in the brand-new default-arguments feature.
+7. Macro-expansion nesting cap (128) too high for the sanitizer build —
+   real overflow at ~80 levels.
+8. `restore_object()`/`restore_variable()` dirty scratch state →
+   uninitialized heap memory used as an `allocate_class_by_size()` size —
+   hard process abort (`illegal size in debugmalloc()`).
+
+Plus **2 further real, well-evidenced bugs** at an adjacent (not
+strictly "crash") tier: #9 `socket_acquire()`'s missing `O_EFUN_SOCKET`
+flag (a statically-unambiguous dangling-pointer setup, not yet triggered
+live — needs real async socket timing a single-file test run can't
+service) and #10 `mudlib_error_handler()`'s ref-count leak (confirmed via
+the project's own hard CI-gating debug checker).
+
+Audited with genuine adversarial effort and found clean: reference-loop
+cycle efuns/orphan collector, `recompile_object()` hot-reload,
+`math.cc`/`matrix.cc`. Parser/sockets got a lighter pass (one dispatched
+sub-investigation was blocked by an automated safety classifier on its
+adversarial-sounding brief; picked up directly by hand afterward, which is
+where #9 came from).

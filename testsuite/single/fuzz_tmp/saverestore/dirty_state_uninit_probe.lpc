@@ -1,0 +1,38 @@
+// Push the pass-1 sizing scratch buffer `sizes[]` (src/vm/internal/base/object.cc,
+// grow_restore_sizes()) past its initial 128-entry zero-initialized capacity via
+// a WIDE (many-sibling, shallow) array, so that the tail entries beyond however
+// many containers this call actually uses are heap-garbage (RESIZE()/realloc does
+// not zero-fill the newly extended region). The LAST sibling is an oversized
+// (>100000 element) array, whose allocate_array() call throws "Illegal array
+// size." while save_svalue_depth is deep in the dirtied range -- leaving
+// save_svalue_depth and sizes[] dirty for the very next restore_svalue() call
+// (see dirty_state_class_oob.lpc for the base mechanism).
+//
+// The follow-up call is a NESTED class literal so its own processing performs
+// ONE MORE save_svalue_depth increment before the interesting read, landing on
+// an entry beyond anything this call ever wrote -- i.e. genuine uninitialized
+// heap memory used directly as an allocation size by allocate_class_by_size(),
+// which (unlike allocate_array()) performs NO size validation at all.
+
+void do_tests() {
+  mixed x;
+  int i;
+  string wide = "";
+  for (i = 0; i < 150; i++) {
+    wide += "({0,}),";
+  }
+  string huge_inner = ",";
+  while (strlen(huge_inner) < 100001) {
+    huge_inner += huge_inner;
+  }
+  huge_inner = huge_inner[0..100000];
+  string poison = "({" + wide + "({" + huge_inner + "}),})";
+
+  string err1 = catch(restore_variable(poison));
+  debug_message(sprintf("DBG poison err=%O\n", err1));
+
+  string err2 = catch(x = restore_variable("(/(/9"));
+  debug_message(sprintf("DBG exploit err=%O x=%O\n", err2, x));
+
+  ASSERT2(1, "reached end without crashing");
+}
