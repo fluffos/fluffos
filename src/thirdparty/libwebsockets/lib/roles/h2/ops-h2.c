@@ -1014,7 +1014,7 @@ rops_perform_user_POLLOUT_h2(struct lws *wsi)
 		/* priority 1: post compression-transform buffered output */
 
 #if defined(LWS_ROLE_WS)
-		if (w->h2_stream_carries_ws) {
+		if (w->h2_stream_carries_ws && w->buflist_out) {
 			/*
 			 * ws-over-h2: whole DATA frames parked by
 			 * lws_h2_frame_write() waiting for tx credit.  Gate
@@ -1026,58 +1026,29 @@ rops_perform_user_POLLOUT_h2(struct lws *wsi)
 			 * once our own frames are gone.  If nothing of ours
 			 * is parked, fall through to normal servicing.
 			 */
-			if (w->buflist_out) {
-				if (lws_h2_ws_drain_parked_tx(wsi, w) < 0) {
-					lwsl_info("%s signalling to close\n",
-						  __func__);
-					lws_close_free_wsi(w,
-						LWS_CLOSE_STATUS_NOSTATUS,
-						"h2 end stream 1");
-					wa = &wsi->mux.child_list;
-					goto next_child;
-				}
-				if (!w->buflist_out)
-					/* fully drained: let the user write */
-					lws_callback_on_writable(w);
-				/*
-				 * else still skint: stay quiet, the
-				 * WINDOW_UPDATE handler re-arms every child
-				 */
+
+			if (lws_h2_ws_drain_parked_tx(wsi, w) < 0) {
+				lwsl_info("%s signalling to close\n",
+					  __func__);
+				lws_close_free_wsi(w,
+					LWS_CLOSE_STATUS_NOSTATUS,
+					"h2 end stream 1");
 				wa = &wsi->mux.child_list;
 				goto next_child;
 			}
-#if !defined(LWS_WITHOUT_EXTENSIONS)
-			/*
-			 * Tx path extension with more to send (eg,
-			 * permessage-deflate whose compressed output
-			 * exceeded its chunk buffer).  The h1 path services
-			 * this from rops_handle_POLLOUT_ws() priority 5; this
-			 * loop is the ONLY POLLOUT servicing an encapsulated
-			 * child ever gets, so it must do the same -- while
-			 * tx_draining_ext is set, lws_send_pipe_choked()
-			 * reports choked, so the user callback will never
-			 * write again and the connection wedges for good.
-			 */
-			if (lwsi_role_ws(w) &&
-			    lwsi_state(w) == LRS_ESTABLISHED &&
-			    w->ws && w->ws->tx_draining_ext) {
-				if (lws_write(w, NULL, 0,
-					      LWS_WRITE_CONTINUATION) < 0) {
-					lwsl_info("%s signalling to close\n",
-						  __func__);
-					lws_close_free_wsi(w,
-						LWS_CLOSE_STATUS_NOSTATUS,
-						"h2 ws ext drain");
-					wa = &wsi->mux.child_list;
-					goto next_child;
-				}
+			if (!w->buflist_out)
+				/* fully drained: let the user write */
 				lws_callback_on_writable(w);
-				wa = &wsi->mux.child_list;
-				goto next_child;
-			}
+			/*
+			 * else still skint: stay quiet, the
+			 * WINDOW_UPDATE handler re-arms every child
+			 */
+			wa = &wsi->mux.child_list;
+			goto next_child;
+		}
 #endif
-		} else
-#endif
+		/* ... for both ws-over-h2 and h2, deal with partial at nwsi */
+
 		if (lws_has_buffered_out(w)) {
 			lwsl_debug("%s: completing partial\n", __func__);
 			if (lws_issue_raw(w, NULL, 0) < 0) {
@@ -1091,6 +1062,34 @@ rops_perform_user_POLLOUT_h2(struct lws *wsi)
 			wa = &wsi->mux.child_list;
 			goto next_child;
 		}
+
+#if defined(LWS_ROLE_WS) && !defined(LWS_WITHOUT_EXTENSIONS)
+		/*
+		 * Tx path extension with more to send (eg, permessage-deflate
+		 * whose compressed output exceeded its chunk buffer).  The h1
+		 * path services this from rops_handle_POLLOUT_ws() priority 5;
+		 * this loop is the ONLY POLLOUT servicing an encapsulated
+		 * child ever gets, so it must do the same -- while
+		 * tx_draining_ext is set, lws_send_pipe_choked() reports
+		 * choked, so the user callback will never write again and the
+		 * connection wedges for good.  Sits after the nwsi-partial
+		 * branch above, mirroring h1's priority order.
+		 */
+		if (w->h2_stream_carries_ws && lwsi_role_ws(w) &&
+		    lwsi_state(w) == LRS_ESTABLISHED &&
+		    w->ws && w->ws->tx_draining_ext) {
+			if (lws_write(w, NULL, 0, LWS_WRITE_CONTINUATION) < 0) {
+				lwsl_info("%s signalling to close\n", __func__);
+				lws_close_free_wsi(w, LWS_CLOSE_STATUS_NOSTATUS,
+						   "h2 ws ext drain");
+				wa = &wsi->mux.child_list;
+				goto next_child;
+			}
+			lws_callback_on_writable(w);
+			wa = &wsi->mux.child_list;
+			goto next_child;
+		}
+#endif
 
 		/* priority 2: pre compression-transform buffered output */
 
