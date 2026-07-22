@@ -142,11 +142,11 @@ void lpc_lex_count_newlines(const char* text, int len);
 // $N / $ function-pointer parameter tokens
 // ---------------------------------------------------------------------------
 
-// Sentinel meaning: the token was too long to be valid; the caller must
-// retry via `return yylex(yylval_param, yyscanner)` itself. A recursive
-// yylex() call is kept visible at each of its call sites in lexer.l (matching
-// every other such call site there) rather than hidden inside this
-// function, so this can't just do the retry itself.
+// Sentinel meaning: the token was too long to be valid (reported here);
+// no token was produced. The lexer.l rule's action falls through so its
+// own yylex() frame keeps scanning -- same no-token convention as
+// LPC_TOKEN_RESCAN (lexer.h), kept as a distinct constant only because
+// this helper predates that one and its callers test it by name.
 inline constexpr int kLpcLexFunctionParamRetry = -2;
 
 // Handles both "$" and "$N" (text/len covers whichever matched). Returns

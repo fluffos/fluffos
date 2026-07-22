@@ -1,0 +1,31 @@
+// Deep expression-tree shapes that ride the PARSER stack (right-nested
+// ternary chains; parenthesized left-nesting-through-the-condition, the
+// deep-descent shape of trees.cc's insert_pop_value): both are bounded
+// by Bison's YYMAXDEPTH and must die with a clean "memory exhausted"
+// compile error, never a C-stack overflow. Complements
+// deep_expr_recursion.lpc, which pins the LEFT-nested chains that keep
+// the parser stack shallow but build unboundedly deep trees (those hit
+// icode.cc's explicit generation-depth cap instead).
+void do_tests() {
+  string err;
+  string src;
+
+  // Left-nested-through-condition ternary, discarded (insert_pop_value's
+  // deep-descent shape). The leading parens force parser-stack growth ->
+  // bounded by YYMAXDEPTH with a clean error.
+  src = "void f() { " + repeat_string("(", 20000) + "1" + repeat_string("?0:0)", 20000) + "; }\n";
+  rm("/gen_probe_tern.c");
+  write_file("/gen_probe_tern.c", src);
+  err = catch(load_object("/gen_probe_tern"));
+  ASSERT2(stringp(err), "20000-deep paren ternary must fail cleanly");
+  rm("/gen_probe_tern.c");
+
+  // Right-nested no-paren ternary chain as a used value: right-nesting
+  // rides the parser stack -> same clean bound.
+  src = "int f() { return " + repeat_string("1?2:", 30000) + "3; }\n";
+  rm("/gen_probe_tern2.c");
+  write_file("/gen_probe_tern2.c", src);
+  err = catch(load_object("/gen_probe_tern2"));
+  ASSERT2(stringp(err), "30000-deep right ternary must fail cleanly");
+  rm("/gen_probe_tern2.c");
+}

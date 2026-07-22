@@ -26,6 +26,17 @@
 // PpMacro / CondState / LpcMacroTable live in compiler.h (they are
 // CompileState members).
 
+// Cap on macro-expansion nesting depth, shared by BOTH expansion engines:
+// the rescan-driven one (lpc_lex_resolve_identifier, counted in LIVE
+// expansion buffers) and the textual argument pre-expander
+// (lpc_lex_expand_string, counted in work-stack frames). Both are
+// iterative -- a level costs a Flex buffer / a work-stack entry on the
+// heap, never a C-stack frame -- so this bounds runaway chains and their
+// memory, not stack safety. Kept at 65535 as a deliberately generous
+// "any sane program fits" limit (~a few hundred bytes per level at full
+// depth).
+inline constexpr size_t kLpcMaxExpansionNesting = 65535;
+
 // Helpers
 ScratchString normalize_filename(const char* filename);
 std::string_view trim(std::string_view s);
@@ -128,16 +139,19 @@ bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, Scra
 // used by start_new_file() for the configured __GLOBAL_INCLUDE_FILE__.
 bool lpc_lex_handle_include(std::string_view rest, void* yyscanner);
 
-// Textual macro expansion (object-like and function-like, with `guard`
-// carrying the names currently being expanded for self-reference
-// termination). ONLY two textual consumers remain -- function-like
-// ARGUMENT pre-expansion (C's "arguments are fully expanded first" step)
-// and #include's unquoted-filename form; both consume the result as
-// text, never rescanned. Ordinary macro expansion is rescan-driven
-// (lpc_lex_resolve_identifier pushes the RAW substituted body as a Flex
-// buffer) and #if/#elif expressions are evaluated over TOKENS
-// (lpc_lex_eval_if_expr below).
-ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard = {});
+// Textual macro expansion (object-like and function-like, with an
+// internal guard chain of the names currently being expanded for
+// self-reference termination). ONLY two textual consumers remain --
+// function-like ARGUMENT pre-expansion (C's "arguments are fully
+// expanded first" step) and #include's unquoted-filename form; both
+// consume the result as text, never rescanned. Ordinary macro expansion
+// is rescan-driven (lpc_lex_resolve_identifier pushes the RAW
+// substituted body as a Flex buffer) and #if/#elif expressions are
+// evaluated over TOKENS (lpc_lex_eval_if_expr below). Runs as an
+// explicit work-stack machine, not C recursion: a deep chain costs heap
+// frames only, bounded by kLpcMaxExpansionNesting (one "Macro expansion
+// nested too deep" report; deeper references stay literal).
+ScratchString lpc_lex_expand_string(std::string_view text);
 
 // __LINE__/__FILE__/__DIR__ expand from the compiler's LIVE position
 // (current_line/current_file) -- one line counter, one file name is the

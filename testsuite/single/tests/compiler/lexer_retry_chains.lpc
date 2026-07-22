@@ -1,0 +1,38 @@
+// The lexer's no-token recovery paths (malformed heredoc starts, over-
+// long $N parameters, template-interpolation closes) used to retry via a
+// recursive yylex() call. Error REPORTING stops after a few parse errors
+// but scanning does not, so a crafted file of back-to-back malformed
+// constructs nested one C-stack frame per occurrence -- a 600KB file of
+// "@\n" lines was enough to overflow the stack and kill the driver.
+// Those paths now return no token and fall through, scanning iteratively
+// in the same yylex() frame; the compile must fail cleanly instead.
+void do_tests() {
+  string err;
+  string src;
+  int i;
+
+  // 1) 300000 consecutive illegal heredoc starts ("@" with an empty
+  //    terminator). One recursive retry per "@" used to overflow the
+  //    C stack; now it is a clean compile failure.
+  rm("/gen_heredoc_chain.c");
+  for (i = 0; i < 6; i++) {
+    write_file("/gen_heredoc_chain.c", repeat_string("@\n", 50000));
+  }
+  err = catch(load_object("/gen_heredoc_chain"));
+  ASSERT2(stringp(err), "a run of illegal heredoc starts must fail cleanly, not crash");
+  rm("/gen_heredoc_chain.c");
+
+  // 2) Over-long $N parameters (digit run past the lexer's line cap)
+  //    inside a real function-pointer context: each is reported and
+  //    consumed with no token produced; the compile fails cleanly and
+  //    scanning continues past every one of them.
+  src = "mixed f() { return (: $" + repeat_string(
+    "9",
+    5000
+  ) + " + $" + repeat_string("9", 5000) + " :); }\n";
+  rm("/gen_dollar_chain.c");
+  write_file("/gen_dollar_chain.c", src);
+  err = catch(load_object("/gen_dollar_chain"));
+  ASSERT2(stringp(err), "over-long $N parameters must fail cleanly");
+  rm("/gen_dollar_chain.c");
+}

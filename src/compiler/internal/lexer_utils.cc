@@ -28,6 +28,8 @@
 #include <vector>
 #include <algorithm>  // for std::sort
 #include <sstream>
+#include <string>
+#include <unordered_map>
 #include <unicode/ustring.h>
 #include <fmt/format.h>
 
@@ -331,18 +333,34 @@ void lpc_lex_scanner_destroyed(void* yyscanner) {
 // exposes accessors and ALL policy lives here).
 // ---------------------------------------------------------------------------
 
+namespace {
+// Buffer-stack indices of the LIVE include-content buffers, innermost
+// last -- maintained by lpc_lex_note_buffer_push/pop and cleared with
+// pushed_kind_stack. A buffer's index here is its position on Flex's
+// buffer stack (base buffer = 0, so these are all >= 1).
+std::vector<int> include_buffer_indices;
+}  // namespace
+
 // Index of the innermost REAL frame on the buffer stack: the top-most
 // INCLUDE buffer, else the base buffer (0). Splice buffers' positions are
-// synthetic; an out-of-range kind (-1, the transient window while a
-// push/pop is half-done) is skipped the same way. -1 = no buffers.
+// synthetic; an out-of-range index (the transient window while a
+// push/pop is half-done) is skipped the same way the old full-stack walk
+// skipped it. -1 = no buffers.
+//
+// O(1) via include_buffer_indices (maintained by the buffer push/pop
+// notes below) instead of walking the whole buffer stack: this sits
+// behind every `current_line` read -- YY_USER_ACTION touches it per
+// matched token -- and a deep macro chain stacks one splice buffer per
+// nesting level, so the walk made every token O(live depth) and a
+// 60000-deep chain effectively hung the compile.
 static int innermost_real_buffer_index(void* yyscanner) {
   int count = lpc_lex_buffer_count(yyscanner);
   if (count <= 0) {
     return -1;
   }
-  for (int i = count - 1; i > 0; --i) {
-    if (lpc_lex_buffer_kind_at(i - 1) == LPC_BUF_INCLUDE &&
-        lpc_lex_buffer_lineno(yyscanner, i) != nullptr) {
+  for (auto it = include_buffer_indices.rbegin(); it != include_buffer_indices.rend(); ++it) {
+    const int i = *it;
+    if (i < count && lpc_lex_buffer_lineno(yyscanner, i) != nullptr) {
       return i;
     }
   }
@@ -552,6 +570,23 @@ struct ExpansionFrame {
 };
 std::vector<ExpansionFrame> expansion_frames;
 
+// Indices (into expansion_frames) of the LIVE frames, innermost last.
+// Lets a buffer pop mark its frame dead in O(1) instead of scanning past
+// however many dead frames linger on the current line, and makes the
+// depth cap count actual nesting depth rather than frames-per-line
+// (sequential macro uses on one line used to trip "nested too deep").
+// Frame indices stay valid for a live frame's whole life: frames are only
+// removed by the dead-tail purge (which never reaches past a live frame)
+// or cleared wholesale between compiles.
+std::vector<size_t> live_expansion_stack;
+
+// Names of the live frames with multiplicity: the self-reference guard
+// lookup, O(1) per identifier instead of a scan over every live frame
+// (quadratic over a deep chain). Keyed by std::string, not views into
+// the frames -- ScratchString's SSO means frame reallocation moves short
+// names. Entries are erased at count 0, so presence == guarded.
+std::unordered_map<std::string, int> live_guard_counts;
+
 // Parallel to the stack of pushed buffers: LpcPushedBufferKind values.
 std::vector<char> pushed_kind_stack;
 }  // namespace
@@ -569,7 +604,14 @@ int lpc_lex_top_buffer_kind(void) {
   return pushed_kind_stack.empty() ? -1 : pushed_kind_stack.back();
 }
 
-void lpc_lex_note_buffer_push(int kind) { pushed_kind_stack.push_back(static_cast<char>(kind)); }
+void lpc_lex_note_buffer_push(int kind) {
+  pushed_kind_stack.push_back(static_cast<char>(kind));
+  if (kind == LPC_BUF_INCLUDE) {
+    // The note runs after the flex push, so the new buffer's stack index
+    // is exactly the pushed count (base buffer = 0).
+    include_buffer_indices.push_back(static_cast<int>(pushed_kind_stack.size()));
+  }
+}
 
 void lpc_lex_note_buffer_pop(int ending_lineno) {
   if (pushed_kind_stack.empty()) return;
@@ -577,14 +619,22 @@ void lpc_lex_note_buffer_pop(int ending_lineno) {
   pushed_kind_stack.pop_back();
   if (kind == LPC_BUF_EXPANSION) {
     // Mark the innermost live frame dead -- frames and expansion buffers
-    // nest LIFO, so it is this buffer's frame.
-    for (auto it = expansion_frames.rbegin(); it != expansion_frames.rend(); ++it) {
-      if (it->live) {
-        it->live = false;
-        break;
+    // nest LIFO, so it is this buffer's frame. (Empty-guarded for the
+    // leftover-buffer unwind in start_new_file, which clears the frame
+    // bookkeeping before lpc_lex_reset pops an aborted compile's stack.)
+    if (!live_expansion_stack.empty()) {
+      ExpansionFrame& f = expansion_frames[live_expansion_stack.back()];
+      live_expansion_stack.pop_back();
+      f.live = false;
+      auto it = live_guard_counts.find(std::string(f.name.data(), f.name.size()));
+      if (it != live_guard_counts.end() && --it->second == 0) {
+        live_guard_counts.erase(it);
       }
     }
   } else if (kind == LPC_BUF_INCLUDE) {
+    if (!include_buffer_indices.empty()) {
+      include_buffer_indices.pop_back();
+    }
     pop_include_state(ending_lineno);
   }
 }
@@ -596,26 +646,9 @@ void lpc_lex_note_buffer_pop(int ending_lineno) {
 // per-occurrence blue paint. Dead (lingering, diagnostics-only) frames
 // deliberately do NOT guard.
 static bool lpc_lex_name_guarded(std::string_view name) {
-  for (const auto& f : expansion_frames) {
-    if (f.live && f.name == name) {
-      return true;
-    }
-  }
-  return false;
+  if (live_guard_counts.empty()) return false;
+  return live_guard_counts.find(std::string(name)) != live_guard_counts.end();
 }
-
-// Nested rescans stack one Flex buffer + one yylex() frame per level; a
-// pathological chain (#define A0 A1 A1 / ...) must fail cleanly, not
-// blow the C stack. 128 was measured to still overflow the C stack under
-// this build's ASan instrumentation (each yylex()/lpc_lex_resolve_identifier()
-// frame pair is much larger there): bisection found the real crash boundary
-// at 70 (survives) / 80 (crashes) levels deep, i.e. under sanitizer builds
-// the cap itself was never reached before the process died. Set well below
-// that measured boundary, mirroring how kMaxOptimizeDepth/
-// kMaxGenerateNodeDepth (generate.cc/icode.cc) were deliberately kept small
-// for the same reason (see commit 117cbc1's reasoning) rather than picking
-// a larger "plausible" number.
-#define MAX_EXPANSION_NESTING 32
 
 // Pushes a frame for an expansion buffer about to be pushed. Zero-length
 // expansions push nothing (no buffer, no frame). The invocation position
@@ -624,6 +657,8 @@ static bool lpc_lex_name_guarded(std::string_view name) {
 // when the identifier matched (argument collection in between doesn't
 // disturb it -- raw reads run no user action).
 static void push_expansion_frame(std::string_view name, const PpMacro& m, int invocation_column) {
+  live_expansion_stack.push_back(expansion_frames.size());
+  ++live_guard_counts[std::string(name)];
   expansion_frames.push_back(ExpansionFrame{ScratchString(name),
                                             ScratchString(std::string_view(m.def_file)), m.def_line,
                                             current_line, invocation_column, true});
@@ -646,8 +681,26 @@ static void purge_exhausted_expansions() {
 }
 
 std::vector<LpcExpansionSite> lpc_lex_expansion_chain(void) {
+  // Deep chains (the nesting cap is 65535) must not turn one diagnostic
+  // into tens of thousands of "expanded from" notes: keep the innermost
+  // and outermost few sites and elide the middle with a marker entry
+  // (def_line -1; the renderer prints its name as a plain note). The
+  // OUTERMOST site must stay the vector's LAST element -- column
+  // attribution reads chain.back().
+  constexpr size_t kChainKeepEachEnd = 16;
+  const size_t total = expansion_frames.size();
   std::vector<LpcExpansionSite> out;
-  for (auto it = expansion_frames.rbegin(); it != expansion_frames.rend(); ++it) {
+  size_t emitted = 0;
+  for (auto it = expansion_frames.rbegin(); it != expansion_frames.rend(); ++it, ++emitted) {
+    if (total > (2 * kChainKeepEachEnd) && emitted == kChainKeepEachEnd) {
+      const size_t elided = total - (2 * kChainKeepEachEnd);
+      out.push_back(LpcExpansionSite{
+          "(" + std::to_string(elided) + " deeper macro expansions elided)", std::string(), -1,
+          it->invocation_line, it->invocation_column});
+      std::advance(it, static_cast<ptrdiff_t>(elided) - 1);
+      emitted += elided - 1;
+      continue;
+    }
     // Diagnostic capture: copy the arena frame text into the persistent
     // std::string site (diags outlive the compile/arena).
     out.push_back(LpcExpansionSite{std::string(it->name.data(), it->name.size()),
@@ -691,7 +744,12 @@ static void pop_include_state(int ending_line) {
   // p.line when the include was pushed and resumes by itself.
 }
 
-int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* yylloc_param,
+// Returns the resolved token, or LPC_TOKEN_RESCAN after consuming a
+// macro reference (expansion pushed as a buffer, no token produced --
+// the identifier rule falls through and its yylex() frame keeps
+// scanning). The YYLTYPE parameter is kept for signature parallelism
+// with the other lexer.l helpers; nothing here writes locations.
+int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yylloc_param*/,
                                void* yyscanner) {
   compiler_context_t* yyextra = reinterpret_cast<compiler_context_t*>(yyget_extra(yyscanner));
   // Copy yytext up front, before ANY lpc_lex_getc(): a getc can pop the
@@ -704,7 +762,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* yyll
     const PpMacro* found = pp_find_macro(std::string_view(text.data(), text.size()));
     if (found != nullptr) {
       const PpMacro& m = *found;
-      if (static_cast<int>(expansion_frames.size()) >= MAX_EXPANSION_NESTING) {
+      if (live_expansion_stack.size() >= kLpcMaxExpansionNesting) {
         lexerror("Macro expansion nested too deep");
       } else if (!m.is_function_like) {
         // __LINE__/__FILE__/__DIR__ expand from the live scan position;
@@ -732,7 +790,12 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* yyll
           }
           push_arena_string(expanded, /*is_expansion=*/!is_builtin, yyscanner);
         }
-        return yylex(yylval_param, yylloc_param, yyscanner);
+        // No token produced: the identifier rule falls through and this
+        // yylex() frame keeps scanning the pushed body (or the parent
+        // input, for an empty expansion). Iterative on purpose -- a
+        // recursive yylex() here would burn one C-stack frame per nesting
+        // level and cap chains at a few thousand.
+        return LPC_TOKEN_RESCAN;
       } else {
         int saved_line = current_line;
         int saved_total = total_lines;
@@ -848,7 +911,9 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* yyll
             push_expansion_frame(text, m, yyextra->token_start_column + 1);
             push_arena_string(expanded, /*is_expansion=*/1, yyscanner);
           }
-          return yylex(yylval_param, yylloc_param, yyscanner);
+          // See the object-like branch: no token, scanning continues in
+          // the caller's own yylex() frame.
+          return LPC_TOKEN_RESCAN;
         } else {
           // No '(' follows: not an invocation. Put every probed byte back
           // (see consumed_text's comment) and let the identifier resolve
@@ -886,8 +951,12 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* yyll
 // "@@TERM ... TERM" (an array of line strings: splices `({ ... })` and
 // splices `"l1", "l2", })` for normal rescanning -- Robocoder's "@@"
 // block). On a recoverable error (bad UTF-8, oversized block), lexerror()
-// just logs and returns, so those paths resume the top-level scanner via
-// `return yylex()`.
+// just logs and returns; those paths -- and the "@@" splice hand-off --
+// produce NO token and return LPC_TOKEN_RESCAN so the heredoc rule's
+// action falls through and its own yylex() frame keeps scanning. (They
+// used to `return yylex()` recursively: error reporting stops after a
+// few parse errors but scanning does NOT, so a crafted file of
+// back-to-back malformed heredocs nested one C-stack frame per block.)
 // The shared tail of lexer.l's two heredoc-start rules (newline-terminated
 // and content-follows forms): validate the accumulated terminator and
 // hand off to the body reader. On an empty terminator, reports and
@@ -897,7 +966,7 @@ int lpc_lex_start_heredoc(union YYSTYPE* yylval_param, struct YYLTYPE* yylloc_pa
   compiler_context_t* ctx = yyget_extra(yyscanner);
   if (ctx->heredoc_terminator.empty()) {
     lexerror("Illegal terminator");
-    return yylex(yylval_param, yylloc_param, yyscanner);
+    return LPC_TOKEN_RESCAN;
   }
   return parseHeredoc(ctx->heredoc_terminator.c_str(), ctx->heredoc_is_array, yylval_param,
                       yylloc_param, yyscanner);
@@ -960,7 +1029,7 @@ int parseHeredoc(const char* terminator, int is_array, union YYSTYPE* yylval_par
         return YYerror;
       }
       lexerror("Text block exceeded maximum length");
-      return yylex(yylval_param, yylloc_param, yyscanner);
+      return LPC_TOKEN_RESCAN;
     }
 
     if (is_array) {
@@ -996,12 +1065,12 @@ int parseHeredoc(const char* terminator, int is_array, union YYSTYPE* yylval_par
       return YYerror;
     }
     push_arena_string(splice, 0, yyscanner);
-    return yylex(yylval_param, yylloc_param, yyscanner);
+    return LPC_TOKEN_RESCAN;
   }
 
   if (!u8_validate(text.c_str())) {
     lexerror("Bad UTF-8 string in string block");
-    return yylex(yylval_param, yylloc_param, yyscanner);
+    return LPC_TOKEN_RESCAN;
   }
   yylval_param->string = scratch_new_string(std::string_view(text));
   return L_STRING;
@@ -1217,6 +1286,7 @@ void lpc_lex_teardown_active(void) {
     lpc_lex_teardown(active_scanner);
   }
   pushed_kind_stack.clear();
+  include_buffer_indices.clear();
 }
 
 static void start_new_file_prepared(char* prepared_base, size_t prepared_body, void* yyscanner,
@@ -1268,6 +1338,11 @@ static void start_new_file_prepared(char* prepared_base, size_t prepared_body, v
   // expansion frames from an aborted compile must not haunt the next.
   compiler_diags.clear();
   expansion_frames.clear();
+  // Cleared BEFORE lpc_lex_reset below unwinds any leftover buffers: its
+  // LPC_BUF_EXPANSION pops must find nothing live to mark (the frames
+  // they'd refer to are gone).
+  live_expansion_stack.clear();
+  live_guard_counts.clear();
   compiler_current_load_reason = std::move(compiler_next_load_reason);
   compiler_next_load_reason.clear();
   // One-shot context a previous ABORTED compile may have left queued
@@ -1287,6 +1362,7 @@ static void start_new_file_prepared(char* prepared_base, size_t prepared_body, v
   // identity and must not be touched.
   lpc_lex_reset(yyscanner);
   pushed_kind_stack.clear();
+  include_buffer_indices.clear();
   for (auto& is : inc_stack) {
     free_string(const_cast<char*>(is.file));
   }
