@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
+#include <string>
+#include <vector>
 #include <unistd.h>
 
 #include "mainlib.h"
@@ -16,6 +18,7 @@
 #include <fcntl.h>
 #include "base/internal/rc.h"
 #include "base/internal/tracing.h"
+#include "vm/internal/eval_limit.h"
 #include "vm/vm.h"
 
 static int lpcc_main(int argc, char** argv) {
@@ -36,10 +39,13 @@ static int lpcc_main(int argc, char** argv) {
   //             starting with {"fluffos_lpcc":1,...} so consumers can find
   //             it in mixed stdout. The bytecode model comes from the same
   //             disassembler switch as the text dump (DisSink json backend).
+  //   --batch   compile MANY files against ONE VM boot instead of one file
+  //             per process invocation -- see the batch block below.
   bool flag_pp = false, flag_tokens = false, flag_ast = false, flag_noopt = false;
-  bool flag_json = false;
+  bool flag_json = false, flag_batch = false;
   const char* pos[3] = {argv[0], nullptr, nullptr};
   int npos = 1;
+  std::vector<const char*> batch_files;
   for (int i = 1; i < argc; i++) {
     std::string_view a = argv[i];
     if (a == "-E")
@@ -52,19 +58,43 @@ static int lpcc_main(int argc, char** argv) {
       flag_noopt = true;
     else if (a == "--json")
       flag_json = true;
-    else if (npos < 3)
+    else if (a == "--batch")
+      flag_batch = true;
+    else if (flag_batch) {
+      // First non-flag arg after --batch is still the config file (pos[1]);
+      // everything after that is a file to compile.
+      if (npos < 2)
+        pos[npos++] = argv[i];
+      else
+        batch_files.push_back(argv[i]);
+    } else if (npos < 3)
       pos[npos++] = argv[i];
   }
-  if (npos != 3) {
-    std::cerr << "Usage: lpcc [-E|--tokens|--ast|-O0] [--json] config_file lpc_file" << std::endl;
-    return 1;
-  }
-  if (flag_json && flag_pp) {
-    std::cerr << "lpcc: --json is not available for -E" << std::endl;
-    return 1;
+  if (flag_batch) {
+    if (flag_pp || flag_tokens || flag_ast || flag_json || flag_noopt) {
+      std::cerr << "lpcc: --batch cannot be combined with -E/--tokens/--ast/-O0/--json"
+                << std::endl;
+      return 1;
+    }
+    if (npos != 2) {
+      std::cerr << "Usage: lpcc --batch config_file [lpc_file ...]  (reads newline-separated "
+                   "paths from stdin if none given)"
+                << std::endl;
+      return 1;
+    }
+  } else {
+    if (npos != 3) {
+      std::cerr << "Usage: lpcc [-E|--tokens|--ast|-O0] [--json] config_file lpc_file"
+                << std::endl;
+      return 1;
+    }
+    if (flag_json && flag_pp) {
+      std::cerr << "lpcc: --json is not available for -E" << std::endl;
+      return 1;
+    }
   }
   argv = const_cast<char**>(pos);
-  argc = 3;
+  argc = flag_batch ? 2 : 3;
 
   Tracer::begin("init_main", EventCategory::DEFAULT);
 
@@ -79,6 +109,59 @@ static int lpcc_main(int argc, char** argv) {
     ScopedTracer const tracer("vm_start");
 
     vm_start();
+  }
+
+  if (flag_batch) {
+    // Compile MANY files against this ONE VM boot (master/simul_efun loaded
+    // once above) instead of paying a fresh boot per file -- a full boot is
+    // the dominant cost of single-file `lpcc config file` for a sweep over
+    // hundreds/thousands of mudlib files. This mirrors how a real driver
+    // boot compiles many objects in the same process with no state reset
+    // between them, so it's not just faster, it's a more realistic test.
+    std::vector<std::string> files(batch_files.begin(), batch_files.end());
+    if (files.empty()) {
+      std::string line;
+      while (std::getline(std::cin, line)) {
+        if (!line.empty()) files.push_back(line);
+      }
+    }
+    int failed = 0;
+    for (const auto& f : files) {
+      printf("===== %s =====\n", f.c_str());
+      fflush(stdout);
+
+      // set_eval() arms a real OS timer (see eval_limit.cc) that isn't reset
+      // just by looping here -- without this, elapsed wall-clock time keeps
+      // accumulating across every file's compile+create() in this one
+      // process, and every file after the budget is used up spuriously
+      // fails with "Too long evaluation. Execution aborted." regardless of
+      // its own cost. The real driver rearms this before every top-level
+      // command/heartbeat (comm.cc, vm.cc); do the same per batch file.
+      set_eval(max_eval_cost);
+
+      current_object = master_ob;
+      struct object_t* obj = nullptr;
+      error_context_t econ{};
+      save_context(&econ);
+      try {
+        obj = find_object(f.c_str());
+      } catch (...) {
+        restore_context(&econ);
+      }
+      pop_context(&econ);
+      current_object = master_ob;
+
+      bool ok = obj != nullptr && obj->prog != nullptr;
+      if (!ok) {
+        fprintf(stderr, "Fail to load object %s.\n", f.c_str());
+        failed++;
+      }
+      printf("%s %s\n", ok ? "PASS" : "FAIL", f.c_str());
+      fflush(stdout);
+    }
+    Tracer::collect();
+    clear_state();
+    return failed > 0 ? 1 : 0;
   }
 
   current_object = master_ob;
