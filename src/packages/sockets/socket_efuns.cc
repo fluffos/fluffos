@@ -2042,6 +2042,13 @@ void mark_sockets() {
     } else if ((s = lpc_socks[i].close_callback.s)) {
       EXTRA_REF(BLOCK(s))++;
     }
+    // f_socket_set_option() stores ref-counted strings (TLS SNI hostname /
+    // cert / key paths) into options[] via assign_svalue -- these are held
+    // off the object graph, so mark them too or check_memory() reports a
+    // bad ref count for a socket carrying a live TLS option (AGENTS.md §3).
+    for (auto& opt : lpc_socks[i].options) {
+      mark_svalue(&opt);
+    }
   }
 }
 #endif

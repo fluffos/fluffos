@@ -210,9 +210,20 @@ int aio_write(struct Request* req) {
 
 void* readthread(struct Request* req) {
   int const fd = open(req->path.c_str(), O_RDONLY);
-  auto size = read(fd, (void*)(req->data.data()), req->data.max_size());
+  if (fd < 0) {
+    req->ret = -1;
+    req->status = DONE;
+    return nullptr;
+  }
+  // Bound the read by the buffer's ACTUAL size, not max_size() (~2^62) --
+  // the caller sizes req->data before dispatching (mirror gzreadthread just
+  // above, which correctly uses .size()). A short read shrinks the buffer;
+  // a negative return leaves it untouched.
+  auto size = read(fd, (void*)(req->data.data()), req->data.size());
   close(fd);
-  req->data.resize(size);
+  if (size >= 0) {
+    req->data.resize(size);
+  }
   req->ret = size;
   req->status = DONE;
   return nullptr;
