@@ -554,6 +554,18 @@ void i_generate_node(parse_node_t* expr) {
     case NODE_CALL:
       generate_expr_list(expr->r.expr);
       end_pushes();
+      // l.number is the element/argument count and is emitted as a 16-bit
+      // short below; ins_short() truncates silently. A count > USHRT_MAX
+      // (e.g. an array/mapping literal with >65535 elements) would emit a
+      // wrong count while codegen still pushed every element, corrupting the
+      // VM stack at runtime. The physical evaluator stack currently caps at
+      // exactly 65536, so this is unreachable today -- but guard it the same
+      // way ins_rel_short()/upd_short() guard branch offsets, so raising the
+      // stack size can never turn it into silent corruption.
+      if (expr->l.number > USHRT_MAX) {
+        yyerror("too many elements in aggregate/argument list, near line %i",
+                line_being_generated);
+      }
       ins_byte(expr->v.number);
       ins_short(expr->l.number);
       break;

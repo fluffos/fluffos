@@ -13,6 +13,7 @@
 // input-stack push and macro expansion's ring-buffer splicing live in
 // lexer_utils.cc, next to the buffer machinery they manipulate.
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -50,7 +51,7 @@ ScratchString substitute(std::string_view body, const std::vector<std::string>& 
 // any parse problem (unpaired bracket, division/modulo by zero, trailing
 // '?' without ':', leftover content) calls lexerror() directly and
 // returns 0.
-long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
+int64_t lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
 
 // There is NO session object. The preprocessor state lives directly in
 // g_compile: `macros` holds USER #defines only (predefines are immutable

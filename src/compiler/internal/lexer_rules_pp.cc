@@ -3,6 +3,7 @@
 #include "compiler/internal/lexer_rules_pp.h"
 
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 
 #include "compiler/internal/compiler.h"
@@ -400,8 +401,11 @@ namespace {
 // ---------------------------------------------------------------------------
 
 struct IfTok {
-  int op;    // 0 = number; otherwise an operator code (see ifexpr_binop)
-  long val;  // the number when op == 0
+  int op;        // 0 = number; otherwise an operator code (see ifexpr_binop)
+  int64_t val;   // the number when op == 0 -- 64-bit to match LPC_INT (a plain
+                 // `long` is 32-bit on Windows/LLP64, which would truncate #if
+                 // arithmetic and disagree with the runtime opcode / constant
+                 // folder, and make the `& 63` shift mask below UB there).
 };
 
 struct IfTokState {
@@ -418,9 +422,9 @@ void ifexpr_set_error(IfTokState* st, const char* msg) {
   if (st->error.empty()) st->error = msg;
 }
 
-long ifexpr_top(IfTokState* st);
+int64_t ifexpr_top(IfTokState* st);
 
-long ifexpr_atom(IfTokState* st) {
+int64_t ifexpr_atom(IfTokState* st) {
   if (ifexpr_at_end(st)) return 0;
   const IfTok& t = (*st->toks)[st->pos];
   if (t.op == 0) {
@@ -430,7 +434,7 @@ long ifexpr_atom(IfTokState* st) {
   switch (t.op) {
     case '(': {
       st->pos++;
-      long v = ifexpr_top(st);
+      int64_t v = ifexpr_top(st);
       if (ifexpr_peek_op(st) == ')') {
         st->pos++;
       } else {
@@ -457,8 +461,8 @@ long ifexpr_atom(IfTokState* st) {
   }
 }
 
-long ifexpr_binop(IfTokState* st, int min_prec) {
-  long lhs = ifexpr_atom(st);
+int64_t ifexpr_binop(IfTokState* st, int min_prec) {
+  int64_t lhs = ifexpr_atom(st);
   for (;;) {
     if (ifexpr_at_end(st)) break;
 
@@ -524,7 +528,7 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
     if (prec < min_prec) break;
 
     st->pos++;
-    long rhs = ifexpr_binop(st, prec + 1);
+    int64_t rhs = ifexpr_binop(st, prec + 1);
 
     switch (op) {
       case 'O':
@@ -561,8 +565,8 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
         lhs = lhs > rhs;
         break;
       case 's':
-        // A raw negative or >=64-bit (lhs/rhs are `long`) shift count is
-        // undefined behavior; mask to the low 6 bits (mod 64) instead of
+        // A raw negative or >=64-bit (lhs/rhs are 64-bit int64_t) shift count
+        // is undefined behavior; mask to the low 6 bits (mod 64) instead of
         // rejecting the expression, matching the runtime opcode.
         lhs = lhs << (rhs & 63);
         break;
@@ -583,8 +587,8 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
           ifexpr_set_error(st, "division by 0 in #if");
           lhs = 0;
         } else if (rhs == -1) {
-          // x / -1 == -x; direct division traps (SIGFPE) for LONG_MIN.
-          lhs = (long)(0ULL - (unsigned long)lhs);
+          // x / -1 == -x; direct division traps (SIGFPE) for INT64_MIN.
+          lhs = (int64_t)(0ULL - (uint64_t)lhs);
         } else {
           lhs = lhs / rhs;
         }
@@ -606,17 +610,17 @@ long ifexpr_binop(IfTokState* st, int min_prec) {
   return lhs;
 }
 
-long ifexpr_top(IfTokState* st) {
-  long cond = ifexpr_binop(st, 0);
+int64_t ifexpr_top(IfTokState* st) {
+  int64_t cond = ifexpr_binop(st, 0);
   if (ifexpr_peek_op(st) == '?') {
     st->pos++;
-    long true_val = ifexpr_top(st);
+    int64_t true_val = ifexpr_top(st);
     if (ifexpr_peek_op(st) == ':') {
       st->pos++;
     } else {
       ifexpr_set_error(st, "'?' without ':' in #if");
     }
-    long false_val = ifexpr_top(st);
+    int64_t false_val = ifexpr_top(st);
     return cond ? true_val : false_val;
   }
   return cond;
@@ -635,7 +639,7 @@ ScratchString ifexpr_token_name(int tok, const union YYSTYPE* lv) {
 // suppressed and evaluate it. Consumes through the closing ')' (or the
 // bare name). Returns the 0/1 result; sets *ended when the expression
 // ran out mid-operand.
-long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
+int64_t ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
   compiler_context_t* ctx = yyget_extra(yyscanner);
   ctx->suppress_expansion = true;
   union YYSTYPE lv;
@@ -645,7 +649,7 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
     paren = true;
     tok = lpc_lex_ifexpr_next(&lv, yyscanner);
   }
-  long result = 0;
+  int64_t result = 0;
   if (tok == LPC_IFEXPR_END || tok <= 0) {
     *ended = true;
     ctx->suppress_expansion = false;
@@ -673,7 +677,7 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
 
 }  // namespace
 
-long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
+int64_t lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
   std::vector<IfTok> toks;
   ScratchString text(trim(expr));
   if (!text.empty()) {
@@ -687,7 +691,7 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
           ended = true;
           break;
         case L_NUMBER:
-          toks.push_back(IfTok{0, static_cast<long>(lv.number)});
+          toks.push_back(IfTok{0, static_cast<int64_t>(lv.number)});
           break;
         case L_REAL:
           lexerror("floating point constants are not allowed in #if");
@@ -759,7 +763,7 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
 
   IfTokState st;
   st.toks = &toks;
-  long result = ifexpr_top(&st);
+  int64_t result = ifexpr_top(&st);
   if (!st.error.empty()) {
     lexerror(st.error.c_str());
     return 0;
