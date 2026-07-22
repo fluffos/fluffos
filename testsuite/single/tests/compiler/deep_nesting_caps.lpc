@@ -1,21 +1,24 @@
-// Regression for two compiler-front-end depth-cap bugs, both of which
-// crashed the *compile* (reachable from ordinary write_file()+load_object()
-// mudlib code, not just the lpcc CLI). Both must now fail cleanly (a compile
-// error / a load returning 0), never crash.
+// Regression for compiler-front-end depth crashes, all reachable from
+// ordinary write_file()+load_object() mudlib code (not just the lpcc CLI).
+// Every deep case must SURVIVE -- historically a crash; the exact outcome
+// (clean rejection or successful compile) is deliberately not asserted, so
+// this file is valid across cap policies. Current policy:
 //
 // 1. Nested (: :) closures past MAX_FUNCTION_DEPTH: push_function_context()
 //    silently no-op'd past the cap while the grammar still ran one
 //    pop_function_context() per closing ":)", eventually walking the shared
 //    current_function_context pointer into nullptr (UBSan: member access
-//    within null pointer). Now the pop side consumes a failed-push budget
-//    first (src/compiler/internal/lexer_utils.cc).
+//    within null pointer). The pop side consumes a failed-push budget first
+//    (src/compiler/internal/lexer_utils.cc); the cap (10) still rejects.
 //
-// 2. Object-like macro expansion past MAX_EXPANSION_NESTING: each level
-//    recurses one more yylex()/lpc_lex_resolve_identifier() C-stack frame
-//    pair. The cap (was 128) sat above what the sanitizer build's stack can
-//    actually survive, so a plain deep #define chain overflowed the C stack
-//    before the cap ever fired. The cap is now 64, under the measured
-//    boundary (src/compiler/internal/lexer_utils.cc).
+// 2. Deep macro chains (rescan path AND lpc_lex_expand_string's argument
+//    pre-expansion) and deep #if expressions used to recurse one C-stack
+//    frame per level -- briefly mitigated by lowering MAX_EXPANSION_NESTING
+//    under the sanitizer build's measured crash boundary, then fixed for
+//    real: those engines are ITERATIVE now (LPC_TOKEN_RESCAN fall-through /
+//    explicit work stacks; see compiler/deep_macro_nesting.lpc), so every
+//    deep case below simply compiles, bounded only by
+//    kLpcMaxExpansionNesting (65535, live frames).
 
 private string build_closures(int n) {
   string s = "";
@@ -41,8 +44,8 @@ private string build_macro_chain(int n) {
   return s;
 }
 
-// A #if whose condition is n-deep nested parens -- drives the recursive
-// #if/#elif evaluator (ifexpr_atom/binop/top in lexer_rules_pp.cc).
+// A #if whose condition is n-deep nested parens -- drives the #if/#elif
+// evaluator (ifexpr_eval in lexer_rules_pp.cc).
 private string build_if_parens(int n) {
   string s = "#if ";
   int i;
@@ -58,7 +61,7 @@ private string build_if_parens(int n) {
 }
 
 // A distinct-macro chain reached through a function-like macro's ARGUMENT --
-// drives lpc_lex_expand_string()'s textual expansion recursion, a different
+// drives lpc_lex_expand_string()'s textual expansion engine, a different
 // path from build_macro_chain()'s rescan path. Written to the file in chunks
 // (write_file appends): the full source for a large n exceeds
 // __MAX_STRING_LENGTH__ if built as one LPC string.
@@ -100,8 +103,8 @@ void do_tests() {
   }
   rm("/gen_deep_closures.c");
 
-  // 200-deep linear macro chain is well past MAX_EXPANSION_NESTING (64):
-  // must reject the compile cleanly, not overflow the C stack.
+  // 200-deep linear macro chain: used to overflow the C stack (then to be
+  // rejected by the lowered cap); compiles fine under the iterative engine.
   rm("/gen_deep_macros.c");
   write_file("/gen_deep_macros.c", build_macro_chain(200));
   ob = catch(load_object("/gen_deep_macros")) ? 0 : find_object("/gen_deep_macros");
@@ -110,8 +113,8 @@ void do_tests() {
   }
   rm("/gen_deep_macros.c");
 
-  // 20000-deep nested #if parens: must reject the compile cleanly, not
-  // overflow the C stack in the recursive #if evaluator.
+  // 20000-deep nested #if parens: used to overflow the C stack in the
+  // recursive #if evaluator; evaluates fine under the explicit-stack one.
   rm("/gen_deep_if.c");
   write_file("/gen_deep_if.c", build_if_parens(20000));
   ob = catch(load_object("/gen_deep_if")) ? 0 : find_object("/gen_deep_if");
@@ -121,8 +124,8 @@ void do_tests() {
   rm("/gen_deep_if.c");
 
   // 20000-deep distinct-macro chain through a function-like macro argument:
-  // must reject the compile cleanly, not overflow the C stack in
-  // lpc_lex_expand_string().
+  // used to overflow the C stack in lpc_lex_expand_string(); its explicit
+  // work-stack rewrite handles it.
   write_macro_arg_chain("/gen_deep_argmac.c", 20000);
   ob = catch(load_object("/gen_deep_argmac")) ? 0 : find_object("/gen_deep_argmac");
   if (objectp(ob)) {

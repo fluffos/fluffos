@@ -269,6 +269,15 @@ enum LpcPushedBufferKind {
 // (never reaches the parser: only the #if evaluator's pulls see it).
 #define LPC_IFEXPR_END (-2)
 
+// Pseudo-token lpc_lex_resolve_identifier() returns when the identifier
+// was a macro reference it consumed: the expansion (possibly empty) was
+// pushed as a fresh buffer and NO token was produced. The identifier
+// rule's action simply falls through so the CURRENT yylex() frame keeps
+// scanning the pushed buffer -- nesting a macro expansion costs one Flex
+// buffer, never a C-stack frame, which is what lets chains up to
+// kLpcMaxExpansionNesting (65535) deep work. Never escapes yylex().
+#define LPC_TOKEN_RESCAN (-3)
+
 // Push `text` as a fresh Flex buffer on top of the current one; scanning
 // consumes it fully, then pops back to the parent buffer at exactly the
 // position it left off (Flex's own bookkeeping -- no rewind/flush

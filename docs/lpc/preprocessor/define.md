@@ -40,7 +40,10 @@ at the very start or end of a body.
 A macro's body is rescanned after substitution, so macros may reference
 other macros freely. A macro that (directly or indirectly) references
 itself stops expanding at the self-reference instead of recursing
-forever, as in C.
+forever, as in C. Expansion nesting (a chain of distinct macros each
+referencing the next) is iterative inside the compiler and bounded at
+65535 levels; exceeding that is a compile error ("Macro expansion
+nested too deep").
 
 Because `#if` expressions are evaluated over the same token stream,
 arithmetic keeps C precedence across macro boundaries:

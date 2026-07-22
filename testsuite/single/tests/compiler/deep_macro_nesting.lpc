@@ -1,0 +1,167 @@
+// Macro-expansion nesting no longer recurses the C stack: the rescan
+// path keeps scanning in the same yylex() frame (one Flex buffer per
+// level) and the textual argument pre-expander runs an explicit work
+// stack, so chains up to 65535 levels deep must compile. The old
+// implementation recursed one yylex() frame per level with a cap of 128
+// -- and counted DEAD same-line provenance frames against that cap, so
+// even 128 sequential uses of a macro on one line spuriously failed with
+// "Macro expansion nested too deep". Past the cap the compile must fail
+// with that clean diagnostic, never a crash.
+
+#define CHAIN_DEPTH 60000
+#define OVER_DEPTH 65600
+
+// O(n) generation: build lines into an array and implode per chunk
+// (repeated string += is quadratic in the interpreter; a 60000-line
+// source took minutes that way). Chunks stay under the configured
+// maximum string length.
+private void gen_chain(string path, int depth) {
+  string *lines;
+  int i, base, n;
+
+  rm(path);
+  for (base = 0; base < depth; base += 5000) {
+    n = (depth - base < 5000) ? (depth - base) : 5000;
+    lines = allocate(n);
+    for (i = 0; i < n; i++) {
+      lines[i] = "#define A" + (base + i) + " A" + (base + i + 1);
+    }
+    write_file(path, implode(lines, "\n") + "\n");
+  }
+  write_file(path, "#define A" + depth + " 42\n" + "#define WRAP(x) (x)\n" +
+    "int query() { return A0; }\n" + "int query_wrap() { return WRAP(A0); }\n");
+}
+
+void do_tests() {
+  object ob;
+  string err;
+  string seq_src;
+  string *lines;
+  int i;
+
+  // 1) A CHAIN_DEPTH-deep object-like chain compiles and evaluates; the
+  //    WRAP() call drives the same chain through function-like ARGUMENT
+  //    pre-expansion (the textual work-stack engine). The old recursive
+  //    lexer errored out at 128 levels (query) and would have overflowed
+  //    the C stack in lpc_lex_expand_string (query_wrap).
+  gen_chain("/gen_deep_macros.c", CHAIN_DEPTH);
+  ob = load_object("/gen_deep_macros");
+  ASSERT2(objectp(ob), "60000-deep macro chain should compile");
+  if (objectp(ob)) {
+    ASSERT_EQ(42, ob->query());
+    ASSERT_EQ(42, ob->query_wrap());
+    destruct(ob);
+  }
+  rm("/gen_deep_macros.c");
+
+  // 2) Sequential (NOT nested) uses of one macro on a single line: each
+  //    use's dead provenance frame lingers until the newline for
+  //    diagnostics, and the old cap counted those, so 128+ uses per line
+  //    failed. Only LIVE nesting may count against the cap.
+  seq_src = "#define SEQ 1 +\nint query_seq() { return ";
+  for (i = 0; i < 300; i++) {
+    seq_src += "SEQ ";
+  }
+  seq_src += "0; }\n";
+  rm("/gen_seq_macros.c");
+  write_file("/gen_seq_macros.c", seq_src);
+  ob = load_object("/gen_seq_macros");
+  ASSERT2(objectp(ob), "300 sequential same-line macro uses should compile");
+  if (objectp(ob)) {
+    ASSERT_EQ(300, ob->query_seq());
+    destruct(ob);
+  }
+  rm("/gen_seq_macros.c");
+
+  // 3) Past the cap (65535 live levels): a clean "Macro expansion nested
+  //    too deep" compile error, not a crash.
+  gen_chain("/gen_over_macros.c", OVER_DEPTH);
+  err = catch(load_object("/gen_over_macros"));
+  ASSERT2(stringp(err), "beyond-cap macro chain must fail to compile cleanly");
+  rm("/gen_over_macros.c");
+
+  // 4) Deep #if expressions. The evaluator used to recurse one C-stack
+  //    frame per unary token, per '(' and per chained ternary, and macro
+  //    expansion amplifies a short #if line into hundreds of thousands
+  //    of such tokens -- a guaranteed stack overflow before the
+  //    explicit-stack rewrite. 262144 unary '!'s (even count, so the
+  //    condition stays 1).
+  lines = ({
+    "#define U8 !!!!!!!!",
+    "#define U64 U8 U8 U8 U8 U8 U8 U8 U8",
+    "#define U512 U64 U64 U64 U64 U64 U64 U64 U64",
+    "#define U4K U512 U512 U512 U512 U512 U512 U512 U512",
+    "#define U32K U4K U4K U4K U4K U4K U4K U4K U4K",
+    "#define U256K U32K U32K U32K U32K U32K U32K U32K U32K",
+    "#if U256K 1",
+    "#define IF_UNARY_OK 1",
+    "#else",
+    "#define IF_UNARY_OK 0",
+    "#endif",
+    "int query_if_unary() { return IF_UNARY_OK; }",
+  });
+  rm("/gen_if_unary.c");
+  write_file("/gen_if_unary.c", implode(lines, "\n") + "\n");
+  ob = load_object("/gen_if_unary");
+  ASSERT2(objectp(ob), "262144 unary operators in #if should evaluate");
+  if (objectp(ob)) {
+    ASSERT_EQ(1, ob->query_if_unary());
+    destruct(ob);
+  }
+  rm("/gen_if_unary.c");
+
+  // 5) 65536 nested parentheses in #if.
+  lines = ({
+    "#define L8 ((((((((",
+    "#define R8 ))))))))",
+    "#define L64 L8 L8 L8 L8 L8 L8 L8 L8",
+    "#define R64 R8 R8 R8 R8 R8 R8 R8 R8",
+    "#define L512 L64 L64 L64 L64 L64 L64 L64 L64",
+    "#define R512 R64 R64 R64 R64 R64 R64 R64 R64",
+    "#define L4K L512 L512 L512 L512 L512 L512 L512 L512",
+    "#define R4K R512 R512 R512 R512 R512 R512 R512 R512",
+    "#define L32K L4K L4K L4K L4K L4K L4K L4K L4K",
+    "#define R32K R4K R4K R4K R4K R4K R4K R4K R4K",
+    "#if L32K L32K 1 R32K R32K",
+    "#define IF_PAREN_OK 1",
+    "#else",
+    "#define IF_PAREN_OK 0",
+    "#endif",
+    "int query_if_paren() { return IF_PAREN_OK; }",
+  });
+  rm("/gen_if_paren.c");
+  write_file("/gen_if_paren.c", implode(lines, "\n") + "\n");
+  ob = load_object("/gen_if_paren");
+  ASSERT2(objectp(ob), "65536 nested parens in #if should evaluate");
+  if (objectp(ob)) {
+    ASSERT_EQ(1, ob->query_if_paren());
+    destruct(ob);
+  }
+  rm("/gen_if_paren.c");
+
+  // 6) 262144 right-chained ternaries in #if (the false branch of each
+  //    nests the next).
+  lines = ({
+    "#define Q8 1 ? 1 : 1 ? 1 : 1 ? 1 : 1 ? 1 : 1 ? 1 : 1 ? 1 : 1 ? 1 : 1 ? 1 :",
+    "#define Q64 Q8 Q8 Q8 Q8 Q8 Q8 Q8 Q8",
+    "#define Q512 Q64 Q64 Q64 Q64 Q64 Q64 Q64 Q64",
+    "#define Q4K Q512 Q512 Q512 Q512 Q512 Q512 Q512 Q512",
+    "#define Q32K Q4K Q4K Q4K Q4K Q4K Q4K Q4K Q4K",
+    "#define Q256K Q32K Q32K Q32K Q32K Q32K Q32K Q32K Q32K",
+    "#if Q256K 7",
+    "#define IF_TERN_OK 1",
+    "#else",
+    "#define IF_TERN_OK 0",
+    "#endif",
+    "int query_if_tern() { return IF_TERN_OK; }",
+  });
+  rm("/gen_if_tern.c");
+  write_file("/gen_if_tern.c", implode(lines, "\n") + "\n");
+  ob = load_object("/gen_if_tern");
+  ASSERT2(objectp(ob), "262144 chained ternaries in #if should evaluate");
+  if (objectp(ob)) {
+    ASSERT_EQ(1, ob->query_if_tern());
+    destruct(ob);
+  }
+  rm("/gen_if_tern.c");
+}

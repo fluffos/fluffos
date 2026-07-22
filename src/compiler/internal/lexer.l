@@ -24,12 +24,14 @@
  * Macro EXPANSION happens at identifier-resolution time
  * (lpc_lex_resolve_identifier in lexer_utils.cc): the expanded body is
  * pushed as a fresh Flex buffer (lpc_lex_push_string_buffer, defined in
- * this file's trailer) and rescanned; the buffer pops back to the parent
- * at its <<EOF>>. Guarded self-references left literal in the expansion
- * are counted per name into compiler_context_t::pending_plain at
- * expansion time ("blue paint" per occurrence, C-preprocessor style); the
- * rescan consumes one count per occurrence and resolves it as a plain
- * identifier. Expansion provenance for diagnostics is one frame per live
+ * this file's trailer), the helper returns LPC_TOKEN_RESCAN (no token),
+ * and the identifier rule falls through so the SAME yylex() frame keeps
+ * scanning the pushed body; the buffer pops back to the parent at its
+ * <<EOF>>. Nesting is therefore iterative -- one Flex buffer per level,
+ * no C-stack recursion -- bounded by kLpcMaxExpansionNesting (65535).
+ * A name matching any LIVE expansion buffer resolves as a plain
+ * identifier (buffer-lifetime self-reference guard, C-preprocessor
+ * style). Expansion provenance for diagnostics is one frame per live
  * expansion buffer (see lexer_utils.cc). Because string/template/char
  * bodies are scanned by their own start conditions and never reach
  * identifier resolution, "no macro expansion inside strings" falls out
@@ -292,7 +294,14 @@ WS_NO_NL    [ \t\r\v\f]
      *
      */
 [a-zA-Z_][a-zA-Z0-9_]* {
-          return lpc_lex_resolve_identifier(yylval_param, yylloc_param, yyscanner);
+          int tok = lpc_lex_resolve_identifier(yylval_param, yylloc_param, yyscanner);
+          if (tok != LPC_TOKEN_RESCAN) return tok;
+          /* The identifier was a macro reference: its expansion (possibly
+           * empty) was pushed as a fresh buffer and no token was produced.
+           * Fall through and keep scanning in THIS yylex() frame -- same
+           * pattern as the <<EOF>> buffer pops below. Nesting is iterative
+           * (one Flex buffer per level, no C-stack frame), which is what
+           * lets expansion chains kLpcMaxExpansionNesting deep work. */
         }
 
     /* String literals: fully native via SC_STRING_BODY, no outp access.
@@ -515,8 +524,12 @@ WS_NO_NL    [ \t\r\v\f]
      * the number. */
 "$"[0-9]+ {
           int result = lpc_lex_function_param(yylval_param, yytext, yyleng);
-          if (result == kLpcLexFunctionParamRetry) return yylex(yylval_param, yylloc_param, yyscanner);
-          return result;
+          if (result != kLpcLexFunctionParamRetry) return result;
+          /* Over-long $N (reported): no token produced; keep scanning in
+           * THIS yylex() frame. Error reporting stops after a few parse
+           * errors but scanning does not, so the old recursive-yylex
+           * retry let a run of consecutive bad $N tokens nest a C-stack
+           * frame each. */
         }
 "$"     { return lpc_lex_function_param(yylval_param, yytext, yyleng); }
 
@@ -617,7 +630,13 @@ WS_NO_NL    [ \t\r\v\f]
            * the rewind still followed it). */
           lpc_lex_newline(yyscanner);
           BEGIN(INITIAL);
-          return lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
+          int tok = lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
+          if (tok != LPC_TOKEN_RESCAN) return tok;
+          /* Recoverable heredoc error (reported) or "@@" array splice
+           * pushed: no token; keep scanning in THIS yylex() frame
+           * (INITIAL was restored above). Falling through instead of a
+           * recursive yylex() keeps a run of malformed heredocs from
+           * nesting a C-stack frame per block. */
         }
     /* Trailing whitespace NOT immediately followed by a newline (i.e. the
      * rule above couldn't complete because EOF or non-whitespace content
@@ -649,7 +668,10 @@ WS_NO_NL    [ \t\r\v\f]
           // lpc_lex_getc() reads it first.
           LPC_YYLESS(0);
           BEGIN(INITIAL);
-          return lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
+          int tok = lpc_lex_start_heredoc(yylval_param, yylloc_param, yyscanner);
+          if (tok != LPC_TOKEN_RESCAN) return tok;
+          /* See the newline-terminated form above: no token, fall
+           * through and keep scanning iteratively. */
         }
 
 "++"    { yylval_param->number = '+'; return L_INC_DEC; }
@@ -729,11 +751,13 @@ WS_NO_NL    [ \t\r\v\f]
           return '{';
         }
 "}"     {
-          if (lpc_lex_brace_close(yyscanner)) {
-            BEGIN(SC_TEMPLATE_BODY);
-            return yylex(yylval_param, yylloc_param, yyscanner);
-          }
-          return '}';
+          if (!lpc_lex_brace_close(yyscanner)) return '}';
+          /* This '}' ends a template interpolation: swallow it, switch
+           * back to the fragment scan, and keep scanning in THIS yylex()
+           * frame (the old recursive yylex() here only ever nested one
+           * transient level, but the fall-through form is uniform with
+           * the other no-token rules). */
+          BEGIN(SC_TEMPLATE_BODY);
         }
 "["     { return '['; }
 "]"     { return ']'; }

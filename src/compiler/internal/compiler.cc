@@ -276,6 +276,14 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
       if (!def_line_text.empty()) {
         emit_snippet(exp.def_line, def_line_text, def_col, nullptr, nullptr);
       }
+    } else if (exp.def_line < 0) {
+      // Elision marker from lpc_lex_expansion_chain(): a deep chain's
+      // middle levels collapsed into one entry; its "name" is the whole
+      // note text.
+      out += c_note;
+      out += "note: ";
+      out += c_off;
+      out += exp.macro_name;
     } else {
       out += c_note;
       out += "note: ";

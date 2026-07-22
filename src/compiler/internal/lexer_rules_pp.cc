@@ -5,8 +5,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
-
-#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
+#include <new>  // placement new (EsPendingCall lands on the arena)
 
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
@@ -403,30 +402,18 @@ namespace {
 // ---------------------------------------------------------------------------
 
 struct IfTok {
-  int op;        // 0 = number; otherwise an operator code (see ifexpr_binop)
-  int64_t val;   // the number when op == 0 -- 64-bit to match LPC_INT (a plain
-                 // `long` is 32-bit on Windows/LLP64, which would truncate #if
-                 // arithmetic and disagree with the runtime opcode / constant
-                 // folder, and make the `& 63` shift mask below UB there).
+  int op;       // 0 = number; otherwise an operator code (see ifexpr_eval)
+  int64_t val;  // the number when op == 0 -- 64-bit to match LPC_INT (a plain
+                // `long` is 32-bit on Windows/LLP64, which would truncate #if
+                // arithmetic and disagree with the runtime opcode / constant
+                // folder, and make the `& 63` shift mask below UB there).
 };
 
 struct IfTokState {
   const std::vector<IfTok>* toks;
   size_t pos = 0;
-  int depth = 0;  // recursion depth of the recursive-descent evaluator below
   ScratchString error;  // first error wins; empty means no error yet
 };
-
-// The #if/#elif evaluator (ifexpr_atom/binop/top) is recursive-descent; its
-// recursion depth tracks paren / unary-operator / ternary nesting, which is
-// attacker-controlled with no bound from the token count. Cap it so a
-// pathological `#if ((((...))))` fails with a clean diagnostic instead of
-// overflowing the C stack. Every recursion path passes through ifexpr_atom
-// (top->binop->atom always; a '(' or unary re-enters atom; a ternary
-// re-enters top->binop->atom), so guarding atom bounds the whole evaluator.
-// Sized well under the ASan build's measured overflow boundary (~15-18k),
-// matching the parse-tree walkers' 500-deep caps (§13).
-static constexpr int kMaxIfExprDepth = 500;
 
 bool ifexpr_at_end(const IfTokState* st) { return st->pos >= st->toks->size(); }
 
@@ -436,214 +423,280 @@ void ifexpr_set_error(IfTokState* st, const char* msg) {
   if (st->error.empty()) st->error = msg;
 }
 
-int64_t ifexpr_top(IfTokState* st);
+// The binary-operator table shared by the evaluator: token code ->
+// {op, precedence}. prec stays -1 for anything that is not a binary
+// operator (including '?' / ':', which the ternary frames handle).
+void ifexpr_binop_of(int c0, int* op, int* prec) {
+  *prec = -1;
+  *op = 0;
+  if (c0 == 'O') {
+    *op = 'O';
+    *prec = 1;
+  } else if (c0 == 'A') {
+    *op = 'A';
+    *prec = 2;
+  } else if (c0 == 'E') {
+    *op = 'E';
+    *prec = 6;
+  } else if (c0 == 'N') {
+    *op = 'N';
+    *prec = 6;
+  } else if (c0 == 'L') {
+    *op = 'L';
+    *prec = 7;
+  } else if (c0 == 'G') {
+    *op = 'G';
+    *prec = 7;
+  } else if (c0 == 's') {
+    *op = 's';
+    *prec = 8;
+  } else if (c0 == 'S') {
+    *op = 'S';
+    *prec = 8;
+  } else if (c0 == '|') {
+    *op = '|';
+    *prec = 3;
+  } else if (c0 == '^') {
+    *op = '^';
+    *prec = 4;
+  } else if (c0 == '&') {
+    *op = '&';
+    *prec = 5;
+  } else if (c0 == '<') {
+    *op = '<';
+    *prec = 7;
+  } else if (c0 == '>') {
+    *op = '>';
+    *prec = 7;
+  } else if (c0 == '+') {
+    *op = '+';
+    *prec = 9;
+  } else if (c0 == '-') {
+    *op = '-';
+    *prec = 9;
+  } else if (c0 == '*') {
+    *op = '*';
+    *prec = 10;
+  } else if (c0 == '/') {
+    *op = '/';
+    *prec = 10;
+  } else if (c0 == '%') {
+    *op = '%';
+    *prec = 10;
+  }
+}
 
-int64_t ifexpr_atom(IfTokState* st) {
-  if (ifexpr_at_end(st)) return 0;
-  if (++st->depth > kMaxIfExprDepth) {
-    --st->depth;
-    ifexpr_set_error(st, "#if expression nested too deeply");
-    return 0;
+int64_t ifexpr_combine(IfTokState* st, int op, int64_t lhs, int64_t rhs) {
+  switch (op) {
+    case 'O':
+      return lhs || rhs;
+    case 'A':
+      return lhs && rhs;
+    case '|':
+      return lhs | rhs;
+    case '^':
+      return lhs ^ rhs;
+    case '&':
+      return lhs & rhs;
+    case 'E':
+      return lhs == rhs;
+    case 'N':
+      return lhs != rhs;
+    case 'L':
+      return lhs <= rhs;
+    case 'G':
+      return lhs >= rhs;
+    case '<':
+      return lhs < rhs;
+    case '>':
+      return lhs > rhs;
+    case 's':
+      // A raw negative or >=64-bit (lhs/rhs are 64-bit int64_t) shift count
+      // is undefined behavior; mask to the low 6 bits (mod 64) instead of
+      // rejecting the expression, matching the runtime opcode.
+      return lhs << (rhs & 63);
+    case 'S':
+      return lhs >> (rhs & 63);
+    case '+':
+      return lhs + rhs;
+    case '-':
+      return lhs - rhs;
+    case '*':
+      return lhs * rhs;
+    case '/':
+      if (rhs == 0) {
+        ifexpr_set_error(st, "division by 0 in #if");
+        return 0;
+      }
+      if (rhs == -1) {
+        // x / -1 == -x; direct division traps (SIGFPE) for INT64_MIN.
+        return (int64_t)(0ULL - (uint64_t)lhs);
+      }
+      return lhs / rhs;
+    case '%':
+      if (rhs == 0) {
+        ifexpr_set_error(st, "modulo by 0 in #if");
+        return 0;
+      }
+      if (rhs == -1) {
+        return 0;  // x % -1 == 0; direct computation traps for LONG_MIN.
+      }
+      return lhs % rhs;
+    default:
+      return lhs;
   }
-  DEFER { --st->depth; };
-  const IfTok& t = (*st->toks)[st->pos];
-  if (t.op == 0) {
-    st->pos++;
-    return t.val;
-  }
-  switch (t.op) {
-    case '(': {
+}
+
+// The expression evaluator, C precedence + ternary, as an explicit-stack
+// machine. This used to be three mutually recursive functions
+// (top/binop/atom); crafted input could drive each one C-stack-frame-deep
+// per TOKEN -- one atom frame per unary in a `!!!!...1` run, one top
+// frame per chained `1 ? 1 :`, several frames per '(' -- and macro
+// expansion amplifies a short #if line into hundreds of thousands of
+// such tokens, far past any stack. Frames live on the heap now, at most
+// a few per token, so depth is bounded by the token count and needs no
+// separate cap. Control flow, token consumption order, and error wording
+// are a bit-exact port of the recursive version.
+struct IfEvalFrame {
+  uint8_t kind;   // 0 = top, 1 = binop, 2 = atom
+  uint8_t state;  // continuation point within the kind
+  int op;         // binop: pending operator; atom: unary operator
+  int min_prec;   // binop only
+  int64_t a;      // top: cond / binop: lhs
+  int64_t b;      // top: true_val
+};
+
+int64_t ifexpr_eval(IfTokState* st) {
+  constexpr uint8_t kTop = 0, kBinop = 1, kAtom = 2;
+  std::vector<IfEvalFrame> stack;
+  stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+  int64_t ret = 0;
+  while (!stack.empty()) {
+    IfEvalFrame& f = stack.back();  // pushes only as the last action before continue
+    if (f.kind == kTop) {
+      if (f.state == 0) {
+        // cond = binop(0)
+        f.state = 1;
+        stack.push_back(IfEvalFrame{kBinop, 0, 0, 0, 0, 0});
+        continue;
+      }
+      if (f.state == 1) {
+        f.a = ret;  // cond
+        if (ifexpr_peek_op(st) == '?') {
+          st->pos++;
+          f.state = 2;  // true_val = top()
+          stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+          continue;
+        }
+        ret = f.a;
+        stack.pop_back();
+        continue;
+      }
+      if (f.state == 2) {
+        f.b = ret;  // true_val
+        if (ifexpr_peek_op(st) == ':') {
+          st->pos++;
+        } else {
+          ifexpr_set_error(st, "'?' without ':' in #if");
+        }
+        f.state = 3;  // false_val = top()
+        stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+        continue;
+      }
+      // state 3: ret holds false_val
+      ret = f.a ? f.b : ret;
+      stack.pop_back();
+      continue;
+    }
+    if (f.kind == kBinop) {
+      if (f.state == 0) {
+        // lhs = atom()
+        f.state = 1;
+        stack.push_back(IfEvalFrame{kAtom, 0, 0, 0, 0, 0});
+        continue;
+      }
+      // state 1: ret holds lhs (from atom); state 2: ret holds rhs
+      f.a = (f.state == 1) ? ret : ifexpr_combine(st, f.op, f.a, ret);
+      int op = 0, prec = -1;
+      if (!ifexpr_at_end(st)) {
+        ifexpr_binop_of(ifexpr_peek_op(st), &op, &prec);
+      }
+      if (prec < f.min_prec) {
+        ret = f.a;
+        stack.pop_back();
+        continue;
+      }
       st->pos++;
-      int64_t v = ifexpr_top(st);
+      f.op = op;
+      f.state = 2;  // rhs = binop(prec + 1)
+      stack.push_back(IfEvalFrame{kBinop, 0, 0, prec + 1, 0, 0});
+      continue;
+    }
+    // kAtom
+    if (f.state == 0) {
+      if (ifexpr_at_end(st)) {
+        ret = 0;
+        stack.pop_back();
+        continue;
+      }
+      const IfTok& t = (*st->toks)[st->pos];
+      if (t.op == 0) {
+        st->pos++;
+        ret = t.val;
+        stack.pop_back();
+        continue;
+      }
+      switch (t.op) {
+        case '(':
+          st->pos++;
+          f.state = 1;  // v = top(), then expect ')'
+          stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+          continue;
+        case '!':
+        case '~':
+        case '-':
+        case '+':
+          st->pos++;
+          f.op = t.op;
+          f.state = 2;  // operand = atom()
+          stack.push_back(IfEvalFrame{kAtom, 0, 0, 0, 0, 0});
+          continue;
+        default:
+          // Mirrors the old walker's unknown-atom behavior: consume, 0.
+          st->pos++;
+          ret = 0;
+          stack.pop_back();
+          continue;
+      }
+    }
+    if (f.state == 1) {
+      // ret holds the parenthesized value
       if (ifexpr_peek_op(st) == ')') {
         st->pos++;
       } else {
         ifexpr_set_error(st, "bracket not paired in #if");
       }
-      return v;
+      stack.pop_back();
+      continue;
     }
-    case '!':
-      st->pos++;
-      return !ifexpr_atom(st);
-    case '~':
-      st->pos++;
-      return ~ifexpr_atom(st);
-    case '-':
-      st->pos++;
-      return -ifexpr_atom(st);
-    case '+':
-      st->pos++;
-      return ifexpr_atom(st);
-    default:
-      // Mirrors the old walker's unknown-atom behavior: consume, 0.
-      st->pos++;
-      return 0;
-  }
-}
-
-int64_t ifexpr_binop(IfTokState* st, int min_prec) {
-  int64_t lhs = ifexpr_atom(st);
-  for (;;) {
-    if (ifexpr_at_end(st)) break;
-
-    int c0 = ifexpr_peek_op(st);
-    int prec = -1, op = 0;
-
-    if (c0 == 'O') {
-      op = 'O';
-      prec = 1;
-    } else if (c0 == 'A') {
-      op = 'A';
-      prec = 2;
-    } else if (c0 == 'E') {
-      op = 'E';
-      prec = 6;
-    } else if (c0 == 'N') {
-      op = 'N';
-      prec = 6;
-    } else if (c0 == 'L') {
-      op = 'L';
-      prec = 7;
-    } else if (c0 == 'G') {
-      op = 'G';
-      prec = 7;
-    } else if (c0 == 's') {
-      op = 's';
-      prec = 8;
-    } else if (c0 == 'S') {
-      op = 'S';
-      prec = 8;
-    } else if (c0 == '|') {
-      op = '|';
-      prec = 3;
-    } else if (c0 == '^') {
-      op = '^';
-      prec = 4;
-    } else if (c0 == '&') {
-      op = '&';
-      prec = 5;
-    } else if (c0 == '<') {
-      op = '<';
-      prec = 7;
-    } else if (c0 == '>') {
-      op = '>';
-      prec = 7;
-    } else if (c0 == '+') {
-      op = '+';
-      prec = 9;
-    } else if (c0 == '-') {
-      op = '-';
-      prec = 9;
-    } else if (c0 == '*') {
-      op = '*';
-      prec = 10;
-    } else if (c0 == '/') {
-      op = '/';
-      prec = 10;
-    } else if (c0 == '%') {
-      op = '%';
-      prec = 10;
-    }
-
-    if (prec < min_prec) break;
-
-    st->pos++;
-    int64_t rhs = ifexpr_binop(st, prec + 1);
-
-    switch (op) {
-      case 'O':
-        lhs = lhs || rhs;
+    // state 2: ret holds the unary operand
+    switch (f.op) {
+      case '!':
+        ret = !ret;
         break;
-      case 'A':
-        lhs = lhs && rhs;
-        break;
-      case '|':
-        lhs = lhs | rhs;
-        break;
-      case '^':
-        lhs = lhs ^ rhs;
-        break;
-      case '&':
-        lhs = lhs & rhs;
-        break;
-      case 'E':
-        lhs = lhs == rhs;
-        break;
-      case 'N':
-        lhs = lhs != rhs;
-        break;
-      case 'L':
-        lhs = lhs <= rhs;
-        break;
-      case 'G':
-        lhs = lhs >= rhs;
-        break;
-      case '<':
-        lhs = lhs < rhs;
-        break;
-      case '>':
-        lhs = lhs > rhs;
-        break;
-      case 's':
-        // A raw negative or >=64-bit (lhs/rhs are 64-bit int64_t) shift count
-        // is undefined behavior; mask to the low 6 bits (mod 64) instead of
-        // rejecting the expression, matching the runtime opcode.
-        lhs = lhs << (rhs & 63);
-        break;
-      case 'S':
-        lhs = lhs >> (rhs & 63);
-        break;
-      case '+':
-        lhs = lhs + rhs;
+      case '~':
+        ret = ~ret;
         break;
       case '-':
-        lhs = lhs - rhs;
+        ret = -ret;
         break;
-      case '*':
-        lhs = lhs * rhs;
-        break;
-      case '/':
-        if (rhs == 0) {
-          ifexpr_set_error(st, "division by 0 in #if");
-          lhs = 0;
-        } else if (rhs == -1) {
-          // x / -1 == -x; direct division traps (SIGFPE) for INT64_MIN.
-          lhs = (int64_t)(0ULL - (uint64_t)lhs);
-        } else {
-          lhs = lhs / rhs;
-        }
-        break;
-      case '%':
-        if (rhs == 0) {
-          ifexpr_set_error(st, "modulo by 0 in #if");
-          lhs = 0;
-        } else if (rhs == -1) {
-          lhs = 0;  // x % -1 == 0; direct computation traps for LONG_MIN.
-        } else {
-          lhs = lhs % rhs;
-        }
-        break;
-      default:
+      default:  // '+'
         break;
     }
+    stack.pop_back();
+    continue;
   }
-  return lhs;
-}
-
-int64_t ifexpr_top(IfTokState* st) {
-  int64_t cond = ifexpr_binop(st, 0);
-  if (ifexpr_peek_op(st) == '?') {
-    st->pos++;
-    int64_t true_val = ifexpr_top(st);
-    if (ifexpr_peek_op(st) == ':') {
-      st->pos++;
-    } else {
-      ifexpr_set_error(st, "'?' without ':' in #if");
-    }
-    int64_t false_val = ifexpr_top(st);
-    return cond ? true_val : false_val;
-  }
-  return cond;
+  return ret;
 }
 
 // The name of an identifier-flavored token, for defined()'s operand.
@@ -783,7 +836,7 @@ int64_t lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
 
   IfTokState st;
   st.toks = &toks;
-  int64_t result = ifexpr_top(&st);
+  int64_t result = ifexpr_eval(&st);
   if (!st.error.empty()) {
     lexerror(st.error.c_str());
     return 0;
@@ -883,99 +936,211 @@ bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
   return false;
 }
 
-ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard) {
-  if (!g_compile.pp_active) return ScratchString(text);
-  // `guard` only stops a macro from expanding ITSELF; a chain of DISTINCT
-  // macros (A->B->C->...) recurses one C-frame per link with no bound. This
-  // is the textual sibling of the rescan path (which caps at
-  // MAX_EXPANSION_NESTING); cap it the same way so a pathological chain fails
-  // with a clean diagnostic instead of overflowing the C stack. The counter
-  // is single-threaded (one lexer per compile) and self-balances via DEFER,
-  // including on an exception unwind. Value matches the rescan cap (64), far
-  // under the measured ~3.5-5k overflow boundary.
-  static constexpr int kMaxExpandStringDepth = 64;
-  static int expand_depth = 0;
-  if (expand_depth >= kMaxExpandStringDepth) {
-    lexerror("Macro expansion nested too deep");
-    return ScratchString(text);
-  }
-  expand_depth++;
-  DEFER { expand_depth--; };
+namespace {
+// One pending function-like invocation inside lpc_lex_expand_string's
+// work stack: raw arguments already collected from the invoking frame's
+// text; each argument is pre-expanded into expanded_args by its own text
+// frame, then the body is substituted and rescanned. Arena-allocated
+// (placement new, destructor never runs: every member allocates from the
+// arena) so member addresses survive the frame vector's reallocation.
+struct EsPendingCall {
+  const PpMacro* m;
+  ScratchString name;  // guard entry for the substituted body's rescan
+  ScratchVector<ScratchString> raw_args;
+  ScratchVector<ScratchString> expanded_args;  // pre-sized; filled one frame at a time
+  size_t next_arg;
+  ScratchString subst;  // owns the substituted body while its frame scans it
+  ScratchString* out;   // where the rescan appends
+};
 
-  ScratchString result;
-  size_t i = 0;
-  while (i < text.size()) {
-    if (text[i] == '"' || text[i] == '\'') {
-      char q = text[i++];
-      result += q;
-      while (i < text.size() && text[i] != q) {
-        if (text[i] == '\\') result += text[i++];
-        if (i < text.size()) result += text[i++];
+// One level of lpc_lex_expand_string's explicit work stack: either a
+// text-scan frame (call == nullptr: scan [text,len) from pos, appending
+// to *out) or a call-driver frame (call != nullptr: feed the pending
+// invocation's arguments through their own frames, then morph into the
+// substituted body's text frame). guard_restore is the guard stack's
+// size at frame entry; frame exit truncates back to it.
+struct EsFrame {
+  const char* text;
+  size_t len;
+  size_t pos;
+  ScratchString* out;
+  size_t guard_restore;
+  EsPendingCall* call;
+};
+}  // namespace
+
+ScratchString lpc_lex_expand_string(std::string_view text) {
+  if (!g_compile.pp_active) return ScratchString(text);
+
+  ScratchString final_out;
+
+  // The guard chain (names currently being expanded, outermost first) as
+  // ONE shared stack plus a name->count map for O(1) membership tests;
+  // each frame truncates back to its entry size on exit. The old
+  // recursive version copied the whole guard vector per level -- O(n^2)
+  // arena memory over a deep chain -- and burned a C-stack frame per
+  // level, which is why it could not survive kLpcMaxExpansionNesting-deep
+  // input.
+  ScratchVector<ScratchString> guards;
+  std::unordered_map<std::string, int> guard_counts;
+  const auto guard_push = [&](std::string_view name) {
+    guards.emplace_back(name);
+    ++guard_counts[std::string(name)];
+  };
+  const auto guards_restore = [&](size_t mark) {
+    while (guards.size() > mark) {
+      auto it = guard_counts.find(std::string(guards.back().data(), guards.back().size()));
+      if (it != guard_counts.end() && --it->second == 0) guard_counts.erase(it);
+      guards.pop_back();
+    }
+  };
+  const auto guarded = [&](std::string_view id) {
+    return !guard_counts.empty() && guard_counts.find(std::string(id)) != guard_counts.end();
+  };
+
+  std::vector<EsFrame> frames;
+  frames.push_back(EsFrame{text.data(), text.size(), 0, &final_out, 0, nullptr});
+
+  // Depth gate for every push below: at the cap, report once and leave
+  // the too-deep reference literal (the compile is failing anyway; the
+  // machine stays memory-safe and terminates).
+  bool reported_too_deep = false;
+  const auto depth_ok = [&]() {
+    if (frames.size() < kLpcMaxExpansionNesting) return true;
+    if (!reported_too_deep) {
+      reported_too_deep = true;
+      lexerror("Macro expansion nested too deep");
+    }
+    return false;
+  };
+
+  while (!frames.empty()) {
+    const size_t fi = frames.size() - 1;
+
+    if (frames[fi].call != nullptr) {
+      EsPendingCall& c = *frames[fi].call;  // arena-stable across frame pushes
+      if (c.next_arg < c.raw_args.size()) {
+        const size_t a = c.next_arg++;
+        // Arguments are pre-expanded under the CALLER's guard set (the
+        // invoked macro's own name is NOT yet guarded) -- C's "arguments
+        // are fully expanded first" step, which lets SECOND(1, SECOND(2,
+        // 3))'s inner reference expand even while the outer invocation
+        // is in flight.
+        if (depth_ok()) {
+          frames.push_back(EsFrame{c.raw_args[a].data(), c.raw_args[a].size(), 0,
+                                   &c.expanded_args[a], guards.size(), nullptr});
+        } else {
+          c.expanded_args[a] = c.raw_args[a];
+        }
+        continue;
       }
-      if (i < text.size()) result += text[i++];
+      // All arguments expanded: substitute, then rescan the result with
+      // the macro's own name guarded for the body's duration.
+      c.subst = substitute(c.m->body, c.m->params, c.expanded_args);
+      guard_push(c.name);
+      EsFrame& f = frames[fi];
+      f.text = c.subst.data();
+      f.len = c.subst.size();
+      f.pos = 0;
+      f.out = c.out;
+      f.guard_restore = guards.size() - 1;
+      f.call = nullptr;
       continue;
     }
-    if (std::isalpha(static_cast<unsigned char>(text[i])) || text[i] == '_') {
-      size_t start = i;
-      while (i < text.size() &&
-             (std::isalnum(static_cast<unsigned char>(text[i])) || text[i] == '_'))
-        i++;
-      std::string_view id = text.substr(start, i - start);
 
-      {
-        ScratchString builtin;
-        if (lpc_lex_builtin_macro(id, &builtin)) {
-          result += builtin;
-          continue;
+    if (frames[fi].pos >= frames[fi].len) {
+      guards_restore(frames[fi].guard_restore);
+      frames.pop_back();
+      continue;
+    }
+
+    // Text scan: consume until a macro reference needs a sub-frame (then
+    // break out with `pushed`) or the frame's text runs dry. `result`
+    // and `t` stay valid across frame pushes (they alias arena / macro
+    // table storage, not the frames vector); the frame reference `f`
+    // does NOT, so its fields are written before any push.
+    EsFrame& f = frames[fi];
+    const std::string_view t(f.text, f.len);
+    ScratchString& result = *f.out;
+    size_t i = f.pos;
+    bool pushed = false;
+    while (i < t.size() && !pushed) {
+      if (t[i] == '"' || t[i] == '\'') {
+        char q = t[i++];
+        result += q;
+        while (i < t.size() && t[i] != q) {
+          if (t[i] == '\\') result += t[i++];
+          if (i < t.size()) result += t[i++];
         }
+        if (i < t.size()) result += t[i++];
+        continue;
       }
+      if (std::isalpha(static_cast<unsigned char>(t[i])) || t[i] == '_') {
+        size_t start = i;
+        while (i < t.size() && (std::isalnum(static_cast<unsigned char>(t[i])) || t[i] == '_')) i++;
+        std::string_view id = t.substr(start, i - start);
 
-      bool guarded = false;
-      for (const auto& g : guard) {
-        if (g == id) {
-          guarded = true;
-          break;
-        }
-      }
-
-      const PpMacro* found = pp_find_macro(id);
-      if (!guarded && found != nullptr) {
-        const PpMacro& m = *found;
-        if (!m.is_function_like) {
-          auto g2 = guard;
-          g2.emplace_back(id);
-          result += lpc_lex_expand_string(m.body, std::move(g2));
-        } else {
-          size_t j = i;
-          while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-          if (j < text.size() && text[j] == '(') {
-            j++;
-            auto args = collect_args(text, j);
-            i = j;
-            ScratchVector<ScratchString> expanded_args;
-            auto g2 = guard;
-            g2.emplace_back(id);
-            // Argument pre-expansion deliberately passes no
-            for (const auto& a : args) expanded_args.push_back(lpc_lex_expand_string(a, guard));
-            ScratchString subst = substitute(m.body, m.params, expanded_args);
-            result += lpc_lex_expand_string(subst, std::move(g2));
-          } else {
-            // Function-like macro name with no argument list in
-            // this text: left literal and NOT counted -- if its
-            // '(' turns out to follow in the input stream after
-            // this text is spliced, the rescan may legitimately
-            // expand it there (C behavior).
-            result += id;
+        {
+          ScratchString builtin;
+          if (lpc_lex_builtin_macro(id, &builtin)) {
+            result += builtin;
+            continue;
           }
         }
-      } else {
-        result += id;
+
+        const PpMacro* found = pp_find_macro(id);
+        if (guarded(id) || found == nullptr) {
+          result += id;
+          continue;
+        }
+        const PpMacro& m = *found;
+        if (!m.is_function_like) {
+          if (depth_ok()) {
+            f.pos = i;
+            guard_push(id);
+            frames.push_back(
+                EsFrame{m.body.data(), m.body.size(), 0, &result, guards.size() - 1, nullptr});
+            pushed = true;
+          } else {
+            result += id;
+          }
+          continue;
+        }
+        size_t j = i;
+        while (j < t.size() && (t[j] == ' ' || t[j] == '\t')) j++;
+        if (j < t.size() && t[j] == '(') {
+          j++;
+          if (depth_ok()) {
+            auto args = collect_args(t, j);
+            f.pos = j;  // consumed through the closing ')'
+            void* mem = scratch_raw_allocate(sizeof(EsPendingCall), alignof(EsPendingCall));
+            auto* call = new (mem) EsPendingCall{&m, ScratchString(id), std::move(args),
+                                                 {},   0,               {},
+                                                 &result};
+            call->expanded_args.resize(call->raw_args.size());
+            frames.push_back(EsFrame{nullptr, 0, 0, nullptr, guards.size(), call});
+            pushed = true;
+          } else {
+            // At the cap: the name stays literal and the argument list
+            // is NOT consumed; it flows through as plain text.
+            result += id;
+          }
+        } else {
+          // Function-like macro name with no argument list in this
+          // text: left literal and NOT counted -- if its '(' turns out
+          // to follow in the input stream after this text is spliced,
+          // the rescan may legitimately expand it there (C behavior).
+          result += id;
+        }
+        continue;
       }
-      continue;
+      result += t[i++];
     }
-    result += text[i++];
+    if (!pushed) {
+      frames[fi].pos = i;  // exhausted; popped (and guards restored) next iteration
+    }
   }
-  return result;
+  return final_out;
 }
 
 static ScratchString fold_backslash_newlines(std::string_view text) {
