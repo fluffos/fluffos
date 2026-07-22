@@ -396,7 +396,14 @@ static void init_domain_for_ob(object_t* ob) {
     ob->stats.domain = current_object->stats.domain;
     return;
   }
-  if (strcmp(backbone_domain->name, domain_name) == 0) {
+  // backbone_domain can still be null here: master's own bootstrap (set_master())
+  // calls the author_file()/domain_file() applies BEFORE it calls
+  // set_backbone_domain(), so if either of those applies (as called on the
+  // master object itself, current_object->uid already set) triggers loading
+  // of another object -- e.g. by call_other()ing into the simul_efun object --
+  // this function reenters with backbone_domain still unset. Treat that as
+  // "no backbone domain yet" (never matches) instead of crashing.
+  if (backbone_domain && strcmp(backbone_domain->name, domain_name) == 0) {
     /*
      * The object is loaded from backbone. We give domain ownership to
      * the creator rather than backbone.
