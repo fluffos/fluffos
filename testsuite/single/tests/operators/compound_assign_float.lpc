@@ -14,21 +14,32 @@
 float global_f;
 
 void do_tests() {
-  float f;
+  float f, f2;
   int i;
 
-  // A declared float starts as a genuine float from birth (T_REAL 0.0),
-  // not integer 0.
-  ASSERT_EQ(1, floatp(f));
-  ASSERT_EQ(1, floatp(global_f));
+  // A declared float with no initializer starts UNDEFINED, exactly like any
+  // other uninitialized variable -- undefinedp() must report 1 until the
+  // first assignment...
+  ASSERT_EQ(1, undefinedp(f));
+  ASSERT_EQ(1, undefinedp(global_f));
 
+  // ...and the first assignment remembers the declared type: op= promotes
+  // via the compile-time RHS coercion + runtime promotion, plain = via
+  // do_promotions().
   f += 1;
+  ASSERT_EQ(0, undefinedp(f));
   ASSERT_EQ(1, floatp(f));
   ASSERT_EQ(1.0, f);
 
   global_f += 1;
+  ASSERT_EQ(0, undefinedp(global_f));
   ASSERT_EQ(1, floatp(global_f));
   ASSERT_EQ(1.0, global_f);
+
+  // Plain first assignment with an int RHS also lands as float.
+  f2 = 1;
+  ASSERT_EQ(1, floatp(f2));
+  ASSERT_EQ(1.0, f2);
 
   f = 0;
   f -= 1;
