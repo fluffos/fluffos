@@ -1,0 +1,35 @@
+// Regression: disassemble() (src/compiler/internal/disassembler.cc) rendered
+// an F_PUSH instruction by looping over its packed push-descriptors (up to
+// 255) and appending each with sprintf() into a fixed 2048-byte stack buffer
+// with no bound check -- the compiler's constant-push peephole merges a long
+// run of similar pushes (e.g. a deep a[0][0][0]... index chain) into one such
+// wide instruction, so disassembling that object overflowed the buffer.
+// dump_prog() is an efun in package develop, so this crashed the live driver,
+// not just the offline lpcc tool. The append is now bounded; surviving the
+// dump_prog() call (with the disassemble bit set) cleanly is the regression
+// signal -- the unfixed driver stack-buffer-overflows in vsprintf under ASan.
+void do_tests() {
+#ifdef __PACKAGE_DEVELOP__
+  string src, idx;
+  object ob;
+  int i;
+
+  idx = "";
+  for (i = 0; i < 200; i++) {
+    idx += "[0]";
+  }
+  src = "mixed a;\nint f() { mixed v = a" + idx + "; return 1; }\n";
+
+  rm("/gen_wide_push.c");
+  write_file("/gen_wide_push.c", src);
+  ob = load_object("/gen_wide_push");
+  ASSERT(objectp(ob));
+  // flag 1 = disassemble (walks the F_PUSH case); dump goes to the given
+  // file. The dump itself is what used to crash.
+  dump_prog(ob, 1, "/gen_prog_dump.txt");
+  destruct(ob);
+  rm("/gen_wide_push.c");
+  rm("/gen_prog_dump.txt");
+#endif
+  ASSERT(1);
+}

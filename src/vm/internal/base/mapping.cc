@@ -728,6 +728,13 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
         total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
         total_mapping_nodes += count;
         free_mapping(m);
+        // Same reasoning as the mapping_too_large() path below: these
+        // remaining elements are invisible to error()'s unwind (the
+        // caller already moved the VM's real sp below this whole
+        // aggregate) and would otherwise leak.
+        for (int k = 0; k < n; k++) {
+          free_svalue(sp + k, "load_mapping_from_aggregate: out of memory");
+        }
         error("Out of memory\n");
       }
     }
@@ -740,6 +747,18 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
       total_mapping_nodes += count;
 
       free_mapping(m);
+      // The caller (F_AGGREGATE_ASSOC, interpret.cc) already moved the VM's
+      // real sp below this entire aggregate before calling in ("sp -=
+      // offset"), so error()'s unwind (pop_n_elems, walking down to the
+      // saved sp) never revisits these slots. Every remaining element from
+      // here on -- this pair (sp[0]/sp[1], already hashed/shared-string-
+      // converted by svalue_to_int above) plus any pairs still unprocessed
+      // beyond it -- would otherwise leak. Already-inserted pairs don't
+      // need this: their ownership was transferred into map nodes that
+      // free_mapping() just freed above.
+      for (int k = 0; k < n; k++) {
+        free_svalue(sp + k, "load_mapping_from_aggregate: too large");
+      }
       mapping_too_large();
     }
 
@@ -1223,9 +1242,14 @@ static svalue_t* insert_in_mapping(mapping_t* m, const char* key) {
   lv.type = T_STRING;
   lv.subtype = STRING_CONSTANT;
   lv.u.string = key;
+  /* lv.u.string will have been converted to a shared string (ref-bumped)
+   * by find_for_insert()'s svalue_to_int() hash, before it can possibly
+   * mapping_too_large()/"Out of memory" error() -- release that ref
+   * unconditionally, including on the throwing path, or every insert
+   * rejected for being over a configured __MAX_MAPPING_SIZE__ (or OOM)
+   * leaks one ref on the key string. */
+  DEFER { free_string(lv.u.string); };
   ret = find_for_insert(m, &lv, 1);
-  /* lv.u.string will have been converted to a shared string */
-  free_string(lv.u.string);
   return ret;
 }
 

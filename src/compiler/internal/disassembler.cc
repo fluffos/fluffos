@@ -394,18 +394,36 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
 
     switch (instr) {
       case F_PUSH: {
-        auto p = buff;
-        p += sprintf(p, "push ");
+        // Up to 255 packed push-descriptors (i, below) can be packed into a
+        // single instruction by the compiler's constant-push peephole; bound
+        // every append against buff's actual remaining space instead of
+        // trusting each individual descriptor's rendering to stay small.
+        // fmt::format_to_n does NOT null-terminate, so reserve the last byte
+        // (buff is otherwise only zeroed at buff[0], not throughout) --
+        // buff is later read back as a C string via "%s".
+        char* p = buff;
+        char* const buff_end = buff + sizeof(buff) - 1;
+        auto append = [&](auto format_str, auto&&... args) {
+          if (p >= buff_end) return;
+          p = fmt::format_to_n(p, buff_end - p, format_str, args...).out;
+        };
+        append(FMT_STRING("push "));
         i = EXTRACT_UCHAR(pc++);
         while (i--) {
           j = EXTRACT_UCHAR(pc++);
-          p += sprintf(p, "%s %d", pushes[(j & PUSH_WHAT) >> 6], j & PUSH_MASK);
+          append(FMT_STRING("{} {}"), pushes[(j & PUSH_WHAT) >> 6], j & PUSH_MASK);
           if (i) {
-            p += sprintf(p, ", ");
+            append(FMT_STRING(", "));
           } else {
             break;
           }
         }
+        // format_to_n never null-terminates; buff isn't zero-filled beyond
+        // buff[0] (leftover content from a wider previous instruction could
+        // still be sitting past `p`), so terminate explicitly. p <= buff_end
+        // always holds (the append lambda's own bound), and buff_end leaves
+        // this write in-bounds.
+        *p = '\0';
         break;
       }
         /* Single numeric arg */
@@ -851,11 +869,24 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         break;
     }
     {
+      // Same overflow shape as the F_PUSH case above: this prints the raw
+      // byte encoding of the CURRENT instruction, whose length (pc -
+      // saved_pc) scales with however many packed descriptors it holds
+      // (up to ~257 bytes for a maximal F_PUSH) -- well past what
+      // 256/3 hex bytes ("XX ", 3 chars each) can hold.
+      // fmt::format_to_n does NOT null-terminate; reserve the last byte so
+      // there's always room for one (tmp is freshly zero-initialized above,
+      // but relying on that alone would mean a full-256-byte fill leaves no
+      // terminator within the array for the "%s" reads below).
       char tmp[256 + 1] = {};
-      auto p = &tmp[0];
-      while (saved_pc != pc) {
-        p += sprintf(p, "%02hhX ", *saved_pc++);
+      char* p = &tmp[0];
+      char* const tmp_end = tmp + sizeof(tmp) - 1;
+      while (saved_pc != pc && p < tmp_end) {
+        p = fmt::format_to_n(p, tmp_end - p, FMT_STRING("{:02X} "),
+                             static_cast<unsigned char>(*saved_pc++))
+                .out;
       }
+      *p = '\0';
       if (sink.f) {
         fprintf(sink.f, " %-25s", tmp);  // byte code in HEX
         fprintf(sink.f, " %-35s; %s\n", query_instr_name(instr), buff);

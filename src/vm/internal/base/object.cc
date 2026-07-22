@@ -922,7 +922,6 @@ key_error:
 static int restore_class(char** str, svalue_t* ret) {
   int size;
   char c;
-  array_t* v;
   svalue_t* sv;
   char* cp = *str;
   int err;
@@ -933,7 +932,18 @@ static int restore_class(char** str, svalue_t* ret) {
     return ROB_CLASS_ERROR;
   }
 
-  v = allocate_class_by_size(size); /* after this point we have to clean up
+  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    // Same reasoning as restore_array()'s guard above: allocate_class_by_size()
+    // now validates and error()s cleanly on an out-of-range size (previously
+    // it didn't validate at all), but that error() still needs to run before
+    // it leaves save_svalue_depth/sizes[] dirty for the next restore.
+    reset_restore_scratch();
+  }
+  // Owned via RAII -- same reasoning as restore_array()'s v_owned above: a
+  // nested restore call below can throw and skip the goto-based `error:`
+  // cleanup, leaking this class.
+  std::unique_ptr<array_t, void (*)(array_t*)> v_owned(allocate_class_by_size(size), free_class);
+  array_t* v = v_owned.get(); /* after this point we have to clean up
                                          or we'll leak */
   sv = v->item;
 
@@ -1004,7 +1014,7 @@ static int restore_class(char** str, svalue_t* ret) {
 
   cp += 2;
   *str = cp;
-  ret->u.arr = v;
+  ret->u.arr = v_owned.release();
   ret->type = T_CLASS;
   return 0;
 /* something went wrong */
@@ -1014,14 +1024,12 @@ numeral_error:
 generic_error:
   err = ROB_CLASS_ERROR;
 error:
-  free_class(v);
   return err;
 }
 
 static int restore_array(char** str, svalue_t* ret) {
   int size;
   char c;
-  array_t* v;
   svalue_t* sv;
   char* cp = *str;
   int err;
@@ -1032,7 +1040,22 @@ static int restore_array(char** str, svalue_t* ret) {
     return ROB_ARRAY_ERROR;
   }
 
-  v = allocate_array(size); /* after this point we have to clean up
+  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    // Unlike the two restore_mapping() error sites, allocate_array()'s own
+    // "Illegal array size" error() below was unguarded: it skips
+    // restore_svalue()'s cleanup the same way OOM/mapping-too-large do,
+    // leaving save_svalue_depth/sizes[] dirty for the *next* restore_svalue()
+    // call, which can then read a stale/uninitialized sizes[] entry.
+    reset_restore_scratch();
+  }
+  // Owned via RAII: a nested restore_mapping()/restore_array()/
+  // restore_class() call below can itself throw (a deeper oversized
+  // element, OOM, mapping-too-large), which would skip the goto-based
+  // `error:` cleanup entirely and leak this array. The destructor covers
+  // every exit uniformly, so the explicit free_array() at `error:` below
+  // is no longer needed either.
+  std::unique_ptr<array_t, void (*)(array_t*)> v_owned(allocate_array(size), free_array);
+  array_t* v = v_owned.get(); /* after this point we have to clean up
                                  or we'll leak */
   sv = v->item;
 
@@ -1103,7 +1126,7 @@ static int restore_array(char** str, svalue_t* ret) {
 
   cp += 2;
   *str = cp;
-  ret->u.arr = v;
+  ret->u.arr = v_owned.release();
   ret->type = T_ARRAY;
   return 0;
 /* something went wrong */
@@ -1113,7 +1136,6 @@ numeral_error:
 generic_error:
   err = ROB_ARRAY_ERROR;
 error:
-  free_array(v);
   return err;
 }
 
@@ -1913,6 +1935,8 @@ void restore_variable(svalue_t* var, char* str) {
       error("restore_object(): Illegal string format.\n");
     } else if (rc & ROB_STRING_UTF8_ERROR) {
       error("restore_object(): string is not valid utf8.\n");
+    } else if (rc & ROB_CLASS_ERROR) {
+      error("restore_object(): Illegal class format.\n");
     }
   }
 }

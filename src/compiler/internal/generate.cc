@@ -555,14 +555,37 @@ static void ast_json_children(nlohmann::json& node, parse_node_t* expr) {
 }
 
 static void ast_json_seq(nlohmann::json& arr, parse_node_t* expr) {
-  if (!expr) return;
-  if (expr->kind == NODE_TWO_VALUES) { // splice nested sequences flat
-    ast_json_seq(arr, expr->l.expr);
-    ast_json_seq(arr, expr->r.expr);
-    return;
+  // Same NODE_TWO_VALUES chain (one node per top-level definition/statement)
+  // that i_generate_node()/optimize() flatten iteratively instead of
+  // recursing -- walking it recursively here would scale C-stack depth with
+  // an object's definition/statement count, not just genuine expression
+  // nesting (github.com/fluffos/fluffos/issues/1267). Push right-then-left
+  // so popping (left-to-right) preserves the original recursive order.
+  std::vector<parse_node_t*> work{expr};
+  while (!work.empty()) {
+    parse_node_t* node = work.back();
+    work.pop_back();
+    if (!node) continue;
+    if (node->kind == NODE_TWO_VALUES) { // splice nested sequences flat
+      work.push_back(node->r.expr);
+      work.push_back(node->l.expr);
+    } else {
+      arr.push_back(ast_json(node));
+    }
   }
-  arr.push_back(ast_json(expr));
 }
+
+namespace {
+// Mirrors optimize()'s guard (see above): ast_json() is a third recursive
+// walker over the same parse-tree shape as optimize()/i_generate_node(), for
+// `lpcc --ast`/`--ast --json`, and runs BEFORE codegen -- so without its own
+// cap it can stack-overflow on a pathologically deep (non-constant-foldable)
+// expression before optimize()'s own cap ever gets a chance to reject it.
+// Diagnostic output only, so going over just truncates the subtree instead
+// of failing anything.
+int g_ast_json_depth = 0;
+constexpr int kMaxAstJsonDepth = 500;
+}  // namespace
 
 static nlohmann::json ast_json(parse_node_t* expr) {
   nlohmann::json n = nlohmann::json::object();
@@ -570,6 +593,12 @@ static nlohmann::json ast_json(parse_node_t* expr) {
     n["k"] = "nil";
     return n;
   }
+  if (++g_ast_json_depth > kMaxAstJsonDepth) {
+    --g_ast_json_depth;
+    n["k"] = "too_deep";
+    return n;
+  }
+  DEFER { --g_ast_json_depth; };
   if (expr->line > 0) n["l"] = expr->line;
   auto kids = [&](parse_node_t* e) { if (e) n["c"].push_back(ast_json(e)); };
   auto scalar = [&](LPC_INT v) { n["a"].push_back(v); };
