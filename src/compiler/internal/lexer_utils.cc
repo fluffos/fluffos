@@ -615,7 +615,7 @@ static bool lpc_lex_name_guarded(std::string_view name) {
 // kMaxGenerateNodeDepth (generate.cc/icode.cc) were deliberately kept small
 // for the same reason (see commit 117cbc1's reasoning) rather than picking
 // a larger "plausible" number.
-#define MAX_EXPANSION_NESTING 64
+#define MAX_EXPANSION_NESTING 32
 
 // Pushes a frame for an expansion buffer about to be pushed. Zero-length
 // expansions push nothing (no buffer, no frame). The invocation position
