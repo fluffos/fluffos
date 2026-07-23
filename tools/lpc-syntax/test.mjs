@@ -765,12 +765,13 @@ check('short code is unaffected by a small printWidth when it already fits',
 check('token-merge safety net: two tokens are never butted together if their'
       + ' concatenation re-lexes as a different token sequence -- `a - --b`'
       + ' must not become `a ---b` (which re-lexes as `(a--) - b`), `- -x`'
-      + ' must not become `--x` (a pre-decrement!), and `f( ::g() )` must'
-      + ' not become `f(::g())` (whose `(:` re-lexes as a functional-literal'
-      + ' opener); already-tight `i--`/`a[0]`/`-1`/`efun::` forms stay tight',
+      + ' must not become `--x` (a pre-decrement!); already-tight'
+      + ' `i--`/`a[0]`/`-1`/`efun::` forms stay tight, and a bare `::` after'
+      + ' `(` goes tight too (`f( ::g() )` -> `f(::g())`) now that the'
+      + ' tokenizer itself (not this safety net) gets "(::" right',
       (() => {
         const cases = [
-          ['x = f( ::g() );\n', 'f( ::g());'],
+          ['x = f( ::g() );\n', 'f(::g());'],
           ['y = a - --b;\n', 'a - --b'],
           ['y = a + ++b;\n', 'a + ++b'],
           ['y = - -x;\n', '- -x'],
@@ -784,6 +785,41 @@ check('token-merge safety net: two tokens are never butted together if their'
                              ['x = efun::sizeof(a);\n', 'efun::sizeof(a)'],
                              ['x = a[0];\n', 'a[0]']]) {
           if (!formatLPC(tight[0]).includes(tight[1])) return false;
+        }
+        return true;
+      })());
+// A bare parent-call `::name(...)` immediately inside a control-flow
+// condition (`if (::name())`) used to mis-tokenize: the tokenizer's naive
+// "(' followed by ':'" check matched "(:" (the functional-literal open)
+// before ever considering that "(::" is "(' + '::" (the scope-resolution
+// operator), leaving a lone ':' behind and corrupting everything the
+// formatter built on top of that token (the '::' rendered as ': :', and
+// the `if`'s condition/body structure came out wrong -- an extra `{`
+// materialized in one real-world case). Caught across a ~91-mudlib
+// corpus scan; two mudlibs' boot broke on exactly this (a player-body
+// class's `::move()`/`::query()` guard). Fixed by tokenizer.mjs's
+// isParentCallOpenParen(), mirroring lexer.l's own `"("{WS}*"::"` guard.
+check('bare `::name(...)` guard in an `if` condition tokenizes and formats'
+      + ' correctly -- the "(::" ambiguity with the "(:" functional-literal'
+      + ' opener must resolve to \'(\' + \'::\', not \'(:\' + \':\'',
+      (() => {
+        const cases = [
+          // Single-line guard directly on the condition.
+          ['if (::valid_leave(me, dir)) return notify_fail("no\\n");\n',
+           'if (::valid_leave(me, dir)) return notify_fail("no\\n");\n'],
+          // The `if (cond) {` shape from the original bug report.
+          ['if (::do_read(arg)) {\n  return 1;\n}\n',
+           'if (::do_read(arg)) {\n  return 1;\n}\n'],
+          // Whitespace/newline between '(' and '::' (lexer.l's WS* class).
+          ['if ( ::do_read(arg)) return 1;\n',
+           'if (::do_read(arg)) return 1;\n'],
+        ];
+        for (const [src, want] of cases) {
+          const out = formatLPC(src);
+          if (out !== want) return false;
+          if (formatLPC(out) !== out) return false;
+          // The tokenizer must see one '::' operator token, not two ':'s.
+          if (!kinds(out).includes('operator:::')) return false;
         }
         return true;
       })());
