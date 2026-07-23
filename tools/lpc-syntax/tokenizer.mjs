@@ -23,6 +23,18 @@ const PUNCT = new Set(grammar.punctuation);
 const isIdentStart = (c) => /[A-Za-z_]/.test(c);
 const isIdentChar = (c) => /[A-Za-z0-9_]/.test(c);
 const isDigit = (c) => /[0-9]/.test(c);
+const isLexWs = (c) => c === ' ' || c === '\t' || c === '\r' || c === '\n' || c === '\v' || c === '\f';
+
+// True when `src[i]` is a '(' immediately (modulo lexer.l's WS class:
+// space/tab/CR/LF/VT/FF) followed by "::" -- i.e. a bare parent-call guard
+// like `(::name(...))`, not a functional-literal open. Mirrors lexer.l's
+// `"("{WS}*"::"` rule, which LPC_YYLESS(1)s back to just '(' so "::" is
+// re-scanned as L_COLON_COLON.
+function isParentCallOpenParen(src, i) {
+  let j = i + 1;
+  while (j < src.length && isLexWs(src[j])) j++;
+  return src[j] === ':' && src[j + 1] === ':';
+}
 
 // Brace-depth scan for a template interpolation body: a raw '{'/'}' count
 // is fooled by a '}' inside a nested string/char/comment/template (e.g.
@@ -337,7 +349,27 @@ export function tokenize(src) {
     }
 
     // functional open/close before operators ("(:", ":)")
-    if (c === '(' && src[i + 1] === ':') { push('functional', '(:'); i += 2; continue; }
+    //
+    // "(::" (optionally with whitespace between the '(' and the "::") is
+    // NOT a functional-literal open -- it's an ordinary '(' followed by
+    // the "::" scope-resolution operator, as in a bare parent-call guard
+    // `if (::name(...))`. lexer.l's own "("{WS}*"::" rule exists for
+    // exactly this: it returns just '(' and pushes the rest back so "::"
+    // scans as its own token next (see the "(::" longest-match guard
+    // comment there). Without this guard, greedily matching '(' + ':' as
+    // "(:" leaves a lone ':' behind, corrupting the token stream (`::` ->
+    // `: :`) and everything the formatter builds on top of it.
+    if (c === '(' && src[i + 1] === ':') {
+      if (isParentCallOpenParen(src, i)) {
+        // Bare '(' -- do not let the operator table below match "(:" as a
+        // functional-literal open either; emit just the paren and let "::"
+        // (and any whitespace between them) scan on the next iterations.
+        push('punctuation', '(');
+        i += 1;
+        continue;
+      }
+      push('functional', '(:'); i += 2; continue;
+    }
     if (c === ':' && src[i + 1] === ')') { push('functional', ':)'); i += 2; continue; }
 
     // operators, longest-match from the grammar contract

@@ -1598,11 +1598,16 @@ function renderLine(toks, mappingContext = false, pendingTernary = 0) {
     // Token-merge safety net: never butt two tokens together whose
     // concatenation re-lexes as something else -- `a - --b` must not
     // become `a ---b` (re-lexing as `(a--) - b`), `- -x` must not become
-    // `--x` (a pre-decrement!), and `f( ::g() )` must not become
-    // `f(::g())` (whose `(:` re-lexes as a functional-literal opener).
-    // Longest-match lexing means ANY tight rule above can accidentally
-    // manufacture a longer operator; checking against the real tokenizer
-    // catches every such pair, present and future, in one place.
+    // `--x` (a pre-decrement!). (`f( ::g() )` going tight to `f(::g())`
+    // used to trip this too, back when the tokenizer's own "(:" rule
+    // didn't look past a "::" -- see isParentCallOpenParen() in
+    // tokenizer.mjs -- and mis-lexed the "(::" it produced. Now that the
+    // tokenizer itself gets that case right, `(` before a bare `::` is
+    // exactly as safe to render tight as any other qualified-scope site,
+    // e.g. `efun::`.) Longest-match lexing means ANY tight rule above can
+    // accidentally manufacture a longer operator; checking against the
+    // real tokenizer catches every such pair, present and future, in one
+    // place.
     if (sep === '' && prev && tokensWouldMerge(prev, t)) sep = ' ';
     out += sep + t.text;
 
