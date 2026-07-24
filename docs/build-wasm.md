@@ -197,8 +197,10 @@ console — implemented in `testsuite/command/jsdemo.lpc` +
 ## Notes & limits
 
 * No eval limit yet on this target: a `while(1);` in LPC blocks the tab.
-* `resolve()` raises "DNS resolver is not available"; connections report
-  `127.0.0.1`.
+* No real DNS: connections report `127.0.0.1`, and `resolve()` succeeds
+  synthetically — the callback fires on the next tick with the native
+  argument shape `(name, ip, key)`, where `ip` is `"127.0.0.1"` (or the
+  input echoed back when it is already a numeric address).
 * Mudlib writes live in page memory for the session; persistent storage
   (IDBFS) is on the roadmap in `src/wasm/README.md`.
 * No zlib on this target: compressed `save_object` degrades to a plain
