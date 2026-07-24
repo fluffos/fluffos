@@ -71,7 +71,14 @@
   #logs .log-line { white-space: pre-wrap; word-break: break-word; }
   #logs .log-line.err { color: #f7768e; }
   #logs .log-ts { color: var(--dim); margin-right: 8px; user-select: none; }
-  #term .pane .xterm-viewport { overscroll-behavior: contain; }
+  #term .pane .xterm-viewport {
+    overscroll-behavior: contain;
+    /* xterm.css hardcodes background-color:#000 on the viewport (a macOS
+       scrollbar-opacity workaround); the sub-row remainder of the pane
+       shows through it as a black strip above #inputbar -- repaint it in
+       the page/terminal background instead. */
+    background-color: var(--bg);
+  }
   #jscanvas {
     display: none; position: fixed; right: 16px; top: 56px;
     border: 1px solid var(--border); border-radius: 6px; background: #04060a;
@@ -170,6 +177,10 @@
       display: inline-flex; align-items: center; justify-content: center;
       min-width: 24px; min-height: 24px;
     }
+    /* display:inline-flex above would defeat the UA's [hidden]{display:none},
+       un-hiding the close button that updateCloseButtons() hides on the
+       permanent first tab -- restore it explicitly. */
+    #tabs .tab .reload[hidden], #tabs .tab .close[hidden] { display: none; }
     #tabAdd { min-width: 40px; }
   }
 </style>
@@ -373,6 +384,27 @@ const TERM_OPTIONS = {
 const mqNarrow = window.matchMedia('(max-width: 480px)');
 function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
 
+// The full command hint clips mid-word at phone widths; keep it for wide
+// screens.  Applied after boot and re-applied on breakpoint crossings.
+function placeholderForViewport() {
+  return mqNarrow.matches
+    ? 'type a command…'
+    : 'type a command — try: eval return 1+1, tuidemo, who';
+}
+
+// On a touch screen the ↻/× icons sit only a few px from the tap point of
+// a tab-switching tap (verified: Playwright's tap on the tab's center hit
+// the ↻ and silently dropped/redialed the session).  Guard both icons on
+// coarse pointers: a tap on an INACTIVE tab's icon only activates the tab;
+// reload/close take a deliberate second tap once the tab is frontmost.
+// Mouse users (fine pointers) keep the direct one-click behavior.
+const mqCoarse = window.matchMedia('(pointer: coarse)');
+function iconTapGuard(s) {
+  if (!mqCoarse.matches || view === s) return false;
+  activateSession(s);
+  return true;
+}
+
 const status = document.getElementById('status');
 const input = document.getElementById('cmd');
 const inputBar = document.getElementById('inputbar');
@@ -485,10 +517,12 @@ function makeSession() {
   s.tab.addEventListener('click', () => activateSession(s));
   s.reload.addEventListener('click', (ev) => {
     ev.stopPropagation();
+    if (iconTapGuard(s)) return;
     reconnectSession(s);
   });
   s.close.addEventListener('click', (ev) => {
     ev.stopPropagation();
+    if (iconTapGuard(s)) return;
     closeSession(s);
   });
   gameTabsEl.appendChild(s.tab);
@@ -575,6 +609,7 @@ mqNarrow.addEventListener('change', () => {
     s.term.options.fontSize = size;
     if (view === s) s.fit.fit();
   }
+  if (connectSession) input.placeholder = placeholderForViewport();
 });
 
 // Reflect the active session's state onto the shared input bar/status.
@@ -865,7 +900,7 @@ createFluffOS(Module).then((M) => {
   };
 
   connectSession(firstSession);
-  input.placeholder = 'type a command — try: eval return 1+1, tuidemo, who';
+  input.placeholder = placeholderForViewport();
   input.focus();
   tabAdd.disabled = false;
 }).catch((e) => {
