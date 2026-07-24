@@ -229,7 +229,39 @@ WS_NO_NL    [ \t\r\v\f]
 
 %%
 
-
+    /* Embedded NUL bytes: LPC source is text -- a raw 0x00 anywhere in the
+     * input is corrupt or crafted, never legitimate. It also cannot be left
+     * to the ordinary rules: Flex scans an in-buffer NUL through its
+     * end-of-buffer machinery (yy_try_NUL_trans/yy_get_previous_state), and
+     * when the DFA state preceding the NUL has no NUL transition that
+     * machinery falls back to yy_last_accepting_state -- which the forward
+     * scan has just clobbered with the end-of-buffer PSEUDO-accepting state
+     * (accept value YY_END_OF_BUFFER); for a 0-2 character token prefix the
+     * re-walk in yy_get_previous_state() records no real accepting state
+     * either (it only records states BEFORE each prefix character), so the
+     * scanner re-enters the same YY_END_OF_BUFFER action with identical
+     * pointers forever -- the AFL-found compiler hang, minimized to any
+     * byte followed by a NUL. The fix is the one flex itself provides:
+     * make sure a RULE can always match the NUL so yy_try_NUL_trans()
+     * succeeds. The two optional (.|\n) arms give every 0-, 1- and
+     * 2-character token prefix a NUL transition -- exactly the prefixes
+     * whose re-walk can record no accepting state (any longer prefix has
+     * an accepting interior state: every single character starts an
+     * accepting state in every start condition except a backslash in the
+     * string/template/char escape states, and after that backslash every
+     * "\c" pair is accepted by an escape rule). Placed FIRST so it wins
+     * every same-length tie: a NUL is reported as an error in every start
+     * condition, never absorbed (the negated character classes below all
+     * exclude \x00 for the same reason; only the preprocessor-directive
+     * line rule deliberately still absorbs NULs so its whole-line capture
+     * stays intact -- lpc_lex_on_directive() rejects those). This pattern
+     * can never match NUL-free input (it must end in the NUL), so it is
+     * invisible to every legitimate compile; progress is guaranteed
+     * because every match consumes at least the NUL itself. */
+<*>(.|\n)?(.|\n)?\x00 {
+          lpc_lex_count_newlines(yytext, yyleng);
+          lexerror("Illegal embedded NUL byte (0x00) in source");
+        }
 
 {WS_NO_NL} { /* ignore */ }
 \n          { lpc_lex_newline(yyscanner); }
@@ -242,7 +274,7 @@ WS_NO_NL    [ \t\r\v\f]
      * instead of every such state needing its own copy of these six
      * rules, or hand-rolling "which state do I return to" bookkeeping. */
 "/*"    { yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
-"//"[^\n]*  { /* line comment; trailing newline handled by the \n rule */ }
+"//"[^\n\x00]*  { /* line comment; trailing newline handled by the \n rule */ }
 
     /* Block comment body: matched natively, no outp access. A lone slash
      * is kept out of the ordinary-run pattern below (it gets its own rule
@@ -254,7 +286,7 @@ WS_NO_NL    [ \t\r\v\f]
 <SC_BLOCK_COMMENT>"*"+"/"   { yy_pop_state(yyscanner); }
 <SC_BLOCK_COMMENT>"*"+      { /* run of '*' not (yet) followed by the closing '/' */ }
 <SC_BLOCK_COMMENT>\n        { lpc_lex_newline(yyscanner); }
-<SC_BLOCK_COMMENT>[^*/\n]+  { /* ordinary comment text */ }
+<SC_BLOCK_COMMENT>[^*/\n\x00]+  { /* ordinary comment text */ }
 <SC_BLOCK_COMMENT>"/"       { /* lone slash, not the start of a nested comment-open */ }
 <SC_BLOCK_COMMENT><<EOF>>   {
               /* Every state-specific <<EOF>> rule pops a drained pushed
@@ -343,8 +375,8 @@ WS_NO_NL    [ \t\r\v\f]
      * Genuinely distinct action, not just a distinct pattern, so a plain
      * <SC_STRING_BODY,SC_TEMPLATE_BODY> tag would be wrong here. */
 <SC_TEMPLATE_BODY>\r\n { lpc_lex_newline(yyscanner); }
-<SC_STRING_BODY>[^\\\"\r\n]+ |
-<SC_TEMPLATE_BODY>[^\\`$\r\n]+ {
+<SC_STRING_BODY>[^\\\"\r\n\x00]+ |
+<SC_TEMPLATE_BODY>[^\\`$\r\n\x00]+ {
           yyextra->str_accum.append(yytext, yyleng);
           STR_CHECK_OVERFLOW();
         }
@@ -489,7 +521,7 @@ WS_NO_NL    [ \t\r\v\f]
      * body, then fails the following closing-quote check) or a literal
      * embedded newline (current_line is NOT incremented here -- only an
      * escaped newline counts as a line break, matching upstream). */
-<SC_CHAR_BODY>[^\\]     {
+<SC_CHAR_BODY>[^\\\x00]     {
           yylval_param->number = static_cast<unsigned char>(yytext[0]);
           BEGIN(SC_CHAR_CLOSE);
         }
@@ -607,7 +639,7 @@ WS_NO_NL    [ \t\r\v\f]
     }
 }
 
-<SC_COND_SKIP>[^\n]+ { /* dead-branch text: never tokenized */ }
+<SC_COND_SKIP>[^\n\x00]+ { /* dead-branch text: never tokenized */ }
 <SC_COND_SKIP>\n { lpc_lex_newline(yyscanner); }
 
     /* Heredoc "@"/"@@" prefix and terminator identifier: fully native, no
