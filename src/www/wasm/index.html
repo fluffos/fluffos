@@ -216,6 +216,49 @@
     #tabs .tab .reload[hidden], #tabs .tab .close[hidden] { display: none; }
     #tabAdd { min-width: 40px; }
   }
+
+  /* ------------------------------------------------------------------ *
+   * Compact chrome: when the VISIBLE viewport is short -- a phone in
+   * landscape, or the on-screen keyboard eating a portrait screen --
+   * the header (title + status) merges into the tab row (one grid row
+   * instead of two stacked bars) and the input bar / tabs shed their
+   * touch-generous padding, down to but not below ~36px tap targets.
+   * Driven by JS (body.compact, see updateCompact() below) off the
+   * same visualViewport plumbing as the keyboard avoidance, because
+   * the real trigger is "how much height is left right now", which an
+   * orientation media query can't see (a keyboard open in portrait is
+   * the same problem as landscape).
+   * ------------------------------------------------------------------ */
+  body.compact {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  body.compact header {
+    grid-area: 1 / 1; display: flex; align-items: center; gap: 8px;
+    padding: 0 4px 0 10px;
+  }
+  body.compact header h1, body.compact header #status {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  body.compact header h1 { font-size: 12px; max-width: 32vw; }
+  body.compact header #status { font-size: 11px; max-width: 26vw; }
+  body.compact #tabs { grid-area: 1 / 2; }
+  body.compact #tabs .tab { padding: 5px 10px 4px; min-height: 36px; }
+  body.compact #tabAdd { min-width: 36px; }
+  body.compact #term, body.compact #logs { grid-area: 2 / 1 / 3 / 3; }
+  body.compact #term { padding: 3px 6px; }
+  body.compact #inputbar { grid-area: 3 / 1 / 4 / 3; }
+  /* keep the row tappable but tight: 16px text + 2*7px = ~37px */
+  body.compact #inputbar .prompt { padding: 7px 0 7px 12px; }
+  body.compact #cmd { padding: 7px 12px 7px 6px; }
+  @media (max-width: 600px) {
+    /* short AND narrow (keyboard open in portrait): width is scarce
+       too -- drop the title text, keep status + tabs.  Landscape has
+       width to spare, so the title survives there. */
+    body.compact header h1 { display: none; }
+    body.compact #inputbar { padding-bottom: 0; }
+  }
 </style>
 </head>
 <body>
@@ -881,7 +924,21 @@ function syncVisualViewport() {
   document.body.style.top = vv.offsetTop + 'px';
   document.body.style.height = vv.height + 'px';
 }
+// Compact chrome (see the body.compact styles): below this many CSS px of
+// VISIBLE height, the header merges into the tab row and the bars shed
+// padding.  620 covers every phone in landscape (~360-430px) and a portrait
+// phone with the keyboard open (a ~670-930px screen minus a ~300-350px
+// keyboard leaves ~350-600px), while normal portrait phones (>=640px, even
+// an iPhone SE), tablets and typical desktop windows keep the roomier
+// two-row layout.
+const COMPACT_MAX_HEIGHT = 620;
+function updateCompact() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.body.classList.toggle('compact', h < COMPACT_MAX_HEIGHT);
+}
 function onViewportChange() {
+  updateCompact();
   syncVisualViewport();
   clearTimeout(viewportTimer);
   viewportTimer = setTimeout(refitVisible, 120);
@@ -896,6 +953,7 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('scroll', onViewportChange);
   syncVisualViewport();
 }
+updateCompact();   // initial state (e.g. the page opens in landscape)
 
 // Belt-and-suspenders for the same keyboard problem: on a browser without
 // window.visualViewport, pull a freshly-focused input back into view
