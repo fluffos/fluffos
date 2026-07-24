@@ -141,10 +141,11 @@ Package matrix (`src/CMakeLists.txt` forces these under `EMSCRIPTEN`):
 | ffi | off | libffi + dlopen |
 | pcre | off | libpcre not cross-built yet (regexp package efuns; core regexp stays) |
 
-DNS (`packages/core/dns.cc`): the resolver half is stubbed to fail the
-same way as a native host without a nameserver (`resolve()` raises an LPC
-error); the address-cache half (`query_ip_name`/`query_ip_number`) is
-compiled unchanged.
+DNS (`packages/core/dns.cc`): the resolver half is a synthetic resolver
+(`dns_stub.cc`) — `resolve()` keeps the native call/return shapes but
+completes on the next tick with `127.0.0.1` (or the input echoed back
+when it is already numeric); the address-cache half
+(`query_ip_name`/`query_ip_number`) is compiled unchanged.
 
 ## 3. Build system
 
@@ -272,8 +273,9 @@ order:
 ## 6. Known limitations (current state)
 
 - No eval limit: `while(1);` in LPC blocks the tab (phase 1 above).
-- `resolve()` raises "DNS resolver is not available"; `query_ip_number()`
-  reports 127.0.0.1 for web connections.
+- No real DNS: `query_ip_number()` reports 127.0.0.1 for web
+  connections, and `resolve()` resolves everything to 127.0.0.1
+  synthetically (native callback shape, next tick).
 - Disabled-package efuns (`socket_*`, `external_start`, `db_*`, ffi,
   async I/O, PCRE efuns, `compress*`/`uncompress*`) don't exist; their
   testsuite files skip themselves via `__PACKAGE_*__` guards and the
