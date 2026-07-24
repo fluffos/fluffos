@@ -21,6 +21,13 @@ typedef struct {
   int context;
   int save_current_type;
   int save_exact_types;
+  // False when rule_lambda_return_type() rejected the type (a non-`function`
+  // reserved type name) and skipped pushing a fresh nested local-variable
+  // scope entirely -- see the .cc for why. rule_primary_expr_anon_func()
+  // must check this and skip its matching restore/pop when false, or it
+  // reads uninitialized fields above and desyncs current_number_of_locals
+  // against the enclosing block's own bookkeeping.
+  bool opened;
 } func_block_t;
 
 // ============================================================================
