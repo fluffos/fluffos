@@ -609,7 +609,7 @@ mqNarrow.addEventListener('change', () => {
     s.term.options.fontSize = size;
     if (view === s) s.fit.fit();
   }
-  if (connectSession) input.placeholder = placeholderForViewport();
+  input.placeholder = placeholderForViewport();
 });
 
 // Reflect the active session's state onto the shared input bar/status.
