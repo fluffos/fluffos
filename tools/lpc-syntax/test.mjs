@@ -848,6 +848,54 @@ check('keyword-tail safety net: a reserved word never has the next token'
         }
         return true;
       })());
+// The unescaped quote-char literal `'''` (an old MudOS-ism, valid per
+// lexer.l: <SC_CHAR_BODY>[^\\] matches ANY raw byte including a literal
+// quote, then <SC_CHAR_CLOSE> takes the third quote) used to mis-lex:
+// the tokenizer scanned "to the next quote" string-style, reading `'''`
+// as an empty `''` plus a stray `'` that opened a bogus literal running
+// to the next quote anywhere on the line. In one real 1990s mudlib
+// (`case ''':	//'` -- a trailing `//'` comment whose quote balances
+// editors' highlighting) that bogus literal swallowed the `:` and the
+// comment opener, and the formatter merged the case label, comment, and
+// the NEXT line's statement into one line -- the `//` then commented
+// out the statement on recompile, silently deleting it. Caught in the
+// same ~91-mudlib corpus scan as the "(::" bug; equally invisible to
+// the token-equivalence self-check (same mis-lex on both sides).
+check("unescaped quote-char literal `'''` lexes as ONE char token (lexer.l:"
+      + ' one raw body byte -- even a quote -- then the closing quote), so a'
+      + " `case ''':` with a trailing `//'` comment never swallows the"
+      + ' following statement',
+      (() => {
+        // Tokenizer ground truth first: one 3-char token, not ''+stray.
+        if (kinds("c = ''';").join(',') !==
+            "identifier:c,operator:=,char:''',punctuation:;") return false;
+        // The sibling escaped forms must be unaffected.
+        if (kinds("c = '\\'';")[2] !== "char:'\\''") return false;
+        if (kinds("c = '\\\"';")[2] !== "char:'\\\"'") return false;
+        // The real-world shape: the comment must stay a comment token and
+        // the next line's statement must survive formatting on its own line.
+        const src = 'void f(string cmd) {\n'
+                  + '\tswitch(cmd[0]) {\n'
+                  + "\t\tcase ''':\t//'\n"
+                  + '\t\t\tcmd = "say " + cmd[1..];\n'
+                  + '\t\t\tbreak;\n'
+                  + '\t\tcase \'\\"\':\t//"\n'
+                  + '\t\t\tcmd = "tell " + cmd[1..];\n'
+                  + '\t\t\tbreak;\n'
+                  + '\t}\n'
+                  + '}\n';
+        const out = formatLPC(src);
+        if (formatLPC(out) !== out) return false;
+        // The case label keeps its literal and its trailing comment...
+        if (!out.includes("case ''':  //'\n")) return false;
+        if (!out.includes("case '\\\"':  //\"\n")) return false;
+        // ...and the statements survive, NOT on a comment-bearing line.
+        for (const stmt of ['cmd = "say " + cmd[1..];', 'cmd = "tell " + cmd[1..];']) {
+          const line = out.split('\n').find((l) => l.includes(stmt));
+          if (!line || line.includes('//')) return false;
+        }
+        return true;
+      })());
 check('a trailing line comment stays at the end of its line at EVERY'
       + ' flush site -- after a one-liner block, an empty block, and a'
       + ' multi-line block close -- and its length never triggers'
