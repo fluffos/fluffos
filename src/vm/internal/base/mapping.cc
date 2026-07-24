@@ -410,7 +410,14 @@ int restore_hash_string(char** val, svalue_t* sv) {
         char* news = cp - 1;
 
         if ((c = *news++ = *cp++)) {
-          while ((c = *cp++) != '"') {
+          // The condition must stop on '\0' too, not just '"': an
+          // unterminated escaped string (no closing quote before the end
+          // of the buffer) otherwise falls into the plain-character branch
+          // below, which copies the NUL byte and keeps looping -- an
+          // unbounded read past the end of the allocation. The `if (!c)`
+          // check after the loop only catches this correctly once the loop
+          // itself can actually exit on NUL.
+          while ((c = *cp++) != '"' && c) {
             if (c == '\\') {
               if (!(c = *news++ = *cp++)) {
                 return ROB_STRING_ERROR;
