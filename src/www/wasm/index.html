@@ -32,6 +32,23 @@
   }
   header h1 { font-size: 15px; margin: 0; color: var(--accent); font-weight: 600; }
   header #status { color: var(--dim); font-size: 12px; }
+  /* Fullscreen toggle: hidden until the boot script verifies the
+     Fullscreen API actually exists here (iPhone Safari, some webviews:
+     it does not) -- see the "fullscreen toggle" section of the script. */
+  #fsToggle {
+    margin-left: auto; align-self: center; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0; border-radius: 4px;
+    color: var(--dim); cursor: pointer; padding: 4px 6px; line-height: 0;
+  }
+  #fsToggle:hover { color: var(--accent); background: var(--border); }
+  #fsToggle[hidden] { display: none; }
+  /* Icon pair swaps on .fs-active, which JS toggles off the
+     fullscreenchange EVENT (never a local flag -- Esc/system exits must
+     not desync it).  Class-based on purpose: SVG elements do not reflect
+     the .hidden IDL property, so el.hidden=true would silently no-op. */
+  #fsToggle #fsIconExit, #fsToggle.fs-active #fsIconEnter { display: none; }
+  #fsToggle.fs-active #fsIconExit { display: inline; }
   #tabs {
     display: flex; gap: 2px; padding: 0 10px; background: var(--panel);
     border-bottom: 1px solid var(--border);
@@ -215,6 +232,7 @@
        permanent first tab -- restore it explicitly. */
     #tabs .tab .reload[hidden], #tabs .tab .close[hidden] { display: none; }
     #tabAdd { min-width: 40px; }
+    #fsToggle { min-width: 36px; min-height: 36px; }
   }
 
   /* ------------------------------------------------------------------ *
@@ -265,6 +283,19 @@
 <header>
   <h1>FluffOS / WebAssembly</h1>
   <div id="status">loading wasm…</div>
+  <button id="fsToggle" type="button" hidden
+          title="Enter fullscreen" aria-label="Enter fullscreen">
+    <svg id="fsIconEnter" width="14" height="14" viewBox="0 0 14 14"
+         fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 1.5H1.5V5M9 1.5h3.5V5M12.5 9v3.5H9M5 12.5H1.5V9"/>
+    </svg>
+    <svg id="fsIconExit" width="14" height="14" viewBox="0 0 14 14"
+         fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M1.5 5H5V1.5M9 1.5V5h3.5M12.5 9H9v3.5M5 12.5V9H1.5"/>
+    </svg>
+  </button>
 </header>
 <nav id="tabs">
   <div id="gameTabs"></div>
@@ -954,6 +985,60 @@ if (window.visualViewport) {
   syncVisualViewport();
 }
 updateCompact();   // initial state (e.g. the page opens in landscape)
+
+// --- fullscreen toggle ----------------------------------------------------
+// After compact chrome squeezed the page's own bars, the biggest remaining
+// space hog on a phone is the browser's chrome (address bar & co.); the
+// Fullscreen API hands that back on request.  Support is genuinely absent
+// in places -- iPhone Safari has no element fullscreen at all, embedded
+// webviews often block it -- so the button stays hidden unless the API is
+// really there, and a rejected request (permissions policy, user-gesture
+// rules) lands in the Logs pane instead of surfacing as an uncaught
+// rejection.  Icon state follows the fullscreenchange EVENT, never a local
+// flag: the user can exit via Esc / back-swipe / system UI and the button
+// must not desync.  webkit-prefixed fallbacks cover older iPadOS Safari,
+// the one mobile platform whose support was prefix-only.
+const fsToggle = document.getElementById('fsToggle');
+const fsRoot = document.documentElement;
+const fsElement = () =>
+  document.fullscreenElement || document.webkitFullscreenElement || null;
+const fsSupported =
+  !!(fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen) &&
+  (document.fullscreenEnabled ?? document.webkitFullscreenEnabled) !== false;
+if (fsSupported) {
+  fsToggle.hidden = false;
+  fsToggle.addEventListener('click', () => {
+    let p;
+    try {
+      p = fsElement()
+        ? (document.exitFullscreen
+             ? document.exitFullscreen()
+             : document.webkitExitFullscreen())
+        : (fsRoot.requestFullscreen
+             ? fsRoot.requestFullscreen({ navigationUI: 'hide' })
+             : fsRoot.webkitRequestFullscreen());
+    } catch (e) {
+      p = Promise.reject(e);
+    }
+    // The prefixed calls return undefined; Promise.resolve() unifies.
+    Promise.resolve(p).catch((e) => pageLog('fullscreen: ' + e, true));
+  });
+  const onFsChange = () => {
+    const fs = !!fsElement();
+    fsToggle.classList.toggle('fs-active', fs);
+    const label = fs ? 'Exit fullscreen' : 'Enter fullscreen';
+    fsToggle.title = label;
+    fsToggle.setAttribute('aria-label', label);
+    // Entering/leaving fullscreen is a viewport change like any other:
+    // rerun the compact-chrome/keyboard plumbing and refit xterm, with the
+    // same late second pass as orientationchange -- some browsers report
+    // the final geometry only after the transition animation settles.
+    onViewportChange();
+    setTimeout(onViewportChange, 300);
+  };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+}
 
 // Belt-and-suspenders for the same keyboard problem: on a browser without
 // window.visualViewport, pull a freshly-focused input back into view
