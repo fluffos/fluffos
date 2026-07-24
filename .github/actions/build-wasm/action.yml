@@ -26,8 +26,11 @@ inputs:
   icu-ver:
     description: ICU release version cross-built for wasm (feeds the deps cache key).
     default: '74-2'
+  pcre-ver:
+    description: PCRE (8.x) release version cross-built for wasm (feeds the deps cache key).
+    default: '8.45'
   deps-prefix:
-    description: Install prefix for the wasm-cross-built dependencies (ICU).
+    description: Install prefix for the wasm-cross-built dependencies (ICU, PCRE).
     default: /opt/wasm-deps
 
 runs:
@@ -58,20 +61,22 @@ runs:
         sudo mkdir -p "${{ inputs.deps-prefix }}"
         sudo chown "$USER" "${{ inputs.deps-prefix }}"
 
-    # ICU cross-built for wasm32; ~10 minutes on a miss, so cache on the
-    # resolved emsdk + upstream versions (bump the -vN suffix to invalidate).
-    - name: Cache wasm dependencies (ICU)
+    # ICU + PCRE cross-built for wasm32; ~10 minutes on a miss, so cache on
+    # the resolved emsdk + upstream versions (bump the -vN suffix to
+    # invalidate).
+    - name: Cache wasm dependencies (ICU, PCRE)
       id: wasm-deps
       uses: actions/cache@v4
       with:
         path: ${{ inputs.deps-prefix }}
-        key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ inputs.icu-ver }}-v3
+        key: wasm-deps-emsdk${{ steps.emver.outputs.version }}-icu${{ inputs.icu-ver }}-pcre${{ inputs.pcre-ver }}-v3
 
     - name: Build wasm dependencies
       if: steps.wasm-deps.outputs.cache-hit != 'true'
       shell: bash
       run: |
         WORK="$RUNNER_TEMP/wasm-deps-build" ICU_VER="${{ inputs.icu-ver }}" \
+          PCRE_VER="${{ inputs.pcre-ver }}" \
           tools/wasm/build-deps.sh
 
     - name: Build driver (native tools + wasm)

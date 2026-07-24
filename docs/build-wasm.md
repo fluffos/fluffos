@@ -39,8 +39,9 @@ and isn't supported) see
 
 ## 1. Build the WASM dependencies (once)
 
-The driver needs a static WASM build of **ICU** (Unicode: grapheme
-iteration, charset conversion) — the only cross-built dependency:
+The driver needs static WASM builds of **ICU** (Unicode: grapheme
+iteration, charset conversion) and **PCRE** (classic 8.x, for the pcre
+package's efuns) — the two cross-built dependencies:
 
 ```bash
 tools/wasm/build-deps.sh          # installs into /opt/wasm-deps
@@ -50,7 +51,9 @@ tools/wasm/build-deps.sh          # installs into /opt/wasm-deps
 This is fully scripted, including the ICU cross-compile quirks (the
 `mh-unknown` platform file, and generating the data archive as C source
 with the host `genccode` because `pkgdata` cannot emit wasm objects).
-It only runs once; re-runs are no-ops.
+PCRE is a plain `emconfigure`/`emmake` static build (UTF-8 + Unicode
+properties on, JIT off — wasm has no executable data pages). It only
+runs once; re-runs are no-ops.
 
 The ICU data archive is **trimmed to break-iterator data** so the
 driver stays small (`fluffos.wasm` is ~3.6MB raw, ~0.8MB brotli) —
@@ -120,8 +123,8 @@ node tools/wasm/run-testsuite.js         # boots testsuite/, runs -ftest
 Exit code 0 plus `Checks succeeded.` is the pass signal — the same gate
 CI uses (see the `wasm` job in `.github/workflows/ci.yml`). Tests for
 packages that don't exist on this target (sockets, external, db, ffi,
-pcre, crypto, async, compress) skip themselves via `#ifdef __PACKAGE_*__`
-guards.
+crypto, async, compress) skip themselves via `#ifdef __PACKAGE_*__`
+guards; the pcre package is on, so its tests run for real.
 
 ## 6. Embedding API (custom frontends)
 
