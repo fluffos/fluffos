@@ -38,17 +38,47 @@ function skipStringSpan(src, i) {
 }
 
 function skipCharSpan(src, i) {
-  // Scan to the CLOSING quote like skipStringSpan -- char literals carry
-  // variable-length escapes (`'\x41'`, `'\101'`), and the old fixed
-  // 2-char assumption made findInterpEnd swallow an interpolation's `}`
-  // right after such a literal, tearing the template apart (literal
-  // corruption on valid LPC).
+  // Mirror lexer.l's char-literal grammar EXACTLY: after the opening
+  // quote, the body is ONE unit -- either a single raw byte (any byte,
+  // *including a literal quote*, per <SC_CHAR_BODY>[^\\]) or one escape
+  // sequence -- and then a closing quote is required. Escapes are
+  // variable-length (`'\x41'` hex, `'\101'` octal), which is why this
+  // can't assume a fixed 2-char width (the old fixed width made
+  // findInterpEnd swallow an interpolation's `}`), but it must NOT
+  // "scan to the next quote" like skipStringSpan either: that misreads
+  // the valid MudOS-ism `'''` (quote char, body is a raw `'`) as an
+  // empty `''` plus a stray `'` that then opens a bogus literal running
+  // to the next quote anywhere on the line -- in one real mudlib that
+  // next quote sat inside a trailing `//'` comment, and the formatter
+  // merged the case label, the comment, and the following statement
+  // into one line, silently deleting the statement on recompile.
   let j = i + 1;
-  while (j < src.length && src[j] !== "'") {
-    if (src[j] === '\\') j++;
-    j++;
+  if (j >= src.length) return j;
+  if (src[j] === '\\') {
+    j++; // the escape introducer; now classify per lexer.l's rules
+    const e = src[j];
+    if (e === undefined) return j;
+    if (e === 'x') {
+      // "\\x"[0-9a-fA-F]+ (or bare "\\x", an error the driver still
+      // consumes as just the two chars before the close-quote check)
+      j++;
+      while (j < src.length && /[0-9A-Fa-f]/.test(src[j])) j++;
+    } else if (e >= '0' && e <= '7') {
+      // "\\"[0-7]+ octal, maximal munch
+      while (j < src.length && src[j] >= '0' && src[j] <= '7') j++;
+    } else if (e === '\r' && src[j + 1] === '\n') {
+      j += 2; // "\\\r\n" escaped newline
+    } else {
+      j++; // "\\." -- simple/unknown escapes are exactly one char
+    }
+  } else {
+    j++; // one raw body byte -- including a literal `'` or newline
   }
-  return Math.min(j + 1, src.length);
+  // Closing quote. If it's missing the driver reports an error and
+  // pushes the offending byte back for the next scan (LPC_YYLESS(0));
+  // mirror that by ending the span here so the byte re-lexes normally.
+  if (j < src.length && src[j] === "'") j++;
+  return j;
 }
 
 function findInterpEnd(src, start) {
@@ -276,17 +306,13 @@ export function tokenize(src) {
       continue;
     }
 
-    // char literal -- escapes can be longer than one char (\xHH hex,
-    // \NNN octal are variable-length), so scan for the closing quote
-    // the same way string literals do rather than assuming a fixed width.
+    // char literal -- one body byte or escape, then the closing quote,
+    // exactly as lexer.l scans it (see skipCharSpan for the full rule;
+    // notably `'''` is a VALID quote-char literal, not an empty `''`).
     if (c === "'") {
-      let j = i + 1;
-      while (j < src.length && src[j] !== "'") {
-        if (src[j] === '\\') j++;
-        j++;
-      }
-      push('char', src.slice(i, Math.min(j + 1, src.length)));
-      i = Math.min(j + 1, src.length);
+      const j = skipCharSpan(src, i);
+      push('char', src.slice(i, j));
+      i = j;
       continue;
     }
 
