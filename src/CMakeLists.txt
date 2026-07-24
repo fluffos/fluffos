@@ -853,6 +853,9 @@ else ()
   if (BUILD_FUZZERS)
     add_executable(fuzz_restore "main_fuzz_restore.cc")
     target_link_libraries(fuzz_restore PUBLIC ${FLUFFOS_LINK})
+
+    add_executable(fuzz_compile "main_fuzz_compile.cc")
+    target_link_libraries(fuzz_compile PUBLIC ${FLUFFOS_LINK})
   endif ()
 
   add_executable(o2json "main_o2json.cc")
