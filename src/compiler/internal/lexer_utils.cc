@@ -23,6 +23,7 @@
 #include <cstdio>    // for EOF
 #include <fcntl.h>   // for O_RDONLY etc
 #include <cstdlib>   // for exit(), FIXME
+#include <cstring>   // for memchr
 #include <cctype>    // for isspace
 #include <unistd.h>  // for read(), FIXME
 #include <vector>
@@ -1177,6 +1178,21 @@ std::pair<char*, size_t> scratch_slurp_fd_prepared(int fd) {
     if (n == 0) break;
     len += static_cast<size_t>(n);
   }
+  // A real embedded NUL byte anywhere in the source hangs the Flex-generated
+  // scanner: yylex()'s YY_END_OF_BUFFER handling special-cases a NUL that
+  // isn't at the two-sentinel end-of-buffer position (yy_try_NUL_trans), and
+  // for certain surrounding byte patterns yy_get_previous_state()'s bounding
+  // pointer (yy_c_buf_p) can end up set such that its scan loop effectively
+  // never terminates (found by AFL++ fuzzing the compiler, minimized to 2
+  // bytes: a non-NUL byte followed by NUL). LPC source is text; a real file
+  // never legitimately contains a raw NUL. Reject it here, at the one place
+  // every on-disk source (main file and #include'd files alike) is read,
+  // instead of trying to make the generated scanner robust to it -- this
+  // reuses the read-error contract every caller already handles cleanly
+  // (lexerror("Cannot read #include file") / "could not read source file").
+  if (memchr(base, '\0', len) != nullptr) {
+    return {nullptr, 0};
+  }
   if (len == 0 || base[len - 1] != '\n') base[len++] = '\n';
   base[len] = 0;
   base[len + 1] = 0;
@@ -1292,7 +1308,16 @@ void lpc_lex_teardown_active(void) {
 static void start_new_file_prepared(char* prepared_base, size_t prepared_body, void* yyscanner,
                                     bool keep_macros);
 
-void start_new_file(std::string_view source, void* yyscanner, bool keep_macros) {
+bool start_new_file(std::string_view source, void* yyscanner, bool keep_macros) {
+  // Reject a real embedded NUL before touching any compiler state -- see
+  // the matching check + rationale in scratch_slurp_fd_prepared() (the
+  // on-disk-file counterpart of this in-memory-source path: lpcshell,
+  // lpcc -e, load_object_from_source()). Failing here, before any of the
+  // resets below run, mirrors start_new_file_fd()'s failure (nothing is
+  // touched when scratch_slurp_fd_prepared() itself fails).
+  if (memchr(source.data(), '\0', source.size()) != nullptr) {
+    return false;
+  }
   // Prepare an arena block from the caller's view: copy + trailing-'\n'
   // guarantee + the two yy_scan_buffer sentinels.
   bool add_nl = !source.empty() && source.back() != '\n';
@@ -1303,6 +1328,7 @@ void start_new_file(std::string_view source, void* yyscanner, bool keep_macros) 
   base[body] = 0;
   base[body + 1] = 0;
   start_new_file_prepared(base, body, yyscanner, keep_macros);
+  return true;
 }
 
 bool start_new_file_fd(int fd, void* yyscanner, bool keep_macros) {

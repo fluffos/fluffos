@@ -216,8 +216,10 @@ char* get_f_name(int);
 // in-memory Flex base buffer via lpc_lex_set_source; a missing final
 // newline is appended); prolog()/stage_output drive it directly.
 // keep_macros=true retains the user #define table across chunks (REPL
-// persistence); the #if stack always resets.
-void start_new_file(std::string_view source, void* yyscanner, bool keep_macros = false);
+// persistence); the #if stack always resets. Returns false (no state
+// touched) if source contains a real embedded NUL byte -- see the
+// rationale in scratch_slurp_fd_prepared()'s matching check.
+bool start_new_file(std::string_view source, void* yyscanner, bool keep_macros = false);
 // Zero-copy variant: reads fd's content straight into the arena block
 // flex scans in place. Returns false on read error.
 bool start_new_file_fd(int fd, void* yyscanner, bool keep_macros = false);

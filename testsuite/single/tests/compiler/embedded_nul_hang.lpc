@@ -1,0 +1,68 @@
+// Regression: a real embedded NUL byte in LPC source (anywhere other than
+// as the buffer's own end-of-scan sentinel) could hang the Flex-generated
+// scanner forever. yylex()'s YY_END_OF_BUFFER handling special-cases a NUL
+// that isn't at the two-sentinel end-of-buffer position via
+// yy_try_NUL_trans()/yy_get_previous_state() (lexer.autogen.cc); for
+// certain surrounding byte patterns this leaves yy_get_previous_state()'s
+// bounding pointer effectively unbounded, so its scan loop never
+// terminates -- found by AFL++ fuzzing the compiler front-end
+// (load_object_from_source()), minimized to 2 bytes: any non-NUL byte
+// followed by a NUL. Reachable through completely ordinary compilation:
+// any .lpc file on disk containing a raw NUL (a stray upload, a bad editor,
+// a crafted mudlib file) hangs the driver on load_object(), and the same
+// in-memory API lpcshell/lpcc -e and load_object_from_source() use is
+// exposed just as directly.
+//
+// LPC source is text; a real program never legitimately contains a raw
+// NUL. The fix rejects it at the two places source bytes actually enter
+// the compiler -- scratch_slurp_fd_prepared() (on-disk: the main file and
+// every #include'd file share this one reader) and start_new_file()
+// (in-memory source) -- turning the hang into an ordinary, catchable
+// compile error instead of trying to make the generated scanner itself
+// robust to it.
+//
+// This can only be driven through the file-loading / in-memory-source
+// entry points (compile_file()/load_object_from_source()), not through an
+// LPC string literal -- LPC string literals cannot contain a raw NUL byte
+// at the source-text level in the first place. Exercise it the same way
+// the compiler's own audit regressions do for a compile-time bug: write a
+// generated file to disk and load it.
+void do_tests() {
+  string path = "/data/embedded_nul_hang_gen";
+  rm(path + ".c");
+
+  // A real embedded NUL can't be expressed as an LPC string literal or via
+  // sprintf("%c", 0) (rejected as not-a-valid-UTF8-char) -- build the file
+  // byte-for-byte with write_buffer() instead (a fresh allocate_buffer()
+  // is zero-filled), exactly the way a corrupted/crafted real .lpc file
+  // could contain one even though save_object()'s own format never does.
+  buffer nul = allocate_buffer(1);
+
+  // The minimized 2-byte reproducer, verbatim: one ordinary byte then NUL.
+  write_buffer(path + ".c", 0, "0");
+  write_buffer(path + ".c", 1, nul);
+  ASSERT2(catch(load_object(path)),
+    "a source file with an embedded NUL must fail to compile cleanly, not hang");
+
+  // A NUL inside a longer, otherwise ordinary program -- same bug class,
+  // more representative of what a corrupted real file looks like.
+  rm(path + ".c");
+  string prog = "void create() { ";
+  string tail = " int x = 1; }\n";
+  write_buffer(path + ".c", 0, prog);
+  write_buffer(path + ".c", strlen(prog), nul);
+  write_buffer(path + ".c", strlen(prog) + 1, tail);
+  ASSERT2(catch(load_object(path)),
+    "a NUL byte inside an otherwise-valid program must fail cleanly, not hang");
+
+  rm(path + ".c");
+
+  // A well-formed compile right after must still work, proving the
+  // rejection doesn't leave any compiler-global scratch state dirty.
+  write_file(path + ".c", "int ok() { return 42; }\n");
+  object ob = load_object(path);
+  ASSERT2(ob, "a normal compile right after the rejections must still succeed");
+  ASSERT_EQ(42, ob->ok());
+  destruct(ob);
+  rm(path + ".c");
+}

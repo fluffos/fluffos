@@ -3122,7 +3122,11 @@ static bool prolog(std::string_view source, const char* name, void* scanner) {
       return false;
     }
   } else {
-    start_new_file(source, scanner);
+    if (!start_new_file(source, scanner)) {
+      yyerror(scanner, "source contains an illegal embedded NUL byte");
+      num_parse_error++;
+      return false;
+    }
   }
   return true;
 }
