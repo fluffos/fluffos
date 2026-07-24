@@ -20,7 +20,25 @@ const MAX_MULTILINE_INDENT = 16;
 export function formatLPC(source, options = {}) {
   const printWidth = options.printWidth > 0 ? options.printWidth : DEFAULT_PRINT_WIDTH;
   const indentUnit = ' '.repeat(options.indentSize > 0 ? options.indentSize : DEFAULT_INDENT_SIZE);
-  const rawToks = tokenize(source).filter((t) => t.kind !== 'whitespace');
+  const allToks = tokenize(source);
+  // REFUSE input that does not lex cleanly: an unterminated
+  // string/char/template/comment/text block is a hard driver lexerror
+  // ("End of file in string" etc., src/compiler/internal/lexer.l), and
+  // everything after the unmatched opener is nonsense tokens -- e.g. one
+  // stray '"' flips string/code sense for the whole rest of the file, so
+  // "formatting" it shreds real string content (CJK text space-separated,
+  // '\n' escapes torn into '\ n'). The corpus token-equivalence/idempotency
+  // self-check CANNOT catch this class: input and output mis-lex
+  // identically, so both sides compare clean. Throwing here is the gate --
+  // format-corpus.mjs reports the file and leaves it byte-identical.
+  const bad = allToks.find((t) => t.unterminated);
+  if (bad) {
+    throw new Error(
+      `unterminated ${bad.kind} starting at line ${bad.line}` +
+      ' (driver lexerror at EOF; the rest of the file does not lex cleanly)' +
+      ' -- refusing to format');
+  }
+  const rawToks = allToks.filter((t) => t.kind !== 'whitespace');
   const toks = maskStringizeArguments(rawToks, source, collectStringizeMacros(rawToks));
   const lines = [];
   let cur = [];

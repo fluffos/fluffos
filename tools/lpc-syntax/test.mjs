@@ -276,10 +276,13 @@ check('trailing "//" comment forces a line break before following code',
         const twice = formatLPC(once);
         return once === twice && !once.split('\n').some((l) => /\/\/note.+\S/.test(l));
       })());
-check('formatter is stable on a source that swallows to EOF (unterminated construct)',
+check('a source that swallows to EOF (unterminated construct) is REFUSED,'
+      + ' not formatted: formatLPC throws (driver ground truth: "End of'
+      + ' file in string" is a hard lexerror, so the tokenization past the'
+      + ' opener is nonsense and any reformatting of it is corruption)',
       (() => {
-        const once = formatLPC('void f() {\n  "\n}\n');
-        return formatLPC(once) === once;
+        try { formatLPC('void f() {\n  "\n}\n'); return false; }
+        catch (e) { return /unterminated string/.test(e.message); }
       })());
 check('case/default label colon has no leading space (unlike ternary/mapping colons)',
       formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n')
@@ -1351,6 +1354,65 @@ check('a leading comment glued to the next token on its source line stays'
         const src = 'mixed a = ({ 1_000_000, /*x*/ 2_000_000, 3_000_000 });\n';
         const p1 = formatLPC(src, { printWidth: 40 });
         return p1 === formatLPC(p1, { printWidth: 40 }) && p1.includes('/*x*/ 2_000_000,');
+      })());
+
+// A file with PRE-EXISTING broken quoting -- one stray unbalanced '"'
+// somewhere, common in 1990s mudlib archives that shipped files that
+// never compiled -- used to be silently rewritten into shredded garbage:
+// past the stray quote the tokenizer's string/code sense is inverted, so
+// real string content lexes as code tokens (every CJK char a separate
+// 'unknown', '\n' escapes torn into '\ n') and the formatter re-spaces
+// them. The driver (lexer.l) hard-errors on such a file ("End of file in
+// string" at <<EOF>>), so it has NO well-defined lex -- the only correct
+// behavior is refusal. Invisible to the corpus token-equivalence +
+// idempotency self-check (input and output mis-lex identically -- same
+// blind spot as the "(::" and "'''" tokenizer fixes); the gate is the
+// tokenizer's `unterminated` flag plus formatLPC throwing on it, which
+// format-corpus.mjs turns into report-and-leave-byte-identical. Found as
+// 200+ corrupted files in the same ~91-real-world-mudlib corpus scan.
+check('broken quoting (stray unbalanced \'"\') is REFUSED: the tokenizer'
+      + ' flags the EOF-swallowing token `unterminated` and formatLPC'
+      + ' throws instead of shredding the inverted string/code regions',
+      (() => {
+        // Real-world shape: a key string missing its closing quote, CJK
+        // string content with escape sequences following it.
+        const broken = 'void create() {\n'
+                     + '  set("short, "棋苑");\n'
+                     + '  set("long", "一张桌子。\\n");\n'
+                     + '}\n';
+        // Tokenizer ground truth: exactly one flagged token, the final
+        // string, and its span runs to end-of-input.
+        const flagged = tokenize(broken).filter((t) => t.unterminated);
+        if (flagged.length !== 1 || flagged[0].kind !== 'string' ||
+            flagged[0].end !== broken.length) return false;
+        try { formatLPC(broken); return false; }
+        catch (e) { if (!/unterminated string/.test(e.message)) return false; }
+        // The balanced sibling lexes clean and still formats fine.
+        const fixed = broken.replace('"short, "', '"short", "');
+        if (tokenize(fixed).some((t) => t.unterminated)) return false;
+        const out = formatLPC(fixed);
+        return formatLPC(out) === out && out.includes('\\n');
+      })());
+check('every EOF-swallowing construct is refused the same way (driver'
+      + ' lexerrors: string, char, template, block comment, text block)',
+      (() => {
+        const cases = [
+          ['string s = "abc;\n', 'string'],
+          ["int c = 'x;\n", 'char'],
+          ['string s = `abc;\n', 'template'],
+          ['/* never ends\nint x;\n', 'comment'],
+          ['string s = @END\nbody line\n', 'textblock'],
+        ];
+        for (const [src, kind] of cases) {
+          const flagged = tokenize(src).filter((t) => t.unterminated);
+          if (flagged.length !== 1 || flagged[0].kind !== kind) return false;
+          try { formatLPC(src); return false; }
+          catch (e) { if (!e.message.includes(`unterminated ${kind}`)) return false; }
+        }
+        // Terminated siblings carry no flag.
+        return !tokenize('string s = "abc";\nint c = \'x\';\n/* ok */\n'
+                         + 'string t = `tpl`;\nstring u = @END\nbody\nEND\n')
+                  .some((t) => t.unterminated);
       })());
 
 // --- lint ---------------------------------------------------------------------

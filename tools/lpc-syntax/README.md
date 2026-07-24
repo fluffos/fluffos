@@ -128,6 +128,15 @@ gaining a space and stringizing to a different string. Both of these were
 real bugs found in this tool that the JS-level self-checks reported as
 clean.
 
+One recurring instance of the class is now gated up front: the tokenizer
+flags any token that hits end-of-file unterminated (string, char,
+template, block comment, text block — each a hard driver lexerror), and
+`formatLPC` refuses such input outright. Before that gate, a 1990s file
+shipped with one stray unbalanced `"` had its string/code sense inverted
+for the whole rest of the file and was silently rewritten into shredded
+garbage — token-equivalent and idempotent on both sides, because both
+sides mis-lexed identically.
+
 The only way to catch that class of bug is to validate against an
 independent ground truth: **build the actual FluffOS driver and run the
 real LPC testsuite against the reformatted corpus**:
