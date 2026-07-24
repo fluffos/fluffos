@@ -828,6 +828,20 @@ void dump_program_ast_json(const char* filename, parse_node_t* tree_main,
          envelope.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str());
 }
 
+namespace {
+// Mirrors ast_json()'s guard (see above): lpc_tree_form()/lpc_tree_expr()
+// are a FOURTH mutually-recursive walker over the same parse-tree shape as
+// optimize()/i_generate_node()/ast_json(), backing the DEBUG-only `tree`
+// keyword's pretty-printer (grammar_rules.cc's rule_tree_block()/
+// rule_tree_expr()) -- found missing its own cap by AFL++ fuzzing the
+// compiler (a deeply-nested expression inside `tree(...)` C-stack-overflows
+// here). Diagnostic output only, so going over just renders the subtree as
+// a placeholder leaf instead of failing anything -- same tradeoff ast_json()
+// makes, for the same reason (github.com/fluffos/fluffos/issues/1267).
+int g_lpc_tree_depth = 0;
+constexpr int kMaxLpcTreeDepth = 500;
+}  // namespace
+
 void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
   if (!expr) {
     dest->kind = NODE_NUMBER;
@@ -835,6 +849,14 @@ void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
     dest->v.number = 0;
     return;
   }
+  if (++g_lpc_tree_depth > kMaxLpcTreeDepth) {
+    --g_lpc_tree_depth;
+    dest->kind = NODE_NUMBER;
+    dest->type = TYPE_ANY;
+    dest->v.number = 0;
+    return;
+  }
+  DEFER { --g_lpc_tree_depth; };
 
   switch (expr->kind) {
     case NODE_TERNARY_OP:

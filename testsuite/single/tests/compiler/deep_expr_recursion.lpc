@@ -26,4 +26,25 @@ void do_tests() {
   ASSERT(1);
 
   rm("/gen_deep_expr.c");
+
+#ifdef __DEBUG__
+  // lpc_tree_form()/lpc_tree_expr() (generate.cc) -- the DEBUG-only `tree`
+  // keyword's pretty-printer -- are a FOURTH mutually-recursive walker over
+  // this exact parse-tree shape, missed by the optimize()/i_generate_node()/
+  // ast_json() audit above: they run mid-parse (grammar_rules.cc's
+  // rule_tree_expr(), called directly from the `tree(...)` grammar
+  // reduction), so they see the SAME unoptimized deep chain before
+  // optimize() or constant-folding ever gets a chance to touch it. Found by
+  // AFL++ fuzzing the compiler front-end (SIGSEGV, C-stack overflow).
+  // __TREE__ expands to `tree` only when __DEBUG__ is defined (a Debug
+  // build), matching the C++ `#ifdef DEBUG` gate on the grammar rule itself
+  // (rule_tree_block()/rule_tree_expr(), grammar_rules.cc) -- this case is
+  // simply absent from a RelWithDebInfo compile, same as constant_expr.lpc's
+  // existing __TREE__ cases.
+  src = "int x; mixed f() { x = 1; mixed code = __TREE__ (" + expr + "); return code; }\n";
+  write_file("/gen_deep_expr.c", src);
+  catch(load_object("/gen_deep_expr"));
+  ASSERT(1);
+  rm("/gen_deep_expr.c");
+#endif
 }
