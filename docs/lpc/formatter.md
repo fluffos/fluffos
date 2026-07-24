@@ -110,19 +110,31 @@ Every write through `format.sh` / `format-corpus.mjs` is gated; a file
 that would violate any of these is reported, left untouched, and the
 run exits nonzero:
 
-1. **Token-sequence equivalence** — the output re-tokenizes to exactly
+1. **Clean lex** — the input must tokenize without hitting end-of-file
+   inside a string, char literal, template literal, block comment, or
+   text block. Each of those is a hard lexerror in the driver
+   (`src/compiler/internal/lexer.l`, "End of file in string" etc.), so
+   such a file has no well-defined token stream — e.g. one stray
+   unbalanced `"` inverts string/code sense for the whole rest of the
+   file, and "formatting" the inverted regions shreds real string
+   content. `formatLPC` throws instead of producing output. This gate
+   exists because the token-equivalence check below cannot catch it:
+   input and output mis-lex identically, so both sides compare clean.
+2. **Token-sequence equivalence** — the output re-tokenizes to exactly
    the input's token kinds and spellings; the formatter cannot change
    what the compiler sees.
-2. **Literal byte-identity** — every string/template/heredoc/char/
+3. **Literal byte-identity** — every string/template/heredoc/char/
    comment/directive token's content is byte-identical.
-3. **Idempotency** — formatting the output again reproduces it
+4. **Idempotency** — formatting the output again reproduces it
    exactly.
 
-Deliberately malformed fixtures that are not valid text (the two
-raw-byte bad-UTF-8 compiler fixtures under
-`testsuite/single/tests/compiler/fail/`) are excluded by
-`testsuite/format.sh`; anything the tokenizer cannot fully understand
-is refused rather than guessed at.
+Deliberately malformed fixtures under
+`testsuite/single/tests/compiler/fail/` are excluded by
+`testsuite/format.sh`: the two raw-byte bad-UTF-8 fixtures (not valid
+text), and the three deliberately-unterminated EOF-lexerror fixtures
+(`eof_in_string.lpc`, `eof_in_comment.lpc`, `bad_at_block.lpc`) that
+guarantee 1 refuses by design; anything the tokenizer cannot fully
+understand is refused rather than guessed at.
 
 Beyond the built-in gates, formatter changes are validated against the
 real driver: the whole reformatted testsuite must still pass

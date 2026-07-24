@@ -64,7 +64,20 @@ for (const f of files) {
     console.error(`LITERAL CONTENT CHANGED, refusing to write: ${f}`);
     continue;
   }
-  if (formatLPC(out) !== out) {
+  // The idempotency pass re-formats the candidate OUTPUT; formatLPC also
+  // throws if its input does not lex cleanly (unterminated string/char/
+  // template/comment/text block -- a driver lexerror). Input passing that
+  // same gate above does not prove the output does, so a throw here is a
+  // refusal for this file, not a crash of the whole run.
+  let again;
+  try {
+    again = formatLPC(out);
+  } catch (e) {
+    errors++;
+    console.error(`FORMAT ERROR (output does not re-lex cleanly), refusing to write: ${f}: ${e.message}`);
+    continue;
+  }
+  if (again !== out) {
     errors++;
     console.error(`NOT IDEMPOTENT, refusing to write: ${f}`);
     continue;

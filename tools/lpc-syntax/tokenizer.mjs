@@ -5,6 +5,21 @@
 // Token kinds: comment, directive, string, template, textblock, char,
 // number, keyword, type, modifier, efunkw, identifier, operator,
 // punctuation, functional, whitespace, unknown.
+//
+// A spanning token that reaches end-of-input without its terminator
+// (string missing its closing '"', char literal missing its closing
+// "'", template literal missing its closing '`', '/*' comment missing
+// its '*/', text block missing its terminator line) is emitted with
+// `unterminated: true`. Driver ground truth
+// (src/compiler/internal/lexer.l): every one of these is a hard
+// lexerror at <<EOF>> ("End of file in string" / "End of file in a
+// comment" / "End of file in template literal" / lpc_lex_char_error /
+// heredoc-terminator error) -- the driver never assigns such a file a
+// meaning, so consumers that rewrite source (format.mjs) must treat the
+// flag as "this tokenization is nonsense past the open point" and
+// refuse. One real-world stray '"' flips string/code sense for the
+// whole rest of the file and the damage is invisible to any self-check
+// that re-tokenizes its own output with this same tokenizer.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -227,8 +242,10 @@ export function tokenize(src) {
     }
     if (c === '/' && src[i + 1] === '*') {
       let j = src.indexOf('*/', i + 2);
-      j = j < 0 ? src.length : j + 2;
+      const closed = j >= 0;
+      j = closed ? j + 2 : src.length;
       push('comment', src.slice(i, j));
+      if (!closed) toks[toks.length - 1].unterminated = true;
       i = j;
       continue;
     }
@@ -264,11 +281,14 @@ export function tokenize(src) {
       if (m) end = j + m.index + term.length;
       else end = src.length;
       push('textblock', src.slice(i, end));
+      if (!m) toks[toks.length - 1].unterminated = true;
       i = end;
       continue;
     }
 
-    // strings
+    // strings -- the loop exits either ON the closing quote (j indexes
+    // it, j < length) or past end-of-input; the latter is the driver's
+    // "End of file in string" lexerror, flagged for consumers.
     if (c === '"') {
       let j = i + 1;
       while (j < src.length && src[j] !== '"') {
@@ -276,6 +296,7 @@ export function tokenize(src) {
         j++;
       }
       push('string', src.slice(i, Math.min(j + 1, src.length)));
+      if (j >= src.length) toks[toks.length - 1].unterminated = true;
       i = Math.min(j + 1, src.length);
       continue;
     }
@@ -285,9 +306,10 @@ export function tokenize(src) {
     if (c === '`') {
       let j = i + 1;
       let frag = '`';
+      let closed = false;
       while (j < src.length) {
         if (src[j] === '\\') { frag += src.slice(j, j + 2); j += 2; continue; }
-        if (src[j] === '`') { frag += '`'; j++; break; }
+        if (src[j] === '`') { frag += '`'; j++; closed = true; break; }
         if (src[j] === '$' && src[j + 1] === '{') {
           push('template', frag + '${');
           i = j + 2;
@@ -314,6 +336,7 @@ export function tokenize(src) {
         j++;
       }
       push('template', frag);
+      if (!closed) toks[toks.length - 1].unterminated = true;
       i = j;
       continue;
     }
@@ -323,7 +346,15 @@ export function tokenize(src) {
     // notably `'''` is a VALID quote-char literal, not an empty `''`).
     if (c === "'") {
       const j = skipCharSpan(src, i);
-      push('char', src.slice(i, j));
+      const span = src.slice(i, j);
+      push('char', span);
+      // A char literal without its closing quote is a driver lexerror
+      // whether it hits EOF ("End of file in char") or not (push-back
+      // recovery, compile still fails): flag it so formatLPC refuses the
+      // file (skipCharSpan ends the span without the close in that case).
+      if (!(span.length >= 2 && span.endsWith("'"))) {
+        toks[toks.length - 1].unterminated = true;
+      }
       i = j;
       continue;
     }
