@@ -3,6 +3,7 @@ option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)
 option(ENABLE_SANITIZER "Build driver with sanitizer support" OFF)
+option(BUILD_FUZZERS "Build AFL++/libFuzzer investigation harnesses (not shipped functionality)" OFF)
 # Packages
 option(PACKAGE_ASYNC "async package" ON)
 option(PACKAGE_COMPRESS "compress package" ON)
@@ -849,6 +850,14 @@ else ()
 
   add_executable(generate_keywords "main_generate_keywords.cc")
   target_link_libraries(generate_keywords PUBLIC ${FLUFFOS_LINK})
+
+  if (BUILD_FUZZERS)
+    add_executable(fuzz_restore "main_fuzz_restore.cc")
+    target_link_libraries(fuzz_restore PUBLIC ${FLUFFOS_LINK})
+
+    add_executable(fuzz_compile "main_fuzz_compile.cc")
+    target_link_libraries(fuzz_compile PUBLIC ${FLUFFOS_LINK})
+  endif ()
 
   add_executable(o2json "main_o2json.cc")
   target_link_libraries(o2json PUBLIC ${FLUFFOS_LINK})
