@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 #
-# build-deps.sh -- cross-build the WASM driver's static dependency (ICU)
-# with Emscripten, into an install prefix. (zlib is not used on the wasm
-# target: MCCP, the compress package and gzip'd file support are off.)
+# build-deps.sh -- cross-build the WASM driver's static dependencies
+# (ICU, PCRE) with Emscripten, into an install prefix. (zlib is not used
+# on the wasm target: MCCP, the compress package and gzip'd file support
+# are off.)
 #
 # Produces under $PREFIX (default /opt/wasm-deps):
 #   lib/libicuuc.a lib/libicui18n.a lib/libicudata.a
 #   include/unicode/*.h ...
+#   lib/libpcre.a include/pcre.h   (pcre package efuns)
 #
 # Requirements: emcc/emconfigure/emmake on PATH, a native C/C++
 # toolchain (ICU cross-builds need native ICU tools first), curl.
@@ -15,6 +17,7 @@
 #   PREFIX     install prefix            (default /opt/wasm-deps)
 #   WORK       scratch build directory   (default <prefix>-build)
 #   ICU_VER    ICU release               (default 74-2)
+#   PCRE_VER   PCRE (8.x) release        (default 8.45, the final one)
 #   ICU_KEEP   extra icupkg keep-patterns for the ICU data trim, space
 #              separated (default: none beyond the built-ins below)
 #
@@ -36,12 +39,14 @@ set -euo pipefail
 PREFIX=${PREFIX:-/opt/wasm-deps}
 WORK=${WORK:-${PREFIX}-build}
 ICU_VER=${ICU_VER:-74-2}
+PCRE_VER=${PCRE_VER:-8.45}
 NPROC=$(nproc 2>/dev/null || echo 4)
 
 ICU_VER_U=${ICU_VER//-/_}   # 74_2
 ICU_MAJOR=${ICU_VER%%-*}    # 74
 
-if [ -f "$PREFIX/lib/libicuuc.a" ] && [ -f "$PREFIX/lib/libicudata.a" ]; then
+if [ -f "$PREFIX/lib/libicuuc.a" ] && [ -f "$PREFIX/lib/libicudata.a" ] &&
+   [ -f "$PREFIX/lib/libpcre.a" ]; then
   echo "wasm deps already present in $PREFIX; nothing to do."
   exit 0
 fi
@@ -123,6 +128,34 @@ if [ ! -f "$PREFIX/lib/libicuuc.a" ] || [ ! -f "$PREFIX/lib/libicudata.a" ]; the
     emcc -O2 -I"$WORK/icu/source/common" -c "$(basename "${DAT%.dat}")_dat.c" \
          -o icudata.o &&
     emar rcs "$PREFIX/lib/libicudata.a" icudata.o)
+fi
+
+# ---------------- PCRE (classic 8.x -- what src/packages/pcre links) ----------------
+if [ ! -f "$PREFIX/lib/libpcre.a" ]; then
+  echo "=== PCRE $PCRE_VER ==="
+  cd "$WORK"
+  if [ ! -d "pcre-$PCRE_VER" ]; then
+    curl -fsSL -o pcre.tbz2 \
+      "https://downloads.sourceforge.net/project/pcre/pcre/$PCRE_VER/pcre-$PCRE_VER.tar.bz2"
+    tar xjf pcre.tbz2
+  fi
+
+  # Plain C, no host tools needed (the default chartables come from the
+  # shipped pcre_chartables.c.dist -- --enable-rebuild-chartables would
+  # need a host-run dftables, so leave it off). JIT stays off: wasm has
+  # no executable data pages. UTF-8 + \p{...} properties are on because
+  # the driver compiles every pattern with PCRE_UTF8.
+  mkdir -p pcre-build-wasm
+  (cd pcre-build-wasm &&
+    CFLAGS="-O2" emconfigure "../pcre-$PCRE_VER/configure" \
+      --host=wasm32-unknown-none \
+      --enable-static --disable-shared \
+      --disable-cpp \
+      --enable-utf --enable-unicode-properties \
+      --prefix="$PREFIX" >/dev/null &&
+    emmake make -j"$NPROC" libpcre.la >/dev/null &&
+    emmake make install-libLTLIBRARIES \
+                 install-nodist_includeHEADERS >/dev/null)
 fi
 
 echo
