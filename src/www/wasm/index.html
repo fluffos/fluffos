@@ -23,8 +23,44 @@
   }
   header h1 { font-size: 15px; margin: 0; color: var(--accent); font-weight: 600; }
   header #status { color: var(--dim); font-size: 12px; }
+  #tabs {
+    display: flex; gap: 2px; padding: 0 10px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  #tabs .tab {
+    display: flex; align-items: center; gap: 7px; cursor: pointer;
+    background: transparent; border: 0; border-bottom: 2px solid transparent;
+    color: var(--dim); font: inherit; font-size: 12px; padding: 7px 12px 5px;
+  }
+  #tabs .tab:hover { color: var(--fg); }
+  #tabs .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  #tabs .tab:disabled { opacity: 0.5; cursor: default; }
+  #gameTabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+  #tabs .tab .reload, #tabs .tab .close {
+    color: var(--dim); border-radius: 3px; padding: 0 4px;
+  }
+  #tabs .tab .close { margin-right: -6px; }
+  #tabs .tab .reload { margin-right: -4px; }
+  #tabs .tab .reload:hover { color: var(--accent); background: var(--border); }
+  #tabs .tab .close:hover { color: #f7768e; background: var(--border); }
+  #tabAdd { font-size: 14px; }
+  #tabs .badge {
+    background: var(--accent); color: var(--bg); border-radius: 9px;
+    font-size: 10px; font-weight: 600; line-height: 1; padding: 2px 6px;
+  }
   #term { flex: 1; min-height: 0; padding: 6px 8px; }
-  #term .xterm { height: 100%; }
+  #term.hidden { display: none; }
+  #term .pane { height: 100%; display: none; }
+  #term .pane.active { display: block; }
+  #term .pane .xterm { height: 100%; }
+  #logs {
+    flex: 1; min-height: 0; overflow-y: auto; display: none;
+    padding: 8px 16px; font-size: 12px; line-height: 1.5;
+  }
+  #logs.active { display: block; }
+  #logs .log-line { white-space: pre-wrap; word-break: break-word; }
+  #logs .log-line.err { color: #f7768e; }
+  #logs .log-ts { color: var(--dim); margin-right: 8px; user-select: none; }
   #jscanvas {
     display: none; position: fixed; right: 16px; top: 56px;
     border: 1px solid var(--border); border-radius: 6px; background: #04060a;
@@ -33,7 +69,7 @@
   #inputbar {
     display: flex; border-top: 1px solid var(--border); background: var(--panel);
   }
-  #inputbar.hidden { display: none; }
+  #inputbar.hidden, #inputbar.logs-active { display: none; }
   #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
   #cmd {
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
@@ -93,7 +129,15 @@
   <h1>FluffOS / WebAssembly</h1>
   <div id="status">loading wasm…</div>
 </header>
+<nav id="tabs">
+  <div id="gameTabs"></div>
+  <button id="tabAdd" class="tab" type="button" disabled
+          title="Open another connection to this mud">+</button>
+  <button id="tabLogs" class="tab" type="button">Logs
+    <span id="logsBadge" class="badge" hidden>0</span></button>
+</nav>
 <div id="term"></div>
+<div id="logs" aria-label="Driver logs" aria-live="off"></div>
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
@@ -219,7 +263,7 @@
   // script below; these callbacks only fire after it exists.
   var Module = {
     print: (s) => pageLog(s),
-    printErr: (s) => pageLog(s),
+    printErr: (s) => pageLog(s, true),
     locateFile: (f) => f,
     onAbort: (what) => {
       status.textContent = 'driver aborted';
@@ -241,16 +285,22 @@
 // ==========================================================================
 // The web terminal: xterm.js does the terminal emulation (rendering, SGR,
 // alternate screen, mouse reporting, bracketed paste, keyboard encoding);
-// this page supplies the two things xterm.js does not:
+// this page supplies what xterm.js does not:
 //
 //   TelnetClient  the telnet protocol: ECHO, SGA (= the driver's char-mode
 //                 signal, src/net/telnet.cc set_charmode), NAWS, TTYPE.
 //   input glue    line mode = the input bar (a MUD-style local-edit line);
 //                 char mode = xterm.js keystrokes stream straight to the
 //                 driver.  Switches automatically on the SGA negotiation.
+//   sessions      any number of Game tabs, each a separate connection into
+//                 the same in-page driver (own Terminal, TelnetClient,
+//                 queues, conn id) -- like several telnet clients dialed
+//                 into one mud.  "+" opens another connection; a Logs tab
+//                 collects driver stdout/stderr; inactive tabs light
+//                 unread badges instead of stealing focus.
 // ==========================================================================
 
-const term = new Terminal({
+const TERM_OPTIONS = {
   fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
   fontSize: 14,
   scrollback: 2000,
@@ -263,122 +313,377 @@ const term = new Terminal({
     brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
     brightCyan: '#7dcfff', brightWhite: '#c0caf5',
   },
-});
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById('term'));
-fitAddon.fit();
-window.term = term;   // devtools + tests
+};
 
-// Driver stdout/stderr (boot noise, debug_message) -- dim, above the game.
-function pageLog(s) { term.write('\x1b[2m' + s + '\x1b[0m\r\n'); }
-
-// (TelnetClient comes from the shared telnet.js)
-
-// --- Boot ---------------------------------------------------------------
 const status = document.getElementById('status');
 const input = document.getElementById('cmd');
 const inputBar = document.getElementById('inputbar');
+const termEl = document.getElementById('term');
+const logsEl = document.getElementById('logs');
+const gameTabsEl = document.getElementById('gameTabs');
+const tabAdd = document.getElementById('tabAdd');
+const tabLogs = document.getElementById('tabLogs');
+const logsBadge = document.getElementById('logsBadge');
 const utf8enc = new TextEncoder();
 
+const sessions = [];      // game sessions, tab order
+const byId = new Map();   // driver conn id -> session
+let view = null;          // what the pane area shows: a session, or 'logs'
+let activeGame = null;    // last active game session (owns the input bar)
+let connecting = null;    // session whose fluffos_connect() is in flight
+let connectSession = null;// assigned once the driver is booted (see .then)
+let driver = null;        // the emscripten module M, once booted
+let sessionSeq = 0;
+
+function bumpBadge(badgeEl, n) {
+  badgeEl.textContent = n > 999 ? '999+' : String(n);
+  badgeEl.hidden = n === 0;
+}
+
+// --- Logs pane -----------------------------------------------------------
+// Driver diagnostics (boot noise, compile warnings/errors, debug_message)
+// arrive through Module.print/printErr and land here, keeping the game
+// terminals clean.  stderr lines render red (compile errors vs. warnings
+// often differ by stream).  The pane auto-scrolls unless the user has
+// scrolled up; while another tab is showing, new lines only light the
+// badge on the Logs tab (cleared on opening it).
+const LOG_MAX_LINES = 5000;
+let logsAtBottom = true;
+let unreadLogs = 0;
+
+logsEl.addEventListener('scroll', () => {
+  logsAtBottom =
+    logsEl.scrollTop + logsEl.clientHeight >= logsEl.scrollHeight - 4;
+});
+
+function pageLog(s, isErr) {
+  const line = document.createElement('div');
+  line.className = isErr ? 'log-line err' : 'log-line';
+  const ts = document.createElement('span');
+  ts.className = 'log-ts';
+  ts.textContent = new Date().toTimeString().slice(0, 8);
+  line.appendChild(ts);
+  line.appendChild(document.createTextNode(String(s)));
+  logsEl.appendChild(line);
+  while (logsEl.childElementCount > LOG_MAX_LINES) {
+    logsEl.firstElementChild.remove();
+  }
+  if (logsAtBottom) logsEl.scrollTop = logsEl.scrollHeight;
+  if (view !== 'logs') {
+    unreadLogs++;
+    bumpBadge(logsBadge, unreadLogs);
+  }
+}
+
+// --- Sessions ------------------------------------------------------------
+// Each session is one connection into the in-page driver, with its own
+// xterm, telnet parser and the two decoupling queues the synchronous wasm
+// bridge requires: fluffos_input() can emit output before it returns, and
+// onOutput arrives while the telnet parser is mid-byte-stream, so sends
+// flush from a 0-timeout (never inside receive()) and inbound chunks
+// drain through a non-reentrant loop.  Keep it that way.
+function makeSession() {
+  const s = {
+    label: 'Game ' + (++sessionSeq),
+    connId: -1,
+    charMode: false,
+    serverEchoes: false,
+    disconnected: false,
+    inputValue: '',   // unsent draft in the input bar, saved on tab switch
+    unread: 0,
+    pendingIn: [],    // [id, bytes] arriving before our conn id is known
+    outbox: [],       // page -> driver, flushed outside receive()
+    flushScheduled: false,
+    inbox: [],        // driver -> page, drained non-reentrantly
+    receiving: false,
+  };
+
+  s.pane = document.createElement('div');
+  s.pane.className = 'pane';
+  termEl.appendChild(s.pane);
+  s.term = new Terminal(TERM_OPTIONS);
+  s.fit = new FitAddon.FitAddon();
+  s.term.loadAddon(s.fit);
+  s.term.open(s.pane);
+
+  s.tab = document.createElement('button');
+  s.tab.type = 'button';
+  s.tab.className = 'tab';
+  s.tab.appendChild(document.createTextNode(s.label));
+  s.badge = document.createElement('span');
+  s.badge.className = 'badge';
+  s.badge.hidden = true;
+  s.tab.appendChild(s.badge);
+  s.reload = document.createElement('span');
+  s.reload.className = 'reload';
+  s.reload.textContent = '↻';
+  s.reload.title = 'Reconnect: drop this tab’s session and dial a fresh one';
+  s.tab.appendChild(s.reload);
+  s.close = document.createElement('span');
+  s.close.className = 'close';
+  s.close.textContent = '×';
+  s.close.title = 'Disconnect and close this tab';
+  s.tab.appendChild(s.close);
+  s.tab.addEventListener('click', () => activateSession(s));
+  s.reload.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    reconnectSession(s);
+  });
+  s.close.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    closeSession(s);
+  });
+  gameTabsEl.appendChild(s.tab);
+
+  s.flushOutbox = () => {
+    s.flushScheduled = false;
+    while (s.connId >= 0 && s.outbox.length) {
+      const bytes = s.outbox.shift();
+      driver.ccall('fluffos_input', null, ['number', 'array', 'number'],
+                   [s.connId, bytes, bytes.length]);
+    }
+  };
+  s.sendToDriver = (bytes) => {
+    s.outbox.push(bytes);
+    if (s.connId >= 0 && !s.flushScheduled) {
+      s.flushScheduled = true;
+      setTimeout(s.flushOutbox, 0);
+    }
+  };
+  s.deliver = (bytes) => {
+    s.inbox.push(bytes);
+    if (s.receiving) return;
+    s.receiving = true;
+    try {
+      while (s.inbox.length) s.telnet.receive(s.inbox.shift());
+    } finally {
+      s.receiving = false;
+    }
+  };
+  // raw application data (telnet.sendRaw doubles IAC bytes)
+  s.sendData = (bytes) => s.telnet.sendRaw(bytes);
+
+  // (Re)create the telnet layer with fresh negotiation state.  Called at
+  // session creation and again on Reconnect: each fluffos_connect() is a
+  // brand-new telnet session on the driver side, so the client-side
+  // parser must start from scratch too.
+  s.setupTelnet = () => {
+    s.telnet = new TelnetClient(s.sendToDriver);
+    s.telnet.onText = (t) => s.term.write(t);
+    s.telnet.onEcho = (on) => {
+      s.serverEchoes = on;
+      if (view === s && !s.charMode) input.type = on ? 'password' : 'text';
+    };
+    s.telnet.onCharMode = (on) => {
+      if (on === s.charMode) return;
+      s.charMode = on;
+      if (view === s) applyInputState(s);
+    };
+    // Real geometry (the fit runs when the pane shows), so the NAWS
+    // answer to the driver's initial DO NAWS carries it.
+    s.telnet.size = { cols: s.term.cols, rows: s.term.rows };
+  };
+  s.setupTelnet();
+
+  // Char mode: xterm.js encodes keys, mouse reports and bracketed pastes
+  // into the exact byte sequences a terminal would send -- forward them.
+  s.term.onData((d) => {
+    if (s.charMode) s.sendData(Array.from(utf8enc.encode(d)));
+  });
+  s.term.onBinary((d) => {
+    if (s.charMode) s.sendData(Array.from(d, (c) => c.charCodeAt(0) & 0xff));
+  });
+  // refit -> onResize fires -> NAWS; the driver re-fires the window_size
+  // apply, so full-screen TUIs relayout live.
+  s.term.onResize(({ cols, rows }) => s.telnet.setSize(cols, rows));
+
+  sessions.push(s);
+  updateCloseButtons();
+  return s;
+}
+
+function updateCloseButtons() {
+  // The first game tab is permanent; only later tabs can be closed.
+  for (const [i, s] of sessions.entries()) s.close.hidden = i === 0;
+}
+
+// Reflect the active session's state onto the shared input bar/status.
+function applyInputState(s) {
+  if (s.charMode) {
+    inputBar.classList.add('hidden');
+    status.textContent = 'char mode — keys go straight to the mud';
+    s.fit.fit();
+    s.term.focus();
+  } else {
+    inputBar.classList.remove('hidden');
+    status.textContent = s.disconnected ? 'disconnected'
+      : s.connId >= 0 ? 'connected (conn ' + s.connId + ')'
+      : 'connecting…';
+    input.type = s.serverEchoes ? 'password' : 'text';
+    input.disabled = s.disconnected || s.connId < 0;
+    s.fit.fit();
+    if (!input.disabled && view === s) input.focus();
+  }
+}
+
+function saveDraft() {
+  if (view && view !== 'logs') view.inputValue = input.value;
+}
+
+function activateSession(s) {
+  if (view === s) return;
+  saveDraft();
+  view = s;
+  activeGame = s;
+  window.term = s.term;   // devtools + tests: the active terminal
+  s.unread = 0;
+  s.badge.hidden = true;
+  tabLogs.classList.remove('active');
+  logsEl.classList.remove('active');
+  termEl.classList.remove('hidden');
+  inputBar.classList.remove('logs-active');
+  for (const o of sessions) {
+    o.tab.classList.toggle('active', o === s);
+    o.pane.classList.toggle('active', o === s);
+  }
+  input.value = s.inputValue;
+  // fit() no-ops while a pane is display:none (the addon bails on NaN
+  // geometry), so refit now that this one is visible again.
+  applyInputState(s);
+}
+
+function showLogs() {
+  if (view === 'logs') return;
+  saveDraft();
+  view = 'logs';
+  tabLogs.classList.add('active');
+  for (const o of sessions) o.tab.classList.remove('active');
+  termEl.classList.add('hidden');
+  logsEl.classList.add('active');
+  inputBar.classList.add('logs-active');
+  unreadLogs = 0;
+  logsBadge.hidden = true;
+  if (logsAtBottom) logsEl.scrollTop = logsEl.scrollHeight;
+}
+tabLogs.addEventListener('click', showLogs);
+
+function closeSession(s) {
+  const i = sessions.indexOf(s);
+  if (i <= 0) return;   // the first game tab is permanent
+  if (driver && s.connId >= 0 && !s.disconnected) {
+    driver.ccall('fluffos_disconnect', null, ['number'], [s.connId]);
+  }
+  byId.delete(s.connId);
+  sessions.splice(i, 1);
+  s.tab.remove();
+  s.pane.remove();
+  s.term.dispose();
+  pageLog(s.label + ': closed');
+  if (activeGame === s) activeGame = sessions[Math.min(i, sessions.length - 1)];
+  if (view === s) {
+    view = null;
+    activateSession(activeGame);
+  }
+  updateCloseButtons();
+}
+
+// Per-tab reload (the ↻ icon): drop this tab's connection and dial a
+// fresh one into the same running driver (mudlib state survives; login
+// starts over) -- a per-connection reconnect, not a page reload.
+function reconnectSession(s) {
+  if (!driver || !connectSession || !s) return;
+  if (s.connId >= 0 && !s.disconnected) {
+    driver.ccall('fluffos_disconnect', null, ['number'], [s.connId]);
+  }
+  byId.delete(s.connId);
+  s.connId = -1;
+  s.outbox.length = 0;
+  s.inbox.length = 0;
+  s.pendingIn.length = 0;
+  s.charMode = false;
+  s.serverEchoes = false;
+  s.disconnected = false;
+  s.setupTelnet();   // fresh client-side negotiation state
+  s.term.write('\r\n\x1b[2m*** reconnecting ***\x1b[0m\r\n');
+  pageLog(s.label + ': reconnect');
+  if (view !== s) activateSession(s);
+  connectSession(s);
+}
+
+// (No driver-reset control: reloading the page already boots a fresh
+// driver from the packed image, so the browser's reload button IS the
+// reset; the per-tab ↻ above only redials one connection.)
+
+// "+" tab: another connection into the same driver (enabled after boot).
+tabAdd.addEventListener('click', () => {
+  if (!connectSession) return;
+  const s = makeSession();
+  activateSession(s);   // visible + fitted first, so NAWS reports for real
+  connectSession(s);
+});
+
+// --- line mode input (shared bar, routed to the active session) ----------
+input.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' || !activeGame) return;
+  const s = activeGame;
+  const line = input.value;
+  input.value = '';
+  if (input.type !== 'password') s.term.write(line + '\r\n');
+  s.sendData(Array.from(utf8enc.encode(line + '\r\n')));
+});
+
+// window resize -> refit the visible terminal (hidden panes refit when
+// their tab is activated).
+let resizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (view !== 'logs' && activeGame) activeGame.fit.fit();
+  }, 120);
+});
+
+// The first game tab exists before the driver finishes loading, so the
+// page shows a terminal immediately; it is dialed in the boot flow below.
+const firstSession = makeSession();
+activateSession(firstSession);
+
+// --- Boot ---------------------------------------------------------------
 // Mount point + config file, written by the packer (fluffos-boot.js).
 if (!window.FLUFFOS_BOOT) {
   pageLog('warning: fluffos-boot.js missing (bundle not built by the ' +
-          'packer?) — falling back to the testsuite defaults');
+          'packer?) — falling back to the testsuite defaults', true);
 }
 const BOOT = window.FLUFFOS_BOOT || { mount: '/testsuite', config: 'etc/config.test' };
 
 createFluffOS(Module).then((M) => {
+  driver = M;
   status.textContent = 'booting driver…';
   M.FS.chdir(BOOT.mount);
 
-  // The wasm bridge is synchronous BOTH ways: fluffos_input() can emit
-  // output before it returns, and onOutput arrives while our telnet parser
-  // is mid-byte-stream. Calling back into the driver from inside receive()
-  // therefore re-enters the parser and corrupts its state (negotiation
-  // ping-pong until stack overflow). Decouple both directions with queues:
-  // sends flush from a 0-timeout (never inside receive()), and inbound
-  // chunks drain through a non-reentrant loop.
-  const connId = { value: -1 };
-  const pendingIn = [];   // driver -> page, before the id is known
-  const outbox = [];      // page -> driver, flushed outside receive()
-  let flushScheduled = false;
-  const flushOutbox = () => {
-    flushScheduled = false;
-    while (connId.value >= 0 && outbox.length) {
-      const bytes = outbox.shift();
-      M.ccall('fluffos_input', null, ['number', 'array', 'number'],
-              [connId.value, bytes, bytes.length]);
-    }
-  };
-  const sendToDriver = (bytes) => {
-    outbox.push(bytes);
-    if (connId.value >= 0 && !flushScheduled) {
-      flushScheduled = true;
-      setTimeout(flushOutbox, 0);
-    }
-  };
-  const inbox = [];
-  let receiving = false;
-  const deliver = (bytes) => {
-    inbox.push(bytes);
-    if (receiving) return;
-    receiving = true;
-    try {
-      while (inbox.length) telnet.receive(inbox.shift());
-    } finally {
-      receiving = false;
-    }
-  };
-  const telnet = new TelnetClient(sendToDriver);
-  telnet.onText = (t) => term.write(t);
-
-  let charMode = false;
-  let serverEchoes = false;
-  telnet.onEcho = (on) => {
-    serverEchoes = on;
-    if (!charMode) input.type = on ? 'password' : 'text';
-  };
-  telnet.onCharMode = (on) => {
-    if (on === charMode) return;
-    charMode = on;
-    if (on) {
-      inputBar.classList.add('hidden');
-      status.textContent = 'char mode — keys go straight to the mud';
-      fitAddon.fit();
-      term.focus();
-    } else {
-      inputBar.classList.remove('hidden');
-      status.textContent = 'connected (conn ' + connId.value + ')';
-      input.type = serverEchoes ? 'password' : 'text';
-      fitAddon.fit();
-      input.focus();
-    }
-  };
-
-  // raw application data (telnet.sendRaw doubles IAC bytes)
-  const sendData = (bytes) => telnet.sendRaw(bytes);
-
-  // Char mode: xterm.js encodes keys, mouse reports and bracketed pastes
-  // into the exact byte sequences a terminal would send -- forward them.
-  term.onData((d) => {
-    if (charMode) sendData(Array.from(utf8enc.encode(d)));
-  });
-  term.onBinary((d) => {
-    if (charMode) sendData(Array.from(d, (c) => c.charCodeAt(0) & 0xff));
-  });
-
   M.fluffos = {
     onOutput: (id, bytes) => {
-      if (connId.value === -1) pendingIn.push(bytes);
-      else if (id === connId.value) deliver(bytes);
+      const s = byId.get(id);
+      if (s) {
+        s.deliver(bytes);
+        if (view !== s) {
+          s.unread++;
+          bumpBadge(s.badge, s.unread);
+        }
+      } else if (connecting) {
+        // The synchronous bridge can emit before fluffos_connect()
+        // returns the id; buffer for the session being dialed.
+        connecting.pendingIn.push([id, bytes]);
+      }
     },
     onDisconnect: (id) => {
-      if (id === connId.value) {
-        pageLog('*** disconnected ***');
-        input.disabled = true;
-        status.textContent = 'disconnected';
-      }
+      const s = byId.get(id);
+      if (!s) return;
+      s.disconnected = true;
+      // Player-facing: show it in that game terminal (dim), and record
+      // it in the Logs pane too.
+      s.term.write('\x1b[2m*** disconnected ***\x1b[0m\r\n');
+      pageLog(s.label + ' (conn ' + id + '): disconnected');
+      if (view === s) applyInputState(s);
     },
     // JS handlers callable from LPC through the jsbridge package:
     //   js_call("fetch_text", ({ url }), (: callback :))
@@ -430,41 +735,29 @@ createFluffOS(Module).then((M) => {
   const rc = M.ccall('fluffos_boot', 'number', ['string'], [BOOT.config]);
   if (rc !== 0) { status.textContent = 'boot failed (' + rc + ')'; return; }
 
-  // Real geometry before connecting, so the NAWS answer to the driver's
-  // initial DO NAWS carries it.
-  telnet.size = { cols: term.cols, rows: term.rows };
-  term.onResize(({ cols, rows }) => telnet.setSize(cols, rows));
-
   // Drive the game loop: heartbeats, call_outs and buffered commands all
   // run inside fluffos_tick().
   setInterval(() => {
     M.ccall('fluffos_tick', 'number', ['number'], [performance.now()]);
   }, 50);
 
-  connId.value = M.ccall('fluffos_connect', 'number', [], []);
-  for (const bytes of pendingIn.splice(0)) deliver(bytes);
-  flushOutbox();   // negotiation replies buffered while connId was unknown
-  status.textContent = 'connected (conn ' + connId.value + ')';
-  input.disabled = false;
+  connectSession = (s) => {
+    connecting = s;
+    s.connId = M.ccall('fluffos_connect', 'number', [], []);
+    connecting = null;
+    byId.set(s.connId, s);
+    for (const [id, bytes] of s.pendingIn.splice(0)) {
+      const target = id === s.connId ? s : byId.get(id);
+      if (target) target.deliver(bytes);
+    }
+    s.flushOutbox();   // negotiation replies buffered while id was unknown
+    if (view === s) applyInputState(s);
+  };
+
+  connectSession(firstSession);
   input.placeholder = 'type a command — try: eval return 1+1, tuidemo, who';
   input.focus();
-
-  // window resize -> refit xterm -> onResize fires -> NAWS; the driver
-  // re-fires the window_size apply, so full-screen TUIs relayout live.
-  let resizeTimer = 0;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => fitAddon.fit(), 120);
-  });
-
-  // --- line mode input ---
-  input.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Enter') return;
-    const line = input.value;
-    input.value = '';
-    if (input.type !== 'password') term.write(line + '\r\n');
-    sendData(Array.from(utf8enc.encode(line + '\r\n')));
-  });
+  tabAdd.disabled = false;
 }).catch((e) => {
   status.textContent = 'failed to load: ' + e;
   ErrorModal.show('Failed to load WebAssembly driver', e,
