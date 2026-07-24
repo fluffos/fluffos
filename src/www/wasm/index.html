@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FluffOS — WebAssembly driver</title>
 <link rel="stylesheet" href="vendor/xterm.css">
 <style>
@@ -11,12 +11,21 @@
     --panel: #11151f; --border: #232a38;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; overscroll-behavior: none; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     background: var(--bg); color: var(--fg);
     font: 14px/1.45 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     display: flex; flex-direction: column;
+    /* Pinned to the layout viewport by default; on touch devices the boot
+       script keeps top/height synced to window.visualViewport instead, so
+       the on-screen keyboard (which iOS/Android only shrink the *visual*
+       viewport for, not this layout one) can never cover #inputbar -- see
+       the "mobile viewport" section of the main script below. */
+    position: fixed; inset: 0;
+    overflow: hidden;
   }
+  button, .tab, #cmd { touch-action: manipulation; }
   header {
     padding: 10px 16px; border-bottom: 1px solid var(--border);
     background: var(--panel); display: flex; align-items: baseline; gap: 12px;
@@ -56,11 +65,13 @@
   #logs {
     flex: 1; min-height: 0; overflow-y: auto; display: none;
     padding: 8px 16px; font-size: 12px; line-height: 1.5;
+    overscroll-behavior: contain;
   }
   #logs.active { display: block; }
   #logs .log-line { white-space: pre-wrap; word-break: break-word; }
   #logs .log-line.err { color: #f7768e; }
   #logs .log-ts { color: var(--dim); margin-right: 8px; user-select: none; }
+  #term .pane .xterm-viewport { overscroll-behavior: contain; }
   #jscanvas {
     display: none; position: fixed; right: 16px; top: 56px;
     border: 1px solid var(--border); border-radius: 6px; background: #04060a;
@@ -122,6 +133,45 @@
   }
   .modal-footer button:hover { border-color: var(--accent); color: var(--accent); }
   .modal-footer button.primary { border-color: var(--accent); color: var(--accent); }
+
+  /* ------------------------------------------------------------------ *
+   * Mobile: legible text + tappable controls at phone widths (~360-430px
+   * CSS px is the realistic target), without pinch-zoom or horizontal
+   * scroll for ordinary game text. xterm's own font size is set in JS
+   * (see fontSizeForViewport() below) since it renders to a canvas, not text.
+   * ------------------------------------------------------------------ */
+  @media (max-width: 600px) {
+    header { padding: max(8px, env(safe-area-inset-top, 0px)) 12px 8px; gap: 8px; }
+    header h1 { font-size: 14px; }
+    header #status {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    #tabs { padding: 0 6px; }
+    #tabs .tab { padding: 10px 10px 8px; font-size: 12.5px; }
+    #term, #logs { padding: 5px 6px; }
+    #logs { font-size: 13px; }
+    #inputbar .prompt { padding: 10px 0 10px 12px; }
+    #cmd {
+      padding: 11px 12px 11px 6px;
+      /* >=16px stops iOS Safari's auto-zoom-on-focus (see pointer:coarse
+         below for the non-width-gated version of this same fix). */
+      font-size: 16px;
+    }
+    #inputbar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  }
+
+  /* Touch-target sizing + iOS zoom-on-focus fix: gated on pointer type
+     rather than width, since any touchscreen (including a wide tablet in
+     landscape) hits both problems this addresses. */
+  @media (pointer: coarse) {
+    #cmd { font-size: 16px; }
+    #tabs .tab { min-height: 40px; }
+    #tabs .tab .reload, #tabs .tab .close {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 24px; min-height: 24px;
+    }
+    #tabAdd { min-width: 40px; }
+  }
 </style>
 </head>
 <body>
@@ -315,6 +365,14 @@ const TERM_OPTIONS = {
   },
 };
 
+// xterm renders to a canvas, not text, so CSS media queries can't resize
+// its font -- read the same breakpoint here and apply a modest bump
+// (14 -> 15px) at phone widths, applied when each Terminal is constructed
+// and re-applied live if the breakpoint is crossed (see the mqNarrow
+// 'change' listener near updateCloseButtons() below).
+const mqNarrow = window.matchMedia('(max-width: 480px)');
+function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
+
 const status = document.getElementById('status');
 const input = document.getElementById('cmd');
 const inputBar = document.getElementById('inputbar');
@@ -401,7 +459,7 @@ function makeSession() {
   s.pane = document.createElement('div');
   s.pane.className = 'pane';
   termEl.appendChild(s.pane);
-  s.term = new Terminal(TERM_OPTIONS);
+  s.term = new Terminal({ ...TERM_OPTIONS, fontSize: fontSizeForViewport() });
   s.fit = new FitAddon.FitAddon();
   s.term.loadAddon(s.fit);
   s.term.open(s.pane);
@@ -506,6 +564,18 @@ function updateCloseButtons() {
   // The first game tab is permanent; only later tabs can be closed.
   for (const [i, s] of sessions.entries()) s.close.hidden = i === 0;
 }
+
+// Crossing the phone-width breakpoint (e.g. rotating to/from landscape,
+// or a foldable) live-updates every session's font size; fit() is a
+// no-op on hidden panes (guarded on NaN geometry) so only the visible
+// one actually refits here -- the rest catch up on activation.
+mqNarrow.addEventListener('change', () => {
+  const size = fontSizeForViewport();
+  for (const s of sessions) {
+    s.term.options.fontSize = size;
+    if (view === s) s.fit.fit();
+  }
+});
 
 // Reflect the active session's state onto the shared input bar/status.
 function applyInputState(s) {
@@ -632,14 +702,54 @@ input.addEventListener('keydown', (ev) => {
   s.sendData(Array.from(utf8enc.encode(line + '\r\n')));
 });
 
-// window resize -> refit the visible terminal (hidden panes refit when
-// their tab is activated).
-let resizeTimer = 0;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    if (view !== 'logs' && activeGame) activeGame.fit.fit();
-  }, 120);
+// --- viewport / on-screen-keyboard handling -------------------------------
+// Two related mobile problems, both about "what is actually visible right
+// now":
+//
+//   1. Refit xterm whenever the visible area changes: window resize,
+//      orientation change, or the on-screen keyboard opening/closing.
+//
+//   2. The keyboard specifically: iOS Safari (and some Android browsers)
+//      do NOT shrink the layout viewport when the keyboard opens -- only
+//      window.visualViewport shrinks. #inputbar is the last child of the
+//      flex column <body>, which normally spans the layout viewport, so
+//      without help it ends up positioned behind the keyboard instead of
+//      just above it. Fix: keep <body> (position: fixed, see the
+//      stylesheet) sized/positioned to match the *visual* viewport
+//      instead; #term is the flex:1 child, so it shrinks to make room and
+//      #inputbar naturally lands at the bottom of the visible area.
+let viewportTimer = 0;
+function refitVisible() {
+  if (view !== 'logs' && activeGame) activeGame.fit.fit();
+}
+function syncVisualViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  document.body.style.top = vv.offsetTop + 'px';
+  document.body.style.height = vv.height + 'px';
+}
+function onViewportChange() {
+  syncVisualViewport();
+  clearTimeout(viewportTimer);
+  viewportTimer = setTimeout(refitVisible, 120);
+}
+window.addEventListener('resize', onViewportChange);
+// Some mobile browsers fire 'resize'/visualViewport events late after a
+// rotation; a second pass once the dust settles keeps xterm's geometry
+// (and NAWS) honest.
+window.addEventListener('orientationchange', () => setTimeout(onViewportChange, 300));
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', onViewportChange);
+  window.visualViewport.addEventListener('scroll', onViewportChange);
+  syncVisualViewport();
+}
+
+// Belt-and-suspenders for the same keyboard problem: on a browser without
+// window.visualViewport, pull a freshly-focused input back into view
+// rather than trusting the browser's own scroll-into-view behavior.
+input.addEventListener('focus', () => {
+  if (window.visualViewport) return;
+  setTimeout(() => input.scrollIntoView({ block: 'end', behavior: 'smooth' }), 50);
 });
 
 // The first game tab exists before the driver finishes loading, so the
