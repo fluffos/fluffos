@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>  // memchr (embedded-NUL rejection in lpc_lex_on_directive)
 #include <new>  // placement new (EsPendingCall lands on the arena)
 
 #include "compiler/internal/compiler.h"
@@ -1415,6 +1416,17 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
   // mode or whether the directive dispatches -- counted exactly once,
   // here (the terminating newline is the lexer.l rule's job, not ours).
   count_directive_newlines(text, len);
+
+  // A raw NUL inside the captured directive line: the directive rule's
+  // [^\n] classes are the ONE place that still deliberately absorbs NUL
+  // bytes (so the whole-line capture stays intact for diagnostics); every
+  // other path reports it via the <*> NUL rule at the top of lexer.l.
+  // Reject it here -- this line only runs for '#'-directive lines, so
+  // unlike a whole-file pre-scan it costs nothing on ordinary source.
+  if (memchr(text, '\0', static_cast<size_t>(len)) != nullptr) {
+    lexerror("Illegal embedded NUL byte (0x00) in preprocessor directive");
+    return LpcDirectiveAction::kNone;
+  }
 
   if (!g_compile.pp_active) return LpcDirectiveAction::kNone;
 

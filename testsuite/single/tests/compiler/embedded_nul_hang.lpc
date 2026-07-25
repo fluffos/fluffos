@@ -1,0 +1,119 @@
+// Regression: a real embedded NUL byte in LPC source (anywhere other than
+// as the buffer's own end-of-scan sentinel) could hang the Flex-generated
+// scanner forever -- found by AFL++ fuzzing the compiler front-end
+// (load_object_from_source()), minimized to 2 bytes: any non-NUL byte
+// followed by a NUL. Reachable through completely ordinary compilation:
+// any .lpc file on disk containing a raw NUL (a stray upload, a bad editor,
+// a crafted mudlib file) hangs the driver on load_object(), and the same
+// in-memory API lpcshell/lpcc -e and load_object_from_source() use is
+// exposed just as directly.
+//
+// Root cause (a flex skeleton defect, confirmed under gdb): when the
+// scanner meets an in-buffer NUL, yylex()'s YY_END_OF_BUFFER handling
+// tries yy_try_NUL_trans(); on failure it falls back to
+// yy_last_accepting_state -- which the forward scan has just clobbered
+// with the end-of-buffer PSEUDO-accepting state -- and for a 0-2
+// character token prefix yy_get_previous_state()'s re-walk records no
+// real accepting state either (it only records states BEFORE each prefix
+// character). The scanner then re-enters the same YY_END_OF_BUFFER
+// action with identical pointers, forever.
+//
+// The fix is the escape hatch flex itself provides -- make sure a RULE
+// can always match the NUL, so yy_try_NUL_trans() succeeds: lexer.l's
+// <*>(.|\n)?(.|\n)?\x00 rule (see its comment for why 0-2 leading
+// characters is exactly the dangerous set) reports every NUL as a clean
+// "Illegal embedded NUL byte" compile error, the negated character
+// classes all exclude \x00 so no state absorbs one silently, and
+// lpc_lex_on_directive() rejects a NUL inside a captured '#' line. No
+// whole-file pre-scan: legitimate (NUL-free) compiles pay nothing.
+//
+// This can only be driven through the file-loading / in-memory-source
+// entry points (compile_file()/load_object_from_source()), not through an
+// LPC string literal -- LPC string literals cannot contain a raw NUL byte
+// at the source-text level in the first place. Exercise it the same way
+// the compiler's own audit regressions do for a compile-time bug: write a
+// generated file to disk and load it.
+
+// Write `pre` + one NUL byte + `post` as a source file and assert it
+// fails to compile cleanly (error, not hang/crash). A real embedded NUL
+// can't be expressed as an LPC string literal or via sprintf("%c", 0)
+// (rejected as not-a-valid-UTF8-char) -- build the file byte-for-byte
+// with write_buffer() instead (a fresh allocate_buffer() is zero-filled),
+// exactly the way a corrupted/crafted real .lpc file could contain one
+// even though save_object()'s own format never does.
+private void assert_nul_rejected(string path, string pre, string post,
+                                 string why) {
+  buffer nul = allocate_buffer(1);
+  rm(path + ".c");
+  if (strlen(pre)) write_buffer(path + ".c", 0, pre);
+  write_buffer(path + ".c", strlen(pre), nul);
+  if (strlen(post)) write_buffer(path + ".c", strlen(pre) + 1, post);
+  ASSERT2(catch(load_object(path)), why);
+  rm(path + ".c");
+}
+
+void do_tests() {
+  string path = "/data/embedded_nul_hang_gen";
+
+  // The minimized 2-byte reproducer, verbatim: one ordinary byte then NUL
+  // (the 1-char-prefix shape that loops on the stale accepting state).
+  assert_nul_rejected(path, "0", "",
+    "a source file with an embedded NUL must fail to compile cleanly, not hang");
+
+  // A NUL inside a longer, otherwise ordinary program -- same bug class,
+  // more representative of what a corrupted real file looks like.
+  assert_nul_rejected(path, "void create() { ", " int x = 1; }\n",
+    "a NUL byte inside an otherwise-valid program must fail cleanly, not hang");
+
+  // NUL as the file's very first byte (the 0-char-prefix / token-start
+  // shape, matched by the bare \x00 arm of the lexer rule).
+  assert_nul_rejected(path, "", "int x;\n",
+    "a NUL as the file's first byte must fail cleanly");
+
+  // Inside a string literal body: without the class exclusion the run
+  // rule would absorb the NUL into the string constant silently.
+  assert_nul_rejected(path, "string s = \"ab", "cd\";\n",
+    "a NUL inside a string literal must be a compile error");
+
+  // Right after a string-escape backslash: the one single-character
+  // prefix that is NOT accepting, i.e. the shape the rule's second
+  // optional arm exists for.
+  assert_nul_rejected(path, "string s = \"ab\\", "cd\";\n",
+    "a NUL after a string-escape backslash must fail cleanly, not hang");
+
+  // Two characters into an escape sequence ("\x" + NUL): the 2-char
+  // prefix whose only accepting state is at its very end -- the deepest
+  // shape whose re-walk records nothing.
+  assert_nul_rejected(path, "string s = \"\\x", "\";\n",
+    "a NUL after an \\x escape prefix must fail cleanly, not hang");
+
+  // Inside a block comment (its own start condition and negated class).
+  assert_nul_rejected(path, "/* ab", "cd */\nint x;\n",
+    "a NUL inside a block comment must be a compile error");
+
+  // Inside a preprocessor directive line: the '#' rule deliberately
+  // captures the whole line, NUL included -- lpc_lex_on_directive()
+  // must reject it.
+  assert_nul_rejected(path, "#define A B", "\nint x;\n",
+    "a NUL inside a preprocessor directive must be a compile error");
+
+  // Inside a dead #if branch (SC_COND_SKIP scans but never tokenizes).
+  assert_nul_rejected(path, "#if 0\nabc", "def\n#endif\nint x;\n",
+    "a NUL inside a dead #if branch must be a compile error");
+
+  // Inside a heredoc body (read through lpc_lex_getc(), not the DFA:
+  // the legacy raw readers treat NUL as end-of-input, so the terminator
+  // is never found and the block errors out).
+  assert_nul_rejected(path, "string s = @END\nline1", "line2\nEND;\n",
+    "a NUL inside a heredoc body must be a compile error");
+
+  // A well-formed compile right after must still work, proving the
+  // rejections don't leave any compiler-global scratch state dirty.
+  rm(path + ".c");
+  write_file(path + ".c", "int ok() { return 42; }\n");
+  object ob = load_object(path);
+  ASSERT2(ob, "a normal compile right after the rejections must still succeed");
+  ASSERT_EQ(42, ob->ok());
+  destruct(ob);
+  rm(path + ".c");
+}

@@ -2277,16 +2277,11 @@ static void mudlib_error_handler(char* err, int katch) {
   mapping_t* m = m_owned.get();
   add_mapping_string(m, "error", err);
   if (current_prog) {
-    // add_mapping_malloced_string() only takes ownership of this malloc'd
-    // string if the insert actually succeeds -- if the mapping is already
-    // at its configured size limit it error()s before ever storing the
-    // pointer, leaking it (add_slash()'s allocation already happened, as
-    // the call argument, before add_mapping_malloced_string ran at all).
-    // Hold it via RAII and only relinquish that once the insert succeeds.
-    std::unique_ptr<char, void (*)(char*)> program_str(add_slash(current_prog->filename),
-                                                        [](char* s) { FREE_MSTR(s); });
-    add_mapping_malloced_string(m, "program", program_str.get());
-    program_str.release();
+    // add_mapping_malloced_string() owns the throwing call (insert_in_
+    // mapping(), which can mapping_too_large()/OOM) internally now, so a
+    // plain call is safe: it frees add_slash()'s allocation on its own
+    // unwind if the insert never happens, same as every other caller.
+    add_mapping_malloced_string(m, "program", add_slash(current_prog->filename));
   }
   if (current_object) {
     add_mapping_object(m, "object", current_object);
@@ -2296,9 +2291,7 @@ static void mudlib_error_handler(char* err, int katch) {
     get_line_number_info(&file, &line);
   }
   if (file) {
-    std::unique_ptr<char, void (*)(char*)> file_str(add_slash(file), [](char* s) { FREE_MSTR(s); });
-    add_mapping_malloced_string(m, "file", file_str.get());
-    file_str.release();
+    add_mapping_malloced_string(m, "file", add_slash(file));
   }
   if (line) {
     add_mapping_pair(m, "line", line);

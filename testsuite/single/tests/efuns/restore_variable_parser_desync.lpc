@@ -1,0 +1,41 @@
+// Regression: restore_array()/restore_mapping()/restore_class() (src/vm/
+// internal/base/object.cc) recurse in lockstep with a one-shot sizing
+// pre-pass (restore_size()/restore_internal_size()) that populates the
+// file-scope sizes[] scratch buffer. That pre-pass and the real parse are
+// two INDEPENDENT hand-written parsers over the same untrusted bytes, and
+// they can disagree: parse_numeric() silently treats whatever byte follows
+// a numeral as an already-consumed delimiter without validating it (its
+// digit-scan loop is `while ((c = *cp++) && isdigit(c))`, which has already
+// advanced cp past the first non-digit byte before returning), while the
+// sizing pre-pass's much coarser "unrecognized token -> scan to the next
+// expected delimiter" fallback reads the same span differently. A numeral
+// directly followed by a stray "({" (found by AFL++ fuzzing restore_
+// variable(), minimized to 10 bytes) makes the real parse believe it has
+// entered a nested array the sizing pass never saw and never recorded a
+// sizes[] entry for -- indexing sizes[save_svalue_depth - 1] then reads a
+// null pointer (sizes was never allocated) or a garbage entry beyond what
+// the pre-pass populated. This crashed with SIGSEGV / a clean UBSan
+// null-pointer-load report before the fix; get_restore_size() now bounds-
+// checks save_svalue_depth against what the sizing pass actually
+// established and fails the restore cleanly instead.
+//
+// Confirmed present (via a ported copy of the harness) on the driver
+// revision that predates this branch's whole file -- this is a pre-existing
+// bug, not a regression from any change in this branch.
+void do_tests() {
+  // The minimized crash: an outer mapping whose key is the "0" shorthand,
+  // whose value is a bare "0" numeral immediately followed by "{(" with no
+  // delimiter -- parse_numeric() silently swallows the "{" as if it were
+  // the value's trailing "," while the sizing pass read the whole "{({,"
+  // span as one opaque token. The mismatch previously null-derefed inside
+  // restore_array(); it must now be a clean, catchable parse error.
+  ASSERT2(catch(restore_variable("([:0{({,])")),
+    "sizing/parse desync (mapping->array) must error cleanly, not crash");
+
+  // A well-formed restore right after must still work, proving the sizing
+  // scratch state (save_svalue_depth / sizes[]) was left clean rather than
+  // dirtied by the rejected malformed input.
+  ASSERT_EQ(7, restore_variable("7"));
+  ASSERT_EQ(3, sizeof(restore_variable("({1,2,3,})")));
+  ASSERT_EQ(1, sizeof(restore_variable("([1:1,])")));
+}

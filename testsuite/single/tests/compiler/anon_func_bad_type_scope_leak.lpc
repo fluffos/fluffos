@@ -1,0 +1,70 @@
+// Regression: rule_lambda_return_type() (grammar_rules_exprs.cc), the
+// "open" half of parsing a typed anonymous-function literal
+// (`TYPE (args) { block }`, e.g. `function (int x) { return x; }`),
+// reports "Reserved type name unexpected." via yyerror() when TYPE isn't
+// `function` -- but used to fall straight through into its side effects
+// regardless: pushing a function context and swapping current_number_of_
+// locals/locals_ptr aside to start a FRESH nested scope for the (about to
+// be malformed) arg list and body. The matching "close",
+// rule_primary_expr_anon_func(), restores that swapped-aside state --
+// but only runs if the grammar production `lambda_return_type '(' argument
+// ')' block` reduces all the way through. If the malformed input inside
+// the parens/braces ALSO hits a genuine Bison-level syntax error (as
+// opposed to parsing to a clean, if semantically-invalid, finish), the
+// parser's error recovery (`error ';' statements`) abandons that
+// production before rule_primary_expr_anon_func() ever runs -- so the
+// "open" half's state swap is never undone. current_number_of_locals is
+// left stuck at 0 (or some other value from a still-live sibling swap)
+// mid-way through the block that contains the TYPE(...) expression.
+//
+// When that ENCLOSING block later closes, rule_block() computes its own
+// local count as `current_number_of_locals - entry_locals` (a snapshot
+// taken when the block opened) -- now negative, since the counter was
+// yanked out from under it. pop_n_locals() hits its "num < 0" invariant:
+// DEBUG_CHECK (base/internal/log.h) makes that a clean fatal() on a Debug
+// build, but DEBUG_CHECK compiles to nothing at all outside Debug (see
+// src/CMakeLists.txt: only CMAKE_BUILD_TYPE=Debug forces DEBUG on) -- so
+// on a RelWithDebInfo build (what real deployments run) there is no check
+// at all: pop_n_locals() proceeds with num=-1, walking current_number_of_
+// locals and the locals[] array pointers in the WRONG direction, an
+// out-of-bounds walk confirmed to SIGSEGV a RelWithDebInfo build for real.
+// All from an ordinary syntax error a mudlib coder (or an attacker who can
+// get any code compiled) can write by hand -- found by AFL++ fuzzing the
+// compiler front-end, minimized to 22 bytes.
+//
+// Fix mirrors the established pattern for a soft-skipped push needing its
+// paired pop to skip in step (AGENTS.md section 13 point 13): a new
+// func_block_t.opened flag records whether rule_lambda_return_type()
+// actually pushed anything; rule_primary_expr_anon_func() checks it and
+// skips its restore entirely when false, whichever way parsing goes from
+// there -- so there is nothing left for error recovery to desync.
+void do_tests() {
+  string path = "/data/anon_func_bad_type_scope_leak_gen";
+  rm(path + ".c");
+
+  // The minimized fuzzer reproducer, verbatim: a for-loop whose body block
+  // contains `object(` -- a reserved (non-`function`) type name used in
+  // anon-function-literal position -- immediately followed by `;`, which
+  // is not valid `argument`/`)`/`block` syntax and triggers the Bison-level
+  // syntax error that abandons the production before the "close" runs.
+  write_file(path + ".c", "a(){for(;n;){object(;}");
+  ASSERT2(catch(load_object(path)),
+    "malformed typed-anon-func-literal attempt must error cleanly, not crash");
+
+  rm(path + ".c");
+
+  // A well-formed compile right after must still work, proving
+  // current_number_of_locals/locals_ptr weren't left corrupted.
+  write_file(path + ".c", "int ok() { int x = 1; return x + 1; }\n");
+  object ob = load_object(path);
+  ASSERT2(ob, "a normal compile right after the rejection must still succeed");
+  ASSERT_EQ(2, ob->ok());
+  destruct(ob);
+  rm(path + ".c");
+
+  // A legitimate typed anonymous function literal, the construct this
+  // whole code path exists for, must still work correctly (not just avoid
+  // crashing) -- see also single/tests/compiler/firstclass_functions.lpc.
+  function f = (function (int a, int b) { return a + b; });
+  ASSERT_EQ(7, f(3, 4));
+}

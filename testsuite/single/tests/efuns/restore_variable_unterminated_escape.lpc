@@ -1,0 +1,44 @@
+// Regression: restore_hash_string() (src/vm/internal/base/mapping.cc, used
+// for mapping keys) and restore_interior_string() (object.cc, used for
+// array/class elements and mapping values) each have an OUTER while loop
+// that stops on '"' or '\0' (a NUL byte hits `case '\0': return
+// ROB_STRING_ERROR;` in the switch), but after an escape ('\') is seen they
+// switch into a separate INNER while loop for the rest of the string. That
+// inner loop's condition used to be `!= '"'` only -- it did not stop on
+// '\0'. An unterminated escaped string (a '\' followed by one ordinary
+// byte, then the buffer ends with no closing '"') hit the loop's plain-
+// character branch on the NUL terminator, which copied it and kept
+// looping: an unbounded read past the end of the string allocation
+// (AddressSanitizer: stack-buffer-overflow; found by AFL++ fuzzing
+// restore_variable(), minimized to 9-10 bytes each). restore_string()
+// (object.cc, the sibling used by restore_object() for a whole save-file)
+// already had the correct `!= '"' && c` guard -- the two efun-facing
+// parsers were simply missing it. Both must now report a clean
+// ROB_STRING_ERROR ("Illegal string format") instead of reading off the
+// end of the buffer.
+//
+// Both minimized reproducers below are the ACTUAL fuzzer-found inputs
+// (delta-debugged down from the original crashes), not hand-constructed --
+// a hand-built "obviously unterminated" string here is deceptive, because
+// restore_size()'s OWN (separate, also-approximate) string handling
+// silently accepts several shapes that never even reach the vulnerable
+// inner loop; only these exact byte sequences drive it.
+//
+// Confirmed present (via a ported copy of the harness) on the driver
+// revision that predates this branch's whole file -- this is a pre-existing
+// bug, not a regression from any change in this branch.
+void do_tests() {
+  // Mapping KEY: exercises restore_hash_string()'s inner loop.
+  ASSERT2(catch(restore_variable("([:0a\"\\,])")),
+    "unterminated escaped mapping key must error cleanly, not overrun");
+
+  // Mapping VALUE: exercises restore_interior_string()'s inner loop (the
+  // same function also parses array/class elements -- one confirmed call
+  // site is enough to pin the shared fix).
+  ASSERT2(catch(restore_variable("([0a\"\\:])")),
+    "unterminated escaped mapping value must error cleanly, not overrun");
+
+  // A well-formed restore right after must still work.
+  ASSERT_EQ("a\"b", restore_variable("\"a\\\"b\""));
+  ASSERT_EQ(3, sizeof(restore_variable("({1,2,3,})")));
+}

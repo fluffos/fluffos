@@ -776,12 +776,34 @@ void rule_primary_expr_index(parse_node_t** result, parse_node_t* expr, parse_no
 
 void rule_lambda_return_type(func_block_t* saved_block, LPC_INT type) {
   auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
-  if (type != TYPE_FUNCTION) yyerror("Reserved type name unexpected.");
+  if (type != TYPE_FUNCTION) {
+    yyerror("Reserved type name unexpected.");
+    // Do NOT push a fresh nested local-variable scope for a rejected type:
+    // the grammar still reduces `argument ')' block` normally afterward
+    // (yyerror() is a diagnostic, not a parse abort), and rule_primary_
+    // expr_anon_func() is the matching "close" that restores state from
+    // this saved_block -- but if the input also hits a genuine Bison-level
+    // syntax error partway through the arg list or body (as opposed to
+    // parsing to a clean, if semantically-invalid, finish), error recovery
+    // can abandon that production before rule_primary_expr_anon_func() ever
+    // runs. An unconditional push here would then never be undone, leaving
+    // current_number_of_locals stuck at 0 mid-block -- the ENCLOSING
+    // block's own entry_locals diff (rule_block()) goes negative on close,
+    // hitting pop_n_locals()'s "num < 0" invariant: a clean fatal() in a
+    // Debug build, but a silent out-of-bounds walk in a build where
+    // DEBUG_CHECK is compiled out (RelWithDebInfo -- this reproduced as a
+    // real SIGSEGV there). Found by AFL++ fuzzing the compiler front-end.
+    // opened=false tells rule_primary_expr_anon_func() to skip its restore
+    // entirely and mirror this skip, whichever way parsing goes from here.
+    saved_block->opened = false;
+    return;
+  }
   saved_block->num_local = current_number_of_locals;
   saved_block->max_num_locals = max_num_locals;
   saved_block->context = context;
   saved_block->save_current_type = current_type;
   saved_block->save_exact_types = exact_types;
+  saved_block->opened = true;
   if (type_of_locals_ptr + max_num_locals + max_local_variables >=
       &type_of_locals[type_of_locals_size])
     reallocate_locals();
@@ -797,6 +819,18 @@ void rule_lambda_return_type(func_block_t* saved_block, LPC_INT type) {
 
 void rule_primary_expr_anon_func(parse_node_t** result, func_block_t* saved_block, argument_t* arg,
                                  decl_t* block) {
+  if (!saved_block->opened) {
+    // Mirrors rule_lambda_return_type()'s skip: the return type was already
+    // rejected there (a compile error already reported, so this whole
+    // expression is going nowhere) and no nested scope was pushed for the
+    // arg list / block that just parsed -- they landed directly in the
+    // ENCLOSING scope instead. Don't touch current_number_of_locals/
+    // locals_ptr/the function-context stack here: there is nothing this
+    // function opened to restore or pop, and saved_block's other fields
+    // were never populated. Produce a harmless placeholder and stop.
+    CREATE_ERROR(*result);
+    return;
+  }
   if (arg->flags & ARG_IS_VARARGS) {
     yyerror("Anonymous varargs functions aren't implemented");
   }
