@@ -5,6 +5,7 @@
 #include <deque>
 #include <map>
 #include <functional>
+#include <memory>
 
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "vm/internal/base/machine.h"
@@ -1281,10 +1282,18 @@ void add_mapping_string(mapping_t* m, const char* key, const char* value) {
 void add_mapping_malloced_string(mapping_t* m, const char* key, char* value) {
   svalue_t* s;
 
+  // insert_in_mapping() (via find_for_insert()) can error()/throw --
+  // mapping_too_large(), OOM -- before `value` is ever stored below. Own it
+  // here for the duration of that call so the unwind frees it on the
+  // throwing path; every caller passes a value it expects this function to
+  // take unconditional ownership of (new_string()-family allocation, freed
+  // with FREE_MSTR), so the ownership transfer belongs in ONE place here,
+  // not duplicated as a RAII wrapper at each call site.
+  std::unique_ptr<char, void (*)(char*)> owned(value, [](char* p) { FREE_MSTR(p); });
   s = insert_in_mapping(m, key);
   s->type = T_STRING;
   s->subtype = STRING_MALLOC;
-  s->u.string = value;
+  s->u.string = owned.release();
 }
 
 void add_mapping_object(mapping_t* m, const char* key, object_t* value) {
