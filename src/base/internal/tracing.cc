@@ -222,7 +222,10 @@ void Tracer::setThreadName(const std::string_view& name) {
 
 void Tracer::counter(const std::string_view& name, long n) {
   if (Tracer::enabled()) {
-    counter(name, {{name, n}});
+    // an explicit std::string key is required, otherwise the initializer list
+    // becomes a JSON array instead of the {name: value} object counter tracks
+    // are read from.
+    counter(name, std::optional<json>(json{{std::string(name), n}}));
   }
 }
 

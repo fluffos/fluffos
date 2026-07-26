@@ -27,6 +27,18 @@ if(${GTEST_FOUND})
   add_executable(file_tests test_file.cc)
   target_link_libraries(file_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
 
+  add_executable(baseutils_tests test_baseutils.cc)
+  target_link_libraries(baseutils_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+
+  add_executable(lru_cache_tests test_lru_cache.cc)
+  target_link_libraries(lru_cache_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+
+  add_executable(rc_tests test_rc.cc)
+  target_link_libraries(rc_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+
+  add_executable(tracing_tests test_tracing.cc)
+  target_link_libraries(tracing_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+
   # Scratchpad-vs-malloc micro-benchmark: proves the compile arena beats
   # heap allocation for the compiler's allocation patterns. Timing-based,
   # so it is NOT registered with ctest -- run manually (RelWithDebInfo):
@@ -48,5 +60,9 @@ if(${GTEST_FOUND})
   gtest_discover_tests(lexer_tests DISCOVERY_TIMEOUT 60)
   gtest_discover_tests(strutils_tests DISCOVERY_TIMEOUT 60)
   gtest_discover_tests(file_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(baseutils_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(lru_cache_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(rc_tests DISCOVERY_TIMEOUT 60)
+  gtest_discover_tests(tracing_tests DISCOVERY_TIMEOUT 60)
 endif()
 
