@@ -3480,8 +3480,11 @@ void f_crypt() {
     salt[0] = '$';
     salt[1] = '6';
     salt[2] = '$';
+    // Salts must come from the CSPRNG, not the game-visible mt19937_64 that
+    // random() draws from: its state is recoverable from observed output, so
+    // salts drawn from it are predictable ahead of account creation.
     for (auto i = 0; i < sh_a512_salt_len; i++) {
-      salt[3 + i] = choice[random_number(strlen(choice))];
+      salt[3 + i] = choice[secure_random_number(strlen(choice))];
     }
     salt[sizeof(salt) - 1] = '\0';
     saltp = salt;
@@ -3512,7 +3515,7 @@ void f_oldcrypt() {
     int i;
 
     for (i = 0; i < salt_len; i++) {
-      salt[i] = choice[random_number(strlen(choice))];
+      salt[i] = choice[secure_random_number(strlen(choice))];
     }
 
     salt[salt_len] = 0;

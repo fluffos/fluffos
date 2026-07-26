@@ -15,6 +15,7 @@
 #include <event2/util.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 #include <deque>
 #include <string>
 #include <unistd.h>  // for close
@@ -900,15 +901,29 @@ int socket_connect(int fd, const char* name, svalue_t* read_callback, svalue_t* 
 
     SSL_set_fd(ssl, lpc_socks[fd].fd);
 
-    if (lpc_socks[fd].options[SO_TLS_VERIFY_PEER].type == T_NUMBER &&
-        lpc_socks[fd].options[SO_TLS_VERIFY_PEER].u.number != 0) {
+    bool const verify_peer = lpc_socks[fd].options[SO_TLS_VERIFY_PEER].type == T_NUMBER &&
+                             lpc_socks[fd].options[SO_TLS_VERIFY_PEER].u.number != 0;
+    if (verify_peer) {
       SSL_set_verify(ssl, SSL_VERIFY_PEER, tls_verify_callback);
     } else {
       SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
     }
 
     if (lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
-      SSL_set_tlsext_host_name(ssl, lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string);
+      const char* const sni_hostname = lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string;
+      SSL_set_tlsext_host_name(ssl, sni_hostname);
+      // Chain validation alone accepts ANY certificate issued by a trusted CA,
+      // for any name: without a name check a MITM presenting a valid
+      // certificate for a host it does control passes verification. Bind the
+      // expected name so OpenSSL matches it against SAN/CN during the
+      // handshake.
+      if (verify_peer) {
+        SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+        if (!SSL_set1_host(ssl, sni_hostname)) {
+          debug(sockets, "socket_connect: SSL_set1_host(%s) failed.\n", sni_hostname);
+          return EECONNECT;
+        }
+      }
       // Drop the string ref once applied to SSL.
       free_svalue(&lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME], "socket_connect");
       lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME] = const0u;
