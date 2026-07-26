@@ -104,12 +104,33 @@ void f_compress_file() {
     return;
   }
 
+  bool ok = true;
   do {
     readb = fread(buf, 1, 4096, in_file);
-    gzwrite(out_file, buf, readb);
+    if (readb > 0 && gzwrite(out_file, buf, readb) != readb) {
+      ok = false;
+      break;
+    }
   } while (readb == 4096);
+  if (ferror(in_file)) {
+    ok = false;
+  }
   fclose(in_file);
-  gzclose(out_file);
+  // The deflate stream is flushed by gzclose(); a full disk shows up there.
+  if (gzclose(out_file) != Z_OK) {
+    ok = false;
+  }
+
+  // Only consume the source once the compressed copy is known to be complete,
+  // otherwise a failed compress destroys the only copy of the data.
+  if (!ok) {
+    debug_message("compress_file: failed to compress /%s into /%s.\n", real_input_file,
+                  output_file);
+    unlink(output_file);
+    pop_n_elems(num_arg);
+    push_number(0);
+    return;
+  }
 
   unlink(real_input_file);
 
@@ -209,12 +230,36 @@ void f_uncompress_file() {
     return;
   }
 
+  bool ok = true;
   do {
     readb = gzread(in_file, buf, 4096);
-    fwrite(buf, 1, readb, out_file);
+    // gzread() returns -1 on a read/inflate error (truncated or corrupt
+    // gzip data): passing that straight to fwrite() converts it to a huge
+    // size_t count.
+    if (readb < 0) {
+      ok = false;
+      break;
+    }
+    if (readb > 0 && fwrite(buf, 1, readb, out_file) != static_cast<size_t>(readb)) {
+      ok = false;
+      break;
+    }
   } while (readb == 4096);
   gzclose(in_file);
-  fclose(out_file);
+  if (fclose(out_file) != 0) {
+    ok = false;
+  }
+
+  // Only consume the source once the decompressed copy is known to be
+  // complete, otherwise a failed decompress destroys the only copy.
+  if (!ok) {
+    debug_message("uncompress_file: failed to decompress /%s into /%s.\n", real_input_file,
+                  output_file);
+    unlink(output_file);
+    pop_n_elems(num_arg);
+    push_number(0);
+    return;
+  }
 
   unlink(real_input_file);
 

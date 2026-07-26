@@ -803,17 +803,24 @@ static int dowrite(int from, int to, const char* fname, int apflg) {
     bytes += strlen(str) + 1; /* str + '\n' */
     if (fputs(str, fp) == EOF) {
       ED_OUTPUT(ED_DEST, "file write error\n");
-      err++;
+      // Callers test the result with `< 0` (see the 'w'/'x' commands, which
+      // clear P_FCHANGED / drop the buffer on a non-negative result), so a
+      // failed write has to report a negative code, not a count.
+      err = EDERR;
       break;
     }
     fputc('\n', fp);
     lptr = lptr->l_next;
   }
 
-  if (!P_RESTRICT) {
+  // The tail of the buffer is only flushed by fclose(): a full disk typically
+  // surfaces there, not in the fputs() above.
+  if (fclose(fp) != 0) {
+    ED_OUTPUT(ED_DEST, "file write error\n");
+    err = EDERR;
+  } else if (err >= 0 && !P_RESTRICT) {
     ED_OUTPUTV(ED_DEST, "%u lines %u bytes\n", lines, bytes);
   }
-  fclose(fp);
 
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {

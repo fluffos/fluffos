@@ -317,8 +317,18 @@ int write_file(const char* file, const char* str, int flags) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
-    gzwrite(gf, str, strlen(str));
-    gzclose(gf);
+    auto const len = strlen(str);
+    int const written = len > 0 ? gzwrite(gf, str, len) : 0;
+    // gzwrite() returns 0 on error, gzclose() flushes the deflate stream and
+    // can fail on its own (a full disk shows up here, not in gzwrite).
+    bool ok = (written == static_cast<int>(len));
+    if (gzclose(gf) != Z_OK) {
+      ok = false;
+    }
+    if (!ok) {
+      debug_perror("write_file", file);
+      return 0;
+    }
     return 1;
   }
 #endif
@@ -327,8 +337,17 @@ int write_file(const char* file, const char* str, int flags) {
     error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
           (flags & 1) ? "overwrite" : "append", strerror(errno));
   }
-  fwrite(str, strlen(str), 1, f);
-  fclose(f);
+  auto const len = strlen(str);
+  // A short fwrite() or a failing fclose() (the buffered data is flushed
+  // there) both mean the file on disk does not hold what we were handed.
+  bool ok = (len == 0 || fwrite(str, len, 1, f) == 1);
+  if (fclose(f) != 0) {
+    ok = false;
+  }
+  if (!ok) {
+    debug_perror("write_file", file);
+    return 0;
+  }
   return 1;
 }
 
@@ -602,7 +621,11 @@ int write_bytes(const char* file, int start, const char* str, int theLength) {
   }
   size = fwrite(str, 1, theLength, fptr);
 
-  fclose(fptr);
+  // fclose() flushes; a write error can surface only here.
+  if (fclose(fptr) != 0) {
+    debug_perror("write_bytes", file);
+    return 0;
+  }
 
   if (size <= 0) {
     return 0;
@@ -807,6 +830,8 @@ static int do_move(const char* from, const char* to, int flag) {
     if (symlink(from, to) == 0) { /* symbolic link */
       return 0;
     }
+    error("cannot link `/%s' to `/%s'\n", from, to);
+    return 1;
   }
 #endif
   return 0;
