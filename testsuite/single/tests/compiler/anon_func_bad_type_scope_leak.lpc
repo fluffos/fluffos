@@ -65,6 +65,6 @@ void do_tests() {
   // A legitimate typed anonymous function literal, the construct this
   // whole code path exists for, must still work correctly (not just avoid
   // crashing) -- see also single/tests/compiler/firstclass_functions.lpc.
-  function f = (function (int a, int b) { return a + b; });
+  function f = (function(int a, int b) { return a + b; });
   ASSERT_EQ(7, f(3, 4));
 }
