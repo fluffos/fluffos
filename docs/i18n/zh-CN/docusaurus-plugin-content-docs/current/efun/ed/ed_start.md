@@ -9,7 +9,8 @@ title: ed / ed_start
 
 ### SYNOPSIS
 
-    string ed_start(string file | void, int restricted | void)
+    string ed_start(string file | void, int restricted | void,
+                    int scroll_lines | void)
 
 ### DESCRIPTION
 
@@ -21,6 +22,13 @@ title: ed / ed_start
 
     If restricted is 1, the commands that change which file is being edited
     will be disabled.
+
+    If scroll_lines is nonzero, it sets the number of lines displayed by the
+    editor's scrolling commands (such as 'z').  The default is 20.
+
+    When ed_start() is called with exactly two arguments, a second argument
+    equal to 1 is treated as 'restricted'; any other value is treated as
+    'scroll_lines'.
 
     Only one ed session can be active per object at a time.
 
