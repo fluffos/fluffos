@@ -137,6 +137,16 @@ void f_bind() {
     error("Master object denied permission to bind() function pointer.\n");
   }
 
+  /* valid_bind() ran arbitrary LPC: if it destructed the new owner, the
+   * destruct sweep (remove_object_from_stack) already released the stack's
+   * ref and zeroed our argument slot -- storing `ob` into hdr.owner below
+   * would create an uncounted reference whose eventual free_object() in
+   * dealloc_funp() over-decrements a ref we no longer hold. Check the slot,
+   * not ob->flags: ob may already be deallocated memory. */
+  if (sp->type != T_OBJECT) {
+    error("New owner was destructed during valid_bind().\n");
+  }
+
   new_fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind"));
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
@@ -2476,7 +2486,7 @@ void f_sizeof() {
       free_array(sp->u.arr);
       break;
     case T_MAPPING:
-      i = sp->u.map->count;
+      i = MAP_COUNT(sp->u.map);
       free_mapping(sp->u.map);
       break;
     case T_BUFFER:

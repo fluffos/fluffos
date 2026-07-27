@@ -166,7 +166,10 @@ void kill_ref(ref_t* ref) {
        global_ref_list at this point, so matching it would wrongly keep
        the mapping locked and leak its deferred nodes. */
     while (r) {
-      if (r != ref && r->sv.u.map == ref->sv.u.map) {
+      /* the type check matters: refs whose sv is not a mapping (foreach
+       * loop refs, killed refs) carry unrelated or uninitialized u data
+       * that could alias this mapping's address */
+      if (r != ref && r->sv.type == T_MAPPING && r->sv.u.map == ref->sv.u.map) {
         break;
       }
       r = r->next;
@@ -175,9 +178,19 @@ void kill_ref(ref_t* ref) {
       unlock_mapping(ref->sv.u.map);
     }
   }
-  if (ref->lvalue) {
-    free_svalue(&ref->sv, "kill_ref");
-  }
+  /* Release the ref's own sv unconditionally: a foreach mapping ref
+   * carries its counted mapping there even while lvalue is still null
+   * (before the first iteration), and every other state holds either a
+   * counted owner (F_MAKE_REF, lvalue set) or an uncounted tag
+   * (T_NUMBER / T_LVALUE_BYTE) for which this is a no-op. */
+  free_svalue(&ref->sv, "kill_ref");
+  /* Clear the stale tag: when the last T_REF svalue holding this ref_t is
+   * later freed, free_svalue() re-enters kill_ref, and the MAP_LOCKED
+   * check above must not re-read the (possibly already deallocated)
+   * mapping through ref->sv. */
+  ref->sv.type = T_NUMBER;
+  ref->sv.subtype = 0;
+  ref->sv.u.number = 0;
   if (ref->next) {
     ref->next->prev = ref->prev;
   }
@@ -1392,9 +1405,18 @@ void pop_control_stack() {
     playerchanged = 0;
     safe_call_efun_callback(&ftc, 0);
     object_t* cgo = command_giver;
+    /* Hold cgo across restore_command_giver(): the restore frees the
+     * command_giver ref, which could be cgo's last -- set_command_giver()
+     * below would then add_ref freed memory. */
+    if (playerchanged && cgo) {
+      add_ref(cgo, "pop_control_stack: playerchanged");
+    }
     restore_command_giver();
     if (playerchanged) {
       set_command_giver(cgo);
+      if (cgo) {
+        free_object(&cgo, "pop_control_stack: playerchanged");
+      }
     }
     outoftime = s;
     free_svalue(&(stuff->func), "pop_stack");
@@ -1809,6 +1831,11 @@ void setup_fake_frame(funptr_t* fun) {
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
   csp->num_local_variables = 0;
+  /* push_control_stack() clears this; the fake frame must too, or an efun
+   * that registers per-frame state against csp (f_defer via an FP_EFUN
+   * funptr) reads and chains onto whatever stale defer_list pointer the
+   * reused control-stack slot still holds. */
+  csp->defers = nullptr;
 
   pc = reinterpret_cast<char*>(&fake_program);
   caller_type = ORIGIN_FUNCTION_POINTER;
@@ -2332,6 +2359,14 @@ void eval_instruction(char* p) {
       case F_KILL_REFS: {
         int num = EXTRACT_UCHAR(pc++);
         while (num--) {
+          /* An error unwind inside this call's argument list (e.g. a catch()
+           * argument evaluated after a ref) has restore_context() kill refs
+           * belonging to the surviving frame too, so the compiler's count
+           * can exceed what is still on the list -- guard against walking
+           * off the end. */
+          if (!global_ref_list) {
+            break;
+          }
           kill_ref(global_ref_list);
         }
         break;
@@ -3069,6 +3104,23 @@ void eval_instruction(char* p) {
           /* foreach guarantees our target remains valid */
           ref->lvalue = nullptr;
           ref->sv.type = T_NUMBER;
+          ref->sv.u.number = 0;
+          if (flags & FOREACH_MAPPING) {
+            /* F_NEXT_FOREACH aims this ref at interior mapping-node value
+             * slots, so lock the mapping exactly like F_MAKE_REF does:
+             * node deletion in the loop body (map_delete, reclaim) then
+             * defers to locked_map_nodes instead of recycling the node the
+             * ref still points into (a write-through would corrupt
+             * whichever mapping reused it). Carrying the mapping as the
+             * ref's own counted sv makes kill_ref() -- reached from both
+             * the loop-variable's eventual release and any error unwind --
+             * perform the matching unlock and ref drop. */
+            mapping_t* m = (sp - 3)->u.map;
+            ref->sv.type = T_MAPPING;
+            ref->sv.u.map = m;
+            m->ref++;
+            m->count |= MAP_LOCKED;
+          }
           STACK_INC;
           sp->type = T_REF;
           sp->u.ref = ref;
@@ -3196,10 +3248,17 @@ void eval_instruction(char* p) {
         stack_in_use_as_temporary--;
 #endif
         if (sp->type == T_REF) {
-          sp->u.ref->lvalue = nullptr;
+          ref_t* r = sp->u.ref;
+          r->lvalue = nullptr;
 
-          if (!(--sp->u.ref->ref)) {
-            FREE(sp->u.ref);
+          if (!(--r->ref)) {
+            /* Normally unreachable (the loop variable still holds a ref),
+             * but if reached the ref must die through kill_ref() so its sv
+             * -- for a mapping ref loop, the counted mapping whose
+             * MAP_LOCKED this loop holds -- is released and the ref is
+             * unlinked from global_ref_list; a bare FREE left both
+             * dangling. */
+            kill_ref(r);
           }
         }
         if ((sp - 1)->type == T_LVALUE) {
@@ -3776,7 +3835,11 @@ void eval_instruction(char* p) {
         lv_owner_type = T_MAPPING;
         lv_owner = reinterpret_cast<refed_t*>(m);
 #endif
-        free_mapping(m);
+        /* Drop the stack's ref WITHOUT the possible dealloc (matching
+         * push_indexed_lvalue's mapping branch): free_mapping() on a ref-1
+         * temporary (e.g. f()->key = v) would free the node the lvalue
+         * above points into before the assignment writes through it. */
+        m->ref--;
         break;
       }
       case F_INDEX:

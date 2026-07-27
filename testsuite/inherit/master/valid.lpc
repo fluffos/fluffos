@@ -99,8 +99,16 @@ int valid_read(string, mixed, string) {
   return 1;
 }
 
-int valid_bind() {
+// Tests can register a hook object to observe valid_bind() (and, e.g.,
+// destruct the prospective owner mid-bind -- see
+// tests/efuns/bind_destruct_owner.lpc). No hook = stock allow-all behavior.
+private object bind_hook;
+
+public void set_bind_hook(object ob) { bind_hook = ob; }
+
+int valid_bind(object binder, object old_owner, object new_owner) {
   inherit_called++;
+  if (bind_hook) return bind_hook->valid_bind_hook(binder, old_owner, new_owner);
   // This is really unsafe, but testsuite uses it to test bind()
   return 1;
 }

@@ -173,15 +173,23 @@ void int_free_svalue(svalue_t* v)
     }
 #endif
     /* TODO: Set to 0 on condition that REF overflow to negative. */
+    bool reached_zero = false;
     if (v->u.refed->ref > 0) {
       v->u.refed->ref--;
+      reached_zero = (v->u.refed->ref == 0);
 #ifdef DEBUGMALLOC_EXTENSIONS
       if (v->u.refed != (void*)&the_null_array && v->u.refed != (void*)&null_buf) {
         md_record_ref_journal(PTR_TO_NODET(v->u.refed), false, v->u.refed->ref, tag);
       }
 #endif  // DEBUGMALLOC_EXTENSIONS
     }
-    if (v->u.refed->ref == 0) {
+    /* Only deallocate when THIS call performed the 1 -> 0 decrement. The
+     * underflow guard above used to suppress just the decrement while the
+     * unconditional `ref == 0` check still ran the dealloc -- so a second
+     * aliased svalue freeing an already-deallocated value (ref reads 0 from
+     * freed memory) triggered a second dealloc instead of containing the
+     * corruption. */
+    if (reached_zero) {
       switch (v->type) {
         case T_OBJECT:
           dealloc_object(v->u.ob, "free_svalue");
@@ -285,7 +293,7 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
     }
     case T_MAPPING: {
       json res = json::object();
-      auto limit = std::min(5u, obj->u.map->count);
+      auto limit = std::min(5u, MAP_COUNT(obj->u.map));
       for (int i = 0; i < obj->u.map->table_size; i++) {
         mapping_node_t* elm;
         for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
@@ -301,8 +309,8 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
           }
         }
       }
-      if (obj->u.map->count > 4) {
-        res["_sizeof"] = std::to_string(obj->u.map->count);
+      if (MAP_COUNT(obj->u.map) > 4) {
+        res["_sizeof"] = std::to_string(MAP_COUNT(obj->u.map));
       }
       return res;
     }
