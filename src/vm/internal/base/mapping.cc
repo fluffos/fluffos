@@ -215,7 +215,11 @@ void unlock_mapping(mapping_t* m) {
       /* take it out of the locked list ... */
       tmp = *mn;
       *mn = (*mn)->next;
-      /* and add it to the free list */
+      /* and add it to the free list -- with both slots zeroed, upholding
+       * new_map_node()'s invariant that free-list nodes carry no stale
+       * svalues (free_node's unlocked branch does the same) */
+      tmp->values[0] = const0u;
+      tmp->values[1] = const0u;
       tmp->next = free_nodes;
       free_nodes = tmp;
     } else {
@@ -233,6 +237,9 @@ void free_node(mapping_t* m, mapping_node_t* mn) {
   } else {
     free_svalue(mn->values + 1, "free_node");
     *(mn->values + 1) = const0u;
+    /* callers free the key before calling free_node; clear the stale tag
+     * so free-list nodes never carry a dangling-looking svalue */
+    *(mn->values) = const0u;
     mn->next = free_nodes;
     free_nodes = mn;
   }
@@ -366,7 +373,7 @@ static mapping_t* copyMapping(mapping_t* m) {
     FREE((char*)newmap);
     error("copyMapping 2 - out of memory.\n");
   }
-  newmap->count = m->count;
+  newmap->count = MAP_COUNT(m); /* never copy the MAP_LOCKED bit */
   total_mapping_nodes += MAP_COUNT(m);
   memset(c, 0, k * sizeof(mapping_node_t*));
   total_mapping_size +=
@@ -542,6 +549,12 @@ svalue_t* find_for_insert(mapping_t* m, svalue_t* lv, int doTheFree) {
         debug(mapping, "mapping.c: found %p\n", (void*)(n->values));
         if (doTheFree) {
           free_svalue(n->values + 1, "find_for_insert");
+          /* Zero the slot: the value's ref is gone, but the mapping is
+           * still live LPC-visible data. If the caller runs arbitrary LPC
+           * before overwriting the slot (allocate_mapping2's callback) and
+           * that LPC error()s, the unwind frees the mapping -- and a stale
+           * populated slot here would be freed a SECOND time. */
+          *(n->values + 1) = const0u;
         }
         return n->values + 1;
       }

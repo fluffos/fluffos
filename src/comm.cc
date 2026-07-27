@@ -793,6 +793,14 @@ void remove_interactive(object_t* ob, int dested) {
     set_eval(max_eval_cost);
     safe_apply(APPLY_NET_DEAD, ob, 0, ORIGIN_DRIVER);
     restore_command_giver();
+    /* net_dead() may have exec()'d the connection into a different object
+     * (the classic linkdead-ghost idiom). exec() already released `ob`'s
+     * interactive reference and moved it (ip->ob, plus a counted ref) to
+     * the new body -- the teardown below must release the CURRENT owner's
+     * reference, not decrement `ob`'s again (that drained a live object to
+     * ref 0: issue #1327's "ref count 0, but not destructed" fatal) nor
+     * leave the new body's ->interactive pointing at the freed ip. */
+    ob = ip->ob;
   }
 
 #ifndef NO_SNOOP
@@ -887,6 +895,7 @@ static int call_function_interactive(interactive_t* i, char* str) {
   }
 
   if ((ob->flags & O_DESTRUCTED) || bad_init_call) {
+    bool const ob_destructed = (ob->flags & O_DESTRUCTED) != 0;
     /* Sorry, the object has selfdestructed (or the call is disallowed)! */
     free_object(&sent->ob, "call_function_interactive");
     free_sentence(sent);
@@ -896,6 +905,14 @@ static int call_function_interactive(interactive_t* i, char* str) {
     i->carryover = nullptr;
     i->num_carry = 0;
     i->input_to = nullptr;
+    if (ob_destructed) {
+      /* The sentence ref freed above may have been the destructed target's
+       * LAST reference (its creation ref was released by an earlier
+       * destruct sweep) -- `ob` can be freed memory now, so we must not
+       * reach the mode-restore code below that reads ob->flags. It would
+       * be a no-op for a destructed object anyway. */
+      return 0;
+    }
     ret = 0;
   } else {
     /*

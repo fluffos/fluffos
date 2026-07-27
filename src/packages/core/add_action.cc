@@ -632,7 +632,11 @@ static int remove_action(svalue_t* act, const char* verb) {
 void remove_sent(object_t* ob, object_t* user) {
   sentence_t** s;
 
-  if (!(user->flags & O_ENABLE_COMMANDS)) {
+  /* Gate on the list, not on O_ENABLE_COMMANDS: sentences can outlive the
+   * flag (disable_commands does not clear user->sent, and command() makes
+   * any object a command giver), and skipping them here left sentences
+   * whose s->ob dangled after the defining object was destructed. */
+  if (!user->sent) {
     return;
   }
 

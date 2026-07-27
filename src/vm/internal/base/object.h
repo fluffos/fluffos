@@ -89,6 +89,10 @@ struct object_t {
                                stale index-based pointers fail cleanly */
   struct object_t* next_all;
   struct object_t* prev_all;
+  struct object_t* next_destruct; /* obj_list_destruct queue link (destruct_object() ->
+                                     remove_destructed_objects()). Dedicated field: the queue
+                                     must never alias next_all/prev_all, which DEBUG builds
+                                     reuse for the obj_list_dangling leak-hunting list. */
 #ifndef NO_ENVIRONMENT
   struct object_t* next_inv;
   struct object_t* contains;

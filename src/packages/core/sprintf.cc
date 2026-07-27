@@ -458,11 +458,11 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
       outbuf_add(outbuf, " :)");
       break;
     case T_MAPPING:
-      if (!(obj->u.map->count)) {
+      if (!MAP_COUNT(obj->u.map)) {
         outbuf_add(outbuf, "([ ])");
       } else {
         outbuf_add(outbuf, "([ /* sizeof() == ");
-        outbuf_addv(outbuf, "%u", obj->u.map->count);
+        outbuf_addv(outbuf, "%u", MAP_COUNT(obj->u.map));
         outbuf_add(outbuf, " */\n");
         for (i = 0; i <= obj->u.map->table_size; i++) {
           mapping_node_t* elm;

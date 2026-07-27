@@ -319,3 +319,35 @@ TEST_F(DriverTest, MidChainFreeKeepsObjListDestructWalkable) {
   RunGuarded([&] { free_object(&c, "MidChainFreeKeepsObjListDestructWalkable"); });
   RunGuarded([&] { free_object(&a, "MidChainFreeKeepsObjListDestructWalkable"); });
 }
+
+// Regression test for an object-ref over-decrement in the destruct sweep:
+// the obj_list_destruct queue used to ride on next_all/prev_all, which DEBUG
+// builds immediately reuse for the obj_list_dangling leak-hunting list.
+// Once a sweep left a still-referenced survivor behind (its next_all now
+// encoding the dangling chain), the NEXT sweep's next_all walk strayed from
+// the fresh queue into the dangling chain and ran destruct2() -- and its
+// free_object() -- on the survivor a second time, deallocating an object
+// other holders still referenced (issue #1327's corruption class). The
+// queue now rides its own next_destruct link.
+TEST_F(DriverTest, SweepDoesNotRevisitSurvivorsOfPreviousSweep) {
+  object_t* a = nullptr;
+  object_t* b = nullptr;
+  RunGuarded([&] { a = load_object_from_source("void bump() {}\n", "lifecycle_sweep_a", 0); });
+  RunGuarded([&] { b = load_object_from_source("void bump() {}\n", "lifecycle_sweep_b", 0); });
+  ASSERT_NE(a, nullptr);
+  ASSERT_NE(b, nullptr);
+
+  // Simulate an LPC variable still referencing a across its destruct.
+  add_ref(a, "SweepDoesNotRevisitSurvivorsOfPreviousSweep");
+
+  RunGuarded([&] { destruct_object(a); });
+  RunGuarded([&] { remove_destructed_objects(); });  // a survives: we hold a ref
+
+  RunGuarded([&] { destruct_object(b); });
+  RunGuarded([&] { remove_destructed_objects(); });  // must not destruct2(a) again
+
+  // Releasing our reference must be the deallocating drop; on the unfixed
+  // binary the second sweep already freed a and this is a use-after-free
+  // (caught by ASan) / double dealloc.
+  RunGuarded([&] { free_object(&a, "SweepDoesNotRevisitSurvivorsOfPreviousSweep"); });
+}

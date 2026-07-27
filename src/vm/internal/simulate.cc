@@ -1546,12 +1546,16 @@ void destruct_object(object_t* ob) {
   ob->next_inv = nullptr;
   ob->contains = nullptr;
 #endif
-  ob->next_all = obj_list_destruct;
-  if (obj_list_destruct) {
-    obj_list_destruct->prev_all = ob;
-  }
-  ob->prev_all = nullptr;
+  /* Queue for the remove_destructed_objects() sweep via the queue's own
+   * dedicated link. The queue used to ride on next_all/prev_all, which DEBUG
+   * builds immediately reuse below for the obj_list_dangling leak-hunting
+   * list -- so once a sweep left a still-referenced survivor behind, the
+   * next sweep's next_all walk strayed into the dangling chain and ran
+   * destruct2() (an object-ref decrement) on already-swept objects. */
+  ob->next_destruct = obj_list_destruct;
   obj_list_destruct = ob;
+  ob->next_all = nullptr;
+  ob->prev_all = nullptr;
   set_heart_beat(ob, 0);
   ob->flags |= O_DESTRUCTED;
   /* moved this here from destruct2() -- see comments in destruct2() */
