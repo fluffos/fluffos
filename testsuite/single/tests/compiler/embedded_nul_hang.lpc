@@ -42,7 +42,7 @@
 // exactly the way a corrupted/crafted real .lpc file could contain one
 // even though save_object()'s own format never does.
 private void assert_nul_rejected(string path, string pre, string post,
-                                 string why) {
+  string why) {
   buffer nul = allocate_buffer(1);
   rm(path + ".c");
   if (strlen(pre)) write_buffer(path + ".c", 0, pre);
