@@ -222,7 +222,13 @@ TEST(TracingEvent, CategoryNamesCoverEveryCategory) {
   EXPECT_EQ("LPC Catch", name_of(EventCategory::LPC_CATCH));
   EXPECT_EQ("LPC Function", name_of(EventCategory::LPC_FUNCTION));
   EXPECT_EQ("LPC EFUN", name_of(EventCategory::LPC_EFUN));
-  EXPECT_EQ("Unknown", name_of(static_cast<EventCategory>(999)));
+  // The "Unknown" fallback branch (an EventCategory value outside the
+  // declared enumerators) is intentionally not exercised here: constructing
+  // one via static_cast<EventCategory>(999) is a load of an invalid enum
+  // value, which is undefined behavior in its own right (flagged by
+  // -fsanitize=enum) independent of whatever category_name() does with it.
+  // Low value relative to the UBSan cost -- category_name()'s default case
+  // is a one-line literal, not logic worth a dedicated regression test.
 }
 
 TEST(TracingEvent, EventCarriesProcessAndThreadIdentity) {

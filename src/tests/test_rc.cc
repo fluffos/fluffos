@@ -28,6 +28,17 @@ std::string temp_path(const std::string& name) {
   return std::string(testing::TempDir()) + "rc_test_" + name;
 }
 
+// read_config()'s fatal paths all call exit(-1). POSIX's wait() status only
+// carries the low 8 bits of the exit code (WEXITSTATUS), so -1 truncates to
+// 255 there; Windows' ExitProcess() takes the value as a full 32-bit code
+// with no truncation, so GetExitCodeProcess() (and gtest's death-test
+// matcher, which reads it back as a plain int) sees -1 unchanged.
+#ifdef _WIN32
+constexpr int kFatalExitCode = -1;
+#else
+constexpr int kFatalExitCode = 255;
+#endif
+
 // Minimal set of options read_config() refuses to run without.
 const char* const kRequiredLines =
     "name : testmud\n"
@@ -267,16 +278,16 @@ TEST_F(RcTest, MissingRequiredOptionIsFatal) {
                            "master file : /master\n",
                            /* with_required = */ false);
 
-  EXPECT_EXIT(read_config(path.c_str()), ::testing::ExitedWithCode(255), ".*");
+  EXPECT_EXIT(read_config(path.c_str()), ::testing::ExitedWithCode(kFatalExitCode), ".*");
 }
 
 TEST_F(RcTest, UnknownPortKindIsFatal) {
   auto path = write_config("bad_port.cfg", "external_port_1 : carrier_pigeon 5000\n");
 
-  EXPECT_EXIT(read_config(path.c_str()), ::testing::ExitedWithCode(255), ".*");
+  EXPECT_EXIT(read_config(path.c_str()), ::testing::ExitedWithCode(kFatalExitCode), ".*");
 }
 
 TEST_F(RcTest, MissingConfigFileIsFatal) {
-  EXPECT_EXIT(read_config(temp_path("does_not_exist.cfg").c_str()), ::testing::ExitedWithCode(255),
+  EXPECT_EXIT(read_config(temp_path("does_not_exist.cfg").c_str()), ::testing::ExitedWithCode(kFatalExitCode),
               ".*");
 }
