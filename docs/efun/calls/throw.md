@@ -78,7 +78,7 @@ title: calls / throw
 ### ERRORS
 
     A throw() with no catch() above it in the current chain of calls
-    raises a real runtime error, `*Throw with no catch.` -- traceback,
+    raises a real runtime error, `"*Throw with no catch.\n"` -- traceback,
     error handler and all -- and the value you threw is discarded.
 
 ### EXAMPLE
@@ -89,12 +89,15 @@ void move_or_fail(object ob, object dest) {
     mixed err = catch(ob->move(dest));
 
     if (err) {
-        // Take the driver's '*' off before adding text, then put it back,
-        // so the result still reads as a driver-style error message.
+        // Only a driver error carries the leading '*', so only put one
+        // back when it was there to begin with -- adding it to a mudlib
+        // value would disguise it as a driver error.
         if (stringp(err) && err[0] == '*')
-            err = err[1..];
-
-        throw("*move_or_fail(): " + err);
+            throw("*move_or_fail(): " + err[1..]);
+        else if (stringp(err))
+            throw("move_or_fail(): " + err);
+        else
+            throw(err);     // not a string -- pass it through untouched
     }
 }
 ```

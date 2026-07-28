@@ -67,8 +67,8 @@ title: calls / throw
 ### 错误
 
     如果当前调用链上没有任何 catch()，throw() 会引发一个真正的运行时
-    错误 `*Throw with no catch.` —— 带调用栈回溯，也会走错误处理流程
-    —— 而你抛出的值会被丢弃。
+    错误 `"*Throw with no catch.\n"` —— 带调用栈回溯，也会走错误处理
+    流程 —— 而你抛出的值会被丢弃。
 
 ### 示例
 
@@ -78,12 +78,14 @@ void move_or_fail(object ob, object dest) {
     mixed err = catch(ob->move(dest));
 
     if (err) {
-        // 先去掉驱动程序加的 '*'，添加文字后再补回去，
-        // 这样结果读起来仍然像一条驱动程序风格的错误消息。
+        // 只有驱动程序的错误才带前导 '*'，所以只在原本就有的时候才补
+        // 回去 —— 给 mudlib 抛出的值加上 '*' 会把它伪装成驱动程序错误。
         if (stringp(err) && err[0] == '*')
-            err = err[1..];
-
-        throw("*move_or_fail(): " + err);
+            throw("*move_or_fail(): " + err[1..]);
+        else if (stringp(err))
+            throw("move_or_fail(): " + err);
+        else
+            throw(err);     // 不是字符串 —— 原样继续往上传
     }
 }
 ```

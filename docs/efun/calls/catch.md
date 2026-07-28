@@ -25,8 +25,10 @@ title: calls / catch
     string (with a leading '*') will be returned.  The value of the body
     expression itself is discarded.
 
-    The function throw() can also be used to immediately return any  value,
-    except 0.
+    The function throw() can also be used to immediately return any value.
+    The one exception is 0, which is not rejected but cannot be detected:
+    catch() already returns 0 to mean "no error", so throw(0) cannot be
+    told apart from the body finishing normally.
 
     It is a compile-time error to `break` or `continue` out of a catch
     block.
