@@ -60,6 +60,37 @@ title: calls / catch
     }
 
     // ERR: "*Error in loading object '/u/g/gesslar/two'"
+
+    // A caught value is not always an error message.  throw() hands back
+    // whatever it was given, so a class makes a tidy typed failure that
+    // the catching code can inspect field by field instead of parsing a
+    // string.
+    class failure {
+        string kind ;
+        mixed detail ;
+    }
+
+    private void charge(object who, int amount) {
+        int have = who->query_coins() ;
+
+        if(have < amount)
+            throw(new(class failure,
+                      kind: "insufficient_funds",
+                      detail: amount - have)) ;
+
+        who->add_coins(-amount) ;
+    }
+
+    void example3(object who, int price) {
+        mixed err = catch( charge(who, price) ) ;
+
+        // classp() must be tested first: err is just as likely to be a
+        // driver error string, and the && stops there when it is.
+        if(classp(err) && err.kind == "insufficient_funds")
+            write("You are " + err.detail + " coins short.\n") ;
+        else if(err)
+            throw(err) ;    // not ours to handle -- pass it along
+    }
     ```
 
 ### SEE ALSO
