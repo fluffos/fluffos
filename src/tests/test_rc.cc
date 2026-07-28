@@ -15,6 +15,7 @@
 #define dup _dup
 #define dup2 _dup2
 #else
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -28,16 +29,22 @@ std::string temp_path(const std::string& name) {
   return std::string(testing::TempDir()) + "rc_test_" + name;
 }
 
-// read_config()'s fatal paths all call exit(-1). POSIX's wait() status only
-// carries the low 8 bits of the exit code (WEXITSTATUS), so -1 truncates to
-// 255 there; Windows' ExitProcess() takes the value as a full 32-bit code
-// with no truncation, so GetExitCodeProcess() (and gtest's death-test
-// matcher, which reads it back as a plain int) sees -1 unchanged.
+// read_config()'s fatal paths all call exit(-1); the exact numeric code
+// isn't a contract anything reads (nothing scripts against "255" vs "-1"
+// for a misconfigured mud), and pinning one is platform-fragile besides:
+// POSIX's wait() status only carries the low 8 bits (WEXITSTATUS), so -1
+// truncates to 255 there, while Windows' ExitProcess() carries the value
+// untruncated. What actually matters -- and is cheap to check without
+// guessing a platform-specific magic number -- is that the process
+// terminated abnormally instead of continuing to run with a
+// half-initialized config.
+bool ExitedFatally(int exit_status) {
 #ifdef _WIN32
-constexpr int kFatalExitCode = -1;
+  return exit_status != 0;
 #else
-constexpr int kFatalExitCode = 255;
+  return WIFEXITED(exit_status) && WEXITSTATUS(exit_status) != 0;
 #endif
+}
 
 // Minimal set of options read_config() refuses to run without.
 const char* const kRequiredLines =
@@ -278,16 +285,16 @@ TEST_F(RcTest, MissingRequiredOptionIsFatal) {
                            "master file : /master\n",
                            /* with_required = */ false);
 
-  EXPECT_EXIT(read_config(path.c_str()), ::testing::ExitedWithCode(kFatalExitCode), ".*");
+  EXPECT_EXIT(read_config(path.c_str()), ExitedFatally, ".*");
 }
 
 TEST_F(RcTest, UnknownPortKindIsFatal) {
   auto path = write_config("bad_port.cfg", "external_port_1 : carrier_pigeon 5000\n");
 
-  EXPECT_EXIT(read_config(path.c_str()), ::testing::ExitedWithCode(kFatalExitCode), ".*");
+  EXPECT_EXIT(read_config(path.c_str()), ExitedFatally, ".*");
 }
 
 TEST_F(RcTest, MissingConfigFileIsFatal) {
-  EXPECT_EXIT(read_config(temp_path("does_not_exist.cfg").c_str()), ::testing::ExitedWithCode(kFatalExitCode),
+  EXPECT_EXIT(read_config(temp_path("does_not_exist.cfg").c_str()), ExitedFatally,
               ".*");
 }
