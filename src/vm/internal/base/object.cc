@@ -2000,6 +2000,19 @@ void dealloc_object(object_t* ob, const char* from) {
    * declarations.
    */
   if (ob->prog) {
+    /* Release the variable block's CONTENTS while prog (the count) is
+     * still around. On the normal teardown path destruct2() already
+     * zeroed them, but an object whose ref count drops to 0 while still
+     * on the destruct queue (before its remove_destructed_objects()
+     * sweep) arrives here with the contents intact -- freeing just the
+     * block leaked every reference the globals held. A variable
+     * containing this very object is safe: its ref is already 0, so
+     * int_free_svalue's underflow guard makes the nested free a no-op. */
+    if (ob->variables) {
+      for (int i = 0; i < ob->prog->num_variables_total; i++) {
+        free_svalue(&ob->variables[i], "dealloc_object");
+      }
+    }
     tot_alloc_object_size -=
         (ob->prog->num_variables_total - 1) * sizeof(svalue_t) + sizeof(object_t);
     free_prog(&ob->prog);

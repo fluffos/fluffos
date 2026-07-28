@@ -93,7 +93,7 @@ void MDmalloc(md_node_t* node, int size, int tag, const char* desc) {
   }
   h = MD_HASH(node);
   node->size = size;
-  node->next = table[h];
+  node->next = table[h]; /* copies the already-encoded head (see md.h) */
 #ifdef DEBUGMALLOC_EXTENSIONS
   if ((tag & 0xff) > MAX_CATEGORY) {
     totals[tag & 0xff] += size;
@@ -116,7 +116,7 @@ void MDmalloc(md_node_t* node, int size, int tag, const char* desc) {
                   PTR(node), node->size);
   }
 #endif
-  table[h] = node;
+  table[h] = md_chain_encode(node);
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -152,9 +152,10 @@ int MDfree(md_node_t* ptr) {
 
   h = MD_HASH(ptr);
   oentry = &table[h];
-  for (entry = *oentry; entry; oentry = &entry->next, entry = *oentry) {
+  for (entry = md_chain_decode(*oentry); entry;
+       oentry = &entry->next, entry = md_chain_decode(*oentry)) {
     if (entry == ptr) {
-      *oentry = entry->next;
+      *oentry = entry->next; /* both slots hold encoded values */
       total_malloced -= entry->size;
       break;
     }

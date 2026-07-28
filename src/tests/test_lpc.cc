@@ -3,6 +3,8 @@
 
 #include "mainlib.h"
 
+#include "comm.h"
+#include "user.h"
 #include "compiler/internal/compiler.h"
 
 namespace {
@@ -350,4 +352,225 @@ TEST_F(DriverTest, SweepDoesNotRevisitSurvivorsOfPreviousSweep) {
   // binary the second sweep already freed a and this is a use-after-free
   // (caught by ASan) / double dealloc.
   RunGuarded([&] { free_object(&a, "SweepDoesNotRevisitSurvivorsOfPreviousSweep"); });
+}
+
+// ---------------------------------------------------------------------------
+// net_dead teardown stress tests (issue #1327).
+//
+// remove_interactive(ob, 0) runs the net_dead() apply -- arbitrary LPC --
+// and then tears the connection down. The classic linkdead idiom has
+// net_dead() call exec() to re-home the connection into a fresh "ghost"
+// body; exec() releases ob's interactive reference and moves both ip->ob
+// and the counted ref to the new body. The teardown used to keep operating
+// on the ORIGINAL ob: it freed the ip the new body still pointed at, nulled
+// the wrong object's ->interactive, and decremented ob's refcount a second
+// time -- draining a live object toward ref 0 (the "ref count 0, but not
+// destructed" fatal). These tests fabricate a minimal transport-less
+// interactive (all the teardown's transport/telnet/translator branches are
+// null-guarded) and hammer every net_dead shape, asserting exact refcount
+// deltas each iteration.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+interactive_t* fabricate_interactive(object_t* ob) {
+  interactive_t* ip = user_add();  // zeroed; transport/telnet/trans all null
+  ip->ob = ob;
+  ip->prompt = "> ";
+  ob->interactive = ip;
+  ob->flags |= O_ONCE_INTERACTIVE;
+  add_ref(ob, "fabricate_interactive");  // the connection's ref, as new_user takes
+  return ip;
+}
+
+// Reads an object-typed global out of a (possibly destructed, not yet swept)
+// object's variable block without running LPC.
+object_t* read_object_global(object_t* ob, int index) {
+  if (!ob->prog || index >= ob->prog->num_variables_total) {
+    return nullptr;
+  }
+  svalue_t* v = &ob->variables[index];
+  return v->type == T_OBJECT ? v->u.ob : nullptr;
+}
+
+}  // namespace
+
+// net_dead() exec()s the connection into a ghost: the teardown must release
+// the ghost's interactive state, not the old body's.
+TEST_F(DriverTest, NetDeadExecGhostStress) {
+  const char* src =
+      "object ghost;\n"
+      "void net_dead() { ghost = new(\"/clone/testob1\"); exec(ghost, this_object()); }\n";
+
+  for (int i = 0; i < 150; i++) {
+    object_t* body = nullptr;
+    std::string name = "netdead_exec_" + std::to_string(i);
+    RunGuarded([&] { body = load_object_from_source(src, name.c_str(), 0); });
+    ASSERT_NE(body, nullptr);
+
+    uint32_t const ref_before = body->ref;
+    fabricate_interactive(body);
+    ASSERT_EQ(body->ref, ref_before + 1);
+
+    RunGuarded([&] { remove_interactive(body, 0); });
+
+    // exec() released the interactive ref net_dead's connection held on
+    // body; the teardown must have released the GHOST's, not body's again.
+    EXPECT_EQ(body->interactive, nullptr);
+    EXPECT_FALSE(body->flags & O_DESTRUCTED);
+    EXPECT_EQ(body->ref, ref_before) << "iteration " << i;
+    EXPECT_TRUE(users().empty());
+
+    object_t* ghost = read_object_global(body, 0);
+    ASSERT_NE(ghost, nullptr);
+    EXPECT_FALSE(ghost->flags & O_DESTRUCTED);
+    // The unfixed teardown left ghost->interactive pointing at the freed ip.
+    EXPECT_EQ(ghost->interactive, nullptr) << "iteration " << i;
+    EXPECT_TRUE(ghost->flags & O_ONCE_INTERACTIVE);
+
+    RunGuarded([&] { destruct_object(ghost); });
+    RunGuarded([&] {
+      destruct_object(body);
+      free_object(&body, "NetDeadExecGhostStress");
+    });
+    if (i % 16 == 0) {
+      RunGuarded([&] { remove_destructed_objects(); });
+    }
+  }
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
+// Baseline: net_dead() that leaves the connection alone. The teardown
+// releases exactly the one interactive ref.
+TEST_F(DriverTest, NetDeadPlainStress) {
+  const char* src = "int dead;\nvoid net_dead() { dead++; }\n";
+
+  for (int i = 0; i < 100; i++) {
+    object_t* body = nullptr;
+    std::string name = "netdead_plain_" + std::to_string(i);
+    RunGuarded([&] { body = load_object_from_source(src, name.c_str(), 0); });
+    ASSERT_NE(body, nullptr);
+
+    uint32_t const ref_before = body->ref;
+    fabricate_interactive(body);
+    RunGuarded([&] { remove_interactive(body, 0); });
+
+    EXPECT_EQ(body->interactive, nullptr);
+    EXPECT_EQ(body->ref, ref_before) << "iteration " << i;
+    EXPECT_TRUE(users().empty());
+    // net_dead must actually have run.
+    EXPECT_EQ(body->variables[0].type, T_NUMBER);
+    EXPECT_EQ(body->variables[0].u.number, 1);
+
+    RunGuarded([&] {
+      destruct_object(body);
+      free_object(&body, "NetDeadPlainStress");
+    });
+    if (i % 16 == 0) {
+      RunGuarded([&] { remove_destructed_objects(); });
+    }
+  }
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
+// net_dead() destructs the body itself: the recursive remove_interactive()
+// from destruct_object() must be absorbed by the CLOSING guard, and the
+// outer teardown still releases exactly one interactive ref.
+TEST_F(DriverTest, NetDeadSelfDestructStress) {
+  const char* src = "void net_dead() { destruct(this_object()); }\n";
+
+  for (int i = 0; i < 100; i++) {
+    object_t* body = nullptr;
+    std::string name = "netdead_selfdestruct_" + std::to_string(i);
+    RunGuarded([&] { body = load_object_from_source(src, name.c_str(), 0); });
+    ASSERT_NE(body, nullptr);
+
+    uint32_t const ref_before = body->ref;
+    fabricate_interactive(body);
+    RunGuarded([&] { remove_interactive(body, 0); });
+
+    EXPECT_TRUE(body->flags & O_DESTRUCTED);
+    EXPECT_EQ(body->interactive, nullptr);
+    EXPECT_EQ(body->ref, ref_before) << "iteration " << i;
+    EXPECT_TRUE(users().empty());
+
+    RunGuarded([&] { free_object(&body, "NetDeadSelfDestructStress"); });
+    if (i % 16 == 0) {
+      RunGuarded([&] { remove_destructed_objects(); });
+    }
+  }
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
+// net_dead() exec()s to a ghost AND destructs the old body: teardown must
+// follow the connection to the ghost while the destruct path skips the
+// (already cleared) old body's interactive.
+TEST_F(DriverTest, NetDeadExecThenDestructStress) {
+  const char* src =
+      "object ghost;\n"
+      "void net_dead() {\n"
+      "  ghost = new(\"/clone/testob1\");\n"
+      "  exec(ghost, this_object());\n"
+      "  destruct(this_object());\n"
+      "}\n";
+
+  for (int i = 0; i < 100; i++) {
+    object_t* body = nullptr;
+    std::string name = "netdead_execdestruct_" + std::to_string(i);
+    RunGuarded([&] { body = load_object_from_source(src, name.c_str(), 0); });
+    ASSERT_NE(body, nullptr);
+
+    fabricate_interactive(body);
+    RunGuarded([&] { remove_interactive(body, 0); });
+
+    EXPECT_TRUE(body->flags & O_DESTRUCTED);
+    EXPECT_EQ(body->interactive, nullptr);
+    EXPECT_TRUE(users().empty());
+
+    // body is destructed but unswept, so its variable block still holds the
+    // ghost; the teardown must have cleaned the ghost's connection state.
+    object_t* ghost = read_object_global(body, 0);
+    ASSERT_NE(ghost, nullptr);
+    EXPECT_FALSE(ghost->flags & O_DESTRUCTED);
+    EXPECT_EQ(ghost->interactive, nullptr) << "iteration " << i;
+
+    RunGuarded([&] { destruct_object(ghost); });
+    RunGuarded([&] { free_object(&body, "NetDeadExecThenDestructStress"); });
+    if (i % 16 == 0) {
+      RunGuarded([&] { remove_destructed_objects(); });
+    }
+  }
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
+// The destruct-driven teardown (dested=1) never runs net_dead() and always
+// operates on the original body.
+TEST_F(DriverTest, RemoveInteractiveDestructedStress) {
+  const char* src = "int dead;\nvoid net_dead() { dead++; }\n";
+
+  for (int i = 0; i < 100; i++) {
+    object_t* body = nullptr;
+    std::string name = "netdead_dested_" + std::to_string(i);
+    RunGuarded([&] { body = load_object_from_source(src, name.c_str(), 0); });
+    ASSERT_NE(body, nullptr);
+
+    uint32_t const ref_before = body->ref;
+    fabricate_interactive(body);
+    RunGuarded([&] { remove_interactive(body, 1); });
+
+    EXPECT_EQ(body->interactive, nullptr);
+    EXPECT_EQ(body->ref, ref_before) << "iteration " << i;
+    EXPECT_TRUE(users().empty());
+    // dested=1 must NOT run the net_dead apply.
+    EXPECT_EQ(body->variables[0].u.number, 0);
+
+    RunGuarded([&] {
+      destruct_object(body);
+      free_object(&body, "RemoveInteractiveDestructedStress");
+    });
+    if (i % 16 == 0) {
+      RunGuarded([&] { remove_destructed_objects(); });
+    }
+  }
+  RunGuarded([&] { remove_destructed_objects(); });
 }

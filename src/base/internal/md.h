@@ -24,6 +24,27 @@ typedef struct md_node_s {
 #endif
 } md_node_t;
 
+/* The tracker's own references to allocations -- the table[] bucket heads
+ * and every node's ->next link -- are stored XOR-mangled. LeakSanitizer's
+ * pointer scan must not be able to follow them: with raw pointers stored,
+ * every allocation is permanently "reachable" through this table, and a
+ * DEBUGMALLOC build can never report a real leak (the dealloc_object()
+ * variable-contents leak was invisible to the Debug+ASan CI job exactly
+ * this way; only the non-DEBUGMALLOC sanitizer job caught it). Live blocks
+ * remain reachable through their real user pointers (LSan honors interior
+ * pointers), so only genuinely-unreferenced blocks become leaks. The mask
+ * keeps mangled values non-canonical so they can't alias a live chunk.
+ * Encode(nullptr) stays nullptr: zero-initialized buckets terminate walks.
+ * Note MDfree()'s unlink copies stored (encoded) values verbatim -- only
+ * walk READS decode. */
+static const uintptr_t kMdChainMask = (uintptr_t)0xA5A5A5A5A5A5A5A5ull;
+static inline md_node_t* md_chain_encode(md_node_t* n) {
+  return n ? (md_node_t*)((uintptr_t)n ^ kMdChainMask) : nullptr;
+}
+static inline md_node_t* md_chain_decode(md_node_t* n) {
+  return n ? (md_node_t*)((uintptr_t)n ^ kMdChainMask) : nullptr;
+}
+
 #ifdef CHECK_MEMORY
 #define MD_OVERHEAD (sizeof(md_node_t) + sizeof(int))
 #define MD_MAGIC 0x4bee4bee

@@ -119,7 +119,7 @@ char* dump_debugmalloc(const char* tfn, int mask) {
   }
   fprintf(fp, "%12s %12s %12s %5s %7s %s\n", "id", "gametick", "ptr", "tag", "sz", "desc");
   for (j = 0; j < MD_TABLE_SIZE; j++) {
-    for (entry = table[j]; entry; entry = entry->next) {
+    for (entry = md_chain_decode(table[j]); entry; entry = md_chain_decode(entry->next)) {
       if (!mask || (entry->tag == mask)) {
         fprintf(fp, "%12d %12" PRId64 " %12p %1d:%03d %7d %s\n", entry->id, entry->gametick,
                 PTR(entry), (entry->tag >> 8) & 0xff, entry->tag & 0xff, entry->size, entry->desc);
@@ -363,7 +363,7 @@ void compute_string_totals(uint64_t* asp, uint64_t* abp, uint64_t* bp) {
   *bp = 0;
 
   for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-    for (entry = table[hsh]; entry; entry = entry->next) {
+    for (entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
       if (entry->tag == TAG_MALLOC_STRING) {
         msbl = NODET_TO_PTR(entry, malloc_block_t*);
         *bp += msbl->size + 1;
@@ -487,7 +487,7 @@ void check_all_blocks(int flag) {
   }
 
   for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-    for (entry = table[hsh]; entry; entry = entry->next) {
+    for (entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
       entry->tag &= ~TAG_MARKED;
       switch (entry->tag & 0xff00) {
         case TAG_TEMPORARY:
@@ -749,7 +749,7 @@ void check_all_blocks(int flag) {
     }
 
     for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-      for (entry = table[hsh]; entry; entry = entry->next) {
+      for (entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
         switch (entry->tag & ~TAG_MARKED) {
           case TAG_IDENT_TABLE: {
             ident_hash_elem_t *hptr, *first;
@@ -872,7 +872,7 @@ void check_all_blocks(int flag) {
 
     /* now check */
     for (hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-      for (entry = table[hsh]; entry; entry = entry->next) {
+      for (entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
         switch (entry->tag) {
           case TAG_MUDLIB_STATS:
             outbuf_addv(&out, "WARNING: Found orphan mudlib stat block: %s %04x\n", entry->desc,
@@ -1134,7 +1134,7 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
                 blocks[TAG_MAPPING & 0xff] + blocks[TAG_FUNP & 0xff]);
 
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
-    for (md_node_t* entry = table[hsh]; entry; entry = entry->next) {
+    for (md_node_t* entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
       switch (entry->tag) {
         case TAG_ARRAY:
         case TAG_CLASS:
