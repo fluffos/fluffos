@@ -296,7 +296,10 @@
     #tabs .tab { padding: 10px 10px 8px; font-size: 12.5px; }
     #term, #logs { padding: 5px 6px; }
     #logs { font-size: 13px; }
-    #inputbar .prompt { padding: 10px 0 10px 12px; }
+    /* font-size matches #cmd below -- .prompt and the input text share a
+       baseline, so a size mismatch here reads as the two being on
+       different lines even though they're the same flex row. */
+    #inputbar .prompt { padding: 10px 0 10px 12px; font-size: 16px; }
     #cmd {
       padding: 11px 12px 11px 6px;
       /* >=16px stops iOS Safari's auto-zoom-on-focus (see pointer:coarse
@@ -310,7 +313,7 @@
      rather than width, since any touchscreen (including a wide tablet in
      landscape) hits both problems this addresses. */
   @media (pointer: coarse) {
-    #cmd { font-size: 16px; }
+    #cmd, #inputbar .prompt { font-size: 16px; }
     #tabs .tab { min-height: 40px; }
     #tabs .tab .reload, #tabs .tab .close {
       display: inline-flex; align-items: center; justify-content: center;
@@ -408,12 +411,7 @@
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
-  <div id="cmd">
-    <span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span>
-    <textarea id="cmdReal" rows="1" autocomplete="off" autocapitalize="off"
-              autocorrect="off" spellcheck="false" enterkeyhint="send"
-              autofocus disabled></textarea>
-  </div>
+  <div id="cmd"><span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span><textarea id="cmdReal" rows="1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" autofocus disabled></textarea></div>
 </div>
 
 <div id="errorModal" class="modal-overlay" hidden>
