@@ -181,23 +181,57 @@
   }
   #inputbar.hidden, #inputbar.logs-active { display: none; }
   #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
+  /* Custom command input: NOT a real <input>/<textarea> visibly -- #cmd is
+     a plain div that renders text/caret/placeholder itself, overlaying an
+     invisible real <textarea id="cmdReal"> that does the actual
+     keystroke/IME capture (#cmdReal rules below). This exists because a
+     real, on-screen, focusable <input> or <textarea> is exactly what iOS
+     keys its system-level AutoFill accessory bar (the passwords/cards/
+     contacts icon row above the keyboard) off of -- confirmed live on
+     both Safari and Chrome for iOS (same WebKit engine underneath) even
+     with autocomplete=off, autocapitalize=off, and (previously) CSS-only
+     password masking that never touched `type`: none of that stopped it,
+     because the bar isn't solely a type="password"/autocomplete heuristic
+     but a broader system feature tied to focusing a real form control.
+     An invisible, off-the-visual-stage-but-still-real control avoids that
+     system integration entirely while keeping real OS text editing
+     (selection, IME composition, copy/paste, undo) working underneath. */
   #cmd {
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
     font: inherit; padding: 10px 16px 10px 8px;
+    position: relative; white-space: pre; overflow-x: auto; overflow-y: hidden;
+    cursor: text;
   }
-  /* Password-style masking WITHOUT ever setting type="password": once an
-     <input> has been type="password" even briefly, iOS/Safari's AutoFill
-     heuristic sticks to it as a credential field for the rest of the
-     page's life (the passwords/cards/contacts QuickType bar keeps showing
-     above the keyboard even after switching back to type="text" --
-     reported live). This mud never wants the browser's credential
-     manager involved at all (autocomplete=off already says so) -- the
-     masking is purely visual, so do it with CSS instead and never touch
-     `type`. -webkit-text-security is WebKit/Blink-only (not in Firefox);
-     acceptable here since it only affects whether typed characters are
-     LEGIBLE, never functionality, and iOS/Chrome cover the overwhelming
-     majority of mobile traffic this page sees. */
-  #cmd.masked { -webkit-text-security: disc; }
+  /* Scrollbar-less horizontal scroll (overflow-x:auto above is what lets
+     renderCmd()'s scrollIntoView bring a caret past the visible edge back
+     into view -- this just hides the resulting scrollbar chrome). */
+  #cmd { scrollbar-width: none; -ms-overflow-style: none; }
+  #cmd::-webkit-scrollbar { display: none; }
+  #cmd .cmd-placeholder { color: var(--dim); }
+  #cmd.has-text .cmd-placeholder { display: none; }
+  #cmd .cmd-caret {
+    display: inline-block; width: 1px; height: 1em; background: var(--fg);
+    vertical-align: text-bottom; margin-left: -1px; visibility: hidden;
+  }
+  #cmd.focused .cmd-caret {
+    visibility: visible; animation: cmd-caret-blink 1s step-end infinite;
+  }
+  @keyframes cmd-caret-blink { 50% { opacity: 0; } }
+  #cmd.disabled { color: var(--dim); cursor: default; }
+  #cmd.disabled .cmd-caret { visibility: hidden; }
+  #cmdReal {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; padding: inherit; border: 0; outline: 0; resize: none;
+    overflow: hidden; background: transparent; font: inherit;
+    white-space: pre; color: transparent; caret-color: transparent;
+    /* Belt-and-suspenders on top of color:transparent: masks the real
+       value even from a long-press text-selection loupe on WebKit, which
+       renders actual glyphs at the OS compositing level rather than
+       going through page CSS color. Harmless to leave on unconditionally
+       (this element is never visible either way) even when the session
+       isn't currently password-masked. */
+    -webkit-text-security: disc;
+  }
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
     display: flex; align-items: center; justify-content: center;
@@ -374,9 +408,12 @@
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
-  <input id="cmd" autocomplete="off" autocapitalize="off" autocorrect="off"
-         spellcheck="false" enterkeyhint="send" autofocus
-         placeholder="loading…" disabled>
+  <div id="cmd">
+    <span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span>
+    <textarea id="cmdReal" rows="1" autocomplete="off" autocapitalize="off"
+              autocorrect="off" spellcheck="false" enterkeyhint="send"
+              autofocus disabled></textarea>
+  </div>
 </div>
 
 <div id="errorModal" class="modal-overlay" hidden>
@@ -651,6 +688,11 @@ function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
 const NOWRAP_COLS = 80;
 let wrapMode = localStorage.getItem('fluffos-wrap') !== 'off';
 
+// Cap on each session's command history (see makeSession()'s history/
+// historyIndex/historyDraft) so an extremely long session doesn't grow
+// the array forever; oldest entries drop off the front.
+const HISTORY_MAX = 200;
+
 // Single choke point for sizing a session's terminal to the current
 // viewport, mode-aware -- replaces every raw fit() call below. fit() (and
 // proposeDimensions()) are no-ops on a hidden pane either way (the addon
@@ -688,7 +730,18 @@ function iconTapGuard(s) {
 }
 
 const status = document.getElementById('status');
-const input = document.getElementById('cmd');
+// The custom command input -- see the big comment on #cmd's CSS for why
+// this isn't a real visible <input>/<textarea>: cmdWrap is the plain div
+// that renders text/caret/placeholder itself; cmdReal is the invisible
+// real <textarea> doing actual keystroke/IME/selection capture underneath
+// it. Everything that used to read/write a native input's .value/
+// .disabled/.focus()/.placeholder now goes through renderCmd() plus these
+// refs instead.
+const cmdWrap = document.getElementById('cmd');
+const cmdReal = document.getElementById('cmdReal');
+const cmdBefore = document.getElementById('cmdBefore');
+const cmdAfter = document.getElementById('cmdAfter');
+const cmdPlaceholder = document.getElementById('cmdPlaceholder');
 const inputBar = document.getElementById('inputbar');
 const termEl = document.getElementById('term');
 const logsEl = document.getElementById('logs');
@@ -697,6 +750,59 @@ const tabAdd = document.getElementById('tabAdd');
 const tabLogs = document.getElementById('tabLogs');
 const logsBadge = document.getElementById('logsBadge');
 const utf8enc = new TextEncoder();
+
+// --- custom command input rendering ---------------------------------------
+// Syncs cmdWrap's visible spans to cmdReal's real value + cursor position.
+// Called after anything that could change either: typing, IME composition,
+// paste, undo, arrow/Home/End navigation, a click repositioning the caret,
+// programmatic value changes (submit-clear, history recall, tab-switch
+// draft restore), and the masked-class toggle. Cheap enough to just call
+// liberally rather than track precisely what changed.
+function renderCmd() {
+  const val = cmdReal.value;
+  const masked = cmdWrap.classList.contains('masked');
+  const display = masked ? '•'.repeat(val.length) : val;
+  // selectionStart tracks the real textarea's cursor even though it's
+  // invisible -- this is what lets Left/Right/Home/End/click-to-position
+  // keep working underneath a custom-rendered caret instead of only
+  // supporting append-at-the-end editing.
+  const pos = Math.max(0, Math.min(display.length, cmdReal.selectionStart ?? display.length));
+  cmdBefore.textContent = display.slice(0, pos);
+  cmdAfter.textContent = display.slice(pos);
+  cmdWrap.classList.toggle('has-text', val.length > 0);
+  // Keep the caret scrolled into view -- a real <input> does this
+  // automatically when its content overflows; #cmd is a plain div and
+  // won't unless told to. 'nearest' is a no-op when already visible, so
+  // this is cheap to call on every render.
+  cmdCaret.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// A MUD command line is conceptually single-line; cmdReal is a <textarea>
+// (not <input>) specifically because textareas are a much weaker signal
+// to iOS's AutoFill heuristics than a single-line text input (see the CSS
+// comment on #cmd), but that means an actual '\n' CAN land in .value from
+// a multi-line paste. Flatten it rather than let renderCmd() (white-space:
+// pre) show a broken-looking embedded line break, or Enter-to-submit
+// later send a multi-line blob to the driver as one "line".
+cmdReal.addEventListener('input', () => {
+  if (cmdReal.value.includes('\n')) {
+    const pos = cmdReal.selectionStart;
+    cmdReal.value = cmdReal.value.replace(/\r?\n/g, ' ');
+    cmdReal.selectionStart = cmdReal.selectionEnd = pos;
+  }
+  renderCmd();
+});
+// keyup/click/select cover cursor-position changes that 'input' alone
+// misses (arrow keys, Home/End, clicking to reposition, select-all).
+for (const ev of ['keyup', 'click', 'select']) {
+  cmdReal.addEventListener(ev, renderCmd);
+}
+cmdReal.addEventListener('focus', () => cmdWrap.classList.add('focused'));
+cmdReal.addEventListener('blur', () => cmdWrap.classList.remove('focused'));
+// Clicking anywhere in the rendered area should feel like clicking a
+// normal input -- cmdReal already covers the full box (position:absolute;
+// inset:0) and sits last in DOM order so it naturally receives the click
+// directly; this is just for the rare case something intercepts it first.
+cmdWrap.addEventListener('click', () => cmdReal.focus());
 
 const sessions = [];      // game sessions, tab order
 const byId = new Map();   // driver conn id -> session
@@ -762,6 +868,9 @@ function makeSession() {
     serverEchoes: false,
     disconnected: false,
     inputValue: '',   // unsent draft in the input bar, saved on tab switch
+    history: [],      // submitted lines, oldest first, per-session shell-style recall
+    historyIndex: -1, // -1 = editing a fresh line; 0 = newest entry; counts backward
+    historyDraft: '', // the in-progress line stashed when ArrowUp starts browsing
     unread: 0,
     pendingIn: [],    // [id, bytes] arriving before our conn id is known
     outbox: [],       // page -> driver, flushed outside receive()
@@ -846,8 +955,14 @@ function makeSession() {
     s.telnet.onText = (t) => s.term.write(t);
     s.telnet.onEcho = (on) => {
       s.serverEchoes = on;
-      // CSS-only masking, never input.type -- see the #cmd.masked rule.
-      if (view === s && !s.charMode) input.classList.toggle('masked', on);
+      // Custom-rendered masking, never a real type="password" -- see the
+      // #cmd/#cmdReal CSS comment. Re-render immediately: if there's
+      // already buffered text when echo state flips mid-line, it should
+      // switch to/from dots right away, not just on the next keystroke.
+      if (view === s && !s.charMode) {
+        cmdWrap.classList.toggle('masked', on);
+        renderCmd();
+      }
     };
     s.telnet.onCharMode = (on) => {
       if (on === s.charMode) return;
@@ -892,7 +1007,7 @@ mqNarrow.addEventListener('change', () => {
     s.term.options.fontSize = size;
     if (view === s) refit(s);
   }
-  input.placeholder = placeholderForViewport();
+  cmdPlaceholder.textContent = placeholderForViewport();
 });
 
 // Reflect the active session's state onto the shared input bar/status.
@@ -912,15 +1027,17 @@ function applyInputState(s) {
     status.textContent = s.disconnected ? 'disconnected'
       : s.connId >= 0 ? 'connected (conn ' + s.connId + ')'
       : 'connecting…';
-    input.classList.toggle('masked', s.serverEchoes);
-    input.disabled = s.disconnected || s.connId < 0;
+    cmdWrap.classList.toggle('masked', s.serverEchoes);
+    cmdReal.disabled = s.disconnected || s.connId < 0;
+    cmdWrap.classList.toggle('disabled', cmdReal.disabled);
+    renderCmd();
     refit(s);
-    if (!input.disabled && view === s) input.focus();
+    if (!cmdReal.disabled && view === s) cmdReal.focus();
   }
 }
 
 function saveDraft() {
-  if (view && view !== 'logs') view.inputValue = input.value;
+  if (view && view !== 'logs') view.inputValue = cmdReal.value;
 }
 
 function activateSession(s) {
@@ -939,7 +1056,8 @@ function activateSession(s) {
     o.tab.classList.toggle('active', o === s);
     o.pane.classList.toggle('active', o === s);
   }
-  input.value = s.inputValue;
+  cmdReal.value = s.inputValue;
+  renderCmd();
   // fit() no-ops while a pane is display:none (the addon bails on NaN
   // geometry), so refit now that this one is visible again.
   applyInputState(s);
@@ -1016,11 +1134,53 @@ tabAdd.addEventListener('click', () => {
 });
 
 // --- line mode input (shared bar, routed to the active session) ----------
-input.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Enter' || !activeGame) return;
+// ArrowUp/ArrowDown: shell-style per-session history recall. `history` is
+// oldest-first; `historyIndex` counts back from the newest entry (-1 =
+// not browsing / editing a fresh line, 0 = the single most recent entry,
+// 1 = the one before that, ...), so history[history.length - 1 -
+// historyIndex] is always the entry currently shown. `historyDraft`
+// stashes whatever was being typed the moment ArrowUp first starts
+// browsing, so ArrowDown-ing back past the newest entry restores it
+// instead of leaving a stale value or an empty line.
+cmdReal.addEventListener('keydown', (ev) => {
+  if (!activeGame) return;
   const s = activeGame;
-  const line = input.value;
-  input.value = '';
+  if (ev.key === 'ArrowUp') {
+    if (!s.history.length || s.historyIndex >= s.history.length - 1) return;
+    ev.preventDefault();
+    if (s.historyIndex === -1) s.historyDraft = cmdReal.value;
+    s.historyIndex++;
+    cmdReal.value = s.history[s.history.length - 1 - s.historyIndex];
+    cmdReal.selectionStart = cmdReal.selectionEnd = cmdReal.value.length;
+    renderCmd();
+    return;
+  }
+  if (ev.key === 'ArrowDown') {
+    if (s.historyIndex === -1) return;
+    ev.preventDefault();
+    s.historyIndex--;
+    cmdReal.value = s.historyIndex === -1
+      ? s.historyDraft
+      : s.history[s.history.length - 1 - s.historyIndex];
+    cmdReal.selectionStart = cmdReal.selectionEnd = cmdReal.value.length;
+    renderCmd();
+    return;
+  }
+  // isComposing: mid-IME-composition (e.g. choosing a Pinyin candidate)
+  // Enter confirms the composition, it must NOT also submit the line --
+  // cmdReal being a <textarea> means an un-prevented Enter would otherwise
+  // insert a literal newline too (a real single-line <input> couldn't).
+  if (ev.key !== 'Enter' || ev.isComposing) return;
+  ev.preventDefault();
+  const line = cmdReal.value;
+  cmdReal.value = '';
+  renderCmd();
+  if (line.length && s.history[s.history.length - 1] !== line) {
+    s.history.push(line);
+    if (s.history.length > HISTORY_MAX) s.history.shift();
+  }
+  s.historyIndex = -1;
+  s.historyDraft = '';
   if (!s.serverEchoes) s.term.write(line + '\r\n');
   s.sendData(Array.from(utf8enc.encode(line + '\r\n')));
 });
@@ -1168,9 +1328,9 @@ if (fsSupported) {
 // Belt-and-suspenders for the same keyboard problem: on a browser without
 // window.visualViewport, pull a freshly-focused input back into view
 // rather than trusting the browser's own scroll-into-view behavior.
-input.addEventListener('focus', () => {
+cmdReal.addEventListener('focus', () => {
   if (window.visualViewport) return;
-  setTimeout(() => input.scrollIntoView({ block: 'end', behavior: 'smooth' }), 50);
+  setTimeout(() => inputBar.scrollIntoView({ block: 'end', behavior: 'smooth' }), 50);
 });
 
 // The first game tab exists before the driver finishes loading, so the
@@ -1294,8 +1454,8 @@ createFluffOS(Module).then((M) => {
   // done its job.  (connectSession -> applyInputState already wrote the
   // 'connected (conn N)' status; finish() only clears the overlay.)
   BootProgress.finish();
-  input.placeholder = placeholderForViewport();
-  input.focus();
+  cmdPlaceholder.textContent = placeholderForViewport();
+  cmdReal.focus();
   tabAdd.disabled = false;
 }).catch((e) => {
   BootProgress.finish();
