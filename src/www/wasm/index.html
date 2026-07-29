@@ -185,6 +185,19 @@
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
     font: inherit; padding: 10px 16px 10px 8px;
   }
+  /* Password-style masking WITHOUT ever setting type="password": once an
+     <input> has been type="password" even briefly, iOS/Safari's AutoFill
+     heuristic sticks to it as a credential field for the rest of the
+     page's life (the passwords/cards/contacts QuickType bar keeps showing
+     above the keyboard even after switching back to type="text" --
+     reported live). This mud never wants the browser's credential
+     manager involved at all (autocomplete=off already says so) -- the
+     masking is purely visual, so do it with CSS instead and never touch
+     `type`. -webkit-text-security is WebKit/Blink-only (not in Firefox);
+     acceptable here since it only affects whether typed characters are
+     LEGIBLE, never functionality, and iOS/Chrome cover the overwhelming
+     majority of mobile traffic this page sees. */
+  #cmd.masked { -webkit-text-security: disc; }
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
     display: flex; align-items: center; justify-content: center;
@@ -833,7 +846,8 @@ function makeSession() {
     s.telnet.onText = (t) => s.term.write(t);
     s.telnet.onEcho = (on) => {
       s.serverEchoes = on;
-      if (view === s && !s.charMode) input.type = on ? 'password' : 'text';
+      // CSS-only masking, never input.type -- see the #cmd.masked rule.
+      if (view === s && !s.charMode) input.classList.toggle('masked', on);
     };
     s.telnet.onCharMode = (on) => {
       if (on === s.charMode) return;
@@ -898,7 +912,7 @@ function applyInputState(s) {
     status.textContent = s.disconnected ? 'disconnected'
       : s.connId >= 0 ? 'connected (conn ' + s.connId + ')'
       : 'connecting…';
-    input.type = s.serverEchoes ? 'password' : 'text';
+    input.classList.toggle('masked', s.serverEchoes);
     input.disabled = s.disconnected || s.connId < 0;
     refit(s);
     if (!input.disabled && view === s) input.focus();
@@ -1007,7 +1021,7 @@ input.addEventListener('keydown', (ev) => {
   const s = activeGame;
   const line = input.value;
   input.value = '';
-  if (input.type !== 'password') s.term.write(line + '\r\n');
+  if (!s.serverEchoes) s.term.write(line + '\r\n');
   s.sendData(Array.from(utf8enc.encode(line + '\r\n')));
 });
 
