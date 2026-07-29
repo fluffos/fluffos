@@ -1,0 +1,8 @@
+// A range is an lvalue, but not one these efuns can rebind: it addresses a
+// span inside an array rather than a slot holding one.  validate_efun_call()
+// rejects any lvalue opcode past F_RINDEX_LVALUE for a `&' argument.
+void foo() {
+  mixed *a = ({ 1, 2, 3 });
+
+  push_array(a[0..1], 4);
+}

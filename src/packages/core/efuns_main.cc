@@ -1164,6 +1164,196 @@ void f_member_array() {
 }
 #endif
 
+/*
+ * push_array / pop_array / shift_array / unshift_array
+ *
+ * Shape operations on an array *binding*: argument 1 is declared `ref` in
+ * core.spec, so the caller's slot arrives as a T_LVALUE (no `ref` keyword at
+ * the LPC call site -- see rule_function_call_efun) and these write the
+ * resulting array back into it.
+ *
+ * Two guards, deliberately kept separate because they mean different things:
+ *
+ *   arr->ref == 1   -- nobody else can observe the block, so it is safe to
+ *                      mutate in place.  At ref > 1 we must build a new array
+ *                      and rebind the slot, or every other holder's view would
+ *                      change under it (and a realloc would dangle them).
+ *
+ *   arr->size != 0  -- allocation provenance.  Every zero-length array in the
+ *                      driver IS &the_null_array (allocate_empty_array(0),
+ *                      fix_array and resize_array all funnel to it), which is
+ *                      a static: RESIZE_ARRAY() on it reallocs non-heap
+ *                      memory.  Same reasoning as add_array()'s size-0
+ *                      early-out.
+ *
+ * Popping or shifting an empty array is a no-op returning undefined, matching
+ * slice_array()'s clamping rather than erroring -- an out-of-range slice is
+ * already sane and safe here.
+ */
+
+/*
+ * Fetch argument 1's slot and validate that it holds an array.
+ *
+ * The argument arrives as a T_REF: core.spec marks it `&', so the compiler
+ * wraps it in F_MAKE_REF the way an explicit `ref' would.  That is what
+ * keeps an index/member target alive -- the ref holds a counted reference
+ * on the owning array, so anything evaluated afterwards that resizes it
+ * sees ref > 1 and copies rather than reallocating out from under us.
+ */
+static svalue_t* array_lvalue_arg(svalue_t* arg, const char* efun_name) {
+  svalue_t* lval;
+
+  if (arg->type != T_REF || !(lval = arg->u.ref->lvalue)) {
+    error("Bad argument 1 to %s(): reference is invalid.\n", efun_name);
+  }
+  if (lval->type != T_ARRAY) {
+    error("Bad argument 1 to %s(): expected an array, got '%s'.\n", efun_name,
+          type_name(lval->type));
+  }
+  return lval;
+}
+
+/*
+ * Indexing an array launders a destructed object to undefined before handing
+ * it back (F_INDEX, interpret.cc).  A removed element has to do the same, or
+ * pop_array()/shift_array() would return a third kind of thing -- a live
+ * pointer to a dead object -- that a[<1] never yields.
+ */
+static void launder_destructed(svalue_t* v) {
+  if (v->type == T_OBJECT && (v->u.ob->flags & O_DESTRUCTED)) {
+    free_svalue(v, "launder_destructed");
+    *v = const0u;
+  }
+}
+
+#ifdef F_PUSH_ARRAY
+void f_push_array() {
+  svalue_t* lval = array_lvalue_arg(sp - 1, "push_array");
+  array_t* arr = lval->u.arr;
+  int const n = arr->size;
+
+  if (n + 1 > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    error("push_array(): result would exceed maximum array size.\n");
+  }
+
+  if (n != 0 && arr->ref == 1) {
+    arr = resize_array(arr, n + 1);
+    lval->u.arr = arr;
+  } else {
+    array_t* dst = allocate_empty_array(n + 1);
+
+    for (int i = 0; i < n; i++) {
+      assign_svalue_no_free(&dst->item[i], &arr->item[i]);
+    }
+    free_array(arr);
+    lval->u.arr = arr = dst;
+  }
+
+  /* transfer the value: its ref moves from the stack into the array */
+  arr->item[n] = *sp--;
+  free_svalue(sp, "f_push_array"); /* release the argument reference */
+  put_number(n + 1);
+}
+#endif
+
+#ifdef F_UNSHIFT_ARRAY
+void f_unshift_array() {
+  svalue_t* lval = array_lvalue_arg(sp - 1, "unshift_array");
+  array_t* arr = lval->u.arr;
+  int const n = arr->size;
+
+  if (n + 1 > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    error("unshift_array(): result would exceed maximum array size.\n");
+  }
+
+  if (n != 0 && arr->ref == 1) {
+    arr = resize_array(arr, n + 1);
+    /* bitwise relocation -- moving svalues touches no refcounts */
+    memmove(arr->item + 1, arr->item, n * sizeof(svalue_t));
+    lval->u.arr = arr;
+  } else {
+    array_t* dst = allocate_empty_array(n + 1);
+
+    for (int i = 0; i < n; i++) {
+      assign_svalue_no_free(&dst->item[i + 1], &arr->item[i]);
+    }
+    free_array(arr);
+    lval->u.arr = arr = dst;
+  }
+
+  arr->item[0] = *sp--;
+  free_svalue(sp, "f_unshift_array"); /* release the argument reference */
+  put_number(n + 1);
+}
+#endif
+
+#ifdef F_POP_ARRAY
+void f_pop_array() {
+  svalue_t* lval = array_lvalue_arg(sp, "pop_array");
+  array_t* arr = lval->u.arr;
+  int const n = arr->size;
+
+  svalue_t result;
+
+  if (n == 0) {
+    result = const0u; /* nothing to pop; the slot is left alone */
+  } else if (arr->ref == 1) {
+    /* Lift the element out before the realloc can move the block. */
+    result = arr->item[n - 1];
+    lval->u.arr = resize_array(arr, n - 1);
+  } else {
+    array_t* dst = allocate_empty_array(n - 1);
+
+    for (int i = 0; i < n - 1; i++) {
+      assign_svalue_no_free(&dst->item[i], &arr->item[i]);
+    }
+    assign_svalue_no_free(&result, &arr->item[n - 1]);
+    lval->u.arr = dst;
+    free_array(arr);
+  }
+
+  launder_destructed(&result);
+
+  /* Release the argument reference only now: it may hold the last count on
+   * the structure `lval' points into, so the slot has to be updated first. */
+  free_svalue(sp, "f_pop_array");
+  *sp = result;
+}
+#endif
+
+#ifdef F_SHIFT_ARRAY
+void f_shift_array() {
+  svalue_t* lval = array_lvalue_arg(sp, "shift_array");
+  array_t* arr = lval->u.arr;
+  int const n = arr->size;
+
+  svalue_t result;
+
+  if (n == 0) {
+    result = const0u;
+  } else if (arr->ref == 1) {
+    result = arr->item[0];
+    /* compact before shrinking: the realloc only truncates the tail */
+    memmove(arr->item, arr->item + 1, (n - 1) * sizeof(svalue_t));
+    lval->u.arr = resize_array(arr, n - 1);
+  } else {
+    array_t* dst = allocate_empty_array(n - 1);
+
+    for (int i = 1; i < n; i++) {
+      assign_svalue_no_free(&dst->item[i - 1], &arr->item[i]);
+    }
+    assign_svalue_no_free(&result, &arr->item[0]);
+    lval->u.arr = dst;
+    free_array(arr);
+  }
+
+  launder_destructed(&result);
+
+  free_svalue(sp, "f_shift_array"); /* see f_pop_array */
+  *sp = result;
+}
+#endif
+
 #ifdef F_MESSAGE
 void f_message() {
   array_t *use = nullptr, *avoid;

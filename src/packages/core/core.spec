@@ -225,6 +225,14 @@ object shadow(object, int default: 1);
 object query_shadowing(object);
 #endif
 mixed *sort_array(mixed *, int | string | function, ...);
+/* Shape operations on an array binding. The trailing `&' on argument 1 makes
+ * it by-reference: the call site passes a plain variable (no `ref` keyword)
+ * and the compiler emits an lvalue for it, the way sscanf() takes its
+ * trailing arguments. */
+int push_array(mixed *&, mixed);
+int unshift_array(mixed *&, mixed);
+mixed pop_array(mixed *&);
+mixed shift_array(mixed *&);
 void throw(mixed);
 mixed *unique_array(mixed *, string | function, void | mixed);
 mapping unique_mapping(mixed *, string | function, ...);

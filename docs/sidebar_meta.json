@@ -5,7 +5,7 @@
   },
   "efun/arrays": {
     "label": "Arrays",
-    "description": "Create, allocate, filter, map, sort and search LPC arrays."
+    "description": "Create, allocate, filter, map, sort, search and mutate LPC arrays."
   },
   "efun/async": {
     "label": "Async I/O",

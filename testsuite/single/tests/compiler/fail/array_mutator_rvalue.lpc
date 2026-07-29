@@ -1,0 +1,10 @@
+// push_array()'s first argument is declared `&' in core.spec, so the compiler
+// has to form an lvalue for it.  A function call result is not assignable --
+// rule_lvalue() must reject it rather than emit a reference to a temporary.
+mixed *get_list() {
+  return ({ 1, 2 });
+}
+
+void foo() {
+  push_array(get_list(), 3);
+}
