@@ -206,25 +206,35 @@ static array_t* fix_array(array_t* p, unsigned int n) {
 }
 
 array_t* resize_array(array_t* p, unsigned int n) {
-  total_array_size -= p->size * sizeof(svalue_t);
-  total_array_size += n * sizeof(svalue_t);
-  if (n) {
-    ms_remove_stats(p);
-    p = RESIZE_ARRAY(p, n);
-    //    if(n>65535)
-    //              fatal("big array3");
-
-    if (!p) {
-      fatal("Out of memory.\n");
-    }
-    p->size = n;
-    ms_setup_stats(p);
-  } else {
+  if (!n) {
+    /* Shrinking to empty is a deallocation, not a resize: the block goes
+     * away entirely and the shared empty array takes its place.  Account
+     * for it exactly as dealloc_empty_array() does -- num_arrays and the
+     * array_t header both have to come back off, and the mudlib stats
+     * entry has to be removed.  (The caller owns the elements; this only
+     * releases the block.)  A plain FREE() here used to leave num_arrays
+     * and total_array_size overstated, which check_memory() reports as a
+     * leak; nothing reached this path until push_array/pop_array. */
     if (p != &the_null_array) {
-      FREE(p);
+      dealloc_empty_array(p);
     }
     return &the_null_array;
   }
+
+  total_array_size -= p->size * sizeof(svalue_t);
+  total_array_size += n * sizeof(svalue_t);
+
+  ms_remove_stats(p);
+  p = RESIZE_ARRAY(p, n);
+  //    if(n>65535)
+  //              fatal("big array3");
+
+  if (!p) {
+    fatal("Out of memory.\n");
+  }
+  p->size = n;
+  ms_setup_stats(p);
+
   return p;
 }
 
