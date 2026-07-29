@@ -29,16 +29,23 @@ static long alist_cmp(svalue_t* /*p1*/, svalue_t* /*p2*/);
  * It is cheaper to reuse it, than to use MALLOC() and allocate.
  */
 
+/* The shared empty array's element storage.  Never read (size is 0) but kept
+ * non-null so that ->item is always a valid pointer: a memcpy/memmove of zero
+ * bytes from a null source is undefined behaviour that UBSan reports, and
+ * plenty of callers pass ->item unconditionally. */
+static svalue_t the_null_array_item[1] = {{T_NUMBER, 0, {0}}};
+
 array_t the_null_array = {
     1, /* ref, always 1. */
 #ifdef DEBUGMALLOC_EXTENSIONS
     1, /* extra_ref */
 #endif
     0, /* size */
+    0, /* capacity */
 #ifdef PACKAGE_MUDLIB_STATS
     {nullptr}, /* statgroup_t stats */
 #endif
-    {{0, 0, {0}}}, /* svalue_t item[1] */
+    the_null_array_item, /* item */
 };
 
 #ifdef PACKAGE_MUDLIB_STATS
@@ -72,13 +79,36 @@ static void ms_setup_stats(array_t* p) {
  *
  * Note that we rely a bit on gcc automatically inlining small routines.
  */
+/* Allocate a header plus `nelem' element slots and set ->capacity.  ->size is
+ * the caller's business (int_allocate_empty_array sets it; fix_array's callers
+ * over-allocate here and set a smaller size later). */
+array_t* alloc_array_block(unsigned int nelem) {
+  array_t* p = ALLOC_ARRAY_HDR();
+
+  if (!p) {
+    return nullptr;
+  }
+  p->item = ALLOC_ARRAY_ITEMS(nelem);
+  if (!p->item) {
+    FREE((char*)p);
+    return nullptr;
+  }
+  p->capacity = nelem;
+
+  return p;
+}
+
 static array_t* int_allocate_empty_array(unsigned int n) {
   array_t* p;
 
-  num_arrays++;
-  total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
-
   p = ALLOC_ARRAY(n);
+  if (!p) {
+    fatal("Out of memory.\n");
+  }
+
+  num_arrays++;
+  total_array_size += sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
+
   p->ref = 1;
   p->size = n;
   ms_setup_stats(p);
@@ -155,8 +185,9 @@ static void dealloc_empty_array(array_t* p) {
   ms_remove_stats(p);
 
   num_arrays--;
-  total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (p->size - 1);
+  total_array_size -= sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
 
+  FREE((char*)p->item);
   FREE((char*)p);
 }
 
@@ -189,18 +220,33 @@ void free_empty_array(array_t* p) {
    size n */
 static array_t* fix_array(array_t* p, unsigned int n) {
   if (n) {
+    /* The caller over-allocated to a worst-case size and now knows the real
+     * one; hand the slack back.  The header address does not change, so any
+     * holder of p stays valid. */
+    if (p->capacity > n) {
+      svalue_t* items = RESIZE_ARRAY_ITEMS(p->item, n);
+
+      if (!items) {
+        fatal("Out of memory.\n");
+      }
+      p->item = items;
+      p->capacity = n;
+    }
+
     num_arrays++;
-    total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
+    total_array_size += sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
 
     p->size = n;
     p->ref = 1;
     ms_setup_stats(p);
-    //      if(n>65535)
-    //          fatal("big array2");
-    return RESIZE_ARRAY(p, n);
+    return p;
   }
   if (p != &the_null_array) {
-    FREE(p);
+    /* Never registered in num_arrays / total_array_size -- that happens
+     * above -- so release the two blocks directly rather than going through
+     * dealloc_empty_array(). */
+    FREE((char*)p->item);
+    FREE((char*)p);
   }
   return &the_null_array;
 }
@@ -221,20 +267,30 @@ array_t* resize_array(array_t* p, unsigned int n) {
     return &the_null_array;
   }
 
-  total_array_size -= p->size * sizeof(svalue_t);
-  total_array_size += n * sizeof(svalue_t);
-
   ms_remove_stats(p);
-  p = RESIZE_ARRAY(p, n);
-  //    if(n>65535)
-  //              fatal("big array3");
 
-  if (!p) {
-    fatal("Out of memory.\n");
+  if (n > p->capacity) {
+    svalue_t* items = RESIZE_ARRAY_ITEMS(p->item, n);
+
+    if (!items) {
+      fatal("Out of memory.\n");
+    }
+    total_array_size -= ARRAY_ITEMS_SIZE(p->capacity);
+    total_array_size += ARRAY_ITEMS_SIZE(n);
+    p->item = items;
+    p->capacity = n;
   }
+  /* Shrinking keeps the slack: the block is not reallocated, so a pop is
+   * O(1) and a push/pop cycle does not thrash the allocator.  Nothing but
+   * pop_array()/shift_array() shrinks an array, and neither wants the
+   * memory back one element at a time. */
+
   p->size = n;
   ms_setup_stats(p);
 
+  /* Note that p itself is unchanged -- the header does not move, which is
+   * the entire point of the ->item indirection.  The return value is kept
+   * for the callers that assign it back, and for the n == 0 case above. */
   return p;
 }
 
@@ -1108,7 +1164,7 @@ void map_string(svalue_t* arg, int num_arg) {
 static function_to_call_t* sort_array_ftc;
 
 array_t* builtin_sort_array(array_t* inlist, int dir) {
-  qsort(reinterpret_cast<char*>(inlist->item), inlist->size, sizeof(inlist->item),
+  qsort(reinterpret_cast<char*>(inlist->item), inlist->size, sizeof(svalue_t),
         (dir < 0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
 
   return inlist;
@@ -1220,9 +1276,9 @@ void f_sort_array(void) {
       tmp = copy_array(tmp);
       push_refed_array(tmp);
       if (CONFIG_INT(__RC_SANE_SORTING__)) {
-        qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
+        qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(svalue_t), sort_array_cmp);
       } else {
-        old_quickSort((char*)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+        old_quickSort((char*)tmp->item, tmp->size, sizeof(svalue_t), sort_array_cmp);
       }
       sort_array_ftc = old_ptr;
       sp--;  // remove tmp from stack, but we don't want to free it!

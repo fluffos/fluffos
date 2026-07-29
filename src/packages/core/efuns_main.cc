@@ -2412,15 +2412,20 @@ void f_rmdir() {
 #ifdef F_SAY
 void f_say() {
   array_t* avoid;
+  /* A one-element scratch array.  array_t's elements live in a separate
+   * allocation (see array.h), so a statically built one has to point at
+   * storage of its own rather than getting a slot inside the struct. */
+  static svalue_t vtmp_item[1];
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
                          1,
 #endif
-                         1,
+                         1, /* size */
+                         1, /* capacity */
 #ifdef PACKAGE_MUDLIB_STATS
-                         {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr}
+                         {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr},
 #endif
-  };
+                         vtmp_item};
 
   if (st_num_arg == 1) {
     avoid = &the_null_array;
@@ -2934,15 +2939,20 @@ void f_tell_object() {
 #ifdef F_TELL_ROOM
 void f_tell_room() {
   array_t* avoid;
+  /* A one-element scratch array.  array_t's elements live in a separate
+   * allocation (see array.h), so a statically built one has to point at
+   * storage of its own rather than getting a slot inside the struct. */
+  static svalue_t vtmp_item[1];
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
                          1,
 #endif
-                         1,
+                         1, /* size */
+                         1, /* capacity */
 #ifdef PACKAGE_MUDLIB_STATS
-                         {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr}
+                         {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr},
 #endif
-  };
+                         vtmp_item};
 
   int const num_arg = st_num_arg;
   svalue_t* arg = sp - num_arg + 1;

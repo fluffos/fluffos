@@ -94,6 +94,20 @@ static const int TAG_MAP_NODE_BLOCK = (TAG_DATA + 46);
 static const int TAG_MAP_TBL = (TAG_DATA + 47);
 static const int TAG_BUFFER = (TAG_DATA + 48);
 static const int TAG_CLASS = (TAG_DATA + 49);
+/* An array_t's separately-allocated element storage (->item): exactly one
+ * block per array, the counterpart of TAG_MAP_TBL for mappings.  Classes are
+ * array_t too but are counted against their own totals (num_classes /
+ * total_class_size), so they get a distinct tag rather than muddying the
+ * per-kind block and byte checks in check_memory().
+ *
+ * The offsets are 53/54 rather than the next free TAG_DATA numbers because
+ * md.cc's blocks[]/totals[] counters are indexed by `tag & 0xff', so a tag is
+ * only distinct to check_memory() if its LOW BYTE is unique across every
+ * TAG_* family.  TAG_DATA + 50/51/52 would have aliased TAG_SCRATCHPAD /
+ * TAG_DB, TAG_REPLACE_OB / TAG_INTERPRETER, and TAG_PCRE_CACHE respectively,
+ * silently folding their bytes into the array totals. */
+static const int TAG_ARRAY_ITEMS = (TAG_DATA + 53);
+static const int TAG_CLASS_ITEMS = (TAG_DATA + 54);
 #ifdef PACKAGE_DB
 static const int TAG_DB = (TAG_PERMANENT + 50);
 #endif
