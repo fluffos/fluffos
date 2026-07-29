@@ -82,7 +82,10 @@ array_t* reg_assoc(svalue_t*, array_t*, array_t*, svalue_t*);
 void dealloc_array(array_t*);
 array_t* union_array(array_t*, array_t*);
 array_t* copy_array(array_t* p);
+/* Set ->size to n, making ->capacity exactly n (both directions). */
 array_t* resize_array(array_t* p, unsigned int n);
+/* Ensure ->capacity >= n, growing geometrically; ->size is untouched. */
+void array_reserve(array_t* p, unsigned int n);
 
 /* Bytes of element storage for `nelem' slots. */
 #define ARRAY_ITEMS_SIZE(nelem) (sizeof(svalue_t) * (nelem))

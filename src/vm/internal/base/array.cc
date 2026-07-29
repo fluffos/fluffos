@@ -269,7 +269,16 @@ array_t* resize_array(array_t* p, unsigned int n) {
 
   ms_remove_stats(p);
 
-  if (n > p->capacity) {
+  /* EXACT: capacity ends up equal to n, in both directions.
+   *
+   * Every caller but the push/pop efuns is a one-shot "I over-allocated to a
+   * worst case and now know the real size" shrink (slice_array, filter,
+   * deep_inventory, intersect_array) or a one-shot grow (add_array's x += x).
+   * They want the slack handed back, not retained: a filter that reduces
+   * 100k elements to one must not keep 100k slots alive in the array it
+   * returns to the mudlib.  Callers that want amortized growth ask for it
+   * explicitly via array_reserve(). */
+  if (n != (unsigned int)p->capacity) {
     svalue_t* items = RESIZE_ARRAY_ITEMS(p->item, n);
 
     if (!items) {
@@ -280,10 +289,6 @@ array_t* resize_array(array_t* p, unsigned int n) {
     p->item = items;
     p->capacity = n;
   }
-  /* Shrinking keeps the slack: the block is not reallocated, so a pop is
-   * O(1) and a push/pop cycle does not thrash the allocator.  Nothing but
-   * pop_array()/shift_array() shrinks an array, and neither wants the
-   * memory back one element at a time. */
 
   p->size = n;
   ms_setup_stats(p);
@@ -292,6 +297,53 @@ array_t* resize_array(array_t* p, unsigned int n) {
    * the entire point of the ->item indirection.  The return value is kept
    * for the callers that assign it back, and for the n == 0 case above. */
   return p;
+}
+
+/*
+ * Ensure room for at least `n' elements without changing ->size, growing
+ * GEOMETRICALLY so that repeated single-element appends are amortized O(1)
+ * rather than reallocating on every push.  Never shrinks.
+ *
+ * The header does not move, so every holder of p keeps seeing the same array.
+ */
+void array_reserve(array_t* p, unsigned int n) {
+  unsigned int newcap;
+  svalue_t* items;
+
+  if (n <= (unsigned int)p->capacity) {
+    return;
+  }
+
+  /* Double, with a small floor so a fresh array does not walk 1,2,4. */
+  newcap = (p->capacity < 4) ? 4 : (unsigned int)p->capacity * 2;
+  /* p->capacity is bounded by max_array_size, so the doubling above cannot
+   * overflow; this is belt-and-braces for a caller that got there another
+   * way. */
+  if (newcap < (unsigned int)p->capacity) {
+    newcap = n;
+  }
+  if (newcap < n) {
+    newcap = n;
+  }
+  /* Don't speculatively allocate past what an array is even allowed to be --
+   * but never below what the caller actually asked for, since the size check
+   * belongs to the caller. */
+  {
+    auto max_array_size = (unsigned int)CONFIG_INT(__MAX_ARRAY_SIZE__);
+
+    if (newcap > max_array_size) {
+      newcap = (n > max_array_size) ? n : max_array_size;
+    }
+  }
+
+  items = RESIZE_ARRAY_ITEMS(p->item, newcap);
+  if (!items) {
+    fatal("Out of memory.\n");
+  }
+  total_array_size -= ARRAY_ITEMS_SIZE(p->capacity);
+  total_array_size += ARRAY_ITEMS_SIZE(newcap);
+  p->item = items;
+  p->capacity = newcap;
 }
 
 array_t* explode_string(const char* str, int slen, const char* del, int dellen, bool reversible) {
@@ -931,16 +983,26 @@ array_t* add_array(array_t* p, array_t* r) {
   array_t* d; /* destination */
 
   /*
-   * have to be careful with size zero arrays because they could be
-   * the_null_array.  REALLOC(the_null_array, ...) is bad :(
+   * Zero-length fast paths.  Release the empty argument with free_array()
+   * rather than a bare ref--: a zero-length array is no longer necessarily
+   * the immortal the_null_array (pop_array()/shift_array() shrink in place,
+   * so a heap array can reach size 0), and dropping its last reference
+   * without deallocating leaks the block.
+   *
+   * Resolve the result BEFORE releasing, since p and r may be the same
+   * array -- freeing first would leave the ternary reading a dead header.
    */
   if (p->size == 0) {
-    p->ref--;
-    return r->ref > 1 ? (r->ref--, copy_array(r)) : r;
+    array_t* d = r->ref > 1 ? (r->ref--, copy_array(r)) : r;
+
+    free_array(p);
+    return d;
   }
   if (r->size == 0) {
-    r->ref--;
-    return p->ref > 1 ? (p->ref--, copy_array(p)) : p;
+    array_t* d = p->ref > 1 ? (p->ref--, copy_array(p)) : p;
+
+    free_array(r);
+    return d;
   }
 
   res = p->size + r->size;
@@ -1647,8 +1709,12 @@ array_t* subtract_array(array_t* minuend, array_t* subtrahend) {
   long i, size, o, d, l, h, msize;
 
   if (!(size = subtrahend->size)) {
-    subtrahend->ref--;
-    return minuend->ref > 1 ? (minuend->ref--, copy_array(minuend)) : minuend;
+    /* free_array(), not a bare ref--, and after the result is resolved -- see
+     * the note in add_array(). */
+    array_t* d = minuend->ref > 1 ? (minuend->ref--, copy_array(minuend)) : minuend;
+
+    free_array(subtrahend);
+    return d;
   }
   if (!(msize = minuend->size)) {
     free_array(subtrahend);
@@ -1855,14 +1921,20 @@ array_t* union_array(array_t* a1, array_t* a2) {
   svalue_t *svt_1, *ntab, *sv_tab, *tmp, *sv_ptr, val;
   long curix, parix, child1, child2;
 
+  /* free_array(), not a bare ref--, and after the result is resolved -- see
+   * the note in add_array(). */
   if (a1s == 0) {
-    a1->ref--;
-    return a2->ref > 1 ? (a2->ref--, copy_array(a2)) : a2;
+    array_t* d = a2->ref > 1 ? (a2->ref--, copy_array(a2)) : a2;
+
+    free_array(a1);
+    return d;
   }
 
   if (a2s == 0 || a1 == a2) {
-    a2->ref--;
-    return a1->ref > 1 ? (a1->ref--, copy_array(a1)) : a1;
+    array_t* d = a1->ref > 1 ? (a1->ref--, copy_array(a1)) : a1;
+
+    free_array(a2);
+    return d;
   }
   /* allocating a new place, a1s + a2s must be enough */
   d = a1s + a2s;
