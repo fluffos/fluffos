@@ -24,8 +24,22 @@
        the "mobile viewport" section of the main script below. */
     position: fixed; inset: 0;
     overflow: hidden;
+    /* Side notch/rounded-corner insets (viewport-fit=cover draws edge-to-
+       edge under them). Only left/right here on purpose -- top/bottom are
+       JS-synced to window.visualViewport for keyboard avoidance (see
+       syncVisualViewport() below) and handled per-element there instead.
+       Landscape phones are exactly where a notch sits on a SIDE rather
+       than the top, which is also when body.compact kicks in -- padding
+       the flex column itself covers every child (header/tabs/term/
+       inputbar) in one place instead of threading env() through each. */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
-  button, .tab, #cmd { touch-action: manipulation; }
+  /* manipulation on the terminal pane too: without it, double-tapping game
+     text to select a word (the natural mobile gesture) can trigger the
+     browser's native double-tap-zoom alongside/instead of xterm's own
+     selection handling. */
+  button, .tab, #cmd, #term .pane { touch-action: manipulation; }
   header {
     padding: 10px 16px; border-bottom: 1px solid var(--border);
     background: var(--panel); display: flex; align-items: baseline; gap: 12px;
@@ -35,14 +49,28 @@
   /* Fullscreen toggle: hidden until the boot script verifies the
      Fullscreen API actually exists here (iPhone Safari, some webviews:
      it does not) -- see the "fullscreen toggle" section of the script. */
+  /* wrapToggle carries the margin-left:auto that pushes both header
+     buttons to the right (it comes first in source order); fsToggle just
+     follows it with the header's normal gap. */
   #fsToggle {
-    margin-left: auto; align-self: center; flex: none;
+    align-self: center; flex: none;
     display: inline-flex; align-items: center; justify-content: center;
     background: transparent; border: 0; border-radius: 4px;
     color: var(--dim); cursor: pointer; padding: 4px 6px; line-height: 0;
   }
   #fsToggle:hover { color: var(--accent); background: var(--border); }
   #fsToggle[hidden] { display: none; }
+  /* Wrap toggle: a real toggle button (not hidden/feature-detected like
+     fsToggle -- this is pure CSS/JS, always available). ".on" reflects
+     wrapMode; unlike fsToggle there's no external event that can desync
+     it, so the class is just set directly from the click handler. */
+  #wrapToggle {
+    margin-left: auto; align-self: center; flex: none;
+    background: transparent; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--dim); cursor: pointer; padding: 3px 8px; font: inherit; font-size: 11px;
+  }
+  #wrapToggle:hover { color: var(--fg); border-color: var(--dim); }
+  #wrapToggle.on { color: var(--accent); border-color: var(--accent); }
   /* Icon pair swaps on .fs-active, which JS toggles off the
      fullscreenchange EVENT (never a local flag -- Esc/system exits must
      not desync it).  Class-based on purpose: SVG elements do not reflect
@@ -79,6 +107,20 @@
   #term .pane { height: 100%; display: none; }
   #term .pane.active { display: block; }
   #term .pane .xterm { height: 100%; }
+  /* Wrap-off mode (see the wrapToggle JS): xterm always wraps at `cols`,
+     it has no native "don't wrap" state, and fit() always shrinks cols to
+     match the pane's pixel width -- so on a phone that mangles anything
+     wider than ~30-40 cols, including most of this project's ASCII-art
+     login banners (authored for the traditional 80-col MUD client). The
+     JS side pins cols at NOWRAP_COLS instead of fitting them; this side
+     lets the wider result actually be seen: .xterm normally stretches to
+     100% of .pane by ordinary block-width rules, which would just clip a
+     wider grid, so let it size to its own (now wider) content instead and
+     scroll the pane under it. xterm.js sets the .xterm-screen canvas
+     layer's pixel dimensions from cols/rows directly, so max-content
+     here tracks that real rendered width. */
+  #term .pane.nowrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #term .pane.nowrap .xterm { width: max-content; }
   #logs {
     flex: 1; min-height: 0; overflow-y: auto; display: none;
     padding: 8px 16px; font-size: 12px; line-height: 1.5;
@@ -233,6 +275,7 @@
     #tabs .tab .reload[hidden], #tabs .tab .close[hidden] { display: none; }
     #tabAdd { min-width: 40px; }
     #fsToggle { min-width: 36px; min-height: 36px; }
+    #wrapToggle { min-height: 36px; }
   }
 
   /* ------------------------------------------------------------------ *
@@ -261,6 +304,7 @@
   }
   body.compact header h1 { font-size: 12px; max-width: 32vw; }
   body.compact header #status { font-size: 11px; max-width: 26vw; }
+  body.compact #wrapToggle { padding: 2px 6px; font-size: 10px; }
   body.compact #tabs { grid-area: 1 / 2; }
   body.compact #tabs .tab { padding: 5px 10px 4px; min-height: 36px; }
   body.compact #tabAdd { min-width: 36px; }
@@ -283,6 +327,9 @@
 <header>
   <h1>FluffOS / WebAssembly</h1>
   <div id="status">loading wasm…</div>
+  <button id="wrapToggle" type="button" class="on" aria-pressed="true"
+          title="Wrap long lines to fit the screen"
+          aria-label="Wrap long lines to fit the screen">Wrap</button>
   <button id="fsToggle" type="button" hidden
           title="Enter fullscreen" aria-label="Enter fullscreen">
     <svg id="fsIconEnter" width="14" height="14" viewBox="0 0 14 14"
@@ -314,7 +361,8 @@
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
-  <input id="cmd" autocomplete="off" spellcheck="false" autofocus
+  <input id="cmd" autocomplete="off" autocapitalize="off" autocorrect="off"
+         spellcheck="false" enterkeyhint="send" autofocus
          placeholder="loading…" disabled>
 </div>
 
@@ -576,6 +624,35 @@ const TERM_OPTIONS = {
 const mqNarrow = window.matchMedia('(max-width: 480px)');
 function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
 
+// --- soft-wrap toggle ------------------------------------------------------
+// xterm has no native "don't wrap" mode -- it always wraps at `cols`, and
+// fit() always shrinks cols to match the pane's actual pixel width. On a
+// phone that mangles anything wider than ~30-40 cols, which includes most
+// of this project's ASCII-art login banners (authored for the traditional
+// 80-col MUD client this whole genre targets). "Wrap off" instead pins
+// cols at NOWRAP_COLS and lets the pane scroll horizontally (see the
+// .pane.nowrap CSS) so art renders at its intended width; "wrap on"
+// (default, matches all prior behavior) keeps fitting cols to the
+// viewport. This is a display preference, not a per-session/per-connection
+// one, hence one global flag (persisted) rather than living on each session.
+const NOWRAP_COLS = 80;
+let wrapMode = localStorage.getItem('fluffos-wrap') !== 'off';
+
+// Single choke point for sizing a session's terminal to the current
+// viewport, mode-aware -- replaces every raw fit() call below. fit() (and
+// proposeDimensions()) are no-ops on a hidden pane either way (the addon
+// bails on NaN geometry), so callers can always call this unconditionally,
+// same as the raw fit() calls it replaces.
+function refit(s) {
+  s.pane.classList.toggle('nowrap', !wrapMode);
+  if (wrapMode) {
+    s.fit.fit();
+    return;
+  }
+  const dims = s.fit.proposeDimensions();
+  if (dims && dims.rows) s.term.resize(NOWRAP_COLS, dims.rows);
+}
+
 // The full command hint clips mid-word at phone widths; keep it for wide
 // screens.  Applied after boot and re-applied on breakpoint crossings.
 function placeholderForViewport() {
@@ -799,7 +876,7 @@ mqNarrow.addEventListener('change', () => {
   const size = fontSizeForViewport();
   for (const s of sessions) {
     s.term.options.fontSize = size;
-    if (view === s) s.fit.fit();
+    if (view === s) refit(s);
   }
   input.placeholder = placeholderForViewport();
 });
@@ -809,6 +886,11 @@ function applyInputState(s) {
   if (s.charMode) {
     inputBar.classList.add('hidden');
     status.textContent = 'char mode — keys go straight to the mud';
+    // Always a real fit here, NOT refit(): char mode is a full-screen TUI
+    // taking over the raw keystream (see s.term.onData below), which lays
+    // itself out from the real NAWS geometry -- pinning cols to
+    // NOWRAP_COLS regardless of wrapMode would misreport the actual
+    // terminal size to an app that genuinely needs it.
     s.fit.fit();
     s.term.focus();
   } else {
@@ -818,7 +900,7 @@ function applyInputState(s) {
       : 'connecting…';
     input.type = s.serverEchoes ? 'password' : 'text';
     input.disabled = s.disconnected || s.connId < 0;
-    s.fit.fit();
+    refit(s);
     if (!input.disabled && view === s) input.focus();
   }
 }
@@ -947,7 +1029,11 @@ input.addEventListener('keydown', (ev) => {
 //      #inputbar naturally lands at the bottom of the visible area.
 let viewportTimer = 0;
 function refitVisible() {
-  if (view !== 'logs' && activeGame) activeGame.fit.fit();
+  if (view === 'logs' || !activeGame) return;
+  // Char mode: always a real fit, never nowrap-pinned -- same reasoning
+  // as applyInputState's charMode branch.
+  if (activeGame.charMode) activeGame.fit.fit();
+  else refit(activeGame);
 }
 function syncVisualViewport() {
   const vv = window.visualViewport;
@@ -985,6 +1071,31 @@ if (window.visualViewport) {
   syncVisualViewport();
 }
 updateCompact();   // initial state (e.g. the page opens in landscape)
+
+// --- wrap toggle -----------------------------------------------------------
+// See the "soft-wrap toggle" section (wrapMode/refit()) above for why this
+// exists. Applies to every session (a display preference, not a per-tab
+// one): only the visible pane needs an immediate refit -- fit()/refit() on
+// a hidden pane is already a no-op elsewhere in this file, so the rest
+// pick up the new mode next time they're activated, same pattern as the
+// mqNarrow breakpoint listener.
+const wrapToggle = document.getElementById('wrapToggle');
+function updateWrapToggle() {
+  wrapToggle.classList.toggle('on', wrapMode);
+  wrapToggle.setAttribute('aria-pressed', String(wrapMode));
+  const label = wrapMode
+    ? 'Wrap long lines to fit the screen'
+    : 'Wrapping off — long lines keep their full width, scroll to see them';
+  wrapToggle.title = label;
+  wrapToggle.setAttribute('aria-label', label);
+}
+updateWrapToggle();
+wrapToggle.addEventListener('click', () => {
+  wrapMode = !wrapMode;
+  localStorage.setItem('fluffos-wrap', wrapMode ? 'on' : 'off');
+  updateWrapToggle();
+  if (view !== 'logs' && activeGame && !activeGame.charMode) refit(activeGame);
+});
 
 // --- fullscreen toggle ----------------------------------------------------
 // After compact chrome squeezed the page's own bars, the biggest remaining
