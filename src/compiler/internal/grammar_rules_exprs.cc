@@ -16,7 +16,22 @@ extern int num_refs;
 
 parse_node_t* rule_expr_or_block_block(decl_t decl_val) { return decl_val.node; }
 
-parse_node_t* rule_expr_or_block_expr(parse_node_t* expr) { return insert_pop_value(expr); }
+parse_node_t* rule_expr_or_block_expr(parse_node_t* expr) {
+  /* pop_value(), not insert_pop_value(): both discard an expression whose
+   * value is unused and which has no side effects, but only pop_value()
+   * diagnoses it.
+   *
+   * This is the body of catch() / time_expression(), and staying silent here
+   * is worse than for an ordinary expression statement, not better -- the
+   * author wrote catch(...) precisely because they expected something to
+   * happen inside it.  `catch(a[5])' and `catch(1 / x)' both compile to an
+   * empty catch and return 0, so the error they meant to trap is never
+   * raised and the test they meant to write silently passes.  A bare
+   * `a[5];' statement has warned about this all along; the catch form did
+   * not, purely because it took the other entry point.
+   */
+  return pop_value(expr);
+}
 
 void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context) {
   CREATE_CATCH(*result, expr_or_block);

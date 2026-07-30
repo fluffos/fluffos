@@ -1,0 +1,53 @@
+// Regression: catch()'s operand is diagnosed when it is discarded.
+//
+// An expression whose value is unused and which has no side effects is
+// dropped during code generation (pop_value()/insert_pop_value(), trees.cc).
+// A bare `a[5];' statement has always warned about that.  catch()'s operand
+// took the non-warning entry point, so `catch(a[5])' and `catch(1 / x)'
+// compiled to an EMPTY catch -- returning 0, never raising the error the
+// author meant to trap -- and said nothing about it.  That makes every
+// "assert this errors" test written in that shape silently vacuous, which is
+// exactly the kind of test whose passing means nothing.
+//
+// The compile must still succeed (this is a warning, not an error); what is
+// pinned here is that the diagnostic is emitted at all.
+void do_tests() {
+  string src, logtext;
+  object ob;
+  int found_file, found_text, before_lines;
+
+  src = "void f() { mixed *a = ({ 1 }); catch(a[5]); }\n"
+    "int g() { mixed *a = ({ 1 }); return catch(a[5]) ? 1 : 0; }\n";
+
+  rm("/gen_catch_nse.c");
+  write_file("/gen_catch_nse.c", src);
+
+  // /log/compile is APPENDED to and survives across runs, so only the part
+  // written by this compile counts -- searching the whole file would happily
+  // match a warning left behind by an earlier run and pass regardless.
+  logtext = read_file("/log/compile");
+  before_lines = stringp(logtext) ? sizeof(explode(logtext, "\n")) : 0;
+
+  ob = load_object("/gen_catch_nse");
+  ASSERT2(objectp(ob), "a discarded catch operand is a warning, not an error");
+
+  // The consequence being warned about: the index never runs, so the catch is
+  // empty and reports no error even though a[5] is out of bounds.  Pinned so
+  // that a future change making error-capable expressions survive shows up
+  // here as a deliberate decision rather than a silent one.
+  if (objectp(ob)) {
+    ASSERT_EQ(0, ob->g());
+    destruct(ob);
+  }
+
+  logtext = read_file("/log/compile", before_lines, 400);
+  ASSERT2(stringp(logtext), "the compile log should be readable");
+  if (stringp(logtext)) {
+    found_file = sizeof(explode(logtext, "gen_catch_nse")) > 1;
+    found_text = sizeof(explode(logtext, "no side effects")) > 1;
+    ASSERT2(found_file, "this compile should have logged something");
+    ASSERT2(found_text, "the discarded catch operand should have warned");
+  }
+
+  rm("/gen_catch_nse.c");
+}
