@@ -700,11 +700,14 @@ function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
 // (default, matches all prior behavior) keeps fitting cols to the
 // viewport. This is a display preference, not a per-session/per-connection
 // one, hence one global flag (persisted) rather than living on each session.
-// NOWRAP_COLS=160 (not 80): a survey of every lib's login banner found real
-// grid-aligned art up to 154 cols wide (colon/dot-shaded pictures, not just
-// text) -- 80 silently re-broke "wrap off" for those even though the user
-// did the right thing and toggled it.
-const NOWRAP_COLS = 160;
+// NOWRAP_COLS is intentionally a huge ceiling, not a tuned-to-content
+// number: a survey of every lib's login banner found real grid-aligned art
+// up to 154 cols wide (colon/dot-shaded pictures, not just text), but any
+// specific finite value tuned to today's content (e.g. 160) just re-breaks
+// "wrap off" the next time some banner is wider than that guess -- "no
+// wrap" should mean no wrap, not "wrap at a bigger number." 2000 cols is
+// far beyond anything this genre's 80/100-col-authored art will ever hit.
+const NOWRAP_COLS = 2000;
 let wrapMode = localStorage.getItem('fluffos-wrap') !== 'off';
 
 // Cap on each session's command history (see makeSession()'s history/
