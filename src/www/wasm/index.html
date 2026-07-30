@@ -181,21 +181,29 @@
   }
   #inputbar.hidden, #inputbar.logs-active { display: none; }
   #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
-  /* Custom command input: NOT a real <input>/<textarea> visibly -- #cmd is
-     a plain div that renders text/caret/placeholder itself, overlaying an
-     invisible real <textarea id="cmdReal"> that does the actual
-     keystroke/IME capture (#cmdReal rules below). This exists because a
-     real, on-screen, focusable <input> or <textarea> is exactly what iOS
-     keys its system-level AutoFill accessory bar (the passwords/cards/
-     contacts icon row above the keyboard) off of -- confirmed live on
-     both Safari and Chrome for iOS (same WebKit engine underneath) even
-     with autocomplete=off, autocapitalize=off, and (previously) CSS-only
-     password masking that never touched `type`: none of that stopped it,
-     because the bar isn't solely a type="password"/autocomplete heuristic
-     but a broader system feature tied to focusing a real form control.
-     An invisible, off-the-visual-stage-but-still-real control avoids that
-     system integration entirely while keeping real OS text editing
-     (selection, IME composition, copy/paste, undo) working underneath. */
+  /* Custom command input: NOT a real <input>/<textarea> -- #cmd is a plain
+     div that renders text/caret/placeholder itself, overlaying an
+     invisible #cmdReal that does the actual keystroke/IME capture
+     (#cmdReal rules below). A real, on-screen, focusable <input> or
+     <textarea> is what iOS keys its system-level AutoFill accessory bar
+     (the passwords/cards/contacts icon row above the keyboard) off of --
+     confirmed live on both Safari and Chrome for iOS (same WebKit engine
+     underneath) even with autocomplete=off, autocapitalize=off, and
+     (previously) CSS-only password masking that never touched `type`:
+     none of that stopped it, because the bar isn't solely a
+     type="password"/autocomplete heuristic but a broader system feature
+     tied to focusing a real FORM control specifically. Making that
+     control merely invisible (an earlier version of this fix) did NOT
+     help -- iOS keys the bar off the focused element's type, not its
+     visual opacity, so a hidden-but-real <textarea> still triggered it.
+     #cmdReal is therefore a contenteditable div, not a form element at
+     all: no `name`, not part of a <form>, never submitted -- outside
+     the category iOS's AutoFill heuristics look at -- while still giving
+     real OS text editing (selection, IME composition, copy/paste, undo)
+     underneath. contenteditable="plaintext-only" (not "true") keeps
+     pasted content flat text with no child markup, so the rest of this
+     file can keep treating cmdReal's content as a single string via
+     .textContent instead of dealing with arbitrary rich-text DOM. */
   #cmd {
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
     font: inherit; padding: 10px 16px 10px 8px;
@@ -221,7 +229,7 @@
   #cmd.disabled .cmd-caret { visibility: hidden; }
   #cmdReal {
     position: absolute; inset: 0; width: 100%; height: 100%;
-    margin: 0; padding: inherit; border: 0; outline: 0; resize: none;
+    margin: 0; padding: inherit; border: 0; outline: 0;
     overflow: hidden; background: transparent; font: inherit;
     white-space: pre; color: transparent; caret-color: transparent;
     /* Belt-and-suspenders on top of color:transparent: masks the real
@@ -229,8 +237,17 @@
        renders actual glyphs at the OS compositing level rather than
        going through page CSS color. Harmless to leave on unconditionally
        (this element is never visible either way) even when the session
-       isn't currently password-masked. */
+       isn't currently password-masked. Documented as an <input>/<textarea>
+       property; left on in case some engine still honors it on a
+       contenteditable div, but the real masking guarantee for this
+       element is that it's never visible at all (renderCmd() does the
+       actual on-screen masking, in the separate #cmd display layer). */
     -webkit-text-security: disc;
+    /* contenteditable elements have no built-in empty-state affordance
+       (a real <textarea> just shows nothing); without this, an empty
+       #cmdReal can collapse to zero height in some layout contexts and
+       stop accepting focus/taps. */
+    min-height: 1em;
   }
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
@@ -411,7 +428,7 @@
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
-  <div id="cmd"><span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span><textarea id="cmdReal" rows="1" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" autofocus disabled></textarea></div>
+  <div id="cmd"><span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span><div id="cmdReal" contenteditable="false" tabindex="0" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send"></div></div>
 </div>
 
 <div id="errorModal" class="modal-overlay" hidden>
@@ -731,10 +748,11 @@ const status = document.getElementById('status');
 // The custom command input -- see the big comment on #cmd's CSS for why
 // this isn't a real visible <input>/<textarea>: cmdWrap is the plain div
 // that renders text/caret/placeholder itself; cmdReal is the invisible
-// real <textarea> doing actual keystroke/IME/selection capture underneath
-// it. Everything that used to read/write a native input's .value/
-// .disabled/.focus()/.placeholder now goes through renderCmd() plus these
-// refs instead.
+// contenteditable div doing actual keystroke/IME/selection capture
+// underneath it. Everything that used to read/write a native input's
+// .value/.selectionStart/.disabled/.focus()/.placeholder now goes through
+// renderCmd() plus these refs (and the cmdRealValue/setCmdRealValue/
+// getCaretOffset/setCaretOffset helpers just below) instead.
 const cmdWrap = document.getElementById('cmd');
 const cmdReal = document.getElementById('cmdReal');
 const cmdBefore = document.getElementById('cmdBefore');
@@ -749,6 +767,46 @@ const tabLogs = document.getElementById('tabLogs');
 const logsBadge = document.getElementById('logsBadge');
 const utf8enc = new TextEncoder();
 
+// --- cmdReal helpers (contenteditable stand-ins for <textarea>.value /
+// .selectionStart) ----------------------------------------------------
+// cmdReal's content is always either empty or a single text node: every
+// programmatic write goes through setCmdRealValue() (.textContent=, which
+// collapses to one text node or none), and typed/pasted input stays flat
+// because of contenteditable="plaintext-only" plus the paste handler
+// below. getCaretOffset/setCaretOffset lean on that invariant instead of
+// walking arbitrary rich-text DOM.
+function cmdRealValue() {
+  return cmdReal.textContent;
+}
+function setCmdRealValue(text) {
+  cmdReal.textContent = text;
+}
+function getCaretOffset() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return cmdReal.textContent.length;
+  const range = sel.getRangeAt(0);
+  if (!cmdReal.contains(range.startContainer)) return cmdReal.textContent.length;
+  const preRange = document.createRange();
+  preRange.selectNodeContents(cmdReal);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  return preRange.toString().length;
+}
+function setCaretOffset(offset) {
+  const sel = window.getSelection();
+  const range = document.createRange();
+  const node = cmdReal.firstChild;
+  if (!node) {
+    range.selectNodeContents(cmdReal);
+    range.collapse(true);
+  } else {
+    const len = node.textContent.length;
+    range.setStart(node, Math.max(0, Math.min(len, offset)));
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 // --- custom command input rendering ---------------------------------------
 // Syncs cmdWrap's visible spans to cmdReal's real value + cursor position.
 // Called after anything that could change either: typing, IME composition,
@@ -757,14 +815,14 @@ const utf8enc = new TextEncoder();
 // draft restore), and the masked-class toggle. Cheap enough to just call
 // liberally rather than track precisely what changed.
 function renderCmd() {
-  const val = cmdReal.value;
+  const val = cmdRealValue();
   const masked = cmdWrap.classList.contains('masked');
   const display = masked ? '•'.repeat(val.length) : val;
-  // selectionStart tracks the real textarea's cursor even though it's
-  // invisible -- this is what lets Left/Right/Home/End/click-to-position
-  // keep working underneath a custom-rendered caret instead of only
-  // supporting append-at-the-end editing.
-  const pos = Math.max(0, Math.min(display.length, cmdReal.selectionStart ?? display.length));
+  // Tracks the real (invisible) editable region's cursor -- this is what
+  // lets Left/Right/Home/End/click-to-position keep working underneath a
+  // custom-rendered caret instead of only supporting append-at-the-end
+  // editing.
+  const pos = Math.max(0, Math.min(display.length, getCaretOffset()));
   cmdBefore.textContent = display.slice(0, pos);
   cmdAfter.textContent = display.slice(pos);
   cmdWrap.classList.toggle('has-text', val.length > 0);
@@ -774,26 +832,41 @@ function renderCmd() {
   // this is cheap to call on every render.
   cmdCaret.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
-// A MUD command line is conceptually single-line; cmdReal is a <textarea>
-// (not <input>) specifically because textareas are a much weaker signal
-// to iOS's AutoFill heuristics than a single-line text input (see the CSS
-// comment on #cmd), but that means an actual '\n' CAN land in .value from
-// a multi-line paste. Flatten it rather than let renderCmd() (white-space:
-// pre) show a broken-looking embedded line break, or Enter-to-submit
-// later send a multi-line blob to the driver as one "line".
+// A MUD command line is conceptually single-line, but a paste (or some
+// exotic IME path) could still land a literal '\n' in cmdReal's content
+// despite plaintext-only mode and the paste handler below. Flatten it
+// rather than let renderCmd() (white-space: pre) show a broken-looking
+// embedded line break, or Enter-to-submit later send a multi-line blob to
+// the driver as one "line".
 cmdReal.addEventListener('input', () => {
-  if (cmdReal.value.includes('\n')) {
-    const pos = cmdReal.selectionStart;
-    cmdReal.value = cmdReal.value.replace(/\r?\n/g, ' ');
-    cmdReal.selectionStart = cmdReal.selectionEnd = pos;
+  if (cmdRealValue().includes('\n')) {
+    const pos = getCaretOffset();
+    setCmdRealValue(cmdRealValue().replace(/\r?\n/g, ' '));
+    setCaretOffset(pos);
   }
   renderCmd();
 });
-// keyup/click/select cover cursor-position changes that 'input' alone
-// misses (arrow keys, Home/End, clicking to reposition, select-all).
-for (const ev of ['keyup', 'click', 'select']) {
+// contenteditable has no 'select' event (that's <input>/<textarea>-only)
+// and no .value, so a paste isn't a simple string assignment either --
+// insert plain text through the normal editing pipeline (keeps
+// undo/IME semantics intact) instead of letting the browser's default
+// paste behavior insert whatever rich content/markup the clipboard holds.
+cmdReal.addEventListener('paste', (ev) => {
+  ev.preventDefault();
+  const text = (ev.clipboardData || window.clipboardData).getData('text/plain').replace(/\r?\n/g, ' ');
+  document.execCommand('insertText', false, text);
+});
+// keyup/click cover cursor-position changes that 'input' alone misses
+// (arrow keys, Home/End, clicking to reposition); selectionchange (below)
+// is the general-purpose backstop (drag-selection, Cmd/Ctrl+A, ...) that
+// 'select' would have covered on a real <textarea>.
+for (const ev of ['keyup', 'click']) {
   cmdReal.addEventListener(ev, renderCmd);
 }
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if (sel.rangeCount && cmdReal.contains(sel.getRangeAt(0).startContainer)) renderCmd();
+});
 cmdReal.addEventListener('focus', () => cmdWrap.classList.add('focused'));
 cmdReal.addEventListener('blur', () => cmdWrap.classList.remove('focused'));
 // Clicking anywhere in the rendered area should feel like clicking a
@@ -1026,7 +1099,10 @@ function applyInputState(s) {
       : s.connId >= 0 ? 'connected (conn ' + s.connId + ')'
       : 'connecting…';
     cmdWrap.classList.toggle('masked', s.serverEchoes);
+    // .disabled is a plain custom property here (divs have no native
+    // disabled state) -- contentEditable is what actually stops input.
     cmdReal.disabled = s.disconnected || s.connId < 0;
+    cmdReal.contentEditable = cmdReal.disabled ? 'false' : 'plaintext-only';
     cmdWrap.classList.toggle('disabled', cmdReal.disabled);
     renderCmd();
     refit(s);
@@ -1035,7 +1111,7 @@ function applyInputState(s) {
 }
 
 function saveDraft() {
-  if (view && view !== 'logs') view.inputValue = cmdReal.value;
+  if (view && view !== 'logs') view.inputValue = cmdRealValue();
 }
 
 function activateSession(s) {
@@ -1054,7 +1130,7 @@ function activateSession(s) {
     o.tab.classList.toggle('active', o === s);
     o.pane.classList.toggle('active', o === s);
   }
-  cmdReal.value = s.inputValue;
+  setCmdRealValue(s.inputValue);
   renderCmd();
   // fit() no-ops while a pane is display:none (the addon bails on NaN
   // geometry), so refit now that this one is visible again.
@@ -1146,10 +1222,10 @@ cmdReal.addEventListener('keydown', (ev) => {
   if (ev.key === 'ArrowUp') {
     if (!s.history.length || s.historyIndex >= s.history.length - 1) return;
     ev.preventDefault();
-    if (s.historyIndex === -1) s.historyDraft = cmdReal.value;
+    if (s.historyIndex === -1) s.historyDraft = cmdRealValue();
     s.historyIndex++;
-    cmdReal.value = s.history[s.history.length - 1 - s.historyIndex];
-    cmdReal.selectionStart = cmdReal.selectionEnd = cmdReal.value.length;
+    setCmdRealValue(s.history[s.history.length - 1 - s.historyIndex]);
+    setCaretOffset(cmdRealValue().length);
     renderCmd();
     return;
   }
@@ -1157,21 +1233,19 @@ cmdReal.addEventListener('keydown', (ev) => {
     if (s.historyIndex === -1) return;
     ev.preventDefault();
     s.historyIndex--;
-    cmdReal.value = s.historyIndex === -1
+    setCmdRealValue(s.historyIndex === -1
       ? s.historyDraft
-      : s.history[s.history.length - 1 - s.historyIndex];
-    cmdReal.selectionStart = cmdReal.selectionEnd = cmdReal.value.length;
+      : s.history[s.history.length - 1 - s.historyIndex]);
+    setCaretOffset(cmdRealValue().length);
     renderCmd();
     return;
   }
   // isComposing: mid-IME-composition (e.g. choosing a Pinyin candidate)
-  // Enter confirms the composition, it must NOT also submit the line --
-  // cmdReal being a <textarea> means an un-prevented Enter would otherwise
-  // insert a literal newline too (a real single-line <input> couldn't).
+  // Enter confirms the composition, it must NOT also submit the line.
   if (ev.key !== 'Enter' || ev.isComposing) return;
   ev.preventDefault();
-  const line = cmdReal.value;
-  cmdReal.value = '';
+  const line = cmdRealValue();
+  setCmdRealValue('');
   renderCmd();
   if (line.length && s.history[s.history.length - 1] !== line) {
     s.history.push(line);
