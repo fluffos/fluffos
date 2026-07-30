@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "symbol.h"
+#include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <string>
@@ -35,6 +36,11 @@ void symbol_start(const char* filename) {
   }
 
   out = fopen(symbolfile.c_str(), "w");
+  if (out == nullptr) {
+    // Every symbol_record() silently no-ops without this; say so once.
+    fprintf(stderr, "symbol: unable to open %s for writing: %s\n", symbolfile.c_str(),
+            strerror(errno));
+  }
 }
 
 void symbol_end() {

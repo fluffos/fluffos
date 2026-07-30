@@ -17,6 +17,31 @@ static Vector* normalize_array(Vector*);
 static Vector* cross_product(Vector*, Vector*, Vector*);
 static Vector* points_to_array(Vector*, Vector*, Vector*);
 
+// Validate that `arg` holds a 16-element array of floats and copy it into the
+// C float matrix `out`. Errors -- without modifying the caller's array -- on a
+// wrong size or a non-float element. Returns the array so the transformed
+// result can be written back with store_matrix().
+static array_t* matrix_arg_to_floats(const svalue_t* arg, Matrix out) {
+  array_t* matrix = arg->u.arr;
+  if (matrix->size < 16) {
+    error("matrix transform requires a 16-element array.\n");
+  }
+  for (int i = 0; i < 16; i++) {
+    if (matrix->item[i].type != T_REAL) {
+      error("matrix transform requires a 16-element float array.\n");
+    }
+    out[i] = matrix->item[i].u.real;
+  }
+  return matrix;
+}
+
+// Write the C float matrix `src` back into the LPC float array `matrix`.
+static void store_matrix(array_t* matrix, const Matrix src) {
+  for (int i = 0; i < 16; i++) {
+    matrix->item[i].u.real = src[i];
+  }
+}
+
 void f_id_matrix() {
   array_t* matrix;
   int i;
@@ -35,7 +60,6 @@ void f_translate() {
   Matrix current_matrix;
   Matrix trans_matrix;
   Matrix final_matrix;
-  int i;
 
   if ((sp - 1)->type != T_REAL) {
     bad_arg(3, F_TRANSLATE);
@@ -46,40 +70,18 @@ void f_translate() {
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 3)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 3, current_matrix);
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
   sp -= 3;
 
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create translation matrix.
+   * create translation matrix, then compute and store the transformed matrix.
    */
   translate_matrix(x, y, z, trans_matrix);
-  /*
-   * compute transformed matrix.
-   */
   mult_matrix(current_matrix, trans_matrix, final_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = final_matrix[i];
-  }
+  store_matrix(matrix, final_matrix);
 }
 
 void f_scale() {
@@ -88,7 +90,6 @@ void f_scale() {
   Matrix current_matrix;
   Matrix scaling_matrix;
   Matrix final_matrix;
-  int i;
 
   if ((sp - 1)->type != T_REAL) {
     bad_arg(3, F_SCALE);
@@ -99,39 +100,17 @@ void f_scale() {
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 3)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 3, current_matrix);
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
   sp -= 3;
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create scaling matrix.
+   * create scaling matrix, then compute and store the transformed matrix.
    */
   scale_matrix(x, y, z, scaling_matrix);
-  /*
-   * compute transformed matrix.
-   */
   mult_matrix(current_matrix, scaling_matrix, final_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = final_matrix[i];
-  }
+  store_matrix(matrix, final_matrix);
 }
 
 void f_rotate_x() {
@@ -140,41 +119,18 @@ void f_rotate_x() {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
-  int i;
 
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 1)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 1, current_matrix);
   angle = (sp--)->u.real;
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create x rotation matrix.
+   * create x rotation matrix, then compute and store the transformed matrix.
    */
   rotate_x_matrix(angle, rot_matrix);
-  /*
-   * compute transformed matrix.
-   */
   mult_matrix(current_matrix, rot_matrix, final_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = final_matrix[i];
-  }
+  store_matrix(matrix, final_matrix);
 }
 
 void f_rotate_y() {
@@ -183,41 +139,18 @@ void f_rotate_y() {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
-  int i;
 
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 1)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 1, current_matrix);
   angle = (sp--)->u.real;
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create y rotation matrix.
+   * create y rotation matrix, then compute and store the transformed matrix.
    */
   rotate_y_matrix(angle, rot_matrix);
-  /*
-   * compute transformed matrix.
-   */
   mult_matrix(current_matrix, rot_matrix, final_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = final_matrix[i];
-  }
+  store_matrix(matrix, final_matrix);
 }
 
 void f_rotate_z() {
@@ -226,41 +159,18 @@ void f_rotate_z() {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
-  int i;
 
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 1)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 1, current_matrix);
   angle = (sp--)->u.real;
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create z rotation matrix.
+   * create z rotation matrix, then compute and store the transformed matrix.
    */
   rotate_z_matrix(angle, rot_matrix);
-  /*
-   * compute transformed matrix.
-   */
   mult_matrix(current_matrix, rot_matrix, final_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = final_matrix[i];
-  }
+  store_matrix(matrix, final_matrix);
 }
 
 void f_lookat_rotate() {
@@ -268,7 +178,6 @@ void f_lookat_rotate() {
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix lookat_matrix;
-  int i;
 
   if ((sp - 1)->type != T_REAL) {
     bad_arg(3, F_LOOKAT_ROTATE);
@@ -279,35 +188,16 @@ void f_lookat_rotate() {
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 3)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 3, current_matrix);
   x = (sp - 2)->u.real;
   y = (sp - 1)->u.real;
   z = sp->u.real;
   sp -= 3;
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create new viewing transformation matrix.
+   * create new viewing transformation matrix and store it.
    */
   lookat_rotate(current_matrix, x, y, z, lookat_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = lookat_matrix[i];
-  }
+  store_matrix(matrix, lookat_matrix);
 }
 
 #ifdef F_LOOKAT_ROTATE2
@@ -316,7 +206,7 @@ void f_lookat_rotate2(void) {
   LPC_FLOAT ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;
   Matrix lookat_matrix;
-  int i, j;
+  int j;
 
   for (j = 4; j >= 0; j--) {
     if ((sp - j)->type != T_REAL) {
@@ -326,15 +216,7 @@ void f_lookat_rotate2(void) {
   /*
    * get arguments from stack.
    */
-  matrix = (sp - 6)->u.arr;
-  if (matrix->size < 16) {
-    error("matrix transform requires a 16-element array.\n");
-  }
-  for (i = 0; i < 16; i++) {
-    if (matrix->item[i].type != T_REAL) {
-      error("matrix transform requires a 16-element float array.\n");
-    }
-  }
+  matrix = matrix_arg_to_floats(sp - 6, current_matrix);
   ex = (sp - 5)->u.real;
   ey = (sp - 4)->u.real;
   ez = (sp - 3)->u.real;
@@ -345,21 +227,10 @@ void f_lookat_rotate2(void) {
   pop_n_elems(6);
 
   /*
-   * convert vec matrix to float matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    current_matrix[i] = matrix->item[i].u.real;
-  }
-  /*
-   * create new viewing transformation matrix.
+   * create new viewing transformation matrix and store it.
    */
   lookat_rotate2(ex, ey, ez, lx, ly, lz, lookat_matrix);
-  /*
-   * convert float matrix to vec matrix.
-   */
-  for (i = 0; i < 16; i++) {
-    matrix->item[i].u.real = lookat_matrix[i];
-  }
+  store_matrix(matrix, lookat_matrix);
 }
 #endif
 
@@ -412,22 +283,15 @@ static Vector* points_to_array(Vector* v, Vector* pa, Vector* pb) {
   return (v);
 }
 
-void lookat_rotate(const Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
-  static Vector n, v, u;
-  static Vector ep, lp;
+// Shared body of lookat_rotate()/lookat_rotate2(): build an orientation matrix
+// from an eye point `ep`, a look point `lp`, and an initial up hint `u`. The two
+// public entry points differ only in how `ep`, `lp`, and the up hint are derived.
+static void build_lookat_matrix(Vector ep, Vector lp, Vector u, Matrix M) {
+  Vector n, v;
 
-  lp.x = x;
-  lp.y = y;
-  lp.z = z;
-  ep.x = T[12];
-  ep.y = T[13];
-  ep.z = T[14];
   points_to_array(&n, &lp, &ep);
   normalize_array(&n);
 
-  u.x = T[0];
-  u.y = T[4];
-  u.z = T[8];
   cross_product(&v, &n, &u);
   normalize_array(&v);
 
@@ -472,65 +336,21 @@ void lookat_rotate(const Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix
 #endif /* DEBUG */
 }
 
+void lookat_rotate(const Matrix T, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix M) {
+  Vector lp = {x, y, z};
+  Vector ep = {T[12], T[13], T[14]};
+  Vector u = {T[0], T[4], T[8]};
+
+  build_lookat_matrix(ep, lp, u, M);
+}
+
 void lookat_rotate2(LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly,
                     LPC_FLOAT lz, Matrix M) {
-  static Vector n, v, u;
-  static Vector ep, lp;
+  Vector ep = {ex, ey, ez};
+  Vector lp = {lx, ly, lz};
+  Vector u = {0., 1., 0.};
 
-  ep.x = ex;
-  ep.y = ey;
-  ep.z = ez;
-  lp.x = lx;
-  lp.y = ly;
-  lp.z = lz;
-  points_to_array(&n, &lp, &ep);
-  normalize_array(&n);
-
-  u.x = 0.;
-  u.y = 1.;
-  u.z = 0.;
-  cross_product(&v, &n, &u);
-  normalize_array(&v);
-
-  cross_product(&u, &v, &n);
-  normalize_array(&u);
-
-  M[0] = u.x;
-  M[1] = v.x;
-  M[2] = n.x;
-  M[3] = 0.;
-  M[4] = u.y;
-  M[5] = v.y;
-  M[6] = n.y;
-  M[7] = 0.;
-  M[8] = u.z;
-  M[9] = v.z;
-  M[10] = n.z;
-  M[11] = 0.;
-#if 0
-  M[12] = ep.x;
-  M[13] = ep.y;
-  M[14] = ep.z;
-  M[15] = 1.;
-#endif
-#if 0
-  M[12] = -U.x * ep.x - U.y * ep.y - U.z * ep.z;
-  M[13] = -V.x * ep.x - V.y * ep.y - V.z * ep.z;
-  M[14] = -N.x * ep.x - N.y * ep.y - N.z * ep.z;
-#endif
-  M[12] = ((u.x * ep.x) + (u.y * ep.y) + (u.z * ep.z));
-  M[13] = ((v.x * ep.x) + (v.y * ep.y) + (v.z * ep.z));
-  M[14] = ((n.x * ep.x) + (n.y * ep.y) + (n.z * ep.z));
-  M[15] = 1.;
-
-#ifdef DEBUG
-  print_array(&lp, "look point");
-  print_array(&ep, "eye point");
-  print_array(&n, "normal array");
-  print_array(&v, "V = N x U");
-  print_array(&u, "U = V x N");
-  print_matrix(M, "final matrix");
-#endif /* DEBUG */
+  build_lookat_matrix(ep, lp, u, M);
 }
 
 void translate_matrix(LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z, Matrix m) {

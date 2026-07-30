@@ -1693,13 +1693,19 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
       error("Could not open /%s for a save.\n", tmp_name);
     }
     if (!gzprintf(gzf, "#/%s\n", ob->prog->filename)) {
-      error("Could not open /%s for a save.\n", tmp_name);
+      // error() throws; close the handle first or it leaks for good.
+      gzclose(gzf);
+      error("Could not write to /%s for a save.\n", tmp_name);
     }
   } else
 #endif
   {
-    if (!(f = fopen(tmp_name, "wb")) || fprintf(f, "#/%s\n", save_name) < 0) {
+    if (!(f = fopen(tmp_name, "wb"))) {
       error("Could not open /%s for a save.\n", tmp_name);
+    }
+    if (fprintf(f, "#/%s\n", save_name) < 0) {
+      fclose(f);
+      error("Could not write to /%s for a save.\n", tmp_name);
     }
   }
   v = ob->variables;
@@ -1730,6 +1736,9 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
                     error_code.value(), error_code.message().c_str());
       std::remove(tmp_name);
       debug_message("Failed to save object!\n");
+      // The save file was never created: report the failure to the caller
+      // instead of returning the byte count as a success.
+      success = 0;
     } else if (save_compressed) {
       char buf[1024];
       // When compressed, unlink the uncompressed name too.
@@ -1915,6 +1924,12 @@ int restore_object(object_t* ob, const char* file, int noclear) {
     // Avoid use up all memory.
     if (bytes_read == chunk) {
       if (buf.size() >= max_memory) {
+        // error() throws; close the handle first or it leaks for good.
+#ifdef HAVE_ZLIB
+        gzclose(gzf);
+#else
+        fclose(gzf);
+#endif
         error("restore_object: Maximum memory limit %d reached trying to read file: %s.\n",
               max_memory, file);
       }

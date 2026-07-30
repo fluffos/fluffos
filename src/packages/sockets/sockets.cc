@@ -299,15 +299,30 @@ void f_socket_status() {
   }
 }
 
+#if defined(F_SOCKET_SET_OPTION) || defined(F_SOCKET_GET_OPTION)
+namespace {
+// Every other socket efun refuses to touch a socket the calling object does
+// not own; the option efuns did not, which let any object read another
+// object's SNI hostname / cert paths and -- worse -- turn off
+// SO_TLS_VERIFY_PEER on a connection it does not own.
+void check_socket_option_access(const char* efun, int lpc_sock) {
+  if (lpc_sock < 0 || lpc_sock >= lpc_socks_num()) {
+    error("Bad socket descriptor: %d\n", lpc_sock);
+  }
+  if (get_socket_owner(lpc_sock) != current_object) {
+    error("%s: socket %d is not owned by this object\n", efun, lpc_sock);
+  }
+}
+}  // namespace
+#endif
+
 #ifdef F_SOCKET_SET_OPTION
 void f_socket_set_option() {
   auto lpc_sock = (sp - 2)->u.number;
   auto option = (sp - 1)->u.number;
   auto* arg = sp;
 
-  if (lpc_sock < 0 || lpc_sock >= lpc_socks_num()) {
-    error("Bad socket descriptor: %d\n", lpc_sock);
-  }
+  check_socket_option_access("socket_set_option", lpc_sock);
 
   switch (option) {
     case SO_TLS_VERIFY_PEER:
@@ -346,46 +361,34 @@ void f_socket_set_option() {
 
 #ifdef F_SOCKET_GET_OPTION
 void f_socket_get_option() {
-  auto lpc_sock = (sp - 2)->u.number;
-  auto option = (sp - 1)->u.number;
+  // socket_get_option(int, int) takes TWO arguments: the socket is at sp - 1
+  // and the option at sp (the old sp - 2 / sp - 1 pair was copied from the
+  // three-argument setter and read the svalue below this frame as the
+  // descriptor while using the descriptor as the option).
+  auto lpc_sock = (sp - 1)->u.number;
+  auto option = sp->u.number;
 
-  if (lpc_sock < 0 || lpc_sock >= lpc_socks_num()) {
-    error("Bad socket descriptor: %d\n", lpc_sock);
-  }
+  check_socket_option_access("socket_get_option", lpc_sock);
 
   switch (option) {
     case SO_TLS_VERIFY_PEER:
-      if (lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].type == T_NUMBER) {
-        push_number(lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER].u.number);
-      } else {
-        push_number(0);
-      }
-      break;
     case SO_TLS_SNI_HOSTNAME:
-      if (lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
-        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_SNI_HOSTNAME].u.string);
-      } else {
-        push_number(0);
-      }
-      break;
     case SO_TLS_CERT:
-      if (lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].type == T_STRING) {
-        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_CERT].u.string);
-      } else {
-        push_number(0);
-      }
-      break;
     case SO_TLS_KEY:
-      if (lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].type == T_STRING) {
-        copy_and_push_string(lpc_socks_get(lpc_sock)->options[SO_TLS_KEY].u.string);
-      } else {
-        push_number(0);
-      }
       break;
     default:
       error("Unknown socket option: %d\n", option);
   }
+
+  svalue_t const value = lpc_socks_get(lpc_sock)->options[option];
   pop_2_elems();
+  if (value.type == T_STRING) {
+    copy_and_push_string(value.u.string);
+  } else if (value.type == T_NUMBER) {
+    push_number(value.u.number);
+  } else {
+    push_number(0);
+  }
 }
 #endif
 
