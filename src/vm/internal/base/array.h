@@ -103,6 +103,8 @@ array_t* resize_array(array_t* p, unsigned int n);
 void array_reserve(array_t* p, unsigned int n);
 /* Set ->size within existing capacity without moving the element block. */
 void array_set_size(array_t* p, unsigned int n);
+/* Give back unused capacity (->size kept).  Driven by reclaim_objects(). */
+void array_trim(array_t* p);
 
 /* Register/release a raw pointer into p->item that outlives the current
  * opcode -- see array_t::item_locks.  Safe on the_null_array (static, and

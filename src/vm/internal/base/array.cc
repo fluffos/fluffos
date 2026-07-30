@@ -301,6 +301,51 @@ array_t* resize_array(array_t* p, unsigned int n) {
 }
 
 /*
+ * Hand back unused element capacity, keeping ->size.  Driven by the periodic
+ * reclaim_objects() sweep, which already walks every array reachable from an
+ * object variable.
+ *
+ * Deferring the shrink to that sweep rather than doing it inside pop_array()
+ * is what keeps a pop O(1) and a push/pop cycle allocation-free; the cost is
+ * that the memory returns on the next sweep instead of immediately.
+ *
+ * Trimming all the way to ->size is fine even for an array that is still
+ * being appended to: array_reserve() grows GEOMETRICALLY, so the first push
+ * past the trimmed capacity costs one realloc and the array has slack again.
+ * An actively-appended array therefore pays at most one extra realloc per
+ * sweep interval, which against a 30-60 second period is nothing.
+ */
+void array_trim(array_t* p) {
+  unsigned int want;
+  svalue_t* items;
+
+  /* the_null_array's storage is a static, and a pinned block is one something
+   * holds a raw pointer into (see array_t::item_locks) -- reallocating either
+   * is exactly what must not happen. */
+  if (p == &the_null_array || array_items_pinned(p)) {
+    return;
+  }
+
+  /* Keep at least one slot.  A zero-byte allocation is implementation-defined
+   * (and the debug allocator rejects it outright), and ->item has to stay
+   * dereferenceable -- the same ">= 1 slot" convention allocate_class() and
+   * the object variable block already use. */
+  want = p->size ? (unsigned int)p->size : 1;
+  if (want >= (unsigned int)p->capacity) {
+    return; /* nothing to give back -- the common case, so keep it cheap */
+  }
+
+  items = RESIZE_ARRAY_ITEMS(p->item, want);
+  if (!items) {
+    return; /* shrinking failed: harmless, just keep the larger block */
+  }
+  total_array_size -= ARRAY_ITEMS_SIZE(p->capacity);
+  total_array_size += ARRAY_ITEMS_SIZE(want);
+  p->item = items;
+  p->capacity = want;
+}
+
+/*
  * Set ->size when ->capacity already allows it (i.e. after array_reserve(),
  * or when shrinking), keeping the mudlib-stats accounting in step.  The
  * element block is neither reallocated nor moved, so every holder of p --
