@@ -224,9 +224,28 @@ void preload(string file) {
 // Write an error message into a log file. The error occured in the object
 // 'file', giving the error message 'message'.
 
+// Compile diagnostics are also kept in memory so a test can assert on them
+// directly. Reading them back out of LOG_DIR + "/compile" is not reliable:
+// the runner removes that file after the compiler/fail/ directory and test
+// files run in randomised order, so whether it exists (and what line a given
+// message lands on) depends on what happened to run first.
+private string *compile_messages = ({});
+
 void log_error(string, string message) {
+  compile_messages += ({ message });
+  // Bound the buffer -- a full suite run compiles hundreds of files and no
+  // test needs more than the diagnostics from the compile it just triggered.
+  if (sizeof(compile_messages) > 200) {
+    compile_messages = compile_messages[<200..];
+  }
   write_file(LOG_DIR + "/compile", message);
 }
+
+// Diagnostics recorded since the last clear_compile_messages(). A test that
+// wants the messages from one specific compile should clear, compile, query.
+public string *query_compile_messages() { return compile_messages; }
+
+public void clear_compile_messages() { compile_messages = ({}); }
 
 // save_ed_setup and restore_ed_setup are called by the ed to maintain
 // individual options settings. These functions are located in the master
