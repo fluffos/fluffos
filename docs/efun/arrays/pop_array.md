@@ -101,7 +101,20 @@ while (sizeof(a)) {
     starts, so it can afford to; an array loop copies nothing.  Appending
     during a loop is always fine -- see push_array(3).
 
+### MEMORY
+
+    Removing an element shortens the array but does not immediately release
+    the storage the element occupied.  That is deliberate: it makes a pop
+    cheap and keeps a repeated push/pop cycle from churning the allocator.
+    The unused storage is handed back by the driver's periodic reclaim pass,
+    which runs every 30 to 60 seconds; reclaim_objects(3) triggers it early
+    if the memory is wanted back sooner.
+
+    So an array that grew to thousands of elements and was then drained keeps
+    its footprint until that pass runs.  memory_info(3) reports the storage
+    actually held, not just the elements currently in the array.
+
 ### SEE ALSO
 
     push_array(3), shift_array(3), unshift_array(3), undefinedp(3),
-    sizeof(3)
+    sizeof(3), reclaim_objects(3), memory_info(3)

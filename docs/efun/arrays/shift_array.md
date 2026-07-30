@@ -44,6 +44,10 @@ shift_array(a);
     Do not shift an array a `foreach` is currently walking -- see
     pop_array(3).
 
+    Removing an element does not immediately release its storage; the unused
+    capacity is returned by the driver's periodic reclaim pass.  See the
+    MEMORY section of pop_array(3).
+
 ### RETURN VALUE
 
     Returns the element that was removed.
@@ -85,4 +89,4 @@ while (sizeof(pending)) {
 ### SEE ALSO
 
     unshift_array(3), pop_array(3), push_array(3), undefinedp(3),
-    sizeof(3)
+    sizeof(3), reclaim_objects(3), memory_info(3)
