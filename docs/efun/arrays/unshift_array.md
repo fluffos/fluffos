@@ -26,18 +26,19 @@ title: arrays / unshift_array
     call result or a range (`arr[0..2]`) is not assignable and is
     rejected at compile time.
 
-    Only the variable passed in is updated.  Other variables holding the
-    same array keep the array they already had:
+    The array itself is changed, not replaced, so everything holding that
+    array sees the new element:
 
 ```c
 mixed *a = ({ 2, 3 });
 mixed *b = a;
 
 unshift_array(a, 1);
-// a is ({ 1, 2, 3 }), b is still ({ 2, 3 })
+// both a and b are ({ 1, 2, 3 })
 ```
 
-    This is the same behaviour as `a = ({ 1 }) + a`.
+    This is what distinguishes it from `a = ({ 1 }) + a`, which builds a new
+    array and rebinds only `a`.
 
 ### RETURN VALUE
 

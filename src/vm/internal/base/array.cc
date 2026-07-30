@@ -42,6 +42,7 @@ array_t the_null_array = {
 #endif
     0, /* size */
     0, /* capacity */
+    0, /* item_locks */
 #ifdef PACKAGE_MUDLIB_STATS
     {nullptr}, /* statgroup_t stats */
 #endif
@@ -297,6 +298,23 @@ array_t* resize_array(array_t* p, unsigned int n) {
    * the entire point of the ->item indirection.  The return value is kept
    * for the callers that assign it back, and for the n == 0 case above. */
   return p;
+}
+
+/*
+ * Set ->size when ->capacity already allows it (i.e. after array_reserve(),
+ * or when shrinking), keeping the mudlib-stats accounting in step.  The
+ * element block is neither reallocated nor moved, so every holder of p --
+ * and any raw pointer into p->item -- stays valid.
+ *
+ * The caller owns the elements: growing leaves the new slots uninitialized,
+ * shrinking leaves the dropped ones for the caller to have transferred or
+ * freed.
+ */
+void array_set_size(array_t* p, unsigned int n) {
+  DEBUG_CHECK(n > (unsigned int)p->capacity, "array_set_size past capacity");
+  ms_remove_stats(p);
+  p->size = n;
+  ms_setup_stats(p);
 }
 
 /*

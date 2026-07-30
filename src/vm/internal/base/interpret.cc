@@ -178,6 +178,14 @@ void kill_ref(ref_t* ref) {
       unlock_mapping(ref->sv.u.map);
     }
   }
+  if (ref->sv.type == T_ARRAY) {
+    /* Matching release for the element-block pin taken by F_MAKE_REF (an
+     * element lvalue) or by F_FOREACH (a ref loop variable over an array).
+     * Reached from the loop variable's eventual release AND from an error
+     * unwind freeing the T_REF stack slot, which is why the pin is carried
+     * on the ref's own sv rather than tracked at the loop's exit opcode. */
+    array_unlock_items(ref->sv.u.arr);
+  }
   /* Release the ref's own sv unconditionally: a foreach mapping ref
    * carries its counted mapping there even while lvalue is still null
    * (before the first iteration), and every other state holds either a
@@ -2157,6 +2165,29 @@ static int stack_size[60];
 static char* previous_pc[60];
 static int last;
 
+/*
+ * An array foreach's iteration state, packed into the one T_NUMBER stack slot
+ * the loop owns: the cursor in the low 32 bits, the element count captured at
+ * loop entry in the high 32 bits.  Both are bounded by max_array_size, well
+ * inside 32 bits.
+ *
+ * The cursor is an INDEX rather than a pointer into ->item (which is what it
+ * used to be) because push_array()/pop_array() resize an array in place, and a
+ * growth past capacity reallocates the element block -- a raw pointer into it
+ * would dangle, and comparing it against a bound derived from the NEW block is
+ * undefined besides.  An index cannot dangle.
+ *
+ * The captured count is what preserves foreach's long-standing shape
+ * guarantee: appending inside the loop body does not extend the loop.  That
+ * used to fall out of the copy path (the loop's own reference forced every
+ * reshaping operation to build a new array), which in-place mutation removes,
+ * so it is now explicit.  The live size is still consulted every step, so a
+ * shrink can never read a slot that is no longer there.
+ */
+#define FOREACH_PACK(idx, count) (((int64_t)(count) << 32) | (uint32_t)(idx))
+#define FOREACH_IDX(v) ((int)(uint32_t)(v))
+#define FOREACH_COUNT(v) ((int)((int64_t)(v) >> 32))
+
 void eval_instruction(char* p) {
   DEBUG_CHECK(current_error_context == nullptr, "No error context");
 
@@ -2347,6 +2378,13 @@ void eval_instruction(char* p) {
             ref->sv.u.refed->ref++;
             if (lv_owner_type == T_MAPPING) {
               (reinterpret_cast<mapping_t*>(lv_owner))->count |= MAP_LOCKED;
+            } else if (lv_owner_type == T_ARRAY) {
+              /* This ref holds a raw pointer INTO the array's element block
+               * (`ref a[0]', a `&'-marked efun argument).  Pin the block so
+               * the shape mutators build a new array instead of resizing in
+               * place and relocating it under us -- the same role MAP_LOCKED
+               * plays above.  kill_ref() releases it. */
+              array_lock_items(reinterpret_cast<array_t*>(lv_owner));
             }
           }
         } else {
@@ -3086,8 +3124,9 @@ void eval_instruction(char* p) {
 
           STACK_INC;
           sp->type = T_NUMBER;
-          sp->u.lvalue = (sp - 1)->u.arr->item;
           sp->subtype = 0;
+          /* index cursor + entry count -- see FOREACH_PACK */
+          sp->u.number = FOREACH_PACK(0, (sp - 1)->u.arr->size);
         }
 
         if (flags & FOREACH_RIGHT_GLOBAL) {
@@ -3120,6 +3159,21 @@ void eval_instruction(char* p) {
             ref->sv.u.map = m;
             m->ref++;
             m->count |= MAP_LOCKED;
+          } else if ((sp - 1)->type == T_ARRAY) {
+            /* Same reasoning for an array ref loop: F_NEXT_FOREACH aims this
+             * ref at arr->item + idx, and push_array()/pop_array() in the
+             * body resize the array in place -- a growth past capacity
+             * relocates the element block and would leave the ref pointing
+             * into freed memory. Pin the block for the loop's duration, and
+             * carry the array as the ref's own counted sv so kill_ref()
+             * performs the matching unlock on both the normal exit and an
+             * error unwind. */
+            array_t* arr = (sp - 1)->u.arr;
+
+            ref->sv.type = T_ARRAY;
+            ref->sv.u.arr = arr;
+            arr->ref++;
+            array_lock_items(arr);
           }
           STACK_INC;
           sp->type = T_REF;
@@ -3228,13 +3282,28 @@ void eval_instruction(char* p) {
             break;
           }
         } else { /* array */
-          if ((sp - 1)->u.lvalue < (sp - 2)->u.arr->item + (sp - 2)->u.arr->size) {
-            if (sp->type == T_REF) {
-              sp->u.ref->lvalue = (sp - 1)->u.lvalue;
-            } else {
-              assign_svalue(sp->u.lvalue, (sp - 1)->u.lvalue);
+          array_t* arr = (sp - 2)->u.arr;
+          int idx = FOREACH_IDX((sp - 1)->u.number);
+          int count = FOREACH_COUNT((sp - 1)->u.number);
+
+          if (idx < count) {
+            /* Appending in the body cannot extend the loop -- `count' was
+             * captured at entry -- but removing elements can leave the loop
+             * addressing a slot that no longer exists.  Surface that the way
+             * every other illegal element access is surfaced, rather than
+             * silently ending the loop early: foreach is not slice_array(),
+             * it does not clamp, and quietly visiting fewer elements would
+             * hide the bug rather than report it. */
+            if (idx >= arr->size) {
+              error("Array shrank during foreach: index %d is past the end (size %d).\n", idx,
+                    arr->size);
             }
-            (sp - 1)->u.lvalue++;
+            if (sp->type == T_REF) {
+              sp->u.ref->lvalue = arr->item + idx;
+            } else {
+              assign_svalue(sp->u.lvalue, arr->item + idx);
+            }
+            (sp - 1)->u.number = FOREACH_PACK(idx + 1, FOREACH_COUNT((sp - 1)->u.number));
 
             COPY_SHORT(&offset, pc);
             pc -= offset;

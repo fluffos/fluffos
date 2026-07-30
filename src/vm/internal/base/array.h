@@ -35,6 +35,21 @@ struct array_t {
 #endif
   int size;
   int capacity; /* allocated element slots; always >= size */
+  /* Number of outstanding RAW POINTERS into ->item that must survive
+   * arbitrary LPC execution: a ref_t aimed at an element (`ref a[0]', a
+   * `&'-marked efun argument) and a `foreach' ref loop variable.  While this
+   * is non-zero the element block must not be relocated, so the shape
+   * mutators fall back to building a new array instead of resizing in place.
+   *
+   * This is deliberately NOT the reference count.  An array being shared is
+   * the normal case and must still mutate in place so every holder observes
+   * it; only an outstanding interior pointer actually constrains us.  Using
+   * ref > 1 here would be a conservative superset that reintroduces exactly
+   * the refcount-dependent visibility this design exists to remove.
+   *
+   * Counterpart of MAP_LOCKED for mappings, which defers node frees while a
+   * ref points into one (see kill_ref / locked_map_nodes). */
+  int item_locks;
 #ifdef PACKAGE_MUDLIB_STATS
   statgroup_t stats; /* creator of the array */
 #endif
@@ -86,6 +101,15 @@ array_t* copy_array(array_t* p);
 array_t* resize_array(array_t* p, unsigned int n);
 /* Ensure ->capacity >= n, growing geometrically; ->size is untouched. */
 void array_reserve(array_t* p, unsigned int n);
+/* Set ->size within existing capacity without moving the element block. */
+void array_set_size(array_t* p, unsigned int n);
+
+/* Register/release a raw pointer into p->item that outlives the current
+ * opcode -- see array_t::item_locks.  Safe on the_null_array (static, and
+ * never resized). */
+static inline void array_lock_items(array_t* p) { p->item_locks++; }
+static inline void array_unlock_items(array_t* p) { p->item_locks--; }
+static inline bool array_items_pinned(array_t* p) { return p->item_locks > 0; }
 
 /* Bytes of element storage for `nelem' slots. */
 #define ARRAY_ITEMS_SIZE(nelem) (sizeof(svalue_t) * (nelem))

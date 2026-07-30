@@ -1172,24 +1172,37 @@ void f_member_array() {
  * the LPC call site -- see rule_function_call_efun) and these write the
  * resulting array back into it.
  *
- * Two guards, deliberately kept separate because they mean different things:
+ * All four mutate the array IN PLACE: the array_t header never moves, so every
+ * variable, mapping value and object variable holding that array observes the
+ * change.  This is the same contract a mapping has -- m["k"] = 1 is visible to
+ * every holder of m -- and it is deliberately NOT conditional on the reference
+ * count.  refs() can report that count, but requiring a caller to consult it
+ * before knowing whether a mutation will be visible would make the count part
+ * of the interface; sharing an array is the normal case, not a modifier.
  *
- *   arr->ref == 1   -- nobody else can observe the block, so it is safe to
- *                      mutate in place.  At ref > 1 we must build a new array
- *                      and rebind the slot, or every other holder's view would
- *                      change under it (and a realloc would dangle them).
+ * Two situations still require building a new array instead (see
+ * array_must_copy_to_resize):
  *
- *   arr->size != 0  -- allocation provenance.  Every zero-length array in the
- *                      driver IS &the_null_array (allocate_empty_array(0),
- *                      fix_array and resize_array all funnel to it), which is
- *                      a static: RESIZE_ARRAY() on it reallocs non-heap
- *                      memory.  Same reasoning as add_array()'s size-0
- *                      early-out.
+ *   the_null_array  -- the shared empty array is a static, so its element
+ *                      storage cannot be reallocated.  Every zero-length
+ *                      array from allocate_empty_array(0)/fix_array is this
+ *                      singleton.
+ *
+ *   pinned items    -- something holds a raw pointer into the element block
+ *                      across arbitrary LPC (`ref a[0]', a `&'-marked
+ *                      argument, a `foreach' ref loop variable), and growth
+ *                      past capacity would relocate the block under it.
+ *                      Rebinding leaves that pointer addressing the intact
+ *                      pre-resize array, which is the ordinary semantic of a
+ *                      reference into a structure that got replaced.
  *
  * Popping or shifting an empty array is a no-op returning undefined, matching
  * slice_array()'s clamping rather than erroring -- an out-of-range slice is
  * already sane and safe here.
  */
+static inline bool array_must_copy_to_resize(array_t* arr) {
+  return arr == &the_null_array || array_items_pinned(arr);
+}
 
 /*
  * Fetch argument 1's slot and validate that it holds an array.
@@ -1236,10 +1249,7 @@ void f_push_array() {
     error("push_array(): result would exceed maximum array size.\n");
   }
 
-  if (n != 0 && arr->ref == 1) {
-    arr = resize_array(arr, n + 1);
-    lval->u.arr = arr;
-  } else {
+  if (array_must_copy_to_resize(arr)) {
     array_t* dst = allocate_empty_array(n + 1);
 
     for (int i = 0; i < n; i++) {
@@ -1247,6 +1257,9 @@ void f_push_array() {
     }
     free_array(arr);
     lval->u.arr = arr = dst;
+  } else {
+    array_reserve(arr, n + 1);
+    array_set_size(arr, n + 1);
   }
 
   /* transfer the value: its ref moves from the stack into the array */
@@ -1266,12 +1279,7 @@ void f_unshift_array() {
     error("unshift_array(): result would exceed maximum array size.\n");
   }
 
-  if (n != 0 && arr->ref == 1) {
-    arr = resize_array(arr, n + 1);
-    /* bitwise relocation -- moving svalues touches no refcounts */
-    memmove(arr->item + 1, arr->item, n * sizeof(svalue_t));
-    lval->u.arr = arr;
-  } else {
+  if (array_must_copy_to_resize(arr)) {
     array_t* dst = allocate_empty_array(n + 1);
 
     for (int i = 0; i < n; i++) {
@@ -1279,6 +1287,11 @@ void f_unshift_array() {
     }
     free_array(arr);
     lval->u.arr = arr = dst;
+  } else {
+    array_reserve(arr, n + 1);
+    /* bitwise relocation -- moving svalues touches no refcounts */
+    memmove(arr->item + 1, arr->item, n * sizeof(svalue_t));
+    array_set_size(arr, n + 1);
   }
 
   arr->item[0] = *sp--;
@@ -1297,11 +1310,7 @@ void f_pop_array() {
 
   if (n == 0) {
     result = const0u; /* nothing to pop; the slot is left alone */
-  } else if (arr->ref == 1) {
-    /* Lift the element out before the realloc can move the block. */
-    result = arr->item[n - 1];
-    lval->u.arr = resize_array(arr, n - 1);
-  } else {
+  } else if (array_must_copy_to_resize(arr)) {
     array_t* dst = allocate_empty_array(n - 1);
 
     for (int i = 0; i < n - 1; i++) {
@@ -1310,6 +1319,12 @@ void f_pop_array() {
     assign_svalue_no_free(&result, &arr->item[n - 1]);
     lval->u.arr = dst;
     free_array(arr);
+  } else {
+    /* Transfer the element out: its reference moves to the result, and the
+     * array forgets the slot.  The block is not reallocated, so the spare
+     * capacity stays for the next push. */
+    result = arr->item[n - 1];
+    array_set_size(arr, n - 1);
   }
 
   launder_destructed(&result);
@@ -1331,12 +1346,7 @@ void f_shift_array() {
 
   if (n == 0) {
     result = const0u;
-  } else if (arr->ref == 1) {
-    result = arr->item[0];
-    /* compact before shrinking: the realloc only truncates the tail */
-    memmove(arr->item, arr->item + 1, (n - 1) * sizeof(svalue_t));
-    lval->u.arr = resize_array(arr, n - 1);
-  } else {
+  } else if (array_must_copy_to_resize(arr)) {
     array_t* dst = allocate_empty_array(n - 1);
 
     for (int i = 1; i < n; i++) {
@@ -1345,6 +1355,11 @@ void f_shift_array() {
     assign_svalue_no_free(&result, &arr->item[0]);
     lval->u.arr = dst;
     free_array(arr);
+  } else {
+    result = arr->item[0];
+    /* bitwise compaction -- moving svalues touches no refcounts */
+    memmove(arr->item, arr->item + 1, (n - 1) * sizeof(svalue_t));
+    array_set_size(arr, n - 1);
   }
 
   launder_destructed(&result);
@@ -2422,6 +2437,7 @@ void f_say() {
 #endif
                          1, /* size */
                          1, /* capacity */
+                         0, /* item_locks */
 #ifdef PACKAGE_MUDLIB_STATS
                          {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr},
 #endif
@@ -2949,6 +2965,7 @@ void f_tell_room() {
 #endif
                          1, /* size */
                          1, /* capacity */
+                         0, /* item_locks */
 #ifdef PACKAGE_MUDLIB_STATS
                          {(mudlib_stats_t*)nullptr, (mudlib_stats_t*)nullptr},
 #endif

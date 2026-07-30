@@ -25,15 +25,16 @@ title: arrays / pop_array
     call result or a range (`arr[0..2]`) is not assignable and is
     rejected at compile time.
 
-    Only the variable passed in is updated.  Other variables holding the
-    same array keep the array they already had:
+    The array itself is changed, not replaced, so everything holding that
+    array sees the element go -- exactly as map_delete() is seen by every
+    holder of a mapping:
 
 ```c
 mixed *a = ({ 1, 2, 3 });
 mixed *b = a;
 
 pop_array(a);
-// a is ({ 1, 2 }), b is still ({ 1, 2, 3 })
+// both a and b are ({ 1, 2 })
 ```
 
     Popping an empty array is not an error.  It is a no-op that returns
@@ -73,18 +74,32 @@ push_array(stack, "again");
 // stack is ({ "again" })
 ```
 
-    Mutating an array while iterating it is safe.  A `foreach` loop walks
-    the array as it stood when the loop was entered, so every element is
-    still visited even if the array empties meanwhile:
+    Do not remove elements from an array a `foreach` is currently walking.
+    A `foreach` visits as many elements as the array held when the loop was
+    entered, so removing elements leaves it addressing one that no longer
+    exists, and that is reported as an error rather than silently visiting
+    fewer elements:
 
 ```c
 mixed *a = ({ 1, 2, 3, 4 });
 
 foreach (mixed x in a) {
-  pop_array(a);
+  pop_array(a);          // visits 1, visits 2, then errors
 }
-// the loop ran four times; a is ({})
 ```
+
+    Use a `while` loop to drain an array:
+
+```c
+while (sizeof(a)) {
+  do_something(pop_array(a));
+}
+```
+
+    Note this differs from a mapping, where deleting entries during a
+    `foreach` is tolerated.  A mapping copies its key list when the loop
+    starts, so it can afford to; an array loop copies nothing.  Appending
+    during a loop is always fine -- see push_array(3).
 
 ### SEE ALSO
 

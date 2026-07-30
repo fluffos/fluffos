@@ -26,20 +26,23 @@ title: arrays / shift_array
     call result or a range (`arr[0..2]`) is not assignable and is
     rejected at compile time.
 
-    Only the variable passed in is updated.  Other variables holding the
-    same array keep the array they already had:
+    The array itself is changed, not replaced, so everything holding that
+    array sees the element go:
 
 ```c
 mixed *a = ({ 1, 2, 3 });
 mixed *b = a;
 
 shift_array(a);
-// a is ({ 2, 3 }), b is still ({ 1, 2, 3 })
+// both a and b are ({ 2, 3 })
 ```
 
     Shifting an empty array is not an error.  It is a no-op that returns
     undefined, the way an out-of-range slice_array() clamps rather than
     failing.
+
+    Do not shift an array a `foreach` is currently walking -- see
+    pop_array(3).
 
 ### RETURN VALUE
 

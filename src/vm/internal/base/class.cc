@@ -16,6 +16,7 @@ static array_t* alloc_class_block(int size) {
   p->item = reinterpret_cast<svalue_t*>(
       DMALLOC(ARRAY_ITEMS_SIZE(slots), TAG_CLASS_ITEMS, "allocate_class"));
   p->capacity = slots;
+  p->item_locks = 0; /* DMALLOC does not zero, unlike ALLOC_ARRAY_HDR */
   p->ref = 1;
   p->size = size;
 

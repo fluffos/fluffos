@@ -27,20 +27,23 @@ title: arrays / push_array
     call result or a range (`arr[0..2]`) is not assignable and is
     rejected at compile time.
 
-    Only the variable passed in is updated.  Other variables holding the
-    same array keep the array they already had:
+    The array itself is changed, not replaced, so everything holding that
+    array sees the new element -- exactly as adding a key to a mapping is
+    seen by every holder of that mapping:
 
 ```c
 mixed *a = ({ 1, 2, 3 });
 mixed *b = a;
 
 push_array(a, 4);
-// a is ({ 1, 2, 3, 4 }), b is still ({ 1, 2, 3 })
+// both a and b are ({ 1, 2, 3, 4 })
 ```
 
-    This is the same behaviour as `a += ({ 4 })`, and differs from
-    shuffle(), which reorders one array in place so that every holder of
-    it observes the change.
+    This is what distinguishes `push_array(a, 4)` from `a += ({ 4 })`.  The
+    `+=` builds a **new** array and rebinds `a` to it, leaving every other
+    holder on the original; `push_array()` reshapes the array `a` names.
+    Both leave `a` with the same contents, and that is where the similarity
+    ends.
 
 ### RETURN VALUE
 
@@ -65,9 +68,11 @@ push_array(m["items"], "sword");
 // m is ([ "items": ({ "sword" }) ])
 ```
 
-    Mutating an array while iterating it is safe.  A `foreach` loop walks
-    the array as it stood when the loop was entered, so the appended
-    elements are not visited:
+    Appending inside a `foreach` cannot extend the loop: the element count
+    is taken when the loop is entered, so an append can never turn into an
+    endless loop.  The appended elements are still added to the array, and
+    every holder of it sees them -- they are simply not visited by this
+    loop.
 
 ```c
 mixed *a = ({ 1, 2, 3 });
@@ -77,6 +82,9 @@ foreach (mixed x in a) {
 }
 // the loop ran three times; a is ({ 1, 2, 3, 10, 20, 30 })
 ```
+
+    Removing elements from the array a `foreach` is walking is a different
+    matter -- see pop_array(3).
 
 ### SEE ALSO
 
