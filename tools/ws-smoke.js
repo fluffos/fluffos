@@ -38,13 +38,14 @@
 //   * a live full-screen TUI (`tuidemo dashboard`): alternate screen,
 //     sustained frame updates, clean quit
 //   * a driver-initiated close while the connection is choked (destruct
-//     the interactive mid-backpressure): teardown must release the
-//     session resources even though the driver side is already gone --
-//     an interim revision leaked a pending session timer here, a
-//     use-after-free that aborted the driver on the ASan CI job
-//   * an `ascii`-subprotocol connection with the same bursts, sent as
-//     TEXT frames (ws_ascii.cc rejects binary frames outright) through
-//     ws_ascii.cc's twin drain loop
+//     the interactive mid-backpressure): all queued output must arrive
+//     before close, and teardown must release the session resources even
+//     though the driver side is already gone -- an interim revision leaked
+//     a pending session timer here, a use-after-free that aborted the driver
+//     on the ASan CI job
+//   * an `ascii`-subprotocol connection with the same bursts and
+//     close-after-flush check, sent as TEXT frames (ws_ascii.cc rejects
+//     binary frames outright) through ws_ascii.cc's twin drain loop
 //   * a TLS (`wss`) telnet connection: banner, then the same forced
 //     backpressure through the TLS partial-write path
 //
@@ -98,6 +99,18 @@ const BURST_CMD = 'eval write(repeat_string("x", 5000) + "|END|"); return "done"
 const BACKPRESSURE_BURST_CMD =
   'eval for (int i=0;i<600;i++) write(repeat_string("x", 8000)); write("|END|"); return "done"';
 
+// Keep the marker split in the source so the echoed command cannot satisfy
+// the close-flush assertion. The output is intentionally large enough to
+// leave the application-side websocket buffer choked when the interactive
+// is destructed.
+const CLOSE_BACKPRESSURE_BURST_CMD =
+  'eval for (int i=0;i<600;i++) write(repeat_string("x", 8000)); ' +
+  'write("|CLOSE-" + "FLUSH|"); return "done"';
+
+const CLOSE_TIMEOUT_BURST_CMD =
+  'eval for (int i=0;i<600;i++) write(repeat_string("x", 8000)); ' +
+  'write("|TIMEOUT-" + "CLOSE|"); return "done"';
+
 // ---- tiny websocket client (RFC6455 client side, no deps) ---------------
 
 class WSClient {
@@ -112,6 +125,7 @@ class WSClient {
     this._onFrame = null;
     this._pending = [];
     this.onClose = () => {};
+    this.closeCode = null;
     this.established = false;
     this.negotiated = null;
     const key = crypto.randomBytes(16).toString('base64');
@@ -158,7 +172,12 @@ class WSClient {
       const payload = this.buf.slice(off, off + len);
       this.buf = this.buf.slice(off + len);
       if (opcode === 0x9) { this.sendFrame(0xA, payload); continue; }  // ping -> pong
-      if (opcode === 0x8) { this.sock.destroy(); this.onClose(); return; }
+      if (opcode === 0x8) {
+        this.closeCode = payload.length >= 2 ? payload.readUInt16BE(0) : 1005;
+        this.sock.destroy();
+        this.onClose();
+        return;
+      }
       if (opcode === 0x1 || opcode === 0x2 || opcode === 0x0) {
         if (this._onFrame) this._onFrame(payload);
         else this._pending.push(payload);
@@ -349,21 +368,59 @@ async function main() {
   ws.close();
 
   // 5b. driver-initiated close while choked: destruct the interactive while
-  //     its output is backpressured. LWS_CALLBACK_CLOSED must release the
-  //     session resources even though pss->user is already nulled -- an
-  //     interim revision leaked a pending session timer on this path, a
-  //     use-after-free on the freed wsi/pss. On the ASan CI job such a bug
-  //     aborts the driver deterministically (the follow-up connection below
-  //     then fails); plain builds may survive it silently.
+  //     its output is backpressured. The application-side evbuffer must drain
+  //     before lws closes, and LWS_CALLBACK_CLOSED must release the session
+  //     resources even though pss->user is already nulled. An interim
+  //     revision leaked a pending session timer on this path, a use-after-free
+  //     on the freed wsi/pss. On the ASan CI job such a bug aborts the driver
+  //     deterministically (the follow-up connection below then fails); plain
+  //     builds may survive it silently.
   const wsD = await connectWS(plain, 'telnet', false);
   const sd = telnetSession(wsD);
+  let destructClosed = false;
+  wsD.onClose = () => { destructClosed = true; };
   await waitFor(() => sd.text.length > 50, 15000);
+  sd.text = '';
   wsD.sock.pause();
-  sd.sendText(BACKPRESSURE_BURST_CMD + '\r\n');
+  sd.sendText(CLOSE_BACKPRESSURE_BURST_CMD + '\r\n');
   await sleep(1000);
   sd.sendText('eval destruct(this_player()); return "bye"\r\n');
-  await sleep(2000);
+  await sleep(1000);
+  wsD.sock.resume();
+  const gotCloseFlush = await waitFor(
+    () => sd.text.includes('|CLOSE-FLUSH|'),
+    20000);
+  const gotDriverClose = await waitFor(() => destructClosed, 10000);
+  check('driver-initiated close flushes choked output before teardown',
+        gotCloseFlush && gotDriverClose && wsD.closeCode === 1000 &&
+          sd.text.length > 4700000,
+        `${sd.text.length} chars; closed ${gotDriverClose}; code ${wsD.closeCode}`);
   wsD.close();
+
+  // A peer that remains choked cannot hold the driver-side session forever.
+  // Keep this socket paused beyond close_user_websocket()'s five-second
+  // application-buffer deadline. The final marker must remain behind the
+  // choked window and the connection must be gone when reads resume.
+  const wsTimeout = await connectWS(plain, 'telnet', false);
+  const timeoutSession = telnetSession(wsTimeout);
+  let timeoutClosed = false;
+  wsTimeout.onClose = () => { timeoutClosed = true; };
+  await waitFor(() => timeoutSession.text.length > 50, 15000);
+  timeoutSession.text = '';
+  wsTimeout.sock.pause();
+  timeoutSession.sendText(CLOSE_TIMEOUT_BURST_CMD + '\r\n');
+  await sleep(1000);
+  timeoutSession.sendText(
+    'eval destruct(this_player()); return "bye"\r\n');
+  await sleep(6000);
+  wsTimeout.sock.resume();
+  const gotBoundedClose = await waitFor(() => timeoutClosed, 10000);
+  check('driver bounds close flushing for a permanently choked peer',
+        gotBoundedClose &&
+          !timeoutSession.text.includes('|TIMEOUT-CLOSE|'),
+        `${timeoutSession.text.length} chars; closed ${gotBoundedClose}`);
+  wsTimeout.close();
+
   const wsE = await connectWS(plain, 'telnet', false);
   const se = telnetSession(wsE);
   check('driver survives destruct-while-choked (teardown UAF regression)',
@@ -392,6 +449,26 @@ async function main() {
   const gotAsciiBackpressure = await waitFor(() => asciiText.includes('|END|'), 20000);
   check('ascii: recovers from genuine backpressure (lws wedge regression)',
         gotAsciiBackpressure && asciiText.length > 4700000, asciiText.length + ' chars');
+
+  asciiText = '';
+  let asciiDestructClosed = false;
+  wsA.onClose = () => { asciiDestructClosed = true; };
+  wsA.sock.pause();
+  wsA.sendText(CLOSE_BACKPRESSURE_BURST_CMD + '\n');
+  await sleep(1000);
+  wsA.sendText('eval destruct(this_player()); return "bye"\n');
+  await sleep(1000);
+  wsA.sock.resume();
+  const gotAsciiCloseFlush = await waitFor(
+    () => asciiText.includes('|CLOSE-FLUSH|'),
+    20000);
+  const gotAsciiDriverClose = await waitFor(
+    () => asciiDestructClosed,
+    10000);
+  check('ascii: driver-initiated close flushes choked output before teardown',
+        gotAsciiCloseFlush && gotAsciiDriverClose &&
+          wsA.closeCode === 1000 && asciiText.length > 4700000,
+        `${asciiText.length} chars; closed ${gotAsciiDriverClose}; code ${wsA.closeCode}`);
   wsA.close();
 
   // 7. TLS websocket: banner, then forced backpressure through the TLS

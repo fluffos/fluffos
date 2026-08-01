@@ -91,6 +91,7 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
 
       pss->user = ip;
       pss->buffer = evbuffer_new();
+      pss->close_after_flush = false;
 
       ip->iflags |= HANDSHAKE_COMPLETE;
       ip->lws = wsi;
@@ -174,6 +175,10 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
       // Data still queued: request the next writeable callback.
       if (evbuffer_get_length(pss->buffer) > 0) {
         lws_callback_on_writable(wsi);
+      }
+      if (pss->close_after_flush && evbuffer_get_length(pss->buffer) == 0) {
+        lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+        return -1;
       }
       break;
     }

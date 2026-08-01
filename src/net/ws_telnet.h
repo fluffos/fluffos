@@ -11,6 +11,7 @@ struct ws_telnet_session {
   struct interactive_t* user;
 
   struct evbuffer* buffer;
+  bool close_after_flush;
 };
 
 int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user, void* in,
