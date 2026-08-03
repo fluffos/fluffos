@@ -1,0 +1,72 @@
+// Pins the reference-semantics rule in docs/lpc/types/general.md:
+// arrays and mappings are referenced by address, so mutating an ELEMENT
+// is seen by every holder -- but "Changing the size of the array will
+// always allocate a new one though."  A size change rebinds only the
+// variable it was applied to; every other holder keeps the array it had.
+// Mappings are the deliberate contrast: adding or deleting a key mutates
+// in place and is seen by every holder.
+//
+// This split is load-bearing: mudlib code shares arrays freely on the
+// promise that no callee can reshape them out from under it, and the VM
+// itself leans on it (foreach walks an array with no snapshot precisely
+// because a reshape can only ever produce a NEW array).  Any future
+// efun that changes an array's size must follow the same rule.
+
+// A reshape inside a callee must never leak out: the argument slot
+// shares the array (shallow), so element writes propagate, but a size
+// change in the callee rebinds only the callee's parameter.
+void grow_by_operator(mixed *arr) { arr += ({ "op" }); }
+void set_first(mixed *arr) { arr[0] = "set"; }
+
+void do_tests() {
+  mixed *a, *b;
+  mapping m, n;
+
+  // Element mutation is shared -- both directions.
+  a = ({ 1, 2, 3 });
+  b = a;
+  a[0] = 99;
+  ASSERT_EQ(99, b[0]);
+  b[2] = 77;
+  ASSERT_EQ(77, a[2]);
+
+  // Growing reshapes: `a' gets a new array, `b' keeps the old one.
+  a = ({ 1, 2, 3 });
+  b = a;
+  a += ({ 4 });
+  ASSERT_EQ(4, sizeof(a));
+  ASSERT_EQ(3, sizeof(b));
+  ASSERT(a != b);
+
+  // Shrinking reshapes the same way.
+  a = ({ 1, 2, 3 });
+  b = a;
+  a -= ({ 2 });
+  ASSERT_EQ(2, sizeof(a));
+  ASSERT_EQ(3, sizeof(b));
+
+  // A range reassignment that changes the size is a reshape too.
+  a = ({ 1, 2, 3 });
+  b = a;
+  a[1..1] = ({ 8, 9 });
+  ASSERT_EQ(4, sizeof(a));
+  ASSERT_EQ(3, sizeof(b));
+
+  // Across a call boundary: the callee shares the array (its element
+  // write reaches us) but its reshape stays its own.
+  a = ({ 1, 2, 3 });
+  set_first(a);
+  ASSERT_EQ("set", a[0]);
+  grow_by_operator(a);
+  ASSERT_EQ(3, sizeof(a));
+
+  // Mappings are the contrast: key add/delete mutate in place and every
+  // holder sees it.
+  m = ([ "a": 1 ]);
+  n = m;
+  m["b"] = 2;
+  ASSERT_EQ(2, sizeof(n));
+  ASSERT_EQ(2, n["b"]);
+  map_delete(m, "a");
+  ASSERT_EQ(1, sizeof(n));
+}
