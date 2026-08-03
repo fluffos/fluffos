@@ -42,10 +42,25 @@
 //     before close, and teardown must release the session resources even
 //     though the driver side is already gone -- an interim revision leaked
 //     a pending session timer here, a use-after-free that aborted the driver
-//     on the ASan CI job
+//     on the ASan CI job. The client also SENDS input during the drain
+//     window: once a close is pending the driver must stop reading (input
+//     is discarded), because the LWS_CALLBACK_RECEIVE null-user guard used
+//     to hard-close the wsi, truncating the very flush the close waits for
 //   * an `ascii`-subprotocol connection with the same bursts and
 //     close-after-flush check, sent as TEXT frames (ws_ascii.cc rejects
 //     binary frames outright) through ws_ascii.cc's twin drain loop
+//   * a permessage-deflate connection (the only pmd coverage anywhere --
+//     browsers negotiate it, this hand-rolled client must opt in): a
+//     destruct right behind an incompressible burst, swept across sizes so
+//     the final 2048-byte drain window is guaranteed (at least once) to
+//     compress to more than pm-deflate's 1024-byte tx buffer and leave the
+//     extension mid-drain (tx_draining_ext) exactly when the application
+//     buffer empties. Closing at that instant makes lws discard the
+//     drain -- the compressed tail of the final message, and the marker
+//     with it -- so the close must wait until lws_send_pipe_choked()
+//     clears. Chromium speaks h1+pmd, Firefox h2+pmd; a test matrix
+//     without pmd has shipped "works in the test client, dies in the
+//     browser" bugs twice before (see src/www/AGENTS.md)
 //   * a TLS (`wss`) telnet connection: banner, then the same forced
 //     backpressure through the TLS partial-write path
 //
@@ -56,6 +71,7 @@
 
 const net = require('net');
 const tls = require('tls');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -114,7 +130,7 @@ const CLOSE_TIMEOUT_BURST_CMD =
 // ---- tiny websocket client (RFC6455 client side, no deps) ---------------
 
 class WSClient {
-  constructor(socket, host, port, subprotocol) {
+  constructor(socket, host, port, subprotocol, offerPmd) {
     this.sock = socket;
     this.buf = Buffer.alloc(0);
     // Frames can arrive (and be parsed) before the caller has a chance to
@@ -128,16 +144,39 @@ class WSClient {
     this.closeCode = null;
     this.established = false;
     this.negotiated = null;
+    this.pmdActive = false;
+    if (offerPmd) {
+      // One persistent raw inflater for the whole connection: RFC 7692
+      // messages are one continuous raw-deflate stream (each message ends
+      // with an elided 00 00 ff ff sync flush), which decodes identically
+      // whether or not the server resets its compression context between
+      // messages -- a reset just means later blocks never reference earlier
+      // history.
+      this._inflater = zlib.createInflateRaw();
+      this._inflater.on('data', (d) => this._deliver(d));
+      // A truncated final message (the very bug the pmd scenario guards)
+      // may leave the stream mid-block; surface that as missing output,
+      // not an unhandled 'error' crash.
+      this._inflater.on('error', () => {});
+      this._msgCompressed = false;
+    }
     const key = crypto.randomBytes(16).toString('base64');
     this.acceptWant = crypto.createHash('sha1')
       .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     socket.write(
       `GET / HTTP/1.1\r\nHost: ${host}:${port}\r\nUpgrade: websocket\r\n` +
       `Connection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\n` +
-      `Sec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: ${subprotocol}\r\n\r\n`);
+      `Sec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: ${subprotocol}\r\n` +
+      (offerPmd ? 'Sec-WebSocket-Extensions: permessage-deflate\r\n' : '') +
+      '\r\n');
     socket.on('data', (d) => this.feed(d));
     socket.on('close', () => this.onClose());
     socket.on('error', () => this.onClose());
+  }
+
+  _deliver(payload) {
+    if (this._onFrame) this._onFrame(payload);
+    else this._pending.push(payload);
   }
 
   feed(d) {
@@ -152,12 +191,15 @@ class WSClient {
       if (!accept || accept[1] !== this.acceptWant) throw new Error('bad Sec-WebSocket-Accept');
       const proto = /sec-websocket-protocol:\s*(\S+)/i.exec(head);
       this.negotiated = proto ? proto[1] : null;
+      this.pmdActive = /sec-websocket-extensions:.*permessage-deflate/i.test(head);
       this.established = true;
     }
     // frames
     for (;;) {
       if (this.buf.length < 2) return;
       const b0 = this.buf[0], b1 = this.buf[1];
+      const fin = !!(b0 & 0x80);
+      const rsv1 = !!(b0 & 0x40);
       const opcode = b0 & 0x0f;
       let len = b1 & 0x7f, off = 2;
       if (len === 126) {
@@ -179,8 +221,23 @@ class WSClient {
         return;
       }
       if (opcode === 0x1 || opcode === 0x2 || opcode === 0x0) {
-        if (this._onFrame) this._onFrame(payload);
-        else this._pending.push(payload);
+        if (this.pmdActive) {
+          // RSV1 marks a compressed message on its FIRST frame only; the
+          // extension tx-drain path splits one message across continuation
+          // frames, which are just further slices of the deflate stream.
+          if (opcode !== 0x0) this._msgCompressed = rsv1;
+          if (this._msgCompressed) {
+            this._inflater.write(payload);
+            // Each complete message elides a trailing 00 00 ff ff sync
+            // flush (RFC 7692 7.2.1); restore it so the inflater emits
+            // everything up to the message boundary.
+            if (fin) this._inflater.write(Buffer.from([0x00, 0x00, 0xff, 0xff]));
+          } else {
+            this._deliver(payload);
+          }
+        } else {
+          this._deliver(payload);
+        }
       }
     }
   }
@@ -220,7 +277,7 @@ class WSClient {
   close() { try { this.sock.destroy(); } catch (_) {} }
 }
 
-function connectWS(port, subprotocol, useTls) {
+function connectWS(port, subprotocol, useTls, offerPmd) {
   return new Promise((resolve, reject) => {
     const to = setTimeout(() => reject(new Error('ws connect timeout')), 15000);
     const sock = useTls
@@ -229,7 +286,7 @@ function connectWS(port, subprotocol, useTls) {
     sock.on('error', (e) => { clearTimeout(to); reject(e); });
     let ws;
     function onUp() {
-      ws = new WSClient(sock, '127.0.0.1', port, subprotocol);
+      ws = new WSClient(sock, '127.0.0.1', port, subprotocol, offerPmd);
       const poll = setInterval(() => {
         if (ws.established) {
           clearInterval(poll); clearTimeout(to);
@@ -386,6 +443,12 @@ async function main() {
   await sleep(1000);
   sd.sendText('eval destruct(this_player()); return "bye"\r\n');
   await sleep(1000);
+  // The close is pending and the drain is choked; a real player often keeps
+  // typing at this point. The driver must stop reading and discard this --
+  // the RECEIVE null-user guard used to hard-close the wsi here, truncating
+  // the flush this whole scenario asserts on.
+  sd.sendText('look\r\n');
+  await sleep(200);
   wsD.sock.resume();
   const gotCloseFlush = await waitFor(
     () => sd.text.includes('|CLOSE-FLUSH|'),
@@ -412,7 +475,10 @@ async function main() {
   await sleep(1000);
   timeoutSession.sendText(
     'eval destruct(this_player()); return "bye"\r\n');
-  await sleep(6000);
+  // Comfortably past the deadline: the timer only starts once the driver
+  // PROCESSES the destruct, so a tight margin here can lose the race on a
+  // loaded CI runner (resume beats the kill and the full drain arrives).
+  await sleep(7000);
   wsTimeout.sock.resume();
   const gotBoundedClose = await waitFor(() => timeoutClosed, 10000);
   check('driver bounds close flushing for a permanently choked peer',
@@ -458,6 +524,10 @@ async function main() {
   await sleep(1000);
   wsA.sendText('eval destruct(this_player()); return "bye"\n');
   await sleep(1000);
+  // Input during the pending-close drain must be discarded, not treated as
+  // a reason to hard-close -- see the telnet twin above.
+  wsA.sendText('look\n');
+  await sleep(200);
   wsA.sock.resume();
   const gotAsciiCloseFlush = await waitFor(
     () => asciiText.includes('|CLOSE-FLUSH|'),
@@ -470,6 +540,55 @@ async function main() {
           wsA.closeCode === 1000 && asciiText.length > 4700000,
         `${asciiText.length} chars; closed ${gotAsciiDriverClose}; code ${wsA.closeCode}`);
   wsA.close();
+
+  // 6b. permessage-deflate close-after-flush: the destruct lands right
+  //     behind an incompressible burst, so the application buffer empties
+  //     while pm-deflate may still hold the compressed tail of the final
+  //     message (tx_draining_ext) -- lws's close path discards that drain,
+  //     so closing at that instant truncates the message. The drain only
+  //     triggers when a drained window's COMPRESSED size exceeds
+  //     pm-deflate's 1024-byte tx buffer, and the final window's size is
+  //     (total output) mod 2048 -- not directly controllable past the
+  //     banner/echo overhead. Sweep burst sizes spaced 375 apart across a
+  //     full 2048 ring: whatever the overhead, at least one attempt's final
+  //     window lands in the drain-triggering range (window width ~650 >
+  //     point spacing 375 after wraparound gap 548), making the sweep a
+  //     deterministic regression rather than an alignment lottery.
+  const pmdSizes = [3300, 3675, 4050, 4425, 4800, 5175];
+  const pmdFailures = [];
+  let pmdNegotiated = false;
+  for (const size of pmdSizes) {
+    const wsP = await connectWS(plain, 'telnet', false, true);
+    if (!wsP.pmdActive) {
+      wsP.close();
+      break;  // pmdNegotiated check below reports it
+    }
+    pmdNegotiated = true;
+    const sp = telnetSession(wsP);
+    let pmdClosed = false;
+    wsP.onClose = () => { pmdClosed = true; };
+    await waitFor(() => sp.text.length > 50, 15000);
+    sp.text = '';
+    // Incompressible payload (uniform random over 94 printable chars,
+    // ~6.55 bits/char, and pm-deflate runs at compression level 1), marker
+    // split so the echoed command can't satisfy the assertion, destruct in
+    // the same eval so the close races the drain of this very output.
+    sp.sendText(
+      `eval string s=""; for(int j=0;j<${size};j++) s+=sprintf("%c",33+random(94)); ` +
+      'write(s+"|PMD-"+"DONE|"); destruct(this_player()); return "bye"\r\n');
+    const pmdSawClose = await waitFor(() => pmdClosed, 15000);
+    const pmdSawMarker = await waitFor(() => sp.text.includes('|PMD-DONE|'), 3000);
+    if (!(pmdSawClose && pmdSawMarker && wsP.closeCode === 1000)) {
+      pmdFailures.push(
+        `size ${size}: ${sp.text.length} chars, marker ${pmdSawMarker}, ` +
+        `closed ${pmdSawClose}, code ${wsP.closeCode}`);
+    }
+    wsP.close();
+  }
+  check('pmd: upgrade negotiates permessage-deflate', pmdNegotiated);
+  check('pmd: driver-initiated close never truncates the extension tx drain',
+        pmdNegotiated && pmdFailures.length === 0,
+        pmdFailures.length ? pmdFailures.join(' | ') : `${pmdSizes.length} burst sizes clean`);
 
   // 7. TLS websocket: banner, then forced backpressure through the TLS
   //    write path (SSL partial writes retry differently --

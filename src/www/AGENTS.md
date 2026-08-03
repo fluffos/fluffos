@@ -76,6 +76,36 @@ rules and once-bitten lessons.
   use-after-free (the pending timer fired on the freed wsi/pss). Any new
   per-session resource must be released on BOTH sides of that
   `pss->user` check.
+* **Driver-initiated close is close-AFTER-FLUSH, with four invariants**
+  (`close_user_websocket()` sets `pss->close_after_flush` + a 5s
+  `PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE` drain deadline; the writable
+  handlers close with status 1000 once drained). Breaking any of these
+  reproduced real truncation:
+  1. **Close only when the evbuffer is empty AND `!lws_send_pipe_choked()`.**
+     Choked-with-empty-buffer means permessage-deflate still holds the
+     compressed tail of the final message (`tx_draining_ext`) — entering
+     the lws close states DISCARDS that drain ("defeat tx draining" in
+     `ops-ws.c`), truncating the final message for every pmd client,
+     i.e. every real browser. Re-arm the writable callback instead; lws
+     services the extension drain itself and calls back when done.
+  2. **The close is ONE-SHOT: clear `close_after_flush` before the
+     `return -1`.** A second already-queued WRITEABLE callback can land
+     before lws processes the first close; returning -1 again re-enters
+     the close path in `LRS_RETURNED_CLOSE` and degrades the clean
+     close handshake into an immediate `close(fd)`. On a socket whose
+     autotuned kernel buffers still hold undelivered output (easy on a
+     connection that already moved megabytes), any late client byte
+     hitting the closed fd triggers an RST that purges ALL in-flight
+     data — a flaky ~30% truncation that only reproduced on a REUSED
+     high-throughput connection, never a fresh one.
+  3. **`LWS_CALLBACK_RECEIVE` with a nulled `pss->user` must DISCARD
+     (break), never `return -1`.** During the drain window a real player
+     keeps typing; hard-closing on that input truncates the very flush
+     the close is waiting for.
+  4. **Do not use `lws_rx_flow_control()` to "stop reading" during the
+     drain.** With the libevent event lib, flipping POLLIN on a live wsi
+     stalls POLLOUT servicing too — the drain freezes and the deadline
+     kills the session (observed directly; both subprotocols).
 * **Multiple stale ws connections skew debugging**: each test run that
   doesn't quit cleanly leaves the driver processing net-dead teardown;
   restart `driver etc/config.test` between debugging sessions and watch
@@ -86,8 +116,11 @@ rules and once-bitten lessons.
 * Any change to these pages, `telnet.js`, or `src/net/ws_*.cc` must keep
   `node tools/ws-smoke.js` green (CI runs it: boots the real driver,
   telnet + ascii subprotocols, SGA switch, multi-window bursts,
-  paused-socket backpressure bursts on plain AND TLS ports, a
-  destruct-while-choked teardown check, TUI frames, clean quit). It
+  paused-socket backpressure bursts on plain AND TLS ports,
+  destruct-while-choked close-flush checks with mid-drain client input,
+  a permessage-deflate close-vs-extension-drain sweep (the only pmd
+  coverage anywhere — the hand-rolled client must opt in), a bounded
+  close-deadline check, TUI frames, clean quit). It
   exists because GTest + the LPC suite exercise **zero** websocket
   client traffic. The backpressure checks are what actually regression-
   guard the lws output wedge above — verified to fail (all three) on the

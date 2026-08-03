@@ -144,14 +144,19 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
         // Hold back a trailing incomplete UTF-8 sequence so a codepoint is
         // never split across ws messages. evbuffer_copyout() does not drain,
         // so the held-back bytes stay at the front of pss->buffer and go out
-        // with the next write.
-        auto new_numbytes = static_cast<ev_ssize_t>(u8_truncate(&buf[LWS_PRE], numbytes));
-        if (new_numbytes == 0) {
-          // Only an incomplete codepoint is buffered; the exit below keeps
-          // a writeable callback requested until the rest of it arrives.
-          break;
+        // with the next write. Skip the hold-back once the user is gone
+        // (close-after-flush drain, like the telnet twin): the rest of the
+        // codepoint can never arrive, and holding it back would spin the
+        // writeable callback until the drain deadline.
+        if (pss->user) {
+          auto new_numbytes = static_cast<ev_ssize_t>(u8_truncate(&buf[LWS_PRE], numbytes));
+          if (new_numbytes == 0) {
+            // Only an incomplete codepoint is buffered; the exit below keeps
+            // a writeable callback requested until the rest of it arrives.
+            break;
+          }
+          numbytes = new_numbytes;
         }
-        numbytes = new_numbytes;
 #ifdef DEBUG
         if (!u8_validate(&buf[LWS_PRE], numbytes)) {
           char buf1[sizeof(buf) + 1] = {};
@@ -177,8 +182,19 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
         lws_callback_on_writable(wsi);
       }
       if (pss->close_after_flush && evbuffer_get_length(pss->buffer) == 0) {
-        lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
-        return -1;
+        // Choked with an empty buffer can mean permessage-deflate is still
+        // draining the last message's compressed tail -- see the telnet twin.
+        // Close only once lws has nothing left in flight.
+        if (!lws_send_pipe_choked(wsi)) {
+          // One-shot, exactly like the telnet twin: a second -1 from an
+          // already-queued WRITEABLE callback aborts the close handshake
+          // into an immediate close(fd), and a late client byte then RSTs
+          // away every kernel-buffered undelivered byte.
+          pss->close_after_flush = false;
+          lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+          return -1;
+        }
+        lws_callback_on_writable(wsi);
       }
       break;
     }
@@ -198,8 +214,11 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
         return -1;
       }
       auto ip = pss->user;
-      if (!ip) {  // we are already disconnected
-        return -1;
+      if (!ip) {
+        // Driver-initiated close pending: discard input instead of
+        // hard-closing, or one keystroke from the peer would truncate the
+        // close-after-flush drain -- see the telnet twin.
+        break;
       }
       comm_text_received(ip, (const char*)in, len);
       break;

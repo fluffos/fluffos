@@ -172,6 +172,15 @@ void close_user_websocket(struct lws* wsi) {
     // before the requested writable callback moves these final bytes into lws.
     // Give the application buffer a bounded drain; the protocol callback closes
     // as soon as it is empty, while this timeout covers a permanently choked peer.
+    //
+    // The session is also done READING: input that arrives during the drain
+    // window is discarded by the protocol callbacks' nulled-pss->user guards
+    // (LWS_CALLBACK_RECEIVE breaks instead of hard-closing, which would
+    // truncate the very output this drain exists to flush). Note that
+    // lws_rx_flow_control() is NOT the way to express that here: with the
+    // libevent event lib, flipping POLLIN on a live wsi desyncs the fd
+    // watcher and starves POLLOUT, stalling the drain until the deadline
+    // kills it.
     lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, 5);
     lws_callback_on_writable(wsi);
     return;
