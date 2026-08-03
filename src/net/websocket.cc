@@ -143,15 +143,13 @@ void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
 void close_websocket_context(struct lws_context* context) { lws_context_destroy(context); }
 
 void close_user_websocket(struct lws* wsi) {
-  lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, LWS_TO_KILL_ASYNC);
+  bool close_from_writable = false;
   switch (lws_get_protocol(wsi)->id) {
     case WS_TELNET: {
       auto pss = reinterpret_cast<ws_telnet_session*>(lws_wsi_user(wsi));
       if (pss) {
-        if (evbuffer_get_length(pss->buffer) > 0) {
-          // try flush before closing.
-          lws_callback_on_writable(wsi);
-        }
+        pss->close_after_flush = true;
+        close_from_writable = true;
         pss->user = nullptr;
       }
       break;
@@ -159,10 +157,8 @@ void close_user_websocket(struct lws* wsi) {
     case WS_ASCII: {
       auto pss = reinterpret_cast<ws_ascii_session*>(lws_wsi_user(wsi));
       if (pss) {
-        if (evbuffer_get_length(pss->buffer) > 0) {
-          // try flush before closing.
-          lws_callback_on_writable(wsi);
-        }
+        pss->close_after_flush = true;
+        close_from_writable = true;
         pss->user = nullptr;
       }
       break;
@@ -170,4 +166,26 @@ void close_user_websocket(struct lws* wsi) {
     default:
       break;
   }
+
+  if (close_from_writable) {
+    // The application-side evbuffer is outside lws, so an async kill can win
+    // before the requested writable callback moves these final bytes into lws.
+    // Give the application buffer a bounded drain; the protocol callback closes
+    // as soon as it is empty, while this timeout covers a permanently choked peer.
+    //
+    // The session is also done READING: input that arrives during the drain
+    // window is discarded by the protocol callbacks' nulled-pss->user guards
+    // (LWS_CALLBACK_RECEIVE breaks instead of hard-closing, which would
+    // truncate the very output this drain exists to flush). Note that
+    // lws_rx_flow_control() is NOT the way to express that here: with the
+    // libevent event lib, flipping POLLIN on a live wsi desyncs the fd
+    // watcher and starves POLLOUT, stalling the drain until the deadline
+    // kills it.
+    lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, 5);
+    lws_callback_on_writable(wsi);
+    return;
+  }
+
+  lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE,
+                  LWS_TO_KILL_ASYNC);
 }

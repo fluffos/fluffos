@@ -141,6 +141,7 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
 
       pss->user = ip;
       pss->buffer = evbuffer_new();
+      pss->close_after_flush = false;
 
       ip->iflags |= HANDSHAKE_COMPLETE;
       ip->lws = wsi;
@@ -236,6 +237,26 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
       if (evbuffer_get_length(pss->buffer) > 0) {
         lws_callback_on_writable(wsi);
       }
+      if (pss->close_after_flush && evbuffer_get_length(pss->buffer) == 0) {
+        // An empty application buffer is not the whole story: choked here can
+        // mean permessage-deflate still holds the compressed tail of the last
+        // message (tx_draining_ext) -- entering the close states makes lws
+        // drop that drain on the floor, truncating the final message. Only
+        // close once lws has nothing left in flight; re-arm otherwise (lws
+        // services the extension drain itself and calls back when done).
+        if (!lws_send_pipe_choked(wsi)) {
+          // One-shot: an already-queued second WRITEABLE callback can land
+          // before lws processes this close. Returning -1 again then
+          // re-enters the close path in LRS_RETURNED_CLOSE and
+          // short-circuits the close handshake into an immediate close(fd);
+          // with kernel-buffered output still undelivered, any late client
+          // byte hitting the closed fd triggers an RST that purges it all.
+          pss->close_after_flush = false;
+          lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+          return -1;
+        }
+        lws_callback_on_writable(wsi);
+      }
       break;
     }
     case LWS_CALLBACK_RECEIVE: {
@@ -249,8 +270,12 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         break;
       }
       auto ip = pss->user;
-      if (!ip) {  // we are already disconnected
-        return -1;
+      if (!ip) {
+        // Driver-initiated close pending: the interactive is gone but the
+        // close-after-flush drain may still be running. Discard the input
+        // instead of hard-closing, or one keystroke from the peer would
+        // truncate the flush; the drain deadline still bounds the session.
+        break;
       }
       comm_telnet_received(ip, (const char*)in, len);
       break;
