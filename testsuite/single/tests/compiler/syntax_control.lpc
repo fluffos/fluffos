@@ -67,8 +67,12 @@ void do_tests() {
   }
   ASSERT_EQ(6, n);
 
-  // catch: expression form and block form.
-  ASSERT_EQ(0, catch(1 + 1));
+  // catch: expression form and block form.  The operand needs a side effect
+  // to survive codegen -- a discarded side-effect-free expression is dropped
+  // (and now warned about), which would leave an empty catch testing nothing.
+  i = 0;
+  ASSERT_EQ(0, catch(i = 1 + 1));
+  ASSERT_EQ(2, i);
   ASSERT(catch(error("boom\n")));
   i = 0;
   ASSERT_EQ(0, catch { i = 5; });
@@ -76,7 +80,7 @@ void do_tests() {
   ASSERT(catch { error("boom\n"); });
 
   // time_expression: expression and block forms measure elapsed time.
-  ASSERT(time_expression (1 + 1) >= 0);
+  ASSERT(time_expression (i = 1 + 1) >= 0);   // same: needs a side effect
   ASSERT(time_expression { for (i = 0; i < 10; i++); } >= 0);
 
   // Empty statement is legal.

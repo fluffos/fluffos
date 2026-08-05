@@ -2236,6 +2236,73 @@ parse_node_t* validate_efun_call(int f, parse_node_t* args) {
         argp += i + 1;
       }
     }
+    /*
+     * Arguments declared `ref' in the .spec take the caller's SLOT rather
+     * than its value, so the call site needs no `ref' keyword -- the same
+     * shape sscanf() gets from its dedicated grammar production, obtained
+     * here by rewriting the already-parsed argument node into its lvalue
+     * form.  rule_lvalue() handles every assignable shape (local, global,
+     * index, member, range) and diagnoses the rest, so passing a
+     * non-assignable expression is a compile error rather than a runtime
+     * one.  Done after the type checks above, which read ->type (unchanged
+     * by the rewrite) and give a better message on a mistyped argument.
+     */
+    if (predefs[f].lvalue_args) {
+      parse_node_t* enode = args;
+
+      for (int argn = 0; argn < num; argn++) {
+        enode = enode->r.expr;
+        if (!enode || !enode->v.expr) {
+          break;
+        }
+        if (predefs[f].lvalue_args & (1 << argn)) {
+          parse_node_t* lval = rule_lvalue(enode->v.expr);
+          parse_node_t* mkref;
+          int op;
+
+          /*
+           * Wrap it in F_MAKE_REF, exactly as an explicit `ref' at the call
+           * site would (rule_expr_ref) -- this is not just bookkeeping.  A
+           * bare index/member lvalue is a raw pointer INTO the owning
+           * array's block, taken with no reference; a later argument that
+           * resizes that same array in place reallocs the block and leaves
+           * the pointer dangling (push_array(a[0], push_array(a, 5))).
+           * F_MAKE_REF takes a counted reference on the owner for exactly
+           * those shapes, so the resize sees ref > 1, copies instead of
+           * reallocating, and the slot stays valid.  Locals and globals
+           * live at stable addresses and F_MAKE_REF correctly skips the
+           * bump for them.  check_refs() (the caller) then emits the
+           * matching F_KILL_REFS.
+           */
+          switch (lval->kind) {
+            case NODE_PARAMETER_LVALUE:
+              op = F_LOCAL_LVALUE;
+              break;
+            case NODE_TERNARY_OP:
+            case NODE_OPCODE_1:
+            case NODE_UNARY_OP_1:
+            case NODE_BINARY_OP:
+              op = lval->v.number;
+              if (op > F_RINDEX_LVALUE) {
+                yyerror("Illegal to pass a range as argument %d to efun %s()", argn + 1,
+                        predefs[f].word);
+              }
+              break;
+            default:
+              op = 0;
+              yyerror("Illegal lvalue");
+              break;
+          }
+          num_refs++;
+          /* Keep the lvalue's static type rather than rule_expr_ref's
+           * TYPE_ANY: the argument type check above has already run, but
+           * later passes still read this node's type. */
+          CREATE_UNARY_OP_1(mkref, F_MAKE_REF, lval->type, lval, op);
+          enode->v.expr = mkref;
+        }
+      }
+    }
+
     args->kind = NODE_EFUN;
     args->l.number = num;
     args->v.number = predefs[f].token;

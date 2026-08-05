@@ -2,15 +2,40 @@
 
 #include "vm/internal/base/machine.h"
 
+/*
+ * A class is an array_t, so its element storage is a separate allocation too
+ * -- see the comment on array_t in array.h.  Classes are fixed size and never
+ * grow, so capacity is just the declared size, with a floor of one slot: a
+ * zero-size class still needs a valid ->item, which the old inline layout
+ * provided for free.
+ */
+static array_t* alloc_class_block(int size) {
+  int const slots = size > 0 ? size : 1;
+  array_t* p = reinterpret_cast<array_t*>(DMALLOC(sizeof(array_t), TAG_CLASS, "allocate_class"));
+
+  p->item = reinterpret_cast<svalue_t*>(
+      DMALLOC(ARRAY_ITEMS_SIZE(slots), TAG_CLASS_ITEMS, "allocate_class"));
+  p->capacity = slots;
+  p->item_locks = 0; /* DMALLOC does not zero, unlike ALLOC_ARRAY_HDR */
+  p->ref = 1;
+  p->size = size;
+
+  num_classes++;
+  total_class_size += sizeof(array_t) + ARRAY_ITEMS_SIZE(slots);
+
+  return p;
+}
+
 void dealloc_class(array_t* p) {
   int i;
 
   num_classes--;
-  total_class_size -= sizeof(array_t) + sizeof(svalue_t) * (p->size - 1);
+  total_class_size -= sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
 
   for (i = p->size; i--;) {
     free_svalue(&p->item[i], "dealloc_class");
   }
+  FREE((char*)p->item);
   FREE((char*)p);
 }
 
@@ -23,20 +48,9 @@ void free_class(array_t* p) {
 }
 
 array_t* allocate_class(class_def_t* cld, int has_values) {
-  array_t* p;
+  array_t* p = alloc_class_block(cld->size);
   int n = cld->size;
-  if (!n) {
-    n++;
-  }
 
-  num_classes++;
-  total_class_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
-
-  p = reinterpret_cast<array_t*>(
-      DMALLOC(sizeof(array_t) + sizeof(svalue_t) * (n - 1), TAG_CLASS, "allocate_class"));
-  n = cld->size;
-  p->ref = 1;
-  p->size = n;
   if (has_values) {
     while (n--) {
       p->item[n] = *sp--;
@@ -62,13 +76,7 @@ array_t* allocate_class_by_size(int size) {
     error("Illegal class size.\n");
   }
 
-  num_classes++;
-  total_class_size += sizeof(array_t) + sizeof(svalue_t) * (size - 1);
-
-  p = reinterpret_cast<array_t*>(
-      DMALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1), TAG_CLASS, "allocate_class"));
-  p->ref = 1;
-  p->size = size;
+  p = alloc_class_block(size);
 
   while (size--) {
     p->item[size] = const0u;
@@ -78,19 +86,9 @@ array_t* allocate_class_by_size(int size) {
 }
 
 array_t* allocate_empty_class_by_size(int size) {
-  array_t* p;
-
   if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
     error("Illegal class size.\n");
   }
 
-  num_classes++;
-  total_class_size += sizeof(array_t) + sizeof(svalue_t) * (size - 1);
-
-  p = reinterpret_cast<array_t*>(
-      DMALLOC(sizeof(array_t) + sizeof(svalue_t) * (size - 1), TAG_CLASS, "allocate_class"));
-  p->ref = 1;
-  p->size = size;
-
-  return p;
+  return alloc_class_block(size);
 }

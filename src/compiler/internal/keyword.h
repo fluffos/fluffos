@@ -24,6 +24,11 @@ struct keyword_t {
   short arg_index;          /* Index pointing to where to find arg type */
   short Default;            /* an efun to use as default for last
                              * argument */
+  short lvalue_args;        /* bitmask of arguments declared `ref' in the
+                             * .spec: those are passed as the caller's slot
+                             * (T_LVALUE) rather than by value, and
+                             * validate_efun_call() rewrites the argument
+                             * node accordingly.  Positions 0-3 only. */
 };
 
 #endif /* SRC_VM_INTERNAL_COMPILER_KEYWORD_H_ */

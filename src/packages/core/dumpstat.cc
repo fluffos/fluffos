@@ -35,8 +35,9 @@ static int svalue_size(svalue_t* v) {
         return 0;
       }
 
-      /* first svalue is stored inside the array struct */
-      total = sizeof(array_t) - sizeof(svalue_t);
+      /* Element storage is a separate allocation; the loop below adds a
+       * sizeof(svalue_t) for each element slot it visits. */
+      total = sizeof(array_t);
       for (i = 0; i < v->u.arr->size; i++) {
         total += svalue_size(&v->u.arr->item[i]) + sizeof(svalue_t);
       }

@@ -10,6 +10,13 @@
 
 #include "tests.h"
 
+// Runtime config slots for get_config()/set_config().  The driver predefines
+// the compile-time __CFG_*__ constants but not these slot numbers, so mirror
+// the ones tests need from src/include/runtime_config.h (CFG_INT(n) is
+// n + RC_BASE_CONFIG_INT, and RC_BASE_CONFIG_INT is 256).
+#define __MAX_ARRAY_SIZE__   267  // CFG_INT(11)
+#define __MAX_MAPPING_SIZE__ 269  // CFG_INT(13)
+
 #define SINGLE_DIR "/single"
 #define CONFIG_DIR "/etc"
 #define LOG_DIR    "/log"

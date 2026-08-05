@@ -67,6 +67,15 @@ int arg_types[1000], last_current_type;
  */
 int curr_arg_types[40], curr_arg_type_size;
 
+/*
+ * Bitmask of the current efun's arguments that were declared `ref' in the
+ * spec file.  Such an argument is passed as the caller's slot rather than
+ * its value: etype() ORs T_LVALUE into its runtime mask so the dispatcher's
+ * CHECK_TYPES() lets it through, and the compiler rewrites the argument
+ * node into its lvalue form (validate_efun_call).
+ */
+int curr_lvalue_args;
+
 struct type {
   const char *name;
   int num;
@@ -144,6 +153,13 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   char buff[500];
   char f_name[500];
   int i, len;
+  /* A `ref' argument's runtime mask lives in instrs[].type[], which only the
+   * fixed-arity F_EFUN1/2/3 dispatch consults; F_EFUNV walks efun_arg_etypes[]
+   * instead, where the T_LVALUE bit is not carried.  Refuse the combination
+   * rather than generating a silently unchecked argument. */
+  if (curr_lvalue_args && (limit_max || min_arg != -1)) {
+    yyerror("`ref' arguments are not supported on varargs efuns");
+  }
   if (min_arg == -1) min_arg = $5;
   if (min_arg > 127) yyerror("min_arg > 127\n");
   if ($3[0] == '\0') {
@@ -186,9 +202,10 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
     $1 = T_MIXED;
   }
 #endif
-  sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%s,%s,%d,%s},\n", $2, f_name, min_arg,
+  sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%s,%s,%d,%s,%d},\n", $2, f_name, min_arg,
           limit_max ? -1 : $5, $1 != T_VOID ? ctype($1) : "TYPE_NOVALUE",
-          etype(0).c_str(), etype(1).c_str(), etype(2).c_str(), etype(3).c_str(), i, $6);
+          etype(0).c_str(), etype(1).c_str(), etype(2).c_str(), etype(3).c_str(), i, $6,
+          curr_lvalue_args);
 
   if (strlen(buff) > sizeof buff) yyerror("Local buffer overwritten !\n");
 
@@ -199,6 +216,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   min_arg = -1;
   limit_max = 0;
   curr_arg_type_size = 0;
+  curr_lvalue_args = 0;
 };
 
 type: basic | basic '*' { $$ = $1 | 0x10000; };
@@ -245,6 +263,24 @@ arg_type: type {
 };
 
 typel: arg_type { $$ = ($1 == T_VOID && min_arg == -1); }
+| arg_type '&' {
+  /* `mixed *&' -- pass the caller's slot, not its value.  Spelled with the
+   * same `&' LPC uses for a by-reference parameter (`int & x'); `ref' is
+   * not available here, ops.spec already declares it as an operator name.
+   *
+   * The delimiting 0 for this argument has not been written yet (typel2
+   * does that), so the number of 0s already present is this argument's
+   * position. */
+  int pos = 0;
+  for (int i = 0; i < curr_arg_type_size; i++) {
+    if (curr_arg_types[i] == 0) pos++;
+  }
+  if (pos >= 4) {
+    yyerror("`ref' is only supported for the first four arguments");
+  }
+  curr_lvalue_args |= 1 << pos;
+  $$ = ($1 == T_VOID && min_arg == -1);
+}
 | typel '|' arg_type { $$ = (min_arg == -1 && ($1 || $3 == T_VOID)); }
 | '.' '.' '.' {
   $$ = min_arg == -1;
@@ -353,6 +389,11 @@ std::string etype(int n) {
     buff += etype1(curr_arg_types[i]);
   }
   if (buff == "") buff = "T_ANY";
+  /* A `&' argument arrives as a T_REF onto the caller's slot (the compiler
+   * wraps it in F_MAKE_REF), so the dispatcher's CHECK_TYPES() must accept
+   * that alongside the declared type; the efun validates what the slot
+   * actually holds. */
+  if (curr_lvalue_args & (1 << n)) buff = "T_REF|" + buff;
   return buff;
 }
 

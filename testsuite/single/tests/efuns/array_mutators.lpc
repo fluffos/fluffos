@@ -1,0 +1,412 @@
+// push_array / pop_array / shift_array / unshift_array
+// (src/packages/core/efuns_main.cc).
+//
+// These are shape operations on an array BINDING: argument 1 is declared
+// `ref` in core.spec, so the call site passes a plain variable and the
+// compiler emits an lvalue for it -- no `ref` keyword, the way sscanf()
+// takes its trailing arguments.
+//
+// Two behaviours are load-bearing and pinned below:
+//   - at ref == 1 the block is mutated in place; at ref > 1 a new array is
+//     built and only the passed slot is rebound, so other holders keep the
+//     array they had
+//   - popping or shifting an empty array is a no-op returning UNDEFINED
+//     (not 0), matching slice_array()'s out-of-range clamping
+
+mixed global_arr;
+
+// Resize an array through one reference while a second reference addresses an
+// element of it -- see the `ref' parameter case at the end of do_tests().
+void resize_owner_then_element(mixed ref elem, mixed ref owner) {
+  push_array(owner, 99);
+  push_array(elem, 7);
+}
+
+void do_tests() {
+  mixed *a, *b;
+  mixed m, popped;
+  mapping map;
+  int rc;
+
+  // --- push_array -------------------------------------------------------
+
+  a = ({ 1, 2 });
+  rc = push_array(a, 3);
+  ASSERT_EQ(3, rc);                       // returns the new size
+  ASSERT_EQ(3, sizeof(a));
+  ASSERT_EQ(3, a[2]);
+
+  // Growing an empty array must not resize the_null_array singleton.
+  a = ({});
+  rc = push_array(a, "first");
+  ASSERT_EQ(1, rc);
+  ASSERT_EQ(1, sizeof(a));
+  ASSERT_EQ("first", a[0]);
+  ASSERT_EQ(0, sizeof(({})));            // the singleton is untouched
+
+  // Every element type survives the transfer, including refcounted ones.
+  a = ({});
+  push_array(a, ({ 1, 2 }));
+  push_array(a, ([ "k": "v" ]));
+  push_array(a, "str");
+  ASSERT_EQ(3, sizeof(a));
+  ASSERT_EQ(2, sizeof(a[0]));
+  ASSERT_EQ("v", a[1]["k"]);
+  ASSERT_EQ("str", a[2]);
+
+  // --- unshift_array ----------------------------------------------------
+
+  a = ({ 2, 3 });
+  rc = unshift_array(a, 1);
+  ASSERT_EQ(3, rc);
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+
+  a = ({});
+  ASSERT_EQ(1, unshift_array(a, "only"));
+  ASSERT_EQ(({ "only" }), a);
+
+  // --- pop_array --------------------------------------------------------
+
+  a = ({ 1, 2, 3 });
+  ASSERT_EQ(3, pop_array(a));
+  ASSERT_EQ(({ 1, 2 }), a);
+  ASSERT_EQ(2, pop_array(a));
+  ASSERT_EQ(1, pop_array(a));
+  ASSERT_EQ(0, sizeof(a));
+
+  // Draining to empty lands back on a real, usable empty array.
+  ASSERT_EQ(1, push_array(a, "refilled"));
+  ASSERT_EQ(({ "refilled" }), a);
+
+  // --- shift_array ------------------------------------------------------
+
+  a = ({ 1, 2, 3 });
+  ASSERT_EQ(1, shift_array(a));
+  ASSERT_EQ(({ 2, 3 }), a);
+  ASSERT_EQ(2, shift_array(a));
+  ASSERT_EQ(({ 3 }), a);
+
+  // --- empty is a no-op returning undefined -----------------------------
+
+  a = ({});
+  popped = pop_array(a);
+  ASSERT_EQ(1, undefinedp(popped));       // NOT a plain 0
+  ASSERT_EQ(0, sizeof(a));                // slot left alone
+
+  popped = shift_array(a);
+  ASSERT_EQ(1, undefinedp(popped));
+  ASSERT_EQ(0, sizeof(a));
+
+  // A popped literal 0 is distinguishable from "nothing to pop".
+  a = ({ 0 });
+  popped = pop_array(a);
+  ASSERT_EQ(0, popped);
+  ASSERT_EQ(0, undefinedp(popped));
+
+  // --- every holder of the array sees the change ------------------------
+
+  // The array is mutated in place, so a second variable naming the same
+  // array observes it -- exactly as m["k"] = 1 is seen by every holder of a
+  // mapping.  This is NOT conditional on the reference count.
+  a = ({ 1, 2, 3 });
+  b = a;                                  // b and a name one array
+  push_array(a, 4);
+  ASSERT_EQ(4, sizeof(a));
+  ASSERT_EQ(4, sizeof(b));
+  ASSERT_EQ(({ 1, 2, 3, 4 }), b);
+
+  a = ({ 1, 2, 3 });
+  b = a;
+  ASSERT_EQ(3, pop_array(a));
+  ASSERT_EQ(({ 1, 2 }), a);
+  ASSERT_EQ(({ 1, 2 }), b);               // the shrink is visible too
+
+  a = ({ 1, 2, 3 });
+  b = a;
+  ASSERT_EQ(1, shift_array(a));
+  ASSERT_EQ(({ 2, 3 }), a);
+  ASSERT_EQ(({ 2, 3 }), b);
+
+  a = ({ 2, 3 });
+  b = a;
+  unshift_array(a, 1);
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+  ASSERT_EQ(({ 1, 2, 3 }), b);
+
+  // A global naming the same array sees it as well.
+  a = ({ "x" });
+  global_arr = a;
+  push_array(a, "y");
+  ASSERT_EQ(2, sizeof(a));
+  ASSERT_EQ(2, sizeof(global_arr));
+  ASSERT_EQ(({ "x", "y" }), global_arr);
+  global_arr = 0;
+
+  // Draining to empty in place: still the same array, and still usable.
+  a = ({ 1, 2 });
+  b = a;
+  pop_array(a);
+  pop_array(a);
+  ASSERT_EQ(0, sizeof(a));
+  ASSERT_EQ(0, sizeof(b));
+  push_array(a, "back");
+  ASSERT_EQ(({ "back" }), b);             // b is still the same array
+
+  // Contrast with +=, which builds a NEW array and rebinds only `a'.  This
+  // is the distinction between reshaping the array and replacing it.
+  a = ({ 1 });
+  b = a;
+  a += ({ 2 });
+  ASSERT_EQ(({ 1, 2 }), a);
+  ASSERT_EQ(({ 1 }), b);                  // b keeps the original array
+
+  // --- other lvalue shapes ----------------------------------------------
+
+  // A global variable as the target.
+  global_arr = ({ 1 });
+  ASSERT_EQ(2, push_array(global_arr, 2));
+  ASSERT_EQ(({ 1, 2 }), global_arr);
+  global_arr = 0;
+
+  // A mapping value as the target.
+  map = ([ "list": ({ 1, 2 }) ]);
+  ASSERT_EQ(3, push_array(map["list"], 3));
+  ASSERT_EQ(({ 1, 2, 3 }), map["list"]);
+  ASSERT_EQ(3, pop_array(map["list"]));
+  ASSERT_EQ(({ 1, 2 }), map["list"]);
+
+  // An array element as the target.
+  a = ({ ({ 1 }), ({ 2 }) });
+  ASSERT_EQ(2, push_array(a[0], 9));
+  ASSERT_EQ(({ 1, 9 }), a[0]);
+  ASSERT_EQ(({ 2 }), a[1]);
+
+  // --- a non-array binding errors ---------------------------------------
+
+  m = 5;
+  ASSERT_NE(0, catch(push_array(m, 1)));
+  ASSERT_NE(0, catch(pop_array(m)));
+  m = "not an array";
+  ASSERT_NE(0, catch(shift_array(m)));
+  ASSERT_NE(0, catch(unshift_array(m, 1)));
+
+  // --- an argument that resizes the target's container -------------------
+
+  // The argument-1 target is a reference INTO a's element block; evaluating
+  // argument 2 then resizes a.  Because that reference is outstanding, a's
+  // element block is pinned, so the inner push builds a new array rather than
+  // relocating the block the outer target points into.  The outer write then
+  // lands on the ELEMENT (a's elements are themselves arrays, shared between
+  // the pre- and post-resize containers), so it is visible through `a'.
+  //
+  // Without the pin the inner resize moves the block and the outer write
+  // lands in freed memory -- a garbage element plus "Bad ref count" on a
+  // Debug build.  Memory safety is the point here; the exact visibility is a
+  // consequence.
+  a = ({ ({ 1 }), ({ 2 }) });
+  push_array(a[0], push_array(a, 5));
+  ASSERT_EQ(3, sizeof(a));
+  ASSERT_EQ(({ 1, 3 }), a[0]);         // 3 == the inner push's return value
+  ASSERT_EQ(({ 2 }), a[1]);
+  ASSERT_EQ(5, a[2]);
+
+  // The same shape through a mapping value, where argument 2 does not
+  // disturb the container: here the write IS visible.
+  map = ([ "list": ({ 1 }) ]);
+  push_array(map["list"], sizeof(map));
+  ASSERT_EQ(({ 1, 1 }), map["list"]);
+
+  // --- foreach visits what was in the array when the loop started ---------
+
+  // Appending inside the loop cannot extend it: the element count is taken at
+  // loop entry.  The growth itself is in place, so every holder of the array
+  // does see the appended elements.
+  a = ({ 1, 2, 3 });
+  b = ({});
+  global_arr = a;
+  foreach (mixed x in a) {
+    push_array(a, 9);
+    push_array(b, x);
+  }
+  ASSERT_EQ(({ 1, 2, 3 }), b);            // three iterations: the entry count
+  ASSERT_EQ(({ 1, 2, 3, 9, 9, 9 }), a);
+  ASSERT_EQ(({ 1, 2, 3, 9, 9, 9 }), global_arr);
+  global_arr = 0;
+
+  // Removing elements from the array being walked leaves the loop addressing
+  // an element that no longer exists.  That is REPORTED, not silently
+  // skipped: foreach is not slice_array() and does not clamp.  (A mapping
+  // tolerates this because it copies its key list at loop entry; an array
+  // loop costs nothing, and taxing every loop to buy the same tolerance is a
+  // bad trade.)
+  a = ({ 1, 2, 3, 4 });
+  b = ({});
+  m = catch {
+    foreach (mixed x in a) {
+      pop_array(a);
+      push_array(b, x);
+    }
+  };
+  ASSERT_NE(0, m);
+  ASSERT_EQ(({ 1, 2 }), b);               // the iterations that were legal
+  ASSERT_EQ(({ 1, 2 }), a);               // and the pops that did happen
+
+  a = ({ 1, 2, 3, 4 });
+  m = catch {
+    foreach (mixed x in a) {
+      shift_array(a);
+    }
+  };
+  ASSERT_NE(0, m);
+
+  // Shrinking some OTHER array is of course fine.
+  a = ({ 1, 2, 3 });
+  b = ({ 9, 9, 9 });
+  foreach (mixed x in a) {
+    pop_array(b);
+  }
+  ASSERT_EQ(3, sizeof(a));
+  ASSERT_EQ(0, sizeof(b));
+
+  // A foreach ref loop variable is a usable target, and the write reaches
+  // the element (arrays mutate in place through a ref loop variable).
+  a = ({ ({ 1 }) });
+  foreach (mixed ref r in a) {
+    push_array(r, 2);
+  }
+  ASSERT_EQ(({ ({ 1, 2 }) }), a);
+
+  // ...and resizing the ITERATED array from inside such a loop is safe.  A
+  // ref loop variable is a raw pointer into the array's element block, which
+  // pins that block: resizing `a' therefore builds a new array instead of
+  // relocating the block the loop variable addresses.  The elements
+  // themselves are shared between the old and new containers, so writes
+  // through r are visible in both.
+  a = ({ ({ 1 }), ({ 2 }) });
+  b = a;                                  // keep the walked array observable
+  foreach (mixed ref r in a) {
+    push_array(a, ({ 9 }));
+    push_array(r, 0);
+  }
+  ASSERT_EQ(({ ({ 1, 0 }), ({ 2, 0 }) }), b);
+  ASSERT_EQ(4, sizeof(a));
+
+  a = ({ ({ 1 }), ({ 2 }) });
+  b = a;
+  foreach (mixed ref r in a) {
+    pop_array(a);
+    push_array(r, 0);
+  }
+  ASSERT_EQ(({ ({ 1, 0 }), ({ 2, 0 }) }), b);   // both elements still visited
+  ASSERT_EQ(0, sizeof(a));
+
+  a = ({ ({ 1 }), ({ 2 }) });
+  b = a;
+  foreach (mixed ref r in a) {
+    shift_array(a);
+    push_array(r, 0);
+  }
+  ASSERT_EQ(({ ({ 1, 0 }), ({ 2, 0 }) }), b);
+  ASSERT_EQ(0, sizeof(a));
+
+  // Same thing where the ref loop variable is itself the resize target and
+  // the iterated array is resized in the same body.
+  a = ({ ({ 1 }), ({ 2 }) });
+  b = a;
+  foreach (mixed ref r in a) {
+    unshift_array(a, ({}));
+    pop_array(r);
+  }
+  ASSERT_EQ(({ ({}), ({}) }), b);
+  ASSERT_EQ(4, sizeof(a));
+
+  // An explicit `ref' into an element, held live while the owning array is
+  // resized through a second reference.  Unlike the foreach case above this
+  // ref pins the element block, so the resize builds a new array rather than
+  // relocating the block that reference addresses -- b is what proves the
+  // element write landed somewhere still alive.  The element is shared
+  // between the old and new containers, so the write shows up in both.
+  a = ({ ({ 1 }) });
+  b = a;
+  resize_owner_then_element(ref a[0], ref a);
+  ASSERT_EQ(({ ({ 1, 7 }) }), b);
+  ASSERT_EQ(2, sizeof(a));
+  ASSERT_EQ(({ 1, 7 }), a[0]);
+  ASSERT_EQ(99, a[1]);
+
+  // --- a destructed object comes back as undefined -----------------------
+
+  // Indexing launders a destructed object to undefined (F_INDEX); removing
+  // one has to agree, or these would yield a live pointer to a dead object
+  // where a[<1] yields 0.
+  {
+    object ob = clone_object("/clone/testob1");
+
+    a = ({ 1, ob });
+    destruct(ob);
+    popped = pop_array(a);
+    ASSERT_EQ(0, popped);
+    ASSERT_EQ(1, undefinedp(popped));
+    ASSERT_EQ(0, objectp(popped));
+
+    ob = clone_object("/clone/testob1");
+    a = ({ ob, 1 });
+    destruct(ob);
+    popped = shift_array(a);
+    ASSERT_EQ(1, undefinedp(popped));
+
+    // A live object is returned untouched.
+    ob = clone_object("/clone/testob1");
+    a = ({ ob });
+    popped = pop_array(a);
+    ASSERT_EQ(1, objectp(popped));
+    ASSERT_EQ(ob, popped);
+    destruct(ob);
+  }
+
+  // --- maximum array size ------------------------------------------------
+
+  {
+    int orig_max = get_config(__MAX_ARRAY_SIZE__);
+    int at_limit, past_limit, past_limit_unshift, size_after;
+
+    // Restore via defer() so an unwind out of this block can never leave the
+    // shrunken limit behind for whatever test file runs next.
+    defer((: set_config, __MAX_ARRAY_SIZE__, orig_max :));
+
+    // Gather the results while the limit is small, and assert only after it
+    // is back -- both the assertion machinery and the mudlib error handler
+    // (which catch() still runs, and which builds a trace array) allocate
+    // arrays of their own, so the limit has to stay well clear of those.
+    a = allocate(63);
+    set_config(__MAX_ARRAY_SIZE__, 64);
+    at_limit = push_array(a, 1);              // exactly at the limit is fine
+    past_limit = catch(push_array(a, 2));     // one past must error
+    past_limit_unshift = catch(unshift_array(a, 0));
+    size_after = sizeof(a);
+    set_config(__MAX_ARRAY_SIZE__, orig_max);
+
+    ASSERT_EQ(64, at_limit);
+    ASSERT_NE(0, past_limit);
+    ASSERT_NE(0, past_limit_unshift);
+    ASSERT_EQ(64, size_after);                // a rejected push changes nothing
+  }
+
+  // --- push_array(a, x) is not a += ({ x }) ------------------------------
+
+  // Both leave `a' with the same contents, and that is where the similarity
+  // ends: += builds a NEW array and rebinds only `a', while push_array()
+  // reshapes the array `a' names, which every other holder sees.  This is the
+  // distinction between replacing an array and changing one.
+  a = ({ 1 });
+  b = a;
+  a += ({ 2 });
+  ASSERT_EQ(({ 1, 2 }), a);
+  ASSERT_EQ(({ 1 }), b);                  // b still names the original
+
+  a = ({ 1 });
+  b = a;
+  push_array(a, 2);
+  ASSERT_EQ(({ 1, 2 }), a);
+  ASSERT_EQ(({ 1, 2 }), b);               // same array, so b sees it
+}

@@ -1,0 +1,72 @@
+// pop_array()/shift_array() shrink an array's size without reallocating its
+// element storage: that is what makes a pop O(1) and a push/pop cycle
+// allocation-free.  The unused capacity is handed back by the periodic
+// reclaim_objects() sweep (array_trim(), driven from reclaim.cc), which
+// already walks every array reachable from an object variable.
+//
+// memory_info() with no argument reports the driver total, which includes
+// total_array_size -- and that counts allocated CAPACITY, so the slack is
+// visible from LPC and the trim is observable.
+
+// The array has to live in an object variable: reclaim_objects() walks object
+// variable blocks, not locals or the VM stack.
+mixed *held;
+
+void do_tests() {
+  int grown, drained, reclaimed;
+  int i;
+
+  // Grow big enough that the slack dwarfs any incidental churn elsewhere in
+  // the driver: 20000 slots is 320KB of svalue_t.
+  held = ({});
+  for (i = 0; i < 20000; i++) {
+    push_array(held, i);
+  }
+  ASSERT_EQ(20000, sizeof(held));
+  grown = memory_info();
+
+  // Drain it. The size drops; the capacity deliberately does not.
+  while (sizeof(held)) {
+    pop_array(held);
+  }
+  ASSERT_EQ(0, sizeof(held));
+  drained = memory_info();
+
+  // Draining freed no element storage -- that is the point being pinned.
+  // (A little noise either way is fine; the slack is ~320KB.)
+  ASSERT2(drained > grown - 100000,
+    "draining should not have released the element storage yet");
+
+  // The sweep gives it back.
+  reclaim_objects();
+  reclaimed = memory_info();
+
+  ASSERT2(reclaimed < drained - 200000,
+    "reclaim_objects() should have returned the unused capacity");
+
+  // The array is still perfectly usable afterwards, at its trimmed capacity.
+  ASSERT_EQ(1, push_array(held, "after"));
+  ASSERT_EQ(({ "after" }), held);
+
+  // ...and growth still works from a trimmed array (geometric growth means
+  // this costs one realloc, not one per push).
+  for (i = 0; i < 100; i++) {
+    push_array(held, i);
+  }
+  ASSERT_EQ(101, sizeof(held));
+
+  // A trim must never touch an array whose element block something holds a
+  // raw pointer into.  A foreach ref loop pins it; resizing inside the loop
+  // therefore rebinds rather than relocating, and a sweep mid-loop must leave
+  // the pinned block alone.
+  held = ({ ({ 1 }), ({ 2 }) });
+  foreach (mixed ref r in held) {
+    reclaim_objects();
+    push_array(r, 0);
+  }
+  ASSERT_EQ(2, sizeof(held));
+  ASSERT_EQ(({ 1, 0 }), held[0]);
+  ASSERT_EQ(({ 2, 0 }), held[1]);
+
+  held = 0;
+}

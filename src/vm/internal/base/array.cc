@@ -29,16 +29,24 @@ static long alist_cmp(svalue_t* /*p1*/, svalue_t* /*p2*/);
  * It is cheaper to reuse it, than to use MALLOC() and allocate.
  */
 
+/* The shared empty array's element storage.  Never read (size is 0) but kept
+ * non-null so that ->item is always a valid pointer: a memcpy/memmove of zero
+ * bytes from a null source is undefined behaviour that UBSan reports, and
+ * plenty of callers pass ->item unconditionally. */
+static svalue_t the_null_array_item[1] = {{T_NUMBER, 0, {0}}};
+
 array_t the_null_array = {
     1, /* ref, always 1. */
 #ifdef DEBUGMALLOC_EXTENSIONS
     1, /* extra_ref */
 #endif
     0, /* size */
+    0, /* capacity */
+    0, /* item_locks */
 #ifdef PACKAGE_MUDLIB_STATS
     {nullptr}, /* statgroup_t stats */
 #endif
-    {{0, 0, {0}}}, /* svalue_t item[1] */
+    the_null_array_item, /* item */
 };
 
 #ifdef PACKAGE_MUDLIB_STATS
@@ -72,13 +80,36 @@ static void ms_setup_stats(array_t* p) {
  *
  * Note that we rely a bit on gcc automatically inlining small routines.
  */
+/* Allocate a header plus `nelem' element slots and set ->capacity.  ->size is
+ * the caller's business (int_allocate_empty_array sets it; fix_array's callers
+ * over-allocate here and set a smaller size later). */
+array_t* alloc_array_block(unsigned int nelem) {
+  array_t* p = ALLOC_ARRAY_HDR();
+
+  if (!p) {
+    return nullptr;
+  }
+  p->item = ALLOC_ARRAY_ITEMS(nelem);
+  if (!p->item) {
+    FREE((char*)p);
+    return nullptr;
+  }
+  p->capacity = nelem;
+
+  return p;
+}
+
 static array_t* int_allocate_empty_array(unsigned int n) {
   array_t* p;
 
-  num_arrays++;
-  total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
-
   p = ALLOC_ARRAY(n);
+  if (!p) {
+    fatal("Out of memory.\n");
+  }
+
+  num_arrays++;
+  total_array_size += sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
+
   p->ref = 1;
   p->size = n;
   ms_setup_stats(p);
@@ -155,8 +186,9 @@ static void dealloc_empty_array(array_t* p) {
   ms_remove_stats(p);
 
   num_arrays--;
-  total_array_size -= sizeof(array_t) + sizeof(svalue_t) * (p->size - 1);
+  total_array_size -= sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
 
+  FREE((char*)p->item);
   FREE((char*)p);
 }
 
@@ -189,43 +221,192 @@ void free_empty_array(array_t* p) {
    size n */
 static array_t* fix_array(array_t* p, unsigned int n) {
   if (n) {
+    /* The caller over-allocated to a worst-case size and now knows the real
+     * one; hand the slack back.  The header address does not change, so any
+     * holder of p stays valid. */
+    if (p->capacity > n) {
+      svalue_t* items = RESIZE_ARRAY_ITEMS(p->item, n);
+
+      if (!items) {
+        fatal("Out of memory.\n");
+      }
+      p->item = items;
+      p->capacity = n;
+    }
+
     num_arrays++;
-    total_array_size += sizeof(array_t) + sizeof(svalue_t) * (n - 1);
+    total_array_size += sizeof(array_t) + ARRAY_ITEMS_SIZE(p->capacity);
 
     p->size = n;
     p->ref = 1;
     ms_setup_stats(p);
-    //      if(n>65535)
-    //          fatal("big array2");
-    return RESIZE_ARRAY(p, n);
+    return p;
   }
   if (p != &the_null_array) {
-    FREE(p);
+    /* Never registered in num_arrays / total_array_size -- that happens
+     * above -- so release the two blocks directly rather than going through
+     * dealloc_empty_array(). */
+    FREE((char*)p->item);
+    FREE((char*)p);
   }
   return &the_null_array;
 }
 
 array_t* resize_array(array_t* p, unsigned int n) {
-  total_array_size -= p->size * sizeof(svalue_t);
-  total_array_size += n * sizeof(svalue_t);
-  if (n) {
-    ms_remove_stats(p);
-    p = RESIZE_ARRAY(p, n);
-    //    if(n>65535)
-    //              fatal("big array3");
-
-    if (!p) {
-      fatal("Out of memory.\n");
-    }
-    p->size = n;
-    ms_setup_stats(p);
-  } else {
+  if (!n) {
+    /* Shrinking to empty is a deallocation, not a resize: the block goes
+     * away entirely and the shared empty array takes its place.  Account
+     * for it exactly as dealloc_empty_array() does -- num_arrays and the
+     * array_t header both have to come back off, and the mudlib stats
+     * entry has to be removed.  (The caller owns the elements; this only
+     * releases the block.)  A plain FREE() here used to leave num_arrays
+     * and total_array_size overstated, which check_memory() reports as a
+     * leak; nothing reached this path until push_array/pop_array. */
     if (p != &the_null_array) {
-      FREE(p);
+      dealloc_empty_array(p);
     }
     return &the_null_array;
   }
+
+  ms_remove_stats(p);
+
+  /* EXACT: capacity ends up equal to n, in both directions.
+   *
+   * Every caller but the push/pop efuns is a one-shot "I over-allocated to a
+   * worst case and now know the real size" shrink (slice_array, filter,
+   * deep_inventory, intersect_array) or a one-shot grow (add_array's x += x).
+   * They want the slack handed back, not retained: a filter that reduces
+   * 100k elements to one must not keep 100k slots alive in the array it
+   * returns to the mudlib.  Callers that want amortized growth ask for it
+   * explicitly via array_reserve(). */
+  if (n != (unsigned int)p->capacity) {
+    svalue_t* items = RESIZE_ARRAY_ITEMS(p->item, n);
+
+    if (!items) {
+      fatal("Out of memory.\n");
+    }
+    total_array_size -= ARRAY_ITEMS_SIZE(p->capacity);
+    total_array_size += ARRAY_ITEMS_SIZE(n);
+    p->item = items;
+    p->capacity = n;
+  }
+
+  p->size = n;
+  ms_setup_stats(p);
+
+  /* Note that p itself is unchanged -- the header does not move, which is
+   * the entire point of the ->item indirection.  The return value is kept
+   * for the callers that assign it back, and for the n == 0 case above. */
   return p;
+}
+
+/*
+ * Hand back unused element capacity, keeping ->size.  Driven by the periodic
+ * reclaim_objects() sweep, which already walks every array reachable from an
+ * object variable.
+ *
+ * Deferring the shrink to that sweep rather than doing it inside pop_array()
+ * is what keeps a pop O(1) and a push/pop cycle allocation-free; the cost is
+ * that the memory returns on the next sweep instead of immediately.
+ *
+ * Trimming all the way to ->size is fine even for an array that is still
+ * being appended to: array_reserve() grows GEOMETRICALLY, so the first push
+ * past the trimmed capacity costs one realloc and the array has slack again.
+ * An actively-appended array therefore pays at most one extra realloc per
+ * sweep interval, which against a 30-60 second period is nothing.
+ */
+void array_trim(array_t* p) {
+  unsigned int want;
+  svalue_t* items;
+
+  /* the_null_array's storage is a static, and a pinned block is one something
+   * holds a raw pointer into (see array_t::item_locks) -- reallocating either
+   * is exactly what must not happen. */
+  if (p == &the_null_array || array_items_pinned(p)) {
+    return;
+  }
+
+  /* Keep at least one slot.  A zero-byte allocation is implementation-defined
+   * (and the debug allocator rejects it outright), and ->item has to stay
+   * dereferenceable -- the same ">= 1 slot" convention allocate_class() and
+   * the object variable block already use. */
+  want = p->size ? (unsigned int)p->size : 1;
+  if (want >= (unsigned int)p->capacity) {
+    return; /* nothing to give back -- the common case, so keep it cheap */
+  }
+
+  items = RESIZE_ARRAY_ITEMS(p->item, want);
+  if (!items) {
+    return; /* shrinking failed: harmless, just keep the larger block */
+  }
+  total_array_size -= ARRAY_ITEMS_SIZE(p->capacity);
+  total_array_size += ARRAY_ITEMS_SIZE(want);
+  p->item = items;
+  p->capacity = want;
+}
+
+/*
+ * Set ->size when ->capacity already allows it (i.e. after array_reserve(),
+ * or when shrinking), keeping the mudlib-stats accounting in step.  The
+ * element block is neither reallocated nor moved, so every holder of p --
+ * and any raw pointer into p->item -- stays valid.
+ *
+ * The caller owns the elements: growing leaves the new slots uninitialized,
+ * shrinking leaves the dropped ones for the caller to have transferred or
+ * freed.
+ */
+void array_set_size(array_t* p, unsigned int n) {
+  DEBUG_CHECK(n > (unsigned int)p->capacity, "array_set_size past capacity");
+  ms_remove_stats(p);
+  p->size = n;
+  ms_setup_stats(p);
+}
+
+/*
+ * Ensure room for at least `n' elements without changing ->size, growing
+ * GEOMETRICALLY so that repeated single-element appends are amortized O(1)
+ * rather than reallocating on every push.  Never shrinks.
+ *
+ * The header does not move, so every holder of p keeps seeing the same array.
+ */
+void array_reserve(array_t* p, unsigned int n) {
+  unsigned int newcap;
+  svalue_t* items;
+
+  if (n <= (unsigned int)p->capacity) {
+    return;
+  }
+
+  /* Double, with a small floor so a fresh array does not walk 1,2,4. */
+  newcap = (p->capacity < 4) ? 4 : (unsigned int)p->capacity * 2;
+  /* p->capacity is bounded by max_array_size, so the doubling above cannot
+   * overflow; this is belt-and-braces for a caller that got there another
+   * way. */
+  if (newcap < (unsigned int)p->capacity) {
+    newcap = n;
+  }
+  if (newcap < n) {
+    newcap = n;
+  }
+  /* Don't speculatively allocate past what an array is even allowed to be --
+   * but never below what the caller actually asked for, since the size check
+   * belongs to the caller. */
+  {
+    auto max_array_size = (unsigned int)CONFIG_INT(__MAX_ARRAY_SIZE__);
+
+    if (newcap > max_array_size) {
+      newcap = (n > max_array_size) ? n : max_array_size;
+    }
+  }
+
+  items = RESIZE_ARRAY_ITEMS(p->item, newcap);
+  if (!items) {
+    fatal("Out of memory.\n");
+  }
+  total_array_size -= ARRAY_ITEMS_SIZE(p->capacity);
+  total_array_size += ARRAY_ITEMS_SIZE(newcap);
+  p->item = items;
+  p->capacity = newcap;
 }
 
 array_t* explode_string(const char* str, int slen, const char* del, int dellen, bool reversible) {
@@ -865,16 +1046,26 @@ array_t* add_array(array_t* p, array_t* r) {
   array_t* d; /* destination */
 
   /*
-   * have to be careful with size zero arrays because they could be
-   * the_null_array.  REALLOC(the_null_array, ...) is bad :(
+   * Zero-length fast paths.  Release the empty argument with free_array()
+   * rather than a bare ref--: a zero-length array is no longer necessarily
+   * the immortal the_null_array (pop_array()/shift_array() shrink in place,
+   * so a heap array can reach size 0), and dropping its last reference
+   * without deallocating leaks the block.
+   *
+   * Resolve the result BEFORE releasing, since p and r may be the same
+   * array -- freeing first would leave the ternary reading a dead header.
    */
   if (p->size == 0) {
-    p->ref--;
-    return r->ref > 1 ? (r->ref--, copy_array(r)) : r;
+    array_t* d = r->ref > 1 ? (r->ref--, copy_array(r)) : r;
+
+    free_array(p);
+    return d;
   }
   if (r->size == 0) {
-    r->ref--;
-    return p->ref > 1 ? (p->ref--, copy_array(p)) : p;
+    array_t* d = p->ref > 1 ? (p->ref--, copy_array(p)) : p;
+
+    free_array(r);
+    return d;
   }
 
   res = p->size + r->size;
@@ -1098,7 +1289,7 @@ void map_string(svalue_t* arg, int num_arg) {
 static function_to_call_t* sort_array_ftc;
 
 array_t* builtin_sort_array(array_t* inlist, int dir) {
-  qsort(reinterpret_cast<char*>(inlist->item), inlist->size, sizeof(inlist->item),
+  qsort(reinterpret_cast<char*>(inlist->item), inlist->size, sizeof(svalue_t),
         (dir < 0) ? builtin_sort_array_cmp_rev : builtin_sort_array_cmp_fwd);
 
   return inlist;
@@ -1210,9 +1401,9 @@ void f_sort_array(void) {
       tmp = copy_array(tmp);
       push_refed_array(tmp);
       if (CONFIG_INT(__RC_SANE_SORTING__)) {
-        qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
+        qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(svalue_t), sort_array_cmp);
       } else {
-        old_quickSort((char*)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
+        old_quickSort((char*)tmp->item, tmp->size, sizeof(svalue_t), sort_array_cmp);
       }
       sort_array_ftc = old_ptr;
       sp--;  // remove tmp from stack, but we don't want to free it!
@@ -1581,8 +1772,12 @@ array_t* subtract_array(array_t* minuend, array_t* subtrahend) {
   long i, size, o, d, l, h, msize;
 
   if (!(size = subtrahend->size)) {
-    subtrahend->ref--;
-    return minuend->ref > 1 ? (minuend->ref--, copy_array(minuend)) : minuend;
+    /* free_array(), not a bare ref--, and after the result is resolved -- see
+     * the note in add_array(). */
+    array_t* d = minuend->ref > 1 ? (minuend->ref--, copy_array(minuend)) : minuend;
+
+    free_array(subtrahend);
+    return d;
   }
   if (!(msize = minuend->size)) {
     free_array(subtrahend);
@@ -1789,14 +1984,20 @@ array_t* union_array(array_t* a1, array_t* a2) {
   svalue_t *svt_1, *ntab, *sv_tab, *tmp, *sv_ptr, val;
   long curix, parix, child1, child2;
 
+  /* free_array(), not a bare ref--, and after the result is resolved -- see
+   * the note in add_array(). */
   if (a1s == 0) {
-    a1->ref--;
-    return a2->ref > 1 ? (a2->ref--, copy_array(a2)) : a2;
+    array_t* d = a2->ref > 1 ? (a2->ref--, copy_array(a2)) : a2;
+
+    free_array(a1);
+    return d;
   }
 
   if (a2s == 0 || a1 == a2) {
-    a2->ref--;
-    return a1->ref > 1 ? (a1->ref--, copy_array(a1)) : a1;
+    array_t* d = a1->ref > 1 ? (a1->ref--, copy_array(a1)) : a1;
+
+    free_array(a2);
+    return d;
   }
   /* allocating a new place, a1s + a2s must be enough */
   d = a1s + a2s;
