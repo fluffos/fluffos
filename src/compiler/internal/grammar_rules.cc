@@ -7,6 +7,7 @@
 #include "compiler/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
+#include "debugger/debug_hook.h"
 
 #include <fmt/format.h>
 
@@ -263,6 +264,41 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
     fun = define_new_function(identifier, argument.num_arg, max_num_locals - argument.num_arg,
                               *func_types, (type & 0xffff) | optional_star);
     if (fun != -1) {
+      // Snapshot local/argument names for the debugger's variable inspector
+      // (DESIGN.md §9) before free_all_local_names() discards them below.
+      // Captured here (top of the block, before the default-argument-closure
+      // loop) rather than right before free_all_local_names() so an early
+      // `return` from that loop on a compile error can't skip it.
+      //
+      // Interned via store_prog_string(), same as class member names in
+      // rule_define_class_members() above -- the strings ride on
+      // prog->strings[]'s own generic per-program free loop, so no per-entry
+      // free is needed, only a single FREE() of the backing short[] (see
+      // deallocate_program()).
+      //
+      // Indexed by runtime_index, NOT array position: a local declared
+      // inside a for()/switch() block that already closed uses
+      // pop_n_locals(), which drops it from locals_ptr[] (so it can't be
+      // captured here) without giving its slot back to max_num_locals -- the
+      // slot number stays permanently reserved for this function. Those
+      // slots are left as -1 (falls back to argN/localN in the debugger).
+      if (max_num_locals > 0 && lpc_debugger_wants_local_names()) {
+        function_t* debug_def = FUNCTION_DEF(fun);
+        int total = max_num_locals;
+        auto* names = reinterpret_cast<short*>(
+            DMALLOC(total * sizeof(short), TAG_LOCAL_NAMES, "rule_func: local_names"));
+        for (int li = 0; li < total; li++) {
+          names[li] = -1;
+        }
+        for (int li = 0; li < current_number_of_locals; li++) {
+          int slot = locals_ptr[li].runtime_index;
+          if (slot >= 0 && slot < total) {
+            names[slot] = store_prog_string(locals_ptr[li].ihe->name);
+          }
+        }
+        debug_def->local_names = names;
+      }
+
       *function = new_node_no_line();
       (*function)->kind = NODE_FUNCTION;
       (*function)->v.number = fun;

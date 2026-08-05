@@ -181,7 +181,8 @@
       "socket_efuns",
       "tls",
       "websocket",
-      "tracing"
+      "tracing",
+      "debugger"
     ],
     "labels": {
       "lpc": "The LPC Language",
@@ -197,7 +198,8 @@
       "socket_efuns": "Socket Efuns",
       "tls": "TLS",
       "websocket": "WebSocket",
-      "tracing": "Tracing"
+      "tracing": "Tracing",
+      "debugger": "WebSocket LPC Debugger"
     }
   },
   "driver": {

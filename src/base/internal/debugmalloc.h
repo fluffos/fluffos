@@ -75,6 +75,17 @@ static const int TAG_SOCKETS = (TAG_PERMANENT + 39);
 // allocate_object_variables) -- separate from the object_t allocation
 // so recompile_object() can swap programs with a different variable count.
 static const int TAG_OBJ_VARS = (TAG_PERMANENT + 40);
+// Compiler-emitted local/argument name table for the source debugger
+// (compiler/internal/grammar_rules.cc rule_func(), src/debugger/DESIGN.md
+// §9): one function_t::local_names block per function that captured names.
+// NOTE: the "+n" suffix is a GLOBAL id (line 35's comment) shared across
+// every TAG_* category via `blocks[tag & 0xff]` (packages/develop/
+// checkmemory.cc) -- +41 collided with TAG_MALLOC_STRING (TAG_DATA + 41)
+// and made check_string_stats() misreport live malloc-string counts
+// whenever any program compiled with "debugger port" set was still
+// loaded, a hard `-ftest` failure. Cross-check EVERY category below, not
+// just TAG_PERMANENT, before reusing a number.
+static const int TAG_LOCAL_NAMES = (TAG_PERMANENT + 53);
 // Compile-arena chunks (compiler/internal/scratchpad.cc): retained across
 // compiles by design -- whitelisted in check_all_blocks like the other
 // persistent driver infrastructure.
