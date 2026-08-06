@@ -37,7 +37,10 @@ union u {
  * differently, which will affect how it should be freed.
  */
 struct svalue_t {
-  unsigned short type;
+  /* 32-bit: the 16 low type bits are fully allocated (see the T_* defines
+   * below), so new value types must use bits at 0x10000 and above. Layout is
+   * unchanged on 64-bit targets: 4 + 2 + 2 bytes padding + 8-byte union. */
+  uint32_t type;
   unsigned short subtype;
   union u u;
 };

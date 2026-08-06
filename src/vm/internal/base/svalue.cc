@@ -85,12 +85,12 @@ namespace {
 // only that each is eventually dealloc'd exactly once.
 struct PendingCompoundFree {
   void* ptr;
-  unsigned short type;  // T_ARRAY, T_CLASS, or T_MAPPING
+  uint32_t type;  // T_ARRAY, T_CLASS, or T_MAPPING
 };
 bool g_freeing_compound = false;
 std::vector<PendingCompoundFree>* g_pending_compound_frees = nullptr;
 
-void dealloc_one_compound(void* ptr, unsigned short type) {
+void dealloc_one_compound(void* ptr, uint32_t type) {
   switch (type) {
     case T_CLASS:
       dealloc_class(reinterpret_cast<array_t*>(ptr));
@@ -107,7 +107,7 @@ void dealloc_one_compound(void* ptr, unsigned short type) {
 // Dispatches one T_ARRAY/T_CLASS/T_MAPPING deallocation, deferring to the
 // queue above if a dealloc_*() call is already in progress further up the
 // (now-flat) call chain.
-void free_compound(void* ptr, unsigned short type) {
+void free_compound(void* ptr, uint32_t type) {
   if (g_freeing_compound) {
     if (!g_pending_compound_frees) {
       g_pending_compound_frees = new std::vector<PendingCompoundFree>();

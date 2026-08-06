@@ -63,7 +63,7 @@ struct PendingFix {
 };
 
 struct Frame {
-  unsigned short type;  // T_ARRAY, T_CLASS, T_MAPPING, or T_FUNCTION
+  uint32_t type;  // T_ARRAY, T_CLASS, T_MAPPING, or T_FUNCTION
   union {
     array_t* arr;
     mapping_t* map;
@@ -127,7 +127,7 @@ std::string render_key(const svalue_t* key) {
   }
 }
 
-Frame make_frame(unsigned short type, void* ptr) {
+Frame make_frame(uint32_t type, void* ptr) {
   Frame f{};
   f.type = type;
   f.u.ptr = ptr;
@@ -155,7 +155,7 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
   // svalue slot; it CAN be a back-edge target, because bind() shares the
   // args array between the old and the new funptr (f_bind in
   // packages/core/efuns_main.cc bumps args->ref instead of copying).
-  auto handle_edge = [&](unsigned short ttype, void* tptr, svalue_t* slot, SlotKind kind,
+  auto handle_edge = [&](uint32_t ttype, void* tptr, svalue_t* slot, SlotKind kind,
                          std::string&& label) {
     auto ins = color.try_emplace(tptr, COLOR_GREY);
     if (ins.second) {  // white: tree edge, descend
