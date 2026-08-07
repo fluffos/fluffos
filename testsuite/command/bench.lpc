@@ -70,6 +70,73 @@ int main(string arg) {
   after = perf_counter_ns();
   REPORT("  ^ same, mapping lookups hoisted", (after - before) / 20000);
 
+  // --- grapheme-cluster (EGC) operations on ASCII strings ---
+  // sizeof()/indexing on a string walks Unicode grapheme boundaries. These
+  // measure the pure-ASCII path, which is what mudlib strings almost always are.
+  {
+    string s16 = "0123456789abcdef";
+    string sBig = read_file("/2000.txt");
+    int acc;
+
+    before = perf_counter_ns();
+    for (i = 0; i < 200000; i++) {
+      acc += sizeof(s16);
+    }
+    after = perf_counter_ns();
+    REPORT("sizeof(16-byte string)", (after - before) / 200000);
+
+    before = perf_counter_ns();
+    for (i = 0; i < 2000; i++) {
+      acc += sizeof(sBig);
+    }
+    after = perf_counter_ns();
+    write(sprintf("%-38s: %12d ns  (%d bytes)\n", "sizeof(large string)",
+      (after - before) / 2000, sizeof(sBig)));
+
+    // Non-ASCII strings gain nothing from the fast path and pay one extra
+    // linear scan before ICU runs. Measure that cost explicitly.
+    {
+      string wide = "";
+      string wideBig;
+      for (i = 0; i < 16; i++) {
+        wide += "你好";  // 你好
+      }
+      wideBig = "";
+      for (i = 0; i < 200; i++) {
+        wideBig += wide;
+      }
+      before = perf_counter_ns();
+      for (i = 0; i < 20000; i++) {
+        acc += sizeof(wide);
+      }
+      after = perf_counter_ns();
+      write(sprintf("%-38s: %12d ns  (%d bytes)\n", "sizeof(non-ASCII small)",
+        (after - before) / 20000, strlen(wide)));
+
+      before = perf_counter_ns();
+      for (i = 0; i < 200; i++) {
+        acc += sizeof(wideBig);
+      }
+      after = perf_counter_ns();
+      write(sprintf("%-38s: %12d ns  (%d bytes)\n", "sizeof(non-ASCII large)",
+        (after - before) / 200, strlen(wideBig)));
+    }
+
+    before = perf_counter_ns();
+    for (i = 0; i < 200000; i++) {
+      acc += s16[5];
+    }
+    after = perf_counter_ns();
+    REPORT("string index s[5]", (after - before) / 200000);
+
+    before = perf_counter_ns();
+    for (i = 0; i < 200000; i++) {
+      junk = s16[3..8];
+    }
+    after = perf_counter_ns();
+    REPORT("string range s[3..8]", (after - before) / 200000);
+  }
+
   // --- the actual reported workload: generate a full planet surface ---
   n = 0;
   before = perf_counter_ns();
