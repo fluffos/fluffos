@@ -36,7 +36,7 @@
 #include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lexer_rules_pp.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/stage_output.h"
 #include "mainlib.h"
 #include "vm/internal/base/interpret.h"
@@ -2473,4 +2473,43 @@ TEST(StageOutput, LoadFailureReturnsFalseAndCleansUp) {
   program_t* good = compile_file("int k() { return 3; }\n", "/after_stage_fail");
   ASSERT_NE(good, nullptr);
   deallocate_program(good);
+}
+
+// ---------------------------------------------------------------------------
+// A compile BORROWS its arena; the caller owns the lifetime.
+//
+// When the compiler reset the arena at the end of a compile it was freeing
+// its own output before the caller had read it -- which is why Diagnostic
+// records had to be heap-allocated. Handing compile_file() an arena inverts
+// that: it allocates there and leaves it untouched, so the owner decides
+// when the memory dies.
+TEST(CompileArenaOwnership, CompileLeavesTheCallersArenaIntact) {
+  ensure_compile_env();
+
+  ScratchArena arena;
+  {
+    ScratchArenaBinding const bind(arena);
+    EXPECT_EQ(0u, scratch_stats().cycle_bytes) << "fresh arena";
+  }
+
+  program_t* prog = compile_file("int f() { return 1; }", "/arena_owned",
+                                 &g_driver_vm_context, &arena);
+  ASSERT_NE(prog, nullptr);
+
+  {
+    ScratchArenaBinding const bind(arena);
+    // The compile's transients are STILL there after compile_file returned:
+    // it neither reset nor freed the arena. This is the property that lets
+    // compiler output outlive the compile.
+    EXPECT_GT(scratch_stats().cycle_bytes, 0u)
+        << "compile must not reset an arena it does not own";
+    EXPECT_EQ(0u, scratch_stats().resets) << "compile must not reset the caller's arena";
+
+    // ...and the owner is the one who reclaims it.
+    arena.reset();
+    EXPECT_EQ(0u, scratch_stats().cycle_bytes);
+    EXPECT_EQ(1u, scratch_stats().resets);
+  }
+
+  deallocate_program(prog);
 }

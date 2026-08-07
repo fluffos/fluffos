@@ -33,7 +33,7 @@
 /* Make the generated grammar.autogen.h self-sufficient for the %union:
  * the `string` member is a ScratchString* (arena string, scratchpad.h). */
 %code requires {
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 }
 
 %{

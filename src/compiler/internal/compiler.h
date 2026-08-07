@@ -10,7 +10,7 @@
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "trees.h"
 #include "compiler/internal/compiler_utils.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
@@ -479,9 +479,16 @@ inline int& compiler_directive_start_line = g_compile.directive_start_line;
 #define MAX_COMPILE_DEPTH 32
 
 // Zero-copy file form: reads fd straight into the arena scan buffer.
-program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context);
+/* A compile BORROWS its arena: it allocates every transient there and
+ * leaves it exactly as it found it -- never reset, never freed. The caller
+ * owns it and decides when that memory dies, which is what lets compiler
+ * output (Diagnostic records above all) outlive the compile. Callers that
+ * do not care may omit it and get a per-call arena that dies on return. */
+program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context,
+                           ScratchArena* arena = nullptr);
 program_t* compile_file(std::string_view source, const char*,
-                        vm_context_t* vm_context = &g_driver_vm_context);
+                        vm_context_t* vm_context = &g_driver_vm_context,
+                        ScratchArena* arena = nullptr);
 
 void reset_function_blocks(void);
 void copy_variables(program_t*, int);

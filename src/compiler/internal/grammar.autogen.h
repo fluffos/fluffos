@@ -47,7 +47,7 @@ extern int yydebug;
 /* "%code requires" blocks.  */
 #line 35 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 #line 53 "$BUILD_ROOT$/src/grammar.autogen.h"
 
@@ -191,4 +191,4 @@ void yypstate_delete (yypstate *ps);
 
 
 #endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */
-/* FluffOS generated-from grammar.y sha256=728753a714187bc4267cb6913374a16543a24935e9017960519fd14e02f3fcb5 */
+/* FluffOS generated-from grammar.y sha256=9bf4bfcf7fe14e7b170e86ac22994339c8ef1b964f6a65c29f5c45dc9542f946 */

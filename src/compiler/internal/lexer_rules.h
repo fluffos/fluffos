@@ -4,7 +4,7 @@
 #include <string>
 
 #include "vm/internal/base/number.h"  // for LPC_INT
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 // lexer_rules.h / lexer_rules.cc — the substantive logic behind lexer.l's
 // rule actions, pulled out into ordinary functions so lexer.l itself stays a

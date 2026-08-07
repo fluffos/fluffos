@@ -14,7 +14,7 @@
 #include "compiler/internal/lexer.h"
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 // See lexer.l's STR_CHECK_OVERFLOW comment: this cap roughly matches the old
 // MAXLINE-based "String too long" limit.

@@ -6,7 +6,7 @@
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 
 // Structs used by value in rule helpers — must match grammar.y %union fields.

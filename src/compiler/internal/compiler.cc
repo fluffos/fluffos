@@ -19,7 +19,7 @@
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
-#include "scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "symbol.h"
 #include <string>
 #include <utility>
@@ -2357,13 +2357,15 @@ void yywarn(const char* fmt, ...) {
 /*
  * Compile an LPC file.
  */
-program_t* compile_file_fd(int fd, const char* name, vm_context_t* vm_context) {
+program_t* compile_file_fd(int fd, const char* name, vm_context_t* vm_context,
+                           ScratchArena* arena) {
   prolog_source_fd = fd;  // consumed-and-cleared by prolog (unwind-safe)
   prolog_source_is_fd = true;
-  return compile_file(std::string_view{}, name, vm_context);
+  return compile_file(std::string_view{}, name, vm_context, arena);
 }
 
-program_t* compile_file(std::string_view source, const char* name, vm_context_t* vm_context) {
+program_t* compile_file(std::string_view source, const char* name, vm_context_t* vm_context,
+                        ScratchArena* arena) {
   static int guard = 0;
   program_t* prog;
   extern int func_present;
@@ -2381,6 +2383,27 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
     error("Object cannot be loaded during compilation.\n");
   }
   guard = 1;
+
+  /* Borrow the caller's arena for the duration. We never reset it and
+   * never free it: the caller owns that memory and decides when it dies,
+   * which is the whole reason compiler output can outlive the compile.
+   *
+   * A caller that does not care (arena == nullptr) gets the shared default
+   * arena, which IS ours to recycle -- so it is reset here, on the way in.
+   * Recycling on entry rather than on exit is the point of the whole
+   * inversion: the previous compile's transients stay readable until the
+   * next compile actually starts.
+   *
+   * The default arena is deliberately process-lifetime rather than a local
+   * declared here. A fresh arena per compile would discard the retained
+   * chunk cache every time -- that cache is what drives a long-lived driver
+   * to zero chunk mallocs in the steady state -- and would leave
+   * scratch_stats()/mud_status() describing an arena that never took part
+   * in a compile.
+   */
+  ScratchArena& compile_arena = (arena != nullptr) ? *arena : scratch_default_arena();
+  if (arena == nullptr) compile_arena.reset();
+  ScratchArenaBinding const arena_binding(compile_arena);
 
   // Publish this compile's identity on the one state object for the
   // duration (cleared in the DEFER below).
@@ -3087,7 +3110,6 @@ static program_t* epilog(void) {
   }
   release_tree();
   uninitialize_parser();
-  scratch_destroy();
   clean_up_locals();
   free_unused_identifiers();
   end_new_file();
@@ -3225,9 +3247,6 @@ static void clean_parser() {
   release_tree();
   uninitialize_parser();
   clean_up_locals();
-  // (Buffers were torn down at the top of this function; the arena reset
-  // must still come after everything that reads arena memory.)
-  scratch_destroy();
   free_unused_identifiers();
 }
 
