@@ -192,6 +192,7 @@ static block_t* alloc_new_shared_string(const char* string, int h, const char* w
   }
   SIZE(b) = (len > UINT_MAX ? UINT_MAX : len);
   REFS(b) = 1;
+  b->ascii = MSTR_ASCII_UNKNOWN;  // computed lazily on first EGC query
   md_record_ref_journal(PTR_TO_NODET(b), true, b->refs,
                         "alloc_new_shared_string: " + std::string(why));
   NEXT(b) = base_table[h];
@@ -374,6 +375,7 @@ char* int_new_string(unsigned int size)
     ADD_NEW_STRING(UINT_MAX, sizeof(malloc_block_t));
   }
   mbt->ref = 1;
+  mbt->ascii = MSTR_ASCII_UNKNOWN;  // computed lazily on first EGC query
   ADD_STRING(mbt->size);
   CHECK_STRING_STATS;
   return reinterpret_cast<char*>(mbt + 1);
@@ -390,6 +392,9 @@ char* extend_string(const char* str, int len) {
   } else {
     mbt->size = UINT_MAX;
   }
+  // The caller is about to write new bytes into the extended buffer, so a
+  // previously cached ASCII answer no longer describes the contents.
+  mbt->ascii = MSTR_ASCII_UNKNOWN;
   ADD_STRING_SIZE(mbt->size - oldsize);
   CHECK_STRING_STATS;
 

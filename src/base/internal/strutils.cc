@@ -13,6 +13,7 @@
 #include "base/internal/log.h"
 #include "base/internal/rc.h"
 #include "base/internal/EGCIterator.h"
+#include "base/internal/stralloc.h"
 
 bool u8_validate(char** s) {
   const auto* p = (const uint8_t*)(*s);
@@ -603,4 +604,20 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
     }
   }
   return result;
+}
+
+// See the declaration in strutils.h. The scan itself is EGCIterator's
+// (all_ascii); this only adds the per-string memoization, which is what
+// makes a repeated sizeof() on the same string O(1) instead of O(n).
+bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted) {
+  if (!counted) {  // no block header to memoize into
+    return EGCIterator(str, len).is_ascii();
+  }
+  unsigned char cached = MSTR_ASCII(str);
+  if (cached != MSTR_ASCII_UNKNOWN) {
+    return cached == MSTR_ASCII_YES;
+  }
+  bool ascii = EGCIterator(str, len).is_ascii();
+  MSTR_ASCII(str) = ascii ? MSTR_ASCII_YES : MSTR_ASCII_NO;
+  return ascii;
 }

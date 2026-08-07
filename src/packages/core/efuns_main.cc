@@ -2494,6 +2494,16 @@ void f_sizeof() {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
+      // Pure ASCII (the overwhelming majority of mudlib text) has one
+      // grapheme cluster per byte, and counted strings remember that in
+      // their block header -- so this is O(1) with no iterator at all.
+      if (u8_string_is_ascii_cached(sp->u.string, SVALUE_STRLEN(sp),
+                                    (sp->subtype & STRING_COUNTED) != 0)) {
+        i = SVALUE_STRLEN(sp);
+        free_string_svalue(sp);
+        put_number(i);
+        return;
+      }
       EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("f_sizeof: Invalid UTF8 string!");

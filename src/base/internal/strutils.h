@@ -222,6 +222,20 @@ class EGCSmartIterator : public EGCIterator {
   int32_t ascii_pos_ = 0;  // byte offset cursor, ASCII fast path only
 };
 
+// Is this string pure ASCII (and CR-free), i.e. does byte offset equal
+// grapheme-cluster index throughout?
+//
+// Pass counted=true only for a STRING_MALLOC / STRING_SHARED string, i.e.
+// one that has a malloc_block_t/block_t header: those memoize the answer in
+// the header, so repeated queries on the same string are O(1) -- which is
+// what turns the common `for (i = 0; i < sizeof(s); i++)` from O(n^2) into
+// O(n). A STRING_CONSTANT has no header and is rescanned each time.
+// See MSTR_ASCII_* in stralloc.h.
+//
+// Takes primitives rather than an svalue_t deliberately: base/ must not
+// depend on VM types (see AGENTS.md 12).
+bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted);
+
 // Check string s is valid utf8
 bool u8_validate(char**);
 bool u8_validate(const char*);
