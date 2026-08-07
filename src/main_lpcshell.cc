@@ -75,6 +75,7 @@
 #include "vm/internal/base/svalue.h"
 #include "vm/internal/base/array.h"
 #include "packages/core/sprintf.h"
+#include "compiler/internal/scratchpad.h"
 
 namespace {
 
@@ -365,6 +366,15 @@ std::string EnsureTrailingSemicolon(std::string s) {
 // Returns false when the statement failed to compile or errored at
 // runtime, so script mode (issue #921) can report a nonzero exit status.
 bool Eval(Session* session, std::string stmt) {
+  // lpcshell is the one consumer that reads compiler output AFTER the
+  // compile that produced it -- it renders compiler_diags itself, below,
+  // once the compile has finished. Hold the arena open for the whole
+  // evaluation so that compiler-side data may live on the scratchpad
+  // instead of being forced onto the heap for our benefit; everything is
+  // bulk-freed when this guard goes out of scope. Compiles nested inside
+  // (the expression attempt, then the statement retry) simply accumulate.
+  ScratchHold const arena_hold;
+
   // Trim trailing newline the REPL loop always appends.
   while (!stmt.empty() && (stmt.back() == '\n' || stmt.back() == '\r')) stmt.pop_back();
   if (stmt.find_first_not_of(" \t") == std::string::npos) return true;

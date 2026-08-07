@@ -93,6 +93,37 @@ ScratchString* scratch_new_string(std::string_view sv);
 // perform NO chunk mallocs at all -- observable via scratch_stats().
 void scratch_destroy();
 
+// Hold the arena open across a compile boundary.
+//
+// The compiler resets the arena at the end of every compile, which is why
+// anything a consumer reads AFTERWARDS -- Diagnostic records above all --
+// has had to live on the heap instead. That is a tax on the compiler paid
+// for the benefit of out-of-band readers, of which lpcshell is the only
+// one that matters.
+//
+// While a hold is active scratch_destroy() only records that a reset was
+// requested; the actual bulk free happens when the last hold is released.
+// So a consumer can compile, read arena-backed compiler output, and then
+// release -- at which point everything is freed in one bump-reset as usual.
+//
+// Nesting is counted, so a hold spanning several compiles is fine (each
+// one's arena memory simply accumulates until release). Use the RAII guard
+// below rather than pairing the calls by hand.
+void scratch_hold();
+void scratch_release();
+
+// True while at least one hold is outstanding. Exposed for assertions and
+// for scratch_stats() consumers that need to explain a non-resetting arena.
+bool scratch_held();
+
+class ScratchHold {
+ public:
+  ScratchHold() { scratch_hold(); }
+  ~ScratchHold() { scratch_release(); }
+  ScratchHold(const ScratchHold&) = delete;
+  ScratchHold& operator=(const ScratchHold&) = delete;
+};
+
 // Steady-state observability: after warmup, `chunk_mallocs` must stop
 // growing across compiles (the warm cache absorbs every request) -- the
 // multi-round benchmark and leak hunts key off this.

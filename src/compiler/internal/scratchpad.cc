@@ -145,7 +145,29 @@ void* scratch_raw_allocate(std::size_t bytes, std::size_t align) {
   return p;
 }
 
+// Outstanding scratch_hold() count, and whether a reset was requested while
+// held. See scratchpad.h.
+static int hold_count = 0;
+static bool reset_pending = false;
+
+void scratch_hold() { hold_count++; }
+
+void scratch_release() {
+  if (hold_count > 0 && --hold_count == 0 && reset_pending) {
+    reset_pending = false;
+    scratch_destroy();
+  }
+}
+
+bool scratch_held() { return hold_count > 0; }
+
 void scratch_destroy() {
+  if (hold_count > 0) {
+    // A consumer is still reading arena memory produced by this compile;
+    // defer the bulk free to the matching scratch_release().
+    reset_pending = true;
+    return;
+  }
   ensure_init();
   while (overflow != nullptr) {
     Chunk* next = overflow->next_overflow;

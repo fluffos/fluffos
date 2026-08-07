@@ -2474,3 +2474,56 @@ TEST(StageOutput, LoadFailureReturnsFalseAndCleansUp) {
   ASSERT_NE(good, nullptr);
   deallocate_program(good);
 }
+
+// ---------------------------------------------------------------------------
+// scratch_hold(): keep the arena open across a compile boundary.
+//
+// The compiler resets the arena at the end of every compile, which is why
+// anything read afterwards (Diagnostic records, lpcshell's deferred
+// rendering) has had to live on the heap. A hold defers that reset so
+// compiler-side data can stay on the scratchpad instead.
+TEST(ScratchHold, DefersResetUntilRelease) {
+  scratch_destroy();  // start from a known state
+  auto base = scratch_stats().resets;
+
+  {
+    ScratchHold const hold;
+    EXPECT_TRUE(scratch_held());
+    // Arena memory allocated under the hold must survive a reset request.
+    ScratchString* s = scratch_new_string("held across the reset");
+    scratch_destroy();  // deferred, not performed
+    EXPECT_EQ(base, scratch_stats().resets) << "reset must not run while held";
+    EXPECT_EQ("held across the reset", std::string(s->c_str()));
+  }
+
+  EXPECT_FALSE(scratch_held());
+  EXPECT_EQ(base + 1, scratch_stats().resets) << "release must perform the deferred reset";
+}
+
+TEST(ScratchHold, NestsAndOnlyOutermostReleaseResets) {
+  scratch_destroy();
+  auto base = scratch_stats().resets;
+
+  {
+    ScratchHold const outer;
+    {
+      ScratchHold const inner;
+      scratch_destroy();
+      EXPECT_EQ(base, scratch_stats().resets);
+    }
+    // Inner release must NOT reset: the outer hold is still outstanding.
+    EXPECT_TRUE(scratch_held());
+    EXPECT_EQ(base, scratch_stats().resets) << "inner release reset too early";
+  }
+  EXPECT_EQ(base + 1, scratch_stats().resets);
+}
+
+TEST(ScratchHold, NoResetRequestMeansNoResetOnRelease) {
+  scratch_destroy();
+  auto base = scratch_stats().resets;
+  {
+    ScratchHold const hold;
+    // no scratch_destroy() inside
+  }
+  EXPECT_EQ(base, scratch_stats().resets) << "release must not invent a reset";
+}
