@@ -49,6 +49,36 @@ void do_tests() {
   s += wide;                // grows in place
   ASSERT_EQ(7, sizeof(s));  // 5 + 2 clusters, NOT 5 + 6 bytes
 
+  // --- the CR-LF seam: concatenation propagates the tag as
+  // ascii(a+b) == ascii(a) && ascii(b), which is only exact because a CR
+  // disqualifies a string outright. Joining "...\r" with "\n..." forms one
+  // CRLF cluster ACROSS the seam, so a propagated "both ASCII" would be a
+  // wrong answer here -- both sides must already be tagged non-ASCII. ---
+  s = "a\r";
+  ASSERT_EQ(2, sizeof(s));  // tag it before joining
+  s += "\nb";
+  ASSERT_EQ(3, sizeof(s));  // 'a', CRLF, 'b' -- not 4
+
+  // --- <non-string> + string takes a THIRD concat path in f_add
+  // (SVALUE_STRING_ADD_LEFT, for int/float/object on the left), which builds
+  // the result fresh instead of extending either operand. The left operand is
+  // held in a variable so the expression cannot be constant-folded away before
+  // f_add ever runs.
+  //
+  // Cluster counts here are correct whether or not the tag is propagated -- an
+  // untagged result just gets rescanned. What this pins is the direction that
+  // would NOT be self-correcting: propagating "ASCII" across a seam that forms
+  // a CRLF, which would answer from the byte length and be wrong. ---
+  int n = 12;
+  s = n + "abc";
+  ASSERT_EQ("12abc", s);
+  ASSERT_EQ(5, sizeof(s));
+  s = n + wide;  // non-ASCII on the right must not come back tagged ASCII
+  ASSERT_EQ(2 + sizeof(wide), sizeof(s));
+  n = 1;
+  s = n + "\r\nb";  // '1', CRLF, 'b' -- a propagated "ASCII" would say 4
+  ASSERT_EQ(3, sizeof(s));
+
   // --- non-ASCII, then reduced back to ASCII ---
   s = wide + "xy";
   ASSERT_EQ(4, sizeof(s));
