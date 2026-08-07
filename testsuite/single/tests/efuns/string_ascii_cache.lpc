@@ -49,6 +49,16 @@ void do_tests() {
   s += wide;                // grows in place
   ASSERT_EQ(7, sizeof(s));  // 5 + 2 clusters, NOT 5 + 6 bytes
 
+  // --- the CR-LF seam: concatenation propagates the tag as
+  // ascii(a+b) == ascii(a) && ascii(b), which is only exact because a CR
+  // disqualifies a string outright. Joining "...\r" with "\n..." forms one
+  // CRLF cluster ACROSS the seam, so a propagated "both ASCII" would be a
+  // wrong answer here -- both sides must already be tagged non-ASCII. ---
+  s = "a\r";
+  ASSERT_EQ(2, sizeof(s));  // tag it before joining
+  s += "\nb";
+  ASSERT_EQ(3, sizeof(s));  // 'a', CRLF, 'b' -- not 4
+
   // --- non-ASCII, then reduced back to ASCII ---
   s = wide + "xy";
   ASSERT_EQ(4, sizeof(s));

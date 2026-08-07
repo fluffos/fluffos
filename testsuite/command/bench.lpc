@@ -122,6 +122,20 @@ int main(string arg) {
         (after - before) / 200, strlen(wideBig)));
     }
 
+    // Build-and-measure loop: without tag propagation across concatenation
+    // each append produces an untagged string, so every sizeof() rescans the
+    // whole (growing) buffer -- O(n^2).
+    {
+      string acc_s = "";
+      before = perf_counter_ns();
+      for (i = 0; i < 4000; i++) {
+        acc_s += "x";
+        acc += sizeof(acc_s);
+      }
+      after = perf_counter_ns();
+      REPORT("append+sizeof loop (4000 iters)", after - before);
+    }
+
     before = perf_counter_ns();
     for (i = 0; i < 200000; i++) {
       acc += s16[5];
