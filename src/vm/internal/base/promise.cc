@@ -317,10 +317,15 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
        * for g_coroutine_econ; throw_error()/await-rejection set it
        * directly). An acatch() region catches it in-place. */
       control_stack_t* marker = nullptr;
-      if (!max_eval_error && !too_deep_error) {
+      if (!max_eval_error) {
         marker = find_acatch_marker(econ.save_csp);
       }
       if (marker) {
+        /* "Too deep recursion." is catchable, exactly as in do_catch(): the
+         * unwind below cuts the control stack back to the marker, so depth
+         * is no longer exceeded when the region's continuation runs. Only
+         * the eval-cost error stays unswallowable. */
+        too_deep_error = 0;
         /* The unwind pops control frames, which runs defer() handlers --
          * arbitrary LPC that can error() again. If that happens the stacks
          * are mid-unwind, so fall through to the reject path (which cuts
@@ -470,6 +475,12 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   previous_ob = coro->prev_ob;
   current_object = coro->ob;
   current_prog = coro->prog;
+  /* (pc, current_prog) must stay a consistent pair from here on: rebuilding
+   * the frame can run mudlib code before eval_instruction() sets pc itself
+   * (unwind_to_acatch_marker() below pops control frames, which runs their
+   * defer() handlers), and dump_trace()/find_line() would compute a bogus
+   * offset from a null pc against a real program. */
+  pc = coro->prog->program + coro->pc_offset;
   function_index_offset = coro->function_index_offset;
   variable_index_offset = coro->variable_index_offset;
   fp = sp + 1;

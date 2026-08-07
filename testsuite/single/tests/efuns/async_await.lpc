@@ -86,6 +86,39 @@ async void acatch_parked_await() {
   acatchParked++;
 }
 
+nosave int deferUnwound;
+
+void unwind_boom() {
+  deferUnwound = 1;
+  error("defer raised during acatch unwind");
+}
+
+// A defer() registered INSIDE an acatch region runs while a rejected resume
+// unwinds the control stack back to the marker -- that is mudlib code
+// executing after the frame has been rebuilt but before eval_instruction()
+// sets pc. If it errors, dump_trace()/find_line() must still see a
+// consistent (pc, current_prog) pair; a null pc against a live program is a
+// Debug-build fatal ("Illegal offset ... in object ...").
+async void defer_in_acatch() {
+  acatch {
+    defer((: unwind_boom :));
+    await reject_trigger;
+  };
+}
+
+nosave int tooDeepCaught, tooDeepResumed;
+
+int recurse_forever(int n) { return recurse_forever(n + 1); }
+
+// "Too deep recursion." is catchable by acatch exactly as by catch: only the
+// eval-cost error is unswallowable
+async void acatch_too_deep() {
+  mixed err = acatch(recurse_forever(0));
+
+  tooDeepResumed = 1;  // the region's continuation must actually run
+  tooDeepCaught = stringp(err) && strsrch(err, "Too deep recursion") != -1;
+}
+
 nosave int coFired, coAwaited, coRemoved, coAcatch;
 
 int co_target() {
@@ -236,6 +269,12 @@ void do_tests() {
   // acatch over a PENDING await, rejected later
   reject_trigger = promise_create();
   acatch_parked_await();
+  promise_catch(defer_in_acatch(), (: 0 :));
+
+  // acatch catches "Too deep recursion." (runs entirely synchronously)
+  acatch_too_deep();
+  ASSERT(tooDeepResumed);
+  ASSERT(tooDeepCaught);
 
   // await_callout(): fulfilled by the call_out firing, and rejected when
   // the call_out is removed before it runs
@@ -262,10 +301,10 @@ void do_tests() {
   }, 1);
 
   call_out(function() {
-    int ok = resumed == 7 && chained == 1 && rejectedCaught == 1 && passThrough == 1 && voidDone == 1 && deferRan == 1 && nestedDone == 14 && acatchAwait == 1 && acatchParked == 1 && settledAwait == 1 && coAwaited == 1 && coRemoved == 1 && coAcatch == 2;
-    ASSERT2(ok, sprintf("deferred async checks: %O %O %O %O %O %O %O %O %O %O %O %O %O", resumed,
+    int ok = resumed == 7 && chained == 1 && rejectedCaught == 1 && passThrough == 1 && voidDone == 1 && deferRan == 1 && nestedDone == 14 && acatchAwait == 1 && acatchParked == 1 && settledAwait == 1 && coAwaited == 1 && coRemoved == 1 && coAcatch == 2 && deferUnwound == 1;
+    ASSERT2(ok, sprintf("deferred async checks: %O %O %O %O %O %O %O %O %O %O %O %O %O %O", resumed,
       chained, rejectedCaught, passThrough, voidDone, deferRan, nestedDone, acatchAwait,
-      acatchParked, settledAwait, coAwaited, coRemoved, coAcatch));
+      acatchParked, settledAwait, coAwaited, coRemoved, coAcatch, deferUnwound));
     if (!ok) shutdown(-1);
     trigger = 0;
     reject_trigger = 0;
