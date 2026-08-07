@@ -163,6 +163,8 @@ void do_tests() {
 //    command-giver-stack entries.
 nosave int nestDone;
 
+mixed cycle_helper(mixed a, mixed b) { return b; }
+
 // a defer() handler that errors WHILE the acatch unwind is popping frames:
 // the throw must not escape the coroutine boundary (which would leave the
 // driver's error context pointing at a dead C++ stack frame)
@@ -195,6 +197,37 @@ void do_more_tests() {
   ASSERT_EQ(1, has_cycle(a));
   break_cycles(a);
   ASSERT_EQ(0, has_cycle(a));
+
+  // A loop through a promise's PENDING REACTION list (a handler capturing
+  // the promise it is attached to) holds strong refs with no other
+  // reclamation path, so it must be visible to the cycle walkers too --
+  // it was previously invisible to both them and the ref checker, and so
+  // leaked permanently and silently.
+  a = promise_create();
+  promise_then(a, (: cycle_helper($1, $(a)) :));
+  ASSERT_EQ(1, has_cycle(a));
+  ASSERT(break_cycles(a) > 0);
+  ASSERT_EQ(0, has_cycle(a));
+
+  // Both shapes must also be RECLAIMABLE by the Debug orphan collector,
+  // not merely reported: a second sweep must find nothing left. (The
+  // collector counted promises as dead but never severed or released
+  // them, so it reported the same blocks forever -- which also made every
+  // later test file fail check_leaks() on a Debug build.)
+#if efun_defined(find_orphaned_cycles)
+  for (i = 0; i < 5; i++) {
+    a = promise_create();
+    b = promise_create();
+    promise_reject(a, b);
+    promise_reject(b, a);
+    a = promise_create();
+    promise_then(a, (: cycle_helper($1, $(a)) :));
+  }
+  a = 0;
+  b = 0;
+  find_orphaned_cycles(1);
+  ASSERT2(find_orphaned_cycles(1) == 0, "promise cycles must be reclaimed, not reported forever");
+#endif
 
   // an acatch-caught error per iteration must not accumulate VM state
   for (i = 0; i < 200; i++) {

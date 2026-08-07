@@ -1247,10 +1247,27 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         break;
       }
       case TAG_PROMISE: {
-        // same edge set as cycles.cc's T_PROMISE case: the settled value
+        // Same edge set as cycles.cc's T_PROMISE case: the settled value
+        // AND the pending reaction list. The reactions hold strong refs
+        // (handler funptrs and the chained promise), so a handler that
+        // captures the promise it is attached to closes a real loop --
+        // treating them as leaves made that leak undetectable.
         auto* prom = reinterpret_cast<promise_t*>(p);
         if (void* c = data_child(&prom->result)) {
           cb(c);
+        }
+        if (prom->reactions) {
+          for (auto& r : *prom->reactions) {
+            if (r.on_fulfilled) {
+              cb(reinterpret_cast<void*>(r.on_fulfilled));
+            }
+            if (r.on_rejected) {
+              cb(reinterpret_cast<void*>(r.on_rejected));
+            }
+            if (r.next) {
+              cb(reinterpret_cast<void*>(r.next));
+            }
+          }
         }
         break;
       }
@@ -1288,7 +1305,7 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
     });
   }
 
-  int dead = 0, n_arr = 0, n_cls = 0, n_map = 0, n_fp = 0;
+  int dead = 0, n_arr = 0, n_cls = 0, n_map = 0, n_fp = 0, n_prom = 0;
   for (auto& kv : cands) {
     if (!kv.second.live) {
       dead++;
@@ -1305,12 +1322,17 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         case TAG_FUNP:
           n_fp++;
           break;
+        case TAG_PROMISE:
+          n_prom++;
+          break;
       }
     }
   }
   if (dead && ob) {
-    outbuf_addv(ob, "orphaned by reference loops: %d array(s), %d class(es), %d mapping(s), %d function pointer(s)\n",
-                n_arr, n_cls, n_map, n_fp);
+    outbuf_addv(ob,
+                "orphaned by reference loops: %d array(s), %d class(es), %d mapping(s), %d "
+                "function pointer(s), %d promise(s)\n",
+                n_arr, n_cls, n_map, n_fp, n_prom);
   }
 
   if (dead && collect) {
@@ -1329,6 +1351,9 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           break;
         case TAG_FUNP:
           reinterpret_cast<funptr_t*>(kv.first)->hdr.ref++;
+          break;
+        case TAG_PROMISE:
+          reinterpret_cast<promise_t*>(kv.first)->ref++;
           break;
       }
     }
@@ -1370,6 +1395,30 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           }
           break;
         }
+        case TAG_PROMISE: {
+          // Drop the settled value AND the pending reaction list: both hold
+          // strong refs and either can close a loop.
+          auto* prom = reinterpret_cast<promise_t*>(kv.first);
+          free_svalue(&prom->result, "collect_cycles");
+          prom->result = const0;
+          if (prom->reactions) {
+            for (auto& r : *prom->reactions) {
+              if (r.on_fulfilled) {
+                free_funp(r.on_fulfilled);
+                r.on_fulfilled = nullptr;
+              }
+              if (r.on_rejected) {
+                free_funp(r.on_rejected);
+                r.on_rejected = nullptr;
+              }
+              if (r.next) {
+                free_promise(r.next);
+                r.next = nullptr;
+              }
+            }
+          }
+          break;
+        }
       }
     }
     // 3. release
@@ -1389,6 +1438,9 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           break;
         case TAG_FUNP:
           free_funp(reinterpret_cast<funptr_t*>(kv.first));
+          break;
+        case TAG_PROMISE:
+          free_promise(reinterpret_cast<promise_t*>(kv.first));
           break;
       }
     }

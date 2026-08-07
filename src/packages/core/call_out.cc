@@ -58,7 +58,16 @@ static void settle_call_out_promise(pending_call_t* cop, svalue_t* value, int re
   cop->promise = nullptr;
   if (p->state == PROMISE_PENDING) {
     if (value) {
-      promise_settle(p, value, rejected);
+      if (rejected) {
+        promise_settle(p, value, 1);
+      } else {
+        /* NOT raw promise_settle(): the callback's return value is
+         * arbitrary and may be a promise -- possibly this very one. Go
+         * through the resolve path so it flattens and self-resolution is
+         * refused, preserving "a fulfilled result is never T_PROMISE"
+         * (a self-reference here was an unreclaimable cycle). */
+        promise_resolve_with(p, value);
+      }
     } else {
       svalue_t err;
       err.type = T_STRING;
