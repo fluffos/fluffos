@@ -157,6 +157,23 @@ inline void free_svalue_maybe_refed(svalue_t* v) {
 // commonly used svalue.
 extern svalue_t const0, const1, const0u;
 
+/* Is this string svalue pure ASCII (and CR-free), i.e. byte offset == grapheme
+ * cluster index? Kept as a macro rather than an inline function so it expands
+ * where SVALUE_STRLEN/STRING_COUNTED are already visible. */
+#define SVALUE_STR_ASCII(sv)                                            \
+  u8_string_is_ascii_cached((sv)->u.string, SVALUE_STRLEN(sv), ((sv)->subtype & STRING_COUNTED) != 0)
+
+/* Tag a freshly built concatenation. ascii(a + b) == ascii(a) && ascii(b) is
+ * exact ONLY because the ASCII predicate excludes CR: with no CR on either
+ * side, no CR-LF (one cluster, UAX #29 GB3) can form across the seam. If
+ * either side is non-ASCII its bytes survive into the result, so NO likewise
+ * propagates exactly -- neither case needs to rescan the joined string.
+ *
+ * Without this, `s += x` in a loop re-derives the tag from scratch for each
+ * intermediate string, making an accompanying sizeof(s) O(n^2). */
+#define MSTR_TAG_JOIN(res, ascii_both) \
+  (MSTR_ASCII(res) = (ascii_both) ? MSTR_ASCII_YES : MSTR_ASCII_NO)
+
 /* These are not used anywhere */
 
 /* Beek - add some sanity to joining strings */
@@ -169,6 +186,7 @@ extern svalue_t const0, const1, const0u;
     int ess_r;                                                                                    \
     ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y);                                             \
     if (ess_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
+    bool ess_ascii = SVALUE_STR_ASCII(x) && u8_string_is_ascii_cached((y), ess_len - ess_r, false);\
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
       ess_res = (char*)extend_string((x)->u.string, ess_len);                                     \
       if (!ess_res) fatal("Out of memory!\n");                                                    \
@@ -181,6 +199,7 @@ extern svalue_t const0, const1, const0u;
       (x)->subtype = STRING_MALLOC;                                                               \
     }                                                                                             \
     (x)->u.string = ess_res;                                                                      \
+    MSTR_TAG_JOIN(ess_res, ess_ascii);                                                             \
   })
 
 /* <something that needs no free> + string svalue */
@@ -192,6 +211,7 @@ extern svalue_t const0, const1, const0u;
     int pss_len;                                                                                  \
     pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));                                            \
     if (pss_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
+    bool pss_ascii = SVALUE_STR_ASCII(sp) && u8_string_is_ascii_cached((y), pss_r, false);         \
     pss_res = new_string(pss_len, z);                                                             \
     strcpy(pss_res, y);                                                                           \
     strcpy(pss_res + pss_r, sp->u.string);                                                        \
@@ -199,6 +219,7 @@ extern svalue_t const0, const1, const0u;
     sp->type = T_STRING;                                                                          \
     sp->u.string = pss_res;                                                                       \
     sp->subtype = STRING_MALLOC;                                                                  \
+    MSTR_TAG_JOIN(pss_res, pss_ascii);                                                            \
   })
 
 /* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
@@ -211,6 +232,7 @@ extern svalue_t const0, const1, const0u;
     ssj_r = SVALUE_STRLEN(x);                                                                     \
     ssj_len = ssj_r + SVALUE_STRLEN(y);                                                           \
     if (ssj_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
+    bool ssj_ascii = SVALUE_STR_ASCII(x) && SVALUE_STR_ASCII(y);                                   \
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
       ssj_res = (char*)extend_string((x)->u.string, ssj_len);                                     \
       if (!ssj_res) fatal("Out of memory!\n");                                                    \
@@ -225,6 +247,7 @@ extern svalue_t const0, const1, const0u;
       (x)->subtype = STRING_MALLOC;                                                               \
     }                                                                                             \
     (x)->u.string = ssj_res;                                                                      \
+    MSTR_TAG_JOIN(ssj_res, ssj_ascii);                                                             \
   })
 
 // Translate svalue into json summary, only suitable for
