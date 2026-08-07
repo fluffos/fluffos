@@ -157,25 +157,56 @@ static std::string display_path(const std::string& file) {
 // snippet (macro-definition notes). The driver runs chdir()ed into the
 // mudlib root, so the real path is the mud path without its leading '/'.
 // Best-effort: returns "" when unreadable (in-memory sources, gone files).
+//
+// This used to walk the file with fgetc(), one byte at a time, and a single
+// rendered diagnostic calls it once per level of a macro-expansion chain --
+// so cost was O(levels x filesize) in one-byte stdio calls. Profiling the
+// LPC testsuite measured 45.4 million fgetc() calls, 12% of the entire run,
+// for only 153 rendered diagnostics.
+//
+// Now it reads through a fixed stack buffer and finds line breaks with
+// memchr. No heap buffer and no scratchpad arena for the scan: this runs
+// both DURING a compile (report_compile_diagnostic, from yyerror/yywarn)
+// and well AFTER one (lpcshell renders stored diagnostics once the arena
+// has been reset, and the compiler GTests call it with no compile at all),
+// so arena allocation here would outlive its cycle. Rescanning per level
+// costs nothing worth caching now that the scan is memchr over 8K blocks.
 static std::string read_source_line(const char* mud_path, int line_no) {
   if (mud_path == nullptr || line_no <= 0) return "";
   const char* rel = mud_path[0] == '/' ? mud_path + 1 : mud_path;
   FILE* f = fopen(rel, "rb");
   if (f == nullptr) return "";
+
+  constexpr size_t kMaxLine = 512;  // clamp, as the byte-at-a-time reader did
+  char buf[8192];
   std::string line;
-  int cur = 1;
-  int ch;
-  while ((ch = fgetc(f)) != EOF) {
-    if (cur == line_no) {
-      if (ch == '\n') break;
-      if (line.size() < 512) line += static_cast<char>(ch);
-    } else if (ch == '\n') {
+  int cur = 1;            // line number of the bytes now being scanned
+  bool found = false;     // reached line_no
+  bool complete = false;  // ...and saw its terminating newline
+  size_t n;
+
+  while (!complete && (n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    size_t pos = 0;
+    while (pos < n) {
+      if (cur == line_no) found = true;
+      const char* nl = static_cast<const char*>(memchr(buf + pos, '\n', n - pos));
+      size_t seg_end = (nl != nullptr) ? static_cast<size_t>(nl - buf) : n;
+      if (found && line.size() < kMaxLine) {
+        line.append(buf + pos, std::min(seg_end - pos, kMaxLine - line.size()));
+      }
+      if (nl == nullptr) break;  // line continues into the next block
+      if (found) {
+        complete = true;
+        break;
+      }
       cur++;
-      if (cur > line_no) break;
+      pos = seg_end + 1;
     }
   }
   fclose(f);
-  while (!line.empty() && (line.back() == '\r')) line.pop_back();
+
+  if (!found) return "";  // line number past end of file
+  while (!line.empty() && line.back() == '\r') line.pop_back();
   return line;
 }
 
