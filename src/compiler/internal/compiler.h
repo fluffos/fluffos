@@ -479,11 +479,16 @@ inline int& compiler_directive_start_line = g_compile.directive_start_line;
 #define MAX_COMPILE_DEPTH 32
 
 // Zero-copy file form: reads fd straight into the arena scan buffer.
-/* A compile BORROWS its arena: it allocates every transient there and
- * leaves it exactly as it found it -- never reset, never freed. The caller
- * owns it and decides when that memory dies, which is what lets compiler
- * output (Diagnostic records above all) outlive the compile. Callers that
- * do not care may omit it and get a per-call arena that dies on return. */
+/* A compile BORROWS the arena it is given: it allocates every transient
+ * there and leaves it exactly as it found it -- never reset, never freed.
+ * The caller owns it and decides when that memory dies, which is what lets
+ * compiler output outlive the compile.
+ *
+ * Omit it and the compile uses the shared default arena instead, which IS
+ * the compiler's to recycle: that one is reset on the way IN, so the
+ * previous compile's transients stay readable until the next compile
+ * actually starts. See scratch_default_arena() for why it is shared rather
+ * than per-call. */
 program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context,
                            ScratchArena* arena = nullptr);
 program_t* compile_file(std::string_view source, const char*,
