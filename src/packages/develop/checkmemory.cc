@@ -1267,6 +1267,23 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
             if (r.next) {
               cb(reinterpret_cast<void*>(r.next));
             }
+            if (r.coro) {
+              // A PARKED COROUTINE is a reference holder too: its saved
+              // frame slice holds the awaited promise itself in the common
+              // `mixed p = promise_create(); await p;` shape, closing a
+              // loop that is otherwise invisible to every detector.
+              for (int fi = 0; fi < r.coro->frame_size; fi++) {
+                if (void* c = data_child(&r.coro->frame[fi])) {
+                  cb(c);
+                }
+              }
+              cb(reinterpret_cast<void*>(r.coro->result_promise));
+              for (struct defer_list* d = r.coro->defers; d; d = d->next) {
+                if (void* c = data_child(&d->func)) {
+                  cb(c);
+                }
+              }
+            }
           }
         }
         break;
@@ -1414,6 +1431,12 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
               if (r.next) {
                 free_promise(r.next);
                 r.next = nullptr;
+              }
+              if (r.coro) {
+                // release the parked frame's refs as well; it can never
+                // run again once its promise is collected
+                free_coroutine_orphan(r.coro);
+                r.coro = nullptr;
               }
             }
           }

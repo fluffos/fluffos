@@ -33,10 +33,14 @@ title: promises / await_callout
 
 ### EXAMPLES
     ```c
-    // yield between chunks so a long job never hits "too long evaluation"
+    // yield between chunks so a long job never hits "too long evaluation".
+    // NOTE: an await cannot suspend inside a foreach (the loop keeps an
+    // lvalue on the stack) -- index with a plain loop instead.
     async void reindex(string *files) {
-        foreach (string f in files) {
-            index_one(f);
+        int i;
+
+        for (i = 0; i < sizeof(files); i++) {
+            index_one(files[i]);
             await await_callout(call_out( (: 0 :), 1));
         }
         write("done\n");

@@ -103,7 +103,8 @@ void rule_foreach_vars_double(decl_t* result, decl_t* var1, decl_t* var2) {
 
 LPC_INT rule_foreach_open() {
   LPC_INT saved = context;
-  context = LOOP_CONTEXT | LOOP_FOREACH;
+  /* see rule_loop_open(): SPECIAL_CONTEXT must survive loop entry */
+  context = (context & SPECIAL_CONTEXT) | LOOP_CONTEXT | LOOP_FOREACH;
   return saved;
 }
 

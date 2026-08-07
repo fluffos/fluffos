@@ -173,6 +173,13 @@ async void acatch_unwind_defer_error() {
   acatch(error("inner"));
 }
 
+// awaits a promise nobody else holds or settles: the frame parks forever
+async void park_own_promise() {
+  mixed p = promise_create();
+
+  await p;
+}
+
 async void acatch_error_loop() {
   mixed p = promise_create();
 
@@ -238,6 +245,18 @@ void do_more_tests() {
   for (i = 0; i < 20; i++) {
     acatch_unwind_defer_error();
   }
+
+  // A parked frame that holds its OWN never-settled awaited promise is a
+  // reference loop through the coroutine's saved frame. It used to be
+  // invisible to every detector (the walkers did not follow the parked
+  // coroutine) and leaked permanently.
+#if efun_defined(find_orphaned_cycles)
+  for (i = 0; i < 5; i++) {
+    park_own_promise();
+  }
+  find_orphaned_cycles(1);
+  ASSERT2(find_orphaned_cycles(1) == 0, "parked-frame cycles must be reclaimed");
+#endif
 
   call_out(function() {
     ASSERT2(nestDone == 200, "acatch error loop resumed " + nestDone + "/200 times");

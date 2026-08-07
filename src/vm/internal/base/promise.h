@@ -133,6 +133,11 @@ void run_async_function(char* entry_pc);
  * error()s (nothing parked) if the current frame cannot be suspended. */
 void coroutine_await_pending(promise_t* awaited);
 
+/* Release an orphaned parked coroutine (its promise is unreachable garbage,
+ * so it can never resume). Frees every ref it holds without running LPC.
+ * Used by the debug orphan-cycle collector. */
+void free_coroutine_orphan(lpc_coroutine_t* coro);
+
 /* One mapping per live suspended coroutine, oldest first (async_info()). */
 struct array_t* build_async_info();
 

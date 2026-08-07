@@ -132,9 +132,12 @@ compile-time or runtime error, never silent misbehavior:
 2. `await` is not allowed inside `catch(...)` or `time_expression(...)`
    (their implementation recurses the C++ stack). Use `acatch`.
 3. An `await` cannot suspend while a transient reference sits on the value
-   stack: `arr[i] += await p` or awaiting inside a `foreach ref` loop is a
-   runtime error. Await into a plain variable first
-   (`x = await p; arr[i] += x;`).
+   stack. This covers `arr[i] += await p` and **any `foreach` loop** (over
+   arrays, mappings, strings or buffers — the loop keeps an lvalue slot
+   live for its variable), which is a runtime error rather than a compile
+   error because it depends on what the awaited promise turns out to be.
+   Await into a plain variable first (`x = await p; arr[i] += x;`), and use
+   an indexed `for` loop when the body needs to suspend.
 4. If the object is destructed, or recompiled by `recompile_object()`,
    while a function is suspended, the resume is abandoned and the
    function's promise rejects with a descriptive error.
@@ -174,6 +177,10 @@ mudlib code using them as identifiers must be renamed.
 - On a Debug build, suspended coroutines and promise reactions are fully
   visible to the `check_memory()` ref-count checker.
 - `defer()` handlers registered before an `await` survive the suspension
-  and run when the function finally finishes (or is abandoned).
+  and run when the function finally finishes, including when it is
+  abandoned because its object was destructed or recompiled. The one
+  exception is abandonment caused by the awaited promise being garbage
+  collected: that happens on a deallocation path where running mudlib code
+  is unsafe, so those handlers are dropped.
 - Driver shutdown discards queued deliveries without running them, like
   pending `call_out()`s.

@@ -53,6 +53,13 @@ struct QueuedReaction {
 
 std::deque<QueuedReaction> g_promise_microtasks;
 bool g_drain_scheduled = false;
+/* The reaction currently being delivered: popped off the deque, so its refs
+ * live only in a C++ local and would be invisible to the ref checker if LPC
+ * called check_memory() from a handler (AGENTS.md section 3). */
+QueuedReaction* g_delivering = nullptr;
+/* The coroutine currently being resumed: still registered, but no longer
+ * "suspended", so async_info() must not list it. */
+lpc_coroutine_t* g_resuming_coro = nullptr;
 
 /* Fairness bound: a self-feeding then() chain must not wedge the driver
  * inside one tick. Leftover work is rescheduled to the next gametick. */
@@ -188,6 +195,7 @@ void drain_promise_microtasks() {
      * strand the rest of the queue. */
     error_context_t econ;
     save_context(&econ);
+    g_delivering = &qr;
     try {
       deliver_reaction(&qr);
     } catch (const char*) {
@@ -197,6 +205,7 @@ void drain_promise_microtasks() {
       too_deep_error = 0;
       max_eval_error = 0;
     }
+    g_delivering = nullptr;
     pop_context(&econ);
   }
   if (!g_promise_microtasks.empty()) {
@@ -494,7 +503,10 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     entry = unwind_to_acatch_marker(csp);
   }
 
+  lpc_coroutine_t* const prev_resuming = g_resuming_coro;
+  g_resuming_coro = coro;
   (void)run_coroutine_body(entry, coro->result_promise, async_frame);
+  g_resuming_coro = prev_resuming;
   /* top level: nothing to propagate an eval-cost error to */
   max_eval_error = 0;
 
@@ -741,12 +753,21 @@ void coroutine_await_pending(promise_t* awaited) {
   g_coroutine_suspended = true;
 }
 
+void free_coroutine_orphan(lpc_coroutine_t* coro) { free_coroutine(coro, nullptr, false); }
+
 array_t* build_async_info() {
-  array_t* v = allocate_empty_array(g_live_coroutines.size());
+  size_t n = g_live_coroutines.size();
+  if (g_resuming_coro != nullptr && n > 0) {
+    n--;
+  }
+  array_t* v = allocate_empty_array(n);
   int i = 0;
 
   for (auto& entry : g_live_coroutines) {
     lpc_coroutine_t* coro = entry.second;
+    if (coro == g_resuming_coro) {
+      continue;  // running, not suspended
+    }
     mapping_t* m = allocate_mapping(8);
     const char* file = nullptr;
     int line = 0;
@@ -829,6 +850,27 @@ void mark_promise(promise_t* p) {
 }
 
 void mark_promise_queue() {
+  auto mark_one = [](QueuedReaction& qr) {
+    if (qr.on_fulfilled) {
+      qr.on_fulfilled->hdr.extra_ref++;
+    }
+    if (qr.on_rejected) {
+      qr.on_rejected->hdr.extra_ref++;
+    }
+    if (qr.next) {
+      qr.next->extra_ref++;
+    }
+    if (qr.command_giver) {
+      qr.command_giver->extra_ref++;
+    }
+    if (qr.coro) {
+      mark_coroutine(qr.coro);
+    }
+    qr.source->extra_ref++;
+  };
+  if (g_delivering != nullptr) {
+    mark_one(*g_delivering);
+  }
   for (auto& qr : g_promise_microtasks) {
     if (qr.on_fulfilled) {
       qr.on_fulfilled->hdr.extra_ref++;

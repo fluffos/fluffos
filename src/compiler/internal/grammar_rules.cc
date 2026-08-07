@@ -425,7 +425,9 @@ void rule_define_class_members(struct ident_hash_elem_t* class_ihe, LPC_INT clas
 
 LPC_INT rule_loop_open() {
   LPC_INT saved = context;
-  context = LOOP_CONTEXT;
+  /* keep SPECIAL_CONTEXT: a loop nested inside catch{}/time_expression{}
+   * is still a place where await/acatch cannot suspend */
+  context = (context & SPECIAL_CONTEXT) | LOOP_CONTEXT;
   return saved;
 }
 
