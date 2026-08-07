@@ -165,7 +165,7 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
 #endif
   pending_func_decl_line = current_line_base + current_line;
   func_present = 1;
-  flags = (type >> 16);
+  flags = PACKED_TYPE_MODS(type);
 
   flags |= global_modifiers;
 
@@ -192,14 +192,14 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
 #endif
   /* the body about to be parsed may (or may not) use await/acatch */
   compiling_async_function = (flags & FUNC_ASYNC) != 0;
-  type = (flags << 16) | (type & 0xffff);
+  type = PACK_TYPE_MODS(flags) | PACKED_TYPE_BASIC(type);
   /* Handle type checking here so we know whether to typecheck
      'argument' */
-  if (type & 0xffff) {
+  if (PACKED_TYPE_BASIC(type)) {
     if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
       exact_types = 0;
     } else {
-      exact_types = (type & 0xffff) | optional_star;
+      exact_types = PACKED_TYPE_BASIC(type) | optional_star;
     }
   } else {
     if (pragmas & PRAGMA_STRICT_TYPES) {
@@ -234,9 +234,10 @@ LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString
   if (argument.flags & ARG_IS_VARARGS) {
     func_types |= (FUNC_TRUE_VARARGS | FUNC_VARARGS);
   }
-  func_types |= (type >> 16);
+  func_types |= PACKED_TYPE_MODS(type);
 
-  define_new_function(shared, argument.num_arg, 0, func_types, (type & 0xffff) | optional_star);
+  define_new_function(shared, argument.num_arg, 0, func_types,
+                      PACKED_TYPE_BASIC(type) | optional_star);
   /* Dropping our ref is safe: the function table's ref keeps the shared
      string alive, so *shared_name_out can't be dangling. */
   free_string(shared);
@@ -263,7 +264,7 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
 
     // Creating functions for argument defaults
     fun = define_new_function(identifier, argument.num_arg, max_num_locals - argument.num_arg,
-                              *func_types, (type & 0xffff) | optional_star);
+                              *func_types, PACKED_TYPE_BASIC(type) | optional_star);
     if (fun != -1) {
       *function = new_node_no_line();
       (*function)->kind = NODE_FUNCTION;

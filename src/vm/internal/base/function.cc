@@ -343,7 +343,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
 
       if (local_is_async) {
         csp->framekind |= FRAME_ASYNC;
-        run_async_function(current_prog->program + func->address);
+        run_async_function(current_prog->program + func->address, func);
       } else {
         call_program(current_prog, func->address);
       }

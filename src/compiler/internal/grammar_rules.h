@@ -76,6 +76,8 @@ LPC_INT rule_type_modifier_list(LPC_INT modifier, LPC_INT list);
 LPC_INT rule_type(LPC_INT modifiers, LPC_INT basic_type);
 LPC_INT rule_atomic_type_class(ident_hash_elem_t* ihe);
 LPC_INT rule_atomic_type_class_identifier(const ScratchString* identifier);
+LPC_INT rule_atomic_type_promise();
+LPC_INT rule_atomic_type_promise_of(LPC_INT payload, LPC_INT close_op);
 LPC_INT rule_param_decl_typed(LPC_INT type_star);
 LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString* name,
                                    parse_node_t* default_val);

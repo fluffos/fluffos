@@ -21,19 +21,45 @@ asynchronous operation. It is created pending and settles exactly once —
 
 `promise` is a declared type, like `mapping` or `buffer` — usable for
 variables, parameters, return types and arrays, and enforced by the
-compiler's type checking:
+compiler's type checking. It is **parameterized by the type it will
+eventually deliver**, written `promise<T>`:
 
 ```c
-promise fetch(string uid);        // return type
-void handle(promise p);           // parameter
-promise *pending = ({ });         // array of promises
+promise<mapping> fetch(string uid);   // return type
+void handle(promise<int> p);          // parameter
+promise<int> *pending = ({ });        // array of promise<int>
+promise<string *> names;              // promise of an array of strings
+promise anything;                     // bare `promise` == promise<mixed>
 ```
 
-`typeof()` returns `"promise"`. Promises compare by identity, work as
-mapping keys, deep-copy shallowly (identity-preserving, like objects),
-and are not serialized by `save_object()`. Calling an `async` function
-yields a value of this type, so `promise p = some_async_fn();`
-type-checks.
+`promise<T> *` and `promise<T *>` are different types and compose
+independently: the first is an *array of promises*, the second is *one
+promise that delivers an array*. Any type may be a payload — including
+`class` types — except `void` and `promise` itself (resolving a promise
+with a promise adopts it, so a promise value is never itself a promise;
+note that `promise<promise<int>>` must be spelled with a space between the
+closing brackets, since `>>` lexes as the shift operator).
+
+Assignment and argument passing compare payloads, so `promise<int>` and
+`promise<string>` are incompatible while `promise` (i.e. `promise<mixed>`)
+accepts either. `await` yields the payload type, so `int n = await
+fetch_count();` type-checks and `string s = await fetch_count();` does not.
+
+`typeof()` returns `"promise"` — it reports the value's kind, not its
+declared payload. The payload does ride along at runtime for promises whose
+type is known (an `async` function's own promise), as the ordinary runtime
+type tag of the value it will deliver, and `sprintf("%O", p)` names it the
+way the driver names any runtime type: `PROMISE<int>( fulfilled: 42 )`,
+`PROMISE<array>` for a `promise<string *>`, `PROMISE<class>` for a
+`promise<class point>`. A promise from `promise_create()` or
+`promise_then()` declares no payload and renders bare, `PROMISE( pending )`.
+The static type is the finer-grained one: the compiler distinguishes
+`promise<string *>` from `promise<int *>`, while the value carries only what
+the runtime itself can represent.
+
+Promises compare by identity, work as mapping keys, deep-copy shallowly
+(identity-preserving, like objects), and are not serialized by
+`save_object()`.
 
 Settlement delivery is never synchronous: handlers attached with
 `promise_then()` and suspended `await` expressions always run from a later
@@ -58,9 +84,10 @@ async int transfer(string from, string to, int amount) {
 }
 ```
 
-A function declared `async` always returns a **promise** for its result,
-whatever its declared return type says (the declared type is what `return`
-statements inside the body are checked against). Calling one runs its body
+A function declared `async` always returns a **promise** for its result:
+an `async T f()` is typed `promise<T>` at every call site, while `T` stays
+what `return` statements inside the body are checked against. Calling one
+runs its body
 **synchronously until the first `await` of a pending promise**; the caller
 receives the promise immediately — already fulfilled if the body finished
 without suspending, pending otherwise.

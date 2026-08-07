@@ -40,6 +40,7 @@ export function formatLPC(source, options = {}) {
   }
   const rawToks = allToks.filter((t) => t.kind !== 'whitespace');
   const toks = maskStringizeArguments(rawToks, source, collectStringizeMacros(rawToks));
+  markPromiseTypeArgs(toks);
   const lines = [];
   let cur = [];
   let depth = 0;
@@ -1014,6 +1015,43 @@ const NEST_CLOSE = new Set([')', '}', ']', ':)']);
 // Do the bracket tokens within toks[start..end] (inclusive) all pair up
 // internally? Used by maskStringizeArguments to decide whether a span is
 // safe to freeze as one opaque token.
+/*
+ * `promise<T>` (issue #1319) is a TYPE with a type argument, not a pair of
+ * comparisons -- `promise` is a reserved word, so `promise` immediately
+ * followed by '<' can only ever be the parameterized-type form. Mark that
+ * '<' and its matching '>' so the spacing rules keep them tight
+ * (`promise<string *>`) instead of rendering `promise < string * >`.
+ *
+ * The payload grammar is `basic_type optional_star` -- at most `class Name *`
+ * -- and a promise payload may not itself be a promise, so the closer is the
+ * first '>' within a few tokens and nesting is impossible. If no '>' turns up
+ * in that window the source does not parse as a promise type anyway; leave it
+ * alone rather than guess.
+ */
+function markPromiseTypeArgs(toks) {
+  const MAX_PAYLOAD_TOKENS = 6;
+  for (let i = 0; i < toks.length - 1; i++) {
+    if (toks[i].text !== 'promise' || toks[i].kind !== 'type') continue;
+    let open = -1;
+    for (let j = i + 1; j < toks.length; j++) {
+      if (toks[j].kind === 'comment') continue;
+      open = j;
+      break;
+    }
+    if (open === -1 || toks[open].text !== '<') continue;
+    let close = -1;
+    for (let j = open + 1; j < toks.length && j <= open + MAX_PAYLOAD_TOKENS; j++) {
+      if (toks[j].kind === 'comment') continue;
+      if (toks[j].text === '>') { close = j; break; }
+      if (toks[j].text === '<') break;  // not a payload we understand
+    }
+    if (close === -1) continue;
+    toks[open].promiseTypeOpen = true;
+    toks[close].promiseTypeClose = true;
+    i = close;
+  }
+}
+
 function spanIsBalanced(toks, start, end) {
   let d = 0;
   for (let j = start; j <= end; j++) {
@@ -1125,6 +1163,10 @@ const CALL_LIKE_KEYWORDS = new Set(['acatch', 'catch', 'new', 'sscanf', 'parse_c
 // a repeated declarator, never an expression.
 function isArrayTypeStarPrefix(tok) {
   return !!tok && (tok.kind === 'type' ||
+                   // the '>' closing a promise<T> ends a type just like a
+                   // type keyword does, so `promise<int> *arr` binds the
+                   // same way as `int *arr`
+                   tok.promiseTypeClose === true ||
                    (tok.kind === 'keyword' && tok.text === 'ref') ||
                    tok.text === '&' || tok.text === '*' || tok.text === ',');
 }
@@ -1427,6 +1469,12 @@ function renderLine(toks, mappingContext = false, pendingTernary = 0) {
     let thisClosesCast = false;
     let sep = ' ';
     if (i === 0) sep = '';
+    // `promise<T>`: the type-argument brackets are part of the type name,
+    // not a pair of comparisons -- render `promise<string *>`, never
+    // `promise < string * >`. Marked by markPromiseTypeArgs(); tested
+    // first so none of the operator rules below can claim these tokens.
+    else if (t.promiseTypeOpen || t.promiseTypeClose ||
+             (prev && prev.promiseTypeOpen)) sep = '';
     // A TRAILING comment (nothing but comments after it on the line)
     // keeps the SOURCE's gap before it, with a two-space minimum for
     // '//' comments -- src/.clang-format's Google base sets
@@ -1612,7 +1660,10 @@ function renderLine(toks, mappingContext = false, pendingTernary = 0) {
         (prev.kind === 'keyword' || prev.kind === 'type' ||
          prev.kind === 'modifier' || prev.kind === 'efunkw') &&
         !(t.text === ';' || t.text === ':' || t.text === ',' || t.text === ')' ||
-          t.text === '(' || t.text === '::')) {
+          t.text === '(' || t.text === '::') &&
+        // ... and not a promise<T> type-argument bracket, whose whole point
+        // is to bind tight to the type name on either side
+        !(t.promiseTypeOpen || t.promiseTypeClose)) {
       sep = ' ';
     }
     // Token-merge safety net: never butt two tokens together whose

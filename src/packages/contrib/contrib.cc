@@ -142,7 +142,7 @@ void f_query_notify_fail() {
 void f_store_variable() {
   int idx;
   svalue_t* sv;
-  unsigned short type;
+  lpc_type_t type;
 
   const char* name = nullptr;
   object_t* ob;
@@ -169,7 +169,7 @@ void f_store_variable() {
 #ifdef F_FETCH_VARIABLE
 void f_fetch_variable() {
   int idx;
-  unsigned short type;
+  lpc_type_t type;
 
   const char* name = nullptr;
   object_t* ob;
@@ -328,7 +328,7 @@ void f_functions() {
   function_t* funp;
   program_t* prog;
   int const flag = (sp--)->u.number;
-  unsigned short* types;
+  lpc_type_t* types;
   char buf[256];
   char* end = EndOf(buf);
   program_t* progp = sp->u.ob->prog;
@@ -1831,11 +1831,11 @@ void f_program_info() {
   add_mapping_pair(m, "function size",
                    info.ff_c * sizeof(unsigned short) + info.fd_c * sizeof(function_t));
   add_mapping_pair(m, "string size", info.s_c * sizeof(char*));
-  add_mapping_pair(m, "var size", info.v_c * (sizeof(char*) + sizeof(unsigned short)));
+  add_mapping_pair(m, "var size", info.v_c * (sizeof(char*) + sizeof(lpc_type_t)));
   add_mapping_pair(m, "class size",
                    info.nc_c * sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
   add_mapping_pair(m, "inherit size", info.i_c * sizeof(inherit_t));
-  add_mapping_pair(m, "saved type size", info.t_c * sizeof(short));
+  add_mapping_pair(m, "saved type size", info.t_c * sizeof(lpc_type_t));
 
   add_mapping_pair(m, "total size", info.total);
 

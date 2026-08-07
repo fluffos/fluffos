@@ -207,7 +207,9 @@ TOKEN_SPEC = {
     "L_PARAMETER": ("identifier", None),
     # keyword families (spellings from lexer_utils.cc reswords[])
     "L_BASIC_TYPE": ("type", ["buffer", "float", "function", "int", "mapping",
-                              "mixed", "object", "promise", "string", "void"]),
+                              "mixed", "object", "string", "void"]),
+    # `promise` has its own token so `promise<T>` can take a payload type
+    "L_PROMISE": ("type", ["promise"]),
     "L_TYPE_MODIFIER": ("modifier", ["async", "nomask", "nosave", "private",
                                      "protected", "public", "static",
                                      "varargs"]),

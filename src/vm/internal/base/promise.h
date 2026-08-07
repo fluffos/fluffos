@@ -127,7 +127,7 @@ struct lpc_coroutine_t {
 /* Run an async function body whose call frame (FRAME_ASYNC) is already set
  * up and whose args/locals are on the stack. Pushes the result promise on
  * the caller's stack before returning. */
-void run_async_function(char* entry_pc);
+void run_async_function(char* entry_pc, const struct function_t* funp);
 /* F_AWAIT on a pending promise: park the current async frame as a reaction
  * on `awaited`. On return the caller must return out of eval_instruction().
  * error()s (nothing parked) if the current frame cannot be suspended. */

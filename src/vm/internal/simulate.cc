@@ -965,7 +965,7 @@ int recompile_object(object_t* target) {
   recompile_variable_names(new_prog, names);
   std::vector<int> old_index(new_n, -1);
   for (int i = 0; i < new_n; i++) {
-    unsigned short vtype;
+    lpc_type_t vtype;
     old_index[i] = find_global_variable(old_prog, names[i], &vtype, 0);
   }
 

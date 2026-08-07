@@ -169,7 +169,6 @@
         "mapping",
         "mixed",
         "object",
-        "promise",
         "string",
         "void"
       ]
@@ -413,6 +412,12 @@
       "category": "keyword",
       "spellings": [
         "acatch"
+      ]
+    },
+    "L_PROMISE": {
+      "category": "type",
+      "spellings": [
+        "promise"
       ]
     },
     "L_ARRAY": {
@@ -1833,6 +1838,22 @@
       "rhs": [
         "L_CLASS",
         "L_IDENTIFIER"
+      ]
+    },
+    {
+      "lhs": "atomic_type",
+      "rhs": [
+        "L_PROMISE"
+      ]
+    },
+    {
+      "lhs": "atomic_type",
+      "rhs": [
+        "L_PROMISE",
+        "'<'",
+        "basic_type",
+        "optional_star",
+        "L_ORDER"
       ]
     },
     {

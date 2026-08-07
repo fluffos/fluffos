@@ -53,17 +53,17 @@ ScratchString* rule_new_local_name_redefine(ident_hash_elem_t* ihe) {
 }
 
 void rule_new_name(LPC_INT star_modifier, const ScratchString* identifier) {
-  if (current_type & (FUNC_VARARGS << 16)) {
+  if (current_type & PACK_TYPE_MODS(FUNC_VARARGS)) {
     yyerror("Illegal to declare varargs variable.");
-    current_type &= ~(FUNC_VARARGS << 16);
+    current_type &= ~PACK_TYPE_MODS(FUNC_VARARGS);
   }
-  if (current_type & (FUNC_ASYNC << 16)) {
+  if (current_type & PACK_TYPE_MODS(FUNC_ASYNC)) {
     yyerror("Illegal to declare async variable.");
-    current_type &= ~(FUNC_ASYNC << 16);
+    current_type &= ~PACK_TYPE_MODS(FUNC_ASYNC);
   }
 
-  if (current_type & 0xffff0000) {
-    current_type = (current_type >> 16) | (current_type & 0xffff);
+  if (current_type & ~BASIC_TYPE_MASK) {
+    current_type = PACKED_TYPE_MODS(current_type) | PACKED_TYPE_BASIC(current_type);
   }
 
   current_type |= global_modifiers;
@@ -86,17 +86,17 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
   parse_node_t *expr_node, *newnode;
   int type;
 
-  if (current_type & (FUNC_VARARGS << 16)) {
+  if (current_type & PACK_TYPE_MODS(FUNC_VARARGS)) {
     yyerror("Illegal to declare varargs variable.");
-    current_type &= ~(FUNC_VARARGS << 16);
+    current_type &= ~PACK_TYPE_MODS(FUNC_VARARGS);
   }
-  if (current_type & (FUNC_ASYNC << 16)) {
+  if (current_type & PACK_TYPE_MODS(FUNC_ASYNC)) {
     yyerror("Illegal to declare async variable.");
-    current_type &= ~(FUNC_ASYNC << 16);
+    current_type &= ~PACK_TYPE_MODS(FUNC_ASYNC);
   }
 
-  if (current_type & 0xffff0000) {
-    current_type = (current_type >> 16) | (current_type & 0xffff);
+  if (current_type & ~BASIC_TYPE_MASK) {
+    current_type = PACKED_TYPE_MODS(current_type) | PACKED_TYPE_BASIC(current_type);
   }
 
   current_type |= global_modifiers;

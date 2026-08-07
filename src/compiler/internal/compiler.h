@@ -84,8 +84,39 @@ struct mem_block_t {
 #define TYPE_FUNCTION 8
 #define TYPE_REAL 9
 #define TYPE_BUFFER 10
-#define TYPE_PROMISE 11 /* async/await (issue #1319) */
 #define TYPE_MASK 0xf
+
+/*
+ * While parsing a declaration the grammar does not yet know whether it is
+ * looking at a function or a variable, so rule_type() parks the declaration
+ * modifiers in the HIGH half of the type word and the consumers merge them
+ * down once the kind is settled. Modifiers span bits 5-14, so the packed
+ * form uses bits 21-30 and the basic type keeps bits 0-15 -- plus the
+ * TYPE_MOD_PROMISE* bits at 16-17, which belong to the basic type and must
+ * survive the merge. Always go through these macros, never a bare
+ * `>> 16` / `& 0xffff`.
+ */
+#define TYPE_MODS_SHIFT 16
+#define BASIC_TYPE_MASK (0xffffu | TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY)
+#define PACK_TYPE_MODS(m) ((m) << TYPE_MODS_SHIFT)
+#define PACKED_TYPE_MODS(t) (((t) & ~BASIC_TYPE_MASK) >> TYPE_MODS_SHIFT)
+#define PACKED_TYPE_BASIC(t) ((t)&BASIC_TYPE_MASK)
+
+/*
+ * promise<T> helpers (issue #1319). See the TYPE_MOD_PROMISE comment in
+ * svalue.h for the encoding.
+ */
+/* the declared value IS a promise (an ARRAY of promises is not) */
+#define IS_PROMISE(t) (((t) & (TYPE_MOD_PROMISE | TYPE_MOD_ARRAY)) == TYPE_MOD_PROMISE)
+/* the type of `await x` where x is declared `t` */
+int promise_payload_type(int t);
+/* the type an async function declared to return `t` yields at its call site */
+int promise_of_type(int t);
+/* the runtime tag (svalue_t::subtype of a T_PROMISE) for a promise type
+ * word: the payload's T_* mask via convert_type(), or 0 when the payload
+ * carries no constraint (mixed/void/unknown) */
+unsigned short promise_value_subtype(int t);
+int convert_type(int type); /* apply.cc: compile-time type word -> T_* mask */
 
 struct local_info_t {
   int runtime_index;
@@ -143,13 +174,19 @@ typedef struct compiler_temp_t {
  * Some good macros to have.
  */
 
-#define IS_CLASS(t) ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
+/* TYPE_MOD_PROMISE joins these masks everywhere TYPE_MOD_CLASS appears: a
+ * promise<class foo> carries TYPE_MOD_CLASS for its PAYLOAD and is not itself
+ * a class, and promise<int> is not an int. */
+#define IS_CLASS(t) \
+  ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS | TYPE_MOD_PROMISE)) == TYPE_MOD_CLASS)
 #define CLASS_IDX(t) (t & ~(DECL_MODS | TYPE_MOD_CLASS))
 
-#define COMP_TYPE(e, t) \
-  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && (compatible[(e & ~DECL_MODS)] & (1 << (t))))
-#define IS_TYPE(e, t) \
-  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && (is_type[(e & ~DECL_MODS)] & (1 << (t))))
+#define COMP_TYPE(e, t)                                                  \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS | TYPE_MOD_PROMISE)) &&        \
+   (compatible[(e & ~DECL_MODS)] & (1 << (t))))
+#define IS_TYPE(e, t)                                             \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS | TYPE_MOD_PROMISE)) && \
+   (is_type[(e & ~DECL_MODS)] & (1 << (t))))
 
 #define FUNCTION_TEMP(n) ((compiler_temp_t*)mem_block[A_FUNCTION_DEFS].block + (n))
 #define FUNCTION_NEXT(n) (FUNCTION_TEMP(n)->next)
@@ -190,7 +227,7 @@ extern char* prog_code_max;
 extern unsigned char string_tags[0x20];
 extern short freed_string;
 extern local_info_t *locals, *locals_ptr;
-extern unsigned short *type_of_locals, *type_of_locals_ptr;
+extern lpc_type_t *type_of_locals, *type_of_locals_ptr;
 extern int current_number_of_locals;
 extern int max_num_locals;
 extern int current_tree;
@@ -199,8 +236,8 @@ extern int type_of_locals_size;
 extern int locals_size;
 extern int current_number_of_locals;
 extern int max_num_locals;
-extern short compatible[12];
-extern short is_type[12];
+extern short compatible[11];
+extern short is_type[11];
 extern int comp_last_inherited;
 
 char* get_type_modifiers(char*, char*, int);
@@ -498,7 +535,6 @@ void type_error(const char*, int);
 int compatible_types(int, int);
 int compatible_types2(int, int);
 int arrange_call_inherited(const char*, parse_node_t*);
-void add_arg_type(unsigned short);
 int define_new_function(const char*, int, int, int, int);
 int define_variable(const char*, int);
 int define_new_variable(const char*, int);
@@ -517,14 +553,14 @@ void pop_func_block(void);
 int decl_fix(int);
 parse_node_t* check_refs(int, parse_node_t*, parse_node_t*);
 
-int lookup_any_class_member(char*, unsigned short*);
+int lookup_any_class_member(char*, lpc_type_t*);
 // Like lookup_any_class_member() but silent when no member is found.
-int lookup_any_class_member_soft(const char*, unsigned short*);
-inline int lookup_any_class_member_soft(const ScratchString* s, unsigned short* t) {
+int lookup_any_class_member_soft(const char*, lpc_type_t*);
+inline int lookup_any_class_member_soft(const ScratchString* s, lpc_type_t* t) {
   return lookup_any_class_member_soft(s->c_str(), t);
 }
-int lookup_class_member(int, const char*, unsigned short*);
-inline int lookup_class_member(int which, const ScratchString* s, unsigned short* t) {
+int lookup_class_member(int, const char*, lpc_type_t*);
+inline int lookup_class_member(int which, const ScratchString* s, lpc_type_t* t) {
   return lookup_class_member(which, s->c_str(), t);
 }
 parse_node_t* reorder_class_values(int, parse_node_t*);

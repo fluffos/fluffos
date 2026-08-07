@@ -52,7 +52,9 @@ void rule_expr_await(parse_node_t** result, parse_node_t* expr) {
   if (context & SPECIAL_CONTEXT) {
     yyerror("await is not allowed inside catch or time_expression (use acatch)");
   }
-  CREATE_UNARY_OP(*result, F_AWAIT, TYPE_ANY, expr);
+  /* `await p` yields p's payload type; awaiting a non-promise (including an
+   * array of promises) passes the value -- and its type -- straight through */
+  CREATE_UNARY_OP(*result, F_AWAIT, promise_payload_type(expr->type & ~DECL_MODS), expr);
 }
 
 void rule_sscanf(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,
@@ -609,7 +611,7 @@ void rule_primary_expr_member_arrow(parse_node_t** result, parse_node_t* expr,
                                     const ScratchString* identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
-    unsigned short tp;
+    lpc_type_t tp;
     if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
@@ -633,7 +635,7 @@ void rule_primary_expr_member_dot(parse_node_t** result, parse_node_t* expr,
                                   const ScratchString* identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
-    unsigned short tp;
+    lpc_type_t tp;
     if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
@@ -1143,9 +1145,9 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
     (*result)->l.number = f;
     (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
     if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
-      /* an async call yields a promise, not the declared return type
-       * (which is what `return` inside the body checks against) */
-      (*result)->type = TYPE_PROMISE;
+      /* an async call yields a promise OF the declared return type (which
+       * is what `return` inside the body checks against) */
+      (*result)->type = promise_of_type((*result)->type);
     }
   } else if ((f = ihe->dn.simul_num) != -1) {
     (*result)->kind = NODE_CALL_1;
@@ -1276,9 +1278,9 @@ void rule_function_call_name(parse_node_t** result, const ScratchString* name,
       } else {
         (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
         if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
-          /* an async call yields a promise, not the declared return type
+          /* an async call yields a promise OF the declared return type
            * (which is what `return` inside the body checks against) */
-          (*result)->type = TYPE_PROMISE;
+          (*result)->type = promise_of_type((*result)->type);
         }
       }
     }

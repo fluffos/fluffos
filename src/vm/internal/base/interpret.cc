@@ -3501,7 +3501,7 @@ void eval_instruction(char* p) {
         if (funflags & FUNC_ASYNC) {
           /* run the coroutine body in its own nested interpreter; it
            * pushes the result promise and restores this frame's state */
-          run_async_function(current_prog->program + funp->address);
+          run_async_function(current_prog->program + funp->address, funp);
           break;
         }
         pc = current_prog->program + funp->address;
@@ -3554,7 +3554,7 @@ void eval_instruction(char* p) {
         funp = setup_inherited_frame(offset);
         csp->pc = pc;
         if (inherited_is_async) {
-          run_async_function(current_prog->program + funp->address);
+          run_async_function(current_prog->program + funp->address, funp);
           break;
         }
         pc = current_prog->program + funp->address;
@@ -4921,7 +4921,7 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
    * not run its body as an ordinary call and return a plain value. */
   if (is_async) {
     csp->framekind |= FRAME_ASYNC;
-    run_async_function(current_prog->program + funp->address);
+    run_async_function(current_prog->program + funp->address, funp);
     return;
   }
   call_program(current_prog, funp->address);

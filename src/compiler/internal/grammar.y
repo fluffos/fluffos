@@ -128,6 +128,7 @@ void yyerror(void *yyscanner, const char *msg);
 /* async/await (issue #1319): `await expr` and `acatch(expr)`. The `async`
  * function modifier rides L_TYPE_MODIFIER (FUNC_ASYNC in yylval). */
 %token L_AWAIT L_ACATCH
+%token L_PROMISE           /* promise<T> (issue #1319) */
 %token L_ARRAY
 %token L_REF
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
@@ -850,6 +851,12 @@ atomic_type:
   L_BASIC_TYPE
   | L_CLASS L_DEFINED_NAME  { $$ = rule_atomic_type_class($L_DEFINED_NAME); }
   | L_CLASS L_IDENTIFIER    { $$ = rule_atomic_type_class_identifier($L_IDENTIFIER); }
+  /* bare `promise` means promise<mixed>. The closing '>' arrives as L_ORDER
+     (the token shared by > >= <=); the rule checks the opcode rather than
+     making the lexer special-case it. */
+  | L_PROMISE                              { $$ = rule_atomic_type_promise(); }
+  | L_PROMISE '<' basic_type optional_star L_ORDER
+      { $$ = rule_atomic_type_promise_of($basic_type | $optional_star, $L_ORDER); }
 ;
 
 /* A parameter type that may also be passed by reference:  int & */

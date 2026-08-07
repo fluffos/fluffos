@@ -290,7 +290,9 @@ const char *ctype(int n) {
         p = "TYPE_BUFFER";
         break;
       case T_PROMISE:
-        p = "TYPE_PROMISE";
+        /* promise<mixed>: the spec language has no payload syntax, and no
+           efun declares one (issue #1319) */
+        p = "(TYPE_MOD_PROMISE|TYPE_ANY)";
         break;
       case T_MIXED:
         p = "TYPE_ANY";

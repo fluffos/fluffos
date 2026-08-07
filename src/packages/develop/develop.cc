@@ -92,7 +92,7 @@ void f_debug_info() {
                   ob->prog->num_functions_defined * sizeof(function_t));
       outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
       outbuf_addv(&out, "num vars %u (%" PRIu64 ")\n", ob->prog->num_variables_defined,
-                  ob->prog->num_variables_defined * (sizeof(char*) + sizeof(short)));
+                  ob->prog->num_variables_defined * (sizeof(char*) + sizeof(lpc_type_t)));
       outbuf_addv(&out, "num inherits %d (%lu)\n", ob->prog->num_inherited,
                   ob->prog->num_inherited * sizeof(inherit_t));
       outbuf_addv(&out, "total size %d\n", ob->prog->total_size);

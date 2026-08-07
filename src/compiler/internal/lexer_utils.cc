@@ -181,7 +181,7 @@ static keyword_t reswords[] = {
     {"object", L_BASIC_TYPE, TYPE_OBJECT},
     {"parse_command", L_PARSE_COMMAND, 0},
     {"private", L_TYPE_MODIFIER, DECL_PRIVATE},
-    {"promise", L_BASIC_TYPE, TYPE_PROMISE},
+    {"promise", L_PROMISE, 0},
     {"protected", L_TYPE_MODIFIER, DECL_PROTECTED},
 #ifdef SENSIBLE_MODIFIERS
     {"public", L_TYPE_MODIFIER, DECL_PUBLIC},

@@ -330,7 +330,9 @@ optAtomicType = atomicType
 
 atomicType = LBasicType
              | LClass, LDefinedName
-             | LClass, LIdentifier ;
+             | LClass, LIdentifier
+             | LPromise
+             | LPromise, "<", basicType, optionalStar, LOrder ;
 
 argType = basicType
           | basicType, ref ;

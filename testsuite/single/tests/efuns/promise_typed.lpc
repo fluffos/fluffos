@@ -1,0 +1,96 @@
+// promise<T>: the parameterized promise type (issue #1319).
+//
+// The payload is a purely static annotation on the compiler side, and rides
+// along at runtime in the promise svalue's `subtype` field for values whose
+// payload is known (an async function's own promise). Illegal payload
+// combinations are plain fail fixtures in tests/compiler/fail/bad_promise_*.
+
+nosave int typedResumed;
+
+async int an_int() { return 42; }
+async string *a_string_array() { return ({ "a", "b" }); }
+async mapping a_mapping() { return ([ "k": 1 ]); }
+
+class point { int x; int y; }
+async class point a_class() {
+  class point pt = new(class point);
+
+  pt->x = 1;
+  return pt;
+}
+
+// promise<T> as a parameter and a return type
+promise<int> forward(promise<int> p) { return p; }
+
+// the payload type flows through `await`
+async void payload_types() {
+  int i = await an_int();
+  string *sa = await a_string_array();
+  mapping mp = await a_mapping();
+  class point pt = await a_class();
+
+  ASSERT_EQ(42, i);
+  ASSERT_EQ(({ "a", "b" }), sa);
+  ASSERT_EQ(1, mp["k"]);
+  ASSERT_EQ(1, pt->x);
+  typedResumed++;
+}
+
+void do_tests() {
+  promise<int> p;
+  promise<int> *parr;
+  promise<string *> psa;
+  promise q;
+  mixed m;
+
+  // an async function's call site is typed promise-of-its-return-type
+  p = an_int();
+  ASSERT_EQ("promise", typeof(p));  // typeof() reports the value kind only
+
+  // the declared payload rides in the value as a runtime T_* mask (what
+  // convert_type() produces), so %O names it the way the driver names any
+  // runtime type
+  ASSERT_EQ("PROMISE<int>( fulfilled: 42 )", sprintf("%O", p));
+  psa = a_string_array();
+  ASSERT_EQ("PROMISE<array>", sprintf("%O", psa)[0..13]);
+
+  // a class payload is on exactly the same path as any other: a runtime
+  // class value is a bare array with no class identity, so T_CLASS is all
+  // there is to say about one -- no special case, no untagged carve-out
+  ASSERT_EQ("PROMISE<class>", sprintf("%O", a_class())[0..13]);
+
+  // a promise with no declared payload (promise_create(), promise_then())
+  // carries no tag and renders bare
+  q = promise_create();
+  ASSERT_EQ("PROMISE( pending )", sprintf("%O", q));
+  ASSERT_EQ("PROMISE( pending )", sprintf("%O", promise_then(q, (: 0 :))));
+
+  // arrays of promises: TYPE_MOD_ARRAY keeps its ordinary meaning, so
+  // `promise<int> *` is an array whose elements are promise<int>
+  parr = ({ an_int(), an_int() });
+  ASSERT_EQ(2, sizeof(parr));
+  ASSERT_EQ(42, promise_result(parr[0]));
+  ASSERT_EQ(42, promise_result(parr[1]));
+
+  // promise<mixed> (bare `promise`) accepts any promise; so does mixed
+  q = p;
+  m = p;
+  ASSERT_EQ(p, q);
+  ASSERT_EQ(p, m);
+
+  // promise<T> as a parameter/return type
+  ASSERT_EQ(p, forward(p));
+
+  // payload_types() awaits, so it finishes on the microtask drain. Start it
+  // FROM a call_out rather than here: master::flag() sits on the stack for
+  // the whole suite, so nothing is serviced until the run ends, and an
+  // already-overdue call_out is not ordered against a gametick event queued
+  // during the run. Kicking off from call_out(1) and checking from
+  // call_out(3) makes the ordering call_out-to-call_out, which IS defined.
+  // (Full runs only -- single-file runs shut down synchronously.)
+  call_out(function() { payload_types(); }, 1);
+  call_out(function() {
+    ASSERT2(typedResumed == 1, sprintf("payload_types resumed: %O", typedResumed));
+    if (typedResumed != 1) shutdown(-1);
+  }, 3);
+}

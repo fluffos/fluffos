@@ -277,7 +277,7 @@ static std::string function_sig_string(program_t* prog, int idx) {
   out += funp.funcname;
 
   out += "(";
-  unsigned short* types;
+  lpc_type_t* types;
   if (prog->type_start && prog->type_start[idx] != INDEX_START_NONE) {
     types = &prog->argument_types[prog->type_start[idx]];
   } else {

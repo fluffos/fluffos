@@ -72,9 +72,9 @@ static void show_overload_warnings(void);
 #define CT(x) (1 << (x))
 #define CT_SIMPLE(x) (CT(TYPE_ANY) | CT(x))
 
-short compatible[12] = {
+short compatible[11] = {
     /* UNKNOWN */ 0,
-    /* ANY */ 0xfff,
+    /* ANY */ 0x7ff,
     /* NOVALUE to*/ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
     /* VOID to*/ CT_SIMPLE(TYPE_VOID) | CT(TYPE_NUMBER),
     /* NUMBER to*/ CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_REAL),
@@ -84,12 +84,11 @@ short compatible[12] = {
     /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
     /* REAL */ CT_SIMPLE(TYPE_REAL) | CT(TYPE_NUMBER),
     /* BUFFER */ CT_SIMPLE(TYPE_BUFFER),
-    /* PROMISE */ CT_SIMPLE(TYPE_PROMISE),
 };
 
-short is_type[12] = {
+short is_type[11] = {
     /* UNKNOWN */ 0,
-    /* ANY */ 0xfff,
+    /* ANY */ 0x7ff,
     /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
     /* VOID */ CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
     /* NUMBER */ CT_SIMPLE(TYPE_NUMBER),
@@ -99,7 +98,6 @@ short is_type[12] = {
     /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
     /* REAL */ CT_SIMPLE(TYPE_REAL),
     /* BUFFER */ CT_SIMPLE(TYPE_BUFFER),
-    /* PROMISE */ CT_SIMPLE(TYPE_PROMISE),
 };
 
 mem_block_t mem_block[NUMAREAS];
@@ -356,7 +354,7 @@ unsigned char string_tags[0x20];
 short freed_string;
 
 /* x_ptr is different inside nested functions */
-unsigned short *type_of_locals, *type_of_locals_ptr;
+lpc_type_t *type_of_locals, *type_of_locals_ptr;
 local_info_t *locals, *locals_ptr;
 
 int locals_size = 0;
@@ -378,7 +376,7 @@ char* get_two_types(char* where, char* end, int type1, int type2) {
 void init_locals() {
   auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
 
-  type_of_locals = reinterpret_cast<unsigned short*>(
+  type_of_locals = reinterpret_cast<lpc_type_t*>(
       DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "init_locals:1"));
   locals = reinterpret_cast<local_info_t*>(
       DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "init_locals:2"));
@@ -486,7 +484,7 @@ void reallocate_locals() {
   int offset;
   offset = type_of_locals_ptr - type_of_locals;
   type_of_locals = RESIZE(type_of_locals, type_of_locals_size += max_local_variables,
-                          unsigned short, TAG_LOCALS, "reallocate_locals:1");
+                          lpc_type_t, TAG_LOCALS, "reallocate_locals:1");
   type_of_locals_ptr = type_of_locals + offset;
   offset = locals_ptr - locals;
   locals = RESIZE(locals, locals_size, local_info_t, TAG_LOCALS, "reallocate_locals:2");
@@ -605,7 +603,7 @@ static void copy_new_function(program_t* prog, int index, program_t* defprog, in
   ihe->dn.function_num = where;
 }
 
-static int find_class_member(int which, const char* name, unsigned short* type) {
+static int find_class_member(int which, const char* name, lpc_type_t* type) {
   int i;
   class_def_t* cd;
   class_member_entry_t* cme;
@@ -632,7 +630,7 @@ static int find_class_member(int which, const char* name, unsigned short* type) 
   }
 }
 
-int lookup_any_class_member(char* name, unsigned short* type) {
+int lookup_any_class_member(char* name, lpc_type_t* type) {
   int ret = lookup_any_class_member_soft(name, type);
   if (ret == -1) {
     yyerror("No class in scope has no member '%s'.", name);
@@ -644,7 +642,7 @@ int lookup_any_class_member(char* name, unsigned short* type) {
 // dot/arrow member-access rules to decide whether to fall back to dynamic
 // mapping-key access (F_MAP_MEMBER) instead of reporting a class-member
 // error, for callers where "not a class member" isn't necessarily wrong.
-int lookup_any_class_member_soft(const char* name, unsigned short* type) {
+int lookup_any_class_member_soft(const char* name, lpc_type_t* type) {
   int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   int i, ret = -1, nret;
   const char* s = findstring(name);
@@ -667,7 +665,7 @@ int lookup_any_class_member_soft(const char* name, unsigned short* type) {
   return ret;
 }
 
-int lookup_class_member(int which, const char* name, unsigned short* type) {
+int lookup_class_member(int which, const char* name, lpc_type_t* type) {
   const char* s = findstring(name);
   int ret;
 
@@ -1062,6 +1060,59 @@ int copy_functions(program_t* from, int typemod) {
   return initializer;
 }
 
+/*
+ * promise<T> type-word helpers (issue #1319). Encoding: svalue.h's
+ * TYPE_MOD_PROMISE comment.
+ */
+
+int promise_payload_type(int t) {
+  /* not a promise (including an ARRAY of promises): `await` passes it
+   * through unchanged, so the type is unchanged too */
+  if (!IS_PROMISE(t)) {
+    return t;
+  }
+  int r = t & ~(TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY);
+  if (t & TYPE_MOD_PROMISE_VALUE_ARRAY) {
+    r |= TYPE_MOD_ARRAY;
+  }
+  return r;
+}
+
+int promise_of_type(int t) {
+  /* an async function declared to return a promise still yields exactly one
+   * promise: the runtime adopts (flattens) a returned promise */
+  if (t & TYPE_MOD_PROMISE) {
+    return t;
+  }
+  int r = t & ~TYPE_MOD_ARRAY;
+  if (t & TYPE_MOD_ARRAY) {
+    r |= TYPE_MOD_PROMISE_VALUE_ARRAY;
+  }
+  return r | TYPE_MOD_PROMISE;
+}
+
+unsigned short promise_value_subtype(int t) {
+  if (!IS_PROMISE(t)) {
+    return 0;
+  }
+  /* Runtime tags are T_* masks, and convert_type() is the driver's one
+   * compile-time-to-runtime mapping -- go through it rather than parking a
+   * compile-time word in an svalue. That keeps classes on the general path
+   * (a runtime class value is a bare array_t with no class identity, so
+   * T_CLASS is all there is to say about one) and keeps the tag meaningful
+   * when the promise crosses objects. */
+  int const rt = convert_type(promise_payload_type(t));
+
+  /* T_ANY ("mixed") and T_INVALID (void/unknown) carry no constraint, which
+   * is exactly what an absent tag means. T_ANY also would not fit: it spans
+   * T_PROMISE at 0x10000, above subtype's 16 bits. Every concrete mask does
+   * fit, and a promise payload can never itself be a promise. */
+  if (rt == T_ANY || rt == T_INVALID) {
+    return 0;
+  }
+  return static_cast<unsigned short>(rt);
+}
+
 void type_error(const char* str, int type) {
   static char buff[512];
   char* end = EndOf(buff);
@@ -1096,6 +1147,20 @@ int compatible_types(int t1, int t2) {
   if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
     return 1;
   }
+  /* promise<T>: two promises are compatible when their payloads are, and a
+   * promise is never compatible with a non-promise (mixed was handled just
+   * above). An ARRAY of promises is not itself a promise, so it falls
+   * through to the ordinary array rules below with TYPE_MOD_ARRAY intact. */
+  if ((t1 | t2) & TYPE_MOD_PROMISE) {
+    if (!(t1 & TYPE_MOD_PROMISE) || !(t2 & TYPE_MOD_PROMISE) ||
+        (t1 & TYPE_MOD_ARRAY) != (t2 & TYPE_MOD_ARRAY)) {
+      return 0;
+    }
+    if (t1 & TYPE_MOD_ARRAY) {
+      return t1 == t2;
+    }
+    return compatible_types(promise_payload_type(t1), promise_payload_type(t2));
+  }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
   }
@@ -1107,7 +1172,7 @@ int compatible_types(int t1, int t2) {
   } else if (t2 & TYPE_MOD_ARRAY) {
     return 0;
   }
-  if (t1 > TYPE_PROMISE || t1 < 0) {
+  if (t1 > TYPE_BUFFER || t1 < 0) {
     fatal("compiler.c: unknown type in compatible_types()");
   }
   return compatible[t1] & (1 << t2);
@@ -1129,6 +1194,20 @@ int compatible_types2(int t1, int t2) {
   }
   if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
     return 1;
+  }
+  /* promise<T>: two promises are compatible when their payloads are, and a
+   * promise is never compatible with a non-promise (mixed was handled just
+   * above). An ARRAY of promises is not itself a promise, so it falls
+   * through to the ordinary array rules below with TYPE_MOD_ARRAY intact. */
+  if ((t1 | t2) & TYPE_MOD_PROMISE) {
+    if (!(t1 & TYPE_MOD_PROMISE) || !(t2 & TYPE_MOD_PROMISE) ||
+        (t1 & TYPE_MOD_ARRAY) != (t2 & TYPE_MOD_ARRAY)) {
+      return 0;
+    }
+    if (t1 & TYPE_MOD_ARRAY) {
+      return t1 == t2;
+    }
+    return compatible_types2(promise_payload_type(t1), promise_payload_type(t2));
   }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
@@ -1489,7 +1568,7 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
       }
     }
     *(reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_INDEX].block) + num) =
-        mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
+        mem_block[A_ARGUMENT_TYPES].current_size / sizeof(lpc_type_t);
     add_to_mem_block(A_ARGUMENT_TYPES, (char*)type_of_locals_ptr,
                      num_arg * sizeof(*type_of_locals_ptr));
     if (!CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
@@ -1556,7 +1635,7 @@ int define_variable(const char* name, int type) {
 
 int define_new_variable(const char* name, int type) {
   int n;
-  unsigned short* tp;
+  lpc_type_t* tp;
   const char** np;
 
   var_defined = 1;
@@ -1564,7 +1643,7 @@ int define_new_variable(const char* name, int type) {
   n = define_variable(name, type);
   np = reinterpret_cast<const char**>(allocate_in_mem_block(A_VAR_NAME, sizeof(char*)));
   *np = name;
-  tp = reinterpret_cast<unsigned short*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short)));
+  tp = reinterpret_cast<lpc_type_t*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(lpc_type_t)));
   *tp = type;
   symbol_record(OP_SYMBOL_VAR, current_file, current_line, name);
   return n;
@@ -1615,8 +1694,9 @@ int decl_fix(int x) {
   return rest | DECL_PROTECTED;
 }
 
-const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",    "string",
-                                     "object",  "mapping", "function", "float", "buffer", "promise"};
+const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",
+                                     "string",  "object",  "mapping",  "function", "float",
+                                     "buffer"};
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
@@ -1674,7 +1754,18 @@ char* get_type_name(char* where, char* end, int type) {
     pointer = 1;
     type &= ~TYPE_MOD_ARRAY;
   }
-  if (type & TYPE_MOD_CLASS) {
+  if (type & TYPE_MOD_PROMISE) {
+    /* render the payload with the same routine, minus its trailing space */
+    char inner[128];
+    char* ip = get_type_name(inner, EndOf(inner), promise_payload_type(type));
+
+    if (ip > inner && ip[-1] == ' ') {
+      *(ip - 1) = '\0';
+    }
+    where = strput(where, end, "promise<");
+    where = strput(where, end, inner);
+    where = strput(where, end, ">");
+  } else if (type & TYPE_MOD_CLASS) {
     where = strput(where, end, "class ");
     /* we're sometimes called from outside the compiler * /
     if (current_file)
@@ -1841,7 +1932,7 @@ int validate_function_call(int f, parse_node_t* args) {
   int num_arg = (args ? args->kind : 0);
   int num_var = 0;
   parse_node_t* pn = args;
-  unsigned short* arg_types = nullptr;
+  lpc_type_t* arg_types = nullptr;
   program_t* prog;
 
   while (pn) {
@@ -1890,7 +1981,7 @@ int validate_function_call(int f, parse_node_t* args) {
       int which = FUNCTION_TEMP(f)->u.index;
       int start = *(reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_INDEX].block) + which);
       if (start != INDEX_START_NONE) {
-        arg_types = reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_TYPES].block) + start;
+        arg_types = reinterpret_cast<lpc_type_t*>(mem_block[A_ARGUMENT_TYPES].block) + start;
       }
     }
 
@@ -2004,7 +2095,13 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
     return node;
   }
 
+  if ((intype & (TYPE_MOD_PROMISE | TYPE_MOD_ARRAY)) == TYPE_MOD_PROMISE) {
+    intype = TYPE_MOD_PROMISE;  /* the payload has no runtime representation */
+  }
   switch (intype & (~DECL_MODS)) {
+    case TYPE_MOD_PROMISE:
+      type = T_PROMISE;
+      break;
     case 0:
     case 3:
       // error situation, don't bother
@@ -2029,9 +2126,6 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
       break;
     case TYPE_BUFFER:
       type = T_BUFFER;
-      break;
-    case TYPE_PROMISE:
-      type = T_PROMISE;
       break;
     default:
       if (intype & TYPE_MOD_ARRAY) {
@@ -2416,16 +2510,16 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   int saved_max_num_locals = max_num_locals;
 
   // Save the original pointers and sizes of local variable scratchpads
-  unsigned short* saved_type_of_locals = type_of_locals;
+  lpc_type_t* saved_type_of_locals = type_of_locals;
   local_info_t* saved_locals = locals;
   int saved_type_of_locals_size = type_of_locals_size;
   int saved_locals_size = locals_size;
-  unsigned short* saved_type_of_locals_ptr = type_of_locals_ptr;
+  lpc_type_t* saved_type_of_locals_ptr = type_of_locals_ptr;
   local_info_t* saved_locals_ptr = locals_ptr;
 
   // Allocate fresh, isolated local variable scratchpads for this compilation level
   auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
-  type_of_locals = reinterpret_cast<unsigned short*>(
+  type_of_locals = reinterpret_cast<lpc_type_t*>(
       DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "compile_file:1"));
   locals = reinterpret_cast<local_info_t*>(
       DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "compile_file:2"));
@@ -2978,7 +3072,7 @@ static program_t* epilog(void) {
   if (mem_block[A_ARGUMENT_INDEX].current_size) {
     unsigned short* dest;
 
-    prog->argument_types = reinterpret_cast<unsigned short*>(p);
+    prog->argument_types = reinterpret_cast<lpc_type_t*>(p);
     copy_in(A_ARGUMENT_TYPES, &p);
 
     dest = prog->type_start = reinterpret_cast<unsigned short*>(p);
@@ -3009,7 +3103,7 @@ static program_t* epilog(void) {
 
   prog->variable_table = reinterpret_cast<char**>(p);
   copy_in(A_VAR_NAME, &p);
-  prog->variable_types = reinterpret_cast<unsigned short*>(p);
+  prog->variable_types = reinterpret_cast<lpc_type_t*>(p);
   copy_in(A_VAR_TYPE, &p);
 
   prog->num_inherited = mem_block[A_INHERITS].current_size / sizeof(inherit_t);

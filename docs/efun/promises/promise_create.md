@@ -10,7 +10,12 @@ title: promises / promise_create
     mixed promise_create();
 
 ### DESCRIPTION
-    Returns a new promise in the pending state. A promise is a first-class
+    Returns a new promise in the pending state, with no declared payload
+    type -- it is a `promise<mixed>`, assignable to any `promise<T>`
+    variable. (Only an `async` function's own promise carries a declared
+    payload; see the async/await concept page.)
+
+    A promise is a first-class
     LPC value (`typeof` returns `"promise"`) holding the eventual result of
     an asynchronous operation. It settles exactly once, either fulfilled via
     promise_resolve(3) or rejected via promise_reject(3); reactions attached

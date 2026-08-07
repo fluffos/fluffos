@@ -657,8 +657,12 @@ static void promise_add_coroutine(promise_t* p, lpc_coroutine_t* coro) {
   }
 }
 
-void run_async_function(char* entry_pc) {
+void run_async_function(char* entry_pc, const function_t* funp) {
   csp->framekind |= FRAME_ASYNC;
+  /* The promise value carries its declared payload type in the svalue's
+   * subtype, taken from the coroutine's declared return type -- promise<T>
+   * for an `async T f()`. See promise_value_subtype(). */
+  unsigned short const value_type = promise_value_subtype(promise_of_type(funp->type));
   promise_t* p = promise_alloc();
   /* the caller set this frame up; nothing is stacked above it yet */
   bool const propagate_eval_error = run_coroutine_body(entry_pc, p, csp);
@@ -669,6 +673,7 @@ void run_async_function(char* entry_pc) {
     error("Can't catch eval cost too big error.\n");
   }
   push_refed_promise(p);
+  sp->subtype = value_type;
 }
 
 void coroutine_await_pending(promise_t* awaited) {
