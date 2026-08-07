@@ -1745,6 +1745,32 @@ char* get_type_modifiers(char* where, char* end, int type) {
   return where;
 }
 
+/*
+ * The class name behind a TYPE_MOD_CLASS type word, or nullptr when it
+ * cannot be known here.
+ *
+ * A class index is program-local, so it only means something while the
+ * defining program's own tables are live -- that is, during its compile.
+ * get_type_name() is also called with no compile in progress (the
+ * disassembler, generate_keywords), where the same index would name a
+ * different class or nothing at all; there we print the bare kind rather
+ * than a confidently wrong name. Every lookup is bounds-checked because the
+ * type word can reach here from a partially-built or erroring compile.
+ */
+static const char* compiling_class_name(int idx) {
+  if (!current_file || !mem_block[A_CLASS_DEF].block || !mem_block[A_STRINGS].block) {
+    return nullptr;
+  }
+  if (idx < 0 || idx >= static_cast<int>(mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t))) {
+    return nullptr;
+  }
+  int const sidx = CLASS(idx)->classname;
+  if (sidx < 0 || sidx >= static_cast<int>(mem_block[A_STRINGS].current_size / sizeof(char*))) {
+    return nullptr;
+  }
+  return PROG_STRING(sidx);
+}
+
 char* get_type_name(char* where, char* end, int type) {
   int pointer = 0;
 
@@ -1766,12 +1792,13 @@ char* get_type_name(char* where, char* end, int type) {
     where = strput(where, end, inner);
     where = strput(where, end, ">");
   } else if (type & TYPE_MOD_CLASS) {
-    where = strput(where, end, "class ");
-    /* we're sometimes called from outside the compiler * /
-    if (current_file)
-        where = strput(where, end, PROG_STRING(CLASS(type &
-    ~TYPE_MOD_CLASS)->name));
-        and that just doesn't work */
+    const char* cname = compiling_class_name(type & CLASS_NUM_MASK);
+
+    where = strput(where, end, "class");
+    if (cname) {
+      where = strput(where, end, " ");
+      where = strput(where, end, cname);
+    }
   } else {
     DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
     where = strput(where, end, compiler_type_names[type]);
