@@ -68,9 +68,26 @@ class BreakIteratorPool {
 
 // Wrapper class to create a icu EGC iterator for given string.
 // can access underlying icu::BreakIterator
+//
+// Pure-ASCII fast path
+// -------------------
+// Driving ICU's rule-based break iterator costs on the order of 50 machine
+// instructions per grapheme cluster, plus a utext_openUTF8()/setText() setup
+// per string. In a mudlib the overwhelming majority of strings are pure
+// ASCII, and for those the answer is trivial: every byte is exactly one
+// grapheme cluster, so EGC index == byte offset and the cluster count is just
+// the byte length.
+//
+// So reset() first scans for a byte with the high bit set. When there is
+// none the string is flagged ASCII, ICU is NOT set up at all, and
+// EGCSmartIterator answers every query arithmetically. ICU is still wired up
+// lazily -- by ensure_icu(), via operator->() -- so code that reaches for the
+// underlying icu::BreakIterator keeps working unchanged on any string.
 class EGCIterator {
  private:
   bool ok_ = false;
+  bool ascii_ = false;
+  bool icu_ready_ = false;
   const char* src_;
   int32_t len_;
 
@@ -79,40 +96,85 @@ class EGCIterator {
     return &pool;
   }
 
- protected:
-  BreakIteratorPool::item_type brk_;
+  // True when the string is pure ASCII (so trivially valid UTF-8) AND contains
+  // no CR.
+  //
+  // The CR exclusion is load-bearing, not caution: UAX #29 rule GB3 joins
+  // CR x LF into ONE grapheme cluster, so "\r\n" is 2 bytes but 1 cluster and
+  // the byte-offset==index identity breaks. CR is the only ASCII byte that can
+  // join with a following character this way -- pinned exhaustively over all
+  // 128x128 ASCII pairs by EGCAsciiFastPath.CrLfIsTheOnlyAsciiJoin. Excluding
+  // every CR (rather than just CR immediately before LF) keeps this a single
+  // flat scan; a lone CR merely falls back to ICU, which is still correct.
+  //
+  // Auto-vectorizes to a few bytes per cycle, against ICU's ~50 instructions
+  // per cluster.
+  static bool all_ascii(const char* src, int32_t slen) {
+    unsigned char acc = 0;
+    unsigned char cr = 0;
+    for (int32_t i = 0; i < slen; i++) {
+      auto c = static_cast<unsigned char>(src[i]);
+      acc |= c;
+      cr |= static_cast<unsigned char>(c == '\r');
+    }
+    return (acc & 0x80u) == 0 && cr == 0;
+  }
 
- public:
-  [[nodiscard]] bool ok() const { return ok_; }
-  [[nodiscard]] const char* data() const { return src_; }
-  [[nodiscard]] int32_t len() const { return len_; }
-  void reset(const char* src, int32_t slen) {
-    ok_ = false;
-
+  bool setup_icu() {
     UText text = UTEXT_INITIALIZER;
     UErrorCode status = U_ZERO_ERROR;
-    utext_openUTF8(&text, src, slen, &status);
+    utext_openUTF8(&text, src_, len_, &status);
     if (!U_SUCCESS(status)) {
       utext_close(&text);
-      return;
+      return false;
     }
 
     status = U_ZERO_ERROR;
     brk_->setText(&text, status);  // copies text
     if (!U_SUCCESS(status)) {
       utext_close(&text);
-      return;
+      return false;
     }
     // no longer needed.
     utext_close(&text);
 
     brk_->first();
+    icu_ready_ = true;
+    return true;
+  }
 
+ protected:
+  BreakIteratorPool::item_type brk_;
+
+  // Materialize the ICU iterator for a string that skipped setup because it
+  // is ASCII. Must be called before ANY use of brk_.
+  bool ensure_icu() { return icu_ready_ ? true : setup_icu(); }
+
+ public:
+  [[nodiscard]] bool ok() const { return ok_; }
+  [[nodiscard]] bool is_ascii() const { return ascii_; }
+  [[nodiscard]] const char* data() const { return src_; }
+  [[nodiscard]] int32_t len() const { return len_; }
+  void reset(const char* src, int32_t slen) {
+    ok_ = false;
+    icu_ready_ = false;
     src_ = src;
     len_ = slen;
-    ok_ = true;
+
+    ascii_ = all_ascii(src, slen);
+    if (ascii_) {
+      // Pure ASCII is always well-formed UTF-8; defer ICU until something
+      // actually asks for the underlying break iterator.
+      ok_ = true;
+      return;
+    }
+
+    ok_ = setup_icu();
   }
-  auto operator->() { return brk_.operator->(); }
+  auto operator->() {
+    ensure_icu();
+    return brk_.operator->();
+  }
 
   static BreakIteratorPool::item_type GetBreakIterator() { return pool()->accquire(); }
 
