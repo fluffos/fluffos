@@ -1774,7 +1774,15 @@ static const char* compiling_class_name(int idx) {
 char* get_type_name(char* where, char* end, int type) {
   int pointer = 0;
 
-  where = get_type_modifiers(where, end, type);
+  /* A class type word keeps its class INDEX in bits 0-6 (CLASS_NUM_MASK),
+   * which overlap FUNC_VARARGS (0x20) and FUNC_ASYNC (0x40) -- so index 33
+   * would print as "varargs class c33" and index 65 as "async class c65".
+   * Only the DECL_* modifiers can legitimately accompany a class here: a
+   * function's FUNC_* flags live in program_t::function_flags, never in the
+   * function_t::type word this renders. Applies to promise<class T> too,
+   * whose payload index sits in the same low bits. */
+  where = get_type_modifiers(where, end,
+                             (type & TYPE_MOD_CLASS) ? (type & DECL_MODS) : type);
   type &= ~DECL_MODS;
   if (type & TYPE_MOD_ARRAY) {
     pointer = 1;

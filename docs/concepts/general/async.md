@@ -35,10 +35,11 @@ promise anything;                     // bare `promise` == promise<mixed>
 `promise<T> *` and `promise<T *>` are different types and compose
 independently: the first is an *array of promises*, the second is *one
 promise that delivers an array*. Any type may be a payload — including
-`class` types — except `void` and `promise` itself (resolving a promise
-with a promise adopts it, so a promise value is never itself a promise;
-note that `promise<promise<int>>` must be spelled with a space between the
-closing brackets, since `>>` lexes as the shift operator).
+`class` types — except `void` and `promise` itself: resolving a promise
+with a promise adopts it, so a promise value is never itself a promise, and
+a nested payload is rejected at compile time. (Spelled `promise<promise<int> >`
+you get the explicit diagnostic; spelled `promise<promise<int>>` you get a
+plain syntax error instead, because `>>` lexes as the shift operator.)
 
 Assignment and argument passing compare payloads, so `promise<int>` and
 `promise<string>` are incompatible while `promise` (i.e. `promise<mixed>`)
@@ -46,16 +47,21 @@ accepts either. `await` yields the payload type, so `int n = await
 fetch_count();` type-checks and `string s = await fetch_count();` does not.
 
 `typeof()` returns `"promise"` — it reports the value's kind, not its
-declared payload. The payload does ride along at runtime for promises whose
-type is known (an `async` function's own promise), as the ordinary runtime
-type tag of the value it will deliver, and `sprintf("%O", p)` names it the
-way the driver names any runtime type: `PROMISE<int>( fulfilled: 42 )`,
+payload. An `async` function's promise does carry the payload its function
+**declared**, as a plain runtime type tag, and `sprintf("%O", p)` names it
+the way the driver names any runtime type: `PROMISE<int>( fulfilled: 42 )`,
 `PROMISE<array>` for a `promise<string *>`, `PROMISE<class>` for a
 `promise<class point>`. A promise from `promise_create()` or
-`promise_then()` declares no payload and renders bare, `PROMISE( pending )`.
-The static type is the finer-grained one: the compiler distinguishes
-`promise<string *>` from `promise<int *>`, while the value carries only what
-the runtime itself can represent.
+`promise_then()` declares nothing and renders bare, `PROMISE( pending )`.
+
+Two things that tag is not. It is not finer-grained than the runtime's own
+types: the compiler tells `promise<string *>` from `promise<int *>`, the
+value only says "array". And it is a **declaration, not a measurement** —
+exactly as trustworthy as any other declared LPC type, which is to say an
+`async int f()` whose body returns a `mixed` that happens to hold a string
+still produces a promise tagged `int`. Read it as documentation of intent,
+the way you would read the function's signature, not as a checked property
+of the settled value.
 
 Promises compare by identity, work as mapping keys, deep-copy shallowly
 (identity-preserving, like objects), and are not serialized by

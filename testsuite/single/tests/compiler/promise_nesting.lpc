@@ -15,6 +15,7 @@ private void expect_rejected(string path, string src, string what) {
 
   write_file(path + ".lpc", src, 1);
   err = catch(load_object(path));
+  rm(path + ".lpc");
   ASSERT2(stringp(err), what + " must be rejected, got: " + sprintf("%O", err));
   ASSERT2(find_object(path) == 0, what + " must not have loaded");
 }
@@ -35,6 +36,7 @@ void do_tests() {
   // the ordinary one-level form still compiles
   write_file("/data/promise_ok.lpc", "void f() { promise<int> p; }\n", 1);
   ASSERT(load_object("/data/promise_ok") != 0);
+  rm("/data/promise_ok.lpc");
 
   expect_rejected("/data/promise_n2", nested(2), "promise<promise<int> >");
   expect_rejected("/data/promise_n3", nested(3), "3-level nested promise");
