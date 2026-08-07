@@ -163,6 +163,14 @@ void do_tests() {
 //    command-giver-stack entries.
 nosave int nestDone;
 
+// a defer() handler that errors WHILE the acatch unwind is popping frames:
+// the throw must not escape the coroutine boundary (which would leave the
+// driver's error context pointing at a dead C++ stack frame)
+async void acatch_unwind_defer_error() {
+  defer((: error("defer boom") :));
+  acatch(error("inner"));
+}
+
 async void acatch_error_loop() {
   mixed p = promise_create();
 
@@ -191,6 +199,11 @@ void do_more_tests() {
   // an acatch-caught error per iteration must not accumulate VM state
   for (i = 0; i < 200; i++) {
     acatch_error_loop();
+  }
+
+  // errors raised by defer handlers during the unwind stay contained
+  for (i = 0; i < 20; i++) {
+    acatch_unwind_defer_error();
   }
 
   call_out(function() {

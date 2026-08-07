@@ -5,6 +5,7 @@
 #include <deque>
 
 #include "backend.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/eval_limit.h"
 
 /*
@@ -280,6 +281,15 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   promise_t* prev_promise = g_coroutine_promise;
   g_coroutine_econ = &econ;
   g_coroutine_promise = p;
+  /* RAII, not a tail assignment: `econ` lives on THIS C++ frame, so if an
+   * exception ever escapes this function the globals must not be left
+   * pointing at it (error_handler() compares current_error_context against
+   * g_coroutine_econ -- a dangling one is a use-after-free). */
+  DEFER {
+    g_coroutine_econ = prev_econ;
+    g_coroutine_promise = prev_promise;
+    pop_context(&econ);
+  };
   bool propagate_eval_error = false;
 
   while (true) {
@@ -302,8 +312,19 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
         marker = find_acatch_marker(econ.save_csp);
       }
       if (marker) {
-        entry_pc = unwind_to_acatch_marker(marker);
-        continue;
+        /* The unwind pops control frames, which runs defer() handlers --
+         * arbitrary LPC that can error() again. If that happens the stacks
+         * are mid-unwind, so fall through to the reject path (which cuts
+         * them back to the floor) rather than letting the throw escape. */
+        bool unwound = false;
+        try {
+          entry_pc = unwind_to_acatch_marker(marker);
+          unwound = true;
+        } catch (const char*) {
+        }
+        if (unwound) {
+          continue;
+        }
       }
       restore_context(&econ);
       svalue_t err = catch_value;
@@ -318,9 +339,6 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
     }
   }
 
-  g_coroutine_econ = prev_econ;
-  g_coroutine_promise = prev_promise;
-  pop_context(&econ);
   return propagate_eval_error;
 }
 
