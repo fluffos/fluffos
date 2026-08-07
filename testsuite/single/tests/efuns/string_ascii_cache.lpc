@@ -1,0 +1,90 @@
+// sizeof() on a string counts grapheme clusters. Pure-ASCII strings take a
+// fast path that answers from the byte length, and counted strings memoize
+// "am I ASCII?" in their block header (MSTR_ASCII_*, src/base/internal/
+// stralloc.h) so repeat queries are O(1).
+//
+// These tests exist to catch a STALE cached tag: every case below asks for
+// sizeof() BEFORE mutating, so the tag is already populated, then mutates and
+// asks again. A cache that failed to invalidate would return the pre-mutation
+// answer.
+void do_tests() {
+  string s;
+  string wide;
+
+  // --- baseline: ASCII is one cluster per byte ---
+  s = "hello";
+  ASSERT_EQ(5, sizeof(s));
+  ASSERT_EQ(5, sizeof(s));  // again: served from the cache
+
+  ASSERT_EQ(0, sizeof(""));
+
+  // --- CR-LF is ONE grapheme cluster (UAX #29 GB3), so a CR-bearing string
+  // must not take the byte-length path ---
+  s = "a\r\nb";
+  ASSERT_EQ(3, sizeof(s));  // 'a', CRLF, 'b' -- not 4
+  ASSERT_EQ(3, sizeof(s));
+  s = "a\rb";  // lone CR is its own cluster
+  ASSERT_EQ(3, sizeof(s));
+
+  // --- non-ASCII counts clusters, not bytes ---
+  wide = "你好";  // 你好: 2 clusters, 6 bytes
+  ASSERT_EQ(2, sizeof(wide));
+  ASSERT_EQ(2, sizeof(wide));
+
+  // --- ASCII, then grow it with non-ASCII: the tag must be re-evaluated ---
+  s = "abc";
+  ASSERT_EQ(3, sizeof(s));  // populate the cache as ASCII
+  s += wide;
+  ASSERT_EQ(5, sizeof(s));  // 3 + 2 clusters, NOT 3 + 6 bytes
+
+  // --- the in-place realloc path: a MALLOC string with refcount 1 is grown
+  // by extend_string() rather than reallocated fresh, so the tag must be
+  // invalidated there specifically. Build one at runtime so it is neither a
+  // shared literal nor multiply referenced. ---
+  s = "";
+  for (int i = 0; i < 5; i++) {
+    s += "a";
+  }
+  ASSERT_EQ(5, sizeof(s));  // populate the cache as ASCII
+  s += wide;                // grows in place
+  ASSERT_EQ(7, sizeof(s));  // 5 + 2 clusters, NOT 5 + 6 bytes
+
+  // --- non-ASCII, then reduced back to ASCII ---
+  s = wide + "xy";
+  ASSERT_EQ(4, sizeof(s));
+  s = s[2..3];
+  ASSERT_EQ(2, sizeof(s));
+
+  // --- write a non-ASCII codepoint through a string-char lvalue after the
+  // string has been cached as ASCII ---
+  s = "abc";
+  ASSERT_EQ(3, sizeof(s));
+  s[1] = 20320;             // U+4F60 你 -- character constants are ASCII-only
+  ASSERT_EQ(3, sizeof(s));  // still 3 clusters, now 5 bytes
+  ASSERT_EQ(20320, s[1]);
+
+  // --- and the reverse: cached as non-ASCII, then overwritten with ASCII ---
+  s = "a你c";
+  ASSERT_EQ(3, sizeof(s));
+  s[1] = 'b';
+  ASSERT_EQ(3, sizeof(s));
+  ASSERT_EQ("abc", s);
+
+  // --- indexing and ranges agree with the cluster count on both paths ---
+  s = "0123456789";
+  ASSERT_EQ(10, sizeof(s));
+  ASSERT_EQ('5', s[5]);
+  ASSERT_EQ("345", s[3..5]);
+  ASSERT_EQ('9', s[<1]);
+
+  wide = "你好世";  // 你好世
+  ASSERT_EQ(3, sizeof(wide));
+  ASSERT_EQ("好", wide[1..1]);
+  ASSERT_EQ("世", wide[<1..]);
+
+  // --- a shared string (interned) reused via a second reference keeps a
+  // correct tag ---
+  s = "shared literal";
+  ASSERT_EQ(14, sizeof(s));
+  ASSERT_EQ(14, sizeof("shared literal"));
+}
