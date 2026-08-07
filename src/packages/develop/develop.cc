@@ -138,6 +138,9 @@ void f_refs() {
     case T_BUFFER:
       r = sp->u.buf->ref;
       break;
+    case T_PROMISE:
+      r = sp->u.prom->ref;
+      break;
     case T_STRING:
       if (sp->subtype & STRING_COUNTED) {
         r = MSTR_REF(sp->u.string);

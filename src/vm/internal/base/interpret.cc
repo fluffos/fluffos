@@ -276,6 +276,8 @@ const char* type_name(int c) {
   } while (!((limit <<= 1) & TYPE_CODES_END));
   /* Oh crap.  Take some time and figure out what we have. */
   switch (c) {
+    case T_PROMISE:
+      return "promise";
     case T_INVALID:
       return "*invalid*";
     case T_LVALUE:
@@ -3496,6 +3498,12 @@ void eval_instruction(char* p) {
         csp->num_local_variables = pushed_args;
         auto* funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
+        if (funflags & FUNC_ASYNC) {
+          /* run the coroutine body in its own nested interpreter; it
+           * pushes the result promise and restores this frame's state */
+          run_async_function(current_prog->program + funp->address);
+          break;
+        }
         pc = current_prog->program + funp->address;
         if (Tracer::enabled()) {
           csp->trace_id = ::get_trace_id(csp);
@@ -3516,12 +3524,14 @@ void eval_instruction(char* p) {
         /* `::`-qualified calls must fill default arguments exactly like
          * F_CALL_FUNCTION_BY_ADDRESS -- this path used to skip them, so the
          * parent function ran with zeros instead of its declared defaults. */
+        bool inherited_is_async = false;
         {
           int roff = offset;
           if (temp_prog->function_flags[roff] & FUNC_ALIAS) {
             roff = temp_prog->function_flags[roff] & ~FUNC_ALIAS;
           }
           auto rflags = temp_prog->function_flags[roff];
+          inherited_is_async = (rflags & FUNC_ASYNC) != 0;
           if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
             auto result = get_function_at_index(temp_prog, roff);
             if (result.first != nullptr) {
@@ -3543,6 +3553,10 @@ void eval_instruction(char* p) {
 
         funp = setup_inherited_frame(offset);
         csp->pc = pc;
+        if (inherited_is_async) {
+          run_async_function(current_prog->program + funp->address);
+          break;
+        }
         pc = current_prog->program + funp->address;
 
         if (Tracer::enabled()) {
@@ -4449,6 +4463,46 @@ void eval_instruction(char* p) {
         push_number(0);
         return; /* return to do_catch */
       }
+      case F_AWAIT: {
+        /* A non-promise operand passes through unchanged: awaiting a plain
+         * value is a no-op, not a scheduling point. (JS yields here too,
+         * but it has no eval-cost model -- see yield_now() for the explicit
+         * spelling.) */
+        if (sp->type != T_PROMISE) {
+          break;
+        }
+        /* Awaiting a promise ALWAYS parks, even when it has already
+         * settled: the resume runs from the microtask drain with a fresh
+         * eval-cost budget, so a chain of awaits naturally breaks long
+         * work into separately-metered pieces instead of burning one
+         * budget. The settled cases are delivered by resume_coroutine()
+         * exactly like a late settle. */
+        coroutine_await_pending(sp->u.prom);
+        return;
+      }
+      case F_ACATCH: {
+        /* like F_CATCH, but a pure control-stack marker: no C++ recursion,
+         * so an await may suspend inside the protected region. Unwinding
+         * is driven from run_coroutine_body(). */
+        LOAD_SHORT(offset, pc);
+        offset = (pc - 2) + offset - current_prog->program;
+        if (!g_coroutine_econ) {
+          error("acatch: not inside an async function body.\n");
+        }
+        push_control_stack(FRAME_CATCH | FRAME_ASYNC);
+        csp->save_sp = sp;
+        csp->save_cgsp = cgsp;
+        csp->pc = current_prog->program + offset;
+        csp->num_local_variables = (csp - 1)->num_local_variables;
+        break;
+      }
+      case F_END_ACATCH: {
+        /* success path: pop the marker (restores pc to the continuation,
+         * which is exactly here) and yield 0, staying in this loop */
+        pop_control_stack();
+        push_number(0);
+        break;
+      }
       case F_TIME_EXPRESSION: {
         long sec, usec;
 #ifdef DEBUG
@@ -4839,12 +4893,14 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   ob->time_of_ref = g_current_gametick;
   /* Direct calls (simul_efuns, heart_beat) must fill default arguments too;
    * simul_efuns with defaults used to run with zeros. */
+  bool is_async = false;
   {
     int roff = offset;
     if (prog->function_flags[roff] & FUNC_ALIAS) {
       roff = prog->function_flags[roff] & ~FUNC_ALIAS;
     }
     auto rflags = prog->function_flags[roff];
+    is_async = (rflags & FUNC_ASYNC) != 0;
     if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
       auto result = get_function_at_index(prog, roff);
       if (result.first != nullptr) {
@@ -4860,6 +4916,14 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   previous_ob = current_object;
   current_object = ob;
   funp = setup_new_frame(offset);
+  /* Same treatment as the other call paths: an async simul_efun (this is
+   * also the FP_SIMUL route) must yield a promise and be able to await,
+   * not run its body as an ordinary call and return a plain value. */
+  if (is_async) {
+    csp->framekind |= FRAME_ASYNC;
+    run_async_function(current_prog->program + funp->address);
+    return;
+  }
   call_program(current_prog, funp->address);
 }
 

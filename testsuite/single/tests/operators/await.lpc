@@ -1,0 +1,136 @@
+// Operator-level semantics of `await` (issue #1319): precedence,
+// pass-through, composition, the cannot-suspend lvalue guard, and the
+// suspended-coroutine limit ("max suspended async functions").
+//
+// await is only legal inside an async function body, so the operator
+// checks live in async helpers. Awaiting a promise always parks (even a
+// settled one), so those helpers finish on the microtask drain; awaiting
+// a non-promise passes through without parking.
+
+nosave mixed pend;
+nosave int compoundDone, opsDone;
+
+// precedence: await is a unary prefix operator, binding tighter than any
+// binary operator but looser than postfix
+async int operators() {
+  mixed p = promise_create();
+  mixed q = promise_create();
+
+  promise_resolve(p, 5);
+  promise_resolve(q, 3);
+
+  ASSERT_EQ(8, await p + 3);
+  ASSERT_EQ(2, await p - 3);
+  ASSERT_EQ(1, await p == 5);
+  ASSERT_EQ(0, !await p);
+  ASSERT_EQ(-5, -await p);
+
+  // composition: several awaits in one expression, and in call arguments
+  ASSERT_EQ(8, await p + await q);
+  ASSERT_EQ(({ 5, 3 }), ({ await p, await q }));
+  ASSERT_EQ(2, sizeof(({ await p, await q })));
+
+  return 1;
+}
+
+// non-promise operands pass through unchanged, whatever their type
+async int passthrough() {
+  ASSERT_EQ(7, await 7);
+  ASSERT_EQ("str", await "str");
+  ASSERT_EQ(({ 1, 2 }), await ({ 1, 2 }));
+  ASSERT_EQ(([ "k": 1 ]), await ([ "k": 1 ]));
+  ASSERT_EQ(0, await 0);
+  return 1;
+}
+
+// rhs of an indexed compound assignment evaluates before the lvalue is
+// pinned, so parking here is clean: it resumes and completes
+async void compound_ok() {
+  int *arr = ({ 1, 2, 3 });
+
+  arr[1] += await pend;
+  ASSERT_EQ(12, arr[1]);
+  compoundDone++;
+}
+
+// a local-variable compound assignment holds its lvalue on the stack
+// across the rhs, so a pending await inside it refuses to suspend --
+// acatch observes the guard error synchronously
+async void local_guarded() {
+  string s = "";
+  mixed err = acatch(s += await pend);
+
+  ASSERT(stringp(err));
+  ASSERT(strsrch(err, "cannot suspend") != -1);
+}
+
+// suspension-limit fixtures: park on a promise that never settles during
+// the loop; acatch keeps the over-limit error from becoming an unhandled
+// rejection
+nosave mixed never;
+
+async int parker() {
+  acatch(await never);
+  return 0;
+}
+
+async int prober() {
+  mixed err = acatch(await never);
+
+  if (!err) return 0;
+  ASSERT(strsrch(err, "too many suspended") != -1);
+  return 1;
+}
+
+void do_tests() {
+  mixed p;
+  int limit;
+
+  // The operator helpers await already-settled promises, which still park
+  // (one fresh eval budget per await), so they finish on the microtask
+  // drain rather than synchronously. Their internal ASSERTs do the real
+  // checking; these confirm the scheduling shape and that they complete.
+  p = operators();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ(1, v);
+    opsDone++;
+  });
+
+  // passthrough() only awaits non-promises, which never park
+  p = passthrough();
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(1, promise_result(p));
+
+  // suspension shapes (deferred: resolved from the call_out below)
+  pend = promise_create();
+  compound_ok();
+  local_guarded();
+
+  // the runaway-exhaustion guard: parking past the configured limit is a
+  // clean error at the await point. 256 + 66 is __RC_MAX_SUSPENDED_ASYNC__
+  // (include/runtime_config.h; RC_BASE_CONFIG_INT is 256).
+  limit = get_config(256 + 66);
+  if (limit > 0 && limit <= 20000) {
+    int i;
+
+    never = promise_create();
+    for (i = 0; i < limit; i++) parker();
+    p = prober();
+    // over the limit, the probe's await errored instead of suspending
+    // and its acatch caught that -- so it finished synchronously
+    ASSERT_EQ(1, promise_status(p));
+    ASSERT_EQ(1, promise_result(p));
+    promise_resolve(never, 0);  // parked parkers resume and finish quietly
+    never = 0;
+  }
+
+  call_out(function() { promise_resolve(pend, 10); }, 1);
+  call_out(function() {
+    ASSERT2(compoundDone == 1 && opsDone == 1,
+      sprintf("deferred await checks: %O %O", compoundDone, opsDone));
+    if (compoundDone != 1 || opsDone != 1) shutdown(-1);
+    pend = 0;
+  }, 2);
+}

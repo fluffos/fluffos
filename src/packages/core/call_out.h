@@ -26,6 +26,10 @@ typedef struct pending_call_s {
   LPC_INT handle;
   struct TickEvent* tick_event;
   bool is_walltime;
+  /* await_callout(): settled when this call_out fires (with the callback's
+   * return value) or rejected if it is removed / its object destructed.
+   * null until something awaits it; ref held. */
+  struct promise_t* promise;
 } pending_call_t;
 
 void call_out(pending_call_t* cop);
@@ -35,6 +39,9 @@ void clear_call_outs(void);
 
 void reclaim_call_outs(void);
 int find_call_out_by_handle(object_t*, LPC_INT);
+/* Promise for a pending call_out's completion; null if no such handle.
+ * The returned promise carries a reference for the caller. */
+struct promise_t* promise_for_call_out(LPC_INT handle);
 int remove_call_out_by_handle(object_t*, LPC_INT);
 LPC_INT new_call_out(object_t*, svalue_t*, std::chrono::milliseconds delay_msec, int, svalue_t*);
 int remove_call_out(object_t*, const char*);

@@ -34,6 +34,7 @@ int same(mixed x, mixed y) {
     case STRING:
     case OBJECT:
     case FLOAT:
+    case PROMISE:  // promises compare by identity
       return x == y;
     case MAPPING:
       if (x == y) return 1;  // speed up this case

@@ -706,6 +706,8 @@ int sameval(svalue_t* arg1, svalue_t* arg2) {
       return arg1->u.real == arg2->u.real;
     case T_BUFFER:
       return arg1->u.buf == arg2->u.buf;
+    case T_PROMISE:
+      return arg1->u.prom == arg2->u.prom;
   }
   return 0;
 }

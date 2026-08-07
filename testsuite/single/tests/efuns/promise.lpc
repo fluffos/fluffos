@@ -1,0 +1,200 @@
+// Native promises (issue #1319 phase 1): promise_create / promise_resolve /
+// promise_reject / promise_then / promise_catch / promise_status /
+// promise_result. Settlement is delivered on a later gametick, so deferred
+// assertions use the terminal-call_out pattern (same as async.lpc); the
+// deferred checks only run in FULL suite runs, never in single-file runs,
+// which shut down synchronously.
+
+nosave int thenFired, chainFired, rejectFired, passthroughFired, flattenFired;
+nosave int lateThenFired, errorChainFired;
+
+// `promise` is a declared type: parameters, return types, locals, globals
+// and arrays of promises all type-check.
+nosave promise global_promise;
+
+promise identity(promise p) { return p; }
+
+void do_more_tests();  // defined below
+
+void do_tests() {
+  mixed p, q, chained;
+  mapping m;
+  promise typed;
+  promise *many;
+
+  // --- declared promise type ---
+  typed = promise_create();
+  ASSERT_EQ("promise", typeof(typed));
+  ASSERT_EQ(typed, identity(typed));
+  global_promise = typed;
+  ASSERT_EQ(typed, global_promise);
+  many = ({ typed, promise_create() });
+  ASSERT_EQ(2, sizeof(many));
+  ASSERT_EQ("promise", typeof(many[0]));
+  global_promise = 0;
+
+  // --- synchronous surface ---
+  p = promise_create();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+
+  // reading a pending result is an error
+  ASSERT(catch(promise_result(p)));
+
+  // a non-promise in a promise-typed argument is rejected at COMPILE time
+  // when the type is statically known (tests/compiler/fail/bad_promise_*),
+  // and at runtime when it arrives through a mixed
+  q = 1;
+  ASSERT(catch(promise_status(q)));
+  q = "nope";
+  ASSERT(catch(promise_then(q, (: $1 :))));
+  // an optional function argument is type-checked too
+  q = 5;
+  ASSERT(catch(promise_then(p, q)));
+
+  // identity semantics
+  q = promise_create();
+  ASSERT(p == p);
+  ASSERT(p != q);
+  ASSERT_EQ(-1, member_array(p, ({ q })));
+  ASSERT_EQ(1, member_array(p, ({ q, p })));
+  m = ([]);
+  m[p] = 42;
+  ASSERT_EQ(42, m[p]);
+  ASSERT_EQ(0, m[q]);
+  map_delete(m, p);
+
+  // %O printing mentions the promise state
+  ASSERT(strsrch(sprintf("%O", p), "PROMISE") != -1);
+  ASSERT(strsrch(sprintf("%O", p), "pending") != -1);
+
+  // --- settlement is never synchronous ---
+  promise_resolve(q, 99);
+  ASSERT_EQ(1, promise_status(q));
+  ASSERT_EQ(99, promise_result(q));
+  // double-settle is an error
+  ASSERT(catch(promise_resolve(q, 1)));
+  ASSERT(catch(promise_reject(q, 1)));
+
+  // then() on a pending promise: fires only after resolution, on a later tick
+  chained = promise_then(p, function(mixed v) {
+    ASSERT_EQ(7, v);
+    thenFired++;
+    return v * 2;
+  });
+  ASSERT_EQ("promise", typeof(chained));
+  promise_then(chained, function(mixed v) {
+    ASSERT_EQ(14, v);
+    chainFired++;
+  });
+  // self-resolution is an error
+  ASSERT(catch(promise_resolve(p, p)));
+  promise_resolve(p, 7);
+  ASSERT_EQ(0, thenFired);  // not synchronous
+
+  // then() on an already-settled promise still fires (later tick)
+  promise_then(q, function(mixed v) {
+    ASSERT_EQ(99, v);
+    lateThenFired++;
+  });
+
+  // rejection propagates through a handler-less link to promise_catch
+  p = promise_create();
+  promise_catch(promise_then(p), function(mixed err) {
+    ASSERT_EQ("*boom", err);
+    rejectFired++;
+  });
+  promise_reject(p, "*boom");
+
+  // pass-through chain propagates fulfillment values
+  p = promise_create();
+  promise_then(promise_then(p), function(mixed v) {
+    ASSERT_EQ("pass", v);
+    passthroughFired++;
+  });
+  promise_resolve(p, "pass");
+
+  // a handler error rejects the chained promise with the error text
+  p = promise_create();
+  promise_catch(promise_then(p, function(mixed v) {
+    error("handler exploded");
+    return 1;
+  }), function(mixed err) {
+    ASSERT(stringp(err));
+    ASSERT(strsrch(err, "handler exploded") != -1);
+    errorChainFired++;
+  });
+  promise_resolve(p, 1);
+
+  // resolving with a promise adopts its state (flattening)
+  p = promise_create();
+  q = promise_create();
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ("inner", v);
+    flattenFired++;
+  });
+  promise_resolve(p, q);
+  ASSERT_EQ(0, promise_status(p));  // still pending: waiting on q
+  promise_resolve(q, "inner");
+
+  // exercise the unhandled-rejection report path (prints to the debug log
+  // when the dropped promise deallocates; nothing to assert here)
+  promise_reject(promise_create(), "dropped rejection (expected in log)");
+
+  do_more_tests();
+
+  // Deferred checks fire after the runner's recap, so a failure here must
+  // fail the run explicitly (the AGENTS.md post-run shutdown(-1) pattern).
+  call_out(function() {
+    int ok = thenFired == 1 && chainFired == 1 && lateThenFired == 1 && rejectFired == 1 && passthroughFired == 1 && errorChainFired == 1 && flattenFired == 1;
+    ASSERT2(ok, sprintf("deferred promise checks: %O %O %O %O %O %O %O", thenFired, chainFired,
+      lateThenFired, rejectFired, passthroughFired, errorChainFired,
+      flattenFired));
+    if (!ok) shutdown(-1);
+  }, 2);
+}
+
+// Regression coverage for the self-review findings (all previously crashed
+// or corrupted VM state):
+//  - a promise rejected with itself, and a two-promise reference cycle,
+//    must not make %O recurse forever, and must be visible to the cycle
+//    efuns so the loop can be broken;
+//  - repeated acatch-caught errors must not leak control-stack or
+//    command-giver-stack entries.
+nosave int nestDone;
+
+async void acatch_error_loop() {
+  mixed p = promise_create();
+
+  promise_resolve(p, 1);
+  acatch(error("boom"));  // caught; must fully unwind
+  await p;
+  nestDone++;
+}
+
+void do_more_tests() {
+  mixed a, b;
+  int i;
+
+  a = promise_create();
+  ASSERT(catch(promise_reject(a, a)));  // self-rejection is refused
+
+  // a two-promise cycle: printable (depth-bounded) and breakable
+  b = promise_create();
+  promise_reject(a, b);
+  promise_reject(b, a);
+  ASSERT(stringp(sprintf("%O", a)));
+  ASSERT_EQ(1, has_cycle(a));
+  break_cycles(a);
+  ASSERT_EQ(0, has_cycle(a));
+
+  // an acatch-caught error per iteration must not accumulate VM state
+  for (i = 0; i < 200; i++) {
+    acatch_error_loop();
+  }
+
+  call_out(function() {
+    ASSERT2(nestDone == 200, "acatch error loop resumed " + nestDone + "/200 times");
+    if (nestDone != 200) shutdown(-1);
+  }, 2);
+}

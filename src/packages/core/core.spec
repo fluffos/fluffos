@@ -373,6 +373,19 @@ int perf_counter_ns();
 int time_ns();
 
 mixed *sys_network_ports();
+
+/* native promises (issue #1319 phase 1) */
+promise promise_create();
+void promise_resolve(promise, void | mixed);
+void promise_reject(promise, void | mixed);
+promise promise_then(promise, void | function, void | function);
+promise promise_catch(promise, function);
+int promise_status(promise);
+mixed promise_result(promise);
+/* pending suspended async function frames, most recently parked last */
+mapping *async_info();
+/* promise for a pending call_out's completion, by handle */
+promise await_callout(int);
 #ifndef __EMSCRIPTEN__
 /* No TLS on the wasm target: the browser terminates TLS long before
  * bytes reach the driver, so the efun does not exist there. (The

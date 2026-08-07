@@ -23,6 +23,38 @@ void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT save
   context = saved_context;
 }
 
+LPC_INT rule_acatch_context_open() {
+  LPC_INT saved = context;
+  context = ACATCH_CONTEXT;
+  return saved;
+}
+
+void rule_acatch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context) {
+  if (!compiling_async_function || current_function_context) {
+    yyerror("acatch is only allowed directly inside an async function body");
+  }
+  if (saved_context & SPECIAL_CONTEXT) {
+    yyerror("acatch is not allowed inside catch or time_expression");
+  }
+  CREATE_ACATCH(*result, expr_or_block);
+  context = saved_context;
+}
+
+void rule_expr_await(parse_node_t** result, parse_node_t* expr) {
+  /* await may only appear where the frame can actually be parked: directly
+   * in an async function's own body (not in a functional or anonymous
+   * function, which run in their own frames), and not under catch or
+   * time_expression, whose do_catch()-style C++ recursion cannot be
+   * suspended. acatch() regions are fine. */
+  if (!compiling_async_function || current_function_context) {
+    yyerror("await is only allowed directly inside an async function body");
+  }
+  if (context & SPECIAL_CONTEXT) {
+    yyerror("await is not allowed inside catch or time_expression (use acatch)");
+  }
+  CREATE_UNARY_OP(*result, F_AWAIT, TYPE_ANY, expr);
+}
+
 void rule_sscanf(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,
                  parse_node_t* lvalue_list) {
   int p = lvalue_list->v.number;
@@ -1110,6 +1142,11 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
     (*result)->v.number = F_CALL_FUNCTION_BY_ADDRESS;
     (*result)->l.number = f;
     (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
+    if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
+      /* an async call yields a promise, not the declared return type
+       * (which is what `return` inside the body checks against) */
+      (*result)->type = TYPE_PROMISE;
+    }
   } else if ((f = ihe->dn.simul_num) != -1) {
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
@@ -1238,6 +1275,11 @@ void rule_function_call_name(parse_node_t** result, const ScratchString* name,
         (*result)->type = TYPE_ANY;
       } else {
         (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
+        if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
+          /* an async call yields a promise, not the declared return type
+           * (which is what `return` inside the body checks against) */
+          (*result)->type = TYPE_PROMISE;
+        }
       }
     }
   }

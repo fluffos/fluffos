@@ -72,7 +72,7 @@ static void show_overload_warnings(void);
 #define CT(x) (1 << (x))
 #define CT_SIMPLE(x) (CT(TYPE_ANY) | CT(x))
 
-short compatible[11] = {
+short compatible[12] = {
     /* UNKNOWN */ 0,
     /* ANY */ 0xfff,
     /* NOVALUE to*/ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
@@ -84,9 +84,10 @@ short compatible[11] = {
     /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
     /* REAL */ CT_SIMPLE(TYPE_REAL) | CT(TYPE_NUMBER),
     /* BUFFER */ CT_SIMPLE(TYPE_BUFFER),
+    /* PROMISE */ CT_SIMPLE(TYPE_PROMISE),
 };
 
-short is_type[11] = {
+short is_type[12] = {
     /* UNKNOWN */ 0,
     /* ANY */ 0xfff,
     /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
@@ -98,6 +99,7 @@ short is_type[11] = {
     /* FUNCTION */ CT_SIMPLE(TYPE_FUNCTION),
     /* REAL */ CT_SIMPLE(TYPE_REAL),
     /* BUFFER */ CT_SIMPLE(TYPE_BUFFER),
+    /* PROMISE */ CT_SIMPLE(TYPE_PROMISE),
 };
 
 mem_block_t mem_block[NUMAREAS];
@@ -115,6 +117,7 @@ int exact_types, global_modifiers;
 int current_type;
 
 int var_defined;
+int compiling_async_function;
 
 unsigned short *comp_def_index_map, *func_index_map;
 unsigned short *prog_flags, *comp_sorted_funcs;
@@ -1104,7 +1107,7 @@ int compatible_types(int t1, int t2) {
   } else if (t2 & TYPE_MOD_ARRAY) {
     return 0;
   }
-  if (t1 > 10 || t1 < 0) {
+  if (t1 > TYPE_PROMISE || t1 < 0) {
     fatal("compiler.c: unknown type in compatible_types()");
   }
   return compatible[t1] & (1 << t2);
@@ -1612,8 +1615,8 @@ int decl_fix(int x) {
   return rest | DECL_PROTECTED;
 }
 
-const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",   "string",
-                                     "object",  "mapping", "function", "float", "buffer"};
+const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",    "string",
+                                     "object",  "mapping", "function", "float", "buffer", "promise"};
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
@@ -1654,6 +1657,9 @@ char* get_type_modifiers(char* where, char* end, int type) {
   }
   if (type & FUNC_VARARGS) {
     where = strput(where, end, "varargs ");
+  }
+  if (type & FUNC_ASYNC) {
+    where = strput(where, end, "async ");
   }
 
   return where;
@@ -2023,6 +2029,9 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
       break;
     case TYPE_BUFFER:
       type = T_BUFFER;
+      break;
+    case TYPE_PROMISE:
+      type = T_PROMISE;
       break;
     default:
       if (intype & TYPE_MOD_ARRAY) {

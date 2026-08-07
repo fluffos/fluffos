@@ -84,6 +84,7 @@ struct mem_block_t {
 #define TYPE_FUNCTION 8
 #define TYPE_REAL 9
 #define TYPE_BUFFER 10
+#define TYPE_PROMISE 11 /* async/await (issue #1319) */
 #define TYPE_MASK 0xf
 
 struct local_info_t {
@@ -105,6 +106,9 @@ extern const char* compiler_type_names[];
 #define LOOP_FOREACH 0x80
 #define SPECIAL_CONTEXT 0x100
 #define ARG_LIST 0x200
+/* inside an acatch() region: like SPECIAL_CONTEXT (no break/continue across
+ * it) but await stays legal -- that is acatch's whole point */
+#define ACATCH_CONTEXT 0x400
 
 struct function_context_t {
   parse_node_t* values_list;
@@ -116,6 +120,9 @@ struct function_context_t {
 
 extern function_context_t* current_function_context;
 extern int var_defined;
+/* the function whose body is being compiled is declared `async` (set by
+ * rule_func_type, cleared when the definition ends) */
+extern int compiling_async_function;
 extern parse_node_t* comp_trees[NUMTREES];
 extern unsigned short* comp_def_index_map;
 extern unsigned short* func_index_map;
@@ -192,8 +199,8 @@ extern int type_of_locals_size;
 extern int locals_size;
 extern int current_number_of_locals;
 extern int max_num_locals;
-extern short compatible[11];
-extern short is_type[11];
+extern short compatible[12];
+extern short is_type[12];
 extern int comp_last_inherited;
 
 char* get_type_modifiers(char*, char*, int);

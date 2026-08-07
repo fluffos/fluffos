@@ -276,6 +276,7 @@ void save_svalue(svalue_t* v, char** buf) {
     }
     case T_OBJECT:
     case T_FUNCTION:
+    case T_PROMISE:
       // ignored
       break;
     default:

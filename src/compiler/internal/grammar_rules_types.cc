@@ -26,6 +26,10 @@ parse_node_t* rule_modifier_change(LPC_INT modifiers) {
     yyerror("Illegal modifier 'varargs' in global modifier list.");
     modifiers &= ~FUNC_VARARGS;
   }
+  if (modifiers & FUNC_ASYNC) {
+    yyerror("Illegal modifier 'async' in global modifier list.");
+    modifiers &= ~FUNC_ASYNC;
+  }
   if (!(modifiers & DECL_ACCESS)) {
     modifiers |= DECL_PUBLIC;
   }

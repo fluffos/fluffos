@@ -190,6 +190,9 @@ ScratchString* rule_function_name_obj(ScratchString* obj, ScratchString* identif
 parse_node_t* rule_expr_or_block_block(decl_t decl_val);
 parse_node_t* rule_expr_or_block_expr(parse_node_t* expr);
 void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context);
+LPC_INT rule_acatch_context_open();
+void rule_acatch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context);
+void rule_expr_await(struct parse_node_t** result, struct parse_node_t* expr);
 void rule_sscanf(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,
                  parse_node_t* lvalue_list);
 void rule_parse_command(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,

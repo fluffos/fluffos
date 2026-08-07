@@ -238,6 +238,9 @@ void mark_svalue(svalue_t* sv) {
     case T_BUFFER:
       sv->u.buf->extra_ref++;
       break;
+    case T_PROMISE:
+      sv->u.prom->extra_ref++;
+      break;
     case T_STRING:
       switch (sv->subtype) {
         case STRING_MALLOC:
@@ -323,6 +326,9 @@ static void md_print_array(array_t* vec) {
         break;
       case T_FUNCTION:
         outbuf_add(&out, "<function>");
+        break;
+      case T_PROMISE:
+        outbuf_add(&out, "<promise>");
         break;
       case T_MAPPING:
         outbuf_add(&out, "<mapping>");
@@ -558,6 +564,9 @@ void check_all_blocks(int flag) {
           buf = NODET_TO_PTR(entry, buffer_t*);
           buf->extra_ref = 0;
           break;
+        case TAG_PROMISE:
+          NODET_TO_PTR(entry, promise_t*)->extra_ref = 0;
+          break;
       }
     }
   }
@@ -713,6 +722,7 @@ void check_all_blocks(int flag) {
     mark_command_giver_stack();
     mark_call_outs();
     mark_dns_requests();
+    mark_promise_queue();
 #ifdef PACKAGE_FFI
     mark_ffi();
 #endif
@@ -775,6 +785,9 @@ void check_all_blocks(int flag) {
           case TAG_FUNP:
             fp = NODET_TO_PTR(entry, funptr_t*);
             mark_funp(fp);
+            break;
+          case TAG_PROMISE:
+            mark_promise(NODET_TO_PTR(entry, promise_t*));
             break;
           case TAG_ARRAY:
             vec = NODET_TO_PTR(entry, array_t*);
@@ -949,6 +962,14 @@ void check_all_blocks(int flag) {
                           buf->extra_ref);
             }
             break;
+          case TAG_PROMISE: {
+            promise_t* prom = NODET_TO_PTR(entry, promise_t*);
+            if (prom->ref != prom->extra_ref) {
+              outbuf_addv(&out, "Bad ref count for promise %p (state %d), is %d - should be %d\n",
+                          prom, prom->state, prom->ref, prom->extra_ref);
+            }
+            break;
+          }
           case TAG_PREDEFINES:
             outbuf_addv(&out, "WARNING: Found orphan predefine: %s %04x\n", entry->desc,
                         entry->tag);
@@ -1048,6 +1069,7 @@ void check_all_blocks(int flag) {
           case TAG_LOCALS:
           case TAG_CALL_OUT:
           case TAG_INPUT_TO:
+          case TAG_DEFERS: /* may be parked in a suspended async coroutine */
             break;
           default:
             if (entry->tag < TAG_MARKED) {
@@ -1131,7 +1153,8 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
   };
   std::unordered_map<void*, Cand> cands;
   cands.reserve(blocks[TAG_ARRAY & 0xff] + blocks[TAG_CLASS & 0xff] +
-                blocks[TAG_MAPPING & 0xff] + blocks[TAG_FUNP & 0xff]);
+                blocks[TAG_MAPPING & 0xff] + blocks[TAG_FUNP & 0xff] +
+                blocks[TAG_PROMISE & 0xff]);
 
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (md_node_t* entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
@@ -1144,6 +1167,9 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
           break;
         case TAG_FUNP:
+          cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
+          break;
+        case TAG_PROMISE:
           cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
           break;
       }
@@ -1159,6 +1185,8 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         return reinterpret_cast<mapping_t*>(p)->ref;
       case TAG_FUNP:
         return reinterpret_cast<funptr_t*>(p)->hdr.ref;
+      case TAG_PROMISE:
+        return reinterpret_cast<promise_t*>(p)->ref;
     }
     return 0;
   };
@@ -1172,6 +1200,8 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         return reinterpret_cast<void*>(sv->u.map);
       case T_FUNCTION:
         return reinterpret_cast<void*>(sv->u.fp);
+      case T_PROMISE:
+        return reinterpret_cast<void*>(sv->u.prom);
     }
     return nullptr;
   };
@@ -1213,6 +1243,14 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         auto* fp = reinterpret_cast<funptr_t*>(p);
         if (fp->hdr.args) {
           cb(reinterpret_cast<void*>(fp->hdr.args));
+        }
+        break;
+      }
+      case TAG_PROMISE: {
+        // same edge set as cycles.cc's T_PROMISE case: the settled value
+        auto* prom = reinterpret_cast<promise_t*>(p);
+        if (void* c = data_child(&prom->result)) {
+          cb(c);
         }
         break;
       }

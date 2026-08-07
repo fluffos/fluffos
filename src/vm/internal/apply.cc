@@ -42,6 +42,8 @@ int convert_type(int type) {
       return T_REAL;
     case TYPE_BUFFER:
       return T_BUFFER;
+    case TYPE_PROMISE:
+      return T_PROMISE;
     default:
       if (type & TYPE_MOD_ARRAY) {
         return T_ARRAY;
@@ -353,7 +355,12 @@ retry_for_shadow:
 #ifdef DEBUG
     save_csp = csp;
 #endif
-    call_program(current_prog, funp->address);
+    if (funflags & FUNC_ASYNC) {
+      csp->framekind |= FRAME_ASYNC;
+      run_async_function(current_prog->program + funp->address);
+    } else {
+      call_program(current_prog, funp->address);
+    }
     DEBUG_CHECK(save_csp - 1 != csp, "Bad csp after execution in apply_low.\n");
     return 1;
   }

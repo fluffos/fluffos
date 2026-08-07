@@ -102,15 +102,17 @@ extern int yydebug;
     L_FUNCTION_OPEN = 297,         /* L_FUNCTION_OPEN  */
     L_SSCANF = 298,                /* L_SSCANF  */
     L_CATCH = 299,                 /* L_CATCH  */
-    L_ARRAY = 300,                 /* L_ARRAY  */
-    L_REF = 301,                   /* L_REF  */
-    L_PARSE_COMMAND = 302,         /* L_PARSE_COMMAND  */
-    L_TIME_EXPRESSION = 303,       /* L_TIME_EXPRESSION  */
-    L_CLASS = 304,                 /* L_CLASS  */
-    L_NEW = 305,                   /* L_NEW  */
-    L_PARAMETER = 306,             /* L_PARAMETER  */
-    L_TREE = 307,                  /* L_TREE  */
-    LOWER_THAN_ELSE = 308          /* LOWER_THAN_ELSE  */
+    L_AWAIT = 300,                 /* L_AWAIT  */
+    L_ACATCH = 301,                /* L_ACATCH  */
+    L_ARRAY = 302,                 /* L_ARRAY  */
+    L_REF = 303,                   /* L_REF  */
+    L_PARSE_COMMAND = 304,         /* L_PARSE_COMMAND  */
+    L_TIME_EXPRESSION = 305,       /* L_TIME_EXPRESSION  */
+    L_CLASS = 306,                 /* L_CLASS  */
+    L_NEW = 307,                   /* L_NEW  */
+    L_PARAMETER = 308,             /* L_PARAMETER  */
+    L_TREE = 309,                  /* L_TREE  */
+    LOWER_THAN_ELSE = 310          /* LOWER_THAN_ELSE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -119,7 +121,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 167 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 171 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
@@ -150,7 +152,7 @@ union YYSTYPE
     LPC_INT saved_refs;
   } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 154 "$BUILD_ROOT$/src/grammar.autogen.h"
+#line 156 "$BUILD_ROOT$/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -191,4 +193,4 @@ void yypstate_delete (yypstate *ps);
 
 
 #endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */
-/* FluffOS generated-from grammar.y sha256=728753a714187bc4267cb6913374a16543a24935e9017960519fd14e02f3fcb5 */
+/* FluffOS generated-from grammar.y sha256=7f218a9d8f63bb51a434adc504bcfd5285a376dad0db4af38d603b79c05b6ef6 */

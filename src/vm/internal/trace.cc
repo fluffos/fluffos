@@ -104,6 +104,13 @@ const char* dump_trace(int how) {
       trace_fp = p[1].fp;
     }
     debug_message("--- frame %td ----\n", p - &control_stack[0]);
+    if (trace_prog == nullptr || trace_obj == nullptr) {
+      /* frame pushed from driver context with no program running (e.g. the
+       * FRAME_CATCH marker under a promise-reaction delivery) */
+      debug_message("<driver frame: no program context>\n");
+      num_arg = -1;
+      continue;
+    }
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION: {
         const char* fname;
@@ -210,6 +217,17 @@ array_t* get_svalue_trace() {
   }
   v = allocate_empty_array((csp - &control_stack[0]) + 1);
   for (p = &control_stack[0]; p < csp; p++) {
+    if (p[1].prog == nullptr || p[1].ob == nullptr) {
+      /* frame pushed from driver context with no program running (e.g. the
+       * FRAME_CATCH marker under a promise-reaction delivery) */
+      m = allocate_mapping(1);
+      add_mapping_string(m, "function", ((p[0].framekind & FRAME_MASK) == FRAME_CATCH)
+                                            ? "CATCH"
+                                            : "<driver>");
+      v->item[(p - &control_stack[0])].type = T_MAPPING;
+      v->item[(p - &control_stack[0])].u.map = m;
+      continue;
+    }
     m = allocate_mapping(6);
     switch (p[0].framekind & FRAME_MASK) {
       case FRAME_FUNCTION:

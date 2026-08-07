@@ -47,7 +47,31 @@ int new_call_out_zero_scheduled_on_this_gametick = 0;
 /*
  * Free a call out structure.
  */
+/* Settle an awaited call_out's promise, if anything is waiting on it. A
+ * still-pending promise at teardown means the call_out never ran (removed,
+ * object destructed, shutdown): reject it so awaiters don't hang forever. */
+static void settle_call_out_promise(pending_call_t* cop, svalue_t* value, int rejected) {
+  if (!cop->promise) {
+    return;
+  }
+  promise_t* p = cop->promise;
+  cop->promise = nullptr;
+  if (p->state == PROMISE_PENDING) {
+    if (value) {
+      promise_settle(p, value, rejected);
+    } else {
+      svalue_t err;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*call_out was removed before it ran";
+      promise_settle(p, &err, 1);
+    }
+  }
+  free_promise(p);
+}
+
 static void free_called_call(pending_call_t* cop) {
+  settle_call_out_promise(cop, nullptr, 1);
   if (cop->ob) {
     free_string(cop->function.s);
     free_object(&cop->ob, "free_call");
@@ -245,14 +269,30 @@ void call_out(pending_call_t* cop) {
 
   save_command_giver(new_command_giver);
   /* current object no longer set */
+  svalue_t* ret = nullptr;
   if (cop->ob) {
     DBG_CALLOUT("  func: %s\n", cop->function.s);
-    (void)safe_apply(cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
+    ret = safe_apply(cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
   } else {
     DBG_CALLOUT("  func: <function>\n");
-    (void)safe_call_function_pointer(cop->function.f, num_callout_args);
+    ret = safe_call_function_pointer(cop->function.f, num_callout_args);
   }
   restore_command_giver();
+
+  /* await_callout(): fulfil with the callback's value, or reject if it
+   * errored (safe_* returns null then). Must run before free_called_call,
+   * whose own settle call is the "never ran" rejection path. */
+  if (cop->promise) {
+    if (ret) {
+      settle_call_out_promise(cop, ret, 0);
+    } else {
+      svalue_t err;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*call_out callback failed";
+      settle_call_out_promise(cop, &err, 1);
+    }
+  }
 
   free_called_call(cop);
 }
@@ -336,6 +376,22 @@ int remove_call_out_by_handle(object_t* ob, LPC_INT handle) {
   }
   DBG_CALLOUT("  not found.\n");
   return -1;
+}
+
+promise_t* promise_for_call_out(LPC_INT handle) {
+  if (handle == 0) {
+    return nullptr;
+  }
+  auto iter = g_callout_handle_map.find(handle);
+  if (iter == g_callout_handle_map.end()) {
+    return nullptr;
+  }
+  auto* cop = iter->second;
+  if (!cop->promise) {
+    cop->promise = promise_alloc();
+  }
+  cop->promise->ref++; /* the caller's reference */
+  return cop->promise;
 }
 
 int find_call_out_by_handle(object_t* ob, LPC_INT handle) {
@@ -438,6 +494,9 @@ void mark_call_outs() {
       if (cop->command_giver) {
         cop->command_giver->extra_ref++;
       }
+    }
+    if (cop->promise) {
+      cop->promise->extra_ref++;
     }
   }
 }

@@ -84,6 +84,11 @@ static const int TAG_SCRATCHPAD = (TAG_PERMANENT + 50);
 // replace_programs() sweep -- legitimately survive a between-executions
 // check_all_blocks, so they get their own whitelisted tag.
 static const int TAG_REPLACE_OB = (TAG_PERMANENT + 51);
+// defer() list nodes (packages/core/efuns_main.cc f_defer): normally
+// consumed at frame pop within one execution, but a node parked in a
+// suspended async coroutine (vm/internal/base/promise.cc) legitimately
+// survives a between-executions check_all_blocks.
+static const int TAG_DEFERS = (TAG_PERMANENT + 52);
 static const int TAG_STRING = (TAG_DATA + 40);
 static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
 static const int TAG_SHARED_STRING = (TAG_DATA + 42);
@@ -94,6 +99,7 @@ static const int TAG_MAP_NODE_BLOCK = (TAG_DATA + 46);
 static const int TAG_MAP_TBL = (TAG_DATA + 47);
 static const int TAG_BUFFER = (TAG_DATA + 48);
 static const int TAG_CLASS = (TAG_DATA + 49);
+static const int TAG_PROMISE = (TAG_DATA + 50);
 #ifdef PACKAGE_DB
 static const int TAG_DB = (TAG_PERMANENT + 50);
 #endif

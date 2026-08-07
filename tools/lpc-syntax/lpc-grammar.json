@@ -3,7 +3,9 @@
   "generator": "tools/lpc-syntax/generate_ebnf.py",
   "keywords": [
     "__TREE__",
+    "acatch",
     "array",
+    "await",
     "break",
     "case",
     "catch",
@@ -36,10 +38,12 @@
     "mapping",
     "mixed",
     "object",
+    "promise",
     "string",
     "void"
   ],
   "modifierKeywords": [
+    "async",
     "nomask",
     "nosave",
     "private",
@@ -165,6 +169,7 @@
         "mapping",
         "mixed",
         "object",
+        "promise",
         "string",
         "void"
       ]
@@ -172,6 +177,7 @@
     "L_TYPE_MODIFIER": {
       "category": "modifier",
       "spellings": [
+        "async",
         "nomask",
         "nosave",
         "private",
@@ -395,6 +401,18 @@
       "category": "keyword",
       "spellings": [
         "catch"
+      ]
+    },
+    "L_AWAIT": {
+      "category": "keyword",
+      "spellings": [
+        "await"
+      ]
+    },
+    "L_ACATCH": {
+      "category": "keyword",
+      "spellings": [
+        "acatch"
       ]
     },
     "L_ARRAY": {
@@ -1006,6 +1024,13 @@
     {
       "lhs": "expr",
       "rhs": [
+        "L_AWAIT",
+        "expr"
+      ]
+    },
+    {
+      "lhs": "expr",
+      "rhs": [
         "lvalue",
         "L_INC_DEC"
       ]
@@ -1094,6 +1119,12 @@
       "lhs": "primary_expr",
       "rhs": [
         "catch"
+      ]
+    },
+    {
+      "lhs": "primary_expr",
+      "rhs": [
+        "acatch"
       ]
     },
     {
@@ -1489,6 +1520,18 @@
         "special_context_start",
         "expr_or_block"
       ]
+    },
+    {
+      "lhs": "acatch",
+      "rhs": [
+        "L_ACATCH",
+        "acatch_context_start",
+        "expr_or_block"
+      ]
+    },
+    {
+      "lhs": "acatch_context_start",
+      "rhs": []
     },
     {
       "lhs": "time_expression",

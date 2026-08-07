@@ -1113,7 +1113,9 @@ function precedesQualifiedScope(tok) {
 // `sscanf(`/`parse_command(` are tight in every real call site (486, 131,
 // 27, 2 occurrences respectively; exactly one spaced `catch (` site
 // exists in the pristine corpus -- 486:1).
-const CALL_LIKE_KEYWORDS = new Set(['catch', 'new', 'sscanf', 'parse_command']);
+// `acatch` is catch's async-aware twin (same expression shape), so it
+// formats the same way.
+const CALL_LIKE_KEYWORDS = new Set(['acatch', 'catch', 'new', 'sscanf', 'parse_command']);
 
 // Array-type-suffix '*' (`int *a`, `mixed ref *arr`, `int *a, *b;`) stays
 // tight against the identifier that follows it; ordinary multiplication

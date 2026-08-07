@@ -2136,6 +2136,14 @@ static int memory_share(svalue_t* sv) {
       /* first byte is stored inside the buffer struct */
       return total +
              (sizeof(buffer_t) + sv->u.buf->size - 1) / (sv->u.buf->ref ? sv->u.buf->ref : 1);
+    case T_PROMISE:
+      if (1 + calldepth > 100) {
+        return 0;
+      }
+      calldepth++;
+      subtotal = sizeof(promise_t) + memory_share(&sv->u.prom->result) - sizeof(svalue_t);
+      calldepth--;
+      return total + subtotal / (sv->u.prom->ref ? sv->u.prom->ref : 1);
   }
   return total;
 }

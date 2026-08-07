@@ -57,6 +57,10 @@ void rule_new_name(LPC_INT star_modifier, const ScratchString* identifier) {
     yyerror("Illegal to declare varargs variable.");
     current_type &= ~(FUNC_VARARGS << 16);
   }
+  if (current_type & (FUNC_ASYNC << 16)) {
+    yyerror("Illegal to declare async variable.");
+    current_type &= ~(FUNC_ASYNC << 16);
+  }
 
   if (current_type & 0xffff0000) {
     current_type = (current_type >> 16) | (current_type & 0xffff);
@@ -85,6 +89,10 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
   if (current_type & (FUNC_VARARGS << 16)) {
     yyerror("Illegal to declare varargs variable.");
     current_type &= ~(FUNC_VARARGS << 16);
+  }
+  if (current_type & (FUNC_ASYNC << 16)) {
+    yyerror("Illegal to declare async variable.");
+    current_type &= ~(FUNC_ASYNC << 16);
   }
 
   if (current_type & 0xffff0000) {

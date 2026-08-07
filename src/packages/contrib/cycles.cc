@@ -63,7 +63,7 @@ struct PendingFix {
 };
 
 struct Frame {
-  uint32_t type;  // T_ARRAY, T_CLASS, T_MAPPING, or T_FUNCTION
+  uint32_t type;  // T_ARRAY, T_CLASS, T_MAPPING, T_FUNCTION, or T_PROMISE
   union {
     array_t* arr;
     mapping_t* map;
@@ -91,6 +91,8 @@ void* compound_ptr(const svalue_t* sv) {
       return reinterpret_cast<void*>(sv->u.map);
     case T_FUNCTION:
       return reinterpret_cast<void*>(sv->u.fp);
+    case T_PROMISE:
+      return reinterpret_cast<void*>(sv->u.prom);
   }
   return nullptr;
 }
@@ -122,6 +124,8 @@ std::string render_key(const svalue_t* key) {
       return "<mapping>";
     case T_FUNCTION:
       return "<function>";
+    case T_PROMISE:
+      return "<promise>";
     default:
       return "<...>";
   }
@@ -258,6 +262,23 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
                         mode == WALK_FIND ? std::string("(args)") : std::string());
             continue;  // `f` may be a stale reference now
           }
+        }
+        break;
+      }
+      case T_PROMISE: {
+        // A settled promise's value is its one value-graph edge. Pending
+        // reactions (handler funptrs, chained promises, parked coroutines)
+        // are driver machinery, not mudlib-visible slots, so they are
+        // leaves here for the same reason objects are.
+        auto* prom = reinterpret_cast<promise_t*>(f.u.ptr);
+        if (f.idx == 0) {
+          f.idx = 1;
+          slot = &prom->result;
+          kind = SLOT_ITEM;
+          if (mode == WALK_FIND) {
+            label = "(result)";
+          }
+          have_edge = true;
         }
         break;
       }

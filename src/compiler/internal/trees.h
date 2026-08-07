@@ -49,6 +49,7 @@ enum node_type {
   NODE_STRING,
   NODE_FUNCTION_CONSTRUCTOR,
   NODE_CATCH,
+  NODE_ACATCH,
   NODE_TIME_EXPRESSION,
   NODE_FUNCTION
 };
@@ -178,6 +179,8 @@ typedef struct parse_node_block_s {
        (vn)->type = f;)
 #define CREATE_CATCH(vn, pn) \
   SAFE((vn) = new_node(); (vn)->kind = NODE_CATCH; (vn)->type = TYPE_ANY; (vn)->r.expr = pn;)
+#define CREATE_ACATCH(vn, pn) \
+  SAFE((vn) = new_node(); (vn)->kind = NODE_ACATCH; (vn)->type = TYPE_ANY; (vn)->r.expr = pn;)
 #define CREATE_TIME_EXPRESSION(vn, pn)                                              \
   SAFE((vn) = new_node(); (vn)->kind = NODE_TIME_EXPRESSION; (vn)->type = TYPE_ANY; \
        (vn)->r.expr = pn;)

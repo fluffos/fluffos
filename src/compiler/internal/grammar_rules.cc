@@ -190,6 +190,8 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
     flags &= ~DECL_NOSAVE;
   }
 #endif
+  /* the body about to be parsed may (or may not) use await/acatch */
+  compiling_async_function = (flags & FUNC_ASYNC) != 0;
   type = (flags << 16) | (type & 0xffff);
   /* Handle type checking here so we know whether to typecheck
      'argument' */
@@ -349,6 +351,7 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
       *function = 0;
   } else
     *function = 0;
+  compiling_async_function = 0;
   free_all_local_names(!!(*block_or_semi));
 }
 

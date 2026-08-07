@@ -68,6 +68,34 @@ static void check_svalue(svalue_t* v) {
       }
       break;
     }
+    case T_PROMISE: {
+      promise_t* prom = v->u.prom;
+      check_svalue(&prom->result);
+      if (prom->reactions) {
+        for (auto& r : *prom->reactions) {
+          svalue_t tmp;
+          tmp.type = T_FUNCTION;
+          if ((tmp.u.fp = r.on_fulfilled)) {
+            check_svalue(&tmp);
+          }
+          if ((tmp.u.fp = r.on_rejected)) {
+            check_svalue(&tmp);
+          }
+          if (r.command_giver && (r.command_giver->flags & O_DESTRUCTED)) {
+            free_object(&r.command_giver, "reclaim_objects");
+            r.command_giver = nullptr;
+            cleaned++;
+          }
+          if (r.next) {
+            svalue_t tmp2;
+            tmp2.type = T_PROMISE;
+            tmp2.u.prom = r.next;
+            check_svalue(&tmp2);
+          }
+        }
+      }
+      break;
+    }
   }
   nested--;
 }

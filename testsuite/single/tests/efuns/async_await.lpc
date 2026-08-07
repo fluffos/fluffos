@@ -1,0 +1,273 @@
+// async/await coroutines (issue #1319 phase 1). Deferred checks use the
+// terminal-call_out + shutdown(-1) pattern (full runs only; single-file
+// runs shut down synchronously).
+
+nosave int order;
+nosave int syncRan, resumed, chained, rejectedCaught, acatchSync, acatchAwait;
+nosave int passThrough, voidDone, deferRan, nestedDone, settledAwait;
+nosave mixed trigger;  // promise resolved later from a call_out
+
+async int simple_add(int a, int b) { return a + b; }
+
+// runs synchronously to the first pending await
+async int suspender() {
+  syncRan = 1;
+  order = 1;
+  int v = await trigger;
+  resumed = v;
+  return v * 2;
+}
+
+async void void_fn() {
+  await trigger;
+  voidDone++;
+}
+
+// awaiting a non-promise passes the value straight through and is NOT a
+// scheduling point, so a body that only does that finishes synchronously
+async int only_plain_awaits() {
+  int a = await 5;
+  string s = await "x";
+
+  return a + strlen(s);
+}
+
+// awaiting a promise ALWAYS parks, even one that has already settled: the
+// resume comes off the microtask drain with a fresh eval budget
+async int awaits_settled() {
+  mixed p = promise_create();
+
+  promise_resolve(p, 6);
+  return await p;
+}
+
+// rejection propagates out of the body and rejects the returned promise
+async int rejector() {
+  await trigger;
+  error("body exploded");
+  return 1;
+}
+
+// acatch: synchronous error inside the region
+async int acatch_sync_error() {
+  mixed err = acatch(error("sync boom"));
+  ASSERT(stringp(err));
+  ASSERT(strsrch(err, "sync boom") != -1);
+  acatchSync++;
+  return 0;
+}
+
+// acatch: rejected await inside the region resumes at the continuation
+async int acatch_rejected_await() {
+  mixed p = promise_create();
+  promise_reject(p, "*async boom");
+  mixed err = acatch(await p);
+  ASSERT_EQ("*async boom", err);
+  // and success straight through: acatch yields 0
+  ASSERT_EQ(0, acatch(1 + 1));
+  acatchAwait++;
+  return 0;
+}
+
+// defer inside an async function runs when the body finishes after resume
+async void deferred_fn() {
+  defer((: deferRan++ :));
+  await trigger;
+}
+
+nosave mixed reject_trigger;  // rejected later from a call_out
+nosave int acatchParked;
+
+// a PENDING await inside acatch: the marker survives park/resume and
+// catches the later rejection
+async void acatch_parked_await() {
+  mixed err = acatch(await reject_trigger);
+  ASSERT_EQ("*late boom", err);
+  acatchParked++;
+}
+
+nosave int coFired, coAwaited, coRemoved, coAcatch;
+
+int co_target() {
+  coFired++;
+  return 99;
+}
+
+// await_callout(): a pending call_out as a promise, fulfilled with the
+// callback's return value
+async void awaits_callout() {
+  int v = await await_callout(call_out((: co_target :), 1));
+
+  ASSERT_EQ(99, v);
+  ASSERT_EQ(1, coFired);
+  coAwaited++;
+}
+
+// acatch composes with await_callout like any other awaited promise --
+// there is no need for a separate "acatch_callout": both a rejected
+// call_out promise AND a synchronous error from await_callout() itself
+// land in the same acatch region
+async void acatch_over_callout() {
+  int h = call_out((: co_target :), 2);
+  mixed err;
+
+  // (a) await_callout() itself errors (handle no longer pending): a
+  // SYNCHRONOUS error inside the region
+  remove_call_out(h);
+  err = acatch(await_callout(h));
+  ASSERT(stringp(err));
+  coAcatch++;
+
+  // (b) the promise rejects while the frame is PARKED on it: the acatch
+  // marker survives the suspension and catches it on resume
+  h = call_out((: co_target :), 2);
+  {
+    mixed pending = await_callout(h);
+
+    remove_call_out(h);  // rejects `pending` before we resume
+    err = acatch(await pending);
+    ASSERT(stringp(err));
+  }
+  coAcatch++;
+}
+
+// an async function awaiting another async function
+async int outer() {
+  int v = await suspender();  // suspender shares `trigger`
+  nestedDone = v;
+  return v;
+}
+
+void do_tests() {
+  mixed p, q;
+  mapping *info;
+
+  // modifier surface
+  ASSERT(functionp((: simple_add :)));
+
+  // async_info(): nothing parked yet in this object
+  info = async_info();
+  ASSERT(arrayp(info));
+
+  // calling an async function returns a promise; body without await
+  // completes immediately (promise already fulfilled)
+  p = simple_add(2, 3);
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(5, promise_result(p));
+
+  // awaiting only non-promises never parks: completes synchronously
+  p = only_plain_awaits();
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(6, promise_result(p));
+
+  // awaiting an already-settled promise still parks (fresh eval budget per
+  // step); the value arrives on the microtask drain
+  q = awaits_settled();
+  ASSERT_EQ(0, promise_status(q));
+  promise_then(q, function(mixed v) {
+    ASSERT_EQ(6, v);
+    settledAwait++;
+  });
+
+  // acatch of a synchronous error
+  p = acatch_sync_error();
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(1, acatchSync);
+
+  // suspension: body runs synchronously to the first pending await
+  trigger = promise_create();
+  order = 0;
+  p = suspender();
+  ASSERT_EQ(1, syncRan);
+  ASSERT_EQ(1, order);
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));  // parked
+  ASSERT_EQ(0, resumed);
+
+  // async_info() now reports the parked frame: identity, location, what
+  // it awaits, and whether its resume is already queued. Other frames may
+  // be parked too (an await on a settled promise parks until the drain),
+  // so find ours rather than assuming it is alone.
+  {
+    mapping found = 0;
+
+    info = async_info();
+    ASSERT(sizeof(info) >= 1);
+    foreach (mapping entry in info) {
+      if (entry["function"] == "suspender") found = entry;
+    }
+    ASSERT(mapp(found));
+    ASSERT_EQ(this_object(), found["object"]);
+    ASSERT_EQ("promise", typeof(found["promise"]));
+    ASSERT_EQ(p, found["promise"]);
+    ASSERT_EQ(trigger, found["awaiting"]);
+    ASSERT_EQ(0, found["ready"]);  // trigger is still pending
+    ASSERT_EQ(0, found["acatch_depth"]);
+    ASSERT(found["id"] > 0);
+    ASSERT_EQ(file_name(this_object()) + ".lpc", found["file"]);
+    ASSERT(found["line"] > 0);
+  }
+
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ(14, v);
+    chained++;
+  });
+
+  q = rejector();
+  promise_catch(q, function(mixed err) {
+    ASSERT(stringp(err));
+    ASSERT(strsrch(err, "body exploded") != -1);
+    rejectedCaught++;
+  });
+
+  // pass-through: await the whole chain from another async fn
+  promise_then(outer(), function(mixed v) {
+    ASSERT_EQ(14, v);
+    passThrough++;
+  });
+
+  void_fn();
+  deferred_fn();
+
+  // acatch over a rejected await (self-contained; runs via microtasks)
+  acatch_rejected_await();
+
+  // acatch over a PENDING await, rejected later
+  reject_trigger = promise_create();
+  acatch_parked_await();
+
+  // await_callout(): fulfilled by the call_out firing, and rejected when
+  // the call_out is removed before it runs
+  ASSERT(catch(await_callout(999999)));  // no such handle
+  awaits_callout();
+  acatch_over_callout();
+  {
+    int h = call_out((: co_target :), 2);
+    mixed pc = await_callout(h);
+
+    ASSERT_EQ("promise", typeof(pc));
+    remove_call_out(h);
+    promise_catch(pc, function(mixed err) {
+      ASSERT(stringp(err));
+      coRemoved++;
+    });
+  }
+
+  // resolve the shared trigger from a call_out: everything suspended on it
+  // resumes on the following gameticks
+  call_out(function() {
+    promise_resolve(trigger, 7);
+    promise_reject(reject_trigger, "*late boom");
+  }, 1);
+
+  call_out(function() {
+    int ok = resumed == 7 && chained == 1 && rejectedCaught == 1 && passThrough == 1 && voidDone == 1 && deferRan == 1 && nestedDone == 14 && acatchAwait == 1 && acatchParked == 1 && settledAwait == 1 && coAwaited == 1 && coRemoved == 1 && coAcatch == 2;
+    ASSERT2(ok, sprintf("deferred async checks: %O %O %O %O %O %O %O %O %O %O %O %O %O", resumed,
+      chained, rejectedCaught, passThrough, voidDone, deferRan, nestedDone, acatchAwait,
+      acatchParked, settledAwait, coAwaited, coRemoved, coAcatch));
+    if (!ok) shutdown(-1);
+    trigger = 0;
+    reject_trigger = 0;
+  }, 3);
+}

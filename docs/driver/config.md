@@ -136,6 +136,9 @@ they always match the options it actually recognizes.
 | `enable_commands call init` | int | 1 | Call init() in an object when enable_commands() is invoked on it. |
 | `sprintf add_justified ignore ANSI colors` | int | 1 | Make sprintf() column justification ignore ANSI color codes when computing field width. |
 | `call_out(0) nest level` | int | 1000 | Maximum nesting level for chains of call_out(0) within a single backend cycle. |
+| `max suspended async functions` | int | 10000 | Maximum number of concurrently suspended async function frames; an await that would "
+     "exceed it errors instead of suspending (runaway-exhaustion guard). 0 disables the "
+     "limit. |
 
 ### Type Checking
 

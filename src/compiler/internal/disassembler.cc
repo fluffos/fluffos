@@ -502,6 +502,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
       case F_JUMP_WHEN_NON_ZERO:
 #endif
       case F_CATCH:
+      case F_ACATCH:
         COPY_SHORT(&sarg, pc);
         sprintf(buff, "%04x", static_cast<unsigned>(sarg));
         pc += 2;

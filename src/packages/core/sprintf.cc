@@ -457,6 +457,25 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
     }
       outbuf_add(outbuf, " :)");
       break;
+    case T_PROMISE:
+      switch (obj->u.prom->state) {
+        /* recurse with indent + 2 (like arrays/classes) so the depth guard
+         * above actually bounds a promise that transitively holds itself */
+        case PROMISE_FULFILLED:
+          outbuf_add(outbuf, "PROMISE( fulfilled: ");
+          svalue_to_string(&obj->u.prom->result, outbuf, indent + 2, 0, 1);
+          outbuf_add(outbuf, " )");
+          break;
+        case PROMISE_REJECTED:
+          outbuf_add(outbuf, "PROMISE( rejected: ");
+          svalue_to_string(&obj->u.prom->result, outbuf, indent + 2, 0, 1);
+          outbuf_add(outbuf, " )");
+          break;
+        default:
+          outbuf_add(outbuf, "PROMISE( pending )");
+          break;
+      }
+      break;
     case T_MAPPING:
       if (!MAP_COUNT(obj->u.map)) {
         outbuf_add(outbuf, "([ ])");

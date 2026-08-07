@@ -1138,6 +1138,11 @@ void f_member_array() {
             break;
           }
           continue;
+        case T_PROMISE:
+          if (find->u.prom == sv->u.prom) {
+            break;
+          }
+          continue;
         default:
           if (sv->type == T_OBJECT && (sv->u.ob->flags & O_DESTRUCTED)) {
             assign_svalue(sv, &const0u);
@@ -3413,7 +3418,7 @@ void f_next_inventory() {
 #ifdef F_DEFER
 void f_defer() {
   auto* newlist = reinterpret_cast<struct defer_list*>(
-      DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
+      DMALLOC(sizeof(struct defer_list), TAG_DEFERS, "defer: new item"));
 
   if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     // In reverse mode, newlist always will be the last data.

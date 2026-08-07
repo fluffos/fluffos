@@ -232,6 +232,7 @@ static parse_node_t* optimize(parse_node_t* expr) {
       break;
     }
     case NODE_CATCH:
+    case NODE_ACATCH:
       OPT(expr->r.expr);
       break;
     case NODE_LVALUE_EFUN:
@@ -746,6 +747,10 @@ static nlohmann::json ast_json(parse_node_t* expr) {
       n["k"] = "catch";
       kids(expr->r.expr);
       break;
+    case NODE_ACATCH:
+      n["k"] = "acatch";
+      kids(expr->r.expr);
+      break;
     case NODE_LVALUE_EFUN: {
       n["k"] = "lvalue_efun";
       kids(expr->l.expr);
@@ -975,6 +980,7 @@ void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
       lpc_tree_expr(ARG_3, expr->r.expr);
       break;
     case NODE_CATCH:
+    case NODE_ACATCH:
       lpc_tree(dest, 2);
       lpc_tree_expr(ARG_2, expr->r.expr);
       break;

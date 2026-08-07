@@ -98,6 +98,9 @@ void shutdownMudOS(int exit_code) {
   // the entries this frees, and are discarded unrun there.
   jsbridge_cleanup();
 #endif
+  // Same ordering constraint: drop queued promise deliveries before their
+  // drain event is discarded by clear_tick_events().
+  promise_cleanup();
   shutdown_external_ports();
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
@@ -1929,6 +1932,9 @@ void print_svalue(svalue_t* arg) {
       case T_BUFFER:
         tell_object(command_giver, "<BUFFER>", strlen("<BUFFER>"));
         break;
+      case T_PROMISE:
+        tell_object(command_giver, "<PROMISE>", strlen("<PROMISE>"));
+        break;
       default:
         tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
         break;
@@ -2235,7 +2241,10 @@ static int num_mudlib_error = 0;
  */
 
 [[noreturn]] void throw_error() {
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
+  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ) {
+    /* inside a catch(), or inside an async function body (where the thrown
+     * value becomes the rejection reason / acatch() result) */
     throw("throw error");
     fatal("Throw_error failed!");
   }
@@ -2383,8 +2392,11 @@ void _error_handler(char* err) {
     fatal("error() without a context: %s", err + 1);
   }
 
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
-    /* user catches this error */
+  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ) {
+    /* user catches this error -- or it unwinds to a running async function
+     * body's boundary, where it becomes a promise rejection (or resumes an
+     * acatch() region); either way the value travels via catch_value. */
     /* This is added so that catches generate messages in the log file. */
     if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);

@@ -29,6 +29,8 @@ union u {
   struct ref_t* ref;
   unsigned char* lvalue_byte;
   void (*error_handler)(void);
+
+  struct promise_t* prom;
 };
 
 /*
@@ -87,6 +89,10 @@ struct ref_t {
 #define T_REF 0x4000u
 #define T_LVALUE_CODEPOINT 0x8000u /* UTF8 codepoint */
 
+/* The 16 low bits are fully allocated; new value types start at 0x10000
+ * (svalue_t::type is 32-bit). */
+#define T_PROMISE 0x10000u
+
 #define TYPE_MOD_ARRAY 0x8000u /* Pointer to a basic type */
 /* Note, the following restricts class_num to < 0x40 or 64   */
 /* The reason for this is that vars still have a ushort type */
@@ -96,7 +102,8 @@ struct ref_t {
 #define TYPE_MOD_CLASS 0x0080u /* a class */
 #define CLASS_NUM_MASK 0x007fu
 
-#define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF)
+#define T_REFED \
+  (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF | T_PROMISE)
 #define T_ANY (T_REFED | T_STRING | T_NUMBER | T_REAL)
 
 /* values for subtype field of svalue struct */
@@ -114,6 +121,8 @@ struct ref_t {
 void copy_some_svalues(svalue_t*, svalue_t*, int);
 void assign_svalue(svalue_t*, svalue_t*);
 void assign_svalue_no_free(svalue_t*, svalue_t*);
+/* deferred T_ARRAY/T_CLASS/T_MAPPING/T_PROMISE deallocation (svalue.cc) */
+void free_compound(void* ptr, uint32_t type);
 
 #ifdef DEBUG
 #define free_svalue(x, y) int_free_svalue(x, y)

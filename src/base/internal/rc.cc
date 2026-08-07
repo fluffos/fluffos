@@ -172,6 +172,11 @@ const FlagEntry INT_FLAGS[] = {
     {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000, 0, INT_MAX,
      "Language Behavior",
      "Maximum nesting level for chains of call_out(0) within a single backend cycle."},
+    {"max suspended async functions", __RC_MAX_SUSPENDED_ASYNC__, 10000, 0, INT_MAX,
+     "Language Behavior",
+     "Maximum number of concurrently suspended async function frames; an await that would "
+     "exceed it errors instead of suspending (runaway-exhaustion guard). 0 disables the "
+     "limit."},
     {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0, 0, INT_MAX, "Diagnostics",
      "Record LPC execution context for tracing and debugging."},
     {"trace lpc instructions", __RC_TRACE_INSTR__, 0, 0, INT_MAX, "Diagnostics",

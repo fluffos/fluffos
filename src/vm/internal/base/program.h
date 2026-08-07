@@ -84,6 +84,10 @@
 #define FUNC_PROTOTYPE 0x0008
 #define FUNC_TRUE_VARARGS 0x0010
 #define FUNC_VARARGS 0x0020
+/* coroutine: calls return a promise, body may await (issue #1319). 0x0080
+ * stays reserved for the future 'remote' modifier -- these are the last two
+ * free bits in the 16-bit function_flags word. */
+#define FUNC_ASYNC 0x0040
 #define FUNC_ALIAS 0x8000 /* This shouldn't be changed */
 
 #define DECL_HIDDEN 0x0100    /* used by private vars */
@@ -114,7 +118,7 @@
 /* only the flags that should be copied up through inheritance levels */
 #define FUNC_MASK                                                                           \
   (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | \
-   FUNC_ALIAS | DECL_MODS)
+   FUNC_ASYNC | FUNC_ALIAS | DECL_MODS)
 
 /* a function that isn't 'real' */
 #define FUNC_NO_CODE (FUNC_ALIAS | FUNC_PROTOTYPE | FUNC_UNDEFINED)

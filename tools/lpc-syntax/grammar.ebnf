@@ -202,6 +202,7 @@ expr = ref, lvalue
        | "!", expr
        | "~", expr
        | "-", expr
+       | LAwait, expr
        | lvalue, LIncDec
        | primaryExpr
        | sscanf
@@ -219,6 +220,7 @@ primaryExpr = functionCall
               | stringLike
               | "(", commaExpr, ")"
               | catch
+              | acatch
               | tree
               | "$", "(", dollarStart, commaExpr, ")"
               | primaryExpr, LArrow, identifier
@@ -263,6 +265,10 @@ sscanf = LSscanf, "(", expr, ",", expr, lvalueList, ")" ;
 parseCommand = LParseCommand, "(", expr, ",", expr, ",", expr, lvalueList, ")" ;
 
 catch = LCatch, specialContextStart, exprOrBlock ;
+
+acatch = LAcatch, acatchContextStart, exprOrBlock ;
+
+acatchContextStart = "" ;
 
 timeExpression = LTimeExpression, specialContextStart, exprOrBlock ;
 
