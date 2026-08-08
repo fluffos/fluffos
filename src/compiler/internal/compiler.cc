@@ -1471,6 +1471,21 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
       yyerror("Illegal to redefine 'nomask' function '%s'.", name);
     }
 
+    /* `async` must agree between a prototype and its definition, and this is
+       an error rather than the warning its neighbours use: async changes the
+       SHAPE of what a call yields (a promise, not the declared type), and a
+       call is typed from whichever declaration the compiler has seen so far.
+       Disagree and the same call is typed one way before the definition and
+       another after it, with no runtime check to catch the difference --
+       `int x = f();` compiles clean while x holds a promise. Only a
+       prototype/definition pair is checked; an inherited function may
+       legitimately be overridden by one that is not async. */
+    if (((flags | funflags) & FUNC_PROTOTYPE) && !(funflags & FUNC_INHERITED) &&
+        ((flags ^ funflags) & FUNC_ASYNC)) {
+      yyerror("Declaration of '%s' disagrees with its %s about 'async'.", name,
+              (funflags & FUNC_PROTOTYPE) ? "prototype" : "definition");
+    }
+
     /* only check prototypes for matching.  It shouldn't be required that
        overloading a function must have the same signature */
     if (exact_types && ((flags | funflags) & FUNC_PROTOTYPE)) {

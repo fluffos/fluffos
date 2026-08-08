@@ -10,6 +10,16 @@ inherit "/clone/async_inherit_base";
 
 nosave int inhResumed;
 
+// `async` agrees between a prototype and its definition (a disagreement is
+// compiler/fail/bad_async_proto_mismatch.lpc); OVERRIDING an inherited
+// function with the opposite asyncness is legal, since the override is a
+// new definition rather than a promise about an existing one.
+async int proto_ok();
+async int proto_ok() { return 8; }
+
+int base_sync() { return 30; }            // was NOT async in the base
+async int overridden_async() { return 9; }
+
 async void awaits_both() {
   int a = await base_async(1);
   int b = await async_inherit_base::base_async(10);
@@ -34,6 +44,12 @@ void do_tests() {
   ASSERT_EQ("PROMISE<int>( fulfilled: 2 )", sprintf("%O", p));
   ASSERT_EQ("PROMISE<int>( fulfilled: 11 )", sprintf("%O", q));
   ASSERT_EQ("PROMISE<array>", sprintf("%O", r)[0..13]);
+
+  // matching prototype, and both override directions
+  ASSERT_EQ(8, promise_result(proto_ok()));
+  ASSERT_EQ(30, base_sync());                       // override is plain int
+  ASSERT_EQ(9, promise_result(overridden_async()));  // override is a promise
+  ASSERT_EQ(3, async_inherit_base::base_sync());     // base version, still int
 
   call_out(function() { awaits_both(); }, 1);
   call_out(function() {
