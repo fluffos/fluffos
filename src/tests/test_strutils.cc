@@ -105,6 +105,25 @@ TEST(EGCAsciiFastPath, DetectsAsciiAndNonAscii) {
   EXPECT_TRUE(empty.is_ascii());
 }
 
+// count() walks the ICU iterator to the end as a side effect, so the ASCII
+// path has to leave its cursor there too -- otherwise a count() followed by
+// next() means one thing on ASCII input and another on non-ASCII. Compared
+// against ICU rather than against an assumed answer.
+TEST(EGCAsciiFastPath, CountLeavesCursorAtEndLikeIcu) {
+  const char* ascii = "hello";
+  const char* wide = "a\xe4\xbd\xa0z";  // a 你 z -- 3 clusters, 5 bytes
+
+  EGCSmartIterator a(ascii, 5);
+  ASSERT_TRUE(a.is_ascii());
+  EXPECT_EQ(5u, a.count());
+  EXPECT_EQ(icu::BreakIterator::DONE, a.next()) << "cursor must be at the end";
+
+  EGCSmartIterator w(wide, 5);
+  ASSERT_FALSE(w.is_ascii());
+  EXPECT_EQ(3u, w.count());
+  EXPECT_EQ(icu::BreakIterator::DONE, w.next()) << "ICU path, same contract";
+}
+
 TEST(EGCAsciiFastPath, CountMatchesIcu) {
   const char* cases[] = {"",   "a",         "hello world",
                          "\t\n multi line \n text", "0123456789",
