@@ -112,6 +112,8 @@ struct mem_block_t {
 int promise_payload_type(int t);
 /* the type an async function declared to return `t` yields at its call site */
 int promise_of_type(int t);
+/* the call-site type of simul_efun n (promise-wrapped when it is async) */
+int simul_efun_call_type(int n);
 /* the runtime tag (svalue_t::subtype of a T_PROMISE) for a promise type
  * word: the payload's T_* mask via convert_type(), or 0 when the payload
  * carries no constraint (mixed/void/unknown) */

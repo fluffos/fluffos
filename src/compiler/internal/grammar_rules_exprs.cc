@@ -1080,7 +1080,7 @@ void rule_function_call_new(parse_node_t** result, parse_node_t* opt_arg_list,
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else {
     *result = validate_efun_call(lookup_predef("clone_object"), opt_arg_list);
 #ifdef CAST_CALL_OTHERS
@@ -1153,7 +1153,7 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else if ((f = ihe->dn.efun_num) != -1) {
     *result = validate_efun_call(f, opt_arg_list);
   } else if ((i = ihe->dn.local_num) != -1 &&
@@ -1366,7 +1366,7 @@ void rule_function_call_arrow(parse_node_t** result, parse_node_t* expr,
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else {
     *result = validate_efun_call(arrow_efun, opt_arg_list);
 #ifdef CAST_CALL_OTHERS

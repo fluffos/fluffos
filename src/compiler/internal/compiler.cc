@@ -1113,6 +1113,42 @@ unsigned short promise_value_subtype(int t) {
   return static_cast<unsigned short>(rt);
 }
 
+/*
+ * The type of an expression that calls simul_efun `n`: its declared return
+ * type, wrapped in a promise when the simul_efun is async.
+ *
+ * FUNC_ASYNC lives in program_t::function_flags, not in the function_t that
+ * SIMUL(n) hands back, so it is read here the same way call_direct() reads
+ * it when dispatching -- through the simul_efun object's program at the
+ * simul's runtime index, following FUNC_ALIAS. Without this the compiler
+ * types an async simul_efun call as its declared return type while the
+ * runtime hands back a promise, and `int x = some_async_simul();` compiles
+ * clean.
+ */
+int simul_efun_call_type(int n) {
+  int t = SIMUL(n)->type & ~DECL_MODS;
+
+  if (!simul_efun_ob || !simul_efun_ob->prog) {
+    return t;
+  }
+  program_t* p = simul_efun_ob->prog;
+  int const nflags = p->last_inherited + p->num_functions_defined;
+  int roff = simuls[n].index;
+  if (roff < 0 || roff >= nflags) {
+    return t;
+  }
+  if (p->function_flags[roff] & FUNC_ALIAS) {
+    roff = p->function_flags[roff] & ~FUNC_ALIAS;
+    if (roff < 0 || roff >= nflags) {
+      return t;
+    }
+  }
+  if (p->function_flags[roff] & FUNC_ASYNC) {
+    t = promise_of_type(t);
+  }
+  return t;
+}
+
 void type_error(const char* str, int type) {
   static char buff[512];
   char* end = EndOf(buff);

@@ -1,0 +1,6 @@
+// an async simul_efun's call site is promise<int>, so assigning it to int
+// must be rejected -- it was silently accepted while the compiler read only
+// SIMUL(n)->type and never the FUNC_ASYNC flag
+void f() {
+  int x = async_simul(1);
+}
