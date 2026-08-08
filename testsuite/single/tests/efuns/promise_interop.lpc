@@ -31,8 +31,12 @@ void do_tests() {
   promise_then(p1, function(mixed v) { chainDone = v; });
   promise_resolve(p3, 5);
 
-  make_adoption_cycle();  // must return first: live locals are not orphans
+  // Only build the cycle where it can be reclaimed again: without
+  // find_orphaned_cycles() (a develop-build efun) it would survive to
+  // driver exit and show up as a leak -- as a pure cycle, LeakSanitizer
+  // reports every block in it as INDIRECT with no direct root.
 #if efun_defined(find_orphaned_cycles)
+  make_adoption_cycle();  // must return first: live locals are not orphans
   ASSERT(find_orphaned_cycles(1) > 0);
   ASSERT_EQ(0, find_orphaned_cycles(1));
 #endif
