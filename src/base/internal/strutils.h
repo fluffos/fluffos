@@ -114,9 +114,16 @@ class EGCSmartIterator : public EGCIterator {
     if (count_ == -1) {
       // ASCII: one cluster per byte, so the count is the byte length. This is
       // the hot one -- sizeof(str) on a mudlib string lands here.
+      //
+      // Leave the cursor at the end, exactly where the ICU walk below leaves
+      // it. No current caller counts and then keeps iterating (they all use
+      // the value, or re-seek with index_to_offset first), but letting the
+      // two paths disagree about cursor state would make a later count() +
+      // next() silently mean different things on ASCII and non-ASCII input.
       if (is_ascii()) {
         count_ = len();
         current_idx_ = count_;
+        ascii_pos_ = len();
         return count_;
       }
       count_ = 0;
