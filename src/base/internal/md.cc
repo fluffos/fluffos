@@ -42,8 +42,8 @@ std::map<int, std::vector<std::string>> md_refjournal;
 }  // namespace
 #endif
 
-void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::string desc) {
 #ifdef DEBUGMALLOC_EXTENSIONS
+void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::string_view desc) {
   auto id = node->id;
   auto it = md_refjournal.find(id);
   if (it == md_refjournal.end()) {
@@ -52,11 +52,9 @@ void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::s
   auto entry = fmt::format(FMT_STRING("{:s}: {:s}, ref={:d}\n"), is_ref ? "REF" : "UNREF", desc,
                            current_ref);
   md_refjournal[id].push_back(entry);
-#endif
 }
 
 void md_print_ref_journal(md_node_t* node, outbuffer_t* outbuf) {
-#ifdef DEBUGMALLOC_EXTENSIONS
   auto id = node->id;
   auto it = md_refjournal.find(id);
   if (it == md_refjournal.end()) {
@@ -65,8 +63,8 @@ void md_print_ref_journal(md_node_t* node, outbuffer_t* outbuf) {
   for (auto& entry : it->second) {
     outbuf_add(outbuf, entry.c_str());
   }
-#endif
 }
+#endif
 
 namespace {
 void clear_ref_journal(md_node_t* node) {

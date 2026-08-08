@@ -68,7 +68,7 @@ void flag(string str) {
   mixed error;
   string cmd, arg;
 
-  if (sscanf(str, "%(test|speed):%s", cmd, arg) != 2)
+  if (sscanf(str, "%(test|speed|bench):%s", cmd, arg) != 2)
     cmd = str;
 
   switch (cmd) {
@@ -86,6 +86,14 @@ void flag(string str) {
       break;
     case "speed":
       error = catch("/command/speed"->main(arg));
+      if (error) {
+        has_error = 1;
+        write(error);
+      }
+      shutdown(0);
+      break;
+    case "bench":
+      error = catch("/command/bench"->main(arg));
       if (error) {
         has_error = 1;
         write(error);

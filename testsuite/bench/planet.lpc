@@ -1,0 +1,237 @@
+// Benchmark fixture: query_noise() extracted from nightmare-residuum
+// lib/daemon/planet.c -- the function reported as slow.
+// https://github.com/michaelprograms/nightmare-residuum
+//
+// Logic unchanged; re-indented by testsuite/format.sh, and the constants it
+// reads from planet.h are inlined below so the fixture stands alone.
+
+inherit "/bench/noise";
+
+#define PIx2                6.283185307179586
+#define WATER_LAKES         0.75
+#define WATER_RIVER_1       0.60
+#define WATER_RIVER_2       0.40
+#define LEVEL_RANGE         20
+#define HEIGHT_DEEPER       0.35
+#define HEIGHT_DEEP         0.40
+#define HEIGHT_SHALLOW      0.45
+#define HEIGHT_SHORE        0.50
+
+varargs mapping query_noise(
+  mapping p,
+  int size,
+  int x,
+  int y,
+  float heightFactor,
+  float humidityFactor,
+  float heatFactor,
+  int time
+) {
+  int size2, level;
+  float nx, ny, nz, nw, now, nowAdj;
+  float nHeight, nHumidity, nHeat, nTmp, nResource = -1.0;
+
+  if (undefinedp(heightFactor)) {
+    heightFactor = 1.0;
+  }
+  if (undefinedp(humidityFactor)) {
+    humidityFactor = 1.0;
+  }
+  if (undefinedp(heatFactor)) {
+    heatFactor = 1.0;
+  }
+  if (undefinedp(time)) {
+    time = time();
+  }
+  if (size <= 0) {
+    error("Bad argument 2 to planet->query_noise: size must be positive");
+  }
+
+  // Calculate our 4D coordinates
+  nx = nz = to_float(x);
+  ny = nw = to_float(y);
+  nx = cos((nx / size) * PIx2) * 2 / PIx2;
+  ny = cos((ny / size) * PIx2) * 2 / PIx2;
+  nz = sin((nz / size) * PIx2) * 2 / PIx2;
+  nw = sin((nw / size) * PIx2) * 2 / PIx2;
+  now = nowAdj = time / 86400 % 100 / 100.0;  // changes every 24 hours, 0.00-0.99
+  if (nowAdj > 0.5) {
+    nowAdj -= 0.5;
+  }
+
+  // level
+  size2 = size / 2;
+  level = to_int(sqrt((size2 - x) * (size2 - x) + (size2 - y) * (size2 - y)) / (size2 * 1.0 / LEVEL_RANGE));
+  level = max(({ 1, min(({ LEVEL_RANGE, level })) }));
+
+  if (heatFactor != 0.0) {
+    // noise Humidity
+    nHumidity = max(({
+      0.0,
+      (((noise_simplex_4d(
+        nx + nowAdj,
+        ny + nowAdj,
+        nz + nowAdj,
+        nw + nowAdj,
+        p,
+        4,
+        3.0
+      ) + 1) / 2) - 0.25) / 0.5
+    }));  // normalize 0.25-0.75 to 0-1
+    nHumidity *= humidityFactor;
+  }
+
+  // noise Height
+  nHeight = (((noise_simplex_4d(
+    nx,
+    ny,
+    nz,
+    nw,
+    p,
+    5,
+    1.25
+  ) + 1) / 2) - 0.25) / 0.5;  // normalize 0.25-0.75 to 0-1
+  nHeight *= heightFactor;
+  // ensure central land mass exists
+  if (
+    (nHeight <= HEIGHT_SHALLOW) &&
+    (x <= size2 + 3 && y <= size2 + 3 && x >= size2 - 3 && y >= size2 - 3) &&
+    (sqrt((size2 - x) * (size2 - x) + (size2 - y) * (size2 - y)) + 0.5 < 3)
+  ) {
+    nHeight += (HEIGHT_SHALLOW - nHeight) + 0.05;
+  } else {
+    // noise River
+    nTmp = (((noise_simplex_4d(
+      nx,
+      ny,
+      nz,
+      nw,
+      p,
+      4,
+      1.25
+    ) + 1) / 2) - 0.25) / 0.5;  // normalize 0.25-0.75 to 0-1
+    if (nTmp >= WATER_LAKES - 0.026 && nTmp <= WATER_LAKES + 0.026) {
+      if (nTmp >= WATER_LAKES - 0.025 && nTmp <= WATER_LAKES + 0.025) {
+        nHeight = max(({
+          0.0,
+          nHeight - (abs(nHeight - HEIGHT_SHALLOW) + 0.05)
+        }));
+      }
+      if (heatFactor != 0.0) {
+        nHumidity += 0.1 * nHeight;
+      }
+    } else {
+      nTmp = (((noise_simplex_4d(
+        nw,
+        nz,
+        ny,
+        nx,
+        p,
+        5,
+        1.25
+      ) + 1) / 2) - 0.25) / 0.5;  // normalize 0.25-0.75 to 0-1
+      if (
+        (nTmp >= WATER_RIVER_1 - 0.026 && nTmp <= WATER_RIVER_1 + 0.026) ||
+        (nTmp >= WATER_RIVER_2 - 0.026 && nTmp <= WATER_RIVER_1 + 0.026)
+      ) {
+        if (
+          (nTmp >= WATER_RIVER_1 - 0.025 && nTmp <= WATER_RIVER_1 + 0.025) ||
+          (nTmp >= WATER_RIVER_2 - 0.025 && nTmp <= WATER_RIVER_2 + 0.025)
+        ) {
+          if (nHeight <= HEIGHT_SHALLOW) {
+            nHeight = nHeight * 0.8;
+          } else {
+            nHeight = max(({
+              0.0,
+              nHeight - (abs(nHeight - HEIGHT_SHALLOW) + 0.05)
+            }));
+          }
+        }
+        if (heatFactor != 0.0) {
+          nHumidity += 0.1 * nHeight;
+        }
+      }
+    }
+  }
+
+  if (heatFactor != 0.0) {
+    // adjust noise Humidity based upon noise Height, lower is wetter
+    if (nHeight <= HEIGHT_DEEPER) {
+      nHumidity += 5.0 * nHeight;
+    } else if (nHeight <= HEIGHT_DEEP) {
+      nHumidity += 4.0 * nHeight;
+    } else if (nHeight <= HEIGHT_SHALLOW) {
+      nHumidity += 3.0 * nHeight;
+    } else if (nHeight <= HEIGHT_SHORE) {
+      nHumidity += 0.2 * nHeight;
+    }
+  }
+
+  if (heatFactor != 0.0) {
+    // noise Heat
+    nHeat = abs((noise_simplex_4d(
+      nx + nowAdj,
+      ny + nowAdj,
+      nz + nowAdj,
+      nw + nowAdj,
+      p,
+      4,
+      2.5
+    ) + 1) / 2);
+    nHeat = abs((nHeat - 0.05) / (0.95 - 0.05));
+    // noise Gradient
+    size2 = size * 45 / 100;
+    if (y >= size2 && y <= size - size2) {  // center 20%
+      nTmp = 1.0;
+    } else if (y < size2) {                 // north 40%
+      nTmp = 1.0 - (gradient_2d(
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        (y * 1.0) / size2
+      ));
+    } else {                                // south 40%
+      nTmp = 1.0 - (gradient_2d(
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        (size - (y + 1.0)) / size2
+      ));
+    }
+    nHeat = nHeat * nTmp * 1.5;
+    nHeat *= heatFactor;
+    if (nHeat > 1.0) {
+      nHeat = 1.0;
+    }
+    // adjust noise Heat based upon noise Height, higher is colder
+    if (nHeight > HEIGHT_SHALLOW) {
+      nHeat -= (nHeight - HEIGHT_SHALLOW) * nHeight;
+    }
+    nHeat = max(({ nHeat, 0.0 }));
+  }
+
+  // noise Resource
+  if (nHeight > HEIGHT_SHORE) {
+    nResource = ((noise_simplex_4d(
+      nx + now,
+      ny + now,
+      nz + now,
+      nw + now,
+      p,
+      4,
+      25.0
+    ) + 1) / 2);
+  }
+
+  return ([
+    "level": level,
+    "height": nHeight,
+    "humidity": nHumidity,
+    "heat": nHeat,
+    "resource": to_int(nResource * 100.0) % 10,
+  ]);
+}

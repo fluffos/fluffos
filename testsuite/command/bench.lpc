@@ -1,0 +1,98 @@
+// Benchmark harness for the reported-slow planet.c query_noise() workload.
+//
+// Source of the measured code (extracted verbatim into /bench/):
+//   https://github.com/michaelprograms/nightmare-residuum
+//   lib/daemon/planet.c  query_noise()      -> /bench/planet.lpc
+//   lib/secure/sefun/noise.c                -> /bench/noise.lpc
+//
+// Run with:  driver etc/config.test -fbench
+// Optional arg selects grid edge, e.g. -fbench:64
+
+#define REPORT(z, t) write(sprintf("%-38s: %12d ns\n", z, t))
+
+int main(string arg) {
+  int before, after, edge, i, x, y, n;
+  mapping p;
+  mapping res;
+  object planet;
+  int t_total, t_perm, t_micro;
+  mixed junk;
+
+  reset_eval_cost();
+  set_eval_limit(0x7fffffff);
+
+  edge = arg && sizeof(arg) ? to_int(arg) : 48;
+  if (edge <= 0) edge = 48;
+
+  planet = load_object("/bench/planet");
+
+  // Build the seeded permutation mapping once (as the real daemon does).
+  before = perf_counter_ns();
+  p = planet->noise_generate_permutation_simplex("benchmark-seed");
+  after = perf_counter_ns();
+  t_perm = after - before;
+  REPORT("noise_generate_permutation_simplex", t_perm);
+
+  // Sanity: the permutation mapping is shaped as query_noise expects.
+  if (!mapp(p) || sizeof(p["p"]) != 256 || sizeof(p["x"]) != 256) {
+    error("bench: permutation mapping malformed");
+  }
+
+  // --- microbenchmark: a single simplex permutation evaluation ---
+  // This is the innermost kernel; query_noise() runs ~21 of these per tile.
+  before = perf_counter_ns();
+  for (i = 0; i < 20000; i++) {
+    junk = planet->noise_simplex_4d_permutation(0.3, 0.7, 0.1, 0.9, p);
+  }
+  after = perf_counter_ns();
+  t_micro = after - before;
+  REPORT("noise_simplex_4d_permutation (each)", t_micro / 20000);
+
+  // --- microbenchmark: one full octave stack (as query_noise calls it) ---
+  before = perf_counter_ns();
+  for (i = 0; i < 5000; i++) {
+    junk = planet->noise_simplex_4d(0.3, 0.7, 0.1, 0.9, p, 5, 1.25);
+  }
+  after = perf_counter_ns();
+  REPORT("noise_simplex_4d(octaves=5) (each)", (after - before) / 5000);
+
+  // --- diagnostic: same maths, but the five p["..."] mapping lookups hoisted
+  // out of the kernel. The gap against the line above is cost that lives in the
+  // LPC's own structure (35 mapping lookups per corner), not in the driver.
+  if (planet->noise_simplex_4d_permutation_hoisted(0.3, 0.7, 0.1, 0.9, p) !=
+    planet->noise_simplex_4d_permutation(0.3, 0.7, 0.1, 0.9, p)) {
+    error("bench: hoisted variant is not numerically identical");
+  }
+  before = perf_counter_ns();
+  for (i = 0; i < 20000; i++) {
+    junk = planet->noise_simplex_4d_permutation_hoisted(0.3, 0.7, 0.1, 0.9, p);
+  }
+  after = perf_counter_ns();
+  REPORT("  ^ same, mapping lookups hoisted", (after - before) / 20000);
+
+  // --- the actual reported workload: generate a full planet surface ---
+  n = 0;
+  before = perf_counter_ns();
+  for (y = 0; y < edge; y++) {
+    for (x = 0; x < edge; x++) {
+      res = planet->query_noise(p, edge, x, y, 1.0, 1.0, 1.0, 1234567);
+      n++;
+    }
+  }
+  after = perf_counter_ns();
+  t_total = after - before;
+
+  write(sprintf("\nplanet grid %dx%d (%d tiles)\n", edge, edge, n));
+  REPORT("query_noise total", t_total);
+  REPORT("query_noise per tile", t_total / n);
+  write(sprintf("%-38s: %12d tiles/sec\n", "throughput",
+    n * 1000000000 / (t_total > 0 ? t_total : 1)));
+
+  // Correctness anchor: print one deterministic sample so optimizations can be
+  // checked for behavioural equivalence.
+  res = planet->query_noise(p, edge, 7, 11, 1.0, 1.0, 1.0, 1234567);
+  write(sprintf("\nsample(7,11) level=%d height=%.9f humidity=%.9f heat=%.9f resource=%d\n",
+    res["level"], res["height"], res["humidity"], res["heat"],
+    res["resource"]));
+  return 1;
+}
