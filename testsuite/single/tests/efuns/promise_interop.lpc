@@ -1,0 +1,68 @@
+// Promise/async interop with the rest of the driver (issue #1319): adoption
+// chains and cycles, async through call_other and through a function
+// pointer, async with default arguments and varargs, an error inside a
+// then() handler, and promises as ordinary values (mapping key, copy()).
+
+async int ai(int n) { return n * 2; }
+async int avar(int a, int b: (: 9 :)) { return a + b; }
+varargs async int avararg(int a, int b) { return a + (b ? b : 100); }
+
+nosave int chainDone, coDone, fpDone, thenErr;
+
+// a mutual adoption: a waits on b waits on a. Both stay pending forever
+// (JS guards only DIRECT self-resolution, and so do we), which makes them a
+// reference loop -- detectable and reclaimable, not a silent leak.
+private void make_adoption_cycle() {
+  mixed a = promise_create(), b = promise_create();
+
+  promise_resolve(a, b);
+  promise_resolve(b, a);
+  promise_catch(a, (: 0 :));
+  promise_catch(b, (: 0 :));
+}
+
+void do_tests() {
+  mixed p1, p2, p3, m;
+  mapping mm;
+
+  p1 = promise_create(); p2 = promise_create(); p3 = promise_create();
+  promise_resolve(p1, p2);
+  promise_resolve(p2, p3);
+  promise_then(p1, function(mixed v) { chainDone = v; });
+  promise_resolve(p3, 5);
+
+  make_adoption_cycle();  // must return first: live locals are not orphans
+#if efun_defined(find_orphaned_cycles)
+  ASSERT(find_orphaned_cycles(1) > 0);
+  ASSERT_EQ(0, find_orphaned_cycles(1));
+#endif
+
+  m = this_object()->ai(3);
+  ASSERT_EQ("promise", typeof(m));
+  promise_then(m, function(mixed v) { coDone = v; });
+  m = evaluate((: ai :), 4);
+  ASSERT_EQ("promise", typeof(m));
+  promise_then(m, function(mixed v) { fpDone = v; });
+
+  ASSERT_EQ(11, promise_result(avar(2)));
+  ASSERT_EQ(101, promise_result(avararg(1)));
+  ASSERT_EQ(3, promise_result(avararg(1, 2)));
+
+  p1 = promise_create();
+  promise_resolve(p1, 1);
+  promise_catch(promise_then(p1, (: error("handler boom") :)),
+    function(mixed e) { thenErr = stringp(e); });
+
+  mm = ([]);
+  p2 = promise_create();
+  mm[p2] = "v";
+  ASSERT_EQ("v", mm[p2]);
+  ASSERT_EQ(p2, copy(({ p2 }))[0]);
+
+  call_out(function() {
+    ASSERT2(chainDone == 5, sprintf("adoption chain: %O", chainDone));
+    ASSERT2(coDone == 6, sprintf("call_other async: %O", coDone));
+    ASSERT2(fpDone == 8, sprintf("funptr async: %O", fpDone));
+    ASSERT2(thenErr == 1, sprintf("then handler error: %O", thenErr));
+  }, 3);
+}

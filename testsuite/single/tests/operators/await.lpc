@@ -8,7 +8,7 @@
 // a non-promise passes through without parking.
 
 nosave mixed pend;
-nosave int compoundDone, opsDone;
+nosave int compoundDone, opsDone, localCompoundDone, foreachGuarded;
 
 // precedence: await is a unary prefix operator, binding tighter than any
 // binary operator but looser than postfix
@@ -53,15 +53,37 @@ async void compound_ok() {
   compoundDone++;
 }
 
-// a local-variable compound assignment holds its lvalue on the stack
-// across the rhs, so a pending await inside it refuses to suspend --
-// acatch observes the guard error synchronously
-async void local_guarded() {
-  string s = "";
-  mixed err = acatch(s += await pend);
+// Compound assignment does NOT pin an lvalue across the rhs -- every shape
+// evaluates the rhs first, so a pending await inside one parks cleanly and
+// resumes with the right value. (This asserted the opposite for a while: the
+// checks ran after the resume, i.e. from a post-suite call_out, where a
+// failure is printed but not counted, so it went unnoticed.)
+async void local_compound_ok() {
+  string s = "n=";
+  int n = 1;
 
+  s += await pend;
+  n += await pend;
+  ASSERT_EQ("n=10", s);
+  ASSERT_EQ(11, n);
+  localCompoundDone++;
+}
+
+// What the guard DOES cover: a foreach loop keeps an lvalue slot live for
+// its loop variable for the whole body, so a pending await inside one
+// refuses to suspend and acatch observes the error.
+async void foreach_guarded() {
+  int *a = ({ 1, 2 });
+  mixed err;
+
+  err = acatch {
+    foreach (int v in a) {
+      await pend;
+    }
+  };
   ASSERT(stringp(err));
   ASSERT(strsrch(err, "cannot suspend") != -1);
+  foreachGuarded++;
 }
 
 // suspension-limit fixtures: park on a promise that never settles during
@@ -106,7 +128,8 @@ void do_tests() {
   // suspension shapes (deferred: resolved from the call_out below)
   pend = promise_create();
   compound_ok();
-  local_guarded();
+  local_compound_ok();
+  foreach_guarded();
 
   // the runaway-exhaustion guard: parking past the configured limit is a
   // clean error at the await point. 256 + 66 is __RC_MAX_SUSPENDED_ASYNC__
@@ -128,9 +151,12 @@ void do_tests() {
 
   call_out(function() { promise_resolve(pend, 10); }, 1);
   call_out(function() {
-    ASSERT2(compoundDone == 1 && opsDone == 1,
-      sprintf("deferred await checks: %O %O", compoundDone, opsDone));
-    if (compoundDone != 1 || opsDone != 1) shutdown(-1);
+    ASSERT2(compoundDone == 1 && opsDone == 1 && localCompoundDone == 1 && foreachGuarded == 1,
+      sprintf("deferred await checks: %O %O %O %O", compoundDone, opsDone, localCompoundDone,
+        foreachGuarded));
+    if (compoundDone != 1 || opsDone != 1 || localCompoundDone != 1 || foreachGuarded != 1) {
+      shutdown(-1);
+    }
     pend = 0;
   }, 2);
 }

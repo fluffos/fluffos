@@ -705,7 +705,7 @@ void coroutine_await_pending(promise_t* awaited) {
         (T_LVALUE | T_LVALUE_BYTE | T_LVALUE_RANGE | T_LVALUE_CODEPOINT | T_REF | T_ERROR_HANDLER)) {
       error(
           "await: cannot suspend while a reference or lvalue is pending on the stack "
-          "(e.g. `arr[i] += await p` or a `foreach ref` loop); await into a plain "
+          "(a `foreach` loop variable, or a `ref` argument); await into a plain "
           "variable first.\n");
     }
   }
