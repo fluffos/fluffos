@@ -174,6 +174,17 @@ extern svalue_t const0, const1, const0u;
 #define MSTR_TAG_JOIN(res, ascii_both) \
   (MSTR_ASCII(res) = (ascii_both) ? MSTR_ASCII_YES : MSTR_ASCII_NO)
 
+/* Tag a substring (range / extract_range). ASCII propagates ONE WAY only:
+ * every byte of the result came from the source, so an ASCII-and-CR-free
+ * source can only yield an ASCII-and-CR-free substring.
+ *
+ * The converse is FALSE and must not be propagated -- "\u4f60abc"[1..3] is
+ * "abc", perfectly ASCII, from a non-ASCII source. So a non-ASCII source
+ * leaves the result UNKNOWN (new_string()'s default), to be derived lazily
+ * if anyone asks. That asymmetry is why this is not MSTR_TAG_JOIN. */
+#define MSTR_TAG_SUBSTRING(res, src_ascii) \
+  SAFE(if (src_ascii) { MSTR_ASCII(res) = MSTR_ASCII_YES; })
+
 /* These are not used anywhere */
 
 /* Beek - add some sanity to joining strings */
