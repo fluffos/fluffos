@@ -153,6 +153,11 @@ class EGCIterator {
  public:
   [[nodiscard]] bool ok() const { return ok_; }
   [[nodiscard]] bool is_ascii() const { return ascii_; }
+  // The raw predicate, WITHOUT constructing an iterator. Constructing one
+  // acquires an ICU break iterator from the pool, which builds 32 of them on
+  // first touch -- absurd overhead when all you want is a byte scan. Callers
+  // that only need the answer (u8_string_is_ascii_cached) use this.
+  static bool scan_is_ascii(const char* src, int32_t slen) { return all_ascii(src, slen); }
   [[nodiscard]] const char* data() const { return src_; }
   [[nodiscard]] int32_t len() const { return len_; }
   void reset(const char* src, int32_t slen) {

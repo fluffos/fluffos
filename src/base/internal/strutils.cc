@@ -611,13 +611,13 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
 // makes a repeated sizeof() on the same string O(1) instead of O(n).
 bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted) {
   if (!counted) {  // no block header to memoize into
-    return EGCIterator(str, len).is_ascii();
+    return EGCIterator::scan_is_ascii(str, len);
   }
   unsigned char cached = MSTR_ASCII(str);
   if (cached != MSTR_ASCII_UNKNOWN) {
     return cached == MSTR_ASCII_YES;
   }
-  bool ascii = EGCIterator(str, len).is_ascii();
+  bool ascii = EGCIterator::scan_is_ascii(str, len);
   MSTR_ASCII(str) = ascii ? MSTR_ASCII_YES : MSTR_ASCII_NO;
   return ascii;
 }
