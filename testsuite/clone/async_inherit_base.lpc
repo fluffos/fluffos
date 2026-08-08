@@ -1,0 +1,3 @@
+// inherited by tests/efuns/async_inherit.lpc
+async int base_async(int n) { return n + 1; }
+async string *base_async_arr() { return ({ "a" }); }

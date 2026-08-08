@@ -1304,6 +1304,13 @@ static int find_matching_function(program_t* prog, const char* name, parse_node_
       node->l.number = ri;
       type = prog->function_table[i].type;
       fix_class_type(&type, prog);
+      if (flags & FUNC_ASYNC) {
+        /* Same as every other call path: an async call yields a promise OF
+           the declared return type. This is the `base::fn()` route -- a
+           plain inherited call goes through FUNCTION_FLAGS() in
+           grammar_rules_exprs.cc, and this site was missed. */
+        type = promise_of_type(type);
+      }
       node->type = type;
       return 1;
     }
