@@ -10,7 +10,7 @@
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "trees.h"
 #include "compiler/internal/compiler_utils.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
@@ -261,9 +261,23 @@ extern vm_context_t g_driver_vm_context;
 // structured consumers (lpcshell) read the fields directly instead.
 // ---------------------------------------------------------------------------
 struct Diagnostic {
+  // Storage note: every variable-length field below lives on the compile's
+  // ScratchArena, not the heap -- the compiler allocates no transient
+  // outside the arena. That is only sound because a compile BORROWS its
+  // arena and never resets it (see compile_file), so these records stay
+  // readable after the compile returns, which is exactly when lpcshell and
+  // the compiler tests read them.
+  //
+  // The lifetime rule that follows: a Diagnostic is valid until its arena
+  // is reset or destroyed. For the shared default arena that is the START
+  // of the next compile -- matching the old behaviour, where the compiler
+  // freed everything at the END of each one. compiler_diags is cleared on
+  // that same boundary (start_new_file), and destroying a stale
+  // arena-backed string is safe because deallocation is a no-op; only
+  // READING one after the reset would be wrong.
   bool is_warning;
-  std::string file;  // innermost file (current_file at capture time)
-  int line;          // line within `file`
+  ScratchString file;  // innermost file (current_file at capture time)
+  int line;            // line within `file`
   // 1-based column of the diagnosed token's START (0 = unknown, so every
   // producer that never learned about columns stays valid). For an error
   // inside a macro expansion this is the OUTERMOST invocation's column --
@@ -273,28 +287,28 @@ struct Diagnostic {
   // The diagnosed physical line's text as still resident in the scanner's
   // innermost real buffer at capture time (empty = unavailable). Rendered
   // as an indented snippet with a caret at `column`.
-  std::string snippet;
-  std::string message;
+  ScratchString snippet;
+  ScratchString message;
   // The live #include stack at capture, innermost includer first:
   // (includer file, line of its #include directive). Rendered clang-style
   // as "In file included from F:N:" prefix lines, outermost first.
-  std::vector<std::pair<std::string, int>> included_from;
+  ScratchVector<std::pair<ScratchString, int>> included_from;
   // The live macro-expansion chain at capture, innermost first. Rendered
   // clang-style: each level prints its own located note
   // ("file:line:col: note: expanded from macro 'F'") with the macro
   // DEFINITION line as a gutter snippet and a caret at the name.
   struct Expansion {
-    std::string macro_name;
-    std::string def_file;  // empty for builtins/predefines
+    ScratchString macro_name;
+    ScratchString def_file;  // empty for builtins/predefines
     int def_line = 0;
     int use_line = 0;
     int use_col = 0;
   };
-  std::vector<Expansion> expansions;
+  ScratchVector<Expansion> expansions;
   // Everything else: site-supplied context (compiler_pending_notes, e.g.
   // "previous definition of 'FOO' was at ..."), the compile-session
   // chain. Rendered as indented notes after the expansion chain.
-  std::vector<std::string> notes;
+  ScratchVector<ScratchString> notes;
   // Fix-it hints (8.5): a replacement for the [col_start, col_end)
   // 1-based column span on the diagnosed line. Rendered as a clang-style
   // replacement line under the caret. Producers attach these only when
@@ -302,9 +316,9 @@ struct Diagnostic {
   struct FixIt {
     int col_start;
     int col_end;
-    std::string replacement;
+    ScratchString replacement;
   };
-  std::vector<FixIt> fixits;
+  ScratchVector<FixIt> fixits;
   // Operand/sub-expression ranges (8.3): 1-based [col_start, col_end]
   // spans, rendered as '~' runs on the caret line when `line` matches the
   // diagnosed line. Attached by grammar actions via
@@ -314,7 +328,7 @@ struct Diagnostic {
     int col_start;
     int col_end;
   };
-  std::vector<Range> ranges;
+  ScratchVector<Range> ranges;
 };
 
 // This compile's captured diagnostics, cleared by start_new_file() (i.e.
@@ -369,9 +383,14 @@ struct CompileState {
   // Structured diagnostics stream + one-shot context.
   std::vector<Diagnostic> diags;
   bool diags_quiet = false;
-  std::vector<std::string> pending_notes;
-  std::vector<Diagnostic::FixIt> pending_fixits;
-  std::vector<Diagnostic::Range> pending_ranges;
+  // Arena-backed like the Diagnostic they are moved into, so staging a
+  // note costs no allocation. These are members of a global that outlives
+  // any one compile, so they follow the documented stale-object rule:
+  // cleared at each capture and at start_new_file, never read across an
+  // arena reset.
+  ScratchVector<ScratchString> pending_notes;
+  ScratchVector<Diagnostic::FixIt> pending_fixits;
+  ScratchVector<Diagnostic::Range> pending_ranges;
   int pending_caret_line = 0;
   int pending_caret_col = 0;
   std::string next_load_reason;
@@ -419,6 +438,19 @@ std::string render_diagnostic(const Diagnostic& d, bool color = false);
 // (apply.cc's trace-driven warnings) that have no compile context.
 void report_compile_diagnostic(const Diagnostic& d);
 
+// Drop every arena-backed record the compiler is holding (compiler_diags
+// and the pending_* staging containers).
+//
+// MUST be called immediately BEFORE the arena those records live in is
+// reset or destroyed, and it is the caller of ScratchArena::reset() who is
+// responsible for it. The asymmetry that makes this necessary: a stale
+// ScratchString is harmless to destroy (its destructor never dereferences
+// the buffer, and deallocation is a no-op), but a stale ScratchVector is
+// NOT -- its destructor walks its own arena-allocated buffer to destroy
+// each element, so clearing it after a reset reads freed memory. A
+// Diagnostic contains four such vectors.
+void compiler_drop_arena_state();
+
 // When set, report_compile_diagnostic() captures but does NOT print or
 // master-report -- for structured consumers (lpcshell) that render
 // compiler_diags themselves, and specifically must not spray a doomed
@@ -431,10 +463,10 @@ inline bool& compiler_diags_quiet = g_compile.diags_quiet;
 // "previous definition of 'FOO' was at file:line" before reporting. Only
 // meaningful immediately before a report; anything stale is cleared at the
 // next capture.
-inline std::vector<std::string>& compiler_pending_notes = g_compile.pending_notes;
+inline ScratchVector<ScratchString>& compiler_pending_notes = g_compile.pending_notes;
 // Fix-it hints queued by the NEXT report's site, same one-shot contract
 // as compiler_pending_notes.
-inline std::vector<Diagnostic::FixIt>& compiler_pending_fixits = g_compile.pending_fixits;
+inline ScratchVector<Diagnostic::FixIt>& compiler_pending_fixits = g_compile.pending_fixits;
 
 // Load-chain provenance (the optional 6.x note): load_object() sets
 // compiler_next_load_reason just before recursively loading an inherited
@@ -450,7 +482,7 @@ inline std::string& compiler_current_load_reason = g_compile.current_load_reason
 // (one-shot, consumed by the next captured diagnostic; the action clears
 // them after the helper returns so they can never leak to an unrelated
 // report). Defined in compiler.cc; the grammar calls the rule_* pair.
-inline std::vector<Diagnostic::Range>& compiler_pending_ranges = g_compile.pending_ranges;
+inline ScratchVector<Diagnostic::Range>& compiler_pending_ranges = g_compile.pending_ranges;
 // The operator's own position: when set (line != 0) and it matches the
 // diagnosed line, the caret moves onto the operator -- clang's
 // `~~~~~ ^ ~~~~~` shape for binary-op type errors.
@@ -479,9 +511,21 @@ inline int& compiler_directive_start_line = g_compile.directive_start_line;
 #define MAX_COMPILE_DEPTH 32
 
 // Zero-copy file form: reads fd straight into the arena scan buffer.
-program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context);
+/* A compile BORROWS the arena it is given: it allocates every transient
+ * there and leaves it exactly as it found it -- never reset, never freed.
+ * The caller owns it and decides when that memory dies, which is what lets
+ * compiler output outlive the compile.
+ *
+ * Omit it and the compile uses the shared default arena instead, which IS
+ * the compiler's to recycle: that one is reset on the way IN, so the
+ * previous compile's transients stay readable until the next compile
+ * actually starts. See scratch_default_arena() for why it is shared rather
+ * than per-call. */
+program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context,
+                           ScratchArena* arena = nullptr);
 program_t* compile_file(std::string_view source, const char*,
-                        vm_context_t* vm_context = &g_driver_vm_context);
+                        vm_context_t* vm_context = &g_driver_vm_context,
+                        ScratchArena* arena = nullptr);
 
 void reset_function_blocks(void);
 void copy_variables(program_t*, int);

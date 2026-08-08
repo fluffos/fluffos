@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 #define DEFMAX 65536  // at least 4 times MAXLINE
 #define MAXLINE 4096

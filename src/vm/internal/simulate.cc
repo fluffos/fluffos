@@ -679,13 +679,13 @@ object_t* load_object(const char* lname, int callcreate) {
 // recompile the same string. Without this, inline inherit source could
 // only inherit programs that happened to be loaded already.
 object_t* load_object_from_source(const std::string& source, const char* virtual_name,
-                                  int callcreate) {
+                                  int callcreate, ScratchArena* arena) {
   auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
   program_t* prog = nullptr;
 
   for (int rounds = 0;; rounds++) {
     save_command_giver(command_giver);
-    prog = compile_file(source, virtual_name);
+    prog = compile_file(source, virtual_name, &g_driver_vm_context, arena);
     restore_command_giver();
 
     if (!inherit_file) {

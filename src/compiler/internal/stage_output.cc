@@ -7,7 +7,7 @@
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
 #include "compiler/internal/lexer_rules_pp.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 #include <nlohmann/json.hpp>
 

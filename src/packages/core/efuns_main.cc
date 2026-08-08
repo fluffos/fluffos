@@ -23,7 +23,7 @@
 #include "packages/core/call_out.h"
 #include "packages/core/dns.h"
 #include "packages/core/add_action.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "packages/core/file.h"
 #include "packages/core/regexp.h"
 #include "packages/core/sprintf.h"  // string_print_formatted

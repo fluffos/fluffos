@@ -616,7 +616,7 @@ set(SRC
   "compiler/internal/lexer_rules.cc" # substantive logic behind lexer.l's rule actions (escape decoding, number parsing, etc.)
   "compiler/internal/lexer_rules_pp.cc" # preprocessing logic and expression parser
   "compiler/internal/stage_output.cc" # lpcc -E/--tokens staged dumps (lex+pp, no parse)
-  "compiler/internal/scratchpad.cc"
+  "base/internal/scratchpad.cc"
   "compiler/internal/trees.cc"
   "vm/internal/base/apply_cache.cc"
   "vm/internal/base/array.cc"

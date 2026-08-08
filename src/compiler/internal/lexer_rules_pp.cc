@@ -1246,9 +1246,16 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
           // (respects #pragma no_warnings, does not fail the
           // compile). Identical-body redefinition stays silent.
           if (!existing->second.def_file.empty()) {
-            compiler_pending_notes.push_back("previous definition of '" + std::string(name) +
-                                             "' was at /" + existing->second.def_file + ":" +
-                                             std::to_string(existing->second.def_line));
+            // Built on the arena, like everything else staged for a
+            // Diagnostic -- the note text never touches the heap.
+            ScratchString note("previous definition of '");
+            note.append(name.data(), name.size());
+            note.append("' was at /");
+            note.append(existing->second.def_file.data(), existing->second.def_file.size());
+            note.append(":");
+            auto line_str = std::to_string(existing->second.def_line);
+            note.append(line_str.data(), line_str.size());
+            compiler_pending_notes.push_back(std::move(note));
           }
           yywarn("Macro '%s' redefined", std::string(name).c_str());
         }
