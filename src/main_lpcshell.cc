@@ -378,6 +378,7 @@ bool Eval(Session* session, std::string stmt) {
   // The previous evaluation's diagnostics have been rendered by now, so its
   // arena memory can go. Reclaiming here rather than at the end of the last
   // Eval() is what keeps those records readable for the whole of it.
+  compiler_drop_arena_state();  // must precede the reset; see its declaration
   session->arena.reset();
 
   // Trim trailing newline the REPL loop always appends.

@@ -148,9 +148,11 @@ void rule_clear_operand_ranges(void) {
 
 // Displays a compiler-internal filename (stored without a leading slash)
 // the way the mudlib names it.
-static std::string display_path(const std::string& file) {
-  if (!file.empty() && file[0] == '/') return file;
-  return "/" + file;
+// string_view so it serves both heap strings and the arena-backed ones in
+// a Diagnostic without copying either into the other's allocator.
+static std::string display_path(std::string_view file) {
+  if (!file.empty() && file[0] == '/') return std::string(file);
+  return "/" + std::string(file);
 }
 
 // Fetch one line of a mudlib-relative source file for a diagnostic
@@ -222,9 +224,10 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   // Gutter snippet, clang-shaped:
   //   %5d | <source line>
   //         | <marks>
-  auto emit_snippet = [&](int line_no, std::string shown, int caret_col,
-                          const std::vector<Diagnostic::Range>* ranges,
-                          const std::vector<Diagnostic::FixIt>* fixits) {
+  auto emit_snippet = [&](int line_no, std::string_view shown_in, int caret_col,
+                          const ScratchVector<Diagnostic::Range>* ranges,
+                          const ScratchVector<Diagnostic::FixIt>* fixits) {
+    std::string shown(shown_in);
     for (auto& ch : shown) {
       if (ch == '\t') ch = ' ';  // tab as one column, matching capture
     }
@@ -260,7 +263,7 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
         if (f.col_start > 0 && static_cast<size_t>(f.col_start) <= shown.size() + 1) {
           out += "\n      | " + std::string(static_cast<size_t>(f.col_start - 1), ' ');
           out += c_caret;
-          out += f.replacement;
+          out.append(f.replacement.data(), f.replacement.size());
           out += c_off;
         }
       }
@@ -283,7 +286,7 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   out += d.is_warning ? "warning: " : "error: ";
   out += c_off;
   out += c_bold;
-  out += d.message;
+  out.append(d.message.data(), d.message.size());
   out += c_off;
   if (!d.snippet.empty()) {
     emit_snippet(d.line, d.snippet, d.column, &d.ranges, &d.fixits);
@@ -303,7 +306,9 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
       out += c_note;
       out += "note: ";
       out += c_off;
-      out += "expanded from macro '" + exp.macro_name + "'";
+      out += "expanded from macro '";
+      out.append(exp.macro_name.data(), exp.macro_name.size());
+      out += "'";
       if (!def_line_text.empty()) {
         emit_snippet(exp.def_line, def_line_text, def_col, nullptr, nullptr);
       }
@@ -329,6 +334,27 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   return out;
 }
 
+// See the declaration in compiler.h for why this has to run before the
+// arena is recycled rather than after.
+void compiler_drop_arena_state() {
+  // RELEASE, not clear(). clear() destroys the elements but KEEPS capacity,
+  // so an arena-backed container in global storage would go on holding a
+  // pointer into the arena cycle that is about to be recycled -- and the
+  // next push_back would write through it, into whatever the arena has
+  // since handed out (in practice the lexer's Flex buffers, which is how
+  // this first showed up: a segfault deep in yypop_buffer_state, nowhere
+  // near the diagnostics). Assigning a fresh instance drops the buffer.
+  //
+  // The clear() calls scattered through the diagnostic paths are fine --
+  // those all happen WITHIN one compile, where the buffer is still live.
+  // This function is the only one that runs across a recycle.
+  compiler_diags.clear();  // heap vector; its elements' arena state dies here
+  compiler_diags.shrink_to_fit();
+  compiler_pending_notes = ScratchVector<ScratchString>{};
+  compiler_pending_fixits = ScratchVector<Diagnostic::FixIt>{};
+  compiler_pending_ranges = ScratchVector<Diagnostic::Range>{};
+}
+
 // Builds and stores the structured record for one reported diagnostic --
 // called by yyerror()/yywarn() at the exact moment of the report, because
 // the provenance is LIVE state: the #include stack is popped as includes
@@ -341,11 +367,19 @@ static const Diagnostic& capture_diagnostic(bool is_warning, const char* message
   d.file = current_file != nullptr ? current_file : "";
   d.line = compiler_directive_start_line != 0 ? compiler_directive_start_line : current_line;
   d.message = message;
-  d.included_from = lpc_lex_include_stack();
+  // The lexer's provenance accessors hand back std::string (they outlive
+  // any one compile), so copy the text onto the arena here -- this is the
+  // heap/arena boundary, and the Diagnostic below owns nothing off-arena.
+  for (const auto& inc : lpc_lex_include_stack()) {
+    d.included_from.emplace_back(ScratchString(inc.first.data(), inc.first.size()), inc.second);
+  }
   auto chain = lpc_lex_expansion_chain();
   for (const auto& site : chain) {
-    d.expansions.push_back(Diagnostic::Expansion{site.name, site.def_file, site.def_line,
-                                                 site.invocation_line, site.invocation_column});
+    d.expansions.push_back(Diagnostic::Expansion{ScratchString(site.name.data(), site.name.size()),
+                                                 ScratchString(site.def_file.data(),
+                                                               site.def_file.size()),
+                                                 site.def_line, site.invocation_line,
+                                                 site.invocation_column});
   }
   // Column + snippet (8.1/8.2). Inside an expansion, attribute to the
   // OUTERMOST invocation (chain is innermost-first, so .back()) -- same
@@ -357,14 +391,17 @@ static const Diagnostic& capture_diagnostic(bool is_warning, const char* message
     } else if (void* scanner = lpc_lex_active_scanner()) {
       d.column = yyget_extra(scanner)->token_start_column + 1;
     }
-    d.snippet = lpc_lex_current_source_line();
+    auto src_line = lpc_lex_current_source_line();
+    d.snippet.assign(src_line.data(), src_line.size());
   }
   d.notes = std::move(compiler_pending_notes);
   compiler_pending_notes.clear();
   d.fixits = std::move(compiler_pending_fixits);
   compiler_pending_fixits.clear();
   if (!compiler_current_load_reason.empty()) {
-    d.notes.push_back(compiler_current_load_reason);
+    // std::string on purpose: set by simulate.cc BEFORE compile_file runs,
+    // i.e. before the arena is recycled, so it cannot live there.
+    d.notes.emplace_back(compiler_current_load_reason.data(), compiler_current_load_reason.size());
   }
   d.ranges = compiler_pending_ranges;  // copied, not moved: the owning
                                        // grammar action clears them
@@ -2402,7 +2439,13 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
    * in a compile.
    */
   ScratchArena& compile_arena = (arena != nullptr) ? *arena : scratch_default_arena();
-  if (arena == nullptr) compile_arena.reset();
+  if (arena == nullptr) {
+    // Release last compile's arena-backed records BEFORE recycling the
+    // arena they live in -- see compiler_drop_arena_state(). A caller that
+    // supplies its own arena owns this ordering itself.
+    compiler_drop_arena_state();
+    compile_arena.reset();
+  }
   ScratchArenaBinding const arena_binding(compile_arena);
 
   // Publish this compile's identity on the one state object for the

@@ -270,7 +270,7 @@ void lpc_lex_append_unknown_escape(void* yyscanner, const char* text, bool is_te
     // -- suggest dropping the backslash (rendered under the caret).
     compiler_context_t* ctx = ctx_of(yyscanner);
     int col = ctx->token_start_column + 1;
-    compiler_pending_fixits.push_back(Diagnostic::FixIt{col, col + 2, std::string(1, text[1])});
+    compiler_pending_fixits.push_back(Diagnostic::FixIt{col, col + 2, ScratchString(1, text[1])});
     char msg[64];
     snprintf(msg, sizeof(msg), "Unknown escape sequence '\\%c'.", text[1]);
     yywarn("%s", msg);
