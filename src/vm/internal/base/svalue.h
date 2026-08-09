@@ -110,12 +110,48 @@ struct ref_t {
 
 void copy_some_svalues(svalue_t*, svalue_t*, int);
 void assign_svalue(svalue_t*, svalue_t*);
+
+/* NOTE: an inline T_NUMBER/T_REAL fast path here (`*to = *from` in the header,
+ * delegating only refcounted sources out of line) is worth ~4% on an
+ * interpreter-bound workload and is functionally correct -- but do NOT add one
+ * without first fixing array_t/class layout. Those use the legacy
+ * `svalue_t item[1]` flexible-array idiom, so once the whole-struct store is
+ * inlined into a caller that can see the allocation, -fsanitize=object-size
+ * reports every item[i>0] write as "store ... with insufficient space for an
+ * object of type 'struct svalue_t'" (e.g. slice_array(), array.cc). The store
+ * is legal -- int_allocate_empty_array() reserves the trailing slots -- but the
+ * declared bound of 1 makes UBSan disagree, and the out-of-line call boundary
+ * is the only reason the existing code does not trip it. That would fail the
+ * RelWithDebInfo+sanitizer CI job. Real flexible array members would unblock
+ * this. */
 void assign_svalue_no_free(svalue_t*, svalue_t*);
 
 #ifdef DEBUG
 #define free_svalue(x, y) int_free_svalue(x, y)
 #else
-#define free_svalue(x, y) int_free_svalue(x)
+/* Also declared in machine.h, which includes this header before getting to it. */
+void int_free_svalue(svalue_t*);
+
+/* int_free_svalue() is called several million times on an interpreter-bound
+ * workload -- roughly once per dispatched opcode that drops a stack slot -- and
+ * it is not inlined across the call boundary. It only has real work to do for a
+ * value that owns something: a string, a refcounted
+ * pointer, or an error handler (which it invokes). For every other type --
+ * T_NUMBER and T_REAL above all -- the entire body reduces to marking the slot
+ * T_FREED, and outside DEBUG builds nothing ever reads that bit back:
+ * assign_svalue_no_free() clears it on overwrite, sprintf.cc masks it out with
+ * (type & ~T_FREED), and the only remaining readers -- the "*freed*" type name
+ * in interpret.cc and the double-free fatal in svalue.cc -- are both #ifdef
+ * DEBUG. So skipping the call outright is unobservable here.
+ *
+ * DEBUG builds keep calling the out-of-line version unconditionally, so the
+ * double-free detection that depends on the bit being set keeps working. */
+inline void free_svalue_maybe_refed(svalue_t* v) {
+  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER)) {
+    int_free_svalue(v);
+  }
+}
+#define free_svalue(x, y) free_svalue_maybe_refed(x)
 #endif
 
 // commonly used svalue.
