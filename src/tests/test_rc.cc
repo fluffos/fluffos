@@ -19,6 +19,33 @@
 #include <unistd.h>
 #endif
 
+// read_config() is called exactly once per process by the real driver
+// (mainlib.cc) and permanently populates globals like config_str[] via
+// alloc_cstring() -- there is no reload path, so it never frees a slot's
+// previous contents before overwriting it. That is fine for a single call
+// per process, but this test suite calls it once per TEST_F in the SAME
+// process: each subsequent call abandons the previous call's allocations,
+// which LeakSanitizer correctly reports as leaked. Silence just that,
+// rather than changing read_config() to defensively free state a real boot
+// never revisits.
+#if defined(__SANITIZE_ADDRESS__)
+#define RC_TEST_HAS_LSAN 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define RC_TEST_HAS_LSAN 1
+#endif
+#endif
+#ifdef RC_TEST_HAS_LSAN
+#include <sanitizer/lsan_interface.h>
+struct ScopedLsanDisable {
+  ScopedLsanDisable() { __lsan_disable(); }
+  ~ScopedLsanDisable() { __lsan_enable(); }
+};
+#define RC_TEST_LSAN_DISABLE() ScopedLsanDisable rc_test_lsan_guard
+#else
+#define RC_TEST_LSAN_DISABLE()
+#endif
+
 // read_config() drives every runtime option of the driver, but nothing outside
 // a full driver boot exercised it: the min/max clamping, comment stripping,
 // port/TLS parsing and the `--generate-config` template were all uncovered.
@@ -92,7 +119,10 @@ class RcTest : public ::testing::Test {
 
   // read_config() chatters to stdout; keep the test output readable.
   static void quiet_read_config(const std::string& path) {
-    capture_stdout("read_config.log", [&]() { read_config(path.c_str()); });
+    capture_stdout("read_config.log", [&]() {
+      RC_TEST_LSAN_DISABLE();
+      read_config(path.c_str());
+    });
   }
 };
 
@@ -197,7 +227,10 @@ TEST_F(RcTest, LegacyPortNumberDefinesFirstPort) {
                            "port number : 4000\n"
                            "external_port_1 : binary 4321\n"
                            "external_port_2 : binary 4001\n");
-  auto log = capture_stdout("legacy_port.log", [&]() { read_config(path.c_str()); });
+  auto log = capture_stdout("legacy_port.log", [&]() {
+    RC_TEST_LSAN_DISABLE();
+    read_config(path.c_str());
+  });
 
   EXPECT_EQ(4000, CONFIG_INT(__MUD_PORT__));
   EXPECT_EQ(PORT_TYPE_TELNET, external_port[0].kind);
@@ -232,7 +265,10 @@ TEST_F(RcTest, ObsoleteAndMissingRecommendedLinesWarn) {
   auto path = write_config("obsolete.cfg",
                            "swap file : /tmp/swap\n"  // obsolete: warn if found
                            "wombles : 1\n");
-  auto log = capture_stdout("obsolete.log", [&]() { read_config(path.c_str()); });
+  auto log = capture_stdout("obsolete.log", [&]() {
+    RC_TEST_LSAN_DISABLE();
+    read_config(path.c_str());
+  });
 
   EXPECT_NE(std::string::npos, log.find("obsolete line in config file"));
   EXPECT_NE(std::string::npos, log.find("swap file"));
