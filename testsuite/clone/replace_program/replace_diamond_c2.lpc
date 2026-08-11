@@ -1,0 +1,18 @@
+// Fixture (expected-NOT-noop case): inherits branch A (bare passthrough)
+// and branch B_extra (base + its own extra() function). This object has
+// MORE effective content than the base alone -- must NOT be flagged as a
+// no-op even though the base itself is reachable via two paths.
+//
+// Deliberately defines nothing of its own beyond create(): try_bind()
+// comes from the shared replace_min_target.lpc, inherited unchanged via
+// BOTH branches (a -> target, and b_extra -> target), so the ONLY thing
+// that can make this fixture correctly register as NOT a no-op is branch
+// b_extra's own extra() function -- the discriminator this fixture
+// claims to isolate. An earlier version of this fixture also defined its
+// own local call_extra() and try_bind2(), either of which alone would
+// have made replace_program_is_noop() correctly return false regardless
+// of whether the branch-content dedup logic actually worked,
+// contaminating the isolation.
+inherit "/clone/replace_program/replace_diamond_a";
+inherit "/clone/replace_program/replace_diamond_b_extra";
+void create() { replace_program("/clone/replace_program/replace_min_target"); }

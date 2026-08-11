@@ -1,0 +1,12 @@
+// Fixture: the genuine "stub becomes a different real class" pattern --
+// inherits both a real target (with its own state/#global_init#) and
+// extra machinery it wants to shed, then replace_program()s down to just
+// the real target. Unlike replace_self_stateful.lpc, this is NOT a no-op:
+// stub_only() would disappear, so it must fall through to the normal
+// pending-swap path exactly as an unpatched driver would. try_bind() is
+// inherited unchanged from replace_stateful_base (see that fixture's
+// comment on why it lives there).
+inherit "/clone/replace_program/replace_stateful_base";
+inherit "/clone/replace_program/replace_stub_extra";
+
+void create() { replace_program("/clone/replace_program/replace_stateful_base"); }

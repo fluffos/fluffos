@@ -1,0 +1,10 @@
+// Fixture: diamond-inheritance base WITH its own variable -- pins the
+// finding that FluffOS does NOT deduplicate diamond-inherited variables:
+// a base reachable via two separate inherit paths contributes its
+// variable block TWICE (once per path), with no virtual-inheritance
+// merging. That duplication is caught by the pre-existing
+// num_variables_total equality check, independent of the function-table
+// comparison.
+int dvar;
+string fdvx() { return "dvx"; }
+mixed try_bind() { mixed fp; return catch(fp = (: fdvx :)); }

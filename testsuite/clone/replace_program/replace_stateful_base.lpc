@@ -1,0 +1,37 @@
+// Fixture for /single/tests/efuns/replace_program_noop_globals.lpc: an
+// inherited base class with an INITIALIZED global variable. The compiler
+// synthesizes a "#global_init#" function (see compiler.cc's TREE_INIT
+// handling, and vm/internal/applies mapping __INIT -> "#global_init#")
+// for any program with initializer code like this -- this is the
+// real-world shape (e.g. the /clone/board/*.c pattern seen throughout the
+// legacy mudlib corpus, where a board's base class carries a `mapping
+// attrs`-style global) that exposed replace_program_is_noop()'s missed
+// #global_init# exclusion: each program compiles its own distinct
+// #global_init#, so comparing it by identity made the no-op check fail
+// for nearly every real object with stateful inherited base classes.
+//
+// try_bind() lives HERE (not on the objects that inherit this class) on
+// purpose: in the real bug, the closure that fails to bind is one defined
+// on the shared base class (e.g. the board's post-completion editor
+// callback), inherited unchanged by the object calling replace_program()
+// on itself -- not a new function added directly to that object.
+mapping attrs = ([ "seeded": 1 ]);
+string pname() { return "stateful_base"; }
+mapping query_attrs() { return attrs; }
+// Mirrors the exact shape of the real crash: xhcii's /inherit/misc/bboard.c
+// (BULLETIN_BOARD, the base huashan_b.c inherits and then redundantly
+// replace_program()s itself down to) does
+// `this_player()->edit((: done_post, this_player(), note :));` in do_post()
+// -- a bound-args lfun closure to a base-class function, constructed while
+// current_object is the board instance itself.
+mixed try_bind() {
+  mixed fp;
+  // NOTE: `catch((: pname, 1 :))` -- the closure literal as catch()'s
+  // direct sole argument -- compiles with an EMPTY catch body (no
+  // F_FUNCTION_CONSTRUCTOR bytecode at all; a separate, pre-existing
+  // compiler quirk unrelated to replace_program, confirmed via
+  // dump_prog()/disassembly and independent of #pragma optimize). Wrapping
+  // it in an assignment expression sidesteps that and reliably reaches
+  // make_lfun_funp() at runtime.
+  return catch(fp = (: pname, 1 :));
+}

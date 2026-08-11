@@ -1,0 +1,117 @@
+// ============================================================================
+// DEMO: the INTENDED use of replace_program() -- deferred, DATA-DRIVEN
+// runtime polymorphism.
+//
+// This is the "here's the good pattern" counterpart to the redundant
+// self-target no-op handled by replace_program_is_noop() (src/packages/
+// core/replace_program.cc) -- a redundant
+// `inherit X; create(){replace_program(X);}` on an object that already
+// fully has X. This file is a genuine, non-no-op use: a generic
+// loader/"shell" object that decides its real class at create() time and
+// transforms into it.
+//
+// Companion fixtures/tests (read these too for the full picture):
+//   demo_poly_base.lpc            -- shared,
+//     stateless scaffolding every concrete type (and the shell) has
+//   demo_poly_{goblin,wolf,ghost}.lpc
+//     -- the concrete monster classes this shell can become
+//   /single/tests/efuns/replace_program_polymorphism_demo.lpc
+//     -- the wired LPC-level test; see its header for exactly what a
+//        synchronous LPC test can and cannot observe about the swap
+//   src/tests/test_lpc.cc's ReplaceProgramPolymorphicShellDemoLandsForReal
+//     -- forces the deferred sweep at the C++ level and proves the FULL
+//        landed transformation (chosen type's behavior present, the
+//        OTHER candidates' and the shell's own machinery genuinely shed,
+//        not just shadowed)
+//
+// HOW replace_program() ACTUALLY CONSTRAINS THIS PATTERN
+// --------------------------------------------------------
+// Read this before reusing this shape elsewhere: the driver only allows
+// swapping to a program the calling object ALREADY INHERITS (see
+// search_inherited() in src/packages/core/replace_program.cc -- targeting
+// anything else fails with "program to replace the current with has to
+// be inherited"). So a shell that wants to become any ONE of several
+// concrete types has to `inherit` ALL of them up front -- the compiled
+// PROGRAM genuinely contains every candidate's code; there is no way to
+// defer compiling the candidates themselves.
+//
+// What the pattern actually saves is PER-OBJECT memory, not compile-time
+// memory: every individual clone of this shell only ever exists once,
+// and the moment create() decides which candidate it really is, the
+// OTHER candidates' variables and functions are discarded from THAT
+// object (see replace_programs()'s variable-trimming code in
+// replace_program.cc -- "move our variables up to the top" / "free the
+// rest"). Concretely here: every shell clone starts out carrying 3
+// separate hp variables (goblin's, wolf's, and ghost's) and all 3
+// classes' functions; the instant the swap lands, 2 of those 3 hp slots
+// and every function that came only from the un-chosen candidates are
+// gone from that specific object, for good. A mudlib with dozens of
+// monster templates and thousands of live spawns saves real memory this
+// way even though every template's source was compiled into the shell's
+// one shared program.
+//
+// The runtime decision itself -- WHICH candidate to keep -- is the part
+// that couldn't be expressed with a plain `inherit` at all: it comes
+// from a spawn table roll, a room's configured monster mix, a save file,
+// or (here, for a self-contained example) plain random().
+//
+// NOTE: unlike the redundant self-target no-op handled by
+// replace_program_is_noop() (src/packages/core/replace_program.cc) -- an
+// object `inherit`ing X and then calling replace_program(X) on that SAME
+// class it already fully has, which the driver now detects as a
+// structural no-op and skips -- every replace_program() call below
+// discards real content (2 of the 3 candidates' functions and
+// variables, plus the shell's own machinery): a genuine structural
+// transformation, not a no-op.
+// ============================================================================
+
+// Compiling this deliberately emits benign "inherited from both X and Y;
+// using the definition in Y" / "Redeclaration of global variable" compiler
+// warnings for query_hp()/attack_damage()/hp, since all 3 candidates
+// below declare them independently under the same names. That is
+// harmless here: nothing calls them THROUGH the shell layer before the
+// swap (only after, once ob->prog is unambiguously one specific
+// candidate's own program) -- the warnings are the compiler accurately
+// describing "3 siblings with the same interface, decision deferred",
+// not a mistake to fix.
+inherit "/clone/replace_program/demo_poly_goblin";
+inherit "/clone/replace_program/demo_poly_wolf";
+inherit "/clone/replace_program/demo_poly_ghost";
+
+// In a real mudlib this would be populated from a spawn table, room
+// config, or similar external/persisted data -- not a literal here -- but
+// the mechanism is identical either way: the choice of WHICH path to
+// hand to replace_program() is made at RUNTIME. Keyed by a short species
+// name so callers (a spawn system restoring a saved monster type, or the
+// test below) can request a specific outcome without knowing the
+// underlying file layout.
+private mapping candidate_types = ([
+  "goblin": "/clone/replace_program/demo_poly_goblin",
+  "wolf":   "/clone/replace_program/demo_poly_wolf",
+  "ghost":  "/clone/replace_program/demo_poly_ghost",
+]);
+
+// Lives ONLY on this shell layer -- gone entirely once the swap lands:
+// replace_programs() doesn't just splice in the chosen candidate, it
+// makes ob->prog literally THAT candidate's own compiled program, so
+// nothing defined only on the shell layer (this function, and the other
+// 2 candidates' own functions/variables) survives. Proves the shell's
+// own loader machinery is genuinely SHED, not merely shadowed by an
+// override.
+string shell_only_marker() { return "shell"; }
+
+// forced_species lets callers (tests, or a mudlib's own deterministic
+// spawn logic, e.g. restoring a saved monster type) pin the outcome by
+// short name; leaving it unset exercises the real runtime decision via
+// random(), same as a live spawn would.
+void create(string forced_species) {
+  string chosen = forced_species && candidate_types[forced_species];
+
+  if (!chosen) {
+    // The actual runtime decision this whole pattern exists for.
+    string *species = keys(candidate_types);
+    chosen = candidate_types[species[random(sizeof(species))]];
+  }
+
+  replace_program(chosen);
+}
