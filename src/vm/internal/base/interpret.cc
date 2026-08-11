@@ -999,6 +999,16 @@ void copy_lvalue_range(svalue_t* from) {
         /* because both of them can only range from 0 to len */
 
         strncpy((const_cast<char*>(owner->u.string)) + ind1, from->u.string, fsize);
+        // owner is always STRING_MALLOC here (push_lvalue_range's
+        // unlink_string_svalue() guarantees it), and this write mutates its
+        // bytes in place -- unlike extend_string()/new_string(), which reset
+        // the cached tag on every allocation, this path grows nothing and so
+        // has no natural place that does that. Left alone, a stale ASCII tag
+        // (e.g. cached YES via SVALUE_STR_ASCII/MSTR_TAG_JOIN before this
+        // assignment) would silently survive a same-byte-length splice of
+        // non-ASCII content, making a later sizeof()/index answer from the
+        // unchanged byte length instead of rescanning.
+        MSTR_ASCII(owner->u.string) = MSTR_ASCII_UNKNOWN;
       } else {
         char *tmp, *dstr = const_cast<char*>(owner->u.string);
 
@@ -1168,6 +1178,13 @@ void assign_lvalue_range(svalue_t* from) {
         /* because both of them can only range from 0 to len */
 
         strncpy((const_cast<char*>(owner->u.string)) + ind1, from->u.string, fsize);
+        // See the matching comment in copy_lvalue_range(): this is an
+        // in-place mutation of owner's bytes (always STRING_MALLOC here),
+        // and unlike extend_string()/new_string() nothing else resets the
+        // cached ASCII tag for it, so a stale YES would survive a
+        // same-byte-length splice of non-ASCII content into a previously
+        // all-ASCII string.
+        MSTR_ASCII(owner->u.string) = MSTR_ASCII_UNKNOWN;
       } else {
         char* tmp;
         const char* dstr = const_cast<char*>(owner->u.string);

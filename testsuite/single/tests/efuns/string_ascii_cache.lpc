@@ -117,4 +117,43 @@ void do_tests() {
   s = "shared literal";
   ASSERT_EQ(14, sizeof(s));
   ASSERT_EQ(14, sizeof("shared literal"));
+
+  // --- in-place range assignment (same-byte-length replacement) mutates the
+  // string's bytes directly via strncpy in assign_lvalue_range() /
+  // copy_lvalue_range() (interpret.cc), rather than through extend_string()
+  // or new_string() -- the two places that otherwise reset MSTR_ASCII. If
+  // the destination was already tagged ASCII, splicing in non-ASCII bytes of
+  // the SAME byte length would leave a stale cached tag: sizeof() would
+  // answer from the (unchanged) byte length instead of rescanning.
+  //
+  // "a" and "b" are plain string LOCAL VARIABLES (not a literal concat
+  // expression) so the compiler cannot constant-fold "a + b" -- it must go
+  // through the real runtime SVALUE_STRING_JOIN path and allocate a fresh
+  // STRING_MALLOC buffer with ref==1, tagged ASCII via concatenation
+  // propagation. Critically, push_lvalue_range()'s unlink_string_svalue() is
+  // a no-op for an already-unshared (ref==1) STRING_MALLOC string, so the
+  // cached tag survives into the in-place mutation below untouched.
+  //
+  // Covers both C++ implementations of the in-place branch: the
+  // void-statement path (copy_lvalue_range, `s[0..1] = x;` as a full
+  // statement) and the used-as-expression-value path (assign_lvalue_range,
+  // the assignment's result consumed by an enclosing expression). ---
+  {
+    string a = "hello ";
+    string b = "world";
+    s = a + b;                 // fresh STRING_MALLOC, ref==1, tag=ASCII via join
+    ASSERT_EQ(11, sizeof(s));
+    s[0..1] = "\xc3\xa9";       // 2-byte UTF-8 char (é, U+00E9), same byte length as "he"
+    ASSERT_EQ(10, sizeof(s));  // 1 wide cluster + 9 ascii clusters, NOT 11 (stale byte length)
+  }
+  {
+    string a = "hello ";
+    string b = "world";
+    string result;
+    s = a + b;
+    ASSERT_EQ(11, sizeof(s));
+    result = (s[0..1] = "\xc3\xa9");  // used as a value -> assign_lvalue_range
+    ASSERT_EQ("\xc3\xa9", result);
+    ASSERT_EQ(10, sizeof(s));
+  }
 }
