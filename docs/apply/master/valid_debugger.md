@@ -16,10 +16,11 @@ title: master / valid_debugger
     Consulted once, when a debugger client's `attach` request has already
     passed the driver's own gates (a correct `debugger password` token, if
     one is configured) but before the session is marked attached. Returning
-    a falsy value (0, or simply not defining this apply's approval) denies
-    the attach; the driver sends a DAP failure response and closes the
-    connection, exactly like a bad password. Returning a truthy value lets
-    the attach proceed.
+    a falsy value (0) denies the attach; the driver sends a DAP failure
+    response and closes the connection, exactly like a bad password.
+    Returning a truthy value lets the attach proceed. If the master object
+    does not define `valid_debugger` at all, this check is skipped entirely
+    and the attach proceeds -- see the note below.
 
     The single argument is the client's peer IP address (a dotted-quad or
     IPv6 literal, e.g. "127.0.0.1"), with no reverse DNS lookup performed.
