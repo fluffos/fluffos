@@ -903,7 +903,16 @@ int socket_connect(int fd, const char* name, svalue_t* read_callback, svalue_t* 
 
     bool const verify_peer = lpc_socks[fd].options[SO_TLS_VERIFY_PEER].type == T_NUMBER &&
                              lpc_socks[fd].options[SO_TLS_VERIFY_PEER].u.number != 0;
-    bool const has_sni_hostname = lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING;
+    // An empty string must count as "no hostname", not just a wrong type:
+    // OpenSSL's X509_VERIFY_PARAM_set1_host() treats a zero-length name as
+    // "clear the host list" and returns success, so SSL_set1_host(ssl, "")
+    // silently leaves NO expected hostname configured. With SSL_VERIFY_PEER
+    // still on, the chain check alone then accepts any CA-issued cert for
+    // any name -- the exact MITM gap this whole verification path exists to
+    // close, just reached via socket_set_option(fd, SO_TLS_SNI_HOSTNAME, "")
+    // instead of never setting the option at all.
+    bool const has_sni_hostname = lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING &&
+                                  lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string[0] != '\0';
     // Chain validation alone accepts ANY certificate issued by a trusted CA,
     // for any name: without a name check a MITM presenting a valid
     // certificate for a host it does control passes verification. There is
