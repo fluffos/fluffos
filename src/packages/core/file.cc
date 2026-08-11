@@ -817,11 +817,28 @@ static int do_move(const char* from, const char* to, int flag) {
   }
   /* rename failed on cross-filesystem link.  Copy the file instead. */
   if (flag == F_RENAME) {
-    if (copy_file(from, to)) {
+    // copy_file() returns 1 on success and a negative value on failure (see
+    // docs/efun/filesystem/cp.md); `if (copy_file(...))` was truthy on
+    // *both* outcomes, so a cross-filesystem rename() always reported
+    // failure here -- even after a successful copy -- and skipped the
+    // unlink() below, leaving the source file behind as a duplicate.
+    //
+    // `from` is only alive courtesy of the caller's from_sv (see
+    // do_rename() above), which is a *static* also owned by check_valid_path()
+    // -- and copy_file() calls check_valid_path() again internally and
+    // reassigns that same static to protect its own copy of the string.
+    // That frees the very buffer `from` points into, out from under us, so
+    // `from` must be snapshotted before the call or unlink() below reads
+    // freed memory.
+    char from_copy[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+    strncpy(from_copy, from, sizeof(from_copy) - 1);
+    from_copy[sizeof(from_copy) - 1] = '\0';
+
+    if (copy_file(from, to) < 0) {
       return 1;
     }
-    if (unlink(from)) {
-      error("cannot remove `/%s'", from);
+    if (unlink(from_copy)) {
+      error("cannot remove `/%s'", from_copy);
       return 1;
     }
   }

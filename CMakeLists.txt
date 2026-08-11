@@ -130,6 +130,28 @@ set_tests_properties(testsuite PROPERTIES
         TIMEOUT 600
         LABELS "testsuite")
 
+# do_move()'s cross-filesystem rename() fallback (copy_file() + unlink(),
+# src/packages/core/file.cc) only runs on EXDEV, which a single-filesystem
+# CI checkout never produces -- so nothing above exercises it. Force it via
+# an LD_PRELOAD stub that always fails rename(2) with EXDEV, and run just
+# the one LPC test that checks the fallback actually moves (not just
+# copies) the file. POSIX-only: EXDEV/LD_PRELOAD have no Windows equivalent
+# and do_move()'s fallback is reached differently there.
+if (NOT WIN32)
+  add_library(force_exdev_rename MODULE testsuite/tools/force_exdev_rename.c)
+  set_target_properties(force_exdev_rename PROPERTIES PREFIX "" OUTPUT_NAME "force_exdev_rename")
+
+  add_test(NAME testsuite-rename-exdev-fallback
+          COMMAND $<TARGET_FILE:driver> etc/config.test -ftest:single/tests/efuns/rename_exdev.lpc
+          WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+  set_tests_properties(testsuite-rename-exdev-fallback PROPERTIES
+          ENVIRONMENT "LD_PRELOAD=$<TARGET_FILE:force_exdev_rename>"
+          PASS_REGULAR_EXPRESSION "Checks succeeded\\."
+          FAIL_REGULAR_EXPRESSION "\\[  FAILED  \\]"
+          TIMEOUT 120
+          LABELS "testsuite")
+endif()
+
 # lpcshell drives the REPL binary itself in script mode against the same
 # mudlib: the wrapping it is being tested for (deciding whether typed text
 # is an expression or a statement, and reporting what happened) lives in
