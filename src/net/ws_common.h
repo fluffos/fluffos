@@ -18,6 +18,13 @@ struct ws_session {
   struct interactive_t* user;
 
   struct evbuffer* buffer;
+
+  // Set by close_user_websocket() for a driver-initiated close: the session
+  // is done reading (RECEIVE discards input instead of hard-closing, which
+  // would truncate the flush this exists to protect) and ws_handle_writeable()
+  // closes with status 1000 once `buffer` is fully drained -- see
+  // src/www/AGENTS.md's "Driver-initiated close is close-AFTER-FLUSH" note.
+  bool close_after_flush;
 };
 
 // Decides how many leading bytes of an outgoing window may be sent without

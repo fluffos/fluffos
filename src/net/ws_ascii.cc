@@ -61,8 +61,11 @@ int ws_ascii_callback(struct lws* wsi, enum lws_callback_reasons reason, void* u
         return -1;
       }
       auto ip = pss->user;
-      if (!ip) {  // we are already disconnected
-        return -1;
+      if (!ip) {
+        // Driver-initiated close pending: discard input instead of
+        // hard-closing, or one keystroke from the peer would truncate the
+        // close-after-flush drain -- see the twin handler in ws_telnet.cc.
+        break;
       }
       comm_text_received(ip, (const char*)in, len);
       break;

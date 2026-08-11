@@ -82,6 +82,7 @@ int ws_handle_established(struct lws* wsi, ws_session* pss,
 
   pss->user = ip;
   pss->buffer = evbuffer_new();
+  pss->close_after_flush = false;
 
   ip->iflags |= HANDSHAKE_COMPLETE;
   ip->lws = wsi;
@@ -143,8 +144,11 @@ int ws_handle_writeable(struct lws* wsi, ws_session* pss, ws_truncate_fn truncat
     }
     // Hold back a trailing partial protocol unit so it is never split across ws
     // messages. evbuffer_copyout() does not drain, so the held-back bytes stay
-    // at the front of pss->buffer and go out with the next write.
-    if (truncate) {
+    // at the front of pss->buffer and go out with the next write. Skip the
+    // hold-back once the user is gone (close-after-flush drain): the rest of
+    // the unit can never arrive, and holding it back would spin the writeable
+    // callback until the drain deadline instead of flushing what we have.
+    if (truncate && pss->user) {
       auto new_numbytes = static_cast<ev_ssize_t>(
           truncate(pss, &buf[LWS_PRE], numbytes,
                    numbytes == static_cast<ev_ssize_t>(sizeof(buf) - LWS_PRE)));
@@ -173,6 +177,26 @@ int ws_handle_writeable(struct lws* wsi, ws_session* pss, ws_truncate_fn truncat
   // to re-arm it (see above) -- this keeps the invariant that queued data always
   // has a callback requested.
   if (evbuffer_get_length(pss->buffer) > 0) {
+    lws_callback_on_writable(wsi);
+  }
+  if (pss->close_after_flush && evbuffer_get_length(pss->buffer) == 0) {
+    // Choked with an empty application buffer is not the whole story: it can
+    // mean permessage-deflate still holds the compressed tail of the last
+    // message (tx_draining_ext) -- entering the close states makes lws drop
+    // that drain on the floor, truncating the final message. Only close once
+    // lws has nothing left in flight; re-arm otherwise (lws services the
+    // extension drain itself and calls back when done).
+    if (!lws_send_pipe_choked(wsi)) {
+      // One-shot: an already-queued second WRITEABLE callback can land before
+      // lws processes this close. Returning -1 again re-enters the close path
+      // in LRS_RETURNED_CLOSE and short-circuits the close handshake into an
+      // immediate close(fd); with kernel-buffered output still undelivered,
+      // any late client byte hitting the closed fd triggers an RST that
+      // purges it all.
+      pss->close_after_flush = false;
+      lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+      return -1;
+    }
     lws_callback_on_writable(wsi);
   }
   return 0;

@@ -109,8 +109,12 @@ int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* 
         break;
       }
       auto ip = pss->user;
-      if (!ip) {  // we are already disconnected
-        return -1;
+      if (!ip) {
+        // Driver-initiated close pending: the interactive is gone but the
+        // close-after-flush drain may still be running. Discard the input
+        // instead of hard-closing, or one keystroke from the peer would
+        // truncate the flush; the drain deadline still bounds the session.
+        break;
       }
       comm_telnet_received(ip, (const char*)in, len);
       break;
