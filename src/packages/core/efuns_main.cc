@@ -2044,6 +2044,14 @@ void f_replace_string() {
           }
           src++;
         }
+        // Unlike every other in-place branch of this efun, this one never
+        // reaches extend_string() (which resets the cached ASCII tag), yet it
+        // just spliced *replace bytes into the unlinked STRING_MALLOC buffer.
+        // A valid 1-byte replacement is always ASCII, but "\r" is too -- and
+        // splicing CR into a CR-free string tagged MSTR_ASCII_YES breaks the
+        // byte==cluster identity ("\r\n" is one grapheme cluster), leaving
+        // sizeof() to answer from the stale tag. Reset so it re-derives.
+        MSTR_ASCII(arg->u.string) = MSTR_ASCII_UNKNOWN;
       } else { /* rlen is zero */
         while (*src) {
           if (*src++ == *pattern) {
@@ -2494,6 +2502,16 @@ void f_sizeof() {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
+      // Pure ASCII (the overwhelming majority of mudlib text) has one
+      // grapheme cluster per byte, and counted strings remember that in
+      // their block header -- so this is O(1) with no iterator at all.
+      if (u8_string_is_ascii_cached(sp->u.string, SVALUE_STRLEN(sp),
+                                    (sp->subtype & STRING_COUNTED) != 0)) {
+        i = SVALUE_STRLEN(sp);
+        free_string_svalue(sp);
+        put_number(i);
+        return;
+      }
       EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("f_sizeof: Invalid UTF8 string!");

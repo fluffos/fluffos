@@ -87,6 +87,19 @@ void check_string_stats(outbuffer_t*);
   allocd_bytes -= len + 1; \
   CHECK_STRING_STATS
 
+/* Cached answer to "is this string pure ASCII (and CR-free)?", so the
+ * grapheme-cluster machinery can be skipped outright rather than re-derived
+ * on every sizeof()/index. Tri-state, and the UNKNOWN default is
+ * load-bearing: a string-creation path that forgets to set it degrades to
+ * scanning (slow but correct) instead of asserting a wrong answer.
+ *
+ * Lives in the two bytes of padding that already sat between `ref` and the
+ * string data, so sizeof(block_t) is unchanged in every build -- see the
+ * static_assert below. */
+#define MSTR_ASCII_UNKNOWN 0u
+#define MSTR_ASCII_YES 1u
+#define MSTR_ASCII_NO 2u
+
 // The layout of malloc_block_s must be same as block_s
 typedef struct malloc_block_s {
   void* _padding1;
@@ -96,12 +109,16 @@ typedef struct malloc_block_s {
 #endif
   unsigned int size;
   unsigned short ref;
+  unsigned char ascii;
 } malloc_block_t;
 
 #define MSTR_BLOCK(x) (((malloc_block_t*)(x)) - 1)
 #define MSTR_EXTRA_REF(x) (MSTR_BLOCK(x)->extra_ref)
 #define MSTR_REF(x) (MSTR_BLOCK(x)->ref)
 #define MSTR_SIZE(x) (MSTR_BLOCK(x)->size)
+/* Valid only for STRING_MALLOC / STRING_SHARED (i.e. STRING_COUNTED) strings;
+ * a STRING_CONSTANT points at a literal with no block header. */
+#define MSTR_ASCII(x) (MSTR_BLOCK(x)->ascii)
 #define MSTR_UPDATE_SIZE(x, y) \
   SAFE(ADD_STRING_SIZE(y - MSTR_SIZE(x)); MSTR_BLOCK(x)->size = (y > UINT_MAX ? UINT_MAX : y);)
 
@@ -139,13 +156,20 @@ typedef struct block_s {
 #if defined(DEBUGMALLOC_EXTENSIONS)  //|| (SIZEOF_CHAR_P == 8)
   unsigned int extra_ref;
 #endif
-  /* these two must be last */
+  /* these three must be last, and must mirror malloc_block_s exactly:
+   * MSTR_SIZE/MSTR_REF/MSTR_ASCII reach a STRING_SHARED string through
+   * malloc_block_t, so the offsets have to agree */
   unsigned int size;   /* length of the string */
   unsigned short refs; /* reference count    */
+  unsigned char ascii; /* MSTR_ASCII_* cache, see above */
 } block_t;
 
 static_assert(sizeof(malloc_block_t) == sizeof(block_t),
               "Block size mismatch, this will cause memory corruption!");
+static_assert(offsetof(malloc_block_t, size) == offsetof(block_t, size) &&
+                  offsetof(malloc_block_t, ref) == offsetof(block_t, refs) &&
+                  offsetof(malloc_block_t, ascii) == offsetof(block_t, ascii),
+              "malloc_block_t/block_t field offsets diverged");
 
 #define NEXT(x) (x)->next
 #define REFS(x) (x)->refs

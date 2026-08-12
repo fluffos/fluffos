@@ -1089,6 +1089,14 @@ void map_string(svalue_t* arg, int num_arg) {
     }
   }
 
+  // The callback's return value was written straight into the unlinked
+  // STRING_MALLOC buffer, and it can be ANY byte -- including '\r' (13),
+  // which breaks the byte==grapheme-cluster identity behind a cached
+  // MSTR_ASCII_YES tag ("\r\n" is one cluster), or a >= 0x80 byte. Nothing
+  // on this path reallocates (extend_string() is what normally resets the
+  // tag), so drop the cache and let it re-derive from the new contents.
+  MSTR_ASCII(arg->u.string) = MSTR_ASCII_UNKNOWN;
+
   pop_n_elems(num_arg - 1);
   /* return value on stack */
 }

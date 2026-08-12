@@ -723,6 +723,7 @@ void f_range(int code) {
       char* tmp = new_string(to - from, "f_range");
       memcpy(tmp, iter.data() + from, to - from);
       tmp[to - from] = '\0';
+      MSTR_TAG_SUBSTRING(tmp, iter.is_ascii());
 
       pop_3_elems();
       push_malloced_string(tmp);
@@ -833,7 +834,9 @@ void f_extract_range(int code) {
         sp->subtype = STRING_CONSTANT;
         sp->u.string = "";
       } else {
-        put_malloced_string(string_copy(iter.data() + offset, "f_extract_range"));
+        char* sub = string_copy(iter.data() + offset, "f_extract_range");
+        MSTR_TAG_SUBSTRING(sub, iter.is_ascii());
+        put_malloced_string(sub);
       }
       free_string_svalue(sp + 1);
       break;
