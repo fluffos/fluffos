@@ -836,3 +836,54 @@ TEST_F(DebuggerTest, AttachDeniedWhenValidDebuggerRejects) {
 
   s.outq.clear();
 }
+
+// Regression: a client may send a DAP field whose JSON type is wrong (a
+// numeric "type"/"command", a string "seq"). nlohmann's value<T>() THROWS
+// type_error.302 on such a mismatch. Some of these reads happen OUTSIDE
+// handle_request()'s try/catch -- dispatch_message()'s "type" probe, and
+// send_response()'s "seq"/"command" echo, which handle_request()'s own catch
+// handler re-invokes. dispatch_message() is the exact entry point the
+// libwebsockets LWS_CALLBACK_RECEIVE handler calls; a throw escaping it would
+// unwind through the C callback frame and abort the driver. Each of these once
+// crashed a live driver (unauthenticated, pre-attach). If dispatch_message()
+// throws here, this test binary aborts -- so reaching the assertions at all is
+// the core guarantee; the response-shape checks confirm graceful handling.
+TEST_F(DebuggerTest, MalformedFieldTypesAreHandledWithoutThrowing) {
+  auto& s = dbg::g_session;
+  s.attached = false;
+  s.authed = false;
+  s.client_addr = "203.0.113.7";
+
+  // 1) Non-string "type": rejected before handle_request(), no response queued.
+  s.outq.clear();
+  dbg::dispatch_message(R"({"type":123})");
+  EXPECT_TRUE(s.outq.empty()) << "non-request message must not produce a response";
+
+  // 2) Non-string "command": handle_request() throws reading it, the catch
+  //    handler must produce a failure response (and must not itself re-throw).
+  s.outq.clear();
+  dbg::dispatch_message(R"({"type":"request","seq":1,"command":123})");
+  ASSERT_FALSE(s.outq.empty());
+  {
+    dbg::djson resp = dbg::djson::parse(s.outq.back());
+    EXPECT_FALSE(resp["success"].get<bool>()) << resp.dump();
+    EXPECT_EQ(resp["request_seq"].get<int>(), 1);
+  }
+
+  // 3) Non-integer "seq" on an otherwise valid request: send_response() must
+  //    tolerate it (echo request_seq 0), not throw.
+  s.outq.clear();
+  dbg::dispatch_message(R"({"type":"request","seq":"abc","command":"initialize"})");
+  ASSERT_FALSE(s.outq.empty());
+  {
+    dbg::djson resp = dbg::djson::parse(s.outq.front());
+    EXPECT_TRUE(resp["success"].get<bool>()) << resp.dump();
+    EXPECT_EQ(resp["request_seq"].get<int>(), 0);
+    EXPECT_EQ(resp["command"].get<std::string>(), "initialize");
+  }
+
+  s.attached = false;
+  s.authed = false;
+  s.outq.clear();
+  dbg::update_flags();
+}

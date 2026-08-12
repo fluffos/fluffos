@@ -32,12 +32,41 @@ bool is_loopback(const char* addr) {
   return !strcmp(addr, "127.0.0.1") || !strcmp(addr, "::1") || !strcmp(addr, "localhost");
 }
 
+// Type-tolerant field readers. nlohmann's value<T>() THROWS type_error.302 when
+// the stored value is present but of the wrong JSON type (e.g. a client sends
+// {"seq":"abc"} or {"command":123}). Several of these reads happen OUTSIDE
+// handle_request()'s try/catch boundary -- dispatch_message()'s "type" probe,
+// send_response()'s "seq"/"command" echo (which the catch handler itself
+// re-invokes), and the catch handler's own diagnostic. A throw from any of
+// those crosses the libwebsockets C callback frame and aborts the whole driver
+// (round-2's function-try-block does not, and cannot, cover them). Read every
+// such field defensively instead.
+std::string json_str(const djson& j, const char* key, const char* dflt) {
+  if (j.is_object()) {
+    auto it = j.find(key);
+    if (it != j.end() && it->is_string()) {
+      return it->get<std::string>();
+    }
+  }
+  return dflt;
+}
+
+int json_int(const djson& j, const char* key, int dflt) {
+  if (j.is_object()) {
+    auto it = j.find(key);
+    if (it != j.end() && it->is_number_integer()) {
+      return it->get<int>();
+    }
+  }
+  return dflt;
+}
+
 void send_response(const djson& request, bool success, djson body, const char* message) {
   auto& s = g_session;
   djson resp = {{"seq", s.out_seq++},
                 {"type", "response"},
-                {"request_seq", request.value("seq", 0)},
-                {"command", request.value("command", "")},
+                {"request_seq", json_int(request, "seq", 0)},
+                {"command", json_str(request, "command", "")},
                 {"success", success}};
   if (!body.is_null()) {
     resp["body"] = body;
@@ -279,7 +308,7 @@ void handle_request(const djson& msg) try {
   // instead. Every branch above builds its response as the LAST statement,
   // so a throw always precedes that branch's send_response -- this cannot
   // double-respond for the same request.
-  debug_message("Debugger: request '%s' failed: %s.\n", msg.value("command", "").c_str(),
+  debug_message("Debugger: request '%s' failed: %s.\n", json_str(msg, "command", "").c_str(),
                 e.what());
   send_response(msg, false, nullptr, "internal error handling request");
 }
@@ -316,7 +345,7 @@ void dispatch_message(const std::string& text) {
     debug_message("Debugger: ignoring unparseable message.\n");
     return;
   }
-  if (msg.value("type", "") == "request") {
+  if (json_str(msg, "type", "") == "request") {
     handle_request(msg);
   }
 }
