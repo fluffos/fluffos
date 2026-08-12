@@ -128,7 +128,19 @@ void arm_step(StepMode mode) {
 void handle_request(const djson& msg) try {
   auto& s = g_session;
   std::string cmd = msg.value("command", "");
-  djson args = msg.contains("arguments") ? msg["arguments"] : djson::object();
+  // Bind by const reference -- never COPY arguments. nlohmann's parser and
+  // destructor are iterative, but its COPY CONSTRUCTOR recurses once per
+  // nesting level, so `djson args = msg["arguments"]` on a deeply-nested
+  // client value ({"arguments":[[[[...) blows the C stack at a few tens of
+  // thousands of levels -- well under the 4 MiB inbound-message cap -- and
+  // crashes the driver. Worse, that copy ran BEFORE the attach/auth gate
+  // below, so an unauthenticated (merely-connected) client could trigger it:
+  // a pre-attach DoS in the same family as the round-2 auth-timeout fix. The
+  // ternary binds a reference without materializing (copying into) a temporary
+  // only when BOTH operands are const lvalues of the same type, hence the
+  // static empty object rather than a `djson::object()` prvalue.
+  static const djson empty_args = djson::object();
+  const djson& args = msg.contains("arguments") ? msg["arguments"] : empty_args;
 
   if (cmd == "initialize") {
     send_response(msg, true, capabilities(), nullptr);

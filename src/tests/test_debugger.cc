@@ -1065,3 +1065,55 @@ TEST_F(DebuggerTest, ClientJsonIntCoercionNeverInvokesFloatCastUB) {
   dbg::breakpoints_clear_all();
   dbg::update_flags();
 }
+
+// Regression: a deeply-nested "arguments" value must not crash the driver.
+// handle_request() used to COPY the arguments object (`djson args =
+// msg["arguments"]`). nlohmann's parser and destructor are iterative, but its
+// copy constructor recurses once per nesting level, so a client message like
+// {"type":"request","command":"initialize","arguments":[[[[...(~100 KB)...]]]]}
+// -- well under the 4 MiB inbound cap -- blew the C stack during that copy and
+// took the whole driver down with SIGSEGV. Critically the copy happened BEFORE
+// the attach/auth gate, so a merely-connected (unauthenticated) client could
+// trigger it: a pre-attach DoS. dispatch_message() is the exact entry point
+// the transport feeds; the fix binds `args` by const reference (no copy).
+// Under ENABLE_SANITIZER this test stack-overflow-aborts without the fix.
+TEST_F(DebuggerTest, DeeplyNestedArgumentsDoesNotOverflowStack) {
+  auto& s = dbg::g_session;
+  s.attached = false;  // prove the pre-attach reachability
+  s.authed = false;
+  s.stopped = false;
+  s.client = nullptr;
+
+  // Depth chosen well past the observed ~50k overflow threshold on an 8 MiB
+  // stack, but small enough to stay far under the 4 MiB message cap.
+  const int kDepth = 120000;
+
+  // Deeply-nested array as the arguments value.
+  {
+    std::string payload = R"({"type":"request","seq":1,"command":"initialize","arguments":)";
+    payload += std::string(kDepth, '[');
+    payload += std::string(kDepth, ']');
+    payload += "}";
+    s.outq.clear();
+    dbg::dispatch_message(payload);  // must not crash
+    // initialize ignores arguments and still answers -> a response was queued,
+    // proving we got past the (former) copy without dying.
+    EXPECT_FALSE(s.outq.empty());
+  }
+
+  // Deeply-nested object as the arguments value (copy ctor recurses on objects
+  // too).
+  {
+    std::string payload = R"({"type":"request","seq":2,"command":"initialize","arguments":)";
+    for (int i = 0; i < kDepth; i++) payload += R"({"a":)";
+    payload += "1";
+    for (int i = 0; i < kDepth; i++) payload += "}";
+    payload += "}";
+    s.outq.clear();
+    dbg::dispatch_message(payload);  // must not crash
+    EXPECT_FALSE(s.outq.empty());
+  }
+
+  s.outq.clear();
+  dbg::update_flags();
+}
