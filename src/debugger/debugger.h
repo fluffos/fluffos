@@ -5,6 +5,7 @@
 #ifndef DEBUGGER_DEBUGGER_H
 #define DEBUGGER_DEBUGGER_H
 
+#include <climits>
 #include <cstdint>
 #include <deque>
 #include <map>
@@ -24,6 +25,45 @@ struct event;
 namespace dbg {
 
 using djson = nlohmann::json;
+
+// Safely coerce ONE client-supplied JSON value to an int, clamped to
+// [INT_MIN, INT_MAX].
+//
+// nlohmann's value<int>()/get<int>() reaches from_json's `static_cast<int>(
+// json_float)` for a JSON *number* whose stored type is float -- which is
+// undefined behavior (and an immediate UBSan/-fsanitize=undefined abort() that
+// NO try/catch can intercept) whenever the value is outside int's range. A
+// hostile-or-buggy client hits this with an outright float ({"line":1e18}) OR,
+// crucially, with an integer literal too large for int64 ({"start":
+// 99999999999999999999}) -- nlohmann parses THAT as a float too. The round-2/3
+// dispatch try/catch only covers type_error THROWS (string-where-int-expected);
+// a float coercion never throws, it aborts. So every client-controlled integer
+// argument must be read through this instead of .value<int>()/.get<int>().
+// Integers are range-clamped (a well-defined integer conversion, never UB);
+// in-range floats truncate toward zero; NaN / non-numbers yield the default.
+inline int json_to_int(const nlohmann::json& v, int dflt) {
+  if (v.is_number_integer()) {  // true for signed AND unsigned JSON integers
+    long long x = v.get<long long>();
+    if (x < INT_MIN) return INT_MIN;
+    if (x > INT_MAX) return INT_MAX;
+    return static_cast<int>(x);
+  }
+  if (v.is_number_float()) {
+    double d = v.get<double>();
+    if (!(d == d)) return dflt;  // NaN
+    if (d <= static_cast<double>(INT_MIN)) return INT_MIN;
+    if (d >= static_cast<double>(INT_MAX)) return INT_MAX;
+    return static_cast<int>(d);  // in range: the truncating cast is defined
+  }
+  return dflt;
+}
+
+// Same, keyed into an object argument bag (missing key / non-object -> default).
+inline int json_arg_int(const nlohmann::json& j, const char* key, int dflt) {
+  if (!j.is_object()) return dflt;
+  auto it = j.find(key);
+  return it == j.end() ? dflt : json_to_int(*it, dflt);
+}
 
 enum class StepMode { kNone, kIn, kOver, kOut };
 

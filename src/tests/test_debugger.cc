@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "base/package_api.h"
 
+#include <climits>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 
@@ -584,6 +586,58 @@ TEST_F(DebuggerTest, SetVariableWritesArrayElement) {
   dbg::g_session.handles.clear();
 }
 
+// Use-after-free regression: setVariable writes a scalar over a slot that held
+// a COMPOUND value; assign_svalue() frees that compound. Any outstanding
+// variablesReference handle that borrowed a raw pointer into the freed value
+// (here: a handle for the nested array the client had expanded) is left
+// dangling, and the next variables/setVariable on it reads array_t::size off
+// freed memory -- a heap-use-after-free (crash / memory disclosure), reachable
+// within a single valid stopped session using only documented DAP requests.
+// The fix invalidates the whole handle table after any mutating setVariable;
+// this test asserts that, and that re-using the stale handle is now a clean
+// miss rather than a freed-memory read (it aborts under ASan without the fix).
+TEST_F(DebuggerTest, SetVariableOverCompoundInvalidatesAliasingHandles) {
+  object_t* ob = LoadFixture("mixed *arr = ({ ({9, 10}), 200 });\n",
+                             "dbgtest_setvar_uaf", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* arr_sv = fixture_global(ob, "arr");
+  ASSERT_NE(arr_sv, nullptr);
+  ASSERT_EQ(arr_sv->type, T_ARRAY);
+  ASSERT_EQ(arr_sv->u.arr->item[0].type, T_ARRAY) << "arr[0] must be the nested array";
+
+  // Handle 0: the outer array (client expands `arr`).
+  dbg::g_session.handles.push_back({dbg::VarHandle::kArray, 0, arr_sv->u.arr});
+  int outer_ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+  // Handle 1: the nested array arr[0] (client expands arr[0] -> ({9,10})).
+  dbg::g_session.handles.push_back(
+      {dbg::VarHandle::kArray, 0, arr_sv->u.arr->item[0].u.arr});
+  int inner_ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  // Overwrite the outer element that holds the nested array with a scalar:
+  // assign_svalue() frees ({9,10}).  inner_ref now aliases freed memory.
+  std::string err;
+  dbg::djson body = dbg::set_variable_request(
+      {{"variablesReference", outer_ref}, {"name", "[0]"}, {"value", "42"}}, err);
+  ASSERT_FALSE(body.is_null()) << "err: " << err;
+  EXPECT_EQ(arr_sv->u.arr->item[0].type, T_NUMBER);
+  EXPECT_EQ(arr_sv->u.arr->item[0].u.number, 42);
+
+  // The fix: the mutating write dropped every handle, so the dangling
+  // inner_ref can no longer be dereferenced.
+  EXPECT_TRUE(dbg::g_session.handles.empty())
+      << "setVariable must invalidate handles after freeing a compound";
+
+  // Re-using the stale handle must be a clean miss, NOT a freed-memory read
+  // (without the fix this line is a heap-use-after-free that ASan aborts on).
+  dbg::djson vars = dbg::build_variables(inner_ref, /*start=*/0, /*count=*/10);
+  EXPECT_TRUE(vars["variables"].empty());
+  dbg::djson sv = dbg::set_variable_request(
+      {{"variablesReference", inner_ref}, {"name", "[0]"}, {"value", "7"}}, err);
+  EXPECT_TRUE(sv.is_null());
+
+  dbg::g_session.handles.clear();
+}
+
 // Regression: a client-supplied array element name whose digits overflow an
 // int ("[99999999999]") must be rejected cleanly, not throw. parse_index_name
 // used std::stoi, which throws std::out_of_range here; that exception would
@@ -935,5 +989,79 @@ TEST_F(DebuggerTest, MalformedFieldTypesAreHandledWithoutThrowing) {
   s.attached = false;
   s.authed = false;
   s.outq.clear();
+  dbg::update_flags();
+}
+
+// A client-supplied JSON *number* whose stored form is float -- an outright
+// float ({"line":1e18}) OR an integer literal too big for int64
+// ({"start":99999999999999999999}, which nlohmann must store as a float) --
+// used to reach nlohmann's static_cast<int>(json_float) in value<int>()/
+// get<int>(). That cast is undefined behavior when the value is outside int's
+// range: under the sanitizer/CI build (-fsanitize=undefined) it calls abort()
+// DIRECTLY, which the dispatch try/catch (a C++ exception boundary) cannot
+// intercept -- a hostile-or-buggy attached client could crash the whole
+// driver. json_to_int()/json_arg_int() must coerce without ever performing
+// that UB. This test fails (and, built with ENABLE_SANITIZER, aborts) if any
+// coercion regresses to a raw value<int>()/get<int>().
+TEST_F(DebuggerTest, ClientJsonIntCoercionNeverInvokesFloatCastUB) {
+  using dbg::json_arg_int;
+  using dbg::json_to_int;
+
+  // Floats far outside int range: clamp, never UB.
+  EXPECT_EQ(json_to_int(dbg::djson(1e18), 7), INT_MAX);
+  EXPECT_EQ(json_to_int(dbg::djson(-1e18), 7), INT_MIN);
+  EXPECT_EQ(json_to_int(dbg::djson(1e300), 7), INT_MAX);
+  EXPECT_EQ(json_to_int(dbg::djson(-1e300), 7), INT_MIN);
+  // In-range float truncates toward zero.
+  EXPECT_EQ(json_to_int(dbg::djson(2.9), 7), 2);
+  EXPECT_EQ(json_to_int(dbg::djson(-2.9), 7), -2);
+  // NaN and non-numbers fall back to the default.
+  EXPECT_EQ(json_to_int(dbg::djson(std::nan("")), 7), 7);
+  EXPECT_EQ(json_to_int(dbg::djson("abc"), 7), 7);
+  EXPECT_EQ(json_to_int(dbg::djson(true), 7), 7);
+  EXPECT_EQ(json_to_int(dbg::djson::array(), 7), 7);
+  // Ordinary integers pass through; oversized integers clamp.
+  EXPECT_EQ(json_to_int(dbg::djson(42), 7), 42);
+  EXPECT_EQ(json_to_int(dbg::djson(-5), 7), -5);
+  EXPECT_EQ(json_to_int(dbg::djson(5000000000LL), 7), INT_MAX);
+  EXPECT_EQ(json_to_int(dbg::djson(-5000000000LL), 7), INT_MIN);
+
+  // An integer literal beyond int64 is parsed by nlohmann as a float; the
+  // coercion must still be safe (this is the exact shape that aborted).
+  dbg::djson huge = dbg::djson::parse("99999999999999999999999999");
+  EXPECT_TRUE(huge.is_number_float()) << "precondition: nlohmann stores it as float";
+  EXPECT_EQ(json_to_int(huge, 7), INT_MAX);
+
+  // Object-keyed reader: missing key / non-object / present.
+  dbg::djson obj = dbg::djson::parse(R"({"line":1e18,"start":3})");
+  EXPECT_EQ(json_arg_int(obj, "line", 0), INT_MAX);
+  EXPECT_EQ(json_arg_int(obj, "start", 0), 3);
+  EXPECT_EQ(json_arg_int(obj, "missing", 9), 9);
+  EXPECT_EQ(json_arg_int(dbg::djson::array(), "line", 9), 9);
+
+  // End-to-end through the real dispatch path: an attached client sending the
+  // hostile setBreakpoints / variables / stackTrace / setVariable payloads
+  // must get an ordinary response, not a driver abort. (These aborted before
+  // the fix, on the sanitizer build.)
+  auto& s = dbg::g_session;
+  s.attached = true;
+  s.authed = true;
+  s.stopped = true;  // variables/stackTrace/setVariable are gated on being stopped
+  for (const char* payload : {
+           R"({"type":"request","seq":1,"command":"setBreakpoints","arguments":{"source":{"path":"/x"},"breakpoints":[{"line":1e18}]}})",
+           R"({"type":"request","seq":2,"command":"setBreakpoints","arguments":{"source":{"path":"/x"},"lines":[99999999999999999999]}})",
+           R"({"type":"request","seq":3,"command":"variables","arguments":{"variablesReference":1e18,"start":-1e18,"count":1e18}})",
+           R"({"type":"request","seq":4,"command":"stackTrace","arguments":{"startFrame":1e18,"levels":-1e18}})",
+           R"({"type":"request","seq":5,"command":"setVariable","arguments":{"variablesReference":1e18,"name":"x","value":"1"}})",
+       }) {
+    s.outq.clear();
+    dbg::dispatch_message(payload);  // must not abort
+    ASSERT_FALSE(s.outq.empty()) << "no response for: " << payload;
+  }
+  s.attached = false;
+  s.authed = false;
+  s.stopped = false;
+  s.outq.clear();
+  dbg::breakpoints_clear_all();
   dbg::update_flags();
 }

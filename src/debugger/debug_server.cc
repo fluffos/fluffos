@@ -238,22 +238,24 @@ void handle_request(const djson& msg) try {
       send_response(msg, false, nullptr, "not stopped");
     } else {
       send_response(msg, true,
-                    build_stack_trace(args.value("startFrame", 0), args.value("levels", 0)),
+                    build_stack_trace(json_arg_int(args, "startFrame", 0),
+                                      json_arg_int(args, "levels", 0)),
                     nullptr);
     }
   } else if (cmd == "scopes") {
     if (!s.stopped) {
       send_response(msg, false, nullptr, "not stopped");
     } else {
-      send_response(msg, true, build_scopes(args.value("frameId", 0)), nullptr);
+      send_response(msg, true, build_scopes(json_arg_int(args, "frameId", 0)), nullptr);
     }
   } else if (cmd == "variables") {
     if (!s.stopped) {
       send_response(msg, false, nullptr, "not stopped");
     } else {
       send_response(msg, true,
-                    build_variables(args.value("variablesReference", 0), args.value("start", 0),
-                                    args.value("count", 0)),
+                    build_variables(json_arg_int(args, "variablesReference", 0),
+                                    json_arg_int(args, "start", 0),
+                                    json_arg_int(args, "count", 0)),
                     nullptr);
     }
   } else if (cmd == "setVariable") {
@@ -289,8 +291,8 @@ void handle_request(const djson& msg) try {
     send_response(msg, true, build_loaded_sources(), nullptr);
   } else if (cmd == "fluffos_objects") {
     send_response(msg, true,
-                  build_objects_list(args.value("filter", ""), args.value("start", 0),
-                                     args.value("count", 0)),
+                  build_objects_list(args.value("filter", ""), json_arg_int(args, "start", 0),
+                                     json_arg_int(args, "count", 0)),
                   nullptr);
   } else if (cmd == "fluffos_object") {
     send_response(msg, true, build_object_info(args.value("name", "")), nullptr);

@@ -735,7 +735,7 @@ djson build_variables(int ref, int start, int count) {
 }
 
 djson set_variable_request(const djson& args, std::string& err) {
-  int ref = args.value("variablesReference", 0);
+  int ref = json_arg_int(args, "variablesReference", 0);
   std::string name = args.value("name", "");
   std::string value_text = args.value("value", "");
 
@@ -749,10 +749,41 @@ djson set_variable_request(const djson& args, std::string& err) {
     return djson();
   }
 
+  // Whatever `target` holds right now is about to be freed by assign_svalue().
+  // If it owns heap storage (i.e. it's anything other than a plain int/float),
+  // freeing it can leave a dangling variablesReference: the handle table
+  // borrows raw pointers INTO live LPC values on the premise that "while
+  // stopped nothing mutates or frees LPC values" (see the file header), and a
+  // write is the one operation that breaks that premise. Example: the client
+  // expands a local array `a` (handle H borrows a->u.arr), then writes a scalar
+  // over `a` (or over a parent element that aliased it); assign_svalue() frees
+  // the array, and the next variables/setVariable on H reads array_t::size /
+  // mapping_t::table off freed storage -- a heap-use-after-free (memory
+  // disclosure or crash). A plain int/float owns nothing, so a scalar->scalar
+  // write can dangle nothing and must NOT disturb sibling handles (the common
+  // "edit several variables in one scope" workflow relies on them surviving).
+  bool old_owned_storage = (target->type != T_NUMBER && target->type != T_REAL);
+
   assign_svalue(target, &new_val);
   free_svalue(&new_val, "dbg setVariable");
 
-  return djson{{"value", preview(target)}, {"type", type_name(target)}, {"variablesReference", 0}};
+  // Build the response before any handle invalidation -- `target` itself stays
+  // valid (a live slot in an array/frame/mapping/object we only wrote
+  // through); it now holds the new scalar.
+  djson result{{"value", preview(target)}, {"type", type_name(target)}, {"variablesReference", 0}};
+
+  // Drop every handle if the overwrite freed heap storage. This is
+  // conservative -- it also invalidates handles that didn't alias the freed
+  // value -- but aliasing can't be determined cheaply, a stale ref then just
+  // fails the bounds check cleanly, and a DAP client re-fetches handles via
+  // scopes/variables after a structural change anyway. The new value is always
+  // a scalar (parse_literal only makes int/float/string), so the response
+  // needs no fresh handle of its own.
+  if (old_owned_storage) {
+    g_session.handles.clear();
+  }
+
+  return result;
 }
 
 djson build_loaded_sources() {

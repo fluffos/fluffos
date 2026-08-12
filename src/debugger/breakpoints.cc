@@ -286,11 +286,15 @@ djson set_breakpoints_request(const djson& args) {
   std::vector<ReqBp> reqs;
   if (args.contains("breakpoints")) {
     for (const auto& b : args["breakpoints"]) {
-      reqs.push_back({b.value("line", 0), b.value("hitCondition", "")});
+      // line MUST go through json_arg_int: a float / oversized-integer literal
+      // reaches nlohmann's static_cast<int>(float) UB, which aborts under the
+      // sanitizer/CI build and is NOT catchable by dispatch's try/catch.
+      reqs.push_back({json_arg_int(b, "line", 0),
+                      b.is_object() ? b.value("hitCondition", "") : std::string()});
     }
   } else if (args.contains("lines")) {
     for (const auto& l : args["lines"]) {
-      reqs.push_back({l.get<int>(), ""});
+      reqs.push_back({json_to_int(l, 0), ""});
     }
   }
 
