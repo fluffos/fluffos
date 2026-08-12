@@ -175,3 +175,29 @@ set_tests_properties(lpcshell-predefine PROPERTIES
         PASS_REGULAR_EXPRESSION "LPCSHELL_PREDEFINED"
         TIMEOUT 120
         LABELS "lpcshell")
+
+# Regression guard for a heap-use-after-free at clean process exit: a
+# statement that compiles successfully but produces a warning WITH an
+# attached fix-it (compiler_pending_fixits -> Diagnostic::fixits, a
+# ScratchVector), and nothing evaluated afterward. compiler_diags (holding
+# that Diagnostic) is only ever dropped at the TOP of the next Eval() --
+# there is no next call here, so it is still holding it, backed by
+# Session::arena, when main() returns and destroys `session`. Without
+# Session::~Session() calling compiler_drop_arena_state() first,
+# ~ScratchArena() frees the arena's chunks while compiler_diags' elements
+# still reference them, and destroying compiler_diags at static-teardown
+# (g_compile's) reads freed memory -- confirmed under ASan as a
+# heap-use-after-free in Diagnostic::FixIt::~FixIt().
+#
+# (A warning with only plain ScratchString fields -- no populated
+# ScratchVector member such as notes/expansions/fixits/ranges/included_from
+# -- would NOT reproduce this: destroying a ScratchString never dereferences
+# its own buffer, only a non-empty ScratchVector's destructor walks its
+# arena-allocated backing array to destroy each element.)
+add_test(NAME lpcshell-warning-at-exit
+        COMMAND $<TARGET_FILE:lpcshell> etc/config.test lpcshell/warning_at_exit.lpcs
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(lpcshell-warning-at-exit PROPERTIES
+        PASS_REGULAR_EXPRESSION "Unknown escape sequence"
+        TIMEOUT 120
+        LABELS "lpcshell")

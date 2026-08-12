@@ -45,7 +45,7 @@
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
 
-#include "scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 #include "symbol.h"
 
