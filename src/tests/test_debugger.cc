@@ -645,6 +645,56 @@ TEST_F(DebuggerTest, SetVariableWritesMappingValue) {
   dbg::g_session.handles.clear();
 }
 
+// Regression: the DAP `variables` request carries client-controlled
+// `start`/`count` ints straight from JSON. build_variables() paged with
+// `for (i = start; i < end; i++)` where `end = min(size, start + count)` and
+// NEVER clamped `start` to >= 0. A hostile-or-buggy attached client sending
+// {"start":-1} (or any negative start) drove the array/class/buffer/local/
+// global render loops to index BEFORE element 0 -- an out-of-bounds heap read
+// whose bytes were then serialized straight back to the client as a variable
+// preview (memory disclosure), and could crash the driver outright. A large
+// positive `start` additionally overflowed the signed `start + count`. An
+// attached client is already privileged (and loopback attaches need no
+// password), so this is a robustness/OOB-read fix rather than an auth-boundary
+// one, but it MUST NOT read out of bounds regardless. ASan/UBSan over this
+// test is what actually proves the negative index is never dereferenced.
+TEST_F(DebuggerTest, BuildVariablesClampsHostileStartWithoutReadingOutOfBounds) {
+  object_t* ob = LoadFixture("mixed *arr = ({100, 200, 300});\n",
+                             "dbgtest_vars_hostile_start", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* arr_sv = fixture_global(ob, "arr");
+  ASSERT_NE(arr_sv, nullptr);
+  ASSERT_EQ(arr_sv->type, T_ARRAY);
+
+  dbg::g_session.handles.push_back({dbg::VarHandle::kArray, 0, arr_sv->u.arr});
+  int ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  // Negative start clamps to 0: the full array renders, in order, and no index
+  // before [0] is ever touched.
+  dbg::djson neg = dbg::build_variables(ref, /*start=*/-1, /*count=*/100);
+  ASSERT_TRUE(neg.contains("variables"));
+  ASSERT_EQ(neg["variables"].size(), 3u) << neg.dump();
+  EXPECT_EQ(neg["variables"][0]["value"].get<std::string>(), "100");
+  EXPECT_EQ(neg["variables"][2]["value"].get<std::string>(), "300");
+
+  // Deeply negative start with a small count: still clamped to [0, 3), never a
+  // window of negative indices.
+  dbg::djson deep = dbg::build_variables(ref, /*start=*/-1000000, /*count=*/5);
+  EXPECT_EQ(deep["variables"].size(), 3u) << deep.dump();
+
+  // Huge positive start must not overflow start + count and must page past the
+  // end cleanly (empty), not wrap to a negative window.
+  dbg::djson big = dbg::build_variables(ref, /*start=*/2147483647, /*count=*/100);
+  EXPECT_EQ(big["variables"].size(), 0u) << big.dump();
+
+  // The array itself must be completely untouched by any of the above.
+  EXPECT_EQ(arr_sv->u.arr->item[0].u.number, 100);
+  EXPECT_EQ(arr_sv->u.arr->item[1].u.number, 200);
+  EXPECT_EQ(arr_sv->u.arr->item[2].u.number, 300);
+
+  dbg::g_session.handles.clear();
+}
+
 // Object/file introspection (fluffos_objects / fluffos_object / fluffos_files
 // custom DAP requests, §8.3): unlike everything above, these work on a
 // LIVE, RUNNING mud -- no stopped frame or handle table involved -- so

@@ -39,6 +39,24 @@ constexpr size_t kStringPreviewCap = 200;
 constexpr int kDefaultPage = 1000;
 constexpr size_t kMaxSourceBytes = 2u << 20;
 
+// Half-open page end for a [start, end) paging loop over a container of `size`
+// elements. The DAP `variables` request carries client-controlled `start`/
+// `count` ints straight from JSON; a negative `start` (e.g. {"start":-1}) would
+// otherwise drive the render loops below to index BEFORE element 0 -- an
+// out-of-bounds read whose bytes get serialized straight back to the client --
+// and a huge `start` would overflow `start + count` (signed UB). Callers must
+// pass an already-non-negative `start` (clamp via the sibling helper); this
+// computes `end` in wide arithmetic so it never exceeds `size` and never
+// overflows.
+inline int page_end(int size, int start, int count) {
+  long long e = static_cast<long long>(start) + count;
+  long long lim = static_cast<long long>(size);
+  return static_cast<int>(e < lim ? e : lim);
+}
+
+// Clamp a client-supplied paging `start` to a sane non-negative value.
+inline int page_start(int start) { return start < 0 ? 0 : start; }
+
 struct FrameRegs {
   control_stack_t* entry = nullptr;  // identity: framekind + fr live here
   program_t* prog = nullptr;         // live registers of this frame:
@@ -265,7 +283,8 @@ void render_globals(object_t* ob, int start, int count, djson& out) {
     return;
   }
   int total = ob->prog->num_variables_total;
-  int end = std::min(total, start + count);
+  start = page_start(start);
+  int end = page_end(total, start, count);
   for (int i = start; i < end; i++) {
     char* vname = variable_name(ob->prog, i);
     std::string name = vname ? vname : ("global" + std::to_string(i));
@@ -560,6 +579,7 @@ djson build_stack_trace(int start, int levels) {
   if (levels <= 0) {
     levels = total;
   }
+  start = page_start(start);
   djson frames = djson::array();
   for (int i = start; i < total && static_cast<int>(frames.size()) < levels; i++) {
     FrameRegs f;
@@ -629,6 +649,7 @@ djson build_variables(int ref, int start, int count) {
   if (count <= 0) {
     count = kDefaultPage;
   }
+  start = page_start(start);
   VarHandle h = s.handles[idx];
 
   switch (h.kind) {
@@ -648,7 +669,7 @@ djson build_variables(int ref, int start, int count) {
       int n = args ? na : (nl < 0 ? 0 : nl);
       const char* prefix = args ? "arg" : "local";
       svalue_t* base = args ? f.fp_ : f.fp_ + na;
-      int end = std::min(n, start + count);
+      int end = page_end(n, start, count);
       for (int i = start; i < end; i++) {
         int slot = args ? i : (na + i);
         const char* real = local_name_for(f, slot);
@@ -670,7 +691,7 @@ djson build_variables(int ref, int start, int count) {
     case VarHandle::kArray:
     case VarHandle::kClass: {
       auto* arr = static_cast<array_t*>(h.ptr);
-      int end = std::min(arr->size, start + count);
+      int end = page_end(arr->size, start, count);
       for (int i = start; i < end; i++) {
         const char* prefix = (h.kind == VarHandle::kClass) ? "member " : "";
         vars.push_back(render_var(prefix + std::string("[") + std::to_string(i) + "]",
@@ -681,7 +702,7 @@ djson build_variables(int ref, int start, int count) {
     case VarHandle::kMapping: {
       auto* m = static_cast<mapping_t*>(h.ptr);
       int seen = 0;
-      int end = start + count;
+      long long end = static_cast<long long>(start) + count;
       for (unsigned int b = 0; b < m->table_size && seen < end; b++) {
         for (mapping_node_t* node = m->table[b]; node && seen < end; node = node->next) {
           if (seen >= start) {
@@ -699,7 +720,7 @@ djson build_variables(int ref, int start, int count) {
     }
     case VarHandle::kBuffer: {
       auto* buf = static_cast<buffer_t*>(h.ptr);
-      int end = std::min(static_cast<int>(buf->size), start + count);
+      int end = page_end(static_cast<int>(buf->size), start, count);
       for (int i = start; i < end; i++) {
         djson var = {{"name", "[" + std::to_string(i) + "]"},
                      {"value", std::to_string(buf->item[i])},
@@ -752,6 +773,8 @@ djson build_objects_list(const std::string& filter, int start, int count) {
   if (count <= 0) {
     count = kDefaultPage;
   }
+  start = page_start(start);
+  long long hi = static_cast<long long>(start) + count;
   djson objects = djson::array();
   int matched = 0;
   for (object_t* ob = obj_list; ob; ob = ob->next_all) {
@@ -761,7 +784,7 @@ djson build_objects_list(const std::string& filter, int start, int count) {
     if (!filter.empty() && !strstr(ob->obname, filter.c_str())) {
       continue;
     }
-    if (matched >= start && matched < start + count) {
+    if (matched >= start && matched < hi) {
       objects.push_back({{"name", std::string("/") + ob->obname},
                          {"program", ob->prog ? std::string("/") + ob->prog->filename : ""},
                          {"clone", (ob->flags & O_CLONE) != 0}});
