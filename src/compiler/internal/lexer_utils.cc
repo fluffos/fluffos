@@ -494,8 +494,11 @@ std::string lpc_lex_error_context_block(void) {
 std::vector<std::string> prepare_logs(const char* error_file, int line, const char* what, int flag,
                                       bool include_error_context) {
   std::vector<std::string> logs;
+  // Capitalized to match report_compile_diagnostic()'s severity marker
+  // (compiler.cc) -- see the comment there for why this stays capitalized
+  // instead of following clang's lowercase convention.
   logs.emplace_back(fmt::format(FMT_STRING("/{}:{}: {}: {}\n"), error_file, line,
-                                flag ? "warning" : "error", what));
+                                flag ? "Warning" : "Error", what));
 
   if (include_error_context) {
     std::string block = lpc_lex_error_context_block();

@@ -284,7 +284,18 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   }
   out += ": ";
   out += d.is_warning ? c_warn : c_err;
-  out += d.is_warning ? "warning: " : "error: ";
+  // Capitalized "Warning"/"Error" (not clang's lowercase convention) is
+  // deliberate: APPLY_LOG_ERROR hands mudlib code only this rendered
+  // string plus the file name, no separate machine-readable severity
+  // field, so every mudlib's log_error()-equivalent has to detect
+  // severity by substring match. This corpus's mudlibs are old
+  // (MudOS-era) and were near-universally written checking for
+  // capitalized "Warning" -- one mudlib corpus's AGENTS.md §7.10 catalogs
+  // this exact case mismatch independently breaking warning-vs-error
+  // handling across dozens of unrelated lineages once the driver moved
+  // to lowercase. Keep this capitalized for that whole corpus's sake
+  // rather than matching modern compiler convention.
+  out += d.is_warning ? "Warning: " : "Error: ";
   out += c_off;
   out += c_bold;
   out.append(d.message.data(), d.message.size());

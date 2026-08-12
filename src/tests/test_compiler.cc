@@ -1385,7 +1385,7 @@ TEST(Diagnostics, CapturesErrorPositionAndMessage) {
   EXPECT_TRUE(d.notes.empty());
   // Rendering: "file:2: error: ..." on one line.
   std::string r = render_diagnostic(d);
-  EXPECT_NE(r.find(":2: error:"), std::string::npos);
+  EXPECT_NE(r.find(":2: Error:"), std::string::npos);
   EXPECT_NE(r.find("boom here"), std::string::npos);
 }
 
@@ -1472,7 +1472,7 @@ TEST(Diagnostics, IncludeProvenanceNote) {
   std::string r = render_diagnostic(d);
   EXPECT_NE(r.find("In file included from "), std::string::npos);
   EXPECT_NE(r.find(":3:\n"), std::string::npos);
-  EXPECT_LT(r.find("In file included from"), r.find("error:"));
+  EXPECT_LT(r.find("In file included from"), r.find("Error:"));
 }
 
 TEST(Diagnostics, ExpansionChainNote) {
@@ -1523,7 +1523,7 @@ TEST(Diagnostics, ExpansionInsideIncludeCombined) {
   ASSERT_FALSE(d.expansions.empty());
   EXPECT_EQ(d.expansions[0].macro_name, "KABOOM");
   std::string r = render_diagnostic(d);
-  EXPECT_LT(r.find("In file included from"), r.find("error:"));
+  EXPECT_LT(r.find("In file included from"), r.find("Error:"));
   EXPECT_NE(r.find(": note: expanded from macro 'KABOOM'"), std::string::npos);
 }
 
@@ -1539,7 +1539,7 @@ TEST(Diagnostics, ColumnAndSnippetCaptured) {
   EXPECT_EQ(d.column, 10);
   EXPECT_NE(d.snippet.find("int bb ="), std::string::npos);
   std::string r = render_diagnostic(d);
-  EXPECT_NE(r.find(":2:10: error:"), std::string::npos);
+  EXPECT_NE(r.find(":2:10: Error:"), std::string::npos);
   // Caret line: two-space indent + (column-1) spaces + '^'.
   // clang gutter: "      | " prefix, caret at column 10.
   EXPECT_NE(r.find("\n      | " + std::string(9, ' ') + "^"), std::string::npos);
