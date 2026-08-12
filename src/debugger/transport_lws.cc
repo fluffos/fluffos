@@ -204,7 +204,20 @@ void transport_kill_client(bool flush) {
     lws_callback_on_writable(s.client);
     return;
   }
-  lws_set_timeout(s.client, pending_timeout::PENDING_TIMEOUT_KILLED_BY_PARENT, LWS_TO_KILL_ASYNC);
+  // Close synchronously, NOT LWS_TO_KILL_ASYNC. An async kill only takes
+  // effect at lws's next internal timeout check, which is driven by lws's
+  // own periodic scheduler -- but this context lives on a PRIVATE libevent
+  // base that we service exclusively via explicit EVLOOP_NONBLOCK pumps, so
+  // that scheduler never runs and an async kill is never processed (the
+  // connection lingers forever; the auth-timeout in debugger_tick() fires
+  // every tick but the socket never actually goes away). Every caller that
+  // reaches this line does so from OUTSIDE an lws callback -- the auth
+  // timeout (a plain timer/hook context) and shutdown; the in-callback
+  // close paths (bad token / veto / disconnect) all queue a response first
+  // and take the writable-drain-then-return-(-1) path above instead -- so
+  // the "wsi is not the one currently being serviced" precondition for a
+  // synchronous close holds.
+  lws_set_timeout(s.client, pending_timeout::PENDING_TIMEOUT_KILLED_BY_PARENT, LWS_TO_KILL_SYNC);
 }
 
 }  // namespace dbg
