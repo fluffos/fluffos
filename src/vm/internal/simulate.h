@@ -1,6 +1,7 @@
 #ifndef SIMULATE_H
 #define SIMULATE_H
 
+#include "base/internal/scratchpad.h"
 #include <string>
 
 #include "vm/internal/base/machine.h"
@@ -35,8 +36,12 @@ int get_char(svalue_t*, int, int, svalue_t*);
 char* check_name(char*);
 int filename_to_obname(const char*, char*, int);
 object_t* load_object(const char*, int);
+/* `arena`, when given, is used for the compile's transient allocations and
+ * is left untouched -- the CALLER owns it, so compiler output (diagnostics)
+ * stays readable after this returns. lpcshell relies on that; the driver
+ * passes nullptr and gets a per-compile arena that dies with the call. */
 object_t* load_object_from_source(const std::string& source, const char* virtual_name,
-                                  int callcreate);
+                                  int callcreate, ScratchArena* arena = nullptr);
 int recompile_object(object_t* target);
 object_t* clone_object(const char*, int);
 object_t* environment(svalue_t*);

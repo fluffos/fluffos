@@ -36,7 +36,7 @@
 #include "compiler/internal/lexer.h"
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lexer_rules_pp.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/stage_output.h"
 #include "mainlib.h"
 #include "vm/internal/base/interpret.h"
@@ -2473,4 +2473,102 @@ TEST(StageOutput, LoadFailureReturnsFalseAndCleansUp) {
   program_t* good = compile_file("int k() { return 3; }\n", "/after_stage_fail");
   ASSERT_NE(good, nullptr);
   deallocate_program(good);
+}
+
+// ---------------------------------------------------------------------------
+// A compile BORROWS its arena; the caller owns the lifetime.
+//
+// When the compiler reset the arena at the end of a compile it was freeing
+// its own output before the caller had read it -- which is why Diagnostic
+// records had to be heap-allocated. Handing compile_file() an arena inverts
+// that: it allocates there and leaves it untouched, so the owner decides
+// when the memory dies.
+TEST(CompileArenaOwnership, CompileLeavesTheCallersArenaIntact) {
+  ensure_compile_env();
+
+  ScratchArena arena;
+  {
+    ScratchArenaBinding const bind(arena);
+    EXPECT_EQ(0u, scratch_stats().cycle_bytes) << "fresh arena";
+  }
+
+  program_t* prog = compile_file("int f() { return 1; }", "/arena_owned",
+                                 &g_driver_vm_context, &arena);
+  ASSERT_NE(prog, nullptr);
+
+  {
+    ScratchArenaBinding const bind(arena);
+    // The compile's transients are STILL there after compile_file returned:
+    // it neither reset nor freed the arena. This is the property that lets
+    // compiler output outlive the compile.
+    EXPECT_GT(scratch_stats().cycle_bytes, 0u)
+        << "compile must not reset an arena it does not own";
+    EXPECT_EQ(0u, scratch_stats().resets) << "compile must not reset the caller's arena";
+
+    // ...and the owner is the one who reclaims it.
+    arena.reset();
+    EXPECT_EQ(0u, scratch_stats().cycle_bytes);
+    EXPECT_EQ(1u, scratch_stats().resets);
+  }
+
+  deallocate_program(prog);
+}
+
+// compiler_drop_arena_state()'s contract: it MUST run immediately before an
+// arena that compiler_diags/pending_* may still reference is reset or
+// destroyed. Skipping it is a real heap-use-after-free, confirmed under ASan
+// by constructing exactly that inversion (destroy a ScratchArena that still
+// backs a non-empty compiler_diags entry, without calling this first): a
+// crash in Diagnostic::~Diagnostic(), reading the ScratchVector<ScratchString>
+// `notes` member's already-freed backing array. (A bare ScratchString never
+// dereferences its buffer to destroy itself -- deallocate is a no-op -- so
+// the Diagnostic needs a non-empty ScratchVector member, e.g. from a macro
+// redefinition's "previous definition" note, to expose it.)
+//
+// main_lpcshell.cc's Session::arena hit this for real, at process exit: a
+// warning as the session's last evaluation, then EOF, leaves compiler_diags
+// non-empty (only the NEXT Eval() drops it) when `session` is destroyed --
+// fixed by Session::~Session() calling compiler_drop_arena_state() before
+// `arena` (declared after it, so destroyed first).
+//
+// The shared default arena has the same shape, only broader: every `exit()`
+// call in the driver runs static destructors, and scratch_default_arena()'s
+// function-local static -- constructed lazily on the driver's first compile,
+// necessarily after g_compile's static-init-time construction -- would be
+// destroyed before g_compile by C++'s reverse-construction-order rule
+// (confirmed by tracing both destructors directly). It usually gets away
+// with it in practice: chunk 0 is almost always the persistent static
+// block, and freeing that one is a deliberate no-op, so a small compile's
+// diagnostics riding on it are untouched by the destructor -- which is why
+// a synthetic boot-failure repro through the real driver did NOT reproduce
+// this the way the two cases above did. The hazard is live once some
+// compile pushes the arena's retained chunk count past 1 (a genuinely heap
+// chunk survives to be freed) or spills into an overflow chunk, and unlike
+// Session::arena there is no single call site to fix it at -- several
+// exit() calls sit downstream of a compile with no later one guaranteed to
+// have dropped compiler_diags first. So scratch_default_arena() is now a
+// deliberately-leaked singleton instead, sidestepping the ordering question
+// by never running its destructor at all. See its definition.
+//
+// This test exercises the FOLLOWED contract, not the violation: an ASan abort
+// would take down the whole test binary rather than just failing one case.
+TEST(CompileArenaOwnership, DropArenaStateBeforeArenaDiesIsSafe) {
+  ensure_compile_env();
+  ScratchArena arena;
+  // Macro redefinition attaches a compiler_pending_notes entry (a
+  // ScratchVector<ScratchString>, non-empty) to the captured Diagnostic.
+  program_t* prog = compile_file("#define FOO 1\n#define FOO 2\nint f() { return 1; }",
+                                 "/arena_owned_notes", &g_driver_vm_context, &arena);
+  ASSERT_NE(prog, nullptr);
+  ASSERT_FALSE(compiler_diags.empty()) << "expected the macro-redefinition warning";
+  bool has_note = false;
+  for (const auto& d : compiler_diags) has_note |= !d.notes.empty();
+  ASSERT_TRUE(has_note) << "expected a non-empty ScratchVector<ScratchString> notes member";
+  deallocate_program(prog);
+
+  // Following the contract: drop the arena-backed records before the arena
+  // that backs them goes away.
+  compiler_drop_arena_state();
+  EXPECT_TRUE(compiler_diags.empty());
+  // `arena` destructs at end of scope now that nothing references it.
 }

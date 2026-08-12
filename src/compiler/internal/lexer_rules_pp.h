@@ -21,7 +21,7 @@
 #include <unordered_map>
 
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 // PpMacro / CondState / LpcMacroTable live in compiler.h (they are
 // CompileState members).
