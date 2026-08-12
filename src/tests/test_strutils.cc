@@ -235,3 +235,47 @@ TEST(EGCAsciiFastPath, CarriageReturnFallsBackToIcu) {
   EXPECT_EQ(static_cast<size_t>(icu_count(s, len)), it.count());
   EXPECT_EQ(static_cast<size_t>(len - 1), it.count());  // CRLF counts as one
 }
+
+// ---------------------------------------------------------------------------
+// MSTR_ASCII tag lifecycle on the one string-block allocation that does NOT
+// go through int_new_string()/alloc_new_shared_string(): int_string_unlink(),
+// which raw-DMALLOCs a fresh header when detaching a multiply-referenced
+// string. Before the fix it copied size/ref into the new header but left the
+// ascii field as heap garbage -- garbage that happened to equal
+// MSTR_ASCII_YES on a non-ASCII string would make sizeof() answer from the
+// byte length. This pins the invariant that the unlinked copy's tag is a
+// defined value and that the public predicate answers correctly through it.
+// (The uninitialized read itself is what MSan would flag pre-fix.)
+#include "base/internal/stralloc.h"
+
+TEST(MstrAsciiTag, StringUnlinkProducesADefinedTag) {
+  // Non-ASCII case: cache NO on the original, then unlink a second reference.
+  char* s = new_string(6, "test: unlink non-ascii");
+  memcpy(s, "\xe4\xbd\xa0\xe5\xa5\xbd", 7);  // "你好" + NUL, 6 bytes
+  EXPECT_FALSE(u8_string_is_ascii_cached(s, 6, true));
+  EXPECT_EQ(MSTR_ASCII_NO, MSTR_ASCII(s));
+
+  MSTR_REF(s)++;  // simulate a second reference, as unlink_string_svalue sees
+  char* copy = string_unlink(s, "test: unlink non-ascii");
+  ASSERT_NE(s, copy);
+  unsigned char tag = MSTR_ASCII(copy);
+  EXPECT_TRUE(tag == MSTR_ASCII_UNKNOWN || tag == MSTR_ASCII_NO)
+      << "unlinked copy's ascii tag is undefined garbage: " << int(tag);
+  EXPECT_FALSE(u8_string_is_ascii_cached(copy, 6, true));
+  FREE_MSTR(copy);
+  FREE_MSTR(s);
+
+  // ASCII case: the copy must not come out pre-tagged NO-or-garbage either.
+  char* a = new_string(3, "test: unlink ascii");
+  memcpy(a, "abc", 4);
+  EXPECT_TRUE(u8_string_is_ascii_cached(a, 3, true));
+  MSTR_REF(a)++;
+  char* acopy = string_unlink(a, "test: unlink ascii");
+  ASSERT_NE(a, acopy);
+  tag = MSTR_ASCII(acopy);
+  EXPECT_TRUE(tag == MSTR_ASCII_UNKNOWN || tag == MSTR_ASCII_YES)
+      << "unlinked copy's ascii tag is undefined garbage: " << int(tag);
+  EXPECT_TRUE(u8_string_is_ascii_cached(acopy, 3, true));
+  FREE_MSTR(acopy);
+  FREE_MSTR(a);
+}

@@ -156,4 +156,36 @@ void do_tests() {
     ASSERT_EQ("\xc3\xa9", result);
     ASSERT_EQ(10, sizeof(s));
   }
+
+  // --- replace_string()'s single-byte in-place branch (pattern length 1,
+  // replacement length 1) writes the replacement byte straight into the
+  // unlinked buffer and, alone among the in-place branches, never reaches
+  // extend_string() -- so nothing resets the cached ASCII tag. Every valid
+  // 1-byte replacement is ASCII, but "\r" is the one that breaks the
+  // byte==cluster identity: splicing it in front of an existing "\n" forms a
+  // single CRLF cluster while the byte length is unchanged.
+  //
+  // The argument is a runtime `a + b` temp: a fresh STRING_MALLOC with
+  // ref==1, tagged ASCII by concat propagation, which unlink_string_svalue()
+  // passes through untouched -- exactly the shape that carries a stale tag
+  // out of the efun. ---
+  {
+    string a = "xy";
+    string b = "\nz";
+    s = replace_string(a + b, "y", "\r");  // "x\r\nz": 4 bytes, 3 clusters
+    ASSERT_EQ(3, sizeof(s));               // 'x', CRLF, 'z' -- not 4
+  }
+
+  // --- map() over a string (map_string) writes each callback return value
+  // straight into the unlinked buffer -- any byte, including '\r' -- and
+  // never reallocates, so nothing on that path resets the cached ASCII tag
+  // either. Same stale-tag shape as above: ASCII-tagged ref==1 temp in,
+  // CR spliced in place, byte length unchanged. ---
+  {
+    string a = "xy";
+    string b = "\nz";
+    s = map(a + b, (: $1 == 'y' ? 13 : 0 :));  // 'y' -> '\r'
+    ASSERT_EQ("x\r\nz", s);
+    ASSERT_EQ(3, sizeof(s));  // 'x', CRLF, 'z' -- not 4
+  }
 }

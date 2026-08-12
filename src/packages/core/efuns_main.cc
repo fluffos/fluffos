@@ -2044,6 +2044,14 @@ void f_replace_string() {
           }
           src++;
         }
+        // Unlike every other in-place branch of this efun, this one never
+        // reaches extend_string() (which resets the cached ASCII tag), yet it
+        // just spliced *replace bytes into the unlinked STRING_MALLOC buffer.
+        // A valid 1-byte replacement is always ASCII, but "\r" is too -- and
+        // splicing CR into a CR-free string tagged MSTR_ASCII_YES breaks the
+        // byte==cluster identity ("\r\n" is one grapheme cluster), leaving
+        // sizeof() to answer from the stale tag. Reset so it re-derives.
+        MSTR_ASCII(arg->u.string) = MSTR_ASCII_UNKNOWN;
       } else { /* rlen is zero */
         while (*src) {
           if (*src++ == *pattern) {

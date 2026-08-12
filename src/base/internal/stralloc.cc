@@ -467,6 +467,13 @@ char* int_string_unlink(const char* str)
     ADD_NEW_STRING(mbt->size, sizeof(malloc_block_t));
   }
   newmbt->ref = 1;
+  // This is the one string-block allocation that goes through raw DMALLOC
+  // instead of int_new_string()/alloc_new_shared_string(), so the ascii
+  // field is heap garbage unless set here. Garbage that happens to equal
+  // MSTR_ASCII_YES on a non-ASCII string would make sizeof() answer from
+  // the byte length. UNKNOWN (not a copy of mbt->ascii) because every
+  // caller unlinks precisely in order to mutate the bytes next.
+  newmbt->ascii = MSTR_ASCII_UNKNOWN;
   CHECK_STRING_STATS;
 
   return reinterpret_cast<char*>(newmbt + 1);
