@@ -23,8 +23,10 @@ title: calls / catch
     如果没有错误会返回 0，如果有标准错误，会返回一个以 `*` 开头的
     包括错误信息的字符串。主体表达式本身的值会被丢弃。
 
-    外部函数 throw() 用来马上抛出一个错误并返回非零值，可以和 catch
-    配合使用。
+    外部函数 throw() 也可以用来立即返回任意值，可以和 catch 配合使用。
+    唯一的例外是 0：它并不会被拒绝，只是无法被检测到 —— catch() 本来
+    就用返回 0 表示“没有出错”，所以 throw(0) 和主体正常执行完毕无法
+    区分。
 
     在 catch 语句块中使用 `break` 或 `continue` 跳出是编译期错误。
 
@@ -56,6 +58,36 @@ title: calls / catch
     }
 
     // ERR: "*Error in loading object '/u/g/gesslar/two'"
+
+    // 捕获到的值不一定是错误消息。throw() 会把收到的值原样交回，
+    // 因此用一个类可以表示一种结构清晰的失败，捕获方能逐个字段
+    // 检查它，而不必去解析字符串。
+    class failure {
+        string kind ;
+        mixed detail ;
+    }
+
+    private void charge(object who, int amount) {
+        int have = who->query_coins() ;
+
+        if(have < amount)
+            throw(new(class failure,
+                      kind: "insufficient_funds",
+                      detail: amount - have)) ;
+
+        who->add_coins(-amount) ;
+    }
+
+    void example3(object who, int price) {
+        mixed err = catch( charge(who, price) ) ;
+
+        // 必须先判断 classp()：err 同样有可能是驱动程序的错误字符串，
+        // 这种情况下 && 会在这里短路。
+        if(classp(err) && err.kind == "insufficient_funds")
+            write("你还差 " + err.detail + " 个金币。\n") ;
+        else if(err)
+            throw(err) ;    // 不该由我们处理 —— 继续往上传
+    }
     ```
 
 ### 参考

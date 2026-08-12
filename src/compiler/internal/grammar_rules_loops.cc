@@ -222,6 +222,33 @@ void rule_return_expr(parse_node_t** result, parse_node_t* expr) {
     p = get_two_types(p, end, expr->type, exact_types);
     yyerror(buf);
   }
+
+  /* Coerce the returned value to the function's declared return type, the
+   * same way rule_expr_assign() coerces an '='/op= RHS to a declared-type
+   * lvalue (grammar_rules_exprs.cc) -- otherwise a function declared
+   * `int` whose return expression is actually a float (e.g. `return
+   * sqrt(x);`) hands back a genuine T_REAL svalue at runtime: compatible_types()
+   * intentionally treats int/float as compatible (so the yyerror above never
+   * fires for this), and nothing else enforced the declared type. A caller
+   * doing `int_var += that_call()` then hit F_ADD_EQ's untyped-lvalue
+   * promotion path meant only for mixed/mapping slots (issue #1331) --
+   * silently promoting a genuinely int-declared variable to float.
+   * Exact-equality checks (matching rule_expr_assign()'s convention, not a
+   * TYPE_MOD_ARRAY-inclusive form) correctly exclude array return types
+   * (`int *`/`float *`) -- this is scalar-only, same as the op= coercion. */
+  if (exact_types == TYPE_REAL && (expr->type == TYPE_NUMBER || expr->kind == NODE_NUMBER)) {
+    /* The second disjunct mirrors do_promotions()'s own check
+     * (compiler.cc): CREATE_NUMBER() gives a literal `0` node type
+     * TYPE_ANY, not TYPE_NUMBER (0 doubles as LPC's untyped "nil" across
+     * every type), so `float f() { return 0; }` would otherwise miss this
+     * branch entirely and fall through to the literal-zero fast path
+     * below unpromoted -- which returns an int-typed T_NUMBER 0 at
+     * runtime, not a T_REAL 0.0. */
+    expr = promote_to_float(expr);
+  } else if (exact_types == TYPE_NUMBER && expr->type == TYPE_REAL) {
+    expr = promote_to_int(expr);
+  }
+
   if (IS_NODE(expr, NODE_NUMBER, 0)) {
     CREATE_RETURN(*result, 0);
   } else {

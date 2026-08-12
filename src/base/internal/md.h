@@ -5,6 +5,7 @@
 
 #include <inttypes.h>
 #include <string>
+#include <string_view>
 
 #include "base/internal/options_incl.h"
 #include "outbuf.h"
@@ -97,7 +98,33 @@ int MDfree(md_node_t*);
 void set_tag(const void*, int);
 #endif
 
-void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::string desc);
+/* The ref journal is a DEBUGMALLOC_EXTENSIONS-only diagnostic, but its call
+ * sites sit in the hottest paths in the VM (assign_svalue_no_free(),
+ * int_free_svalue(), int_ref_string(), ...) and pass __CURRENT_FILE_LINE__,
+ * a ~50-character literal.
+ *
+ * Taking `desc` as std::string BY VALUE made every one of those call sites
+ * pay a strlen + operator new + memcpy + free per call -- an unconditional
+ * heap round-trip on every refcounted svalue assignment and release, even
+ * in production builds where the function body compiles to nothing. Removing
+ * it (this change plus the macro below) cut total retired instructions by
+ * ~33% on an otherwise allocation-free numeric LPC workload.
+ *
+ * Take a string_view (never allocates, and the argument is always a literal
+ * or an already-materialized string), and compile the call away entirely
+ * when the journal is not built in. */
+#ifdef DEBUGMALLOC_EXTENSIONS
+void md_record_ref_journal(md_node_t* node, bool is_ref, int current_ref, std::string_view desc);
 void md_print_ref_journal(md_node_t* node, outbuffer_t* outbuf);
+#else
+/* Compile the call away ENTIRELY, arguments included -- an empty inline
+ * function is not enough. Several call sites build their description by
+ * concatenation ("ref_string: " + std::string(desc), stralloc.cc), which
+ * still allocates twice per call when the argument is evaluated, and
+ * int_ref_string()/int_free_string() run on every shared-string ref and
+ * release in the VM. */
+#define md_record_ref_journal(...) ((void)0)
+inline void md_print_ref_journal(md_node_t* /*node*/, outbuffer_t* /*outbuf*/) {}
+#endif
 
 #endif

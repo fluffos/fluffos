@@ -24,8 +24,22 @@
        the "mobile viewport" section of the main script below. */
     position: fixed; inset: 0;
     overflow: hidden;
+    /* Side notch/rounded-corner insets (viewport-fit=cover draws edge-to-
+       edge under them). Only left/right here on purpose -- top/bottom are
+       JS-synced to window.visualViewport for keyboard avoidance (see
+       syncVisualViewport() below) and handled per-element there instead.
+       Landscape phones are exactly where a notch sits on a SIDE rather
+       than the top, which is also when body.compact kicks in -- padding
+       the flex column itself covers every child (header/tabs/term/
+       inputbar) in one place instead of threading env() through each. */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
-  button, .tab, #cmd { touch-action: manipulation; }
+  /* manipulation on the terminal pane too: without it, double-tapping game
+     text to select a word (the natural mobile gesture) can trigger the
+     browser's native double-tap-zoom alongside/instead of xterm's own
+     selection handling. */
+  button, .tab, #cmd, #term .pane { touch-action: manipulation; }
   header {
     padding: 10px 16px; border-bottom: 1px solid var(--border);
     background: var(--panel); display: flex; align-items: baseline; gap: 12px;
@@ -35,14 +49,28 @@
   /* Fullscreen toggle: hidden until the boot script verifies the
      Fullscreen API actually exists here (iPhone Safari, some webviews:
      it does not) -- see the "fullscreen toggle" section of the script. */
+  /* wrapToggle carries the margin-left:auto that pushes both header
+     buttons to the right (it comes first in source order); fsToggle just
+     follows it with the header's normal gap. */
   #fsToggle {
-    margin-left: auto; align-self: center; flex: none;
+    align-self: center; flex: none;
     display: inline-flex; align-items: center; justify-content: center;
     background: transparent; border: 0; border-radius: 4px;
     color: var(--dim); cursor: pointer; padding: 4px 6px; line-height: 0;
   }
   #fsToggle:hover { color: var(--accent); background: var(--border); }
   #fsToggle[hidden] { display: none; }
+  /* Wrap toggle: a real toggle button (not hidden/feature-detected like
+     fsToggle -- this is pure CSS/JS, always available). ".on" reflects
+     wrapMode; unlike fsToggle there's no external event that can desync
+     it, so the class is just set directly from the click handler. */
+  #wrapToggle {
+    margin-left: auto; align-self: center; flex: none;
+    background: transparent; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--dim); cursor: pointer; padding: 3px 8px; font: inherit; font-size: 11px;
+  }
+  #wrapToggle:hover { color: var(--fg); border-color: var(--dim); }
+  #wrapToggle.on { color: var(--accent); border-color: var(--accent); }
   /* Icon pair swaps on .fs-active, which JS toggles off the
      fullscreenchange EVENT (never a local flag -- Esc/system exits must
      not desync it).  Class-based on purpose: SVG elements do not reflect
@@ -79,6 +107,20 @@
   #term .pane { height: 100%; display: none; }
   #term .pane.active { display: block; }
   #term .pane .xterm { height: 100%; }
+  /* Wrap-off mode (see the wrapToggle JS): xterm always wraps at `cols`,
+     it has no native "don't wrap" state, and fit() always shrinks cols to
+     match the pane's pixel width -- so on a phone that mangles anything
+     wider than ~30-40 cols, including most of this project's ASCII-art
+     login banners (authored for the traditional 80-col MUD client). The
+     JS side pins cols at NOWRAP_COLS instead of fitting them; this side
+     lets the wider result actually be seen: .xterm normally stretches to
+     100% of .pane by ordinary block-width rules, which would just clip a
+     wider grid, so let it size to its own (now wider) content instead and
+     scroll the pane under it. xterm.js sets the .xterm-screen canvas
+     layer's pixel dimensions from cols/rows directly, so max-content
+     here tracks that real rendered width. */
+  #term .pane.nowrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #term .pane.nowrap .xterm { width: max-content; }
   #logs {
     flex: 1; min-height: 0; overflow-y: auto; display: none;
     padding: 8px 16px; font-size: 12px; line-height: 1.5;
@@ -139,9 +181,73 @@
   }
   #inputbar.hidden, #inputbar.logs-active { display: none; }
   #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
+  /* Custom command input: NOT a real <input>/<textarea> -- #cmd is a plain
+     div that renders text/caret/placeholder itself, overlaying an
+     invisible #cmdReal that does the actual keystroke/IME capture
+     (#cmdReal rules below). A real, on-screen, focusable <input> or
+     <textarea> is what iOS keys its system-level AutoFill accessory bar
+     (the passwords/cards/contacts icon row above the keyboard) off of --
+     confirmed live on both Safari and Chrome for iOS (same WebKit engine
+     underneath) even with autocomplete=off, autocapitalize=off, and
+     (previously) CSS-only password masking that never touched `type`:
+     none of that stopped it, because the bar isn't solely a
+     type="password"/autocomplete heuristic but a broader system feature
+     tied to focusing a real FORM control specifically. Making that
+     control merely invisible (an earlier version of this fix) did NOT
+     help -- iOS keys the bar off the focused element's type, not its
+     visual opacity, so a hidden-but-real <textarea> still triggered it.
+     #cmdReal is therefore a contenteditable div, not a form element at
+     all: no `name`, not part of a <form>, never submitted -- outside
+     the category iOS's AutoFill heuristics look at -- while still giving
+     real OS text editing (selection, IME composition, copy/paste, undo)
+     underneath. contenteditable="plaintext-only" (not "true") keeps
+     pasted content flat text with no child markup, so the rest of this
+     file can keep treating cmdReal's content as a single string via
+     .textContent instead of dealing with arbitrary rich-text DOM. */
   #cmd {
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
     font: inherit; padding: 10px 16px 10px 8px;
+    position: relative; white-space: pre; overflow-x: auto; overflow-y: hidden;
+    cursor: text;
+  }
+  /* Scrollbar-less horizontal scroll (overflow-x:auto above is what lets
+     renderCmd()'s scrollIntoView bring a caret past the visible edge back
+     into view -- this just hides the resulting scrollbar chrome). */
+  #cmd { scrollbar-width: none; -ms-overflow-style: none; }
+  #cmd::-webkit-scrollbar { display: none; }
+  #cmd .cmd-placeholder { color: var(--dim); }
+  #cmd.has-text .cmd-placeholder { display: none; }
+  #cmd .cmd-caret {
+    display: inline-block; width: 1px; height: 1em; background: var(--fg);
+    vertical-align: text-bottom; margin-left: -1px; visibility: hidden;
+  }
+  #cmd.focused .cmd-caret {
+    visibility: visible; animation: cmd-caret-blink 1s step-end infinite;
+  }
+  @keyframes cmd-caret-blink { 50% { opacity: 0; } }
+  #cmd.disabled { color: var(--dim); cursor: default; }
+  #cmd.disabled .cmd-caret { visibility: hidden; }
+  #cmdReal {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; padding: inherit; border: 0; outline: 0;
+    overflow: hidden; background: transparent; font: inherit;
+    white-space: pre; color: transparent; caret-color: transparent;
+    /* Belt-and-suspenders on top of color:transparent: masks the real
+       value even from a long-press text-selection loupe on WebKit, which
+       renders actual glyphs at the OS compositing level rather than
+       going through page CSS color. Harmless to leave on unconditionally
+       (this element is never visible either way) even when the session
+       isn't currently password-masked. Documented as an <input>/<textarea>
+       property; left on in case some engine still honors it on a
+       contenteditable div, but the real masking guarantee for this
+       element is that it's never visible at all (renderCmd() does the
+       actual on-screen masking, in the separate #cmd display layer). */
+    -webkit-text-security: disc;
+    /* contenteditable elements have no built-in empty-state affordance
+       (a real <textarea> just shows nothing); without this, an empty
+       #cmdReal can collapse to zero height in some layout contexts and
+       stop accepting focus/taps. */
+    min-height: 1em;
   }
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
@@ -207,7 +313,10 @@
     #tabs .tab { padding: 10px 10px 8px; font-size: 12.5px; }
     #term, #logs { padding: 5px 6px; }
     #logs { font-size: 13px; }
-    #inputbar .prompt { padding: 10px 0 10px 12px; }
+    /* font-size matches #cmd below -- .prompt and the input text share a
+       baseline, so a size mismatch here reads as the two being on
+       different lines even though they're the same flex row. */
+    #inputbar .prompt { padding: 10px 0 10px 12px; font-size: 16px; }
     #cmd {
       padding: 11px 12px 11px 6px;
       /* >=16px stops iOS Safari's auto-zoom-on-focus (see pointer:coarse
@@ -221,7 +330,7 @@
      rather than width, since any touchscreen (including a wide tablet in
      landscape) hits both problems this addresses. */
   @media (pointer: coarse) {
-    #cmd { font-size: 16px; }
+    #cmd, #inputbar .prompt { font-size: 16px; }
     #tabs .tab { min-height: 40px; }
     #tabs .tab .reload, #tabs .tab .close {
       display: inline-flex; align-items: center; justify-content: center;
@@ -233,6 +342,7 @@
     #tabs .tab .reload[hidden], #tabs .tab .close[hidden] { display: none; }
     #tabAdd { min-width: 40px; }
     #fsToggle { min-width: 36px; min-height: 36px; }
+    #wrapToggle { min-height: 36px; }
   }
 
   /* ------------------------------------------------------------------ *
@@ -261,6 +371,7 @@
   }
   body.compact header h1 { font-size: 12px; max-width: 32vw; }
   body.compact header #status { font-size: 11px; max-width: 26vw; }
+  body.compact #wrapToggle { padding: 2px 6px; font-size: 10px; }
   body.compact #tabs { grid-area: 1 / 2; }
   body.compact #tabs .tab { padding: 5px 10px 4px; min-height: 36px; }
   body.compact #tabAdd { min-width: 36px; }
@@ -283,6 +394,9 @@
 <header>
   <h1>FluffOS / WebAssembly</h1>
   <div id="status">loading wasm…</div>
+  <button id="wrapToggle" type="button" class="on" aria-pressed="true"
+          title="Wrap long lines to fit the screen"
+          aria-label="Wrap long lines to fit the screen">Wrap</button>
   <button id="fsToggle" type="button" hidden
           title="Enter fullscreen" aria-label="Enter fullscreen">
     <svg id="fsIconEnter" width="14" height="14" viewBox="0 0 14 14"
@@ -314,8 +428,7 @@
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
-  <input id="cmd" autocomplete="off" spellcheck="false" autofocus
-         placeholder="loading…" disabled>
+  <div id="cmd"><span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span><div id="cmdReal" contenteditable="false" tabindex="0" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send"></div></div>
 </div>
 
 <div id="errorModal" class="modal-overlay" hidden>
@@ -576,6 +689,44 @@ const TERM_OPTIONS = {
 const mqNarrow = window.matchMedia('(max-width: 480px)');
 function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
 
+// --- soft-wrap toggle ------------------------------------------------------
+// xterm has no native "don't wrap" mode -- it always wraps at `cols`, and
+// fit() always shrinks cols to match the pane's actual pixel width. On a
+// phone that mangles anything wider than ~30-40 cols, which includes most
+// of this project's ASCII-art login banners (authored for the traditional
+// 80-col MUD client this whole genre targets). "Wrap off" instead pins
+// cols at NOWRAP_COLS and lets the pane scroll horizontally (see the
+// .pane.nowrap CSS) so art renders at its intended width; "wrap on"
+// (default, matches all prior behavior) keeps fitting cols to the
+// viewport. This is a display preference, not a per-session/per-connection
+// one, hence one global flag (persisted) rather than living on each session.
+// NOWRAP_COLS=200: a survey of every lib's login banner found real
+// grid-aligned art up to 154 cols wide (colon/dot-shaded pictures, not just
+// text) -- 200 gives that headroom to grow without re-breaking "wrap off"
+// the way the original 80 did.
+const NOWRAP_COLS = 200;
+let wrapMode = localStorage.getItem('fluffos-wrap') !== 'off';
+
+// Cap on each session's command history (see makeSession()'s history/
+// historyIndex/historyDraft) so an extremely long session doesn't grow
+// the array forever; oldest entries drop off the front.
+const HISTORY_MAX = 200;
+
+// Single choke point for sizing a session's terminal to the current
+// viewport, mode-aware -- replaces every raw fit() call below. fit() (and
+// proposeDimensions()) are no-ops on a hidden pane either way (the addon
+// bails on NaN geometry), so callers can always call this unconditionally,
+// same as the raw fit() calls it replaces.
+function refit(s) {
+  s.pane.classList.toggle('nowrap', !wrapMode);
+  if (wrapMode) {
+    s.fit.fit();
+    return;
+  }
+  const dims = s.fit.proposeDimensions();
+  if (dims && dims.rows) s.term.resize(NOWRAP_COLS, dims.rows);
+}
+
 // The full command hint clips mid-word at phone widths; keep it for wide
 // screens.  Applied after boot and re-applied on breakpoint crossings.
 function placeholderForViewport() {
@@ -598,7 +749,19 @@ function iconTapGuard(s) {
 }
 
 const status = document.getElementById('status');
-const input = document.getElementById('cmd');
+// The custom command input -- see the big comment on #cmd's CSS for why
+// this isn't a real visible <input>/<textarea>: cmdWrap is the plain div
+// that renders text/caret/placeholder itself; cmdReal is the invisible
+// contenteditable div doing actual keystroke/IME/selection capture
+// underneath it. Everything that used to read/write a native input's
+// .value/.selectionStart/.disabled/.focus()/.placeholder now goes through
+// renderCmd() plus these refs (and the cmdRealValue/setCmdRealValue/
+// getCaretOffset/setCaretOffset helpers just below) instead.
+const cmdWrap = document.getElementById('cmd');
+const cmdReal = document.getElementById('cmdReal');
+const cmdBefore = document.getElementById('cmdBefore');
+const cmdAfter = document.getElementById('cmdAfter');
+const cmdPlaceholder = document.getElementById('cmdPlaceholder');
 const inputBar = document.getElementById('inputbar');
 const termEl = document.getElementById('term');
 const logsEl = document.getElementById('logs');
@@ -607,6 +770,114 @@ const tabAdd = document.getElementById('tabAdd');
 const tabLogs = document.getElementById('tabLogs');
 const logsBadge = document.getElementById('logsBadge');
 const utf8enc = new TextEncoder();
+
+// --- cmdReal helpers (contenteditable stand-ins for <textarea>.value /
+// .selectionStart) ----------------------------------------------------
+// cmdReal's content is always either empty or a single text node: every
+// programmatic write goes through setCmdRealValue() (.textContent=, which
+// collapses to one text node or none), and typed/pasted input stays flat
+// because of contenteditable="plaintext-only" plus the paste handler
+// below. getCaretOffset/setCaretOffset lean on that invariant instead of
+// walking arbitrary rich-text DOM.
+function cmdRealValue() {
+  return cmdReal.textContent;
+}
+function setCmdRealValue(text) {
+  cmdReal.textContent = text;
+}
+function getCaretOffset() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return cmdReal.textContent.length;
+  const range = sel.getRangeAt(0);
+  if (!cmdReal.contains(range.startContainer)) return cmdReal.textContent.length;
+  const preRange = document.createRange();
+  preRange.selectNodeContents(cmdReal);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  return preRange.toString().length;
+}
+function setCaretOffset(offset) {
+  const sel = window.getSelection();
+  const range = document.createRange();
+  const node = cmdReal.firstChild;
+  if (!node) {
+    range.selectNodeContents(cmdReal);
+    range.collapse(true);
+  } else {
+    const len = node.textContent.length;
+    range.setStart(node, Math.max(0, Math.min(len, offset)));
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// --- custom command input rendering ---------------------------------------
+// Syncs cmdWrap's visible spans to cmdReal's real value + cursor position.
+// Called after anything that could change either: typing, IME composition,
+// paste, undo, arrow/Home/End navigation, a click repositioning the caret,
+// programmatic value changes (submit-clear, history recall, tab-switch
+// draft restore), and the masked-class toggle. Cheap enough to just call
+// liberally rather than track precisely what changed.
+function renderCmd() {
+  const val = cmdRealValue();
+  const masked = cmdWrap.classList.contains('masked');
+  const display = masked ? '•'.repeat(val.length) : val;
+  // Tracks the real (invisible) editable region's cursor -- this is what
+  // lets Left/Right/Home/End/click-to-position keep working underneath a
+  // custom-rendered caret instead of only supporting append-at-the-end
+  // editing.
+  const pos = Math.max(0, Math.min(display.length, getCaretOffset()));
+  cmdBefore.textContent = display.slice(0, pos);
+  cmdAfter.textContent = display.slice(pos);
+  cmdWrap.classList.toggle('has-text', val.length > 0);
+  // Keep the caret scrolled into view -- a real <input> does this
+  // automatically when its content overflows; #cmd is a plain div and
+  // won't unless told to. 'nearest' is a no-op when already visible, so
+  // this is cheap to call on every render.
+  cmdCaret.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// A MUD command line is conceptually single-line, but a paste (or some
+// exotic IME path) could still land a literal '\n' in cmdReal's content
+// despite plaintext-only mode and the paste handler below. Flatten it
+// rather than let renderCmd() (white-space: pre) show a broken-looking
+// embedded line break, or Enter-to-submit later send a multi-line blob to
+// the driver as one "line".
+cmdReal.addEventListener('input', () => {
+  if (cmdRealValue().includes('\n')) {
+    const pos = getCaretOffset();
+    setCmdRealValue(cmdRealValue().replace(/\r?\n/g, ' '));
+    setCaretOffset(pos);
+  }
+  renderCmd();
+});
+// contenteditable has no 'select' event (that's <input>/<textarea>-only)
+// and no .value, so a paste isn't a simple string assignment either --
+// insert plain text through the normal editing pipeline (keeps
+// undo/IME semantics intact) instead of letting the browser's default
+// paste behavior insert whatever rich content/markup the clipboard holds.
+cmdReal.addEventListener('paste', (ev) => {
+  ev.preventDefault();
+  const text = (ev.clipboardData || window.clipboardData).getData('text/plain').replace(/\r?\n/g, ' ');
+  document.execCommand('insertText', false, text);
+});
+// keyup/click cover cursor-position changes that 'input' alone misses
+// (arrow keys, Home/End, clicking to reposition); selectionchange (below)
+// is the general-purpose backstop (drag-selection, Cmd/Ctrl+A, ...) that
+// 'select' would have covered on a real <textarea>.
+for (const ev of ['keyup', 'click']) {
+  cmdReal.addEventListener(ev, renderCmd);
+}
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if (sel.rangeCount && cmdReal.contains(sel.getRangeAt(0).startContainer)) renderCmd();
+});
+cmdReal.addEventListener('focus', () => cmdWrap.classList.add('focused'));
+cmdReal.addEventListener('blur', () => cmdWrap.classList.remove('focused'));
+// Clicking anywhere in the rendered area should feel like clicking a
+// normal input -- cmdReal already covers the full box (position:absolute;
+// inset:0) and sits last in DOM order so it naturally receives the click
+// directly; this is just for the rare case something intercepts it first.
+cmdWrap.addEventListener('click', () => cmdReal.focus());
 
 const sessions = [];      // game sessions, tab order
 const byId = new Map();   // driver conn id -> session
@@ -672,6 +943,9 @@ function makeSession() {
     serverEchoes: false,
     disconnected: false,
     inputValue: '',   // unsent draft in the input bar, saved on tab switch
+    history: [],      // submitted lines, oldest first, per-session shell-style recall
+    historyIndex: -1, // -1 = editing a fresh line; 0 = newest entry; counts backward
+    historyDraft: '', // the in-progress line stashed when ArrowUp starts browsing
     unread: 0,
     pendingIn: [],    // [id, bytes] arriving before our conn id is known
     outbox: [],       // page -> driver, flushed outside receive()
@@ -756,7 +1030,14 @@ function makeSession() {
     s.telnet.onText = (t) => s.term.write(t);
     s.telnet.onEcho = (on) => {
       s.serverEchoes = on;
-      if (view === s && !s.charMode) input.type = on ? 'password' : 'text';
+      // Custom-rendered masking, never a real type="password" -- see the
+      // #cmd/#cmdReal CSS comment. Re-render immediately: if there's
+      // already buffered text when echo state flips mid-line, it should
+      // switch to/from dots right away, not just on the next keystroke.
+      if (view === s && !s.charMode) {
+        cmdWrap.classList.toggle('masked', on);
+        renderCmd();
+      }
     };
     s.telnet.onCharMode = (on) => {
       if (on === s.charMode) return;
@@ -799,9 +1080,9 @@ mqNarrow.addEventListener('change', () => {
   const size = fontSizeForViewport();
   for (const s of sessions) {
     s.term.options.fontSize = size;
-    if (view === s) s.fit.fit();
+    if (view === s) refit(s);
   }
-  input.placeholder = placeholderForViewport();
+  cmdPlaceholder.textContent = placeholderForViewport();
 });
 
 // Reflect the active session's state onto the shared input bar/status.
@@ -809,6 +1090,11 @@ function applyInputState(s) {
   if (s.charMode) {
     inputBar.classList.add('hidden');
     status.textContent = 'char mode — keys go straight to the mud';
+    // Always a real fit here, NOT refit(): char mode is a full-screen TUI
+    // taking over the raw keystream (see s.term.onData below), which lays
+    // itself out from the real NAWS geometry -- pinning cols to
+    // NOWRAP_COLS regardless of wrapMode would misreport the actual
+    // terminal size to an app that genuinely needs it.
     s.fit.fit();
     s.term.focus();
   } else {
@@ -816,15 +1102,20 @@ function applyInputState(s) {
     status.textContent = s.disconnected ? 'disconnected'
       : s.connId >= 0 ? 'connected (conn ' + s.connId + ')'
       : 'connecting…';
-    input.type = s.serverEchoes ? 'password' : 'text';
-    input.disabled = s.disconnected || s.connId < 0;
-    s.fit.fit();
-    if (!input.disabled && view === s) input.focus();
+    cmdWrap.classList.toggle('masked', s.serverEchoes);
+    // .disabled is a plain custom property here (divs have no native
+    // disabled state) -- contentEditable is what actually stops input.
+    cmdReal.disabled = s.disconnected || s.connId < 0;
+    cmdReal.contentEditable = cmdReal.disabled ? 'false' : 'plaintext-only';
+    cmdWrap.classList.toggle('disabled', cmdReal.disabled);
+    renderCmd();
+    refit(s);
+    if (!cmdReal.disabled && view === s) cmdReal.focus();
   }
 }
 
 function saveDraft() {
-  if (view && view !== 'logs') view.inputValue = input.value;
+  if (view && view !== 'logs') view.inputValue = cmdRealValue();
 }
 
 function activateSession(s) {
@@ -843,7 +1134,8 @@ function activateSession(s) {
     o.tab.classList.toggle('active', o === s);
     o.pane.classList.toggle('active', o === s);
   }
-  input.value = s.inputValue;
+  setCmdRealValue(s.inputValue);
+  renderCmd();
   // fit() no-ops while a pane is display:none (the addon bails on NaN
   // geometry), so refit now that this one is visible again.
   applyInputState(s);
@@ -920,12 +1212,52 @@ tabAdd.addEventListener('click', () => {
 });
 
 // --- line mode input (shared bar, routed to the active session) ----------
-input.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Enter' || !activeGame) return;
+// ArrowUp/ArrowDown: shell-style per-session history recall. `history` is
+// oldest-first; `historyIndex` counts back from the newest entry (-1 =
+// not browsing / editing a fresh line, 0 = the single most recent entry,
+// 1 = the one before that, ...), so history[history.length - 1 -
+// historyIndex] is always the entry currently shown. `historyDraft`
+// stashes whatever was being typed the moment ArrowUp first starts
+// browsing, so ArrowDown-ing back past the newest entry restores it
+// instead of leaving a stale value or an empty line.
+cmdReal.addEventListener('keydown', (ev) => {
+  if (!activeGame) return;
   const s = activeGame;
-  const line = input.value;
-  input.value = '';
-  if (input.type !== 'password') s.term.write(line + '\r\n');
+  if (ev.key === 'ArrowUp') {
+    if (!s.history.length || s.historyIndex >= s.history.length - 1) return;
+    ev.preventDefault();
+    if (s.historyIndex === -1) s.historyDraft = cmdRealValue();
+    s.historyIndex++;
+    setCmdRealValue(s.history[s.history.length - 1 - s.historyIndex]);
+    setCaretOffset(cmdRealValue().length);
+    renderCmd();
+    return;
+  }
+  if (ev.key === 'ArrowDown') {
+    if (s.historyIndex === -1) return;
+    ev.preventDefault();
+    s.historyIndex--;
+    setCmdRealValue(s.historyIndex === -1
+      ? s.historyDraft
+      : s.history[s.history.length - 1 - s.historyIndex]);
+    setCaretOffset(cmdRealValue().length);
+    renderCmd();
+    return;
+  }
+  // isComposing: mid-IME-composition (e.g. choosing a Pinyin candidate)
+  // Enter confirms the composition, it must NOT also submit the line.
+  if (ev.key !== 'Enter' || ev.isComposing) return;
+  ev.preventDefault();
+  const line = cmdRealValue();
+  setCmdRealValue('');
+  renderCmd();
+  if (line.length && s.history[s.history.length - 1] !== line) {
+    s.history.push(line);
+    if (s.history.length > HISTORY_MAX) s.history.shift();
+  }
+  s.historyIndex = -1;
+  s.historyDraft = '';
+  if (!s.serverEchoes) s.term.write(line + '\r\n');
   s.sendData(Array.from(utf8enc.encode(line + '\r\n')));
 });
 
@@ -947,7 +1279,11 @@ input.addEventListener('keydown', (ev) => {
 //      #inputbar naturally lands at the bottom of the visible area.
 let viewportTimer = 0;
 function refitVisible() {
-  if (view !== 'logs' && activeGame) activeGame.fit.fit();
+  if (view === 'logs' || !activeGame) return;
+  // Char mode: always a real fit, never nowrap-pinned -- same reasoning
+  // as applyInputState's charMode branch.
+  if (activeGame.charMode) activeGame.fit.fit();
+  else refit(activeGame);
 }
 function syncVisualViewport() {
   const vv = window.visualViewport;
@@ -985,6 +1321,31 @@ if (window.visualViewport) {
   syncVisualViewport();
 }
 updateCompact();   // initial state (e.g. the page opens in landscape)
+
+// --- wrap toggle -----------------------------------------------------------
+// See the "soft-wrap toggle" section (wrapMode/refit()) above for why this
+// exists. Applies to every session (a display preference, not a per-tab
+// one): only the visible pane needs an immediate refit -- fit()/refit() on
+// a hidden pane is already a no-op elsewhere in this file, so the rest
+// pick up the new mode next time they're activated, same pattern as the
+// mqNarrow breakpoint listener.
+const wrapToggle = document.getElementById('wrapToggle');
+function updateWrapToggle() {
+  wrapToggle.classList.toggle('on', wrapMode);
+  wrapToggle.setAttribute('aria-pressed', String(wrapMode));
+  const label = wrapMode
+    ? 'Wrap long lines to fit the screen'
+    : 'Wrapping off — long lines keep their full width, scroll to see them';
+  wrapToggle.title = label;
+  wrapToggle.setAttribute('aria-label', label);
+}
+updateWrapToggle();
+wrapToggle.addEventListener('click', () => {
+  wrapMode = !wrapMode;
+  localStorage.setItem('fluffos-wrap', wrapMode ? 'on' : 'off');
+  updateWrapToggle();
+  if (view !== 'logs' && activeGame && !activeGame.charMode) refit(activeGame);
+});
 
 // --- fullscreen toggle ----------------------------------------------------
 // After compact chrome squeezed the page's own bars, the biggest remaining
@@ -1043,9 +1404,9 @@ if (fsSupported) {
 // Belt-and-suspenders for the same keyboard problem: on a browser without
 // window.visualViewport, pull a freshly-focused input back into view
 // rather than trusting the browser's own scroll-into-view behavior.
-input.addEventListener('focus', () => {
+cmdReal.addEventListener('focus', () => {
   if (window.visualViewport) return;
-  setTimeout(() => input.scrollIntoView({ block: 'end', behavior: 'smooth' }), 50);
+  setTimeout(() => inputBar.scrollIntoView({ block: 'end', behavior: 'smooth' }), 50);
 });
 
 // The first game tab exists before the driver finishes loading, so the
@@ -1169,8 +1530,8 @@ createFluffOS(Module).then((M) => {
   // done its job.  (connectSession -> applyInputState already wrote the
   // 'connected (conn N)' status; finish() only clears the overlay.)
   BootProgress.finish();
-  input.placeholder = placeholderForViewport();
-  input.focus();
+  cmdPlaceholder.textContent = placeholderForViewport();
+  cmdReal.focus();
   tabAdd.disabled = false;
 }).catch((e) => {
   BootProgress.finish();
