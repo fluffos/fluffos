@@ -8,6 +8,7 @@
 
 #include <cstring>
 #include <ctime>
+#include <exception>
 
 #include "applies_table.autogen.h"
 #include "vm/internal/base/machine.h"
@@ -95,7 +96,7 @@ void arm_step(StepMode mode) {
   update_flags();
 }
 
-void handle_request(const djson& msg) {
+void handle_request(const djson& msg) try {
   auto& s = g_session;
   std::string cmd = msg.value("command", "");
   djson args = msg.contains("arguments") ? msg["arguments"] : djson::object();
@@ -169,6 +170,9 @@ void handle_request(const djson& msg) {
     s.break_all = false;
     if (args.contains("filters")) {
       for (const auto& f : args["filters"]) {
+        if (!f.is_string()) {
+          continue;  // a non-string filter entry is not one we advertised
+        }
         std::string name = f.get<std::string>();
         if (name == "uncaught") {
           s.break_uncaught = true;
@@ -266,6 +270,18 @@ void handle_request(const djson& msg) {
   } else {
     send_response(msg, false, nullptr, "unsupported request");
   }
+} catch (const std::exception& e) {
+  // Last-resort boundary: dispatch runs inside the libwebsockets C callback,
+  // so ANY C++ exception unwinding out of here (a JSON type coercion on a
+  // malformed argument, a numeric parse, etc.) would cross a C frame and
+  // abort the whole driver. A hostile-or-buggy client must never be able to
+  // do that; drop the offending request with a best-effort failure response
+  // instead. Every branch above builds its response as the LAST statement,
+  // so a throw always precedes that branch's send_response -- this cannot
+  // double-respond for the same request.
+  debug_message("Debugger: request '%s' failed: %s.\n", msg.value("command", "").c_str(),
+                e.what());
+  send_response(msg, false, nullptr, "internal error handling request");
 }
 
 }  // namespace

@@ -15,7 +15,10 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -304,7 +307,19 @@ bool parse_index_name(const std::string& name, bool is_class, int& out) {
       return false;
     }
   }
-  out = std::stoi(s);
+  // Bounds-checked on purpose: std::stoi throws std::out_of_range for a
+  // digit run that overflows an int (e.g. "[99999999999]" or even
+  // "[3000000000]"). This runs inside the libwebsockets C callback, where an
+  // exception unwinding through the C frame would abort the whole driver.
+  // An out-of-range subscript simply isn't a valid element, so reject it
+  // cleanly and let the caller return "no such element".
+  errno = 0;
+  char* endp = nullptr;
+  long v = strtol(s.c_str(), &endp, 10);
+  if (errno != 0 || endp != s.c_str() + s.size() || v < 0 || v > INT_MAX) {
+    return false;
+  }
+  out = static_cast<int>(v);
   return true;
 }
 

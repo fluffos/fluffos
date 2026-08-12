@@ -584,6 +584,41 @@ TEST_F(DebuggerTest, SetVariableWritesArrayElement) {
   dbg::g_session.handles.clear();
 }
 
+// Regression: a client-supplied array element name whose digits overflow an
+// int ("[99999999999]") must be rejected cleanly, not throw. parse_index_name
+// used std::stoi, which throws std::out_of_range here; that exception would
+// unwind out of set_variable_request -> handle_request -> the libwebsockets C
+// callback, aborting the whole driver. An attached client is already
+// privileged, so this is a robustness/DoS fix, not a privilege boundary.
+TEST_F(DebuggerTest, SetVariableRejectsOutOfRangeArrayIndexWithoutThrowing) {
+  object_t* ob = LoadFixture("mixed *arr = ({100, 200, 300});\n",
+                             "dbgtest_setvar_bigindex", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+  svalue_t* arr_sv = fixture_global(ob, "arr");
+  ASSERT_NE(arr_sv, nullptr);
+  ASSERT_EQ(arr_sv->type, T_ARRAY);
+
+  dbg::g_session.handles.push_back({dbg::VarHandle::kArray, 0, arr_sv->u.arr});
+  int ref = dbg::kHandleBase + static_cast<int>(dbg::g_session.handles.size()) - 1;
+
+  std::string err;
+  // Both an int-overflowing index and a long-but-in-range-of-long index that
+  // still exceeds INT_MAX must be rejected without throwing.
+  for (const char* bad : {"[99999999999]", "[3000000000]"}) {
+    err.clear();
+    dbg::djson body = dbg::set_variable_request(
+        {{"variablesReference", ref}, {"name", bad}, {"value", "1"}}, err);
+    EXPECT_TRUE(body.is_null()) << "index " << bad << " should be rejected";
+    EXPECT_FALSE(err.empty());
+  }
+  // Original array untouched.
+  EXPECT_EQ(arr_sv->u.arr->item[0].u.number, 100);
+  EXPECT_EQ(arr_sv->u.arr->item[1].u.number, 200);
+  EXPECT_EQ(arr_sv->u.arr->item[2].u.number, 300);
+
+  dbg::g_session.handles.clear();
+}
+
 TEST_F(DebuggerTest, SetVariableWritesMappingValue) {
   object_t* ob = LoadFixture("mapping m = ([\"hello\": \"world\"]);\n", "dbgtest_setvar_mapping",
                              /*callcreate=*/true);
