@@ -28,6 +28,28 @@ static bool buffer_promotable(int type, int exprtype) {
 }
 
 void rule_def_global_var(LPC_INT type_val) {
+  /* End of a global declaration: every initializer in it has been compiled
+   * into the __INIT tree, so the local scope those initializers may have
+   * opened is over. Reset it before the next definition is parsed.
+   *
+   * pop_n_locals() (rule_expr_or_block_block) returns the NAMES to scope, but
+   * not max_num_locals -- the runtime-slot high-water mark, which is
+   * deliberately not reused across sibling scopes inside one function. At
+   * file scope there is no enclosing function to end and reset it, so a
+   * single local declared in a global initializer's block left the mark at 1
+   * and the NEXT function's parameters were allocated from slot 1 up while
+   * the VM still pushes arguments at 0..n-1:
+   *
+   *   mixed g = catch { int f = 1; };
+   *   int id(int a) { return a; }      // id(71) silently returned 0
+   *
+   * with no diagnostic anywhere. Only the first function after the
+   * initializer was affected, because rule_func() resets the table on the way
+   * out of it. __INIT's own frame is sized separately, from the compile-wide
+   * high-water mark (compile_max_num_locals), so resetting here is safe: the
+   * initializers are sequential statements and may reuse the same slots. */
+  free_all_local_names(0);
+
   if (!(type_val & ~(DECL_MODS))) {
     /* A typeless declaration immediately after a class body is almost
        certainly the C-style combined form 'class Foo { ... } var;', which

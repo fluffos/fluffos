@@ -1,0 +1,58 @@
+// A block used in EXPRESSION position must end its local scope at the closing
+// brace, exactly as one used as a statement does.
+//
+// `block` hands its scope's local count up to the rule that consumed it, and
+// the statement path (rule_statement_compound_stmt) feeds that to
+// pop_n_locals(). The expression path (rule_expr_or_block_block) kept only the
+// parse node and dropped the count, so every local declared inside a
+// `catch {}` / `acatch {}` / `time_expression {}` stayed in scope after the
+// block. Four consequences, in increasing order of nastiness:
+//
+//   1. out-of-scope names still resolved -- illegal code compiled;
+//   2. LEGAL code was rejected: re-declaring the name afterwards was
+//      "Illegal to redeclare local name";
+//   3. for()/foreach() pop a FIXED count rather than a scope diff, so a leak
+//      in the init expression made them free the wrong local and the loop
+//      variable outlived the loop;
+//   4. worst, a leak from a GLOBAL initializer had no enclosing function to
+//      end and reset the runtime-slot high-water mark, so the NEXT function's
+//      parameters were allocated from slot 1 up while the VM kept pushing
+//      arguments at 0..n-1 -- `id1(71)` returned 0, with no diagnostic
+//      anywhere. Only the first function after the initializer was affected,
+//      which is why a test whose next function takes no parameters cannot see
+//      it.
+//
+// Anonymous functions were the one construct already restoring this properly.
+//
+// Fixtures live under /clone/ because the runner executes every file under
+// tests/, and three of these must fail to compile.
+
+#include "/include/tests.h"
+
+void do_tests() {
+  object ob;
+
+  // 1. The block's locals are gone after it.
+  ASSERT2(catch(load_object("/clone/block_scope_leak_a1")) != 0,
+    "a local declared inside catch{} is still visible after the block");
+
+  // 2. ... which means the name is free to re-declare.
+  ASSERT2(catch(load_object("/clone/block_scope_leak_a2")) == 0,
+    "re-declaring after the block was rejected, but the block's scope ended");
+  ASSERT_EQ(2, "/clone/block_scope_leak_a2"->probe());
+
+  // 3. for() still pops its own loop variable, not the block's local.
+  ASSERT2(catch(load_object("/clone/block_scope_leak_a3")) != 0,
+    "the for-init leak made the loop variable outlive the loop");
+
+  // 4. The function following a global initializer gets its real argument
+  //    slots. This is the silent one: on the unfixed driver it compiles
+  //    cleanly and returns the wrong value.
+  ob = load_object("/clone/block_scope_leak_a4");
+  ASSERT_EQ(71, ob->id1(71));
+  ASSERT_EQ(71, ob->id2(71));
+  ASSERT_EQ(30, ob->add2(10, 20));
+
+  ob = load_object("/clone/block_scope_leak_a5");
+  ASSERT_EQ(30, ob->add2(10, 20));
+}
