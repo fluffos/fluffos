@@ -55,4 +55,19 @@ void do_tests() {
 
   ob = load_object("/clone/block_scope_leak_a5");
   ASSERT_EQ(30, ob->add2(10, 20));
+
+  // 5. ... and the mirror image of 4: the file's global initializers all
+  //    compile into ONE frame (__INIT), so their locals must NOT share a
+  //    runtime slot. Resetting the slot counter per declaration -- which is
+  //    what stops symptom 4 -- made successive initializers alias slot 0, and
+  //    a local declared WITHOUT an initializer emits no code at all (it must
+  //    read as undefined until first assigned, relying on the frame's
+  //    one-time zero-fill), so it read the previous declaration's leftover
+  //    value. Across types, too. The two resets are separate concerns: names
+  //    leave scope at the end of a declaration, slot numbering restarts at a
+  //    new FRAME.
+  ob = load_object("/clone/block_scope_leak_a6");
+  ASSERT_EQ(0, ob->query_int());
+  ASSERT_EQ(1, ob->query_undef());
+  ASSERT_EQ(0, ob->query_str());
 }

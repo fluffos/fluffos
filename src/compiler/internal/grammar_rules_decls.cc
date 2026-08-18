@@ -29,26 +29,33 @@ static bool buffer_promotable(int type, int exprtype) {
 
 void rule_def_global_var(LPC_INT type_val) {
   /* End of a global declaration: every initializer in it has been compiled
-   * into the __INIT tree, so the local scope those initializers may have
-   * opened is over. Reset it before the next definition is parsed.
+   * into the __INIT tree, so the names those initializers declared go out of
+   * scope here.
    *
-   * pop_n_locals() (rule_expr_or_block_block) returns the NAMES to scope, but
-   * not max_num_locals -- the runtime-slot high-water mark, which is
-   * deliberately not reused across sibling scopes inside one function. At
-   * file scope there is no enclosing function to end and reset it, so a
-   * single local declared in a global initializer's block left the mark at 1
-   * and the NEXT function's parameters were allocated from slot 1 up while
-   * the VM still pushes arguments at 0..n-1:
+   * release_local_names(), NOT free_all_local_names(), and the difference is
+   * the whole point. Every global initializer in a file is compiled into ONE
+   * frame -- __INIT -- so its slot numbering has to keep climbing across
+   * declarations, exactly as it does across sibling scopes inside a function
+   * (which is why pop_n_locals() lowers current_number_of_locals but never
+   * max_num_locals). Resetting max_num_locals here as well made successive
+   * initializers ALIAS slot 0, and a local declared WITHOUT an initializer
+   * emits no code at all -- rule_new_local_def() leaves it undefined until
+   * first assigned, relying on the frame's one-time zero-fill -- so it read
+   * the previous declaration's leftover value:
    *
-   *   mixed g = catch { int f = 1; };
-   *   int id(int a) { return a; }      // id(71) silently returned 0
+   *   mixed g1 = catch { int a = 42; };
+   *   mixed g2 = catch { int b; seen = b; };   // seen == 42, not 0
    *
-   * with no diagnostic anywhere. Only the first function after the
-   * initializer was affected, because rule_func() resets the table on the way
-   * out of it. __INIT's own frame is sized separately, from the compile-wide
-   * high-water mark (compile_max_num_locals), so resetting here is safe: the
-   * initializers are sequential statements and may reuse the same slots. */
-  free_all_local_names(0);
+   * across types too: a `class A a;` reading a live `class B` left by an
+   * earlier initializer, with no diagnostic.
+   *
+   * max_num_locals is reset instead where a genuinely new frame begins, in
+   * rule_func_type() for each function definition. That is what keeps the
+   * next function's parameters at slots 0..n-1 -- without it, one local
+   * declared in a global initializer's block shifted them all and
+   * `int id(int a) { return a; }` silently returned 0. __INIT's own frame is
+   * sized from the compile-wide high-water mark (compile_max_num_locals). */
+  release_local_names(0);
 
   if (!(type_val & ~(DECL_MODS))) {
     /* A typeless declaration immediately after a class body is almost
@@ -151,6 +158,25 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
 void rule_block(decl_t* result, parse_node_t* stmts_node, int entry_locals) {
   result->node = stmts_node;
   result->num = current_number_of_locals - entry_locals;
+  if (result->num < 0) {
+    /* Bison error recovery can discard a production that had opened a nested
+     * locals scope before the rule that would have restored it ever runs --
+     * `function (int x, ) { ... }`, a stray comma, leaves
+     * rule_lambda_return_type()'s scope switch unwound by
+     * rule_primary_expr_anon_func(). The enclosing block then closes with
+     * fewer locals than it entered with, and the count it hands up is
+     * NEGATIVE: a clean fatal("pop_n_locals called with num < 0") on Debug,
+     * and a SIGSEGV on a build where DEBUG_CHECK is compiled out, from a
+     * syntax error in one line of mudlib source.
+     *
+     * The count is only ever used to decide how many names to take back out
+     * of scope, and the compile is already failing, so clamping is exactly
+     * right: it turns the crash back into the diagnostic the user should
+     * have got. (Deliberately here rather than inside pop_n_locals(), whose
+     * DEBUG_CHECK stays a real invariant for callers that compute a count
+     * some other way.) */
+    result->num = 0;
+  }
 }
 
 parse_node_t* rule_new_local_def(const ScratchString* name, LPC_INT type_star) {

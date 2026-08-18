@@ -228,6 +228,7 @@ void yyerror(struct YYLTYPE* llocp, void* yyscanner, const char* msg);
 void yywarn(const char* fmt, ...);
 char* the_file_name(const char*);
 void free_all_local_names(int);
+void release_local_names(int);
 void pop_n_locals(int);
 void reactivate_current_locals(void);
 void clean_up_locals(void);
