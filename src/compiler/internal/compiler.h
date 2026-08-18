@@ -106,6 +106,23 @@ extern const char* compiler_type_names[];
 #define SPECIAL_CONTEXT 0x100
 #define ARG_LIST 0x200
 
+/* A block used in EXPRESSION position -- catch {}, acatch {}, time_expression
+ * {} -- saves the parser state it is about to clobber on Bison's own value
+ * stack, and its reduce action restores it. The context flags are one such
+ * piece of state; current_type is the other, and it was not saved: a
+ * declaration inside the block (`mixed e = catch { float f = 1.0; };`)
+ * overwrites the file-scope current_type global, and the ENCLOSING
+ * declarator's rule reads that global only afterwards, so the declared
+ * variable silently takes the inner declaration's type -- `e` above becomes
+ * a float and `e = 5;` then stores 5.0. (AGENTS.md section 13 item 9, at the
+ * compiler level.) Both travel packed in the single LPC_INT the
+ * *_context_open() rules return, which is error-safe: the value lives on the
+ * parser stack and is discarded with it, so a parse error cannot desync a
+ * side stack. Context flags are all <= 0x800, so the low half is ample. */
+#define PACK_SAVED_CONTEXT(ctx, type)   (((LPC_INT)(uint32_t)(type) << 32) | ((LPC_INT)(ctx) & 0xffffffffLL))
+#define SAVED_CONTEXT_FLAGS(v) ((LPC_INT)((v) & 0xffffffffLL))
+#define SAVED_CONTEXT_TYPE(v) ((int)((LPC_INT)(v) >> 32))
+
 struct function_context_t {
   parse_node_t* values_list;
   short bindable;

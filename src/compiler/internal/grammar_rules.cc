@@ -427,7 +427,8 @@ LPC_INT rule_loop_open() {
 }
 
 LPC_INT rule_special_context_open() {
-  LPC_INT saved = context;
+  LPC_INT saved = PACK_SAVED_CONTEXT(context, current_type);
+  /* catch{} / time_expression{}: break/continue may not cross out of it. */
   context = SPECIAL_CONTEXT;
   return saved;
 }

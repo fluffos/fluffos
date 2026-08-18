@@ -70,6 +70,11 @@ int g_optimize_depth = 0;
 constexpr int kMaxOptimizeDepth = 500;
 }  // namespace
 
+/* Is `n` a slot the optimizer's per-function scratch actually covers? */
+static bool optimizer_local_slot(int n) {
+  return last_local_refs != nullptr && n >= 0 && n < optimizer_num_locals;
+}
+
 static parse_node_t* optimize(parse_node_t* expr) {
   if (!expr) {
     return nullptr;
@@ -94,7 +99,7 @@ static parse_node_t* optimize(parse_node_t* expr) {
           if (!optimizer_state) {
             int x = expr->r.expr->l.number;
 
-            if (last_local_refs[x]) {
+            if (optimizer_local_slot(x) && last_local_refs[x]) {
               last_local_refs[x]->v.number = F_TRANSFER_LOCAL;
               last_local_refs[x] = nullptr;
             }
@@ -120,6 +125,15 @@ static parse_node_t* optimize(parse_node_t* expr) {
     case NODE_UNARY_OP_1:
       OPT(expr->r.expr);
       if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
+        /* A local index the scratch array was not sized for. It should not
+         * happen (generate_function() sizes it from the function's local
+         * count), but the array is a peephole optimisation only, so degrade
+         * to "no peephole" rather than reading off the end -- a tree that
+         * out-counts its function crashed the driver at compile time once
+         * already (__INIT, see compile_max_num_locals in compiler.cc). */
+        if (!optimizer_local_slot(expr->l.number)) {
+          break;
+        }
         if (last_local_refs[expr->l.number] && !optimizer_state) {
           last_local_refs[expr->l.number]->v.number = F_TRANSFER_LOCAL;
           last_local_refs[expr->l.number] = nullptr;
@@ -128,6 +142,9 @@ static parse_node_t* optimize(parse_node_t* expr) {
       break;
     case NODE_OPCODE_1:
       if (expr->v.number == F_LOCAL || expr->v.number == F_LOCAL_LVALUE) {
+        if (!optimizer_local_slot(expr->l.number)) {
+          break;
+        }
         if (expr->v.number == F_LOCAL) {
           if (!optimizer_state) {
             last_local_refs[expr->l.number] = expr;
@@ -296,6 +313,7 @@ static void optimizer_start_function(int n) {
     }
   } else {
     last_local_refs = nullptr;
+    optimizer_num_locals = 0;
   }
 }
 
