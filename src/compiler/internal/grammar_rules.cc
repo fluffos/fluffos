@@ -191,6 +191,16 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
   }
 #endif
   type = (flags << 16) | (type & 0xffff);
+  /* A function definition starts here, so a NEW frame starts here: restart
+   * slot numbering. Inside a file this matters only after a global
+   * initializer, which shares __INIT's single frame and therefore leaves
+   * max_num_locals climbing (see rule_def_global_var); without this reset the
+   * first function after such an initializer had its parameters allocated
+   * above the initializer's locals while the VM kept pushing arguments at
+   * 0..n-1, and returned the wrong values with no diagnostic. Harmless
+   * everywhere else -- rule_func() already resets on the way out. */
+  free_all_local_names(0);
+
   /* Handle type checking here so we know whether to typecheck
      'argument' */
   if (type & 0xffff) {

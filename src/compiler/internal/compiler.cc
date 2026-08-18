@@ -466,7 +466,10 @@ void init_locals() {
   current_number_of_locals = max_num_locals = 0;
 }
 
-void free_all_local_names(int flag) {
+/* Take every local name currently in scope back out of scope, WITHOUT
+ * touching max_num_locals -- the runtime-slot high-water mark, which must
+ * keep climbing for as long as one frame is being emitted. */
+void release_local_names(int flag) {
   int i;
 
   for (i = 0; i < current_number_of_locals; i++) {
@@ -477,8 +480,13 @@ void free_all_local_names(int flag) {
     locals_ptr[i].ihe->dn.local_num = -1;
   }
   current_number_of_locals = 0;
-  max_num_locals = 0;
   symbol_record(OP_SYMBOL_FREE, current_file, current_line, "");
+}
+
+void free_all_local_names(int flag) {
+  release_local_names(flag);
+  /* A new frame starts here, so slot numbering restarts too. */
+  max_num_locals = 0;
 }
 
 void deactivate_current_locals() {
@@ -570,7 +578,19 @@ void reallocate_locals() {
                           unsigned short, TAG_LOCALS, "reallocate_locals:1");
   type_of_locals_ptr = type_of_locals + offset;
   offset = locals_ptr - locals;
-  locals = RESIZE(locals, locals_size, local_info_t, TAG_LOCALS, "reallocate_locals:2");
+  /* locals_size += ..., not locals_size: the parallel type_of_locals array
+   * above grows, but this one was resized to the size it already had, so it
+   * never grew at all while locals_ptr kept advancing by
+   * current_number_of_locals at every nested-function scope switch
+   * (rule_lambda_return_type). Enough cumulative locals across nested
+   * anonymous functions and add_local_name() writes past the end of the
+   * allocation -- an ASan heap-buffer-overflow WRITE, and a heap-corruption
+   * abort on a Debug build, reachable from ordinary mudlib source.
+   * add_local_name()'s own "Too many local variables" check cannot bound it,
+   * because that compares the PER-LEVEL max_num_locals rather than the
+   * cumulative base locals_ptr sits at. */
+  locals = RESIZE(locals, locals_size += max_local_variables, local_info_t, TAG_LOCALS,
+                  "reallocate_locals:2");
   locals_ptr = locals + offset;
 }
 

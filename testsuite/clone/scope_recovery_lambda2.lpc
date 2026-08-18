@@ -1,0 +1,13 @@
+// The same shape with the block in STATEMENT position, which reached the
+// negative count before the expression path ever did.
+void f() {
+  int a;
+  int b;
+  int c;
+  int d;
+
+  {
+    mixed g = function(int x,) { return x; };
+  }
+  a = 1;
+}

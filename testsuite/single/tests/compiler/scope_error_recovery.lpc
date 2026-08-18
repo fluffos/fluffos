@@ -1,0 +1,27 @@
+// A syntax error must not be able to desync the compiler's local-scope count
+// into a NEGATIVE pop.
+//
+// rule_lambda_return_type() switches to a nested locals scope and only
+// rule_primary_expr_anon_func() switches back. Bison error recovery can
+// discard everything between them -- a stray comma in a parameter list is
+// enough -- so the enclosing block closes with fewer locals than it opened
+// with, and the count it hands to pop_n_locals() is negative. That was a
+// fatal("pop_n_locals called with num < 0") on a Debug build and a SIGSEGV on
+// a build where DEBUG_CHECK is compiled out: one typo in one mudlib file
+// killing the driver at compile time.
+//
+// rule_block() now clamps the count. It is only ever used to decide how many
+// names to take back out of scope, and the compile is already failing, so
+// clamping restores the diagnostic the author should have got.
+
+#include "/include/tests.h"
+
+void do_tests() {
+  ASSERT2(catch(load_object("/clone/scope_recovery_lambda")) != 0,
+    "a stray comma in a lambda parameter list should be a syntax error");
+  ASSERT2(catch(load_object("/clone/scope_recovery_lambda2")) != 0,
+    "the statement-position form should be a syntax error too");
+
+  // The compiler is still healthy afterwards: argument slots are intact.
+  ASSERT_EQ(123, "/clone/block_scope_leak_a4"->id1(123));
+}

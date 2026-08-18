@@ -1,0 +1,49 @@
+// reallocate_locals() grew the type array but not the name array.
+//
+// The compiler keeps two parallel arrays for locals: type_of_locals and
+// locals. reallocate_locals() resized the first with `type_of_locals_size +=
+// max_local_variables` but passed `locals_size` UNCHANGED to the second, so
+// the name array never grew -- while locals_ptr keeps advancing by
+// current_number_of_locals at every nested-function scope switch. Enough
+// cumulative locals across nested anonymous functions and add_local_name()
+// writes past the end of the allocation: an ASan heap-buffer-overflow WRITE
+// and a heap-corruption abort on a Debug build, from ordinary mudlib source.
+//
+// add_local_name()'s own "Too many local variables" check cannot bound this,
+// because it compares the PER-LEVEL max_num_locals against the limit, not the
+// cumulative base that locals_ptr sits at.
+//
+// The source is generated rather than committed because the boundary is a few
+// hundred locals; the file is removed afterwards.
+
+#include "/include/tests.h"
+
+#define GEN "/data/nested_lambda_locals"
+#define PER_LEVEL 180
+
+private string level(string tag) {
+  string s = "";
+  int i;
+
+  for (i = 0; i < PER_LEVEL; i++) {
+    s += "    int " + tag + i + ";\n";
+  }
+  return s;
+}
+
+void do_tests() {
+  string src;
+  mixed err;
+  object ob;
+
+  src = "mixed deep() {\n  return function() {\n" + level("a") + "    return function() {\n" + level("b") + "      return function() {\n" + level("c") + "        return 1;\n      };\n    };\n  };\n}\n";
+
+  write_file(GEN + ".c", src, 1);
+  err = catch(ob = load_object(GEN));
+  ASSERT2(err == 0, "three nested lambdas with " + (PER_LEVEL * 3) +
+    " cumulative locals should compile: " + err);
+  if (ob) {
+    destruct(ob);
+  }
+  rm(GEN + ".c");
+}
