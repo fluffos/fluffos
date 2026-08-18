@@ -335,7 +335,7 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
       p = strput(buf, end, "Bad assignment ");
       p = get_two_types(p, end, lval->type, rval->type);
       p = strput(p, end, ".");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
     CREATE_LOGICAL_ASSIGN(*result, opcode, lval, rval);
   } else {
@@ -359,7 +359,7 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
       p = strput(buf, end, "Bad assignment ");
       p = get_two_types(p, end, lval->type, rval->type);
       p = strput(p, end, ".");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
 
     if (opcode == F_ASSIGN) (*result)->l.expr = do_promotions(rval, lval->type);
@@ -404,7 +404,7 @@ void rule_expr_ternary(parse_node_t** result, parse_node_t* cond, parse_node_t* 
     p = strput(buf, end, "Types in ?: do not match ");
     p = get_two_types(p, end, val1->type, val2->type);
     p = strput(p, end, ".");
-    yywarn(buf);
+    yywarn("%s", buf);
   }
 
   if (IS_NODE(cond, NODE_UNARY_OP, F_NOT)) {
@@ -429,7 +429,7 @@ void rule_primary_expr_cast(parse_node_t** result, LPC_INT type, parse_node_t* e
     p = get_type_name(p, end, expr->type);
     p = strput(p, end, "to ");
     p = get_type_name(p, end, type);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 }
 
@@ -525,7 +525,7 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
       p = strput(buf, end, "Illegal to use private variable '");
       p = strput(p, end, ihe->name);
       p = strput(p, end, "'");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   } else if (ihe->dn.function_num != -1) {
     *result = new_node();
@@ -562,7 +562,7 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
       add_local_name(ihe->name, TYPE_ANY);
     }
     CREATE_ERROR(*result);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 }
 
@@ -931,7 +931,7 @@ void rule_primary_expr_functional_1(parse_node_t** result, LPC_INT val) {
         p = strput(buf, end, "Illegal to use private variable '");
         p = strput(p, end, VAR_TEMP((*result)->l.expr->l.number)->name);
         p = strput(p, end, "'");
-        yyerror(buf);
+        yyerror("%s", buf);
       }
       break;
     default:
@@ -972,7 +972,7 @@ void rule_primary_expr_functional_2(parse_node_t** result, LPC_INT val,
             char* p;
             p = strput(bff, end, "Too many arguments to ");
             p = strput(p, end, predefs[f].word);
-            yyerror(bff);
+            yyerror("%s", bff);
           }
         } else if (max_arg != -1 && exact_types) {
           int i, argn, tmp;
@@ -992,7 +992,7 @@ void rule_primary_expr_functional_2(parse_node_t** result, LPC_INT val,
               p = strput(p, end, " to efun ");
               p = strput(p, end, predefs[f].word);
               p = strput(p, end, "()");
-              yyerror(buf);
+              yyerror("%s", buf);
             } else {
               if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
                 for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++);
@@ -1097,7 +1097,7 @@ void rule_function_call_new_class(parse_node_t** result, ident_hash_elem_t* ihe,
     p = strput(buf, end, "Undefined class '");
     p = strput(p, end, ihe->name);
     p = strput(p, end, "'");
-    yyerror(buf);
+    yyerror("%s", buf);
     CREATE_ERROR(*result);
     /* class_init member-name c_str()s are arena memory; bulk-freed. */
   } else {
@@ -1187,7 +1187,7 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
       p = strput(buf, end, "Illegal to use private variable '");
       p = strput(p, end, ihe->name);
       p = strput(p, end, "'");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
 
     (*result)->kind = NODE_EFUN;
@@ -1212,7 +1212,7 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
       if (*n == ':') n++;
       p = strput(buf, end, "Undefined function ");
       p = strput(p, end, n);
-      yyerror(buf);
+      yyerror("%s", buf);
     } else {
       if (current_function_context) current_function_context->bindable = FP_NOT_BINDABLE;
 
@@ -1419,7 +1419,7 @@ void rule_expr_or(struct parse_node_t** result, struct parse_node_t* expr1,
         p = strput(buf, end, "Incompatible types for | ");
         p = get_two_types(p, end, t1, t3);
         p = strput(p, end, ".");
-        yyerror(buf);
+        yyerror("%s", buf);
       }
       t1 = TYPE_ANY | TYPE_MOD_ARRAY;
     }
@@ -1446,7 +1446,7 @@ void rule_expr_and(struct parse_node_t** result, struct parse_node_t* expr1,
         p = strput(buf, end, "Incompatible types for & ");
         p = get_two_types(p, end, t1, t3);
         p = strput(p, end, ".");
-        yyerror(buf);
+        yyerror("%s", buf);
       }
       t1 = TYPE_ANY | TYPE_MOD_ARRAY;
     }
@@ -1476,7 +1476,7 @@ void rule_expr_eq(struct parse_node_t** result, struct parse_node_t* expr1,
     p = strput(buf, end, "== always false because of incompatible types ");
     p = get_two_types(p, end, expr1->type, expr2->type);
     p = strput(p, end, ".");
-    yyerror(buf);
+    yyerror("%s", buf);
   }
   if (IS_NODE(expr1, NODE_NUMBER, 0)) {
     CREATE_UNARY_OP(*result, F_NOT, TYPE_NUMBER, expr2);
@@ -1496,7 +1496,7 @@ void rule_expr_ne(struct parse_node_t** result, struct parse_node_t* expr1,
     p = strput(buf, end, "!= always true because of incompatible types ");
     p = get_two_types(p, end, expr1->type, expr2->type);
     p = strput(p, end, ".");
-    yyerror(buf);
+    yyerror("%s", buf);
   }
   CREATE_BINARY_OP(*result, F_NE, TYPE_NUMBER, expr1, expr2);
 }
@@ -1516,7 +1516,7 @@ void rule_expr_order(struct parse_node_t** result, struct parse_node_t* expr1, L
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, t1);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!COMP_TYPE(t3, TYPE_NUMBER) && !COMP_TYPE(t3, TYPE_STRING)) {
       char buf[256];
       char* end = EndOf(buf);
@@ -1526,7 +1526,7 @@ void rule_expr_order(struct parse_node_t** result, struct parse_node_t* expr1, L
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, t3);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!compatible_types2(t1, t3)) {
       char buf[256];
       char* end = EndOf(buf);
@@ -1535,7 +1535,7 @@ void rule_expr_order(struct parse_node_t** result, struct parse_node_t* expr1, L
       p = strput(p, end, query_instr_name(op));
       p = strput(p, end, " do not have compatible types : ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   }
   CREATE_BINARY_OP(*result, op, TYPE_NUMBER, expr1, expr2);
@@ -1553,7 +1553,7 @@ void rule_expr_lt(struct parse_node_t** result, struct parse_node_t* expr1,
       p = strput(buf, end, "Bad left argument to '<' : \"");
       p = get_type_name(p, end, t1);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!COMP_TYPE(t3, TYPE_NUMBER) && !COMP_TYPE(t3, TYPE_STRING)) {
       char buf[200];
       char* end = EndOf(buf);
@@ -1561,14 +1561,14 @@ void rule_expr_lt(struct parse_node_t** result, struct parse_node_t* expr1,
       p = strput(buf, end, "Bad right argument to '<' : \"");
       p = get_type_name(p, end, t3);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!compatible_types2(t1, t3)) {
       char buf[256];
       char* end = EndOf(buf);
       char* p;
       p = strput(buf, end, "Arguments to < do not have compatible types : ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   }
   CREATE_BINARY_OP(*result, F_LT, TYPE_NUMBER, expr1, expr2);
@@ -1658,7 +1658,7 @@ void rule_expr_add(struct parse_node_t** result, struct parse_node_t* expr1,
 
             p = strput(buf, end, "Invalid argument types to '+' ");
             p = get_two_types(p, end, t1, t3);
-            yyerror(buf);
+            yyerror("%s", buf);
             result_type = TYPE_ANY;
           }
         }
@@ -1797,7 +1797,7 @@ void rule_expr_sub(struct parse_node_t** result, struct parse_node_t* expr1,
 
       p = strput(buf, end, "Invalid types to '-' ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
       result_type = TYPE_ANY;
     }
   } else
@@ -1879,7 +1879,7 @@ void rule_expr_mul(struct parse_node_t** result, struct parse_node_t* expr1,
 
       p = strput(buf, end, "Invalid types to '*' ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
       result_type = TYPE_ANY;
     }
   } else
@@ -1957,7 +1957,7 @@ void rule_expr_div(struct parse_node_t** result, struct parse_node_t* expr1,
 
       p = strput(buf, end, "Invalid types to '/' ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
       result_type = TYPE_ANY;
     }
   } else
@@ -2035,7 +2035,7 @@ void rule_expr_cast(struct parse_node_t** result, LPC_INT type, struct parse_nod
     p = get_type_name(p, end, expr->type);
     p = strput(p, end, "to ");
     p = get_type_name(p, end, type);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 }
 

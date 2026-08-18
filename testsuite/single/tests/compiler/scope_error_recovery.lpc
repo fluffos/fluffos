@@ -22,6 +22,21 @@ void do_tests() {
   ASSERT2(catch(load_object("/clone/scope_recovery_lambda2")) != 0,
     "the statement-position form should be a syntax error too");
 
+  // The same abandoned production reached two more crash sites, both through
+  // callers that pop a FIXED count rather than a scope difference -- for() and
+  // foreach() pop their loop variable, switch() pops its pre-case
+  // declarations. A fixed count is only right if the scope still holds what it
+  // did when the count was decided, so the leaked scope drove
+  // current_number_of_locals negative: locals_ptr[-1] was read for its
+  // runtime_index and written through (SIGSEGV, ASan heap-buffer-overflow),
+  // and clean_up_locals() dereferenced an uninitialised ident_hash_elem_t in
+  // the gap the advanced locals_ptr left behind. Fuzzing reduced 150 distinct
+  // crashing inputs to these two shapes.
+  ASSERT2(catch(load_object("/clone/scope_recovery_for")) != 0,
+    "an abandoned lambda production in a for() body should be a syntax error");
+  ASSERT2(catch(load_object("/clone/scope_recovery_foreach")) != 0,
+    "the same in a foreach() body should be a syntax error");
+
   // The compiler is still healthy afterwards: argument slots are intact.
   ASSERT_EQ(123, "/clone/block_scope_leak_a4"->id1(123));
 }
