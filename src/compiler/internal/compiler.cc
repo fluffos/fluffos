@@ -429,6 +429,18 @@ int locals_size = 0;
 int type_of_locals_size = 0;
 int current_number_of_locals = 0;
 int max_num_locals = 0;
+/* High-water mark of max_num_locals across the WHOLE compile.
+ *
+ * max_num_locals is per-function and reset by free_all_local_names(), so by
+ * the time __INIT is assembled at the end of the compile it reads 0 -- even
+ * though a global initializer's block (`mixed g = catch { int f = 1; };`)
+ * declared locals that are still referenced by local index in __INIT's tree.
+ * generate_function() sizes the optimizer's last_local_refs[] from that
+ * number, and 0 means "allocate nothing", so optimizing __INIT dereferenced
+ * a null pointer and took the driver down while COMPILING one line of
+ * ordinary mudlib source. Sizing __INIT's scratch by the largest count seen
+ * anywhere in the file over-allocates a little and can never be short. */
+static int compile_max_num_locals = 0;
 
 /* This function has strput() semantics; see comments in simulate.c */
 char* get_two_types(char* where, char* end, int type1, int type2) {
@@ -542,6 +554,9 @@ int add_local_name(const char* str, int type, parse_node_t* optional_default_arg
   locals_ptr[idx].runtime_index = max_num_locals;
   if (ihe->dn.local_num == -1) {
     ihe->sem_value++;
+  }
+  if (max_num_locals + 1 > compile_max_num_locals) {
+    compile_max_num_locals = max_num_locals + 1;
   }
   return ihe->dn.local_num = max_num_locals++;
 }
@@ -2866,11 +2881,24 @@ static program_t* epilog(void) {
     CREATE_RETURN(pn, nullptr);
     newnode = comp_trees[TREE_INIT];
     CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0, newnode, pn);
-    fun = define_new_function(APPLY___INIT, 0, 0, DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
+    /* num_local is compile_max_num_locals, not 0: a global initializer may
+     * declare locals inside a catch {} / time_expression {} block, and __INIT
+     * has to allocate slots for them or the generated code pushes locals the
+     * frame does not have ("Invalid Program: op F_TRANSFER_LOCAL Tried to
+     * push non-existent local" at load time). Sized by the largest count seen
+     * anywhere in the file: initializers run as sequential statements so the
+     * slots are reused, and over-allocating a handful of svalues for the
+     * duration of __INIT is cheaper than threading a second high-water mark
+     * through the parser. */
+    fun = define_new_function(APPLY___INIT, 0, compile_max_num_locals,
+                              DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
     pn = new_node_no_line();
     pn->kind = NODE_FUNCTION;
     pn->v.number = fun;
-    pn->l.number = 0;
+    /* Not 0: a global initializer may declare locals inside a catch {} /
+     * time_expression {} block, and their indices appear in this tree (see
+     * compile_max_num_locals). */
+    pn->l.number = compile_max_num_locals;
     pn->r.expr = comp_trees[TREE_INIT];
     comp_trees[TREE_INIT] = pn;
   }
@@ -3197,6 +3225,7 @@ static bool prolog(std::string_view source, const char* name, void* scanner) {
   for (i = 0; i < NUMTREES; i++) {
     comp_trees[i] = nullptr;
   }
+  compile_max_num_locals = 0;
   prog_flags = nullptr;
   func_index_map = nullptr;
   comp_sorted_funcs = nullptr;

@@ -1,0 +1,103 @@
+// A block used in EXPRESSION position must not leak its inner declarations'
+// type to the declaration it is initializing.
+//
+// `catch {}` and `time_expression {}` both set the compiler's
+// file-scope `current_type` when a declaration inside them is parsed, and the
+// ENCLOSING declarator's rule reads that same global afterwards -- so the
+// variable being initialized silently took the type of the last local
+// declared inside the block. Two ways that showed up:
+//
+//   mixed err = catch { mapping acc = ...; };    // err is typed `mapping`
+//   write("failed: " + err);                     // Invalid argument types to '+'
+//
+// -- a compile error pointing at a line that has nothing to do with the
+// cause -- and, when the stolen type is one the compiler will coerce to:
+//
+//   mixed e = catch { float f = 1.0; };
+//   e = 5;                                       // silently stores 5.000000
+//
+// -- no error at all, just a wrong value, because do_promotions() inserted an
+// int->float conversion nobody asked for.
+//
+// The block constructs now save and restore current_type across the block on
+// Bison's own value stack, alongside the context flags they already saved
+// there.
+
+#include "/include/tests.h"
+
+nosave mixed keep;
+
+private void float_case() {
+  mixed e = catch { float scratch = 1.0; };
+  int n = 5;
+
+  e = n;
+  ASSERT_EQ("int", typeof(e));
+  ASSERT_EQ(5, e);
+}
+
+private void mapping_case() {
+  // The documented idiom: a declaration inside the region. If the enclosing
+  // `err` is retyped to `mapping`, this file does not compile at all.
+  mixed err = catch {
+    mapping acc = ([ "balance": 10 ]);
+    keep = acc;
+  };
+
+  ASSERT_EQ(0, err);
+  keep = "concatenating " + (err ? err : "nothing");
+  ASSERT_EQ("string", typeof(keep));
+}
+
+private void second_declarator_case() {
+  // The leak also reached a LATER declarator in the same statement.
+  mixed e = catch { int v = 1; }, e2;
+
+  e2 = 1.5;
+  ASSERT_EQ("float", typeof(e2));
+  ASSERT_EQ(0, e);
+}
+
+private void time_expression_case() {
+  mixed t = time_expression { float scratch = 2.0; };
+  int n = 7;
+
+  ASSERT2(intp(t), "time_expression should still yield an int");
+  t = n;
+  ASSERT_EQ("int", typeof(t));
+  ASSERT_EQ(7, t);
+}
+
+private void nested_case() {
+  mixed outer = catch {
+    string s = "x";
+    keep = catch { float f = 3.0; };
+  };
+  int n = 9;
+
+  outer = n;
+  ASSERT_EQ("int", typeof(outer));
+  ASSERT_EQ(9, outer);
+}
+
+
+// A global initializer reaches the same rules through __INIT, which used to
+// declare zero locals to the tree optimizer -- a local declared inside this
+// block then indexed a scratch array that was never allocated, segfaulting
+// the driver while COMPILING this line.
+nosave mixed global_init = catch {
+  int inner = 1;
+  keep = inner;
+};
+
+void do_tests() {
+  ASSERT2(
+    global_init == 0,
+    "global_init = " + sprintf("%O", global_init) + " typeof " + typeof(global_init)
+  );
+  float_case();
+  mapping_case();
+  second_declarator_case();
+  time_expression_case();
+  nested_case();
+}
