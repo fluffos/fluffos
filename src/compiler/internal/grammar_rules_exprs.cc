@@ -14,7 +14,31 @@ extern int context;
 extern int func_present;
 extern int num_refs;
 
-parse_node_t* rule_expr_or_block_block(decl_t decl_val) { return decl_val.node; }
+parse_node_t* rule_expr_or_block_block(decl_t decl_val) {
+  parse_node_t* node = decl_val.node;
+
+  /* Pop the block's locals, exactly as the STATEMENT path does
+   * (rule_statement_compound_stmt). `block` hands up the scope's local count
+   * in decl_val.num; dropping it left every local declared inside a
+   * catch {} / acatch {} / time_expression {} in scope after the closing
+   * brace, with consequences well past "an out-of-scope name still
+   * resolves":
+   *
+   *   - legal code rejected -- `mixed e = catch { int v = 1; }; int v = 2;`
+   *     is "Illegal to redeclare local name 'v'";
+   *   - for()/foreach() pop a FIXED count rather than a scope diff, so a leak
+   *     in the init expression makes them free the wrong local and the loop
+   *     variable outlives the loop;
+   *   - and, worst, a leak from a GLOBAL initializer is never cleaned up by
+   *     anything (there is no enclosing function to end), so the next
+   *     function's parameters are allocated from slot 1 up while the VM still
+   *     pushes arguments at 0..n-1: `mixed g = catch { int f = 1; }; int
+   *     id(int a) { return a; }` compiled silently and id(71) returned 0.
+   *
+   * Anonymous functions were the one construct already doing this correctly. */
+  pop_n_locals(decl_val.num);
+  return node;
+}
 
 parse_node_t* rule_expr_or_block_expr(parse_node_t* expr) { return insert_pop_value(expr); }
 
