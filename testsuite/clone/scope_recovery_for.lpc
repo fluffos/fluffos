@@ -1,0 +1,13 @@
+// Fixture for compiler/scope_error_recovery.lpc: an abandoned anonymous-
+// function production inside a for() body. rule_lambda_return_type() opened a
+// nested locals scope that nothing closed, and for() pops a FIXED count, so
+// current_number_of_locals went negative and locals_ptr[-1] was read.
+// Must fail to compile, without taking the driver down.
+void f() {
+  for (int i = 0; ; ) {
+    function();
+  }
+  {
+    function();
+  }
+}

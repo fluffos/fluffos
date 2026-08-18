@@ -146,7 +146,7 @@ parse_node_t* binary_int_op(parse_node_t* l, parse_node_t* r, char op, const cha
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, l->type);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
     if (!IS_TYPE(r->type, TYPE_NUMBER)) {
       char buf[256];
@@ -158,7 +158,7 @@ parse_node_t* binary_int_op(parse_node_t* l, parse_node_t* r, char op, const cha
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, r->type);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   }
   if (l->kind == NODE_NUMBER) {

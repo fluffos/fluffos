@@ -142,7 +142,7 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
       p = get_two_types(p, end, type, expr->type);
       p = strput(p, end, " when initializing ");
       p = strput(p, end, identifier->c_str());
-      yyerror(buff);
+      yyerror("%s", buff);
     }
   } else
     type = 0;
@@ -210,7 +210,7 @@ parse_node_t* rule_new_local_def_with_init(const ScratchString* name, LPC_INT ty
     p = get_two_types(p, end, type, expr->type);
     p = strput(p, end, " when initializing ");
     p = strput(p, end, name->c_str());
-    yyerror(buff);
+    yyerror("%s", buff);
   }
 
   expr = do_promotions(expr, type);
@@ -240,7 +240,7 @@ parse_node_t* rule_single_new_local_def_with_init(LPC_INT local_num, LPC_INT ass
     p = strput(buff, end, "Type mismatch ");
     p = get_two_types(p, end, type, expr->type);
     p = strput(p, end, " when initializing.");
-    yyerror(buff);
+    yyerror("%s", buff);
   }
 
   expr = do_promotions(expr, type);

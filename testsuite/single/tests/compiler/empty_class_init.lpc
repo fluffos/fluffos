@@ -1,0 +1,21 @@
+// An empty class body instantiated with a named initializer must be diagnosed,
+// not abort the driver.
+//
+// reorder_class_values() called DCALLOC(cd->size, ...) with size 0, tripping
+// debugmalloc's assert(size > 0): a Debug driver died with SIGABRT while
+// COMPILING `new(class E, x: 1)` where `class E { }` is empty. Release builds
+// were unaffected, which is why it survived -- and it was found by mutating a
+// real in-tree file, whose `class Node { }` is genuine source.
+//
+// Only the allocation is special-cased: the member walk still runs, so the
+// bogus member is reported the same way a non-empty class reports it. An early
+// return would have traded an abort for a silently accepted typo.
+
+#include "/include/tests.h"
+
+void do_tests() {
+  mixed err = catch(load_object("/clone/empty_class_named_init"));
+
+  ASSERT2(err != 0,
+    "an empty class with a named initializer should be diagnosed, not accepted");
+}

@@ -66,7 +66,7 @@ void rule_foreach_var_defined(decl_t* result, ident_hash_elem_t* ihe) {
     p = strput(buf, end, "'");
     p = strput(p, end, ihe->name);
     p = strput(p, end, "' is not a local or a global variable.");
-    yyerror(buf);
+    yyerror("%s", buf);
     CREATE_OPCODE_1(result->node, F_GLOBAL_LVALUE, 0, 0);
   }
   result->num = 0;
@@ -220,7 +220,7 @@ void rule_return_expr(parse_node_t** result, parse_node_t* expr) {
 
     p = strput(buf, end, "Type of returned value doesn't match function return type ");
     p = get_two_types(p, end, expr->type, exact_types);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 
   /* Coerce the returned value to the function's declared return type, the

@@ -1,0 +1,15 @@
+// Fixture for compiler/empty_class_init.lpc: instantiating an EMPTY class with
+// a named initializer reached DCALLOC(0, ...), which trips debugmalloc's
+// assert(size > 0) -- a Debug-build abort while COMPILING this one line.
+// The bogus member must still be reported, exactly as for a non-empty class.
+class E {}
+
+class N {
+  int a;
+}
+
+int empty_bogus() {
+  class E e = new(class E, x: 1);
+
+  return 0;
+}

@@ -509,10 +509,21 @@ void reactivate_current_locals() {
 void clean_up_locals() {
   int offset;
 
-  offset = locals_ptr + current_number_of_locals - locals;
+  /* Walk only the CURRENT scope, i.e. [locals_ptr, locals_ptr +
+   * current_number_of_locals), not everything from the base of the array.
+   * When a nested scope was opened by rule_lambda_return_type() and never
+   * closed (see pop_n_locals), locals_ptr sits above `locals` with a gap of
+   * entries this function never initialised, and dereferencing their `ihe`
+   * is a null-pointer member access -- the second crash site of the same
+   * root cause. Entries below locals_ptr belong to the enclosing scope and
+   * are released by whoever owns it. */
+  offset = current_number_of_locals;
   while (offset--) {
-    locals[offset].ihe->sem_value--;
-    locals[offset].ihe->dn.local_num = -1;
+    if (locals_ptr[offset].ihe == nullptr) {
+      continue;
+    }
+    locals_ptr[offset].ihe->sem_value--;
+    locals_ptr[offset].ihe->dn.local_num = -1;
   }
   current_number_of_locals = 0;
   max_num_locals = 0;
@@ -525,7 +536,29 @@ void pop_n_locals(int num) {
   int ltype_start, i1;
 
   DEBUG_CHECK(num < 0, "pop_n_locals called with num < 0");
-  if (num == 0) {
+  /* Clamp to what is actually in scope.
+   *
+   * Several callers pop a FIXED count rather than a scope difference --
+   * rule_for()/rule_foreach() pop their loop variable, rule_switch pops its
+   * pre-case declarations -- and a fixed count is only right if the scope
+   * still holds what it did when the count was decided. Bison error recovery
+   * can break that: rule_lambda_return_type() opens a nested locals scope in
+   * a mid-rule action and only rule_primary_expr_anon_func() closes it, so a
+   * syntax error between them (`for (int i = 0; ; ) { function(); }`) leaves
+   * the scope open and the fixed pop drives current_number_of_locals
+   * NEGATIVE. locals_ptr[-1] is then read for its runtime_index and the loop
+   * below writes through the garbage `ihe` it finds -- a SIGSEGV on release
+   * and Debug alike, and an ASan heap-buffer-overflow, from one malformed
+   * mudlib file. Found by fuzzing: 150 of 157 distinct crashing inputs.
+   *
+   * Clamping here rather than at each caller covers all three at once, and
+   * the compile is already failing when it fires. rule_block()'s own
+   * negative-diff clamp stays: it protects the count it computes before the
+   * value ever reaches this function. */
+  if (num > current_number_of_locals) {
+    num = current_number_of_locals;
+  }
+  if (num <= 0) {
     return;
   }
   symbol_record(OP_SYMBOL_POP, current_file, current_line, std::to_string(num).c_str());
@@ -791,8 +824,21 @@ parse_node_t* reorder_class_values(int which, parse_node_t* node) {
   int i;
 
   cd = (reinterpret_cast<class_def_t*>(mem_block[A_CLASS_DEF].block)) + which;
-  tmp = reinterpret_cast<parse_node_t**>(
-      DCALLOC(cd->size, sizeof(parse_node_t*), TAG_COMPILER, "reorder_class_values"));
+  /* At least one element: an EMPTY class body reaches here with size 0 when
+   * it is instantiated with a named initializer -- `class E { }` then
+   * `new(class E, x: 1)` -- and DCALLOC(0, ...) trips debugmalloc's
+   * `assert(size > 0)`, so a Debug driver ABORTED while compiling that one
+   * line. Release builds were unaffected, which is why it went unnoticed.
+   *
+   * Only the allocation is special-cased, deliberately: both loops below are
+   * bounded by cd->size and do nothing for an empty class, while the member
+   * walk in between still runs and still reports `x` through
+   * lookup_class_member()'s "Class 'E' has no member 'x'" -- which is what a
+   * non-empty class does with a bogus member, and what an early return here
+   * would have silently skipped. */
+  tmp = reinterpret_cast<parse_node_t**>(DCALLOC(cd->size > 0 ? cd->size : 1,
+                                                 sizeof(parse_node_t*), TAG_COMPILER,
+                                                 "reorder_class_values"));
 
   for (i = 0; i < cd->size; i++) {
     tmp[i] = nullptr;
@@ -1172,7 +1218,7 @@ void type_error(const char* str, int type) {
   p = strput(p, end, ": \"");
   p = get_type_name(p, end, type);
   p = strput(p, end, "\"");
-  yyerror(buff);
+  yyerror("%s", buff);
 }
 
 /*
@@ -2036,7 +2082,7 @@ int validate_function_call(int f, parse_node_t* args) {
           p = strput(p, end, funp->funcname);
           p = strput(p, end, " ");
           p = get_two_types(p, end, arg_types[i], tmp);
-          yyerror(buff);
+          yyerror("%s", buff);
         }
         enode = enode->r.expr;
       }
@@ -3491,7 +3537,7 @@ void prepare_cases(parse_node_t* pn, int start) {
       }
       p = strput_int(p, end, l2);
       p = strput(p, end, ".");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
     (*(ce - 1))->l.expr = *ce;
     if ((*ce)->v.expr) {
