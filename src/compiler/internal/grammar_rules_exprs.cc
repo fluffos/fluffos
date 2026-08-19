@@ -554,7 +554,7 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
     char buf[256];
     char* end = EndOf(buf);
     char* p;
-    auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+    auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
     p = strput(buf, end, "Undefined variable '");
     p = strput(p, end, ihe->name);
     p = strput(p, end, "'");
@@ -567,7 +567,7 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
 }
 
 void rule_primary_expr_identifier(parse_node_t** result, const ScratchString* name) {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
   if (current_number_of_locals < max_local_variables) {
     add_local_name(name, TYPE_ANY);
   }
@@ -801,7 +801,7 @@ void rule_primary_expr_index(parse_node_t** result, parse_node_t* expr, parse_no
 }
 
 void rule_lambda_return_type(func_block_t* saved_block, LPC_INT type) {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
   if (type != TYPE_FUNCTION) {
     yyerror("Reserved type name unexpected.");
     // Do NOT push a fresh nested local-variable scope for a rejected type:

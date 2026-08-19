@@ -492,7 +492,7 @@ char* get_two_types(char* where, char* end, int type1, int type2) {
 }
 
 void init_locals() {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
 
   type_of_locals = reinterpret_cast<unsigned short*>(
       DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "init_locals:1"));
@@ -616,7 +616,7 @@ void pop_n_locals(int num) {
 }
 
 int add_local_name(const char* str, int type, parse_node_t* optional_default_arg_value) {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
 
   if (max_num_locals == max_local_variables) {
     yyerror("Too many local variables");
@@ -641,7 +641,7 @@ int add_local_name(const char* str, int type, parse_node_t* optional_default_arg
 }
 
 void reallocate_locals() {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
 
   int offset;
   offset = type_of_locals_ptr - type_of_locals;
@@ -2670,7 +2670,7 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   local_info_t* saved_locals_ptr = locals_ptr;
 
   // Allocate fresh, isolated local variable scratchpads for this compilation level
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
   type_of_locals = reinterpret_cast<unsigned short*>(
       DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "compile_file:1"));
   locals = reinterpret_cast<local_info_t*>(
