@@ -94,7 +94,6 @@ they always match the options it actually recognizes.
 | `evaluator stack size` | int | 65536 | Maximum size of the evaluator stack, which holds all local variables and call arguments. |
 | `inherit chain size` | int | 30 | Maximum depth of an object's inheritance chain. |
 | `maximum evaluation cost` | int | 30000000 | Maximum eval cost a single thread may consume before execution is aborted. |
-| `maximum local variables` | int | 255 | Maximum number of local variables a single function may allocate. This counts SLOTS, not names in scope at once: sibling blocks inside one function each take fresh slots and never give them back, so a function with ten sequential blocks of eight locals allocates eighty, not eight. Local variable indexes are encoded as a single byte in bytecode, so this cannot exceed 255. Values well below the default will refuse code that works today -- before this option was fixed it had no effect at all, and every function was limited to 521 slots. _(range 64-255)_ |
 | `maximum call depth` | int | 150 | Maximum nesting depth of LPC function calls. |
 | `maximum array size` | int | 15000 | Maximum number of elements in a single array. |
 | `maximum buffer size` | int | 1048576 | Maximum size, in bytes, of a single buffer variable. |

@@ -1573,9 +1573,20 @@ TEST(Diagnostics, WindowedSnippetClipsRangeStartingLeftOfWindow) {
       << "a range starting left of the window must still underline its "
          "visible part, not disappear:\n"
       << r;
-  // The caret is still placed, and the underline must not run past it into
-  // the columns the range does not cover.
   EXPECT_NE(r.find('^'), std::string::npos);
+
+  // Asserting merely that SOME '~' exists is too weak -- it holds whether the
+  // underline is clipped correctly or spills left onto the "..." elision
+  // marker. Pin the alignment: on the marks line, every column under the
+  // three-character marker must be blank, because the marker is not part of
+  // any operand.
+  auto const marks_at = r.rfind("\n      | ");
+  ASSERT_NE(marks_at, std::string::npos) << r;
+  std::string const marks = r.substr(marks_at + 9);
+  ASSERT_GE(marks.size(), 3u) << r;
+  EXPECT_EQ(marks.substr(0, 3), "   ")
+      << "the elision marker must not be underlined:\n"
+      << r;
 }
 
 TEST(Diagnostics, ExpansionErrorAttributesInvocationColumn) {
