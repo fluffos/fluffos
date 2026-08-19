@@ -2273,7 +2273,12 @@ void eval_instruction(char* p) {
               break;
             case PUSH_LOCAL:
               lval = fp + (i & PUSH_MASK);
-              if ((fp - lval) >= csp->num_local_variables) {
+              /* (lval - fp), not (fp - lval): the operand is an index ABOVE
+               * fp, so the reversed subtraction is -index and could only ever
+               * be >= num_local_variables for the degenerate empty frame.
+               * Every real over-index slipped straight through into an
+               * out-of-bounds svalue read. */
+              if ((lval - fp) >= csp->num_local_variables) {
                 error("Invalid Program: op PUSH Tried to push non-existent local\n");
               }
               if ((lval->type == T_OBJECT) && (lval->u.ob->flags & O_DESTRUCTED)) {
@@ -2710,7 +2715,7 @@ void eval_instruction(char* p) {
         svalue_t* s;
 
         s = fp + EXTRACT_UCHAR(pc++);
-        if ((fp - s) >= csp->num_local_variables) {
+        if ((s - fp) >= csp->num_local_variables) {
           error("Invalid Program: op F_TRANSFER_LOCAL Tried to push non-existent local.");
         }
         if ((s->type == T_OBJECT) && (s->u.ob->flags & O_DESTRUCTED)) {
@@ -2725,7 +2730,7 @@ void eval_instruction(char* p) {
         svalue_t* s;
 
         s = fp + EXTRACT_UCHAR(pc++);
-        if ((fp - s) >= csp->num_local_variables)
+        if ((s - fp) >= csp->num_local_variables)
           error("Invalid Program: op F_LOCAL Tried to push non-existent local.");
 
         /*
@@ -3427,6 +3432,28 @@ void eval_instruction(char* p) {
       case F_VOID_ASSIGN_LOCAL:
         if (sp->type != T_INVALID) {
           lval = fp + EXTRACT_UCHAR(pc++);
+          /* Bounds-check like F_LOCAL / F_TRANSFER_LOCAL / PUSH_LOCAL do. This
+           * is the WRITING local opcode and was the only one with no guard at
+           * all, so an index past the frame silently freed and overwrote
+           * whatever sat above it -- the caller's stack.
+           *
+           * Reachable today: a default-argument expression that declares a
+           * local, `int f(int a, int b : (: (catch { int q = 1; } ? 7 : 5)
+           * :))`. Its `q` is numbered in the ENCLOSING function's frame
+           * (slot 2, after a and b), but fill_default_args() invokes the
+           * helper with call_program() directly, bypassing
+           * setup_new_frame(), so the frame it runs in has no locals at all.
+           * f(1) returned 100 instead of 105 and f(2, 3) returned 200 instead
+           * of 203 -- the explicitly passed argument was destroyed too -- with
+           * a Debug build reporting a bad shared-string ref count and, in one
+           * shape, aborting on "T_FREED svalue freed".
+           *
+           * Diagnosing rather than corrupting is the fix available here; the
+           * numbering mismatch itself lives in the compiler and is a larger
+           * change. */
+          if ((lval - fp) >= csp->num_local_variables) {
+            error("Invalid Program: op F_VOID_ASSIGN_LOCAL Tried to assign non-existent local.\n");
+          }
           free_svalue(lval, "F_VOID_ASSIGN_LOCAL");
           *lval = *sp--;
         } else {
