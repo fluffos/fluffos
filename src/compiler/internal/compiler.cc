@@ -246,6 +246,7 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     constexpr size_t kMaxSnippetWidth = 200;
     constexpr size_t kCaretMargin = 80;
     int col_shift = 0;
+    int snippet_prefix = 0;
     if (shown.size() > kMaxSnippetWidth) {
       size_t const caret = caret_col > 0 ? static_cast<size_t>(caret_col - 1) : 0;
       size_t start = caret > kCaretMargin ? caret - kCaretMargin : 0;
@@ -264,6 +265,7 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
         windowed += "...";
       }
       col_shift = static_cast<int>(prefix) - static_cast<int>(start);
+      snippet_prefix = static_cast<int>(prefix);
       shown = windowed;
     }
     char num[16];
@@ -281,8 +283,11 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
          * huge value, so the loop condition failed on its FIRST test and
          * the whole underline disappeared instead of being clipped to the
          * visible part (which made the `if (c <= 0) continue` that used to
-         * sit here dead code). */
-        for (int c = std::max(1, r.col_start + col_shift), last = r.col_end + col_shift;
+         * sit here dead code). The floor is the first column of real source,
+         * PAST the "..." elision marker -- clamping to 1 instead underlines
+         * the marker itself, which is not part of any operand. */
+        for (int c = std::max(snippet_prefix + 1, r.col_start + col_shift),
+                 last = r.col_end + col_shift;
              c <= last && static_cast<size_t>(c) <= marks.size(); c++) {
           marks[static_cast<size_t>(c - 1)] = '~';
           any = true;
@@ -498,7 +503,7 @@ char* get_two_types(char* where, char* end, int type1, int type2) {
 }
 
 void init_locals() {
-  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
 
   type_of_locals = reinterpret_cast<lpc_type_t*>(
       DCALLOC(max_local_variables, sizeof(lpc_type_t), TAG_LOCALS, "init_locals:1"));
@@ -622,7 +627,7 @@ void pop_n_locals(int num) {
 }
 
 int add_local_name(const char* str, int type, parse_node_t* optional_default_arg_value) {
-  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
 
   if (max_num_locals == max_local_variables) {
     yyerror("Too many local variables");
@@ -647,7 +652,7 @@ int add_local_name(const char* str, int type, parse_node_t* optional_default_arg
 }
 
 void reallocate_locals() {
-  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
 
   int offset;
   offset = type_of_locals_ptr - type_of_locals;
@@ -2928,7 +2933,7 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   local_info_t* saved_locals_ptr = locals_ptr;
 
   // Allocate fresh, isolated local variable scratchpads for this compilation level
-  auto max_local_variables = CONFIG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
   type_of_locals = reinterpret_cast<lpc_type_t*>(
       DCALLOC(max_local_variables, sizeof(lpc_type_t), TAG_LOCALS, "compile_file:1"));
   locals = reinterpret_cast<local_info_t*>(

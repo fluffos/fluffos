@@ -596,6 +596,13 @@ inline int& compiler_directive_start_line = g_compile.directive_start_line;
 // (the reentrancy guard rejects nesting outright, so depth is always 0);
 // kept so that if the guard were ever bypassed by a future bug, the
 // failure is a clear chained error report instead of runaway recursion.
+/* A local's index is emitted as a single byte (icode.cc: ins_byte(F_LOCAL);
+ * ins_byte(which)), so 255 is what the bytecode can address -- past that a
+ * function used to compile and then read or write the wrong slot. This is a
+ * property of the instruction encoding, not a policy, which is why it is a
+ * constant here and not a runtime config option. */
+constexpr int kMaxLocalVariables = 255;
+
 #define MAX_COMPILE_DEPTH 32
 
 // Zero-copy file form: reads fd straight into the arena scan buffer.

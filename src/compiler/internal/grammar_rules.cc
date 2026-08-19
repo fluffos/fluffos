@@ -453,6 +453,18 @@ LPC_INT rule_special_context_open() {
   return saved;
 }
 
+LPC_INT rule_tree_context_open() {
+  /* __TREE__ {} needs the SAVED value (so rule_tree_block can put
+   * current_type back) and nothing else. It must not borrow
+   * rule_special_context_open(), which also SETS
+   * context = SPECIAL_CONTEXT | NO_SUSPEND_CONTEXT: __TREE__ discards the
+   * block's code entirely and imposes no restriction of its own, so doing
+   * that made `break`/`continue` inside a __TREE__ block in a loop, and
+   * `await` inside one, compile errors -- reported against constructs the
+   * source never mentions. AGENTS.md section 13 item 22. */
+  return PACK_SAVED_CONTEXT(context, current_type);
+}
+
 LPC_INT rule_block_open() { return (LPC_INT)current_number_of_locals; }
 
 void rule_number(parse_node_t** result, LPC_INT val) { CREATE_NUMBER(*result, val); }

@@ -75,19 +75,6 @@ const FlagEntry INT_FLAGS[] = {
      "Maximum depth of an object's inheritance chain."},
     {"maximum evaluation cost", __MAX_EVAL_COST__, 30000000, 0, INT_MAX, "Limits",
      "Maximum eval cost a single thread may consume before execution is aborted."},
-    /* Default is the hard ceiling, not 64. Every reader spelled this
-     * CFG_INT(__MAX_LOCAL_VARIABLES__), but __MAX_LOCAL_VARIABLES__ IS
-     * CFG_INT(9) already -- the double offset yielded a constant 521, so the
-     * option was silently inert and the effective limit was 521 for everyone.
-     * Local indices are emitted as a single byte (icode.cc: ins_byte(F_LOCAL);
-     * ins_byte(which)), so 521 was never encodable: a function with more than
-     * 255 locals compiled and then read or wrote the wrong slot. Making the
-     * option work therefore also has to keep the ceiling at what does encode.
-     * Defaulting to UINT8_MAX rather than 64 means nothing that compiles and
-     * works today stops doing so -- only programs that were already
-     * generating unencodable indices are now rejected, with a diagnostic. */
-    {"maximum local variables", __MAX_LOCAL_VARIABLES__, UINT8_MAX, 64, UINT8_MAX, "Limits",
-     "Maximum number of local variables a single function may allocate. This counts SLOTS, not names in scope at once: sibling blocks inside one function each take fresh slots and never give them back, so a function with ten sequential blocks of eight locals allocates eighty, not eight. Local variable indexes are encoded as a single byte in bytecode, so this cannot exceed 255. Values well below the default will refuse code that works today -- before this option was fixed it had no effect at all, and every function was limited to 521 slots."},
     {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH, 0, INT_MAX, "Limits",
      "Maximum nesting depth of LPC function calls."},
 
