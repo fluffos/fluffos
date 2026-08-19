@@ -26,7 +26,11 @@
 private int have_tree() {
   int ok;
 
-  write_file(GEN + "_probe.c", "int p() { mixed *t = __TREE__ { int a = 1; }; return t ? 1 : 1; }\n", 1);
+  write_file(
+    GEN + "_probe.c",
+    "int p() { mixed *t = __TREE__ { int a = 1; }; return t ? 1 : 1; }\n",
+    1
+  );
   ok = !catch(load_object(GEN + "_probe"));
   if (ok) {
     destruct(find_object(GEN + "_probe"));
@@ -65,7 +69,7 @@ void do_tests() {
 
   err = catch(ob = load_object(GEN));
   ASSERT2(!err, "a __TREE__ block's locals must not stay in scope after it: " +
-                (err ? err : ""));
+    (err ? err : ""));
   if (!err && ob) {
     ASSERT_EQ(2, ob->scope());
     ASSERT_EQ("int", ob->decl_type());
@@ -85,8 +89,8 @@ void do_tests() {
     "  return r;\n"
     "}\n", 1);
   ASSERT2(catch(load_object(GEN + "_leak")),
-          "the loop variable must not outlive a for() whose init contains "
-          "a __TREE__ block");
+    "the loop variable must not outlive a for() whose init contains "
+    "a __TREE__ block");
   if (find_object(GEN + "_leak")) {
     destruct(find_object(GEN + "_leak"));
   }
