@@ -1,6 +1,6 @@
 // __TREE__ {} is a block in EXPRESSION position, and it was the last such
 // production that neither popped the block's locals nor restored the
-// enclosing declaration's type -- the two duties catch {} / acatch {} /
+// enclosing declaration's type -- the two duties catch {} and
 // time_expression {} were given in this same series.
 //
 // Without the fix, on a driver that has __TREE__:

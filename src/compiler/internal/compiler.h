@@ -151,7 +151,7 @@ extern const char* compiler_type_names[];
  * `for (...) { break; }` written inside catch { } still compiles. */
 #define NO_SUSPEND_CONTEXT 0x800
 
-/* A block used in EXPRESSION position -- catch {}, acatch {}, time_expression
+/* A block used in EXPRESSION position -- catch {}, time_expression
  * {} -- saves the parser state it is about to clobber on Bison's own value
  * stack, and its reduce action restores it. The context flags are one such
  * piece of state; current_type is the other, and it was not saved: a

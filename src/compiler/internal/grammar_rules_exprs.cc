@@ -20,7 +20,7 @@ parse_node_t* rule_expr_or_block_block(decl_t decl_val) {
   /* Pop the block's locals, exactly as the STATEMENT path does
    * (rule_statement_compound_stmt). `block` hands up the scope's local count
    * in decl_val.num; dropping it left every local declared inside a
-   * catch {} / acatch {} / time_expression {} in scope after the closing
+   * catch {} / time_expression {} in scope after the closing
    * brace, with consequences well past "an out-of-scope name still
    * resolves":
    *
