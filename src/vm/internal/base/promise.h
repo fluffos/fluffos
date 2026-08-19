@@ -162,6 +162,12 @@ struct lpc_coroutine_t {
    * Implies `queued`: a frame that is NOT queued is freed outright at
    * destruct rather than marked. */
   bool abandoned;
+  /* Mirrors membership of g_live_coroutines, maintained at the same two
+   * points. Lets suspended_coroutine_count() answer "is this one still
+   * registered?" without a map lookup -- it runs on the await path, where
+   * its own comment promised O(1) while two .count() calls made it
+   * O(log n). */
+  bool registered;
   std::vector<lpc_coroutine_acatch_t> markers; /* outermost first */
 };
 

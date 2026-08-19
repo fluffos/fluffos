@@ -144,11 +144,10 @@ static bool coroutine_is_running(const lpc_coroutine_t* coro) {
  * the map only at the end of free_coroutine(). */
 static size_t suspended_coroutine_count() {
   size_t n = g_live_coroutines.size();
-  if (g_resuming_coro != nullptr && g_live_coroutines.count(g_resuming_coro->id) != 0) {
+  if (g_resuming_coro != nullptr && g_resuming_coro->registered) {
     n--;
   }
-  if (g_freeing_coro != nullptr && g_freeing_coro != g_resuming_coro &&
-      g_live_coroutines.count(g_freeing_coro->id) != 0) {
+  if (g_freeing_coro != nullptr && g_freeing_coro != g_resuming_coro && g_freeing_coro->registered) {
     n--;
   }
   /* Frames whose owner was destructed while their delivery was already
@@ -848,6 +847,7 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
               "free_coroutine: a coroutine reached the free path with its queue "
               "ownership still claimed\n");
   g_live_coroutines.erase(coro->id);
+  coro->registered = false;
   {
     auto owned = g_coroutines_by_owner.find(owner);
     if (owned != g_coroutines_by_owner.end()) {
@@ -1298,6 +1298,7 @@ void coroutine_await_pending(promise_t* awaited) {
 
   /* registered from the moment it exists: every free_coroutine() erases */
   g_live_coroutines[coro->id] = coro;
+  coro->registered = true;
   g_coroutines_by_owner[coro->ob].push_back(coro->id);
 
   /* hand the coroutine to the awaited promise, then drop the stack's ref
