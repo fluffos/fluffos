@@ -1,0 +1,40 @@
+// A default-argument expression may not DECLARE a local.
+//
+// The parameter is registered only after its own default has been parsed (the
+// grammar reduces new_local_name's action in rule_param_decl_typed_name, after
+// optional_default_arg_value), and a declaration inside the default goes
+// through add_local_name() into the enclosing function's numbering. So it
+// takes the slot the parameter was going to get and pushes the parameter one
+// higher:
+//
+//   int f(int a, int b : (: (catch { int q = 1; } ? 7 : 5) :))
+//        { return a * 100 + b; }
+//
+// compiled to `transfer_local LV0` for a and `transfer_local LV2` for b, while
+// every caller pushes arguments at LV0..LV1. f(1) returned 100 instead of 105,
+// and f(2, 3) returned 200 instead of 203 -- losing the argument that was
+// actually passed. On Debug builds it also produced a bad shared-string ref
+// count, and one shape aborted on "T_FREED svalue freed".
+//
+// Nothing diagnosed it, and the shift is only observable when a parameter
+// follows, which is why the same declaration inside an ordinary functional
+// appears to work.
+
+#include "/include/tests.h"
+
+void do_tests() {
+  object ob;
+
+  ASSERT2(catch(load_object("/clone/default_arg_decl")) != 0,
+    "a declaration inside a default argument expression must be rejected");
+
+  // Everything that does not declare still works, including a default that
+  // calls a local function when the call comes from the same object.
+  ob = load_object("/clone/default_arg_ok");
+  ASSERT_EQ(42, ob->konst(2));
+  ASSERT_EQ(4, ob->efn(1));
+  ASSERT_EQ(43, ob->expr(1));
+  ASSERT_EQ(5, ob->called_locally());
+  ASSERT_EQ(3, ob->konst(1, 2));
+  destruct(ob);
+}

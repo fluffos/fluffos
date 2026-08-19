@@ -1,0 +1,7 @@
+// Fixture for compiler/default_arg_decl.lpc: a local declared inside a default
+// argument expression takes the parameter's own slot, so this must not
+// compile. Before it was diagnosed, `f` read b from LV2 while the caller
+// pushed arguments at LV0..LV1.
+int f(int a, int b: (: (catch { int q = 1; } ? 7 : 5) :)) {
+  return a * 100 + b;
+}

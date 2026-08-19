@@ -1,0 +1,9 @@
+// The shapes that must keep working: constants, efun calls, and a functional
+// that declares nothing.
+int helper() { return 4; }
+
+int konst(int a, int b: (: 40 :)) { return a + b; }
+int efn(int a, int b: (: sizeof(({ 1, 2, 3 })) :)) { return a + b; }
+int expr(int a, int b: (: 6 * 7 :)) { return a + b; }
+int local_fn(int a, int b: (: helper() :)) { return a + b; }
+int called_locally() { return local_fn(1); }

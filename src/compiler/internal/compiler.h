@@ -128,6 +128,17 @@ struct function_context_t {
   short bindable;
   short num_parameters;
   short num_locals;
+  /* max_num_locals when this `(: :)` was opened. num_locals above counts only
+   * the functional's OWN ($1-style) locals; a local declared in a block inside
+   * the body goes through add_local_name() into the enclosing function's
+   * numbering instead, and this snapshot is what detects that.
+   *
+   * max_num_locals, not current_number_of_locals: a block pops its names at
+   * the closing brace but never lowers the slot high-water mark, so by the
+   * time the default expression finishes the name count is back where it
+   * started while the SLOT has been consumed for good -- and the consumed
+   * slot is the damage. */
+  int entry_num_locals;
   struct function_context_t* parent;
 };
 
