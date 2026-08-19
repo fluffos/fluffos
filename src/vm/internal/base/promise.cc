@@ -480,9 +480,13 @@ void deliver_reaction(QueuedReaction* qr) {
     giver = nullptr;
   }
   save_command_giver(giver);
-  set_eval(max_eval_cost);
 
   if (handler) {
+    /* Armed only for a delivery that runs LPC. A pass-through (no handler)
+     * just propagates state to the chained promise in C++ and never enters
+     * the interpreter, so arming there spent a timer_settime(2) syscall per
+     * link of an adoption chain for nothing. */
+    set_eval(max_eval_cost);
     svalue_t out = const0;
     if (invoke_handler(handler, &src->result, &out)) {
       if (qr->next) {
@@ -878,7 +882,12 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     return;
   }
 
-  set_eval(max_eval_cost);
+  /* No set_eval() here: deliver_reaction(), the only caller, arms the budget
+   * immediately before calling us precisely so that the abandon paths above
+   * -- which return without reaching this point while still running the
+   * parked frame's defer() handlers -- get a fresh one too. Re-arming here
+   * costs a timer_settime(2) syscall and buys nothing: nothing between that
+   * call and this line runs LPC. */
   /* this_player() at suspension time is restored on resume under the same
    * driver option that governs call_out() and promise_then() handlers */
   object_t* giver = nullptr;
