@@ -1545,6 +1545,39 @@ TEST(Diagnostics, ColumnAndSnippetCaptured) {
   EXPECT_NE(r.find("\n      | " + std::string(9, ' ') + "^"), std::string::npos);
 }
 
+TEST(Diagnostics, WindowedSnippetClipsRangeStartingLeftOfWindow) {
+  // A line past the 200-column windowing threshold is rendered as a window
+  // around the caret, and the operand ranges shift with it. A range that
+  // BEGINS left of the window must be clipped to its visible part -- it used
+  // to vanish entirely, because the shifted start column went <= 0, the
+  // unsigned compare in the loop condition wrapped to a huge value, and the
+  // loop therefore ended before its first iteration.
+  pp("int x;\n");  // establish the compile arena these fields live on
+
+  Diagnostic d;
+  d.is_warning = false;
+  d.file = "test";
+  d.line = 1;
+  d.message = "Invalid argument types";
+  // 620 columns: caret near the right end, so the window starts well past
+  // column 1 and the left operand's range is entirely to its left except
+  // for the tail that remains on screen.
+  std::string line(620, 'a');
+  d.snippet = line.c_str();
+  d.column = 600;
+  d.ranges.push_back(Diagnostic::Range{1, 1, 610});
+
+  std::string r = render_diagnostic(d, false);
+  EXPECT_NE(r.find("..."), std::string::npos) << "expected a windowed snippet";
+  EXPECT_NE(r.find('~'), std::string::npos)
+      << "a range starting left of the window must still underline its "
+         "visible part, not disappear:\n"
+      << r;
+  // The caret is still placed, and the underline must not run past it into
+  // the columns the range does not cover.
+  EXPECT_NE(r.find('^'), std::string::npos);
+}
+
 TEST(Diagnostics, ExpansionErrorAttributesInvocationColumn) {
   // An error INSIDE an expansion attributes line/column/snippet to the
   // OUTERMOST invocation site (clang's "expansion location"): the

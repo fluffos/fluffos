@@ -460,12 +460,21 @@ void rule_program_append(parse_node_t** result, parse_node_t* prog, parse_node_t
   CREATE_TWO_VALUES(*result, 0, prog, def);
 }
 
-void rule_tree_block(parse_node_t** result, parse_node_t* block_node) {
+void rule_tree_block(parse_node_t** result, decl_t decl_val, LPC_INT saved_context) {
+  /* __TREE__ {} is a block in EXPRESSION position, so it owes the same two
+   * duties as catch {} and time_expression {}: pop the block's
+   * locals (rule_expr_or_block_block explains what leaking them costs), and
+   * put back the current_type the enclosing declarator is about to read.
+   * It was the last such production doing neither -- reachable only on
+   * DEBUG builds, since L_TREE is registered under #ifdef DEBUG, but that
+   * is a CI configuration. */
+  pop_n_locals(decl_val.num);
+  context = SAVED_CONTEXT_FLAGS(saved_context);
+  current_type = SAVED_CONTEXT_TYPE(saved_context);
 #ifdef DEBUG
   *result = new_node_no_line();
-  lpc_tree_form(block_node, *result);
+  lpc_tree_form(decl_val.node, *result);
 #else
-  (void)block_node;
   *result = nullptr;
 #endif
 }

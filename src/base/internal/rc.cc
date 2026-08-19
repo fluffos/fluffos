@@ -87,7 +87,7 @@ const FlagEntry INT_FLAGS[] = {
      * works today stops doing so -- only programs that were already
      * generating unencodable indices are now rejected, with a diagnostic. */
     {"maximum local variables", __MAX_LOCAL_VARIABLES__, UINT8_MAX, 64, UINT8_MAX, "Limits",
-     "Maximum number of local variables in a single function. Local variable indexes are encoded as a single byte in bytecode, so this cannot exceed 255."},
+     "Maximum number of local variables a single function may allocate. This counts SLOTS, not names in scope at once: sibling blocks inside one function each take fresh slots and never give them back, so a function with ten sequential blocks of eight locals allocates eighty, not eight. Local variable indexes are encoded as a single byte in bytecode, so this cannot exceed 255. Values well below the default will refuse code that works today -- before this option was fixed it had no effect at all, and every function was limited to 521 slots."},
     {"maximum call depth", __MAX_CALL_DEPTH__, CFG_MAX_CALL_DEPTH, 0, INT_MAX, "Limits",
      "Maximum nesting depth of LPC function calls."},
 
