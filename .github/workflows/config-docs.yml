@@ -20,6 +20,16 @@ on:
       - 'docs/gen_config_docs.py'
       - 'docs/driver/config.md'
 
+# Supersede an in-flight run when the same ref is pushed again. Without this
+# every push starts a full matrix and none of the older ones ever stop, so a
+# branch pushed a few times in quick succession has several complete runs
+# competing for the same runners and starving each other -- which looks
+# exactly like a CI outage. The default branch is exempt: master runs are the
+# release record and each commit's result is worth keeping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 jobs:
   check:
     name: config.md is up to date
