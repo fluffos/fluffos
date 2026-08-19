@@ -46,6 +46,26 @@ parse_node_t* rule_default_arg_value(parse_node_t* expr) {
   if (current_function_context->num_locals) {
     yyerror("Illegal to use local variable in functional.");
   }
+  /* A local DECLARED inside the default expression -- `int f(int a, int b :
+   * (: (catch { int q = 1; } ? 7 : 5) :))` -- does not go through
+   * num_locals above; add_local_name() puts it in the ENCLOSING function's
+   * numbering. And the parameter itself is registered only after its default
+   * has been parsed (the grammar reduces new_local_name's action in
+   * rule_param_decl_typed_name, after optional_default_arg_value), so such a
+   * declaration takes the slot the parameter was going to get and pushes the
+   * parameter one higher.
+   *
+   * The result is silent and ugly: `f` above compiled to read `b` from LV2
+   * while its caller pushes arguments at LV0..LV1, so f(1) returned 100
+   * instead of 105 and f(2, 3) returned 200 instead of 203 -- losing the
+   * argument that WAS passed. Nothing diagnosed it, and the shift shows up
+   * only if a parameter follows, which is why the same declaration inside an
+   * ordinary functional appears to work. */
+  if (max_num_locals != current_function_context->entry_num_locals) {
+    yyerror(
+        "Illegal to declare a local variable in a default argument expression: it would take "
+        "the parameter's own slot.");
+  }
   if (current_function_context->values_list->r.expr) {
     current_function_context->values_list->r.expr->kind =
         current_function_context->values_list->kind;

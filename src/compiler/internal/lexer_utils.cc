@@ -529,6 +529,7 @@ void push_function_context() {
   node->kind = 0;
   fc->values_list = node;
   fc->bindable = 0;
+  fc->entry_num_locals = max_num_locals;
   fc->parent = current_function_context;
 
   current_function_context = fc;
