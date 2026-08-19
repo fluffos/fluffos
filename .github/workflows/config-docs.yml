@@ -14,7 +14,6 @@ on:
       - 'docs/gen_config_docs.py'
       - 'docs/driver/config.md'
   pull_request:
-    branches: [master]
     paths:
       - 'src/base/internal/rc.cc'
       - 'src/base/internal/options_internal.h'
