@@ -86,6 +86,17 @@ static int svalue_size(svalue_t* v) {
     case T_BUFFER:
       /* first byte is stored inside the buffer struct */
       return sizeof(buffer_t) + v->u.buf->size - 1;
+    case T_PROMISE: {
+      if (++depth > 100) {
+        return 0;
+      }
+      total = sizeof(promise_t) + svalue_size(&v->u.prom->result);
+      if (v->u.prom->reactions) {
+        total += v->u.prom->reactions->size() * sizeof(promise_reaction_t);
+      }
+      depth--;
+      return total;
+    }
     default:
         // some freed value or a reference (!) to one (in all my test cases
         // anyway), it will be removed by reclaim_objects later, Wodan

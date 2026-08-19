@@ -1,0 +1,4 @@
+// acatch is only legal directly inside an async function body
+int f() {
+  return acatch(1);
+}

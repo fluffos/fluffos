@@ -85,13 +85,18 @@ namespace {
 // only that each is eventually dealloc'd exactly once.
 struct PendingCompoundFree {
   void* ptr;
-  unsigned short type;  // T_ARRAY, T_CLASS, or T_MAPPING
+  uint32_t type;  // T_ARRAY, T_CLASS, T_MAPPING, or T_PROMISE
 };
 bool g_freeing_compound = false;
 std::vector<PendingCompoundFree>* g_pending_compound_frees = nullptr;
 
-void dealloc_one_compound(void* ptr, unsigned short type) {
+}  // namespace
+
+static void dealloc_one_compound(void* ptr, uint32_t type) {
   switch (type) {
+    case T_PROMISE:
+      dealloc_promise(reinterpret_cast<promise_t*>(ptr));
+      break;
     case T_CLASS:
       dealloc_class(reinterpret_cast<array_t*>(ptr));
       break;
@@ -107,7 +112,7 @@ void dealloc_one_compound(void* ptr, unsigned short type) {
 // Dispatches one T_ARRAY/T_CLASS/T_MAPPING deallocation, deferring to the
 // queue above if a dealloc_*() call is already in progress further up the
 // (now-flat) call chain.
-void free_compound(void* ptr, unsigned short type) {
+void free_compound(void* ptr, uint32_t type) {
   if (g_freeing_compound) {
     if (!g_pending_compound_frees) {
       g_pending_compound_frees = new std::vector<PendingCompoundFree>();
@@ -124,7 +129,6 @@ void free_compound(void* ptr, unsigned short type) {
   }
   g_freeing_compound = false;
 }
-}  // namespace
 
 /*
  * Free the data that an svalue is pointing to. Not the svalue
@@ -213,6 +217,11 @@ void int_free_svalue(svalue_t* v)
         case T_FUNCTION:
           dealloc_funp(v->u.fp);
           break;
+        case T_PROMISE:
+          /* deferred like arrays/mappings: dropping a long then()-chain
+           * must not recurse the C stack away. */
+          free_compound(v->u.prom, T_PROMISE);
+          break;
         case T_REF:
           if (!v->u.ref->lvalue) {
             kill_ref(v->u.ref);
@@ -256,6 +265,15 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
       return {{"ref", (intptr_t)obj->u.ref->lvalue}};
     case T_FUNCTION:
       return "function";
+    case T_PROMISE:
+      switch (obj->u.prom->state) {
+        case PROMISE_FULFILLED:
+          return "promise (fulfilled)";
+        case PROMISE_REJECTED:
+          return "promise (rejected)";
+        default:
+          return "promise (pending)";
+      }
     case T_NUMBER:
       return obj->u.number;
     case T_REAL:

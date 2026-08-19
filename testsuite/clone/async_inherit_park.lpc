@@ -1,0 +1,15 @@
+// Base class defining an async function that actually PARKS. The parked
+// coroutine records current_prog, which for an inherited function is THIS
+// program, not the child object's ob->prog -- resume_coroutine()'s
+// replace_program() staleness guard must compare against the owner's
+// top-level program instead, or every inherited await is rejected.
+
+nosave mixed base_gate;
+
+void set_gate(mixed p) { base_gate = p; }
+
+async int base_park(int n) {
+  int v = await base_gate;
+
+  return n + v;
+}

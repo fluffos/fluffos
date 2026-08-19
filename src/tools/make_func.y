@@ -33,6 +33,7 @@ void yyerror(const char *str) {
 #define T_FLOAT 8
 #define T_FUNCTION 9
 #define T_BUFFER 10
+#define T_PROMISE 11
 
 extern int num_buff;
 extern int op_code, efun_code;
@@ -82,7 +83,8 @@ type types[] = {
     {"unknown", T_UNKNOWN},
     {"float", T_FLOAT},
     {"function", T_FUNCTION},
-    {"buffer", T_BUFFER}
+    {"buffer", T_BUFFER},
+    {"promise", T_PROMISE}
 };
 
 #define NELEMS(arr) (sizeof arr / sizeof arr[0])
@@ -287,6 +289,11 @@ const char *ctype(int n) {
       case T_BUFFER:
         p = "TYPE_BUFFER";
         break;
+      case T_PROMISE:
+        /* promise<mixed>: the spec language has no payload syntax, and no
+           efun declares one (issue #1319) */
+        p = "(TYPE_MOD_PROMISE|TYPE_ANY)";
+        break;
       case T_MIXED:
         p = "TYPE_ANY";
         break;
@@ -318,6 +325,8 @@ const char *etype1(int n) {
       return "T_STRING";
     case T_BUFFER:
       return "T_BUFFER";
+    case T_PROMISE:
+      return "T_PROMISE";
     case T_MIXED:
       return "T_ANY"; /* 0 means any type */
     default:

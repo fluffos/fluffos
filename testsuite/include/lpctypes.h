@@ -12,5 +12,6 @@
 #define FLOAT           "float"
 #define BUFFER          "buffer"
 #define CLASS           "class"
+#define PROMISE         "promise"
 
 #endif

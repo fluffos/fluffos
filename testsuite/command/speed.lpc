@@ -2,6 +2,7 @@
 #define STRING_TESTS
 #define ARRAY_TESTS
 #define MAPPING_TESTS
+#define ASYNC_TESTS
 
 inherit "/single/inh";
 
@@ -20,6 +21,147 @@ create() {
 }
 
 void lfun0() {}
+
+#ifdef ASYNC_TESTS
+// Async/promise cost model (issue #1319). Per await: one promise_t, its
+// reaction list, one lpc_coroutine_t, one heap copy of the frame slice, one
+// registry insert. The park half is synchronous and measurable here; the
+// RESUME half is not, because master::flag() holds the stack for the whole
+// run so the microtask drain never gets a tick. Read these as park-side
+// numbers only.
+//
+// Measured (RelWithDebInfo, x86-64), for comparison against the same run's
+// "local call (no args)" ~45 ns and "call_other" ~117 ns:
+//
+//   promise_create              ~80 ns
+//   promise_create+resolve     ~120 ns
+//   promise_then (1 reaction)  ~190 ns
+//   async call, no suspend     ~110 ns
+//   async park                 ~650-920 ns, FLAT from 1000 to 8000 live
+//   settle+queue               ~130 ns
+//
+// Two conclusions worth keeping, because both contradict a plausible guess:
+//
+//  - Park cost does NOT grow with the number of suspended frames, so the
+//    std::map registry is not a bottleneck and replacing it with a
+//    specialized id table would buy nothing. (The O(N^2) that DID exist was
+//    a per-await SCAN of that map for the suspension-limit check, already
+//    replaced by the O(1) suspended_coroutine_count().)
+//  - The reaction list costs at most the 70 ns separating promise_then from
+//    promise_create+resolve -- and that 70 also covers the chained promise
+//    and the funptr ref. Storing the first reaction inline in promise_t
+//    would therefore move park by a few percent while adding an
+//    inline-or-spilled case to every promise walker (mark, cycle detect,
+//    reclaim, dealloc, drain). Not worth it: those walkers disagreeing with
+//    each other is this subsystem's most productive source of real bugs.
+//
+// Resolution limit: this harness times one pass, no best-of-N, so run-to-run
+// spread is ~25%. Do not read anything into a change smaller than that --
+// add a dedicated best-of-N benchmark instead (cf. src/tests/bench_*.cc).
+nosave promise *bench_parked;
+
+private void bench_create() { promise_create(); }
+
+private void bench_create_resolve() {
+  promise p = promise_create();
+  promise_resolve(p, 1);
+}
+
+// One reaction attached to a pending promise: the reaction-list push, which
+// is the cost the list's storage choice actually decides.
+private void bench_then() { promise_then(promise_create(), (: 1 :)); }
+
+// An async body that completes without suspending -- the common case for a
+// function that is async only because it *might* await. Costs the entry
+// frame plus the result promise, and no coroutine at all.
+private async int bench_async_nosuspend() { return 1; }
+
+// A real park: allocates the coroutine, copies the frame slice out, and
+// registers it. The promise is never settled, so each call leaves one
+// suspended frame behind -- hence the modest count and the cleanup after.
+private async int bench_async_park(promise p) {
+  int x = await p;
+  return x;
+}
+
+// ---------------------------------------------------------------------------
+// -fspeed:async -- the half the synchronous harness structurally cannot see.
+//
+// Delivery (a resumed `await`, a then-handler, a call_out promise) runs from
+// the microtask drain, which is a gametick event. Nothing is serviced while
+// master::flag() holds the stack, so every number above is park-side only.
+// This benchmark returns to the driver instead, runs its phases from
+// call_outs, and shuts down when it is finished.
+//
+// Measuring it by wall clock would mostly measure the gametick period, not
+// the code. So the delivered work timestamps ITSELF: the first delivery of a
+// batch records a start, every delivery records an end, and the span divided
+// by the batch size is the per-delivery cost inside one drain. A batch stays
+// under the suspension ceiling (10000), so the span excludes tick latency
+// entirely. It is also sized to fit inside one "async drain batch":
+// past that the drain deliberately yields to the event loop and the span
+// would measure the SCHEDULER (which tests/efuns/promise_drain_yield.lpc
+// covers) rather than the per-delivery cost this benchmark is for.
+//
+// Measured (RelWithDebInfo, x86-64, four runs):
+//
+//   await resume   ~1400-2100 ns   park -> settle -> drain -> resume, the
+//                                  resume half: frame spliced back onto the
+//                                  stack, eval_instruction re-entered, the
+//                                  coroutine torn down
+//   then handler    ~800-1300 ns   same queue and drain, no frame to restore
+//
+// So a whole await cycle is roughly 2-3 us (park ~650-920 ns above, plus
+// resume), and RESUME is the dominant term -- larger than park, and about
+// twice a plain handler delivery. Anyone optimizing this subsystem should
+// start there and not with the promise containers, both of which measured
+// as noise (see the note above the synchronous benchmarks).
+#define ABENCH_N 1000
+
+// master::flag() checks this before shutting the driver down
+nosave int a_pending;
+nosave int a_first, a_last, a_count, a_issued;
+nosave promise *a_batch;
+
+int is_pending() { return a_pending; }
+
+private void a_mark() {
+  if (!a_count) {
+    a_first = perf_counter_ns();
+  }
+  a_count++;
+  a_last = perf_counter_ns();
+}
+
+// resumed coroutine: the full park -> settle -> drain -> resume cycle
+private async void a_await_probe(promise p) {
+  await p;
+  a_mark();
+}
+
+// then-handler delivery, for contrast: same drain, no frame to restore
+private mixed a_then_probe(mixed v) {
+  a_mark();
+  return v;
+}
+
+private void a_report(string label) {
+  if (a_count < 2) {
+    out(sprintf("%-30s: %10s\n", label, "no data"));
+    return;
+  }
+  // per-delivery cost inside the drain, then the whole issue-to-last span
+  // (which does include the drain's own scheduling)
+  out(sprintf("%-30s: %10d ns\n", label, (a_last - a_first) / (a_count - 1)));
+  out(sprintf("%-30s: %10d ns\n", "  " + label + " span", a_last - a_issued));
+}
+
+private void a_reset() {
+  a_first = 0;
+  a_last = 0;
+  a_count = 0;
+}
+#endif
 
 void lfun1(mixed a1) {}
 
@@ -85,9 +227,103 @@ int fib_recur(int n) {
 #define TIME(z, n, x) START; LOOP(n, x); END; REPORT(z, ((time) / n))
 #define SAVETIME(z, n, x) START; LOOP(n, x); END; z = time
 
-int main() {
-  int before, after;
+#ifdef ASYNC_TESTS
+// Phases run one per call_out so each batch's drain completes before the
+// next batch is issued. A phase that ISSUES work must return to the driver
+// before the phase that reads the result, or the drain has not run yet.
+private void a_phase(int phase) {
   int i;
+
+  switch (phase) {
+    case 0:
+      out("\n--- async scheduler (delivery side) ---\n");
+      // Park a batch, leaving every frame suspended on its own promise.
+      a_batch = allocate(ABENCH_N);
+      a_reset();
+      for (i = 0; i < ABENCH_N; i++) {
+        a_batch[i] = promise_create();
+        a_await_probe(a_batch[i]);
+      }
+      ASSERT_EQ(ABENCH_N, sizeof(async_info()));
+      break;
+
+    case 1:
+      // Settle them all. The drain runs after this frame returns, still in
+      // this gametick, and resumes all ABENCH_N frames in one pass.
+      a_issued = perf_counter_ns();
+      for (i = 0; i < ABENCH_N; i++) {
+        promise_resolve(a_batch[i], i);
+      }
+      break;
+
+    case 2:
+      ASSERT_EQ(ABENCH_N, a_count);
+      ASSERT_EQ(0, sizeof(async_info()));
+      a_report("await resume");
+      a_batch = 0;
+      break;
+
+    case 3:
+      // Same batch size through then-handlers instead: same drain, same
+      // queue, but no parked frame to splice back onto the stack.
+      a_batch = allocate(ABENCH_N);
+      a_reset();
+      for (i = 0; i < ABENCH_N; i++) {
+        a_batch[i] = promise_create();
+        promise_then(a_batch[i], (: a_then_probe :));
+      }
+      break;
+
+    case 4:
+      a_issued = perf_counter_ns();
+      for (i = 0; i < ABENCH_N; i++) {
+        promise_resolve(a_batch[i], i);
+      }
+      break;
+
+    case 5:
+      ASSERT_EQ(ABENCH_N, a_count);
+      a_report("then handler");
+      a_batch = 0;
+      break;
+
+      // Deliberately no call_out-promise phase. A batch of call_out(0)
+      // promises is throttled by "call_out(0) nest level" (10 in this config),
+      // so ABENCH_N of them spread over ~400 gameticks and the number would
+      // report the call_out throttle rather than anything about promises.
+      // Measuring the timer bridge needs its own harness with a batch sized to
+      // the nest level.
+
+    default:
+      out("\n");
+      a_pending = 0;
+      shutdown(0);
+      return;
+  }
+  call_out((: a_phase :), 1, phase + 1);
+}
+#endif
+
+private int sync_main();
+
+int main(string arg) {
+#ifdef ASYNC_TESTS
+  // The scheduler benchmark cannot share this frame: nothing it measures
+  // runs until this returns. master::flag() honors is_pending() and leaves
+  // the driver up; a_phase() shuts down when the last phase reports.
+  if (arg == "async") {
+    a_pending = 1;
+    write(__VERSION__ + "\n");
+    a_phase(0);
+    return 1;
+  }
+#endif
+  return sync_main();
+}
+
+private int sync_main() {
+  int before, after;
+  int i, j;
 #ifdef STRING_TESTS
   string s, s1, s2, s3;
 #endif
@@ -257,6 +493,50 @@ int main() {
   TIME("explicit inherited", 100000, inh::ifun());
   TIME("save_object", 300, save_object("/tmp"));
   TIME("restore_object", 1000, restore_object("/tmp"));
+#endif
+#ifdef ASYNC_TESTS
+  // Correctness first, as everywhere else in this file: a benchmark of the
+  // wrong thing is worse than no benchmark.
+  ASSERT_EQ("promise", typeof(promise_create()));
+  ASSERT_EQ(1, promise_status(bench_async_nosuspend()));
+
+  TIME("promise_create", 100000, bench_create());
+  TIME("promise_create+resolve", 100000, bench_create_resolve());
+  TIME("promise_then (1 reaction)", 100000, bench_then());
+  TIME("async call, no suspend", 100000, bench_async_nosuspend());
+
+  // Park cost. Kept well under 'max suspended async functions' (10000) and
+  // held in an array so the frames stay alive for the measurement rather
+  // than being collected mid-loop. Dropping the array afterwards abandons
+  // them, which is the documented behavior for an unreachable pending
+  // promise.
+  // Reported in bands so the MARGINAL cost of a park is visible against the
+  // number of frames already suspended. A flat profile says the cost is the
+  // fixed per-park work (allocation and the frame copy); a rising one says
+  // the live-coroutine registry is the problem.
+  bench_parked = allocate(8000);
+  for (j = 0; j < 8; j++) {
+    START;
+    for (i = j * 1000; i < (j + 1) * 1000; i++) {
+      bench_parked[i] = promise_create();
+      bench_async_park(bench_parked[i]);
+    }
+    END;
+    REPORT("async park, " + ((j + 1) * 1000) + " live", time / 1000);
+  }
+  ASSERT_EQ(8000, sizeof(async_info()));
+
+  // Settling them is the other half a mudlib pays: each settle queues a
+  // delivery. The delivery itself runs from the drain, which cannot happen
+  // while this function holds the stack, so this measures enqueue only.
+  START;
+  for (i = 0; i < 8000; i++) {
+    promise_resolve(bench_parked[i], i);
+  }
+  END;
+  REPORT("async await, settle+queue", time / 8000);
+
+  bench_parked = 0;
 #endif
   s = read_file("/single/tests/std/test.json");
   TIME("json_decode", 200, json_decode(s));

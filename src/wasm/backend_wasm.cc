@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <chrono>
 #include <map>
+#include <vector>
 
 #include "vm/vm.h"
 
@@ -39,12 +40,20 @@ double s_now_ms = 0;
 double s_last_gametick_ms = 0;
 
 void call_walltime_events() {
-  // Drain until quiet: a walltime callback may schedule another walltime
-  // event at (or before) the current time.
+  // Run only what is ALREADY due when this pass starts. A callback may post
+  // another walltime event for the current time -- the promise microtask
+  // drain does exactly that to continue after yielding -- and running it in
+  // the same pass would spin here instead of returning to the host, which is
+  // the one thing a walltime re-post exists to avoid. libevent behaves the
+  // same way: a re-posted event runs on the next iteration of its loop, not
+  // inside the current callback.
+  std::vector<TickEvent*> due;
   while (!g_wall_queue.empty() && g_wall_queue.begin()->first <= s_now_ms) {
     auto iter = g_wall_queue.begin();
-    auto* event = iter->second;
+    due.push_back(iter->second);
     g_wall_queue.erase(iter);
+  }
+  for (auto* event : due) {
     backend_dispose_tick_event(event);
   }
 }
@@ -56,6 +65,16 @@ TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
   auto* event = new TickEvent(callback);
   g_wall_queue.insert(WallQueue::value_type(s_now_ms + delay_msecs.count(), event));
   return event;
+}
+
+TickEvent* add_loop_yield_event(TickEvent::callback_type callback) {
+  /* The wasm loop is host-driven: control returns to the page between
+   * advances, which IS the yield this primitive promises. Scheduling one
+   * millisecond ahead keeps it out of the current advance's due-set, so a
+   * self-re-posting callback spreads across host frames instead of spinning
+   * inside one -- the same guarantee the libevent backend gets from the
+   * active_later queue. */
+  return add_walltime_event(std::chrono::milliseconds(1), callback);
 }
 
 int clear_walltime_events() {

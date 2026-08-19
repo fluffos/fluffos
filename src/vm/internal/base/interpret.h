@@ -25,6 +25,11 @@
 #define FRAME_EXTERNAL 8
 
 #define FRAME_RETURNED_FROM_CATCH 16
+/* async/await (issue #1319): on a FRAME_FUNCTION frame, marks the entry
+ * frame of an async coroutine body (pushed under run_async_function()); on a
+ * FRAME_CATCH frame, marks an acatch() region marker (no C++ recursion,
+ * unlike do_catch()). */
+#define FRAME_ASYNC 32
 struct defer_list {
   struct defer_list* next;
   svalue_t func;
@@ -44,6 +49,11 @@ struct control_stack_t {
   char* pc;          /* TODO: change this to unsigned char* */
 
   svalue_t* fp;
+  /* acatch() markers only (FRAME_CATCH | FRAME_ASYNC): the value-stack top
+   * and command-giver-stack top at region entry, so an unwind can cut both
+   * back to it the way restore_context() would. */
+  svalue_t* save_sp;
+  object_t** save_cgsp;
   struct defer_list* defers;
   int num_local_variables;   /* Local + arguments */
   int function_index_offset; /* Used when executing functions in inherited

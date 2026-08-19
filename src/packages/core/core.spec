@@ -54,8 +54,12 @@ string *explode(string, string);
 string *explode_reversible(string, string);
 mixed implode(mixed *, string | function, void | mixed);
 
-int call_out(string | function, int|float, ...);
-int call_out_walltime(string | function, int|float, ...);
+/* classic form: call_out(fn, delay, args...) -> handle. With NO callback --
+   call_out(delay) -- returns a PROMISE fulfilled when the delay elapses
+   (issue #1319); the delay's position moves, so both forms' later args are
+   validated in int_call_out() rather than here. */
+mixed call_out(int | float | string | function, ...);
+mixed call_out_walltime(int | float | string | function, ...);
 mixed *call_out_info();
 int find_call_out(int | string);
 int remove_call_out(int | void | string);
@@ -373,6 +377,17 @@ int perf_counter_ns();
 int time_ns();
 
 mixed *sys_network_ports();
+
+/* native promises (issue #1319 phase 1) */
+promise promise_create();
+void promise_resolve(promise, void | mixed);
+void promise_reject(promise, void | mixed);
+promise promise_then(promise, void | function, void | function);
+promise promise_catch(promise, function);
+int promise_status(promise);
+mixed promise_result(promise);
+/* pending suspended async function frames, most recently parked last */
+mixed async_info(int default: 0);
 #ifndef __EMSCRIPTEN__
 /* No TLS on the wasm target: the browser terminates TLS long before
  * bytes reach the driver, so the efun does not exist there. (The

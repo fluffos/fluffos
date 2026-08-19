@@ -147,10 +147,14 @@ static keyword_t reswords[] = {
 #ifdef DEBUG
     {"__TREE__", L_TREE, 0},
 #endif
+    /* async/await (issue #1319) */
+    {"acatch", L_ACATCH, 0},
 #ifdef ARRAY_RESERVED_WORD
     {"array", L_ARRAY, 0},
 #endif
     {"asm", 0, 0},
+    {"async", L_TYPE_MODIFIER, FUNC_ASYNC},
+    {"await", L_AWAIT, 0},
     {"break", L_BREAK, 0},
     {"buffer", L_BASIC_TYPE, TYPE_BUFFER},
     {"case", L_CASE, 0},
@@ -181,6 +185,7 @@ static keyword_t reswords[] = {
     {"object", L_BASIC_TYPE, TYPE_OBJECT},
     {"parse_command", L_PARSE_COMMAND, 0},
     {"private", L_TYPE_MODIFIER, DECL_PRIVATE},
+    {"promise", L_PROMISE, 0},
     {"protected", L_TYPE_MODIFIER, DECL_PROTECTED},
 #ifdef SENSIBLE_MODIFIERS
     {"public", L_TYPE_MODIFIER, DECL_PUBLIC},

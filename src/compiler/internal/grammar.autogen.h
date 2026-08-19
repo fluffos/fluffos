@@ -102,15 +102,18 @@ extern int yydebug;
     L_FUNCTION_OPEN = 297,         /* L_FUNCTION_OPEN  */
     L_SSCANF = 298,                /* L_SSCANF  */
     L_CATCH = 299,                 /* L_CATCH  */
-    L_ARRAY = 300,                 /* L_ARRAY  */
-    L_REF = 301,                   /* L_REF  */
-    L_PARSE_COMMAND = 302,         /* L_PARSE_COMMAND  */
-    L_TIME_EXPRESSION = 303,       /* L_TIME_EXPRESSION  */
-    L_CLASS = 304,                 /* L_CLASS  */
-    L_NEW = 305,                   /* L_NEW  */
-    L_PARAMETER = 306,             /* L_PARAMETER  */
-    L_TREE = 307,                  /* L_TREE  */
-    LOWER_THAN_ELSE = 308          /* LOWER_THAN_ELSE  */
+    L_AWAIT = 300,                 /* L_AWAIT  */
+    L_ACATCH = 301,                /* L_ACATCH  */
+    L_PROMISE = 302,               /* L_PROMISE  */
+    L_ARRAY = 303,                 /* L_ARRAY  */
+    L_REF = 304,                   /* L_REF  */
+    L_PARSE_COMMAND = 305,         /* L_PARSE_COMMAND  */
+    L_TIME_EXPRESSION = 306,       /* L_TIME_EXPRESSION  */
+    L_CLASS = 307,                 /* L_CLASS  */
+    L_NEW = 308,                   /* L_NEW  */
+    L_PARAMETER = 309,             /* L_PARAMETER  */
+    L_TREE = 310,                  /* L_TREE  */
+    LOWER_THAN_ELSE = 311          /* LOWER_THAN_ELSE  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -119,7 +122,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 167 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 172 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
@@ -150,7 +153,7 @@ union YYSTYPE
     LPC_INT saved_refs;
   } call_open;                 /* context/refs captured at the '(' of a call */
 
-#line 154 "$BUILD_ROOT$/src/grammar.autogen.h"
+#line 157 "$BUILD_ROOT$/src/grammar.autogen.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -191,4 +194,4 @@ void yypstate_delete (yypstate *ps);
 
 
 #endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */
-/* FluffOS generated-from grammar.y sha256=9bf4bfcf7fe14e7b170e86ac22994339c8ef1b964f6a65c29f5c45dc9542f946 */
+/* FluffOS generated-from grammar.y sha256=20b45d6abb52bd9c7193b0b7ff8f2799c556ca60daa7b14d1b0b304eaf864e38 */

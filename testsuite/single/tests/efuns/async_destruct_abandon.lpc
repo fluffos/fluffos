@@ -1,0 +1,127 @@
+// Destructing an object must abandon async functions suspended inside it.
+//
+// A parked frame used to be discovered only LAZILY -- by resume_coroutine()'s
+// destructed check when the awaited promise settles. For a promise that never
+// settles, that is never. And the shape that produces such a promise is
+// ordinary: a frame holding the promise in a local keeps it alive, which also
+// disables the "awaited promise was collected while pending" safety net, so
+// both documented abandonment paths miss together.
+//
+// Left that way the coroutine pinned the destructed object, its program, its
+// saved frame and one of the "max suspended async functions" slots (10000 by
+// default) for the life of the driver -- and check_memory() saw nothing,
+// because the live-coroutine registry kept it all reachable. A mud where
+// players quit mid-await accumulates those without bound.
+//
+// destruct_object() now abandons them eagerly, rejecting each frame's promise,
+// exactly as it already did for promises backed by a call_out.
+
+nosave int rejected;
+nosave mixed reason;
+
+nosave mixed suicide_reason;
+nosave int before;
+nosave int *our_ids;
+
+void do_tests() {
+  object ob, nested, keeper, suicide;
+
+  before = sizeof(async_info());
+
+  ob = clone_object("/clone/async_never_settles");
+  promise_catch(ob->run(), function(mixed err) {
+    rejected = 1;
+    reason = err;
+    return 0;
+  });
+
+  // The body parked on its promise, so it is suspended right now.
+  ASSERT_EQ(before + 1, sizeof(async_info()));
+
+  destruct(ob);
+
+  // Eagerly abandoned: the slot is released immediately, not at some later
+  // settle that will never come.
+  ASSERT_EQ(before, sizeof(async_info()));
+
+  // Nested frames of the SAME object, parked at once: outer awaits inner's
+  // result promise, inner awaits a promise nothing settles. Abandoning inner
+  // settles its result promise, which moves outer to the microtask queue
+  // WHILE the abandonment loop is still running. An abandonment that decided
+  // up front which coroutines to free then freed outer with a queued delivery
+  // still pointing at it -- a use-after-free that segfaults a live driver
+  // (ASan: heap-use-after-free in resume_coroutine). Nothing here needs to
+  // assert on that beyond surviving: the crash was unconditional, and the
+  // Debug/ASan configurations turn any residue into a hard failure.
+  nested = clone_object("/clone/async_nested_park");
+  promise_catch(nested->outer(), function(mixed err) { return 0; });
+  ASSERT_EQ(before + 2, sizeof(async_info()));
+  // Remember which frames are OURS. A full suite run has other files' frames
+  // coming and going, so an absolute count taken now says nothing by the time
+  // the drain has run; the ids are unique and stable.
+  our_ids = ({});
+  foreach (mapping m in async_info()) {
+    if (m["object"] == nested) {
+      our_ids += ({ m["id"] });
+    }
+  }
+  ASSERT_EQ(2, sizeof(our_ids));
+  destruct(nested);
+  // The inner frame goes immediately. The outer one was handed to the
+  // microtask queue by the inner frame's rejection, so it is deliberately
+  // NOT freed here -- its resume is already scheduled and resume_coroutine()
+  // abandons a destructed owner on arrival. Freeing it here is exactly the
+  // use-after-free described above; it is gone by the time the drain has run,
+  // which the post-drain check below confirms.
+  ASSERT2(sizeof(async_info()) <= before + 1,
+    sprintf("destruct left %d frames parked, expected at most 1 awaiting delivery",
+      sizeof(async_info()) - before));
+
+  // A frame that would park AFTER its object is destructed is refused rather
+  // than parked. abandon_coroutines_of_object() runs once, at destruct, so it
+  // can only reach frames parked by then; a frame that parks later escapes it
+  // permanently, and if its awaited promise never settles nothing else ever
+  // notices it either. The ordinary die()/quit() shape reaches this:
+  // `await x; cleanup(); destruct(this_object()); await y;`.
+  keeper = clone_object("/clone/async_promise_keeper");
+  suicide = clone_object("/clone/async_self_destruct");
+
+  // Everything below is delivered from the drain, so it is checked FROM the
+  // last of those deliveries rather than from a fixed-delay call_out. The
+  // deliveries are a FIFO queue: this object's rejection was enqueued after
+  // the two above it, so by the time this handler runs they have all been
+  // processed. A deadline instead of the handler would make the test a
+  // throughput measurement -- with `async drain batch : 1` the suite's
+  // backlog alone pushes this delivery past any second-scale call_out, and
+  // the test failed for a reason that had nothing to do with what it pins.
+  // If the delivery never arrives, the latch is never released and the run
+  // fails naming it, which is the failure this test wants.
+  EXPECT_LATCH("async destruct abandon");
+  promise_catch(suicide->suicide(keeper), function(mixed err) {
+    suicide_reason = err;
+    ASSERT2(rejected, "destructing an object with a suspended async function left its promise "
+      "pending forever");
+    ASSERT2(stringp(reason) && strsrch(reason, "destructed") != -1,
+      sprintf("expected a destructed-object rejection, got %O", reason));
+
+    // The nested pair is fully gone once the drain has delivered: the inner
+    // frame was abandoned eagerly, the outer one on arrival at
+    // resume_coroutine(). This is the check the comment above refers to, and
+    // it is what fails if abandonment leaves a frame parked. (Freeing one
+    // that still had a delivery queued did not fail a check at all -- it
+    // crashed the driver outright.)
+    foreach (mapping m in async_info()) {
+      ASSERT2(member_array(m["id"], our_ids) == -1,
+        sprintf("frame %d of the destructed object is still parked after the drain", m["id"]));
+    }
+
+    // And the frame that tried to park inside its own destructed object was
+    // refused, rejecting its promise, rather than parking somewhere nothing
+    // can ever reach it.
+    ASSERT2(stringp(suicide_reason) && strsrch(suicide_reason, "destructed object") != -1,
+      sprintf("awaiting inside a destructed object should be refused, got %O", suicide_reason));
+
+    RELEASE_LATCH("async destruct abandon");
+    return 0;
+  });
+}

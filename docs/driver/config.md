@@ -86,6 +86,7 @@ they always match the options it actually recognizes.
 | `time to swap` | int | 300 | Seconds an unused object stays in memory before being swapped out; 0 disables swapping. |
 | `gametick msec` | int | 1000 | Granularity of in-game time in milliseconds (the shortest visible time interval). |
 | `heartbeat interval msec` | int | 1000 | Heartbeat interval in milliseconds. |
+| `async drain batch` | int | 0 | How many promise deliveries (resumed await frames and settlement handlers) the microtask drain may make in one turn of the event loop before re-posting itself and letting the loop run. Between turns the driver reads pending network input, schedules commands and fires timers, so async work proceeds continuously without ever holding the loop. Work created during a turn counts toward the same batch, so a sequential chain of awaits runs at full speed instead of paying a loop turn per link. This value is therefore a responsiveness setting: one turn holds the driver for one batch of deliveries, and a very large value lets a self-feeding promise chain monopolise it. The drain re-posts through the event loop's yield-to-I/O path rather than a timer, so a small batch costs a loop turn per batch but no fixed delay. 0 (the default) uses a built-in batch size chosen to keep a turn around a millisecond of trivial deliveries. |
 
 ### Limits
 
@@ -136,6 +137,7 @@ they always match the options it actually recognizes.
 | `enable_commands call init` | int | 1 | Call init() in an object when enable_commands() is invoked on it. |
 | `sprintf add_justified ignore ANSI colors` | int | 1 | Make sprintf() column justification ignore ANSI color codes when computing field width. |
 | `call_out(0) nest level` | int | 1000 | Maximum nesting level for chains of call_out(0) within a single backend cycle. |
+| `max suspended async functions` | int | 10000 | Maximum number of concurrently suspended async function frames; an await that would exceed it errors instead of suspending (runaway-exhaustion guard). 0 disables the limit. |
 
 ### Type Checking
 

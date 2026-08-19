@@ -2,6 +2,8 @@
 #define PROGRAM_H
 
 #include <cstdint>
+
+#include "vm/internal/base/svalue.h" /* lpc_type_t */
 #include <memory>
 #include <unordered_map>
 
@@ -84,6 +86,10 @@
 #define FUNC_PROTOTYPE 0x0008
 #define FUNC_TRUE_VARARGS 0x0010
 #define FUNC_VARARGS 0x0020
+/* coroutine: calls return a promise, body may await (issue #1319). 0x0080
+ * stays reserved for the future 'remote' modifier -- these are the last two
+ * free bits in the 16-bit function_flags word. */
+#define FUNC_ASYNC 0x0040
 #define FUNC_ALIAS 0x8000 /* This shouldn't be changed */
 
 #define DECL_HIDDEN 0x0100    /* used by private vars */
@@ -114,7 +120,7 @@
 /* only the flags that should be copied up through inheritance levels */
 #define FUNC_MASK                                                                           \
   (FUNC_VARARGS | FUNC_UNDEFINED | FUNC_STRICT_TYPES | FUNC_PROTOTYPE | FUNC_TRUE_VARARGS | \
-   FUNC_ALIAS | DECL_MODS)
+   FUNC_ASYNC | FUNC_ALIAS | DECL_MODS)
 
 /* a function that isn't 'real' */
 #define FUNC_NO_CODE (FUNC_ALIAS | FUNC_PROTOTYPE | FUNC_UNDEFINED)
@@ -164,7 +170,7 @@ typedef struct {
 
 struct function_t {
   const char* funcname;
-  unsigned short type;
+  lpc_type_t type;
   uint8_t num_arg;
   uint8_t min_arg;
   unsigned char num_local;
@@ -182,7 +188,7 @@ struct function_t {
 
 typedef struct {
   const char* name;
-  unsigned short type; /* Type of variable. See above. TYPE_ */
+  lpc_type_t type; /* Type of variable. See above. TYPE_ */
 } variable_t;
 
 struct inherit_t {
@@ -220,7 +226,7 @@ struct program_t {
   struct class_member_entry_t* class_members;
   char** strings;                 /* All strings uses by the program */
   char** variable_table;          /* variables defined by this program */
-  unsigned short* variable_types; /* variables defined by this program */
+  lpc_type_t* variable_types;     /* variables defined by this program */
   inherit_t* inherit;             /* List of inherited prgms */
   int total_size;                 /* Sum of all data in this struct */
                                   /*
@@ -233,7 +239,7 @@ struct program_t {
                                    * inheritance. There are several lines of code that depends on the type
                                    * length (16 bits) of 'type_start' (sorry !).
                                    */
-  unsigned short* argument_types;
+  lpc_type_t* argument_types;
 #define INDEX_START_NONE 65535
   unsigned short* type_start;
   /*

@@ -183,7 +183,14 @@ const FlagEntry INT_FLAGS[] = {
     {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000, 0, INT_MAX,
      "Language Behavior",
      "Maximum nesting level for chains of call_out(0) within a single backend cycle."},
-    {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0, 0, INT_MAX, "Diagnostics",
+    /* single string literal on one line: docs/gen_config_docs.py reads the
+     * description verbatim and does not fold adjacent C literals */
+    {"max suspended async functions", __RC_MAX_SUSPENDED_ASYNC__, 10000, 0, INT_MAX,
+     "Language Behavior",
+     "Maximum number of concurrently suspended async function frames; an await that would exceed it errors instead of suspending (runaway-exhaustion guard). 0 disables the limit."},
+    {"async drain batch", __RC_ASYNC_DRAIN_BATCH__, 0, 0, INT_MAX, "Timing & Lifecycle",
+     "How many promise deliveries (resumed await frames and settlement handlers) the microtask drain may make in one turn of the event loop before re-posting itself and letting the loop run. Between turns the driver reads pending network input, schedules commands and fires timers, so async work proceeds continuously without ever holding the loop. Work created during a turn counts toward the same batch, so a sequential chain of awaits runs at full speed instead of paying a loop turn per link. This value is therefore a responsiveness setting: one turn holds the driver for one batch of deliveries, and a very large value lets a self-feeding promise chain monopolise it. The drain re-posts through the event loop's yield-to-I/O path rather than a timer, so a small batch costs a loop turn per batch but no fixed delay. 0 (the default) uses a built-in batch size chosen to keep a turn around a millisecond of trivial deliveries."},
+        {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0, 0, INT_MAX, "Diagnostics",
      "Record LPC execution context for tracing and debugging."},
     {"trace lpc instructions", __RC_TRACE_INSTR__, 0, 0, INT_MAX, "Diagnostics",
      "Trace individual LPC instructions for debugging."},

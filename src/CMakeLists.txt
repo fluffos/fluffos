@@ -628,6 +628,7 @@ set(SRC
   "vm/internal/base/mapping.cc"
   "vm/internal/base/object.cc"
   "vm/internal/base/program.cc"
+  "vm/internal/base/promise.cc"
   "vm/internal/base/svalue.cc"
   "vm/internal/apply.cc"
   "vm/internal/eval_limit.cc"

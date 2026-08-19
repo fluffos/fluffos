@@ -1,0 +1,5 @@
+// an array of promises is not a promise, and vice versa
+async int f() { return 1; }
+void g() {
+  promise<int> p = ({ f() });
+}

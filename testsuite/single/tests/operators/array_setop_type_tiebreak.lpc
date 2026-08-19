@@ -1,0 +1,121 @@
+// alist_cmp() (src/vm/internal/base/array.cc) orders svalues by raw payload
+// first, then breaks a tie on the type tag. It backs the binary searches in
+// subtract_array() ('-'), intersect_array() ('&') and union_array() ('|'),
+// so any asymmetry in it makes those operators silently drop an element
+// that is present, or keep one that is not -- no error, no crash.
+//
+// Every comparison in it used to be written as a SUBTRACTION, which was
+// wrong in three independent ways. Each way makes the comparator report
+// "equal" (or "greater") for values that differ, in one direction only:
+//
+//  - the type tiebreak, `p1->type - p2->type`: correct while the field was
+//    an `unsigned short` (both operands integer-promoted to int, so the
+//    subtraction was signed), silently unsigned once it was widened to
+//    uint32_t, which does not promote;
+//  - the payload difference wrapping, with only the single value LONG_MIN
+//    special-cased and rewritten as `p1 > p2` -- which is 0, "equal", when
+//    p1 < p2;
+//  - the payload difference stored in a `long`, 32-bit on the wasm32 and
+//    MinGW64 targets, so it compared only the low 32 bits there.
+//
+// It is now a plain three-way comparison at full width. The blocks below
+// pin one shape per defect; the first block alone fails 9 checks on a
+// binary with the old tag subtraction.
+void do_tests() {
+  mixed *a, *b;
+
+  // The minimal shape: subtracting an array from itself must always be
+  // empty, whatever it holds.
+  a = ({ -2, 0.0, 0, 1, 2 });
+  ASSERT_EQ(0, sizeof(a - a));
+
+  a = ({ 0.0, 0, 1 });
+  ASSERT_EQ(0, sizeof(a - a));
+
+  a = ({ -3, -2, -1, 0.0, 0, 2 });
+  ASSERT_EQ(0, sizeof(a - a));
+
+  // ... and the same shapes under '&' and '|'.
+  a = ({ -2, 0.0, 0, 1, 2 });
+  ASSERT_EQ(5, sizeof(a & a));
+  ASSERT_EQ(5, sizeof(a | a));
+
+  // A real (non-self) subtraction still removes exactly the colliding
+  // members and keeps the rest: int 0 and float 0.0 are DISTINCT values,
+  // so removing one must not remove the other.
+  a = ({ 0, 0.0, 1 });
+  b = a - ({ 0 });
+  ASSERT_EQ(2, sizeof(b));
+  ASSERT(member_array(0.0, b) != -1);
+  ASSERT_EQ(-1, member_array(0, b));
+
+  b = a - ({ 0.0 });
+  ASSERT_EQ(2, sizeof(b));
+  ASSERT(member_array(0, b) != -1);
+  ASSERT_EQ(-1, member_array(0.0, b));
+
+  // Intersection with only the float present keeps only the float.
+  b = a & ({ 0.0, 7 });
+  ASSERT_EQ(1, sizeof(b));
+  ASSERT(member_array(0.0, b) != -1);
+
+  // Any other type pair whose payload can tie works the same way. An
+  // empty string and an empty array both hold a pointer, but 0 and "" tie
+  // whenever the string is the zero-length shared string only by luck --
+  // use the reliable numeric pair plus a wider mixed array to exercise a
+  // deeper sort.
+  a = ({ 5, 5.0, 4, 4.0, 3, 3.0, 2, 2.0, 1, 1.0, 0, 0.0 });
+  ASSERT_EQ(0, sizeof(a - a));
+  ASSERT_EQ(12, sizeof(a & a));
+  ASSERT_EQ(12, sizeof(a | a));
+
+  // Removing every float must leave every int, and vice versa.
+  b = a - ({ 0.0, 1.0, 2.0, 3.0, 4.0, 5.0 });
+  ASSERT_EQ(6, sizeof(b));
+  ASSERT_EQ(-1, member_array(0.0, b));
+  ASSERT(member_array(0, b) != -1);
+
+  b = a - ({ 0, 1, 2, 3, 4, 5 });
+  ASSERT_EQ(6, sizeof(b));
+  ASSERT_EQ(-1, member_array(0, b));
+  ASSERT(member_array(0.0, b) != -1);
+
+  // The comparator used to reach the tiebreak above by SUBTRACTING the two
+  // payloads, which was wrong in two further ways -- both of which make it
+  // report "equal" for values that differ, so a present element is treated
+  // as found in the subtrahend and dropped.
+  //
+  // (1) The difference wraps. Only the single wrapped value LONG_MIN was
+  // special-cased, and the rewrite (`p1 > p2`) yields 0 -- "equal" -- when
+  // p1 < p2. For IEEE-754, bits(-x) is bits(x) - 2^63, so the difference is
+  // exactly LONG_MIN for EVERY float x > 0, and for int pairs whose gap is
+  // 2^63 (-1 against LONG_MAX). Order matters: only one of the two
+  // directions hits it, which is what asymmetry means.
+  a = ({ -1.0, 1.0 });
+  b = a - ({ 1.0 });
+  ASSERT_EQ(1, sizeof(b));
+  ASSERT(member_array(-1.0, b) != -1);
+
+  b = a & ({ 1.0 });
+  ASSERT_EQ(1, sizeof(b));
+  ASSERT(member_array(1.0, b) != -1);
+
+  a = ({ -1, 9223372036854775807 });
+  b = a - ({ 9223372036854775807 });
+  ASSERT_EQ(1, sizeof(b));
+  ASSERT(member_array(-1, b) != -1);
+
+  // (2) The difference was held in a `long`, which is 32 bits on the wasm32
+  // and MinGW64 targets -- so any two ints agreeing modulo 2^32 compared
+  // equal there while comparing correctly on 64-bit Linux. These pass
+  // everywhere only if the comparison is done at full width.
+  a = ({ 0, 4294967296 });
+  b = a - ({ 0 });
+  ASSERT_EQ(1, sizeof(b));
+  ASSERT(member_array(4294967296, b) != -1);
+
+  a = ({ 1, 4294967297 });
+  b = a - ({ 1 });
+  ASSERT_EQ(1, sizeof(b));
+  ASSERT(member_array(4294967297, b) != -1);
+}

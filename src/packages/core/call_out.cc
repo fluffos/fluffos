@@ -47,9 +47,47 @@ int new_call_out_zero_scheduled_on_this_gametick = 0;
 /*
  * Free a call out structure.
  */
+/* Settle an awaited call_out's promise, if anything is waiting on it. A
+ * still-pending promise at teardown means the call_out never ran (removed,
+ * object destructed, shutdown): reject it so awaiters don't hang forever. */
+static void settle_call_out_promise(pending_call_t* cop, svalue_t* value, int rejected) {
+  if (!cop->promise) {
+    return;
+  }
+  promise_t* p = cop->promise;
+  cop->promise = nullptr;
+  if (p->state == PROMISE_PENDING) {
+    if (value) {
+      if (rejected) {
+        promise_settle(p, value, 1);
+      } else {
+        /* NOT raw promise_settle(): go through the resolve path so a
+         * promise value flattens and self-resolution is refused,
+         * preserving "a fulfilled result is never T_PROMISE". With
+         * await_callout() gone this is defensive -- the only entries that
+         * carry a promise today are timer-only ones, whose value is always
+         * the number 0 -- but any future form that fulfils with a
+         * callback's return value (which may be a promise, possibly this
+         * very one: that was an unreclaimable cycle) needs exactly this. */
+        promise_resolve_with(p, value);
+      }
+    } else {
+      svalue_t err;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*call_out was removed before it ran";
+      promise_settle(p, &err, 1);
+    }
+  }
+  free_promise(p);
+}
+
 static void free_called_call(pending_call_t* cop) {
+  settle_call_out_promise(cop, nullptr, 1);
   if (cop->ob) {
-    free_string(cop->function.s);
+    if (cop->function.s) { /* null for a timer-only entry */
+      free_string(cop->function.s);
+    }
     free_object(&cop->ob, "free_call");
   } else {
     free_funp(cop->function.f);
@@ -124,11 +162,20 @@ LPC_INT new_call_out(object_t* ob, svalue_t* fun, std::chrono::milliseconds dela
     cop->function.s = make_shared_string(fun->u.string);
     cop->ob = ob;
     add_ref(ob, "call_out");
-  } else {
+  } else if (fun->type == T_FUNCTION) {
     DBG_CALLOUT("  function: <function>\n");
     cop->function.f = fun->u.fp;
     fun->u.fp->hdr.ref++;
     cop->ob = nullptr;
+  } else {
+    /* Timer-only (call_out(delay) with no callback, issue #1319): nothing
+     * to call at fire time -- the entry exists to settle its promise. The
+     * representation is ob set + function.s null; every function.s
+     * consumer in this file checks for it explicitly. */
+    DBG_CALLOUT("  function: <timer>\n");
+    cop->function.s = nullptr;
+    cop->ob = ob;
+    add_ref(ob, "call_out");
   }
 
   cop->handle = g_current_gametick + (++unique);
@@ -198,7 +245,7 @@ void call_out(pending_call_t* cop) {
   }
 
   // FIXME: Figure out why this is useful. Maybe a security thing.
-  if (cop->ob && cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
+  if (cop->ob && cop->function.s && cop->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
     DBG_CALLOUT("  Trying to call illegal function, ignored.\n");
     free_call(cop);
     return;
@@ -245,14 +292,35 @@ void call_out(pending_call_t* cop) {
 
   save_command_giver(new_command_giver);
   /* current object no longer set */
-  if (cop->ob) {
+  svalue_t* ret = nullptr;
+  svalue_t timer_result = const0;
+  if (cop->ob && !cop->function.s) {
+    /* timer-only: nothing to call; the delay elapsing IS the result */
+    DBG_CALLOUT("  func: <timer>\n");
+    ret = &timer_result;
+  } else if (cop->ob) {
     DBG_CALLOUT("  func: %s\n", cop->function.s);
-    (void)safe_apply(cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
+    ret = safe_apply(cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
   } else {
     DBG_CALLOUT("  func: <function>\n");
-    (void)safe_call_function_pointer(cop->function.f, num_callout_args);
+    ret = safe_call_function_pointer(cop->function.f, num_callout_args);
   }
   restore_command_giver();
+
+  /* Promise delivery: fulfil with the callback's value, or reject if it
+   * errored (safe_* returns null then). Must run before free_called_call,
+   * whose own settle call is the "never ran" rejection path. */
+  if (cop->promise) {
+    if (ret) {
+      settle_call_out_promise(cop, ret, 0);
+    } else {
+      svalue_t err;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*call_out callback failed";
+      settle_call_out_promise(cop, &err, 1);
+    }
+  }
 
   free_called_call(cop);
 }
@@ -291,7 +359,7 @@ int remove_call_out(object_t* ob, const char* fun) {
     }
     auto* cop = iter_handle->second;
 
-    if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
+    if (cop->ob == ob && cop->function.s && strcmp(cop->function.s, fun) == 0) {
       auto remaining_time = time_left(cop);
       free_call(cop);
       g_callout_handle_map.erase(iter_handle);
@@ -338,6 +406,22 @@ int remove_call_out_by_handle(object_t* ob, LPC_INT handle) {
   return -1;
 }
 
+promise_t* promise_for_call_out(LPC_INT handle) {
+  if (handle == 0) {
+    return nullptr;
+  }
+  auto iter = g_callout_handle_map.find(handle);
+  if (iter == g_callout_handle_map.end()) {
+    return nullptr;
+  }
+  auto* cop = iter->second;
+  if (!cop->promise) {
+    cop->promise = promise_alloc();
+  }
+  cop->promise->ref++; /* the caller's reference */
+  return cop->promise;
+}
+
 int find_call_out_by_handle(object_t* ob, LPC_INT handle) {
   DBG_CALLOUT("find_call_out_by_handle: ob: %s, handle: %" LPC_INT_FMTSTR_P "\n", ob->obname,
               handle);
@@ -380,7 +464,7 @@ int find_call_out(object_t* ob, const char* fun) {
       continue;
     }
     auto* cop = iter_handle->second;
-    if (cop->ob == ob && strcmp(cop->function.s, fun) == 0) {
+    if (cop->ob == ob && cop->function.s && strcmp(cop->function.s, fun) == 0) {
       auto remaining_time = time_left(cop);
       DBG_CALLOUT("  found: remaining time %d.\n", remaining_time);
       return remaining_time;
@@ -430,7 +514,9 @@ void mark_call_outs() {
     }
     if (cop->ob) {
       cop->ob->extra_ref++;
-      EXTRA_REF(BLOCK(cop->function.s))++;
+      if (cop->function.s) { /* null for a timer-only entry */
+        EXTRA_REF(BLOCK(cop->function.s))++;
+      }
     } else {
       cop->function.f->hdr.extra_ref++;
     }
@@ -438,6 +524,9 @@ void mark_call_outs() {
       if (cop->command_giver) {
         cop->command_giver->extra_ref++;
       }
+    }
+    if (cop->promise) {
+      cop->promise->extra_ref++;
     }
   }
 }
@@ -477,7 +566,9 @@ array_t* get_all_call_outs() {
       add_ref(cop->ob, "get_all_call_outs");
       vv->item[1].type = T_STRING;
       vv->item[1].subtype = STRING_SHARED;
-      vv->item[1].u.string = make_shared_string(cop->function.s);
+      /* "<timer>" is cosmetic only: find/remove-by-name compare against
+       * function.s itself (null here), so the placeholder cannot match */
+      vv->item[1].u.string = make_shared_string(cop->function.s ? cop->function.s : "<timer>");
     } else {
       outbuffer_t tmpbuf;
       svalue_t tmpval;
@@ -533,6 +624,31 @@ void remove_all_call_out(object_t* obj) {
     }
   }
   DBG_CALLOUT("remove_all_call_out: removed %d callouts.\n", i);
+}
+
+/* destruct_object(): a destructed object's call_outs are reclaimed LAZILY
+ * (the fire path skips them, reclaim_call_outs() sweeps them) -- a
+ * long-standing design this function deliberately does not change. But a
+ * PROMISE awaiting one must reject NOW: nothing will ever fulfil it, and a
+ * parked awaiter would otherwise hang until the delay elapses (observed: a
+ * destructed-while-parked await call_out(600) kept its awaiter suspended
+ * for the full 600 seconds). The cop itself stays for the lazy sweep. */
+void reject_call_out_promises(object_t* obj) {
+  auto range = g_callout_object_handle_map.equal_range(obj);
+  for (auto iter = range.first; iter != range.second; ++iter) {
+    auto iter_handle = g_callout_handle_map.find(iter->second);
+    if (iter_handle == g_callout_handle_map.end()) {
+      continue; /* stale entry; the lazy sweeps clean these */
+    }
+    auto* cop = iter_handle->second;
+    if (cop->promise && cop->ob == obj) {
+      svalue_t err;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*call_out's object was destructed before it ran";
+      settle_call_out_promise(cop, &err, 1);
+    }
+  }
 }
 
 void clear_call_outs() {
@@ -601,14 +717,35 @@ void reclaim_call_outs() {
 namespace {
 inline void int_call_out(bool walltime) {
   svalue_t* arg = sp - st_num_arg + 1;
-  int const num = st_num_arg - 2;
+  /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
+   * registers a timer-only call_out and returns a promise fulfilled (with 0)
+   * when the delay elapses, rejected if the call_out is removed or its
+   * object destructed first -- `await call_out(2)` is the pause idiom. The
+   * classic function-first form is untouched and still returns the handle. */
+  bool const timer_form = (arg[0].type == T_NUMBER || arg[0].type == T_REAL);
+  /* name the efun the author actually called: this helper serves both, and
+   * loosening the spec to min_arg 1 moved these from compile time (where the
+   * spec named them correctly) to here */
+  const char* const efun_name = walltime ? "call_out_walltime" : "call_out";
+  if (timer_form && st_num_arg > 1) {
+    error("%s: a delay-only %s takes no arguments (nothing will be called).\n", efun_name,
+          efun_name);
+  }
+  /* The spec can no longer pin argument 2's type (the delay is argument 1 in
+   * the promise form), so the classic form checks it here. */
+  if (!timer_form &&
+      (st_num_arg < 2 || (arg[1].type != T_NUMBER && arg[1].type != T_REAL))) {
+    error("%s: argument 2 (the delay) must be int or float.\n", efun_name);
+  }
+  svalue_t* delay_arg = timer_form ? &arg[0] : &arg[1];
+  int const num = timer_form ? 0 : st_num_arg - 2;
   LPC_INT ret;
 
   LPC_INT delay_msecs = 0;
-  switch (arg[1].type) {
+  switch (delay_arg->type) {
     case T_NUMBER: {
       // seconds * 1000 can overflow int64 (UB / UBSan abort); saturate.
-      LPC_INT secs = arg[1].u.number;
+      LPC_INT secs = delay_arg->u.number;
       if (secs > INT64_MAX / 1000) {
         delay_msecs = INT64_MAX;
       } else {
@@ -617,7 +754,7 @@ inline void int_call_out(bool walltime) {
       break;
     }
     case T_REAL: {
-      double ms = floor(arg[1].u.real * 1000.0);
+      double ms = floor(delay_arg->u.real * 1000.0);
       if (ms >= (double)INT64_MAX) {
         delay_msecs = INT64_MAX;
       } else if (ms <= 0.0) {
@@ -630,6 +767,33 @@ inline void int_call_out(bool walltime) {
   }
   if (delay_msecs < 0) {
     delay_msecs = 0;
+  }
+
+  if (timer_form) {
+    promise_t* p;
+
+    if (!(current_object->flags & O_DESTRUCTED)) {
+      /* arg[0] doubles as the "function" svalue: new_call_out reads only its
+       * type, and T_NUMBER/T_REAL select the timer-only entry */
+      ret = new_call_out(current_object, &arg[0], std::chrono::milliseconds(delay_msecs), 0,
+                         nullptr, walltime);
+      p = promise_for_call_out(ret);
+      DEBUG_CHECK(!p, "BUG: no promise for a call_out registered this instant.\n");
+    } else {
+      /* the classic form returns handle 0 without registering here; the
+       * promise-shaped equivalent of "nothing was scheduled" */
+      p = promise_alloc();
+      svalue_t err;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*call_out was removed before it ran";
+      promise_settle(p, &err, 1);
+    }
+    /* sp is the delay (T_NUMBER/T_REAL): overwrite it, nothing to free */
+    sp->type = T_PROMISE;
+    sp->subtype = 0;
+    sp->u.prom = p;
+    return;
   }
 
   if (!(current_object->flags & O_DESTRUCTED)) {

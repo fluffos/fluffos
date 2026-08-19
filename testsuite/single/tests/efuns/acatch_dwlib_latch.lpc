@@ -1,0 +1,68 @@
+// Regression: an error unwound by `acatch` has to reset the same
+// module-global scratch state that restore_context() resets.
+//
+// unwind_to_acatch_marker() (src/vm/internal/base/promise.cc) exists because
+// no C++ handler runs for an acatch region -- the throw is caught at the
+// coroutine boundary and the region is resumed in place. It is written to do
+// everything restore_context() does, and it reproduced four of the five:
+// control stack, command-giver stack, value stack, and the csp-anchored ref
+// list. The fifth is dwlib's `_in_reference_allowed`, a re-entrancy latch
+// that reference_allowed() sets and then holds across several applies of
+// arbitrary LPC, clearing it on its own normal returns only.
+//
+// So an error raised inside `acatch(reference_allowed(...))` left the latch
+// set -- for the rest of the driver's life, since nothing else clears it.
+// The guard it feeds (`if (!invis || !referee_creator || _in_reference_allowed)
+// return 1;`) then made EVERY later reference_allowed() call return "allowed"
+// unconditionally, silently disabling the invisibility check mudlib-wide.
+// Written as plain `catch(...)` the same code is unaffected, because
+// do_catch()'s handler goes through restore_context().
+//
+// PACKAGE_DWLIB is off by default and absent from CI, so this test only runs
+// where the package is compiled in. The general rule it pins applies to every
+// such latch: when restore_context() grows another reset,
+// unwind_to_acatch_marker() needs it too (AGENTS.md section 4).
+
+#ifdef __PACKAGE_DWLIB__
+private async void trip_latch() {
+  object erroring, referrer;
+
+  erroring = clone_object("/clone/dwlib_erroring_creator");
+  referrer = clone_object("/clone/dwlib_referrer");
+
+  // reference_allowed() sets the latch, then applies query_name(), which
+  // raises. acatch catches it, so this function returns normally -- and the
+  // latch must not survive.
+  acatch(reference_allowed(erroring, referrer));
+
+  destruct(erroring);
+  destruct(referrer);
+}
+#endif
+
+void do_tests() {
+#ifdef __PACKAGE_DWLIB__
+  object invis, referrer;
+
+  invis = clone_object("/clone/dwlib_invis_creator");
+  referrer = clone_object("/clone/dwlib_referrer");
+
+  // Baseline: an invisible creator is not referenceable.
+  ASSERT_EQ(0, reference_allowed(invis, referrer));
+
+  // An async body runs synchronously up to its first await, and there is no
+  // await here, so the acatch has already unwound by the time this returns.
+  trip_latch();
+
+  ASSERT2(reference_allowed(invis, referrer) == 0,
+    "dwlib re-entrancy latch left set by an acatch unwind: "
+    "every later permission check now returns 'allowed'");
+
+  // Plain catch, for contrast: this path was always correct.
+  catch(reference_allowed(clone_object("/clone/dwlib_erroring_creator"), referrer));
+  ASSERT_EQ(0, reference_allowed(invis, referrer));
+
+  destruct(invis);
+  destruct(referrer);
+#endif
+}

@@ -73,9 +73,9 @@ extern lpc_predef_t* lpc_predefs;
 
 typedef struct {
   short max_arg, min_arg; /* Can't use char to represent -1 */
-  short type[4];          /* need a short to hold the biggest type flag */
+  uint32_t type[4];       /* runtime T_* masks; the low 16 bits are full */
   short Default;
-  unsigned short ret_type;
+  uint32_t ret_type; /* compiler TYPE_* for efuns; runtime T_* for operators */
   const char* name;
   int arg_index;
 } instr_t;

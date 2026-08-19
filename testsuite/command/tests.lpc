@@ -51,6 +51,7 @@ private void run_one(string path, int kind) {
   }
 
   before = sizeof("/single/master"->query_failures());
+  "/single/master"->set_in_test_file(1);
   total_files++;
   write("[ RUN      ] " + path + "\n");
   t0 = perf_counter_ns();
@@ -77,6 +78,7 @@ private void run_one(string path, int kind) {
       break;
   }
 
+  "/single/master"->set_in_test_file(0);
   ms = (perf_counter_ns() - t0) / 1000000;
   if (sizeof("/single/master"->query_failures()) > before) {
     failed_files += ({ path });
@@ -137,6 +139,13 @@ private string glob_to_regexp(string pat) {
   return re + "$";
 }
 
+// Set when execute() finished the files but latches were still open, so
+// the recap was deferred to finish_run() (called by the terminal once the
+// latches clear). Keeps the recap the LAST word, which is what makes a
+// deferred check countable.
+private int report_deferred = 0;
+private int deferred_t0 = 0;
+
 private int report(int total_ms) {
   string *failures = "/single/master"->query_failures();
 
@@ -151,6 +160,15 @@ private int report(int total_ms) {
     sizeof(failures) + " failed check(s), listed below:\n");
   foreach (string f in failed_files) {
     write("[  FAILED  ] " + f + "\n");
+  }
+  // A failure recorded after its file finished (deferred work: a call_out,
+  // a promise reaction, a resumed coroutine) belongs to no file, so the
+  // list above cannot name it. Print every recorded message too -- always,
+  // not just when the file list happens to be empty, or a run with one
+  // ordinary file failure would report a higher check count than it names
+  // and the deferred failure would be invisible again.
+  foreach (string msg in failures) {
+    write("[  FAILED  ] " + msg + (msg[<1] == '\n' ? "" : "\n"));
   }
   return 0;
 }
@@ -177,6 +195,22 @@ int execute(string fun, int single_test: (: 0 :)) {
     run_one(fun, 0);
   }
 
+  // Tests that declared outstanding work (EXPECT_LATCH) are not finished
+  // yet: their remaining assertions run on later ticks. Defer the recap to
+  // finish_run() so those checks are counted rather than printed after it.
+  if (sizeof("/single/master"->query_latches())) {
+    report_deferred = 1;
+    deferred_t0 = t0;
+    write("[  WAIT    ] " + sizeof("/single/master"->query_latches()) +
+      " exit latch(es) outstanding; deferring recap.\n");
+    if (single_test) {
+      // A full run reaches the shutdown test, which now waits on latches;
+      // a single/filtered run has to arm that terminal itself.
+      "single/tests/efuns/shutdown"->do_the_nasty_deed();
+    }
+    return 1;
+  }
+
   if (!report((perf_counter_ns() - t0) / 1000000)) {
     // Autotest mode: exit nonzero. Interactively, just report.
     if (!this_player()) {
@@ -196,6 +230,24 @@ int execute(string fun, int single_test: (: 0 :)) {
   }
 
   return 1;
+}
+
+// Called by the terminal (single/tests/efuns/shutdown.lpc) once every exit
+// latch has cleared -- or once the wait budget ran out, in which case the
+// unreleased latches have already been recorded as failures. Returns 1 if
+// the run passed. Safe to call when nothing was deferred.
+// True between execute() deferring the recap and finish_run() emitting it.
+// master::flag() must not shutdown(-1) on a recorded failure in that window:
+// the terminal has not run yet, so doing so would skip the recap AND every
+// latched check still outstanding -- one early failure would mask all of them.
+public int is_report_deferred() { return report_deferred; }
+
+public int finish_run() {
+  if (!report_deferred) {
+    return !sizeof("/single/master"->query_failures());
+  }
+  report_deferred = 0;
+  return report((perf_counter_ns() - deferred_t0) / 1000000);
 }
 
 int main(string file) {

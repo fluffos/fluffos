@@ -1,17 +1,18 @@
 // A block used in EXPRESSION position must not leak its inner declarations'
 // type to the declaration it is initializing.
 //
-// `catch {}` and `time_expression {}` both set the compiler's
+// `catch {}`, `acatch {}` and `time_expression {}` all set the compiler's
 // file-scope `current_type` when a declaration inside them is parsed, and the
 // ENCLOSING declarator's rule reads that same global afterwards -- so the
 // variable being initialized silently took the type of the last local
 // declared inside the block. Two ways that showed up:
 //
-//   mixed err = catch { mapping acc = ...; };    // err is typed `mapping`
+//   mixed err = acatch { mapping acc = ...; };   // err is typed `mapping`
 //   write("failed: " + err);                     // Invalid argument types to '+'
 //
-// -- a compile error pointing at a line that has nothing to do with the
-// cause -- and, when the stolen type is one the compiler will coerce to:
+// -- a compile error on the documented acatch idiom, pointing at a line that
+// has nothing to do with the cause -- and, when the stolen type is one the
+// compiler will coerce to:
 //
 //   mixed e = catch { float f = 1.0; };
 //   e = 5;                                       // silently stores 5.000000
@@ -80,6 +81,18 @@ private void nested_case() {
   ASSERT_EQ(9, outer);
 }
 
+async void acatch_case() {
+  mixed err = acatch {
+    mapping acc = ([ "balance": 10 ]);
+    keep = acc;
+  };
+  int n = 3;
+
+  ASSERT_EQ(0, err);
+  err = n;
+  ASSERT_EQ("int", typeof(err));
+  ASSERT_EQ(3, err);
+}
 
 // A global initializer reaches the same rules through __INIT, which used to
 // declare zero locals to the tree optimizer -- a local declared inside this
@@ -100,4 +113,5 @@ void do_tests() {
   second_declarator_case();
   time_expression_case();
   nested_case();
+  acatch_case();
 }

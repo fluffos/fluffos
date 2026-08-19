@@ -7,5 +7,9 @@ void test() {
   executed++; ;
 }
 void do_tests() {
+  // the whole point of this crasher: the nesting limit fires from a
+  // call_out, i.e. after this file has finished
+  master()->expect_deferred_error("Nesting call_out(0) level limit");
+
   call_out("test", 0.1);
 }

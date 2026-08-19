@@ -276,6 +276,7 @@ void save_svalue(svalue_t* v, char** buf) {
     }
     case T_OBJECT:
     case T_FUNCTION:
+    case T_PROMISE:
       // ignored
       break;
     default:
@@ -1365,7 +1366,7 @@ static int safe_restore_svalue(char* cp, svalue_t* v) {
   return 0;
 }
 
-static int fgv_recurse(program_t* prog, int* idx, const char* name, unsigned short* type,
+static int fgv_recurse(program_t* prog, int* idx, const char* name, lpc_type_t* type,
                        int check_nosave) {
   int i;
   for (i = 0; i < prog->num_inherited; i++) {
@@ -1387,7 +1388,7 @@ static int fgv_recurse(program_t* prog, int* idx, const char* name, unsigned sho
   return 0;
 }
 
-int find_global_variable(program_t* prog, const char* const name, unsigned short* type,
+int find_global_variable(program_t* prog, const char* const name, lpc_type_t* type,
                          int check_nosave) {
   int idx = 0;
   const char* str = findstring(name);
@@ -1406,7 +1407,7 @@ void restore_object_from_line(object_t* ob, char* line, int noclear) {
   int idx;
   svalue_t* sv = ob->variables;
   int rc;
-  unsigned short t;
+  lpc_type_t t;
 
   if (line[0] == '#') { /* ignore 'comments' in savefiles */
     return;

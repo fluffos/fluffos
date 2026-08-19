@@ -1,0 +1,358 @@
+// Randomized (but seeded, so reproducible) destructive-lifecycle fuzzer for
+// suspended async frames.
+//
+// The hand-written async tests each pin ONE ordering. The bugs that actually
+// shipped in this branch were all orderings nobody thought to write down: a
+// frame abandoned while one of its siblings already had a delivery queued, a
+// promise settled in the same synchronous step as the destruct of the object
+// awaiting it, a frame parked inside an object that destructs itself. This
+// file mixes park / settle / reject / drop / destruct operations against a
+// pool of clones and re-checks the scheduler's own invariants after EVERY
+// step, so an ordering nobody wrote a test for still gets executed.
+//
+// The seed is fixed: a fuzzer in CI has to fail the same way twice.
+//
+// Invariants checked after every operation:
+//   * async_info(1)["suspended"] agrees with sizeof(async_info()) -- the
+//     scheduler's counter and its enumeration are two independent walks of
+//     the live-coroutine registry, so a frame freed on one path but not the
+//     other shows up here immediately.
+//   * no listed frame names a destructed object -- destruct must abandon
+//     eagerly, never leave a frame pinning a dead object.
+//   * every listed frame still resolves a function name out of its program.
+// And after teardown, that every frame this file created is gone.
+
+#include "/include/tests.h"
+
+#define ROUNDS 4
+#define OPS_PER_ROUND 25
+#define POOL 6
+
+nosave int seed;
+nosave object *workers;
+nosave promise *promises;
+nosave int *our_ids;
+nosave int round;
+nosave int settled_handlers;
+nosave int op_no;
+nosave string trace;
+nosave int chaos_budget;
+nosave int recompiles;
+nosave int finish_tries;
+nosave int *op_hits;
+
+private void check_invariants(string where);
+private object a_worker();
+private promise a_promise();
+private void watch(promise p);
+private void note_ids();
+
+private int rnd(int n) {
+  // 30-bit LCG. Deterministic across platforms: every operand stays well
+  // inside 32 bits, so this does not depend on wraparound behaviour.
+  //
+  // Take the HIGH bits: an LCG's low bits have short periods (bit 0
+  // alternates, bit 1 has period 4), so `seed % n` for a small n samples the
+  // worst part of the state and cycles through a handful of values.
+  seed = (seed * 1103515245 + 12345) & 0x3fffffff;
+  return n > 0 ? (seed >> 15) % n : 0;
+}
+
+private void note_ids() {
+  mixed *info = async_info();
+  int i;
+
+  for (i = 0; i < sizeof(info); i++) {
+    if (member_array(info[i]["id"], our_ids) == -1 &&
+      member_array(info[i]["object"], workers) != -1) {
+      our_ids += ({ info[i]["id"] });
+    }
+  }
+}
+
+private int our_live_frames() {
+  mixed *info = async_info();
+  int i, n;
+
+  for (i = 0; i < sizeof(info); i++) {
+    if (member_array(info[i]["id"], our_ids) != -1) {
+      n++;
+    }
+  }
+  return n;
+}
+
+private void check_invariants(string where) {
+  mixed *info = async_info();
+  mapping sched = async_info(1);
+  int i;
+
+  ASSERT2(sched["suspended"] == sizeof(info),
+    where + ": async_info(1) says " + sched["suspended"] +
+    " suspended but async_info() lists " + sizeof(info));
+  for (i = 0; i < sizeof(info); i++) {
+    ASSERT2(info[i]["object"] != 0,
+      where + ": suspended frame " + info[i]["id"] +
+      " lives in a destructed object");
+    ASSERT2(stringp(info[i]["function"]),
+      where + ": suspended frame " + info[i]["id"] +
+      " has no function name");
+  }
+  ASSERT2(sched["pending_deliveries"] >= 0, where + ": negative pending_deliveries");
+}
+
+// Runs INSIDE a drain delivery. Mutating the coroutine registry from a
+// reaction handler is the re-entrancy every abandonment path has to survive,
+// and it is what a real mudlib does: a rejection handler that calls dest() on
+// the player, a fulfilment handler that starts the next async step. Doing it
+// here means destructs and fresh parks land BETWEEN two deliveries of the
+// same drain batch rather than only between gameticks.
+private void chaos() {
+  object w;
+  promise q;
+
+  if (chaos_budget <= 0) {
+    return;
+  }
+  chaos_budget--;
+  check_invariants("chaos entry");
+  workers -= ({ 0 });
+  switch (rnd(3)) {
+    case 0:
+      if (sizeof(workers)) {
+        destruct(workers[rnd(sizeof(workers))]);
+        workers -= ({ 0 });
+      }
+      break;
+    case 1:
+      w = a_worker();
+      watch(w->park_own());
+      note_ids();
+      break;
+    case 2:
+      q = a_promise();
+      if (q && promise_status(q) == 0) {
+        promise_resolve(q, -1);
+      }
+      break;
+  }
+  check_invariants("chaos exit");
+}
+
+// Handlers deliberately capture nothing: an anonymous function that closed
+// over the promise would build a reference loop the Debug build then reports.
+private void watch(promise p) {
+  promise_catch(p, function(mixed err) {
+    settled_handlers++;
+    chaos();
+    return 0;
+  });
+}
+
+private object a_worker() {
+  workers -= ({ 0 });
+  if (!sizeof(workers) || sizeof(workers) < POOL && rnd(3) == 0) {
+    object w = clone_object("/clone/async_fuzz_worker");
+    workers += ({ w });
+    return w;
+  }
+  return workers[rnd(sizeof(workers))];
+}
+
+private promise a_promise() {
+  promises -= ({ 0 });
+  if (!sizeof(promises)) {
+    return 0;
+  }
+  return promises[rnd(sizeof(promises))];
+}
+
+private void step() {
+  object w;
+  promise p, q;
+  int op = rnd(13);
+
+  op_no++;
+  op_hits[op] = 1;
+  trace = "op#" + op_no + " kind " + op;
+
+  switch (op) {
+    case 0:  // plain park on a fresh promise
+      w = a_worker();
+      p = promise_create();
+      promises += ({ p });
+      watch(w->park(p));
+      note_ids();
+      break;
+    case 1:  // park on a promise only the frame itself holds
+      w = a_worker();
+      watch(w->park_own());
+      note_ids();
+      break;
+    case 2:  // two frames of the SAME object parked at once
+      w = a_worker();
+      p = promise_create();
+      promises += ({ p });
+      watch(w->outer(p));
+      note_ids();
+      break;
+    case 3:  // await guarded by acatch: a rejection resumes rather than rejects
+      w = a_worker();
+      p = promise_create();
+      promises += ({ p });
+      watch(w->park_acatch(p));
+      note_ids();
+      break;
+    case 4:  // frame that destructs its own object and then awaits again
+      w = a_worker();
+      p = promise_create();
+      q = promise_create();
+      promises += ({ p, q });
+      watch(w->park_then_die(p, q));
+      note_ids();
+      break;
+    case 5:  // destruct a random clone out from under whatever is parked in it
+      workers -= ({ 0 });
+      if (sizeof(workers)) {
+        w = workers[rnd(sizeof(workers))];
+        destruct(w);
+        workers -= ({ 0 });
+      }
+      break;
+    case 6:  // fulfil
+      p = a_promise();
+      if (p && promise_status(p) == 0) {
+        promise_resolve(p, op_no);
+      }
+      break;
+    case 7:  // reject
+      p = a_promise();
+      if (p && promise_status(p) == 0) {
+        watch(p);  // a rejection nobody handles is reported, not silent
+        promise_reject(p, "fuzz " + op_no);
+      }
+      break;
+    case 8:  // drop our last reference to a pending promise
+      promises -= ({ 0 });
+      if (sizeof(promises)) {
+        promises = promises[0..rnd(sizeof(promises)) - 1] + promises[rnd(sizeof(promises)) + 1..];
+      }
+      break;
+    case 9:  // settle a frame's self-held promise through the object
+      workers -= ({ 0 });
+      if (sizeof(workers)) {
+        workers[rnd(sizeof(workers))]->settle_held(rnd(2));
+      }
+      break;
+    case 10:  // settle, then destruct the object awaiting it in the SAME step:
+      // the delivery is already queued when abandonment runs
+      workers -= ({ 0 });
+      p = a_promise();
+      if (p && sizeof(workers) && promise_status(p) == 0) {
+        promise_resolve(p, op_no);
+        destruct(workers[rnd(sizeof(workers))]);
+        workers -= ({ 0 });
+      }
+      break;
+    case 11:  // chain a new promise off an existing one
+      p = a_promise();
+      if (p) {
+        q = promise_then(p, function(mixed v) {
+          settled_handlers++;
+          return v;
+        });
+        watch(q);
+        promises += ({ q });
+      }
+      break;
+    case 12:  // recompile the shared program out from under every parked
+      // frame: each one's prog_generation snapshot goes stale, so a
+      // later settle must reject it cleanly rather than resume into
+      // bytecode whose layout has changed
+      if (recompiles < 2) {
+        recompiles++;
+        recompile_object(load_object("/clone/async_fuzz_worker"));
+      }
+      break;
+  }
+  check_invariants(trace);
+}
+
+private void finish() {
+  int i;
+
+  workers -= ({ 0 });
+  for (i = 0; i < sizeof(workers); i++) {
+    destruct(workers[i]);
+  }
+  workers = ({});
+  promises = ({});
+
+  // Wait for quiescence rather than asserting on a deadline. How long the
+  // backlog takes to clear is a throughput property of `async drain batch`
+  // (at 1 it is a thousand deliveries a second), not of anything this file
+  // pins -- so give it as long as it needs, bounded so that a frame which is
+  // genuinely stuck still fails the run instead of hanging it.
+  if (our_live_frames() > 0 && finish_tries < 30) {
+    finish_tries++;
+    call_out((: finish :), 1);
+    return;
+  }
+  check_invariants("teardown");
+  // Every frame this file created is accounted for: resumed, rejected, or
+  // abandoned. None may still be sitting in the registry.
+  ASSERT2(our_live_frames() == 0,
+    "after teardown " + our_live_frames() + " of this file's " +
+    sizeof(our_ids) + " frames are still suspended");
+
+  // Coverage, not behaviour: a fuzzer that silently stops reaching its own
+  // interesting paths still reports a clean run. Each of these is a path a
+  // refactor could disconnect without any check noticing.
+  ASSERT2(sizeof(our_ids) > 20,
+    "only " + sizeof(our_ids) + " frames were ever parked: the fuzzer is not "
+    "reaching the suspension path");
+  ASSERT2(settled_handlers > 0, "no reaction handler ever ran");
+  ASSERT2(chaos_budget < 40,
+    "the chaos path never executed: nothing mutated the registry from inside a "
+    "drain delivery");
+  ASSERT2(recompiles > 0, "the recompile op never fired");
+  // The LCG's low bits cycle, so a naive rnd() silently reached only a
+  // fraction of the operation kinds while every other check stayed green.
+  ASSERT2(sizeof(op_hits - ({ 0 })) >= 12,
+    "only " + sizeof(op_hits - ({ 0 })) + " of 13 operation kinds were ever chosen");
+  RELEASE_LATCH("async_lifecycle_fuzz");
+}
+
+private void fuzz_round() {
+  int i;
+
+  for (i = 0; i < OPS_PER_ROUND; i++) {
+    step();
+  }
+  round++;
+  if (round < ROUNDS) {
+    call_out((: fuzz_round :), 1);
+  } else {
+    call_out((: finish :), 1);
+  }
+}
+
+void do_tests() {
+  seed = 20260818;
+  workers = ({});
+  promises = ({});
+  our_ids = ({});
+  round = 0;
+  op_no = 0;
+  chaos_budget = 40;
+  recompiles = 0;
+  finish_tries = 0;
+  op_hits = allocate(13);
+
+  // Everything runs from call_outs: master::flag() sits on the stack for the
+  // whole synchronous part of a run, so nothing -- no drain, no resume -- is
+  // serviced until do_tests() returns. Starting from a call_out makes the
+  // ordering call_out-to-call_out, which is defined.
+  EXPECT_LATCH("async_lifecycle_fuzz");
+  call_out((: fuzz_round :), 1);
+}
