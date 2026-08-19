@@ -156,6 +156,16 @@ drain, with no wall-clock delay per iteration. Only when a drain exceeds
 again a moment later — the price of the driver staying responsive under
 unbounded async work, paid once per batch rather than once per `await`.
 
+The yield is to the event loop's own post-I/O queue, not a timer, so there
+is no fixed delay between batches: the loop polls sockets, fires due timers
+and comes straight back. That keeps latency at one batch — measured worst
+timer jitter is a few milliseconds even while the drain is saturated — but
+it also means sustained async work runs the driver at 100% of one core
+rather than leaving it idle between batches. A mud with a genuinely
+unbounded promise chain will use every cycle it is given; that is the
+intended behaviour, and it is a change worth knowing about on a
+co-tenanted host.
+
 While suspended, the object remains fully live: incoming calls run
 normally (there are no re-entrancy locks), and each `async` call has its
 own suspension state, so concurrent invocations don't interfere. The

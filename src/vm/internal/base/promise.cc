@@ -1608,6 +1608,13 @@ void mark_promise_queue() {
 
 void promise_cleanup() {
   g_promises_shut_down = true;
+  /* The TickEvent g_drain_event points at is owned by the backend and is
+   * deleted by clear_tick_events()/clear_walltime_events(), which run AFTER
+   * this in the shutdown sequence. Drop our pointer now rather than relying
+   * on g_promises_shut_down keeping every later reader away from it. */
+  g_drain_event = nullptr;
+  g_drain_event_is_tick = false;
+  g_drain_scheduled = false;
   while (!g_promise_microtasks.empty()) {
     QueuedReaction qr = g_promise_microtasks.front();
     g_promise_microtasks.pop_front();

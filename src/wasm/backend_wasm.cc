@@ -72,8 +72,18 @@ TickEvent* add_loop_yield_event(TickEvent::callback_type callback) {
    * advances, which IS the yield this primitive promises. Scheduling one
    * millisecond ahead keeps it out of the current advance's due-set, so a
    * self-re-posting callback spreads across host frames instead of spinning
-   * inside one -- the same guarantee the libevent backend gets from the
-   * active_later queue. */
+   * inside one.
+   *
+   * The +1 is load-bearing, not a rounding fudge: wasm_backend_advance()
+   * calls call_walltime_events() again after every caught-up gametick
+   * WITHOUT moving s_now_ms, so a same-millisecond re-post would be re-run
+   * up to kMaxCatchup+1 times inside a single advance -- exactly the spin
+   * the due-set snapshot exists to prevent.
+   *
+   * This is the yield guarantee only; it is NOT the libevent backend's
+   * no-millisecond-floor guarantee. Throughput here is one drain batch per
+   * host advance, so the host's call rate is the ceiling (see the delay
+   * wasm_backend_advance() returns, which the host is expected to honour). */
   return add_walltime_event(std::chrono::milliseconds(1), callback);
 }
 

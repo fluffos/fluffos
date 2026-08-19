@@ -113,8 +113,11 @@ void on_loop_yield_event(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
  * libuv's check phase / setImmediate -- and libevent's own bufferevent code
  * uses the same queue for the same reason (event_deferred_cb_schedule_ runs
  * MAX_DEFERREDS_QUEUED=32 callbacks eagerly, then defers the rest). The
- * symbol is non-static and unchanged across libevent 2.x; nothing inside
- * libevent references it, so it is only retained in the link because we do.
+ * symbol is non-static, and nothing inside libevent references it, so it is
+ * only retained in the link because we do. The queue is a 2.1 feature (it
+ * does not appear in ChangeLog-2.0), which is why libevent is vendored
+ * rather than probed for: a missing symbol here is a link error, not a
+ * silent behaviour change.
  * RE-CHECK THIS ON EVERY LIBEVENT UPGRADE (AGENTS.md section 14). */
 extern "C" void event_active_later_(struct event* ev, int res);
 
@@ -141,6 +144,9 @@ TickEvent* add_loop_yield_event(TickEvent::callback_type callback) {
   /* Created but deliberately never event_add()ed: it carries no timeout and
    * no fd, it exists only as a handle the active_later queue can hold. */
   self->ev = event_new(g_event_base, -1, 0, on_loop_yield_event, self);
+  if (self->ev == nullptr) {
+    fatal("add_loop_yield_event: out of memory");
+  }
   g_loop_yield_events.insert(self);
   /* Promotion to the active queue happens at the TOP of the next loop
    * iteration, before dispatch(), and the pending entry keeps
