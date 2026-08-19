@@ -85,9 +85,6 @@ inherit chain size : 30
 # it is exceeded.
 maximum evaluation cost : 30000000
 
-# Max number of local variables in a function.
-maximum local variables : 50
-
 # Set the maximum call depth for functions.
 maximum call depth : 150
 

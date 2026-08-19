@@ -56,7 +56,7 @@
 #define __EVALUATOR_STACK_SIZE__ CFG_INT(6)
 #define __INHERIT_CHAIN_SIZE__ CFG_INT(7)
 #define __MAX_EVAL_COST__ CFG_INT(8)
-#define __MAX_LOCAL_VARIABLES__ CFG_INT(9)
+#define __RC_INT_9__ CFG_INT(9) /* retired: was 'maximum local variables' */
 #define __MAX_CALL_DEPTH__ CFG_INT(10)
 #define __MAX_ARRAY_SIZE__ CFG_INT(11)
 #define __MAX_BUFFER_SIZE__ CFG_INT(12)

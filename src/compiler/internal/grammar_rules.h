@@ -54,6 +54,7 @@ void rule_define_class_members(struct ident_hash_elem_t* class_ihe, LPC_INT clas
 // These are all thin wrappers over one-liners that need compiler.h internals.
 LPC_INT rule_loop_open();
 LPC_INT rule_special_context_open();
+LPC_INT rule_tree_context_open();
 LPC_INT rule_block_open();
 void rule_number(parse_node_t** result, LPC_INT val);
 void rule_real(parse_node_t** result, LPC_FLOAT val);

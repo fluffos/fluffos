@@ -47,6 +47,27 @@ void do_tests() {
     return;  // not a DEBUG driver: __TREE__ does not exist
   }
 
+  // __TREE__ discards the block's code and imposes no restriction of its
+  // own, so it must not borrow the catch/time_expression context. Routing it
+  // through special_context_start once made `break`, `continue` and `await`
+  // inside a __TREE__ block compile errors -- reported, confusingly, against
+  // constructs the source never mentions.
+  write_file(GEN + "_ctx.c",
+    "int probe() {\n"
+    "  int i, seen = 0;\n"
+    "  for (i = 0; i < 3; i++) { __TREE__ { break; }; seen++; }\n"
+    "  for (i = 0; i < 3; i++) { __TREE__ { continue; }; seen++; }\n"
+    "  switch (1) { case 1: __TREE__ { break; }; }\n"
+    "  return seen;\n"
+    "}\n", 1);
+  err = catch(ob = load_object(GEN + "_ctx"));
+  ASSERT2(!err, "break/continue inside a __TREE__ block must stay legal: " +
+    (err ? err : ""));
+  if (!err && ob) {
+    destruct(ob);
+  }
+  rm(GEN + "_ctx.c");
+
   write_file(GEN + ".c",
     "int scope() {\n"
     "  mixed *t = __TREE__ { int v = 1; };\n"

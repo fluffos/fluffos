@@ -94,7 +94,13 @@ TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
   if (delay_msecs.count() != 0) {
     delay_ptr = &val;
   }
-  event_base_once(g_event_base, -1, EV_TIMEOUT, on_walltime_event, event, delay_ptr);
+  /* A failed schedule is not a benign no-op: the TickEvent is never
+   * dispatched and never freed, so whatever it carried -- a promise drain, a
+   * queued user command -- silently never happens. Nothing up the call chain
+   * can act on that, so fail loudly instead. */
+  if (event_base_once(g_event_base, -1, EV_TIMEOUT, on_walltime_event, event, delay_ptr) != 0) {
+    fatal("add_walltime_event: unable to schedule event");
+  }
   return event;
 }
 

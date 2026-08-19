@@ -231,7 +231,7 @@ void yyerror(void *yyscanner, const char *msg);
 %type <call_open> call_open
 %type <number> local_decl_header local_decl_statement_header
 %type <func_block> lambda_return_type
-%type <number> loop_start foreach_start block_start special_context_start
+%type <number> loop_start foreach_start block_start special_context_start tree_context_start
 %type <contextp> dollar_start
 
 %%
@@ -244,6 +244,7 @@ loop_start: %empty { $$ = rule_loop_open(); };
 foreach_start: %empty { $$ = rule_foreach_open(); };
 block_start: %empty { $$ = rule_block_open(); };
 special_context_start: %empty { $$ = rule_special_context_open(); };
+tree_context_start: %empty { $$ = rule_tree_context_open(); };
 dollar_start: %empty { $$ = rule_dollar_open(); };
 
 /* =========================================================================
@@ -666,8 +667,8 @@ time_expression:
 
 /* tree: debug-only parse-tree pretty-printer. */
 tree:
-  L_TREE special_context_start block
-    { rule_tree_block(&$$, $block, $special_context_start); }
+  L_TREE tree_context_start block
+    { rule_tree_block(&$$, $block, $tree_context_start); }
   | L_TREE '(' comma_expr ')'
     { rule_tree_expr(&$$, $comma_expr); }
 ;

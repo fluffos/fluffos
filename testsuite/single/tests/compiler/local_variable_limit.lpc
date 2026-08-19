@@ -1,13 +1,16 @@
-// `maximum local variables` must actually be enforced, and its ceiling must
-// match what the bytecode can encode.
+// A function may not allocate more locals than the bytecode can address.
 //
-// Every reader spelled the option CFG_INT(__MAX_LOCAL_VARIABLES__), but
-// __MAX_LOCAL_VARIABLES__ *is* CFG_INT(9) already -- the double offset
-// produced a constant 521, so the option was inert and 521 was everyone's
-// effective limit. Local indices are emitted as a single byte
-// (icode.cc: ins_byte(F_LOCAL); ins_byte(which)), so 521 was never encodable:
-// a function with more than 255 locals compiled, then read or wrote the wrong
-// slot at runtime.
+// A local's index is emitted as a single byte (icode.cc: ins_byte(F_LOCAL);
+// ins_byte(which)), so 255 is the ceiling. Past it a function used to compile
+// and then read or write the wrong slot at runtime.
+//
+// This was once the `maximum local variables` config option, which never
+// worked: every reader spelled it CFG_INT(__MAX_LOCAL_VARIABLES__), but
+// __MAX_LOCAL_VARIABLES__ *is* CFG_INT(9) already, so the double offset
+// yielded a constant 521 and the option never reached config_int[]. 521 was
+// not encodable either. The limit is now a constant (kMaxLocalVariables),
+// since what a byte can address is a property of the instruction encoding
+// and not something a mudlib should be able to set.
 //
 // The source is generated rather than committed: the point is the boundary,
 // and a 300-declaration file is not worth reading.
