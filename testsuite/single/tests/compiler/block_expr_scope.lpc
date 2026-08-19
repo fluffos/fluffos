@@ -5,7 +5,7 @@
 // the statement path (rule_statement_compound_stmt) feeds that to
 // pop_n_locals(). The expression path (rule_expr_or_block_block) kept only the
 // parse node and dropped the count, so every local declared inside a
-// `catch {}` / `acatch {}` / `time_expression {}` stayed in scope after the
+// `catch {}` / `time_expression {}` stayed in scope after the
 // block. Four consequences, in increasing order of nastiness:
 //
 //   1. out-of-scope names still resolved -- illegal code compiled;
