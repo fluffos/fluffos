@@ -1,0 +1,94 @@
+// __TREE__ {} is a block in EXPRESSION position, and it was the last such
+// production that neither popped the block's locals nor restored the
+// enclosing declaration's type -- the two duties catch {} / acatch {} /
+// time_expression {} were given in this same series.
+//
+// Without the fix, on a driver that has __TREE__:
+//
+//   mixed *t = __TREE__ { int v = 1; }; int v = 2;
+//        -> "Illegal to redeclare local name 'v'", rejecting legal code
+//   mixed e = __TREE__ { float scratch = 1.0; }; ...
+//        -> e is silently retyped `float`, and the resulting complaint lands
+//           on a line that has nothing to do with the cause
+//
+// and a for() init containing one leaks a slot -- for()/foreach() pop a FIXED
+// count rather than a scope diff -- so the loop variable outlives the loop.
+//
+// __TREE__ is registered under #ifdef DEBUG (lexer_utils.cc reswords[]), and
+// there is no efun that reports that, so the sources are generated and the
+// support probe IS the build check: if a bare __TREE__ will not compile, this
+// is not a DEBUG driver and there is nothing here to test.
+
+#include "/include/tests.h"
+
+#define GEN "/data/tree_block_scope"
+
+private int have_tree() {
+  int ok;
+
+  write_file(GEN + "_probe.c", "int p() { mixed *t = __TREE__ { int a = 1; }; return t ? 1 : 1; }\n", 1);
+  ok = !catch(load_object(GEN + "_probe"));
+  if (ok) {
+    destruct(find_object(GEN + "_probe"));
+  }
+  rm(GEN + "_probe.c");
+  return ok;
+}
+
+void do_tests() {
+  object ob;
+  mixed err;
+
+  if (!have_tree()) {
+    return;  // not a DEBUG driver: __TREE__ does not exist
+  }
+
+  write_file(GEN + ".c",
+    "int scope() {\n"
+    "  mixed *t = __TREE__ { int v = 1; };\n"
+    "  int v = 2;\n"                       // must be a FRESH name
+    "  return v + (t ? 0 : 0);\n"
+    "}\n"
+    "string decl_type() {\n"
+    "  mixed e = __TREE__ { float scratch = 1.0; };\n"
+    "  int n = 5;\n"
+    "  e = n;\n"                           // stays an int if the type was restored
+    "  return typeof(e);\n"
+    "}\n"
+    "int loop_slot() {\n"
+    "  int seen = 0;\n"
+    // *0 so the start is 0 whatever the tree's size is; the point is only
+    // that a __TREE__ block sits in the init expression.
+    "  for (int i = sizeof(__TREE__ { int v = 1; }) * 0; i < 1; i++) { seen++; }\n"
+    "  return seen;\n"
+    "}\n", 1);
+
+  err = catch(ob = load_object(GEN));
+  ASSERT2(!err, "a __TREE__ block's locals must not stay in scope after it: " +
+                (err ? err : ""));
+  if (!err && ob) {
+    ASSERT_EQ(2, ob->scope());
+    ASSERT_EQ("int", ob->decl_type());
+    ASSERT_EQ(1, ob->loop_slot());
+    destruct(ob);
+  }
+  rm(GEN + ".c");
+
+  // for()/foreach() pop a FIXED count rather than a scope diff, so a slot
+  // leaked by the init expression makes them free the wrong local and the
+  // loop variable stays visible afterwards. Referencing it must not compile.
+  write_file(GEN + "_leak.c",
+    "int probe() {\n"
+    "  int r;\n"
+    "  for (int i = sizeof(__TREE__ { int v = 1; }) * 0; i < 1; i++) {}\n"
+    "  r = i;\n"
+    "  return r;\n"
+    "}\n", 1);
+  ASSERT2(catch(load_object(GEN + "_leak")),
+          "the loop variable must not outlive a for() whose init contains "
+          "a __TREE__ block");
+  if (find_object(GEN + "_leak")) {
+    destruct(find_object(GEN + "_leak"));
+  }
+  rm(GEN + "_leak.c");
+}
