@@ -232,6 +232,39 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     for (auto& ch : shown) {
       if (ch == '\t') ch = ' ';  // tab as one column, matching capture
     }
+    /* Window a very long line around the caret, clang-style, instead of
+     * echoing the whole thing. A minified or machine-generated file can put
+     * its entire program on one line, and EVERY diagnostic reproduces that
+     * line in full: 500 warnings on a 34KB line produced 35MB of output and
+     * 24MB appended to debug.log. The echo exists to show the reader where
+     * they are, which a window does just as well.
+     *
+     * col_shift maps a source column to its column in the windowed string,
+     * and is applied to the caret, the range marks and the fix-its below so
+     * they stay aligned. */
+    constexpr size_t kMaxSnippetWidth = 200;
+    constexpr size_t kCaretMargin = 80;
+    int col_shift = 0;
+    if (shown.size() > kMaxSnippetWidth) {
+      size_t const caret = caret_col > 0 ? static_cast<size_t>(caret_col - 1) : 0;
+      size_t start = caret > kCaretMargin ? caret - kCaretMargin : 0;
+      size_t end = start + kMaxSnippetWidth;
+      if (end > shown.size()) {
+        end = shown.size();
+        start = end > kMaxSnippetWidth ? end - kMaxSnippetWidth : 0;
+      }
+      std::string windowed;
+      if (start > 0) {
+        windowed = "...";
+      }
+      size_t const prefix = windowed.size();
+      windowed.append(shown, start, end - start);
+      if (end < shown.size()) {
+        windowed += "...";
+      }
+      col_shift = static_cast<int>(prefix) - static_cast<int>(start);
+      shown = windowed;
+    }
     char num[16];
     snprintf(num, sizeof(num), "%5d", line_no);
     out += "\n";
@@ -242,14 +275,17 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     if (ranges != nullptr) {
       for (const auto& r : *ranges) {
         if (r.line != line_no || r.col_start <= 0 || r.col_start > r.col_end) continue;
-        for (int c = r.col_start; c <= r.col_end && static_cast<size_t>(c) <= marks.size(); c++) {
+        for (int c = r.col_start + col_shift, last = r.col_end + col_shift;
+             c <= last && static_cast<size_t>(c) <= marks.size(); c++) {
+          if (c <= 0) continue;
           marks[static_cast<size_t>(c - 1)] = '~';
           any = true;
         }
       }
     }
-    if (caret_col > 0 && static_cast<size_t>(caret_col) <= shown.size() + 1) {
-      marks[static_cast<size_t>(caret_col - 1)] = '^';
+    int const caret_shown = caret_col + col_shift;
+    if (caret_col > 0 && caret_shown > 0 && static_cast<size_t>(caret_shown) <= shown.size() + 1) {
+      marks[static_cast<size_t>(caret_shown - 1)] = '^';
       any = true;
     }
     if (any) {
@@ -261,8 +297,10 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     }
     if (fixits != nullptr) {
       for (const auto& f : *fixits) {
-        if (f.col_start > 0 && static_cast<size_t>(f.col_start) <= shown.size() + 1) {
-          out += "\n      | " + std::string(static_cast<size_t>(f.col_start - 1), ' ');
+        int const fix_shown = f.col_start + col_shift;
+        if (f.col_start > 0 && fix_shown > 0 &&
+            static_cast<size_t>(fix_shown) <= shown.size() + 1) {
+          out += "\n      | " + std::string(static_cast<size_t>(fix_shown - 1), ' ');
           out += c_caret;
           out.append(f.replacement.data(), f.replacement.size());
           out += c_off;
@@ -2483,6 +2521,31 @@ void yywarn(const char* fmt, ...) {
     return;
   }
 
+  /* Cap, for the same reason yyerror() caps at 5 -- but the cost here is
+   * worse than a long list. Every report echoes its source line, so N
+   * warnings on one long line cost O(N x line length): a machine-generated
+   * or minified file with 500 unused locals on one line turned 34KB of
+   * source into 35MB of output and 24MB appended to debug.log, and an object
+   * that recompiles does it again each time. Truncating the echo (see
+   * kMaxSnippetWidth in render_diagnostic) removes the line-length factor;
+   * this removes the count factor.
+   *
+   * The limit is generous -- a real file with more than this many warnings
+   * has a problem the first hundred already told you about -- and the last
+   * report says how many were dropped, so the output is never silently
+   * incomplete. */
+  constexpr int kMaxParseWarnings = 100;
+  if (num_parse_warn >= kMaxParseWarnings) {
+    if (num_parse_warn == kMaxParseWarnings) {
+      num_parse_warn++;
+      report_compile_diagnostic(capture_diagnostic(
+          /*is_warning=*/true, "too many warnings in this file; further warnings suppressed"));
+    }
+    compiler_pending_notes.clear();
+    compiler_pending_fixits.clear();
+    return;
+  }
+  num_parse_warn++;
   report_compile_diagnostic(capture_diagnostic(/*is_warning=*/true, buf));
 }
 
@@ -3276,6 +3339,7 @@ static bool prolog(std::string_view source, const char* name, void* scanner) {
 
   function_context.num_parameters = -1;
   num_parse_error = 0;
+  num_parse_warn = 0;
   global_modifiers = 0;
   var_defined = 0;
 
