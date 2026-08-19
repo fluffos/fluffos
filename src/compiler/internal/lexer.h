@@ -174,6 +174,7 @@ extern const char* current_file;
 extern int current_file_id;
 extern int pragmas;
 extern int num_parse_error;
+extern int num_parse_warn;
 extern lpc_predef_t* lpc_predefs;
 extern int efun_arg_types[];
 extern int context;

@@ -81,6 +81,10 @@ static const char* main_filename = nullptr;
 int pragmas;
 
 int num_parse_error; /* Number of errors in the parser. */
+/* Warnings reported so far in this compile. yyerror() has always stopped after
+ * 5, but yywarn() had no cap at all, and every report echoes its source line --
+ * so one file could emit warnings without bound. See kMaxParseWarnings. */
+int num_parse_warn;
 
 lpc_predef_t* lpc_predefs = nullptr;
 
