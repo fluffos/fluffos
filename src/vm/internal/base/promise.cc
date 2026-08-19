@@ -46,6 +46,14 @@ bool g_coroutine_suspended = false;
  * reaction list / the microtask queue, so this registry must NOT mark
  * anything itself or extra_ref would double-count. */
 std::map<uint64_t, lpc_coroutine_t*> g_live_coroutines;
+/* Owner index over g_live_coroutines, so destruct_object() does not scan every
+ * parked frame in the driver to discover it has none of its own. Kept in step
+ * at exactly the two points that maintain the registry itself (park, and
+ * free_coroutine); coro->ob is assigned once at creation and never reassigned,
+ * so an entry cannot go stale while its coroutine lives. Holds no reference --
+ * the coroutine already owns one on its object, and the ids here are also in
+ * g_live_coroutines, which is what the ref checker walks. */
+std::unordered_map<object_t*, std::vector<uint64_t>> g_coroutines_by_owner;
 uint64_t g_next_coroutine_id = 0;
 /* the result promise of the innermost running coroutine body */
 promise_t* g_coroutine_promise = nullptr;
@@ -774,6 +782,13 @@ void discard_defer_list(struct defer_list* d) {
  * (promise_settle only queues -- no LPC runs synchronously, so this is
  * safe from deallocation paths too). */
 void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) {
+  /* Latched before free_object() below nulls coro->ob: the owner index is
+   * keyed on that pointer, and losing it would strand the entry -- so the
+   * object's next destruct would find no frames and skip abandoning them.
+   * Only ever compared as an address, never dereferenced, so it stays valid
+   * as a key even once the object is gone (ids are unique, so an unrelated
+   * object later reusing the address cannot have our id in its list). */
+  object_t* const owner = coro->ob;
   /* gather all pending defers, innermost region first, frame's last */
   struct defer_list* all = nullptr;
   struct defer_list** tail = &all;
@@ -833,6 +848,16 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
               "free_coroutine: a coroutine reached the free path with its queue "
               "ownership still claimed\n");
   g_live_coroutines.erase(coro->id);
+  {
+    auto owned = g_coroutines_by_owner.find(owner);
+    if (owned != g_coroutines_by_owner.end()) {
+      auto& ids = owned->second;
+      ids.erase(std::remove(ids.begin(), ids.end(), coro->id), ids.end());
+      if (ids.empty()) {
+        g_coroutines_by_owner.erase(owned);
+      }
+    }
+  }
   delete coro;
 }
 
@@ -1273,6 +1298,7 @@ void coroutine_await_pending(promise_t* awaited) {
 
   /* registered from the moment it exists: every free_coroutine() erases */
   g_live_coroutines[coro->id] = coro;
+  g_coroutines_by_owner[coro->ob].push_back(coro->id);
 
   /* hand the coroutine to the awaited promise, then drop the stack's ref
    * on it -- if that was the last ref the promise can never settle and the
@@ -1309,7 +1335,13 @@ void free_coroutine_orphan(lpc_coroutine_t* coro) { free_coroutine(coro, nullptr
  * funptrs owned by the object being destructed, and call_function_pointer()
  * refuses those -- see the note in docs/concepts/general/async.md. */
 void abandon_coroutines_of_object(object_t* ob) {
-  if (g_live_coroutines.empty()) {
+  /* O(this object's frames), not O(every parked frame in the driver). The
+   * owner index answers "has this object any?" in one hash lookup, which is
+   * the answer for every destruct in a mud that does not use async at all --
+   * previously each of those walked the whole registry, so a 1000-clone
+   * reset sweep paid ~75ms at the default ceiling for nothing. */
+  auto owned = g_coroutines_by_owner.find(ob);
+  if (owned == g_coroutines_by_owner.end()) {
     return;
   }
   /* Collect this object's parked frames in ONE pass, by id.
@@ -1329,11 +1361,14 @@ void abandon_coroutines_of_object(object_t* ob) {
    * it outright through a dealloc cascade, so every candidate is re-validated
    * against the registry immediately before it is touched. */
   std::vector<uint64_t> candidates;
-  for (auto& entry : g_live_coroutines) {
-    lpc_coroutine_t* coro = entry.second;
-    if (coro->ob != ob) {
+  /* by value: freeing a frame can add to or erase from the owner's list */
+  std::vector<uint64_t> const mine = owned->second;
+  for (uint64_t const cid : mine) {
+    auto entry = g_live_coroutines.find(cid);
+    if (entry == g_live_coroutines.end()) {
       continue;
     }
+    lpc_coroutine_t* coro = entry->second;
     if (coro->queued) {
       /* Owned by the microtask queue; resume_coroutine() abandons it on
        * arrival. Freeing it here would strand that delivery -- but it is
@@ -1351,9 +1386,20 @@ void abandon_coroutines_of_object(object_t* ob) {
       continue;
     }
     if (!coroutine_is_running(coro)) {
-      candidates.push_back(entry.first);
+      candidates.push_back(cid);
     }
   }
+#ifdef DEBUG
+  /* The index is only as good as its two sync points. Cross-check it against
+   * the registry on debug builds: a missed entry here means a parked frame
+   * survives its object's destruct forever, which is exactly the bug this
+   * function exists to prevent and is otherwise silent. */
+  for (auto& entry : g_live_coroutines) {
+    DEBUG_CHECK(entry.second->ob == ob &&
+                    std::find(mine.begin(), mine.end(), entry.first) == mine.end(),
+                "abandon_coroutines_of_object: owner index missed a parked frame\n");
+  }
+#endif
 
   for (uint64_t id : candidates) {
     auto it = g_live_coroutines.find(id);
