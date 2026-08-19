@@ -75,8 +75,11 @@ time to swap : 600
 # strings, 6 bits per byte.
 maximum bits in a bitfield : 1200
 
-# Max number of local variables in a function.
-maximum local variables : 30
+# Max number of local variables in a function. This used to read 30, which
+# was silently ignored (the option was inert), and is below the 64 floor the
+# option now enforces. The suite compiles a 200-local function on purpose
+# (single/tests/compiler/local_variable_limit.lpc), so it needs the ceiling.
+maximum local variables : 255
 
 # Define the maximum call depth for functions.
 maximum call depth : 30

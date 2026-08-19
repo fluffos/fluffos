@@ -59,7 +59,7 @@ void rule_number(parse_node_t** result, LPC_INT val);
 void rule_real(parse_node_t** result, LPC_FLOAT val);
 void rule_primary_expr_parameter(parse_node_t** result, LPC_INT n);
 void rule_program_append(parse_node_t** result, parse_node_t* prog, parse_node_t* def);
-void rule_tree_block(parse_node_t** result, parse_node_t* block_node);
+void rule_tree_block(parse_node_t** result, decl_t decl_val, LPC_INT saved_context);
 void rule_tree_expr(parse_node_t** result, parse_node_t* expr);
 void rule_opt_semicolon();
 ScratchString* rule_string_literal_concat(ScratchString* s1, ScratchString* s2);

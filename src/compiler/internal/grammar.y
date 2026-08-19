@@ -684,8 +684,8 @@ time_expression:
 
 /* tree: debug-only parse-tree pretty-printer. */
 tree:
-  L_TREE block
-    { rule_tree_block(&$$, $block.node); }
+  L_TREE special_context_start block
+    { rule_tree_block(&$$, $block, $special_context_start); }
   | L_TREE '(' comma_expr ')'
     { rule_tree_expr(&$$, $comma_expr); }
 ;

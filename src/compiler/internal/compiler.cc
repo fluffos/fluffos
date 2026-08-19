@@ -276,9 +276,14 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     if (ranges != nullptr) {
       for (const auto& r : *ranges) {
         if (r.line != line_no || r.col_start <= 0 || r.col_start > r.col_end) continue;
-        for (int c = r.col_start + col_shift, last = r.col_end + col_shift;
+        /* Clamp the START, don't skip from it: a range that begins left of
+         * the window has c <= 0, and static_cast<size_t> then wraps to a
+         * huge value, so the loop condition failed on its FIRST test and
+         * the whole underline disappeared instead of being clipped to the
+         * visible part (which made the `if (c <= 0) continue` that used to
+         * sit here dead code). */
+        for (int c = std::max(1, r.col_start + col_shift), last = r.col_end + col_shift;
              c <= last && static_cast<size_t>(c) <= marks.size(); c++) {
-          if (c <= 0) continue;
           marks[static_cast<size_t>(c - 1)] = '~';
           any = true;
         }
