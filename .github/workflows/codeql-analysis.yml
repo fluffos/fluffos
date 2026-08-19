@@ -5,9 +5,9 @@ on:
     branches: [master, v2019]
     paths-ignore:
       - 'docs/**'
+  # Analyze every pull request regardless of base branch, so a stacked PR
+  # is not silently unanalyzed.
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [master]
     paths-ignore:
       - 'docs/**'
   schedule:
