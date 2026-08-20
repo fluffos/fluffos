@@ -88,6 +88,7 @@ void promise_resolve_with(promise_t* p, svalue_t* value);
 /* Attach a reaction. All passed refs (funptrs, next, command_giver) are
  * TRANSFERRED to the promise machinery. Delivers on a later gametick if the
  * promise is already settled. */
+size_t pending_promise_deliveries();
 void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected,
                           promise_t* next, object_t* giver);
 

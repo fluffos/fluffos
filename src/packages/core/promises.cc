@@ -75,6 +75,26 @@ static void promise_then_common(int num_arg, funptr_t* on_fulfilled, funptr_t* o
   svalue_t* parg = sp - num_arg + 1;
   promise_t* p = parg->u.prom;
 
+  /* Refuse to register more work when the delivery queue is already
+   * saturated. Without this a handler that attaches more reactions than the
+   * drain retires grows g_promise_microtasks without bound -- one call to a
+   * two-reaction self-feeding function reached 2.3 million queued deliveries
+   * in a couple of seconds here, and aborts the driver with std::bad_alloc
+   * once memory runs out. There is no LPC frame to blame and no eval budget
+   * to exceed: every delivery is armed with a fresh one.
+   *
+   * `call_out(0) nest level` refuses exactly this shape for same-tick
+   * call_outs (call_out.cc); promises reached it again with no guard. Checked
+   * HERE, at the top of the efun before anything is allocated or ref'd, so
+   * the error unwinds with nothing half-built (AGENTS.md section 4). */
+  {
+    LPC_INT const limit = CONFIG_INT(__RC_MAX_PENDING_DELIVERIES__);
+    if (limit > 0 && (LPC_INT)pending_promise_deliveries() >= limit) {
+      error("promise_then: too many promise deliveries already pending (limit %d).\n",
+            (int)limit);
+    }
+  }
+
   object_t* giver = nullptr;
   if (CONFIG_INT(__RC_THIS_PLAYER_IN_CALL_OUT__) && command_giver) {
     giver = command_giver;

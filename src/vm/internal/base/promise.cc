@@ -1022,6 +1022,9 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
 
 }  // namespace
 
+/* Queue depth, for the registration ceiling in promise_then/promise_catch. */
+size_t pending_promise_deliveries() { return g_promise_microtasks.size(); }
+
 promise_t* promise_alloc() {
   auto* p = reinterpret_cast<promise_t*>(
       DCALLOC(1, sizeof(promise_t), TAG_PROMISE, "promise_alloc"));
