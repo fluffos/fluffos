@@ -436,10 +436,13 @@ bool invoke_handler(funptr_t* fp, svalue_t* arg, svalue_t* out) {
     pop_context(&econ);
     return true;
   } catch (const char*) {
-    restore_context(&econ);
-    /* take ownership of the caught error value, like do_catch() */
-    *out = catch_value;
+    /* Latched before restore_context(), which pops control frames and so runs
+     * defer() handlers -- see unwind_to_acatch_marker(). Taking ownership of
+     * the caught value, like do_catch(). */
+    svalue_t caught = catch_value;
     catch_value = const1;
+    restore_context(&econ);
+    *out = caught;
     if (max_eval_error) {
       set_eval(max_eval_cost);
       max_eval_error = 0;
@@ -642,6 +645,15 @@ control_stack_t* find_acatch_marker(control_stack_t* floor_csp) {
  * state must be reset on the error path too). When restore_context() grows
  * another such reset, it belongs here as well. */
 char* unwind_to_acatch_marker(control_stack_t* marker) {
+  /* Latch the caught value BEFORE anything below runs LPC. pop_control_stack()
+   * invokes the frame's defer() handlers, and do_catch() assigns const1 to
+   * catch_value on ENTRY -- so a handler containing any catch(...) wipes the
+   * error this unwind exists to deliver, and the acatch region yields 0, which
+   * reads as "no error" to `if (e = acatch {...})`. Ownership transfers here:
+   * catch_value is reset now, and `caught` is handed to the stack below.
+   * (AGENTS.md section 13 item 3 -- a bare global clobbered by nested LPC.) */
+  svalue_t caught = catch_value;
+  catch_value = const1;
 #ifdef PACKAGE_DWLIB
   _in_reference_allowed = 0;
 #endif
@@ -667,8 +679,7 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
   }
 
   STACK_INC;
-  *sp = catch_value;
-  catch_value = const1;
+  *sp = caught;
   return pc;
 }
 
@@ -747,9 +758,10 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
           continue;
         }
       }
-      restore_context(&econ);
+      /* latched before restore_context() runs the frame's defers, as above */
       svalue_t err = catch_value;
       catch_value = const1;
+      restore_context(&econ);
       (void)promise_settle(p, &err, 1);
       free_svalue(&err, "run_coroutine_body");
       too_deep_error = 0;
