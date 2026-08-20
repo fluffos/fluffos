@@ -1,0 +1,43 @@
+// A rejection reason must be TRUTHY by default.
+//
+// acatch(), like catch(), signals failure by yielding the reason and success
+// by yielding 0. A bare promise_reject(p) used to reject with the integer 0,
+// so the idiom async.md documents --
+//
+//     mixed err = acatch(await p);
+//     if (err) write("failed: " + err);
+//
+// -- took the SUCCESS branch on a real rejection, silently. catch() never had
+// this problem because the driver always yields a "*..." string.
+
+#include "/include/tests.h"
+
+nosave int done;
+
+async void probe() {
+  mixed p = promise_create();
+  mixed err;
+
+  promise_reject(p);            // no reason: must still be truthy
+  err = acatch(await p);
+  ASSERT2(err, "a bare promise_reject() must reject with a TRUTHY reason, "
+    "or acatch() cannot tell it from success");
+  ASSERT_EQ("string", typeof(err));
+  done = 1;
+}
+
+void do_tests() {
+  mixed p2 = promise_create();
+
+  // The explicit form is unchanged and still the caller's choice.
+  promise_reject(p2, "explicit reason");
+  ASSERT_EQ(2, promise_status(p2));
+  ASSERT_EQ("explicit reason", promise_result(p2));
+
+  probe();
+  call_out(function() {
+    if (!done) {
+      shutdown(-1);
+    }
+  }, 3);
+}

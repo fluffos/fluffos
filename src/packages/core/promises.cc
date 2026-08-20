@@ -52,7 +52,20 @@ void f_promise_reject() {
   if (num_arg > 1 && sp->type == T_PROMISE && sp->u.prom == p) {
     error("promise_reject: cannot reject a promise with itself.\n");
   }
-  promise_settle(p, (num_arg > 1) ? sp : &const0, 1);
+  /* A rejection reason must be TRUTHY by default. acatch(), like catch(),
+   * signals failure by yielding the reason and success by yielding 0, so a
+   * falsy reason is indistinguishable from success -- `mixed err =
+   * acatch(await p); if (err) ...` would take the success branch on a real
+   * rejection, which is the idiom async.md itself documents. catch() never
+   * has this problem because the driver always produces a "*..." string, so
+   * a bare promise_reject() now does the same. An explicitly falsy reason
+   * (promise_reject(p, 0)) is still the caller's choice, and still
+   * ambiguous -- promise_status() is the unambiguous test. */
+  svalue_t default_reason;
+  default_reason.type = T_STRING;
+  default_reason.subtype = STRING_CONSTANT;
+  default_reason.u.string = "*promise rejected";
+  promise_settle(p, (num_arg > 1) ? sp : &default_reason, 1);
   pop_n_elems(num_arg);
 }
 #endif
