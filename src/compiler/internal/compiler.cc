@@ -266,7 +266,7 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
       }
       col_shift = static_cast<int>(prefix) - static_cast<int>(start);
       snippet_prefix = static_cast<int>(prefix);
-      shown = windowed;
+      shown = std::move(windowed);
     }
     char num[16];
     snprintf(num, sizeof(num), "%5d", line_no);
