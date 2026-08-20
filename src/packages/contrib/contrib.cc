@@ -2082,10 +2082,12 @@ static int memory_share(svalue_t* sv) {
         return 0;
       }
       calldepth++;
-      /* first svalue is stored inside the array struct, so sizeof(array_t)
-       * includes one svalue.
+      /* Element storage is a separate allocation of `capacity' slots, so the
+       * header contributes exactly sizeof(array_t) and the slots are counted
+       * per element below (the unused capacity slack is not attributed to
+       * anyone's share).
        */
-      subtotal = sizeof(array_t) - sizeof(svalue_t);
+      subtotal = sizeof(array_t);
       for (i = 0; i < sv->u.arr->size; i++) {
         subtotal += memory_share(&sv->u.arr->item[i]);
       }

@@ -69,6 +69,39 @@ Writes through the loop variable do not propagate to the source variable —
 strings are passed into `foreach` by value. To mutate a string, assign
 through an index instead (`s[i] = c`, `s[i] += 1`).
 
+### Resizing the array being iterated
+
+A `ref` loop variable points directly at an element of the array being
+iterated. While such a loop is running, that array is *pinned*: resizing it
+with [push_array](../../efun/arrays/push_array),
+[pop_array](../../efun/arrays/pop_array),
+[shift_array](../../efun/arrays/shift_array) or
+[unshift_array](../../efun/arrays/unshift_array) builds a new array and rebinds
+the variable, rather than reshaping the array in place as those efuns normally
+do.
+
+This is the one situation in which those efuns do not reshape the array every
+holder sees. The loop keeps iterating the array it started with, and the
+element writes still reach the elements — the elements are shared between the
+old and the new array:
+
+```c
+mixed *a = ({ ({ 1 }), ({ 2 }) });
+mixed *b = a;
+
+foreach (mixed ref r in a) {
+    push_array(a, ({ 9 }));   // rebinds `a', does not reshape it
+    push_array(r, 0);         // reaches the element, seen through b too
+}
+// b is ({ ({ 1, 0 }), ({ 2, 0 }) })
+```
+
+Without a `ref` loop variable there is no pin, and those efuns reshape the
+array normally. A `foreach` still visits only as many elements as the array
+held when the loop was entered, so appending inside the loop cannot extend it;
+*removing* elements from the array being walked raises an error (see
+[pop_array](../../efun/arrays/pop_array)).
+
 ### Restrictions
 
 - `ref` can only be used in function parameter declarations, function call

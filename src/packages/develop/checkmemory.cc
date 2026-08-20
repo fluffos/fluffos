@@ -609,15 +609,23 @@ void check_all_blocks(int flag) {
     if (blocks[TAG_ARRAY & 0xff] != num_arrays)
       outbuf_addv(&out, "WARNING: num_arrays is: %" PRIu64 " should be: %" PRIu64 "\n", num_arrays,
                   blocks[TAG_ARRAY & 0xff]);
-    if (totals[TAG_ARRAY & 0xff] != total_array_size)
+    /* An array is two blocks now (header + element storage), and
+     * total_array_size accounts for both. */
+    if (blocks[TAG_ARRAY_ITEMS & 0xff] != num_arrays)
+      outbuf_addv(&out, "WARNING: %" PRIu64 " item blocks for %" PRIu64 " arrays\n",
+                  blocks[TAG_ARRAY_ITEMS & 0xff], num_arrays);
+    if (totals[TAG_ARRAY & 0xff] + totals[TAG_ARRAY_ITEMS & 0xff] != total_array_size)
       outbuf_addv(&out, "WARNING: total_array_size is: %" PRIu64 " should be: %" PRIu64 "\n",
-                  total_array_size, totals[TAG_ARRAY & 0xff]);
+                  total_array_size, totals[TAG_ARRAY & 0xff] + totals[TAG_ARRAY_ITEMS & 0xff]);
     if (blocks[TAG_CLASS & 0xff] != num_classes)
       outbuf_addv(&out, "WARNING: num_classes is: %" PRIu64 " should be: %" PRIu64 "\n",
                   num_classes, blocks[TAG_CLASS & 0xff]);
-    if (totals[TAG_CLASS & 0xff] != total_class_size)
+    if (blocks[TAG_CLASS_ITEMS & 0xff] != num_classes)
+      outbuf_addv(&out, "WARNING: %" PRIu64 " item blocks for %" PRIu64 " classes\n",
+                  blocks[TAG_CLASS_ITEMS & 0xff], num_classes);
+    if (totals[TAG_CLASS & 0xff] + totals[TAG_CLASS_ITEMS & 0xff] != total_class_size)
       outbuf_addv(&out, "WARNING: total_class_size is: %" PRIu64 " should be: %" PRIu64 "\n",
-                  total_class_size, totals[TAG_CLASS & 0xff]);
+                  total_class_size, totals[TAG_CLASS & 0xff] + totals[TAG_CLASS_ITEMS & 0xff]);
     if (blocks[TAG_MAPPING & 0xff] != num_mappings)
       outbuf_addv(&out, "WARNING: num_mappings is: %" PRIu64 " should be: %" PRIu64 "\n",
                   num_mappings, blocks[TAG_MAPPING & 0xff]);
@@ -778,8 +786,16 @@ void check_all_blocks(int flag) {
             break;
           case TAG_ARRAY:
             vec = NODET_TO_PTR(entry, array_t*);
-            if (entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1)) {
+            /* The header is a fixed-size block now; the element storage is
+             * its own allocation of `capacity' slots, marked here so the
+             * orphan scan does not report it. */
+            if (entry->size != sizeof(array_t)) {
               outbuf_addv(&out, "array size doesn't match block size: %s %04x\n", entry->desc,
+                          entry->tag);
+            }
+            DO_MARK(vec->item, TAG_ARRAY_ITEMS);
+            if (PTR_TO_NODET(vec->item)->size != ARRAY_ITEMS_SIZE(vec->capacity)) {
+              outbuf_addv(&out, "array item block doesn't match capacity: %s %04x\n", entry->desc,
                           entry->tag);
             }
             for (i = 0; i < vec->size; i++) {
@@ -788,11 +804,11 @@ void check_all_blocks(int flag) {
             break;
           case TAG_CLASS:
             vec = NODET_TO_PTR(entry, array_t*);
-            if (vec->size &&
-                entry->size != sizeof(array_t) + sizeof(svalue_t[1]) * (vec->size - 1)) {
+            if (entry->size != sizeof(array_t)) {
               outbuf_addv(&out, "class size doesn't match block size: %s %04x\n", entry->desc,
                           entry->tag);
             }
+            DO_MARK(vec->item, TAG_CLASS_ITEMS);
             for (i = 0; i < vec->size; i++) {
               mark_svalue(&vec->item[i]);
             }
@@ -1029,6 +1045,14 @@ void check_all_blocks(int flag) {
             break;
           case TAG_MAP_TBL:
             outbuf_addv(&out, "WARNING: Found orphan mapping table: %s %04x\n", entry->desc,
+                        entry->tag);
+            break;
+          case TAG_ARRAY_ITEMS:
+            outbuf_addv(&out, "WARNING: Found orphan array item block: %s %04x\n", entry->desc,
+                        entry->tag);
+            break;
+          case TAG_CLASS_ITEMS:
+            outbuf_addv(&out, "WARNING: Found orphan class item block: %s %04x\n", entry->desc,
                         entry->tag);
             break;
           case TAG_MAP_NODE_BLOCK:

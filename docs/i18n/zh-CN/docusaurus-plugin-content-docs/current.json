@@ -44,7 +44,7 @@
     "description": "The generated-index page title for category 'Arrays' in sidebar 'docs'"
   },
   "sidebar.docs.category.efun/arrays.link.generated-index.description": {
-    "message": "创建、分配、过滤、映射、排序和搜索 LPC 数组。",
+    "message": "创建、分配、过滤、映射、排序、搜索和修改 LPC 数组。",
     "description": "The generated-index page description for category 'Arrays' in sidebar 'docs'"
   },
   "sidebar.docs.category.efun/async": {
@@ -2718,5 +2718,21 @@
   "sidebar.docs.doc.stdlib/ffi_util": {
     "message": "FFI 工具",
     "description": "The label for the doc item 'FFI Utilities' in sidebar 'docs', linking to the doc stdlib/ffi_util"
+  },
+  "sidebar.docs.doc.efun/arrays/pop_array": {
+    "message": "pop_array",
+    "description": "The label for the doc item 'pop_array' in sidebar 'docs', linking to the doc efun/arrays/pop_array"
+  },
+  "sidebar.docs.doc.efun/arrays/push_array": {
+    "message": "push_array",
+    "description": "The label for the doc item 'push_array' in sidebar 'docs', linking to the doc efun/arrays/push_array"
+  },
+  "sidebar.docs.doc.efun/arrays/shift_array": {
+    "message": "shift_array",
+    "description": "The label for the doc item 'shift_array' in sidebar 'docs', linking to the doc efun/arrays/shift_array"
+  },
+  "sidebar.docs.doc.efun/arrays/unshift_array": {
+    "message": "unshift_array",
+    "description": "The label for the doc item 'unshift_array' in sidebar 'docs', linking to the doc efun/arrays/unshift_array"
   }
 }

@@ -41,6 +41,22 @@ static void check_svalue(svalue_t* v) {
       break;
     case T_ARRAY:
     case T_CLASS:
+      /* While we are standing on the array anyway, give back any element
+       * capacity pop_array()/shift_array() left behind -- they shrink ->size
+       * without reallocating, so that a pop is O(1) and a push/pop cycle does
+       * not thrash the allocator, and rely on this sweep to return the slack.
+       *
+       * Arrays only: a class carries no slack, and its bytes are accounted
+       * against total_class_size rather than total_array_size.
+       *
+       * Safe to do before walking the elements: the array_t header never
+       * moves, and the loop below re-reads ->item every iteration, so even a
+       * relocation survives -- which matters for a self-referential array
+       * (a[0] == a), where a nested check_svalue() can reach this same array.
+       */
+      if (v->type == T_ARRAY) {
+        array_trim(v->u.arr);
+      }
       for (idx = 0; idx < v->u.arr->size; idx++) {
         check_svalue(&v->u.arr->item[idx]);
       }

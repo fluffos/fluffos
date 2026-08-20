@@ -18,7 +18,7 @@
           "type": "generated-index",
           "title": "Arrays",
           "slug": "/efun/arrays/",
-          "description": "Create, allocate, filter, map, sort and search LPC arrays."
+          "description": "Create, allocate, filter, map, sort, search and mutate LPC arrays."
         },
         "items": [
           {
@@ -65,6 +65,24 @@
           },
           {
             "type": "doc",
+            "id": "efun/arrays/pop_array",
+            "key": "efun/arrays/pop_array",
+            "label": "pop_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/push_array",
+            "key": "efun/arrays/push_array",
+            "label": "push_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/shift_array",
+            "key": "efun/arrays/shift_array",
+            "label": "shift_array"
+          },
+          {
+            "type": "doc",
             "id": "efun/arrays/shuffle",
             "key": "efun/arrays/shuffle",
             "label": "shuffle"
@@ -80,6 +98,12 @@
             "id": "efun/arrays/unique_array",
             "key": "efun/arrays/unique_array",
             "label": "unique_array"
+          },
+          {
+            "type": "doc",
+            "id": "efun/arrays/unshift_array",
+            "key": "efun/arrays/unshift_array",
+            "label": "unshift_array"
           }
         ]
       },

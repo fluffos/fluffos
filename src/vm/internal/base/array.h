@@ -7,16 +7,53 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 #endif
 
+/*
+ * The header and the element storage are SEPARATE allocations, and `item'
+ * points at `capacity' element slots.
+ *
+ * This is the same split mapping_t has with its bucket table, and it exists
+ * for the same reason: the header's address is stable across a resize.  An
+ * array variable holds a pointer to this header, so with the elements inline
+ * (the old `svalue_t item[1]' layout) growing an array necessarily moved it,
+ * and every other holder of that array would have had to be found and told
+ * the new address -- impossible, since holders are scattered across object
+ * variable blocks, mappings, the VM stack and C++ containers.  With the
+ * indirection the header never moves, so an array can grow in place and every
+ * holder observes it, exactly as a mapping does when a key is added.
+ *
+ * `capacity' may exceed `size': callers that over-allocate and then shrink
+ * (see fix_array) keep the slack rather than paying for a second realloc,
+ * and growth into existing slack does not move the element block at all.
+ * Memory accounting (total_array_size, checkmemory.cc) counts CAPACITY,
+ * since that is what is allocated; mudlib stats count size, which is what
+ * LPC sees.
+ */
 struct array_t {
   uint32_t ref;
 #ifdef DEBUGMALLOC_EXTENSIONS
   int extra_ref;
 #endif
   int size;
+  int capacity; /* allocated element slots; always >= size */
+  /* Number of outstanding RAW POINTERS into ->item that must survive
+   * arbitrary LPC execution: a ref_t aimed at an element (`ref a[0]', a
+   * `&'-marked efun argument) and a `foreach' ref loop variable.  While this
+   * is non-zero the element block must not be relocated, so the shape
+   * mutators fall back to building a new array instead of resizing in place.
+   *
+   * This is deliberately NOT the reference count.  An array being shared is
+   * the normal case and must still mutate in place so every holder observes
+   * it; only an outstanding interior pointer actually constrains us.  Using
+   * ref > 1 here would be a conservative superset that reintroduces exactly
+   * the refcount-dependent visibility this design exists to remove.
+   *
+   * Counterpart of MAP_LOCKED for mappings, which defers node frees while a
+   * ref points into one (see kill_ref / locked_map_nodes). */
+  int item_locks;
 #ifdef PACKAGE_MUDLIB_STATS
   statgroup_t stats; /* creator of the array */
 #endif
-  svalue_t item[1];
+  svalue_t* item; /* `capacity' slots, separately allocated */
 };
 
 extern array_t the_null_array;
@@ -60,14 +97,38 @@ array_t* reg_assoc(svalue_t*, array_t*, array_t*, svalue_t*);
 void dealloc_array(array_t*);
 array_t* union_array(array_t*, array_t*);
 array_t* copy_array(array_t* p);
+/* Set ->size to n, making ->capacity exactly n (both directions). */
 array_t* resize_array(array_t* p, unsigned int n);
+/* Ensure ->capacity >= n, growing geometrically; ->size is untouched. */
+void array_reserve(array_t* p, unsigned int n);
+/* Set ->size within existing capacity without moving the element block. */
+void array_set_size(array_t* p, unsigned int n);
+/* Give back unused capacity (->size kept).  Driven by reclaim_objects(). */
+void array_trim(array_t* p);
 
-#define ALLOC_ARRAY(nelem)                                                          \
-  (array_t*)DCALLOC(sizeof(array_t) + sizeof(svalue_t) * (nelem - 1), 1, TAG_ARRAY, \
-                    "ALLOC_"                                                        \
-                    "ARRAY")
-#define RESIZE_ARRAY(vec, nelem)                                                       \
-  (array_t*)DREALLOC(vec, sizeof(array_t) + sizeof(svalue_t) * (nelem - 1), TAG_ARRAY, \
-                     "RESIZE_ARRAY")
+/* Register/release a raw pointer into p->item that outlives the current
+ * opcode -- see array_t::item_locks.  Safe on the_null_array (static, and
+ * never resized). */
+static inline void array_lock_items(array_t* p) { p->item_locks++; }
+static inline void array_unlock_items(array_t* p) { p->item_locks--; }
+static inline bool array_items_pinned(array_t* p) { return p->item_locks > 0; }
+
+/* Bytes of element storage for `nelem' slots. */
+#define ARRAY_ITEMS_SIZE(nelem) (sizeof(svalue_t) * (nelem))
+
+/* The header alone.  Element storage is allocated separately and hung off
+ * ->item; ALLOC_ARRAY() below does both and is what callers want. */
+#define ALLOC_ARRAY_HDR() (array_t*)DCALLOC(sizeof(array_t), 1, TAG_ARRAY, "ALLOC_ARRAY_HDR")
+
+#define ALLOC_ARRAY_ITEMS(nelem) \
+  (svalue_t*)DMALLOC(ARRAY_ITEMS_SIZE(nelem), TAG_ARRAY_ITEMS, "ALLOC_ARRAY_ITEMS")
+#define RESIZE_ARRAY_ITEMS(items, nelem)                                   \
+  (svalue_t*)DREALLOC(items, ARRAY_ITEMS_SIZE(nelem), TAG_ARRAY_ITEMS,     \
+                      "RESIZE_ARRAY_ITEMS")
+
+/* Header + `nelem' element slots, capacity set, size left to the caller.
+ * Returns nullptr if either allocation fails. */
+array_t* alloc_array_block(unsigned int nelem);
+#define ALLOC_ARRAY(nelem) alloc_array_block(nelem)
 
 #endif
