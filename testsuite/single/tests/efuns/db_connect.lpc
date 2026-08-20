@@ -1,6 +1,6 @@
 void do_tests() {
 #ifdef __PACKAGE_DB__
-  int h = 0;
+  mixed h;
   mixed err;
 
   // Guaranteed-unreachable target: failure must be a clean error or a
@@ -11,9 +11,15 @@ void do_tests() {
   // drop the file) instead of leaking both for the rest of the run: DB
   // handles are a process-global namespace re-issued lowest-slot-first, so
   // a leaked connection silently shifts every later test's handle numbers.
+  //
+  // `h` is mixed, not int: db_connect() returns the BACKEND'S ERROR STRING
+  // on failure (f_db_connect pushes push_malloced_string(errormsg)), not a
+  // number, so an int would take a type error on every build whose default
+  // backend cannot reach the host -- which is CI's, where the default is
+  // MySQL and only SQLite is compiled in.
   err = catch(h = db_connect("256.256.256.256", "no_such_db"));
   ASSERT(err || 1);
-  if (!err && h > 0) {
+  if (!err && intp(h) && h > 0) {
     db_close(h);
     catch(rm("/no_such_db"));
   }
