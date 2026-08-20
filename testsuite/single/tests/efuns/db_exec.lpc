@@ -1,7 +1,11 @@
+// db_exec() on a handle that was never issued must be a clean, catchable
+// error, never a crash. See db_close.lpc for why a small handle is unsafe
+// here (global handle namespace + randomized test order).
+#define NEVER_ISSUED_DB_HANDLE 1000000
+
 void do_tests() {
 #ifdef __PACKAGE_DB__
-  // No connection with handle 1 exists.
-  ASSERT(catch(db_exec(1, "SELECT 1")) || 1);
+  ASSERT(catch(db_exec(NEVER_ISSUED_DB_HANDLE, "SELECT 1")));
 #endif
   ASSERT(1);
 }

@@ -1,7 +1,17 @@
+// db_close() on a handle that was never issued must be a clean, catchable
+// error, never a crash.
+//
+// The handle must be one create_db_conn() can never have returned: DB
+// handles are a PROCESS-GLOBAL namespace (lowest free slot + 1, and
+// free_db_conn() re-issues a closed slot immediately), so poking a small
+// handle here would close a connection another test file is still using --
+// test order is randomized, which made that an intermittent, cross-file
+// failure.
+#define NEVER_ISSUED_DB_HANDLE 1000000
+
 void do_tests() {
 #ifdef __PACKAGE_DB__
-  // No connection with handle 1 exists.
-  ASSERT(catch(db_close(1)) || 1);
+  ASSERT(catch(db_close(NEVER_ISSUED_DB_HANDLE)));
 #endif
   ASSERT(1);
 }
