@@ -18,7 +18,6 @@
 // The chain runs entirely after do_tests() has returned, so it is declared
 // with an EXIT LATCH and the checks are counted like any other.
 
-#define BATCHES 20
 
 nosave int n;
 nosave int done;
@@ -56,20 +55,27 @@ void feed() {
 
 private void check_chain() {
   mapping now = async_info(1);
-  int required = BATCHES - 1;
+  int yields = now["drain_yields"] - yields_before;
 
   // Nothing was stranded by a yield: reaching here at all means every link
   // was delivered, and feed()'s over-count guard means none was delivered
   // twice. (A count assertion here would be tautological -- this function is
   // called from the link that makes the count come out right.)
-  // ... and it could not have got there without yielding at least once per
-  // batch of links. This lower bound is created by this file's own chain,
-  // so unrelated suite traffic can only add to it.
-  ASSERT2(now["drain_yields"] - yields_before >= required,
-    sprintf("a %d-link self-feeding chain against a batch of %d yielded only %d times "
-      "(need >= %d): the drain is not re-posting, so it holds the event loop for "
-      "the whole chain",
-      chain_len, batch, now["drain_yields"] - yields_before, required));
+  //
+  // The lower bound is deliberately 2, not a derived number. Under the old
+  // count-based batch the yield count was exactly chain_len / batch; under an
+  // eval-cost budget it is chain_len * cost_per_delivery / budget, and
+  // cost_per_delivery varies with the machine and the build. Requiring a
+  // computed count here would encode a timing assumption and fail on a fast
+  // host -- exactly the trap testsuite/README.md warns about. What this test
+  // exists to catch is a drain that does NOT re-post and holds the event loop
+  // for the whole chain; two yields proves re-posting is repeating, and the
+  // yields_before subtraction means unrelated suite traffic can only add.
+  ASSERT2(yields >= 2,
+    sprintf("a %d-link self-feeding chain yielded only %d times against a %d us "
+      "budget: the drain is not re-posting, so it holds the event loop for the "
+      "whole chain",
+      chain_len, yields, batch));
   RELEASE_LATCH("drain budget chain");
 }
 

@@ -303,7 +303,7 @@ mudlib code using them as identifiers must be renamed.
   latency under sustained promise load still around a millisecond.
 
   `async_info(1)` reports the scheduler: `pending_deliveries`, the monotonic
-  `drain_yields`, and the effective `drain_batch`. A rising `drain_yields`
+  `drain_yields`, and the effective `drain_eval_budget`. A rising `drain_yields`
   with a non-zero `pending_deliveries` is backpressure — async work arriving
   faster than it is delivered.
 
