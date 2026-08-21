@@ -1153,8 +1153,15 @@ promise_t* promise_async_yield() {
       std::vector<promise_t*> due;
       due.swap(g_pending_yields);
       for (auto* p : due) {
-        svalue_t zero = const0;
-        (void)promise_settle(p, &zero, 0);
+        /* Skip one whose fate LPC already committed to an adoption
+         * (`promise_resolve(y, other)` with `other` still pending). The
+         * efuns refuse a second settle in that state on the grounds that
+         * the adoption owns the outcome; settling here anyway would
+         * override it and silently discard the adopted value. */
+        if (!p->resolving) {
+          svalue_t zero = const0;
+          (void)promise_settle(p, &zero, 0);
+        }
         free_promise(p);
       }
     }));
@@ -1872,11 +1879,40 @@ void promise_cleanup() {
   g_drain_event_is_tick = false;
   g_drain_scheduled = false;
   /* Same reasoning for the yield event, whose TickEvent the backend deletes
-   * (without running it) in clear_walltime_events(). The promises it would
-   * have settled are released here; anything still awaiting one is being
-   * torn down in the same sequence. */
+   * (without running it) in clear_walltime_events().
+   *
+   * SETTLE-REJECT first, do not merely drop the reference. A parked coroutine
+   * does NOT hold a ref on the promise it awaits -- coroutine_await_pending()
+   * drops the stack slot's ref once the coroutine is registered as a reaction
+   * -- so for the ordinary shape
+   *
+   *     promise p = async_yield();   // the frame local is the surviving ref
+   *     await p;
+   *
+   * the last reference lives INSIDE the parked coroutine's saved frame, and
+   * the coroutine is reachable only from p->reactions. That is a refcount
+   * cycle: free_promise() never reaches zero, dealloc_promise()'s
+   * reaction-cleanup never runs, and the coroutine, its frame svalues (with
+   * the object and program refs they hold) and both promises leak at exit.
+   * Measured at 328 bytes in 6 allocations, all reported Indirect with no
+   * Direct root -- LeakSanitizer's signature for a pure cycle.
+   *
+   * Settling breaks it: the reaction is handed to enqueue_reaction(), which
+   * short-circuits to free_queued_reaction() because g_promises_shut_down is
+   * already set above, freeing the coroutine synchronously.
+   *
+   * This is what the sibling teardown already does and what simulate.cc's
+   * shutdown ordering comment demands of it: clear_call_outs() rejects every
+   * call_out promise for exactly this reason. A driver-owned promise must be
+   * SETTLED at teardown, never just released (AGENTS.md section 15 -- the
+   * ownership step that only some sibling paths take). */
   g_yield_event = nullptr;
   for (auto* p : g_pending_yields) {
+    svalue_t err;
+    err.type = T_STRING;
+    err.subtype = STRING_CONSTANT;
+    err.u.string = "*async_yield never ran: the driver shut down";
+    (void)promise_settle(p, &err, 1);
     free_promise(p);
   }
   g_pending_yields.clear();

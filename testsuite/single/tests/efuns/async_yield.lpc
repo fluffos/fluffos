@@ -35,6 +35,7 @@ nosave int attempts;
 nosave int finished;
 
 private async void probe();
+private async void adoption();
 private void ceiling();
 
 private void finish(mixed complaint) {
@@ -128,6 +129,34 @@ private async void value_semantics() {
   // Two calls before the loop runs are distinct promises sharing one wake-up.
   p = async_yield();
   ASSERT2(p != async_yield(), "async_yield() handed out the same promise twice");
+
+  adoption();
+}
+
+// A yield promise whose fate LPC has already committed to an adoption must
+// not be settled out from under it when the loop's wake-up arrives.
+// promise_resolve(y, other) with `other` still pending makes y follow other;
+// y stays PENDING, but its outcome is decided. The wake-up settling y with 0
+// anyway discards the adopted value silently -- and is not even a
+// double-settle the efuns would refuse, because it comes from the driver.
+private async void adoption() {
+  promise y = async_yield();
+  promise other = promise_create();
+  int got;
+
+  promise_resolve(y, other);
+  ASSERT_EQ(0, promise_status(y));
+
+  // A call_out is a later gametick; the yield wake-up is the next pass of the
+  // event loop. So the wake-up is guaranteed to have come and gone before
+  // `other` carries a value, which is what makes the reading below decisive.
+  call_out((: promise_resolve, other, 42 :), 1);
+
+  got = await y;
+  ASSERT2(got == 42,
+    sprintf("the yield wake-up overrode an adoption: awaiting the yield promise "
+      "produced %O instead of the adopted value 42",
+      got));
 
   probe();
 }

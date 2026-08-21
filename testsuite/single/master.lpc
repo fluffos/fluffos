@@ -323,7 +323,13 @@ mixed valid_read(string file, object ob, string func) {
   if (strsrch(file, "valid_read_promise_probe") != -1) {
     return promise_create();
   }
-  return 1;
+  // Chain to /inherit/master/valid, do not just return 1: that copy counts
+  // the apply for the suite's "MASTER valid inherit functions are not being
+  // called!" check AND deliberately clobbers st_num_arg with a 3-argument
+  // efun, which is how a driver that reads the global after an apply (see
+  // AGENTS.md section 13.16) fails the suite instead of passing silently.
+  // Shadowing it outright quietly disabled both.
+  return ::valid_read(file, ob, func);
 }
 
 void log_error(string, string message) {
