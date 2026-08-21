@@ -2440,6 +2440,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/promises/async_yield",
+            "key": "efun/promises/async_yield",
+            "label": "async_yield"
+          },
+          {
+            "type": "doc",
             "id": "efun/promises/promise_catch",
             "key": "efun/promises/promise_catch",
             "label": "promise_catch"

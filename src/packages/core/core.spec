@@ -388,6 +388,10 @@ int promise_status(promise);
 mixed promise_result(promise);
 /* pending suspended async function frames, most recently parked last */
 mixed async_info(int default: 0);
+/* a promise fulfilled on the next pass of the event loop, after the driver
+   has polled sockets and fired due timers -- `await async_yield();` is the
+   cooperative preemption point for a long async function */
+promise async_yield();
 #ifndef __EMSCRIPTEN__
 /* No TLS on the wasm target: the browser terminates TLS long before
  * bytes reach the driver, so the efun does not exist there. (The

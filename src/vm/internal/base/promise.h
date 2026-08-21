@@ -94,6 +94,20 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
 
 void push_refed_promise(promise_t* p);
 
+/* A promise fulfilled with 0 on the next pass of the event loop -- after the
+ * driver has polled sockets, queued commands and fired due timers. This is
+ * the cooperative preemption point for a long async function: `await
+ * async_yield();` parks the frame at a suspension point that is safe by
+ * construction and resumes it on a later drain turn.
+ *
+ * It is NOT the same as awaiting an already-settled promise, which parks but
+ * re-queues into the SAME drain turn (deliberately: that is what lets a
+ * sequential await loop run at full speed instead of paying an event-loop
+ * turn per iteration). Only this reaches the poll.
+ *
+ * Returns a promise with one reference for the caller. */
+promise_t* promise_async_yield();
+
 /*
  * async/await coroutines (issue #1319).
  *

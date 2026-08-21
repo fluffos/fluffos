@@ -206,6 +206,18 @@ LPC_INT g_drain_yields_total = 0;
  * a settle that finds a loop-armed drain already pending needed no new
  * event and is served just as promptly. Reported by async_info(1). */
 LPC_INT g_drain_arms_loop_total = 0;
+/* Promises handed out by async_yield(), waiting for the next pass of the
+ * event loop. The registry HOLDS A REFERENCE on each, which is what keeps a
+ * yield alive when the awaiting frame is the only other holder -- and what
+ * makes them an OFF-GRAPH reference the ref checker cannot see on its own,
+ * so mark_promise_queue() marks them (AGENTS.md section 3).
+ *
+ * One event serves all of them: they all resolve at the same instant, so a
+ * burst of async_yield() calls in one execution costs one TickEvent, not one
+ * each. */
+std::vector<promise_t*> g_pending_yields;
+TickEvent* g_yield_event = nullptr;
+
 /* True while drain_promise_microtasks() is running. A settle made BY a
  * delivery is not an external arrival, and counting it would drown the
  * signal: a drain re-posts itself as a walltime event, so from its second
@@ -1092,6 +1104,46 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
 /* Queue depth, for the registration ceiling in promise_then/promise_catch. */
 size_t pending_promise_deliveries() { return g_promise_microtasks.size(); }
 
+promise_t* promise_async_yield() {
+  auto* p = promise_alloc();
+
+  if (g_promises_shut_down) {
+    /* Past promise_cleanup(): no further loop pass will happen, so there is
+     * nothing to register the promise WITH -- and registering it would leak
+     * it, since the registry that would free it has already been emptied.
+     * The caller gets a promise that stays pending, which is what "the loop
+     * will never run again" honestly is. Matches enqueue_reaction(), which
+     * likewise drops work rather than queueing into a drained queue. */
+    return p;
+  }
+
+  /* two references: one for the caller, one for the registry below */
+  p->ref++;
+  g_pending_yields.push_back(p);
+
+  if (g_yield_event == nullptr) {
+    g_yield_event = add_loop_yield_event(TickEvent::callback_type([] {
+      g_yield_event = nullptr;
+      if (g_promises_shut_down) {
+        return;
+      }
+      /* Swapped out BEFORE settling. Settling only QUEUES deliveries, but
+       * promise_settle() runs the adoption/self-resolve paths and a settle
+       * can arm the drain, and a later delivery can call async_yield()
+       * again -- which must land in the NEXT pass, on a fresh event, not be
+       * appended to the batch being walked here. */
+      std::vector<promise_t*> due;
+      due.swap(g_pending_yields);
+      for (auto* p : due) {
+        svalue_t zero = const0;
+        (void)promise_settle(p, &zero, 0);
+        free_promise(p);
+      }
+    }));
+  }
+  return p;
+}
+
 promise_t* promise_alloc() {
   auto* p = reinterpret_cast<promise_t*>(
       DCALLOC(1, sizeof(promise_t), TAG_PROMISE, "promise_alloc"));
@@ -1686,6 +1738,11 @@ void mark_promise(promise_t* p) {
 }
 
 void mark_promise_queue() {
+  /* Off-graph: a pending async_yield() promise is referenced only by the
+   * registry, which is a C++ global the allocation sweep never walks. */
+  for (auto* p : g_pending_yields) {
+    p->extra_ref++;
+  }
   auto mark_one = [](QueuedReaction& qr) {
     if (qr.on_fulfilled) {
       qr.on_fulfilled->hdr.extra_ref++;
@@ -1753,6 +1810,15 @@ void promise_cleanup() {
   g_drain_event = nullptr;
   g_drain_event_is_tick = false;
   g_drain_scheduled = false;
+  /* Same reasoning for the yield event, whose TickEvent the backend deletes
+   * (without running it) in clear_walltime_events(). The promises it would
+   * have settled are released here; anything still awaiting one is being
+   * torn down in the same sequence. */
+  g_yield_event = nullptr;
+  for (auto* p : g_pending_yields) {
+    free_promise(p);
+  }
+  g_pending_yields.clear();
   while (!g_promise_microtasks.empty()) {
     QueuedReaction qr = g_promise_microtasks.front();
     g_promise_microtasks.pop_front();

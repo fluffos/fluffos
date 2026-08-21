@@ -156,6 +156,30 @@ the turn's `async drain eval budget` is spent does it yield to the event loop
 and pick up again a moment later — the price of the driver staying responsive under
 unbounded async work, paid once per batch rather than once per `await`.
 
+The flip side is that a plain `await` is **not** a way to hand the event
+loop a turn: the resume is re-queued into the same drain turn, so the loop
+does not run in between. When that is what you want — a long computation
+that should let players be served around it — use
+[`async_yield()`](../../efun/promises/async_yield), whose promise settles
+from the event loop's own post-poll queue:
+
+```c
+async void reindex(mixed *rows) {
+    int i;
+
+    foreach (mixed row in rows) {
+        index(row);
+        if (++i % 500 == 0) {
+            await async_yield();     // the loop runs here
+        }
+    }
+}
+```
+
+`await call_out(0)` is not a substitute — a `call_out(0)` runs on the same
+gametick, and `call_out(0) nest level` refuses one used as a yield inside a
+loop. `await call_out(1)` does reach the loop, but costs a whole gametick.
+
 The yield is to the event loop's own post-I/O queue, not a timer, so there
 is no fixed delay between batches: the loop polls sockets, fires due timers
 and comes straight back. That keeps latency at one batch — measured worst

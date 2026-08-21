@@ -1,0 +1,112 @@
+// async_yield() is the cooperative preemption point inside a long async
+// function: `await async_yield();` parks the frame and resumes it only after
+// the driver has been back to its event loop -- polled sockets, queued
+// commands, fired due timers.
+//
+// It is not the same as awaiting an already-settled promise. That parks too,
+// but its resume is re-queued into the SAME drain turn, which is deliberate:
+// it is what lets
+//
+//     for (i = 0; i < n; i++) sum += await compute(i);
+//
+// run at full speed instead of paying an event-loop turn per iteration. So a
+// plain `await` does not give the loop a turn, and neither does
+// `await call_out(0)` (a call_out(0) runs on the same gametick, and
+// `call_out(0) nest level` errors out if one is used as a yield in a loop).
+// async_yield() is the primitive that actually reaches the poll: it rides
+// the same event-loop yield the microtask drain uses to re-post itself.
+//
+// The observable is async_info(1)'s "drain_arms_loop", which counts settles
+// that arrive from OUTSIDE gametick dispatch and outside a running drain --
+// i.e. from the event loop itself. A resume that came back inside the same
+// drain turn cannot have moved it; a resume that went through the loop must
+// have. The two legs are measured in one async function so that the control
+// leg's window is a single drain turn with no loop pass inside it, which is
+// what makes its reading deterministic rather than a race against whatever
+// else the suite has in flight.
+//
+// If the turn happens to end inside the control leg anyway (the suite's own
+// backlog shares these turns), that leg proves nothing and the probe simply
+// runs again, rather than asserting on a coincidence.
+
+#define MAX_ATTEMPTS 20
+
+nosave int attempts;
+nosave int finished;
+
+private async void probe();
+
+private void finish(mixed complaint) {
+  if (finished++) {
+    return;
+  }
+  if (complaint) {
+    ASSERT2(0, complaint);
+  }
+  RELEASE_LATCH("async yield");
+}
+
+private async void probe() {
+  promise settled;
+  int before, after_settled, after_yield;
+
+  before = async_info(1)["drain_arms_loop"];
+
+  // Control leg: parks, but resumes inside the turn that delivered the park.
+  settled = promise_create();
+  promise_resolve(settled, 0);
+  await settled;
+  after_settled = async_info(1)["drain_arms_loop"];
+
+  if (after_settled != before) {
+    // The turn ended inside the control leg, so it says nothing about
+    // whether a plain await reaches the loop. Try again.
+    if (++attempts < MAX_ATTEMPTS) {
+      probe();
+      return;
+    }
+    finish(sprintf("after %d attempts the control leg never ran inside a single "
+      "drain turn, so this file never tested anything",
+      attempts));
+    return;
+  }
+
+  // The real leg.
+  await async_yield();
+  after_yield = async_info(1)["drain_arms_loop"];
+
+  ASSERT2(after_yield > after_settled,
+    sprintf("await async_yield() resumed without the event loop getting a turn "
+      "(drain_arms_loop stayed at %d, where an await of an already-settled "
+      "promise leaves it too) -- it is behaving like an ordinary await, so it "
+      "is not a preemption point",
+      after_yield));
+  finish(0);
+}
+
+private async void value_semantics() {
+  promise p = async_yield();
+
+  ASSERT_EQ("promise", typeof(p));
+  // Cannot settle synchronously: the loop has not run yet.
+  ASSERT_EQ(0, promise_status(p));
+  ASSERT_EQ(0, await p);
+  // Settled after the fact, fulfilled rather than rejected.
+  ASSERT_EQ(1, promise_status(p));
+
+  // Two calls before the loop runs are distinct promises sharing one wake-up.
+  p = async_yield();
+  ASSERT2(p != async_yield(), "async_yield() handed out the same promise twice");
+
+  probe();
+}
+
+void do_tests() {
+  EXPECT_LATCH("async yield");
+
+  // From a call_out: master::flag() holds the stack for the whole run, so
+  // nothing queued during do_tests() is serviced until it returns, and
+  // starting from a call_out keeps the ordering call_out-to-call_out, which
+  // is defined (testsuite/README.md).
+  call_out((: value_semantics :), 1);
+}

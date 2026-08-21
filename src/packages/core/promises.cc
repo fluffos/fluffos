@@ -157,6 +157,13 @@ void f_promise_result() {
 }
 #endif
 
+#ifdef F_ASYNC_YIELD
+void f_async_yield() {
+  /* No arguments, so nothing to pop: STACK_INC and write the result. */
+  push_refed_promise(promise_async_yield());
+}
+#endif
+
 #ifdef F_ASYNC_INFO
 void f_async_info() {
   /* async_info()  -> one mapping per suspended coroutine (the original form)
