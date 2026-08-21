@@ -17,37 +17,39 @@
 //   * a promise_then() handler, and
 //   * an async function resumed from a parked `await`.
 //
-// It measures the budget REMAINING (`set_eval_limit(-1)`) at two points in
-// one drain turn, burning a calibrated slice of eval time in between. If the
-// second delivery inherited what was left, its sample would be LOWER by at
-// least the burn. Because each delivery is armed afresh, it is HIGHER -- back
-// up at the configured maximum.
+// The observable is the budget REMAINING (`set_eval_limit(-1)`), sampled in
+// the first delivery and again in the second, with a small calibrated burn in
+// between. Sharing one budget means the second sample is LOWER by at least
+// the burn. Arming afresh means it is back up near the maximum, so it does
+// not drop at all -- and the sign of that difference is the whole test.
 //
-// The burn is sized from the CONFIGURED turn budget, not from a fixed number
-// of microseconds: the two samples only compare if they happen in the SAME
-// turn, and a burn larger than the budget guarantees they do not (which is
-// how an earlier version of this file passed against the very design it was
-// written to reject). Even sized correctly the turn can end between them --
-// the suite's own backlog shares these turns -- so the probe checks
-// async_info's yield counter and simply runs again when that happens, rather
-// than asserting on a coincidence.
+// The burn is deliberately SMALL in absolute terms (BURN_US), not a fraction
+// of the turn budget. Both samples only compare if they happen in the same
+// turn, so anything that pushes the pair past the turn budget makes the probe
+// inconclusive -- and an earlier version, which burned a third of the budget,
+// was inconclusive on EVERY attempt on a sanitizer build, where the fixed
+// overhead of the probe itself already fills a turn. A burn far below the
+// budget leaves room for that overhead.
+//
+// When the turn does end in between anyway, the probe runs again rather than
+// asserting on a coincidence; exhausting the retries is a failure only when
+// the configured budget was comfortably large enough to have observed it.
 
 #define PROBE_ITERS 200000
-// Burn this fraction of one turn budget between the samples: small enough
-// that both deliveries fit in a turn, large enough to tell a re-armed budget
-// from an inherited one.
-#define BURN_FRACTION 3
-#define MIN_BURN_US 200
+// Well above eval-timer granularity, well below the default 1000 us turn
+// budget.
+#define BURN_US 100
 #define MAX_ATTEMPTS 20
 
 nosave int burn_iters;
 nosave int burn_us;
+nosave int budget_us;
 nosave int sample_before;
 nosave int yields_at_first;
 nosave int attempts;
-nosave int conclusive;
 nosave int finished;
 
+private async void probe();
 private void start_probe();
 
 private void burn(int n) {
@@ -71,7 +73,7 @@ private void finish(mixed complaint) {
 // Resumed from the parked await below, still inside the drain turn that
 // delivered first_handler() -- unless the turn ended in between, which the
 // yield counter reports and which is not a result either way.
-private async void probe_resume() {
+private async void probe() {
   promise p;
   int sample_after;
 
@@ -84,33 +86,42 @@ private async void probe_resume() {
       start_probe();
       return;
     }
-    finish(sprintf("after %d attempts the two probe deliveries never landed in "
-      "the same drain turn, so this file never tested anything",
-      attempts));
+    if (budget_us >= BURN_US * 10) {
+      finish(sprintf("after %d attempts the two probe deliveries never landed in "
+        "the same drain turn, even though the turn budget is %d us against a "
+        "%d us probe -- so this file never tested anything",
+        attempts, budget_us, BURN_US));
+    } else {
+      // A turn budget this small cannot fit two deliveries plus the burn, so
+      // there is nothing to observe and nothing to report. Deliberately not a
+      // failure: `async drain eval budget : 1` is a supported (if extreme)
+      // setting, and the hostile-config matrix runs it.
+      finish(0);
+    }
     return;
   }
 
-  conclusive = 1;
   sample_after = set_eval_limit(-1);
-  if (sample_after - sample_before >= burn_us / 2) {
+  // Shared budget: down by at least the burn. Armed afresh: back near the
+  // maximum, so not down at all. Half the burn is the margin.
+  if (sample_after > sample_before - burn_us / 2) {
     finish(0);
     return;
   }
   finish(sprintf("a delivery made after one that burned about %d us of its budget "
     "saw only %d us remaining, against the earlier delivery's %d -- it "
-    "inherited the turn's leftovers instead of being armed with a "
-    "budget of its own, so a handler can be aborted for time spent by "
-    "the handlers ahead of it",
+    "inherited the turn's leftovers instead of being armed with a budget of "
+    "its own, so a handler can be aborted for time spent by the handlers "
+    "ahead of it",
     burn_us, sample_after, sample_before));
 }
 
 private mixed first_handler(mixed v) {
   yields_at_first = async_info(1)["drain_yields"];
-  burn(burn_iters);
-  // Sampled AFTER the burn, so it is the low-water mark this delivery leaves
-  // behind. The next delivery must not start from here.
+  // Sampled BEFORE the burn, so a shared budget shows the burn as a drop.
   sample_before = set_eval_limit(-1);
-  probe_resume();
+  burn(burn_iters);
+  probe();
   return v;
 }
 
@@ -136,10 +147,8 @@ private int metered() {
 private void calibrate() {
   int cost;
 
-  burn_us = async_info(1)["drain_eval_budget"] / BURN_FRACTION;
-  if (burn_us < MIN_BURN_US) {
-    burn_us = MIN_BURN_US;
-  }
+  budget_us = async_info(1)["drain_eval_budget"];
+  burn_us = BURN_US;
   // Wall clock is the unit: FluffOS meters eval cost with a POSIX
   // CLOCK_MONOTONIC timer, so the microseconds time_expression reports ARE
   // the eval cost the same work spends.

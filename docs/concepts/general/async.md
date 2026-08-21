@@ -394,8 +394,8 @@ mudlib code using them as identifiers must be renamed.
   though each individual settle queues immediately.
 
 - **On the WebAssembly build there is no evaluation limit at all** — the
-  driver's eval timer is POSIX-only, and emscripten (like macOS and Windows)
-  gets none, so the boot log says so. Deliveries are still armed, but the
+  driver's eval timer is built only for Linux (`#ifdef __linux__` in
+  `eval_limit.cc`), and emscripten — like macOS and Windows — gets none, so the boot log says so. Deliveries are still armed, but the
   arming does nothing: a runaway promise handler blocks the page exactly as a
   `while (1);` in any other function would. What *does* still work is the
   turn budget, which is measured on the monotonic clock — so a large backlog

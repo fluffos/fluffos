@@ -28,7 +28,7 @@ a container:
 |---|---|
 | `p == q` | true only for the *same* promise |
 | mapping key | keyed by identity |
-| `copy(p)` / `deep_copy(p)` | the same promise, not a copy |
+| `copy(p)` | the same promise, not a copy |
 | `save_object()` | not serialisable; saves as `0` |
 | `typeof(p)` | `"promise"` |
 | `sprintf("%O", p)` | `PROMISE( fulfilled: 42 )` |
