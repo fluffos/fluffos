@@ -49,7 +49,9 @@ Rules the compiler enforces:
   but the master that name is yours. Have the apply call an async function
   instead. Note the check keys on the declaration: it does not catch an apply
   that merely *returns* the result of an async call, and it cannot see
-  `add_action()` verb functions, whose names are arbitrary.
+  `add_action()` verb functions, whose names are arbitrary. Those consumers
+  refuse a promise themselves — `check_valid_path()` denies it, and a verb
+  function that returns one is treated as having declined the command.
 
 An `async` body runs **synchronously** until its first `await` of a pending
 promise, so anything before that has already happened by the time the caller

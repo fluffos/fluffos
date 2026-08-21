@@ -285,10 +285,13 @@ compile-time or runtime error, never silent misbehavior:
    for one. It keys on the declaration, so it does not catch an ordinary apply
    that returns the result of an async call — `mixed id(string s) { return
    slow(); }` — and it cannot cover `add_action()` verb functions at all,
-   whose names are arbitrary. Where a promise reaching the driver is a
-   security question rather than a correctness one, the consumer refuses it:
-   `check_valid_path()` denies a `valid_read()`/`valid_write()` that returns a
-   promise, and logs why.
+   whose names are arbitrary. So the consumers the compiler cannot reach
+   refuse a promise themselves, and log why: `check_valid_path()` denies a
+   `valid_read()`/`valid_write()` that returns one, and the command parser
+   treats a verb function that returns one as having *declined* the command —
+   it goes on to the next sentence on that verb and, if none takes it, calls
+   `notify_no_command()`. A verb that has not answered has not claimed the
+   command.
 7. An eval-cost ("too long evaluation") error can never be swallowed by an
    async body or `acatch`, matching `catch`.
 
