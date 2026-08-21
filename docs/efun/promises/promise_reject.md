@@ -23,7 +23,12 @@ title: promises / promise_reject
 
     A rejected promise whose rejection is never observed (no handler
     attached, result never read) is reported to the debug log when it is
-    deallocated.
+    deallocated. The report names where the promise was REJECTED --
+    `Unhandled promise rejection (rejected by /obj/thing at
+    /obj/thing.lpc:42): reason` -- because deallocation can be arbitrarily
+    far from the rejection, and the reason on its own is often not enough to
+    identify it (`(int) 0` is an ordinary rejection value for the promise
+    forms of async_read(3) and friends).
 
 ### SEE ALSO
     promise_resolve(3), promise_catch(3), promise_then(3)

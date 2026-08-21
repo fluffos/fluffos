@@ -1632,12 +1632,53 @@ invalid:
  */
 /* Returns an index into A_FUNCTIONS_DEFS.
  */
+/* Is `name` one of the functions the DRIVER calls on an object -- an apply?
+ * Reads the generated table so it cannot drift as applies are added. */
+static bool is_driver_apply(const char* name) {
+  for (const char** apply = all_applies_table; *apply != nullptr; apply++) {
+    if (strcmp(*apply, name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 int define_new_function(const char* name, int num_arg, int num_local, int flags, int type) {
   int oldindex = -1, num = -1, newindex = -1;
   unsigned short argument_start_index;
   ident_hash_elem_t* ihe;
   function_t* funp = nullptr;
   compiler_temp_t* newfunc;
+
+  /* An apply cannot be async, because the DRIVER is the caller and it has
+   * nowhere to await. It reads the return value immediately, and an async
+   * function returns a promise the instant it parks -- so the driver reads a
+   * promise where it expects a value, and a promise is neither the number 0
+   * nor a string.
+   *
+   * That is not a curiosity, it is a security hole. check_valid_path()
+   * (packages/core/file.cc) denies only on `T_NUMBER && == 0`, so
+   * `async int valid_read(...)` grants access unconditionally, whatever the
+   * body would have decided -- silently, and before the body has even
+   * finished. `id()` returning a promise makes every object answer to every
+   * name; error_handler(), compile_object() and the rest of the value-reading
+   * applies degrade the same way.
+   *
+   * The applies whose value is ignored (create(), init(), ...) fail more
+   * quietly but no more usefully: the driver treats the object as ready while
+   * the body is still parked. Refusing the whole set is the honest rule, and
+   * it costs nothing -- an apply that wants async work calls an async
+   * function:
+   *
+   *     void create() { start_loading(); }        // apply, ordinary
+   *     async void start_loading() { ... await ... }
+   */
+  if ((flags & FUNC_ASYNC) && !(flags & FUNC_PROTOTYPE) && is_driver_apply(name)) {
+    yyerror(
+        "'%s' is an apply -- the driver calls it and reads its return value, so it cannot be "
+        "'async'. Have it call an async function instead.",
+        name);
+  }
 
   oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
   if (oldindex >= 0) {

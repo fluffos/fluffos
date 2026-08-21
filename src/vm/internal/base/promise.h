@@ -72,6 +72,13 @@ struct promise_t {
   unsigned short value_type;
   svalue_t result; /* valid when state != PROMISE_PENDING */
   std::vector<promise_reaction_t>* reactions; /* pending only; else null */
+  /* Where this promise was REJECTED ("/obj/thing:42"), for the unhandled-
+   * rejection report. Captured at rejection, not creation: an unhandled
+   * rejection is reported when the promise is finally deallocated, which can
+   * be arbitrarily far from either, and of the two the site that produced the
+   * failure is the one worth naming. Only rejections pay for it -- a fulfilled
+   * promise never allocates this. Malloced (FREE_MSTR), null if unknown. */
+  char* reject_origin;
 };
 
 promise_t* promise_alloc();

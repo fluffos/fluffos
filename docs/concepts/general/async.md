@@ -81,7 +81,16 @@ Fulfilling a promise with another promise **adopts** it (flattening): the
 outer promise stays pending until the inner one settles, then settles the
 same way. A rejection that is never observed — no rejection handler, the
 result never read — is reported to the debug log when the promise is
-deallocated.
+deallocated, naming where it was rejected:
+
+```
+Unhandled promise rejection (rejected by /obj/thing at /obj/thing.lpc:42): no such file
+```
+
+Deallocation can be arbitrarily far from the rejection, and the reason on
+its own is often not enough to identify which promise it was — `(int) 0` is
+an ordinary rejection value for the promise forms of `async_read()` and
+friends — so the locus is the part that makes the line actionable.
 
 ## `async` functions
 
@@ -252,7 +261,23 @@ compile-time or runtime error, never silent misbehavior:
    with a descriptive error.
 5. `break`/`continue` may not jump out of an `acatch` region (same rule as
    `catch`); `return` works normally.
-6. An eval-cost ("too long evaluation") error can never be swallowed by an
+6. An **apply cannot be `async`** — every name the driver calls on an object,
+   master applies (`valid_read`, `error_handler`, `compile_object`, …) and
+   object applies (`create`, `init`, `id`, …) alike. The driver is the caller
+   and reads the return value the moment the apply returns, which for an async
+   function is a promise handed back the instant the body parks. For the
+   value-reading applies that is a security hole rather than a curiosity:
+   `check_valid_path()` denies only on an integer `0`, so an async
+   `valid_read()` would grant access unconditionally, whatever the body
+   decided. The applies whose value is ignored fail more quietly but no more
+   usefully — the driver treats the object as ready while the body is still
+   parked. An apply that wants async work calls an async function:
+
+   ```c
+   void create() { start_loading(); }          // apply, ordinary
+   async void start_loading() { config = await load(); }
+   ```
+7. An eval-cost ("too long evaluation") error can never be swallowed by an
    async body or `acatch`, matching `catch`.
 
 ## Resource limits
@@ -368,6 +393,14 @@ mudlib code using them as identifiers must be renamed.
   larger than one turn is **not** all delivered in the same gametick, even
   though each individual settle queues immediately.
 
+- **On the WebAssembly build there is no evaluation limit at all** — the
+  driver's eval timer is POSIX-only, and emscripten (like macOS and Windows)
+  gets none, so the boot log says so. Deliveries are still armed, but the
+  arming does nothing: a runaway promise handler blocks the page exactly as a
+  `while (1);` in any other function would. What *does* still work is the
+  turn budget, which is measured on the monotonic clock — so a large backlog
+  is still split across turns and the page still gets its turns back between
+  them. Only the per-delivery bound is missing.
 - On a Debug build, suspended coroutines and promise reactions are fully
   visible to the `check_memory()` ref-count checker.
 - `defer()` handlers registered before an `await` survive the suspension

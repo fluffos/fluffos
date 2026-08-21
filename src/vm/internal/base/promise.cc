@@ -1172,7 +1172,28 @@ promise_t* promise_alloc() {
   p->value_type = 0;
   p->result = const0;
   p->reactions = nullptr;
+  p->reject_origin = nullptr;
   return p;
+}
+
+/* "/obj/name:42" for the currently executing LPC, or null if there is none
+ * (a rejection made from a driver callback rather than from LPC). */
+char* capture_reject_origin() {
+  if (current_object == nullptr) {
+    return nullptr;
+  }
+  const char* file = nullptr;
+  int line = 0;
+  if (current_prog != nullptr) {
+    get_line_number_info(&file, &line);
+  }
+  char buf[512];
+  if (file != nullptr && line > 0) {
+    snprintf(buf, sizeof(buf), "/%s at %s:%d", current_object->obname, file, line);
+  } else {
+    snprintf(buf, sizeof(buf), "/%s", current_object->obname);
+  }
+  return string_copy(buf, "capture_reject_origin");
 }
 
 void free_promise(promise_t* p) {
@@ -1189,8 +1210,14 @@ void free_promise(promise_t* p) {
 
 void dealloc_promise(promise_t* p) {
   if (p->state == PROMISE_REJECTED && !p->handled) {
+    /* Where it was rejected. Without this the report is a bare reason with no
+     * object, function or line -- and it is printed at DEALLOCATION, which
+     * can be arbitrarily far from the rejection, so there is nothing else in
+     * the log to correlate it with. */
+    const char* const origin = p->reject_origin ? p->reject_origin : "unknown location";
     if (p->result.type == T_STRING) {
-      debug_message("Unhandled promise rejection: %s\n", p->result.u.string);
+      debug_message("Unhandled promise rejection (rejected by %s): %s\n", origin,
+                    p->result.u.string);
     } else {
       /* Render the VALUE where it is cheap to, not just its type name:
        * non-string reasons are routine here (the promise forms of
@@ -1201,22 +1228,28 @@ void dealloc_promise(promise_t* p) {
        * deallocation path. */
       switch (p->result.type) {
         case T_NUMBER:
-          debug_message("Unhandled promise rejection: (int) %" LPC_INT_FMTSTR_P "\n",
-                        p->result.u.number);
+          debug_message("Unhandled promise rejection (rejected by %s): (int) %" LPC_INT_FMTSTR_P
+                        "\n",
+                        origin, p->result.u.number);
           break;
         case T_REAL:
-          debug_message("Unhandled promise rejection: (float) %f\n",
+          debug_message("Unhandled promise rejection (rejected by %s): (float) %f\n", origin,
                         static_cast<double>(p->result.u.real));
           break;
         case T_OBJECT:
-          debug_message("Unhandled promise rejection: (object) /%s\n",
+          debug_message("Unhandled promise rejection (rejected by %s): (object) /%s\n", origin,
                         p->result.u.ob->obname ? p->result.u.ob->obname : "?");
           break;
         default:
-          debug_message("Unhandled promise rejection: (%s)\n", type_name(p->result.type));
+          debug_message("Unhandled promise rejection (rejected by %s): (%s)\n", origin,
+                        type_name(p->result.type));
           break;
       }
     }
+  }
+  if (p->reject_origin != nullptr) {
+    FREE_MSTR(p->reject_origin);
+    p->reject_origin = nullptr;
   }
   free_svalue(&p->result, "dealloc_promise");
   if (p->reactions) {
@@ -1252,6 +1285,9 @@ void dealloc_promise(promise_t* p) {
 int promise_settle(promise_t* p, svalue_t* value, int rejected) {
   if (p->state != PROMISE_PENDING) {
     return 0; /* first settle wins */
+  }
+  if (rejected && p->reject_origin == nullptr) {
+    p->reject_origin = capture_reject_origin();
   }
   p->state = rejected ? PROMISE_REJECTED : PROMISE_FULFILLED;
   assign_svalue(&p->result, value);
@@ -1734,6 +1770,13 @@ void mark_coroutine(lpc_coroutine_t* coro) {
 
 void mark_promise(promise_t* p) {
   mark_svalue(&p->result);
+  /* A raw malloced string held by the struct rather than by an svalue, so
+   * nothing else marks it: without this the checker reports it as an
+   * unaccounted reference after every file that leaves a rejected promise
+   * around (AGENTS.md section 3). */
+  if (p->reject_origin != nullptr) {
+    MSTR_EXTRA_REF(p->reject_origin)++;
+  }
   if (p->reactions) {
     for (auto& r : *p->reactions) {
       if (r.on_fulfilled) {
