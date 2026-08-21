@@ -11,9 +11,20 @@
 // there is no LPC-visible channel for it. The check retries rather than
 // assuming the promise has been reclaimed by any particular tick.
 
-#define MARKER "unhandled-locus-probe-6f21"
+// get_config(10) is `debug log file`. Asking the driver rather than assuming
+// "/log/debug.log" matters: under an alternate config the report goes
+// somewhere else, and the test would otherwise read a STALE log from an
+// earlier run -- which is exactly what happened under the hostile-config
+// matrix, where it matched a line written by a previous build and reported a
+// missing locus that was not missing.
+#define DEBUG_LOG_FILE 10
 #define MAX_TRIES 12
 
+// Unique per run, so a line left in the log by an earlier run of this same
+// file cannot satisfy the search. A fixed marker made the test able to pass
+// (or fail) on evidence that had nothing to do with the run in progress.
+nosave string marker;
+nosave string logfile;
 nosave int tries;
 nosave int finished;
 
@@ -22,7 +33,7 @@ private void check_log();
 private void drop_a_rejection() {
   promise p = promise_create();
 
-  promise_reject(p, MARKER);
+  promise_reject(p, marker);
   // p is the only reference and it dies with this frame, so the promise is
   // reclaimed with its rejection never handled.
 }
@@ -38,12 +49,12 @@ private void finish(mixed complaint) {
 }
 
 private void check_log() {
-  string log = read_file("/log/debug.log");
+  string log = read_file(logfile);
   int at;
   string line;
   int start;
 
-  at = log ? strsrch(log, MARKER) : -1;
+  at = log ? strsrch(log, marker) : -1;
   if (at == -1) {
     if (++tries < MAX_TRIES) {
       call_out((: check_log :), 1);
@@ -70,6 +81,11 @@ private void check_log() {
 }
 
 void do_tests() {
+  marker = "unhandled-locus-probe-" + time() + "-" + random(1000000);
+  logfile = LOG_DIR + "/" + get_config(DEBUG_LOG_FILE);
+  ASSERT2(stringp(get_config(DEBUG_LOG_FILE)),
+    "get_config(10) should name the debug log file");
+
   EXPECT_LATCH("unhandled rejection locus");
 
   drop_a_rejection();
