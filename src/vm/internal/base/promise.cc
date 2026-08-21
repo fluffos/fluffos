@@ -739,8 +739,20 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
   while (cgsp != marker->save_cgsp) {
     restore_command_giver();
   }
-  while (sp > marker->save_sp) {
-    pop_stack();
+  if (sp > marker->save_sp) {
+    pop_n_elems(sp - marker->save_sp);
+  } else if (sp < marker->save_sp) {
+    /* restore_context()'s underflow repair, for the same reason it has one:
+     * an error path with broken stack accounting can leave sp BELOW the
+     * mark, and here that additionally lands the caught value at the wrong
+     * depth, so the code after the region reads the wrong slots. Re-point sp
+     * at the mark and neutralize the revived slots so later pops do not free
+     * stale pointers. */
+    debug_message("acatch unwind: value stack underflow by %" PRIdPTR " elements, repairing.\n",
+                  static_cast<intptr_t>(marker->save_sp - sp));
+    while (sp < marker->save_sp) {
+      *++sp = const0;
+    }
   }
   pop_control_stack();
 
@@ -1384,7 +1396,13 @@ void run_async_function(char* entry_pc, const function_t* funp) {
   bool const propagate_eval_error = run_coroutine_body(entry_pc, p, csp);
   if (propagate_eval_error) {
     /* do_catch() parity: the eval-cost limit cannot be swallowed. The
-     * promise was already rejected; release our ref before unwinding. */
+     * promise was already rejected; release our ref before unwinding.
+     *
+     * Mark it handled first. The caller never receives this promise -- the
+     * error() below reaches it instead -- so the rejection IS delivered, by
+     * the other route. Without this the drop reports "Unhandled promise
+     * rejection" as well, and one eval-cost overrun is logged twice. */
+    p->handled = true;
     free_promise(p);
     error("Can't catch eval cost too big error.\n");
   }
