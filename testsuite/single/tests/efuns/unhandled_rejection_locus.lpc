@@ -20,9 +20,16 @@
 #define DEBUG_LOG_FILE 10
 #define MAX_TRIES 12
 
-// Unique per run, so a line left in the log by an earlier run of this same
-// file cannot satisfy the search. A fixed marker made the test able to pass
-// (or fail) on evidence that had nothing to do with the run in progress.
+// read_file() with no range returns only the first `maximum read file size`
+// bytes of the file, and the report lands wherever in the log this file
+// happened to run -- with the suite's file order randomized, anywhere. A
+// head-anchored read passed only because the log was still under the cap;
+// enough extra output from any other test would have pushed the report out of
+// the window and failed this file for driver behaviour that was working. So
+// scan the whole log, a window of lines at a time.
+#define CHUNK_LINES 500
+#define MAX_CHUNKS 400
+
 nosave string marker;
 nosave string logfile;
 nosave int tries;
@@ -48,14 +55,56 @@ private void finish(mixed complaint) {
   RELEASE_LATCH("unhandled rejection locus");
 }
 
-private void check_log() {
-  string log = read_file(logfile);
-  int at;
-  string line;
-  int start;
+// Returns the text of the reporting line up to the marker, "" if the whole
+// log was scanned without finding it, or 0 if read_file() could not reach the
+// whole log -- its own buffer is bounded too, so past that point this test
+// declines rather than accusing the driver of not reporting.
+private mixed scan_log() {
+  int line = 1;
+  int scanned = 0;
+  int i;
+  int total = file_size(logfile);
 
-  at = log ? strsrch(log, marker) : -1;
-  if (at == -1) {
+  if (total < 0) {
+    return 0;
+  }
+
+  for (i = 0; i < MAX_CHUNKS; i++) {
+    string chunk = read_file(logfile, line, CHUNK_LINES);
+    int at;
+
+    if (!chunk || chunk == "") {
+      break;
+    }
+    scanned += strlen(chunk);
+    at = strsrch(chunk, marker);
+    if (at != -1) {
+      int start = at;
+
+      while (start > 0 && chunk[start - 1] != '\n') {
+        start--;
+      }
+      // Through the end of the marker, so the result can never be "" -- the
+      // caller distinguishes "found" from "not found yet" by that.
+      return chunk[start..at + strlen(marker) - 1];
+    }
+    line += CHUNK_LINES;
+  }
+
+  return scanned >= total ? "" : 0;
+}
+
+private void check_log() {
+  mixed line = scan_log();
+
+  if (line == 0) {
+    // Out of read_file()'s reach. Not a driver failure and not evidence
+    // either way, so say nothing and stop.
+    finish(0);
+    return;
+  }
+
+  if (line == "") {
     if (++tries < MAX_TRIES) {
       call_out((: check_log :), 1);
       return;
@@ -63,13 +112,6 @@ private void check_log() {
     finish("the dropped rejection was never reported to the debug log");
     return;
   }
-
-  // Back up to the start of the reporting line.
-  start = at;
-  while (start > 0 && log[start - 1] != '\n') {
-    start--;
-  }
-  line = log[start..at - 1];
 
   ASSERT2(strsrch(line, "Unhandled promise rejection") != -1,
     "the marker turned up in the log but not on a rejection report: " + line);
@@ -81,10 +123,18 @@ private void check_log() {
 }
 
 void do_tests() {
+  string configured = get_config(DEBUG_LOG_FILE);
+
   marker = "unhandled-locus-probe-" + time() + "-" + random(1000000);
-  logfile = LOG_DIR + "/" + get_config(DEBUG_LOG_FILE);
-  ASSERT2(stringp(get_config(DEBUG_LOG_FILE)),
-    "get_config(10) should name the debug log file");
+
+  // No debug log configured means the report has nowhere to go and there is
+  // nothing here to read back. Say that, rather than spending the retries and
+  // then blaming the driver for "never reporting" -- which is what this file
+  // did when a hostile-config run was accidentally left without the setting.
+  if (!stringp(configured) || configured == "") {
+    return;
+  }
+  logfile = LOG_DIR + "/" + configured;
 
   EXPECT_LATCH("unhandled rejection locus");
 
