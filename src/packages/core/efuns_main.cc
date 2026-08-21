@@ -133,7 +133,7 @@ void f_bind() {
   push_object(ob);
 
   res = apply_master_ob(APPLY_VALID_BIND, 3);
-  if (!MASTER_APPROVED(res)) {
+  if (!MASTER_APPROVED(res, "valid_bind")) {
     error("Master object denied permission to bind() function pointer.\n");
   }
 

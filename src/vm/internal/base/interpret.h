@@ -88,6 +88,19 @@ struct function_lookup_info_t {
 };
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
+
+/* Did an LPC function the DRIVER called answer yes to a yes/no question?
+ *
+ * Not simply !IS_ZERO(): an async function hands back a T_PROMISE the instant
+ * its body parks, before it has decided anything, and a bare truthiness test
+ * reads that as "yes". A function that has not answered has not said yes --
+ * the same rule check_valid_path(), master_approved() and the command parser
+ * apply (AGENTS.md section 13.24). Use this wherever the driver asks an
+ * object a question and acts on the answer (id(), is_living(),
+ * inventory_accessible(), ...), NOT for an ordinary LPC callback whose result
+ * is used as a truth value -- there a promise is true, exactly as it is to
+ * the equivalent hand-written `if (cb(x))`. */
+#define APPLY_SAYS_YES(x) (!IS_ZERO(x) && (x)->type != T_PROMISE)
 #define IS_UNDEFINED(x) \
   (!(x) || (((x)->type == T_NUMBER) && ((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
 

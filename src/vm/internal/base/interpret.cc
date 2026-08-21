@@ -360,7 +360,7 @@ int validate_shadowing(object_t* ob) {
 
   push_object(ob);
   ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
-  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret)) {
+  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret, "valid_shadow")) {
     return 1;
   }
   return 0;

@@ -178,7 +178,7 @@ LPC_INT rule_efun_override(const ScratchString* identifier) {
     share_and_push_string(identifier->c_str());
     push_malloced_string(add_slash(main_file_name()));
     svalue_t* ret = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-    if (!MASTER_APPROVED(ret)) {
+    if (!MASTER_APPROVED(ret, "valid_override")) {
       yyerror("Invalid simulated efunction override");
       res = -1;
     }
@@ -191,7 +191,7 @@ LPC_INT rule_efun_override_new() {
   push_constant_string("new");
   push_malloced_string(add_slash(main_file_name()));
   svalue_t* res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-  if (!MASTER_APPROVED(res)) {
+  if (!MASTER_APPROVED(res, "valid_override")) {
     yyerror("Invalid simulated efunction override");
     return -1;
   } else {

@@ -1038,7 +1038,7 @@ void f_link() {
   push_svalue(arg - 1);
   push_svalue(arg);
   ret = apply_master_ob(APPLY_VALID_LINK, 2);
-  if (MASTER_APPROVED(ret)) {
+  if (MASTER_APPROVED(ret, "valid_link")) {
     i = do_rename((sp - 1)->u.string, sp->u.string, F_LINK);
   } else {
     i = 0;

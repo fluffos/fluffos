@@ -651,7 +651,7 @@ object_t* load_object(const char* lname, int callcreate) {
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret)) {
+  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
     destruct_object(ob);
     error("master object: %s() denied permission to load '/%s'.\n",
           applies_table[APPLY_VALID_OBJECT], name);
@@ -774,7 +774,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   save_command_giver(command_giver);
   push_object(ob);
   svalue_t* mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret)) {
+  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
     destruct_object(ob);
     restore_command_giver();
     error("master object: %s() denied permission to load in-memory object '/%s'.\n",
@@ -1235,7 +1235,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     if ((ob->flags & O_DESTRUCTED) || !ob->super || (ob->super->flags & O_DESTRUCTED)) {
       return nullptr;
     }
-    if (!IS_ZERO(ret)) {
+    if (APPLY_SAYS_YES(ret)) {
       return ob->super;
     }
     return object_present2(v->u.string, ob->super->contains);
@@ -1282,7 +1282,7 @@ static object_t* object_present2(const char* str, object_t* ob) {
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }
-    if (IS_ZERO(ret)) {
+    if (!APPLY_SAYS_YES(ret)) {
       continue;
     }
     if (--count > 0) {
