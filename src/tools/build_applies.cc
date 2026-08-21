@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
   char* p;
   int apply_number = 0;
   std::vector<std::string> all_applies;
+  size_t num_object_applies = 0;
 
   fprintf(out,
           "// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
@@ -45,7 +46,12 @@ int main(int argc, char** argv) {
           "// cache. This one exists so the COMPILER can ask \"is this name an\n"
           "// apply?\" without a hand-maintained second copy drifting out of\n"
           "// step (define_new_function() refuses `async` on one).\n"
-          "extern const char *all_applies_table[];\n\n// the folowing "
+          "extern const char *all_applies_table[];\n"
+          "\n// The OBJECT half of the above: names the driver applies to any\n"
+          "// object. The rest of all_applies_table[] is master-only, dispatched\n"
+          "// on master_ob alone -- which is why the compiler treats the two\n"
+          "// differently (an error vs a warning for `async`).\n"
+          "extern const char *object_applies_table[];\n\n// the folowing "
           "must be the first character of __INIT\n#define "
           "APPLY___INIT_SPECIAL_CHAR\t\t'#'\n");
   fprintf(table,
@@ -83,10 +89,20 @@ int main(int argc, char** argv) {
       all_applies.emplace_back(buf);
     }
   }
+  num_object_applies = all_applies.size();
   while (fgets(buf, sizeof(buf), f)) {
+    /* Same guards the object loop above has. Without them a blank line or a
+     * '#' comment in this half would shift every APPLY_* number (they index
+     * applies_table[]) and inject a bogus name into the tables. */
+    if (buf[0] == '\0' || buf[0] == '\n' || buf[0] == '\r' || buf[0] == '#') {
+      continue;
+    }
     buf[strlen(buf) - 1] = 0;
-    if (buf[strlen(buf) - 1] == '\r') {
+    if (buf[0] != '\0' && buf[strlen(buf) - 1] == '\r') {
       buf[strlen(buf) - 1] = 0;
+    }
+    if (buf[0] == '\0') {
+      continue;
     }
     if ((colon = strchr(buf, ':'))) {
       *colon++ = 0;
@@ -115,6 +131,12 @@ int main(int argc, char** argv) {
   fprintf(table, "\nconst char *all_applies_table[] = {\n");
   for (const auto& apply : all_applies) {
     fprintf(table, "\t\"%s\",\n", apply.c_str());
+  }
+  fprintf(table, "\tnullptr,\n};\n");
+
+  fprintf(table, "\nconst char *object_applies_table[] = {\n");
+  for (size_t i = 0; i < num_object_applies; i++) {
+    fprintf(table, "\t\"%s\",\n", all_applies[i].c_str());
   }
   fprintf(table, "\tnullptr,\n};\n");
   fprintf(out, "\n#define NUM_MASTER_APPLIES\t%i\n\n#endif\n", apply_number);

@@ -672,6 +672,23 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
   if (v && v->type == T_NUMBER && v->u.number == 0) {
     return nullptr;
   }
+  /* An async valid_read()/valid_write() hands back a promise the instant its
+   * body parks -- before it has decided anything. Everything below treats a
+   * non-string, non-zero return as "allow", so without this a promise is a
+   * silent grant. Deny instead: the driver is the caller here and has nowhere
+   * to await, so there is no answer yet, and no answer must not mean yes.
+   *
+   * define_new_function() refuses `async` on these names outright, but that
+   * check keys on the DECLARATION and so cannot see an ordinary valid_read()
+   * that returns the result of an async call. This is the backstop that
+   * actually closes the hole. */
+  if (v && v->type == T_PROMISE) {
+    debug_message(
+        "%s: %s returned a promise -- an apply cannot be async, and a pending answer is not a "
+        "grant. Denying.\n",
+        call_fun, writeflg ? "valid_write" : "valid_read");
+    return nullptr;
+  }
   if (v && v->type == T_STRING) {
     path = v->u.string;
   } else {

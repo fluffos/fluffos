@@ -261,22 +261,34 @@ compile-time or runtime error, never silent misbehavior:
    with a descriptive error.
 5. `break`/`continue` may not jump out of an `acatch` region (same rule as
    `catch`); `return` works normally.
-6. An **apply cannot be `async`** — every name the driver calls on an object,
-   master applies (`valid_read`, `error_handler`, `compile_object`, …) and
-   object applies (`create`, `init`, `id`, …) alike. The driver is the caller
-   and reads the return value the moment the apply returns, which for an async
-   function is a promise handed back the instant the body parks. For the
-   value-reading applies that is a security hole rather than a curiosity:
-   `check_valid_path()` denies only on an integer `0`, so an async
-   `valid_read()` would grant access unconditionally, whatever the body
-   decided. The applies whose value is ignored fail more quietly but no more
-   usefully — the driver treats the object as ready while the body is still
-   parked. An apply that wants async work calls an async function:
+6. An **apply should not be `async`**. The driver is the caller and reads the
+   return value the moment the apply returns, which for an async function is a
+   promise handed back the instant the body parks — before it has decided
+   anything. Consumers that treat an unrecognised value as permissive then
+   read that as "yes". Applies whose value is ignored (`create()`, `init()`)
+   fail more quietly but no more usefully: the driver treats the object as
+   ready while the body is still parked. An apply that wants async work calls
+   an async function:
 
    ```c
    void create() { start_loading(); }          // apply, ordinary
    async void start_loading() { config = await load(); }
    ```
+
+   The compiler enforces this as far as a name can: `async` on an **object
+   apply** (`create`, `init`, `id`, `heart_beat`, …) is an error, since the
+   driver calls those on any object; `async` on a **master-only apply**
+   (`valid_read`, `error_handler`, `compile_object`, …) is a warning, because
+   on any object other than the master the name is the author's to use.
+
+   **That check is a lint, not a boundary**, and it matters not to mistake it
+   for one. It keys on the declaration, so it does not catch an ordinary apply
+   that returns the result of an async call — `mixed id(string s) { return
+   slow(); }` — and it cannot cover `add_action()` verb functions at all,
+   whose names are arbitrary. Where a promise reaching the driver is a
+   security question rather than a correctness one, the consumer refuses it:
+   `check_valid_path()` denies a `valid_read()`/`valid_write()` that returns a
+   promise, and logs why.
 7. An eval-cost ("too long evaluation") error can never be swallowed by an
    async body or `acatch`, matching `catch`.
 

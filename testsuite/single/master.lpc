@@ -310,6 +310,22 @@ void preload(string file) {
 // Write an error message into a log file. The error occured in the object
 // 'file', giving the error message 'message'.
 
+// check_valid_path() reads this apply's return value the moment it returns,
+// and treats anything that is not the integer 0 and not a string as "allow".
+// An `async` valid_read() would therefore grant access unconditionally, from a
+// body that has decided nothing yet -- so the driver denies a promise instead,
+// which is what tests/efuns/valid_read_promise.lpc pins.
+//
+// Only the probe path is special; everything else is allowed, which is what
+// this mudlib did before it had a valid_read() at all (a missing apply reads
+// as "allow" in check_valid_path()).
+mixed valid_read(string file, object ob, string func) {
+  if (strsrch(file, "valid_read_promise_probe") != -1) {
+    return promise_create();
+  }
+  return 1;
+}
+
 void log_error(string, string message) {
   write_file(LOG_DIR + "/compile", message);
 }

@@ -41,12 +41,15 @@ Rules the compiler enforces:
   another, with nothing at runtime to catch it.
 * `async` is a **function** modifier: not variables, not `modifier_change`
   blocks (`async:`).
-* **An apply cannot be `async`** — every name the driver itself calls, master
-  applies (`valid_read`, `error_handler`, ...) and object applies (`create`,
-  `init`, `id`, ...) alike. The driver reads the return value immediately and
-  has nowhere to await; for the value-reading applies an async version is a
-  security hole rather than a curiosity. Have the apply call an async
-  function instead.
+* **An apply should not be `async`** — the driver reads the return value
+  immediately and has nowhere to await, so it gets a promise from a body that
+  has decided nothing yet. `async` on an **object apply** (`create`, `init`,
+  `id`, `heart_beat`, ...) is a compile error; on a **master-only apply**
+  (`valid_read`, `error_handler`, ...) it is a warning, since on any object
+  but the master that name is yours. Have the apply call an async function
+  instead. Note the check keys on the declaration: it does not catch an apply
+  that merely *returns* the result of an async call, and it cannot see
+  `add_action()` verb functions, whose names are arbitrary.
 
 An `async` body runs **synchronously** until its first `await` of a pending
 promise, so anything before that has already happened by the time the caller

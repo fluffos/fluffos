@@ -1632,10 +1632,12 @@ invalid:
  */
 /* Returns an index into A_FUNCTIONS_DEFS.
  */
-/* Is `name` one of the functions the DRIVER calls on an object -- an apply?
- * Reads the generated table so it cannot drift as applies are added. */
-static bool is_driver_apply(const char* name) {
-  for (const char** apply = all_applies_table; *apply != nullptr; apply++) {
+/* Is `name` one of the functions the DRIVER calls -- an apply? Both tables are
+ * generated from vm/internal/applies, so neither can drift as applies are
+ * added. object_applies_table[] is the half the driver calls on ANY object;
+ * all_applies_table[] additionally covers the master-only half. */
+static bool in_applies_table(const char* const* table, const char* name) {
+  for (const char* const* apply = table; *apply != nullptr; apply++) {
     if (strcmp(*apply, name) == 0) {
       return true;
     }
@@ -1650,34 +1652,53 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
   function_t* funp = nullptr;
   compiler_temp_t* newfunc;
 
-  /* An apply cannot be async, because the DRIVER is the caller and it has
-   * nowhere to await. It reads the return value immediately, and an async
-   * function returns a promise the instant it parks -- so the driver reads a
-   * promise where it expects a value, and a promise is neither the number 0
-   * nor a string.
+  /* An apply cannot usefully be async, because the DRIVER is the caller and
+   * it has nowhere to await. It reads the return value immediately, and an
+   * async function returns a promise the instant it parks -- so the driver
+   * reads a promise where it expects a value, and a promise is neither the
+   * number 0 nor a string. Consumers that treat an unrecognised tag as
+   * permissive then read it as "yes": check_valid_path() would grant access,
+   * present()'s IS_ZERO() would make an object answer to every name. Applies
+   * whose value is ignored (create(), init()) fail more quietly but no more
+   * usefully -- the driver treats the object as ready while the body is still
+   * parked.
    *
-   * That is not a curiosity, it is a security hole. check_valid_path()
-   * (packages/core/file.cc) denies only on `T_NUMBER && == 0`, so
-   * `async int valid_read(...)` grants access unconditionally, whatever the
-   * body would have decided -- silently, and before the body has even
-   * finished. `id()` returning a promise makes every object answer to every
-   * name; error_handler(), compile_object() and the rest of the value-reading
-   * applies degrade the same way.
+   * This is a LINT, not a security boundary, and it is important not to
+   * mistake it for one. It keys on the DECLARATION, so it catches the direct
+   * mistake and nothing else. It cannot see an ordinary apply that returns
+   * the result of an async call:
    *
-   * The applies whose value is ignored (create(), init(), ...) fail more
-   * quietly but no more usefully: the driver treats the object as ready while
-   * the body is still parked. Refusing the whole set is the honest rule, and
-   * it costs nothing -- an apply that wants async work calls an async
-   * function:
+   *     mixed id(string s) { return slow(); }     // slow() is async
+   *
+   * and it cannot cover add_action() verb functions at all, whose names are
+   * arbitrary mudlib strings. The consumers are where a promise actually has
+   * to be refused; check_valid_path() (packages/core/file.cc) now denies on
+   * one, which is the backstop for the security-relevant case.
+   *
+   * The fix for an apply that wants async work is to call an async function:
    *
    *     void create() { start_loading(); }        // apply, ordinary
    *     async void start_loading() { ... await ... }
    */
-  if ((flags & FUNC_ASYNC) && !(flags & FUNC_PROTOTYPE) && is_driver_apply(name)) {
-    yyerror(
-        "'%s' is an apply -- the driver calls it and reads its return value, so it cannot be "
-        "'async'. Have it call an async function instead.",
-        name);
+  if ((flags & FUNC_ASYNC) && !(flags & FUNC_PROTOTYPE)) {
+    if (in_applies_table(object_applies_table, name)) {
+      /* The driver calls this on ANY object, so it is always wrong here. */
+      yyerror(
+          "'%s' is an apply -- the driver calls it and reads its return value, so it cannot be "
+          "'async'. Have it call an async function instead.",
+          name);
+    } else if (in_applies_table(all_applies_table, name)) {
+      /* Master-only: the driver applies it to master_ob and nothing else, so
+       * on any other object the name is the author's to use. A warning rather
+       * than an error, because refusing it outright is a real cost -- this
+       * mudlib's own std/database.lpc has a `private mixed connect()`, and a
+       * database connect is exactly the thing one would want to await. On the
+       * master itself it is still a mistake, which is what the warning says. */
+      yywarn(
+          "'%s' is a master apply: if this object is the master, the driver reads its return "
+          "value and cannot await a promise. Harmless on any other object.",
+          name);
+    }
   }
 
   oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
