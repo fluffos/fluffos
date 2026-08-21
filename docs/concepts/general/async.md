@@ -266,6 +266,11 @@ simply rejecting that function's promise. This is a runaway-exhaustion
 guard: a loop spawning async calls that never settle hits a bounded error
 rather than consuming memory without limit.
 
+`await async_yield()` holds one of those slots while it is parked, like any
+other `await`. It is a scheduling primitive rather than a wait on real work,
+so a function that yields periodically occupies a slot only between the yield
+and the loop's next pass.
+
 `call_out(delay)` — a delay with **no callback** — returns a promise
 fulfilled (with `0`) when the delay elapses, and rejected if the call_out
 is removed (`remove_call_out()` with no argument sweeps it with the rest)
@@ -280,6 +285,14 @@ pattern: `async_read(path)`, `async_write(path, str, flag)` and
 promise fulfilled with the value the callback would have received, or
 rejected with the failure value (e.g. `async_read`'s negative int) —
 `string s = await async_read(path);`.
+
+`async_yield()` returns a promise fulfilled with `0` on the event loop's
+next pass — `await async_yield();` is the cooperative preemption point for a
+long computation, letting the driver serve players between chunks. It is the
+one `await` that reaches the loop; see "Interaction with the rest of the
+driver" for why a plain `await` does not. Pending yields are bounded by the
+same **`max pending promise deliveries`** ceiling as queued reactions,
+because a yield the caller has dropped stays allocated until the loop runs.
 
 `async_info()` lists every currently suspended frame — what it is, where
 it is parked, and what it awaits — the async counterpart of

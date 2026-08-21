@@ -1105,6 +1105,22 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
 size_t pending_promise_deliveries() { return g_promise_microtasks.size(); }
 
 promise_t* promise_async_yield() {
+  /* Checked BEFORE allocating, so the error() unwind has nothing to clean up.
+   *
+   * A pending yield is retained memory the caller can no longer see: unlike
+   * promise_create(), dropping the returned value does NOT free it, because
+   * the registry still holds a reference until the loop runs. So a sync loop
+   * calling async_yield() and discarding the result would grow the registry
+   * for as long as its eval budget lasts. That is the same runaway shape
+   * promise_then()'s ceiling exists for -- a handler queueing work faster
+   * than the driver retires it -- so it shares the same limit rather than
+   * introducing a second knob for it. */
+  LPC_INT const limit = CONFIG_INT(__RC_MAX_PENDING_DELIVERIES__);
+  if (limit > 0 && static_cast<LPC_INT>(g_pending_yields.size()) >= limit) {
+    error("async_yield: too many yields already waiting for the event loop (limit %d).\n",
+          static_cast<int>(limit));
+  }
+
   auto* p = promise_alloc();
 
   if (g_promises_shut_down) {
@@ -1117,9 +1133,11 @@ promise_t* promise_async_yield() {
     return p;
   }
 
-  /* two references: one for the caller, one for the registry below */
-  p->ref++;
+  /* Registered before the ref is taken: push_back is the only step here that
+   * can throw, and doing it first means a throw cannot leave an extra
+   * reference on a promise nothing holds. */
   g_pending_yields.push_back(p);
+  p->ref++; /* one for the caller, one for the registry */
 
   if (g_yield_event == nullptr) {
     g_yield_event = add_loop_yield_event(TickEvent::callback_type([] {

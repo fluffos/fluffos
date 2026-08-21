@@ -41,4 +41,4 @@ title: promises / promise_then
 
 ### SEE ALSO
     promise_catch(3), promise_create(3), promise_resolve(3),
-    promise_reject(3)
+    promise_reject(3), async_yield(3)

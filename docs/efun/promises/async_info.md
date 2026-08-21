@@ -69,7 +69,7 @@ title: promises / async_info
     ```
 
 ### SEE ALSO
-    call_out_info(3), promise_status(3), promise_then(3)
+    async_yield(3), call_out_info(3), promise_status(3), promise_then(3)
 
 ### NOTE
     Unrelated to the async_read(3)/async_write(3) family from the async

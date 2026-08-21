@@ -35,6 +35,7 @@ nosave int attempts;
 nosave int finished;
 
 private async void probe();
+private void ceiling();
 
 private void finish(mixed complaint) {
   if (finished++) {
@@ -43,6 +44,11 @@ private void finish(mixed complaint) {
   if (complaint) {
     ASSERT2(0, complaint);
   }
+  // Last, deliberately: it saturates the process-wide pending-yield registry,
+  // and every async_yield() made before the loop's next pass shares that
+  // ceiling -- including the probe's own, which would then error instead of
+  // parking. Anything added to this file that yields must go BEFORE here.
+  ceiling();
   RELEASE_LATCH("async yield");
 }
 
@@ -82,6 +88,31 @@ private async void probe() {
       "is not a preemption point",
       after_yield));
   finish(0);
+}
+
+// A pending yield stays allocated after the caller drops it (the driver
+// still holds it until the loop runs), so a loop that discards them retains
+// memory where `promise_create()` would not. That is bounded by the same
+// `max pending promise deliveries` ceiling as queued reactions.
+private void ceiling() {
+  // Generously above the default ceiling (100000), so the guard fires long
+  // before this bound. Reaching the bound with no error means the limit is
+  // disabled or configured higher, which the message names rather than
+  // reporting as a driver fault.
+  int cap = 200000;
+  int i;
+  mixed err;
+
+  err = catch {
+    for (i = 0; i < cap; i++) {
+      async_yield();
+    }
+  };
+  ASSERT2(err && strsrch(err, "too many yields") != -1,
+    sprintf("a loop discarding %d async_yield() promises was not stopped by the "
+      "pending ceiling (%s) -- either the guard is gone, or `max pending "
+      "promise deliveries` is disabled or set above %d",
+      i, err ? err : "no error", cap));
 }
 
 private async void value_semantics() {
