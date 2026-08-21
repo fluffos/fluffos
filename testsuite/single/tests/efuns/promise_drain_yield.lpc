@@ -2,47 +2,92 @@
 //
 // Delivery (resumed await frames, settlement handlers) runs from the driver,
 // and while it runs nothing else does: no socket reads, no command
-// scheduling, no timers. So the drain makes a bounded number of deliveries
-// per turn and then RE-POSTS itself to the event loop, which is where
-// pending network I/O is actually serviced. Async work proceeds across as
-// many turns as it needs, using time the driver would otherwise spend idle,
-// without ever holding the loop.
+// scheduling, no timers. So the drain spends at most `async drain eval
+// budget` on a turn and then RE-POSTS itself to the event loop, which is
+// where pending network I/O is actually serviced. Async work proceeds across
+// as many turns as it needs, using time the driver would otherwise spend
+// idle, without ever holding the loop.
 //
-// Two bounds, and the second is the one that matters:
+// Work created DURING a turn counts toward that same turn, so a causal chain
+// (a sequential await loop) runs at full speed instead of paying a loop turn
+// per link. The time budget is therefore the only bound, which makes it a
+// responsiveness setting -- promise_drain_budget.lpc pins that a self-feeding
+// chain still yields once per turn.
 //
-//  - at most "async drain eval budget" of eval cost per turn, so a large backlog is
-//    cut into predictable pieces instead of one long stall;
-//  - work created DURING a turn counts toward that same batch, so a causal
-//    chain (a sequential await loop) runs at full speed instead of paying a
-//    loop turn per link. The batch is therefore the only bound, which makes
-//    its size a responsiveness setting -- promise_drain_budget.lpc pins that
-//    a self-feeding chain still yields once per batch.
+// THE BUDGET IS TIME, NOT A COUNT, and the backlog here has to be built in
+// the same unit. An earlier version queued `budget * 3` promises with trivial
+// handlers and asserted three turns, reading the microsecond budget as if it
+// were a delivery count. That is a throughput measurement: 3000 empty
+// handlers fit inside 1000 us on a release build, so the whole backlog
+// cleared in ONE turn and the file failed on the fastest CI targets (clang,
+// macOS and Windows RelWithDebInfo) while passing everywhere slower. The
+// handlers below instead burn a calibrated fraction of the budget each, so
+// the backlog exceeds it by construction on any machine.
 //
 // Yielding is observed through async_info(1)'s "drain_yields" counter rather
-// than by timing. Wall clock cannot see it on every target: the wasm test
-// runner drives the driver from a virtual clock, so a re-posted turn arrives
-// with no real time elapsed and looks exactly like an immediate one.
+// than by timing the run. Wall clock cannot see it on every target: the wasm
+// test runner drives the driver from a virtual clock, so a re-posted turn
+// arrives with no real time elapsed and looks exactly like an immediate one.
+
+// Each handler burns this fraction of the turn budget, so this many
+// deliveries fill a turn.
+#define HANDLERS_PER_TURN 4
+// Turns' worth of backlog to queue. The assertion only demands 2 yields, so
+// this carries a wide margin against a machine where the fixed per-delivery
+// overhead shifts the arithmetic.
+#define TARGET_TURNS 6
+// Don't burn more than this per handler however large the budget is.
+#define MAX_HANDLER_US 2000
+// ... and give up rather than burn for minutes if the budget is enormous.
+#define MAX_QUEUED 400
+#define CALIBRATE_START 100000
+#define CALIBRATE_TRIES 24
+// Enough measured microseconds to scale from without rounding noise.
+#define CALIBRATE_FLOOR 200
 
 nosave int delivered;
+nosave int queued;
 nosave int yields_before;
-nosave int batch;
+nosave int budget_us;
+nosave int handler_us;
+nosave int burn_iters;
+nosave int finished;
 
 private void check_results();
 
+private void burn(int n) {
+  int i, x;
+
+  for (i = 0; i < n; i++) {
+    x += i;
+  }
+}
+
+private void finish(mixed complaint) {
+  if (finished++) {
+    return;
+  }
+  if (complaint) {
+    ASSERT2(0, complaint);
+  }
+  RELEASE_LATCH("promise drain yield");
+}
+
 private mixed count_handler(mixed v) {
   delivered++;
-  if (delivered > batch * 3) {
-    // Only batch*3 promises were queued, so a delivery beyond that means the
+  if (delivered > queued) {
+    // Only `queued` promises were made, so a delivery beyond that means the
     // drain handed one reaction out twice.
-    ASSERT2(0, "a reaction was delivered more than once (delivered=" + delivered + ")");
+    finish("a reaction was delivered more than once (delivered=" + delivered + ")");
     return v;
   }
-  if (delivered == batch * 3) {
+  burn(burn_iters);
+  if (delivered == queued) {
     // Checked from the LAST delivery rather than after a fixed delay: a
-    // deadline turns this into a throughput measurement, and the drain's
-    // throughput is exactly what the batch size changes (at `async drain
-    // batch : 1` the backlog takes three seconds to clear). From here the
-    // count is right by construction and the yields have already happened.
+    // deadline turns this into a throughput measurement, and throughput is
+    // exactly what the budget changes (at `async drain eval budget : 1` a
+    // backlog trickles out one delivery per loop turn). From here the count
+    // is right by construction and the yields have already happened.
     check_results();
   }
   return v;
@@ -55,25 +100,63 @@ private void check_results() {
   // delivery arrived, and count_handler's over-count guard means none arrived
   // twice. (A count assertion here would be tautological -- this function is
   // called from the delivery that makes the count come out right.)
-  // A backlog three times the batch cannot have been delivered in one turn.
   ASSERT2(info["drain_yields"] >= yields_before + 2,
-    sprintf("a backlog of %d deliveries against a batch of %d produced only %d yields "
-      "-- the drain is not re-posting, so it holds the event loop for the whole "
-      "backlog",
-      batch * 3, batch, info["drain_yields"] - yields_before));
+    sprintf("a backlog of %d deliveries burning about %d us each, against a turn "
+      "budget of %d us, produced only %d yields -- the drain is not re-posting, "
+      "so it holds the event loop for the whole backlog",
+      queued, handler_us, budget_us, info["drain_yields"] - yields_before));
 
-  RELEASE_LATCH("promise drain yield");
+  finish(0);
+}
+
+// Iterations of burn() that cost about handler_us microseconds. Wall clock is
+// the unit: the drain measures its turn on the monotonic clock, so the
+// microseconds time_expression reports are the same microseconds it spends.
+private void calibrate() {
+  int iters = CALIBRATE_START;
+  int cost = 0;
+  int i;
+
+  for (i = 0; i < CALIBRATE_TRIES; i++) {
+    cost = time_expression {
+      burn(iters);
+    };
+    if (cost >= CALIBRATE_FLOOR) {
+      break;
+    }
+    iters *= 4;
+  }
+  if (cost < 1) {
+    cost = 1;
+  }
+  burn_iters = iters * handler_us / cost;
+  if (burn_iters < 100) {
+    burn_iters = 100;
+  }
 }
 
 private void start_work() {
   int i;
   promise p;
 
-  yields_before = async_info(1)["drain_yields"];
+  handler_us = budget_us / HANDLERS_PER_TURN;
+  if (handler_us < 1) {
+    handler_us = 1;
+  }
+  if (handler_us > MAX_HANDLER_US) {
+    handler_us = MAX_HANDLER_US;
+  }
+  queued = TARGET_TURNS * budget_us / handler_us + HANDLERS_PER_TURN;
+  if (queued > MAX_QUEUED) {
+    // A turn budget this large would need minutes of burning to overrun.
+    // Nothing to observe and nothing to report -- deliberately not a failure.
+    finish(0);
+    return;
+  }
+  calibrate();
 
-  // Queue three batches' worth in one go, so the drain has to take at least
-  // three turns to deliver them.
-  for (i = 0; i < batch * 3; i++) {
+  yields_before = async_info(1)["drain_yields"];
+  for (i = 0; i < queued; i++) {
     p = promise_create();
     promise_then(p, (: count_handler :));
     promise_resolve(p, i);
@@ -88,8 +171,8 @@ void do_tests() {
   ASSERT_EQ("mapping", typeof(info));
   ASSERT_EQ("array", typeof(async_info()));
 
-  batch = info["drain_eval_budget"];
-  ASSERT2(batch > 0, "async_info(1) should report the effective drain budget");
+  budget_us = info["drain_eval_budget"];
+  ASSERT2(budget_us > 0, "async_info(1) should report the effective drain budget");
 
   EXPECT_LATCH("promise drain yield");
 
