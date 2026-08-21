@@ -69,13 +69,14 @@ Promises compare by identity, work as mapping keys, deep-copy shallowly
 
 Settlement delivery is never synchronous: handlers attached with
 `promise_then()` and suspended `await` expressions always run from the
-microtask drain, in attachment order, each with a fresh evaluation-cost
-budget (the same model as `call_out(0)` callbacks). The drain is a
-zero-delay gametick event, so it runs after the current execution finishes
-but still within the *same* gametick -- not on a later one. A drain with more
-work than fits in one turn re-posts itself to the event loop and continues
-there, so later deliveries of a large batch can land after that gametick (see
-"Interaction with the rest of the driver").
+microtask drain, in attachment order. The drain is a zero-delay gametick
+event, so it runs after the current execution finishes but still within the
+*same* gametick -- not on a later one. One turn of the drain runs on a single
+evaluation-cost budget shared by every delivery in it, the same way a command
+or a `call_out` gets one budget for everything it calls; when the budget runs
+out the rest of the queue is deferred to a later turn, which re-posts itself
+to the event loop, so later deliveries of a large batch can land after that
+gametick (see "Interaction with the rest of the driver").
 
 Fulfilling a promise with another promise **adopts** it (flattening): the
 outer promise stays pending until the inner one settles, then settles the
@@ -143,28 +144,33 @@ runtime.
   value is a no-op, not a scheduling point;
 - a **promise always suspends**, even one that has already settled. The
   driver keeps serving everything else; the function resumes from the
-  microtask drain **with a fresh evaluation-cost budget**, receiving the
-  value, or with the rejection raised at the await point.
+  microtask drain, receiving the value, or with the rejection raised at the
+  await point.
 
-That last rule is what makes `await` a scheduling primitive: because every
-awaited promise costs a suspension and buys a fresh budget, a loop of
-awaits breaks long work into separately-metered pieces instead of burning
-one budget until "too long evaluation". Resuming is a microtask, not a
-timer: a sequential loop of awaits runs at full speed, all of it inside the
-drain, with no wall-clock delay per iteration. Only when a drain exceeds
-the turn's `async drain eval budget` is spent does it yield to the event loop
-and pick up again a moment later — the price of the driver staying responsive under
-unbounded async work, paid once per batch rather than once per `await`.
+Resuming is a microtask, not a timer: a sequential loop of awaits runs at
+full speed, all of it inside the drain, with no wall-clock delay per
+iteration. It is not, however, a way around the evaluation limit. Every
+delivery a drain turn makes — resumed frames and `promise_then()` handlers
+alike — spends the **same** budget, exactly as every function a command calls
+spends the command's; suspending and resuming does not buy a fresh one. When
+the turn's budget runs out, the delivery that was running takes the ordinary
+"too long evaluation" error and the rest of the queue is deferred to the next
+turn, which yields to the event loop first and starts with a fresh budget.
+Deferral is not an error and nothing is dropped — it is the price of the
+driver staying responsive under unbounded async work, paid once per turn
+rather than once per `await`.
 
 The yield is to the event loop's own post-I/O queue, not a timer, so there
-is no fixed delay between batches: the loop polls sockets, fires due timers
-and comes straight back. That keeps latency at one batch — measured worst
+is no fixed delay between turns: the loop polls sockets, fires due timers
+and comes straight back. That keeps latency at one turn — measured worst
 timer jitter is a few milliseconds even while the drain is saturated — but
 it also means sustained async work runs the driver at 100% of one core
-rather than leaving it idle between batches. A mud with a genuinely
-unbounded promise chain will use every cycle it is given; that is the
-intended behaviour, and it is a change worth knowing about on a
-co-tenanted host.
+rather than leaving it idle between turns. A mud with enough real async
+work to keep the queue non-empty will use every cycle it is given; that is
+the intended behaviour, and it is a change worth knowing about on a
+co-tenanted host. (A *runaway* chain is a different thing and does not run
+forever: it spends the turn's budget and takes the evaluation-limit error,
+like any other runaway computation.)
 
 While suspended, the object remains fully live: incoming calls run
 normally (there are no re-entrancy locks), and each `async` call has its
@@ -272,23 +278,22 @@ mudlib code using them as identifiers must be renamed.
 ## Interaction with the rest of the driver
 
 - Delivery rides the gametick event queue, and a drain that cannot finish in
-  one go **re-posts itself to the event loop** rather than running on. Each
-  turn spends at most `async drain eval budget` of eval cost — counting work created
-  *during* the turn, so a sequential chain of awaits runs at full speed
-  rather than paying a loop turn per link. Between turns the driver reads
-  pending network input, schedules commands and fires timers.
+  one go **re-posts itself to the event loop** rather than running on. A turn
+  is bounded by one `maximum evaluation cost`, shared by every delivery it
+  makes — counting work created *during* the turn, so a sequential chain of
+  awaits runs at full speed rather than paying a loop turn per link. Between
+  turns the driver reads pending network input, schedules commands and fires
+  timers.
 
   The effect is that async work proceeds continuously, using time the driver
-  would otherwise spend idle between gameticks, without holding the event
-  loop for more than one batch. A large backlog is delivered across as many
-  turns as it needs instead of in one stall, and a self-feeding
-  `promise_then()` chain yields every batch rather than wedging the driver.
+  would otherwise spend idle between gameticks, without ever holding the
+  event loop longer than a single command may hold it. A large backlog is
+  delivered across as many turns as it needs instead of in one stall, and a
+  self-feeding `promise_then()` chain runs into the evaluation limit like any
+  other runaway computation rather than wedging the driver.
 
-  Because the batch is the only bound, its size is a responsiveness setting.
-  The default keeps a turn to roughly a millisecond of trivial deliveries;
-  raising it far above that lets a self-feeding chain hold the driver for
-  correspondingly longer, and a large enough value will stall network I/O
-  outright.
+  `maximum evaluation cost` is therefore a responsiveness setting for async
+  work as well: it is the longest a drain turn can hold the loop.
 
   The re-post is a true yield to I/O, not a timer: it rides libevent's
   `active_later` queue, which the loop promotes at the top of its next
@@ -302,10 +307,10 @@ mudlib code using them as identifiers must be renamed.
   predecessor: 9.0M deliveries in 5s versus 635k, i.e. 14×, with login
   latency under sustained promise load still around a millisecond.
 
-  `async_info(1)` reports the scheduler: `pending_deliveries`, the monotonic
-  `drain_yields`, and the effective `drain_eval_budget`. A rising `drain_yields`
-  with a non-zero `pending_deliveries` is backpressure — async work arriving
-  faster than it is delivered.
+  `async_info(1)` reports the scheduler: `pending_deliveries` and the
+  monotonic `drain_yields`. A rising `drain_yields` with a non-zero
+  `pending_deliveries` is backpressure — async work arriving faster than it
+  is delivered.
 
   A settle that happens *outside* gametick dispatch — which is how every
   `package/async` I/O completion arrives (`async_read`, `async_write`,

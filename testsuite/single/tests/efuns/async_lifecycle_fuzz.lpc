@@ -289,8 +289,8 @@ private void finish() {
   promises = ({});
 
   // Wait for quiescence rather than asserting on a deadline. How long the
-  // backlog takes to clear is a throughput property of `async drain eval budget`
-  // (at 1 it is a thousand deliveries a second), not of anything this file
+  // backlog takes to clear is a throughput property of the drain turn budget
+  // and of whatever else the suite has queued, not of anything this file
   // pins -- so give it as long as it needs, bounded so that a frame which is
   // genuinely stuck still fails the run instead of hanging it.
   if (our_live_frames() > 0 && finish_tries < 30) {

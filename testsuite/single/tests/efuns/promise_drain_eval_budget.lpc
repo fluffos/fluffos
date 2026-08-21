@@ -1,0 +1,149 @@
+// One turn of the promise microtask drain runs on ONE evaluation budget,
+// shared by every delivery it makes.
+//
+// Every top-level entry into LPC -- a command, a call_out, a heart_beat --
+// gets a single `maximum evaluation cost` no matter how many functions it
+// goes on to call. A drain turn is that entry for promise deliveries, and the
+// deliveries are the calls, so they share one budget too. Without that,
+// promise handlers are exempt from the eval limit: an earlier version armed a
+// fresh budget per delivery, so a self-feeding `.then` chain could buy
+// unlimited compute one link at a time, and a turn of N deliveries could hold
+// the whole driver for N times the limit.
+//
+// Observed rather than provoked. Actually exhausting the budget would mean
+// shrinking `maximum evaluation cost`, which is process-global -- an earlier
+// version of this file did exactly that and gave an unrelated test's chain a
+// spurious "Too long evaluation" when the two happened to share a turn. What
+// this measures instead is the budget REMAINING (`set_eval_limit(-1)`) at two
+// points in one turn, on the two paths that used to re-arm:
+//
+//   * a promise_then() handler, and
+//   * an async function resumed from a parked `await`.
+//
+// Between the two samples the test burns a calibrated slice of eval time, so
+// with one shared budget the second sample must be lower by at least that
+// much. If either path re-armed, the second sample would be back up at the
+// configured maximum, which is what the assertion names.
+//
+// Both samples are taken inside the same drain turn: work created DURING a
+// turn is delivered in that turn, and `await` of an already-settled promise
+// still parks and resumes through the queue. That holds as long as the turn
+// does not run out of budget between them, which the runner's `maximum
+// evaluation cost` (set enormous, see efuns/set_eval_limit.lpc) makes
+// impossible for the few milliseconds burned here.
+
+// Calibration probe. Scaled so the burn between the two samples costs
+// BURN_US; the assertion allows for half of it being lost to scheduling.
+#define PROBE_ITERS 200000
+#define BURN_US 6000
+#define MIN_DROP_US 2000
+
+nosave int burn_iters;
+nosave int sample_before;
+nosave int finished;
+
+private void burn(int n) {
+  int i, x;
+
+  for (i = 0; i < n; i++) {
+    x += i;
+  }
+}
+
+private void finish(mixed complaint) {
+  if (finished++) {
+    return;
+  }
+  if (complaint) {
+    ASSERT2(0, complaint);
+  }
+  RELEASE_LATCH("promise drain eval budget");
+}
+
+// Resumed from the parked await below, still inside the drain turn that
+// delivered first_handler().
+private async void probe_resume() {
+  promise p;
+  int sample_after;
+  int drop;
+
+  p = promise_create();
+  promise_resolve(p, 0);
+  await p;
+
+  sample_after = set_eval_limit(-1);
+  drop = sample_before - sample_after;
+  if (drop >= MIN_DROP_US) {
+    finish(0);
+    return;
+  }
+  finish(sprintf("two deliveries in one drain turn saw the evaluation budget go "
+    "from %d us remaining to %d us (a drop of %d, expected at least "
+    "%d for the %d us burned between them) -- a delivery is arming a "
+    "budget of its own instead of sharing the turn's, which exempts "
+    "promise handlers from the eval limit",
+    sample_before, sample_after, drop, MIN_DROP_US, BURN_US));
+}
+
+private mixed first_handler(mixed v) {
+  sample_before = set_eval_limit(-1);
+  burn(burn_iters);
+  probe_resume();
+  return v;
+}
+
+// Is eval cost metered on this platform at all? get_eval() only reads a real
+// timer on Linux; elsewhere it returns the configured maximum unchanged, and
+// there is nothing here to measure.
+private int metered() {
+  int a, b;
+
+  a = set_eval_limit(-1);
+  burn(PROBE_ITERS);
+  b = set_eval_limit(-1);
+  return b < a;
+}
+
+private void calibrate() {
+  int cost;
+
+  // Wall clock is the unit: FluffOS meters eval cost with a POSIX timer, so
+  // the microseconds time_expression reports ARE the eval cost the same work
+  // spends.
+  cost = time_expression {
+    burn(PROBE_ITERS);
+  };
+  if (cost < 1) {
+    cost = 1;
+  }
+  burn_iters = PROBE_ITERS * BURN_US / cost;
+  if (burn_iters < 1000) {
+    burn_iters = 1000;
+  }
+  if (burn_iters > 500000000) {
+    burn_iters = 500000000;
+  }
+}
+
+private void run() {
+  promise p;
+
+  if (!metered()) {
+    finish(0);
+    return;
+  }
+  calibrate();
+  p = promise_create();
+  promise_then(p, (: first_handler :));
+  promise_resolve(p, 0);
+}
+
+void do_tests() {
+  EXPECT_LATCH("promise drain eval budget");
+
+  // From a call_out, so the ordering against the drain is call_out-to-
+  // call_out (testsuite/README.md): master::flag() holds the stack for the
+  // whole run, so nothing queued during do_tests() is serviced until it
+  // returns.
+  call_out((: run :), 1);
+}

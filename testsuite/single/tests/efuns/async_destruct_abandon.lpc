@@ -91,7 +91,7 @@ void do_tests() {
   // deliveries are a FIFO queue: this object's rejection was enqueued after
   // the two above it, so by the time this handler runs they have all been
   // processed. A deadline instead of the handler would make the test a
-  // throughput measurement -- with `async drain eval budget : 1` the suite's
+  // throughput measurement -- with a small `maximum evaluation cost` the suite's
   // backlog alone pushes this delivery past any second-scale call_out, and
   // the test failed for a reason that had nothing to do with what it pins.
   // If the delivery never arrives, the latch is never released and the run
