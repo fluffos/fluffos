@@ -98,11 +98,10 @@ private async int bench_async_park(promise p) {
 // batch records a start, every delivery records an end, and the span divided
 // by the batch size is the per-delivery cost inside one drain. A batch stays
 // under the suspension ceiling (10000), so the span excludes tick latency
-// entirely. It is also small enough to fit inside one drain turn's shared
-// evaluation budget: past that the drain deliberately yields to the event
-// loop and the span would measure the SCHEDULER (which
-// tests/efuns/promise_drain_eval_budget.lpc covers) rather than the
-// per-delivery cost this benchmark is for.
+// entirely. It is also sized to fit inside one "async drain eval budget":
+// past that the drain deliberately yields to the event loop and the span
+// would measure the SCHEDULER (which tests/efuns/promise_drain_yield.lpc
+// covers) rather than the per-delivery cost this benchmark is for.
 //
 // Measured (RelWithDebInfo, x86-64, four runs):
 //

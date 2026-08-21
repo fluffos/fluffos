@@ -1,0 +1,98 @@
+// A self-feeding then-chain must not hold the event loop: the drain delivers
+// at most "async drain eval budget" of eval cost per turn and then re-posts itself,
+// letting the driver read sockets and fire timers in between.
+//
+// The chain is sized from the CONFIGURED batch, not from a fixed number. An
+// earlier version used 40 links, which pinned nothing once the drain started
+// counting work created during a turn toward the same batch: 40 < 512, so the
+// whole chain ran in one turn and yielded zero times. It passed anyway, purely
+// on other test files' backlog moving the global counter inside its window --
+// a guard that would survive deleting the re-post entirely.
+//
+// Sizing the chain at several batches forces yields that this file's own work
+// must account for: a chain of N links against a batch of B cannot complete in
+// fewer than N/B turns, so the counter must rise by at least that much no
+// matter what else the suite is doing. Links are cheap so the whole thing is
+// milliseconds of work.
+//
+// The chain runs entirely after do_tests() has returned, so it is declared
+// with an EXIT LATCH and the checks are counted like any other.
+
+
+nosave int n;
+nosave int done;
+nosave int chain_len;
+nosave int yields_before;
+nosave int batch;
+
+private void check_chain();
+
+void feed() {
+  mixed p;
+
+  if (++n > chain_len) {
+    // Not reachable by construction -- the link below is only chained while
+    // the chain is short -- so this fires only if the drain delivered one
+    // reaction twice, which a re-post that fails to consume its queue entry
+    // would do.
+    ASSERT2(0, "a chain link was delivered more than once (n=" + n + ")");
+    return;
+  }
+  if (n == chain_len) {
+    done = 1;
+    // Checked from the LAST link rather than after a fixed delay, for the
+    // reason the sibling drain tests give: how long the chain takes to run
+    // is a throughput property of the batch size and of whatever else the
+    // suite has queued, not of anything this file pins. If the chain
+    // stalls, the exit latch fails the run naming it.
+    check_chain();
+    return;
+  }
+  p = promise_create();
+  promise_then(p, (: feed :));
+  promise_resolve(p, 0);
+}
+
+private void check_chain() {
+  mapping now = async_info(1);
+  int yields = now["drain_yields"] - yields_before;
+
+  // Nothing was stranded by a yield: reaching here at all means every link
+  // was delivered, and feed()'s over-count guard means none was delivered
+  // twice. (A count assertion here would be tautological -- this function is
+  // called from the link that makes the count come out right.)
+  //
+  // The lower bound is deliberately 2, not a derived number. Under the old
+  // count-based batch the yield count was exactly chain_len / batch; under an
+  // eval-cost budget it is chain_len * cost_per_delivery / budget, and
+  // cost_per_delivery varies with the machine and the build. Requiring a
+  // computed count here would encode a timing assumption and fail on a fast
+  // host -- exactly the trap testsuite/README.md warns about. What this test
+  // exists to catch is a drain that does NOT re-post and holds the event loop
+  // for the whole chain; two yields proves re-posting is repeating, and the
+  // yields_before subtraction means unrelated suite traffic can only add.
+  ASSERT2(yields >= 2,
+    sprintf("a %d-link self-feeding chain yielded only %d times against a %d us "
+      "budget: the drain is not re-posting, so it holds the event loop for the "
+      "whole chain",
+      chain_len, yields, batch));
+  RELEASE_LATCH("drain budget chain");
+}
+
+void do_tests() {
+  mapping info = async_info(1);
+
+  batch = info["drain_eval_budget"];
+
+  ASSERT2(batch > 0, "async_info(1) should report the effective drain budget");
+  /* The budget is EVAL COST (microseconds), not a delivery count, so the
+   * chain cannot be sized from it directly. A trivial delivery costs well
+   * under a microsecond, so this many links spans many budgets' worth of
+   * work whatever the configured budget is. */
+  chain_len = 40000;
+  yields_before = info["drain_yields"];
+
+  EXPECT_LATCH("drain budget chain");
+
+  call_out((: feed :), 1);
+}

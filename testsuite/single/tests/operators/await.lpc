@@ -133,9 +133,9 @@ void do_tests() {
   mixed p;
   int limit;
 
-  // The operator helpers await already-settled promises, which still park,
-  // so they finish on the microtask drain rather than synchronously
-  // (sharing that turn's eval budget). Their internal ASSERTs do the real
+  // The operator helpers await already-settled promises, which still park
+  // (one fresh eval budget per await), so they finish on the microtask
+  // drain rather than synchronously. Their internal ASSERTs do the real
   // checking; these confirm the scheduling shape and that they complete.
   EXPECT_LATCH("await operator semantics");
   p = operators();

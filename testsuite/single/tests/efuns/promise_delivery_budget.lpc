@@ -1,0 +1,178 @@
+// A promise delivery is never cut short by what the drain turn already spent.
+//
+// The drain bounds how many deliveries a turn STARTS -- that is what keeps
+// the event loop responsive under a backlog -- but it never interrupts one it
+// has started. Each delivery is armed with a whole `maximum evaluation cost`
+// of its own, exactly like a call_out() callback, so a resumed async function
+// or a settlement handler runs to its own natural end no matter how much time
+// the deliveries ahead of it in the same turn used. When the turn's budget is
+// gone the REMAINING deliveries are pushed past the next I/O poll; nothing in
+// flight is aborted and nothing is dropped.
+//
+// Sharing one budget across a turn was tried and is wrong for exactly this
+// reason: an innocent handler took "Too long evaluation" because the handlers
+// ahead of it had spent the turn's time. This file pins that it cannot
+// happen, on both paths that arm a budget:
+//
+//   * a promise_then() handler, and
+//   * an async function resumed from a parked `await`.
+//
+// It measures the budget REMAINING (`set_eval_limit(-1)`) at two points in
+// one drain turn, burning a calibrated slice of eval time in between. If the
+// second delivery inherited what was left, its sample would be LOWER by at
+// least the burn. Because each delivery is armed afresh, it is HIGHER -- back
+// up at the configured maximum.
+//
+// The burn is sized from the CONFIGURED turn budget, not from a fixed number
+// of microseconds: the two samples only compare if they happen in the SAME
+// turn, and a burn larger than the budget guarantees they do not (which is
+// how an earlier version of this file passed against the very design it was
+// written to reject). Even sized correctly the turn can end between them --
+// the suite's own backlog shares these turns -- so the probe checks
+// async_info's yield counter and simply runs again when that happens, rather
+// than asserting on a coincidence.
+
+#define PROBE_ITERS 200000
+// Burn this fraction of one turn budget between the samples: small enough
+// that both deliveries fit in a turn, large enough to tell a re-armed budget
+// from an inherited one.
+#define BURN_FRACTION 3
+#define MIN_BURN_US 200
+#define MAX_ATTEMPTS 20
+
+nosave int burn_iters;
+nosave int burn_us;
+nosave int sample_before;
+nosave int yields_at_first;
+nosave int attempts;
+nosave int conclusive;
+nosave int finished;
+
+private void start_probe();
+
+private void burn(int n) {
+  int i, x;
+
+  for (i = 0; i < n; i++) {
+    x += i;
+  }
+}
+
+private void finish(mixed complaint) {
+  if (finished++) {
+    return;
+  }
+  if (complaint) {
+    ASSERT2(0, complaint);
+  }
+  RELEASE_LATCH("promise delivery budget");
+}
+
+// Resumed from the parked await below, still inside the drain turn that
+// delivered first_handler() -- unless the turn ended in between, which the
+// yield counter reports and which is not a result either way.
+private async void probe_resume() {
+  promise p;
+  int sample_after;
+
+  p = promise_create();
+  promise_resolve(p, 0);
+  await p;
+
+  if (async_info(1)["drain_yields"] != yields_at_first) {
+    if (++attempts < MAX_ATTEMPTS) {
+      start_probe();
+      return;
+    }
+    finish(sprintf("after %d attempts the two probe deliveries never landed in "
+      "the same drain turn, so this file never tested anything",
+      attempts));
+    return;
+  }
+
+  conclusive = 1;
+  sample_after = set_eval_limit(-1);
+  if (sample_after - sample_before >= burn_us / 2) {
+    finish(0);
+    return;
+  }
+  finish(sprintf("a delivery made after one that burned about %d us of its budget "
+    "saw only %d us remaining, against the earlier delivery's %d -- it "
+    "inherited the turn's leftovers instead of being armed with a "
+    "budget of its own, so a handler can be aborted for time spent by "
+    "the handlers ahead of it",
+    burn_us, sample_after, sample_before));
+}
+
+private mixed first_handler(mixed v) {
+  yields_at_first = async_info(1)["drain_yields"];
+  burn(burn_iters);
+  // Sampled AFTER the burn, so it is the low-water mark this delivery leaves
+  // behind. The next delivery must not start from here.
+  sample_before = set_eval_limit(-1);
+  probe_resume();
+  return v;
+}
+
+private void start_probe() {
+  promise p = promise_create();
+
+  promise_then(p, (: first_handler :));
+  promise_resolve(p, 0);
+}
+
+// Is eval cost metered on this platform at all? get_eval() only reads a real
+// timer on Linux; elsewhere it returns the configured maximum unchanged, and
+// there is nothing here to measure.
+private int metered() {
+  int a, b;
+
+  a = set_eval_limit(-1);
+  burn(PROBE_ITERS);
+  b = set_eval_limit(-1);
+  return b < a;
+}
+
+private void calibrate() {
+  int cost;
+
+  burn_us = async_info(1)["drain_eval_budget"] / BURN_FRACTION;
+  if (burn_us < MIN_BURN_US) {
+    burn_us = MIN_BURN_US;
+  }
+  // Wall clock is the unit: FluffOS meters eval cost with a POSIX
+  // CLOCK_MONOTONIC timer, so the microseconds time_expression reports ARE
+  // the eval cost the same work spends.
+  cost = time_expression {
+    burn(PROBE_ITERS);
+  };
+  if (cost < 1) {
+    cost = 1;
+  }
+  burn_iters = PROBE_ITERS * burn_us / cost;
+  if (burn_iters < 100) {
+    burn_iters = 100;
+  }
+  if (burn_iters > 500000000) {
+    burn_iters = 500000000;
+  }
+}
+
+private void run() {
+  if (!metered()) {
+    finish(0);
+    return;
+  }
+  calibrate();
+  start_probe();
+}
+
+void do_tests() {
+  EXPECT_LATCH("promise delivery budget");
+
+  // From a call_out, so the ordering against the drain is call_out-to-
+  // call_out (testsuite/README.md): master::flag() holds the stack for the
+  // whole run, so nothing queued during do_tests() is serviced until it
+  // returns.
+  call_out((: run :), 1);
+}

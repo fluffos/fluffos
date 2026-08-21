@@ -168,6 +168,14 @@ static size_t suspended_coroutine_count() {
 std::vector<promise_t*> g_active_body_promises;
 #endif
 
+/* Deliveries per turn of the event loop when nothing is configured. At the
+ * ~1-2 us a trivial delivery measures (testsuite/command/speed.lpc) this is
+ * on the order of a millisecond of work before the loop gets to poll I/O
+ * again -- small enough to keep the driver responsive under a large backlog,
+ * large enough that the per-turn overhead (one walltime event and one loop
+ * iteration) is amortised away. */
+constexpr LPC_INT kDefaultDrainBudgetUs = 1000;
+
 /* The rejection reason for a frame abandoned because its object went away.
  * Shared by BOTH routes -- destruct_object()'s eager sweep and
  * resume_coroutine()'s check when a delivery arrives for a destructed owner
@@ -344,6 +352,26 @@ void schedule_drain_continue() {
   }
 }
 
+/* How many deliveries one turn of the event loop may make.
+ *
+ * The bound is what stops the drain hogging the loop. It is deliberately a
+ * COUNT and not a wall-clock deadline: a delivery is arbitrary LPC and
+ * cannot be preempted part-way, so a deadline could not bound a single slow
+ * handler either -- it would only add a clock read per delivery for a
+ * guarantee it cannot make. What a count does buy is that the ordinary case
+ * (many cheap deliveries) is chopped into loop turns of a predictable size.
+ *
+ * Work created DURING a turn counts toward the same batch, so a chain of
+ * causally dependent deliveries (a sequential `await` loop) runs at full
+ * speed rather than paying a loop turn per link. The batch is therefore the
+ * only bound, which makes its size a responsiveness setting: a turn holds
+ * the driver for one batch of deliveries, so a very large value lets a
+ * self-feeding chain monopolise it. */
+LPC_INT drain_eval_budget_us() {
+  auto const configured = CONFIG_INT(__RC_ASYNC_DRAIN_EVAL_BUDGET__);
+  return configured > 0 ? configured : kDefaultDrainBudgetUs;
+}
+
 void free_queued_reaction(QueuedReaction* qr) {
   if (qr->on_fulfilled) {
     free_funp(qr->on_fulfilled);
@@ -415,14 +443,13 @@ bool invoke_handler(funptr_t* fp, svalue_t* arg, svalue_t* out) {
     catch_value = const1;
     restore_context(&econ);
     *out = caught;
-    /* max_eval_error / outoftime are deliberately left as error_handler()
-     * left them (it forces outoftime back on for an eval-cost error, exactly
-     * so the condition cannot be swallowed by a catch). The whole drain turn
-     * runs on ONE budget, so that flag IS the signal the drain loop reads to
-     * stop delivering; re-arming a fresh budget here would hand the next
-     * delivery another full one, which is the unbounded-turn behaviour this
-     * design exists to remove. drain_promise_microtasks() clears both at the
-     * end of the turn. */
+    /* max_eval_error / outoftime are left exactly as error_handler() left
+     * them (it forces outoftime back on for an eval-cost error, precisely so
+     * the condition cannot be swallowed by a catch). The drain loop reads
+     * them to end the turn: a delivery that just consumed a whole
+     * `maximum evaluation cost` is the strongest possible signal that the
+     * loop wants the driver back. Re-arming a budget here would hide that,
+     * and clearing the flag would too. The turn clears both on its way out. */
     too_deep_error = 0;
     pop_context(&econ);
     return false;
@@ -437,8 +464,21 @@ void deliver_reaction(QueuedReaction* qr) {
   promise_t* src = qr->source;
 
   if (qr->coro) {
-    /* No set_eval() here: the eval budget belongs to the drain TURN, armed
-     * once by drain_promise_microtasks() -- see the long comment there. */
+    /* Every delivery gets a WHOLE eval budget of its own, so that a resumed
+     * async function runs to its own natural end -- it is never cut short
+     * because earlier deliveries in this turn used the loop's time. That is
+     * the same deal a call_out() callback gets, and it is what makes the
+     * turn budget purely a SCHEDULING bound: the turn stops handing out
+     * deliveries, it never interrupts one it already started.
+     *
+     * Armed HERE, not inside resume_coroutine(), because its abandon paths
+     * (destructed owner, recompiled/replaced program, rejection with no
+     * acatch, resume stack overflow) return before reaching it while still
+     * running the parked frame's defer() handlers as arbitrary LPC. Those
+     * would otherwise inherit whatever the previous delivery in this drain
+     * left over -- and consecutive abandons would share one cumulatively-
+     * draining budget, truncating a predictable fraction of cleanups. */
+    set_eval(max_eval_cost);
     /* hand the coroutine off before the call: resume_coroutine owns it from
      * here (including on its own error paths), so the drain's recovery
      * catch must not free it again */
@@ -461,6 +501,14 @@ void deliver_reaction(QueuedReaction* qr) {
   save_command_giver(giver);
 
   if (handler) {
+    /* A whole budget of its own, as above: a handler runs to completion on
+     * its own terms, never truncated by what this turn already spent.
+     *
+     * Armed only for a delivery that runs LPC. A pass-through (no handler)
+     * just propagates state to the chained promise in C++ and never enters
+     * the interpreter, so arming there spent a timer_settime(2) syscall per
+     * link of an adoption chain for nothing. */
+    set_eval(max_eval_cost);
     svalue_t out = const0;
     if (invoke_handler(handler, &src->result, &out)) {
       if (qr->next) {
@@ -501,77 +549,82 @@ void drain_promise_microtasks() {
    * where pending network I/O is actually serviced, picking the queue back
    * up on the next loop iteration.
    *
-   * The bound is ONE evaluation budget for the whole turn, armed here and
-   * never re-armed per delivery. That is the same contract every other
-   * top-level entry into LPC has: a command, a call_out, a heart_beat each
-   * get one `maximum evaluation cost` no matter how many functions they go
-   * on to call. A drain turn is that entry for promise deliveries, and the
-   * deliveries are the calls.
+   * The bound governs HOW MANY deliveries a turn starts. It never truncates
+   * one: each delivery is armed with a whole `maximum evaluation cost` of
+   * its own (deliver_reaction), so a resumed async function or a settlement
+   * handler always runs to its own natural end. Sharing one budget across a
+   * turn was tried and is wrong for exactly this reason -- it made an
+   * innocent handler die of "Too long evaluation" because the deliveries
+   * ahead of it in the same turn had used the time. A delivery is a
+   * scheduled unit of work like a call_out callback, and gets metered like
+   * one; the turn budget is a SCHEDULING decision layered on top, and its
+   * only effect is to stop handing out more work.
    *
-   * It replaced a per-delivery budget, which could not bound a turn at all:
-   * each delivery armed a fresh `maximum evaluation cost`, so a batch of N
-   * had a worst case of N times that -- measured at 17-21 SECOND freezes
-   * with a batch of 512, during which nothing else in the driver runs. It
-   * also let promise handlers bypass the eval limit outright: chain enough
-   * `.then`s and any amount of compute becomes affordable.
+   * Two independent things end a turn.
    *
-   * Checking it is FREE, which is the other reason it is the eval budget and
-   * not a clock. FluffOS meters eval cost with a POSIX timer whose signal
-   * handler sets the volatile `outoftime`; eval_instruction() tests exactly
-   * that flag once per opcode (interpret.cc), and so does the loop below,
-   * once per delivery. The version this replaced read steady_clock::now()
-   * per delivery to measure elapsed microseconds by hand -- reimplementing,
-   * at a cost, a measurement the driver was already making for free.
+   * 1. The turn has held the loop for drain_eval_budget_us(). This counts
+   *    work created DURING the turn as well as work already queued, which is
+   *    not an oversight but the point: `await` of an already-settled promise
+   *    still parks, so an ordinary sequential loop
    *
-   * Running out is not an error for the DRAIN and drops nothing: the loop
-   * exits, the tail below re-arms it, and the remaining deliveries are made
-   * on the next turn with a fresh budget, after the loop has polled I/O.
-   * The one delivery that is actually running when the budget expires gets
-   * the ordinary "Too long evaluation" error, exactly as the function that
-   * happens to be running when a command's budget expires does -- promise
-   * handlers are not exempt from the eval limit, they share one.
+   *        for (i = 0; i < n; i++) sum += await compute(i);
    *
-   * Work created DURING a turn is delivered in the same turn if the budget
-   * allows. That is not an oversight: `await` of an already-settled promise
-   * still parks, so an ordinary sequential loop
+   *    is a causal chain in which each delivery enqueues exactly the next
+   *    one. An earlier version capped the turn at the queue length AT ENTRY
+   *    so a self-feeding chain would yield on every link; that made the entry
+   *    length 1 for every chain of this shape, costing a whole event-loop
+   *    turn plus a re-post timer per link -- measured at ~4ms per await, i.e.
+   *    two seconds for a 500-iteration loop on an idle driver, for the idiom
+   *    the documentation actively recommends.
    *
-   *     for (i = 0; i < n; i++) sum += await compute(i);
+   *    Measured with the monotonic clock rather than get_eval(): FluffOS
+   *    meters eval cost with a POSIX CLOCK_MONOTONIC timer, so elapsed
+   *    microseconds ARE the eval cost spent -- and steady_clock is a ~20ns
+   *    vDSO read where timer_gettime() is a ~300ns syscall, on a path that
+   *    already pays one timer_settime() per delivery.
    *
-   * is a causal chain in which each delivery enqueues exactly the next one.
-   * An earlier version capped the turn at the queue length AT ENTRY so a
-   * self-feeding chain would yield on every link; that made the entry length
-   * 1 for every chain of this shape, costing a whole event-loop turn plus a
-   * re-post timer per link -- measured at ~4ms per await, i.e. two seconds
-   * for a 500-iteration loop on an idle driver, for the idiom the
-   * documentation actively recommends. Sharing one budget bounds a runaway
-   * chain just as tightly while letting a legitimate one run at full speed.
+   * 2. The delivery that just ran consumed its ENTIRE budget -- `outoftime`
+   *    (the volatile flag the SIGVTALRM handler sets, which
+   *    eval_instruction() itself tests once per opcode) or `max_eval_error`.
+   *    This test is free, and it is the one that matters under load: a
+   *    handler that just burned a whole `maximum evaluation cost` has held
+   *    the loop for far longer than any turn budget, and starting another
+   *    full-budget delivery behind it is the last thing the driver wants.
+   *    error_handler() forces `outoftime` back on for an eval-cost error
+   *    precisely so it cannot be swallowed, so this single test covers both
+   *    "the timer fired" and "that delivery died of the limit".
    *
-   * On a platform with no eval limit (eval_limit.cc arms a real timer only on
-   * Linux; elsewhere it warns at boot and `outoftime` is never set) a turn is
-   * unbounded -- exactly as every command and call_out on that platform
-   * already is. This deliberately inherits the driver's existing contract
-   * rather than inventing a second, stricter one for promises alone. */
-  set_eval(max_eval_cost);
-  /* The turn's budget ends with the turn. The drain is a top-level entry
-   * point, so an exhausted budget must not leak into whatever the backend
-   * runs next (which arms its own) -- and must not survive as a stale
-   * `outoftime` that aborts it instantly. */
+   * Both are tested BEFORE a delivery, never after, so a turn always makes at
+   * least one and a single expensive handler cannot starve the queue.
+   * Neither is an error for the drain and neither drops anything: the tail
+   * below re-arms the drain, so the remaining work is simply deferred past
+   * the next I/O poll. */
+  auto const budget_us = drain_eval_budget_us();
+  auto const turn_started = std::chrono::steady_clock::now();
+  bool first = true;
+  /* The flags belong to the deliveries, not to the backend: a turn that ends
+   * on an exhausted delivery must not leave `outoftime` set for whatever the
+   * loop runs next (which arms its own budget, but reads the flag first). */
   DEFER {
     outoftime = 0;
     max_eval_error = 0;
   };
 
   while (!g_promise_microtasks.empty()) {
-    /* One volatile load. Set either by the SIGVTALRM handler (the budget ran
-     * out between deliveries) or by error_handler(), which forces it back on
-     * for an eval-cost error precisely so the condition cannot be swallowed
-     * -- so this one test covers both "the timer fired" and "a delivery died
-     * of the eval limit". Tested BEFORE a delivery, never after, so a turn
-     * always makes at least one: the budget is freshly armed above, so the
-     * first test can only fail if a signal arrived in between. */
-    if (outoftime) {
-      break;
+    if (!first) {
+      if (outoftime || max_eval_error) {
+        break;
+      }
+      if (budget_us > 0) {
+        auto const spent = std::chrono::duration_cast<std::chrono::microseconds>(
+                               std::chrono::steady_clock::now() - turn_started)
+                               .count();
+        if (spent >= budget_us) {
+          break;
+        }
+      }
     }
+    first = false;
     QueuedReaction qr = g_promise_microtasks.front();
     g_promise_microtasks.pop_front();
     /* This is a bare tick callback: an error escaping to the event loop is
@@ -1027,9 +1080,9 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   };
   /* The eval-cost flag is deliberately NOT consumed here, unlike the
    * synchronous entry in run_async_function(), which rethrows it into its
-   * caller's evaluation. A resumption has no caller: the drain turn is the
-   * top-level entry, so the flag stays set and the drain loop reads it as
-   * "this turn's budget is gone" and defers the rest of the queue. */
+   * caller's evaluation. A resumption has no caller -- but the drain turn
+   * that delivered it does read the flag, as a resumed frame that burned its
+   * whole budget ends the turn. drain_promise_microtasks() clears it. */
   (void)run_coroutine_body(entry, coro->result_promise, async_frame);
   free_coroutine(coro, nullptr, false);
 }
@@ -1499,6 +1552,9 @@ mapping_t* build_async_scheduler_info() {
   /* monotonic: settles that arrived from outside gametick dispatch and are
    * therefore served by an event-loop arming rather than by the tick queue */
   add_mapping_pair(m, "drain_arms_loop", g_drain_arms_loop_total);
+  /* the EFFECTIVE budget, not the raw config: 0 there means "use the
+   * default", and a caller watching the scheduler wants the real number */
+  add_mapping_pair(m, "drain_eval_budget", drain_eval_budget_us());
 
   done = true;
   return m;

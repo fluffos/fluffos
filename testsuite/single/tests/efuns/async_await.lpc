@@ -36,7 +36,7 @@ async int only_plain_awaits() {
 }
 
 // awaiting a promise ALWAYS parks, even one that has already settled: the
-// resume comes off the microtask drain, not from the await expression
+// resume comes off the microtask drain with a fresh eval budget
 async int awaits_settled() {
   mixed p = promise_create();
 
@@ -199,8 +199,8 @@ void do_tests() {
   ASSERT_EQ(1, promise_status(p));
   ASSERT_EQ(6, promise_result(p));
 
-  // awaiting an already-settled promise still parks; the value arrives on
-  // the microtask drain
+  // awaiting an already-settled promise still parks (fresh eval budget per
+  // step); the value arrives on the microtask drain
   q = awaits_settled();
   ASSERT_EQ(0, promise_status(q));
   EXPECT_LATCH("await an already-settled promise");

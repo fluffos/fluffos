@@ -38,6 +38,8 @@ title: promises / async_info
         "drain_yields"        int  monotonic count of drain turns that ended
                                    with work still queued and re-posted
                                    themselves to the event loop
+        "drain_eval_budget"   int  the effective per-turn eval-cost budget (us)
+                                   ("async drain eval budget")
         "drain_arms_loop"     int  monotonic count of EXTERNAL settles — ones
                                    arriving neither from gametick dispatch nor
                                    from inside a running drain, i.e. I/O
