@@ -10,7 +10,7 @@
 //
 // Two bounds, and the second is the one that matters:
 //
-//  - at most "async drain batch" deliveries per turn, so a large backlog is
+//  - at most "async drain eval budget" of eval cost per turn, so a large backlog is
 //    cut into predictable pieces instead of one long stall;
 //  - work created DURING a turn counts toward that same batch, so a causal
 //    chain (a sequential await loop) runs at full speed instead of paying a
@@ -88,8 +88,8 @@ void do_tests() {
   ASSERT_EQ("mapping", typeof(info));
   ASSERT_EQ("array", typeof(async_info()));
 
-  batch = info["drain_batch"];
-  ASSERT2(batch > 0, "async_info(1) should report the effective batch size");
+  batch = info["drain_eval_budget"];
+  ASSERT2(batch > 0, "async_info(1) should report the effective drain budget");
 
   EXPECT_LATCH("promise drain yield");
 

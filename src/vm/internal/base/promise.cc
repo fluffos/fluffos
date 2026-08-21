@@ -174,7 +174,7 @@ std::vector<promise_t*> g_active_body_promises;
  * again -- small enough to keep the driver responsive under a large backlog,
  * large enough that the per-turn overhead (one walltime event and one loop
  * iteration) is amortised away. */
-constexpr LPC_INT kDefaultDrainBatch = 512;
+constexpr LPC_INT kDefaultDrainBudgetUs = 1000;
 
 /* The rejection reason for a frame abandoned because its object went away.
  * Shared by BOTH routes -- destruct_object()'s eager sweep and
@@ -367,9 +367,9 @@ void schedule_drain_continue() {
  * only bound, which makes its size a responsiveness setting: a turn holds
  * the driver for one batch of deliveries, so a very large value lets a
  * self-feeding chain monopolise it. */
-LPC_INT drain_batch_limit() {
-  auto const configured = CONFIG_INT(__RC_ASYNC_DRAIN_BATCH__);
-  return configured > 0 ? configured : kDefaultDrainBatch;
+LPC_INT drain_eval_budget_us() {
+  auto const configured = CONFIG_INT(__RC_ASYNC_DRAIN_EVAL_BUDGET__);
+  return configured > 0 ? configured : kDefaultDrainBudgetUs;
 }
 
 void free_queued_reaction(QueuedReaction* qr) {
@@ -537,7 +537,7 @@ void drain_promise_microtasks() {
    * pending network I/O is actually serviced, picking the queue back up on
    * the next loop iteration.
    *
-   * The bound is drain_batch_limit() deliveries, counting work created
+   * The bound is drain_eval_budget_us() of eval cost, counting work created
    * DURING the turn as well as work already queued. That second part is not
    * an oversight, it is the point: `await` of an already-settled promise
    * still parks, so an ordinary sequential loop
@@ -553,13 +553,43 @@ void drain_promise_microtasks() {
    * await, i.e. a 500-iteration loop took two seconds on an idle driver,
    * for the idiom the documentation actively recommends.
    *
-   * Yielding every drain_batch_limit() links bounds a runaway chain just as
+   * Yielding once the turn's eval budget is spent bounds a runaway chain just as
    * effectively (the loop is re-entered after at most one batch of work,
    * around a millisecond of trivial deliveries) while letting a legitimate
    * chain run at full speed. */
-  auto batch = drain_batch_limit();
+  /* The turn's budget is EVAL COST, not a count of deliveries. A count
+   * cannot bound anything here: every delivery is armed with a fresh
+   * max_eval_cost, so a batch of N had a worst case of N * max_eval_cost --
+   * measured at 17-21 second freezes with the old default of 512, during
+   * which nothing else in the driver runs. A budget bounds the turn at
+   * itself plus at most one delivery's eval cost, which is exactly the
+   * worst case any ordinary command or call_out already has.
+   *
+   * Measured with the monotonic clock rather than get_eval(): FluffOS meters
+   * eval cost with a POSIX wall-clock timer, so elapsed microseconds ARE the
+   * eval cost spent -- and reading steady_clock costs ~20ns through the vDSO
+   * where timer_gettime() is a ~300ns syscall, on a path where we just
+   * removed a syscall of exactly that class.
+   *
+   * Checked BEFORE each delivery, never after, so a turn always makes at
+   * least one delivery and a single expensive handler cannot starve the
+   * queue. Running out is not an error and drops nothing: the loop below
+   * re-arms the drain, so the remaining work is simply deferred past the
+   * next I/O poll. */
+  auto const budget_us = drain_eval_budget_us();
+  auto const turn_started = std::chrono::steady_clock::now();
+  bool first = true;
 
-  while (!g_promise_microtasks.empty() && batch-- > 0) {
+  while (!g_promise_microtasks.empty()) {
+    if (!first && budget_us > 0) {
+      auto const spent = std::chrono::duration_cast<std::chrono::microseconds>(
+                             std::chrono::steady_clock::now() - turn_started)
+                             .count();
+      if (spent >= budget_us) {
+        break;
+      }
+    }
+    first = false;
     QueuedReaction qr = g_promise_microtasks.front();
     g_promise_microtasks.pop_front();
     /* This is a bare tick callback: an error escaping to the event loop is
@@ -1485,9 +1515,9 @@ mapping_t* build_async_scheduler_info() {
   /* monotonic: settles that arrived from outside gametick dispatch and are
    * therefore served by an event-loop arming rather than by the tick queue */
   add_mapping_pair(m, "drain_arms_loop", g_drain_arms_loop_total);
-  /* the EFFECTIVE batch, not the raw config: 0 there means "use the
+  /* the EFFECTIVE budget, not the raw config: 0 there means "use the
    * default", and a caller watching the scheduler wants the real number */
-  add_mapping_pair(m, "drain_batch", drain_batch_limit());
+  add_mapping_pair(m, "drain_eval_budget", drain_eval_budget_us());
 
   done = true;
   return m;

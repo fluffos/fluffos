@@ -1,5 +1,5 @@
 // A self-feeding then-chain must not hold the event loop: the drain delivers
-// at most "async drain batch" reactions per turn and then re-posts itself,
+// at most "async drain eval budget" of eval cost per turn and then re-posts itself,
 // letting the driver read sockets and fire timers in between.
 //
 // The chain is sized from the CONFIGURED batch, not from a fixed number. An
@@ -76,10 +76,14 @@ private void check_chain() {
 void do_tests() {
   mapping info = async_info(1);
 
-  batch = info["drain_batch"];
+  batch = info["drain_eval_budget"];
 
-  ASSERT2(batch > 0, "async_info(1) should report the effective batch size");
-  chain_len = batch * BATCHES;
+  ASSERT2(batch > 0, "async_info(1) should report the effective drain budget");
+  /* The budget is EVAL COST (microseconds), not a delivery count, so the
+   * chain cannot be sized from it directly. A trivial delivery costs well
+   * under a microsecond, so this many links spans many budgets' worth of
+   * work whatever the configured budget is. */
+  chain_len = 40000;
   yields_before = info["drain_yields"];
 
   EXPECT_LATCH("drain budget chain");

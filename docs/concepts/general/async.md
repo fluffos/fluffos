@@ -152,8 +152,8 @@ awaits breaks long work into separately-metered pieces instead of burning
 one budget until "too long evaluation". Resuming is a microtask, not a
 timer: a sequential loop of awaits runs at full speed, all of it inside the
 drain, with no wall-clock delay per iteration. Only when a drain exceeds
-`async drain batch` deliveries does it yield to the event loop and pick up
-again a moment later — the price of the driver staying responsive under
+the turn's `async drain eval budget` is spent does it yield to the event loop
+and pick up again a moment later — the price of the driver staying responsive under
 unbounded async work, paid once per batch rather than once per `await`.
 
 The yield is to the event loop's own post-I/O queue, not a timer, so there
@@ -273,7 +273,7 @@ mudlib code using them as identifiers must be renamed.
 
 - Delivery rides the gametick event queue, and a drain that cannot finish in
   one go **re-posts itself to the event loop** rather than running on. Each
-  turn makes at most `async drain batch` deliveries — counting work created
+  turn spends at most `async drain eval budget` of eval cost — counting work created
   *during* the turn, so a sequential chain of awaits runs at full speed
   rather than paying a loop turn per link. Between turns the driver reads
   pending network input, schedules commands and fires timers.
