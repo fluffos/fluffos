@@ -905,7 +905,25 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
     coro->defers = nullptr;
   }
   if (all) {
-    if (run_lpc) {
+    /* "Can LPC still run in this object?", not merely "did the caller ask?".
+     * resume_coroutine() abandons on a destructed, recompiled or replaced
+     * owner, and in every one of those cases call_function_pointer() REFUSES
+     * the defer funptrs -- "Owner (...) of function pointer is destructed",
+     * "Stale function pointer: owner ... was recompiled". Asking anyway
+     * turns each pending defer into a driver error() through
+     * mudlib_error_handler: one per defer per abandoned frame, naming a
+     * cause no mudlib author can act on, and a mass destruct produces a
+     * burst of them. The eager sibling route,
+     * abandon_coroutines_of_object(), already discards them silently and
+     * says why. Same situation, so same answer (AGENTS.md section 15).
+     *
+     * Decided here rather than at the four call sites so it also covers a
+     * defer handler that destructs the owner partway through the list. */
+    bool const can_run = run_lpc && coro->ob != nullptr &&
+                         !(coro->ob->flags & O_DESTRUCTED) &&
+                         coro->prog_generation == coro->ob->prog_generation &&
+                         coro->ob->prog == coro->object_prog;
+    if (can_run) {
       /* a scratch frame whose pop runs the defers with full semantics.
        * Those handlers are arbitrary LPC: keep this coroutine's still-held
        * refs visible to the Debug ref checker for the duration (its defer
@@ -913,10 +931,23 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
        * exactly what is left). */
       lpc_coroutine_t* const prev_freeing = g_freeing_coro;
       g_freeing_coro = coro;
+      /* RAII, and the list handed over before anything that can throw:
+       * push_control_stack() errors on a full control stack, which would
+       * otherwise leak the whole gathered list AND leave g_freeing_coro
+       * dangling at a coroutine nothing frees -- biasing
+       * coroutine_is_running() for the rest of the run. That is the
+       * §13.13 shape: a fixed-size stack whose over-cap push throws after
+       * the caller has already handed ownership over. */
+      struct defer_list* pending = all;
+      all = nullptr;
+      DEFER {
+        g_freeing_coro = prev_freeing;
+        discard_defer_list(pending);
+      };
       push_control_stack(FRAME_CATCH);
-      csp->defers = all;
+      csp->defers = pending;
+      pending = nullptr;
       pop_control_stack();
-      g_freeing_coro = prev_freeing;
     } else {
       discard_defer_list(all);
     }
@@ -1077,6 +1108,31 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   lpc_coroutine_t* const prev_resuming = g_resuming_coro;
   g_resuming_coro = coro;
 
+  /* RAII, not tail statements, for the same reason run_coroutine_body()
+   * gives: run_coroutine_body() catches `const char*`, which covers every
+   * error()/throw() an LPC body can raise, but NOT a C++ exception from the
+   * allocations around it (std::bad_alloc out of `new svalue_t[n]`, a
+   * markers/vector push_back). If one ever escaped, a tail assignment would
+   * leave g_resuming_coro dangling at a coroutine nothing frees -- which also
+   * biases suspended_coroutine_count() forever, since coroutine_is_running()
+   * keeps matching the stale pointer -- and the command-giver stack one entry
+   * deep. Unreachable outside OOM today; this just stops it being a question.
+   *
+   * Armed BEFORE the entry-point computation below, not after it: STACK_INC
+   * expands to CHECK_STACK_OVERFLOW and can error(), and
+   * unwind_to_acatch_marker() runs pop_control_stack() -- arbitrary LPC
+   * defer handlers -- and ends in a STACK_INC of its own. An escape from
+   * either lands in the drain's catch with qr->coro already nulled, so
+   * nothing would free the coroutine: it would leak with its frame and refs,
+   * stay in g_live_coroutines, and leave g_resuming_coro pointing at it. The
+   * follow-on is worse than the leak -- the drain then releases qr->source,
+   * and build_async_info() reads coro->awaiting (deliberately not ref-held)
+   * for async_info(), i.e. a use-after-free from ordinary LPC. */
+  DEFER {
+    g_resuming_coro = prev_resuming;
+    restore_command_giver();
+  };
+
   char* entry;
   if (!rejected) {
     /* the await expression's value */
@@ -1088,20 +1144,6 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     assign_svalue(&catch_value, &source->result);
     entry = unwind_to_acatch_marker(csp);
   }
-
-  /* RAII, not tail statements, for the same reason run_coroutine_body()
-   * gives: run_coroutine_body() catches `const char*`, which covers every
-   * error()/throw() an LPC body can raise, but NOT a C++ exception from the
-   * allocations around it (std::bad_alloc out of `new svalue_t[n]`, a
-   * markers/vector push_back). If one ever escaped, a tail assignment would
-   * leave g_resuming_coro dangling at a coroutine nothing frees -- which also
-   * biases suspended_coroutine_count() forever, since coroutine_is_running()
-   * keeps matching the stale pointer -- and the command-giver stack one entry
-   * deep. Unreachable outside OOM today; this just stops it being a question. */
-  DEFER {
-    g_resuming_coro = prev_resuming;
-    restore_command_giver();
-  };
   /* The eval-cost flag is deliberately NOT consumed here, unlike the
    * synchronous entry in run_async_function(), which rethrows it into its
    * caller's evaluation. A resumption has no caller -- but the drain turn
@@ -1280,6 +1322,34 @@ void dealloc_promise(promise_t* p) {
         free_funp(r.on_rejected);
       }
       if (r.next) {
+        /* An ADOPTION target must be settled, not merely released.
+         * promise_resolve_with(next, p) committed next's fate to p and
+         * latched next->resolving -- deliberately without taking a ref on p,
+         * since that would build the cycle promise_cleanup() exists to
+         * break. So when p dies unsettled, next is left PENDING with its
+         * fate already spoken for, and both promise_resolve() and
+         * promise_reject() refuse it on those grounds: the mudlib can never
+         * take it back, and nothing is reported, because a promise stuck
+         * pending is not a rejection. Anything awaiting it is parked for the
+         * life of the driver, holding its object, program, frame slice and
+         * one `max suspended async functions` slot -- invisible to both
+         * abandon routes, since the object is alive and the promise it
+         * awaits is alive; it is the SOURCE that died.
+         *
+         * Same safety net as the r.coro arm below, and gated on `resolving`
+         * so an ordinary promise_then() chain keeps its documented
+         * behaviour: dropping the last reference to a plain pending promise
+         * frees its reactions and the awaiting side simply never runs, but
+         * that promise is still one LPC can settle itself. Only the adopted
+         * case is unrecoverable. promise_settle() only queues, so no LPC
+         * runs here. */
+        if (r.next->resolving && r.next->state == PROMISE_PENDING) {
+          svalue_t err;
+          err.type = T_STRING;
+          err.subtype = STRING_CONSTANT;
+          err.u.string = "*promise adoption source was collected before settling";
+          (void)promise_settle(r.next, &err, 1);
+        }
         free_promise(r.next);
       }
       if (r.command_giver) {
