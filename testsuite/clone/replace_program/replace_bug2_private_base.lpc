@@ -1,0 +1,27 @@
+// Fixture for Bug 2 (see replace_bug2_wrapper.lpc for the full scenario
+// writeup, and replace_program_is_noop()'s function-flags comparison in
+// src/packages/core/replace_program.cc): a base class with a PRIVATE
+// function.
+//
+// try_call_secret_via_self() and try_bind() both live HERE (inherited
+// unchanged by the wrapper), matching the convention established by
+// replace_stateful_base.lpc: what's being tested is how a function
+// DEFINED on the shared base class behaves depending on which program
+// object->prog structurally is, not something newly added by the object
+// that calls replace_program() on itself.
+private int secret() { return 42; }
+
+// Self-call via call_other (apply()) is how apply.cc's DECL_ACCESS
+// permission check -- the one this fixture exercises -- actually gets
+// consulted. A bare, unqualified secret() call from within the same
+// compiled bytecode bypasses apply()/apply_low() entirely (a direct call
+// instruction, no permission check at all), so it can't observe the
+// DECL_PRIVATE vs. DECL_HIDDEN difference this bug is about. call_other
+// silently evaluates to 0 on a permission failure (apply()'s "return 0"),
+// so this returns 42 if the self-call is permitted, 0 if it's rejected.
+int try_call_secret_via_self() { return this_object()->secret(); }
+
+mixed try_bind() {
+  mixed fp;
+  return catch(fp = (: try_call_secret_via_self, 1 :));
+}

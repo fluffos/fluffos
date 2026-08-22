@@ -1,0 +1,23 @@
+// Regression test for Bug 1: f_replace_program()'s no-op fast path
+// silently un-cancelling an earlier genuine pending swap
+// (src/packages/core/replace_program.cc). Fixtures: /clone/replace_program/replace_bug1_y
+// (genuine first target), /clone/replace_program/replace_bug1_base (no-op second target,
+// strictly contains Y), /clone/replace_program/replace_bug1_shell (create() calls
+// replace_program() twice: Y then BASE).
+//
+// This LPC-level test can only observe that A swap is PENDING -- see
+// replace_program_noop_globals.lpc/replace_program_polymorphism_demo.lpc's
+// comments for why (the test harness never yields back to the backend's
+// gametick queue mid-suite). Proving WHICH target actually wins the sweep
+// (BASE, per last-call-wins -- not Y, the stale first call) needs forcing
+// the deferred sweep synchronously; see
+// ReplaceProgramBug1LastCallWinsAfterNoopSecondCall in src/tests/test_lpc.cc.
+void do_tests() {
+  object ob = clone_object("/clone/replace_program/replace_bug1_shell");
+  // A pending swap must exist: create()'s SECOND call registers a real
+  // entry targeting BASE, updating (not discarding) the first call's
+  // entry -- try_bind() must fail, exactly like every other pending-swap
+  // fixture in this suite.
+  ASSERT(ob->try_bind());
+  destruct(ob);
+}

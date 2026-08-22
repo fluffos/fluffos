@@ -1,0 +1,7 @@
+// Fixture (expected-NOT-noop, safe/conservative case): inherits a
+// stateful mixin THEN the target, so the target's variables start at a
+// nonzero offset. create() redundantly targets it. Must NOT be a no-op:
+// applying the swap for real would discard the mixin's svar.
+inherit "/clone/replace_program/replace_vo_statemixin";
+inherit "/clone/replace_program/replace_min_target";
+void create() { replace_program("/clone/replace_program/replace_min_target"); }

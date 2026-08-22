@@ -1,0 +1,3 @@
+// Fixture: a PURE-FUNCTION mixin -- ZERO variables, one function of its
+// own -- inherited ahead of the target.
+string mfunc() { return "mfunc"; }

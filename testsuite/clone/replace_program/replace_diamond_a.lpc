@@ -1,0 +1,3 @@
+// Fixture: diamond left branch, bare passthrough of the base.
+inherit "/clone/replace_program/replace_min_target";
+void create() {}

@@ -1,0 +1,6 @@
+// Fixture: middle level that inherits the stateful mixin THEN the real
+// target (the shared replace_min_target), so the target's variables
+// start at offset 1 (mixin_var) within this program.
+inherit "/clone/replace_program/replace_ml_mixin";
+inherit "/clone/replace_program/replace_min_target";
+void create() {}

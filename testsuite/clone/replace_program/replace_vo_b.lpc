@@ -1,0 +1,21 @@
+// Fixture (expected-NOT-noop -- correctly conservative, NOT a gap): a
+// pure-function mixin (zero vars) inherited ahead of the target, so
+// var_offset correctly stays 0 (the mixin contributes no variables) and
+// the total variable count still matches. Only the FUNCTION-side check
+// is what makes this correctly refuse no-op status: mfunc() is real
+// content this object exposes that the target does not.
+//
+// This is deliberately NOT relaxed to a no-op even though skipping the
+// swap is "safe" in the narrow sense of not corrupting anything: a REAL
+// replace_program() application replaces ob->prog outright (see
+// replace_programs() in replace_program.cc -- `ob->prog = new_prog;`),
+// which would make mfunc() permanently unreachable. Objects legitimately
+// use replace_program() to SHED extra machinery on purpose (see
+// replace_stub_becomes_real.lpc / replace_stub_extra.lpc), so treating
+// "cur_prog has extra functions the target lacks" as safe-to-skip would
+// silently keep those functions callable instead of shedding them --
+// diverging from what a real swap would have done. Pinning this behavior
+// so a future "smarter" comparison doesn't relax it by accident.
+inherit "/clone/replace_program/replace_vo_funcmixin";
+inherit "/clone/replace_program/replace_min_target";
+void create() { replace_program("/clone/replace_program/replace_min_target"); }

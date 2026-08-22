@@ -1,0 +1,81 @@
+// Regression tests for replace_program_is_noop()'s generality
+// (src/packages/core/replace_program.cc), covering three axes an earlier
+// verification pass on this same fix flagged for follow-up: multi-level
+// (indirect) inherit, diamond inheritance, and var_offset != 0
+// correctness. Each axis was probed empirically against the real driver
+// (not just read from source) before being pinned here; none of them
+// turned out to be false-positive (unsafe) risks in the current
+// implementation -- this file exists to keep it that way under future
+// changes. Fixtures: /clone/replace_program/replace_ml_*, /clone/replace_program/replace_diamond_*,
+// /clone/replace_program/replace_vo_* -- all three axes' "x" target below is the single
+// shared, deliberately inert /clone/replace_program/replace_min_target.lpc (zero
+// variables, one marker function); only the surrounding fixtures
+// (mid/mid2/top/top2, a/b/b_extra, statemixin/funcmixin) vary per axis.
+void do_tests() {
+  object ob;
+
+  // --- Multi-level / indirect inherit ---------------------------------
+
+  // Expected no-op: top -> mid -> x, both intermediate levels bare
+  // passthroughs. Exercises search_inherited()'s recursive var_offset
+  // accumulation on a DEFERRED (indirect, two levels up) match.
+  ob = clone_object("/clone/replace_program/replace_ml_top");
+  ASSERT_EQ(0, ob->try_bind());
+  destruct(ob);
+
+  // Expected NOT a no-op (safety-critical): top2 -> mid2 (mixin+x) -> x,
+  // where the mixin contributes a variable, so x's vars sit at a nonzero
+  // offset accumulated across two inherit levels. Must still register a
+  // pending swap.
+  ob = clone_object("/clone/replace_program/replace_ml_top2");
+  ASSERT(ob->try_bind());
+  destruct(ob);
+
+  // --- Diamond inheritance ---------------------------------------------
+
+  // Expected no-op: c inherits both a and b, each of which inherits the
+  // same (zero-variable) base x. The resolved function-name comparison
+  // must dedupe x's functions across both paths.
+  ob = clone_object("/clone/replace_program/replace_diamond_c");
+  ASSERT_EQ(0, ob->try_bind());
+  destruct(ob);
+
+  // Expected NOT a no-op: c2 inherits a (bare) and b_extra (base + its
+  // own extra() function) -- c2 has strictly more content than the base
+  // alone. try_bind() itself is inherited unchanged via BOTH branches
+  // (see replace_diamond_c2.lpc's comment), so a failure here is
+  // attributable solely to b_extra's extra() function -- the branch-
+  // content dedup logic actually being exercised, not an artifact of
+  // fixture-local content.
+  ob = clone_object("/clone/replace_program/replace_diamond_c2");
+  ASSERT(ob->try_bind());
+  destruct(ob);
+
+  // Expected NOT a no-op (safety-critical): a STATEFUL diamond base
+  // reachable via two paths gets its variable block duplicated (FluffOS
+  // does not deduplicate diamond-inherited variables) -- the resulting
+  // object has DOUBLE the base's variable count. The pre-existing
+  // num_variables_total equality check must catch this.
+  ob = clone_object("/clone/replace_program/replace_diamond_var_c");
+  ASSERT(ob->try_bind());
+  destruct(ob);
+
+  // --- var_offset != 0 correctness --------------------------------------
+
+  // Expected NOT a no-op (safe/conservative): a stateful mixin inherited
+  // ahead of the target puts the target's variables at a nonzero offset;
+  // applying the swap for real would discard the mixin's variable.
+  ob = clone_object("/clone/replace_program/replace_vo_a");
+  ASSERT(ob->try_bind());
+  destruct(ob);
+
+  // Expected NOT a no-op -- correctly conservative, NOT a generality gap:
+  // a PURE-FUNCTION mixin (zero variables) inherited ahead of the target
+  // keeps var_offset at 0, but the mixin's function is real content the
+  // target lacks. See replace_vo_b.lpc's comment for why relaxing this
+  // would be unsafe (it would defeat the "shed extra machinery" use case
+  // replace_stub_becomes_real.lpc exercises).
+  ob = clone_object("/clone/replace_program/replace_vo_b");
+  ASSERT(ob->try_bind());
+  destruct(ob);
+}

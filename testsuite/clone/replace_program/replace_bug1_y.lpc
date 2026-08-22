@@ -1,0 +1,7 @@
+// Fixture for Bug 1 (see replace_bug1_shell.lpc for the full scenario
+// writeup): the shell's GENUINE first replace_program() target. Deliberately
+// defines only what makes it strictly SMALLER than replace_bug1_base.lpc
+// (which inherits this and adds base_marker() on top) -- so that, relative
+// to the shell (which == replace_bug1_base exactly), targeting Y is a real,
+// non-no-op swap: Y lacks base_marker().
+string y_marker() { return "y"; }

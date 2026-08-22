@@ -1,0 +1,7 @@
+// Fixture: extra "stub loader" machinery an object sheds via
+// replace_program() -- used to build the genuine different-target case,
+// which must keep going through the normal pending-swap path unchanged
+// (replace_program_is_noop() must return false here: stub_only() is a
+// name the swap target does not expose).
+mapping stub_state = ([ "stub": 1 ]);
+string stub_only() { return "stub"; }

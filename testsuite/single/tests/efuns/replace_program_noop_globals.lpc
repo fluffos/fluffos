@@ -1,0 +1,27 @@
+// Regression test for replace_program_is_noop() (src/packages/core/
+// replace_program.cc) when the inherited base class has an initialized
+// global variable, which makes the compiler synthesize a distinct
+// "#global_init#" per program. Fixtures:
+//   /clone/replace_program/replace_stateful_base    -- base with `mapping attrs = ([...]);`
+//   /clone/replace_program/replace_self_stateful    -- redundant self-target no-op case
+//   /clone/replace_program/replace_stub_extra       -- extra machinery for the stub case
+//   /clone/replace_program/replace_stub_becomes_real -- genuine different-target case
+void do_tests() {
+  object ob;
+
+  // Redundant self-target (`inherit X; create(){replace_program(X);}`)
+  // where X has state: this must be detected as a true no-op and binding
+  // a closure to the object must succeed immediately afterward -- no
+  // pending-swap window at all.
+  ob = clone_object("/clone/replace_program/replace_self_stateful");
+  ASSERT_EQ(0, ob->try_bind());
+  destruct(ob);
+
+  // Genuine different-target case (a stub shedding extra machinery down
+  // to just the stateful real target): NOT a no-op, so this must still
+  // register a pending swap and binding a closure must still fail
+  // immediately afterward, exactly like the unpatched driver.
+  ob = clone_object("/clone/replace_program/replace_stub_becomes_real");
+  ASSERT(ob->try_bind());
+  destruct(ob);
+}

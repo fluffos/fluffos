@@ -1,0 +1,29 @@
+// Regression fixture for Bug 1: f_replace_program()'s no-op fast path
+// (src/packages/core/replace_program.cc) used to silently un-cancel an
+// earlier GENUINE pending swap. retrieve_replace_program_entry() implements
+// "last call wins" for repeated replace_program() calls within the same
+// execution (a second call REUSES and UPDATES the first call's pending
+// entry) -- the no-op fast path added to skip pending-swap bookkeeping for
+// true no-ops used to return early WITHOUT consulting or updating an
+// already-pending entry, breaking that contract: a genuine first call
+// followed by a no-op second call left the FIRST call's stale target
+// pending instead of honoring the second (last) call.
+//
+// This shell is a bare passthrough of BASE (identical effective content --
+// zero vars/funcs added beyond what BASE itself has), so relative to the
+// shell's own (unswapped) current_object->prog:
+//   - replace_program(Y), called FIRST, is NOT a no-op: the shell (== BASE)
+//     has base_marker(), which Y lacks.
+//   - replace_program(BASE), called SECOND, IS a no-op: the shell already
+//     == BASE exactly.
+// Expected (last-call-wins, matching every other repeated-call case in the
+// driver): the object lands on BASE post-sweep, not Y. On the unfixed
+// driver, the no-op fast path silently left the first call's stale
+// Y-targeting entry pending and the object incorrectly landed on Y instead
+// -- discarding what create()'s own last line of code actually asked for.
+inherit "/clone/replace_program/replace_bug1_base";
+
+void create() {
+  replace_program("/clone/replace_program/replace_bug1_y");
+  replace_program("/clone/replace_program/replace_bug1_base");
+}

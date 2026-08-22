@@ -1,0 +1,26 @@
+// Regression fixture for Bug 2: replace_program_is_noop() (src/packages/
+// core/replace_program.cc) used to compare only resolved function_t*
+// IDENTITY, missing that the SAME function can have genuinely different,
+// behaviorally-relevant ACCESS flags depending on which program you look
+// at it through.
+//
+// This is the exact common redundant-self-target boilerplate
+// (`inherit X; create(){replace_program(X);}`) that
+// replace_program_is_noop() (src/packages/core/replace_program.cc)
+// handles, where X (/clone/replace_program/replace_bug2_private_base) happens to have a
+// PRIVATE function.
+// copy_new_function() (compiler.cc) demotes 'private' to 'hidden'
+// whenever a function gets copied into an INHERITING program's own
+// function_flags[] -- so this wrapper's own copy of secret() is
+// DECL_HIDDEN, even though the base's own slot for the exact same
+// function_t is DECL_PRIVATE. apply()'s permission check (apply.cc's
+// funflags/need logic) requires DECL_PRIVATE for a self-call-other, and
+// DECL_HIDDEN doesn't meet that bar -- so try_call_secret_via_self()
+// genuinely behaves differently (fails vs. succeeds) depending on whether
+// ob->prog is this wrapper or the real base. The old identity-only check
+// missed this real, observable difference and would wrongly call it a
+// no-op, permanently stranding the object as the wrapper -- the swap the
+// LPC author actually asked for would simply never happen, silently.
+inherit "/clone/replace_program/replace_bug2_private_base";
+
+void create() { replace_program("/clone/replace_program/replace_bug2_private_base"); }
