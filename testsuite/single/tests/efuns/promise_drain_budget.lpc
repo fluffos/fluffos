@@ -120,8 +120,14 @@ private void check_chain() {
   // computed count here would encode a timing assumption and fail on a fast
   // host -- exactly the trap testsuite/README.md warns about. What this test
   // exists to catch is a drain that does NOT re-post and holds the event loop
-  // for the whole chain; two yields proves re-posting is repeating, and the
-  // yields_before subtraction means unrelated suite traffic can only add.
+  // for the whole chain; two yields proves re-posting is repeating.
+  //
+  // Note which way the global counter can mislead: other files' yields land
+  // in this window too, so unrelated traffic can only ever push the delta UP
+  // -- that is the false-PASS direction, not a safety margin. What makes the
+  // guard sound is that a drain which never re-posts leaves the counter at
+  // zero for the whole suite, so there is no traffic to hide behind. (This
+  // file's own chain measures 5-6 yields against the required 2.)
   ASSERT2(yields >= 2,
     sprintf("a %d-link self-feeding chain burning about %d us per link yielded only "
       "%d times against a %d us budget: the drain is not re-posting, so it holds "

@@ -67,13 +67,30 @@ private void parser_leg() {
   parse_refresh();
   parse_add_rule("poke", "LIV");
 
-  // "bag" is the fixture's parse id, but its is_living() answers with a
+  // Control first: the same rule against an object whose is_living() answers
+  // yes immediately MUST match. Without this, "did not match" would prove
+  // nothing -- any breakage in the rule setup looks identical to the fix
+  // working, and the old `err || !matched` accepted an error from any cause
+  // at all as a pass.
+  {
+    object control = clone_object("/clone/async_answer_living");
+    mixed matched = 0;
+    mixed err = catch(matched = parse_sentence("poke bag", 2, ({ control })));
+
+    ASSERT2(!err, sprintf("the control parse errored: %O", err));
+    ASSERT2(matched, "the poke LIV rule does not match even a plainly living object, "
+      "so the promise leg below would pass for the wrong reason");
+    destruct(control);
+  }
+
+  // "bag" is the fixture's parse id too, but its is_living() answers with a
   // promise, so LIV must not match it.
   {
     mixed matched = 0;
     mixed err = catch(matched = parse_sentence("poke bag", 2, ({ fixture })));
 
-    ASSERT2(err || !matched,
+    ASSERT2(!err, sprintf("the promise-answering parse errored: %O", err));
+    ASSERT2(!matched,
       "is_living() answered with a promise and the parser matched LIV on it anyway");
   }
   parse_remove("poke");

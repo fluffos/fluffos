@@ -12,7 +12,15 @@
 
 #include "/include/tests.h"
 
-nosave int done;
+// The two checks that matter park on an await, so they run after do_tests()
+// has returned. That needs an EXIT LATCH, not a shutdown(-1) call_out: the
+// runner holds its recap until every latch clears, which is what makes a
+// deferred check COUNTED. Without one, a filtered run of this file reported
+// "2 checks ... Checks succeeded." with the probe never having executed --
+// the two counted checks were the synchronous control block below -- and a
+// full run only caught a deliberately injected failure here because 56 OTHER
+// files happened to hold latches that deferred the recap past the drain.
+// The shutdown(-1) guard never fired either, for the same reason.
 
 async void probe() {
   mixed p = promise_create();
@@ -23,7 +31,7 @@ async void probe() {
   ASSERT2(err, "a bare promise_reject() must reject with a TRUTHY reason, "
     "or acatch() cannot tell it from success");
   ASSERT_EQ("string", typeof(err));
-  done = 1;
+  RELEASE_LATCH("bare reject is truthy");
 }
 
 void do_tests() {
@@ -34,10 +42,6 @@ void do_tests() {
   ASSERT_EQ(2, promise_status(p2));
   ASSERT_EQ("explicit reason", promise_result(p2));
 
+  EXPECT_LATCH("bare reject is truthy");
   probe();
-  call_out(function() {
-    if (!done) {
-      shutdown(-1);
-    }
-  }, 3);
 }

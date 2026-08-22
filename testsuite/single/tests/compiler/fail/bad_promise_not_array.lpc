@@ -1,0 +1,8 @@
+// The reverse of bad_promise_array_mismatch: a promise is not an ARRAY of
+// promises either. TYPE_MOD_ARRAY keeps its ordinary meaning on a promise
+// declaration, so `promise<int> *` is an array of promises and must not
+// accept a bare one.
+async int f() { return 1; }
+void g() {
+  promise<int> *arr = f();
+}

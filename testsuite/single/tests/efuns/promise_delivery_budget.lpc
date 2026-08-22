@@ -137,19 +137,25 @@ private async void probe() {
 }
 
 private void conclude() {
+  // Asserted rather than returned quietly, so a passing run RECORDS a check.
+  // Every skip path in this file (unmetered platform, budget too small to fit
+  // the pair, retries exhausted) also ends in finish(0), and a pass that
+  // records nothing is indistinguishable from a probe that never ran.
+  ASSERT2(rounds >= MIN_ROUNDS,
+    sprintf("only %d of %d probe rounds completed, which is too few for the "
+      "minimum to mean anything",
+      rounds, PROBE_ROUNDS));
   // Shared budget: every round is down by at least the burn, so the minimum
   // is too. Armed afresh: the rounds are independent samples of one
   // delivery's own overhead, so the minimum sits below zero.
-  if (min_diff <= burn_us / 2) {
-    finish(0);
-    return;
-  }
-  finish(sprintf("over %d rounds, a delivery made after one that burned about %d us "
-    "of its budget never once had its own budget back: the smallest drop was "
-    "%d us. It is inheriting the turn's leftovers instead of being armed "
-    "afresh, so a handler can be aborted for time spent by the handlers ahead "
-    "of it",
-    rounds, burn_us, min_diff));
+  ASSERT2(min_diff <= burn_us / 2,
+    sprintf("over %d rounds, a delivery made after one that burned about %d us "
+      "of its budget never once had its own budget back: the smallest drop was "
+      "%d us. It is inheriting the turn's leftovers instead of being armed "
+      "afresh, so a handler can be aborted for time spent by the handlers ahead "
+      "of it",
+      rounds, burn_us, min_diff));
+  finish(0);
 }
 
 private mixed first_handler(mixed v) {

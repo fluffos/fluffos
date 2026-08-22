@@ -18,8 +18,9 @@
 // Written as plain `catch(...)` the same code is unaffected, because
 // do_catch()'s handler goes through restore_context().
 //
-// PACKAGE_DWLIB is off by default and absent from CI, so this test only runs
-// where the package is compiled in. The general rule it pins applies to every
+// PACKAGE_DWLIB is off in the default build, so this file compiles to nothing
+// there -- but it is NOT absent from CI: .github/workflows/ci.yml builds
+// -DPACKAGE_DWLIB=ON, so these checks do run. Do not delete this as dead. The general rule it pins applies to every
 // such latch: when restore_context() grows another reset,
 // unwind_to_acatch_marker() needs it too (AGENTS.md section 4).
 

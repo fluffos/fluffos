@@ -109,10 +109,10 @@ private void run_case(int idx) {
   }
   fragment_hits[f1] = 1;
   src = "nosave mixed keep;\n" + prelude(p);
-  // The probe comes FIRST for half the cases and LAST for the other half:
-  // only the function immediately following a leak was affected, so a probe
-  // that always sits at the end would miss a leak that an intervening
-  // function absorbs.
+  // TWO probes, one before the leaking function and one after: only the
+  // function immediately following a leak was affected, so a probe that sat
+  // only at the end would miss a leak that an intervening function absorbs,
+  // and one only at the front would miss the ordinary case.
   src += "int probe(int a, int b, int c) { return a * 100 + b * 10 + c; }\n";
   src += "int work() {\n";
   src += fragment(f1, "1");

@@ -22,9 +22,12 @@ nosave mixed reason;
 nosave mixed suicide_reason;
 nosave int before;
 nosave int *our_ids;
+// Global, not a do_tests() local: the cleanup below runs inside an anonymous
+// function, which cannot see enclosing locals.
+nosave object keeper;
 
 void do_tests() {
-  object ob, nested, keeper, suicide;
+  object ob, nested, suicide;
 
   before = sizeof(async_info());
 
@@ -121,6 +124,12 @@ void do_tests() {
     ASSERT2(stringp(suicide_reason) && strsrch(suicide_reason, "destructed object") != -1,
       sprintf("awaiting inside a destructed object should be refused, got %O", suicide_reason));
 
+    // The keeper holds a promise in a nosave global, so leaving it cloned
+    // would keep that promise alive for the rest of the run; every other
+    // clone in this file is cleaned up.
+    if (keeper) {
+      destruct(keeper);
+    }
     RELEASE_LATCH("async destruct abandon");
     return 0;
   });
