@@ -79,9 +79,15 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
   if (evutil_make_socket_nonblocking(sv[0]) == -1 || evutil_make_socket_nonblocking(sv[1]) == -1) {
     return EESOCKET;
   }
-  ret = posix_spawn_file_actions_adddup2(&file_actions, sv[1], 0) ||
-        posix_spawn_file_actions_adddup2(&file_actions, sv[1], 1) ||
-        posix_spawn_file_actions_adddup2(&file_actions, sv[1], 2);
+  // Each call returns an errno value; `||`-chaining them collapses that into
+  // 1 and loses which failure happened (strerror(1) is a misleading EPERM).
+  ret = 0;
+  for (int child_fd : {0, 1, 2}) {
+    ret = posix_spawn_file_actions_adddup2(&file_actions, sv[1], child_fd);
+    if (ret != 0) {
+      break;
+    }
+  }
   if (ret != 0) {
     debug(external_start, "external_start: posix_spawn_file_actions_adddup2() error: %s\n",
           strerror(ret));
@@ -258,7 +264,11 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
   auto* sock = lpc_socks_get(fd);
 
   SOCKET sv[2];
-  socketpair_win32(sv, 0);
+  if (socketpair_win32(sv, 0) != 0) {
+    // Nothing has been provisioned on the socket slot yet; bail out before
+    // wiring event listeners onto an uninitialized descriptor.
+    return EESOCKET;
+  }
 
   new_lpc_socket_event_listener(fd, sock, sv[1]);
 

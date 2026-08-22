@@ -655,6 +655,7 @@ else ()
     "net/transport_libevent.cc"
     "net/tls.cc"
     "net/websocket.cc"
+    "net/ws_common.cc"
     "net/ws_ascii.cc"
     "net/ws_telnet.cc"
     "base/internal/crash_handler.cc"

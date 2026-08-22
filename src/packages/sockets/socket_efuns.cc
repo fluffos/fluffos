@@ -15,6 +15,7 @@
 #include <event2/util.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 #include <deque>
 #include <string>
 #include <unistd.h>  // for close
@@ -900,15 +901,52 @@ int socket_connect(int fd, const char* name, svalue_t* read_callback, svalue_t* 
 
     SSL_set_fd(ssl, lpc_socks[fd].fd);
 
-    if (lpc_socks[fd].options[SO_TLS_VERIFY_PEER].type == T_NUMBER &&
-        lpc_socks[fd].options[SO_TLS_VERIFY_PEER].u.number != 0) {
+    bool const verify_peer = lpc_socks[fd].options[SO_TLS_VERIFY_PEER].type == T_NUMBER &&
+                             lpc_socks[fd].options[SO_TLS_VERIFY_PEER].u.number != 0;
+    // An empty string must count as "no hostname", not just a wrong type:
+    // OpenSSL's X509_VERIFY_PARAM_set1_host() treats a zero-length name as
+    // "clear the host list" and returns success, so SSL_set1_host(ssl, "")
+    // silently leaves NO expected hostname configured. With SSL_VERIFY_PEER
+    // still on, the chain check alone then accepts any CA-issued cert for
+    // any name -- the exact MITM gap this whole verification path exists to
+    // close, just reached via socket_set_option(fd, SO_TLS_SNI_HOSTNAME, "")
+    // instead of never setting the option at all.
+    bool const has_sni_hostname = lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING &&
+                                  lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string[0] != '\0';
+    // Chain validation alone accepts ANY certificate issued by a trusted CA,
+    // for any name: without a name check a MITM presenting a valid
+    // certificate for a host it does control passes verification. There is
+    // no implicit hostname to fall back on here -- `name` (the connect
+    // target) may be a bare IP literal, which is not a meaningful SNI/cert
+    // name -- so fail closed instead of silently downgrading to chain-only
+    // verification when the caller asked for SO_TLS_VERIFY_PEER but never
+    // set SO_TLS_SNI_HOSTNAME.
+    if (verify_peer && !has_sni_hostname) {
+      debug(sockets,
+            "socket_connect: SO_TLS_VERIFY_PEER is set but SO_TLS_SNI_HOSTNAME is not; refusing "
+            "to connect with no hostname to verify against.\n");
+      return EECONNECT;
+    }
+
+    if (verify_peer) {
       SSL_set_verify(ssl, SSL_VERIFY_PEER, tls_verify_callback);
     } else {
       SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
     }
 
-    if (lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].type == T_STRING) {
-      SSL_set_tlsext_host_name(ssl, lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string);
+    if (has_sni_hostname) {
+      const char* const sni_hostname = lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME].u.string;
+      SSL_set_tlsext_host_name(ssl, sni_hostname);
+      // Bind the expected name so OpenSSL matches it against SAN/CN during
+      // the handshake (see the fail-closed check above for why this is
+      // mandatory whenever verify_peer is on).
+      if (verify_peer) {
+        SSL_set_hostflags(ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+        if (!SSL_set1_host(ssl, sni_hostname)) {
+          debug(sockets, "socket_connect: SSL_set1_host(%s) failed.\n", sni_hostname);
+          return EECONNECT;
+        }
+      }
       // Drop the string ref once applied to SSL.
       free_svalue(&lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME], "socket_connect");
       lpc_socks[fd].options[SO_TLS_SNI_HOSTNAME] = const0u;

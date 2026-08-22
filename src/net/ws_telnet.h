@@ -3,16 +3,7 @@
 
 #include <libwebsockets.h>
 
-/* one of these is created for each client connecting to us */
-const int PROTOCOL_WS_TELNET = 2;
-
-struct ws_telnet_session {
-  struct lws* wsi;
-  struct interactive_t* user;
-
-  struct evbuffer* buffer;
-  bool close_after_flush;
-};
+#include "net/ws_common.h"
 
 int ws_telnet_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user, void* in,
                        size_t len);

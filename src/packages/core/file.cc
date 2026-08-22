@@ -317,8 +317,18 @@ int write_file(const char* file, const char* str, int flags) {
       error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
             (flags & 1) ? "overwrite" : "append", strerror(errno));
     }
-    gzwrite(gf, str, strlen(str));
-    gzclose(gf);
+    auto const len = strlen(str);
+    int const written = len > 0 ? gzwrite(gf, str, len) : 0;
+    // gzwrite() returns 0 on error, gzclose() flushes the deflate stream and
+    // can fail on its own (a full disk shows up here, not in gzwrite).
+    bool ok = (written == static_cast<int>(len));
+    if (gzclose(gf) != Z_OK) {
+      ok = false;
+    }
+    if (!ok) {
+      debug_perror("write_file", file);
+      return 0;
+    }
     return 1;
   }
 #endif
@@ -327,8 +337,17 @@ int write_file(const char* file, const char* str, int flags) {
     error("Wrong permissions for opening file /%s for %s.\n\"%s\"\n", file,
           (flags & 1) ? "overwrite" : "append", strerror(errno));
   }
-  fwrite(str, strlen(str), 1, f);
-  fclose(f);
+  auto const len = strlen(str);
+  // A short fwrite() or a failing fclose() (the buffered data is flushed
+  // there) both mean the file on disk does not hold what we were handed.
+  bool ok = (len == 0 || fwrite(str, len, 1, f) == 1);
+  if (fclose(f) != 0) {
+    ok = false;
+  }
+  if (!ok) {
+    debug_perror("write_file", file);
+    return 0;
+  }
   return 1;
 }
 
@@ -602,7 +621,11 @@ int write_bytes(const char* file, int start, const char* str, int theLength) {
   }
   size = fwrite(str, 1, theLength, fptr);
 
-  fclose(fptr);
+  // fclose() flushes; a write error can surface only here.
+  if (fclose(fptr) != 0) {
+    debug_perror("write_bytes", file);
+    return 0;
+  }
 
   if (size <= 0) {
     return 0;
@@ -794,11 +817,28 @@ static int do_move(const char* from, const char* to, int flag) {
   }
   /* rename failed on cross-filesystem link.  Copy the file instead. */
   if (flag == F_RENAME) {
-    if (copy_file(from, to)) {
+    // copy_file() returns 1 on success and a negative value on failure (see
+    // docs/efun/filesystem/cp.md); `if (copy_file(...))` was truthy on
+    // *both* outcomes, so a cross-filesystem rename() always reported
+    // failure here -- even after a successful copy -- and skipped the
+    // unlink() below, leaving the source file behind as a duplicate.
+    //
+    // `from` is only alive courtesy of the caller's from_sv (see
+    // do_rename() above), which is a *static* also owned by check_valid_path()
+    // -- and copy_file() calls check_valid_path() again internally and
+    // reassigns that same static to protect its own copy of the string.
+    // That frees the very buffer `from` points into, out from under us, so
+    // `from` must be snapshotted before the call or unlink() below reads
+    // freed memory.
+    char from_copy[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
+    strncpy(from_copy, from, sizeof(from_copy) - 1);
+    from_copy[sizeof(from_copy) - 1] = '\0';
+
+    if (copy_file(from, to) < 0) {
       return 1;
     }
-    if (unlink(from)) {
-      error("cannot remove `/%s'", from);
+    if (unlink(from_copy)) {
+      error("cannot remove `/%s'", from_copy);
       return 1;
     }
   }
@@ -807,6 +847,8 @@ static int do_move(const char* from, const char* to, int flag) {
     if (symlink(from, to) == 0) { /* symbolic link */
       return 0;
     }
+    error("cannot link `/%s' to `/%s'\n", from, to);
+    return 1;
   }
 #endif
   return 0;

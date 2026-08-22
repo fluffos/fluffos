@@ -4,8 +4,20 @@
 void rcb(int fd) {}
 void do_tests() {
   int fd = socket_create(STREAM, "rcb");
-  catch(socket_get_option(fd, SO_TLS_VERIFY_PEER));
+
+  // Options round-trip through the getter.
+  socket_set_option(fd, SO_TLS_VERIFY_PEER, 1);
+  ASSERT_EQ(1, socket_get_option(fd, SO_TLS_VERIFY_PEER));
+  socket_set_option(fd, SO_TLS_SNI_HOSTNAME, "example.com");
+  ASSERT_EQ("example.com", socket_get_option(fd, SO_TLS_SNI_HOSTNAME));
+
+  // Unset options read back as 0.
+  ASSERT_EQ(0, socket_get_option(fd, SO_TLS_CERT));
+
+  // Unknown option and bad descriptor are errors.
+  ASSERT_NE(0, catch(socket_get_option(fd, 999)));
+  ASSERT_NE(0, catch(socket_get_option(-1, SO_TLS_VERIFY_PEER)));
+
   socket_close(fd);
-  ASSERT(1);
 }
 #endif

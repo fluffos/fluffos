@@ -1639,6 +1639,13 @@ static int file_length(const char* file) {
 
   do {
     num = fread(buf, 1, sizeof(buf) - 1, f);
+    // A read error leaves feof() false and fread() returning 0 forever, so
+    // without this the loop spins for good instead of reporting the failure.
+    if (num == 0 && ferror(f)) {
+      debug_perror("file_length", file);
+      fclose(f);
+      return -1;
+    }
     p = buf;
     while ((newp = reinterpret_cast<char*>(memchr(p, '\n', num)))) {
       num -= (newp - (p - 1));

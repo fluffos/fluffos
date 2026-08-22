@@ -17,10 +17,10 @@ enum PROTOCOL_ID {
 
 static struct lws_protocols protocols[] = {
     {"http", lws_callback_http_dummy, 0, 0, WS_HTTP},
-    {"ascii", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_ASCII},
-    {"telnet", ws_telnet_callback, sizeof(struct ws_telnet_session), 4096, WS_TELNET},
+    {"ascii", ws_ascii_callback, sizeof(struct ws_session), 4096, WS_ASCII},
+    {"telnet", ws_telnet_callback, sizeof(struct ws_session), 4096, WS_TELNET},
     // for backward compatiblity with fluffos 2.x
-    {"binary", ws_telnet_callback, sizeof(struct ws_telnet_session), 4096, WS_TELNET},
+    {"binary", ws_telnet_callback, sizeof(struct ws_session), 4096, WS_TELNET},
     {NULL, NULL, 0, 0} /* terminator */
 };
 
@@ -36,10 +36,10 @@ static const struct lws_extension extensions[] = {
 // initializers. Remaining fields are zero/nullptr; origin is set on create.
 static struct lws_http_mount init_mount() {
   struct lws_http_mount m = {};
-  m.mountpoint = "/";            /* mountpoint URL */
-  m.def = "index.html";          /* default filename */
+  m.mountpoint = "/";               /* mountpoint URL */
+  m.def = "index.html";             /* default filename */
   m.origin_protocol = LWSMPRO_FILE; /* files in a dir */
-  m.mountpoint_len = 1;          /* char count */
+  m.mountpoint_len = 1;             /* char count */
   return m;
 }
 static struct lws_http_mount mount = init_mount();
@@ -143,19 +143,22 @@ void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
 void close_websocket_context(struct lws_context* context) { lws_context_destroy(context); }
 
 void close_user_websocket(struct lws* wsi) {
+  // NOTE: LWS_TO_KILL_ASYNC does not mean "give the peer a grace period to
+  // drain" -- per lws-timeout-timer.h it marks the wsi to be killed "at the
+  // next timeout check", i.e. essentially immediately. Using it here for the
+  // matched-protocol case raced the requested writable callback below and
+  // regularly won, silently dropping whatever was still queued in
+  // pss->buffer (that evbuffer lives outside lws, so an async kill doesn't
+  // wait for it). The real bounded drain window is the explicit `5` (seconds)
+  // in the close_from_writable branch below; LWS_TO_KILL_ASYNC is only
+  // correct for the fallback case, where there is no application buffer to
+  // protect. See src/www/AGENTS.md's "Driver-initiated close is
+  // close-AFTER-FLUSH" note for the four invariants this depends on.
   bool close_from_writable = false;
   switch (lws_get_protocol(wsi)->id) {
-    case WS_TELNET: {
-      auto pss = reinterpret_cast<ws_telnet_session*>(lws_wsi_user(wsi));
-      if (pss) {
-        pss->close_after_flush = true;
-        close_from_writable = true;
-        pss->user = nullptr;
-      }
-      break;
-    }
+    case WS_TELNET:
     case WS_ASCII: {
-      auto pss = reinterpret_cast<ws_ascii_session*>(lws_wsi_user(wsi));
+      auto pss = reinterpret_cast<ws_session*>(lws_wsi_user(wsi));
       if (pss) {
         pss->close_after_flush = true;
         close_from_writable = true;
@@ -186,6 +189,5 @@ void close_user_websocket(struct lws* wsi) {
     return;
   }
 
-  lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE,
-                  LWS_TO_KILL_ASYNC);
+  lws_set_timeout(wsi, pending_timeout::PENDING_FLUSH_STORED_SEND_BEFORE_CLOSE, LWS_TO_KILL_ASYNC);
 }
