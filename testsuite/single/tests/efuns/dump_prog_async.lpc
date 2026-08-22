@@ -1,0 +1,35 @@
+// Regression: disassemble() fetched opcodes through a plain (signed) char,
+// so the three opcodes above 127 (await/acatch/end_acatch) sign-extended,
+// printed as op_invalid, and desynced the rest of the listing (the case
+// that skips acatch's 2-byte offset could never match). Any async function
+// makes dump_prog() output garbage on the unfixed binary.
+
+#if efun_defined(dump_prog)
+
+async int helper(mixed p) {
+  mixed e = acatch(await p);
+
+  return e ? 0 : 1;
+}
+
+void do_tests() {
+  string txt;
+  string tail = "invalid";
+
+  dump_prog(this_object(), 1, "/data/dump_prog_async.txt");
+  txt = read_file("/data/dump_prog_async.txt");
+  rm("/data/dump_prog_async.txt");
+  ASSERT(stringp(txt));
+  ASSERT(strsrch(txt, "acatch") != -1);
+  ASSERT(strsrch(txt, "await") != -1);
+  // needle assembled at runtime THROUGH A VARIABLE: a literal (or a folded
+  // constant concatenation) would land in this program's own string table,
+  // which the dump includes
+  ASSERT(strsrch(txt, "op_" + tail) == -1);
+}
+
+#else
+
+void do_tests() {}
+
+#endif

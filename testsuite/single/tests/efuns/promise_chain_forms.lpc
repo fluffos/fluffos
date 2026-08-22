@@ -1,0 +1,106 @@
+// Promise chaining and resolve/adoption against the promise-form efuns
+// (issue #1319): then() on a timer promise, a then-handler returning a
+// promise (adopted by the chain), promise_resolve() adopting a timer or a
+// package promise (stays pending, propagates fulfilment AND rejection),
+// several consumers of one timer promise, and awaiting a timer promise
+// that already fired (settled awaits still park, then resume off the
+// drain).
+//
+// Every observation below happens after do_tests() has returned, so each
+// independent deferred path declares its own EXIT LATCH: the run waits for
+// them, their checks are counted, and a chain that never fires fails the
+// run by name instead of passing quietly.
+
+nosave int multi;
+nosave mixed keep, firedTimer;
+
+async int second_stage() { return 42; }
+
+// await a timer promise long after it fired: settles like any settled
+// promise -- park, resume with its value off the drain
+async void late_awaiter() {
+  int v = await firedTimer;
+
+  ASSERT_EQ(0, v);
+  firedTimer = 0;
+  RELEASE_LATCH("await an already-fired timer");
+}
+
+void do_tests() {
+  mixed t, c, p, q;
+  object tc;
+
+  // 1. then() on a timer promise; handler returning a PROMISE is adopted by
+  //    the chained promise (flattening through the chain)
+  t = call_out(1);
+  EXPECT_LATCH("then on a timer promise");
+  EXPECT_LATCH("chain adopts a returned promise");
+  c = promise_then(t, function(mixed v) {
+    ASSERT_EQ(0, v);
+    RELEASE_LATCH("then on a timer promise");
+    return second_stage();          // promise: chain must adopt it
+  });
+  promise_then(c, function(mixed v) {
+    ASSERT_EQ(42, v);
+    RELEASE_LATCH("chain adopts a returned promise");
+  });
+
+  // 2. promise_resolve(p, <timer promise>): adoption keeps p pending until
+  //    the timer fires, then fulfils with its value
+  p = promise_create();
+  promise_resolve(p, call_out(1));
+  ASSERT_EQ(0, promise_status(p));  // pending: adopted, not stored
+  EXPECT_LATCH("resolve adopts a timer promise");
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ(0, v);
+    RELEASE_LATCH("resolve adopts a timer promise");
+  });
+
+  // 3. adoption propagates REJECTION: adopt a clone's timer, then sweep it
+  tc = clone_object("/clone/async_timer");
+  q = promise_create();
+  promise_resolve(q, tc->make_timer());
+  tc->nuke();
+  keep = tc;
+  EXPECT_LATCH("adoption propagates rejection");
+  promise_catch(q, function(mixed err) {
+    ASSERT(stringp(err));
+    if (keep) destruct(keep);
+    keep = 0;
+    RELEASE_LATCH("adoption propagates rejection");
+  });
+
+  // 4. several consumers of ONE timer promise: two thens both fire, in
+  //    registration order, so the second one sees both increments
+  t = call_out(1);
+  EXPECT_LATCH("two consumers of one timer promise");
+  promise_then(t, function(mixed v) { multi += 1; });
+  promise_then(t, function(mixed v) {
+    multi += 10;
+    ASSERT_EQ(11, multi);
+    RELEASE_LATCH("two consumers of one timer promise");
+  });
+
+#ifdef __PACKAGE_ASYNC__
+  // 5. chaining and adoption on a package promise
+  EXPECT_LATCH("then on a package promise");
+  promise_then(async_read("/single/tests/efuns/promise_chain_forms.lpc"),
+    function(mixed s) {
+      ASSERT(stringp(s));
+      RELEASE_LATCH("then on a package promise");
+    });
+  p = promise_create();
+  promise_resolve(p, async_getdir("/single/tests/efuns/"));
+  EXPECT_LATCH("resolve adopts a package promise");
+  promise_then(p, function(mixed d) {
+    ASSERT(arrayp(d));
+    ASSERT(sizeof(d) > 0);
+    RELEASE_LATCH("resolve adopts a package promise");
+  });
+#endif
+
+  // 6. a timer promise held past its fire time, awaited later
+  firedTimer = call_out(1);
+  EXPECT_LATCH("await an already-fired timer");
+  call_out(function() { late_awaiter(); }, 2);  // well after the fire
+}

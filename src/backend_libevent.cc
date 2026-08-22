@@ -15,6 +15,7 @@
 #include <event2/event.h>   // for event_add, etc
 #include <event2/thread.h>  // for thread support
 #include <chrono>
+#include <set>
 
 #include "vm/vm.h"
 
@@ -80,7 +81,45 @@ void on_game_tick(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
 void on_walltime_event(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
   backend_dispose_tick_event(reinterpret_cast<TickEvent*>(arg));
 }
+
+/* Backing store for add_loop_yield_event(). libevent's active_later queue
+ * needs a caller-owned struct event (event_base_once() allocates its own and
+ * offers no way to reach that queue), so we pair one with the TickEvent and
+ * free both when it fires. Tracked in a list so clear_walltime_events() can
+ * reclaim any that never did. */
+struct LoopYieldEvent {
+  struct event* ev;
+  TickEvent* tick;
+};
+std::set<LoopYieldEvent*> g_loop_yield_events;
+
+void on_loop_yield_event(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
+  auto* self = reinterpret_cast<LoopYieldEvent*>(arg);
+  auto* tick = self->tick;
+  g_loop_yield_events.erase(self);
+  /* libevent has already taken it off the active queue before invoking us,
+   * and it is neither persistent nor added, so freeing it here is safe. */
+  event_free(self->ev);
+  delete self;
+  backend_dispose_tick_event(tick);
+}
 }  // namespace
+
+/* Declared in libevent's event-internal.h, which is not installed and drags
+ * in the whole private base layout, so it is spelled out here instead.
+ *
+ * This is the one internal libevent symbol the driver uses. It is the only
+ * way to reach the active_later queue -- the public API has no equivalent of
+ * libuv's check phase / setImmediate -- and libevent's own bufferevent code
+ * uses the same queue for the same reason (event_deferred_cb_schedule_ runs
+ * MAX_DEFERREDS_QUEUED=32 callbacks eagerly, then defers the rest). The
+ * symbol is non-static, and nothing inside libevent references it, so it is
+ * only retained in the link because we do. The queue is a 2.1 feature (it
+ * does not appear in ChangeLog-2.0), which is why libevent is vendored
+ * rather than probed for: a missing symbol here is a link error, not a
+ * silent behaviour change.
+ * RE-CHECK THIS ON EVERY LIBEVENT UPGRADE (AGENTS.md section 14). */
+extern "C" void event_active_later_(struct event* ev, int res);
 
 // Schedule a immediate event on main loop.
 TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
@@ -104,10 +143,40 @@ TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
   return event;
 }
 
+TickEvent* add_loop_yield_event(TickEvent::callback_type callback) {
+  auto* tick = new TickEvent(callback);
+  auto* self = new LoopYieldEvent{};
+  self->tick = tick;
+  /* Created but deliberately never event_add()ed: it carries no timeout and
+   * no fd, it exists only as a handle the active_later queue can hold. */
+  self->ev = event_new(g_event_base, -1, 0, on_loop_yield_event, self);
+  if (self->ev == nullptr) {
+    fatal("add_loop_yield_event: out of memory");
+  }
+  g_loop_yield_events.insert(self);
+  /* Promotion to the active queue happens at the TOP of the next loop
+   * iteration, before dispatch(), and the pending entry keeps
+   * N_ACTIVE_CALLBACKS non-zero so that iteration polls with a zero timeout
+   * instead of blocking. Net effect: poll, then run -- and because promotion
+   * only ever happens in the loop body, a callback that re-posts itself this
+   * way provably cannot run twice in one event_process_active() pass. */
+  event_active_later_(self->ev, EV_TIMEOUT);
+  return tick;
+}
+
 int clear_walltime_events() {
   // Wall-time events are one-shot event_base_once() entries owned by
-  // libevent; there is no queue of ours to drain.
-  return 0;
+  // libevent; there is no queue of ours to drain. Loop-yield events are
+  // ours, though.
+  int n = 0;
+  for (auto* self : g_loop_yield_events) {
+    event_free(self->ev);
+    delete self->tick;
+    delete self;
+    n++;
+  }
+  g_loop_yield_events.clear();
+  return n;
 }
 
 /*

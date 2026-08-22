@@ -1,0 +1,4 @@
+// The same rule for an OBJECT apply, not just a master one: create()'s value
+// is ignored, but the driver still treats the object as ready while an async
+// body is still parked. The refusal covers every name in the applies table.
+async void create() {}

@@ -1,0 +1,2 @@
+inherit "/clone/async_replace_pad";
+inherit "/clone/async_replace_base";

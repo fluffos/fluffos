@@ -1,0 +1,82 @@
+// Fixture for efuns/async_lifecycle_fuzz.lpc.
+//
+// One clone can be parked in several different shapes, so the fuzzer can mix
+// them freely against the same destruct/settle/drop operations: a plain park,
+// a nested pair of frames in the SAME object, a park guarded by acatch, a
+// frame that destructs its own object after resuming, and a frame that parks
+// on a promise it alone holds (the shape whose only abandonment route is
+// destruct_object).
+nosave promise held;
+nosave int resumed;
+nosave int failed;
+
+int resume_count() { return resumed; }
+int fail_count() { return failed; }
+
+async int park(promise p) {
+  int v = await p;
+
+  resumed++;
+  return v;
+}
+
+// The awaited promise is reachable only from this frame's own copy, so the
+// "awaited promise was collected while pending" net cannot fire for it.
+async int park_own() {
+  promise p = promise_create();
+  int v;
+
+  held = p;
+  v = await p;
+  resumed++;
+  return v;
+}
+
+mixed get_held() { return held; }
+
+void settle_held(int ok) {
+  if (held) {
+    if (ok) {
+      promise_resolve(held, 1);
+    } else {
+      promise_reject(held, "fuzz reject");
+    }
+    held = 0;
+  }
+}
+
+async int inner(promise p) {
+  int v = await p;
+
+  resumed++;
+  return v;
+}
+
+// Two frames of this object parked at once; abandoning the inner one settles
+// a promise the outer one is parked on, mid-abandonment.
+async int outer(promise p) {
+  int v = await inner(p);
+
+  resumed++;
+  return v;
+}
+
+async int park_acatch(promise p) {
+  mixed err = acatch(await p);
+
+  resumed++;
+  if (err) {
+    failed++;
+    return -1;
+  }
+  return 1;
+}
+
+// Resumes, then destructs its own object, then parks again inside it.
+async int park_then_die(promise p, promise second) {
+  await p;
+  resumed++;
+  destruct(this_object());
+  await second;
+  return 2;
+}

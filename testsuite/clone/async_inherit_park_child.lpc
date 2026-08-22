@@ -1,0 +1,11 @@
+inherit "/clone/async_inherit_park";
+
+nosave mixed child_gate;
+
+async int child_park(int n) {
+  int v = await child_gate;
+
+  return n + v;
+}
+
+void set_child_gate(mixed p) { child_gate = p; }

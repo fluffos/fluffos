@@ -10,6 +10,7 @@ title: async / async_getdir
 ### SYNOPSIS
 
     void async_getdir( string dir, function callback );
+    promise async_getdir( string dir );
 
 ### DESCRIPTION
 
@@ -28,6 +29,10 @@ title: async / async_getdir
             // empty array when no matching files exist
             // array of matching filenames
         }
+
+
+    With the callback OMITTED, returns a promise fulfilled with the sorted
+    array of names -- `string *names = await async_getdir(dir);`.
 
 ### NOTE
 

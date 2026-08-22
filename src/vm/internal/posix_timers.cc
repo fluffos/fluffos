@@ -32,14 +32,16 @@ void init_posix_timers(void) {
   sev.sigev_value.sival_ptr = NULL;
 
   int i = -1;
-// Only CLOCK_REALTIME is standard.
-#if defined(CLOCK_MONOTONIC_COARSE)
-  i = timer_create(CLOCK_MONOTONIC_COARSE, &sev, &eval_timer_id);
-#endif
+  /* Only CLOCK_REALTIME is standard, so fall back to it.
+   *
+   * CLOCK_MONOTONIC_COARSE was tried first here, and never once succeeded:
+   * the kernel's posix-timer clock table has no coarse entries, so
+   * timer_create() rejects it with EOPNOTSUPP (verified) and every boot paid
+   * a failing syscall to learn that. It would be the wrong clock anyway --
+   * coarse clocks advance a tick at a time, which for the eval-cost timer
+   * would quantize the budget the whole interpreter is metered against. */
 #if defined(CLOCK_MONOTONIC)
-  if (i < 0) {
-    i = timer_create(CLOCK_MONOTONIC, &sev, &eval_timer_id);
-  }
+  i = timer_create(CLOCK_MONOTONIC, &sev, &eval_timer_id);
 #endif
   if (i < 0) {
     i = timer_create(CLOCK_REALTIME, &sev, &eval_timer_id);

@@ -275,6 +275,13 @@ order:
 ## 6. Known limitations (current state)
 
 - No eval limit: `while(1);` in LPC blocks the tab (phase 1 above).
+  This is also the one place the async scheduler behaves differently:
+  a drain turn is still bounded by `async drain eval budget` (measured
+  on `steady_clock`, which emscripten maps to `performance.now()`), but
+  the PER-DELIVERY budget that stops any single handler running away is
+  a no-op here, so one runaway promise handler blocks the tab exactly
+  like the `while(1)` above. Nothing async-specific is wrong; the
+  platform simply has no eval limit for anything.
 - No real DNS: `query_ip_number()` reports 127.0.0.1 for web
   connections, and `resolve()` resolves everything to 127.0.0.1
   synthetically (native callback shape, next tick).

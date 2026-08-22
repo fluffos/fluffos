@@ -1,0 +1,10 @@
+// heart_beat is an apply too, even though the driver dispatches it by a
+// cached index (prog->heart_beat) rather than by name -- so it is not in the
+// master-applies table that the dispatch cache uses, and it had to be added
+// to the object half of vm/internal/applies for the compiler to see it.
+//
+// It is the worst apply to make async, not the most obscure: the driver
+// discards the return value, so a rejection has no handler at all, and the
+// beat re-fires every tick while the previous one is still parked -- one more
+// suspended frame per beat, against `max suspended async functions`.
+async void heart_beat() {}

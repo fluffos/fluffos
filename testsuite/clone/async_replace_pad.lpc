@@ -1,0 +1,6 @@
+// Padding globals only: makes the child's variable block big enough that
+// replace_program() actually shifts the base's variables down, so a stale
+// variable_index_offset reads the wrong slots instead of accidentally the
+// right ones.
+
+nosave int pad1, pad2, pad3, pad4, pad5, pad6;

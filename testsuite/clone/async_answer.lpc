@@ -1,0 +1,36 @@
+// A fixture that answers the driver's questions with a PROMISE.
+//
+// `id()` is an object apply, so `async int id()` is a compile error; and
+// `is_living()` is not in the applies table at all, so `async int
+// is_living()` compiles with no diagnostic whatsoever. Neither matters here:
+// an ORDINARY function that returns an async call's result hands the driver a
+// promise just the same, and no name-keyed compile check can see that.
+//
+// decide() never awaits, so its promise is already fulfilled -- with 0, a
+// denial. Parking is not required for the bug; an async function returns a
+// promise whether or not it suspends.
+
+async int decide() { return 0; }
+
+mixed id(string name) { return decide(); }
+
+mixed is_living() { return decide(); }
+
+string *parse_command_id_list() { return ({ "bag" }); }
+
+// The parser asks the target object whether it accepts being the direct
+// object of "poke LIV"; without this the rule declines for a reason that has
+// nothing to do with is_living().
+mixed direct_poke_liv() { return 1; }
+
+void create() {
+#ifdef __PACKAGE_PARSER__
+  parse_init();
+#endif
+}
+
+void move_to(object dest) {
+#ifndef __NO_ENVIRONMENT__
+  move_object(dest);
+#endif
+}

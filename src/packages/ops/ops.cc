@@ -180,6 +180,12 @@ void f_eq() {
       free_buffer(sp->u.buf);
       break;
     }
+    case T_PROMISE: {
+      i = (sp - 1)->u.prom == sp->u.prom;
+      free_promise((sp--)->u.prom);
+      free_promise(sp->u.prom);
+      break;
+    }
     default:
       pop_stack();
       free_svalue(sp, "f_eq");
@@ -536,6 +542,13 @@ void f_ne() {
       i = (sp - 1)->u.buf != sp->u.buf;
       free_buffer((sp--)->u.buf);
       free_buffer(sp->u.buf);
+      break;
+    }
+
+    case T_PROMISE: {
+      i = (sp - 1)->u.prom != sp->u.prom;
+      free_promise((sp--)->u.prom);
+      free_promise(sp->u.prom);
       break;
     }
 

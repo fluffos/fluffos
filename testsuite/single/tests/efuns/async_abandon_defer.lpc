@@ -1,0 +1,66 @@
+// Abandoning a parked frame whose owner is gone must not try to run its
+// defer() handlers.
+//
+// A parked frame can hold pending defer()s, and there are two routes that
+// abandon one. The eager route, taken when the object is destructed while the
+// frame is still parked, discards them and says why: they are funptrs owned
+// by the object being destructed, and call_function_pointer() refuses those.
+//
+// The other route is reached when the resume was already QUEUED before the
+// destruct: the drain delivers it, resume_coroutine() finds the owner gone,
+// and abandons. That route used to ask for the defers to run anyway -- so
+// every one of them produced a driver error ("Owner (...) of function pointer
+// is destructed") through the mudlib error handler, one per defer per
+// abandoned frame, naming a cause no mudlib author can act on. A mass
+// destruct produced a burst of them.
+//
+// Same situation, so it now gets the same answer as its sibling: the decision
+// is made from whether LPC can still run in that object, not from which route
+// asked (AGENTS.md section 15). The same rule covers a recompiled or
+// replaced-program owner, where the funptrs are stale rather than destructed.
+//
+// Be straight about what this file can and cannot prove. The refusal is
+// SILENT from LPC: pop_control_stack() runs defers through
+// safe_call_function_pointer(), which swallows the error, so on the unfixed
+// driver there is no failure to record and nothing to assert against. What
+// the file does is pin the SETUP -- that the frame really is parked, its
+// resume really is queued, and its owner really is destructed before the
+// drain gets to it -- which is the part that silently stops being true when
+// the surrounding machinery changes. Instrumenting free_coroutine() confirms
+// this scenario reaches the branch: run_lpc=1 with a destructed owner, which
+// the fix turns into can_run=0. The fix itself rests on matching its sibling
+// route (AGENTS.md section 13's code-symmetry argument, which it explicitly
+// allows where no observable regression route exists).
+
+nosave object worker;
+nosave promise gate;
+
+private void done() {
+  // Assert the SETUP, not the fix: the fix is the absence of an error, and a
+  // file whose passing run records no check at all cannot be told apart from
+  // one that never reached the scenario. These two say the frame really was
+  // parked, queued and abandoned.
+  ASSERT2(!worker, "the worker should have been destructed while its resume was queued");
+  ASSERT_EQ(1, promise_status(gate));
+  RELEASE_LATCH("abandon defer");
+}
+
+void do_tests() {
+  gate = promise_create();
+
+  EXPECT_LATCH("abandon defer");
+
+  worker = clone_object("/clone/async_defer_park");
+  worker->set_gate(gate);
+  worker->park();  // runs to the await and parks, with a defer outstanding
+
+  // Queue the resume FIRST, then destruct: that is what routes this frame
+  // through resume_coroutine()'s abandon rather than the eager sweep.
+  promise_resolve(gate, 0);
+  destruct(worker);
+  worker = 0;
+
+  // Late enough that the drain has delivered the queued resume and taken the
+  // abandon path.
+  call_out((: done :), 2);
+}

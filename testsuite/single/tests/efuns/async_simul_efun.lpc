@@ -1,0 +1,32 @@
+// An async simul_efun yields a promise, and the compiler must know it
+// (issue #1319). FUNC_ASYNC lives in program_t::function_flags, not in the
+// function_t that SIMUL(n) exposes, so the call-site typing has to read it
+// the same way call_direct() does when dispatching.
+
+async void awaits_simul() {
+  int v = await async_simul(21);
+
+  ASSERT_EQ(42, v);
+  RELEASE_LATCH("await simul_efun");
+}
+
+void do_tests() {
+  promise<int> p;
+  mixed m;
+
+  // the call site is typed promise<int>, not int
+  p = async_simul(3);
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ("PROMISE<int>( fulfilled: 6 )", sprintf("%O", p));
+
+  // and the runtime really does hand back a promise
+  m = async_simul(4);
+  ASSERT_EQ("promise", typeof(m));
+  ASSERT_EQ(8, promise_result(m));
+
+  // awaiting one works like any other async call (see promise_typed.lpc for
+  // why the body is started from a call_out). It resumes after do_tests()
+  // has returned, so the EXIT LATCH holds the run open until its check ran.
+  EXPECT_LATCH("await simul_efun");
+  call_out(function() { awaits_simul(); }, 1);
+}

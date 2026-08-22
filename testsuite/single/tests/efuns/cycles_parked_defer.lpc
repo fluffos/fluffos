@@ -1,0 +1,59 @@
+// break_cycles() must never cut a reference that is not an LPC-visible
+// value. Two edges of a parked async frame look breakable but are not:
+//
+//   * a defer() node's function -- pop_control_stack() calls it
+//     unconditionally when the frame unwinds, so a zeroed slot is a null
+//     funptr dereference (segfault; UBSan: "member access within null
+//     pointer of type 'funptr_t'");
+//   * the coroutine's own result promise -- "breaking" it means abandoning
+//     the frame, and settling that promise mutates and frees the very
+//     reaction vector the fixer is iterating (use-after-free).
+//
+// Both are still DETECTED (has_cycle/find_cycles report them); break_cycles
+// leaves them intact and simply breaks fewer edges. The parked frame's own
+// value-stack slots stay breakable -- a local legitimately becomes 0, which
+// is what cycles_parked_coroutine.lpc pins.
+//
+// The loop here closes through the defer's captured argument:
+//   fp -> hdr.args[0] -> gate -> reaction -> coroutine -> defers->func -> fp
+
+#if efun_defined(break_cycles)
+
+nosave mixed gate, dfp;
+nosave int bodyDone, deferRan;
+
+void defer_target(mixed unused) { deferRan++; }
+
+async void parker() {
+  defer(dfp);
+  await gate;
+  bodyDone++;
+}
+
+void do_tests() {
+  EXPECT_LATCH("parked defer survives break_cycles");
+
+  gate = promise_create();
+  dfp = (: defer_target, gate :);  // captures the promise the body awaits
+  parker();                        // runs to the await and parks
+
+  ASSERT_EQ(1, has_cycle(dfp));  // the loop is still reported...
+  break_cycles(dfp);             // ...but the defer's function is not cut
+
+  call_out(function() { promise_resolve(gate, 1); }, 1);
+  call_out(function() {
+    // the frame resumed and its defer ran a real function, rather than
+    // crashing the driver on a zeroed slot
+    ASSERT_EQ(1, bodyDone);
+    ASSERT_EQ(1, deferRan);
+    gate = 0;
+    dfp = 0;
+    RELEASE_LATCH("parked defer survives break_cycles");
+  }, 3);
+}
+
+#else
+
+void do_tests() {}
+
+#endif

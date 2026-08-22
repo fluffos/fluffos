@@ -95,6 +95,10 @@
     "label": "Regular Expressions (PCRE)",
     "description": "Perl-compatible regular expression matching, extraction and replacement."
   },
+  "efun/promises": {
+    "label": "Promises",
+    "description": "Native promises: the eventual results of asynchronous operations, consumed with async/await or then-chaining."
+  },
   "efun/sockets": {
     "label": "Sockets",
     "description": "Low-level TCP/UDP socket networking from the sockets package."

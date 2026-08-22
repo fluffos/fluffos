@@ -1,0 +1,59 @@
+// promise<class T> (issue #1319). A class payload is on exactly the same
+// path as any other type -- no carve-out:
+//
+//   - compile time it is TYPE_MOD_CLASS | index like any class declaration,
+//     so fix_class_type() remaps the index across an inherit and
+//     compatible_types() requires an exact class match;
+//   - at runtime the tag is T_CLASS, because a class value is a bare array
+//     with no class identity (allocate_class() returns an array_t) and
+//     T_CLASS is all the runtime can honestly say about one.
+//
+// The rejection cases are fail fixtures in tests/compiler/fail/.
+
+inherit "/clone/promise_class_base";
+
+class holder {
+  promise<int> p;
+  int n;
+}
+
+async int an_int() { return 3; }
+
+async void awaits_inherited_class() {
+  class point pt = await make_point();
+
+  ASSERT_EQ(7, pt->x);
+  ASSERT_EQ(9, pt->y);
+  RELEASE_LATCH("await inherited class promise");
+}
+
+void do_tests() {
+  promise<class point> pp;
+  class holder h;
+
+  // an inherited async class-returning function: the payload's class index
+  // was allocated in the BASE program's class table
+  pp = make_point();
+  ASSERT_EQ("promise", typeof(pp));
+  ASSERT_EQ(7, promise_result(pp)->x);
+
+  // the runtime tag is the plain T_CLASS mask, named like any runtime type
+  ASSERT_EQ("PROMISE<class>", sprintf("%O", pp)[0..13]);
+
+  // promise<class T> in parameter and return position, across the inherit
+  ASSERT_EQ(pp, passthru(pp));
+
+  // a class MEMBER may itself be promise-typed
+  h = new(class holder);
+  h->p = an_int();
+  h->n = 1;
+  ASSERT_EQ("promise", typeof(h->p));
+  ASSERT_EQ(3, promise_result(h->p));
+
+  // see promise_typed.lpc: start the awaiting body from a call_out so its
+  // microtask drain is ordered against the rest of the run. It finishes
+  // after do_tests() has returned, so an EXIT LATCH holds the run open until
+  // its checks have run -- and fails the run if it never resumes at all.
+  EXPECT_LATCH("await inherited class promise");
+  call_out(function() { awaits_inherited_class(); }, 1);
+}

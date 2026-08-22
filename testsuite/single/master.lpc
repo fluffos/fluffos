@@ -15,6 +15,28 @@ nosave string last_error = "";
 nosave int num_checks = 0;
 nosave string *test_failures = ({});
 
+// Set by the runner around each test file: see error_handler().
+nosave int in_test_file = 0;
+
+public void set_in_test_file(int on) { in_test_file = on; }
+
+// Uncaught errors raised by DEFERRED work (a call_out, a promise reaction,
+// a resumed coroutine) are recorded as failures -- otherwise a test whose
+// deferred half threw reports green, since its remaining checks simply
+// never run and nothing else notices. A test that raises such an error ON
+// PURPOSE declares it here, by a substring of the message.
+//
+// Each declaration is SINGLE-USE: it is consumed by the first matching
+// error. The list is process-global and cannot be cleared per file (the
+// errors it describes fire long after their file returned), so a permanent
+// entry would go on swallowing genuine failures in every later file for
+// the rest of the run. Declare once per expected occurrence.
+nosave string *expected_deferred_errors = ({});
+
+public void expect_deferred_error(string substr) {
+  expected_deferred_errors += ({ substr });
+}
+
 public string clear_last_error() {
   num_checks++;
   last_error = "";
@@ -27,6 +49,59 @@ public void record_failure(string msg) {
 public int query_num_checks() { return num_checks; }
 
 public string *query_failures() { return test_failures; }
+
+// ---------------------------------------------------------------------
+// Exit latches.
+//
+// do_tests() returning does NOT mean a test is finished: it may have left
+// a call_out, a parked `await`, or package I/O in flight, and any check
+// that runs later would land after the runner's recap -- printed, but not
+// counted, so the run reports green (this is why deferred checks needed
+// hand-written shutdown(-1) gates, and why the two files that forgot one
+// pinned nothing).
+//
+// Instead a test DECLARES its outstanding work: EXPECT_LATCH("name")
+// before scheduling it, RELEASE_LATCH("name") once the last assertion for
+// that work has run. The harness holds the end of the run open until every
+// latch is clear, so those checks are counted like any other. A latch that
+// never clears is itself a failure naming the test and the latch, rather
+// than a silent pass or a hang.
+nosave mapping open_latches = ([]);
+
+private string latch_key(object owner, string name) {
+  return (owner ? file_name(owner) : "<gone>") + " :: " + name;
+}
+
+public void expect_latch(string name) {
+  string key = latch_key(previous_object(), name);
+
+  if (open_latches[key]) {
+    record_failure(key + ": latch registered twice");
+    return;
+  }
+  open_latches[key] = 1;
+}
+
+public void release_latch(string name) {
+  string key = latch_key(previous_object(), name);
+
+  if (!open_latches[key]) {
+    record_failure(key + ": latch released without being registered");
+    return;
+  }
+  map_delete(open_latches, key);
+}
+
+public string *query_latches() { return keys(open_latches); }
+
+// Called by the terminal once the wait budget is exhausted: whatever is
+// still outstanding is a failure, and is cleared so the run can finish.
+public void expire_latches() {
+  foreach (string key in keys(open_latches)) {
+    record_failure(key + ": latch never released (test left work unfinished)");
+  }
+  open_latches = ([]);
+}
 
 // Remove and return the most recently recorded failure (the harness
 // self-test /single/tests/std/harness.lpc uses this to probe the
@@ -90,13 +165,24 @@ void flag(string str) {
         has_error = 1;
         write(error);
       }
-      shutdown(0);
+      // `-fspeed:async` measures the scheduler, which cannot run at all
+      // while this frame holds the stack: the microtask drain is a gametick
+      // event, and no tick is serviced until flag() returns. That benchmark
+      // therefore keeps running across ticks and shuts down itself, exactly
+      // as the test runner defers to its latch terminal above.
+      if (!"/command/speed"->is_pending()) {
+        shutdown(0);
+      }
       break;
     default:
       write("The only supported flag is 'test' and 'speed', got '" + str + "'.\n");
       break;
   }
-  if (has_error) { shutdown(-1); }
+  // A deferred recap means latched work is still outstanding and the
+  // terminal has not run: shutting down here would skip the recap and every
+  // remaining latched check, so one early failure would mask all of them.
+  // The terminal exits nonzero for us once the latches clear.
+  if (has_error && !"/command/tests"->is_report_deferred()) { shutdown(-1); }
   // otherwise wait for auto shutdown
 }
 
@@ -224,6 +310,28 @@ void preload(string file) {
 // Write an error message into a log file. The error occured in the object
 // 'file', giving the error message 'message'.
 
+// check_valid_path() reads this apply's return value the moment it returns,
+// and treats anything that is not the integer 0 and not a string as "allow".
+// An `async` valid_read() would therefore grant access unconditionally, from a
+// body that has decided nothing yet -- so the driver denies a promise instead,
+// which is what tests/efuns/valid_read_promise.lpc pins.
+//
+// Only the probe path is special; everything else is allowed, which is what
+// this mudlib did before it had a valid_read() at all (a missing apply reads
+// as "allow" in check_valid_path()).
+mixed valid_read(string file, object ob, string func) {
+  if (strsrch(file, "valid_read_promise_probe") != -1) {
+    return promise_create();
+  }
+  // Chain to /inherit/master/valid, do not just return 1: that copy counts
+  // the apply for the suite's "MASTER valid inherit functions are not being
+  // called!" check AND deliberately clobbers st_num_arg with a 3-argument
+  // efun, which is how a driver that reads the global after an apply (see
+  // AGENTS.md section 13.16) fails the suite instead of passing silently.
+  // Shadowing it outright quietly disabled both.
+  return ::valid_read(file, ob, func);
+}
+
 void log_error(string, string message) {
   write_file(LOG_DIR + "/compile", message);
 }
@@ -332,6 +440,34 @@ staticf void error_handler(mapping map, int flag) {
   last_error = str;
   write_file("/log/log", str);
   if (!flag && ob) tell_object(ob, str);
+
+  // An UNCAUGHT error (flag == 0) is a test failure, and until this was
+  // recorded it could vanish entirely: run_one() only catches errors thrown
+  // out of do_tests(), so an error inside a call_out, a promise reaction or
+  // a resumed coroutine reached only this handler -- which writes /log/log
+  // and tells this_player(), and there is no this_player() during post-run
+  // tick work. A test whose deferred half threw therefore reported green
+  // (its checks simply never ran, and "fewer checks than last time" is not
+  // something CI can key on). Caught errors (flag != 0) are ordinary
+  // control flow -- tests use catch() deliberately -- and are not recorded.
+  // ...but only for DEFERRED work. While a test file is executing, an
+  // uncaught error is either caught by run_one() or deliberate (the whole
+  // crasher/ convention is "errors are ignored; only crashing the driver
+  // fails"). The invisible case is an error AFTER the file returned --
+  // in a call_out, a promise reaction, a resumed coroutine -- which reaches
+  // only this handler, and there is no this_player() to tell during post-run
+  // tick work, so the test's remaining checks silently never ran.
+  if (!flag && !in_test_file) {
+    for (int i = 0; i < sizeof(expected_deferred_errors); i++) {
+      if (strsrch(map["error"], expected_deferred_errors[i]) != -1) {
+        // consume it, so one declaration masks exactly one error
+        expected_deferred_errors = expected_deferred_errors[0..i - 1] + expected_deferred_errors[i + 1..];
+        return;
+      }
+    }
+    record_failure(sprintf("uncaught error in deferred work: %s (object %O, program %O, line %O)",
+      map["error"], map["object"] || "none", map["program"] || "none", map["line"]));
+  }
 }
 
 // ---------------------------------------------------------------------------

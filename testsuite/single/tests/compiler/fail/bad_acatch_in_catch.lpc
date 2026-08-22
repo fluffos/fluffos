@@ -1,0 +1,5 @@
+// acatch may not appear inside catch: the interleaved C++ frame breaks
+// acatch's marker-based unwinding
+async int f() {
+  return catch(acatch(1));
+}

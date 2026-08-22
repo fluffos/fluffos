@@ -1,0 +1,2 @@
+// async is a function-only modifier
+async int x;

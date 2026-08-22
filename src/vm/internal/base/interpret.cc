@@ -47,7 +47,7 @@ void push_indexed_lvalue(int /*code*/);
 void break_point(void);
 static void do_loop_cond_number(void);
 static void do_loop_cond_local(void);
-static void do_catch(char* /*pc*/, unsigned short /*new_pc_offset*/);
+static void do_catch(char* /*pc*/, unsigned int /*new_pc_offset*/);
 int last_instructions(void);
 static const char* get_arg(int, int);
 extern inline const char* access_to_name(int /*mode*/);
@@ -276,6 +276,8 @@ const char* type_name(int c) {
   } while (!((limit <<= 1) & TYPE_CODES_END));
   /* Oh crap.  Take some time and figure out what we have. */
   switch (c) {
+    case T_PROMISE:
+      return "promise";
     case T_INVALID:
       return "*invalid*";
     case T_LVALUE:
@@ -358,7 +360,7 @@ int validate_shadowing(object_t* ob) {
 
   push_object(ob);
   ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
-  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret)) {
+  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret, "valid_shadow")) {
     return 1;
   }
   return 0;
@@ -1272,15 +1274,18 @@ void pop_3_elems() {
   free_svalue(sp--, "pop_3_elems");
 }
 
-static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
-  auto type = val->type;
+/* Render the names of every type bit set in `type`, separated by `sep`.
+ * type_names[] only covers the contiguous low window TYPE_CODES_START ..
+ * TYPE_CODES_END; tags above it (T_PROMISE) must be listed explicitly or
+ * the caller prints an empty type list -- "Expected:  Got: 1." */
+static void add_type_mask_names(outbuffer_t* buf, uint32_t type, const char* sep) {
   int flag = 0;
-  int j = TYPE_CODES_START;
+  uint32_t j = TYPE_CODES_START;
   int k = 0;
   do {
     if (type & j) {
       if (flag) {
-        outbuf_add(buf, " and ");
+        outbuf_add(buf, sep);
       } else {
         flag = 1;
       }
@@ -1288,6 +1293,16 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
     }
     k++;
   } while (!((j <<= 1) & TYPE_CODES_END));
+  if (type & T_PROMISE) {
+    if (flag) {
+      outbuf_add(buf, sep);
+    }
+    outbuf_add(buf, "promise");
+  }
+}
+
+static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
+  add_type_mask_names(buf, val->type, " and ");
 }
 
 [[noreturn]] void bad_arg(int arg, int instr) {
@@ -1303,20 +1318,7 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
   for (int i = 0; i < 127; i++) {
     auto type = types[i];
     if (!type) break;
-    int flag = 0;
-    int j = TYPE_CODES_START;
-    int k = 0;
-    do {
-      if (type & j) {
-        if (flag) {
-          outbuf_add(&outbuf, " or ");
-        } else {
-          flag = 1;
-        }
-        outbuf_add(&outbuf, type_names[k]);
-      }
-      k++;
-    } while (!((j <<= 1) & TYPE_CODES_END));
+    add_type_mask_names(&outbuf, type, " or ");
     outbuf_add(&outbuf, ", ");
   }
 
@@ -1331,25 +1333,12 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
 
 [[noreturn]] void bad_argument(svalue_t* val, int type, int arg, int instr) {
   outbuffer_t outbuf;
-  int flag = 0;
-  int j = TYPE_CODES_START;
-  int k = 0;
 
   outbuf_zero(&outbuf);
   outbuf_addv(&outbuf, "Bad argument %d to %s%s\nExpected: ", arg, query_instr_name(instr),
               (instr < EFUN_BASE ? "" : "()"));
 
-  do {
-    if (type & j) {
-      if (flag) {
-        outbuf_add(&outbuf, " or ");
-      } else {
-        flag = 1;
-      }
-      outbuf_add(&outbuf, type_names[k]);
-    }
-    k++;
-  } while (!((j <<= 1) & TYPE_CODES_END));
+  add_type_mask_names(&outbuf, type, " or ");
 
   outbuf_add(&outbuf, " Got: ");
   svalue_to_string(val, &outbuf, 0, 0, 0);
@@ -3553,6 +3542,12 @@ void eval_instruction(char* p) {
         csp->num_local_variables = pushed_args;
         auto* funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
+        if (funflags & FUNC_ASYNC) {
+          /* run the coroutine body in its own nested interpreter; it
+           * pushes the result promise and restores this frame's state */
+          run_async_function(current_prog->program + funp->address, funp);
+          break;
+        }
         pc = current_prog->program + funp->address;
         if (Tracer::enabled()) {
           csp->trace_id = ::get_trace_id(csp);
@@ -3573,12 +3568,14 @@ void eval_instruction(char* p) {
         /* `::`-qualified calls must fill default arguments exactly like
          * F_CALL_FUNCTION_BY_ADDRESS -- this path used to skip them, so the
          * parent function ran with zeros instead of its declared defaults. */
+        bool inherited_is_async = false;
         {
           int roff = offset;
           if (temp_prog->function_flags[roff] & FUNC_ALIAS) {
             roff = temp_prog->function_flags[roff] & ~FUNC_ALIAS;
           }
           auto rflags = temp_prog->function_flags[roff];
+          inherited_is_async = (rflags & FUNC_ASYNC) != 0;
           if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
             auto result = get_function_at_index(temp_prog, roff);
             if (result.first != nullptr) {
@@ -3600,6 +3597,10 @@ void eval_instruction(char* p) {
 
         funp = setup_inherited_frame(offset);
         csp->pc = pc;
+        if (inherited_is_async) {
+          run_async_function(current_prog->program + funp->address, funp);
+          break;
+        }
         pc = current_prog->program + funp->address;
 
         if (Tracer::enabled()) {
@@ -4488,9 +4489,11 @@ void eval_instruction(char* p) {
          * statement.
          */
         LOAD_SHORT(offset, pc);
-        offset = (pc - 2) + offset - current_prog->program;
+        /* absolute program offset -- must not go back through the 16-bit
+         * `offset` local, see F_ACATCH */
+        unsigned int const catch_offset = (pc - 2) + offset - current_prog->program;
 
-        do_catch(pc, offset);
+        do_catch(pc, catch_offset);
         if ((csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) ==
             (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) {
           return;
@@ -4505,6 +4508,50 @@ void eval_instruction(char* p) {
         pop_control_stack();
         push_number(0);
         return; /* return to do_catch */
+      }
+      case F_AWAIT: {
+        /* A non-promise operand passes through unchanged: awaiting a plain
+         * value is a no-op, not a scheduling point. (JS yields here too,
+         * but it has no eval-cost model -- see yield_now() for the explicit
+         * spelling.) */
+        if (sp->type != T_PROMISE) {
+          break;
+        }
+        /* Awaiting a promise ALWAYS parks, even when it has already
+         * settled: the resume runs from the microtask drain with a fresh
+         * eval-cost budget, so a chain of awaits naturally breaks long
+         * work into separately-metered pieces instead of burning one
+         * budget. The settled cases are delivered by resume_coroutine()
+         * exactly like a late settle. */
+        coroutine_await_pending(sp->u.prom);
+        return;
+      }
+      case F_ACATCH: {
+        /* like F_CATCH, but a pure control-stack marker: no C++ recursion,
+         * so an await may suspend inside the protected region. Unwinding
+         * is driven from run_coroutine_body(). */
+        LOAD_SHORT(offset, pc);
+        /* Keep the continuation as a POINTER. Round-tripping it through the
+         * shared 16-bit `offset` local would truncate an absolute program
+         * offset -- addresses are 32-bit -- so any acatch past 64KB of
+         * bytecode would resume in the middle of an unrelated function. */
+        char* const continuation = (pc - 2) + offset;
+        if (!g_coroutine_econ) {
+          error("acatch: not inside an async function body.\n");
+        }
+        push_control_stack(FRAME_CATCH | FRAME_ASYNC);
+        csp->save_sp = sp;
+        csp->save_cgsp = cgsp;
+        csp->pc = continuation;
+        csp->num_local_variables = (csp - 1)->num_local_variables;
+        break;
+      }
+      case F_END_ACATCH: {
+        /* success path: pop the marker (restores pc to the continuation,
+         * which is exactly here) and yield 0, staying in this loop */
+        pop_control_stack();
+        push_number(0);
+        break;
       }
       case F_TIME_EXPRESSION: {
         long sec, usec;
@@ -4655,7 +4702,7 @@ void eval_instruction(char* p) {
   } /* while (1) */
 }
 
-static void do_catch(char* pc, unsigned short new_pc_offset) {
+static void do_catch(char* pc, unsigned int new_pc_offset) {
   error_context_t econ;
 
   /*
@@ -4896,12 +4943,14 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   ob->time_of_ref = g_current_gametick;
   /* Direct calls (simul_efuns, heart_beat) must fill default arguments too;
    * simul_efuns with defaults used to run with zeros. */
+  bool is_async = false;
   {
     int roff = offset;
     if (prog->function_flags[roff] & FUNC_ALIAS) {
       roff = prog->function_flags[roff] & ~FUNC_ALIAS;
     }
     auto rflags = prog->function_flags[roff];
+    is_async = (rflags & FUNC_ASYNC) != 0;
     if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
       auto result = get_function_at_index(prog, roff);
       if (result.first != nullptr) {
@@ -4917,6 +4966,14 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   previous_ob = current_object;
   current_object = ob;
   funp = setup_new_frame(offset);
+  /* Same treatment as the other call paths: an async simul_efun (this is
+   * also the FP_SIMUL route) must yield a promise and be able to await,
+   * not run its body as an ordinary call and return a plain value. */
+  if (is_async) {
+    csp->framekind |= FRAME_ASYNC;
+    run_async_function(current_prog->program + funp->address, funp);
+    return;
+  }
   call_program(current_prog, funp->address);
 }
 

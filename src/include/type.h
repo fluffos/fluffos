@@ -12,6 +12,7 @@
 #define T_FLOAT "float"
 #define T_BUFFER "buffer"
 #define T_CLASS "class"
+#define T_PROMISE "promise"
 
 #define T_INVALID "*invalid*"
 #define T_LVALUE "*lvalue*"

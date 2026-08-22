@@ -1,0 +1,98 @@
+// Regression: `acatch`'s continuation address was truncated to 16 bits.
+//
+// F_ACATCH records where execution resumes after the protected region by
+// reusing eval_instruction()'s shared `unsigned short offset` local -- fine
+// for the 16-bit branch displacement LOAD_SHORT() reads into it, but the
+// value stored into the marker frame's csp->pc is an ABSOLUTE offset into
+// current_prog->program, and program addresses are 32-bit. Any acatch whose
+// bytecode sits past 0xFFFF therefore resumed at
+// `program + (real_offset & 0xFFFF)`, i.e. in the middle of an unrelated
+// function -- so the rest of the async body silently never ran. Both region
+// exits use that pc: the success path through F_END_ACATCH's
+// pop_control_stack(), and the throw path through
+// unwind_to_acatch_marker(). 64KB of bytecode is roughly an 8000-statement
+// source file, well within real mudlib range.
+//
+// The same narrowing existed in do_catch()'s offset parameter, so plain
+// `catch` past 64KB resumed at a truncated pc too; the generated object
+// exercises both. On the unfixed binary this test does not merely fail --
+// the driver aborts with "Undefined instruction" as it executes whatever
+// bytecode the truncated address landed in.
+//
+// Only the SUCCESS paths are driven here, deliberately. Raising an error
+// inside a program this large needs a traceback, and building one trips a
+// separate, pre-existing 64KB limit that has nothing to do with acatch:
+// program_t::program_size is an `unsigned short`, so find_line() sees an
+// offset past the (truncated) program size and bails -- fatally on a Debug
+// build. The error paths of acatch and catch read the very same csp->pc, so
+// the success paths pin the truncation just as well; their unwinding
+// behavior is covered by the ordinary-sized tests in
+// compiler/async_await_context.lpc and operators/await.lpc.
+
+#define FILLERS 60
+#define STMTS 200
+
+private string generate() {
+  string src;
+  int i, j;
+
+  src = "int y;\n";
+  // Filler first, so the acatch/catch regions below sit past 64KB of
+  // emitted bytecode.
+  for (i = 0; i < FILLERS; i++) {
+    src += "int filler" + i + "(int x) {\n";
+    for (j = 0; j < STMTS; j++) {
+      src += "  y = y + x;\n";
+    }
+    src += "  return y;\n}\n";
+  }
+
+  src += "nosave int a_ok, c_ok;\nmixed ok_reason;\n";
+
+  // acatch, success path: the region yields 0 and execution continues at
+  // the statement after it.
+  src += "async int probe_acatch_ok() {\n"
+    "  mixed e = acatch(1);\n"
+    "  ok_reason = e;\n"
+    "  a_ok = 77;\n"
+    "  return 2;\n"
+    "}\n";
+
+  // the plain-catch sibling, same address arithmetic
+  src += "int probe_catch_ok() {\n"
+    "  mixed e = catch(1);\n"
+    "  c_ok = 79;\n"
+    "  return e == 0;\n"
+    "}\n";
+
+  src += "int q_a_ok() { return a_ok; }\n"
+    "int q_c_ok() { return c_ok; }\n"
+    "mixed q_ok_reason() { return ok_reason; }\n";
+  return src;
+}
+
+void do_tests() {
+  object ob;
+
+  rm("/data/gen_acatch_big.lpc");
+  write_file("/data/gen_acatch_big.lpc", generate(), 1);
+
+  ob = load_object("/data/gen_acatch_big");
+  ASSERT2(objectp(ob), "a >64KB program with acatch should compile");
+  if (!objectp(ob)) {
+    rm("/data/gen_acatch_big.lpc");
+    return;
+  }
+
+  // An async body runs synchronously up to its first await; there is no
+  // await here, so the call has fully executed by the time it returns.
+  ob->probe_acatch_ok();
+  ASSERT_EQ(77, ob->q_a_ok());
+  ASSERT_EQ(0, ob->q_ok_reason());
+
+  ASSERT_EQ(1, ob->probe_catch_ok());
+  ASSERT_EQ(79, ob->q_c_ok());
+
+  destruct(ob);
+  rm("/data/gen_acatch_big.lpc");
+}

@@ -208,8 +208,11 @@ TOKEN_SPEC = {
     # keyword families (spellings from lexer_utils.cc reswords[])
     "L_BASIC_TYPE": ("type", ["buffer", "float", "function", "int", "mapping",
                               "mixed", "object", "string", "void"]),
-    "L_TYPE_MODIFIER": ("modifier", ["nomask", "nosave", "private", "protected",
-                                     "public", "static", "varargs"]),
+    # `promise` has its own token so `promise<T>` can take a payload type
+    "L_PROMISE": ("type", ["promise"]),
+    "L_TYPE_MODIFIER": ("modifier", ["async", "nomask", "nosave", "private",
+                                     "protected", "public", "static",
+                                     "varargs"]),
     "L_IF": ("keyword", ["if"]), "L_ELSE": ("keyword", ["else"]),
     "L_SWITCH": ("keyword", ["switch"]), "L_CASE": ("keyword", ["case"]),
     "L_DEFAULT": ("keyword", ["default"]), "L_WHILE": ("keyword", ["while"]),
@@ -218,6 +221,7 @@ TOKEN_SPEC = {
     "L_BREAK": ("keyword", ["break"]), "L_CONTINUE": ("keyword", ["continue"]),
     "L_RETURN": ("keyword", ["return"]), "L_INHERIT": ("keyword", ["inherit"]),
     "L_CATCH": ("keyword", ["catch"]), "L_NEW": ("keyword", ["new"]),
+    "L_AWAIT": ("keyword", ["await"]), "L_ACATCH": ("keyword", ["acatch"]),
     # lexer_utils.cc's reswords[] maps BOTH spellings to L_CLASS (STRUCT_CLASS
     # and STRUCT_STRUCT are both unconditionally #defined in
     # options_internal.h) -- "struct" is a real keyword, not a plain name.

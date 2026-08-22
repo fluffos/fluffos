@@ -1,0 +1,5 @@
+// a prototype and its definition must agree about `async`: a call compiled
+// before the definition is typed from the prototype, so a disagreement
+// silently mistypes it (`int x = p();` accepted while x holds a promise)
+int p();
+async int p() { return 1; }

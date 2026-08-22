@@ -1,0 +1,45 @@
+// replace_program() swaps ob->prog to an inherited program and rewrites the
+// object's variable block, WITHOUT bumping prog_generation. A coroutine
+// parked in that object therefore holds a variable_index_offset computed
+// for the old layout: resuming it reads the wrong globals (release) or
+// aborts the driver with "Illegal variable access" (Debug). The resume must
+// be refused with a clean rejection instead.
+//
+// The parked function lives in the very program being replaced in, so the
+// object ends up with ob->prog == the coroutine's DEFINING program -- the
+// case a naive `ob->prog != coro->prog` guard cannot see.
+//
+// The whole sequence runs after do_tests() returns, so it is declared with
+// an EXIT LATCH and the rejection check below is counted like any other.
+
+nosave object clone;
+nosave mixed gate, parked;
+
+void do_tests() {
+  EXPECT_LATCH("replace_program under parked coroutine");
+
+  call_out(function() {
+    clone = clone_object("/clone/async_replace_child");
+    gate = promise_create();
+    clone->set_gate(gate);
+    parked = clone->park2(1);  // parks inside the to-be-replaced program
+    clone->do_replace();
+    reclaim_objects();  // forces the pending replace_programs() sweep
+  }, 1);
+
+  call_out(function() { promise_resolve(gate, 5); }, 2);
+
+  call_out(function() {
+    // rejected, with the program-replacement reason -- never fulfilled with
+    // a value computed against a stale variable block
+    ASSERT_EQ(2, promise_status(parked));
+    if (promise_status(parked) == 2) {
+      ASSERT(stringp(promise_result(parked)));
+      ASSERT(strsrch(promise_result(parked), "replaced") != -1);
+    }
+    gate = 0;
+    parked = 0;
+    if (clone) destruct(clone);
+    RELEASE_LATCH("replace_program under parked coroutine");
+  }, 4);
+}

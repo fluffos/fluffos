@@ -28,6 +28,8 @@
 #include "include/function.h"
 #include "vm/internal/base/function.h"
 
+#include "vm/internal/base/promise.h"
+
 #include "vm/internal/base/interpret.h"
 
 // TODO: in interpret.cc

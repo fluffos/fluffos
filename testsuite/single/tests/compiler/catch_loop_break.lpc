@@ -1,0 +1,72 @@
+// break/continue that stay ENTIRELY inside a catch{} / time_expression{}
+// block -- targeting a loop or switch that is itself wholly inside the
+// block -- are ordinary local branches and must keep compiling. Making
+// `await` illegal inside such nested loops must not be implemented by
+// carrying the break/continue-blocking context through loop entry (that
+// rejected long-standing mudlib code with "Cannot break out of catch { }").
+// The complementary direction -- await/acatch still illegal in a loop
+// nested inside catch -- is pinned by compiler/fail/bad_await_in_catch.lpc
+// and compiler/async_await_context.lpc.
+
+int loop_in_catch() {
+  int seen = 0;
+
+  catch {
+    int i;
+
+    for (i = 0; i < 10; i++) {
+      if (i == 1) continue;
+      if (i == 3) break;
+      seen++;
+    }
+  };
+  return seen;
+}
+
+int foreach_in_catch() {
+  int seen = 0;
+
+  catch {
+    foreach (int v in ({ 1, 2, 3 })) {
+      if (v == 2) break;
+      seen++;
+    }
+  };
+  return seen;
+}
+
+int switch_in_catch() {
+  int hit = 0;
+
+  catch {
+    switch (1) {
+      case 1:
+        hit = 1;
+        break;
+      default:
+        hit = 2;
+    }
+  };
+  return hit;
+}
+
+int loop_in_time_expression() {
+  int seen = 0;
+
+  time_expression {
+    int i;
+
+    for (i = 0; i < 5; i++) {
+      if (i == 2) break;
+      seen++;
+    }
+  };
+  return seen;
+}
+
+void do_tests() {
+  ASSERT_EQ(2, loop_in_catch());
+  ASSERT_EQ(1, foreach_in_catch());
+  ASSERT_EQ(1, switch_in_catch());
+  ASSERT_EQ(2, loop_in_time_expression());
+}

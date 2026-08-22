@@ -29,6 +29,8 @@ union u {
   struct ref_t* ref;
   unsigned char* lvalue_byte;
   void (*error_handler)(void);
+
+  struct promise_t* prom;
 };
 
 /*
@@ -37,7 +39,10 @@ union u {
  * differently, which will affect how it should be freed.
  */
 struct svalue_t {
-  unsigned short type;
+  /* 32-bit: the 16 low type bits are fully allocated (see the T_* defines
+   * below), so new value types must use bits at 0x10000 and above. Layout is
+   * unchanged on 64-bit targets: 4 + 2 + 2 bytes padding + 8-byte union. */
+  uint32_t type;
   unsigned short subtype;
   union u u;
 };
@@ -84,16 +89,46 @@ struct ref_t {
 #define T_REF 0x4000u
 #define T_LVALUE_CODEPOINT 0x8000u /* UTF8 codepoint */
 
+/* The 16 low bits are fully allocated; new value types start at 0x10000
+ * (svalue_t::type is 32-bit). */
+#define T_PROMISE 0x10000u
+
+/*
+ * Compile-time type words. These are a separate namespace from the runtime
+ * T_* tags above: a base type (TYPE_* in compiler.h) or a class index, plus
+ * the TYPE_MOD_* bits here and the DECL_* / LOCAL_MOD_* bits in program.h.
+ *
+ * lpc_type_t is 32 bits wide -- the low 16 are fully allocated, and
+ * promise<T> (issue #1319) encodes its payload type in the same word as the
+ * declaration's own array modifier.
+ */
+typedef uint32_t lpc_type_t;
+
 #define TYPE_MOD_ARRAY 0x8000u /* Pointer to a basic type */
-/* Note, the following restricts class_num to < 0x40 or 64   */
-/* The reason for this is that vars still have a ushort type */
-/* This restriction is not unreasonable, since LPC is still  */
-/* catered for mini-applications (compared to say, C++ or    */
-/* java)..for now - Sym                                      */
+/* Note, the following restricts class_num to < 0x80 or 128, since the class
+ * index shares the low byte with TYPE_MOD_CLASS. */
 #define TYPE_MOD_CLASS 0x0080u /* a class */
 #define CLASS_NUM_MASK 0x007fu
 
-#define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF)
+/*
+ * promise<T>: TYPE_MOD_PROMISE says the declared value is a promise, and the
+ * rest of the word describes its PAYLOAD (base type or class index).
+ * TYPE_MOD_ARRAY keeps its exact ordinary meaning -- "this declaration is an
+ * array" -- so `promise<int> *` (an array of promises) is
+ * TYPE_MOD_PROMISE | TYPE_MOD_ARRAY | TYPE_NUMBER. The payload's own
+ * array-ness is TYPE_MOD_PROMISE_VALUE_ARRAY, so `promise<int *>` is
+ * TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY | TYPE_NUMBER and the two
+ * compose. Bare `promise` means promise<mixed>.
+ *
+ * These two bits sit in the gap between the basic type (bits 0-15) and the
+ * declaration modifiers the parser parks in bits 21-30 (see rule_type() and
+ * BASIC_TYPE_MASK in compiler.h).
+ */
+#define TYPE_MOD_PROMISE 0x10000u
+#define TYPE_MOD_PROMISE_VALUE_ARRAY 0x20000u
+
+#define T_REFED \
+  (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF | T_PROMISE)
 #define T_ANY (T_REFED | T_STRING | T_NUMBER | T_REAL)
 
 /* values for subtype field of svalue struct */
@@ -125,6 +160,8 @@ void assign_svalue(svalue_t*, svalue_t*);
  * RelWithDebInfo+sanitizer CI job. Real flexible array members would unblock
  * this. */
 void assign_svalue_no_free(svalue_t*, svalue_t*);
+/* deferred T_ARRAY/T_CLASS/T_MAPPING/T_PROMISE deallocation (svalue.cc) */
+void free_compound(void* ptr, uint32_t type);
 
 #ifdef DEBUG
 #define free_svalue(x, y) int_free_svalue(x, y)

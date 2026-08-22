@@ -26,6 +26,10 @@ parse_node_t* rule_modifier_change(LPC_INT modifiers) {
     yyerror("Illegal modifier 'varargs' in global modifier list.");
     modifiers &= ~FUNC_VARARGS;
   }
+  if (modifiers & FUNC_ASYNC) {
+    yyerror("Illegal modifier 'async' in global modifier list.");
+    modifiers &= ~FUNC_ASYNC;
+  }
   if (!(modifiers & DECL_ACCESS)) {
     modifiers |= DECL_PUBLIC;
   }
@@ -97,7 +101,7 @@ LPC_INT rule_type_modifier_list(LPC_INT modifier, LPC_INT list) {
 }
 
 LPC_INT rule_type(LPC_INT modifiers, LPC_INT basic_type) {
-  LPC_INT res = (modifiers << 16) | basic_type;
+  LPC_INT res = PACK_TYPE_MODS(modifiers) | basic_type;
   current_type = res;
   return res;
 }
@@ -109,6 +113,28 @@ LPC_INT rule_atomic_type_class(ident_hash_elem_t* ihe) {
   } else {
     return ihe->dn.class_num | TYPE_MOD_CLASS;
   }
+}
+
+/* bare `promise` == promise<mixed> */
+LPC_INT rule_atomic_type_promise() { return TYPE_MOD_PROMISE | TYPE_ANY; }
+
+LPC_INT rule_atomic_type_promise_of(LPC_INT payload, LPC_INT close_op) {
+  if (close_op != F_GT) {
+    /* `promise<int >= x` and friends: the shared L_ORDER token was not a
+       plain '>'. Diagnose rather than silently accepting the declaration. */
+    yyerror("Expected '>' to close a promise<...> type.");
+  }
+  if (payload & TYPE_MOD_PROMISE) {
+    /* promise<promise<T>> is meaningless: resolving a promise with a promise
+       adopts it, so a promise value is never itself a promise. */
+    yyerror("A promise payload type may not itself be a promise.");
+    payload &= ~(TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY);
+  }
+  if (payload == TYPE_VOID) {
+    yyerror("Illegal to declare a promise of type void.");
+    payload = TYPE_ANY;
+  }
+  return promise_of_type(payload);
 }
 
 LPC_INT rule_atomic_type_class_identifier(const ScratchString* identifier) {

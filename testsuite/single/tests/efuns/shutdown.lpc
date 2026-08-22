@@ -1,5 +1,54 @@
+// Terminal of the run. Two jobs beyond exercising shutdown():
+//
+// 1. Wait for EXIT LATCHES. A test that left work in flight (a call_out, a
+//    parked `await`, package I/O) declares it with EXPECT_LATCH and clears
+//    it when its last assertion has run. Holding the exit open until every
+//    latch clears is what makes those checks COUNTED -- the runner's recap
+//    only happens afterwards, via /command/tests::finish_run().
+//
+// 2. Gate on failures recorded after the recap. master::flag() computes
+//    has_error and returns while the recap is still the last word, so
+//    anything recorded later used to be printed and then discarded by an
+//    unconditional shutdown(0). Individual tests still carry their own
+//    gates (they fire earlier and name the specific check); this is the
+//    backstop for the ones that forget.
+
+// Ticks to wait for outstanding latches before declaring them failed. The
+// bound matters more than its size: a stuck latch must fail the run with a
+// name, never hang it.
+#define LATCH_WAIT_TICKS 60
+
+nosave int waited;
+
 void do_the_nasty_deed() {
+  string *late;
+
+  if (sizeof(master()->query_latches())) {
+    if (waited++ < LATCH_WAIT_TICKS) {
+      call_out((: do_the_nasty_deed :), 1);
+      return;
+    }
+    // Budget exhausted: record each unreleased latch as a failure so the
+    // recap names the test that left work unfinished.
+    write("timed out waiting for exit latches:\n");
+    foreach (string key in master()->query_latches()) {
+      write("  " + key + "\n");
+    }
+    master()->expire_latches();
+  }
+
   write("all tests finished, shutting down.\n");
+
+  // Emit the deferred recap, now that every latch is clear.
+  "/command/tests"->finish_run();
+
+  late = master()->query_failures();
+  if (sizeof(late)) {
+    shutdown(-1);
+    ASSERT(0);
+    return;
+  }
+
   shutdown(0);
   ASSERT(0);
 }

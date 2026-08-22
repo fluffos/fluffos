@@ -1,0 +1,7 @@
+// Fixture for efuns/acatch_dwlib_latch.lpc: an invisible creator whose
+// query_name() raises. reference_allowed() sets its re-entrancy latch and
+// then applies query_name() on both objects, so this errors from INSIDE the
+// latched region -- the case whose unwind has to clear the latch.
+int query_invis() { return 3; }
+int query_creator() { return 1; }
+string query_name() { error("query_name raises inside reference_allowed\n"); return "x"; }

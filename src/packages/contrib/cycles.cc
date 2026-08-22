@@ -53,17 +53,28 @@ enum WalkMode { WALK_DETECT, WALK_FIND, WALK_BREAK };
 // bind() SHARES the args array between the old and new funptr) has no
 // svalue slot at all, so the funptr's args list is replaced with a
 // zero-filled one of the same size.
-enum SlotKind { SLOT_ITEM, SLOT_MAP_VALUE, SLOT_MAP_KEY, SLOT_FP_ARGS };
+enum SlotKind {
+  SLOT_ITEM,
+  SLOT_MAP_VALUE,
+  SLOT_MAP_KEY,
+  SLOT_FP_ARGS,
+  // A strong ref inside a promise's pending reaction list (a handler
+  // funptr, or the chained promise). Not an svalue slot either, so it is
+  // recorded as an index pair and cleared in the post-pass.
+  SLOT_PROMISE_REACTION,
+};
 
 struct PendingFix {
   SlotKind kind;
   svalue_t container;  // owns a reference until the post-pass is done
   svalue_t* slot;      // ITEM/MAP_VALUE: slot to zero; MAP_KEY: &node->values[0];
-                       // FP_ARGS: null (container is the owning funptr)
+                       // FP_ARGS / PROMISE_REACTION: null
+  int reaction_idx = -1;  // PROMISE_REACTION: which reaction
+  int reaction_slot = 0;  // PROMISE_REACTION: 0=on_fulfilled 1=on_rejected 2=next
 };
 
 struct Frame {
-  unsigned short type;  // T_ARRAY, T_CLASS, T_MAPPING, or T_FUNCTION
+  uint32_t type;  // T_ARRAY, T_CLASS, T_MAPPING, T_FUNCTION, or T_PROMISE
   union {
     array_t* arr;
     mapping_t* map;
@@ -71,9 +82,23 @@ struct Frame {
     void* ptr;
   } u;
   int idx;               // next item (array/class), current bucket (mapping),
-                         // 0 = args pending / 1 = done (function)
+                         // 0 = args pending / 1 = done (function);
+                         // promise: 0 = result edge pending, 1 = reactions
   mapping_node_t* node;  // current node within the bucket (mapping)
   int phase;             // 0 = key next, 1 = value next (mapping)
+  // T_PROMISE reaction cursor -- O(1) per edge (a flattened index that
+  // re-scans the reactions vector is O(edges * reactions), a stall on a
+  // promise with many reactions):
+  int ridx;                   // current reaction
+  int rphase;                 // 0..2 pointer slots; with a parked coroutine:
+                              // 3 frame slots, 4 coro defers, 5 marker
+                              // defers, 6 result promise. Only the frame
+                              // slots are BREAKABLE (a local legitimately
+                              // becomes 0); the defer funcs and the result
+                              // promise are detect-only -- see handle_edge.
+  int rsub;                   // frame-slot index (rphase 3) / marker (rphase 5)
+  struct defer_list* rdefer;  // current defer node (rphase 4/5)
+  int rdfield;                // 0 = func next, 1 = tp next
 };
 
 struct WalkResult {
@@ -91,6 +116,8 @@ void* compound_ptr(const svalue_t* sv) {
       return reinterpret_cast<void*>(sv->u.map);
     case T_FUNCTION:
       return reinterpret_cast<void*>(sv->u.fp);
+    case T_PROMISE:
+      return reinterpret_cast<void*>(sv->u.prom);
   }
   return nullptr;
 }
@@ -122,12 +149,14 @@ std::string render_key(const svalue_t* key) {
       return "<mapping>";
     case T_FUNCTION:
       return "<function>";
+    case T_PROMISE:
+      return "<promise>";
     default:
       return "<...>";
   }
 }
 
-Frame make_frame(unsigned short type, void* ptr) {
+Frame make_frame(uint32_t type, void* ptr) {
   Frame f{};
   f.type = type;
   f.u.ptr = ptr;
@@ -146,6 +175,8 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
   std::unordered_map<void*, char> color;
   std::vector<Frame> stack;
   std::vector<std::string> labels;  // edge label per open frame below the root
+  // set just before a SLOT_PROMISE_REACTION handle_edge() call
+  PendingFix reaction_hint;
 
   color[rptr] = COLOR_GREY;
   stack.push_back(make_frame(root->type, rptr));
@@ -155,8 +186,18 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
   // svalue slot; it CAN be a back-edge target, because bind() shares the
   // args array between the old and the new funptr (f_bind in
   // packages/core/efuns_main.cc bumps args->ref instead of copying).
-  auto handle_edge = [&](unsigned short ttype, void* tptr, svalue_t* slot, SlotKind kind,
-                         std::string&& label) {
+  // `breakable` is false for an edge that must only be DETECTED, never cut:
+  // some references are not LPC-visible values that can simply become 0.
+  // A parked coroutine's defer-list `func` must always be a real function
+  // (pop_control_stack() calls it unconditionally, so a zeroed slot is a
+  // null deref), and its result promise cannot be cut by abandoning the
+  // coroutine, because that settles the promise -- which mutates and frees
+  // the very reaction vector the fixer is iterating. Such a loop is
+  // reported by has_cycle()/find_cycles() and left intact by
+  // break_cycles(); on develop builds find_orphaned_cycles() still
+  // reclaims it.
+  auto handle_edge = [&](uint32_t ttype, void* tptr, svalue_t* slot, SlotKind kind,
+                         std::string&& label, bool breakable = true) {
     auto ins = color.try_emplace(tptr, COLOR_GREY);
     if (ins.second) {  // white: tree edge, descend
       Frame child = make_frame(ttype, tptr);
@@ -175,10 +216,14 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
         }
         path += label;
         res->paths.push_back(std::move(path));
-      } else if (mode == WALK_BREAK) {
+      } else if (mode == WALK_BREAK && breakable) {
         PendingFix fix;
         fix.kind = kind;
         fix.slot = slot;
+        if (kind == SLOT_PROMISE_REACTION) {
+          fix.reaction_idx = reaction_hint.reaction_idx;
+          fix.reaction_slot = reaction_hint.reaction_slot;
+        }
         // Hold a reference on the slot's container (for SLOT_FP_ARGS, the
         // owning funptr) so the post-pass can touch it no matter what
         // earlier fixes deallocated.
@@ -204,6 +249,9 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
     SlotKind kind = SLOT_ITEM;
     std::string label;
     bool have_edge = false;
+    // cleared for a generic-slot edge that must be detected but never cut
+    bool slot_breakable = true;
+    bool descended = false;  // an edge was already handed to handle_edge()
 
     switch (f.type) {
       case T_ARRAY:
@@ -261,6 +309,153 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
         }
         break;
       }
+      case T_PROMISE: {
+        // Two kinds of outgoing edge: the settled value, then every strong
+        // ref in the PENDING REACTION list (handler funptrs and the chained
+        // promise). The reactions are not mudlib-visible slots, but they
+        // are real refs with no other reclamation path -- a handler that
+        // captures the promise it is attached to is a genuine loop, so
+        // treating them as leaves would make that leak undetectable.
+        auto* prom = reinterpret_cast<promise_t*>(f.u.ptr);
+        if (f.idx == 0) {
+          f.idx = 1;
+          slot = &prom->result;
+          kind = SLOT_ITEM;
+          if (mode == WALK_FIND) {
+            label = "(result)";
+          }
+          have_edge = true;
+          break;
+        }
+        // Enumerate every strong ref of every reaction with the per-frame
+        // cursor (ridx/rphase/rsub/rdefer/rdfield): 3 pointer slots, then --
+        // for a PARKED COROUTINE -- its saved frame slice, its captured
+        // defers (region markers included), and its result promise LAST.
+        // The frame slice holds the awaited promise itself in the common
+        // `mixed p = promise_create(); await p;` shape, closing a loop that
+        // would otherwise be invisible here, exactly as in checkmemory.cc's
+        // sibling walker. Pointer edges go straight to handle_edge() with
+        // the reaction hint for the break pass; svalue edges inside the
+        // coroutine take the generic `slot` path, which f_break_cycles()
+        // clears to 0 like any container slot. ALL cursor mutation happens
+        // BEFORE handle_edge() -- a descend can reallocate `stack` and
+        // invalidate `f`.
+        {
+          int const nreact = prom->reactions ? static_cast<int>(prom->reactions->size()) : 0;
+          while (f.ridx < nreact && !have_edge && !descended) {
+            auto& r = (*prom->reactions)[f.ridx];
+            if (f.rphase < 3) {
+              int const ri = f.ridx;
+              int const rs = f.rphase;
+              void* target;
+              uint32_t ttype = T_FUNCTION;
+              if (rs == 0) {
+                target = reinterpret_cast<void*>(r.on_fulfilled);
+              } else if (rs == 1) {
+                target = reinterpret_cast<void*>(r.on_rejected);
+              } else {
+                target = reinterpret_cast<void*>(r.next);
+                ttype = T_PROMISE;
+              }
+              f.rphase++;
+              if (f.rphase == 3 && r.coro == nullptr) {
+                f.ridx++;
+                f.rphase = 0;
+              }
+              if (target != nullptr) {
+                reaction_hint.reaction_idx = ri;
+                reaction_hint.reaction_slot = rs;
+                handle_edge(ttype, target, nullptr, SLOT_PROMISE_REACTION,
+                            mode == WALK_FIND ? std::string("(reaction)") : std::string());
+                descended = true;  // `f` may be stale; restart the outer walk
+                break;
+              }
+              continue;  // null pointer slot: keep scanning
+            }
+            if (f.rphase == 3) {  // parked frame slots
+              if (f.rsub < r.coro->frame_size) {
+                slot = &r.coro->frame[f.rsub];
+                f.rsub++;
+                kind = SLOT_ITEM;
+                if (mode == WALK_FIND) {
+                  label = "(parked frame)";
+                }
+                have_edge = true;
+                break;
+              }
+              f.rphase = 4;
+              f.rdefer = r.coro->defers;
+              f.rdfield = 0;
+              continue;
+            }
+            if (f.rphase == 4) {  // the async frame's own defers
+              if (f.rdefer == nullptr) {
+                f.rphase = 5;
+                f.rsub = 0;  // marker index; rdefer stays null until scanned
+                continue;
+              }
+            } else if (f.rphase == 5) {  // acatch-marker defers
+              while (f.rdefer == nullptr &&
+                     f.rsub < static_cast<int>(r.coro->markers.size())) {
+                f.rdefer = r.coro->markers[f.rsub].defers;
+                f.rsub++;
+              }
+              if (f.rdefer == nullptr) {
+                f.rphase = 6;
+                continue;
+              }
+            }
+            if (f.rphase == 4 || f.rphase == 5) {  // emit func then tp of rdefer
+              slot = (f.rdfield == 0) ? &f.rdefer->func : &f.rdefer->tp;
+              /* DETECT ONLY for `func`: pop_control_stack() calls a defer's
+                 function unconditionally, so zeroing the slot turns the
+                 later call into a null-funptr dereference. `tp` is only fed
+                 to save_command_giver(), which accepts 0. */
+              slot_breakable = (f.rdfield != 0);
+              if (f.rdfield == 0) {
+                f.rdfield = 1;
+              } else {
+                f.rdfield = 0;
+                f.rdefer = f.rdefer->next;
+              }
+              kind = SLOT_ITEM;
+              if (mode == WALK_FIND) {
+                label = "(parked defer)";
+              }
+              have_edge = true;
+              break;
+            }
+            // rphase == 6: the coroutine's result promise. DETECT-ONLY
+            // (see the breakable flag below): cutting it would mean
+            // abandoning the frame, and settling that promise frees the
+            // reaction vector this walk is iterating.
+            {
+              int const ri = f.ridx;
+              void* const target = reinterpret_cast<void*>(r.coro->result_promise);
+              f.ridx++;
+              f.rphase = 0;
+              f.rsub = 0;
+              f.rdefer = nullptr;
+              f.rdfield = 0;
+              reaction_hint.reaction_idx = ri;
+              reaction_hint.reaction_slot = 3;
+              /* DETECT ONLY: cutting this edge would mean abandoning the
+                 coroutine, and settling its promise mutates + frees the very
+                 reaction vector the fixer is walking (use-after-free). */
+              handle_edge(T_PROMISE, target, nullptr, SLOT_PROMISE_REACTION,
+                          mode == WALK_FIND ? std::string("(reaction)") : std::string(),
+                          /*breakable=*/false);
+              descended = true;  // `f` may be stale; restart the outer walk
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    if (descended) {
+      continue;
     }
 
     if (!have_edge) {  // frame exhausted: close it
@@ -274,7 +469,7 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
 
     void* tptr = compound_ptr(slot);
     if (tptr != nullptr) {
-      handle_edge(slot->type, tptr, slot, kind, std::move(label));
+      handle_edge(slot->type, tptr, slot, kind, std::move(label), slot_breakable);
       // `f` may be a stale reference now; loop back around
     }
   }
@@ -348,6 +543,22 @@ void f_break_cycles() {
       if (old != nullptr) {
         fp->hdr.args = allocate_array(old->size);
         free_array(old);
+      }
+      broken++;
+    } else if (fix.kind == SLOT_PROMISE_REACTION) {
+      promise_t* prom = fix.container.u.prom;
+      if (prom->reactions && fix.reaction_idx < static_cast<int>(prom->reactions->size())) {
+        auto& r = (*prom->reactions)[fix.reaction_idx];
+        if (fix.reaction_slot == 0 && r.on_fulfilled) {
+          free_funp(r.on_fulfilled);
+          r.on_fulfilled = nullptr;
+        } else if (fix.reaction_slot == 1 && r.on_rejected) {
+          free_funp(r.on_rejected);
+          r.on_rejected = nullptr;
+        } else if (fix.reaction_slot == 2 && r.next) {
+          free_promise(r.next);
+          r.next = nullptr;
+        }
       }
       broken++;
     } else if (fix.kind != SLOT_MAP_KEY) {

@@ -1,0 +1,265 @@
+// Native promises (issue #1319 phase 1): promise_create / promise_resolve /
+// promise_reject / promise_then / promise_catch / promise_status /
+// promise_result. Settlement is delivered on a later gametick, so every
+// then/catch handler here runs after do_tests() has returned. Each
+// independent chain declares its own EXIT LATCH: the run holds its recap
+// until they have all settled, so their checks are counted like any other,
+// and a chain that never fires fails the run naming its latch.
+
+nosave int thenFired;  // also pins that delivery is never synchronous
+
+// `promise` is a declared type: parameters, return types, locals, globals
+// and arrays of promises all type-check.
+nosave promise global_promise;
+
+promise identity(promise p) { return p; }
+
+void do_more_tests();  // defined below
+
+void do_tests() {
+  mixed p, q, chained;
+  mapping m;
+  promise typed;
+  promise *many;
+
+  // --- declared promise type ---
+  typed = promise_create();
+  ASSERT_EQ("promise", typeof(typed));
+  ASSERT_EQ(typed, identity(typed));
+  global_promise = typed;
+  ASSERT_EQ(typed, global_promise);
+  many = ({ typed, promise_create() });
+  ASSERT_EQ(2, sizeof(many));
+  ASSERT_EQ("promise", typeof(many[0]));
+  global_promise = 0;
+
+  // --- synchronous surface ---
+  p = promise_create();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+
+  // reading a pending result is an error
+  ASSERT(catch(promise_result(p)));
+
+  // a non-promise in a promise-typed argument is rejected at COMPILE time
+  // when the type is statically known (tests/compiler/fail/bad_promise_*),
+  // and at runtime when it arrives through a mixed
+  q = 1;
+  ASSERT(catch(promise_status(q)));
+  q = "nope";
+  ASSERT(catch(promise_then(q, (: $1 :))));
+  // an optional function argument is type-checked too
+  q = 5;
+  ASSERT(catch(promise_then(p, q)));
+
+  // identity semantics
+  q = promise_create();
+  ASSERT(p == p);
+  ASSERT(p != q);
+  ASSERT_EQ(-1, member_array(p, ({ q })));
+  ASSERT_EQ(1, member_array(p, ({ q, p })));
+  m = ([]);
+  m[p] = 42;
+  ASSERT_EQ(42, m[p]);
+  ASSERT_EQ(0, m[q]);
+  map_delete(m, p);
+
+  // %O printing mentions the promise state
+  ASSERT(strsrch(sprintf("%O", p), "PROMISE") != -1);
+  ASSERT(strsrch(sprintf("%O", p), "pending") != -1);
+
+  // --- settlement is never synchronous ---
+  promise_resolve(q, 99);
+  ASSERT_EQ(1, promise_status(q));
+  ASSERT_EQ(99, promise_result(q));
+  // double-settle is an error
+  ASSERT(catch(promise_resolve(q, 1)));
+  ASSERT(catch(promise_reject(q, 1)));
+
+  // then() on a pending promise: fires only after resolution, on a later tick
+  EXPECT_LATCH("then on a pending promise");
+  EXPECT_LATCH("chained then");
+  chained = promise_then(p, function(mixed v) {
+    ASSERT_EQ(7, v);
+    thenFired++;
+    RELEASE_LATCH("then on a pending promise");
+    return v * 2;
+  });
+  ASSERT_EQ("promise", typeof(chained));
+  promise_then(chained, function(mixed v) {
+    ASSERT_EQ(14, v);
+    RELEASE_LATCH("chained then");
+  });
+  // self-resolution is an error
+  ASSERT(catch(promise_resolve(p, p)));
+  promise_resolve(p, 7);
+  ASSERT_EQ(0, thenFired);  // not synchronous
+
+  // then() on an already-settled promise still fires (later tick)
+  EXPECT_LATCH("then on a settled promise");
+  promise_then(q, function(mixed v) {
+    ASSERT_EQ(99, v);
+    RELEASE_LATCH("then on a settled promise");
+  });
+
+  // rejection propagates through a handler-less link to promise_catch
+  p = promise_create();
+  EXPECT_LATCH("rejection through a handler-less link");
+  promise_catch(promise_then(p), function(mixed err) {
+    ASSERT_EQ("*boom", err);
+    RELEASE_LATCH("rejection through a handler-less link");
+  });
+  promise_reject(p, "*boom");
+
+  // pass-through chain propagates fulfillment values
+  p = promise_create();
+  EXPECT_LATCH("pass-through chain");
+  promise_then(promise_then(p), function(mixed v) {
+    ASSERT_EQ("pass", v);
+    RELEASE_LATCH("pass-through chain");
+  });
+  promise_resolve(p, "pass");
+
+  // a handler error rejects the chained promise with the error text
+  p = promise_create();
+  EXPECT_LATCH("handler error rejects the chain");
+  promise_catch(promise_then(p, function(mixed v) {
+    error("handler exploded");
+    return 1;
+  }), function(mixed err) {
+    ASSERT(stringp(err));
+    ASSERT(strsrch(err, "handler exploded") != -1);
+    RELEASE_LATCH("handler error rejects the chain");
+  });
+  promise_resolve(p, 1);
+
+  // resolving with a promise adopts its state (flattening)
+  p = promise_create();
+  q = promise_create();
+  EXPECT_LATCH("resolve with a promise flattens");
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ("inner", v);
+    RELEASE_LATCH("resolve with a promise flattens");
+  });
+  promise_resolve(p, q);
+  ASSERT_EQ(0, promise_status(p));  // still pending: waiting on q
+  promise_resolve(q, "inner");
+
+  // exercise the unhandled-rejection report path (prints to the debug log
+  // when the dropped promise deallocates; nothing to assert here)
+  promise_reject(promise_create(), "dropped rejection (expected in log)");
+
+  do_more_tests();
+}
+
+// Regression coverage for the self-review findings (all previously crashed
+// or corrupted VM state):
+//  - a promise rejected with itself, and a two-promise reference cycle,
+//    must not make %O recurse forever, and must be visible to the cycle
+//    efuns so the loop can be broken;
+//  - repeated acatch-caught errors must not leak control-stack or
+//    command-giver-stack entries.
+nosave int nestDone;
+
+mixed cycle_helper(mixed a, mixed b) { return b; }
+
+// a defer() handler that errors WHILE the acatch unwind is popping frames:
+// the throw must not escape the coroutine boundary (which would leave the
+// driver's error context pointing at a dead C++ stack frame)
+async void acatch_unwind_defer_error() {
+  defer((: error("defer boom") :));
+  acatch(error("inner"));
+}
+
+// awaits a promise nobody else holds or settles: the frame parks forever
+async void park_own_promise() {
+  mixed p = promise_create();
+
+  await p;
+}
+
+async void acatch_error_loop() {
+  mixed p = promise_create();
+
+  promise_resolve(p, 1);
+  acatch(error("boom"));  // caught; must fully unwind
+  await p;
+  nestDone++;
+}
+
+void do_more_tests() {
+  mixed a, b;
+  int i;
+
+  a = promise_create();
+  ASSERT(catch(promise_reject(a, a)));  // self-rejection is refused
+
+  // a two-promise cycle: printable (depth-bounded) and breakable
+  b = promise_create();
+  promise_reject(a, b);
+  promise_reject(b, a);
+  ASSERT(stringp(sprintf("%O", a)));
+  ASSERT_EQ(1, has_cycle(a));
+  break_cycles(a);
+  ASSERT_EQ(0, has_cycle(a));
+
+  // A loop through a promise's PENDING REACTION list (a handler capturing
+  // the promise it is attached to) holds strong refs with no other
+  // reclamation path, so it must be visible to the cycle walkers too --
+  // it was previously invisible to both them and the ref checker, and so
+  // leaked permanently and silently.
+  a = promise_create();
+  promise_then(a, (: cycle_helper($1, $(a)) :));
+  ASSERT_EQ(1, has_cycle(a));
+  ASSERT(break_cycles(a) > 0);
+  ASSERT_EQ(0, has_cycle(a));
+
+  // Both shapes must also be RECLAIMABLE by the Debug orphan collector,
+  // not merely reported: a second sweep must find nothing left. (The
+  // collector counted promises as dead but never severed or released
+  // them, so it reported the same blocks forever -- which also made every
+  // later test file fail check_leaks() on a Debug build.)
+#if efun_defined(find_orphaned_cycles)
+  for (i = 0; i < 5; i++) {
+    a = promise_create();
+    b = promise_create();
+    promise_reject(a, b);
+    promise_reject(b, a);
+    a = promise_create();
+    promise_then(a, (: cycle_helper($1, $(a)) :));
+  }
+  a = 0;
+  b = 0;
+  find_orphaned_cycles(1);
+  ASSERT2(find_orphaned_cycles(1) == 0, "promise cycles must be reclaimed, not reported forever");
+#endif
+
+  // an acatch-caught error per iteration must not accumulate VM state
+  EXPECT_LATCH("acatch error loop resumes");
+  for (i = 0; i < 200; i++) {
+    acatch_error_loop();
+  }
+
+  // errors raised by defer handlers during the unwind stay contained
+  for (i = 0; i < 20; i++) {
+    acatch_unwind_defer_error();
+  }
+
+  // A parked frame that holds its OWN never-settled awaited promise is a
+  // reference loop through the coroutine's saved frame. It used to be
+  // invisible to every detector (the walkers did not follow the parked
+  // coroutine) and leaked permanently.
+#if efun_defined(find_orphaned_cycles)
+  for (i = 0; i < 5; i++) {
+    park_own_promise();
+  }
+  find_orphaned_cycles(1);
+  ASSERT2(find_orphaned_cycles(1) == 0, "parked-frame cycles must be reclaimed");
+#endif
+
+  // every one of the 200 coroutines above must resume off the drain
+  call_out(function() {
+    ASSERT_EQ(200, nestDone);
+    RELEASE_LATCH("acatch error loop resumes");
+  }, 2);
+}

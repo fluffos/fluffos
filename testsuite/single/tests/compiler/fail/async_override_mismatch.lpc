@@ -1,0 +1,12 @@
+// Overriding an inherited non-async function with an async one must be
+// rejected. The base program is already compiled, and the call inside its
+// use() was typed against `int f()`. Were this allowed, that call would
+// receive a promise instead: `if (f(1))` becomes unconditionally true and the
+// first arithmetic on the result errors at runtime, far from the cause.
+// Changing any other part of the return type across an override already
+// warns; this one has no runtime check behind it at all, so it is an error.
+inherit "/clone/async_override_base";
+
+async int f(int n) {
+  return n + 100;
+}

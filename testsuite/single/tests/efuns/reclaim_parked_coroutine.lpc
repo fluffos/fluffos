@@ -1,0 +1,48 @@
+// reclaim_objects() walks a parked coroutine's frame slice so destructed
+// objects held in a suspended frame get reclaimed. That walk is an
+// unmemoized tree walk bounded only by depth (25), and the awaited promise
+// is normally IN the frame it recurses into -- promise -> reaction ->
+// coroutine frame -> same promise is a one-hop loop, so K copies of the
+// promise in the frame cost K^25 visits. K=3 never finished in 60 seconds.
+// Each promise must be walked at most once per path.
+//
+// Three locals alias the awaited promise here (K=4 with the parameter), so
+// the unfixed walk is ~10^15 visits; the reclaim_objects() call below simply
+// never returns.
+//
+// It all runs after do_tests() has returned, so the work is declared with an
+// EXIT LATCH and the checks below are counted like any other.
+
+nosave mixed trig;
+nosave object junk;
+nosave int parked;
+
+async void park(mixed p) {
+  mixed a = p;
+  mixed b = p;
+  mixed c = p;
+
+  parked = 1;
+  await p;
+  // keep the aliases live across the suspension
+  if (a != b || b != c) parked = -1;
+}
+
+void do_tests() {
+  EXPECT_LATCH("reclaim with parked coroutine");
+
+  call_out(function() {
+    trig = promise_create();
+    park(trig);
+    junk = clone_object("/clone/async_timer");
+    destruct(junk);
+    ASSERT(reclaim_objects() >= 0);  // must RETURN, promptly
+    promise_resolve(trig, 1);
+  }, 1);
+
+  call_out(function() {
+    ASSERT_EQ(1, parked);  // -1 means the aliases did not survive the park
+    trig = 0;
+    RELEASE_LATCH("reclaim with parked coroutine");
+  }, 3);
+}

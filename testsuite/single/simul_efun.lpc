@@ -34,6 +34,7 @@ int same(mixed x, mixed y) {
     case STRING:
     case OBJECT:
     case FLOAT:
+    case PROMISE:  // promises compare by identity
       return x == y;
     case MAPPING:
       if (x == y) return 1;  // speed up this case
@@ -241,3 +242,9 @@ void simul() {}
 // Simul_efun with a default argument: call_direct() must fill it (pinned by
 // tests/compiler/default_args_inherit.lpc -- simuls used to see 0).
 int defarg_simul(int a: (: 77 :)) { return a; }
+
+// An `async` simul_efun. The runtime dispatches it through call_direct(),
+// which reads FUNC_ASYNC out of function_flags -- and so must the compiler,
+// or a call site is typed `int` while the value is a promise (pinned by
+// tests/efuns/async_simul_efun.lpc and compiler/fail/bad_async_simul_type.lpc).
+async int async_simul(int n) { return n * 2; }

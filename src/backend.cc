@@ -3,6 +3,8 @@
 
 #include "backend.h"
 
+#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
+
 #include <chrono>
 #include <cmath>   // for exp
 #include <cstdio>  // for snprintf
@@ -51,12 +53,27 @@ namespace {
 using TickQueue = std::multimap<decltype(g_current_gametick), TickEvent*, std::less<>>;
 TickQueue g_tick_queue;
 
+/* True while call_tick_events() is dispatching. Anything that wants "run me
+ * as soon as the current execution finishes" has to arm itself differently
+ * depending on this: a gametick event at delay 0 is picked up by the loop
+ * below and runs in this same pass, but ONLY if we are already inside it --
+ * from anywhere else (a walltime callback, a socket read) the queue is not
+ * touched again until the next gametick, which at the default 1000ms period
+ * is a very long time to sit on a settled promise. See schedule_drain(). */
+bool g_in_tick_events = false;
+
 // Call all events for current tick
 inline void call_tick_events() {
   // Skip if nothing to do.
   if (g_tick_queue.empty() || g_tick_queue.begin()->first > g_current_gametick) {
     return;
   }
+  /* Cleared on the way out however we leave: a callback can throw (the
+   * promise drain guards its own deliveries, but the scaffolding around a
+   * tick callback can still raise), and leaving this latched would make
+   * every later settle arm a gametick event that nothing services. */
+  g_in_tick_events = true;
+  DEFER { g_in_tick_events = false; };
   // Loop until there are no more events to run.
   //
   // NOTE: some event, like call_out(0), will add event to tick_queue during
@@ -89,6 +106,8 @@ inline void call_tick_events() {
 void look_for_objects_to_swap();
 
 }  // namespace
+
+bool backend_in_tick_events() { return g_in_tick_events; }
 
 void backend_dispose_tick_event(TickEvent* event) {
   if (event->valid) {

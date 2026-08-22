@@ -1,0 +1,215 @@
+// Operator-level semantics of `await` (issue #1319): precedence,
+// pass-through, composition, the cannot-suspend lvalue guard, and the
+// suspended-coroutine limit ("max suspended async functions").
+//
+// await is only legal inside an async function body, so the operator
+// checks live in async helpers. Awaiting a promise always parks (even a
+// settled one), so those helpers finish on the microtask drain; awaiting
+// a non-promise passes through without parking.
+//
+// Each parking helper therefore declares its own EXIT LATCH: the run holds
+// its recap until the helper has resumed and finished, so the ASSERTs in
+// its body -- which run after do_tests() returned -- are counted like any
+// other, and a body that never resumes fails the run naming its latch.
+
+nosave mixed pend;
+
+// precedence: await is a unary prefix operator, binding tighter than any
+// binary operator but looser than postfix
+async int operators() {
+  mixed p = promise_create();
+  mixed q = promise_create();
+  int r1, r2, r3, r4, r5, r6, r8;
+  mixed a7;
+
+  promise_resolve(p, 5);
+  promise_resolve(q, 3);
+
+  r1 = await p + 3;
+  r2 = await p - 3;
+  r3 = await p == 5;
+  r4 = !await p;
+  r5 = -await p;
+  ASSERT_EQ(8, r1);
+  ASSERT_EQ(2, r2);
+  ASSERT_EQ(1, r3);
+  ASSERT_EQ(0, r4);
+  ASSERT_EQ(-5, r5);
+
+  // composition: several awaits in one expression, and in call arguments
+  r6 = await p + await q;
+  a7 = ({ await p, await q });
+  r8 = sizeof(({ await p, await q }));
+  ASSERT_EQ(8, r6);
+  ASSERT_EQ(({ 5, 3 }), a7);
+  ASSERT_EQ(2, r8);
+
+  // the ASSERTs above are counted (this file's exit latch keeps the run
+  // open for them); the returned 1 only says the body ran to the end
+  return 1;
+}
+
+// non-promise operands pass through unchanged, whatever their type
+async int passthrough() {
+  ASSERT_EQ(7, await 7);
+  ASSERT_EQ("str", await "str");
+  ASSERT_EQ(({ 1, 2 }), await ({ 1, 2 }));
+  ASSERT_EQ(([ "k": 1 ]), await ([ "k": 1 ]));
+  ASSERT_EQ(0, await 0);
+  return 1;
+}
+
+// rhs of an indexed compound assignment evaluates before the lvalue is
+// pinned, so parking here is clean: it resumes and completes
+async void compound_ok() {
+  int *arr = ({ 1, 2, 3 });
+
+  arr[1] += await pend;
+  ASSERT_EQ(12, arr[1]);
+  RELEASE_LATCH("indexed compound assign across a park");
+}
+
+// Compound assignment does NOT pin an lvalue across the rhs -- every shape
+// evaluates the rhs first, so a pending await inside one parks cleanly and
+// resumes with the right value. (This asserted the opposite for a while,
+// back when checks running after the resume were printed but not counted,
+// so the wrong assertion went unnoticed; the exit latch is why they count.)
+async void local_compound_ok() {
+  string s = "n=";
+  int n = 1;
+
+  s += await pend;
+  n += await pend;
+  ASSERT_EQ("n=10", s);
+  ASSERT_EQ(11, n);
+  RELEASE_LATCH("local compound assign across a park");
+}
+
+// What the guard DOES cover: a foreach loop keeps an lvalue slot live for
+// its loop variable for the whole body, so a pending await inside one
+// refuses to suspend and acatch observes the error.
+async void foreach_guarded() {
+  int *a = ({ 1, 2 });
+  int completed = 0;
+  mixed err;
+
+  err = acatch {
+    foreach (int v in a) {
+      await pend;
+    }
+    completed = 1;  // must stay 0: the loop must NOT resume normally
+  };
+  ASSERT_EQ(0, completed);  // the loop must NOT have resumed normally
+  ASSERT(stringp(err));
+  ASSERT(strsrch(err, "cannot suspend") != -1);
+  RELEASE_LATCH("foreach lvalue refuses to suspend");
+}
+
+// suspension-limit fixtures: park on a promise that never settles during
+// the loop; acatch keeps the over-limit error from becoming an unhandled
+// rejection
+nosave mixed never;
+
+async int parker() {
+  acatch(await never);
+  return 0;
+}
+
+async int prober() {
+  mixed err = acatch(await never);
+
+  if (!err) return 0;
+  ASSERT(strsrch(err, "too many suspended") != -1);
+  return 1;
+}
+
+nosave mixed released;
+nosave mixed *parked_promises;
+
+// used to prove the suspension budget is free again after the guard test
+async void releaser() { await released; }
+
+void do_tests() {
+  mixed p;
+  int limit;
+
+  // The operator helpers await already-settled promises, which still park
+  // (one fresh eval budget per await), so they finish on the microtask
+  // drain rather than synchronously. Their internal ASSERTs do the real
+  // checking; these confirm the scheduling shape and that they complete.
+  EXPECT_LATCH("await operator semantics");
+  p = operators();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ(1, v);  // the body ran to the end
+    RELEASE_LATCH("await operator semantics");
+  });
+
+  // passthrough() only awaits non-promises, which never park
+  p = passthrough();
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(1, promise_result(p));
+
+  // suspension shapes (deferred: resolved from the call_out below)
+  pend = promise_create();
+  EXPECT_LATCH("indexed compound assign across a park");
+  compound_ok();
+  EXPECT_LATCH("local compound assign across a park");
+  local_compound_ok();
+  EXPECT_LATCH("foreach lvalue refuses to suspend");
+  foreach_guarded();
+
+  // the runaway-exhaustion guard: parking past the configured limit is a
+  // clean error at the await point. 256 + 66 is __RC_MAX_SUSPENDED_ASYNC__
+  // (include/runtime_config.h; RC_BASE_CONFIG_INT is 256).
+  limit = get_config(256 + 66);
+  if (limit > 0 && limit <= 20000) {
+    int i;
+
+    never = promise_create();
+    // Hold each parked frame's promise: dropping `never` below rejects all
+    // of them, and a rejection nobody observes is reported to the debug log
+    // -- ~10,000 lines that bury every other diagnostic in the run. Reading
+    // the result counts as observing it, and is a stronger check anyway.
+    parked_promises = allocate(limit);
+    for (i = 0; i < limit; i++) parked_promises[i] = parker();
+    p = prober();
+    // over the limit, the probe's await errored instead of suspending
+    // and its acatch caught that -- so it finished synchronously
+    ASSERT_EQ(1, promise_status(p));
+    ASSERT_EQ(1, promise_result(p));
+    // RELEASE THE BUDGET, and do it synchronously. promise_resolve() only
+    // QUEUES the parked resumes onto the microtask drain, and the drain is a
+    // gametick event that cannot run while master::flag() holds the stack for
+    // the whole suite -- so the suspended count would stay pinned at the
+    // limit for every file that runs after this one, and every later `await`
+    // of a promise anywhere in the suite would fail the runaway guard.
+    // Dropping the last reference instead frees the promise now, which frees
+    // its reaction list and with it every parked frame (each is rejected with
+    // "*awaited promise was collected before settling", observed by nobody).
+    never = 0;
+    // every parked frame was abandoned with the collection reason, and
+    // reading it marks the rejection observed
+    ASSERT_EQ(2, promise_status(parked_promises[0]));
+    ASSERT(strsrch(promise_result(parked_promises[0]), "collected") != -1);
+    for (i = 1; i < limit; i++) promise_result(parked_promises[i]);
+    parked_promises = 0;
+    // and the budget is genuinely available again: a fresh await parks
+    // rather than hitting the guard. (async_info() counts every parked
+    // frame in the driver, including other files' latched work, so the
+    // property to assert is "a park succeeds", not "the count is zero".)
+    {
+      mixed gate = promise_create();
+      mixed q;
+
+      released = gate;
+      q = releaser();
+      ASSERT_EQ(0, promise_status(q));  // parked, not rejected by the guard
+      released = 0;                     // reclaims it again
+    }
+  }
+
+  call_out(function() { promise_resolve(pend, 10); }, 1);
+  call_out(function() { pend = 0; }, 2);
+}

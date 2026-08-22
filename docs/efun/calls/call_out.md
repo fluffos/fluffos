@@ -10,12 +10,23 @@ title: calls / call_out
 ### SYNOPSIS
 
     int call_out( string | function fun, int | float delay, mixed arg ... );
+    promise call_out( int | float delay );
 
 ### DESCRIPTION
 
     Schedule a future call of function <fun> in this_object(). The call will
     take place in <delay> seconds, with each of the arguments <arg> provided.
     <arg> can be of any type.
+
+    The second form -- a delay with NO callback -- schedules a timer and
+    returns a promise instead of a handle: fulfilled with 0 when the delay
+    elapses, rejected if the call_out is removed (remove_call_out(3) with no
+    argument sweeps it with the rest) or this object is destructed first.
+    Inside an async function, `await call_out(delay)` is the non-blocking
+    pause idiom. Extra arguments are an error in this form (there is nothing
+    to call with them), and no handle is returned, so a timer you may need
+    to cancel individually should use the classic form. In call_out_info(4)
+    such a timer's function slot reads "<timer>".
 
     If the gametick in the runtime config is less than 1000, you may specify
     a <delay> as a float in milliseconds (gametick / 1000) representing a

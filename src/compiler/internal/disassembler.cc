@@ -48,7 +48,9 @@ void dump_prog_details(program_t* prog, FILE* f, int flags) {
   for (i = 0; i < prog->num_variables_defined; i++) {
     char buf[255];
     auto end = &buf[sizeof(buf) - 1];
+    set_type_name_foreign(1);
     get_type_name(&buf[0], end, prog->variable_types[i]);
+    set_type_name_foreign(0);
     fprintf(f, "%4d: %s%s\n", variable_runtime_index + i, buf, prog->variable_table[i]);
   }
   fprintf(f, "STRINGS:\n");
@@ -272,12 +274,14 @@ static std::string function_sig_string(program_t* prog, int idx) {
   get_type_modifiers(&buf[0], end, funflags);
   out += buf;
 
+  set_type_name_foreign(1);
   get_type_name(&buf[0], end, funp.type);
+  set_type_name_foreign(0);
   out += buf;
   out += funp.funcname;
 
   out += "(";
-  unsigned short* types;
+  lpc_type_t* types;
   if (prog->type_start && prog->type_start[idx] != INDEX_START_NONE) {
     types = &prog->argument_types[prog->type_start[idx]];
   } else {
@@ -286,7 +290,9 @@ static std::string function_sig_string(program_t* prog, int idx) {
   if (funp.num_arg > 0) {
     if (types) {
       for (int i = 0; i < funp.num_arg; i++) {
+        set_type_name_foreign(1);
         auto p = get_type_name(buf, end, types[i]);
+        set_type_name_foreign(0);
         *(p - 1) = '\0';  // get rid of last space
         if (i != 0) out += ",";
         out += buf;
@@ -367,7 +373,11 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
     }
 
     auto saved_pc = pc;
-    instr = *pc++;
+    /* pc is char* (signed on x86-64): a plain *pc++ sign-extends opcodes
+     * >= 128 (F_AWAIT/F_ACATCH/F_END_ACATCH live up there), so every case
+     * label for them becomes dead and the listing desyncs on the operand
+     * bytes. */
+    instr = EXTRACT_UCHAR(pc++);
     buff[0] = 0;
     sarg = 0;
 
@@ -502,6 +512,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
       case F_JUMP_WHEN_NON_ZERO:
 #endif
       case F_CATCH:
+      case F_ACATCH:
         COPY_SHORT(&sarg, pc);
         sprintf(buff, "%04x", static_cast<unsigned>(sarg));
         pc += 2;
@@ -621,7 +632,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         break;
       case F_LOOP_COND_LOCAL:
         i = EXTRACT_UCHAR(pc++);
-        iarg = *pc++;
+        iarg = EXTRACT_UCHAR(pc++); /* local index is an unsigned byte */
         COPY_SHORT(&sarg, pc);
         offset = (pc - code) - sarg;
         pc += 2;
@@ -981,7 +992,9 @@ static nlohmann::json prog_details_json(program_t* prog, int flags) {
   for (int i = 0; i < prog->num_variables_defined; i++) {
     char buf[255];
     auto end = &buf[sizeof(buf) - 1];
+    set_type_name_foreign(1);
     get_type_name(&buf[0], end, prog->variable_types[i]);
+    set_type_name_foreign(0);
     p["variables"].push_back({{"i", variable_runtime_index + i},
                               {"decl", std::string(buf) + prog->variable_table[i]}});
   }

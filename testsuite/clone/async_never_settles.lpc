@@ -1,0 +1,15 @@
+// Fixture for efuns/async_destruct_abandon.lpc: an async function parked on
+// a promise that nothing will ever settle. The promise is held in a LOCAL, so
+// the parked frame's own copy keeps it alive -- which is what disables the
+// "awaited promise was collected" safety net and leaves destruct as the only
+// thing that can abandon the frame.
+nosave promise held;
+
+async int run() {
+  promise p = promise_create();
+  int v;
+
+  held = p;
+  v = await p;
+  return v;
+}

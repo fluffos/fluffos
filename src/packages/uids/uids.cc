@@ -97,7 +97,7 @@ void f_seteuid() {
   push_object(current_object);
   push_svalue(arg);
   ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
-  if (!MASTER_APPROVED(ret)) {
+  if (!MASTER_APPROVED(ret, "valid_seteuid")) {
     free_string_svalue(sp);
     *sp = const0;
     return;

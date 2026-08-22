@@ -1,0 +1,50 @@
+// promise<T> nesting is structurally bounded (issue #1319).
+//
+// The encoding has exactly ONE promise bit (TYPE_MOD_PROMISE), so a type word
+// can never represent a promise of a promise -- which matches the runtime,
+// where resolving a promise with a promise adopts it. The grammar rejects the
+// source spelling, so every consumer that walks a promise type
+// (get_type_name(), compatible_types(), promise_payload_type()) recurses at
+// most one level whatever the input looks like.
+//
+// Fixtures are generated under /data at runtime: tests/**/*.lpc is the runner's
+// own corpus, so a deliberately-uncompilable file cannot live there.
+
+private void expect_rejected(string path, string src, string what) {
+  mixed err;
+
+  write_file(path + ".lpc", src, 1);
+  err = catch(load_object(path));
+  rm(path + ".lpc");
+  ASSERT2(stringp(err), what + " must be rejected, got: " + sprintf("%O", err));
+  ASSERT2(find_object(path) == 0, what + " must not have loaded");
+}
+
+private string nested(int levels) {
+  string src = "void f() { ";
+  int i;
+
+  for (i = 0; i < levels; i++) src += "promise<";
+  src += "int";
+  // spelled with spaces: ">>" lexes as the shift operator, which is a plain
+  // syntax error rather than the semantic diagnostic this test is after
+  for (i = 0; i < levels; i++) src += " >";
+  return src + " p; }\n";
+}
+
+void do_tests() {
+  // the ordinary one-level form still compiles
+  write_file("/data/promise_ok.lpc", "void f() { promise<int> p; }\n", 1);
+  ASSERT(load_object("/data/promise_ok") != 0);
+  rm("/data/promise_ok.lpc");
+
+  expect_rejected("/data/promise_n2", nested(2), "promise<promise<int> >");
+  expect_rejected("/data/promise_n3", nested(3), "3-level nested promise");
+
+  // deep nesting is a clean compile error, not a crash or a runaway walk
+  expect_rejected("/data/promise_n2000", nested(2000), "2000-level nested promise");
+
+  // ">>" is a syntax error rather than the semantic one, but still an error
+  expect_rejected("/data/promise_shift", "void f() { promise<promise<int>> p; }\n",
+    "promise<promise<int>> (no space)");
+}

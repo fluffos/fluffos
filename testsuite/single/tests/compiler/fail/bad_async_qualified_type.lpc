@@ -1,0 +1,7 @@
+// a `base::fn()` call to an inherited async function is promise<int>, not
+// int -- find_matching_function() used to type it from the declared return
+// type and ignore FUNC_ASYNC
+inherit "/clone/async_inherit_base";
+void f() {
+  int x = async_inherit_base::base_async(1);
+}

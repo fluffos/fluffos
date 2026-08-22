@@ -120,7 +120,7 @@ parse_node_t* new_node_no_line() {
 }
 
 /* quick routine to make a generic branched node */
-parse_node_t* make_branched_node(short kind, char type, parse_node_t* l, parse_node_t* r) {
+parse_node_t* make_branched_node(short kind, lpc_type_t type, parse_node_t* l, parse_node_t* r) {
   parse_node_t* ret;
 
   ret = new_node();

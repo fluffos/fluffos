@@ -1,0 +1,85 @@
+// A defer() handler that runs any catch(...) must not wipe the error the
+// unwind is delivering.
+//
+// do_catch() assigns const1 to the global catch_value on ENTRY, and
+// pop_control_stack() runs the frame's defer() handlers -- arbitrary LPC.
+// Every site that popped frames and THEN read catch_value therefore
+// delivered 0 instead of the real error whenever a defer handler happened to
+// use catch(). An acatch region yielding 0 reads as "no error" to
+// `if (e = acatch {...})`, so the failure was silently swallowed.
+//
+// The value is now latched before the pops. Four shapes, all of which
+// yielded 0 before the fix.
+//
+// Three of the four run after do_tests() has returned -- one parks on an
+// await, two are drain deliveries -- so each declares its own EXIT LATCH.
+// That is what makes their checks COUNTED: the runner holds its recap until
+// every latch clears. With the single shutdown(-1) call_out this file used
+// to have, a filtered run reported "2 checks ... Checks succeeded." with six
+// of the eight assertions never executed, and the guard itself never fired
+// either, because with no latch outstanding the runner reports and arms the
+// terminal synchronously.
+
+#include "/include/tests.h"
+
+void dirty() { catch(1); }
+
+async void sync_error_in_acatch() {
+  mixed e = acatch {
+    defer((: dirty :));
+    error("boom-sync");
+  };
+  ASSERT2(stringp(e), "acatch/sync got " + sprintf("%O", e));
+  ASSERT2(strsrch(e, "boom-sync") != -1, "acatch/sync reason was " + sprintf("%O", e));
+}
+
+async void rejected_await_in_acatch(mixed p) {
+  mixed e = acatch {
+    defer((: dirty :));
+    await p;
+  };
+  ASSERT2(stringp(e), "acatch/await got " + sprintf("%O", e));
+  ASSERT2(strsrch(e, "rejected-reason") != -1, "acatch/await reason was " + sprintf("%O", e));
+  RELEASE_LATCH("acatch over a rejected await");
+}
+
+async void body_error_rejects() {
+  defer((: dirty :));
+  error("boom-body");
+}
+
+void handler(mixed x) {
+  defer((: dirty :));
+  error("handler-boom");
+}
+
+void do_tests() {
+  mixed p = promise_create();
+  mixed q = promise_create();
+  mixed chained;
+
+  EXPECT_LATCH("acatch over a rejected await");
+  EXPECT_LATCH("async body rejection reason");
+  EXPECT_LATCH("then-handler rejection reason");
+
+  sync_error_in_acatch();
+
+  promise_reject(p, "rejected-reason");
+  rejected_await_in_acatch(p);
+
+  // an uncaught error in an async body must reject with the real reason
+  promise_catch(body_error_rejects(), function(mixed r) {
+    ASSERT2(stringp(r), "async body rejection got " + sprintf("%O", r));
+    ASSERT2(strsrch(r, "boom-body") != -1, "async body reason was " + sprintf("%O", r));
+    RELEASE_LATCH("async body rejection reason");
+  });
+
+  // a then-handler that errors must reject its chained promise with the reason
+  promise_resolve(q, 1);
+  chained = promise_then(q, (: handler :));
+  promise_catch(chained, function(mixed r) {
+    ASSERT2(stringp(r), "handler rejection got " + sprintf("%O", r));
+    ASSERT2(strsrch(r, "handler-boom") != -1, "handler reason was " + sprintf("%O", r));
+    RELEASE_LATCH("then-handler rejection reason");
+  });
+}

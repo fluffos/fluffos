@@ -1,0 +1,4 @@
+// promise<void> is not a declarable type
+void f() {
+  promise<void> p;
+}

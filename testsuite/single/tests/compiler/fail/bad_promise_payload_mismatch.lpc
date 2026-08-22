@@ -1,0 +1,5 @@
+// promise<T> payloads are type-checked: promise<int> is not promise<string>
+async int f() { return 1; }
+void g() {
+  promise<string> p = f();
+}

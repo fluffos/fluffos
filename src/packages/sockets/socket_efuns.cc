@@ -249,7 +249,7 @@ int check_valid_socket(const char* const what, int fd, object_t* owner, const ch
   push_refed_array(info);
 
   mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-  return MASTER_APPROVED(mret);
+  return MASTER_APPROVED(mret, "valid_socket");
 }
 
 static void clear_socket(int which, int dofree) {

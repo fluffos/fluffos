@@ -1,0 +1,17 @@
+// Fixture for efuns/async_destruct_abandon.lpc: an async body that destructs
+// its own object and then awaits again -- the ordinary die()/quit() shape.
+nosave promise held;
+
+async int suicide(object keeper) {
+  promise first = promise_create();
+  promise second;
+
+  promise_resolve(first, 1);
+  await first;  // resumes normally
+
+  second = promise_create();
+  keeper->keep(second);  // held elsewhere, never settled
+  destruct(this_object());
+  await second;  // would park inside a destructed object
+  return 2;
+}

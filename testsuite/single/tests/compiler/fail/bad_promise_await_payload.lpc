@@ -1,0 +1,5 @@
+// `await` yields the promise's PAYLOAD type, so a mismatched target is an error
+async int f() { return 1; }
+async void g() {
+  string s = await f();
+}

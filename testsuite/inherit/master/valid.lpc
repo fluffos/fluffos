@@ -87,8 +87,19 @@ int valid_socket(object, string, mixed *) {
 //  and the function by which they called it.
 // return: 1 if access allowed, 0 if access not allowed.
 
+// valid_read/valid_write deliberately end by calling efuns of differing
+// arities: st_num_arg is a bare global overwritten by every efun dispatch,
+// so an efun that consults it AFTER this apply returns (e.g. to detect an
+// optional trailing argument) reads the arity of whatever we called last.
+// With these calls in place, every file efun exercised by the suite runs
+// its post-apply logic against a clobbered st_num_arg -- a driver-side
+// latch bug (like the async_read/write/getdir one) breaks the suite
+// instead of passing silently because the master "conveniently" called
+// nothing.
+
 int valid_write(string, mixed, string) {
   inherit_called++;
+  sizeof(allocate(2));  // 1-arg efuns: clobber st_num_arg to 1
   return 1;
 }
 
@@ -96,6 +107,7 @@ int valid_write(string, mixed, string) {
 
 int valid_read(string, mixed, string) {
   inherit_called++;
+  member_array(0, ({ 1, 2 }), 0);  // 3-arg efun: clobber st_num_arg to 3
   return 1;
 }
 

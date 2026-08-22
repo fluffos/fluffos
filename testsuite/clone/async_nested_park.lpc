@@ -1,0 +1,21 @@
+// Fixture for efuns/async_destruct_abandon.lpc: two frames of the SAME object
+// parked at once, the outer one awaiting the inner one's promise. Destructing
+// the object then abandons the inner frame, which settles its result promise
+// and hands the outer frame to the microtask queue -- mid-abandonment. That
+// ordering is what a snapshot-based abandonment gets wrong.
+nosave promise held;
+
+async int inner() {
+  promise p = promise_create();
+  int v;
+
+  held = p;  // never settled by anyone
+  v = await p;
+  return v;
+}
+
+async int outer() {
+  int v = await inner();
+
+  return v;
+}

@@ -33,9 +33,23 @@ struct TickEvent {
 
 // Register a event to run on game ticks.
 TickEvent* add_gametick_event(int delay_ticks, TickEvent::callback_type callback);
+/* True while the current gametick's events are being dispatched. A delay-0
+ * gametick event runs in the same pass only when armed from inside it;
+ * elsewhere it waits for the next gametick. */
+bool backend_in_tick_events();
 // Realtime event will be executed as close to designated walltime as possible.
 TickEvent* add_walltime_event(std::chrono::milliseconds delay_msecs,
                               TickEvent::callback_type callback);
+/* Run as soon as the loop has next polled for I/O -- "yield to I/O, then me".
+ *
+ * This is NOT add_walltime_event(0): a zero timeout means "activate now" to
+ * libevent, which puts the callback straight on the active queue and can
+ * re-dispatch it from the same event_process_active() pass, so a callback
+ * that re-posts itself never lets the loop poll. It is also not
+ * add_walltime_event(1ms), which does yield but bounds throughput at one
+ * turn per millisecond. Use this for work that must be split across loop
+ * turns without paying a timer for each one. */
+TickEvent* add_loop_yield_event(TickEvent::callback_type callback);
 
 // Used in shutdownMudos()
 void clear_tick_events();

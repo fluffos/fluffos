@@ -100,6 +100,17 @@ static const char* sources[] = {"*",
                                 "buffers",
                                 "classes"};
 
+/* The loop below walks all MAX_TAGS (255) tag slots while this table only
+ * names the low ones, so anything allocated with a higher tag (TAG_PROMISE,
+ * TAG_DEFERS, TAG_PCRE_CACHE, ...) used to hand %s an out-of-bounds pointer
+ * -- a segfault in check_memory(1). Index through source_name(). */
+static const char* source_name(int tag) {
+  if (tag >= 0 && tag < static_cast<int>(sizeof(sources) / sizeof(sources[0]))) {
+    return sources[tag];
+  }
+  return "<other blocks>";
+}
+
 void mark_svalue(svalue_t* sv);
 
 char* dump_debugmalloc(const char* tfn, int mask) {
@@ -238,6 +249,9 @@ void mark_svalue(svalue_t* sv) {
     case T_BUFFER:
       sv->u.buf->extra_ref++;
       break;
+    case T_PROMISE:
+      sv->u.prom->extra_ref++;
+      break;
     case T_STRING:
       switch (sv->subtype) {
         case STRING_MALLOC:
@@ -323,6 +337,9 @@ static void md_print_array(array_t* vec) {
         break;
       case T_FUNCTION:
         outbuf_add(&out, "<function>");
+        break;
+      case T_PROMISE:
+        outbuf_add(&out, "<promise>");
         break;
       case T_MAPPING:
         outbuf_add(&out, "<mapping>");
@@ -558,6 +575,9 @@ void check_all_blocks(int flag) {
           buf = NODET_TO_PTR(entry, buffer_t*);
           buf->extra_ref = 0;
           break;
+        case TAG_PROMISE:
+          NODET_TO_PTR(entry, promise_t*)->extra_ref = 0;
+          break;
       }
     }
   }
@@ -713,6 +733,7 @@ void check_all_blocks(int flag) {
     mark_command_giver_stack();
     mark_call_outs();
     mark_dns_requests();
+    mark_promise_queue();
 #ifdef PACKAGE_FFI
     mark_ffi();
 #endif
@@ -775,6 +796,9 @@ void check_all_blocks(int flag) {
           case TAG_FUNP:
             fp = NODET_TO_PTR(entry, funptr_t*);
             mark_funp(fp);
+            break;
+          case TAG_PROMISE:
+            mark_promise(NODET_TO_PTR(entry, promise_t*));
             break;
           case TAG_ARRAY:
             vec = NODET_TO_PTR(entry, array_t*);
@@ -949,6 +973,14 @@ void check_all_blocks(int flag) {
                           buf->extra_ref);
             }
             break;
+          case TAG_PROMISE: {
+            promise_t* prom = NODET_TO_PTR(entry, promise_t*);
+            if (prom->ref != prom->extra_ref) {
+              outbuf_addv(&out, "Bad ref count for promise %p (state %d), is %d - should be %d\n",
+                          prom, prom->state, prom->ref, prom->extra_ref);
+            }
+            break;
+          }
           case TAG_PREDEFINES:
             outbuf_addv(&out, "WARNING: Found orphan predefine: %s %04x\n", entry->desc,
                         entry->tag);
@@ -1048,6 +1080,7 @@ void check_all_blocks(int flag) {
           case TAG_LOCALS:
           case TAG_CALL_OUT:
           case TAG_INPUT_TO:
+          case TAG_DEFERS: /* may be parked in a suspended async coroutine */
             break;
           default:
             if (entry->tag < TAG_MARKED) {
@@ -1066,7 +1099,8 @@ void check_all_blocks(int flag) {
     outbuf_add(&out, "------------------------------ ------ --------\n");
     for (i = 1; i < MAX_TAGS; i++) {
       if (totals[i]) {
-        outbuf_addv(&out, "%-30s %6" PRIu64 " %8" PRIu64 "\n", sources[i], blocks[i], totals[i]);
+        outbuf_addv(&out, "%-30s %6" PRIu64 " %8" PRIu64 "\n", source_name(i), blocks[i],
+                    totals[i]);
       }
       if (i == 5) {
         outbuf_add(&out, "\n");
@@ -1131,7 +1165,8 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
   };
   std::unordered_map<void*, Cand> cands;
   cands.reserve(blocks[TAG_ARRAY & 0xff] + blocks[TAG_CLASS & 0xff] +
-                blocks[TAG_MAPPING & 0xff] + blocks[TAG_FUNP & 0xff]);
+                blocks[TAG_MAPPING & 0xff] + blocks[TAG_FUNP & 0xff] +
+                blocks[TAG_PROMISE & 0xff]);
 
   for (int hsh = 0; hsh < MD_TABLE_SIZE; hsh++) {
     for (md_node_t* entry = md_chain_decode(table[hsh]); entry; entry = md_chain_decode(entry->next)) {
@@ -1144,6 +1179,9 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
           break;
         case TAG_FUNP:
+          cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
+          break;
+        case TAG_PROMISE:
           cands[NODET_TO_PTR(entry, void*)] = Cand{entry->tag};
           break;
       }
@@ -1159,6 +1197,8 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         return reinterpret_cast<mapping_t*>(p)->ref;
       case TAG_FUNP:
         return reinterpret_cast<funptr_t*>(p)->hdr.ref;
+      case TAG_PROMISE:
+        return reinterpret_cast<promise_t*>(p)->ref;
     }
     return 0;
   };
@@ -1172,6 +1212,8 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         return reinterpret_cast<void*>(sv->u.map);
       case T_FUNCTION:
         return reinterpret_cast<void*>(sv->u.fp);
+      case T_PROMISE:
+        return reinterpret_cast<void*>(sv->u.prom);
     }
     return nullptr;
   };
@@ -1216,6 +1258,64 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         }
         break;
       }
+      case TAG_PROMISE: {
+        // Same edge set as cycles.cc's T_PROMISE case: the settled value
+        // AND the pending reaction list. The reactions hold strong refs
+        // (handler funptrs and the chained promise), so a handler that
+        // captures the promise it is attached to closes a real loop --
+        // treating them as leaves made that leak undetectable.
+        auto* prom = reinterpret_cast<promise_t*>(p);
+        if (void* c = data_child(&prom->result)) {
+          cb(c);
+        }
+        if (prom->reactions) {
+          for (auto& r : *prom->reactions) {
+            if (r.on_fulfilled) {
+              cb(reinterpret_cast<void*>(r.on_fulfilled));
+            }
+            if (r.on_rejected) {
+              cb(reinterpret_cast<void*>(r.on_rejected));
+            }
+            if (r.next) {
+              cb(reinterpret_cast<void*>(r.next));
+            }
+            if (r.coro) {
+              // A PARKED COROUTINE is a reference holder too: its saved
+              // frame slice holds the awaited promise itself in the common
+              // `mixed p = promise_create(); await p;` shape, closing a
+              // loop that is otherwise invisible to every detector.
+              for (int fi = 0; fi < r.coro->frame_size; fi++) {
+                if (void* c = data_child(&r.coro->frame[fi])) {
+                  cb(c);
+                }
+              }
+              cb(reinterpret_cast<void*>(r.coro->result_promise));
+              for (struct defer_list* d = r.coro->defers; d; d = d->next) {
+                if (void* c = data_child(&d->func)) {
+                  cb(c);
+                }
+                if (void* c = data_child(&d->tp)) {
+                  cb(c);
+                }
+              }
+              // acatch-region defers captured at park time travel in the
+              // markers, not coro->defers (mark_coroutine/free_coroutine
+              // both walk them; this walker must agree)
+              for (auto& mk : r.coro->markers) {
+                for (struct defer_list* d = mk.defers; d; d = d->next) {
+                  if (void* c = data_child(&d->func)) {
+                    cb(c);
+                  }
+                  if (void* c = data_child(&d->tp)) {
+                    cb(c);
+                  }
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
     }
   };
 
@@ -1250,7 +1350,7 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
     });
   }
 
-  int dead = 0, n_arr = 0, n_cls = 0, n_map = 0, n_fp = 0;
+  int dead = 0, n_arr = 0, n_cls = 0, n_map = 0, n_fp = 0, n_prom = 0;
   for (auto& kv : cands) {
     if (!kv.second.live) {
       dead++;
@@ -1267,12 +1367,17 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
         case TAG_FUNP:
           n_fp++;
           break;
+        case TAG_PROMISE:
+          n_prom++;
+          break;
       }
     }
   }
   if (dead && ob) {
-    outbuf_addv(ob, "orphaned by reference loops: %d array(s), %d class(es), %d mapping(s), %d function pointer(s)\n",
-                n_arr, n_cls, n_map, n_fp);
+    outbuf_addv(ob,
+                "orphaned by reference loops: %d array(s), %d class(es), %d mapping(s), %d "
+                "function pointer(s), %d promise(s)\n",
+                n_arr, n_cls, n_map, n_fp, n_prom);
   }
 
   if (dead && collect) {
@@ -1291,6 +1396,9 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           break;
         case TAG_FUNP:
           reinterpret_cast<funptr_t*>(kv.first)->hdr.ref++;
+          break;
+        case TAG_PROMISE:
+          reinterpret_cast<promise_t*>(kv.first)->ref++;
           break;
       }
     }
@@ -1332,6 +1440,36 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           }
           break;
         }
+        case TAG_PROMISE: {
+          // Drop the settled value AND the pending reaction list: both hold
+          // strong refs and either can close a loop.
+          auto* prom = reinterpret_cast<promise_t*>(kv.first);
+          free_svalue(&prom->result, "collect_cycles");
+          prom->result = const0;
+          if (prom->reactions) {
+            for (auto& r : *prom->reactions) {
+              if (r.on_fulfilled) {
+                free_funp(r.on_fulfilled);
+                r.on_fulfilled = nullptr;
+              }
+              if (r.on_rejected) {
+                free_funp(r.on_rejected);
+                r.on_rejected = nullptr;
+              }
+              if (r.next) {
+                free_promise(r.next);
+                r.next = nullptr;
+              }
+              if (r.coro) {
+                // release the parked frame's refs as well; it can never
+                // run again once its promise is collected
+                free_coroutine_orphan(r.coro);
+                r.coro = nullptr;
+              }
+            }
+          }
+          break;
+        }
       }
     }
     // 3. release
@@ -1351,6 +1489,9 @@ int md_scan_orphaned_cycles(int collect, outbuffer_t* ob) {
           break;
         case TAG_FUNP:
           free_funp(reinterpret_cast<funptr_t*>(kv.first));
+          break;
+        case TAG_PROMISE:
+          free_promise(reinterpret_cast<promise_t*>(kv.first));
           break;
       }
     }

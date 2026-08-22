@@ -33,6 +33,14 @@ title: master / error_handler
          "file"      : string,   // the file to which the line number refers
             "line"      : int       // the line number
         ])
+
+    Not every entry has all of those. A frame entered from DRIVER CONTEXT
+    -- a promise reaction handler, the defer() teardown of an abandoned
+    coroutine -- is running no program in no object, and its entry contains
+    ONLY "function" (the string "CATCH" for a catch marker, "<driver>"
+    otherwise): no "program", "object", "file" or "line". Index those keys
+    defensively rather than assuming they are present.
+
     The 'caught' flag is 1 if the error was trapped by catch().
 
 ### SEE ALSO

@@ -1,0 +1,21 @@
+// helpers for tests/efuns/async_await.lpc and call_out_promise.lpc: a clone
+// that parks on a timer-only call_out, so the test can reject the promise
+// from outside (remove_call_out() sweeps only THIS object's call_outs, and
+// destructing the clone abandons the parked frame).
+nosave int caught;
+
+async void park() {
+  mixed err = acatch(await call_out(600));
+
+  caught = stringp(err);
+}
+
+async int park_exposed() { return await call_out(600); }
+
+void nuke() { remove_call_out(); }
+
+int query_caught() { return caught; }
+
+// a timer promise created in THIS object's context, for adoption tests --
+// nuke()'s remove_call_out() sweep rejects it
+mixed make_timer() { return call_out(600); }
