@@ -15,6 +15,7 @@
 /testsuite/trace_lpcc.json
 /testsuite/trace_test.json
 /testsuite/aw_test.txt
+/testsuite/etc/config.dap-smoke.test
 **/Testing/Temporary
 .vscode/c_cpp_properties.json
 /compile_commands.json
