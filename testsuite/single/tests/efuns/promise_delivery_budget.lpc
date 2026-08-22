@@ -20,26 +20,41 @@
 // The observable is the budget REMAINING (`set_eval_limit(-1)`), sampled in
 // the first delivery and again in the second, with a small calibrated burn in
 // between. Sharing one budget means the second sample is LOWER by at least
-// the burn. Arming afresh means it is back up near the maximum, so it does
-// not drop at all -- and the sign of that difference is the whole test.
+// the burn, because one countdown only goes one way. Arming afresh means the
+// two readings are INDEPENDENT samples of a single delivery's own start-up
+// overhead, so their difference is noise centred on zero.
 //
-// The burn is deliberately SMALL in absolute terms (BURN_US), not a fraction
-// of the turn budget. Both samples only compare if they happen in the same
-// turn, so anything that pushes the pair past the turn budget makes the probe
-// inconclusive -- and an earlier version, which burned a third of the budget,
-// was inconclusive on EVERY attempt on a sanitizer build, where the fixed
-// overhead of the probe itself already fills a turn. A burn far below the
-// budget leaves room for that overhead.
+// That noise is the whole difficulty, and it is why this is measured over
+// several rounds instead of once. The burn has to stay well under the turn
+// budget -- both samples only compare if they land in the SAME turn, and an
+// earlier version that burned a third of the budget was inconclusive on every
+// attempt on a sanitizer build, where one delivery's overhead already fills
+// most of a turn. But that same overhead is what makes a single round
+// unreliable: measured on a clang ASan Debug build, the per-round difference
+// ranged from -103 us to +77 us against a 100 us burn, so a threshold of half
+// the burn sat INSIDE the noise band and the file failed roughly one run in
+// six. Raising the burn does not help -- at 400 us the pair stopped fitting
+// in one turn and the probe became inconclusive instead.
 //
-// When the turn does end in between anyway, the probe runs again rather than
-// asserting on a coincidence; exhausting the retries is a failure only when
-// the configured budget was comfortably large enough to have observed it.
+// So the observable is the MINIMUM difference over several rounds. A shared
+// budget drops the reading by at least the burn on EVERY round, so its
+// minimum is still at least the burn. Independent samples put the minimum
+// firmly negative: at the measured distribution one round exceeds the
+// threshold about 8% of the time, so several rounds all doing so is not
+// something that happens.
+//
+// When a turn ends between a round's two samples, that round runs again
+// rather than asserting on a coincidence; exhausting the retries reports on
+// the rounds already collected, or -- if there are too few -- says so.
 
 #define PROBE_ITERS 200000
 // Well above eval-timer granularity, well below the default 1000 us turn
 // budget.
 #define BURN_US 100
 #define MAX_ATTEMPTS 20
+// Rounds to collect, and the fewest that still make the minimum meaningful.
+#define PROBE_ROUNDS 6
+#define MIN_ROUNDS 3
 
 nosave int burn_iters;
 nosave int burn_us;
@@ -47,10 +62,13 @@ nosave int budget_us;
 nosave int sample_before;
 nosave int yields_at_first;
 nosave int attempts;
+nosave int rounds;
+nosave int min_diff;
 nosave int finished;
 
 private async void probe();
 private void start_probe();
+private void conclude();
 
 private void burn(int n) {
   int i, x;
@@ -86,6 +104,11 @@ private async void probe() {
       start_probe();
       return;
     }
+    if (rounds >= MIN_ROUNDS) {
+      // Enough rounds already collected to conclude from.
+      conclude();
+      return;
+    }
     if (budget_us >= BURN_US * 10) {
       finish(sprintf("after %d attempts the two probe deliveries never landed in "
         "the same drain turn, even though the turn budget is %d us against a "
@@ -102,18 +125,31 @@ private async void probe() {
   }
 
   sample_after = set_eval_limit(-1);
-  // Shared budget: down by at least the burn. Armed afresh: back near the
-  // maximum, so not down at all. Half the burn is the margin.
-  if (sample_after > sample_before - burn_us / 2) {
+  if (!rounds || sample_before - sample_after < min_diff) {
+    min_diff = sample_before - sample_after;
+  }
+  if (++rounds < PROBE_ROUNDS) {
+    attempts = 0;
+    start_probe();
+    return;
+  }
+  conclude();
+}
+
+private void conclude() {
+  // Shared budget: every round is down by at least the burn, so the minimum
+  // is too. Armed afresh: the rounds are independent samples of one
+  // delivery's own overhead, so the minimum sits below zero.
+  if (min_diff <= burn_us / 2) {
     finish(0);
     return;
   }
-  finish(sprintf("a delivery made after one that burned about %d us of its budget "
-    "saw only %d us remaining, against the earlier delivery's %d -- it "
-    "inherited the turn's leftovers instead of being armed with a budget of "
-    "its own, so a handler can be aborted for time spent by the handlers "
-    "ahead of it",
-    burn_us, sample_after, sample_before));
+  finish(sprintf("over %d rounds, a delivery made after one that burned about %d us "
+    "of its budget never once had its own budget back: the smallest drop was "
+    "%d us. It is inheriting the turn's leftovers instead of being armed "
+    "afresh, so a handler can be aborted for time spent by the handlers ahead "
+    "of it",
+    rounds, burn_us, min_diff));
 }
 
 private mixed first_handler(mixed v) {

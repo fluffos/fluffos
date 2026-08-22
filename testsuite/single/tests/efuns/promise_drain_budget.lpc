@@ -2,30 +2,80 @@
 // at most "async drain eval budget" of eval cost per turn and then re-posts itself,
 // letting the driver read sockets and fire timers in between.
 //
-// The chain is sized from the CONFIGURED batch, not from a fixed number. An
-// earlier version used 40 links, which pinned nothing once the drain started
-// counting work created during a turn toward the same batch: 40 < 512, so the
-// whole chain ran in one turn and yielded zero times. It passed anyway, purely
-// on other test files' backlog moving the global counter inside its window --
-// a guard that would survive deleting the re-post entirely.
+// The chain is sized so that its own cost spans several turns, and it must be
+// sized in the budget's unit -- TIME. An early version used 40 trivial links,
+// which pinned nothing once the drain counted work created during a turn
+// toward the same turn: the whole chain ran in one turn and yielded zero
+// times, passing only because other test files' backlog moved the global
+// counter inside its window. The version after that used 40000 trivial links,
+// which is a delivery COUNT standing in for a time budget: it happens to
+// exceed the budget everywhere, but by wildly different margins -- on a
+// sanitizer build, where one delivery costs hundreds of microseconds against
+// a 1000 us turn, it ran for tens of thousands of turns, took over a minute
+// on its own and tripped the driver's own "drain has yielded N times in a
+// row" warning four times.
 //
-// Sizing the chain at several batches forces yields that this file's own work
-// must account for: a chain of N links against a batch of B cannot complete in
-// fewer than N/B turns, so the counter must rise by at least that much no
-// matter what else the suite is doing. Links are cheap so the whole thing is
-// milliseconds of work.
+// So each link burns a calibrated quarter of the budget instead, and a couple
+// of dozen links then span several turns on any machine -- milliseconds of
+// work rather than a minute, with the same guarantee.
 //
 // The chain runs entirely after do_tests() has returned, so it is declared
 // with an EXIT LATCH and the checks are counted like any other.
 
+
+// Each link burns this fraction of the turn budget, so this many links fill a
+// turn; the chain is this many turns' worth.
+#define LINKS_PER_TURN 4
+#define TARGET_TURNS 6
+#define MAX_LINK_US 2000
+#define MAX_LINKS 400
+#define CALIBRATE_START 100000
+#define CALIBRATE_TRIES 24
+#define CALIBRATE_FLOOR 200
 
 nosave int n;
 nosave int done;
 nosave int chain_len;
 nosave int yields_before;
 nosave int batch;
+nosave int link_us;
+nosave int burn_iters;
 
 private void check_chain();
+
+private void burn(int count) {
+  int i, x;
+
+  for (i = 0; i < count; i++) {
+    x += i;
+  }
+}
+
+// Iterations of burn() costing about link_us microseconds. Wall clock is the
+// unit: the drain measures its turn on the monotonic clock, so the
+// microseconds time_expression reports are the ones it spends.
+private void calibrate() {
+  int iters = CALIBRATE_START;
+  int cost = 0;
+  int i;
+
+  for (i = 0; i < CALIBRATE_TRIES; i++) {
+    cost = time_expression {
+      burn(iters);
+    };
+    if (cost >= CALIBRATE_FLOOR) {
+      break;
+    }
+    iters *= 4;
+  }
+  if (cost < 1) {
+    cost = 1;
+  }
+  burn_iters = iters * link_us / cost;
+  if (burn_iters < 100) {
+    burn_iters = 100;
+  }
+}
 
 void feed() {
   mixed p;
@@ -38,6 +88,7 @@ void feed() {
     ASSERT2(0, "a chain link was delivered more than once (n=" + n + ")");
     return;
   }
+  burn(burn_iters);
   if (n == chain_len) {
     done = 1;
     // Checked from the LAST link rather than after a fixed delay, for the
@@ -72,11 +123,31 @@ private void check_chain() {
   // for the whole chain; two yields proves re-posting is repeating, and the
   // yields_before subtraction means unrelated suite traffic can only add.
   ASSERT2(yields >= 2,
-    sprintf("a %d-link self-feeding chain yielded only %d times against a %d us "
-      "budget: the drain is not re-posting, so it holds the event loop for the "
-      "whole chain",
-      chain_len, yields, batch));
+    sprintf("a %d-link self-feeding chain burning about %d us per link yielded only "
+      "%d times against a %d us budget: the drain is not re-posting, so it holds "
+      "the event loop for the whole chain",
+      chain_len, link_us, yields, batch));
   RELEASE_LATCH("drain budget chain");
+}
+
+private void start_chain() {
+  link_us = batch / LINKS_PER_TURN;
+  if (link_us < 1) {
+    link_us = 1;
+  }
+  if (link_us > MAX_LINK_US) {
+    link_us = MAX_LINK_US;
+  }
+  chain_len = TARGET_TURNS * batch / link_us + LINKS_PER_TURN;
+  if (chain_len > MAX_LINKS) {
+    // A turn budget this large would need minutes of burning to span several
+    // turns. Nothing to observe -- deliberately not a failure.
+    RELEASE_LATCH("drain budget chain");
+    return;
+  }
+  calibrate();
+  yields_before = async_info(1)["drain_yields"];
+  feed();
 }
 
 void do_tests() {
@@ -85,14 +156,8 @@ void do_tests() {
   batch = info["drain_eval_budget"];
 
   ASSERT2(batch > 0, "async_info(1) should report the effective drain budget");
-  /* The budget is EVAL COST (microseconds), not a delivery count, so the
-   * chain cannot be sized from it directly. A trivial delivery costs well
-   * under a microsecond, so this many links spans many budgets' worth of
-   * work whatever the configured budget is. */
-  chain_len = 40000;
-  yields_before = info["drain_yields"];
 
   EXPECT_LATCH("drain budget chain");
 
-  call_out((: feed :), 1);
+  call_out((: start_chain :), 1);
 }
