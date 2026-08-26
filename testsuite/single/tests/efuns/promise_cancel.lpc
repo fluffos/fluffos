@@ -1,0 +1,127 @@
+// promise_cancel(): ask an async function body to give up.
+//
+// Cooperative, not preemptive. The body's NEXT await raises a catchable
+// cancellation; a stretch of straight-line code already running finishes
+// first, and a body that never awaits again runs to completion. It unwinds
+// through acatch() and runs defer() handlers like any other rejection.
+//
+// CONSUME-ONCE: the raise clears the request, so a body that catches its
+// cancellation can still await cleanup and even return normally. Cancel is a
+// request the body may decline, not a verdict.
+//
+// The awkward case the machinery exists for is a frame parked on a promise
+// that never settles: waiting for it would mean the cancellation never
+// arrives, so the frame is detached from that promise and its rejection is
+// scheduled directly.
+
+#include "/include/tests.h"
+
+nosave promise never, gate;
+nosave promise held, caught_body, defer_body;
+nosave int body_ran_past_await, defer_ran, cleanup_awaited;
+nosave mixed caught;
+
+// Parked on a promise nothing will ever settle.
+private async int stuck() {
+  await never;
+  body_ran_past_await = 1;
+
+  return 1;
+}
+
+// Catches its own cancellation, then does async cleanup and returns anyway.
+private async int recovers() {
+  mixed err = acatch(await never);
+
+  caught = err;
+  // Consume-once: this second await must NOT re-raise.
+  cleanup_awaited = await gate;
+
+  return 42;
+}
+
+private async int with_defer() {
+  defer(function() { defer_ran = 1; });
+  await never;
+
+  return 0;
+}
+
+private async int quick() { return 3; }
+
+private void check_stuck() {
+  EXPECT_LATCH("stuck");
+  held = stuck();
+  ASSERT_EQ(0, promise_status(held));
+  ASSERT_EQ(1, promise_cancel(held));
+
+  promise_catch(held, function(mixed reason) {
+    ASSERT_EQ("*async function cancelled", reason);
+    ASSERT_EQ(0, body_ran_past_await);
+    ASSERT_EQ(2, promise_status(held));
+    RELEASE_LATCH("stuck");
+  });
+}
+
+private void check_recovers() {
+  EXPECT_LATCH("recovers");
+  caught_body = recovers();
+  ASSERT_EQ(1, promise_cancel(caught_body));
+
+  promise_then(caught_body, function(mixed v) {
+    // The body declined the cancellation: its promise FULFILS.
+    ASSERT_EQ(42, v);
+    ASSERT_EQ("*async function cancelled", caught);
+    ASSERT_EQ(9, cleanup_awaited);
+    RELEASE_LATCH("recovers");
+  });
+}
+
+private void check_defer() {
+  EXPECT_LATCH("defer");
+  defer_body = with_defer();
+  ASSERT_EQ(1, promise_cancel(defer_body));
+
+  promise_catch(defer_body, function(mixed reason) {
+    ASSERT_EQ("*async function cancelled", reason);
+    ASSERT_EQ(1, defer_ran);
+    RELEASE_LATCH("defer");
+  });
+}
+
+private void check_refusals() {
+  mixed err;
+  promise done;
+
+  // Not an async function's promise: refused, loudly.
+  err = catch(promise_cancel(promise_create()));
+  ASSERT2(err, "promise_create() promise cannot be cancelled");
+  ASSERT2(stringp(err) && strsrch(err, "does not belong to an async function") != -1,
+    "the refusal says why: " + err);
+
+  err = catch(promise_cancel(promise_then(promise_create(), function(mixed v) { return v; })));
+  ASSERT2(err, "a then-chain link cannot be cancelled");
+
+  err = catch(promise_cancel(call_out(60)));
+  ASSERT2(err, "a call_out(delay) promise cannot be cancelled");
+
+  // An async body that already finished: 0, not an error. A body racing its
+  // canceller to completion is the normal outcome, not a mistake.
+  done = quick();
+  ASSERT_EQ(1, promise_status(done));
+  ASSERT_EQ(0, promise_cancel(done));
+}
+
+void do_tests() {
+  never = promise_create();
+  gate = promise_create();
+
+  check_stuck();
+  check_recovers();
+  check_defer();
+  check_refusals();
+
+  // Lets recovers()' cleanup await through; `never` is deliberately never
+  // settled, which is the whole point of the first three.
+  promise_resolve(gate, 9);
+}
