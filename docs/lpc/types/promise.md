@@ -82,3 +82,5 @@ tagged `int`; nothing re-checks it at settle time.
 * `promise_create`, `promise_resolve`, `promise_reject`, `promise_then`,
   `promise_catch`, `promise_status`, `promise_result`, `promisep`,
   `async_yield`, `async_info`
+* combinators: `promise_all`, `promise_any`, `promise_race`,
+  `promise_all_settled`

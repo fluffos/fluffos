@@ -2446,6 +2446,24 @@
           },
           {
             "type": "doc",
+            "id": "efun/promises/promise_all",
+            "key": "efun/promises/promise_all",
+            "label": "promise_all"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_all_settled",
+            "key": "efun/promises/promise_all_settled",
+            "label": "promise_all_settled"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_any",
+            "key": "efun/promises/promise_any",
+            "label": "promise_any"
+          },
+          {
+            "type": "doc",
             "id": "efun/promises/promise_catch",
             "key": "efun/promises/promise_catch",
             "label": "promise_catch"
@@ -2455,6 +2473,12 @@
             "id": "efun/promises/promise_create",
             "key": "efun/promises/promise_create",
             "label": "promise_create"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_race",
+            "key": "efun/promises/promise_race",
+            "label": "promise_race"
           },
           {
             "type": "doc",
