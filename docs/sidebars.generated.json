@@ -2464,6 +2464,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/promises/promise_cancel",
+            "key": "efun/promises/promise_cancel",
+            "label": "promise_cancel"
+          },
+          {
+            "type": "doc",
             "id": "efun/promises/promise_catch",
             "key": "efun/promises/promise_catch",
             "label": "promise_catch"

@@ -207,6 +207,16 @@ void f_promise_race() { promise_combinator_efun(PROMISE_COMB_RACE); }
 void f_promise_all_settled() { promise_combinator_efun(PROMISE_COMB_ALL_SETTLED); }
 #endif
 
+#ifdef F_PROMISE_CANCEL
+void f_promise_cancel() {
+  /* validated (and possibly error()ed) before the stack is touched */
+  int const armed = promise_request_cancel(sp->u.prom);
+
+  free_svalue(sp, "f_promise_cancel");
+  put_number(armed);
+}
+#endif
+
 #ifdef F_PROMISEP
 void f_promisep() {
   /* the argument is `mixed`, so unlike the rest of this file the tag has

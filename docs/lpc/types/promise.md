@@ -84,3 +84,4 @@ tagged `int`; nothing re-checks it at settle time.
   `async_yield`, `async_info`
 * combinators: `promise_all`, `promise_any`, `promise_race`,
   `promise_all_settled`
+* `promise_cancel` — ask an `async` body to give up at its next `await`
