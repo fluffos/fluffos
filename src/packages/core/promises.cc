@@ -171,6 +171,42 @@ void f_promise_result() {
 }
 #endif
 
+/* shared body of the four combinators; the array arg is spec-typed, so only
+ * its ELEMENTS need checking (AGENTS.md section 2) -- and they need none: a
+ * non-promise element is defined to count as already fulfilled with itself,
+ * so map() output drops straight in. */
+static void promise_combinator_efun(uint8_t kind) {
+  array_t* inputs = sp->u.arr;
+
+  if (kind == PROMISE_COMB_RACE && inputs->size == 0) {
+    /* JS lets this hang forever. Here a hung await is a parked frame holding
+     * its object, its program and one `max suspended async functions` slot
+     * for the life of the driver, so refuse it where the mistake is. */
+    error("promise_race: needs at least one promise; an empty array would never settle.\n");
+  }
+  promise_t* result = promise_combinator_start(kind, inputs);
+  free_svalue(sp, "promise_combinator_efun");
+  sp->type = T_PROMISE;
+  sp->subtype = 0;
+  sp->u.prom = result;
+}
+
+#ifdef F_PROMISE_ALL
+void f_promise_all() { promise_combinator_efun(PROMISE_COMB_ALL); }
+#endif
+
+#ifdef F_PROMISE_ANY
+void f_promise_any() { promise_combinator_efun(PROMISE_COMB_ANY); }
+#endif
+
+#ifdef F_PROMISE_RACE
+void f_promise_race() { promise_combinator_efun(PROMISE_COMB_RACE); }
+#endif
+
+#ifdef F_PROMISE_ALL_SETTLED
+void f_promise_all_settled() { promise_combinator_efun(PROMISE_COMB_ALL_SETTLED); }
+#endif
+
 #ifdef F_PROMISEP
 void f_promisep() {
   /* the argument is `mixed`, so unlike the rest of this file the tag has
