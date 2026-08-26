@@ -1,0 +1,172 @@
+// promise_all / promise_any / promise_race / promise_all_settled.
+//
+// One aggregate is shared by every input's reaction and dies with the last
+// of them. Aggregation runs no LPC, so it happens inside the delivery like a
+// pass-through chain link: ordering is the drain's, and nothing settles
+// synchronously from the efun unless every input was a plain value.
+//
+// A non-promise element counts as already fulfilled with itself, so the
+// output of an ordinary map() drops straight in without wrapping.
+
+#include "/include/tests.h"
+
+nosave promise a, b, c;
+
+private async int slow(int n, int fail) {
+  await a;
+  if (fail) {
+    error("boom " + n);
+  }
+
+  return n;
+}
+
+private void check_all() {
+  EXPECT_LATCH("all");
+  promise_then(promise_all(({ b, c, 99 })), function(mixed v) {
+    ASSERT2(pointerp(v), "promise_all fulfils with an array");
+    ASSERT_EQ(3, sizeof(v));
+    // Positional: slot i is input i, whatever order they settled in.
+    ASSERT_EQ(1, v[0]);
+    ASSERT_EQ(2, v[1]);
+    ASSERT_EQ(99, v[2]);
+    RELEASE_LATCH("all");
+  });
+}
+
+private void check_all_fail() {
+  promise x = promise_create();
+  promise y = promise_create();
+
+  EXPECT_LATCH("all-fail");
+  promise_catch(promise_all(({ x, y })), function(mixed reason) {
+    ASSERT_EQ("*first to fail", reason);
+    RELEASE_LATCH("all-fail");
+  });
+  promise_reject(x, "*first to fail");
+  promise_reject(y, "*second, ignored");
+}
+
+private void check_any() {
+  promise x = promise_create();
+  promise y = promise_create();
+
+  EXPECT_LATCH("any");
+  promise_then(promise_any(({ x, y })), function(mixed v) {
+    ASSERT_EQ(7, v);
+    RELEASE_LATCH("any");
+  });
+  promise_reject(x, "*this one failed");
+  promise_resolve(y, 7);
+}
+
+private void check_any_all_reject() {
+  promise x = promise_create();
+  promise y = promise_create();
+
+  EXPECT_LATCH("any-none");
+  promise_catch(promise_any(({ x, y })), function(mixed reason) {
+    ASSERT2(pointerp(reason), "promise_any rejects with the array of reasons");
+    ASSERT_EQ(2, sizeof(reason));
+    ASSERT_EQ("*no", reason[0]);
+    ASSERT_EQ("*nope", reason[1]);
+    RELEASE_LATCH("any-none");
+  });
+  promise_reject(x, "*no");
+  promise_reject(y, "*nope");
+}
+
+private void check_race() {
+  promise x = promise_create();
+  promise y = promise_create();
+
+  // A REJECTION wins a race too -- race is first-settled, not first-fulfilled.
+  EXPECT_LATCH("race");
+  promise_catch(promise_race(({ x, y })), function(mixed reason) {
+    ASSERT_EQ("*lost the race", reason);
+    RELEASE_LATCH("race");
+  });
+  promise_reject(x, "*lost the race");
+  promise_resolve(y, 1);
+}
+
+private void check_all_settled() {
+  promise x = promise_create();
+  promise y = promise_create();
+
+  EXPECT_LATCH("settled");
+  promise_then(promise_all_settled(({ x, y })), function(mixed v) {
+    ASSERT_EQ(2, sizeof(v));
+    // status uses promise_status()'s codes, so one vocabulary covers both.
+    ASSERT_EQ(1, v[0]["status"]);
+    ASSERT_EQ("ok", v[0]["value"]);
+    ASSERT_EQ(2, v[1]["status"]);
+    ASSERT_EQ("*bad", v[1]["reason"]);
+    ASSERT2(undefinedp(v[0]["reason"]), "a fulfilled entry carries no reason");
+    ASSERT2(undefinedp(v[1]["value"]), "a rejected entry carries no value");
+    RELEASE_LATCH("settled");
+  });
+  promise_resolve(x, "ok");
+  promise_reject(y, "*bad");
+}
+
+private void check_edges() {
+  mixed err;
+
+  // Empty promise_all/all_settled have trivially met their condition.
+  EXPECT_LATCH("empty-all");
+  promise_then(promise_all(({})), function(mixed v) {
+    ASSERT_EQ(0, sizeof(v));
+    RELEASE_LATCH("empty-all");
+  });
+
+  EXPECT_LATCH("empty-settled");
+  promise_then(promise_all_settled(({})), function(mixed v) {
+    ASSERT_EQ(0, sizeof(v));
+    RELEASE_LATCH("empty-settled");
+  });
+
+  // Empty promise_any can never be satisfied, so it rejects rather than
+  // hanging -- and the reason is truthy, as acatch() requires.
+  EXPECT_LATCH("empty-any");
+  promise_catch(promise_any(({})), function(mixed reason) {
+    ASSERT2(reason, "an empty promise_any rejects with a truthy reason");
+    RELEASE_LATCH("empty-any");
+  });
+
+  // Empty promise_race would wait forever, which here means a parked frame
+  // holding an object, a program and a suspension slot for the life of the
+  // driver. Refused where the mistake is instead of reproduced from JS.
+  err = catch(promise_race(({})));
+  ASSERT2(err, "an empty promise_race is refused");
+  ASSERT2(stringp(err) && strsrch(err, "never settle") != -1,
+    "the refusal says why: " + err);
+
+  // All-plain input settles without any promise being involved.
+  EXPECT_LATCH("plain");
+  promise_then(promise_all(({ 1, "two", 3 })), function(mixed v) {
+    ASSERT_EQ(3, sizeof(v));
+    ASSERT_EQ("two", v[1]);
+    RELEASE_LATCH("plain");
+  });
+}
+
+void do_tests() {
+  a = promise_create();
+  b = slow(1, 0);
+  c = slow(2, 0);
+
+  ASSERT_EQ("promise", typeof(promise_all(({}))));
+  ASSERT2(promisep(promise_race(({ promise_create() }))), "promise_race returns a promise");
+
+  check_all();
+  check_all_fail();
+  check_any();
+  check_any_all_reject();
+  check_race();
+  check_all_settled();
+  check_edges();
+
+  // Releases both async bodies; promise_all above then completes.
+  promise_resolve(a, 0);
+}

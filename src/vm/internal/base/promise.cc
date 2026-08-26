@@ -39,6 +39,13 @@ extern int _in_reference_allowed;
  * declaration. Read only under DEBUG; see control_stack_t::save_temporaries. */
 extern int stack_in_use_as_temporary;
 
+/* Combinator helpers, declared at file scope for the same reason as
+ * _in_reference_allowed above: they are DEFINED below the anonymous
+ * namespace but CALLED from inside it, and declaring them in there would
+ * name a different, never-defined symbol. */
+void free_combinator(promise_combinator_t* c);
+void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected);
+
 namespace {
 
 /* set by coroutine_await_pending(); read by run_coroutine_body() to tell a
@@ -74,6 +81,8 @@ struct QueuedReaction {
   promise_t* next;
   object_t* command_giver;
   lpc_coroutine_t* coro;
+  promise_combinator_t* comb;
+  int comb_index;
   promise_t* source;
 };
 
@@ -414,6 +423,12 @@ void free_queued_reaction(QueuedReaction* qr) {
     free_coroutine(qr->coro, nullptr, false);
     qr->coro = nullptr;
   }
+  if (qr->comb) {
+    /* never delivered (shutdown): this input simply never reports, and the
+     * aggregate dies with the last of its reactions */
+    free_combinator(qr->comb);
+    qr->comb = nullptr;
+  }
   if (qr->source) {
     free_promise(qr->source);
     qr->source = nullptr;
@@ -422,7 +437,8 @@ void free_queued_reaction(QueuedReaction* qr) {
 
 void enqueue_reaction(promise_t* source, promise_reaction_t* r) {
   source->ref++;
-  QueuedReaction qr{r->on_fulfilled, r->on_rejected, r->next, r->command_giver, r->coro, source};
+  QueuedReaction qr{r->on_fulfilled, r->on_rejected, r->next,       r->command_giver,
+                    r->coro,         r->comb,        r->comb_index, source};
   if (qr.coro != nullptr) {
     qr.coro->queued = true;
   }
@@ -512,6 +528,15 @@ void deliver_reaction(QueuedReaction* qr) {
   }
 
   bool const rejected = (src->state == PROMISE_REJECTED);
+
+  if (qr->comb) {
+    /* Pure aggregation: runs no LPC, so it needs neither an eval budget nor
+     * the command_giver dance below, and cannot re-enter the drain. */
+    deliver_combinator(qr->comb, qr->comb_index, &src->result, rejected);
+    free_queued_reaction(qr);
+    return;
+  }
+
   funptr_t* handler = rejected ? qr->on_rejected : qr->on_fulfilled;
 
   object_t* giver = qr->command_giver;
@@ -1380,6 +1405,19 @@ void dealloc_promise(promise_t* p) {
         err.u.string = "*awaited promise was collected before settling";
         free_coroutine(r.coro, &err, false);
       }
+      if (r.comb) {
+        /* This input died unsettled, so it can never report. Deliver a
+         * rejection on its behalf rather than just dropping the reference:
+         * otherwise `remaining` never reaches zero and a promise_all() whose
+         * input was collected stays pending forever -- the same stranded
+         * shape the r.next arm above exists to prevent. */
+        svalue_t err;
+        err.type = T_STRING;
+        err.subtype = STRING_CONSTANT;
+        err.u.string = "*promise was collected before settling";
+        deliver_combinator(r.comb, r.comb_index, &err, true);
+        free_combinator(r.comb);
+      }
     }
     delete p->reactions;
     p->reactions = nullptr;
@@ -1435,7 +1473,7 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
   if (on_rejected || next) {
     p->handled = true;
   }
-  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr};
+  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr, nullptr, 0};
   if (p->state == PROMISE_PENDING) {
     if (!p->reactions) {
       p->reactions = new std::vector<promise_reaction_t>();
@@ -1446,11 +1484,215 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
   }
 }
 
+/*
+ * Combinators: promise_all / promise_any / promise_race / promise_all_settled.
+ *
+ * One promise_combinator_t is shared by every input's reaction; each holds a
+ * reference, so the aggregate dies with the last input however that input
+ * ends. Aggregation runs no LPC, so it happens inside the delivery like a
+ * pass-through link -- ordering stays the drain's, and a combinator can never
+ * settle its result synchronously from the efun unless every input was a
+ * plain value.
+ */
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+/* Marked from here, once per combinator, NOT from each reaction that points
+ * at it: N reactions share one aggregate holding ONE reference to `result`
+ * and `slots`, so per-reaction marking would report N-1 phantom refs. Same
+ * reason g_active_body_promises exists. */
+std::vector<promise_combinator_t*> g_live_combinators;
+#endif
+
+void free_combinator(promise_combinator_t* c) {
+  if (--c->ref > 0) {
+    return;
+  }
+#ifdef DEBUGMALLOC_EXTENSIONS
+  for (auto it = g_live_combinators.begin(); it != g_live_combinators.end(); ++it) {
+    if (*it == c) {
+      g_live_combinators.erase(it);
+      break;
+    }
+  }
+#endif
+  if (c->result) {
+    free_promise(c->result);
+  }
+  if (c->slots) {
+    free_array(c->slots);
+  }
+  delete c;
+}
+
+/* Insert a constant-named key and return its value slot, ready to overwrite.
+ *
+ * A local mirror of mapping.cc's insert_in_mapping(), which is static there.
+ * Do not be tempted to hand find_for_insert() a reused key svalue: its hash
+ * (svalue_to_int) CONVERTS the key IN PLACE from a constant to a ref-bumped
+ * shared string, so a second insert through the same svalue carries subtype
+ * STRING_SHARED over a string literal and INC_COUNTED_REF writes into
+ * read-only memory. The ref that conversion took is ours to release, on the
+ * throwing path too -- hence the DEFER, exactly as the original explains. */
+svalue_t* promise_map_slot(mapping_t* m, const char* key) {
+  svalue_t lv;
+
+  lv.type = T_STRING;
+  lv.subtype = STRING_CONSTANT;
+  lv.u.string = key;
+  DEFER { free_string(lv.u.string); };
+  return find_for_insert(m, &lv, 1);
+}
+
+/* One input settled (or was a plain value). Records it and settles the result
+ * if this input decided the outcome. Runs no LPC. */
+void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected) {
+  switch (c->kind) {
+    case PROMISE_COMB_RACE:
+      /* first to settle decides, either way */
+      (void)promise_settle(c->result, value, rejected ? 1 : 0);
+      break;
+
+    case PROMISE_COMB_ALL:
+      if (rejected) {
+        (void)promise_settle(c->result, value, 1); /* fail fast */
+      } else {
+        assign_svalue(&c->slots->item[index], value);
+      }
+      break;
+
+    case PROMISE_COMB_ANY:
+      if (rejected) {
+        assign_svalue(&c->slots->item[index], value);
+      } else {
+        (void)promise_settle(c->result, value, 0); /* first success wins */
+      }
+      break;
+
+    case PROMISE_COMB_ALL_SETTLED: {
+      /* ([ "status": 1|2, "value"|"reason": v ]) -- the status codes are
+       * promise_status()'s, so one vocabulary covers both. */
+      mapping_t* m = allocate_mapping(2);
+      svalue_t* slot = promise_map_slot(m, "status");
+      slot->type = T_NUMBER;
+      slot->subtype = 0;
+      slot->u.number = rejected ? PROMISE_REJECTED : PROMISE_FULFILLED;
+      slot = promise_map_slot(m, rejected ? "reason" : "value");
+      assign_svalue_no_free(slot, value);
+      free_svalue(&c->slots->item[index], "deliver_combinator");
+      c->slots->item[index].type = T_MAPPING;
+      c->slots->item[index].u.map = m;
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  /* Decrement unconditionally, including on the paths that already settled
+   * above: a later settle is a silent no-op, so one counter serves every
+   * kind and no arm can forget to advance it. */
+  if (--c->remaining == 0) {
+    if (c->kind == PROMISE_COMB_ALL || c->kind == PROMISE_COMB_ALL_SETTLED) {
+      svalue_t all = const0;
+      all.type = T_ARRAY;
+      all.u.arr = c->slots;
+      (void)promise_settle(c->result, &all, 0);
+    } else if (c->kind == PROMISE_COMB_ANY) {
+      /* every input rejected: reject with the array of reasons */
+      svalue_t all = const0;
+      all.type = T_ARRAY;
+      all.u.arr = c->slots;
+      (void)promise_settle(c->result, &all, 1);
+    }
+  }
+}
+
+promise_t* promise_combinator_start(uint8_t kind, array_t* inputs) {
+  int const n = inputs->size;
+  promise_t* result = promise_alloc();
+
+  if (n == 0) {
+    /* Decided here rather than left to the loop, and deliberately not
+     * uniform: an empty promise_all()/promise_all_settled() has trivially
+     * met its condition, an empty promise_any() can never be satisfied, and
+     * an empty promise_race() would wait forever -- which in a driver is a
+     * parked frame holding an object, a program and a suspension slot for
+     * the life of the process, so it is refused by the efun before it gets
+     * here rather than reproduced from JS. */
+    if (kind == PROMISE_COMB_ANY) {
+      svalue_t err = const0;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = "*promise_any: no promises to wait for";
+      (void)promise_settle(result, &err, 1);
+    } else {
+      svalue_t empty = const0;
+      empty.type = T_ARRAY;
+      empty.u.arr = &the_null_array;
+      (void)promise_settle(result, &empty, 0);
+    }
+    return result;
+  }
+
+  /* Plain new, not DMALLOC: every TAG_PROMISE block is cast straight to
+   * promise_t* by checkmemory.cc's sweep, so borrowing that tag would be a
+   * type confusion, and a new tag would have to be taught to all of its
+   * walkers. lpc_coroutine_t -- a bigger off-graph struct holding far more
+   * references -- is allocated the same way for the same reason; what the
+   * checker needs is the MARKING below, not the block. */
+  auto* c = new promise_combinator_t{};
+  c->ref = 1; /* held by this function until every input is attached */
+  c->kind = kind;
+  c->result = result;
+  result->ref++;
+  c->slots = allocate_empty_array(n);
+  for (int i = 0; i < n; i++) {
+    c->slots->item[i] = const0;
+  }
+  c->remaining = n;
+#ifdef DEBUGMALLOC_EXTENSIONS
+  g_live_combinators.push_back(c);
+#endif
+
+  /* Two passes. Attaching first means a plain value can never drive
+   * `remaining` to zero while later inputs are still being hooked up, which
+   * would settle the result early and leave the rest writing into a decided
+   * aggregate. */
+  for (int i = 0; i < n; i++) {
+    if (inputs->item[i].type != T_PROMISE) {
+      continue;
+    }
+    promise_t* src = inputs->item[i].u.prom;
+    src->handled = true; /* the combinator observes the rejection */
+    c->ref++;
+    promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, nullptr, c, i};
+    if (src->state == PROMISE_PENDING) {
+      if (!src->reactions) {
+        src->reactions = new std::vector<promise_reaction_t>();
+      }
+      src->reactions->push_back(r);
+    } else {
+      enqueue_reaction(src, &r);
+    }
+  }
+  for (int i = 0; i < n; i++) {
+    if (inputs->item[i].type == T_PROMISE) {
+      continue;
+    }
+    /* A non-promise counts as already fulfilled with itself, so the output of
+     * an ordinary map() can be passed straight in. */
+    deliver_combinator(c, i, &inputs->item[i], false);
+  }
+
+  free_combinator(c); /* release the arming reference */
+  return result;
+}
+
 /* Attach a parked coroutine to the promise it awaits. Ownership of `coro`
  * transfers to the promise machinery. */
 static void promise_add_coroutine(promise_t* p, lpc_coroutine_t* coro) {
   p->handled = true; /* the await observes a rejection */
-  promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, coro};
+  promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, coro, nullptr, 0};
   if (p->state == PROMISE_PENDING) {
     if (!p->reactions) {
       p->reactions = new std::vector<promise_reaction_t>();
@@ -1916,6 +2158,21 @@ void mark_promise_queue() {
    * registry, which is a C++ global the allocation sweep never walks. */
   for (auto* p : g_pending_yields) {
     p->extra_ref++;
+  }
+  /* Combinators, likewise off-graph -- and marked ONCE per aggregate rather
+   * than from each of the N reactions pointing at it, because those N share
+   * a single reference to `result` and `slots`. Marking per reaction would
+   * report N-1 references nobody holds. */
+  for (auto* c : g_live_combinators) {
+    if (c->result) {
+      c->result->extra_ref++;
+    }
+    if (c->slots) {
+      c->slots->extra_ref++;
+      for (int i = 0; i < c->slots->size; i++) {
+        mark_svalue(&c->slots->item[i]);
+      }
+    }
   }
   auto mark_one = [](QueuedReaction& qr) {
     if (qr.on_fulfilled) {

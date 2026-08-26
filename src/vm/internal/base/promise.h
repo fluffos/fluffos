@@ -36,12 +36,39 @@ enum : uint8_t {
   PROMISE_REJECTED = 2,
 };
 
+/* promise_all() / promise_any() / promise_race() / promise_all_settled() */
+enum : uint8_t {
+  PROMISE_COMB_ALL = 0,
+  PROMISE_COMB_ANY = 1,
+  PROMISE_COMB_RACE = 2,
+  PROMISE_COMB_ALL_SETTLED = 3,
+};
+
+/* Aggregation state shared by every input reaction of ONE combinator call.
+ * Ref-counted with one reference per outstanding input reaction, so it dies
+ * with the last of them however they end (delivered, or dropped at shutdown).
+ *
+ * It is an OFF-GRAPH holder of `result` and `slots` (AGENTS.md section 3):
+ * reachable only from reaction records, and reachable from SEVERAL of them at
+ * once. That is why the debug ref checker marks it from its own registry
+ * rather than from each reaction -- marking per reaction would bump
+ * extra_ref once per input against a single real reference. */
+struct promise_combinator_t {
+  uint32_t ref;
+  uint8_t kind;             /* PROMISE_COMB_* */
+  struct promise_t* result; /* ref held; settled when the rule below is met */
+  struct array_t* slots;    /* ref held; one entry per input, filled in place */
+  int remaining;            /* inputs not yet settled */
+};
+
 struct promise_reaction_t {
   struct funptr_t* on_fulfilled;    /* ref held; may be null (pass-through) */
   struct funptr_t* on_rejected;     /* ref held; may be null (pass-through) */
   struct promise_t* next;           /* ref held; chained promise to settle; may be null */
   struct object_t* command_giver;   /* ref held; may be null */
   struct lpc_coroutine_t* coro;     /* owned; a parked await to resume; may be null */
+  struct promise_combinator_t* comb; /* ref held; may be null */
+  int comb_index;                   /* which input of `comb` this reaction is */
 };
 
 struct promise_t {
@@ -108,6 +135,13 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
                           promise_t* next, object_t* giver);
 
 void push_refed_promise(promise_t* p);
+
+/* Build a combinator over `inputs` and return its result promise with one
+ * reference for the caller. An element that is not a promise counts as
+ * already fulfilled with itself (so the output of an ordinary map() works).
+ * Never settles the result before the caller receives it unless every input
+ * was a plain value. */
+promise_t* promise_combinator_start(uint8_t kind, struct array_t* inputs);
 
 /* A promise fulfilled with 0 on the next pass of the event loop -- after the
  * driver has polled sockets, queued commands and fired due timers. This is

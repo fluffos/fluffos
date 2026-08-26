@@ -389,6 +389,12 @@ mixed promise_result(promise);
 /* the *p() type test for T_PROMISE; `mixed`, not `promise`, because the
    whole point is to ask about a value whose type is not known statically */
 int promisep(mixed);
+/* combinators over an array of promises; a non-promise element counts as
+   already fulfilled with itself, so map() output can be passed straight in */
+promise promise_all(mixed *);
+promise promise_any(mixed *);
+promise promise_race(mixed *);
+promise promise_all_settled(mixed *);
 /* pending suspended async function frames, most recently parked last */
 mixed async_info(int default: 0);
 /* a promise fulfilled on the next pass of the event loop, after the driver
