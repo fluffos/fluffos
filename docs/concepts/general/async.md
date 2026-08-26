@@ -131,12 +131,19 @@ object alive and keeps its suspension slot. Note that JS cannot reach this
 state at all, since an async function's resolver is never handed out; here
 promises are first-class, so the refusal has to be explicit.
 
-There is no cancellation primitive in phase 1, and the refusal removes the
-one thing that looked like one. Two replacements, depending on which side
-you are on.
+To ask a body to stop, use `promise_cancel()`, which is the real primitive
+the refusal above pointed at: it makes the body's **next `await` raise** a
+catchable `"*async function cancelled"`, unwinding through `acatch` and
+running `defer` handlers on the way out. It is cooperative — a body part-way
+through straight-line code finishes that stretch, and one that never awaits
+again runs to completion — and the request is **consumed** by the raise, so
+a body that catches its cancellation can still `await` cleanup and return
+normally. It does not propagate into promises the body is awaiting.
 
-A body that should be able to give up early `await`s a gate the caller
-holds:
+Two patterns remain useful alongside it, depending on which side you are on.
+
+A body that wants a cheaper, purely voluntary check `await`s a gate the
+caller holds:
 
 ```c
 async int worker(promise cancel) {
@@ -167,8 +174,20 @@ The `promise_status()` guards are not optional, and this is where LPC
 differs from JS: there, settling an already-settled promise is a silent
 no-op, which is what lets `Promise.race` be written in userland. Here it is
 an **error**, so the unguarded version throws on whichever of the two paths
-finishes second — the common case, not a rare one. Note also that the
-underlying work is not stopped by either shape; only your wait ends.
+finishes second — the common case, not a rare one.
+
+In practice `promise_race()` does this for you, and is what you should reach
+for first:
+
+```c
+promise with_timeout(promise p, int secs) {
+    return promise_race(({ p, timer_that_rejects(secs) }));
+}
+```
+
+Neither shape stops the underlying work; only your wait ends. To stop the
+work as well, the operation has to be an `async` function you can
+`promise_cancel()`.
 
 `return value` fulfills the promise (a returned promise is adopted). An
 uncaught error inside the body rejects it — an async body behaves as if

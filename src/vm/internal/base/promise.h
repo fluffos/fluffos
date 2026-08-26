@@ -98,6 +98,16 @@ struct promise_t {
    * state unreachable by never handing out an async function's resolver;
    * here promises are first-class, so the refusal has to be explicit. */
   bool body_owned;
+  /* A cancellation has been requested on this async body and not yet
+   * delivered. CONSUME-ONCE: the raise clears it, so a body that catches its
+   * cancellation in acatch() can still await cleanup and even return a value
+   * -- cancel is a request the body may decline, not a verdict. Lives on the
+   * promise rather than on lpc_coroutine_t because the promise is the only
+   * LPC-reachable handle AND the durable identity of the body across all its
+   * parks: each park allocates a fresh coroutine and each resume frees it,
+   * and a body running its first synchronous stretch has no coroutine at
+   * all. */
+  bool cancelled;
   /* the declared payload tag of an `async T f()`'s promise, as the runtime
    * T_* mask (0 = unannotated, e.g. promise_create()). The authoritative
    * copy lives in the svalue's subtype -- this is the record that survives
@@ -142,6 +152,12 @@ void push_refed_promise(promise_t* p);
  * Never settles the result before the caller receives it unless every input
  * was a plain value. */
 promise_t* promise_combinator_start(uint8_t kind, struct array_t* inputs);
+
+/* Request cancellation of the async function body that owns `p`. Returns 1
+ * if a cancellation was armed, 0 if there was nothing left to cancel (the
+ * body already finished, or its fate is already committed to an adoption).
+ * error()s if `p` is not an async function's promise. Runs no LPC. */
+int promise_request_cancel(promise_t* p);
 
 /* A promise fulfilled with 0 on the next pass of the event loop -- after the
  * driver has polled sockets, queued commands and fired due timers. This is

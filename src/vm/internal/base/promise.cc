@@ -9,6 +9,7 @@
 #include "backend.h"
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/eval_limit.h"
+#include "vm/internal/simulate.h"  // throw_error (cancellation raise)
 
 /*
  * Native LPC promises (issue #1319 phase 1). See promise.h for the ownership
@@ -199,6 +200,13 @@ constexpr LPC_INT kDefaultDrainBudgetUs = 1000;
  * newline. No trailing newline: this is a value handed to a rejection
  * handler, not a message printed by error(). */
 constexpr const char* kDestructedRejection = "*async function owner was destructed while suspended";
+/* What a cancelled body's next await raises, and what its promise rejects
+ * with if nothing catches it. Matched by CONTENT, like every other reason in
+ * this family -- a plain string is forgeable by throw(), which is accepted:
+ * discriminating cancellation authoritatively would need a driver-reserved
+ * value kind, and promise_status() already answers the question from
+ * outside. */
+constexpr const char* kCancelledRejection = "*async function cancelled";
 
 /* Consecutive slices that ended with work still queued. Routine under load;
  * a long run of them means the queue is not keeping up. Reset by any slice
@@ -1033,7 +1041,11 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
 }
 
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
-  bool const rejected = (source->state == PROMISE_REJECTED);
+  bool rejected = (source->state == PROMISE_REJECTED);
+  /* what the resumed await yields, or rejects with -- the source's result
+   * unless a cancellation overrides it below */
+  svalue_t cancel_reason;
+  svalue_t* reason = &source->result;
 
   /* Three ways the owner can invalidate the parked frame: destruction,
    * recompile_object() (bumps prog_generation), and replace_program()
@@ -1061,11 +1073,33 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     return;
   }
 
+  /* A cancellation requested while this frame was already QUEUED: it is
+   * sitting AT an await, so converting the delivery in flight into the
+   * cancellation raise is exactly what "raises at the next await" means for
+   * it. Letting the value through and raising one await later would silently
+   * run one more stretch of the body.
+   *
+   * Deliberately AFTER the destruct/staleness block above, which must win: a
+   * frame whose owner is gone cannot run acatch or defer LPC at all, so the
+   * reason that names the real reason it can never continue is the useful
+   * one. A cancellation that loses that race is simply consumed with the
+   * frame. If the queued delivery was itself a rejection, cancellation
+   * overrides its reason -- deterministic, and the canceller has declared
+   * disinterest in the outcome either way. */
+  if (coro->result_promise->cancelled) {
+    coro->result_promise->cancelled = false; /* consume-once */
+    cancel_reason.type = T_STRING;
+    cancel_reason.subtype = STRING_CONSTANT;
+    cancel_reason.u.string = kCancelledRejection;
+    reason = &cancel_reason;
+    rejected = true;
+  }
+
   if (rejected && coro->markers.empty()) {
     /* no acatch() region spans the await: the rejection propagates
      * straight to the coroutine's own promise, no need to rebuild the
      * frame at all (no catch may span an await by construction). */
-    free_coroutine(coro, &source->result, true);
+    free_coroutine(coro, reason, true);
     return;
   }
 
@@ -1177,11 +1211,11 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   if (!rejected) {
     /* the await expression's value */
     STACK_INC;
-    assign_svalue_no_free(sp, &source->result);
+    assign_svalue_no_free(sp, reason);
     entry = coro->prog->program + coro->pc_offset;
   } else {
     /* re-raise at the await point; the innermost acatch() catches it */
-    assign_svalue(&catch_value, &source->result);
+    assign_svalue(&catch_value, reason);
     entry = unwind_to_acatch_marker(csp);
   }
   /* The eval-cost flag is deliberately NOT consumed here, unlike the
@@ -1271,6 +1305,7 @@ promise_t* promise_alloc() {
   p->handled = false;
   p->resolving = false;
   p->body_owned = false;
+  p->cancelled = false;
   p->value_type = 0;
   p->result = const0;
   p->reactions = nullptr;
@@ -1688,6 +1723,94 @@ promise_t* promise_combinator_start(uint8_t kind, array_t* inputs) {
   return result;
 }
 
+int promise_request_cancel(promise_t* p) {
+  if (!p->body_owned) {
+    /* Only an async function body has a "next await" for a cancellation to
+     * arrive at. Everything else the driver hands out is refused rather than
+     * quietly ignored: a promise_create() promise is already settleable by
+     * whoever owns it (and cancelling someone else's channel is what the
+     * body_owned refusal exists to prevent); an async_read()/async_write()
+     * promise cannot stop the worker thread that is already reading the
+     * file; a call_out(delay) promise is documented as non-cancellable (use
+     * the classic form and remove_call_out()); and rejecting a then-chain
+     * link cannot stop its upstream. */
+    error("promise_cancel: promise does not belong to an async function.\n");
+  }
+  if (p->state != PROMISE_PENDING || p->resolving) {
+    /* Already finished, or the body returned a still-pending promise and is
+     * gone -- in both cases there is no frame left to interrupt. NOT an
+     * error: a body racing to completion against its canceller is the
+     * documented normal outcome, and erroring would make every cancel a
+     * race against its target. */
+    return 0;
+  }
+
+  p->cancelled = true;
+  /* The canceller has forced the outcome, so the rejection below is not
+   * "unhandled" even if nobody attached a handler; without this a
+   * fire-and-forget cancel logs a rejection report when the promise dies. */
+  p->handled = true;
+
+  /* Find the parked frame, if there is one. A linear scan over at most
+   * `max suspended async functions` entries, on a rare user-initiated efun.
+   * Deliberately NOT an index keyed by result promise: that would add two
+   * more sync points to the park/free pair, which is exactly the
+   * "one sibling path forgot" hazard of AGENTS.md section 13.15 -- and the
+   * owner index already needed a Debug sweep to police the two it has. */
+  lpc_coroutine_t* coro = nullptr;
+  for (auto& entry : g_live_coroutines) {
+    if (entry.second->result_promise == p && !entry.second->abandoned) {
+      coro = entry.second;
+      break;
+    }
+  }
+  /* No frame parked on a promise right now: the body is running (its first
+   * synchronous stretch, or after an acatch caught an earlier cancel), or it
+   * is already queued for resumption. Both consume the flag at their own
+   * boundary -- coroutine_await_pending() and resume_coroutine() -- so there
+   * is no window where the request is lost. */
+  if (coro == nullptr || coro->queued || coroutine_is_running(coro)) {
+    return 1;
+  }
+
+  /* Parked on a promise that may never settle, so waiting for it is not an
+   * option: detach the frame and schedule its own rejection delivery. From
+   * here to the enqueue nothing may run LPC or throw -- the coroutine is
+   * owned by a raw local in between. */
+  promise_t* awaited = coro->awaiting;
+  if (awaited != nullptr && awaited->reactions != nullptr) {
+    for (auto rit = awaited->reactions->begin(); rit != awaited->reactions->end(); ++rit) {
+      if (rit->coro == coro) {
+        awaited->reactions->erase(rit);
+        break;
+      }
+    }
+  }
+
+  /* A synthetic already-rejected source to deliver through. coro->awaiting is
+   * REPOINTED at it, which is load-bearing rather than tidiness:
+   * build_async_info() dereferences coro->awaiting unconditionally and it is
+   * deliberately not ref-held, so after the detach above the original could
+   * be freed by its other holders at any moment -- leaving a dangling read
+   * reachable from an ordinary async_info() call. The queued reaction holds a
+   * ref on this one for exactly as long as the coroutine is queued, so the
+   * lifetimes match. */
+  promise_t* s = promise_alloc();
+  svalue_t reason;
+  reason.type = T_STRING;
+  reason.subtype = STRING_CONSTANT;
+  reason.u.string = kCancelledRejection;
+  (void)promise_settle(s, &reason, 1);
+  /* nothing will attach a handler to a promise only the driver can see */
+  s->handled = true;
+  coro->awaiting = s;
+
+  promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, coro, nullptr, 0};
+  enqueue_reaction(s, &r); /* takes its own ref on s, marks coro queued */
+  free_promise(s);         /* the queue is now the sole owner */
+  return 1;
+}
+
 /* Attach a parked coroutine to the promise it awaits. Ownership of `coro`
  * transfers to the promise machinery. */
 static void promise_add_coroutine(promise_t* p, lpc_coroutine_t* coro) {
@@ -1756,6 +1879,29 @@ void coroutine_await_pending(promise_t* awaited) {
   }
   if (!async_frame || !g_coroutine_promise) {
     error("await: not directly inside an async function body.\n");
+  }
+  /* A cancellation requested while this body was RUNNING (its own first
+   * synchronous stretch, or the code after an acatch caught an earlier one)
+   * is delivered here, at the next await -- which is what makes cancellation
+   * cooperative rather than preemptive.
+   *
+   * Raised through the throw path rather than error(), for two reasons: the
+   * caught value is then the IDENTICAL constant the parked route delivers
+   * (an error() would wrap it in its own "*...\n" formatting, so acatch
+   * would see two different spellings depending on where the cancel landed),
+   * and cancellation is a delivered outcome, not a fault, so it should not
+   * reach the error handler's log. f_throw()/throw_error() is the precedent.
+   *
+   * Placed before ANY STACK_INC or allocation below, so the unwind has no
+   * half-initialised slot to trip over (AGENTS.md section 4). */
+  if (g_coroutine_promise->cancelled) {
+    g_coroutine_promise->cancelled = false; /* consume-once */
+    /* the value travels in catch_value, exactly as f_throw() does it */
+    free_svalue(&catch_value, "coroutine_await_pending: cancelled");
+    catch_value.type = T_STRING;
+    catch_value.subtype = STRING_CONSTANT;
+    catch_value.u.string = kCancelledRejection;
+    throw_error();
   }
   /* Parking inside an object that is ALREADY destructed would create a frame
    * nothing can ever clean up: abandon_coroutines_of_object() runs once, from
