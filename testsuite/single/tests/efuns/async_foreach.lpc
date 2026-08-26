@@ -1,0 +1,130 @@
+// `await` inside a foreach loop.
+//
+// Every foreach pushes a T_LVALUE for its loop variable (interpret.cc's
+// F_FOREACH, the branch after the iterable setup), and the suspension used
+// to refuse ANY lvalue on the stack -- so an await was illegal in every
+// foreach shape, including the plain local-variable one.
+//
+// A loop variable's lvalue addresses a slot INSIDE the frame, and the frame
+// is exactly what parking copies and rebuilds. So it is relocatable: held as
+// an offset across the suspension and re-derived against the new fp. What
+// stays refused is the rest, for reasons that differ:
+//
+//   * a GLOBAL loop variable's lvalue points into the object's variable
+//     block -- a second relocation base, not attempted here;
+//   * a `ref` loop variable owns heap state tied to the C++ frame;
+//   * string-char and buffer-byte lvalues are backed by SHARED VM globals
+//     (AGENTS.md 13.9), one instance at a time by construction, so they can
+//     never be per-frame state and are refused permanently.
+
+#include "/include/tests.h"
+
+nosave promise gate;
+nosave int g_loopvar;
+
+private async int sum_array() {
+  int total;
+
+  foreach (int i in ({ 1, 2, 3 })) {
+    total += i * await gate;
+  }
+
+  return total;
+}
+
+private async string cat_string() {
+  string out = "";
+
+  foreach (int c in "abc") {
+    await gate;
+    out += sprintf("%c", c);
+  }
+
+  return out;
+}
+
+private async int sum_mapping() {
+  int total;
+
+  foreach (string k, int v in ([ "a": 1, "b": 2 ])) {
+    total += v * await gate;
+    total += strlen(k);
+  }
+
+  return total;
+}
+
+private async int nested() {
+  int total;
+
+  foreach (int i in ({ 1, 2 })) {
+    foreach (int j in ({ 10, 20 })) {
+      total += (i * j) * await gate;
+    }
+  }
+
+  return total;
+}
+
+private async int global_loopvar() {
+  foreach (g_loopvar in ({ 1, 2 })) {
+    await gate;
+  }
+
+  return 0;
+}
+
+private async int ref_loopvar() {
+  int *a = ({ 1, 2 });
+
+  foreach (int ref x in a) {
+    x = await gate;
+  }
+
+  return 0;
+}
+
+void do_tests() {
+  gate = promise_create();
+  promise_resolve(gate, 2);
+
+  EXPECT_LATCH("array");
+  promise_then(sum_array(), function(mixed v) {
+    ASSERT_EQ(12, v);  // (1+2+3) * 2
+    RELEASE_LATCH("array");
+  });
+
+  EXPECT_LATCH("string");
+  promise_then(cat_string(), function(mixed v) {
+    ASSERT_EQ("abc", v);
+    RELEASE_LATCH("string");
+  });
+
+  EXPECT_LATCH("mapping");
+  promise_then(sum_mapping(), function(mixed v) {
+    ASSERT_EQ(8, v);  // (1+2)*2 + 1 + 1
+    RELEASE_LATCH("mapping");
+  });
+
+  EXPECT_LATCH("nested");
+  promise_then(nested(), function(mixed v) {
+    ASSERT_EQ(180, v);  // (10+20+20+40) * 2
+    RELEASE_LATCH("nested");
+  });
+
+  // Still refused, with a diagnostic that now says which shapes are the
+  // problem rather than blaming foreach as a whole.
+  EXPECT_LATCH("global-refused");
+  promise_catch(global_loopvar(), function(mixed reason) {
+    ASSERT2(stringp(reason) && strsrch(reason, "GLOBAL loop variable") != -1,
+      "a global loop variable is refused, and named: " + reason);
+    RELEASE_LATCH("global-refused");
+  });
+
+  EXPECT_LATCH("ref-refused");
+  promise_catch(ref_loopvar(), function(mixed reason) {
+    ASSERT2(stringp(reason) && strsrch(reason, "cannot suspend") != -1,
+      "a ref loop variable is refused: " + reason);
+    RELEASE_LATCH("ref-refused");
+  });
+}

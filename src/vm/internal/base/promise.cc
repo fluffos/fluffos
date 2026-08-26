@@ -35,6 +35,12 @@ error_context_t* g_coroutine_econ = nullptr;
 extern int _in_reference_allowed;
 #endif
 
+#ifdef DEBUG
+/* interpret.cc's foreach-temporaries counter. Defined there without a header
+ * declaration, so name it here rather than widen its visibility. */
+extern int stack_in_use_as_temporary;
+#endif
+
 /* Combinator helpers, declared at file scope for the same reason as
  * _in_reference_allowed above: they are DEFINED below the anonymous
  * namespace but CALLED from inside it, and declaring them in there would
@@ -65,6 +71,17 @@ std::unordered_map<object_t*, std::vector<uint64_t>> g_coroutines_by_owner;
 uint64_t g_next_coroutine_id = 0;
 /* the result promise of the innermost running coroutine body */
 promise_t* g_coroutine_promise = nullptr;
+#ifdef DEBUG
+/* stack_in_use_as_temporary as it stood when the innermost body was entered.
+ * foreach bumps that GLOBAL counter to tell break_point() its temporaries are
+ * legitimately sitting above fp; anything above this base belongs to the
+ * running body, and moves into the parked frame with it. Without the split, a
+ * body that parks inside a foreach leaves the count elevated for whatever
+ * runs next, and -- because reset_machine() zeroes it between top-level calls
+ * -- arrives at its resume with the temporaries restored but the count gone,
+ * which is a "Bad stack pointer" fatal on Debug builds. */
+int g_coroutine_temp_base = 0;
+#endif
 
 void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc);
 bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame);
@@ -832,6 +849,10 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   promise_t* prev_promise = g_coroutine_promise;
   g_coroutine_econ = &econ;
   g_coroutine_promise = p;
+#ifdef DEBUG
+  int const prev_temp_base = g_coroutine_temp_base;
+  g_coroutine_temp_base = stack_in_use_as_temporary;
+#endif
   /* RAII, not a tail assignment: `econ` lives on THIS C++ frame, so if an
    * exception ever escapes this function the globals must not be left
    * pointing at it (error_handler() compares current_error_context against
@@ -839,6 +860,9 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   DEFER {
     g_coroutine_econ = prev_econ;
     g_coroutine_promise = prev_promise;
+#ifdef DEBUG
+    g_coroutine_temp_base = prev_temp_base;
+#endif
     pop_context(&econ);
   };
   bool propagate_eval_error = false;
@@ -1142,6 +1166,21 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   fp = sp + 1;
   if (coro->frame_size > 0) {
     memcpy(fp, coro->frame, coro->frame_size * sizeof(svalue_t));
+    /* re-derive the frame-relative lvalues against the NEW fp (see the
+     * matching conversion in coroutine_await_pending) */
+    for (int slot : coro->frame_lvalues) {
+      svalue_t* target = fp + fp[slot].u.number;
+      fp[slot].type = T_LVALUE;
+      fp[slot].subtype = 0;
+      fp[slot].u.lvalue = target;
+    }
+    coro->frame_lvalues.clear();
+#ifdef DEBUG
+    /* the temporaries are back on the stack, so the count is owed again --
+     * F_EXIT_FOREACH will retire them one loop at a time as before */
+    stack_in_use_as_temporary += coro->temporaries;
+    coro->temporaries = 0;
+#endif
   }
   sp = fp + coro->frame_size - 1;
   delete[] coro->frame;
@@ -1917,14 +1956,34 @@ void coroutine_await_pending(promise_t* awaited) {
       error("await: too many suspended async functions (limit %d).\n", static_cast<int>(limit));
     }
   }
-  /* transient references into the stacks cannot be parked */
+  /* Transient references into the stacks. A plain T_LVALUE that addresses a
+   * slot INSIDE this frame is fine and is relocated across the suspension
+   * (see the frame copy below) -- that is what every ordinary `foreach`
+   * leaves on the stack for its loop variable, so refusing it blanket-wise
+   * made `await` illegal in any foreach at all.
+   *
+   * Everything else here genuinely cannot be parked, and for different
+   * reasons worth keeping straight:
+   *   - T_LVALUE addressing something outside the frame (a GLOBAL loop
+   *     variable goes through find_value() into the object's variable
+   *     block) has a second relocation base and its own lifetime questions;
+   *     refused for now rather than guessed at.
+   *   - T_LVALUE_BYTE / _CODEPOINT / _RANGE are backed by SHARED VM globals
+   *     (AGENTS.md section 13.9), one instance at a time by construction, so
+   *     they can never be per-frame state -- these stay refused permanently.
+   *   - T_REF and T_ERROR_HANDLER own heap state whose unwind is tied to
+   *     this C++ frame. */
   for (svalue_t* v = fp; v < sp; v++) {
+    if (v->type == T_LVALUE && v->u.lvalue >= fp && v->u.lvalue < sp) {
+      continue; /* relocatable */
+    }
     if (v->type &
         (T_LVALUE | T_LVALUE_BYTE | T_LVALUE_RANGE | T_LVALUE_CODEPOINT | T_REF | T_ERROR_HANDLER)) {
       error(
           "await: cannot suspend while a reference or lvalue is pending on the stack. "
-          "Inside a `foreach` loop, use an indexed `for` loop instead; for a `ref` "
-          "argument, await into a plain variable first and pass that.\n");
+          "A `foreach` over a GLOBAL loop variable or a `ref` one cannot hold an await -- "
+          "use a local loop variable, or an indexed `for`; for a `ref` argument, await "
+          "into a plain variable first and pass that.\n");
     }
   }
 
@@ -1971,7 +2030,32 @@ void coroutine_await_pending(promise_t* awaited) {
   if (n > 0) {
     coro->frame = new svalue_t[n];
     memcpy(coro->frame, fp, n * sizeof(svalue_t));
+    /* Relocate frame-relative lvalues. The resume rebuilds this slice at a
+     * DIFFERENT fp, so a T_LVALUE pointing into it (a foreach loop variable
+     * is the common one) would be stale on arrival. Held as an OFFSET while
+     * parked, and as a T_NUMBER rather than a T_LVALUE carrying an offset in
+     * its pointer, so nothing in between -- free_svalue on the frame, the
+     * debug ref checker's mark_svalue -- can be handed a pointer that no
+     * longer addresses anything. The scan above has already refused every
+     * lvalue kind that is NOT relocatable this way. */
+    for (int i = 0; i < n; i++) {
+      if (coro->frame[i].type != T_LVALUE) {
+        continue;
+      }
+      coro->frame_lvalues.push_back(i);
+      coro->frame[i].type = T_NUMBER;
+      coro->frame[i].subtype = 0;
+      coro->frame[i].u.number = coro->frame[i].u.lvalue - fp;
+    }
   }
+
+#ifdef DEBUG
+  /* The foreach temporaries above fp leave the stack with the frame, so the
+   * global count hands its body-owned part over to the coroutine and drops
+   * back to what the enclosing frames legitimately have. */
+  coro->temporaries = stack_in_use_as_temporary - g_coroutine_temp_base;
+  stack_in_use_as_temporary = g_coroutine_temp_base;
+#endif
 
   /* registered from the moment it exists: every free_coroutine() erases */
   g_live_coroutines[coro->id] = coro;

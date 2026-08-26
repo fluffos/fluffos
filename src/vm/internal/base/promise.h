@@ -225,6 +225,16 @@ struct lpc_coroutine_t {
   struct defer_list* defers; /* the async frame's defers */
   svalue_t* frame;           /* owned bitwise copy of [fp .. sp] */
   int frame_size;
+  /* Slots of `frame` that held a T_LVALUE pointing INTO the frame -- a
+   * foreach loop variable, typically. The resume rebuilds the slice at a
+   * different fp, so those are stored as offsets (and as T_NUMBER, so no
+   * stale pointer exists at any point) and re-derived on arrival. */
+  std::vector<int> frame_lvalues;
+#ifdef DEBUG
+  /* open foreach loops whose temporaries travel inside `frame`. Handed back
+   * to the global counter on resume; see g_coroutine_temp_base. */
+  int temporaries;
+#endif
   /* True from the moment a settle hands this coroutine to the microtask queue
    * until the delivery consumes it. Ownership has moved to the queue by then,
    * so destruct-time abandonment must leave it alone -- freeing it would

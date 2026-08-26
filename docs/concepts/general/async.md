@@ -314,14 +314,21 @@ compile-time or runtime error, never silent misbehavior:
 2. `await` is not allowed inside `catch(...)` or `time_expression(...)`
    (their implementation recurses the C++ stack). Use `acatch`.
 3. An `await` cannot suspend while a transient reference sits on the value
-   stack. In practice this means **any `foreach` loop** (over arrays,
-   mappings, strings or buffers — the loop keeps an lvalue slot live for its
-   variable for the whole body) and a `ref` argument. It is a runtime error
+   stack that suspension cannot relocate. A `foreach` over a **local** loop
+   variable is fine — arrays, mappings, strings, buffers, nested loops
+   included — because that variable's lvalue addresses a slot inside the
+   frame, and the frame is exactly what parking copies and rebuilds, so it
+   is carried across as an offset. What is still refused is a `foreach` over
+   a **global** loop variable (its lvalue points into the object's variable
+   block, a second relocation base), a **`ref`** loop variable or `ref`
+   argument, and a string-char or buffer-byte lvalue (`s[i]`, `b[i]` —
+   those are backed by shared VM scratch state, one instance at a time by
+   construction, so they can never be per-frame). It is a runtime error
    rather than a compile error because it depends on what the awaited
-   promise turns out to be; use an indexed `for` loop when the body needs to
-   suspend. Compound assignment is *not* affected — `arr[i] += await p`,
-   `s += await p` and friends evaluate the right-hand side before pinning
-   the target, so they park and resume normally.
+   promise turns out to be; use a local loop variable, or an indexed `for`.
+   Compound assignment is *not* affected — `arr[i] += await p`, `s += await
+   p` and friends evaluate the right-hand side before pinning the target, so
+   they park and resume normally.
 4. If the object is destructed, recompiled by `recompile_object()`, or has
    its program swapped by `replace_program()` while a function is
    suspended, the resume is abandoned and the function's promise rejects
