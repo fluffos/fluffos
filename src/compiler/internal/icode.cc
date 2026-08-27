@@ -792,6 +792,18 @@ void i_generate_node(parse_node_t* expr) {
       upd_short(addr, CURRENT_PROGRAM_SIZE - addr, "catch");
       break;
     }
+    case NODE_ACATCH: {
+      int addr;
+
+      end_pushes();
+      ins_byte(F_ACATCH);
+      addr = CURRENT_PROGRAM_SIZE;
+      ins_short(0);
+      i_generate_node(expr->r.expr);
+      ins_byte(F_END_ACATCH);
+      upd_short(addr, CURRENT_PROGRAM_SIZE - addr, "acatch");
+      break;
+    }
     case NODE_TIME_EXPRESSION: {
       end_pushes();
       ins_byte(F_TIME_EXPRESSION);

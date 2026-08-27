@@ -1,0 +1,5 @@
+// a promise payload may not itself be a promise (resolving a promise with a
+// promise adopts it, so a promise value is never a promise)
+void f() {
+  promise < promise<int> > p;
+}

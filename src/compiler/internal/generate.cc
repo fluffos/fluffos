@@ -249,6 +249,7 @@ static parse_node_t* optimize(parse_node_t* expr) {
       break;
     }
     case NODE_CATCH:
+    case NODE_ACATCH:
       OPT(expr->r.expr);
       break;
     case NODE_LVALUE_EFUN:
@@ -439,7 +440,13 @@ const char* lpc_tree_name[] = {"return",
                                "number",
                                "string",
                                "function",
-                               "catch"};
+                               "catch",
+                               /* keep in step with trees.h's node-kind enum:
+                                * lpc_tree_form() indexes this table by kind
+                                * for NODE_CATCH/NODE_ACATCH, so a missing
+                                * entry is an out-of-bounds read (__TREE__ of
+                                * an acatch segfaulted on Debug builds) */
+                               "acatch"};
 
 static void lpc_tree(parse_node_t* dest, int num) {
   parse_node_t* pn;
@@ -764,6 +771,10 @@ static nlohmann::json ast_json(parse_node_t* expr) {
       n["k"] = "catch";
       kids(expr->r.expr);
       break;
+    case NODE_ACATCH:
+      n["k"] = "acatch";
+      kids(expr->r.expr);
+      break;
     case NODE_LVALUE_EFUN: {
       n["k"] = "lvalue_efun";
       kids(expr->l.expr);
@@ -993,6 +1004,7 @@ void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
       lpc_tree_expr(ARG_3, expr->r.expr);
       break;
     case NODE_CATCH:
+    case NODE_ACATCH:
       lpc_tree(dest, 2);
       lpc_tree_expr(ARG_2, expr->r.expr);
       break;

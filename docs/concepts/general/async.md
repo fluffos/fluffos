@@ -1,0 +1,496 @@
+---
+title: Async / await
+---
+
+# Async / await
+
+FluffOS supports native coroutine-style asynchronous programming
+(issue #1319, phase 1): a first-class **promise** value type, an
+**`async`** function modifier, an **`await`** expression that suspends the
+function without blocking the driver, and **`acatch`**, the async-aware
+form of `catch`. This page is the execution-model specification.
+
+## Promises
+
+A promise is a first-class LPC value holding the eventual result of an
+asynchronous operation. It is created pending and settles exactly once —
+**fulfilled** with a value or **rejected** with a reason. See
+`promise_create()`, `promise_resolve()`, `promise_reject()`,
+`promise_then()`, `promise_catch()`, `promise_status()`,
+`promise_result()`, and `async_info()`.
+
+`promise` is a declared type, like `mapping` or `buffer` — usable for
+variables, parameters, return types and arrays, and enforced by the
+compiler's type checking. It is **parameterized by the type it will
+eventually deliver**, written `promise<T>`:
+
+```c
+promise<mapping> fetch(string uid);   // return type
+void handle(promise<int> p);          // parameter
+promise<int> *pending = ({ });        // array of promise<int>
+promise<string *> names;              // promise of an array of strings
+promise anything;                     // bare `promise` == promise<mixed>
+```
+
+`promise<T> *` and `promise<T *>` are different types and compose
+independently: the first is an *array of promises*, the second is *one
+promise that delivers an array*. Any type may be a payload — including
+`class` types — except `void` and `promise` itself: resolving a promise
+with a promise adopts it, so a promise value is never itself a promise, and
+a nested payload is rejected at compile time. (Spelled `promise<promise<int> >`
+you get the explicit diagnostic; spelled `promise<promise<int>>` you get a
+plain syntax error instead, because `>>` lexes as the shift operator.)
+
+Assignment and argument passing compare payloads, so `promise<int>` and
+`promise<string>` are incompatible while `promise` (i.e. `promise<mixed>`)
+accepts either. `await` yields the payload type, so `int n = await
+fetch_count();` type-checks and `string s = await fetch_count();` does not.
+
+`typeof()` returns `"promise"` — it reports the value's kind, not its
+payload. An `async` function's promise does carry the payload its function
+**declared**, as a plain runtime type tag, and `sprintf("%O", p)` names it
+the way the driver names any runtime type: `PROMISE<int>( fulfilled: 42 )`,
+`PROMISE<array>` for a `promise<string *>`, `PROMISE<class>` for a
+`promise<class point>`. A promise from `promise_create()` or
+`promise_then()` declares nothing and renders bare, `PROMISE( pending )`.
+
+Two things that tag is not. It is not finer-grained than the runtime's own
+types: the compiler tells `promise<string *>` from `promise<int *>`, the
+value only says "array". And it is a **declaration, not a measurement** —
+exactly as trustworthy as any other declared LPC type, which is to say an
+`async int f()` whose body returns a `mixed` that happens to hold a string
+still produces a promise tagged `int`. Read it as documentation of intent,
+the way you would read the function's signature, not as a checked property
+of the settled value.
+
+Promises compare by identity, work as mapping keys, deep-copy shallowly
+(identity-preserving, like objects), and are not serialized by
+`save_object()`.
+
+Settlement delivery is never synchronous: handlers attached with
+`promise_then()` and suspended `await` expressions always run from the
+microtask drain, in attachment order, each with a fresh evaluation-cost
+budget (the same model as `call_out(0)` callbacks). The drain is a
+zero-delay gametick event, so it runs after the current execution finishes
+but still within the *same* gametick -- not on a later one. A drain with more
+work than fits in one turn re-posts itself to the event loop and continues
+there, so later deliveries of a large batch can land after that gametick (see
+"Interaction with the rest of the driver").
+
+Fulfilling a promise with another promise **adopts** it (flattening): the
+outer promise stays pending until the inner one settles, then settles the
+same way. A rejection that is never observed — no rejection handler, the
+result never read — is reported to the debug log when the promise is
+deallocated, naming where it was rejected:
+
+```
+Unhandled promise rejection (rejected by /obj/thing at /obj/thing.lpc:42): no such file
+```
+
+Deallocation can be arbitrarily far from the rejection, and the reason on
+its own is often not enough to identify which promise it was — `(int) 0` is
+an ordinary rejection value for the promise forms of `async_read()` and
+friends — so the locus is the part that makes the line actionable.
+
+## `async` functions
+
+```c
+async int transfer(string from, string to, int amount) {
+    mapping acc = await fetch_account(from);
+    if (acc["balance"] < amount) return 0;
+    await update_account(from, -amount);
+    await update_account(to, amount);
+    return 1;
+}
+```
+
+A function declared `async` always returns a **promise** for its result:
+an `async T f()` is typed `promise<T>` at every call site, while `T` stays
+what `return` statements inside the body are checked against. Calling one
+runs its body
+**synchronously until the first `await` of a promise** — any promise:
+awaiting a promise always parks, even one that has already settled, and
+only awaiting a non-promise value continues synchronously (see `await`
+below). The caller receives the promise immediately — already fulfilled
+only if the body completed without awaiting any promise, pending
+otherwise.
+
+The one exception to `async T f()` being typed `promise<T>` is `T` being an
+**array of promises**. A type word carries a single promise bit, so
+`promise<promise<int> *>` is unspellable; the call site is typed
+`promise<mixed *>` instead — sound (it really is a promise of an array) but
+weaker, so `promise<int> *a = f();` does not compile. Only the payload
+loses its element type: `async int *g()` is still typed `promise<int *>`.
+
+The promise belongs to the body: it is the body's result channel, and the
+body is the only thing that settles it. `promise_resolve()` and
+`promise_reject()` **refuse** a promise that came from an `async` function.
+Allowing it would discard whatever the body goes on to return — first
+settle wins — and would not stop the body, which keeps running, keeps its
+object alive and keeps its suspension slot. Note that JS cannot reach this
+state at all, since an async function's resolver is never handed out; here
+promises are first-class, so the refusal has to be explicit.
+
+There is no cancellation primitive in phase 1, and the refusal removes the
+one thing that looked like one. Two replacements, depending on which side
+you are on.
+
+A body that should be able to give up early `await`s a gate the caller
+holds:
+
+```c
+async int worker(promise cancel) {
+    foo();
+    if (promise_status(cancel)) return 0;   // caller gave up
+    return await slow();
+}
+```
+
+A *caller* that wants to bound a wait it does not own wraps the promise
+instead of settling it:
+
+```c
+promise with_timeout(promise p, int secs) {
+    promise gate = promise_create();
+
+    promise_then(p, function(mixed v) {
+        if (!promise_status(gate)) promise_resolve(gate, v);
+    });
+    call_out(function() {
+        if (!promise_status(gate)) promise_reject(gate, "*timeout");
+    }, secs);
+    return gate;
+}
+```
+
+The `promise_status()` guards are not optional, and this is where LPC
+differs from JS: there, settling an already-settled promise is a silent
+no-op, which is what lets `Promise.race` be written in userland. Here it is
+an **error**, so the unguarded version throws on whichever of the two paths
+finishes second — the common case, not a rare one. Note also that the
+underlying work is not stopped by either shape; only your wait ends.
+
+`return value` fulfills the promise (a returned promise is adopted). An
+uncaught error inside the body rejects it — an async body behaves as if
+wrapped in an implicit `catch`, so the error is reported like a caught
+error and becomes the rejection reason. `throw(value)` inside an async
+body rejects with `value`.
+
+The modifier propagates through inheritance and applies on every call
+path: direct local calls, `::`-qualified calls, `call_other()`, and
+function pointers.
+
+An override must **agree with the inherited function about `async`**, in
+both directions, and the compiler rejects a mismatch. The inherited program
+is already compiled, and every call to the function inside it was typed
+against its own declaration: making an override `async` when the base is not
+would hand those calls a promise where they expect the declared type (`if
+(f())` becomes unconditionally true, and the first arithmetic on the result
+errors at runtime far from the cause), and dropping `async` in an override
+does the reverse. Changing any other part of a return type across an
+override merely warns; this one is an error because nothing checks it at
+runtime.
+
+## `await`
+
+`await expr` is a unary prefix expression (`await a + b` parses as
+`(await a) + b`):
+
+- a **non-promise** operand passes through unchanged — awaiting a plain
+  value is a no-op, not a scheduling point;
+- a **promise always suspends**, even one that has already settled. The
+  driver keeps serving everything else; the function resumes from the
+  microtask drain **with a fresh evaluation-cost budget**, receiving the
+  value, or with the rejection raised at the await point.
+
+That last rule is what makes `await` a scheduling primitive: because every
+awaited promise costs a suspension and buys a fresh budget, a loop of
+awaits breaks long work into separately-metered pieces instead of burning
+one budget until "too long evaluation". Resuming is a microtask, not a
+timer: a sequential loop of awaits runs at full speed, all of it inside the
+drain, with no wall-clock delay per iteration. Only when a drain exceeds
+the turn's `async drain eval budget` is spent does it yield to the event loop
+and pick up again a moment later — the price of the driver staying responsive under
+unbounded async work, paid once per batch rather than once per `await`.
+
+The flip side is that a plain `await` is **not** a way to hand the event
+loop a turn: the resume is re-queued into the same drain turn, so the loop
+does not run in between. When that is what you want — a long computation
+that should let players be served around it — use
+[`async_yield()`](../../efun/promises/async_yield), whose promise settles
+from the event loop's own post-poll queue:
+
+```c
+async void reindex(mixed *rows) {
+    int i;
+
+    foreach (mixed row in rows) {
+        index(row);
+        if (++i % 500 == 0) {
+            await async_yield();     // the loop runs here
+        }
+    }
+}
+```
+
+`await call_out(0)` is not a substitute — a `call_out(0)` runs on the same
+gametick, and `call_out(0) nest level` refuses one used as a yield inside a
+loop. `await call_out(1)` does reach the loop, but costs a whole gametick.
+
+The yield is to the event loop's own post-I/O queue, not a timer, so there
+is no fixed delay between batches: the loop polls sockets, fires due timers
+and comes straight back. That keeps latency at one batch — measured worst
+timer jitter is a few milliseconds even while the drain is saturated — but
+it also means sustained async work runs the driver at 100% of one core
+rather than leaving it idle between batches. A mud with a genuinely
+unbounded promise chain will use every cycle it is given; that is the
+intended behaviour, and it is a change worth knowing about on a
+co-tenanted host.
+
+While suspended, the object remains fully live: incoming calls run
+normally (there are no re-entrancy locks), and each `async` call has its
+own suspension state, so concurrent invocations don't interfere. The
+suspension holds real references on the object and its program.
+`this_player()` across a suspension is governed by the same driver option
+as `call_out()` callbacks, **`this_player in call_out`**: with the option
+enabled (the default), `this_player()` at suspension time is restored on
+resume; with it disabled, `this_player()` is 0 after resuming.
+
+## `acatch`
+
+`await` is **not allowed inside `catch`** (see restrictions below).
+`acatch(expr)` / `acatch { ... }` is the async-aware replacement: the same
+value convention as `catch` — `0` on success, the error value on failure —
+but `await` may suspend inside the protected region.
+
+```c
+async void pay(object who, int amount) {
+    mixed err = acatch(await bank_transfer(who, amount));
+    if (err) write("Transfer failed: " + err + "\n");
+}
+```
+
+An error raised inside the region — synchronously, or as the rejection of
+an awaited promise, even one that settles long after the function
+suspended — resumes execution right after the `acatch` with the error as
+its value. `acatch` is only legal directly inside an `async` function
+body, and not inside a plain `catch`.
+
+One rejection does not reach an `acatch` region: if the awaited promise is
+garbage-collected while still pending (its last reference dropped, so it can
+never settle), the parked frame is abandoned rather than resumed, and the
+async function's own promise is rejected with `*awaited promise was
+collected before settling`. There is no resume, so no `acatch` inside the
+function runs -- observe that case on the returned promise instead.
+
+## Restrictions
+
+These rules keep suspension sound (the VM parks exactly one frame; no C++
+stack may be pinned across a suspension). Each violation is a clean
+compile-time or runtime error, never silent misbehavior:
+
+1. `await` and `acatch` are only legal **directly inside an `async`
+   function body** — not in `(: :)` functionals or anonymous functions
+   (those run in their own frames), and not at top level.
+2. `await` is not allowed inside `catch(...)` or `time_expression(...)`
+   (their implementation recurses the C++ stack). Use `acatch`.
+3. An `await` cannot suspend while a transient reference sits on the value
+   stack. In practice this means **any `foreach` loop** (over arrays,
+   mappings, strings or buffers — the loop keeps an lvalue slot live for its
+   variable for the whole body) and a `ref` argument. It is a runtime error
+   rather than a compile error because it depends on what the awaited
+   promise turns out to be; use an indexed `for` loop when the body needs to
+   suspend. Compound assignment is *not* affected — `arr[i] += await p`,
+   `s += await p` and friends evaluate the right-hand side before pinning
+   the target, so they park and resume normally.
+4. If the object is destructed, recompiled by `recompile_object()`, or has
+   its program swapped by `replace_program()` while a function is
+   suspended, the resume is abandoned and the function's promise rejects
+   with a descriptive error.
+5. `break`/`continue` may not jump out of an `acatch` region (same rule as
+   `catch`); `return` works normally.
+6. An **apply should not be `async`**. The driver is the caller and reads the
+   return value the moment the apply returns, which for an async function is a
+   promise handed back the instant the body parks — before it has decided
+   anything. Consumers that treat an unrecognised value as permissive then
+   read that as "yes". Applies whose value is ignored (`create()`, `init()`)
+   fail more quietly but no more usefully: the driver treats the object as
+   ready while the body is still parked. An apply that wants async work calls
+   an async function:
+
+   ```c
+   void create() { start_loading(); }          // apply, ordinary
+   async void start_loading() { config = await load(); }
+   ```
+
+   The compiler enforces this as far as a name can: `async` on an **object
+   apply** (`create`, `init`, `id`, `heart_beat`, …) is an error, since the
+   driver calls those on any object; `async` on a **master-only apply**
+   (`valid_read`, `error_handler`, `compile_object`, …) is a warning, because
+   on any object other than the master the name is the author's to use.
+
+   **That check is a lint, not a boundary**, and it matters not to mistake it
+   for one. It keys on the declaration, so it does not catch an ordinary apply
+   that returns the result of an async call — `mixed id(string s) { return
+   slow(); }` — and it cannot cover `add_action()` verb functions at all,
+   whose names are arbitrary. So the consumers refuse a promise themselves —
+   a function that has not answered has not said yes:
+
+   * `check_valid_path()` denies a `valid_read()`/`valid_write()` that
+     returns one, and logs why.
+   * every master approval gate — `valid_seteuid`, `valid_bind`,
+     `valid_shadow`, `valid_socket`, `valid_object`, `valid_link`,
+     `valid_hide`, `valid_override` — denies and names itself in the log.
+   * the command parser treats a verb function that returns one as having
+     *declined* the command: it goes on to the next sentence on that verb
+     and, if none takes it, calls `notify_no_command()`.
+   * `present()` does not match an object whose `id()` returns one, and the
+     parser does not set an object's `living` / `inventory_accessible` /
+     `inventory_visible` / `livings_are_remote` flags from one.
+7. An eval-cost ("too long evaluation") error can never be swallowed by an
+   async body or `acatch`, matching `catch`.
+
+## Resource limits
+
+Each suspended function holds a heap copy of its frame, so the number of
+concurrently suspended async functions is bounded by the runtime config
+option **`max suspended async functions`** (default 10000; 0 disables the
+limit). An `await` that would exceed it raises a clean error at the await
+point instead of suspending — catchable with `acatch`, and otherwise
+simply rejecting that function's promise. This is a runaway-exhaustion
+guard: a loop spawning async calls that never settle hits a bounded error
+rather than consuming memory without limit.
+
+`await async_yield()` holds one of those slots while it is parked, like any
+other `await`. It is a scheduling primitive rather than a wait on real work,
+so a function that yields periodically occupies a slot only between the yield
+and the loop's next pass.
+
+`call_out(delay)` — a delay with **no callback** — returns a promise
+fulfilled (with `0`) when the delay elapses, and rejected if the call_out
+is removed (`remove_call_out()` with no argument sweeps it with the rest)
+or its object destructed first. `await call_out(2)` is the non-blocking
+pause idiom. The classic `call_out(fn, delay, ...)` form is unchanged and
+still returns the handle; note the promise form returns no handle, so a
+timer you may need to cancel individually should use the classic form.
+
+The worker-thread I/O efuns of the async *package* follow the same
+pattern: `async_read(path)`, `async_write(path, str, flag)` and
+`async_getdir(path)` with the trailing callback **omitted** return a
+promise fulfilled with the value the callback would have received, or
+rejected with the failure value (e.g. `async_read`'s negative int) —
+`string s = await async_read(path);`.
+
+`async_yield()` returns a promise fulfilled with `0` on the event loop's
+next pass — `await async_yield();` is the cooperative preemption point for a
+long computation, letting the driver serve players between chunks. It is the
+one `await` that reaches the loop; see "Interaction with the rest of the
+driver" for why a plain `await` does not. Pending yields are bounded by the
+same **`max pending promise deliveries`** ceiling as queued reactions,
+because a yield the caller has dropped stays allocated until the loop runs.
+
+`async_info()` lists every currently suspended frame — what it is, where
+it is parked, and what it awaits — the async counterpart of
+`call_out_info()`. A frame stops being listed the moment its object is
+destructed, even in the case where the driver cannot free it yet (its
+delivery was already queued, so the queue owns it until it arrives and is
+abandoned there). Such a frame can never resume, so it is not reported as
+suspended and does not hold one of the `max suspended async functions`
+slots against live frames.
+
+`async`, `await`, `acatch` and `promise` are reserved words. Existing
+mudlib code using them as identifiers must be renamed.
+
+## Interaction with the rest of the driver
+
+- Delivery rides the gametick event queue, and a drain that cannot finish in
+  one go **re-posts itself to the event loop** rather than running on. Each
+  turn spends at most `async drain eval budget` of eval cost — counting work created
+  *during* the turn, so a sequential chain of awaits runs at full speed
+  rather than paying a loop turn per link. Between turns the driver reads
+  pending network input, schedules commands and fires timers.
+
+  The budget governs how many deliveries a turn **starts**; it never
+  interrupts one it has started. Each delivery is armed with a whole
+  `maximum evaluation cost` of its own, so a resumed async function or a
+  settlement handler always runs to its own natural end, however much time
+  the deliveries ahead of it in the same turn used. Running out is a
+  scheduling decision, not an error: the remaining deliveries are pushed past
+  the next I/O poll and nothing in flight is aborted or dropped.
+
+  A turn also ends immediately when the delivery that just ran consumed its
+  *entire* budget and took "too long evaluation". That handler alone has
+  already held the loop for longer than any turn budget, so starting another
+  full-budget delivery behind it is the last thing the driver wants; the
+  queue is deferred instead.
+
+  The effect is that async work proceeds continuously, using time the driver
+  would otherwise spend idle between gameticks, without holding the event
+  loop for more than one batch. A large backlog is delivered across as many
+  turns as it needs instead of in one stall, and a self-feeding
+  `promise_then()` chain yields every batch rather than wedging the driver.
+
+  Because the batch is the only bound, its size is a responsiveness setting.
+  The default keeps a turn to roughly a millisecond of trivial deliveries;
+  raising it far above that lets a self-feeding chain hold the driver for
+  correspondingly longer, and a large enough value will stall network I/O
+  outright.
+
+  The re-post is a true yield to I/O, not a timer: it rides libevent's
+  `active_later` queue, which the loop promotes at the top of its next
+  iteration, *before* polling — and keeps the loop from blocking while one is
+  pending. So the loop polls sockets between every turn, with no fixed delay
+  to pay. A zero-delay timer would not do this (libevent dispatches a zero
+  timeout immediately, from the same pass, so a self-re-posting drain never
+  lets the loop poll at all — measured: a `call_out` six seconds out did not
+  run in ninety seconds), and a one-millisecond timer does yield but caps
+  delivery at one turn per millisecond. Measured against that 1 ms
+  predecessor: 9.0M deliveries in 5s versus 635k, i.e. 14×, with login
+  latency under sustained promise load still around a millisecond.
+
+  `async_info(1)` reports the scheduler: `pending_deliveries`, the monotonic
+  `drain_yields`, and the effective `drain_eval_budget`. A rising `drain_yields`
+  with a non-zero `pending_deliveries` is backpressure — async work arriving
+  faster than it is delivered.
+
+  A settle that happens *outside* gametick dispatch — which is how every
+  `package/async` I/O completion arrives (`async_read`, `async_write`,
+  `async_getdir`, `async_db_exec`) — arms the drain through the event loop
+  rather than the tick queue, so it is delivered on the loop's next pass
+  instead of waiting for the next gametick.
+
+  A consequence worth knowing when writing tests: a batch of settlements
+  larger than one turn is **not** all delivered in the same gametick, even
+  though each individual settle queues immediately.
+
+- **On the WebAssembly build there is no evaluation limit at all** — the
+  driver's eval timer is built only for Linux (`#ifdef __linux__` in
+  `eval_limit.cc`), and emscripten — like macOS and Windows — gets none, so the boot log says so. Deliveries are still armed, but the
+  arming does nothing: a runaway promise handler blocks the page exactly as a
+  `while (1);` in any other function would. What *does* still work is the
+  turn budget, which is measured on the monotonic clock — so a large backlog
+  is still split across turns and the page still gets its turns back between
+  them. Only the per-delivery bound is missing.
+- On a Debug build, suspended coroutines and promise reactions are fully
+  visible to the `check_memory()` ref-count checker.
+- `defer()` handlers registered before an `await` survive the suspension
+  and run when the function finally finishes, including when it is abandoned
+  because its object was recompiled. Two cases where they do **not** run:
+
+  - **The object was destructed.** Frames parked inside an object are
+    abandoned by `destruct_object()` itself, and that happens partway through
+    tearing the object down, where running mudlib code is not safe — so their
+    `defer()` handlers are discarded rather than run. Even reached by the
+    other route (a delivery arriving for a destructed owner, which runs at a
+    safe point), most handlers still could not run: a `defer()` handler is a
+    function pointer, and the driver refuses to call one whose owner is
+    destructed ("Owner of function pointer is destructed"), which is every
+    handler written the natural way — `defer((: release_lock, key :))` inside
+    the object's own method. Do not rely on `defer()` for cleanup that must
+    survive the owner being destructed mid-`await`; put that cleanup in an
+    object that outlives the operation.
+  - **The awaited promise was garbage collected.** That happens on a
+    deallocation path where running mudlib code is unsafe, so those handlers
+    are dropped.
+- Driver shutdown discards queued deliveries without running them, like
+  pending `call_out()`s.

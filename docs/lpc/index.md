@@ -8,6 +8,7 @@ title: lpc
 * [style guide](style-guide)
 * [formatter](formatter)
 ## constructs
+* [async, await, acatch](constructs/async)
 * [for](constructs/for)
 * [function](constructs/function)
 * [if](constructs/if)
@@ -31,5 +32,6 @@ title: lpc
 * [function](types/function)
 * [general](types/general)
 * [mappings](types/mappings)
+* [promise](types/promise)
 * [strings](types/strings)
 * [substructures](types/substructures)

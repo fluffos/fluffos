@@ -10,6 +10,7 @@
 #include "packages/core/reclaim.h"
 
 #include <functional>
+#include <vector>
 
 #include "packages/core/call_out.h"
 
@@ -19,6 +20,15 @@ static void gc_mapping(mapping_t* /*m*/);
 static void check_svalue(svalue_t* /*v*/);
 
 static int cleaned, nested;
+
+/* Promises currently on the walk path. check_svalue() is an unmemoized tree
+ * walk bounded only by MAX_RECURSION, so a value reachable K times from
+ * itself costs K^25 visits. A parked coroutine makes that trivially
+ * reachable: `mixed q = p; await p;` puts the awaited promise in two frame
+ * slots, and promise -> reaction -> coroutine frame -> same promise is a
+ * one-hop loop -- K=3 never finished in 60s. Walking each promise at most
+ * once per path removes the blowup at its source. */
+static std::vector<promise_t*> walking_promises;
 
 static void check_svalue(svalue_t* v) {
   int idx;
@@ -65,6 +75,77 @@ static void check_svalue(svalue_t* v) {
       tmp.type = T_ARRAY;
       if ((tmp.u.arr = v->u.fp->hdr.args)) {
         check_svalue(&tmp);
+      }
+      break;
+    }
+    case T_PROMISE: {
+      promise_t* prom = v->u.prom;
+      /* see walking_promises: without this, an ordinary parked `await p`
+       * makes the walk exponential */
+      for (promise_t* seen : walking_promises) {
+        if (seen == prom) {
+          nested--;
+          return;
+        }
+      }
+      walking_promises.push_back(prom);
+      DEFER { walking_promises.pop_back(); };
+      check_svalue(&prom->result);
+      if (prom->reactions) {
+        for (auto& r : *prom->reactions) {
+          svalue_t tmp;
+          tmp.type = T_FUNCTION;
+          if ((tmp.u.fp = r.on_fulfilled)) {
+            check_svalue(&tmp);
+          }
+          if ((tmp.u.fp = r.on_rejected)) {
+            check_svalue(&tmp);
+          }
+          if (r.command_giver && (r.command_giver->flags & O_DESTRUCTED)) {
+            free_object(&r.command_giver, "reclaim_objects");
+            r.command_giver = nullptr;
+            cleaned++;
+          }
+          if (r.next) {
+            svalue_t tmp2;
+            tmp2.type = T_PROMISE;
+            tmp2.u.prom = r.next;
+            check_svalue(&tmp2);
+          }
+          if (r.coro) {
+            /* A PARKED COROUTINE holds svalues too -- its saved frame slice
+             * and its defer lists (the async frame's and every acatch
+             * marker's). Objects destructed while a frame is suspended are
+             * only reclaimable through here; every sibling walker
+             * (mark_coroutine, checkmemory's orphan scan, cycles.cc) already
+             * covers these. coro->ob/prev_ob/command_giver are deliberately
+             * NOT nulled: resume_coroutine() reads ob to decide the frame is
+             * stale, and free_coroutine() frees all three. */
+            {
+              /* the coroutine's own result promise: often its ONLY ref, so
+               * nothing else here reaches what that promise's reactions
+               * hold. The three sibling walkers (mark_coroutine,
+               * checkmemory's orphan scan, cycles.cc) all cover it. */
+              svalue_t tmp3;
+              tmp3.type = T_PROMISE;
+              tmp3.u.prom = r.coro->result_promise;
+              check_svalue(&tmp3);
+            }
+            for (int fi = 0; fi < r.coro->frame_size; fi++) {
+              check_svalue(&r.coro->frame[fi]);
+            }
+            for (struct defer_list* d = r.coro->defers; d; d = d->next) {
+              check_svalue(&d->func);
+              check_svalue(&d->tp);
+            }
+            for (auto& mk : r.coro->markers) {
+              for (struct defer_list* d = mk.defers; d; d = d->next) {
+                check_svalue(&d->func);
+                check_svalue(&d->tp);
+              }
+            }
+          }
+        }
       }
       break;
     }

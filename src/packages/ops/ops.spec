@@ -80,3 +80,22 @@ operator parse_command;
 operator new_class, new_empty_class;
 operator expand_varargs;
 operator type_check;
+
+/* async/await (issue #1319). Appended rather than inserted, but be clear
+ * about what that does and does not buy: the operators in this file are
+ * numbered BEFORE the efuns, so adding three here still shifts every efun
+ * opcode up by three (F_TRIM is 134 on this branch). Appending only keeps
+ * the other OPERATORS stable.
+ *
+ * That is safe here because nothing persists bytecode -- programs are
+ * compiled from source at load and never serialised, "swapping" in
+ * backend.cc is reset/clean_up only, and instrs[], the interpreter and the
+ * disassembler are all generated together from these files. It would stop
+ * being safe the day anything caches compiled programs across runs.
+ *
+ * It did push opcodes past 127, which is exactly the AGENTS.md section
+ * 13.17 boundary: the disassembler's `*pc` fetch sign-extended them and
+ * silently dropped every high opcode until it was changed to
+ * EXTRACT_UCHAR. */
+operator await;
+operator acatch, end_acatch;

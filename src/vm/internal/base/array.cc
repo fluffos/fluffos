@@ -706,6 +706,8 @@ int sameval(svalue_t* arg1, svalue_t* arg2) {
       return arg1->u.real == arg2->u.real;
     case T_BUFFER:
       return arg1->u.buf == arg2->u.buf;
+    case T_PROMISE:
+      return arg1->u.prom == arg2->u.prom;
   }
   return 0;
 }
@@ -1474,17 +1476,36 @@ array_t* deep_inventory_array(array_t* arr, int take_top, funptr_t* fp) {
 }
 #endif
 
+/* Total order over raw svalue payload then type tag, used to sort the
+ * lookup table behind array '-', '&' and '|'. Every caller reads only the
+ * SIGN, so this returns -1/0/1 rather than a difference -- computing it as
+ * a subtraction is what made all three of the following wrong:
+ *
+ *  - `p1->u.number - p2->u.number` wraps (LPC_INT is 64-bit and -fwrapv
+ *    makes the overflow silent). The old guard special-cased the single
+ *    value it noticed, d == LONG_MIN, but rewrote it as `p1 > p2`, which is
+ *    0 when p1 < p2 -- i.e. "equal". bits(-x) - bits(x) is exactly LONG_MIN
+ *    for every float x > 0, so cmp(-1.0, 1.0) reported equal while
+ *    cmp(1.0, -1.0) reported greater: `({ -1.0, 1.0 }) - ({ 1.0 })` came
+ *    back empty, and the '&' of the same pair kept an element present in
+ *    neither side.
+ *  - `long` is 32-bit on the wasm32 and MinGW64 targets (both in CI), so
+ *    the 64-bit difference truncated there and any two ints agreeing modulo
+ *    2^32 compared equal -- `({ 0, 4294967296 }) - ({ 0 })` came back empty
+ *    on wasm while being correct natively.
+ *  - svalue_t::type is uint32_t, which (unlike the unsigned short it used
+ *    to be) does not integer-promote, so the tag subtraction was unsigned
+ *    and wrapped positive whenever p1's tag was the smaller one.
+ *
+ * All three shapes make the comparator asymmetric or intransitive, which
+ * sends the binary searches down the wrong half and silently drops or keeps
+ * the wrong elements -- no error, no crash. */
 static long alist_cmp(svalue_t* p1, svalue_t* p2) {
-  long d;
-
-  if ((d = p1->u.number - p2->u.number)) {
-    if (d == LONG_MIN) {
-      d = p1->u.number > p2->u.number;
-    }
-    return d;
+  if (p1->u.number != p2->u.number) {
+    return (p1->u.number > p2->u.number) ? 1 : -1;
   }
-  if ((d = p1->type - p2->type)) {
-    return d;
+  if (p1->type != p2->type) {
+    return (p1->type > p2->type) ? 1 : -1;
   }
   return 0;
 }

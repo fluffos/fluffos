@@ -48,6 +48,41 @@ void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT save
   current_type = SAVED_CONTEXT_TYPE(saved_context);
 }
 
+LPC_INT rule_acatch_context_open() {
+  LPC_INT saved = PACK_SAVED_CONTEXT(context, current_type);
+  context = (context & NO_SUSPEND_CONTEXT) | ACATCH_CONTEXT;
+  return saved;
+}
+
+void rule_acatch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context) {
+  if (!compiling_async_function || current_function_context) {
+    yyerror("acatch is only allowed directly inside an async function body");
+  }
+  if (SAVED_CONTEXT_FLAGS(saved_context) & NO_SUSPEND_CONTEXT) {
+    yyerror("acatch is not allowed inside catch or time_expression");
+  }
+  CREATE_ACATCH(*result, expr_or_block);
+  context = SAVED_CONTEXT_FLAGS(saved_context);
+  current_type = SAVED_CONTEXT_TYPE(saved_context);
+}
+
+void rule_expr_await(parse_node_t** result, parse_node_t* expr) {
+  /* await may only appear where the frame can actually be parked: directly
+   * in an async function's own body (not in a functional or anonymous
+   * function, which run in their own frames), and not under catch or
+   * time_expression, whose do_catch()-style C++ recursion cannot be
+   * suspended. acatch() regions are fine. */
+  if (!compiling_async_function || current_function_context) {
+    yyerror("await is only allowed directly inside an async function body");
+  }
+  if (context & NO_SUSPEND_CONTEXT) {
+    yyerror("await is not allowed inside catch or time_expression (use acatch)");
+  }
+  /* `await p` yields p's payload type; awaiting a non-promise (including an
+   * array of promises) passes the value -- and its type -- straight through */
+  CREATE_UNARY_OP(*result, F_AWAIT, promise_payload_type(expr->type & ~DECL_MODS), expr);
+}
+
 void rule_sscanf(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,
                  parse_node_t* lvalue_list) {
   int p = lvalue_list->v.number;
@@ -143,7 +178,7 @@ LPC_INT rule_efun_override(const ScratchString* identifier) {
     share_and_push_string(identifier->c_str());
     push_malloced_string(add_slash(main_file_name()));
     svalue_t* ret = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-    if (!MASTER_APPROVED(ret)) {
+    if (!MASTER_APPROVED(ret, "valid_override")) {
       yyerror("Invalid simulated efunction override");
       res = -1;
     }
@@ -156,7 +191,7 @@ LPC_INT rule_efun_override_new() {
   push_constant_string("new");
   push_malloced_string(add_slash(main_file_name()));
   svalue_t* res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-  if (!MASTER_APPROVED(res)) {
+  if (!MASTER_APPROVED(res, "valid_override")) {
     yyerror("Invalid simulated efunction override");
     return -1;
   } else {
@@ -603,7 +638,7 @@ void rule_primary_expr_member_arrow(parse_node_t** result, parse_node_t* expr,
                                     const ScratchString* identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
-    unsigned short tp;
+    lpc_type_t tp;
     if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
@@ -627,7 +662,7 @@ void rule_primary_expr_member_dot(parse_node_t** result, parse_node_t* expr,
                                   const ScratchString* identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
-    unsigned short tp;
+    lpc_type_t tp;
     if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
@@ -1072,7 +1107,7 @@ void rule_function_call_new(parse_node_t** result, parse_node_t* opt_arg_list,
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else {
     *result = validate_efun_call(lookup_predef("clone_object"), opt_arg_list);
 #ifdef CAST_CALL_OTHERS
@@ -1136,11 +1171,16 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
     (*result)->v.number = F_CALL_FUNCTION_BY_ADDRESS;
     (*result)->l.number = f;
     (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
+    if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
+      /* an async call yields a promise OF the declared return type (which
+       * is what `return` inside the body checks against) */
+      (*result)->type = promise_of_type((*result)->type);
+    }
   } else if ((f = ihe->dn.simul_num) != -1) {
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else if ((f = ihe->dn.efun_num) != -1) {
     *result = validate_efun_call(f, opt_arg_list);
   } else if ((i = ihe->dn.local_num) != -1 &&
@@ -1264,6 +1304,11 @@ void rule_function_call_name(parse_node_t** result, const ScratchString* name,
         (*result)->type = TYPE_ANY;
       } else {
         (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
+        if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
+          /* an async call yields a promise OF the declared return type
+           * (which is what `return` inside the body checks against) */
+          (*result)->type = promise_of_type((*result)->type);
+        }
       }
     }
   }
@@ -1348,7 +1393,7 @@ void rule_function_call_arrow(parse_node_t** result, parse_node_t* expr,
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else {
     *result = validate_efun_call(arrow_efun, opt_arg_list);
 #ifdef CAST_CALL_OTHERS

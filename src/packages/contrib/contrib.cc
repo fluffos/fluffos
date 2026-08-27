@@ -142,7 +142,7 @@ void f_query_notify_fail() {
 void f_store_variable() {
   int idx;
   svalue_t* sv;
-  unsigned short type;
+  lpc_type_t type;
 
   const char* name = nullptr;
   object_t* ob;
@@ -169,7 +169,7 @@ void f_store_variable() {
 #ifdef F_FETCH_VARIABLE
 void f_fetch_variable() {
   int idx;
-  unsigned short type;
+  lpc_type_t type;
 
   const char* name = nullptr;
   object_t* ob;
@@ -328,7 +328,7 @@ void f_functions() {
   function_t* funp;
   program_t* prog;
   int const flag = (sp--)->u.number;
-  unsigned short* types;
+  lpc_type_t* types;
   char buf[256];
   char* end = EndOf(buf);
   program_t* progp = sp->u.ob->prog;
@@ -395,7 +395,9 @@ void f_functions() {
       subvec->item[1].subtype = 0;
       subvec->item[1].u.number = funp->num_arg;
 
+      set_type_name_foreign(1);
       auto* p = get_type_name(buf, end, funp->type);
+      set_type_name_foreign(0);
       *(p - 1) = '\0';  // get rid of last space
       subvec->item[2].type = T_STRING;
       subvec->item[2].subtype = STRING_SHARED;
@@ -403,7 +405,9 @@ void f_functions() {
 
       for (j = 0; j < funp->num_arg; j++) {
         if (types) {
+          set_type_name_foreign(1);
           auto* p = get_type_name(buf, end, types[j]);
+          set_type_name_foreign(0);
           *(p - 1) = '\0';  // get rid of last space
           subvec->item[3 + j].type = T_STRING;
           subvec->item[3 + j].subtype = STRING_SHARED;
@@ -443,7 +447,9 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
       subarr->item[0].type = T_STRING;
       subarr->item[0].subtype = STRING_SHARED;
       subarr->item[0].u.string = ref_string(prog->variable_table[i]);
+      set_type_name_foreign(1);
       auto* p = get_type_name(buf, end, prog->variable_types[i]);
+      set_type_name_foreign(0);
       *(p - 1) = '\0';  // get rid of last space
       subarr->item[1].type = T_STRING;
       subarr->item[1].subtype = STRING_SHARED;
@@ -1831,11 +1837,11 @@ void f_program_info() {
   add_mapping_pair(m, "function size",
                    info.ff_c * sizeof(unsigned short) + info.fd_c * sizeof(function_t));
   add_mapping_pair(m, "string size", info.s_c * sizeof(char*));
-  add_mapping_pair(m, "var size", info.v_c * (sizeof(char*) + sizeof(unsigned short)));
+  add_mapping_pair(m, "var size", info.v_c * (sizeof(char*) + sizeof(lpc_type_t)));
   add_mapping_pair(m, "class size",
                    info.nc_c * sizeof(class_def_t) + info.mc_c * sizeof(class_member_entry_t));
   add_mapping_pair(m, "inherit size", info.i_c * sizeof(inherit_t));
-  add_mapping_pair(m, "saved type size", info.t_c * sizeof(short));
+  add_mapping_pair(m, "saved type size", info.t_c * sizeof(lpc_type_t));
 
   add_mapping_pair(m, "total size", info.total);
 
@@ -2136,6 +2142,14 @@ static int memory_share(svalue_t* sv) {
       /* first byte is stored inside the buffer struct */
       return total +
              (sizeof(buffer_t) + sv->u.buf->size - 1) / (sv->u.buf->ref ? sv->u.buf->ref : 1);
+    case T_PROMISE:
+      if (1 + calldepth > 100) {
+        return 0;
+      }
+      calldepth++;
+      subtotal = sizeof(promise_t) + memory_share(&sv->u.prom->result) - sizeof(svalue_t);
+      calldepth--;
+      return total + subtotal / (sv->u.prom->ref ? sv->u.prom->ref : 1);
   }
   return total;
 }
@@ -3113,7 +3127,9 @@ void f_classes() {
             make_shared_string(prog->strings[prog->class_members[offset].membername]);
 
         // ...and type.
+        set_type_name_foreign(1);
         auto* p = get_type_name(buf, end, prog->class_members[offset].type);
+        set_type_name_foreign(0);
         *(p - 1) = '\0';  // get rid of last space
         subsubvec->item[1].type = T_STRING;
         subsubvec->item[1].subtype = STRING_SHARED;

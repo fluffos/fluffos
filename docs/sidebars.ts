@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
             'lpc/types/float',
             'lpc/types/function',
             'lpc/types/mappings',
+            'lpc/types/promise',
             'lpc/types/strings',
             'lpc/types/substructures',
           ],
@@ -53,6 +54,7 @@ const sidebars: SidebarsConfig = {
           label: 'Constructs',
           link: { type: 'doc', id: 'lpc/constructs/index' },
           items: [
+            'lpc/constructs/async',
             'lpc/constructs/for',
             'lpc/constructs/function',
             'lpc/constructs/if',

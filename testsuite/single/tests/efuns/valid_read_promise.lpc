@@ -1,0 +1,49 @@
+// A promise returned to valid_read() is a DENIAL, not a grant.
+//
+// check_valid_path() (packages/core/file.cc) denies only on the integer 0 and
+// otherwise falls through to "allow" -- so an apply that hands back a promise,
+// which is what an async function returns the instant its body parks, used to
+// read as permission granted from a body that had decided nothing.
+//
+// The compiler refuses `async` on apply names, but that check keys on the
+// DECLARATION and so cannot see an ordinary valid_read() that returns the
+// result of an async call. This is the backstop, and it is the one that
+// actually closes the hole; the master's valid_read() returns a bare promise
+// for one probe path to exercise it.
+//
+// The probe file has to EXIST and have contents, or allow and deny are
+// indistinguishable: read_file() returns 0 for a denied path and 0 for a
+// missing one alike.
+
+#define PROBE "/data/valid_read_promise_probe"
+#define OPEN  "/data/valid_read_promise_open"
+
+void do_tests() {
+  mixed denied;
+  mixed allowed;
+
+  rm(PROBE);
+  rm(OPEN);
+  write_file(PROBE, "secret\n");
+  write_file(OPEN, "public\n");
+
+  // Control: an ordinary path, same master, same efun. Proves the deny below
+  // is about the promise and not about having added the apply at all.
+  allowed = catch {
+    allowed = read_file(OPEN);
+  };
+  ASSERT2(!allowed, "adding valid_read() to the master broke ordinary reads");
+  ASSERT_EQ("public\n", read_file(OPEN));
+
+  // The probe path: valid_read() hands back a pending promise.
+  denied = 0;
+  catch {
+    denied = read_file(PROBE);
+  };
+  ASSERT2(!stringp(denied),
+    "valid_read() returned a promise and the read was ALLOWED -- a pending "
+    "answer is being read as permission granted (got: " + (denied ? denied : "0") + ")");
+
+  rm(PROBE);
+  rm(OPEN);
+}

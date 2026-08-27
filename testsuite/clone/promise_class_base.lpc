@@ -1,0 +1,17 @@
+// inherited by tests/efuns/promise_class.lpc: a promise<class T> whose class
+// index is defined HERE, so the inheritor must remap it into its own class
+// table (fix_class_type) with the promise bits intact.
+class point {
+  int x;
+  int y;
+}
+
+async class point make_point() {
+  class point p = new(class point);
+
+  p->x = 7;
+  p->y = 9;
+  return p;
+}
+
+promise<class point> passthru(promise<class point> p) { return p; }

@@ -98,6 +98,16 @@ void shutdownMudOS(int exit_code) {
   // the entries this frees, and are discarded unrun there.
   jsbridge_cleanup();
 #endif
+  // Freeing a leftover call_out settle-rejects its promise, which ENQUEUES
+  // a reaction -- so this must run before promise_cleanup() drains the
+  // queue, or those reactions (and any parked coroutine they own) leak
+  // into the dead queue at exit.
+  clear_call_outs();
+  // Same ordering constraint as jsbridge above: drop queued promise
+  // deliveries before their drain event is discarded by
+  // clear_tick_events(). promise_cleanup() also latches the queue shut, so
+  // any later settle frees its reaction instead of queueing it.
+  promise_cleanup();
   shutdown_external_ports();
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
@@ -107,7 +117,6 @@ void shutdownMudOS(int exit_code) {
 
   /* clean up heap allocations so valgrind don't consider them lost.*/
   reset_machine(0);
-  clear_call_outs();
   clear_tick_events();
   clear_heartbeats();
 #ifdef PROFILING
@@ -642,7 +651,7 @@ object_t* load_object(const char* lname, int callcreate) {
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret)) {
+  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
     destruct_object(ob);
     error("master object: %s() denied permission to load '/%s'.\n",
           applies_table[APPLY_VALID_OBJECT], name);
@@ -765,7 +774,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   save_command_giver(command_giver);
   push_object(ob);
   svalue_t* mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret)) {
+  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
     destruct_object(ob);
     restore_command_giver();
     error("master object: %s() denied permission to load in-memory object '/%s'.\n",
@@ -962,7 +971,7 @@ int recompile_object(object_t* target) {
   recompile_variable_names(new_prog, names);
   std::vector<int> old_index(new_n, -1);
   for (int i = 0; i < new_n; i++) {
-    unsigned short vtype;
+    lpc_type_t vtype;
     old_index[i] = find_global_variable(old_prog, names[i], &vtype, 0);
   }
 
@@ -1226,7 +1235,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     if ((ob->flags & O_DESTRUCTED) || !ob->super || (ob->super->flags & O_DESTRUCTED)) {
       return nullptr;
     }
-    if (!IS_ZERO(ret)) {
+    if (APPLY_SAYS_YES(ret)) {
       return ob->super;
     }
     return object_present2(v->u.string, ob->super->contains);
@@ -1273,7 +1282,7 @@ static object_t* object_present2(const char* str, object_t* ob) {
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }
-    if (IS_ZERO(ret)) {
+    if (!APPLY_SAYS_YES(ret)) {
       continue;
     }
     if (--count > 0) {
@@ -1557,6 +1566,14 @@ void destruct_object(object_t* ob) {
   ob->next_all = nullptr;
   ob->prev_all = nullptr;
   set_heart_beat(ob, 0);
+  /* The object's call_outs stay for the lazy reclaim (fire-path skip /
+   * reclaim_call_outs), but any PROMISE awaiting one rejects now -- see
+   * reject_call_out_promises(). */
+  reject_call_out_promises(ob);
+  /* ... and any async function suspended INSIDE this object: otherwise it is
+   * only noticed when the awaited promise settles, which for a promise that
+   * never settles is never. */
+  abandon_coroutines_of_object(ob);
   ob->flags |= O_DESTRUCTED;
   /* moved this here from destruct2() -- see comments in destruct2() */
   if (ob->interactive) {
@@ -1929,6 +1946,9 @@ void print_svalue(svalue_t* arg) {
       case T_BUFFER:
         tell_object(command_giver, "<BUFFER>", strlen("<BUFFER>"));
         break;
+      case T_PROMISE:
+        tell_object(command_giver, "<PROMISE>", strlen("<PROMISE>"));
+        break;
       default:
         tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
         break;
@@ -2235,7 +2255,10 @@ static int num_mudlib_error = 0;
  */
 
 [[noreturn]] void throw_error() {
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
+  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ) {
+    /* inside a catch(), or inside an async function body (where the thrown
+     * value becomes the rejection reason / acatch() result) */
     throw("throw error");
     fatal("Throw_error failed!");
   }
@@ -2383,8 +2406,11 @@ void _error_handler(char* err) {
     fatal("error() without a context: %s", err + 1);
   }
 
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
-    /* user catches this error */
+  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ) {
+    /* user catches this error -- or it unwinds to a running async function
+     * body's boundary, where it becomes a promise rejection (or resumes an
+     * acatch() region); either way the value travels via catch_value. */
     /* This is added so that catches generate messages in the log file. */
     if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);

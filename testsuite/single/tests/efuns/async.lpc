@@ -30,7 +30,23 @@ void do_tests() {
     calledGetDir++;
   } :), 1);
 
-  rm("/log/testfile");  // ensure test file is deleted pre-test
+  // ensure the test files are deleted pre-test
+  rm("/log/testfile");
+  rm("/log/testfile_async");
+
+  // The written file and the read file are deliberately DIFFERENT paths.
+  // package/async services requests from a pool, not a queue: do_stuff()
+  // spawns a fresh detached worker whenever `reqs` is momentarily empty
+  // (async.cc), so two requests issued back to back can run concurrently on
+  // two threads with no ordering between them. An async_read queued next to
+  // the async_write of the same file therefore races it, and reading the
+  // not-yet-written file yields "" -- which is exactly what a Windows CI
+  // runner did. Nothing here may depend on one async request completing
+  // before another.
+  //
+  // So the file the read consumes is written SYNCHRONOUSLY below, and
+  // async_write proves itself on a path nothing reads back. Each efun keeps
+  // its own coverage; only the cross-worker ordering is gone.
 
   // async_write
   async_write("/log", "test data written to file", 1, function(int res) {
@@ -38,11 +54,15 @@ void do_tests() {
     ASSERT_EQ(-1, res);
     calledWrite++;
   });
-  async_write("/log/testfile", "test data written to file", 1, function(int res) {
+  async_write("/log/testfile_async", "test data written to file", 1, function(int res) {
     write("ASYNC: async_write callback\n");
     ASSERT_EQ(0, res);
     calledWrite++;
   });
+
+  // Synchronous, and fclose()d before it returns, so the file is complete on
+  // disk before the async_read below is even queued.
+  ASSERT_EQ(1, write_file("/log/testfile", "test data written to file", 1));
 
   // async_read
   async_read("/log", function(mixed res) {
@@ -56,11 +76,22 @@ void do_tests() {
     calledRead++;
   });
 
+  // Everything above lands after do_tests() returns. Without a latch the
+  // runner recaps first and those checks are PRINTED but never COUNTED: a
+  // single-file run of this file used to report [ OK ] and exit 0 with a
+  // deliberately broken callback assertion in it, and the two call_outs
+  // below never ran at all. In a full run it failed only incidentally,
+  // because other files' latches happened to hold the recap open.
+  EXPECT_LATCH("async callbacks");
+
   call_out(function() {
-    rm("/log/testfile");  // ensure test file is deleted post-test
+    // ensure the test files are deleted post-test
+    rm("/log/testfile");
+    rm("/log/testfile_async");
     ASSERT_EQ(4, calledGetDir);
     ASSERT_EQ(2, calledWrite);
     ASSERT_EQ(2, calledRead);
+    RELEASE_LATCH("async callbacks");
   }, 2);
 #endif
 }

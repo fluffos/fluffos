@@ -1,0 +1,17 @@
+// The control for async_driver_answers.lpc's parser leg: identical to
+// /clone/async_answer except that is_living() gives a plain, immediate yes.
+// Without it, "the rule did not match" proves nothing -- any breakage in the
+// rule setup would look like the fix working.
+mixed id(string name) { return 0; }
+
+mixed is_living() { return 1; }
+
+string *parse_command_id_list() { return ({ "bag" }); }
+
+mixed direct_poke_liv() { return 1; }
+
+void create() {
+#ifdef __PACKAGE_PARSER__
+  parse_init();
+#endif
+}

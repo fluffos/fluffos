@@ -1,0 +1,109 @@
+// A promise is not an answer: every place the DRIVER asks an LPC function a
+// yes/no question and acts on the reply.
+//
+// An async function hands back a promise the instant its body parks -- and
+// even when it does not park at all -- before it has decided anything. Every
+// one of these consumers used a "not the integer 0 means yes" test, which a
+// promise satisfies, so an unanswered question read as a grant:
+//
+//   * MASTER_APPROVED() -- one macro behind valid_seteuid, valid_bind,
+//     valid_shadow, valid_socket, valid_object, valid_link, valid_hide and
+//     valid_override. `bind()` is the cheapest of those to drive from here.
+//   * present() -- object_present()/object_present2() ask id(), so an object
+//     whose id() answers with a promise matched EVERY name.
+//   * the parser -- is_living(), inventory_accessible(), inventory_visible()
+//     and livings_are_remote() set the object's parse flags the same way.
+//
+// The compile-time refusal of `async` on apply names reaches none of this:
+// `is_living()` is not in the applies table at all, and an ordinary
+// `mixed id(string s) { return slow(); }` is invisible to a check that keys
+// on the declaration. See AGENTS.md section 13.24.
+
+nosave object fixture;
+
+async int deny() { return 0; }
+
+// Registered on the testsuite master via set_bind_hook(); its return value
+// becomes valid_bind()'s. An ordinary function returning an async call's
+// result -- exactly the shape no compile check can see.
+mixed valid_bind_hook(object binder, object old_owner, object new_owner) {
+  return deny();
+}
+
+// Handlers for the parser leg's "poke LIV" rule.
+mixed can_poke_liv() { return 1; }
+mixed do_poke_liv() { return 1; }
+
+private void master_gate_leg() {
+  object target = clone_object("/clone/testob1");
+  mixed err;
+
+  "/single/master"->set_bind_hook(this_object());
+  err = catch(bind((: $1 + $2 :), target));
+  "/single/master"->set_bind_hook(0);
+
+  ASSERT2(err && strsrch(err, "denied permission") != -1,
+    "valid_bind() answered with a promise and bind() went ahead anyway, got " +
+    (err ? err : "no error"));
+  destruct(target);
+}
+
+private void present_leg() {
+#ifndef __NO_ENVIRONMENT__
+  fixture = clone_object("/clone/async_answer");
+  fixture->move_to(this_object());
+
+  ASSERT2(present("no-object-is-called-this", this_object()) == 0,
+    "id() answered with a promise and present() matched on it anyway");
+#endif
+}
+
+private void parser_leg() {
+#ifdef __PACKAGE_PARSER__
+  if (!fixture) {
+    return;
+  }
+  parse_init();
+  parse_refresh();
+  parse_add_rule("poke", "LIV");
+
+  // Control first: the same rule against an object whose is_living() answers
+  // yes immediately MUST match. Without this, "did not match" would prove
+  // nothing -- any breakage in the rule setup looks identical to the fix
+  // working, and the old `err || !matched` accepted an error from any cause
+  // at all as a pass.
+  {
+    object control = clone_object("/clone/async_answer_living");
+    mixed matched = 0;
+    mixed err = catch(matched = parse_sentence("poke bag", 2, ({ control })));
+
+    ASSERT2(!err, sprintf("the control parse errored: %O", err));
+    ASSERT2(matched, "the poke LIV rule does not match even a plainly living object, "
+      "so the promise leg below would pass for the wrong reason");
+    destruct(control);
+  }
+
+  // "bag" is the fixture's parse id too, but its is_living() answers with a
+  // promise, so LIV must not match it.
+  {
+    mixed matched = 0;
+    mixed err = catch(matched = parse_sentence("poke bag", 2, ({ fixture })));
+
+    ASSERT2(!err, sprintf("the promise-answering parse errored: %O", err));
+    ASSERT2(!matched,
+      "is_living() answered with a promise and the parser matched LIV on it anyway");
+  }
+  parse_remove("poke");
+#endif
+}
+
+void do_tests() {
+  master_gate_leg();
+  present_leg();
+  parser_leg();
+
+  if (fixture) {
+    destruct(fixture);
+    fixture = 0;
+  }
+}

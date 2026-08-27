@@ -14,6 +14,23 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
 
+int master_approved(svalue_t* v, const char* apply_name) {
+  if (v == reinterpret_cast<svalue_t*>(-1)) {
+    return 1; /* no master yet: the bootstrap allow */
+  }
+  if (!v) {
+    return 0;
+  }
+  if (v->type == T_PROMISE) {
+    debug_message(
+        "%s returned a promise: an apply cannot be async -- the driver reads its answer the "
+        "moment it returns, and a pending answer is not a grant. Denying.\n",
+        apply_name);
+    return 0;
+  }
+  return v->type != T_NUMBER || v->u.number != 0;
+}
+
 struct object_t* master_ob = nullptr;
 struct function_lookup_info_t* master_applies = nullptr;
 

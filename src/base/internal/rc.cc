@@ -170,6 +170,17 @@ const FlagEntry INT_FLAGS[] = {
     {"call_out(0) nest level", __RC_CALL_OUT_ZERO_NEST_LEVEL__, 1000, 0, INT_MAX,
      "Language Behavior",
      "Maximum nesting level for chains of call_out(0) within a single backend cycle."},
+    /* single string literal on one line: docs/gen_config_docs.py reads the
+     * description verbatim and does not fold adjacent C literals */
+    {"max suspended async functions", __RC_MAX_SUSPENDED_ASYNC__, 10000, 0, INT_MAX,
+     "Language Behavior",
+     "Maximum number of concurrently suspended async function frames; an await that would exceed it errors instead of suspending (runaway-exhaustion guard). 0 disables the limit."},
+    {"async drain eval budget", __RC_ASYNC_DRAIN_EVAL_BUDGET__, 0, 0, INT_MAX,
+     "Timing & Lifecycle",
+     "How long one turn of the promise microtask drain may hold the event loop, in the same microseconds `maximum evaluation cost` is measured in (FluffOS meters eval cost with a wall-clock timer, so the two units are the same thing). When the turn has spent this much, the remaining deliveries are deferred past the next I/O poll -- the loop reads sockets, schedules commands and fires timers, then the drain resumes. Deferral is not an error and nothing is dropped, and a delivery already in flight is never interrupted: the budget governs how many deliveries a turn STARTS, and each one is armed with a whole `maximum evaluation cost` of its own so it runs to its natural end no matter what the turn spent before it. A turn also ends immediately when the delivery that just ran consumed its entire budget -- that handler has already held the loop longer than any turn budget. This replaced a count of deliveries, which could not bound anything: each delivery is armed with a fresh `maximum evaluation cost`, so a batch of N had a worst case of N times that -- measured at 17-21 SECOND freezes with the old default of 512. A budget bounds the turn at itself plus at most one delivery's eval cost, which is the same worst case any ordinary command or call_out already has. 0 (the default) uses a built-in budget of one millisecond."},
+    {"max pending promise deliveries", __RC_MAX_PENDING_DELIVERIES__, 100000, 0, INT_MAX,
+     "Timing & Lifecycle",
+     "Ceiling on promise reactions waiting to be delivered. Attaching another one past this point is an LPC error, which is what stops a self-feeding chain -- a handler that attaches more reactions than the drain retires -- from growing the queue until the driver runs out of memory and aborts. This is the promise-side analogue of `call_out(0) nest level`, which refuses the same runaway shape for same-tick call_outs. It also bounds promises handed out by `async_yield()` and still waiting for the event loop's next pass, which is the same shape: a pending yield stays allocated after the caller drops it, because the driver still holds it. The limit bounds QUEUED deliveries and pending yields, not parked async frames; those have their own ceiling in `max suspended async functions`. 0 disables the check, which lets a runaway chain abort the driver."},
     {"trace lpc execution context", __RC_TRACE_CONTEXT__, 0, 0, INT_MAX, "Diagnostics",
      "Record LPC execution context for tracing and debugging."},
     {"trace lpc instructions", __RC_TRACE_INSTR__, 0, 0, INT_MAX, "Diagnostics",

@@ -41,6 +41,14 @@ int test_complex_default(int x, int y: (: time() % 100 :)) {
 }
 
 // Test nested function calls in defaults
+private int default_bonus() { return 42; }
+
+// The only default here that resolves a NAME rather than a constant or an
+// efun; see the note at its call site in do_tests().
+int test_local_fn_default(int a, int b: (: default_bonus() :)) {
+  return a + b;
+}
+
 string test_nested(string s, string prefix: (: upper_case("pre") :)) {
   return prefix + s;
 }
@@ -124,4 +132,27 @@ void do_tests() {
   // Test efun call in default
   ASSERT_EQ(105, test_efun_default(100));  // 100 + sizeof({1,2,3,4,5}) = 105
   ASSERT_EQ(110, test_efun_default(100, 10));
+
+  // A default that names a LOCAL function of this program. Every default
+  // above evaluates to a constant or an efun call, neither of which carries a
+  // function index, so none of them exercises name resolution at all.
+  //
+  // KNOWN GAP, deliberately not asserted here: this works for a call from
+  // inside the declaring object, which is what these tests do, and NOT for an
+  // external one. A default argument is evaluated in the CALLER's context --
+  // compiler/function_callother.lpc pins that, asserting `(: this_object() :)`
+  // as a default yields the calling object -- but the closure that names a
+  // local function takes its owner and function index from current_object
+  // too, so an external `ob->f(1)` resolves the index in the CALLER's program
+  // and runs whatever sits there: a wrong value, an unrelated function with
+  // the wrong arity, "Illegal function index", or unbounded recursion.
+  //
+  // The two behaviours cannot both hold -- resolving in the callee would run
+  // the callee's code against the caller's variables -- and the funptr type
+  // cannot tell `(: local_fn() :)` from `(: efun() :)`, since both are
+  // FP_FUNCTIONAL code blocks, so the case cannot simply be refused either.
+  // Which semantic wins is a decision for this driver's maintainers; what is
+  // pinned below is the half that is unambiguously correct today.
+  ASSERT_EQ(47, test_local_fn_default(5));
+  ASSERT_EQ(11, test_local_fn_default(5, 6));
 }

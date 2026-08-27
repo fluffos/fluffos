@@ -25,6 +25,15 @@ title: contrib / find_cycles
         ["name"]     mapping value under key "name"
         [key <map>]  a mapping KEY (the key itself continues the path)
         (args)       a function pointer's captured argument list
+        (result)     a promise's settled value
+        (reaction)   one pending reaction of a promise: its fulfillment
+                     handler, its rejection handler, the promise it
+                     chains to, or -- when the reaction holds a parked
+                     async frame -- that frame's result promise
+        (parked frame)
+                     a saved value-stack slot of a parked async frame
+        (parked defer)
+                     a pending defer() handler of a parked async frame
 
     Which slot of a loop is reported depends on traversal order (array
     index order, mapping table order), so treat the paths as diagnostics,

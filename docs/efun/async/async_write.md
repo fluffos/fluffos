@@ -10,6 +10,7 @@ title: async / async_write
 ### SYNOPSIS
 
     void async_write( string file, string str, int flag, function callback );
+    promise async_write( string file, string str, int flag );
 
 ### DESCRIPTION
 
@@ -25,6 +26,11 @@ title: async / async_write
             // -1 for failure
             //  0 for success
         }
+
+
+    With the callback OMITTED, returns a promise instead: fulfilled (with
+    undefined) on success, rejected with the negative int the callback
+    would have received on failure -- `await async_write(f, data, 1);`.
 
 ### NOTE
 

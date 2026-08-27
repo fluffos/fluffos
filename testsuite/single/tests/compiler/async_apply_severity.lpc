@@ -1,0 +1,40 @@
+// `async` on an apply: an error for the applies the driver calls on ANY
+// object, a warning for the master-only ones.
+//
+// The split matters because the two carry different risk. An object apply
+// (create, init, id, heart_beat, ...) is dispatched to whatever object
+// defines it, so `async` there is always wrong. A master apply is dispatched
+// to master_ob and nothing else, so on any other object the name is the
+// author's to use -- and refusing it outright has a real cost: this mudlib's
+// own std/database.lpc has a `private mixed connect()`, and a database
+// connect is exactly the thing one would want to await.
+//
+// The error half is pinned by compiler/fail/async_object_apply.lpc and
+// compiler/fail/async_heart_beat.lpc, which must not compile. This file pins
+// the WARNING half, which must: a master-apply name on an ordinary object is
+// a diagnostic, not a refusal.
+//
+// Source is generated at runtime so the fixture cannot be mistaken for a real
+// apply on this object.
+
+#define GEN "/data/async_master_apply_gen.c"
+
+void do_tests() {
+  object ob;
+
+  rm(GEN);
+  write_file(GEN,
+    "async int valid_read(string f, object o, string fn, int fl) { return 1; }\n"
+    "async mixed connect(int p) { return 0; }\n"
+    "int probe() { return 42; }\n");
+
+  ob = load_object(GEN);
+  ASSERT2(objectp(ob), "a master-apply name declared `async` on an ordinary "
+    "object must warn, not refuse: the driver never applies it here");
+  ASSERT_EQ(42, ob->probe());
+
+  if (objectp(ob)) {
+    destruct(ob);
+  }
+  rm(GEN);
+}

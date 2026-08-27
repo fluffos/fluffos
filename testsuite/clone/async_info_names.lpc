@@ -1,0 +1,19 @@
+// Inherits a base, so this program's last_inherited != 0 -- the condition
+// under which a function_table index and a runtime function index diverge.
+// The parking function is deliberately NOT the first defined function.
+
+inherit "/clone/async_inherit_park";
+
+nosave mixed gate2;
+
+void set_gate2(mixed p) { gate2 = p; }
+
+int filler_a() { return 1; }
+
+int filler_b() { return 2; }
+
+async int named_parker() {
+  int v = await gate2;
+
+  return v;
+}
