@@ -1,0 +1,74 @@
+// Companion LPC-level test for the "intended use" replace_program() demo
+// (testsuite/clone/replace_program/demo_poly_*.lpc) -- the
+// legitimate runtime-polymorphism counterpart to the redundant
+// self-target no-op handled by replace_program_is_noop() (src/packages/
+// core/replace_program.cc). See the shell fixture's header
+// comment for the full pattern writeup, INCLUDING why the shell has to
+// `inherit` all 3 concrete candidate types up front (replace_program()
+// can only swap to something already inherited).
+//
+// WHAT THIS FILE CAN AND CANNOT CHECK:
+//
+// replace_programs() (the actual swap) only runs from the backend's
+// gametick queue (src/vm/internal/vm.cc's remove_destructed_objects(),
+// scheduled every 5 minutes by src/backend.cc, or one gametick after the
+// reclaim_objects() efun) -- and this test harness's single top-level
+// -ftest run never yields back to the real event loop mid-suite, so no
+// gametick ever elapses between two test files' do_tests() calls (the
+// same reason call_out.lpc only ever asserts call_out_info() metadata,
+// never a callback's actual side effect, within one do_tests()). So what
+// THIS test can honestly pin, immediately after clone_object(), is the
+// PENDING state: the shell object still IS running the shell's own
+// program (its own soon-to-be-shed function is still there, and it
+// already contains all 3 candidates' functions -- it has to, see above),
+// AND -- via try_bind() (see demo_poly_base.lpc)
+// -- that a swap really is registered as pending: replace_program()'s
+// pending-swap bookkeeping is what make_lfun_funp() consults to refuse
+// binding a closure, so a try_bind() failure here is direct evidence
+// that replace_program_is_noop() correctly did NOT fire on this
+// genuinely-transformative case.
+//
+// The FULL landed transformation -- exactly one candidate's behavior
+// surviving, the other 2 candidates' AND the shell's own machinery
+// genuinely gone -- is verified by forcing the deferred sweep
+// synchronously, which requires calling remove_destructed_objects()
+// directly at the C++ level; see
+// ReplaceProgramPolymorphicShellDemoLandsForReal in src/tests/test_lpc.cc.
+void do_tests() {
+  object ob;
+
+  // Force a specific concrete type via create()'s forced_species
+  // argument -- exercising that deterministic-argument code path,
+  // distinct from the random() path exercised below -- the way a real
+  // spawn system's deterministic path (e.g. restoring a saved monster
+  // type) would.
+  ob = clone_object("/clone/replace_program/demo_poly_shell", "goblin");
+
+  // Still running the shell's own program: it already contains every
+  // candidate's functions (required -- replace_program() can only swap
+  // to something already inherited)...
+  ASSERT(function_exists("is_goblin", ob));
+  ASSERT(function_exists("is_wolf", ob));
+  ASSERT(function_exists("is_ghost", ob));
+  // ...plus its own (about-to-be-shed) machinery, proving this genuinely
+  // started as the shell and not already a bare concrete class.
+  ASSERT(function_exists("shell_only_marker", ob));
+  // A genuine swap is pending (the shell has 3 candidates' worth of
+  // content beyond any single one), so binding must FAIL here -- this is
+  // what would catch replace_program_is_noop() over-triggering on this
+  // multi-candidate shell.
+  ASSERT(ob->try_bind());
+
+  destruct(ob);
+
+  // Letting random() actually run end-to-end (no forced_species): every
+  // outcome is one of the 3 known candidates, and the shell/candidate
+  // split above holds identically regardless of which one gets picked.
+  ob = clone_object("/clone/replace_program/demo_poly_shell");
+  ASSERT(function_exists("is_goblin", ob));
+  ASSERT(function_exists("is_wolf", ob));
+  ASSERT(function_exists("is_ghost", ob));
+  ASSERT(function_exists("shell_only_marker", ob));
+  ASSERT(ob->try_bind());
+  destruct(ob);
+}

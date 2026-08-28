@@ -1,0 +1,9 @@
+// Fixture (expected-noop case): inherits BOTH branches of the diamond,
+// each of which inherits the same base -- the base is reachable via two
+// distinct paths. Both branches add nothing of their own. Must be
+// recognized as a no-op: the resolved (name -> function_t*) comparison
+// must dedupe the base's functions across both paths rather than
+// spuriously treating the second path as "extra" content.
+inherit "/clone/replace_program/replace_diamond_a";
+inherit "/clone/replace_program/replace_diamond_b";
+void create() { replace_program("/clone/replace_program/replace_min_target"); }

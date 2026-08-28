@@ -354,6 +354,302 @@ TEST_F(DriverTest, SweepDoesNotRevisitSurvivorsOfPreviousSweep) {
   RunGuarded([&] { free_object(&a, "SweepDoesNotRevisitSurvivorsOfPreviousSweep"); });
 }
 
+// Companion GTest for the "intended use" replace_program() demo
+// (testsuite/clone/replace_program/demo_poly_*.lpc) -- the
+// legitimate runtime-polymorphism counterpart to the redundant
+// self-target no-op bug fixed elsewhere in replace_program.cc. See the
+// shell fixture's header comment for the full pattern writeup.
+//
+// /single/tests/efuns/replace_program_polymorphism_demo.lpc (the LPC-level
+// companion) can only observe that a swap got PENDING: replace_programs()
+// only runs off the backend's gametick queue (vm.cc's
+// remove_destructed_objects(), reached via add_gametick_event() /
+// call_remove_destructed_objects() in backend.cc), and the LPC test
+// harness's single top-level -ftest run never yields back to the real
+// event loop mid-suite, so no gametick ever elapses between two test
+// files. This GTest uses the same technique this file already
+// establishes for the sibling obj_list_destruct sweep (see
+// SweepDoesNotRevisitSurvivorsOfPreviousSweep above): call
+// remove_destructed_objects() directly to force replace_programs() to run
+// synchronously, so we can prove the shell ACTUALLY becomes its chosen
+// concrete class -- not merely that a swap got queued.
+//
+// Coverage note: relying solely on the shell's real random() path would
+// make branch coverage probabilistic -- each of goblin/wolf/ghost only
+// ~1/3 likely per run, and wolf/ghost specifically (the two species whose
+// var_offset within the shell is nonzero, see
+// demo_poly_shell.lpc's inherit order) hit only
+// ~2/3 of runs combined, so a var_offset regression could pass a given CI
+// run roughly 1/3 of the time. This test keeps ONE random-path clone (to
+// keep exercising that real spawn-table randomness genuinely works) and
+// adds THREE deterministic clones via create()'s forced_species argument
+// (one per species), so all three -- including both nonzero-var_offset
+// ones -- land unconditionally on every run.
+TEST_F(DriverTest, ReplaceProgramPolymorphicShellDemoLandsForReal) {
+  object_t* ob = nullptr;
+  // find_object() loads (and runs create() on) the shell's blueprint.
+  // With no forced_species argument, create() exercises the real runtime
+  // decision via random() among the 3 concrete candidate types -- which
+  // one it lands on doesn't matter below, only that it lands on exactly
+  // one of them, consistently, before vs. after the swap.
+  RunGuarded(
+      [&] { ob = find_object("/clone/replace_program/demo_poly_shell"); });
+  ASSERT_NE(ob, nullptr);
+
+  // Pre-sweep: this is still, literally, the shell's own program -- which
+  // already contains all 3 candidates' code (replace_program() can only
+  // target something already inherited, see the shell fixture's header),
+  // so all 3 markers resolve...
+  EXPECT_NE(safe_apply("is_goblin", ob, 0, ORIGIN_DRIVER), nullptr);
+  EXPECT_NE(safe_apply("is_wolf", ob, 0, ORIGIN_DRIVER), nullptr);
+  EXPECT_NE(safe_apply("is_ghost", ob, 0, ORIGIN_DRIVER), nullptr);
+  // ...and so does the shell's own (about-to-be-shed) machinery.
+  svalue_t* shell_marker = safe_apply("shell_only_marker", ob, 0, ORIGIN_DRIVER);
+  ASSERT_NE(shell_marker, nullptr);
+  ASSERT_EQ(shell_marker->type, T_STRING);
+  EXPECT_STREQ(shell_marker->u.string, "shell");
+
+  // Deterministic clones: one per species, via create()'s forced_species
+  // argument (demo_poly_shell.lpc's create(string
+  // forced_species)). clone_object() (vm/internal/simulate.h) takes its
+  // create() arguments off the top of the LPC stack -- push the species
+  // string, then pass a count of 1 -- and, unlike find_object(), asserts a
+  // live current_object (DEBUG_CHECK in simulate.cc), so set one first,
+  // matching the convention other tests in this file use (e.g.
+  // TestCompileDumpProgWorks above).
+  object_t* goblin_ob = nullptr;
+  object_t* wolf_ob = nullptr;
+  object_t* ghost_ob = nullptr;
+  RunGuarded([&] {
+    current_object = master_ob;
+    push_constant_string("goblin");
+    goblin_ob = clone_object("/clone/replace_program/demo_poly_shell", 1);
+  });
+  RunGuarded([&] {
+    current_object = master_ob;
+    push_constant_string("wolf");
+    wolf_ob = clone_object("/clone/replace_program/demo_poly_shell", 1);
+  });
+  RunGuarded([&] {
+    current_object = master_ob;
+    push_constant_string("ghost");
+    ghost_ob = clone_object("/clone/replace_program/demo_poly_shell", 1);
+  });
+  ASSERT_NE(goblin_ob, nullptr);
+  ASSERT_NE(wolf_ob, nullptr);
+  ASSERT_NE(ghost_ob, nullptr);
+
+  // Force the deferred sweep that an ordinary run only ever reaches via
+  // the backend's tick queue. replace_programs() (replace_program.cc)
+  // walks the ENTIRE obj_list_replace queue unconditionally, so one call
+  // lands all 4 pending objects (the random one plus the 3 forced ones)
+  // together.
+  RunGuarded([&] { remove_destructed_objects(); });
+
+  // Post-sweep: the shell has genuinely become exactly ONE concrete
+  // class -- exactly one of the 3 markers still resolves...
+  bool goblin = safe_apply("is_goblin", ob, 0, ORIGIN_DRIVER) != nullptr;
+  bool wolf = safe_apply("is_wolf", ob, 0, ORIGIN_DRIVER) != nullptr;
+  bool ghost = safe_apply("is_ghost", ob, 0, ORIGIN_DRIVER) != nullptr;
+  EXPECT_EQ(goblin + wolf + ghost, 1)
+      << "expected exactly one candidate to survive the swap; got goblin="
+      << goblin << " wolf=" << wolf << " ghost=" << ghost;
+
+  // ...and attack_damage()/query_hp() agree with whichever one it is --
+  // proving the swap didn't just add the chosen candidate's marker
+  // alongside the others, it made this object literally BE that
+  // candidate's own compiled program (var_offset-correct and all).
+  //
+  // apply()/safe_apply() both return a pointer into ONE shared static
+  // (apply_ret_value, see vm/internal/apply.cc) -- it must be consumed
+  // (copied out) before the next apply() call, or a second call silently
+  // overwrites what the first call's pointer points to.
+  svalue_t* dmg_sv = safe_apply("attack_damage", ob, 0, ORIGIN_DRIVER);
+  ASSERT_NE(dmg_sv, nullptr);
+  ASSERT_EQ(dmg_sv->type, T_NUMBER);
+  LPC_INT dmg = dmg_sv->u.number;
+
+  svalue_t* hp_sv = safe_apply("query_hp", ob, 0, ORIGIN_DRIVER);
+  ASSERT_NE(hp_sv, nullptr);
+  ASSERT_EQ(hp_sv->type, T_NUMBER);
+  LPC_INT hp = hp_sv->u.number;
+
+  if (goblin) {
+    EXPECT_EQ(dmg, 3);
+    EXPECT_EQ(hp, 8);
+  } else if (wolf) {
+    EXPECT_EQ(dmg, 5);
+    EXPECT_EQ(hp, 12);
+  } else if (ghost) {
+    EXPECT_EQ(dmg, 2);
+    EXPECT_EQ(hp, 6);
+  }
+
+  // The shell's own machinery, and the other 2 candidates', are
+  // genuinely GONE -- shed for real, not merely shadowed by an override
+  // -- proving this was a real structural transformation, matching what
+  // replace_programs()'s variable-trimming code actually does, not just
+  // an additive change.
+  EXPECT_EQ(safe_apply("shell_only_marker", ob, 0, ORIGIN_DRIVER), nullptr);
+
+  // Now the deterministic part: each forced clone must have landed on
+  // EXACTLY its forced species, not merely "some" species -- this is what
+  // actually pins var_offset correctness for wolf/ghost on every run.
+  struct Expected {
+    object_t* obj;
+    const char* label;
+    bool want_goblin, want_wolf, want_ghost;
+    LPC_INT want_dmg, want_hp;
+  };
+  Expected cases[] = {
+      {goblin_ob, "goblin", true, false, false, 3, 8},
+      {wolf_ob, "wolf", false, true, false, 5, 12},
+      {ghost_ob, "ghost", false, false, true, 2, 6},
+  };
+  for (auto& c : cases) {
+    bool c_goblin = safe_apply("is_goblin", c.obj, 0, ORIGIN_DRIVER) != nullptr;
+    bool c_wolf = safe_apply("is_wolf", c.obj, 0, ORIGIN_DRIVER) != nullptr;
+    bool c_ghost = safe_apply("is_ghost", c.obj, 0, ORIGIN_DRIVER) != nullptr;
+    EXPECT_EQ(c_goblin, c.want_goblin) << "forced_species=" << c.label;
+    EXPECT_EQ(c_wolf, c.want_wolf) << "forced_species=" << c.label;
+    EXPECT_EQ(c_ghost, c.want_ghost) << "forced_species=" << c.label;
+
+    svalue_t* c_dmg_sv = safe_apply("attack_damage", c.obj, 0, ORIGIN_DRIVER);
+    ASSERT_NE(c_dmg_sv, nullptr) << "forced_species=" << c.label;
+    ASSERT_EQ(c_dmg_sv->type, T_NUMBER);
+    EXPECT_EQ(c_dmg_sv->u.number, c.want_dmg) << "forced_species=" << c.label;
+
+    svalue_t* c_hp_sv = safe_apply("query_hp", c.obj, 0, ORIGIN_DRIVER);
+    ASSERT_NE(c_hp_sv, nullptr) << "forced_species=" << c.label;
+    ASSERT_EQ(c_hp_sv->type, T_NUMBER);
+    EXPECT_EQ(c_hp_sv->u.number, c.want_hp) << "forced_species=" << c.label;
+
+    EXPECT_EQ(safe_apply("shell_only_marker", c.obj, 0, ORIGIN_DRIVER), nullptr)
+        << "forced_species=" << c.label;
+  }
+}
+
+// Regression GTest for Bug 1 and Bug 2 (see
+// replace_program_bug1_last_call_wins.lpc / replace_program_bug2_private_flags.lpc
+// and the /clone/replace_program/replace_bug1_*/replace_bug2_* fixtures for the full
+// scenario writeups). Both bugs are fixes to the SAME no-op fast path in
+// f_replace_program() (src/packages/core/replace_program.cc), both are
+// only observable by forcing the deferred sweep synchronously (see
+// ReplaceProgramPolymorphicShellDemoLandsForReal above for why an
+// LPC-level test alone can't observe this), and both are otherwise
+// mechanically identical: clone a fixture, assert its pre-swap state,
+// force ONE shared remove_destructed_objects() sweep (it walks the
+// entire obj_list_replace queue unconditionally, so a single call lands
+// every pending entry from both scenarios together -- exactly what a
+// real backend tick does when multiple objects have pending swaps), then
+// assert each fixture's post-swap state. Kept as two clearly-labeled
+// SCOPED_TRACE blocks rather than two full test functions: a failure in
+// either block still names exactly which scenario broke.
+//
+// Bug 1: the no-op fast path used to return early WITHOUT consulting an
+// already-pending entry, so a genuine first call followed by a no-op
+// second call left the FIRST call's stale target pending instead of the
+// second (last) call's target -- violating
+// retrieve_replace_program_entry()'s "last call wins" contract, which
+// every OTHER repeated-replace_program()-call case in the driver honors.
+//
+// Bug 2: replace_program_is_noop() used to compare only resolved
+// function_t* IDENTITY between cur_prog and new_prog, missing that the
+// SAME function can carry genuinely different, behaviorally-relevant
+// ACCESS flags depending on which program's own function_flags[] you
+// read it through -- copy_new_function() (compiler.cc) demotes 'private'
+// to 'hidden' when a function is copied down an inherit edge, purely as
+// a side effect of being inherited, with no change to the underlying
+// bytecode/function_t. Bug 2's block proves this is a REAL, observable
+// behavioral difference (not just a theoretical flag mismatch) by
+// exercising apply.cc's actual permission check via a self-call-other,
+// both pre- and post-swap.
+TEST_F(DriverTest, ReplaceProgramLandedSwapSemantics) {
+  // --- Bug 1 setup: last-call-wins -------------------------------------
+  object_t* bug1_ob = nullptr;
+  // find_object() loads (and runs create() on) the shell's blueprint --
+  // same technique as the polymorphism demo test above.
+  RunGuarded([&] { bug1_ob = find_object("/clone/replace_program/replace_bug1_shell"); });
+  ASSERT_NE(bug1_ob, nullptr);
+  {
+    SCOPED_TRACE("bug1: last-call-wins after a no-op second call");
+    // Pre-sweep: still literally the shell's own program, which already
+    // contains both Y's and BASE's content (replace_program() can only
+    // target something already inherited). Note base_marker() is present
+    // both pre-sweep AND if the object ends up landing on BASE -- it
+    // does NOT discriminate "never swapped" from "correctly swapped to
+    // BASE", by design (the shell is a bare passthrough of BASE, so they
+    // are functionally identical). Neither does y_marker(): BASE itself
+    // inherits Y, so y_marker() stays resolvable on EVERY possible
+    // outcome here (unswapped shell, landed on Y, or landed on BASE) --
+    // it cannot discriminate anything either. The only way to tell
+    // exactly which program the object structurally ended up with is to
+    // check ob->prog->filename directly, below.
+    EXPECT_NE(safe_apply("y_marker", bug1_ob, 0, ORIGIN_DRIVER), nullptr);
+    EXPECT_NE(safe_apply("base_marker", bug1_ob, 0, ORIGIN_DRIVER), nullptr);
+    ASSERT_NE(bug1_ob->prog, nullptr);
+    EXPECT_STREQ(bug1_ob->prog->filename, "clone/replace_program/replace_bug1_shell.lpc");
+  }
+
+  // --- Bug 2 setup: private access flags survive the swap --------------
+  object_t* bug2_ob = nullptr;
+  RunGuarded([&] { bug2_ob = find_object("/clone/replace_program/replace_bug2_wrapper"); });
+  ASSERT_NE(bug2_ob, nullptr);
+  {
+    SCOPED_TRACE("bug2: private-flags-affect-self-call-permission, pre-swap");
+    // Pre-sweep: ob->prog is still literally the wrapper's own compiled
+    // program. Its own function_flags entry for secret() was demoted
+    // from the base's DECL_PRIVATE to DECL_HIDDEN by copy_new_function()
+    // purely because it got copied down an inherit edge -- apply()'s
+    // permission check requires DECL_PRIVATE for a self-call-other, and
+    // DECL_HIDDEN doesn't meet that bar, so this must be REJECTED
+    // (evaluates to 0), not succeed.
+    svalue_t* pre = safe_apply("try_call_secret_via_self", bug2_ob, 0, ORIGIN_DRIVER);
+    ASSERT_NE(pre, nullptr);
+    ASSERT_EQ(pre->type, T_NUMBER);
+    EXPECT_EQ(pre->u.number, 0)
+        << "expected the self-call to be rejected pre-swap (the wrapper's "
+           "own copy of secret() is DECL_HIDDEN, not DECL_PRIVATE)";
+  }
+
+  // Force the deferred sweep that an ordinary run only ever reaches via
+  // the backend's tick queue -- ONE call lands both bug1_ob's and
+  // bug2_ob's pending entries together.
+  RunGuarded([&] { remove_destructed_objects(); });
+
+  {
+    SCOPED_TRACE("bug1: last-call-wins after a no-op second call");
+    // Post-sweep: last-call-wins means the object must have
+    // STRUCTURALLY become BASE's own compiled program (the second/last
+    // call's target) -- not Y's (the stale first call's target, what the
+    // unfixed driver incorrectly produced), and not still the shell's
+    // own (i.e. not "no swap happened at all", which a wrongly-taken
+    // no-op fast path on BOTH calls could also produce).
+    ASSERT_NE(bug1_ob->prog, nullptr);
+    EXPECT_STREQ(bug1_ob->prog->filename, "clone/replace_program/replace_bug1_base.lpc")
+        << "expected the object to have structurally become BASE (the "
+           "second/last call's target); landing on Y or staying as the "
+           "shell both indicate the no-op second call was mishandled";
+  }
+
+  {
+    SCOPED_TRACE("bug2: private-flags-affect-self-call-permission, post-swap");
+    // Post-sweep: Bug 2's fix correctly refused the no-op fast path (the
+    // DECL_PRIVATE vs. DECL_HIDDEN mismatch on secret() was detected),
+    // so a real pending swap got registered and landed -- ob->prog is
+    // genuinely the base program now, whose own function_flags entry for
+    // secret() is DECL_PRIVATE, which DOES meet apply()'s self-call bar.
+    ASSERT_NE(bug2_ob->prog, nullptr);
+    EXPECT_STREQ(bug2_ob->prog->filename, "clone/replace_program/replace_bug2_private_base.lpc");
+    svalue_t* post = safe_apply("try_call_secret_via_self", bug2_ob, 0, ORIGIN_DRIVER);
+    ASSERT_NE(post, nullptr);
+    ASSERT_EQ(post->type, T_NUMBER);
+    EXPECT_EQ(post->u.number, 42)
+        << "expected the self-call to succeed post-swap (the base's own "
+           "secret() is genuinely DECL_PRIVATE)";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // net_dead teardown stress tests (issue #1327).
 //

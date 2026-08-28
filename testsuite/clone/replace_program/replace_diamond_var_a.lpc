@@ -1,0 +1,2 @@
+inherit "/clone/replace_program/replace_diamond_var_x";
+void create() {}

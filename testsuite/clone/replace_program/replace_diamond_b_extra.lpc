@@ -1,0 +1,5 @@
+// Fixture: diamond right branch that adds its OWN function beyond the
+// base -- used to build the expected-NOT-noop diamond case.
+inherit "/clone/replace_program/replace_min_target";
+void create() {}
+string extra() { return "extra"; }
