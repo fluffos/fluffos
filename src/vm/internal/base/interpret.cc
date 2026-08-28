@@ -4978,14 +4978,22 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
 }
 
 void translate_absolute_line(int abs_line, unsigned short* file_info, int* ret_file,
-                             int* ret_line) {
+                             int* ret_line, unsigned short* end) {
   unsigned short *p1, *p2;
   int file;
   int line_tmp = abs_line;
 
-  /* two passes: first, find out what file we're interested in */
+  /* two passes: first, find out what file we're interested in.
+   *
+   * The `end` bound is defence in depth, not decoration. A zero count here
+   * (which a 16-bit truncation used to produce for a 65536-line file, see
+   * save_file_info) makes this loop advance without ever reducing line_tmp,
+   * so it runs off the table and returns whatever it lands on as a file
+   * index -- which the caller uses to index progp->strings. An out-of-bounds
+   * table walk feeding a string index is a far worse failure than a wrong
+   * line number, so stop at the last entry and report that file instead. */
   p1 = file_info;
-  while (line_tmp > *p1) {
+  while (line_tmp > *p1 && (end == nullptr || p1 + 2 < end)) {
     line_tmp -= *p1;
     p1 += 2;
   }
@@ -5045,7 +5053,10 @@ static int find_line(char* p, const program_t* progp, const char** ret_file, int
   COPY4(&abs_line, lns + 1);
 #endif
 
-  translate_absolute_line(abs_line, &progp->file_info[2], &file_idx, ret_line);
+  /* entries run from file_info[2] up to the line-number block at
+   * file_info[file_info[1]] */
+  translate_absolute_line(abs_line, &progp->file_info[2], &file_idx, ret_line,
+                          &progp->file_info[progp->file_info[1]]);
 
   *ret_file = progp->strings[file_idx - 1];
   return 0;

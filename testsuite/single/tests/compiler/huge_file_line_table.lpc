@@ -1,0 +1,78 @@
+// A file of 65536+ lines must not corrupt the line table.
+//
+// The per-file line count in prog->file_info is 16 bits (the table is
+// unsigned short pairs), and save_file_info() stored it without capping. At
+// exactly 65536 lines the count wrapped to 0, and
+// translate_absolute_line()'s first pass -- `while (line_tmp > *p1)
+// { line_tmp -= *p1; p1 += 2; }` -- then advanced without ever reducing
+// line_tmp, walked off the end of the table, and returned whatever it landed
+// on as a file index. The caller feeds that straight to
+// progp->strings[idx - 1], so the FIRST runtime error reported from such a
+// file segfaulted the driver.
+//
+// Not exotic: it is one large generated or accumulated mudlib file. The
+// count is now emitted in <=65535 chunks carrying the same file id, which
+// the decoder already reassembles (its second pass sums earlier entries with
+// a matching id), and the decoder's walk is bounded as well.
+//
+// This test drives the reporting path that crashed -- catching an error
+// forces the driver to translate an absolute line into (file, line).
+
+#include "/include/tests.h"
+
+#define GEN "/data/huge_line_table.c"
+
+private void build(int pad_lines) {
+  string chunk = "";
+  int i;
+
+  rm(GEN);
+  // Batch the padding: write_file() appends, and one call per line is far
+  // too slow at this size.
+  for (i = 0; i < 500; i++) {
+    chunk += "//\n";
+  }
+  for (i = 0; i < pad_lines / 500; i++) {
+    write_file(GEN, chunk);
+  }
+  for (i = 0; i < pad_lines % 500; i++) {
+    write_file(GEN, "//\n");
+  }
+  write_file(GEN, "int boom() { error(\"line table probe\"); }\n");
+  write_file(GEN, "int fine() { return 1; }\n");
+}
+
+private void probe(int pad_lines, string what) {
+  object ob;
+  mixed err;
+
+  build(pad_lines);
+  ob = load_object(GEN);
+  ASSERT2(ob, what + ": the generated file compiles");
+  if (!ob) {
+    return;
+  }
+
+  // The call that used to segfault: reporting the error has to translate an
+  // absolute line through the file-info table.
+  err = catch(ob->boom());
+  ASSERT2(stringp(err) && strsrch(err, "line table probe") != -1,
+    what + ": the error is reported, not fatal: " + err);
+  // And the object still works afterwards.
+  ASSERT_EQ(1, ob->fine());
+
+  destruct(ob);
+  rm(GEN);
+}
+
+void do_tests() {
+  // Just under the boundary: the case that always worked, kept as a control
+  // so a regression that breaks ordinary files is distinguishable from one
+  // that only breaks huge ones.
+  probe(60000, "60000 lines");
+  // The boundary itself, where the count wrapped to exactly 0.
+  probe(65536, "65536 lines");
+  // Past it, where the count wrapped to a small non-zero value and
+  // misattributed rather than looping.
+  probe(70003, "70003 lines");
+}
