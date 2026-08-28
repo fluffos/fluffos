@@ -345,7 +345,6 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
           while (f.ridx < nreact && !have_edge && !descended) {
             auto& r = (*prom->reactions)[f.ridx];
             if (f.rphase < 3) {
-              int const ri = f.ridx;
               int const rs = f.rphase;
               void* target;
               uint32_t ttype = T_FUNCTION;
@@ -357,14 +356,21 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
                 target = reinterpret_cast<void*>(r.next);
                 ttype = T_PROMISE;
               }
+              /* Record the cursor BEFORE the mutation below advances it --
+                 that ordering is the whole reason this is not written at the
+                 handle_edge() call. Unconditional rather than guarded by
+                 `target`: the hint is scratch that only the
+                 SLOT_PROMISE_REACTION handle_edge() reads, and every such
+                 call sets it first, so a write no edge consumes is
+                 overwritten before it can be read. */
+              reaction_hint.reaction_idx = f.ridx;
+              reaction_hint.reaction_slot = rs;
               f.rphase++;
               if (f.rphase == 3 && r.coro == nullptr) {
                 f.ridx++;
                 f.rphase = 0;
               }
               if (target != nullptr) {
-                reaction_hint.reaction_idx = ri;
-                reaction_hint.reaction_slot = rs;
                 handle_edge(ttype, target, nullptr, SLOT_PROMISE_REACTION,
                             mode == WALK_FIND ? std::string("(reaction)") : std::string());
                 descended = true;  // `f` may be stale; restart the outer walk
@@ -430,15 +436,16 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
             // abandoning the frame, and settling that promise frees the
             // reaction vector this walk is iterating.
             {
-              int const ri = f.ridx;
               void* const target = reinterpret_cast<void*>(r.coro->result_promise);
               f.ridx++;
               f.rphase = 0;
               f.rsub = 0;
               f.rdefer = nullptr;
               f.rdfield = 0;
-              reaction_hint.reaction_idx = ri;
-              reaction_hint.reaction_slot = 3;
+              /* No reaction_hint here, deliberately: the only reader is
+                 handle_edge()'s WALK_BREAK path, which this edge cannot
+                 reach because it passes breakable=false below. Setting one
+                 would be a store nothing can ever load. */
               /* DETECT ONLY: cutting this edge would mean abandoning the
                  coroutine, and settling its promise mutates + frees the very
                  reaction vector the fixer is walking (use-after-free). */

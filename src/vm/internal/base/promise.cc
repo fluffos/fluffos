@@ -293,8 +293,11 @@ void schedule_drain() {
   /* delay 0 here is a one-shot, not a self-re-posting callback, so it cannot
    * spin the loop the way a zero-delay continuation would (see
    * schedule_drain_continue) -- it just runs on the next pass. */
+  /* std::move on both arms: exactly one runs, so neither can observe the
+   * other's moved-from `cb`, and the callback holds a std::function's heap
+   * allocation worth not copying. */
   if (backend_in_tick_events()) {
-    g_drain_event = add_gametick_event(0, cb);
+    g_drain_event = add_gametick_event(0, std::move(cb));
     g_drain_event_is_tick = true;
   } else {
     g_drain_event_is_tick = false;
@@ -304,7 +307,7 @@ void schedule_drain() {
     if (!g_draining) {
       g_drain_arms_loop_total++;
     }
-    g_drain_event = add_walltime_event(std::chrono::milliseconds(0), cb);
+    g_drain_event = add_walltime_event(std::chrono::milliseconds(0), std::move(cb));
   }
 }
 
