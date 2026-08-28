@@ -1,0 +1,25 @@
+// Regression: `compiling_async_function` is set by an async function
+// header and cleared only when the `function` production reduces. A
+// compile that aborts between the two (lex_fatal after enough parse
+// errors inside the body) used to leak the stale flag into the NEXT
+// compile, where a global initializer -- outside any function -- would
+// then accept `await`. The fixed compiler saves/clears/restores the flag
+// around every compile, so file B below must fail to COMPILE; on the
+// unfixed binary it loads cleanly (awaiting a non-promise just passes
+// the value through, so nothing errors at runtime either).
+
+void do_tests() {
+  // file A: an async function whose body dies in a hail of parse errors,
+  // aborting the compile after the header set the flag
+  write_file("/data/stale_async_a.lpc",
+    "async void broken() {\n][\n][\n][\n][\n][\n][\n}\n", 1);
+  ASSERT2(catch(load_object("/data/stale_async_a")), "fixture A unexpectedly compiled");
+
+  // file B: `await` in a global variable initializer must never compile
+  write_file("/data/stale_async_b.lpc", "int g = await 1;\nint q() { return g; }\n", 1);
+  ASSERT2(catch(load_object("/data/stale_async_b")),
+    "await compiled outside an async function (stale compiling_async_function)");
+
+  rm("/data/stale_async_a.lpc");
+  rm("/data/stale_async_b.lpc");
+}

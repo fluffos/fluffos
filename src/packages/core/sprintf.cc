@@ -457,6 +457,34 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
     }
       outbuf_add(outbuf, " :)");
       break;
+    case T_PROMISE:
+      /* the declared payload type, when the value carries one (an async
+         function's promise does; promise_create()'s does not) */
+      if (obj->subtype) {
+        outbuf_add(outbuf, "PROMISE<");
+        outbuf_add(outbuf, type_name(obj->subtype));
+        outbuf_add(outbuf, ">");
+      } else {
+        outbuf_add(outbuf, "PROMISE");
+      }
+      switch (obj->u.prom->state) {
+        /* recurse with indent + 2 (like arrays/classes) so the depth guard
+         * above actually bounds a promise that transitively holds itself */
+        case PROMISE_FULFILLED:
+          outbuf_add(outbuf, "( fulfilled: ");
+          svalue_to_string(&obj->u.prom->result, outbuf, indent + 2, 0, 1);
+          outbuf_add(outbuf, " )");
+          break;
+        case PROMISE_REJECTED:
+          outbuf_add(outbuf, "( rejected: ");
+          svalue_to_string(&obj->u.prom->result, outbuf, indent + 2, 0, 1);
+          outbuf_add(outbuf, " )");
+          break;
+        default:
+          outbuf_add(outbuf, "( pending )");
+          break;
+      }
+      break;
     case T_MAPPING:
       if (!MAP_COUNT(obj->u.map)) {
         outbuf_add(outbuf, "([ ])");

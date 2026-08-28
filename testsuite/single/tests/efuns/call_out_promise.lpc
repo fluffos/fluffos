@@ -1,0 +1,60 @@
+// The promise form of call_out (issue #1319): a delay with no callback
+// returns a promise fulfilled with 0 when the delay elapses -- `await
+// call_out(n)` is the pause idiom. The classic function-first form is
+// unchanged. Rejection paths (remove_call_out sweep, destruct while
+// parked) are pinned by tests/efuns/async_await.lpc via /clone/async_timer.
+
+nosave int classic;
+nosave mixed keepP;
+
+void cb() { classic = 1; }
+
+async void pause_test() {
+  int v = await call_out(1);
+  ASSERT_EQ(0, v);
+  RELEASE_LATCH("await call_out(1)");
+}
+
+void do_tests() {
+  mixed p, info;
+  int h;
+
+  // classic form untouched
+  h = call_out((: cb :), 1);
+  ASSERT(intp(h) && h > 0);
+
+  // promise form
+  p = call_out(2);
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+  keepP = p;
+
+  // float delay, walltime variant
+  ASSERT_EQ("promise", typeof(call_out(0.5)));
+  ASSERT_EQ("promise", typeof(call_out_walltime(1)));
+
+  // call_out_info renders the timer-only entry with a placeholder
+  info = filter(call_out_info(), (: $1[1] == "<timer>" :));
+  ASSERT(sizeof(info) >= 1);
+  // ...which find/remove by name can NOT match
+  ASSERT_EQ(-1, find_call_out("<timer>"));
+  ASSERT_EQ(-1, remove_call_out("<timer>"));
+
+  // error cases
+  ASSERT(stringp(catch(call_out(2, "extra"))));
+  ASSERT(stringp(catch(call_out((: cb :)))));
+  ASSERT(stringp(catch(call_out((: cb :), "x"))));
+
+  // both halves finish after do_tests() returns: pause_test() parks on its
+  // timer promise, the classic call_out fires on a later tick. Each declares
+  // its own EXIT LATCH so the run waits for it and both checks are counted.
+  EXPECT_LATCH("await call_out(1)");
+  pause_test();
+
+  EXPECT_LATCH("classic call_out fired");
+  call_out(function() {
+    ASSERT_EQ(1, classic);
+    keepP = 0;
+    RELEASE_LATCH("classic call_out fired");
+  }, 4);
+}

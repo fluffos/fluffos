@@ -103,7 +103,8 @@ void rule_foreach_vars_double(decl_t* result, decl_t* var1, decl_t* var2) {
 
 LPC_INT rule_foreach_open() {
   LPC_INT saved = context;
-  context = LOOP_CONTEXT | LOOP_FOREACH;
+  /* see rule_loop_open(): NO_SUSPEND_CONTEXT must survive loop entry */
+  context = (context & NO_SUSPEND_CONTEXT) | LOOP_CONTEXT | LOOP_FOREACH;
   return saved;
 }
 
@@ -167,6 +168,9 @@ parse_node_t* rule_statement_break() {
   if (context & SPECIAL_CONTEXT) {
     yyerror("Cannot break out of catch { } or time_expression { }");
     node = 0;
+  } else if (context & ACATCH_CONTEXT) {
+    yyerror("Cannot break out of acatch { }");
+    node = 0;
   } else if (context & SWITCH_CONTEXT) {
     CREATE_CONTROL_JUMP(node, CJ_BREAK_SWITCH);
   } else if (context & LOOP_CONTEXT) {
@@ -188,6 +192,8 @@ parse_node_t* rule_statement_continue() {
   parse_node_t* node;
   if (context & SPECIAL_CONTEXT)
     yyerror("Cannot continue out of catch { } or time_expression { }");
+  else if (context & ACATCH_CONTEXT)
+    yyerror("Cannot continue out of acatch { }");
   else if (!(context & LOOP_CONTEXT))
     yyerror("continue statement outside loop");
   CREATE_CONTROL_JUMP(node, CJ_CONTINUE);

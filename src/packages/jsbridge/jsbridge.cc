@@ -67,6 +67,19 @@ struct JsExport {
 };
 std::map<std::string, JsExport*> g_js_exports;
 
+// A js_export'ed `async` function returned a promise: the page's callLPC
+// promise settles when this one does. A ref is held on each (marked below
+// for the Debug ref checker, AGENTS.md section 3) until it settles.
+struct PendingLpcPromise {
+  promise_t* prom;
+  int id;
+};
+std::vector<PendingLpcPromise> pending_lpc_promises;
+bool promise_watch_scheduled = false;
+
+void schedule_promise_watch();
+
+
 void free_js_export(JsExport* exp) {
   free_svalue(&exp->call_back, "free_js_export");
   free_object(&exp->ob_to_call, "free_js_export");
@@ -105,6 +118,10 @@ void mark_js_calls_impl() {
   }
   for (auto& entry : g_js_exports) {
     mark_callback_refs(&entry.second->call_back, entry.second->ob_to_call);
+  }
+  /* refs held only by this table are invisible to the object-graph sweep */
+  for (auto& entry : pending_lpc_promises) {
+    entry.prom->extra_ref++;
   }
 }
 #endif
@@ -155,6 +172,10 @@ void jsbridge_cleanup() {
     g_js_exports.erase(it);
     free_js_export(exp);
   }
+  for (auto& entry : pending_lpc_promises) {
+    free_promise(entry.prom);
+  }
+  pending_lpc_promises.clear();
 }
 
 // clang-format off
@@ -221,6 +242,46 @@ EM_JS(void, js_bridge_lpc_result, (int id, int ok, const char* text_ptr), {
   var text = UTF8ToString(text_ptr);
   if (ok) entry["resolve"](text); else entry["reject"](new Error(text));
 });
+
+namespace {
+void watch_lpc_promises();
+
+void schedule_promise_watch() {
+  if (!promise_watch_scheduled && !pending_lpc_promises.empty()) {
+    promise_watch_scheduled = true;
+    add_gametick_event(1, TickEvent::callback_type([] { watch_lpc_promises(); }));
+  }
+}
+
+// Poll rather than attach a reaction: promise reactions carry LPC funptrs,
+// and this consumer is C++. Runs once per gametick only while something is
+// outstanding.
+void watch_lpc_promises() {
+  promise_watch_scheduled = false;
+  std::vector<PendingLpcPromise> still_pending;
+  for (auto& entry : pending_lpc_promises) {
+    promise_t* p = entry.prom;
+    if (p->state == PROMISE_PENDING) {
+      still_pending.push_back(entry);
+      continue;
+    }
+    bool const ok = (p->state == PROMISE_FULFILLED);
+    if (p->result.type == T_STRING) {
+      js_bridge_lpc_result(entry.id, ok ? 1 : 0, p->result.u.string);
+    } else {
+      char* formatted = string_print_formatted("%O", 1, &p->result);
+      js_bridge_lpc_result(entry.id, ok ? 1 : 0, formatted ? formatted : "");
+      if (formatted) {
+        FREE_MSTR(formatted);
+      }
+    }
+    free_promise(p);
+  }
+  pending_lpc_promises.swap(still_pending);
+  schedule_promise_watch();
+}
+
+}  // namespace
 // clang-format on
 
 namespace {
@@ -254,6 +315,17 @@ void deliver_lpc_call(const std::string& name, const std::vector<std::string>& a
 
   if (ret == nullptr) {
     js_bridge_lpc_result(id, 0, "LPC callback error (object destructed or runtime error)");
+    return;
+  }
+  if (ret->type == T_PROMISE) {
+    // An `async` LPC export returns a promise, so the page's callLPC promise
+    // must settle when THAT settles -- %O-formatting it would resolve the
+    // page with the literal text "PROMISE<string>( pending )" and drop the
+    // real value. Hold a ref and finish from the settle watcher below.
+    ret->u.prom->ref++;
+    ret->u.prom->handled = true;  // the page observes any rejection
+    pending_lpc_promises.push_back({ret->u.prom, id});
+    schedule_promise_watch();
     return;
   }
   if (ret->type == T_STRING) {

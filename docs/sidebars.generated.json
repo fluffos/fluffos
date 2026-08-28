@@ -2423,6 +2423,79 @@
       },
       {
         "type": "category",
+        "key": "efun/promises",
+        "label": "Promises",
+        "link": {
+          "type": "generated-index",
+          "title": "Promises",
+          "slug": "/efun/promises/",
+          "description": "Native promises: the eventual results of asynchronous operations, consumed with async/await or then-chaining."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/promises/async_info",
+            "key": "efun/promises/async_info",
+            "label": "async_info"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/async_yield",
+            "key": "efun/promises/async_yield",
+            "label": "async_yield"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_catch",
+            "key": "efun/promises/promise_catch",
+            "label": "promise_catch"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_create",
+            "key": "efun/promises/promise_create",
+            "label": "promise_create"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_reject",
+            "key": "efun/promises/promise_reject",
+            "label": "promise_reject"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_resolve",
+            "key": "efun/promises/promise_resolve",
+            "label": "promise_resolve"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_result",
+            "key": "efun/promises/promise_result",
+            "label": "promise_result"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_status",
+            "key": "efun/promises/promise_status",
+            "label": "promise_status"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_then",
+            "key": "efun/promises/promise_then",
+            "label": "promise_then"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promisep",
+            "key": "efun/promises/promisep",
+            "label": "promisep"
+          }
+        ]
+      },
+      {
+        "type": "category",
         "key": "efun/sockets",
         "label": "Sockets",
         "link": {
@@ -3652,6 +3725,12 @@
             "id": "concepts/general/tracing",
             "key": "concepts/general/tracing",
             "label": "Tracing"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/async",
+            "key": "concepts/general/async",
+            "label": "async"
           }
         ]
       }

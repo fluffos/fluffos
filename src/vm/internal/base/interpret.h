@@ -25,6 +25,11 @@
 #define FRAME_EXTERNAL 8
 
 #define FRAME_RETURNED_FROM_CATCH 16
+/* async/await (issue #1319): on a FRAME_FUNCTION frame, marks the entry
+ * frame of an async coroutine body (pushed under run_async_function()); on a
+ * FRAME_CATCH frame, marks an acatch() region marker (no C++ recursion,
+ * unlike do_catch()). */
+#define FRAME_ASYNC 32
 struct defer_list {
   struct defer_list* next;
   svalue_t func;
@@ -44,6 +49,11 @@ struct control_stack_t {
   char* pc;          /* TODO: change this to unsigned char* */
 
   svalue_t* fp;
+  /* acatch() markers only (FRAME_CATCH | FRAME_ASYNC): the value-stack top
+   * and command-giver-stack top at region entry, so an unwind can cut both
+   * back to it the way restore_context() would. */
+  svalue_t* save_sp;
+  object_t** save_cgsp;
   struct defer_list* defers;
   int num_local_variables;   /* Local + arguments */
   int function_index_offset; /* Used when executing functions in inherited
@@ -78,6 +88,19 @@ struct function_lookup_info_t {
 };
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
+
+/* Did an LPC function the DRIVER called answer yes to a yes/no question?
+ *
+ * Not simply !IS_ZERO(): an async function hands back a T_PROMISE the instant
+ * its body parks, before it has decided anything, and a bare truthiness test
+ * reads that as "yes". A function that has not answered has not said yes --
+ * the same rule check_valid_path(), master_approved() and the command parser
+ * apply (AGENTS.md section 13.24). Use this wherever the driver asks an
+ * object a question and acts on the answer (id(), is_living(),
+ * inventory_accessible(), ...), NOT for an ordinary LPC callback whose result
+ * is used as a truth value -- there a promise is true, exactly as it is to
+ * the equivalent hand-written `if (cb(x))`. */
+#define APPLY_SAYS_YES(x) (!IS_ZERO(x) && (x)->type != T_PROMISE)
 #define IS_UNDEFINED(x) \
   (!(x) || (((x)->type == T_NUMBER) && ((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
 

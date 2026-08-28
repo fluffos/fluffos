@@ -3,6 +3,7 @@ OBJ_DUMP2
 PROG_DUMP
 test_file
 testfile
+testfile_async
 testfile1
 testfile.zerolength
 /log/log

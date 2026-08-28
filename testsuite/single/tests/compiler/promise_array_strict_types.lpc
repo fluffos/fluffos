@@ -1,0 +1,87 @@
+#pragma strict_types
+// Indexing an array of promises must yield the element's declared type.
+//
+// Under strict_types the index rules wrap every element read in a runtime
+// F_TYPE_CHECK node (rule_primary_expr_index strips TYPE_MOD_ARRAY from the
+// array's type and calls add_type_check() with the element type).
+// add_type_check() also has to turn that compile-time type into a runtime
+// T_* tag, and for a promise the payload has no runtime representation --
+// so it folded `promise<T>` down to a bare TYPE_MOD_PROMISE. It did that by
+// overwriting its own `intype` parameter, which is ALSO the static type it
+// stamps on the wrapper node it returns. The payload was therefore
+// destroyed for every checked expression: reading `pa[0]` out of a
+// `promise<int> *` came back typed `promise<unknown>`, which is compatible
+// with nothing concrete.
+//
+// On the unfixed binary this file does not compile -- every use below is
+// rejected with a "promise<int> vs promise<unknown>" style error, and the
+// await in awaits_element() fails with "Bad assignment ( int vs unknown )".
+// Arrays of promises are a documented, supported composition (that is why
+// TYPE_MOD_ARRAY keeps its ordinary meaning for promises), and they are the
+// natural shape for awaiting several things, so this made them unusable in
+// exactly the mode the type system exists for.
+
+nosave promise<int> *pa;
+
+async int produce(int n) { return n; }
+
+void takes_promise(promise<int> p) {}
+
+// element read as a return value
+promise<int> first_element() { return pa[0]; }
+
+// element read as an assignment source and as an argument
+void reads_element() {
+  promise<int> p;
+
+  p = pa[0];
+  takes_promise(pa[1]);
+  takes_promise(pa[<1]);
+}
+
+// element read through a range (the sibling index rule) stays an array
+void reads_range() {
+  promise<int> *slice = pa[0..0];
+
+  takes_promise(slice[0]);
+}
+
+// the payload also has to survive far enough for await to type its result
+async int awaits_element() {
+  int x = await pa[0];
+
+  return x;
+}
+
+// a non-promise array element is unaffected -- pins that the fix did not
+// change the ordinary path
+void reads_int_element() {
+  int *ia = ({ 1, 2 });
+  int i = ia[0];
+
+  ASSERT_EQ(1, i);
+}
+
+void do_tests() {
+  promise<int> p;
+
+  pa = ({ produce(7), produce(8) });
+
+  // the runtime value really is a promise, i.e. the type check the wrapper
+  // node emits passes rather than being silently skipped
+  ASSERT_EQ("promise", typeof(pa[0]));
+
+  p = first_element();
+  ASSERT_EQ("promise", typeof(p));
+
+  reads_element();
+  reads_range();
+  reads_int_element();
+
+  // awaits_element() returns a promise of its own; both it and the parked
+  // element promise settle from the drain, which the suite's shutdown
+  // terminal waits out. Nothing to release here -- dropping the array is
+  // enough, and the results are observed by the type assertions above.
+  awaits_element();
+  pa = 0;
+}

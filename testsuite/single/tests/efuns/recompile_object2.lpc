@@ -165,6 +165,10 @@ protected void verify_callouts() {
 }
 
 void do_tests() {
+  // its pending call_out deliberately fires post-run against a stale
+  // funptr, so the error is expected rather than a deferred-work failure
+  master()->expect_deferred_error("Stale function pointer");
+
   string err = catch(run_checks());
 
   cleanup();

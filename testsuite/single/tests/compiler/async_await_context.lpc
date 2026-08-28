@@ -1,0 +1,43 @@
+// async/await (issue #1319): the async modifier's call-path semantics.
+// Every call path to an async function must yield a promise: direct local
+// call, function pointer, call_other, an inherited call, and a
+// ::-qualified call (via the /clone/async_parent + /clone/async_child
+// fixtures). The illegal-context cases are plain fail fixtures in
+// tests/compiler/fail/bad_await_*.lpc / bad_acatch_*.lpc /
+// bad_async_*.lpc.
+
+async int af() { return 9; }
+
+void do_tests() {
+  object ob;
+  mixed p;
+
+  // direct local call
+  p = af();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(9, promise_result(p));
+
+  // function pointer
+  p = evaluate((: af :));
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(9, promise_result(p));
+
+  // call_other
+  p = this_object()->af();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(9, promise_result(p));
+
+  // inheritance: FUNC_ASYNC propagates -- the inherited call and the
+  // ::-qualified call both yield promises
+  ob = load_object("/clone/async_child");
+  ASSERT(objectp(ob));
+
+  p = ob->call_it();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(42, promise_result(p));
+
+  p = ob->call_parent();
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(42, promise_result(p));
+}

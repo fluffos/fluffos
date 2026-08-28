@@ -1,0 +1,10 @@
+// An array of promises is not a promise. (The reverse -- a promise is not an
+// array of promises -- is bad_promise_not_array.lpc; a fail fixture can only
+// pin one diagnostic.) Note the array literal here types as `mixed *`, so
+// the rejection is `promise<int> vs mixed *`: what this pins is that a
+// promise declaration does not accept an array, not anything about the
+// element type.
+async int f() { return 1; }
+void g() {
+  promise<int> p = ({ f() });
+}

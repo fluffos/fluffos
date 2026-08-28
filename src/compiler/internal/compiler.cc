@@ -75,7 +75,7 @@ static void show_overload_warnings(void);
 
 short compatible[11] = {
     /* UNKNOWN */ 0,
-    /* ANY */ 0xfff,
+    /* ANY */ 0x7ff,
     /* NOVALUE to*/ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
     /* VOID to*/ CT_SIMPLE(TYPE_VOID) | CT(TYPE_NUMBER),
     /* NUMBER to*/ CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_REAL),
@@ -89,7 +89,7 @@ short compatible[11] = {
 
 short is_type[11] = {
     /* UNKNOWN */ 0,
-    /* ANY */ 0xfff,
+    /* ANY */ 0x7ff,
     /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
     /* VOID */ CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
     /* NUMBER */ CT_SIMPLE(TYPE_NUMBER),
@@ -116,6 +116,7 @@ int exact_types, global_modifiers;
 int current_type;
 
 int var_defined;
+int compiling_async_function;
 
 unsigned short *comp_def_index_map, *func_index_map;
 unsigned short *prog_flags, *comp_sorted_funcs;
@@ -470,7 +471,7 @@ unsigned char string_tags[0x20];
 short freed_string;
 
 /* x_ptr is different inside nested functions */
-unsigned short *type_of_locals, *type_of_locals_ptr;
+lpc_type_t *type_of_locals, *type_of_locals_ptr;
 local_info_t *locals, *locals_ptr;
 
 int locals_size = 0;
@@ -504,8 +505,8 @@ char* get_two_types(char* where, char* end, int type1, int type2) {
 void init_locals() {
   auto max_local_variables = kMaxLocalVariables;
 
-  type_of_locals = reinterpret_cast<unsigned short*>(
-      DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "init_locals:1"));
+  type_of_locals = reinterpret_cast<lpc_type_t*>(
+      DCALLOC(max_local_variables, sizeof(lpc_type_t), TAG_LOCALS, "init_locals:1"));
   locals = reinterpret_cast<local_info_t*>(
       DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "init_locals:2"));
   type_of_locals_ptr = type_of_locals;
@@ -656,7 +657,7 @@ void reallocate_locals() {
   int offset;
   offset = type_of_locals_ptr - type_of_locals;
   type_of_locals = RESIZE(type_of_locals, type_of_locals_size += max_local_variables,
-                          unsigned short, TAG_LOCALS, "reallocate_locals:1");
+                          lpc_type_t, TAG_LOCALS, "reallocate_locals:1");
   type_of_locals_ptr = type_of_locals + offset;
   offset = locals_ptr - locals;
   /* locals_size += ..., not locals_size: the parallel type_of_locals array
@@ -787,7 +788,7 @@ static void copy_new_function(program_t* prog, int index, program_t* defprog, in
   ihe->dn.function_num = where;
 }
 
-static int find_class_member(int which, const char* name, unsigned short* type) {
+static int find_class_member(int which, const char* name, lpc_type_t* type) {
   int i;
   class_def_t* cd;
   class_member_entry_t* cme;
@@ -814,7 +815,7 @@ static int find_class_member(int which, const char* name, unsigned short* type) 
   }
 }
 
-int lookup_any_class_member(char* name, unsigned short* type) {
+int lookup_any_class_member(char* name, lpc_type_t* type) {
   int ret = lookup_any_class_member_soft(name, type);
   if (ret == -1) {
     yyerror("No class in scope has no member '%s'.", name);
@@ -826,7 +827,7 @@ int lookup_any_class_member(char* name, unsigned short* type) {
 // dot/arrow member-access rules to decide whether to fall back to dynamic
 // mapping-key access (F_MAP_MEMBER) instead of reporting a class-member
 // error, for callers where "not a class member" isn't necessarily wrong.
-int lookup_any_class_member_soft(const char* name, unsigned short* type) {
+int lookup_any_class_member_soft(const char* name, lpc_type_t* type) {
   int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   int i, ret = -1, nret;
   const char* s = findstring(name);
@@ -849,7 +850,7 @@ int lookup_any_class_member_soft(const char* name, unsigned short* type) {
   return ret;
 }
 
-int lookup_class_member(int which, const char* name, unsigned short* type) {
+int lookup_class_member(int which, const char* name, lpc_type_t* type) {
   const char* s = findstring(name);
   int ret;
 
@@ -1257,6 +1258,106 @@ int copy_functions(program_t* from, int typemod) {
   return initializer;
 }
 
+/*
+ * promise<T> type-word helpers (issue #1319). Encoding: svalue.h's
+ * TYPE_MOD_PROMISE comment.
+ */
+
+int promise_payload_type(int t) {
+  /* not a promise (including an ARRAY of promises): `await` passes it
+   * through unchanged, so the type is unchanged too */
+  if (!IS_PROMISE(t)) {
+    return t;
+  }
+  int r = t & ~(TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY);
+  if (t & TYPE_MOD_PROMISE_VALUE_ARRAY) {
+    r |= TYPE_MOD_ARRAY;
+  }
+  return r;
+}
+
+int promise_of_type(int t) {
+  /* an async function declared to return a promise still yields exactly one
+   * promise: the runtime adopts (flattens) a returned promise */
+  if (IS_PROMISE(t)) {
+    return t;
+  }
+  if (t & TYPE_MOD_PROMISE) {
+    /* An ARRAY of promises (TYPE_MOD_PROMISE *and* TYPE_MOD_ARRAY). The
+     * array is not itself a promise, so nothing is adopted and the call
+     * yields a promise OF that array -- but there is only one promise bit,
+     * so `promise<promise<int> *>` cannot be spelled. Describe the payload
+     * as an untyped array: sound (it really is a promise of an array) and
+     * strictly weaker, instead of the bare `t` this used to return, which
+     * claimed the call site was an array and let
+     * `promise<int> *a = fa();` through with a plain promise in it. */
+    return TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY | TYPE_ANY;
+  }
+  int r = t & ~TYPE_MOD_ARRAY;
+  if (t & TYPE_MOD_ARRAY) {
+    r |= TYPE_MOD_PROMISE_VALUE_ARRAY;
+  }
+  return r | TYPE_MOD_PROMISE;
+}
+
+unsigned short promise_value_subtype(int t) {
+  if (!IS_PROMISE(t)) {
+    return 0;
+  }
+  /* Runtime tags are T_* masks, and convert_type() is the driver's one
+   * compile-time-to-runtime mapping -- go through it rather than parking a
+   * compile-time word in an svalue. That keeps classes on the general path
+   * (a runtime class value is a bare array_t with no class identity, so
+   * T_CLASS is all there is to say about one) and keeps the tag meaningful
+   * when the promise crosses objects. */
+  int const rt = convert_type(promise_payload_type(t));
+
+  /* T_ANY ("mixed") and T_INVALID (void/unknown) carry no constraint, which
+   * is exactly what an absent tag means. T_ANY also would not fit: it spans
+   * T_PROMISE at 0x10000, above subtype's 16 bits. Every concrete mask does
+   * fit, and a promise payload can never itself be a promise. */
+  if (rt == T_ANY || rt == T_INVALID) {
+    return 0;
+  }
+  return static_cast<unsigned short>(rt);
+}
+
+/*
+ * The type of an expression that calls simul_efun `n`: its declared return
+ * type, wrapped in a promise when the simul_efun is async.
+ *
+ * FUNC_ASYNC lives in program_t::function_flags, not in the function_t that
+ * SIMUL(n) hands back, so it is read here the same way call_direct() reads
+ * it when dispatching -- through the simul_efun object's program at the
+ * simul's runtime index, following FUNC_ALIAS. Without this the compiler
+ * types an async simul_efun call as its declared return type while the
+ * runtime hands back a promise, and `int x = some_async_simul();` compiles
+ * clean.
+ */
+int simul_efun_call_type(int n) {
+  int t = SIMUL(n)->type & ~DECL_MODS;
+
+  if (!simul_efun_ob || !simul_efun_ob->prog) {
+    return t;
+  }
+  program_t* p = simul_efun_ob->prog;
+  int const nflags = p->last_inherited + p->num_functions_defined;
+  int roff = simuls[n].index;
+  if (roff < 0 || roff >= nflags) {
+    return t;
+  }
+  if (p->function_flags[roff] & FUNC_ALIAS) {
+    roff = p->function_flags[roff] & ~FUNC_ALIAS;
+    if (roff < 0 || roff >= nflags) {
+      return t;
+    }
+  }
+  if (p->function_flags[roff] & FUNC_ASYNC) {
+    t = promise_of_type(t);
+  }
+  return t;
+}
+
 void type_error(const char* str, int type) {
   static char buff[512];
   char* end = EndOf(buff);
@@ -1291,6 +1392,20 @@ int compatible_types(int t1, int t2) {
   if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
     return 1;
   }
+  /* promise<T>: two promises are compatible when their payloads are, and a
+   * promise is never compatible with a non-promise (mixed was handled just
+   * above). An ARRAY of promises is not itself a promise, so it falls
+   * through to the ordinary array rules below with TYPE_MOD_ARRAY intact. */
+  if ((t1 | t2) & TYPE_MOD_PROMISE) {
+    if (!(t1 & TYPE_MOD_PROMISE) || !(t2 & TYPE_MOD_PROMISE) ||
+        (t1 & TYPE_MOD_ARRAY) != (t2 & TYPE_MOD_ARRAY)) {
+      return 0;
+    }
+    if (t1 & TYPE_MOD_ARRAY) {
+      return t1 == t2;
+    }
+    return compatible_types(promise_payload_type(t1), promise_payload_type(t2));
+  }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
   }
@@ -1302,7 +1417,7 @@ int compatible_types(int t1, int t2) {
   } else if (t2 & TYPE_MOD_ARRAY) {
     return 0;
   }
-  if (t1 > 10 || t1 < 0) {
+  if (t1 > TYPE_BUFFER || t1 < 0) {
     fatal("compiler.c: unknown type in compatible_types()");
   }
   return compatible[t1] & (1 << t2);
@@ -1324,6 +1439,20 @@ int compatible_types2(int t1, int t2) {
   }
   if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
     return 1;
+  }
+  /* promise<T>: two promises are compatible when their payloads are, and a
+   * promise is never compatible with a non-promise (mixed was handled just
+   * above). An ARRAY of promises is not itself a promise, so it falls
+   * through to the ordinary array rules below with TYPE_MOD_ARRAY intact. */
+  if ((t1 | t2) & TYPE_MOD_PROMISE) {
+    if (!(t1 & TYPE_MOD_PROMISE) || !(t2 & TYPE_MOD_PROMISE) ||
+        (t1 & TYPE_MOD_ARRAY) != (t2 & TYPE_MOD_ARRAY)) {
+      return 0;
+    }
+    if (t1 & TYPE_MOD_ARRAY) {
+      return t1 == t2;
+    }
+    return compatible_types2(promise_payload_type(t1), promise_payload_type(t2));
   }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
@@ -1384,6 +1513,13 @@ static int find_matching_function(program_t* prog, const char* name, parse_node_
       node->l.number = ri;
       type = prog->function_table[i].type;
       fix_class_type(&type, prog);
+      if (flags & FUNC_ASYNC) {
+        /* Same as every other call path: an async call yields a promise OF
+           the declared return type. This is the `base::fn()` route -- a
+           plain inherited call goes through FUNCTION_FLAGS() in
+           grammar_rules_exprs.cc, and this site was missed. */
+        type = promise_of_type(type);
+      }
       node->type = type;
       return 1;
     }
@@ -1496,12 +1632,74 @@ invalid:
  */
 /* Returns an index into A_FUNCTIONS_DEFS.
  */
+/* Is `name` one of the functions the DRIVER calls -- an apply? Both tables are
+ * generated from vm/internal/applies, so neither can drift as applies are
+ * added. object_applies_table[] is the half the driver calls on ANY object;
+ * all_applies_table[] additionally covers the master-only half. */
+static bool in_applies_table(const char* const* table, const char* name) {
+  for (const char* const* apply = table; *apply != nullptr; apply++) {
+    if (strcmp(*apply, name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 int define_new_function(const char* name, int num_arg, int num_local, int flags, int type) {
   int oldindex = -1, num = -1, newindex = -1;
   unsigned short argument_start_index;
   ident_hash_elem_t* ihe;
   function_t* funp = nullptr;
   compiler_temp_t* newfunc;
+
+  /* An apply cannot usefully be async, because the DRIVER is the caller and
+   * it has nowhere to await. It reads the return value immediately, and an
+   * async function returns a promise the instant it parks -- so the driver
+   * reads a promise where it expects a value, and a promise is neither the
+   * number 0 nor a string. Consumers that treat an unrecognised tag as
+   * permissive then read it as "yes": check_valid_path() would grant access,
+   * present()'s IS_ZERO() would make an object answer to every name. Applies
+   * whose value is ignored (create(), init()) fail more quietly but no more
+   * usefully -- the driver treats the object as ready while the body is still
+   * parked.
+   *
+   * This is a LINT, not a security boundary, and it is important not to
+   * mistake it for one. It keys on the DECLARATION, so it catches the direct
+   * mistake and nothing else. It cannot see an ordinary apply that returns
+   * the result of an async call:
+   *
+   *     mixed id(string s) { return slow(); }     // slow() is async
+   *
+   * and it cannot cover add_action() verb functions at all, whose names are
+   * arbitrary mudlib strings. The consumers are where a promise actually has
+   * to be refused; check_valid_path() (packages/core/file.cc) now denies on
+   * one, which is the backstop for the security-relevant case.
+   *
+   * The fix for an apply that wants async work is to call an async function:
+   *
+   *     void create() { start_loading(); }        // apply, ordinary
+   *     async void start_loading() { ... await ... }
+   */
+  if ((flags & FUNC_ASYNC) && !(flags & FUNC_PROTOTYPE)) {
+    if (in_applies_table(object_applies_table, name)) {
+      /* The driver calls this on ANY object, so it is always wrong here. */
+      yyerror(
+          "'%s' is an apply -- the driver calls it and reads its return value, so it cannot be "
+          "'async'. Have it call an async function instead.",
+          name);
+    } else if (in_applies_table(all_applies_table, name)) {
+      /* Master-only: the driver applies it to master_ob and nothing else, so
+       * on any other object the name is the author's to use. A warning rather
+       * than an error, because refusing it outright is a real cost -- this
+       * mudlib's own std/database.lpc has a `private mixed connect()`, and a
+       * database connect is exactly the thing one would want to await. On the
+       * master itself it is still a mistake, which is what the warning says. */
+      yywarn(
+          "'%s' is a master apply: if this object is the master, the driver reads its return "
+          "value and cannot await a promise. Harmless on any other object.",
+          name);
+    }
+  }
 
   oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
   if (oldindex >= 0) {
@@ -1542,6 +1740,39 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
      */
     if ((funflags & DECL_NOMASK) && !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE))) {
       yyerror("Illegal to redefine 'nomask' function '%s'.", name);
+    }
+
+    /* `async` must agree between a prototype and its definition, and this is
+       an error rather than the warning its neighbours use: async changes the
+       SHAPE of what a call yields (a promise, not the declared type), and a
+       call is typed from whichever declaration the compiler has seen so far.
+       Disagree and the same call is typed one way before the definition and
+       another after it, with no runtime check to catch the difference --
+       `int x = f();` compiles clean while x holds a promise. Only a
+       prototype/definition pair is checked here; the inherited case is
+       checked separately below. */
+    if (((flags | funflags) & FUNC_PROTOTYPE) && !(funflags & FUNC_INHERITED) &&
+        ((flags ^ funflags) & FUNC_ASYNC)) {
+      yyerror("Declaration of '%s' disagrees with its %s about 'async'.", name,
+              (funflags & FUNC_PROTOTYPE) ? "prototype" : "definition");
+    }
+
+    /* The same disagreement across an INHERIT is just as unsound, in both
+       directions, and used to pass without even a warning.
+       The base program is already compiled: every call to this function
+       inside it was typed against the base's own declaration. Changing
+       async-ness in an override changes what those calls actually yield --
+       `int x = f();` in the base receives a promise, `if (f())` becomes
+       unconditionally true, and the first arithmetic on the result errors at
+       runtime, far from the cause. Changing any OTHER part of the return type
+       across an override already warns; this one is stronger than a warning
+       because there is no runtime check behind it. */
+    if ((funflags & FUNC_INHERITED) && !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) &&
+        ((flags ^ funflags) & FUNC_ASYNC)) {
+      yyerror("'%s' is declared %s in the inherited program: an override must agree, "
+              "because calls compiled there expect %s.",
+              name, (funflags & FUNC_ASYNC) ? "async" : "non-async",
+              (funflags & FUNC_ASYNC) ? "a promise" : "the declared type");
     }
 
     /* only check prototypes for matching.  It shouldn't be required that
@@ -1684,7 +1915,7 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
       }
     }
     *(reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_INDEX].block) + num) =
-        mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
+        mem_block[A_ARGUMENT_TYPES].current_size / sizeof(lpc_type_t);
     add_to_mem_block(A_ARGUMENT_TYPES, (char*)type_of_locals_ptr,
                      num_arg * sizeof(*type_of_locals_ptr));
     if (!CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
@@ -1751,7 +1982,7 @@ int define_variable(const char* name, int type) {
 
 int define_new_variable(const char* name, int type) {
   int n;
-  unsigned short* tp;
+  lpc_type_t* tp;
   const char** np;
 
   var_defined = 1;
@@ -1759,7 +1990,7 @@ int define_new_variable(const char* name, int type) {
   n = define_variable(name, type);
   np = reinterpret_cast<const char**>(allocate_in_mem_block(A_VAR_NAME, sizeof(char*)));
   *np = name;
-  tp = reinterpret_cast<unsigned short*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short)));
+  tp = reinterpret_cast<lpc_type_t*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(lpc_type_t)));
   *tp = type;
   symbol_record(OP_SYMBOL_VAR, current_file, current_line, name);
   return n;
@@ -1810,8 +2041,9 @@ int decl_fix(int x) {
   return rest | DECL_PROTECTED;
 }
 
-const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",   "string",
-                                     "object",  "mapping", "function", "float", "buffer"};
+const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",
+                                     "string",  "object",  "mapping",  "function", "float",
+                                     "buffer"};
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
@@ -1853,26 +2085,88 @@ char* get_type_modifiers(char* where, char* end, int type) {
   if (type & FUNC_VARARGS) {
     where = strput(where, end, "varargs ");
   }
+  if (type & FUNC_ASYNC) {
+    where = strput(where, end, "async ");
+  }
 
   return where;
+}
+
+/*
+ * The class name behind a TYPE_MOD_CLASS type word, or nullptr when it
+ * cannot be known here.
+ *
+ * A class index is program-local, so it only means something while the
+ * defining program's own tables are live -- that is, during its compile.
+ * get_type_name() is also called with no compile in progress (the
+ * disassembler, generate_keywords), where the same index would name a
+ * different class or nothing at all; there we print the bare kind rather
+ * than a confidently wrong name. Every lookup is bounds-checked because the
+ * type word can reach here from a partially-built or erroring compile.
+ */
+/* Set while a RUNTIME consumer (functions()/variables()/dump_prog(), i.e. a
+ * caller holding some other program's type word) is rendering. A compile can
+ * be in flight underneath it -- several master applies run mid-compile
+ * (valid_override, inherit_program, include_file, the error handler) and a
+ * mudlib is free to call reflection efuns from them -- and resolving that
+ * caller's class index against the in-flight compile's class table names a
+ * class from an unrelated program. Print the bare kind instead, which is
+ * what the driver did before class names were added. */
+static int rendering_foreign_type = 0;
+
+void set_type_name_foreign(int on) { rendering_foreign_type = on; }
+
+static const char* compiling_class_name(int idx) {
+  if (rendering_foreign_type || !current_file || !mem_block[A_CLASS_DEF].block ||
+      !mem_block[A_STRINGS].block) {
+    return nullptr;
+  }
+  if (idx < 0 || idx >= static_cast<int>(mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t))) {
+    return nullptr;
+  }
+  int const sidx = CLASS(idx)->classname;
+  if (sidx < 0 || sidx >= static_cast<int>(mem_block[A_STRINGS].current_size / sizeof(char*))) {
+    return nullptr;
+  }
+  return PROG_STRING(sidx);
 }
 
 char* get_type_name(char* where, char* end, int type) {
   int pointer = 0;
 
-  where = get_type_modifiers(where, end, type);
+  /* A class type word keeps its class INDEX in bits 0-6 (CLASS_NUM_MASK),
+   * which overlap FUNC_VARARGS (0x20) and FUNC_ASYNC (0x40) -- so index 33
+   * would print as "varargs class c33" and index 65 as "async class c65".
+   * Only the DECL_* modifiers can legitimately accompany a class here: a
+   * function's FUNC_* flags live in program_t::function_flags, never in the
+   * function_t::type word this renders. Applies to promise<class T> too,
+   * whose payload index sits in the same low bits. */
+  where = get_type_modifiers(where, end,
+                             (type & TYPE_MOD_CLASS) ? (type & DECL_MODS) : type);
   type &= ~DECL_MODS;
   if (type & TYPE_MOD_ARRAY) {
     pointer = 1;
     type &= ~TYPE_MOD_ARRAY;
   }
-  if (type & TYPE_MOD_CLASS) {
-    where = strput(where, end, "class ");
-    /* we're sometimes called from outside the compiler * /
-    if (current_file)
-        where = strput(where, end, PROG_STRING(CLASS(type &
-    ~TYPE_MOD_CLASS)->name));
-        and that just doesn't work */
+  if (type & TYPE_MOD_PROMISE) {
+    /* render the payload with the same routine, minus its trailing space */
+    char inner[128];
+    char* ip = get_type_name(inner, EndOf(inner), promise_payload_type(type));
+
+    if (ip > inner && ip[-1] == ' ') {
+      *(ip - 1) = '\0';
+    }
+    where = strput(where, end, "promise<");
+    where = strput(where, end, inner);
+    where = strput(where, end, ">");
+  } else if (type & TYPE_MOD_CLASS) {
+    const char* cname = compiling_class_name(type & CLASS_NUM_MASK);
+
+    where = strput(where, end, "class");
+    if (cname) {
+      where = strput(where, end, " ");
+      where = strput(where, end, cname);
+    }
   } else {
     DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
     where = strput(where, end, compiler_type_names[type]);
@@ -2046,7 +2340,7 @@ int validate_function_call(int f, parse_node_t* args) {
   int num_arg = (args ? args->kind : 0);
   int num_var = 0;
   parse_node_t* pn = args;
-  unsigned short* arg_types = nullptr;
+  lpc_type_t* arg_types = nullptr;
   program_t* prog;
 
   while (pn) {
@@ -2095,7 +2389,7 @@ int validate_function_call(int f, parse_node_t* args) {
       int which = FUNCTION_TEMP(f)->u.index;
       int start = *(reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_INDEX].block) + which);
       if (start != INDEX_START_NONE) {
-        arg_types = reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_TYPES].block) + start;
+        arg_types = reinterpret_cast<lpc_type_t*>(mem_block[A_ARGUMENT_TYPES].block) + start;
       }
     }
 
@@ -2209,7 +2503,20 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
     return node;
   }
 
-  switch (intype & (~DECL_MODS)) {
+  /* Derive the runtime tag from a COPY: `intype` is also the static type of
+   * the wrapper node built below, so folding the payload away here would
+   * retype every checked expression as promise<unknown>. That is what an
+   * indexed `promise<T> *` element hits (rule_primary_expr_index strips
+   * TYPE_MOD_ARRAY and re-checks the element), leaving legal strict_types
+   * code rejected as `promise<int> vs promise<unknown>`. */
+  lpc_type_t runtype = intype;
+  if ((runtype & (TYPE_MOD_PROMISE | TYPE_MOD_ARRAY)) == TYPE_MOD_PROMISE) {
+    runtype = TYPE_MOD_PROMISE; /* the payload has no runtime representation */
+  }
+  switch (runtype & (~DECL_MODS)) {
+    case TYPE_MOD_PROMISE:
+      type = T_PROMISE;
+      break;
     case 0:
     case 3:
       // error situation, don't bother
@@ -2236,7 +2543,7 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
       type = T_BUFFER;
       break;
     default:
-      if (intype & TYPE_MOD_ARRAY) {
+      if (runtype & TYPE_MOD_ARRAY) {
         type = T_ARRAY;
       } else {
         type = T_CLASS;
@@ -2671,18 +2978,26 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   int saved_current_number_of_locals = current_number_of_locals;
   int saved_max_num_locals = max_num_locals;
 
+  // Cleared only by the `function` production's final action, so an aborted
+  // compile (lex_fatal / error() unwind between a header's rule_func_type()
+  // and rule_func()) would otherwise leak a stale 1 into the NEXT compile,
+  // letting await/acatch pass their async-context check in that file's
+  // global initializers.
+  int saved_compiling_async_function = compiling_async_function;
+  compiling_async_function = 0;
+
   // Save the original pointers and sizes of local variable scratchpads
-  unsigned short* saved_type_of_locals = type_of_locals;
+  lpc_type_t* saved_type_of_locals = type_of_locals;
   local_info_t* saved_locals = locals;
   int saved_type_of_locals_size = type_of_locals_size;
   int saved_locals_size = locals_size;
-  unsigned short* saved_type_of_locals_ptr = type_of_locals_ptr;
+  lpc_type_t* saved_type_of_locals_ptr = type_of_locals_ptr;
   local_info_t* saved_locals_ptr = locals_ptr;
 
   // Allocate fresh, isolated local variable scratchpads for this compilation level
   auto max_local_variables = kMaxLocalVariables;
-  type_of_locals = reinterpret_cast<unsigned short*>(
-      DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "compile_file:1"));
+  type_of_locals = reinterpret_cast<lpc_type_t*>(
+      DCALLOC(max_local_variables, sizeof(lpc_type_t), TAG_LOCALS, "compile_file:1"));
   locals = reinterpret_cast<local_info_t*>(
       DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "compile_file:2"));
   type_of_locals_size = max_local_variables;
@@ -2761,6 +3076,7 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
 
       current_number_of_locals = saved_current_number_of_locals;
       max_num_locals = saved_max_num_locals;
+      compiling_async_function = saved_compiling_async_function;
 
       type_of_locals = saved_type_of_locals;
       locals = saved_locals;
@@ -3247,7 +3563,7 @@ static program_t* epilog(void) {
   if (mem_block[A_ARGUMENT_INDEX].current_size) {
     unsigned short* dest;
 
-    prog->argument_types = reinterpret_cast<unsigned short*>(p);
+    prog->argument_types = reinterpret_cast<lpc_type_t*>(p);
     copy_in(A_ARGUMENT_TYPES, &p);
 
     dest = prog->type_start = reinterpret_cast<unsigned short*>(p);
@@ -3278,7 +3594,7 @@ static program_t* epilog(void) {
 
   prog->variable_table = reinterpret_cast<char**>(p);
   copy_in(A_VAR_NAME, &p);
-  prog->variable_types = reinterpret_cast<unsigned short*>(p);
+  prog->variable_types = reinterpret_cast<lpc_type_t*>(p);
   copy_in(A_VAR_TYPE, &p);
 
   prog->num_inherited = mem_block[A_INHERITS].current_size / sizeof(inherit_t);

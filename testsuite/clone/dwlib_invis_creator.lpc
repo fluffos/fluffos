@@ -1,0 +1,7 @@
+// Fixture for efuns/acatch_dwlib_latch.lpc: an invisible creator, which is
+// what makes reference_allowed() take its guarded path rather than the
+// "everyone can see this" shortcut.
+int query_invis() { return 3; }
+int query_creator() { return 1; }
+string query_name() { return "invisguy"; }
+mixed query_allowed() { return ({}); }
