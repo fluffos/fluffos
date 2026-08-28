@@ -3950,11 +3950,35 @@ void prepare_cases(parse_node_t* pn, int start) {
 }
 
 void save_file_info(int file_id, int lines) {
-  short fi[2];
+  /* The count is 16 bits wide (the whole table is unsigned short pairs), so
+   * a file -- or one contiguous stretch of a file between #includes -- of
+   * 65536 lines used to wrap to 0. translate_absolute_line()'s first pass
+   * then subtracts 0 without ever reducing the line it is looking for, walks
+   * off the end of the table, and returns whatever garbage it lands on as a
+   * file index; the caller feeds that straight to progp->strings[idx - 1].
+   * The first runtime error reported from such a file segfaults the driver.
+   *
+   * Emit the count in chunks of at most 65535 carrying the same file id.
+   * The format is unchanged and the decoder needs no change either: its
+   * second pass already sums every earlier entry with the same file id when
+   * it reconstructs the file-relative line, so a split file decodes exactly
+   * as an unsplit one would have.
+   *
+   * do/while, not while: a zero-line entry is legitimate (an #include on the
+   * first line of a file leaves no lines before it) and must still emit
+   * exactly one entry, as it always did. */
+  do {
+    unsigned short fi[2];
+    int const chunk = (lines > 0xffff) ? 0xffff : lines;
 
-  fi[0] = lines;
-  fi[1] = file_id;
-  add_to_mem_block(A_FILE_INFO, (char*)&fi[0], sizeof(fi));
+    /* unsigned short, not short: this is how the table is read back, and
+     * storing a count above 32767 through a signed short was needless
+     * implementation-defined behaviour. */
+    fi[0] = static_cast<unsigned short>(chunk);
+    fi[1] = static_cast<unsigned short>(file_id);
+    add_to_mem_block(A_FILE_INFO, (char*)&fi[0], sizeof(fi));
+    lines -= chunk;
+  } while (lines > 0);
 }
 
 int add_program_file(const char* name, int top) {
