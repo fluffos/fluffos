@@ -10,6 +10,7 @@
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/simulate.h"  // throw_error (cancellation raise)
+#include "include/promise.h"  // LPC-visible rejection reasons
 
 /*
  * Native LPC promises (issue #1319 phase 1). See promise.h for the ownership
@@ -211,14 +212,14 @@ constexpr LPC_INT kDefaultDrainBudgetUs = 1000;
  * They previously differed in wording and in whether they carried a trailing
  * newline. No trailing newline: this is a value handed to a rejection
  * handler, not a message printed by error(). */
-constexpr const char* kDestructedRejection = "*async function owner was destructed while suspended";
+constexpr const char* kDestructedRejection = PROMISE_REASON_DESTRUCTED;
 /* What a cancelled body's next await raises, and what its promise rejects
  * with if nothing catches it. Matched by CONTENT, like every other reason in
  * this family -- a plain string is forgeable by throw(), which is accepted:
  * discriminating cancellation authoritatively would need a driver-reserved
  * value kind, and promise_status() already answers the question from
  * outside. */
-constexpr const char* kCancelledRejection = "*async function cancelled";
+constexpr const char* kCancelledRejection = PROMISE_REASON_CANCELLED;
 
 /* Consecutive slices that ended with work still queued. Routine under load;
  * a long run of them means the queue is not keeping up. Reset by any slice
@@ -1077,9 +1078,9 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     if (coro->ob->flags & O_DESTRUCTED) {
       err.u.string = const_cast<char*>(kDestructedRejection);
     } else if (coro->prog_generation != coro->ob->prog_generation) {
-      err.u.string = "*async function owner was recompiled while suspended";
+      err.u.string = PROMISE_REASON_RECOMPILED;
     } else {
-      err.u.string = "*async function owner's program was replaced while suspended";
+      err.u.string = PROMISE_REASON_REPLACED_PROGRAM;
     }
     free_coroutine(coro, &err, true);
     return;
@@ -1119,7 +1120,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     svalue_t err;
     err.type = T_STRING;
     err.subtype = STRING_CONSTANT;
-    err.u.string = "*stack overflow while resuming async function";
+    err.u.string = PROMISE_REASON_STACK_OVERFLOW;
     free_coroutine(coro, &err, true);
     return;
   }
@@ -1450,7 +1451,7 @@ void dealloc_promise(promise_t* p) {
           svalue_t err;
           err.type = T_STRING;
           err.subtype = STRING_CONSTANT;
-          err.u.string = "*promise adoption source was collected before settling";
+          err.u.string = PROMISE_REASON_ADOPTION_COLLECTED;
           (void)promise_settle(r.next, &err, 1);
         }
         free_promise(r.next);
@@ -1464,7 +1465,7 @@ void dealloc_promise(promise_t* p) {
         svalue_t err;
         err.type = T_STRING;
         err.subtype = STRING_CONSTANT;
-        err.u.string = "*awaited promise was collected before settling";
+        err.u.string = PROMISE_REASON_AWAITED_COLLECTED;
         free_coroutine(r.coro, &err, false);
       }
       if (r.comb) {
@@ -1476,7 +1477,7 @@ void dealloc_promise(promise_t* p) {
         svalue_t err;
         err.type = T_STRING;
         err.subtype = STRING_CONSTANT;
-        err.u.string = "*promise was collected before settling";
+        err.u.string = PROMISE_REASON_COLLECTED;
         deliver_combinator(r.comb, r.comb_index, &err, true);
         free_combinator(r.comb);
       }
@@ -1514,7 +1515,7 @@ void promise_resolve_with(promise_t* p, svalue_t* value) {
       svalue_t err;
       err.type = T_STRING;
       err.subtype = STRING_CONSTANT;
-      err.u.string = "*promise resolved with itself";
+      err.u.string = PROMISE_REASON_SELF_RESOLVED;
       promise_settle(p, &err, 1);
       return;
     }
@@ -1685,7 +1686,7 @@ promise_t* promise_combinator_start(uint8_t kind, array_t* inputs) {
       svalue_t err = const0;
       err.type = T_STRING;
       err.subtype = STRING_CONSTANT;
-      err.u.string = "*promise_any: no promises to wait for";
+      err.u.string = PROMISE_REASON_ANY_EMPTY;
       (void)promise_settle(result, &err, 1);
     } else {
       svalue_t empty = const0;
@@ -2492,7 +2493,7 @@ void promise_cleanup() {
     svalue_t err;
     err.type = T_STRING;
     err.subtype = STRING_CONSTANT;
-    err.u.string = "*async_yield never ran: the driver shut down";
+    err.u.string = PROMISE_REASON_YIELD_SHUTDOWN;
     (void)promise_settle(p, &err, 1);
     free_promise(p);
   }
