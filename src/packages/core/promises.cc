@@ -1,6 +1,7 @@
 #include "base/package_api.h"
 
 #include "packages/core/call_out.h"
+#include "include/promise.h"  // LPC-visible rejection reasons
 
 /*
  * Promise efuns (issue #1319 phase 1). The T_PROMISE machinery itself lives
@@ -78,7 +79,7 @@ void f_promise_reject() {
   svalue_t default_reason;
   default_reason.type = T_STRING;
   default_reason.subtype = STRING_CONSTANT;
-  default_reason.u.string = "*promise rejected";
+  default_reason.u.string = PROMISE_REASON_NO_REASON;
   promise_settle(p, (num_arg > 1) ? sp : &default_reason, 1);
   pop_n_elems(num_arg);
 }

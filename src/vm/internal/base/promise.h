@@ -30,11 +30,10 @@
  * any value.
  */
 
-enum : uint8_t {
-  PROMISE_PENDING = 0,
-  PROMISE_FULFILLED = 1,
-  PROMISE_REJECTED = 2,
-};
+/* The state codes are LPC-visible (promise_status() returns them), so they
+ * are defined in include/promise.h and shared with the mudlib rather than
+ * duplicated here. */
+#include "include/promise.h"
 
 /* promise_all() / promise_any() / promise_race() / promise_all_settled() */
 enum : uint8_t {
