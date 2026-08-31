@@ -24,6 +24,19 @@
 // handlers below instead burn a calibrated fraction of the budget each, so
 // the backlog exceeds it by construction on any machine.
 //
+// Calibration alone was not enough either, and the second failure is worth
+// recording because it looks exactly like a driver bug. burn_iters is sized
+// from a sample taken BEFORE the backlog runs; a CI runner that shifts CPU
+// frequency in between makes the real handlers cost a fraction of that, the
+// whole backlog fits in one turn, and the file reports a perfectly healthy
+// drain as "not re-posting" (observed on macOS RelWithDebInfo: 28 deliveries
+// said to cost 250 us each, one yield, and the identical commit passed on
+// re-run). So the handlers now MEASURE what they actually burn, and
+// check_results() tests that premise before drawing any conclusion. A
+// backlog that did not really exceed the budget proves nothing about
+// re-posting, and saying so is not the same as passing silently -- that path
+// still records a check.
+//
 // Yielding is observed through async_info(1)'s "drain_yields" counter rather
 // than by timing the run. Wall clock cannot see it on every target: the wasm
 // test runner drives the driver from a virtual clock, so a re-posted turn
@@ -51,6 +64,9 @@ nosave int yields_before;
 nosave int budget_us;
 nosave int handler_us;
 nosave int burn_iters;
+// What the handlers ACTUALLY cost, summed as they run -- the premise
+// check_results() tests before drawing any conclusion about re-posting.
+nosave int burned_us;
 nosave int finished;
 
 private void check_results();
@@ -81,7 +97,18 @@ private mixed count_handler(mixed v) {
     finish("a reaction was delivered more than once (delivered=" + delivered + ")");
     return v;
   }
-  burn(burn_iters);
+  // Measured, not assumed. calibrate() sizes burn_iters from a sample taken
+  // BEFORE the backlog runs, and the two do not always agree: a CI runner
+  // that shifts CPU frequency in between makes the real handlers cost a
+  // fraction of the calibrated figure, the whole backlog then fits in one
+  // turn, and the file reports a healthy drain as "not re-posting". That is
+  // exactly what a macOS RelWithDebInfo runner did -- 28 deliveries said to
+  // cost 250 us each produced a single yield, and the same commit passed on
+  // re-run. Accumulating the real cost lets check_results() test its own
+  // premise instead of trusting the calibration.
+  burned_us += time_expression {
+    burn(burn_iters);
+  };
   if (delivered == queued) {
     // Checked from the LAST delivery rather than after a fixed delay: a
     // deadline turns this into a throughput measurement, and throughput is
@@ -98,13 +125,32 @@ private void check_results() {
 
   // Splitting across turns loses nothing: reaching here at all means every
   // delivery arrived, and count_handler's over-count guard means none arrived
-  // twice. (A count assertion here would be tautological -- this function is
-  // called from the delivery that makes the count come out right.)
+  // twice.
+  //
+  // Check the PREMISE before the conclusion. The claim is "a backlog that
+  // exceeds the turn budget must be spread over turns", so if the backlog
+  // did not actually exceed it there is nothing here to observe -- and
+  // asserting anyway reports the machine, not the driver.
+  //
+  // Two budgets' worth is the bar, matching the two yields demanded below.
+  // Still records a check either way: this path is the one a mis-calibrated
+  // host takes, and a pass with no checks at all is indistinguishable from a
+  // file that never ran.
+  if (burned_us < budget_us * 2) {
+    ASSERT2(delivered == queued,
+      sprintf("the backlog measured only %d us against a %d us turn budget, so it "
+        "never had to be split -- calibration expected about %d us. Nothing to "
+        "conclude about re-posting, but every one of the %d deliveries did arrive",
+        burned_us, budget_us, queued * handler_us, queued));
+    finish(0);
+    return;
+  }
+
   ASSERT2(info["drain_yields"] >= yields_before + 2,
-    sprintf("a backlog of %d deliveries burning about %d us each, against a turn "
+    sprintf("a backlog of %d deliveries measured at %d us total, against a turn "
       "budget of %d us, produced only %d yields -- the drain is not re-posting, "
       "so it holds the event loop for the whole backlog",
-      queued, handler_us, budget_us, info["drain_yields"] - yields_before));
+      queued, burned_us, budget_us, info["drain_yields"] - yields_before));
 
   finish(0);
 }
