@@ -1,0 +1,80 @@
+// Tracing must survive a trace that fills its event buffer.
+//
+// TraceWriter::log() caps the buffer at MAX_EVENTS and calls Tracer::stop()
+// when it fills. It cannot flush there -- flush() takes the lock log() is
+// already holding -- so the buffer is left FULL with is_enabled false. Every
+// path that flushed was then gated behind Tracer::enabled():
+// f_trace_start(), f_trace_end(), the walltime collect callback, and
+// Tracer::start(). None of them ran again, so the buffer was never drained
+// and tracing was dead for the rest of the process: each later trace_start()
+// re-enabled, logged one event, immediately re-tripped the cap, disabled
+// itself again, and wrote nothing. Silently -- the "dumping N events" line
+// only prints from inside flush(). Reported from a live mud that had run 26
+// hours with tracing wedged (issue #1348); only a restart recovered it.
+//
+// Tracer::collect() already self-guards on an empty filename, so the gates
+// were redundant as well as harmful, and they are gone.
+//
+// The overflow trace deliberately targets a directory that does not exist:
+// trace_start() accepts the path, and the dump thread then fails to open it
+// and discards the buffer. A million events would otherwise write ~134 MB of
+// JSON, and the events are not what this file is about.
+
+#define TRACE_FILE "/data/trace_after_overflow.json"
+// Two events per LPC function call, against a 1,000,000 cap. Costs ~260 ms.
+#define OVERFLOW_CALLS 600000
+#define MAX_TRIES 8
+
+nosave int tries;
+
+private void check_file();
+
+// Traced as an LPC function call, which is what generates the events --
+// efun calls and individual instructions are only traced in builds that
+// compile those hooks in.
+private int noop(int x) {
+  return x;
+}
+
+private void burn(int count) {
+  int i;
+
+  for (i = 0; i < count; i++) {
+    noop(i);
+  }
+}
+
+void do_tests() {
+#if efun_defined(trace_start)
+  EXPECT_LATCH("tracing recovers after overflow");
+
+  // Fill the buffer, then end the window.
+  trace_start("/data/no_such_dir/overflow.json", 300);
+  burn(OVERFLOW_CALLS);
+  trace_end();
+
+  // An ordinary short trace afterwards. On the unfixed driver this produces
+  // no file at all.
+  rm(TRACE_FILE);
+  trace_start(TRACE_FILE, 300);
+  burn(50);
+  trace_end();
+
+  // The dump runs on its own thread, so poll for the file rather than
+  // assuming it has landed.
+  call_out((: check_file :), 1);
+#endif
+}
+
+private void check_file() {
+  if (file_size(TRACE_FILE) <= 0 && ++tries < MAX_TRIES) {
+    call_out((: check_file :), 1);
+    return;
+  }
+
+  ASSERT2(file_size(TRACE_FILE) > 0,
+    "after one trace filled its event buffer, a later trace wrote no file at all -- "
+    "tracing is wedged for the life of the process and only a restart recovers it");
+  rm(TRACE_FILE);
+  RELEASE_LATCH("tracing recovers after overflow");
+}
