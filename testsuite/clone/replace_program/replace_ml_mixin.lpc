@@ -1,0 +1,5 @@
+// Fixture: a mixin with its own variable AND function, inherited ahead of
+// the real target -- used to build a multi-level indirect case where the
+// target's variables sit at a nonzero offset several inherit-levels up.
+int mixin_var;
+string mixin_func() { return "mixin"; }

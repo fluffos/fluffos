@@ -1,0 +1,7 @@
+// Fixture (expected-noop case): top inherits mid (not X directly); mid
+// inherits X. top's create() redundantly targets X, TWO levels up --
+// exercises search_inherited()'s recursive var_offset accumulation
+// (the "*offpnt += prg->inherit[i].variable_index_offset;" path) on a
+// deferred (indirect) match, not just a direct one-level inherit.
+inherit "/clone/replace_program/replace_ml_mid";
+void create() { replace_program("/clone/replace_program/replace_min_target"); }

@@ -1,0 +1,13 @@
+// Fixture: the classic `inherit X; void create() { replace_program(X); }`
+// boilerplate found throughout the real-world mudlib corpus (e.g. xhcii's
+// /clone/board/huashan_b.c inheriting its bulletin-board base class and
+// then redundantly replace_program()-ing itself down to that exact same
+// class). X (/clone/replace_program/replace_stateful_base) has an initialized global, so
+// this only passes replace_program_is_noop() once "#global_init#" is
+// excluded from the comparison alongside "create". Deliberately defines
+// NO functions of its own besides create() -- matching the real pattern
+// exactly, and making try_bind() (called externally) resolve to the
+// inherited, unmodified base-class function.
+inherit "/clone/replace_program/replace_stateful_base";
+
+void create() { replace_program("/clone/replace_program/replace_stateful_base"); }

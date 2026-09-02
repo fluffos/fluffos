@@ -1,0 +1,3 @@
+// Fixture: bare passthrough middle level (adds nothing of its own).
+inherit "/clone/replace_program/replace_min_target";
+void create() {}
