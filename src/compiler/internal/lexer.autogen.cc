@@ -3739,12 +3739,12 @@ YY_RULE_SETUP
 #line 269 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
-/* SC_BLOCK_COMMENT is entered via yy_push_state()/left via
-     * yy_pop_state() (%option stack), not a plain BEGIN(), so it's a
-     * reusable sub-scan: whichever state had a comment-open appear in it gets
-     * control back exactly where it left off once the comment closes,
-     * instead of every such state needing its own copy of these six
-     * rules, or hand-rolling "which state do I return to" bookkeeping. */
+/* SC_BLOCK_COMMENT is a reusable sub-scan: entered via yy_push_state()
+     * / left via yy_pop_state() (%option stack), not a plain BEGIN(), so
+     * whichever state had a comment-open in it gets control back where it
+     * left off, instead of each needing its own copy of these rules.
+     * THE LITERAL AND COMMENT RULES HERE ARE MIRRORED BY HAND in
+     * lexer_scan.h -- teach it any new form, or #1362 recurs (AGENTS.md). */
 case 5:
 YY_RULE_SETUP
 #line 277 "$REPO_ROOT$/src/compiler/internal/lexer.l"
@@ -6218,4 +6218,4 @@ void lpc_lex_reset(void *yyscanner) {
 }
 
 
-/* FluffOS generated-from lexer.l sha256=dba328e987078532eea2af195b227bfe077ca6c9d44437e339cb793579633374 */
+/* FluffOS generated-from lexer.l sha256=50ec84b1d29c7c40c3bb3982f59e1da56e1e2aeae01e09fbb9615019ffb01ad8 */

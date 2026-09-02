@@ -267,12 +267,12 @@ WS_NO_NL    [ \t\r\v\f]
 \n          { lpc_lex_newline(yyscanner); }
 "\\"\r?\n   { lpc_lex_newline(yyscanner); }
 
-    /* SC_BLOCK_COMMENT is entered via yy_push_state()/left via
-     * yy_pop_state() (%option stack), not a plain BEGIN(), so it's a
-     * reusable sub-scan: whichever state had a comment-open appear in it gets
-     * control back exactly where it left off once the comment closes,
-     * instead of every such state needing its own copy of these six
-     * rules, or hand-rolling "which state do I return to" bookkeeping. */
+    /* SC_BLOCK_COMMENT is a reusable sub-scan: entered via yy_push_state()
+     * / left via yy_pop_state() (%option stack), not a plain BEGIN(), so
+     * whichever state had a comment-open in it gets control back where it
+     * left off, instead of each needing its own copy of these rules.
+     * THE LITERAL AND COMMENT RULES HERE ARE MIRRORED BY HAND in
+     * lexer_scan.h -- teach it any new form, or #1362 recurs (AGENTS.md). */
 "/*"    { yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
 "//"[^\n\x00]*  { /* line comment; trailing newline handled by the \n rule */ }
 
