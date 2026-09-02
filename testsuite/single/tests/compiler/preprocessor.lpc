@@ -85,6 +85,14 @@ this is not code and must never be compiled
 #define UNDEF_ME 5
 #undef UNDEF_ME // gone
 
+// #1362: comments are whitespace inside an argument LIST too. The macro
+// argument collector reads raw characters, so nothing strips comments out
+// from under it -- an apostrophe in one ("a guild's") opened a character
+// literal that ran to end of file, and a '//' survived into the argument
+// text to comment out the rest of it once that text was rescanned.
+#define MES(y) ("[" + y + "]")
+#define ARG_ID(x) (x)
+
 void do_tests() {
   // ## token paste builds an identifier.
   int GLUE(fo, o) = 42;
@@ -129,6 +137,34 @@ void do_tests() {
   ASSERT_EQ(1, IFDEF_CMT_OK);
   int UNDEF_ME = 9;
   ASSERT_EQ(9, UNDEF_ME);
+
+  // #1362 -- comments inside an argument list.
+  ASSERT_EQ("[AAA\nBBB\n]", MES("AAA\n" +
+    /* a comment with a guild's apostrophe in it */
+    "BBB\n"));
+  ASSERT_EQ("[AAA\nBBB\n]", MES("AAA\n" +  // another guild's apostrophe
+  "BBB\n"));
+  ASSERT_EQ("[ab]", MES("a" /* no apostrophe in this one */ + "b"));
+
+  // An apostrophe inside a STRING argument is ordinary text, as ever.
+  ASSERT_EQ("[it's]", MES("it's"));
+
+  // A comment is ONE space here too (DOUBLE_NEG above pins the same rule
+  // for a macro body), so it separates tokens rather than pasting them.
+  // Stringized, because that is the only spelling the corpus formatter is
+  // guaranteed not to re-space out from under the pin (see AGENTS.md).
+  ASSERT_EQ("a b", STR(a/*sep*/b));
+
+  // A comment may sit between the macro name and its '(' -- that is still
+  // an invocation, not a bare identifier.
+  ASSERT_EQ("[x]", MES /* why is this here? */ ("x"));
+
+  // Newlines inside an argument-list comment are counted exactly once.
+  int line_a = __LINE__;
+  ASSERT_EQ(1, ARG_ID(/* one
+                         two
+                         three */ 1));
+  ASSERT_EQ(4, __LINE__ - line_a);
 
   // Builtin macros: __FILE__ / __DIR__ / __LINE__.
   ASSERT_EQ("/single/tests/compiler/preprocessor.lpc", __FILE__);

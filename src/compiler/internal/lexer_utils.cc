@@ -829,12 +829,96 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
           return static_cast<char>(gc);
         };
 
+        // Deciding a '/' starts a comment needs the byte after it, and that
+        // byte usually still has to be processed normally (a division, a
+        // quote, the ')' that ends the call). One slot of pushback, shared by
+        // both loops below, keeps that dispatch in one place. A pushed-back
+        // byte is already in consumed_text, so the no-parenthesis restore
+        // stays complete even when one is still held.
+        char ungot = 0;
+        auto next_char = [&]() -> char {
+          if (ungot != 0) {
+            char held = ungot;
+            ungot = 0;
+            return held;
+          }
+          return get_next_char();
+        };
+
+        // Nothing strips comments out from under this collector -- it reads
+        // raw characters, deliberately (see consumed_text above) -- so it has
+        // to do it itself, exactly as the pre-Flex path's cmygetc() did for
+        // every character it read outside a quote. Without this an
+        // apostrophe in a comment inside an argument list ("a guild's") opens
+        // a character literal that runs to end of file, and a '//' comment
+        // survives into the argument text to comment out the rest of it once
+        // the collapsed-newline text is rescanned (#1362).
+        //
+        // Returns true if a comment was consumed; sets eof_in_comment if the
+        // file ended inside one. A comment yields whitespace, per C -- the
+        // callers add the space, since a comment between the macro name and
+        // its '(' contributes nothing to any argument.
+        bool eof_in_comment = false;
+        auto skip_comment = [&]() -> bool {
+          char ch2 = next_char();
+          if (ch2 == '*') {
+            char prev = 0;
+            while (true) {
+              char cc = next_char();
+              if (cc == '\0') {
+                eof_in_comment = true;
+                return true;
+              }
+              if (cc == '\n') {
+                total_lines++;  // line counting itself is native (yyinput)
+              }
+              if (prev == '*' && cc == '/') {
+                return true;
+              }
+              // "/*/" is not a complete comment: the '/' that closes one can
+              // never be the same '/' that opened it.
+              prev = cc;
+            }
+          }
+          if (ch2 == '/') {
+            while (true) {
+              char cc = next_char();
+              if (cc == '\0') {
+                eof_in_comment = true;
+                return true;
+              }
+              if (cc == '\n') {
+                // Hand the newline back rather than counting it here: it is
+                // ordinary whitespace that terminates the comment, and both
+                // callers already count and translate one correctly.
+                ungot = cc;
+                return true;
+              }
+            }
+          }
+          // Not a comment -- a division, or end of file. Pushing back '\0' is
+          // a no-op, and the caller's next read hits the same end of file.
+          ungot = ch2;
+          return false;
+        };
+
         char c;
         while (true) {
-          c = get_next_char();
+          c = next_char();
           if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
             if (c == '\n') {
               total_lines++;  // line counting itself is native (yyinput)
+            }
+            continue;
+          }
+          if (c == '/' && skip_comment()) {
+            // A comment sits where whitespace may: MES /* why */ (x) is an
+            // invocation. On end of file inside it, fall through to the
+            // no-parenthesis path, which restores the text and lets the
+            // ordinary scan report the unterminated comment.
+            if (eof_in_comment) {
+              c = '\0';
+              break;
             }
             continue;
           }
@@ -847,7 +931,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
           int depth = 0;
           char inq = 0;
           while (true) {
-            char ch = get_next_char();
+            char ch = next_char();
             if (ch == '\0') {
               lexerror("End of file in macro arguments");
               break;
@@ -858,7 +942,7 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
             if (inq) {
               if (ch == '\\') {
                 arg += ch;
-                char ch2 = get_next_char();
+                char ch2 = next_char();
                 if (ch2 == '\0') {
                   lexerror("End of file in macro arguments");
                   break;
@@ -871,6 +955,12 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
               }
               arg += ch;
               if (ch == inq) inq = 0;
+            } else if (ch == '/' && skip_comment()) {
+              if (eof_in_comment) {
+                lexerror("End of file in a comment");
+                break;
+              }
+              arg += ' ';
             } else if (ch == '"' || ch == '\'' || ch == '`') {
               inq = ch;
               arg += ch;

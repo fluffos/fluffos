@@ -611,6 +611,56 @@ TEST(Preprocessor, DroppedMultiLineArgKeepsLineCount) {
             "int a = 1; ; int l = 3;");
 }
 
+// #1362: the argument collector reads raw characters, deliberately, so
+// nothing strips comments out from under it -- it has to skip them itself,
+// exactly as the pre-Flex cmygetc() did for every character read outside a
+// quote. Until it did, an apostrophe inside a comment inside an argument
+// list ("a guild's") opened a character literal that ran to end of file.
+
+TEST(Preprocessor, BlockCommentWithApostropheInMacroArgs) {
+  EXPECT_EQ(pp("#define MES(y) (\"[\" + y + \"]\")\n"
+               "string s = MES(\"AAA\" +\n"
+               "/* a comment with a guild's apostrophe in it */\n"
+               "\"BBB\");\n"),
+            "string s = (\"[\" + \"AAA\" + \"BBB\" + \"]\");");
+}
+
+TEST(Preprocessor, LineCommentWithApostropheInMacroArgs) {
+  // A '//' comment must not survive into the argument text either: the
+  // newline that ends it is collapsed to a space, so a comment that got
+  // through would comment out the rest of the argument on rescan.
+  EXPECT_EQ(pp("#define MES(y) (\"[\" + y + \"]\")\n"
+               "string s = MES(\"AAA\" + // another guild's apostrophe\n"
+               "\"BBB\");\n"),
+            "string s = (\"[\" + \"AAA\" + \"BBB\" + \"]\");");
+}
+
+TEST(Preprocessor, CommentInMacroArgIsOneSpaceNotAPaste) {
+  // Stringized because that is the only place the space is observable here:
+  // normalize_whitespace() keeps whitespace only inside a string literal.
+  EXPECT_EQ(pp("#define STR(x) #x\nstring s = STR(a/*sep*/b);\n"), "string s = \"a b\";");
+}
+
+TEST(Preprocessor, CommentBetweenMacroNameAndOpenParen) {
+  // A comment sits where whitespace may, so this is still an invocation
+  // and not a bare identifier followed by a parenthesized expression.
+  EXPECT_EQ(pp("#define ID(x) ((x) * 2)\nint v = ID /* why here? */ (3);\n"),
+            "int v = ((3) * 2);");
+}
+
+TEST(Preprocessor, SlashInMacroArgIsStillDivision) {
+  // Only '/*' and '//' start a comment; a lone '/' is the operator, and the
+  // byte probed after it must still be processed normally.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(6/2);\n"), "int v = (6 / 2);");
+}
+
+TEST(Preprocessor, MultiLineCommentInMacroArgKeepsLineCount) {
+  // The collector counts the newlines it swallows inside the comment, and
+  // the comment text never reappears in the expansion to be counted twice.
+  EXPECT_EQ(pp("#define ID(x) x\nint a = ID(/* one\ntwo\nthree */ 1);\nint l = __LINE__;\n"),
+            "int a = 1; int l = 5;");
+}
+
 TEST(Preprocessor, AliasToFunctionLikeExpandsWithStreamArgs) {
   // UNPAINTED function-like name left literal only because no '('
   // followed it in the expansion text itself: when the '(' turns out to
