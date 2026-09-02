@@ -59,189 +59,6 @@ struct DirectiveTextSrc {
 };
 }  // namespace
 
-ScratchString strip_directive_comments(std::string_view s) {
-  ScratchString r;
-  r.reserve(s.size());
-  DirectiveTextSrc src{s};
-  for (;;) {
-    src.unit.clear();
-    lpc_lex::UnitInfo u = lpc_lex::scan_one_unit(src);
-    if (u.unit == lpc_lex::Unit::kEof) break;
-    if (u.unit == lpc_lex::Unit::kLineComment) break;  // rest is a comment
-    if (u.unit == lpc_lex::Unit::kBlockComment) {
-      // A comment is ONE space (C translation phase 3), not nothing:
-      // eliding it entirely would paste the surrounding tokens together
-      // ("1/*x*/2" must stay two tokens, not become "12").
-      r += ' ';
-      continue;
-    }
-    r += src.unit;  // raw spelling, quotes and all
-  }
-  return r;
-}
-
-// Index of the first '/*' that never closes within `s`, or npos when every
-// block comment in `s` is terminated. Shares the classifier with
-// strip_directive_comments() above, so the two cannot disagree about what
-// is a comment -- they used to, and about apostrophes in particular.
-static size_t open_comment_start(std::string_view s) {
-  DirectiveTextSrc src{s};
-  for (;;) {
-    size_t start = src.consumed;
-    lpc_lex::UnitInfo u = lpc_lex::scan_one_unit(src);
-    if (u.unit == lpc_lex::Unit::kEof) return std::string_view::npos;
-    // '//' runs to the newline that ends the capture: nothing after it on
-    // this line can open anything.
-    if (u.unit == lpc_lex::Unit::kLineComment) return std::string_view::npos;
-    if (u.unit == lpc_lex::Unit::kBlockComment && u.unterminated) return start;
-  }
-}
-
-bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, ScratchString* out,
-                                int* pulled_lines) {
-  std::string_view sv(text, len);
-  size_t open = open_comment_start(sv);
-  if (open == std::string_view::npos) return false;
-
-  int kind = lpc_lex_top_buffer_kind();
-  if (kind == LPC_BUF_PLAIN || kind == LPC_BUF_EXPANSION || kind == LPC_BUF_IF_EXPR) return false;
-
-  out->assign(sv.substr(0, open));
-  *out += ' ';
-
-  // The capture ended inside that comment, so this reader is handed control
-  // mid-comment: it finishes the comment through the shared classifier's
-  // block-comment tail, then classifies the rest of the logical line with
-  // scan_one_unit(). Both halves therefore obey the same rules as the DFA
-  // and as the two text helpers above -- this loop used to carry its own
-  // copy of them, and that copy had the apostrophe bug too (a lone "'" in
-  // the pulled text opened a quote that hid a '*/' from it).
-  struct StreamSrc {
-    void* yyscanner;
-    ScratchString unit;
-
-    int peek(int k) const { return lpc_lex_peek(yyscanner, k); }
-    void advance() {
-      int gc = lpc_lex_getc(yyscanner);
-      if (gc > 0) keep(gc);
-    }
-    void keep(int c) { unit += static_cast<char>(c); }
-  };
-  StreamSrc src{yyscanner, ScratchString()};
-
-  // Newlines that do NOT end up in *out (comment-internal ones, and the
-  // terminator) are counted here; ones that do are counted from the text
-  // later, exactly like the capture-embedded ones.
-  int consumed = 0;
-  auto count_dropped = [&](int newlines) {
-    for (int i = 0; i < newlines; i++) {
-      lpc_lex_newline(yyscanner);
-      consumed++;
-    }
-  };
-  auto report_eof = [&]() {
-    // Same terminal case as SC_BLOCK_COMMENT's <<EOF>> rule (and
-    // lpc_lex_getc() already continued into parent buffers, matching its
-    // lpc_lex_pop_splice_if_any step).
-    lexerror("End of file in a comment (opened on a preprocessor directive)");
-  };
-
-  lpc_lex::UnitInfo open_tail = lpc_lex::finish_block_comment(src);
-  count_dropped(open_tail.newlines);
-  if (open_tail.nested_comment_open) {
-    yywarn("/* found in comment.");  // same warning as SC_BLOCK_COMMENT
-  }
-  bool done = open_tail.unterminated;
-  if (open_tail.unterminated) {
-    report_eof();
-  }
-
-  bool in_line_comment = false;
-  while (!done) {
-    src.unit.clear();
-    lpc_lex::UnitInfo u = lpc_lex::scan_one_unit(src);
-    switch (u.unit) {
-      case lpc_lex::Unit::kEof:
-        report_eof();
-        done = true;
-        break;
-
-      case lpc_lex::Unit::kBlockComment:
-        count_dropped(u.newlines);
-        if (u.nested_comment_open) {
-          yywarn("/* found in comment.");
-        }
-        if (u.unterminated) {
-          report_eof();
-          done = true;
-          break;
-        }
-        *out += ' ';  // a comment is one space, as everywhere else
-        break;
-
-      case lpc_lex::Unit::kLineComment:
-        // Kept raw, as the directive's own text: strip_directive_comments()
-        // removes it once the logical line is complete.
-        *out += src.unit;
-        in_line_comment = !u.unterminated;
-        if (u.unterminated) {
-          report_eof();
-          done = true;
-        }
-        break;
-
-      case lpc_lex::Unit::kOrdinary: {
-        char c = src.unit[0];
-        if (c != '\n') {
-          *out += c;
-          break;
-        }
-        // A backslash before the newline splices the next physical line in,
-        // matching the capture pattern's (\\\r?\n[^\n]*)* tail (and C, where
-        // splicing precedes comment recognition -- so it applies inside '//'
-        // too, which is why a spliced line comment stays a line comment).
-        size_t n = out->size();
-        bool spliced = (n >= 1 && (*out)[n - 1] == '\\') ||
-                       (n >= 2 && (*out)[n - 1] == '\r' && (*out)[n - 2] == '\\');
-        if (spliced) {
-          *out += '\n';
-          if (in_line_comment) {
-            src.unit.clear();
-            lpc_lex::UnitInfo tail = lpc_lex::finish_line_comment(src);
-            *out += src.unit;
-            if (tail.unterminated) {
-              report_eof();
-              done = true;
-            }
-          }
-          break;
-        }
-        count_dropped(1);
-        done = true;  // the logical line's terminator
-        break;
-      }
-
-      default:
-        // A string, template or character literal: raw spelling, and nothing
-        // inside one opens a comment or ends the line.
-        *out += src.unit;
-        count_dropped(0);
-        if (u.unterminated) {
-          report_eof();
-          done = true;
-        }
-        break;
-    }
-    if (u.unit != lpc_lex::Unit::kLineComment && u.unit != lpc_lex::Unit::kOrdinary) {
-      in_line_comment = false;
-    }
-  }
-
-  // The formula in lpc_lex_on_directive() already subtracts the
-  // terminator; report only the newlines beyond it.
-  *pulled_lines = consumed > 0 ? consumed - 1 : 0;
-  return true;
-}
 
 ScratchString stringize(std::string_view s) {
   ScratchString r("\"");
@@ -965,19 +782,6 @@ bool lpc_lex_emitting() {
   return true;
 }
 
-// total_lines += for each '\n' embedded in the matched text
-// (backslash-continuation line breaks inside a directive) -- the LINE
-// counter itself advances natively (%option yylineno scans the matched
-// text). Called exactly once per captured line, by lpc_lex_on_directive().
-static void count_directive_newlines(const char* text, int len) {
-  for (int i = 0; i < len; i++) {
-    if (text[i] == '\n') {
-      total_lines++;  // the newline itself is counted natively
-                      // (%option yylineno scans the matched text)
-    }
-  }
-}
-
 bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
   if (name == "__LINE__") {
     char buf[32];
@@ -1209,24 +1013,6 @@ ScratchString lpc_lex_expand_string(std::string_view text) {
   return final_out;
 }
 
-static ScratchString fold_backslash_newlines(std::string_view text) {
-  ScratchString result;
-  result.reserve(text.size());
-  for (size_t i = 0; i < text.size();) {
-    if (text[i] == '\\') {
-      size_t j = i + 1;
-      if (j < text.size() && text[j] == '\r') j++;
-      if (j < text.size() && text[j] == '\n') {
-        i = j + 1;
-        continue;
-      }
-    }
-    result.push_back(text[i]);
-    i++;
-  }
-  return result;
-}
-
 // Applies one already-parsed directive: `dir` is the directive keyword,
 // `rest` its payload (both views into the caller's folded line). This is
 // the single implementation behind lpc_lex_on_directive() -- both scan
@@ -1240,7 +1026,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
       // tail otherwise lands in the stored body and -- expansion buffers
       // carry no newline to end it -- comments out the rest of whatever
       // spliced text the macro later expands into (#1240).
-      ScratchString rest_stripped = strip_directive_comments(rest);
+      ScratchString rest_stripped = ScratchString(rest);
       rest = std::string_view(rest_stripped);
       size_t idx = 0;
       while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
@@ -1338,7 +1124,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     if (lpc_lex_emitting()) {
       // Same phase-3 rule as #define: "#undef X // why" names X, not
       // "X // why" (which silently erased nothing).
-      std::string name(trim(std::string_view(strip_directive_comments(rest))));
+      std::string name(trim(rest));
       if (pp_is_predefined(name)) {
         lexerror("Illegal to #undef a predefined value.");
       } else {
@@ -1348,17 +1134,17 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
   } else if (dir == "ifdef") {
     // Strip comments or "#ifdef X // why" looks up the wrong name and
     // silently takes the false branch.
-    bool def = pp_find_macro(trim(std::string_view(strip_directive_comments(rest)))) != nullptr;
+    bool def = pp_find_macro(trim(rest)) != nullptr;
     bool emit = lpc_lex_emitting() && def;
     g_compile.conds.push_back({emit, emit});
   } else if (dir == "ifndef") {
-    bool def = pp_find_macro(trim(std::string_view(strip_directive_comments(rest)))) != nullptr;
+    bool def = pp_find_macro(trim(rest)) != nullptr;
     bool emit = lpc_lex_emitting() && !def;
     g_compile.conds.push_back({emit, emit});
   } else if (dir == "if") {
     bool cond = false;
     if (lpc_lex_emitting()) {
-      ScratchString stripped = strip_directive_comments(rest);
+      ScratchString stripped = ScratchString(rest);
       ScratchString trimmed(trim(std::string_view(stripped)));
       if (trimmed.empty()) {
         lexerror("missing expression in #if");
@@ -1376,7 +1162,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
       bool outer = lpc_lex_emitting();
       bool cond = false;
       if (outer && !had) {
-        ScratchString stripped = strip_directive_comments(rest);
+        ScratchString stripped = ScratchString(rest);
         ScratchString trimmed(trim(std::string_view(stripped)));
         if (trimmed.empty()) {
           lexerror("missing expression in #elif");
@@ -1429,7 +1215,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     if (lpc_lex_emitting()) {
       // Pragma payloads are word lists, so a trailing comment would read
       // as an unknown pragma word -- strip like the other parsed forms.
-      ScratchString rest_str(trim(std::string_view(strip_directive_comments(rest))));
+      ScratchString rest_str(trim(rest));
       handle_pragma(const_cast<char*>(rest_str.c_str()));
     }
   } else if (dir == "line" ||
@@ -1471,23 +1257,20 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
 }
 
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
-                                        bool in_skip_mode, int pulled_lines) {
-  // The directive's own first line, for error attribution: the lexer.l
-  // rule consumed + counted the terminating newline before calling us,
-  // so current_line is already one past the directive's LAST physical
-  // line; its embedded continuations haven't been counted yet, so its
-  // FIRST line is exactly current_line - 1 -- minus any extra physical
-  // lines lpc_lex_complete_directive() pulled for a spanning /* comment.
-  // Published around the dispatch calls below via
-  // compiler_directive_start_line (see its comment in compiler.h) so
-  // yyerror()/yywarn() attribute to the directive rather than the line
-  // after it.
-  int directive_line = current_line - 1 - pulled_lines;
-
-  // Embedded continuation newlines are physical lines regardless of scan
-  // mode or whether the directive dispatches -- counted exactly once,
-  // here (the terminating newline is the lexer.l rule's job, not ours).
-  count_directive_newlines(text, len);
+                                        bool in_skip_mode, int directive_line) {
+  // The directive's own first line, for error attribution, is recorded by
+  // SC_DIRECTIVE at the '#' and handed straight here. It used to be
+  // derived -- current_line minus the terminator minus however many lines
+  // the hand-written completer had pulled -- and every physical line a
+  // directive can legally span (a backslash continuation, a block comment
+  // closing later) was a term in that subtraction. Published around the
+  // dispatch calls below via compiler_directive_start_line (see its
+  // comment in compiler.h) so yyerror()/yywarn() attribute to the
+  // directive rather than to the line after it.
+  //
+  // Continuation and comment newlines are counted where they are scanned
+  // (SC_DIRECTIVE's rules and SC_BLOCK_COMMENT's), so `text` holds one
+  // logical line with no newlines in it and nothing is counted here.
 
   // A raw NUL inside the captured directive line: the directive rule's
   // [^\n] classes are the ONE place that still deliberately absorbs NUL
@@ -1504,8 +1287,7 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
 
   // Fold + parse the captured line exactly once: both the skip-mode
   // classification and the full dispatch below read the same name/rest.
-  ScratchString folded = fold_backslash_newlines(std::string_view(text, len));
-  std::string_view sv(folded);
+  std::string_view sv(text, static_cast<size_t>(len));
   size_t i = 0;
   while (i < sv.size() && (sv[i] == ' ' || sv[i] == '\t')) i++;
   if (i < sv.size() && sv[i] == '#') i++;

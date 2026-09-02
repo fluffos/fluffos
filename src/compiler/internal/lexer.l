@@ -163,7 +163,6 @@
     (void)(buf); (void)(max_size); result = 0;
 
 // Defined in the trailer below (uses the generated yyinput()).
-static void lpc_lex_consume_directive_newline(void *yyscanner);
 
 
 %}
@@ -226,6 +225,7 @@ WS_NO_NL    [ \t\r\v\f]
 %x SC_TEMPLATE_BODY
 %x SC_HEREDOC_TERM
 %x SC_COND_SKIP
+%x SC_DIRECTIVE
 
 %%
 
@@ -616,22 +616,53 @@ WS_NO_NL    [ \t\r\v\f]
      * the token stream, with a single current_line counter that nothing
      * else fights.
      */
-<INITIAL,SC_COND_SKIP>^[ \t]*"#"[^\n]*(\\\r?\n[^\n]*)* {
-    /* The capture stops at a physical newline, which a block comment
-     * opened on the line may legally span (#1236) -- complete the
-     * logical line first (policy in lexer_rules_pp.cc, reading through
-     * lpc_lex_getc()). When it pulled the tail, the terminating newline
-     * has already been consumed and counted. */
-    ScratchString completed;
-    int pulled_lines = 0;
-    bool extended =
-        lpc_lex_complete_directive(yytext, yyleng, yyscanner, &completed, &pulled_lines);
-    if (!extended) {
-        lpc_lex_consume_directive_newline(yyscanner);
-    }
+<INITIAL,SC_COND_SKIP>^[ \t]*"#" {
+    /* A directive is scanned, not captured-then-repaired. The old rule
+     * matched the whole physical line with one pattern and then had to
+     * hand-read the rest whenever the line did not end where the pattern
+     * thought it did -- a block comment opened on it may close on a LATER
+     * line (#1236) -- which meant a second, hand-written statement of
+     * where literals and comments begin and end, and it disagreed with
+     * these rules about an apostrophe (#1362 and its directive twin).
+     * SC_DIRECTIVE accumulates the logical line through the rules below,
+     * so the scanner is the only thing that decides that. */
+    yyextra->directive_accum.assign(yytext, yyleng);
+    yyextra->directive_line = current_line;
+    yy_push_state(SC_DIRECTIVE, yyscanner);
+}
+
+    /* Comments are whitespace, and one space of it (C phase 3), folded
+     * away HERE so nothing downstream has to strip them. The block form
+     * reuses SC_BLOCK_COMMENT -- its newlines are counted by that state's
+     * own rule and it returns control here when it closes, which is what
+     * makes a comment spanning physical lines cost nothing special. */
+<SC_DIRECTIVE>"/*"          { yyextra->directive_accum += ' '; yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
+<SC_DIRECTIVE>"//"[^\n\x00]*  { yyextra->directive_accum += ' '; }
+
+    /* A backslash-continuation is dropped and counted: the logical line
+     * carries on, and the physical line it crossed is a line like any
+     * other. Nothing downstream folds these out any more. */
+<SC_DIRECTIVE>"\\"\r?\n     { lpc_lex_newline(yyscanner); }
+
+    /* Literals, appended raw. Line-bounded on purpose (AGENTS.md 7): an
+     * unterminated one is not a literal, its opening quote falls through
+     * to the catch-all below as an ordinary character, and the payload
+     * parsers see it as such. The character-literal pattern is the DFA's
+     * own model -- one escape or one byte, then the close quote -- and it
+     * beats the catch-all by longest match, so a lone apostrophe costs
+     * exactly one character and can never swallow a line. */
+<SC_DIRECTIVE>\"([^\\\"\n\x00]|\\[^\n\x00])*\" |
+<SC_DIRECTIVE>`([^\\`\n\x00]|\\[^\n\x00])*` |
+<SC_DIRECTIVE>'(\\([0-7]+|x[0-9a-fA-F]+|[^\n\x00])|[^\\'\n\x00])' {
+    yyextra->directive_accum.append(yytext, yyleng);
+}
+
+<SC_DIRECTIVE>\n {
+    yy_pop_state(yyscanner);
+    lpc_lex_newline(yyscanner);
     LpcDirectiveAction act = lpc_lex_on_directive(
-        extended ? completed.c_str() : yytext, extended ? (int)completed.size() : yyleng,
-        yyscanner, YY_START == SC_COND_SKIP, pulled_lines);
+        yyextra->directive_accum.c_str(), (int)yyextra->directive_accum.size(),
+        yyscanner, YY_START == SC_COND_SKIP, yyextra->directive_line);
     if (act == LpcDirectiveAction::kEnterSkip) {
         BEGIN(SC_COND_SKIP);
     } else if (act == LpcDirectiveAction::kExitSkip) {
@@ -639,7 +670,33 @@ WS_NO_NL    [ \t\r\v\f]
     }
 }
 
-<SC_COND_SKIP>[^\n\x00]+ { /* dead-branch text: never tokenized */ }
+    /* End of input ends the directive too -- and ends it HERE, without
+     * reaching into a parent buffer: a '#' at the start of a pushed
+     * splice must not turn that buffer's parent into directive text. The
+     * state is popped without consuming anything, so the ordinary <<EOF>>
+     * handling pops the splice (or finishes the file) next. */
+<SC_DIRECTIVE><<EOF>> {
+    yy_pop_state(yyscanner);
+    LpcDirectiveAction act = lpc_lex_on_directive(
+        yyextra->directive_accum.c_str(), (int)yyextra->directive_accum.size(),
+        yyscanner, YY_START == SC_COND_SKIP, yyextra->directive_line);
+    if (act == LpcDirectiveAction::kEnterSkip) {
+        BEGIN(SC_COND_SKIP);
+    } else if (act == LpcDirectiveAction::kExitSkip) {
+        BEGIN(INITIAL);
+    }
+}
+
+<SC_DIRECTIVE>[^\n\x00]     { yyextra->directive_accum += yytext[0]; }
+
+    /* Dead-branch text, never tokenized -- but it must not swallow a line
+     * that starts a directive, or the #else/#endif that ends the branch is
+     * never seen. Flex takes the LONGEST match, so a whole-line rule beats
+     * the directive rule's short "#" opener; this one therefore cannot
+     * start at a '#'. The single-character fallback below can, but only
+     * ties with it, and the directive rule is written first. */
+<SC_COND_SKIP>^[ \t]*[^ \t#\n\x00][^\n\x00]* { /* dead-branch line */ }
+<SC_COND_SKIP>[^\n\x00] { /* dead-branch remainder */ }
 <SC_COND_SKIP>\n { lpc_lex_newline(yyscanner); }
 
     /* Heredoc "@"/"@@" prefix and terminator identifier: fully native, no
@@ -925,28 +982,6 @@ void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yysca
   lpc_lex_note_buffer_push(kind);
 }
 
-// A directive owns its whole logical line, terminating newline included
-// -- consumed and counted BEFORE dispatching, so an #include's stack
-// entry records the line AFTER the directive as the parent's resume
-// line. The newline is simply the next byte of whatever real source is
-// feeding Flex (base stream or an include's pushed buffer; both
-// auto-append a trailing '\n' at EOF), read through yyinput(), which
-// also sets the BOL flag so '^' anchors keep working on the very next
-// line. Splice/if-expr buffers contain no newlines -- nothing to
-// consume (a '#' at a fresh splice buffer's start can match the
-// anchored rule; pathological, but must not eat a byte).
-static void lpc_lex_consume_directive_newline(void *yyscanner) {
-  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
-  int kind = lpc_lex_top_buffer_kind();
-  if (kind == LPC_BUF_PLAIN || kind == LPC_BUF_EXPANSION || kind == LPC_BUF_IF_EXPR) {
-    return;
-  }
-  int nl = yyinput(yyscanner);
-  if (nl == '\n') {
-    lpc_lex_newline(yyscanner);
-    yycolumn = 0;  // yyinput() doesn't maintain yycolumn
-  }
-}
 
 int lpc_lex_ifexpr_next(union YYSTYPE *yylval_param, void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
