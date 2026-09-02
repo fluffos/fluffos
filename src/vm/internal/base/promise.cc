@@ -84,7 +84,8 @@ int g_coroutine_temp_base = 0;
 #endif
 
 void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc);
-bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame);
+bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame,
+                        int resumed_temp_base = -1);
 
 /* A settled reaction awaiting delivery. Holds a ref on everything it points
  * at, including the source promise (for the result value). */
@@ -836,7 +837,8 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
  * set up and `entry_pc` points into its program. Settles `p` on completion
  * or failure. Returns true if an uncatchable eval-cost error must be
  * propagated by the caller (do_catch() parity). */
-bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame) {
+bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame,
+                        int resumed_temp_base) {
   error_context_t econ;
   save_context(&econ);
   /* The coroutine owns its whole frame (safe_apply's "callee owns the
@@ -858,7 +860,15 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   g_coroutine_promise = p;
 #ifdef DEBUG
   int const prev_temp_base = g_coroutine_temp_base;
-  g_coroutine_temp_base = stack_in_use_as_temporary;
+  /* On a RESUME the caller has already put the frame's own foreach
+   * temporaries back on the counter, so reading it here would fold them
+   * into this body's base -- the next park would then compute a delta of
+   * zero, hand the coroutine nothing, and leave the count elevated for
+   * whatever runs next (permanently, if the frame is later abandoned and
+   * its F_EXIT_FOREACH never runs). A nonzero count silently disables
+   * break_point()'s stack check, so the loss is quiet. resume_coroutine()
+   * passes what the counter held before it re-added them. */
+  g_coroutine_temp_base = resumed_temp_base >= 0 ? resumed_temp_base : stack_in_use_as_temporary;
 #endif
   /* RAII, not a tail assignment: `econ` lives on THIS C++ frame, so if an
    * exception ever escapes this function the globals must not be left
@@ -1061,6 +1071,8 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
 
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   bool rejected = (source->state == PROMISE_REJECTED);
+  /* -1 = "no resumed frame to account for"; see the frame restore below */
+  int resumed_temp_base = -1;
   /* what the resumed await yields, or rejects with -- the source's result
    * unless a cancellation overrides it below */
   svalue_t cancel_reason;
@@ -1184,7 +1196,10 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     coro->frame_lvalues.clear();
 #ifdef DEBUG
     /* the temporaries are back on the stack, so the count is owed again --
-     * F_EXIT_FOREACH will retire them one loop at a time as before */
+     * F_EXIT_FOREACH will retire them one loop at a time as before. The
+     * base handed to run_coroutine_body() below is what the counter held
+     * BEFORE this frame's share went back on it. */
+    resumed_temp_base = stack_in_use_as_temporary;
     stack_in_use_as_temporary += coro->temporaries;
     coro->temporaries = 0;
 #endif
@@ -1257,7 +1272,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
    * caller's evaluation. A resumption has no caller -- but the drain turn
    * that delivered it does read the flag, as a resumed frame that burned its
    * whole budget ends the turn. drain_promise_microtasks() clears it. */
-  (void)run_coroutine_body(entry, coro->result_promise, async_frame);
+  (void)run_coroutine_body(entry, coro->result_promise, async_frame, resumed_temp_base);
   free_coroutine(coro, nullptr, false);
 }
 
@@ -2393,10 +2408,14 @@ void mark_promise_queue() {
       c->result->extra_ref++;
     }
     if (c->slots) {
+      /* Only the combinator's own reference: `slots` is an ordinary
+       * allocated array, so the sweep that reaches this one reaches its
+       * TAG_ARRAY block too and marks every item there (checkmemory.cc's
+       * TAG_ARRAY case). Marking them again here would report one ref
+       * nobody holds per refcounted delivered value -- unlike a
+       * coroutine's frame[], which is a bare new[] the sweep never sees
+       * and which mark_coroutine() therefore does have to walk. */
       c->slots->extra_ref++;
-      for (int i = 0; i < c->slots->size; i++) {
-        mark_svalue(&c->slots->item[i]);
-      }
     }
   }
   auto mark_one = [](QueuedReaction& qr) {

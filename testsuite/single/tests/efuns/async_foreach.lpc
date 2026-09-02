@@ -84,6 +84,34 @@ private async int ref_loopvar() {
   return 0;
 }
 
+// Every gate above is resolved before its await, so all of those resumes
+// land in the one drain turn. Here each iteration parks and comes back in a
+// LATER backend turn, which is what exercises the per-frame handover of the
+// count owed for an open foreach: it goes to the coroutine at each park and
+// comes back at each resume, and a base taken on the wrong side of that
+// leaves the count elevated for whatever runs next.
+private promise next_turn(int v) {
+  promise p = promise_create();
+
+  // The locals travel as call_out arguments: an anonymous function body is
+  // not a closure over the enclosing frame.
+  call_out(function(promise target, int with) {
+    promise_resolve(target, with);
+  }, 1, p, v);
+
+  return p;
+}
+
+private async int sum_across_turns() {
+  int total;
+
+  foreach (int i in ({ 1, 2, 3 })) {
+    total += i * await next_turn(2);
+  }
+
+  return total;
+}
+
 void do_tests() {
   gate = promise_create();
   promise_resolve(gate, 2);
@@ -110,6 +138,16 @@ void do_tests() {
   promise_then(nested(), function(mixed v) {
     ASSERT_EQ(180, v);  // (10+20+20+40) * 2
     RELEASE_LATCH("nested");
+  });
+
+  // Deferred by construction: master::flag() sits on the stack for the whole
+  // run, so the first call_out cannot fire until the suite is over -- which
+  // is exactly the point. The latch is the counted signal (a check inside a
+  // post-run callback is printed but not tallied).
+  EXPECT_LATCH("cross-turn");
+  promise_then(sum_across_turns(), function(mixed v) {
+    ASSERT_EQ(12, v);  // (1+2+3) * 2, one park per iteration
+    RELEASE_LATCH("cross-turn");
   });
 
   // Still refused, with a diagnostic that now says which shapes are the
