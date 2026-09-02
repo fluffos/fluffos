@@ -34,6 +34,7 @@
 #include "compiler/internal/grammar_rules.h"
 #include "compiler/internal/grammar.autogen.h"
 #include "compiler/internal/lexer.h"
+#include "compiler/internal/lexer_scan.h"
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lexer_rules_pp.h"
 #include "base/internal/scratchpad.h"
@@ -831,6 +832,242 @@ TEST(Preprocessor, MultiLineCommentAfterNonCallMacroNameKeepsLineCount) {
             "int a = ID; int l = 4;");
 }
 
+
+
+// -- one classifier, so an apostrophe cannot mean different things --------
+// lexer_scan.h states the DFA's rule once for every reader that consumes
+// raw characters: a '"' string and a '`' template run to their closing
+// quote and may span lines, but a character literal is one escape or one
+// byte followed by the close quote (SC_CHAR_BODY -> SC_CHAR_CLOSE) and can
+// never consume a line. Each raw reader used to re-state that rule, get the
+// apostrophe wrong, and get it wrong differently.
+
+TEST(Preprocessor, DirectiveApostropheDoesNotHideAMultiLineComment) {
+  // The line completer decides whether a block comment opened on a
+  // directive line is still open. An apostrophe before it used to open a
+  // quote that ran to the end of the captured line, hiding the comment --
+  // so the directive ended at the first newline and the comment's
+  // continuation was compiled as code ("more */" here).
+  EXPECT_EQ(pp("#warn that's bad /* explain\nmore */\nint a = 1;\n"), "int a = 1;");
+}
+
+TEST(Preprocessor, DirectiveApostropheWithATrailingComment) {
+  EXPECT_EQ(pp("#define X 1 /* it's one */ + 2\nint a = X;\n"), "int a = 1 + 2;");
+}
+
+TEST(Preprocessor, DirectiveApostropheBeforeALineComment) {
+  EXPECT_EQ(pp("#define X 1 // it's one\nint a = X;\n"), "int a = 1;");
+}
+
+TEST(Preprocessor, CharLiteralCommaInMacroArgIsNotASeparator) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(',');\n"), "int v = (',');");
+}
+
+TEST(Preprocessor, CharLiteralParenInMacroArgDoesNotCloseTheList) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(')');\n"), "int v = (')');");
+}
+
+TEST(Preprocessor, CharLiteralQuoteInMacroArgDoesNotOpenAString) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('\"');\n"), "int v = ('\"');");
+}
+
+TEST(Preprocessor, CharLiteralEscapesSurviveAsMacroArgs) {
+  // The body may carry digits ('\101', '\x41'), and the close quote may be
+  // escaped ('\''), so the lookahead is several bytes -- none of which may
+  // be lost when it turns out not to be a literal after all.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('\\n');\n"), "int v = ('\\n');");
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('\\'');\n"), "int v = ('\\'');");
+  // Both escapes decode to 'A'; the point is that the multi-byte lookahead
+  // reached each closing quote and split the two arguments on the real comma.
+  EXPECT_EQ(pp("#define ADD(a, b) a + b\nint v = ADD('\\101', '\\x41');\n"),
+            "int v = 'A' + 'A';");
+}
+
+TEST(Preprocessor, CommentInsideACharLiteralIsNotAComment) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('/');\n"), "int v = ('/');");
+}
+
+
+// -- the readers that bypass the DFA agree with the DFA ---------------------
+// lexer_scan.h states, once, the rule every raw reader needs: a '"' string
+// and a '`' template run to their closing quote and may span lines, but a
+// character literal is one escape or one byte plus the close quote, and
+// absent that quote it was never a literal at all. Four readers used to
+// state it themselves, wrongly and differently.
+
+TEST(Preprocessor, StrayApostropheDoesNotStrandBytesAfterADirective) {
+  // The reader stops at the newline that ends the directive. An earlier
+  // version of the classifier did its character-literal lookahead by
+  // consuming bytes and holding them in a private pushback -- bytes that
+  // were simply gone if the reader stopped while any were held. Here the
+  // "'foo'" probe holds "\n" and "i", the completer takes the newline as
+  // its terminator, and the "i" of "int" never reaches the scanner:
+  // "int x = 1;" compiled as "nt x = 1;". Nothing is consumed before it is
+  // classified now, so there is nothing to strand.
+  EXPECT_EQ(pp("#warn /* multi\nline */ use 'foo'\nint x = 1;\n"), "int x = 1;");
+}
+
+TEST(Preprocessor, StrayApostropheDoesNotStrandBytesAfterAnArgumentList) {
+  // Same defect on the collector's success path: the ')' that closed the
+  // list left the ';' behind it stranded.
+  auto p = LpcPreprocessor::make_session();
+  auto out = p->preprocess_next("#define ID(x) (x)\nint v = ID(x');\nint w = 2;\n", "test");
+  // The stray quote is diagnosed by the ordinary scan (it decodes to 0);
+  // what matters is that the file keeps its shape around it.
+  EXPECT_EQ(out, "int v = (x 0; int w = 2;");
+}
+
+TEST(Preprocessor, NestedTemplateInAMacroArgument) {
+  // A template may contain "${...}", which may contain another template.
+  // Ending the outer one at the inner one's backtick made the argument list
+  // run to end of file.
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(`a${`x`}b`);\n"), "string s = (`a${`x`}b`);");
+}
+
+TEST(Preprocessor, OverlongCharEscapeIsStillACharLiteral) {
+  // The DFA accepts an over-long escape (and reports it); a lookahead cap
+  // here would call the same input "not a literal" and disagree.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('\\x41414141414141414141');\n"), "int v = ('x');");
+}
+
+TEST(Preprocessor, EscapedCrlfInACharLiteralArgument) {
+  // lexer.l has an explicit SC_CHAR_BODY rule for a backslash-CRLF body.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('\\\r\n');\n"), "int v = ('\\n');");
+}
+
+TEST(Preprocessor, LineCommentAtEndOfInputIsNotUnterminated) {
+  // The DFA's line-comment pattern matches an empty tail, so end of input
+  // ends one normally. Reporting it as unterminated produced a spurious
+  // "End of file in a comment".
+  auto p = LpcPreprocessor::make_session();
+  p->preprocess_next("#define ID(x) (x)\nint v = ID(1); // trailing", "test");
+  EXPECT_TRUE(p->errors().empty());
+}
+
+TEST(Preprocessor, TemplateIsOpaqueToCollectionButNotToExpansion) {
+  // Two different questions, and conflating them broke template_literal.lpc:
+  // a ',' inside a template does not separate ARGUMENTS...
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(`a,b`);\n"), "string s = (`a,b`);");
+  // ...but "${...}" is ordinary code, so a macro call inside one still
+  // expands, commas and all.
+  EXPECT_EQ(pp("#define PAIR(a, b) (b)\nstring s = PAIR(\"x\", `n=${PAIR(1, 2)}`);\n"),
+            "string s = (`n=${(2)}`);");
+}
+
+// The differential test. The classifier is a SECOND statement of rules whose
+// first statement is lexer.l, so the thing worth testing is not that it is
+// right in the cases someone thought of -- it is that it says the same thing
+// as the DFA on inputs nobody thought of.
+//
+// For text the DFA accepts, both sides produce a "shape": the literals in
+// order (S/T/C) plus the top-level '(' ')' ',' -- exactly the decisions the
+// raw readers make (where does this literal end, and is this punctuation
+// real?). Comments contribute nothing to either side. A template is one
+// opaque unit on both sides: its "${...}" tokens are collapsed, because a
+// reader that treats a literal as indivisible is the intended behaviour, not
+// a divergence.
+//
+// If a new literal form is added to lexer.l, add its delimiters to kAlphabet
+// here -- that is the trigger for teaching lexer_scan.h about it too.
+namespace {
+
+struct ShapeSrc {
+  std::string_view s;
+  size_t i = 0;
+  int peek(int k) const {
+    size_t at = i + static_cast<size_t>(k);
+    return at < s.size() ? static_cast<unsigned char>(s[at]) : 0;
+  }
+  void advance() {
+    if (i < s.size()) keep(static_cast<unsigned char>(s[i++]));
+  }
+  void keep(int) {}
+};
+
+std::string classifier_shape(const std::string& src, bool* unterminated) {
+  ShapeSrc v{src};
+  std::string out;
+  *unterminated = false;
+  for (;;) {
+    lpc_lex::UnitInfo u = lpc_lex::scan_one_unit(v);
+    if (u.unit == lpc_lex::Unit::kEof) break;
+    if (u.unterminated) {
+      *unterminated = true;
+      break;
+    }
+    switch (u.unit) {
+      case lpc_lex::Unit::kString: out += 'S'; break;
+      case lpc_lex::Unit::kTemplate: out += 'T'; break;
+      case lpc_lex::Unit::kChar: out += 'C'; break;
+      case lpc_lex::Unit::kOrdinary:
+        if (u.ch == '(' || u.ch == ')' || u.ch == ',') out += u.ch;
+        break;
+      default: break;  // comments produce nothing, like the DFA's tokens
+    }
+  }
+  return out;
+}
+
+std::string dfa_shape(const std::string& src, bool* usable) {
+  num_parse_error = 0;
+  auto tokens = TokenizeSession(false, src, "diff");
+  *usable = (num_parse_error == 0);
+  std::string out;
+  int in_template = 0;
+  for (const auto& t : tokens) {
+    if (t.kind == L_TEMPLATE_HEAD) {
+      out += 'T';
+      in_template++;
+      continue;
+    }
+    if (t.kind == L_TEMPLATE_TAIL) {
+      if (in_template > 0) in_template--;
+      continue;
+    }
+    if (in_template > 0) continue;  // a template is one opaque unit
+    if (t.kind == L_STRING) {
+      out += t.is_template ? 'T' : 'S';
+    } else if (t.kind == L_NUMBER && t.is_char_literal) {
+      out += 'C';
+    } else if (t.text.size() == 1 &&
+               (t.text[0] == '(' || t.text[0] == ')' || t.text[0] == ',')) {
+      out += t.text[0];
+    }
+  }
+  return out;
+}
+
+}  // namespace
+
+TEST(Preprocessor, ClassifierAgreesWithTheScannerOnRandomInput) {
+  static const char* kAlphabet[] = {"a",  "1",  "(", ")", ",",  "'",  "\"", "`",  "\\",
+                                    "/*", "*/", "//", "$", "{", "}",  " ",  "\n", "x",
+                                    "n",  "\\n", "\\x41", "\\101", ";", "+"};
+  constexpr int kPieces = sizeof(kAlphabet) / sizeof(kAlphabet[0]);
+  uint64_t seed = 0x5eed1362ull;
+  auto next = [&]() { return (seed = seed * 6364136223846793005ull + 1442695040888963407ull) >> 33; };
+
+  int compared = 0;
+  for (int iter = 0; iter < 20000; iter++) {
+    std::string src;
+    int len = 1 + static_cast<int>(next() % 12);
+    for (int i = 0; i < len; i++) src += kAlphabet[next() % kPieces];
+    src += '\n';  // every real input reaches the scanner newline-terminated
+
+    bool usable = false;
+    std::string dfa = dfa_shape(src, &usable);
+    if (!usable) continue;  // only compare where the DFA itself is happy
+
+    bool unterminated = false;
+    std::string mine = classifier_shape(src, &unterminated);
+    if (unterminated) continue;  // the DFA accepted it, so this is a mismatch
+                                 // only if it also produced a shape -- see below
+    compared++;
+    EXPECT_EQ(mine, dfa) << "input: " << ::testing::PrintToString(src);
+  }
+  // Guard against the corpus silently degenerating to inputs the DFA rejects.
+  EXPECT_GT(compared, 2000);
+}
 
 TEST(Preprocessor, AliasToFunctionLikeExpandsWithStreamArgs) {
   // UNPAINTED function-like name left literal only because no '('

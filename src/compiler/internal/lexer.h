@@ -390,6 +390,11 @@ int* lpc_lex_buffer_lineno(void* yyscanner, int i);
 int lpc_lex_buffer_extents(void* yyscanner, int i, const char** base, const char** limit,
                            const char** pos, char* held);
 
+// Look ahead k bytes (0 = next) without consuming; 0 at end of input.
+// Walks the buffer stack like lpc_lex_getc(), but pops nothing. Defined in
+// lexer_utils.cc; used by every reader that must classify before consuming.
+int lpc_lex_peek(void* yyscanner, int k);
+
 // Pull one token for the #if/#elif expression evaluator: yylex() under
 // the INITIAL start condition (the surrounding scan may be in
 // SC_COND_SKIP for a dead-branch #elif), restoring the caller's
