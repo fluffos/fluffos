@@ -12,6 +12,16 @@
 
 nosave promise a, b, c;
 
+// A combinator still PENDING when the file ends leaves its already delivered
+// slots there for the post-file check_memory() to walk. `slots` is an
+// ordinary allocated array, so the checker's sweep reaches its own block and
+// marks every item; marking them a second time from the combinator registry
+// reported one reference nobody holds per refcounted delivered value
+// ("Bad ref count for array, is 1 - should be 2") and failed the file with
+// LEAK. Numbers alone never showed it -- the delivered values have to be
+// refcounted, and the aggregate has to still be alive at the check.
+nosave promise live_input, live_result;
+
 private async int slow(int n, int fail) {
   await a;
   if (fail) {
@@ -141,6 +151,15 @@ private void check_edges() {
   ASSERT2(err, "an empty promise_race is refused");
   ASSERT2(stringp(err) && strsrch(err, "never settle") != -1,
     "the refusal says why: " + err);
+
+  // Left pending on purpose: see the declaration above. Settled from a
+  // call_out so the aggregate survives every check_memory() during the run
+  // and nothing is still pending at exit.
+  live_input = promise_create();
+  live_result = promise_all(({ ({ 1, 2 }), ([ "k": 1 ]), "a string", live_input }));
+  call_out(function() {
+    promise_resolve(live_input, 0);
+  }, 1);
 
   // All-plain input settles without any promise being involved.
   EXPECT_LATCH("plain");
