@@ -807,7 +807,6 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
         // level and cap chains at a few thousand.
         return LPC_TOKEN_RESCAN;
       } else {
-        int saved_line = current_line;
         int saved_total = total_lines;
         // Characters are read THROUGH Flex (lpc_lex_getc: its buffer,
         // in-memory buffers) rather than from raw `outp` -- no rewind/flush
@@ -1018,7 +1017,15 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
           // No '(' follows: not an invocation. Put every probed byte back
           // (see consumed_text's comment) and let the identifier resolve
           // as a plain symbol; the pushed-back bytes are scanned next.
-          current_line = saved_line;
+          //
+          // Only total_lines is rewound. current_line is the CURRENT
+          // BUFFER's yylineno (lexer.h), which yyinput() already advanced
+          // for every newline probed above -- and the pushed-back copy is
+          // scanned as its own buffer, whose count is discarded when it
+          // pops, so a rewind here loses those lines outright and every
+          // __LINE__, diagnostic and traceback below this point is short by
+          // that many. total_lines is a plain global with no such per-buffer
+          // reset, so the rescan really does re-add its share.
           total_lines = saved_total;
           if (!consumed_text.empty()) {
             push_arena_string(consumed_text, /*is_expansion=*/0, yyscanner);

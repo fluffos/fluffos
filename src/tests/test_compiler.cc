@@ -661,6 +661,177 @@ TEST(Preprocessor, MultiLineCommentInMacroArgKeepsLineCount) {
             "int a = 1; int l = 5;");
 }
 
+// -- #1362, the rest of the surface -----------------------------------------
+// Every place the collector can now mistake one thing for another: what a
+// comment must hide (commas, parens, quotes), what must not start one (a
+// string, a char literal, a template literal, a lone '/'), what must not end
+// one, where the file can end, and whether the line count stays exact.
+
+TEST(Preprocessor, CommentInMacroArgHidesItsPunctuation) {
+  // A comma, paren or quote inside a comment is comment text: it must not
+  // split an argument, move the nesting depth, or open a string.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(1 /* , ) ( \" ` */ + 2);\n"), "int v = (1 + 2);");
+}
+
+TEST(Preprocessor, LineCommentInMacroArgHidesItsPunctuation) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(1 // , ) ( \" `\n + 2);\n"), "int v = (1 + 2);");
+}
+
+TEST(Preprocessor, ArgumentsStillSplitAcrossAComment) {
+  EXPECT_EQ(pp("#define ADD(a, b) a + b\nint v = ADD(1 /* c */, 2);\n"), "int v = 1 + 2;");
+}
+
+TEST(Preprocessor, CommentDoesNotHideNestedParensInMacroArg) {
+  EXPECT_EQ(pp("#define ADD(a, b) a + b\nint v = ADD(f(1 /* , */ , 2), 3);\n"),
+            "int v = f(1, 2) + 3;");
+}
+
+TEST(Preprocessor, DoubleSlashInsideStringArgIsNotAComment) {
+  // The commonest shape of all: a URL in a string argument.
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(\"http://example.com/\");\n"),
+            "string s = (\"http://example.com/\");");
+}
+
+TEST(Preprocessor, BlockCommentOpenerInsideStringArgIsNotAComment) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(\"a/*b\") + \"c\";\n"),
+            "string s = (\"a/*b\") + \"c\";");
+}
+
+TEST(Preprocessor, ApostropheInsideStringArgIsOrdinaryText) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(\"it's\");\n"), "string s = (\"it's\");");
+}
+
+TEST(Preprocessor, EscapedQuoteThenCommentInMacroArg) {
+  // The escape handling inside a quote runs before any comment handling, so
+  // the '"' that ends the string is the unescaped one.
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(\"a\\\"\" /* c */ + \"b\");\n"),
+            "string s = (\"a\\\"\" + \"b\");");
+}
+
+TEST(Preprocessor, SlashInCharLiteralArgIsNotAComment) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID('/');\n"), "int v = ('/');");
+}
+
+TEST(Preprocessor, DoubleSlashInTemplateLiteralArgIsNotAComment) {
+  // '`' is a quote to the collector, so nothing inside one starts a comment.
+  EXPECT_EQ(pp("#define ID(x) (x)\nstring s = ID(`a//b`);\n"), "string s = (`a//b`);");
+}
+
+TEST(Preprocessor, SlashStarSlashIsNotACompleteComment) {
+  // "/*/" cannot close on the same '/' that opened it.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(1 /*/ still inside */ + 2);\n"),
+            "int v = (1 + 2);");
+}
+
+TEST(Preprocessor, EmptyBlockCommentInMacroArg) {
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(1 /**/ + 2);\n"), "int v = (1 + 2);");
+}
+
+TEST(Preprocessor, StarSlashInsideLineCommentInMacroArg) {
+  // A '*/' does not end a '//' comment, and does not leak into the argument.
+  EXPECT_EQ(pp("#define ID(x) (x)\nint v = ID(1 // */ not special\n + 2);\n"),
+            "int v = (1 + 2);");
+}
+
+TEST(Preprocessor, ArgumentThatIsOnlyACommentIsEmpty) {
+  EXPECT_EQ(pp("#define ONE(x) 1\nint v = ONE(/* nothing but a comment */);\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, MacroNameInsideACommentInMacroArgIsNotExpanded) {
+  EXPECT_EQ(pp("#define TWO 2\n#define ID(x) (x)\nint v = ID(1 /* TWO */ + 3);\n"),
+            "int v = (1 + 3);");
+}
+
+TEST(Preprocessor, DivideAssignInMacroArgIsNotAComment) {
+  EXPECT_EQ(pp("#define ID(x) x\nint v = 6; ID(v /= 2);\n"), "int v = 6; v /= 2;");
+}
+
+TEST(Preprocessor, StringizeSeesACommentAsOneSpaceOfRawSpelling) {
+  // '#' captures the argument's RAW SPELLING and does not collapse runs of
+  // whitespace the way C does (STR(a  b) is "a  b" here, and the corpus
+  // formatter's stringize masking depends on that). So a comment reads as
+  // exactly one more space: adjacent to its neighbours it separates them,
+  // and with real spaces around it, all three survive.
+  EXPECT_EQ(pp("#define STR(x) #x\nstring s = STR(a/*c*/b);\n"), "string s = \"a b\";");
+  EXPECT_EQ(pp("#define STR(x) #x\nstring s = STR(a /*c*/ b);\n"), "string s = \"a   b\";");
+  // Leading and trailing comments are trimmed off with the whitespace.
+  EXPECT_EQ(pp("#define STR(x) #x\nstring s = STR(/*c*/ a /*c*/);\n"), "string s = \"a\";");
+}
+
+TEST(Preprocessor, NonCallMacroNameKeepsLineCountAcrossNewlines) {
+  // A function-like macro name with no '(' after it: the probe reads the
+  // newlines looking for one, and current_line (the buffer's own yylineno)
+  // counts them as it goes. Rewinding that while handing the bytes back as
+  // a SEPARATE buffer -- whose count dies with it -- lost them outright,
+  // leaving every __LINE__ and diagnostic below short by that many. No
+  // comment needed to hit it; the comment case is just the loud one.
+  EXPECT_EQ(pp("#define ID(x) x\nint a = ID\n\n; int l = __LINE__;\n"),
+            "int a = ID; int l = 4;");
+}
+
+TEST(Preprocessor, TrailingSlashAtEofInMacroArgsErrors) {
+  // A '/' as the last byte of the file: the lookahead must see end of file
+  // and stop, not read past it.
+  auto p = LpcPreprocessor::make_session();
+  p->preprocess_next("#define ID(x) (x)\nint v = ID(1 /", "test");
+  EXPECT_FALSE(p->errors().empty());
+}
+
+TEST(Preprocessor, UnterminatedBlockCommentInMacroArgsErrors) {
+  auto p = LpcPreprocessor::make_session();
+  p->preprocess_next("#define ID(x) (x)\nint v = ID(1 /* never closed\n", "test");
+  EXPECT_FALSE(p->errors().empty());
+}
+
+TEST(Preprocessor, UnterminatedLineCommentAtEofInMacroArgsErrors) {
+  // No closing newline and no closing ')': stop at end of file with a
+  // diagnostic rather than spinning.
+  auto p = LpcPreprocessor::make_session();
+  p->preprocess_next("#define ID(x) (x)\nint v = ID(1 // never ends", "test");
+  EXPECT_FALSE(p->errors().empty());
+}
+
+TEST(Preprocessor, LineCommentThenOpenParenOnTheNextLine) {
+  EXPECT_EQ(pp("#define ID(x) ((x) * 2)\nint v = ID // why here?\n(3);\n"),
+            "int v = ((3) * 2);");
+}
+
+TEST(Preprocessor, CommentAfterMacroNameWithNoCallIsRestored) {
+  // Not an invocation: the name stays an ordinary identifier, and the probed
+  // text -- comment included -- is pushed back and rescanned.
+  EXPECT_EQ(pp("#define ID(x) ((x) * 2)\nint v = ID /* not a call */ ;\n"), "int v = ID;");
+}
+
+TEST(Preprocessor, UnterminatedCommentAfterMacroNameErrors) {
+  auto p = LpcPreprocessor::make_session();
+  p->preprocess_next("#define ID(x) x\nint v = ID /* never closed\n", "test");
+  EXPECT_FALSE(p->errors().empty());
+}
+
+TEST(Preprocessor, CrlfLineCommentInMacroArgs) {
+  EXPECT_EQ(pp("#define ID(x) (x)\r\nint v = ID(1 // c\r\n + 2);\r\n"), "int v = (1 + 2);");
+}
+
+TEST(Preprocessor, DroppedMultiLineCommentArgKeepsLineCount) {
+  // The comment is inside an argument that never reappears in the expansion,
+  // so its newlines are counted exactly where they are consumed.
+  EXPECT_EQ(pp("#define EAT(x)\nint a = 1; EAT(/* one\ntwo\n*/ foo); int l = __LINE__;\n"),
+            "int a = 1; ; int l = 4;");
+}
+
+TEST(Preprocessor, MultiLineCommentBeforeOpenParenKeepsLineCount) {
+  EXPECT_EQ(pp("#define ID(x) x\nint a = ID /* one\ntwo\n*/ (1); int l = __LINE__;\n"),
+            "int a = 1; int l = 4;");
+}
+
+TEST(Preprocessor, MultiLineCommentAfterNonCallMacroNameKeepsLineCount) {
+  // The probe restores current_line/total_lines and pushes the text back, so
+  // the rescan is what counts these newlines -- exactly once, either way.
+  EXPECT_EQ(pp("#define ID(x) x\nint a = ID /* one\ntwo\n*/ ; int l = __LINE__;\n"),
+            "int a = ID; int l = 4;");
+}
+
+
 TEST(Preprocessor, AliasToFunctionLikeExpandsWithStreamArgs) {
   // UNPAINTED function-like name left literal only because no '('
   // followed it in the expansion text itself: when the '(' turns out to
