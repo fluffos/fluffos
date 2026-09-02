@@ -18,6 +18,7 @@
 
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/lexer.h"
+#include "compiler/internal/lexer_scan.h"
 #include "compiler/internal/lexer_rules_pp.h"
 
 #include <cstdio>    // for EOF
@@ -379,6 +380,48 @@ static int innermost_real_buffer_index(void* yyscanner) {
 // The storage behind the `current_line` macro (lexer.h): a reference to the
 // innermost real frame's native line counter, falling back to
 // lpc_lex_line_fallback when no scanner or buffer is live.
+// Look ahead k bytes (0 = the next one) WITHOUT consuming anything, walking
+// down the buffer stack exactly as lpc_lex_getc() walks it when a splice
+// drains -- but without popping, since a peek must leave the input alone.
+//
+// This exists so the raw readers can classify a construct before consuming
+// it. Deciding whether a "'" opens a character literal takes several bytes
+// of lookahead ('\101', '\x41'), and an earlier version of this did it by
+// reading those bytes and pushing them back into a private buffer. That
+// buffer could still hold bytes when the reader stopped -- at the ')' that
+// ends an argument list, at the newline that ends a directive -- and those
+// bytes were then gone from the input for good ("int x" scanned as "nt x").
+// Nothing here is ever removed from the stream before it is classified, so
+// there is nothing that can be left behind.
+//
+// The top buffer's next byte lives in `held`: Flex writes a NUL over it at
+// the current position and keeps the original there. Lower buffers had
+// theirs written back when they were switched away from, so they read
+// straight out of the buffer.
+int lpc_lex_peek(void* yyscanner, int k) {
+  int count = lpc_lex_buffer_count(yyscanner);
+  for (int i = count - 1; i >= 0 && k >= 0; --i) {
+    const char* base = nullptr;
+    const char* limit = nullptr;
+    const char* pos = nullptr;
+    char held = 0;
+    if (!lpc_lex_buffer_extents(yyscanner, i, &base, &limit, &pos, &held)) {
+      continue;
+    }
+    ptrdiff_t avail = limit - pos;
+    if (avail <= 0) {
+      continue;  // drained: lpc_lex_getc() would pop it and read the parent
+    }
+    if (k < avail) {
+      bool const is_top = (i == count - 1);
+      char c = (is_top && k == 0) ? (held != 0 ? held : *pos) : pos[k];
+      return static_cast<unsigned char>(c);
+    }
+    k -= static_cast<int>(avail);
+  }
+  return 0;
+}
+
 int& lpc_lex_current_line_ref(void) {
   void* yyscanner = active_scanner;
   if (yyscanner == nullptr) {
@@ -807,7 +850,6 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
         // level and cap chains at a few thousand.
         return LPC_TOKEN_RESCAN;
       } else {
-        int saved_line = current_line;
         int saved_total = total_lines;
         // Characters are read THROUGH Flex (lpc_lex_getc: its buffer,
         // in-memory buffers) rather than from raw `outp` -- no rewind/flush
@@ -820,24 +862,67 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
         // old raw-read version).
         ScratchString consumed_text;
 
-        auto get_next_char = [&]() -> char {
-          int gc = lpc_lex_getc(yyscanner);
-          if (gc <= 0) {
-            return '\0';
+        // Everything pulled from the stream is recorded for the
+        // no-parenthesis restore below, which pushes the text back as a
+        // fresh splice buffer rather than rewinding a pointer (a saved outp
+        // would dangle across a refill_buffer() memmove -- a latent
+        // corruption in the old raw-read version). `unit` collects one
+        // lexical unit's raw spelling for the classifier.
+        struct ArgSrc {
+          void* yyscanner;
+          ScratchString* consumed;
+          ScratchString unit;
+
+          int peek(int k) const { return lpc_lex_peek(yyscanner, k); }
+          void advance() {
+            int gc = lpc_lex_getc(yyscanner);
+            if (gc > 0) keep(gc);
           }
-          consumed_text += static_cast<char>(gc);
-          return static_cast<char>(gc);
+          void keep(int c) {
+            unit += static_cast<char>(c);
+            *consumed += static_cast<char>(c);
+          }
+        };
+        ArgSrc src{yyscanner, &consumed_text, ScratchString()};
+
+        // Strings, character literals and comments are recognised by the
+        // shared classifier (lexer_scan.h) rather than by a private copy of
+        // those rules: this reader used to have its own, and it disagreed
+        // with the DFA about an apostrophe -- one in a comment inside an
+        // argument list opened a character literal that ran to end of file
+        // (#1362). Line counting stays here, because only this caller knows
+        // which of the bytes it consumes will be handed back to be counted
+        // again (current_line is native; see the restore below).
+        auto next_unit = [&]() -> lpc_lex::UnitInfo {
+          src.unit.clear();
+          return lpc_lex::scan_one_unit(src);
         };
 
-        char c;
-        while (true) {
-          c = get_next_char();
-          if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-            if (c == '\n') {
-              total_lines++;  // line counting itself is native (yyinput)
+        char c = '\0';
+        for (;;) {
+          lpc_lex::UnitInfo u = next_unit();
+          total_lines += u.newlines;  // line counting itself is native (yyinput)
+          if (u.unit == lpc_lex::Unit::kEof) {
+            c = '\0';
+            break;
+          }
+          if (u.unit == lpc_lex::Unit::kBlockComment || u.unit == lpc_lex::Unit::kLineComment) {
+            // A comment sits where whitespace may: MES /* why */ (x) is an
+            // invocation. On end of file inside one, fall through to the
+            // no-parenthesis path, which restores the text and lets the
+            // ordinary scan report the unterminated comment.
+            if (u.unterminated) {
+              c = '\0';
+              break;
             }
             continue;
           }
+          char first = src.unit.empty() ? '\0' : src.unit[0];
+          if (u.unit == lpc_lex::Unit::kOrdinary &&
+              (first == ' ' || first == '\t' || first == '\n' || first == '\r')) {
+            continue;
+          }
+          c = first;
           break;
         }
 
@@ -845,36 +930,35 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
           ScratchVector<ScratchString> args;
           ScratchString arg;
           int depth = 0;
-          char inq = 0;
-          while (true) {
-            char ch = get_next_char();
-            if (ch == '\0') {
+          for (;;) {
+            lpc_lex::UnitInfo u = next_unit();
+            total_lines += u.newlines;  // line counting itself is native
+            if (u.unit == lpc_lex::Unit::kEof) {
               lexerror("End of file in macro arguments");
               break;
             }
-            if (ch == '\n') {
-              total_lines++;  // line counting itself is native (yyinput)
-            }
-            if (inq) {
-              if (ch == '\\') {
-                arg += ch;
-                char ch2 = get_next_char();
-                if (ch2 == '\0') {
-                  lexerror("End of file in macro arguments");
-                  break;
-                }
-                if (ch2 == '\n') {
-                  total_lines++;  // line counting itself is native (yyinput)
-                }
-                arg += ch2;
-                continue;
+            if (u.unit == lpc_lex::Unit::kBlockComment || u.unit == lpc_lex::Unit::kLineComment) {
+              if (u.unterminated) {
+                lexerror("End of file in a comment");
+                break;
               }
-              arg += ch;
-              if (ch == inq) inq = 0;
-            } else if (ch == '"' || ch == '\'' || ch == '`') {
-              inq = ch;
-              arg += ch;
-            } else if (ch == '(') {
+              // A comment is whitespace, and one space of it (C, and what
+              // the driver already does for a comment inside a macro BODY).
+              arg += ' ';
+              continue;
+            }
+            if (u.unit != lpc_lex::Unit::kOrdinary) {
+              // A string, template or character literal: raw spelling, which
+              // cannot be altered and inside which nothing is punctuation.
+              if (u.unterminated) {
+                lexerror("End of file in macro arguments");
+                break;
+              }
+              arg += src.unit;
+              continue;
+            }
+            char ch = src.unit[0];
+            if (ch == '(') {
               depth++;
               arg += ch;
             } else if (ch == ')') {
@@ -895,10 +979,10 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
               // Collapse it to a space here: the count stays with the
               // consumption (right, because an UNUSED parameter's text
               // never reappears at all), and splices carry no newlines.
-              // Quoted text (the inq path above) is kept verbatim -- a
-              // string literal's bytes can't be altered; a raw newline
-              // inside a quoted macro argument still double-counts, an
-              // accepted pathological corner.
+              // Text inside a literal is kept verbatim by the branch above
+              // -- a string's bytes can't be altered; a raw newline inside
+              // a quoted macro argument still double-counts, an accepted
+              // pathological corner.
               arg += (ch == '\n') ? ' ' : ch;
             }
           }
@@ -928,7 +1012,15 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
           // No '(' follows: not an invocation. Put every probed byte back
           // (see consumed_text's comment) and let the identifier resolve
           // as a plain symbol; the pushed-back bytes are scanned next.
-          current_line = saved_line;
+          //
+          // Only total_lines is rewound. current_line is the CURRENT
+          // BUFFER's yylineno (lexer.h), which yyinput() already advanced
+          // for every newline probed above -- and the pushed-back copy is
+          // scanned as its own buffer, whose count is discarded when it
+          // pops, so a rewind here loses those lines outright and every
+          // __LINE__, diagnostic and traceback below this point is short by
+          // that many. total_lines is a plain global with no such per-buffer
+          // reset, so the rescan really does re-add its share.
           total_lines = saved_total;
           if (!consumed_text.empty()) {
             push_arena_string(consumed_text, /*is_expansion=*/0, yyscanner);

@@ -55,16 +55,19 @@ function isParentCallOpenParen(src, i) {
 // is fooled by a '}' inside a nested string/char/comment/template (e.g.
 // `${ ch == '}' }` or `${ s == "}" }`), so those spans must be skipped
 // as opaque units rather than scanned character-by-character.
-function skipStringSpan(src, i) {
+// `quote` is the delimiter the span opened with: '"' for a string, '`' for
+// a template literal, which is closed the same way (an unescaped copy of
+// its own opening character).
+export function skipStringSpan(src, i, quote = '"') {
   let j = i + 1;
-  while (j < src.length && src[j] !== '"') {
+  while (j < src.length && src[j] !== quote) {
     if (src[j] === '\\') j++;
     j++;
   }
   return Math.min(j + 1, src.length);
 }
 
-function skipCharSpan(src, i) {
+export function skipCharSpan(src, i) {
   // Mirror lexer.l's char-literal grammar EXACTLY: after the opening
   // quote, the body is ONE unit -- either a single raw byte (any byte,
   // *including a literal quote*, per <SC_CHAR_BODY>[^\\]) or one escape

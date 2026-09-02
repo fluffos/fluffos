@@ -95,6 +95,30 @@ check("format.mjs never re-spaces a macro argument that's stringized via a"
         const out = formatLPC(src);
         return out === src && formatLPC(out) === out;
       })());
+check('an unpaired apostrophe on a directive line does not hide a comment'
+      + ' from the stringize detector -- a lone "\'" is one character, not a'
+      + ' quote that scans forward for a partner (lexer.l scans a char'
+      + ' literal as one escape or one byte then the close quote), so the'
+      + ' comment in `#define S(x) don\'t#/*c*/x` still folds to a space and'
+      + ' S(1+2) keeps stringizing to "1+2" (driver bug #1362, same shape)',
+      (() => {
+        const src = "#define S(x) don't#/*c*/x\nvoid f() { string a = S(1+2); }\n";
+        const out = formatLPC(src);
+        // The baseline without the apostrophe is already pinned above; the
+        // point here is that adding one changes nothing.
+        const plain = formatLPC('#define S(x) #/*c*/x\nvoid f() { string a = S(1+2); }\n');
+        return out.includes('S(1+2)') && plain.includes('S(1+2)');
+      })());
+
+check("a template literal on a directive line is closed by its own backtick,"
+      + ' not by the next double quote (skipStringSpan takes the delimiter it'
+      + ' opened with)',
+      (() => {
+        const src = '#define T(x) `a${x}b` #x\nvoid f() { string a = T(1+2); }\n';
+        const out = formatLPC(src);
+        return out.includes('T(1+2)');
+      })());
+
 check("'##' token paste is NOT stringize -- a macro using only '##' on its"
       + " parameters (`#define GLUE(a, b) a##b`) leaves its call-site"
       + ' arguments free to be reformatted normally, and an unrelated'

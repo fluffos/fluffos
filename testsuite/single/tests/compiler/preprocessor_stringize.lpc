@@ -47,6 +47,17 @@ x
 // past its physical line (the next line must compile as ordinary code).
 #define Q it'
 
+// An apostrophe in a directive body must not hide a comment from the
+// formatter's stringize detector. "'''" is a legal char literal -- one raw
+// body byte, which happens to be a quote, then the close -- but a scanner
+// that pairs quotes greedily instead reads it as "closed, then reopened",
+// runs to end of line, and never folds the /*c*/ below to the space that
+// makes "# x" a stringize. The detector then misses SQ, the call site is
+// re-spaced, and this file's own assertion changes meaning: verified by
+// running the pre-fix formatter over this file and the driver over the
+// result ("1 + 2", FAILED).
+#define SQ(x) (''' ? #/*c*/x : "nope")
+
 void do_tests() {
   int x = 1 + 2;
   mixed y = ({ 3 });
@@ -61,4 +72,5 @@ void do_tests() {
   ASSERT_EQ("5+6", string(5+6));
   ASSERT_EQ("y+3]", FB(x[1+2,y+3], 9));
   ASSERT_EQ("3+4", FB((: x, 1, 2 :), 3+4));
+  ASSERT_EQ("1+2", SQ(1+2));
 }
