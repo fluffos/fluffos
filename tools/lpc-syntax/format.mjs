@@ -3,7 +3,7 @@
 // column 0, strings/comments/text blocks verbatim. Deterministic and
 // idempotent (format(format(x)) === format(x) -- pinned by test.mjs).
 
-import { tokenize } from './tokenizer.mjs';
+import { tokenize, skipStringSpan, skipCharSpan } from './tokenizer.mjs';
 
 // 100 matches ColumnLimit in src/.clang-format -- the repo's C++ style
 // (Google base, IndentWidth 2) that this formatter mirrors for every
@@ -817,7 +817,6 @@ function foldDirectiveText(text) {
   let out = '';
   let i = 0;
   const n = text.length;
-  let quote = null;
   while (i < n) {
     const c = text[i];
     if (c === '\\') {
@@ -828,13 +827,29 @@ function foldDirectiveText(text) {
       i += 2;
       continue;
     }
-    if (quote) {
-      if (c === quote) quote = null;
-      out += c;
-      i++;
+    // Literals are skipped through the tokenizer's OWN span functions, not
+    // a second model of them here. This used to open a quote on any "'"
+    // and scan forward for a partner, which is not what the driver does: a
+    // character literal is one escape or one byte and then the close quote
+    // (lexer.l's SC_CHAR_BODY/SC_CHAR_CLOSE), so a lone apostrophe is just
+    // a character. With the old model an unpaired "'" -- legal and inert
+    // in a directive, see directiveLineEnd -- swallowed the rest of the
+    // line, leaving a following comment unfolded; a `#define S(x)
+    // don't#/*c*/x` then hid its stringize from the detector below and its
+    // call-site argument WAS re-spaced, changing what the driver
+    // stringizes ("1+2" -> "1 + 2"). Same bug the driver had (#1362).
+    if (c === '"' || c === '`') {
+      const e = skipStringSpan(text, i, c);
+      out += text.slice(i, e);
+      i = e;
       continue;
     }
-    if (c === '"' || c === "'") { quote = c; out += c; i++; continue; }
+    if (c === "'") {
+      const e = skipCharSpan(text, i);
+      out += text.slice(i, e);
+      i = e;
+      continue;
+    }
     if (c === '/' && text[i + 1] === '*') {
       const end = text.indexOf('*/', i + 2);
       out += ' ';

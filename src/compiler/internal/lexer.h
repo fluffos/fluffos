@@ -99,6 +99,14 @@ struct compiler_context_t {
   // die at scratch_destroy while this context object survives (scanner
   // reuse), so lpc_lex_reset_context() re-initializes them per compile.
   ScratchString str_accum;
+  // The logical line SC_DIRECTIVE is accumulating, and the physical line
+  // its '#' sat on. The line is recorded at the '#' rather than derived
+  // afterwards from current_line: a directive may legally span physical
+  // lines (a backslash continuation, or a block comment that closes on a
+  // later line, #1236), and reconstructing where it started by subtracting
+  // what was consumed is exactly the arithmetic that kept going wrong.
+  ScratchString directive_accum;
+  int directive_line = 0;
   ScratchString heredoc_terminator;
   bool heredoc_is_array = false;
   // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
@@ -389,6 +397,11 @@ int lpc_lex_buffer_count(void* yyscanner);
 int* lpc_lex_buffer_lineno(void* yyscanner, int i);
 int lpc_lex_buffer_extents(void* yyscanner, int i, const char** base, const char** limit,
                            const char** pos, char* held);
+
+// Look ahead k bytes (0 = next) without consuming; 0 at end of input.
+// Walks the buffer stack like lpc_lex_getc(), but pops nothing. Defined in
+// lexer_utils.cc; used by every reader that must classify before consuming.
+int lpc_lex_peek(void* yyscanner, int k);
 
 // Pull one token for the #if/#elif expression evaluator: yylex() under
 // the INITIAL start condition (the surrounding scan may be in
