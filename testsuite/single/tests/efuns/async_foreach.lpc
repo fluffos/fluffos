@@ -112,6 +112,62 @@ private async int sum_across_turns() {
   return total;
 }
 
+/* Leaving a foreach EARLY across a suspension. Each of these emits one
+ * F_EXIT_FOREACH per open loop (icode.cc), which is what retires the loop's
+ * temporaries; a resumed frame has to reach them the same way an ordinary
+ * one does. `return` from inside the loop skips the loop's own exit path,
+ * so it is the one worth pinning separately. */
+private async int loop_break() {
+  int total;
+
+  foreach (int i in ({ 1, 2, 3, 4 })) {
+    total += i * await gate;
+    if (i == 2) {
+      break;
+    }
+  }
+
+  return total;
+}
+
+private async int loop_continue() {
+  int total;
+
+  foreach (int i in ({ 1, 2, 3, 4 })) {
+    if (i == 2) {
+      continue;
+    }
+    total += i * await gate;
+  }
+
+  return total;
+}
+
+private async int loop_return() {
+  foreach (int i in ({ 1, 2, 3 })) {
+    if (await gate) {
+      return i * 10;
+    }
+  }
+
+  return -1;
+}
+
+/* An error raised after a resume, inside the loop: it unwinds through the
+ * open foreach and out of the body, rejecting the result promise. */
+private async int loop_error() {
+  int total;
+
+  foreach (int i in ({ 1, 2, 3 })) {
+    total += await gate;
+    if (i == 2) {
+      error("boom in loop");
+    }
+  }
+
+  return total;
+}
+
 void do_tests() {
   gate = promise_create();
   promise_resolve(gate, 2);
@@ -148,6 +204,31 @@ void do_tests() {
   promise_then(sum_across_turns(), function(mixed v) {
     ASSERT_EQ(12, v);  // (1+2+3) * 2, one park per iteration
     RELEASE_LATCH("cross-turn");
+  });
+
+  EXPECT_LATCH("break");
+  promise_then(loop_break(), function(mixed v) {
+    ASSERT_EQ(6, v);  // (1+2) * 2
+    RELEASE_LATCH("break");
+  });
+
+  EXPECT_LATCH("continue");
+  promise_then(loop_continue(), function(mixed v) {
+    ASSERT_EQ(16, v);  // (1+3+4) * 2
+    RELEASE_LATCH("continue");
+  });
+
+  EXPECT_LATCH("return");
+  promise_then(loop_return(), function(mixed v) {
+    ASSERT_EQ(10, v);
+    RELEASE_LATCH("return");
+  });
+
+  EXPECT_LATCH("loop-error");
+  promise_catch(loop_error(), function(mixed reason) {
+    ASSERT2(stringp(reason) && strsrch(reason, "boom in loop") != -1,
+      "an error after a resume unwinds out of the open foreach: " + reason);
+    RELEASE_LATCH("loop-error");
   });
 
   // Still refused, with a diagnostic that now says which shapes are the

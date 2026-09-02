@@ -161,6 +161,33 @@ private void check_edges() {
     promise_resolve(live_input, 0);
   }, 1);
 
+  // The SAME promise twice in one input: two independent reactions, two
+  // deliveries, two slots -- not one delivery that leaves a slot unwritten
+  // and `remaining` stuck above zero.
+  promise dup = promise_create();
+  EXPECT_LATCH("dup");
+  promise_then(promise_all(({ dup, dup, dup })), function(mixed v) {
+    ASSERT_EQ(3, sizeof(v));
+    ASSERT_EQ(7, v[0]);
+    ASSERT_EQ(7, v[1]);
+    ASSERT_EQ(7, v[2]);
+    RELEASE_LATCH("dup");
+  });
+  promise_resolve(dup, 7);
+
+  // An input whose last reference goes away before it settles: it can never
+  // settle now, so the aggregate is told rather than left pending forever.
+  promise orphaned;
+  {
+    promise doomed = promise_create();
+    orphaned = promise_all(({ doomed, 1 }));
+  }
+  EXPECT_LATCH("collected");
+  promise_catch(orphaned, function(mixed reason) {
+    ASSERT2(stringp(reason), "a collected input rejects the aggregate: " + reason);
+    RELEASE_LATCH("collected");
+  });
+
   // All-plain input settles without any promise being involved.
   EXPECT_LATCH("plain");
   promise_then(promise_all(({ 1, "two", 3 })), function(mixed v) {

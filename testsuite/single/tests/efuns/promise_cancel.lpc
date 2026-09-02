@@ -112,6 +112,22 @@ private void check_refusals() {
   ASSERT_EQ(0, promise_cancel(done));
 }
 
+/* Cancelling a frame parked inside a NESTED foreach: two loops' worth of
+ * temporaries are handed back at the resume and then thrown through by the
+ * cancellation, which is the shape where the count and the stack have the
+ * most to disagree about. */
+private async int cancel_in_nested_loop() {
+  int total;
+
+  foreach (int i in ({ 1, 2 })) {
+    foreach (int j in ({ 10, 20 })) {
+      total += await never;
+    }
+  }
+
+  return total;
+}
+
 void do_tests() {
   never = promise_create();
   gate = promise_create();
@@ -124,4 +140,16 @@ void do_tests() {
   // Lets recovers()' cleanup await through; `never` is deliberately never
   // settled, which is the whole point of the first three.
   promise_resolve(gate, 9);
+
+  // Parked inside a nested foreach when the cancellation arrives.
+  {
+    promise nested = cancel_in_nested_loop();
+
+    EXPECT_LATCH("cancel-nested");
+    promise_catch(nested, function(mixed reason) {
+      ASSERT_EQ("*async function cancelled", reason);
+      RELEASE_LATCH("cancel-nested");
+    });
+    ASSERT_EQ(1, promise_cancel(nested));
+  }
 }
