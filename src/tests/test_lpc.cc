@@ -564,6 +564,45 @@ TEST_F(DriverTest, ReplaceProgramPolymorphicShellDemoLandsForReal) {
 // behavioral difference (not just a theoretical flag mismatch) by
 // exercising apply.cc's actual permission check via a self-call-other,
 // both pre- and post-swap.
+// Debug-only: stack_in_use_as_temporary and break_point() both exist only
+// under DEBUG (interpret.cc), so there is nothing to check in a release
+// build -- and nothing to link against either.
+#ifdef DEBUG
+TEST_F(DriverTest, ForeachTemporariesRestoredOnUnwind) {
+  // foreach bumps stack_in_use_as_temporary so break_point() knows the
+  // temporaries sitting above fp are legitimate, and F_EXIT_FOREACH retires
+  // them. An error thrown out of the loop never reaches that opcode, so only
+  // the unwind can put the counter back -- and error_context_t does not carry
+  // it. Before this was fixed, one catch() of an error inside a foreach left
+  // the count at 1 for the life of the process, and break_point() only checks
+  // the stack when the count is ZERO: the check silently stopped running for
+  // all later LPC. Nothing in the LPC suite can observe that, hence a unit
+  // test reading the counter directly.
+  extern int stack_in_use_as_temporary;
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    auto* ob = find_object("/clone/foreach_unwind");
+    ASSERT_NE(ob, nullptr);
+    current_object = master_ob;
+
+    int const before = stack_in_use_as_temporary;
+    apply("caught_in_foreach", ob, 0, ORIGIN_DRIVER);
+    EXPECT_EQ(before, stack_in_use_as_temporary)
+        << "catch() of an error inside a foreach leaked temporaries";
+
+    apply("caught_in_nested_foreach", ob, 0, ORIGIN_DRIVER);
+    EXPECT_EQ(before, stack_in_use_as_temporary)
+        << "the same, unwinding through two open loops";
+    pop_context(&econ);
+  } catch (const char* e) {
+    restore_context(&econ);
+    pop_context(&econ);
+    FAIL() << "unexpected error: " << e;
+  }
+}
+#endif  // DEBUG
+
 TEST_F(DriverTest, ReplaceProgramLandedSwapSemantics) {
   // --- Bug 1 setup: last-call-wins -------------------------------------
   object_t* bug1_ob = nullptr;

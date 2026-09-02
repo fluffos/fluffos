@@ -1,0 +1,24 @@
+// Fixtures for DriverTest.ForeachTemporariesRestoredOnUnwind: each opens a
+// foreach (which bumps interpret.cc's stack_in_use_as_temporary) and then
+// errors out of it, so the loop's F_EXIT_FOREACH never runs and only the
+// unwind can put the counter back.
+
+private void thrower() {
+  foreach (int i in ({ 1, 2, 3 })) {
+    error("boom");
+  }
+}
+
+int caught_in_foreach() {
+  return !!catch(thrower());
+}
+
+private void nested_thrower() {
+  foreach (int i in ({ 1, 2 })) {
+    thrower();
+  }
+}
+
+int caught_in_nested_foreach() {
+  return !!catch(nested_thrower());
+}

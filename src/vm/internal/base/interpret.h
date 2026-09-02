@@ -54,6 +54,15 @@ struct control_stack_t {
    * back to it the way restore_context() would. */
   svalue_t* save_sp;
   object_t** save_cgsp;
+#ifdef DEBUG
+  /* stack_in_use_as_temporary as it stood when this frame was pushed. An
+   * unwind cuts the value stack back to the frame, taking any foreach
+   * temporaries above it along, so the counter has to come back with them.
+   * Nothing else restores it -- error_context_t carries sp/csp/cgsp and not
+   * this -- and a NONZERO count silently disables break_point()'s stack
+   * check for all later LPC, so a leak here is permanent and quiet. */
+  int save_temporaries;
+#endif
   struct defer_list* defers;
   int num_local_variables;   /* Local + arguments */
   int function_index_offset; /* Used when executing functions in inherited
