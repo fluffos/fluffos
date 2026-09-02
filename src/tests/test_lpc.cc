@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "base/package_api.h"
+#include "packages_missing_efuns.autogen.h"
 
 #include "mainlib.h"
 
@@ -602,6 +603,32 @@ TEST_F(DriverTest, ForeachTemporariesRestoredOnUnwind) {
   }
 }
 #endif  // DEBUG
+
+TEST_F(DriverTest, MissingEfunTableNamesOnlyAbsentPackages) {
+  // packages_missing_efuns.autogen.h lists the efuns of packages this build
+  // does NOT have, so "Undefined function hash" can say which package `hash`
+  // would have come from (#1352). The note is only trustworthy if a hit means
+  // exactly "not compiled in" -- an entry naming an efun this driver DOES
+  // have would attach it to an ordinary typo'd call instead. The generator
+  // scans only disabled packages' spec files; this pins that it stays so.
+  //
+  // A build with every package enabled leaves the table empty, which is a
+  // valid outcome and not a reason to fail.
+  for (const auto& entry : missing_efuns) {
+    if (entry.name == nullptr) {
+      break;  // sentinel; an all-packages-enabled build has only this
+    }
+    ASSERT_NE(entry.package, nullptr);
+    EXPECT_STRNE(entry.name, "") << "an entry with no efun name";
+    EXPECT_EQ(0, strncmp(entry.package, "PACKAGE_", 8))
+        << "package should be a PACKAGE_* option, got: " << entry.package;
+
+    ident_hash_elem_t* ihe = lookup_ident(entry.name);
+    EXPECT_FALSE(ihe != nullptr && (ihe->token & IHE_EFUN))
+        << entry.name << " is listed as needing " << entry.package
+        << " but this driver HAS it as an efun -- the note would be wrong";
+  }
+}
 
 TEST_F(DriverTest, ReplaceProgramLandedSwapSemantics) {
   // --- Bug 1 setup: last-call-wins -------------------------------------

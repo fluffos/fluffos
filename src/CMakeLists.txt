@@ -395,6 +395,7 @@ set(TOOL_SRC
 
 set(GENERATRED_SOURCE
   "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
+  "${CMAKE_CURRENT_BINARY_DIR}/packages_missing_efuns.autogen.h"
   "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.cc"
   "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.h"
   "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.cc"
@@ -414,7 +415,7 @@ add_custom_command(
 
 find_program(BASH_EXECUTABLE bash REQUIRED)
 add_custom_command(
-  OUTPUT "packages.fullspec"
+  OUTPUT "packages.fullspec" "packages_missing_efuns.autogen.h"
   COMMAND "${BASH_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
   # packages.autogen.h carries the enabled-package set: without this
   # dependency, toggling a package option left a stale efun table.

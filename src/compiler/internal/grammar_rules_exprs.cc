@@ -3,12 +3,34 @@
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
+#include "packages_missing_efuns.autogen.h"
 #include "compiler/internal/lexer.h"
 #include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 
 #include <fmt/format.h>
+
+/* An efun this driver was not built with, or nullptr.
+ *
+ * Packages are selected at compile time, so a driver built without one has no
+ * such efun at all and an ordinary "Undefined function hash" is all the
+ * compiler could say -- which gives no hint that `hash` IS an efun and merely
+ * was not compiled in (issue #1352: a user bisected driver versions over it).
+ * The generated table lists only efuns of packages this build does NOT have,
+ * so reaching here with a hit means exactly that and nothing else. */
+static const char* missing_efun_package(const char* name) {
+  for (const auto& entry : missing_efuns) {
+    if (entry.name == nullptr) {
+      break;  // sentinel
+    }
+    if (strcmp(entry.name, name) == 0) {
+      return entry.package;
+    }
+  }
+  return nullptr;
+}
+
 
 extern int context;
 extern int func_present;
@@ -1252,6 +1274,11 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
       if (*n == ':') n++;
       p = strput(buf, end, "Undefined function ");
       p = strput(p, end, n);
+      if (const char* pkg = missing_efun_package(n)) {
+        p = strput(p, end, " (an efun of ");
+        p = strput(p, end, pkg);
+        p = strput(p, end, ", which this driver was not built with)");
+      }
       yyerror("%s", buf);
     } else {
       if (current_function_context) current_function_context->bindable = FP_NOT_BINDABLE;
@@ -1266,6 +1293,7 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
   *result = check_refs(num_refs - saved_refs, opt_arg_list, *result);
   num_refs = saved_refs;
 }
+
 
 void rule_function_call_name(parse_node_t** result, const ScratchString* name,
                              parse_node_t* opt_arg_list, LPC_INT saved_context,
@@ -1290,7 +1318,12 @@ void rule_function_call_name(parse_node_t** result, const ScratchString* name,
       if (exact_types) {
         const char* n = name->c_str();
         if (*n == ':') n++;
-        yyerror("Undefined function %s", n);
+        if (const char* pkg = missing_efun_package(n)) {
+          yyerror("Undefined function %s (an efun of %s, which this driver was not built with)", n,
+                  pkg);
+        } else {
+          yyerror("Undefined function %s", n);
+        }
       } else {
         f = define_new_function(name->c_str(), 0, 0, DECL_PUBLIC | FUNC_UNDEFINED, TYPE_ANY);
       }
