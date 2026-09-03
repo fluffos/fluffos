@@ -32,7 +32,12 @@ error_context_t* g_coroutine_econ = nullptr;
  * everything below lives in an anonymous namespace, and declaring it there
  * would name a DIFFERENT, never-defined symbol and fail to link. */
 extern int _in_reference_allowed;
+
 #endif
+
+/* interpret.cc's foreach-temporaries counter, defined there without a header
+ * declaration. Read only under DEBUG; see control_stack_t::save_temporaries. */
+extern int stack_in_use_as_temporary;
 
 namespace {
 
@@ -757,6 +762,13 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
       *++sp = const0;
     }
   }
+#ifdef DEBUG
+  /* Same restore do_catch() makes, from the marker frame rather than a C++
+   * local: this unwind reaches the region from the error path, not from the
+   * frame that entered it. An `await` inside a `foreach` inside an
+   * `acatch` is the shape that needs it. */
+  stack_in_use_as_temporary = marker->save_temporaries;
+#endif
   pop_control_stack();
 
   /* kill ref lvalues created at or above the frame we just left */

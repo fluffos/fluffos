@@ -1363,6 +1363,9 @@ void push_control_stack(int frkind) {
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
   csp->defers = nullptr;
+#ifdef DEBUG
+  csp->save_temporaries = stack_in_use_as_temporary;
+#endif
   csp->trace_id.reset();
 }
 
@@ -4704,6 +4707,14 @@ void eval_instruction(char* p) {
 
 static void do_catch(char* pc, unsigned int new_pc_offset) {
   error_context_t econ;
+#ifdef DEBUG
+  /* See control_stack_t::save_temporaries. The unwind below pops the value
+   * stack back to this point, so any foreach temporaries the erroring code
+   * had open go with it; without putting the counter back, a
+   * catch(foreach { error(); }) left it elevated for the rest of the
+   * process and break_point() silently stopped checking. */
+  int const saved_temporaries = stack_in_use_as_temporary;
+#endif
 
   /*
    * Save some global variables that must be restored separately after a
@@ -4725,6 +4736,9 @@ static void do_catch(char* pc, unsigned int new_pc_offset) {
      * must be restored manually here.
      */
     restore_context(&econ);
+#ifdef DEBUG
+    stack_in_use_as_temporary = saved_temporaries;
+#endif
     STACK_INC;
     *sp = catch_value;
     catch_value = const1;
