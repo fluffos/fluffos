@@ -282,10 +282,19 @@ TEST_F(DriverTest, ExplodeDelimiterMustNotMatchPastCountedLength) {
   EXPECT_STREQ(v->item[0].u.string, "ab-");
   free_array(v);
 
-  std::string han = "\xe4\xbd\xa0-----";  // 你-----
-  v = explode_string(han.c_str(), static_cast<int>(han.size()), "--", 2, false);
+  // Three dashes: one trailing `--` is skipped, leftover dash stays in
+  // the field. Five dashes: two trailing `--`, skip one, keep one empty.
+  std::string han3 = "\xe4\xbd\xa0---";  // 你---
+  v = explode_string(han3.c_str(), static_cast<int>(han3.size()), "--", 2, false);
   ASSERT_EQ(v->size, 1);
   EXPECT_STREQ(v->item[0].u.string, "\xe4\xbd\xa0-");
+  free_array(v);
+
+  std::string han = "\xe4\xbd\xa0-----";  // 你-----
+  v = explode_string(han.c_str(), static_cast<int>(han.size()), "--", 2, false);
+  ASSERT_EQ(v->size, 2);
+  EXPECT_STREQ(v->item[0].u.string, "\xe4\xbd\xa0-");
+  EXPECT_STREQ(v->item[1].u.string, "");
   free_array(v);
 
   v = explode_string(han.c_str(), static_cast<int>(han.size()), "--", 2, true);
@@ -307,8 +316,9 @@ TEST_F(DriverTest, ExplodeDelimiterMustNotMatchPastCountedLength) {
 
   std::string cr = "a\r\nb-----";
   v = explode_string(cr.c_str(), static_cast<int>(cr.size()), "--", 2, false);
-  ASSERT_EQ(v->size, 1);
+  ASSERT_EQ(v->size, 2);
   EXPECT_STREQ(v->item[0].u.string, "a\r\nb-");
+  EXPECT_STREQ(v->item[1].u.string, "");
   free_array(v);
 }
 
