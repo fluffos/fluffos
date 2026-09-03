@@ -403,11 +403,13 @@ char* implode_string(array_t* arr, const char* del, int del_len) {
   for (i = 0, num = 0; i < arr->size; i++) {
     if (arr->item[i].type == T_STRING) {
       if (num) {
-        strncpy(p, del, del_len);
+        // del_len is the counted LPC string length, so a byte-for-byte copy
+        // is both correct (even with embedded NULs) and faster than strncpy.
+        memcpy(p, del, del_len);
         p += del_len;
       }
       size = SVALUE_STRLEN(&arr->item[i]);
-      strncpy(p, arr->item[i].u.string, size);
+      memcpy(p, arr->item[i].u.string, size);
       p += size;
       num++;
     }
