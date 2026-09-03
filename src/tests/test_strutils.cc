@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <string>
 #include "base/std.h"
 
 #include "base/internal/strutils.h"
@@ -223,6 +224,49 @@ TEST(EGCAsciiFastPath, CrLfIsTheOnlyAsciiJoin) {
           << "ASCII pair (" << a << "," << b << ") clustered unexpectedly";
     }
   }
+}
+
+// explode() reset()s the iterator to a shrinking suffix once per token.
+// A subrange of a known-ASCII string must stay on the ASCII path without
+// a fresh all_ascii() scan (issue #1366). Resetting to a different buffer
+// still has to rescan — including the ASCII → non-ASCII direction.
+TEST(EGCAsciiFastPath, ResetToSuffixStaysAscii) {
+  std::string s(2048, 'x');
+  for (size_t i = 10; i < s.size(); i += 11) s[i] = ' ';
+  EGCIterator it(s.data(), static_cast<int32_t>(s.size()));
+  ASSERT_TRUE(it.is_ascii());
+  for (int32_t off = 0; off + 11 <= static_cast<int32_t>(s.size()); off += 11) {
+    it.reset(s.data() + off, static_cast<int32_t>(s.size()) - off);
+    EXPECT_TRUE(it.ok()) << "offset " << off;
+    EXPECT_TRUE(it.is_ascii()) << "offset " << off;
+    EXPECT_EQ(s.data() + off, it.data());
+  }
+}
+
+TEST(EGCAsciiFastPath, ResetToUnrelatedStringRescans) {
+  EGCIterator it("hello", 5);
+  ASSERT_TRUE(it.is_ascii());
+  const char* wide = "a\xe4\xbd\xa0z";  // a 你 z
+  it.reset(wide, 5);
+  EXPECT_TRUE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
+  it.reset("abc", 3);
+  EXPECT_TRUE(it.ok());
+  EXPECT_TRUE(it.is_ascii());
+}
+
+TEST(U8EgcFind, AsciiForwardAndReverse) {
+  const char* s = "ab cd ab";
+  EGCIterator it(s, 8);
+  ASSERT_TRUE(it.is_ascii());
+  EXPECT_EQ(2, u8_egc_find_as_offset(it, " ", 1, false));
+  EXPECT_EQ(5, u8_egc_find_as_offset(it, " ", 1, true));
+  EXPECT_EQ(0, u8_egc_find_as_offset(it, "ab", 2, false));
+  EXPECT_EQ(6, u8_egc_find_as_offset(it, "ab", 2, true));
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "zz", 2, false));
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "zz", 2, true));
+  // Non-ASCII needle cannot occur in a CR-free ASCII haystack.
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\xe4\xbd\xa0", 3, false));
 }
 
 // And confirm a CR-bearing string is routed to ICU rather than the fast path.

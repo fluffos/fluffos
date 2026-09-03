@@ -78,6 +78,28 @@ int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t need
   }
   if (!iter.ok()) return -1;
 
+  // Haystack already proven CR-free ASCII: every byte is a grapheme
+  // boundary, so find/rfind is EGC-correct and must not touch ICU.
+  // explode()'s trailing-delimiter walk used the reverse path, which
+  // previously always called isBoundary() and so ensure_icu()'d the
+  // whole remaining string on every token. A needle with a high bit or
+  // CR cannot occur in this haystack.
+  if (iter.is_ascii()) {
+    bool needle_ascii = true;
+    for (size_t i = 0; i < needle_len; i++) {
+      auto c = static_cast<unsigned char>(needle[i]);
+      if (c >= 0x80u || c == '\r') {
+        needle_ascii = false;
+        break;
+      }
+    }
+    if (!needle_ascii) return -1;
+    std::string_view const hay(haystack, haystack_len);
+    std::string_view const ndl(needle, needle_len);
+    auto pos = reverse ? hay.rfind(ndl) : hay.find(ndl);
+    return pos == std::string_view::npos ? -1 : static_cast<int32_t>(pos);
+  }
+
   // fast track ascii string search upto 4 characters.
   if (!reverse) {
     bool is_all_ascii = false;

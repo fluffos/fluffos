@@ -94,4 +94,18 @@ void do_tests() {
   ASSERT_EQ(
     ({ "lh15970183750", "abcdefghigk", "werert" }),
     explode("lh15970183750║abcdefghigk║werert", "║"));
+
+  // issue #1366: many ASCII tokens must still split correctly (and in
+  // linear time — the C++ side of this is EGCIterator::reset skipping
+  // a rescan on suffixes of a known-ASCII string). Stay under the
+  // testsuite `maximum array size` of 15000.
+  {
+    int n = 8000;
+    string many = repeat_string("abcdefghij ", n);
+    mixed *parts = explode(many, " ");
+    ASSERT_EQ(n, sizeof(parts));
+    ASSERT_EQ("abcdefghij", parts[0]);
+    ASSERT_EQ("abcdefghij", parts[<1]);
+    ASSERT_EQ(many, implode(explode_reversible(many, " "), " "));
+  }
 }

@@ -264,6 +264,9 @@ array_t* explode_string(const char* str, int slen, const char* del, int dellen, 
   auto num_leading = 0;
   auto num_trailing = 0;
 
+  // One iterator over the whole input. Each delimiter match then reset()s
+  // it to the remaining suffix/prefix; for ASCII that must not rescan (see
+  // EGCIterator::reset and issue #1366).
   EGCIterator iter(source, sourcelen);
   /*
    * Count leading 'del' strings.

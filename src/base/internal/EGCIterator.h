@@ -161,10 +161,31 @@ class EGCIterator {
   [[nodiscard]] const char* data() const { return src_; }
   [[nodiscard]] int32_t len() const { return len_; }
   void reset(const char* src, int32_t slen) {
+    // explode() (and similar token walks) call reset() once per delimiter
+    // with a suffix/prefix of the same buffer. all_ascii() is a full scan,
+    // so doing it on every remaining slice is O(n²) in token count — that
+    // is issue #1366: explode of 50k ASCII tokens went from ~8 ms to ~237 ms
+    // after reset() started scanning. A subrange of a known-ASCII string is
+    // still ASCII (the CR / high-bit exclusion is closed under substring),
+    // so skip the scan when the new range sits inside the previous one.
+    // icu_ready_ is always dropped: a BreakIterator setText()'d on the old
+    // range must not be reused on the new one.
+    const bool prev_ascii = ok_ && ascii_;
+    const char* const prev_src = src_;
+    const int32_t prev_len = len_;
+
     ok_ = false;
     icu_ready_ = false;
     src_ = src;
     len_ = slen;
+
+    if (prev_ascii && slen >= 0 && src >= prev_src &&
+        static_cast<size_t>(src - prev_src) + static_cast<size_t>(slen) <=
+            static_cast<size_t>(prev_len)) {
+      ascii_ = true;
+      ok_ = true;
+      return;
+    }
 
     ascii_ = all_ascii(src, slen);
     if (ascii_) {

@@ -253,6 +253,25 @@ TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
   EXPECT_EQ(v->size, 0);
 }
 
+// issue #1366: explode() became superlinear in token count because
+// EGCIterator::reset() rescanned the remaining string for ASCII on every
+// delimiter. Pin the many-token ASCII split; the testsuite's
+// `maximum array size` is 15000, so stay under that.
+TEST_F(DriverTest, ExplodeManyAsciiTokens) {
+  constexpr int kTokens = 8000;
+  std::string s;
+  s.reserve(kTokens * 11);
+  for (int i = 0; i < kTokens; i++) {
+    if (i) s.push_back(' ');
+    s += "abcdefghij";
+  }
+  array_t* v = explode_string(s.c_str(), static_cast<int>(s.size()), " ", 1, false);
+  ASSERT_EQ(v->size, kTokens);
+  EXPECT_STREQ(v->item[0].u.string, "abcdefghij");
+  EXPECT_STREQ(v->item[kTokens - 1].u.string, "abcdefghij");
+  free_array(v);
+}
+
 // Regression test for a heap-use-after-free in dealloc_object()
 // (src/vm/internal/base/object.cc): destruct_object() pushes the object
 // onto the global obj_list_destruct queue (simulate.cc); on the unfixed
