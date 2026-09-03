@@ -168,6 +168,38 @@ private async int loop_error() {
   return total;
 }
 
+/* An acatch region wrapping a foreach that awaits, erroring after the
+ * resume. The region's marker frame is rebuilt at the resume, and the count
+ * of temporaries it was entered with has to be rebuilt with it -- the frame
+ * comes back on a different base, so the recorded value travels relative to
+ * that base (lpc_coroutine_acatch_t::temporaries_offset). The miscount is not
+ * observable from LPC (an over-count only stops break_point() checking), so
+ * this pins the path itself: the error is caught by the acatch, the body
+ * carries on, and the loop after it still runs. */
+private async int acatch_over_loop() {
+  mixed err;
+  int total;
+
+  err = acatch {
+    foreach (int i in ({ 1, 2, 3 })) {
+      total += await gate;
+      if (i == 2) {
+        error("caught inside the loop");
+      }
+    }
+  };
+
+  if (!err) {
+    return -1;
+  }
+
+  foreach (int j in ({ 10, 20 })) {
+    total += j * await gate;
+  }
+
+  return total;
+}
+
 void do_tests() {
   gate = promise_create();
   promise_resolve(gate, 2);
@@ -229,6 +261,13 @@ void do_tests() {
     ASSERT2(stringp(reason) && strsrch(reason, "boom in loop") != -1,
       "an error after a resume unwinds out of the open foreach: " + reason);
     RELEASE_LATCH("loop-error");
+  });
+
+  EXPECT_LATCH("acatch-loop");
+  promise_then(acatch_over_loop(), function(mixed v) {
+    // 2+2 from the two iterations before the error, then (10+20)*2
+    ASSERT_EQ(64, v);
+    RELEASE_LATCH("acatch-loop");
   });
 
   // Still refused, with a diagnostic that now says which shapes are the
