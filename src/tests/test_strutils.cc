@@ -256,6 +256,23 @@ TEST(EGCAsciiFastPath, ResetToUnrelatedStringRescans) {
   EXPECT_TRUE(it.is_ascii());
 }
 
+// explode()'s trailing-delimiter walk reset()s to a prefix (same pointer,
+// shorter length). The empty suffix at the end is the all-delimiters case.
+TEST(EGCAsciiFastPath, ResetToPrefixAndEmptyEndStayAscii) {
+  const char* s = "hello world";
+  EGCIterator it(s, 11);
+  ASSERT_TRUE(it.is_ascii());
+  it.reset(s, 5);  // prefix "hello"
+  EXPECT_TRUE(it.ok());
+  EXPECT_TRUE(it.is_ascii());
+  EXPECT_EQ(s, it.data());
+  EXPECT_EQ(5, it.len());
+  it.reset(s + 11, 0);  // empty suffix at the end
+  EXPECT_TRUE(it.ok());
+  EXPECT_TRUE(it.is_ascii());
+  EXPECT_EQ(0, it.len());
+}
+
 TEST(U8EgcFind, AsciiForwardAndReverse) {
   const char* s = "ab cd ab";
   EGCIterator it(s, 8);
@@ -268,6 +285,7 @@ TEST(U8EgcFind, AsciiForwardAndReverse) {
   EXPECT_EQ(-1, u8_egc_find_as_offset(it, "zz", 2, true));
   // Non-ASCII needle cannot occur in a CR-free ASCII haystack.
   EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\xe4\xbd\xa0", 3, false));
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\r", 1, false));
 }
 
 // u8_offset_to_egc_index used to drive ICU through operator->() even when
@@ -340,6 +358,15 @@ TEST(U8EgcSplit, MatchesIcuOnNonAscii) {
 
 TEST(U8EgcSplit, EmptyInput) {
   EXPECT_TRUE(u8_egc_split("", 0).empty());
+}
+
+TEST(U8EgcSplit, CrLfIsOneCluster) {
+  const char* s = "a\r\nb";
+  auto parts = u8_egc_split(s, 4);
+  ASSERT_EQ(3u, parts.size());
+  EXPECT_EQ("a", parts[0]);
+  EXPECT_EQ(std::string_view("\r\n", 2), parts[1]);
+  EXPECT_EQ("b", parts[2]);
 }
 
 // And confirm a CR-bearing string is routed to ICU rather than the fast path.

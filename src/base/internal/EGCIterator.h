@@ -2,6 +2,7 @@
 #define FLUFFOS_SRC_BASE_INTERNAL_STRUTILS_CC_EGCSTRINGVIEW_H_
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <cctype>
 #include <locale>
@@ -179,12 +180,19 @@ class EGCIterator {
     src_ = src;
     len_ = slen;
 
-    if (prev_ascii && slen >= 0 && src >= prev_src &&
-        static_cast<size_t>(src - prev_src) + static_cast<size_t>(slen) <=
-            static_cast<size_t>(prev_len)) {
-      ascii_ = true;
-      ok_ = true;
-      return;
+    // Subrange test is overflow-safe on 32-bit (wasm32): check slen against
+    // prev_len first so (prev_len - slen) cannot wrap, then compare the
+    // pointer offset as uintptr_t rather than subtracting pointers from
+    // possibly distinct objects.
+    if (prev_ascii && slen >= 0 && slen <= prev_len) {
+      const auto src_u = reinterpret_cast<uintptr_t>(src);
+      const auto prev_u = reinterpret_cast<uintptr_t>(prev_src);
+      if (src_u >= prev_u &&
+          src_u - prev_u <= static_cast<uintptr_t>(prev_len) - static_cast<uintptr_t>(slen)) {
+        ascii_ = true;
+        ok_ = true;
+        return;
+      }
     }
 
     ascii_ = all_ascii(src, slen);
