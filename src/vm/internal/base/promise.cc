@@ -1209,8 +1209,20 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   coro->frame = nullptr;
   coro->frame_size = 0;
 
+#ifdef DEBUG
+  /* The base these markers' offsets were taken against. When there was no
+   * frame to restore there were no temporaries either, so the counter is
+   * already the base. */
+  int const marker_base = (resumed_temp_base >= 0) ? resumed_temp_base : stack_in_use_as_temporary;
+#endif
   for (auto& m : coro->markers) {
     push_control_stack(FRAME_CATCH | FRAME_ASYNC);
+#ifdef DEBUG
+    /* push_control_stack() recorded the count as it is NOW -- with this
+     * body's temporaries already back on it -- which is not what the region
+     * was entered with. */
+    csp->save_temporaries = marker_base + m.temporaries_offset;
+#endif
     csp->pc = coro->prog->program + m.pc_offset;
     csp->save_sp = fp + m.sp_offset;
     csp->save_cgsp = cgsp;
@@ -2040,8 +2052,13 @@ void coroutine_await_pending(promise_t* awaited) {
   coro->defers = async_frame->defers;
   async_frame->defers = nullptr;
   for (control_stack_t* f = async_frame + 1; f <= csp; f++) {
-    coro->markers.push_back({static_cast<int>(f->pc - current_prog->program),
-                             static_cast<int>(f->save_sp - fp), f->defers});
+    lpc_coroutine_acatch_t m{static_cast<int>(f->pc - current_prog->program),
+                             static_cast<int>(f->save_sp - fp), f->defers};
+#ifdef DEBUG
+    /* see the field's comment: carried relative to the body's base */
+    m.temporaries_offset = f->save_temporaries - g_coroutine_temp_base;
+#endif
+    coro->markers.push_back(m);
     f->defers = nullptr;
   }
 

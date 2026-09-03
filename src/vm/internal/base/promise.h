@@ -192,6 +192,20 @@ struct lpc_coroutine_acatch_t {
   int pc_offset; /* continuation (code after the region), relative to prog->program */
   int sp_offset; /* value-stack top at region entry, relative to fp */
   struct defer_list* defers;
+#ifdef DEBUG
+  /* The frame's recorded foreach-temporaries count (control_stack_t::
+   * save_temporaries), relative to the BODY's base -- relative for exactly
+   * the reason sp_offset is relative to fp: the absolute value is meaningless
+   * once the frame is rebuilt on a resume, where the base is different.
+   *
+   * Without carrying it, resume_coroutine() re-pushes these markers AFTER it
+   * has added the body's temporaries back, so each frame records the inflated
+   * count instead of the one at region entry -- and an error unwinding to the
+   * region then restores the counter to that, leaving it high by however many
+   * loops were open inside the region. `acatch { foreach (...) { await p;
+   * error(); } }` is the shape. */
+  int temporaries_offset = 0;
+#endif
 };
 
 struct lpc_coroutine_t {
