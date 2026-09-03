@@ -108,4 +108,15 @@ void do_tests() {
     ASSERT_EQ("abcdefghij", parts[<1]);
     ASSERT_EQ(many, implode(explode_reversible(many, " "), " "));
   }
+
+  // explode(s, "") splits on grapheme clusters. The C++ helper used to
+  // drive ICU through operator->() even for ASCII (sibling of #1366).
+  {
+    string many = repeat_string("a", 8000);
+    mixed *chars = explode(many, "");
+    ASSERT_EQ(8000, sizeof(chars));
+    ASSERT_EQ("a", chars[0]);
+    ASSERT_EQ("a", chars[<1]);
+    ASSERT_EQ(many, implode(chars, ""));
+  }
 }

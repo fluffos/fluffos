@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <string>
+#include <vector>
 #include "base/std.h"
 
 #include "base/internal/strutils.h"
@@ -267,6 +268,78 @@ TEST(U8EgcFind, AsciiForwardAndReverse) {
   EXPECT_EQ(-1, u8_egc_find_as_offset(it, "zz", 2, true));
   // Non-ASCII needle cannot occur in a CR-free ASCII haystack.
   EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\xe4\xbd\xa0", 3, false));
+}
+
+// u8_offset_to_egc_index used to drive ICU through operator->() even when
+// the iterator had already classified the haystack as ASCII. strsrch()
+// converts a byte offset to an EGC index through this helper, so ASCII
+// search paid a full setText + walk. Pin against ICU, including the
+// non-boundary case (CRLF) the fast path must not mis-report.
+TEST(U8OffsetToEgcIndex, AsciiOffsetIsIndex) {
+  const char* s = "hello";
+  EGCIterator it(s, 5);
+  ASSERT_TRUE(it.is_ascii());
+  for (int32_t off = 0; off <= 5; off++) {
+    EXPECT_EQ(off, u8_offset_to_egc_index(it, off)) << "offset " << off;
+  }
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 6));
+}
+
+TEST(U8OffsetToEgcIndex, CrLfInteriorIsNotABoundary) {
+  const char* s = "a\r\nb";  // clusters: a, CRLF, b — offsets 0, 1, 3, 4
+  EGCIterator it(s, 4);
+  ASSERT_FALSE(it.is_ascii());
+  EXPECT_EQ(0, u8_offset_to_egc_index(it, 0));
+  EXPECT_EQ(1, u8_offset_to_egc_index(it, 1));
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 2)) << "interior of CRLF";
+  EXPECT_EQ(2, u8_offset_to_egc_index(it, 3));
+  EXPECT_EQ(3, u8_offset_to_egc_index(it, 4));
+}
+
+TEST(U8OffsetToEgcIndex, MatchesIcuOnNonAscii) {
+  const char* s = "a\xe4\xbd\xa0z";  // a 你 z — 5 bytes, 3 clusters
+  EGCIterator it(s, 5);
+  ASSERT_FALSE(it.is_ascii());
+  EXPECT_EQ(0, u8_offset_to_egc_index(it, 0));
+  EXPECT_EQ(1, u8_offset_to_egc_index(it, 1));
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 2));  // interior of 你
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 3));
+  EXPECT_EQ(2, u8_offset_to_egc_index(it, 4));
+  EXPECT_EQ(3, u8_offset_to_egc_index(it, 5));
+}
+
+// explode(s, "") walks u8_egc_split, which used to call operator->() and
+// so ensure_icu() on every ASCII string. Drive the real helper against
+// an ICU walk of the same bytes.
+TEST(U8EgcSplit, AsciiOneBytePerCluster) {
+  const char* s = "hello";
+  auto parts = u8_egc_split(s, 5);
+  ASSERT_EQ(5u, parts.size());
+  for (int i = 0; i < 5; i++) {
+    EXPECT_EQ(1u, parts[i].size());
+    EXPECT_EQ(s[i], parts[i][0]);
+  }
+}
+
+TEST(U8EgcSplit, MatchesIcuOnNonAscii) {
+  const char* s = "a\xe4\xbd\xa0z";  // a 你 z
+  auto parts = u8_egc_split(s, 5);
+  EGCIterator ref(s, 5);
+  std::vector<std::string_view> expect;
+  ref->first();
+  auto start = ref->current();
+  while (ref->next() != icu::BreakIterator::DONE) {
+    expect.emplace_back(s + start, ref->current() - start);
+    start = ref->current();
+  }
+  ASSERT_EQ(expect.size(), parts.size());
+  for (size_t i = 0; i < parts.size(); i++) {
+    EXPECT_EQ(expect[i], parts[i]) << "cluster " << i;
+  }
+}
+
+TEST(U8EgcSplit, EmptyInput) {
+  EXPECT_TRUE(u8_egc_split("", 0).empty());
 }
 
 // And confirm a CR-bearing string is routed to ICU rather than the fast path.

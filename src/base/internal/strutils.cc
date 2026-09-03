@@ -196,6 +196,14 @@ int32_t u8_offset_to_egc_index(EGCIterator& iter, int32_t offset) {
   if (offset <= 0) return offset;
   if (!iter.ok()) return -1;
 
+  // CR-free ASCII: every byte is a cluster boundary, so the EGC index is
+  // the byte offset. Driving ICU here (via operator->) is what made
+  // strsrch() of a long ASCII haystack pay a full setText + walk after
+  // strchr already found the match — same class of miss as #1366.
+  if (iter.is_ascii()) {
+    return offset > iter.len() ? -1 : offset;
+  }
+
   int idx = -1;
   int pos = 0;
 
@@ -590,17 +598,20 @@ size_t u8_width(const char* src, int len) {
 
 std::vector<std::string_view> u8_egc_split(const char* src, int32_t slen) {
   std::vector<std::string_view> result;
-  result.reserve(16);
+  if (slen <= 0) return result;
 
   EGCSmartIterator iter(src, slen);
   if (!iter.ok()) return result;
 
-  iter->first();
-  auto start = iter->current();
-  while (iter->next() != icu::BreakIterator::DONE) {
-    auto size = iter->current() - start;
-    result.emplace_back(src + start, size);
-    start = iter->current();
+  // Walk via EGCSmartIterator, not operator->(): the latter ensure_icu()'s
+  // the whole string, so explode(s, "") on ASCII paid a BreakIterator walk
+  // of every byte. first()/next() are arithmetic on the ASCII path.
+  result.reserve(static_cast<size_t>(slen));
+  int32_t start = iter.first();
+  int32_t cur;
+  while ((cur = iter.next()) != icu::BreakIterator::DONE) {
+    result.emplace_back(src + start, cur - start);
+    start = cur;
   }
 
   return result;
