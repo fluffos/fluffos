@@ -69,6 +69,29 @@ and the backslash should be dropped:
       |                 m
 ```
 
+## Efuns from packages this driver lacks
+
+Packages are selected when the driver is compiled, so a driver built
+without one has no such efun at all and a call to it is an ordinary
+undefined function. Since that says nothing about the name being a real
+efun, the compiler names the package it would have come from:
+
+```text
+/feature/user_gmcp.lpc:112:47: error: Undefined function hash (an efun of PACKAGE_CRYPTO, which this driver was not built with)
+```
+
+The note appears only for names this build genuinely lacks. An efun the
+driver does have never reaches this diagnostic, and a name that no
+package declares gets the plain message, so the note is never a guess.
+
+From LPC, the same question is answered by the per-package predefines:
+
+```c
+#ifdef __PACKAGE_CRYPTO__
+    // hash() exists
+#endif
+```
+
 ## Legacy error context
 
 `#pragma show_error_context` is a legacy flag that predates these
