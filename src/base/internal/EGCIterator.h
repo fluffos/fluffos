@@ -111,6 +111,10 @@ class EGCIterator {
   // Auto-vectorizes to a few bytes per cycle, against ICU's ~50 instructions
   // per cluster.
   static bool all_ascii(const char* src, int32_t slen) {
+    // slen < 0 is not a counted length (ICU uses -1 for NUL-terminated).
+    // The empty loop would otherwise return true, and callers that then
+    // did `size_t n = slen` built a ~2^32/2^64-byte view — SIGSEGV.
+    if (slen < 0) return false;
     unsigned char acc = 0;
     unsigned char cr = 0;
     for (int32_t i = 0; i < slen; i++) {
@@ -161,7 +165,10 @@ class EGCIterator {
   static bool scan_is_ascii(const char* src, int32_t slen) { return all_ascii(src, slen); }
   [[nodiscard]] const char* data() const { return src_; }
   [[nodiscard]] int32_t len() const { return len_; }
-  void reset(const char* src, int32_t slen) {
+  // Virtual so EGCSmartIterator can drop its cached count / cursor. The
+  // EGCIterator constructor calls this by name (C++ does not dispatch to
+  // the derived override during base construction); that is intentional.
+  virtual void reset(const char* src, int32_t slen) {
     // explode() (and similar token walks) call reset() once per delimiter
     // with a suffix/prefix of the same buffer. all_ascii() is a full scan,
     // so doing it on every remaining slice is O(n²) in token count — that
@@ -177,8 +184,16 @@ class EGCIterator {
 
     ok_ = false;
     icu_ready_ = false;
+    ascii_ = false;
     src_ = src;
     len_ = slen;
+
+    // Only -1 means NUL-terminated (ICU convention). Other negatives are
+    // not a length: explode used to pass them after a strstr match that
+    // started inside the counted range and ran past it.
+    if (slen < -1) {
+      return;
+    }
 
     // Subrange test is overflow-safe on 32-bit (wasm32): check slen against
     // prev_len first so (prev_len - slen) cannot wrap, then compare the
@@ -195,10 +210,10 @@ class EGCIterator {
       }
     }
 
-    ascii_ = all_ascii(src, slen);
-    if (ascii_) {
+    if (slen >= 0 && all_ascii(src, slen)) {
       // Pure ASCII is always well-formed UTF-8; defer ICU until something
       // actually asks for the underlying break iterator.
+      ascii_ = true;
       ok_ = true;
       return;
     }

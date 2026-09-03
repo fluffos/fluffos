@@ -257,7 +257,9 @@ TEST(EGCAsciiFastPath, ResetToUnrelatedStringRescans) {
 }
 
 // explode()'s trailing-delimiter walk reset()s to a prefix (same pointer,
-// shorter length). The empty suffix at the end is the all-delimiters case.
+// shorter length). The empty suffix at the end is the all-delimiters case
+// and must be taken from the *full* remembered range — after a prefix
+// reset the remembered span is only that prefix, so s+11 is outside it.
 TEST(EGCAsciiFastPath, ResetToPrefixAndEmptyEndStayAscii) {
   const char* s = "hello world";
   EGCIterator it(s, 11);
@@ -267,10 +269,20 @@ TEST(EGCAsciiFastPath, ResetToPrefixAndEmptyEndStayAscii) {
   EXPECT_TRUE(it.is_ascii());
   EXPECT_EQ(s, it.data());
   EXPECT_EQ(5, it.len());
+  it.reset(s, 11);  // restore the full range so the empty end is a subrange
+  ASSERT_TRUE(it.is_ascii());
   it.reset(s + 11, 0);  // empty suffix at the end
   EXPECT_TRUE(it.ok());
   EXPECT_TRUE(it.is_ascii());
   EXPECT_EQ(0, it.len());
+}
+
+TEST(EGCAsciiFastPath, NegativeLenIsNotAscii) {
+  EXPECT_FALSE(EGCIterator::scan_is_ascii("hello", -3));
+  EXPECT_FALSE(EGCIterator::scan_is_ascii("hello", -1));
+  EGCIterator it("hello", -3);
+  EXPECT_FALSE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
 }
 
 TEST(U8EgcFind, AsciiForwardAndReverse) {
@@ -286,6 +298,26 @@ TEST(U8EgcFind, AsciiForwardAndReverse) {
   // Non-ASCII needle cannot occur in a CR-free ASCII haystack.
   EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\xe4\xbd\xa0", 3, false));
   EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\r", 1, false));
+}
+
+// strstr ignores the counted length. A needle that starts inside the
+// counted range and runs into bytes past it is not a match — explode's
+// trailing trim leaves those bytes in the C string. The ASCII path
+// already used string_view; this pins the non-ASCII strstr path.
+TEST(U8EgcFind, MatchMustFitInCountedLength) {
+  const char ascii[] = "ab--";
+  EGCIterator ita(ascii, 3);  // "ab-"
+  ASSERT_TRUE(ita.is_ascii());
+  EXPECT_EQ(-1, u8_egc_find_as_offset(ita, "--", 2, false));
+
+  const char wide[] = "\xe4\xbd\xa0--";  // 你-- (5 bytes + NUL)
+  EGCIterator itw(wide, 4);              // 你-
+  ASSERT_FALSE(itw.is_ascii());
+  EXPECT_EQ(-1, u8_egc_find_as_offset(itw, "--", 2, false));
+
+  EGCIterator it_full(wide, 5);
+  ASSERT_FALSE(it_full.is_ascii());
+  EXPECT_EQ(3, u8_egc_find_as_offset(it_full, "--", 2, false));
 }
 
 // u8_offset_to_egc_index used to drive ICU through operator->() even when
@@ -358,6 +390,14 @@ TEST(U8EgcSplit, MatchesIcuOnNonAscii) {
 
 TEST(U8EgcSplit, EmptyInput) {
   EXPECT_TRUE(u8_egc_split("", 0).empty());
+}
+
+TEST(EGCSmartIterator, ResetClearsCachedCount) {
+  EGCSmartIterator it("abcd", 4);
+  EXPECT_EQ(4u, it.count());
+  it.reset("xy", 2);
+  EXPECT_TRUE(it.ok());
+  EXPECT_EQ(2u, it.count());
 }
 
 TEST(U8EgcSplit, CrLfIsOneCluster) {

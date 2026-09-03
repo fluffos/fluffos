@@ -43,5 +43,9 @@ TEXT;
     ASSERT_EQ(10, strsrch(many, " "));
     ASSERT_EQ(10, strsrch(many, ' '));
     ASSERT_EQ(sizeof(many) - 1, strsrch(many, " ", 1));
+    // Single-char needles take strchr in f_strsrch; a multi-char needle
+    // is the one that actually reaches u8_egc_find_as_offset.
+    ASSERT_EQ(8, strsrch(many, "ij "));
+    ASSERT_EQ(sizeof(many) - 3, strsrch(many, "ij ", 1));
   }
 }

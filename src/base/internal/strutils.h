@@ -110,6 +110,12 @@ inline void ReplaceStringInPlace(std::string& subject, const std::string& search
 class EGCSmartIterator : public EGCIterator {
  public:
   EGCSmartIterator(const char* src, int32_t slen) : EGCIterator(src, slen) {}
+  void reset(const char* src, int32_t slen) override {
+    EGCIterator::reset(src, slen);
+    current_idx_ = 0;
+    count_ = -1;
+    ascii_pos_ = 0;
+  }
   size_t count() {
     if (count_ == -1) {
       // ASCII: one cluster per byte, so the count is the byte length. This is
