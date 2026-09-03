@@ -97,8 +97,8 @@ void do_tests() {
 
   // issue #1366: many ASCII tokens must still split correctly (and in
   // linear time — the C++ side of this is EGCIterator::reset skipping
-  // a rescan on suffixes of a known-ASCII string). Stay under the
-  // testsuite `maximum array size` of 15000.
+  // a rescan on suffixes of a known-ASCII string). config.test sets
+  // `maximum array size` to 100000; stay well under that.
   {
     int n = 8000;
     string many = repeat_string("abcdefghij ", n);

@@ -255,8 +255,8 @@ TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
 
 // issue #1366: explode() became superlinear in token count because
 // EGCIterator::reset() rescanned the remaining string for ASCII on every
-// delimiter. Pin the many-token ASCII split; the testsuite's
-// `maximum array size` is 15000, so stay under that.
+// delimiter. Pin the many-token ASCII split. config.test sets
+// `maximum array size` to 100000; stay well under that.
 TEST_F(DriverTest, ExplodeManyAsciiTokens) {
   constexpr int kTokens = 8000;
   std::string s;
