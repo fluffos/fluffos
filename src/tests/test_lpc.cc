@@ -253,6 +253,88 @@ TEST_F(DriverTest, ExplodeReversibleAllDelimiters) {
   EXPECT_EQ(v->size, 0);
 }
 
+// issue #1366: explode() became superlinear in token count because
+// EGCIterator::reset() rescanned the remaining string for ASCII on every
+// delimiter. Pin the many-token ASCII split. config.test sets
+// `maximum array size` to 100000; stay well under that.
+TEST_F(DriverTest, ExplodeManyAsciiTokens) {
+  constexpr int kTokens = 8000;
+  std::string s;
+  s.reserve(kTokens * 11);
+  for (int i = 0; i < kTokens; i++) {
+    if (i) s.push_back(' ');
+    s += "abcdefghij";
+  }
+  array_t* v = explode_string(s.c_str(), static_cast<int>(s.size()), " ", 1, false);
+  ASSERT_EQ(v->size, kTokens);
+  EXPECT_STREQ(v->item[0].u.string, "abcdefghij");
+  EXPECT_STREQ(v->item[kTokens - 1].u.string, "abcdefghij");
+  free_array(v);
+}
+
+// strstr used to accept a delimiter that started inside the counted
+// length and ran into bytes past it (left behind by trailing-delimiter
+// trim). ASCII find/rfind was already correct; the non-ASCII strstr
+// path then let sourcelen go negative and SIGSEGV'd. Pin both.
+TEST_F(DriverTest, ExplodeDelimiterMustNotMatchPastCountedLength) {
+  array_t* v = explode_string("ab---", 5, "--", 2, false);
+  ASSERT_EQ(v->size, 1);
+  EXPECT_STREQ(v->item[0].u.string, "ab-");
+  free_array(v);
+
+  // Three dashes: one trailing `--` is skipped, leftover dash stays in
+  // the field. Five dashes: two trailing `--`, skip one, keep one empty.
+  std::string han3 = "\xe4\xbd\xa0---";  // 你---
+  v = explode_string(han3.c_str(), static_cast<int>(han3.size()), "--", 2, false);
+  ASSERT_EQ(v->size, 1);
+  EXPECT_STREQ(v->item[0].u.string, "\xe4\xbd\xa0-");
+  free_array(v);
+
+  std::string han = "\xe4\xbd\xa0-----";  // 你-----
+  v = explode_string(han.c_str(), static_cast<int>(han.size()), "--", 2, false);
+  ASSERT_EQ(v->size, 2);
+  EXPECT_STREQ(v->item[0].u.string, "\xe4\xbd\xa0-");
+  EXPECT_STREQ(v->item[1].u.string, "");
+  free_array(v);
+
+  v = explode_string(han.c_str(), static_cast<int>(han.size()), "--", 2, true);
+  ASSERT_EQ(v->size, 3);
+  EXPECT_STREQ(v->item[0].u.string, "\xe4\xbd\xa0-");
+  EXPECT_STREQ(v->item[1].u.string, "");
+  EXPECT_STREQ(v->item[2].u.string, "");
+  char* joined = implode_string(v, "--", 2);
+  EXPECT_STREQ(joined, han.c_str());
+  FREE_MSTR(joined);
+  free_array(v);
+
+  std::string cafe = "caf\xc3\xa9 text\n\n\n\n\n";
+  v = explode_string(cafe.c_str(), static_cast<int>(cafe.size()), "\n\n", 2, false);
+  ASSERT_EQ(v->size, 2);
+  EXPECT_STREQ(v->item[0].u.string, "caf\xc3\xa9 text\n");
+  EXPECT_STREQ(v->item[1].u.string, "");
+  free_array(v);
+
+  std::string cr = "a\r\nb-----";
+  v = explode_string(cr.c_str(), static_cast<int>(cr.size()), "--", 2, false);
+  ASSERT_EQ(v->size, 2);
+  EXPECT_STREQ(v->item[0].u.string, "a\r\nb-");
+  EXPECT_STREQ(v->item[1].u.string, "");
+  free_array(v);
+}
+
+// Trailing-delimiter walk reset()s to a shrinking prefix once per match.
+// Pin many trailing ASCII delimiters (sibling of ExplodeManyAsciiTokens).
+TEST_F(DriverTest, ExplodeManyTrailingDelimiters) {
+  constexpr int kDelims = 8000;
+  std::string s = "x";
+  s.append(kDelims, ' ');
+  array_t* v = explode_string(s.c_str(), static_cast<int>(s.size()), " ", 1, false);
+  ASSERT_EQ(v->size, kDelims);  // "x" plus (n-1) trailing empties after skipping one
+  EXPECT_STREQ(v->item[0].u.string, "x");
+  EXPECT_STREQ(v->item[kDelims - 1].u.string, "");
+  free_array(v);
+}
+
 // Regression test for a heap-use-after-free in dealloc_object()
 // (src/vm/internal/base/object.cc): destruct_object() pushes the object
 // onto the global obj_list_destruct queue (simulate.cc); on the unfixed

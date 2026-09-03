@@ -69,14 +69,41 @@ size_t u8_incomplete_tail(std::string_view buf) {
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
 int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t needle_len,
                               bool reverse) {
+  if (!iter.ok()) return -1;
+
   const char* haystack = iter.data();
-  size_t const haystack_len = iter.len() == -1 ? strlen(haystack) : iter.len();
+  int32_t const raw_len = iter.len();
+  // Only -1 means NUL-terminated. Casting any other negative to size_t
+  // made the ASCII string_view path scan off the mapping (SIGSEGV).
+  if (raw_len < -1) return -1;
+  size_t const haystack_len = raw_len == -1 ? strlen(haystack) : static_cast<size_t>(raw_len);
 
   // no way
   if (needle_len > haystack_len) {
     return -1;
   }
-  if (!iter.ok()) return -1;
+
+  // Haystack already proven CR-free ASCII: every byte is a grapheme
+  // boundary, so find/rfind is EGC-correct and must not touch ICU.
+  // explode()'s trailing-delimiter walk used the reverse path, which
+  // previously always called isBoundary() and so ensure_icu()'d the
+  // whole remaining string on every token. A needle with a high bit or
+  // CR cannot occur in this haystack.
+  if (iter.is_ascii()) {
+    bool needle_ascii = true;
+    for (size_t i = 0; i < needle_len; i++) {
+      auto c = static_cast<unsigned char>(needle[i]);
+      if (c >= 0x80u || c == '\r') {
+        needle_ascii = false;
+        break;
+      }
+    }
+    if (!needle_ascii) return -1;
+    std::string_view const hay(haystack, haystack_len);
+    std::string_view const ndl(needle, needle_len);
+    auto pos = reverse ? hay.rfind(ndl) : hay.find(ndl);
+    return pos == std::string_view::npos ? -1 : static_cast<int32_t>(pos);
+  }
 
   // fast track ascii string search upto 4 characters.
   if (!reverse) {
@@ -89,11 +116,17 @@ int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t need
       if (i == 3) is_all_ascii = false;
     }
     if (is_all_ascii) {
-      // strstr doesn't follow haystack_len, so we may overrun, wasting some cycles.
+      // strstr does not honor haystack_len. explode()'s trailing-delimiter
+      // trim shortens the count but leaves the C string intact, so a match
+      // can start inside the counted range and extend past it. Accepting
+      // that made sourcelen go negative. Reject unless the whole needle
+      // sits in [0, haystack_len).
       const auto* res = strstr(haystack, needle);
       auto ret = res == nullptr ? -1 : (decltype(haystack))res - haystack;
-      if (ret >= haystack_len) ret = -1;
-      return ret;
+      if (ret < 0 || static_cast<size_t>(ret) > haystack_len - needle_len) {
+        return -1;
+      }
+      return static_cast<int32_t>(ret);
     }
   }
 
@@ -173,6 +206,14 @@ void u8_copy_and_replace_codepoint_at(EGCSmartIterator& iter, char* dst, int32_t
 int32_t u8_offset_to_egc_index(EGCIterator& iter, int32_t offset) {
   if (offset <= 0) return offset;
   if (!iter.ok()) return -1;
+
+  // CR-free ASCII: every byte is a cluster boundary, so the EGC index is
+  // the byte offset. Driving ICU here (via operator->) is what made
+  // strsrch() of a long ASCII haystack pay a full setText + walk after
+  // strchr already found the match — same class of miss as #1366.
+  if (iter.is_ascii()) {
+    return offset > iter.len() ? -1 : offset;
+  }
 
   int idx = -1;
   int pos = 0;
@@ -568,17 +609,20 @@ size_t u8_width(const char* src, int len) {
 
 std::vector<std::string_view> u8_egc_split(const char* src, int32_t slen) {
   std::vector<std::string_view> result;
-  result.reserve(16);
+  if (slen <= 0) return result;
 
   EGCSmartIterator iter(src, slen);
   if (!iter.ok()) return result;
 
-  iter->first();
-  auto start = iter->current();
-  while (iter->next() != icu::BreakIterator::DONE) {
-    auto size = iter->current() - start;
-    result.emplace_back(src + start, size);
-    start = iter->current();
+  // Walk via EGCSmartIterator, not operator->(): the latter ensure_icu()'s
+  // the whole string, so explode(s, "") on ASCII paid a BreakIterator walk
+  // of every byte. first()/next() are arithmetic on the ASCII path.
+  result.reserve(iter.is_ascii() ? static_cast<size_t>(slen) : 16);
+  int32_t start = iter.first();
+  int32_t cur;
+  while ((cur = iter.next()) != icu::BreakIterator::DONE) {
+    result.emplace_back(src + start, cur - start);
+    start = cur;
   }
 
   return result;

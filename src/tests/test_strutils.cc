@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <string>
+#include <vector>
 #include "base/std.h"
 
 #include "base/internal/strutils.h"
@@ -223,6 +225,188 @@ TEST(EGCAsciiFastPath, CrLfIsTheOnlyAsciiJoin) {
           << "ASCII pair (" << a << "," << b << ") clustered unexpectedly";
     }
   }
+}
+
+// explode() reset()s the iterator to a shrinking suffix once per token.
+// A subrange of a known-ASCII string must stay on the ASCII path without
+// a fresh all_ascii() scan (issue #1366). Resetting to a different buffer
+// still has to rescan — including the ASCII → non-ASCII direction.
+TEST(EGCAsciiFastPath, ResetToSuffixStaysAscii) {
+  std::string s(2048, 'x');
+  for (size_t i = 10; i < s.size(); i += 11) s[i] = ' ';
+  EGCIterator it(s.data(), static_cast<int32_t>(s.size()));
+  ASSERT_TRUE(it.is_ascii());
+  for (int32_t off = 0; off + 11 <= static_cast<int32_t>(s.size()); off += 11) {
+    it.reset(s.data() + off, static_cast<int32_t>(s.size()) - off);
+    EXPECT_TRUE(it.ok()) << "offset " << off;
+    EXPECT_TRUE(it.is_ascii()) << "offset " << off;
+    EXPECT_EQ(s.data() + off, it.data());
+  }
+}
+
+TEST(EGCAsciiFastPath, ResetToUnrelatedStringRescans) {
+  EGCIterator it("hello", 5);
+  ASSERT_TRUE(it.is_ascii());
+  const char* wide = "a\xe4\xbd\xa0z";  // a 你 z
+  it.reset(wide, 5);
+  EXPECT_TRUE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
+  it.reset("abc", 3);
+  EXPECT_TRUE(it.ok());
+  EXPECT_TRUE(it.is_ascii());
+}
+
+// explode()'s trailing-delimiter walk reset()s to a prefix (same pointer,
+// shorter length). The empty suffix at the end is the all-delimiters case
+// and must be taken from the *full* remembered range — after a prefix
+// reset the remembered span is only that prefix, so s+11 is outside it.
+TEST(EGCAsciiFastPath, ResetToPrefixAndEmptyEndStayAscii) {
+  const char* s = "hello world";
+  EGCIterator it(s, 11);
+  ASSERT_TRUE(it.is_ascii());
+  it.reset(s, 5);  // prefix "hello"
+  EXPECT_TRUE(it.ok());
+  EXPECT_TRUE(it.is_ascii());
+  EXPECT_EQ(s, it.data());
+  EXPECT_EQ(5, it.len());
+  it.reset(s, 11);  // restore the full range so the empty end is a subrange
+  ASSERT_TRUE(it.is_ascii());
+  it.reset(s + 11, 0);  // empty suffix at the end
+  EXPECT_TRUE(it.ok());
+  EXPECT_TRUE(it.is_ascii());
+  EXPECT_EQ(0, it.len());
+}
+
+TEST(EGCAsciiFastPath, NegativeLenIsNotAscii) {
+  EXPECT_FALSE(EGCIterator::scan_is_ascii("hello", -3));
+  EXPECT_FALSE(EGCIterator::scan_is_ascii("hello", -1));
+  EGCIterator it("hello", -3);
+  EXPECT_FALSE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
+}
+
+TEST(U8EgcFind, AsciiForwardAndReverse) {
+  const char* s = "ab cd ab";
+  EGCIterator it(s, 8);
+  ASSERT_TRUE(it.is_ascii());
+  EXPECT_EQ(2, u8_egc_find_as_offset(it, " ", 1, false));
+  EXPECT_EQ(5, u8_egc_find_as_offset(it, " ", 1, true));
+  EXPECT_EQ(0, u8_egc_find_as_offset(it, "ab", 2, false));
+  EXPECT_EQ(6, u8_egc_find_as_offset(it, "ab", 2, true));
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "zz", 2, false));
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "zz", 2, true));
+  // Non-ASCII needle cannot occur in a CR-free ASCII haystack.
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\xe4\xbd\xa0", 3, false));
+  EXPECT_EQ(-1, u8_egc_find_as_offset(it, "\r", 1, false));
+}
+
+// strstr ignores the counted length. A needle that starts inside the
+// counted range and runs into bytes past it is not a match — explode's
+// trailing trim leaves those bytes in the C string. The ASCII path
+// already used string_view; this pins the non-ASCII strstr path.
+TEST(U8EgcFind, MatchMustFitInCountedLength) {
+  const char ascii[] = "ab--";
+  EGCIterator ita(ascii, 3);  // "ab-"
+  ASSERT_TRUE(ita.is_ascii());
+  EXPECT_EQ(-1, u8_egc_find_as_offset(ita, "--", 2, false));
+
+  const char wide[] = "\xe4\xbd\xa0--";  // 你-- (5 bytes + NUL)
+  EGCIterator itw(wide, 4);              // 你-
+  ASSERT_FALSE(itw.is_ascii());
+  EXPECT_EQ(-1, u8_egc_find_as_offset(itw, "--", 2, false));
+
+  EGCIterator it_full(wide, 5);
+  ASSERT_FALSE(it_full.is_ascii());
+  EXPECT_EQ(3, u8_egc_find_as_offset(it_full, "--", 2, false));
+}
+
+// u8_offset_to_egc_index used to drive ICU through operator->() even when
+// the iterator had already classified the haystack as ASCII. strsrch()
+// converts a byte offset to an EGC index through this helper, so ASCII
+// search paid a full setText + walk. Pin against ICU, including the
+// non-boundary case (CRLF) the fast path must not mis-report.
+TEST(U8OffsetToEgcIndex, AsciiOffsetIsIndex) {
+  const char* s = "hello";
+  EGCIterator it(s, 5);
+  ASSERT_TRUE(it.is_ascii());
+  for (int32_t off = 0; off <= 5; off++) {
+    EXPECT_EQ(off, u8_offset_to_egc_index(it, off)) << "offset " << off;
+  }
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 6));
+}
+
+TEST(U8OffsetToEgcIndex, CrLfInteriorIsNotABoundary) {
+  const char* s = "a\r\nb";  // clusters: a, CRLF, b — offsets 0, 1, 3, 4
+  EGCIterator it(s, 4);
+  ASSERT_FALSE(it.is_ascii());
+  EXPECT_EQ(0, u8_offset_to_egc_index(it, 0));
+  EXPECT_EQ(1, u8_offset_to_egc_index(it, 1));
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 2)) << "interior of CRLF";
+  EXPECT_EQ(2, u8_offset_to_egc_index(it, 3));
+  EXPECT_EQ(3, u8_offset_to_egc_index(it, 4));
+}
+
+TEST(U8OffsetToEgcIndex, MatchesIcuOnNonAscii) {
+  const char* s = "a\xe4\xbd\xa0z";  // a 你 z — 5 bytes, 3 clusters
+  EGCIterator it(s, 5);
+  ASSERT_FALSE(it.is_ascii());
+  EXPECT_EQ(0, u8_offset_to_egc_index(it, 0));
+  EXPECT_EQ(1, u8_offset_to_egc_index(it, 1));
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 2));  // interior of 你
+  EXPECT_EQ(-1, u8_offset_to_egc_index(it, 3));
+  EXPECT_EQ(2, u8_offset_to_egc_index(it, 4));
+  EXPECT_EQ(3, u8_offset_to_egc_index(it, 5));
+}
+
+// explode(s, "") walks u8_egc_split, which used to call operator->() and
+// so ensure_icu() on every ASCII string. Drive the real helper against
+// an ICU walk of the same bytes.
+TEST(U8EgcSplit, AsciiOneBytePerCluster) {
+  const char* s = "hello";
+  auto parts = u8_egc_split(s, 5);
+  ASSERT_EQ(5u, parts.size());
+  for (int i = 0; i < 5; i++) {
+    EXPECT_EQ(1u, parts[i].size());
+    EXPECT_EQ(s[i], parts[i][0]);
+  }
+}
+
+TEST(U8EgcSplit, MatchesIcuOnNonAscii) {
+  const char* s = "a\xe4\xbd\xa0z";  // a 你 z
+  auto parts = u8_egc_split(s, 5);
+  EGCIterator ref(s, 5);
+  std::vector<std::string_view> expect;
+  ref->first();
+  auto start = ref->current();
+  while (ref->next() != icu::BreakIterator::DONE) {
+    expect.emplace_back(s + start, ref->current() - start);
+    start = ref->current();
+  }
+  ASSERT_EQ(expect.size(), parts.size());
+  for (size_t i = 0; i < parts.size(); i++) {
+    EXPECT_EQ(expect[i], parts[i]) << "cluster " << i;
+  }
+}
+
+TEST(U8EgcSplit, EmptyInput) {
+  EXPECT_TRUE(u8_egc_split("", 0).empty());
+}
+
+TEST(EGCSmartIterator, ResetClearsCachedCount) {
+  EGCSmartIterator it("abcd", 4);
+  EXPECT_EQ(4u, it.count());
+  it.reset("xy", 2);
+  EXPECT_TRUE(it.ok());
+  EXPECT_EQ(2u, it.count());
+}
+
+TEST(U8EgcSplit, CrLfIsOneCluster) {
+  const char* s = "a\r\nb";
+  auto parts = u8_egc_split(s, 4);
+  ASSERT_EQ(3u, parts.size());
+  EXPECT_EQ("a", parts[0]);
+  EXPECT_EQ(std::string_view("\r\n", 2), parts[1]);
+  EXPECT_EQ("b", parts[2]);
 }
 
 // And confirm a CR-bearing string is routed to ICU rather than the fast path.

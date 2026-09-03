@@ -35,4 +35,17 @@ Content-Type: application/json; charset=UTF-8
 {"code":0,"session":"E4EtZGu4"}
 TEXT;
   ASSERT_EQ(155, strsrch(txt, "{"));
+
+  // Sibling of #1366: strsrch converts a byte offset to an EGC index
+  // through u8_offset_to_egc_index, which used to walk ICU even on ASCII.
+  {
+    string many = repeat_string("abcdefghij ", 800);
+    ASSERT_EQ(10, strsrch(many, " "));
+    ASSERT_EQ(10, strsrch(many, ' '));
+    ASSERT_EQ(sizeof(many) - 1, strsrch(many, " ", 1));
+    // Single-char needles take strchr in f_strsrch; a multi-char needle
+    // is the one that actually reaches u8_egc_find_as_offset.
+    ASSERT_EQ(8, strsrch(many, "ij "));
+    ASSERT_EQ(sizeof(many) - 3, strsrch(many, "ij ", 1));
+  }
 }

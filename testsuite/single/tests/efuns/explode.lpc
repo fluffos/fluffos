@@ -94,4 +94,53 @@ void do_tests() {
   ASSERT_EQ(
     ({ "lh15970183750", "abcdefghigk", "werert" }),
     explode("lh15970183750║abcdefghigk║werert", "║"));
+
+  // issue #1366: many ASCII tokens must still split correctly (and in
+  // linear time — the C++ side of this is EGCIterator::reset skipping
+  // a rescan on suffixes of a known-ASCII string). config.test sets
+  // `maximum array size` to 100000; stay well under that.
+  {
+    int n = 8000;
+    string many = repeat_string("abcdefghij ", n);
+    mixed *parts = explode(many, " ");
+    ASSERT_EQ(n, sizeof(parts));
+    ASSERT_EQ("abcdefghij", parts[0]);
+    ASSERT_EQ("abcdefghij", parts[<1]);
+    ASSERT_EQ(many, implode(explode_reversible(many, " "), " "));
+  }
+
+  // explode(s, "") splits on grapheme clusters. The C++ helper used to
+  // drive ICU through operator->() even for ASCII (sibling of #1366).
+  {
+    string many = repeat_string("a", 8000);
+    mixed *chars = explode(many, "");
+    ASSERT_EQ(8000, sizeof(chars));
+    ASSERT_EQ("a", chars[0]);
+    ASSERT_EQ("a", chars[<1]);
+    ASSERT_EQ(many, implode(chars, ""));
+  }
+
+  // Multi-byte delimiter leftover after trailing trim. Master's strstr
+  // path accepted a match that started inside the counted length and
+  // ran past it, so explode("ab---", "--") returned ({ "ab", "-" }).
+  // ASCII find/rfind was already correct; the strstr end-bound check
+  // makes UTF-8 haystacks match. The UTF-8 cases SIGSEGV'd when
+  // sourcelen went negative and the ASCII string_view path scanned
+  // (size_t)-N bytes.
+  ASSERT_EQ(({ "ab-" }), explode("ab---", "--"));
+  ASSERT_EQ(({ "你-" }), explode("你---", "--"));
+  ASSERT_EQ(({ "你-", "" }), explode("你-----", "--"));
+  ASSERT_EQ(({ "你-", "", "" }), explode_reversible("你-----", "--"));
+  ASSERT_EQ("你-----", implode(explode_reversible("你-----", "--"), "--"));
+  ASSERT_EQ(({ "café text\n", "" }), explode("café text\n\n\n\n\n", "\n\n"));
+  ASSERT_EQ(({ "a\r\nb-", "" }), explode("a\r\nb-----", "--"));
+
+  {
+    int n = 8000;
+    string many = "x" + repeat_string(" ", n);
+    mixed *parts = explode(many, " ");
+    ASSERT_EQ(n, sizeof(parts));
+    ASSERT_EQ("x", parts[0]);
+    ASSERT_EQ("", parts[<1]);
+  }
 }
