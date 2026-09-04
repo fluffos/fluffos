@@ -35,8 +35,9 @@ struct mem_block_t {
 
 #define START_BLOCK_SIZE 4096
 
-/* NUMPAREAS ares are saved with the program code after compilation,
- * the rest are only temporary.
+/* NUMPAREAS areas are saved with the program code after compilation,
+ * the rest are only temporary. A_INCLUDES is outside NUMPAREAS but is
+ * copied into program_t::include_names for include_list().
  */
 #define A_PROGRAM 0 /* executable code */
 #define A_FUNCTIONS 1

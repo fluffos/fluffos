@@ -236,6 +236,10 @@ struct program_t {
   char** variable_table;          /* variables defined by this program */
   lpc_type_t* variable_types;     /* variables defined by this program */
   inherit_t* inherit;             /* List of inherited prgms */
+  /* Packed nul-terminated include paths (not the main file), first-seen
+   * order. Copied from A_INCLUDES; include_list() walks this. */
+  char* include_names;
+  int include_names_size;
   int total_size;                 /* Sum of all data in this struct */
                                   /*
                                    * The types of function arguments are saved where 'argument_types'

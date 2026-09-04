@@ -796,6 +796,16 @@ void f_shallow_inherit_list() {
 }
 #endif
 
+#ifdef F_INCLUDE_LIST
+void f_include_list() {
+  array_t* vec;
+
+  vec = include_list(sp->u.ob);
+  free_object(&sp->u.ob, "f_include_list");
+  put_array(vec);
+}
+#endif
+
 #ifdef F_INPUT_TO
 void f_input_to() {
   svalue_t* arg;

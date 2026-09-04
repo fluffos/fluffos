@@ -2833,6 +2833,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/system/include_list",
+            "key": "efun/system/include_list",
+            "label": "include_list"
+          },
+          {
+            "type": "doc",
             "id": "efun/system/inherit_list",
             "key": "efun/system/inherit_list",
             "label": "inherit_list"

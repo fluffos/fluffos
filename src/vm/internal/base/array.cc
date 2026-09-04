@@ -3,6 +3,8 @@
 #include "vm/internal/base/machine.h"
 
 #include <stdlib.h>  // for qsort
+#include <cstring>
+#include <vector>
 
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
@@ -2025,6 +2027,47 @@ array_t* inherit_list(object_t* ob) {
     ret->item[il].type = T_STRING;
     ret->item[il].subtype = STRING_MALLOC;
     ret->item[il].u.string = add_slash(pr->filename);
+  }
+  return ret;
+}
+
+/*
+ * Files this program actually #included (nested includes included,
+ * duplicates dropped, first-seen order). The main source is omitted;
+ * the configured global include file is listed when it was opened.
+ */
+array_t* include_list(object_t* ob) {
+  program_t* prog = ob->prog;
+  if (!prog || !prog->include_names || prog->include_names_size <= 0) {
+    return &the_null_array;
+  }
+
+  std::vector<const char*> names;
+  const char* p = prog->include_names;
+  const char* end = p + prog->include_names_size;
+  while (p < end) {
+    if (*p == '\0') {
+      p++;
+      continue;
+    }
+    bool seen = false;
+    for (const char* existing : names) {
+      if (strcmp(existing, p) == 0) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) {
+      names.push_back(p);
+    }
+    p += strlen(p) + 1;
+  }
+
+  array_t* ret = allocate_empty_array(static_cast<int>(names.size()));
+  for (size_t i = 0; i < names.size(); i++) {
+    ret->item[i].type = T_STRING;
+    ret->item[i].subtype = STRING_MALLOC;
+    ret->item[i].u.string = add_slash(names[i]);
   }
   return ret;
 }
