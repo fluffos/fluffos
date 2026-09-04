@@ -5,13 +5,19 @@
 // A declared int/float variable, or an element of a typed array (`int *`),
 // has a real type contract the compiler can see, so the RHS is coerced to
 // match it at compile time (rule_expr_assign, grammar_rules_exprs.cc) and
-// the lvalue always keeps its declared type.
+// the lvalue always keeps its declared type. That includes a mixed /
+// call_other RHS (issue #1365): `ob->f()` is statically mixed even when
+// f() is declared float, so the compiler still emits to_int()/to_float().
 //
 // A `mixed` variable or a mapping value has no declared type to enforce.
 // Compound-assign is the only way such a slot can ever become a float, so
 // the runtime opcode (F_ADD_EQ/f_sub_eq/f_mult_eq/f_div_eq) promotes it
 // instead of truncating.
 float global_f;
+
+// Honestly typed; the gap is that this_object()->f() is still mixed.
+float give_float() { return 1.5; }
+int give_int() { return 2; }
 
 void do_tests() {
   float f, f2;
@@ -128,4 +134,40 @@ void do_tests() {
   marr[0] += 1.5;
   ASSERT_EQ(1, floatp(marr[0]));
   ASSERT_EQ(6.5, marr[0]);
+
+  // issue #1365: call_other is statically mixed even when the callee is
+  // declared float, so the TYPE_REAL compile-time coercion never fired
+  // and a declared int was promoted at runtime. Same contract as
+  // `i += 1.5` above: keep the declared type. this_object()-> is enough;
+  // a direct give_float() would be statically float and miss the gap.
+  ASSERT_EQ(1, floatp(this_object()->give_float()));
+
+  i = 10; i += this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(11, i);
+  i = 10; i -= this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(9, i);
+  // Same as `i *= 1.5` above: the RHS is truncated first
+  // (4 * to_int(1.5) == 4, not floor(4 * 1.5)).
+  i = 4; i *= this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(4, i);
+  i = 7; i /= this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(7, i);
+
+  i = 10; i += this_object()->give_int(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(12, i);
+
+  int *iarr = ({ 10 });
+  iarr[0] += this_object()->give_float();
+  ASSERT_EQ(1, intp(iarr[0]));
+  ASSERT_EQ(11, iarr[0]);
+
+  // A mixed *variable* is still untyped at the use site, so op= promotes
+  // (wrapping every mixed RHS in to_int() would also swallow
+  // `str[0] += mixed_string`, which must stay a runtime error).
+  mixed held = 1.5;
+  i = 10;
+  i += held;
+  ASSERT_EQ(1, floatp(i));
+  ASSERT_EQ(11.5, i);
+
+  // Declared float + call_other stays float (symmetric wrap).
+  f = 10.0;
+  f += this_object()->give_int();
+  ASSERT_EQ(1, floatp(f));
+  ASSERT_EQ(12.0, f);
 }
