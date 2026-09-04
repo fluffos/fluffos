@@ -274,6 +274,8 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
           return "promise (fulfilled)";
         case PROMISE_REJECTED:
           return "promise (rejected)";
+        case PROMISE_CANCELLED:
+          return "promise (cancelled)";
         default:
           return "promise (pending)";
       }
