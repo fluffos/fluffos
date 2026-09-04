@@ -9,6 +9,8 @@
 #include "backend.h"
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/eval_limit.h"
+#include "vm/internal/simulate.h"  // throw_error (cancellation raise)
+#include "include/promise.h"  // LPC-visible rejection reasons
 
 /*
  * Native LPC promises (issue #1319 phase 1). See promise.h for the ownership
@@ -39,6 +41,14 @@ extern int _in_reference_allowed;
  * declaration. Read only under DEBUG; see control_stack_t::save_temporaries. */
 extern int stack_in_use_as_temporary;
 
+/* Combinator helpers, declared at file scope for the same reason as
+ * _in_reference_allowed above: they are DEFINED below the anonymous
+ * namespace but CALLED from inside it, and declaring them in there would
+ * name a different, never-defined symbol. */
+void free_combinator(promise_combinator_t* c);
+void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected,
+                       bool from_cancel = false);
+
 namespace {
 
 /* set by coroutine_await_pending(); read by run_coroutine_body() to tell a
@@ -62,9 +72,21 @@ std::unordered_map<object_t*, std::vector<uint64_t>> g_coroutines_by_owner;
 uint64_t g_next_coroutine_id = 0;
 /* the result promise of the innermost running coroutine body */
 promise_t* g_coroutine_promise = nullptr;
+#ifdef DEBUG
+/* stack_in_use_as_temporary as it stood when the innermost body was entered.
+ * foreach bumps that GLOBAL counter to tell break_point() its temporaries are
+ * legitimately sitting above fp; anything above this base belongs to the
+ * running body, and moves into the parked frame with it. Without the split, a
+ * body that parks inside a foreach leaves the count elevated for whatever
+ * runs next, and -- because reset_machine() zeroes it between top-level calls
+ * -- arrives at its resume with the temporaries restored but the count gone,
+ * which is a "Bad stack pointer" fatal on Debug builds. */
+int g_coroutine_temp_base = 0;
+#endif
 
 void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc);
-bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame);
+bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame,
+                        int resumed_temp_base = -1);
 
 /* A settled reaction awaiting delivery. Holds a ref on everything it points
  * at, including the source promise (for the result value). */
@@ -74,6 +96,8 @@ struct QueuedReaction {
   promise_t* next;
   object_t* command_giver;
   lpc_coroutine_t* coro;
+  promise_combinator_t* comb;
+  int comb_index;
   promise_t* source;
 };
 
@@ -189,7 +213,18 @@ constexpr LPC_INT kDefaultDrainBudgetUs = 1000;
  * They previously differed in wording and in whether they carried a trailing
  * newline. No trailing newline: this is a value handed to a rejection
  * handler, not a message printed by error(). */
-constexpr const char* kDestructedRejection = "*async function owner was destructed while suspended";
+constexpr const char* kDestructedRejection = PROMISE_REASON_DESTRUCTED;
+/* What a cancelled body's next await raises, and what its promise settles
+ * with as PROMISE_CANCELLED if nothing catches it. Matched by CONTENT for
+ * the raise itself -- a plain string is forgeable by throw() -- but
+ * promise_status() is the authoritative test from outside. */
+constexpr const char* kCancelledRejection = PROMISE_REASON_CANCELLED;
+
+/* Cancelled is a negative settlement: await / then / combinators treat it
+ * like a rejection, but promise_status() reports PROMISE_CANCELLED. */
+bool promise_failed(const promise_t* p) {
+  return p->state == PROMISE_REJECTED || p->state == PROMISE_CANCELLED;
+}
 
 /* Consecutive slices that ended with work still queued. Routine under load;
  * a long run of them means the queue is not keeping up. Reset by any slice
@@ -414,6 +449,12 @@ void free_queued_reaction(QueuedReaction* qr) {
     free_coroutine(qr->coro, nullptr, false);
     qr->coro = nullptr;
   }
+  if (qr->comb) {
+    /* never delivered (shutdown): this input simply never reports, and the
+     * aggregate dies with the last of its reactions */
+    free_combinator(qr->comb);
+    qr->comb = nullptr;
+  }
   if (qr->source) {
     free_promise(qr->source);
     qr->source = nullptr;
@@ -422,7 +463,8 @@ void free_queued_reaction(QueuedReaction* qr) {
 
 void enqueue_reaction(promise_t* source, promise_reaction_t* r) {
   source->ref++;
-  QueuedReaction qr{r->on_fulfilled, r->on_rejected, r->next, r->command_giver, r->coro, source};
+  QueuedReaction qr{r->on_fulfilled, r->on_rejected, r->next,       r->command_giver,
+                    r->coro,         r->comb,        r->comb_index, source};
   if (qr.coro != nullptr) {
     qr.coro->queued = true;
   }
@@ -511,7 +553,16 @@ void deliver_reaction(QueuedReaction* qr) {
     return;
   }
 
-  bool const rejected = (src->state == PROMISE_REJECTED);
+  bool const rejected = promise_failed(src);
+
+  if (qr->comb) {
+    /* Pure aggregation: runs no LPC, so it needs neither an eval budget nor
+     * the command_giver dance below, and cannot re-enter the drain. */
+    deliver_combinator(qr->comb, qr->comb_index, &src->result, rejected, src->from_cancel);
+    free_queued_reaction(qr);
+    return;
+  }
+
   funptr_t* handler = rejected ? qr->on_rejected : qr->on_fulfilled;
 
   object_t* giver = qr->command_giver;
@@ -544,6 +595,9 @@ void deliver_reaction(QueuedReaction* qr) {
     /* pass-through: propagate the source's state to the chained promise */
     if (qr->next) {
       if (rejected) {
+        if (src->from_cancel) {
+          qr->next->from_cancel = true;
+        }
         promise_settle(qr->next, &src->result, 1);
       } else {
         promise_resolve_with(qr->next, &src->result);
@@ -791,7 +845,8 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
  * set up and `entry_pc` points into its program. Settles `p` on completion
  * or failure. Returns true if an uncatchable eval-cost error must be
  * propagated by the caller (do_catch() parity). */
-bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame) {
+bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame,
+                        int resumed_temp_base) {
   error_context_t econ;
   save_context(&econ);
   /* The coroutine owns its whole frame (safe_apply's "callee owns the
@@ -811,6 +866,18 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   promise_t* prev_promise = g_coroutine_promise;
   g_coroutine_econ = &econ;
   g_coroutine_promise = p;
+#ifdef DEBUG
+  int const prev_temp_base = g_coroutine_temp_base;
+  /* On a RESUME the caller has already put the frame's own foreach
+   * temporaries back on the counter, so reading it here would fold them
+   * into this body's base -- the next park would then compute a delta of
+   * zero, hand the coroutine nothing, and leave the count elevated for
+   * whatever runs next (permanently, if the frame is later abandoned and
+   * its F_EXIT_FOREACH never runs). A nonzero count silently disables
+   * break_point()'s stack check, so the loss is quiet. resume_coroutine()
+   * passes what the counter held before it re-added them. */
+  g_coroutine_temp_base = resumed_temp_base >= 0 ? resumed_temp_base : stack_in_use_as_temporary;
+#endif
   /* RAII, not a tail assignment: `econ` lives on THIS C++ frame, so if an
    * exception ever escapes this function the globals must not be left
    * pointing at it (error_handler() compares current_error_context against
@@ -818,6 +885,9 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   DEFER {
     g_coroutine_econ = prev_econ;
     g_coroutine_promise = prev_promise;
+#ifdef DEBUG
+    g_coroutine_temp_base = prev_temp_base;
+#endif
     pop_context(&econ);
   };
   bool propagate_eval_error = false;
@@ -858,6 +928,14 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
         } catch (const char*) {
         }
         if (unwound) {
+          /* The body caught the raise. If this was a cancellation, it was
+           * declined -- later settlement is ordinary fulfill or reject, not
+           * PROMISE_CANCELLED. Matched by the driver's constant pointer, not
+           * by string content: a mudlib throw of the same letters is a
+           * rejection. */
+          if (catch_value.type == T_STRING && catch_value.u.string == kCancelledRejection) {
+            p->from_cancel = false;
+          }
           continue;
         }
       }
@@ -1008,7 +1086,13 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
 }
 
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
-  bool const rejected = (source->state == PROMISE_REJECTED);
+  bool rejected = promise_failed(source);
+  /* -1 = "no resumed frame to account for"; see the frame restore below */
+  int resumed_temp_base = -1;
+  /* what the resumed await yields, or rejects with -- the source's result
+   * unless a cancellation overrides it below */
+  svalue_t cancel_reason;
+  svalue_t* reason = &source->result;
 
   /* Three ways the owner can invalidate the parked frame: destruction,
    * recompile_object() (bumps prog_generation), and replace_program()
@@ -1028,19 +1112,44 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     if (coro->ob->flags & O_DESTRUCTED) {
       err.u.string = const_cast<char*>(kDestructedRejection);
     } else if (coro->prog_generation != coro->ob->prog_generation) {
-      err.u.string = "*async function owner was recompiled while suspended";
+      err.u.string = PROMISE_REASON_RECOMPILED;
     } else {
-      err.u.string = "*async function owner's program was replaced while suspended";
+      err.u.string = PROMISE_REASON_REPLACED_PROGRAM;
     }
     free_coroutine(coro, &err, true);
     return;
+  }
+
+  /* A cancellation requested while this frame was already QUEUED: it is
+   * sitting AT an await, so converting the delivery in flight into the
+   * cancellation raise is exactly what "raises at the next await" means for
+   * it. Letting the value through and raising one await later would silently
+   * run one more stretch of the body.
+   *
+   * Deliberately AFTER the destruct/staleness block above, which must win: a
+   * frame whose owner is gone cannot run acatch or defer LPC at all, so the
+   * reason that names the real reason it can never continue is the useful
+   * one. A cancellation that loses that race is simply consumed with the
+   * frame. If the queued delivery was itself a rejection, cancellation
+   * overrides its reason -- deterministic, and the canceller has declared
+   * disinterest in the outcome either way. */
+  if (coro->result_promise->cancelled) {
+    coro->result_promise->cancelled = false; /* consume-once */
+    cancel_reason.type = T_STRING;
+    cancel_reason.subtype = STRING_CONSTANT;
+    cancel_reason.u.string = kCancelledRejection;
+    reason = &cancel_reason;
+    rejected = true;
   }
 
   if (rejected && coro->markers.empty()) {
     /* no acatch() region spans the await: the rejection propagates
      * straight to the coroutine's own promise, no need to rebuild the
      * frame at all (no catch may span an await by construction). */
-    free_coroutine(coro, &source->result, true);
+    if (source->from_cancel || reason == &cancel_reason) {
+      coro->result_promise->from_cancel = true;
+    }
+    free_coroutine(coro, reason, true);
     return;
   }
 
@@ -1048,7 +1157,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     svalue_t err;
     err.type = T_STRING;
     err.subtype = STRING_CONSTANT;
-    err.u.string = "*stack overflow while resuming async function";
+    err.u.string = PROMISE_REASON_STACK_OVERFLOW;
     free_coroutine(coro, &err, true);
     return;
   }
@@ -1095,14 +1204,44 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   fp = sp + 1;
   if (coro->frame_size > 0) {
     memcpy(fp, coro->frame, coro->frame_size * sizeof(svalue_t));
+    /* re-derive the frame-relative lvalues against the NEW fp (see the
+     * matching conversion in coroutine_await_pending) */
+    for (int slot : coro->frame_lvalues) {
+      svalue_t* target = fp + fp[slot].u.number;
+      fp[slot].type = T_LVALUE;
+      fp[slot].subtype = 0;
+      fp[slot].u.lvalue = target;
+    }
+    coro->frame_lvalues.clear();
+#ifdef DEBUG
+    /* the temporaries are back on the stack, so the count is owed again --
+     * F_EXIT_FOREACH will retire them one loop at a time as before. The
+     * base handed to run_coroutine_body() below is what the counter held
+     * BEFORE this frame's share went back on it. */
+    resumed_temp_base = stack_in_use_as_temporary;
+    stack_in_use_as_temporary += coro->temporaries;
+    coro->temporaries = 0;
+#endif
   }
   sp = fp + coro->frame_size - 1;
   delete[] coro->frame;
   coro->frame = nullptr;
   coro->frame_size = 0;
 
+#ifdef DEBUG
+  /* The base these markers' offsets were taken against. When there was no
+   * frame to restore there were no temporaries either, so the counter is
+   * already the base. */
+  int const marker_base = (resumed_temp_base >= 0) ? resumed_temp_base : stack_in_use_as_temporary;
+#endif
   for (auto& m : coro->markers) {
     push_control_stack(FRAME_CATCH | FRAME_ASYNC);
+#ifdef DEBUG
+    /* push_control_stack() recorded the count as it is NOW -- with this
+     * body's temporaries already back on it -- which is not what the region
+     * was entered with. */
+    csp->save_temporaries = marker_base + m.temporaries_offset;
+#endif
     csp->pc = coro->prog->program + m.pc_offset;
     csp->save_sp = fp + m.sp_offset;
     csp->save_cgsp = cgsp;
@@ -1152,11 +1291,18 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   if (!rejected) {
     /* the await expression's value */
     STACK_INC;
-    assign_svalue_no_free(sp, &source->result);
+    assign_svalue_no_free(sp, reason);
     entry = coro->prog->program + coro->pc_offset;
   } else {
-    /* re-raise at the await point; the innermost acatch() catches it */
-    assign_svalue(&catch_value, &source->result);
+    /* re-raise at the await point; the innermost acatch() catches it.
+     * Catching THIS body's own cancel (reason == &cancel_reason) declines
+     * it -- later settlement is ordinary. An inherited cancelled await is
+     * just a catchable rejection here; from_cancel was never set on this
+     * result. */
+    if (reason == &cancel_reason) {
+      coro->result_promise->from_cancel = false;
+    }
+    assign_svalue(&catch_value, reason);
     entry = unwind_to_acatch_marker(csp);
   }
   /* The eval-cost flag is deliberately NOT consumed here, unlike the
@@ -1164,7 +1310,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
    * caller's evaluation. A resumption has no caller -- but the drain turn
    * that delivered it does read the flag, as a resumed frame that burned its
    * whole budget ends the turn. drain_promise_microtasks() clears it. */
-  (void)run_coroutine_body(entry, coro->result_promise, async_frame);
+  (void)run_coroutine_body(entry, coro->result_promise, async_frame, resumed_temp_base);
   free_coroutine(coro, nullptr, false);
 }
 
@@ -1246,6 +1392,8 @@ promise_t* promise_alloc() {
   p->handled = false;
   p->resolving = false;
   p->body_owned = false;
+  p->cancelled = false;
+  p->from_cancel = false;
   p->value_type = 0;
   p->result = const0;
   p->reactions = nullptr;
@@ -1286,7 +1434,7 @@ void free_promise(promise_t* p) {
 }
 
 void dealloc_promise(promise_t* p) {
-  if (p->state == PROMISE_REJECTED && !p->handled) {
+  if (p->state == PROMISE_REJECTED && !p->handled && !p->from_cancel) {
     /* Where it was rejected. Without this the report is a bare reason with no
      * object, function or line -- and it is printed at DEALLOCATION, which
      * can be arbitrarily far from the rejection, so there is nothing else in
@@ -1363,7 +1511,7 @@ void dealloc_promise(promise_t* p) {
           svalue_t err;
           err.type = T_STRING;
           err.subtype = STRING_CONSTANT;
-          err.u.string = "*promise adoption source was collected before settling";
+          err.u.string = PROMISE_REASON_ADOPTION_COLLECTED;
           (void)promise_settle(r.next, &err, 1);
         }
         free_promise(r.next);
@@ -1377,8 +1525,21 @@ void dealloc_promise(promise_t* p) {
         svalue_t err;
         err.type = T_STRING;
         err.subtype = STRING_CONSTANT;
-        err.u.string = "*awaited promise was collected before settling";
+        err.u.string = PROMISE_REASON_AWAITED_COLLECTED;
         free_coroutine(r.coro, &err, false);
+      }
+      if (r.comb) {
+        /* This input died unsettled, so it can never report. Deliver a
+         * rejection on its behalf rather than just dropping the reference:
+         * otherwise `remaining` never reaches zero and a promise_all() whose
+         * input was collected stays pending forever -- the same stranded
+         * shape the r.next arm above exists to prevent. */
+        svalue_t err;
+        err.type = T_STRING;
+        err.subtype = STRING_CONSTANT;
+        err.u.string = PROMISE_REASON_COLLECTED;
+        deliver_combinator(r.comb, r.comb_index, &err, true, p->from_cancel);
+        free_combinator(r.comb);
       }
     }
     delete p->reactions;
@@ -1394,7 +1555,13 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected) {
   if (rejected && p->reject_origin == nullptr) {
     p->reject_origin = capture_reject_origin();
   }
-  p->state = rejected ? PROMISE_REJECTED : PROMISE_FULFILLED;
+  if (!rejected) {
+    p->state = PROMISE_FULFILLED;
+  } else if (p->from_cancel) {
+    p->state = PROMISE_CANCELLED;
+  } else {
+    p->state = PROMISE_REJECTED;
+  }
   assign_svalue(&p->result, value);
   if (p->reactions) {
     std::vector<promise_reaction_t>* reactions = p->reactions;
@@ -1414,7 +1581,7 @@ void promise_resolve_with(promise_t* p, svalue_t* value) {
       svalue_t err;
       err.type = T_STRING;
       err.subtype = STRING_CONSTANT;
-      err.u.string = "*promise resolved with itself";
+      err.u.string = PROMISE_REASON_SELF_RESOLVED;
       promise_settle(p, &err, 1);
       return;
     }
@@ -1435,7 +1602,7 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
   if (on_rejected || next) {
     p->handled = true;
   }
-  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr};
+  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr, nullptr, 0};
   if (p->state == PROMISE_PENDING) {
     if (!p->reactions) {
       p->reactions = new std::vector<promise_reaction_t>();
@@ -1446,11 +1613,313 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
   }
 }
 
+/*
+ * Combinators: promise_all / promise_any / promise_race / promise_all_settled.
+ *
+ * One promise_combinator_t is shared by every input's reaction; each holds a
+ * reference, so the aggregate dies with the last input however that input
+ * ends. Aggregation runs no LPC, so it happens inside the delivery like a
+ * pass-through link -- ordering stays the drain's, and a combinator can never
+ * settle its result synchronously from the efun unless every input was a
+ * plain value.
+ */
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+/* Marked from here, once per combinator, NOT from each reaction that points
+ * at it: N reactions share one aggregate holding ONE reference to `result`
+ * and `slots`, so per-reaction marking would report N-1 phantom refs. Same
+ * reason g_active_body_promises exists. */
+std::vector<promise_combinator_t*> g_live_combinators;
+#endif
+
+void free_combinator(promise_combinator_t* c) {
+  if (--c->ref > 0) {
+    return;
+  }
+#ifdef DEBUGMALLOC_EXTENSIONS
+  for (auto it = g_live_combinators.begin(); it != g_live_combinators.end(); ++it) {
+    if (*it == c) {
+      g_live_combinators.erase(it);
+      break;
+    }
+  }
+#endif
+  if (c->result) {
+    free_promise(c->result);
+  }
+  if (c->slots) {
+    free_array(c->slots);
+  }
+  delete c;
+}
+
+/* Insert a constant-named key and return its value slot, ready to overwrite.
+ *
+ * A local mirror of mapping.cc's insert_in_mapping(), which is static there.
+ * Do not be tempted to hand find_for_insert() a reused key svalue: its hash
+ * (svalue_to_int) CONVERTS the key IN PLACE from a constant to a ref-bumped
+ * shared string, so a second insert through the same svalue carries subtype
+ * STRING_SHARED over a string literal and INC_COUNTED_REF writes into
+ * read-only memory. The ref that conversion took is ours to release, on the
+ * throwing path too -- hence the DEFER, exactly as the original explains. */
+svalue_t* promise_map_slot(mapping_t* m, const char* key) {
+  svalue_t lv;
+
+  lv.type = T_STRING;
+  lv.subtype = STRING_CONSTANT;
+  lv.u.string = key;
+  DEFER { free_string(lv.u.string); };
+  return find_for_insert(m, &lv, 1);
+}
+
+/* One input settled (or was a plain value). Records it and settles the result
+ * if this input decided the outcome. Runs no LPC. */
+void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected,
+                       bool from_cancel) {
+  switch (c->kind) {
+    case PROMISE_COMB_RACE:
+      /* first to settle decides, either way */
+      if (rejected && from_cancel) {
+        c->result->from_cancel = true;
+      }
+      (void)promise_settle(c->result, value, rejected ? 1 : 0);
+      break;
+
+    case PROMISE_COMB_ALL:
+      if (rejected) {
+        if (from_cancel) {
+          c->result->from_cancel = true;
+        }
+        (void)promise_settle(c->result, value, 1); /* fail fast */
+      } else {
+        assign_svalue(&c->slots->item[index], value);
+      }
+      break;
+
+    case PROMISE_COMB_ANY:
+      if (rejected) {
+        assign_svalue(&c->slots->item[index], value);
+      } else {
+        (void)promise_settle(c->result, value, 0); /* first success wins */
+      }
+      break;
+
+    case PROMISE_COMB_ALL_SETTLED: {
+      /* ([ "status": 1|2|3, "value"|"reason": v ]) -- the status codes are
+       * promise_status()'s, so one vocabulary covers both. */
+      mapping_t* m = allocate_mapping(2);
+      svalue_t* slot = promise_map_slot(m, "status");
+      slot->type = T_NUMBER;
+      slot->subtype = 0;
+      slot->u.number = rejected ? (from_cancel ? PROMISE_CANCELLED : PROMISE_REJECTED)
+                                : PROMISE_FULFILLED;
+      slot = promise_map_slot(m, rejected ? "reason" : "value");
+      assign_svalue_no_free(slot, value);
+      free_svalue(&c->slots->item[index], "deliver_combinator");
+      c->slots->item[index].type = T_MAPPING;
+      c->slots->item[index].u.map = m;
+      break;
+    }
+
+    default:
+      break;
+  }
+
+  /* Decrement unconditionally, including on the paths that already settled
+   * above: a later settle is a silent no-op, so one counter serves every
+   * kind and no arm can forget to advance it. */
+  if (--c->remaining == 0) {
+    if (c->kind == PROMISE_COMB_ALL || c->kind == PROMISE_COMB_ALL_SETTLED) {
+      svalue_t all = const0;
+      all.type = T_ARRAY;
+      all.u.arr = c->slots;
+      (void)promise_settle(c->result, &all, 0);
+    } else if (c->kind == PROMISE_COMB_ANY) {
+      /* every input rejected: reject with the array of reasons */
+      svalue_t all = const0;
+      all.type = T_ARRAY;
+      all.u.arr = c->slots;
+      (void)promise_settle(c->result, &all, 1);
+    }
+  }
+}
+
+promise_t* promise_combinator_start(uint8_t kind, array_t* inputs) {
+  int const n = inputs->size;
+  promise_t* result = promise_alloc();
+
+  if (n == 0) {
+    /* Decided here rather than left to the loop, and deliberately not
+     * uniform: an empty promise_all()/promise_all_settled() has trivially
+     * met its condition, an empty promise_any() can never be satisfied, and
+     * an empty promise_race() would wait forever -- which in a driver is a
+     * parked frame holding an object, a program and a suspension slot for
+     * the life of the process, so it is refused by the efun before it gets
+     * here rather than reproduced from JS. */
+    if (kind == PROMISE_COMB_ANY) {
+      svalue_t err = const0;
+      err.type = T_STRING;
+      err.subtype = STRING_CONSTANT;
+      err.u.string = PROMISE_REASON_ANY_EMPTY;
+      (void)promise_settle(result, &err, 1);
+    } else {
+      svalue_t empty = const0;
+      empty.type = T_ARRAY;
+      empty.u.arr = &the_null_array;
+      (void)promise_settle(result, &empty, 0);
+    }
+    return result;
+  }
+
+  /* Plain new, not DMALLOC: every TAG_PROMISE block is cast straight to
+   * promise_t* by checkmemory.cc's sweep, so borrowing that tag would be a
+   * type confusion, and a new tag would have to be taught to all of its
+   * walkers. lpc_coroutine_t -- a bigger off-graph struct holding far more
+   * references -- is allocated the same way for the same reason; what the
+   * checker needs is the MARKING below, not the block. */
+  auto* c = new promise_combinator_t{};
+  c->ref = 1; /* held by this function until every input is attached */
+  c->kind = kind;
+  c->result = result;
+  result->ref++;
+  c->slots = allocate_empty_array(n);
+  for (int i = 0; i < n; i++) {
+    c->slots->item[i] = const0;
+  }
+  c->remaining = n;
+#ifdef DEBUGMALLOC_EXTENSIONS
+  g_live_combinators.push_back(c);
+#endif
+
+  /* Two passes. Attaching first means a plain value can never drive
+   * `remaining` to zero while later inputs are still being hooked up, which
+   * would settle the result early and leave the rest writing into a decided
+   * aggregate. */
+  for (int i = 0; i < n; i++) {
+    if (inputs->item[i].type != T_PROMISE) {
+      continue;
+    }
+    promise_t* src = inputs->item[i].u.prom;
+    src->handled = true; /* the combinator observes the rejection */
+    c->ref++;
+    promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, nullptr, c, i};
+    if (src->state == PROMISE_PENDING) {
+      if (!src->reactions) {
+        src->reactions = new std::vector<promise_reaction_t>();
+      }
+      src->reactions->push_back(r);
+    } else {
+      enqueue_reaction(src, &r);
+    }
+  }
+  for (int i = 0; i < n; i++) {
+    if (inputs->item[i].type == T_PROMISE) {
+      continue;
+    }
+    /* A non-promise counts as already fulfilled with itself, so the output of
+     * an ordinary map() can be passed straight in. */
+    deliver_combinator(c, i, &inputs->item[i], false);
+  }
+
+  free_combinator(c); /* release the arming reference */
+  return result;
+}
+
+int promise_request_cancel(promise_t* p) {
+  if (!p->body_owned) {
+    /* Only an async function body has a "next await" for a cancellation to
+     * arrive at. Everything else the driver hands out is refused rather than
+     * quietly ignored: a promise_create() promise is already settleable by
+     * whoever owns it (and cancelling someone else's channel is what the
+     * body_owned refusal exists to prevent); an async_read()/async_write()
+     * promise cannot stop the worker thread that is already reading the
+     * file; a call_out(delay) promise is documented as non-cancellable (use
+     * the classic form and remove_call_out()); and rejecting a then-chain
+     * link cannot stop its upstream. */
+    error("promise_cancel: promise does not belong to an async function.\n");
+  }
+  if (p->state != PROMISE_PENDING || p->resolving) {
+    /* Already finished, or the body returned a still-pending promise and is
+     * gone -- in both cases there is no frame left to interrupt. NOT an
+     * error: a body racing to completion against its canceller is the
+     * documented normal outcome, and erroring would make every cancel a
+     * race against its target. */
+    return 0;
+  }
+
+  p->cancelled = true;
+  /* The canceller has forced the outcome, so the rejection below is not
+   * "unhandled" even if nobody attached a handler; without this a
+   * fire-and-forget cancel logs a rejection report when the promise dies.
+   * from_cancel travels with the reason to every downstream link. */
+  p->handled = true;
+  p->from_cancel = true;
+
+  /* Find the parked frame, if there is one. A linear scan over at most
+   * `max suspended async functions` entries, on a rare user-initiated efun.
+   * Deliberately NOT an index keyed by result promise: that would add two
+   * more sync points to the park/free pair, which is exactly the
+   * "one sibling path forgot" hazard of AGENTS.md section 13.15 -- and the
+   * owner index already needed a Debug sweep to police the two it has. */
+  lpc_coroutine_t* coro = nullptr;
+  for (auto& entry : g_live_coroutines) {
+    if (entry.second->result_promise == p && !entry.second->abandoned) {
+      coro = entry.second;
+      break;
+    }
+  }
+  /* No frame parked on a promise right now: the body is running (its first
+   * synchronous stretch, or after an acatch caught an earlier cancel), or it
+   * is already queued for resumption. Both consume the flag at their own
+   * boundary -- coroutine_await_pending() and resume_coroutine() -- so there
+   * is no window where the request is lost. */
+  if (coro == nullptr || coro->queued || coroutine_is_running(coro)) {
+    return 1;
+  }
+
+  /* Parked on a promise that may never settle, so waiting for it is not an
+   * option: detach the frame and schedule its own rejection delivery. From
+   * here to the enqueue nothing may run LPC or throw -- the coroutine is
+   * owned by a raw local in between. */
+  promise_t* awaited = coro->awaiting;
+  if (awaited != nullptr && awaited->reactions != nullptr) {
+    for (auto rit = awaited->reactions->begin(); rit != awaited->reactions->end(); ++rit) {
+      if (rit->coro == coro) {
+        awaited->reactions->erase(rit);
+        break;
+      }
+    }
+  }
+
+  /* A synthetic already-rejected source to deliver through. coro->awaiting is
+   * REPOINTED at it, which is load-bearing rather than tidiness:
+   * build_async_info() dereferences coro->awaiting unconditionally and it is
+   * deliberately not ref-held, so after the detach above the original could
+   * be freed by its other holders at any moment -- leaving a dangling read
+   * reachable from an ordinary async_info() call. The queued reaction holds a
+   * ref on this one for exactly as long as the coroutine is queued, so the
+   * lifetimes match. */
+  promise_t* s = promise_alloc();
+  svalue_t reason;
+  reason.type = T_STRING;
+  reason.subtype = STRING_CONSTANT;
+  reason.u.string = kCancelledRejection;
+  (void)promise_settle(s, &reason, 1);
+  /* nothing will attach a handler to a promise only the driver can see */
+  s->handled = true;
+  coro->awaiting = s;
+
+  promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, coro, nullptr, 0};
+  enqueue_reaction(s, &r); /* takes its own ref on s, marks coro queued */
+  free_promise(s);         /* the queue is now the sole owner */
+  return 1;
+}
+
 /* Attach a parked coroutine to the promise it awaits. Ownership of `coro`
  * transfers to the promise machinery. */
 static void promise_add_coroutine(promise_t* p, lpc_coroutine_t* coro) {
   p->handled = true; /* the await observes a rejection */
-  promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, coro};
+  promise_reaction_t r{nullptr, nullptr, nullptr, nullptr, coro, nullptr, 0};
   if (p->state == PROMISE_PENDING) {
     if (!p->reactions) {
       p->reactions = new std::vector<promise_reaction_t>();
@@ -1515,6 +1984,29 @@ void coroutine_await_pending(promise_t* awaited) {
   if (!async_frame || !g_coroutine_promise) {
     error("await: not directly inside an async function body.\n");
   }
+  /* A cancellation requested while this body was RUNNING (its own first
+   * synchronous stretch, or the code after an acatch caught an earlier one)
+   * is delivered here, at the next await -- which is what makes cancellation
+   * cooperative rather than preemptive.
+   *
+   * Raised through the throw path rather than error(), for two reasons: the
+   * caught value is then the IDENTICAL constant the parked route delivers
+   * (an error() would wrap it in its own "*...\n" formatting, so acatch
+   * would see two different spellings depending on where the cancel landed),
+   * and cancellation is a delivered outcome, not a fault, so it should not
+   * reach the error handler's log. f_throw()/throw_error() is the precedent.
+   *
+   * Placed before ANY STACK_INC or allocation below, so the unwind has no
+   * half-initialised slot to trip over (AGENTS.md section 4). */
+  if (g_coroutine_promise->cancelled) {
+    g_coroutine_promise->cancelled = false; /* consume-once */
+    /* the value travels in catch_value, exactly as f_throw() does it */
+    free_svalue(&catch_value, "coroutine_await_pending: cancelled");
+    catch_value.type = T_STRING;
+    catch_value.subtype = STRING_CONSTANT;
+    catch_value.u.string = kCancelledRejection;
+    throw_error();
+  }
   /* Parking inside an object that is ALREADY destructed would create a frame
    * nothing can ever clean up: abandon_coroutines_of_object() runs once, from
    * destruct_object(), so it only sees frames that were parked by then, and
@@ -1541,14 +2033,34 @@ void coroutine_await_pending(promise_t* awaited) {
       error("await: too many suspended async functions (limit %d).\n", static_cast<int>(limit));
     }
   }
-  /* transient references into the stacks cannot be parked */
+  /* Transient references into the stacks. A plain T_LVALUE that addresses a
+   * slot INSIDE this frame is fine and is relocated across the suspension
+   * (see the frame copy below) -- that is what every ordinary `foreach`
+   * leaves on the stack for its loop variable, so refusing it blanket-wise
+   * made `await` illegal in any foreach at all.
+   *
+   * Everything else here genuinely cannot be parked, and for different
+   * reasons worth keeping straight:
+   *   - T_LVALUE addressing something outside the frame (a GLOBAL loop
+   *     variable goes through find_value() into the object's variable
+   *     block) has a second relocation base and its own lifetime questions;
+   *     refused for now rather than guessed at.
+   *   - T_LVALUE_BYTE / _CODEPOINT / _RANGE are backed by SHARED VM globals
+   *     (AGENTS.md section 13.9), one instance at a time by construction, so
+   *     they can never be per-frame state -- these stay refused permanently.
+   *   - T_REF and T_ERROR_HANDLER own heap state whose unwind is tied to
+   *     this C++ frame. */
   for (svalue_t* v = fp; v < sp; v++) {
+    if (v->type == T_LVALUE && v->u.lvalue >= fp && v->u.lvalue < sp) {
+      continue; /* relocatable */
+    }
     if (v->type &
         (T_LVALUE | T_LVALUE_BYTE | T_LVALUE_RANGE | T_LVALUE_CODEPOINT | T_REF | T_ERROR_HANDLER)) {
       error(
           "await: cannot suspend while a reference or lvalue is pending on the stack. "
-          "Inside a `foreach` loop, use an indexed `for` loop instead; for a `ref` "
-          "argument, await into a plain variable first and pass that.\n");
+          "A `foreach` over a GLOBAL loop variable or a `ref` one cannot hold an await -- "
+          "use a local loop variable, or an indexed `for`; for a `ref` argument, await "
+          "into a plain variable first and pass that.\n");
     }
   }
 
@@ -1583,8 +2095,13 @@ void coroutine_await_pending(promise_t* awaited) {
   coro->defers = async_frame->defers;
   async_frame->defers = nullptr;
   for (control_stack_t* f = async_frame + 1; f <= csp; f++) {
-    coro->markers.push_back({static_cast<int>(f->pc - current_prog->program),
-                             static_cast<int>(f->save_sp - fp), f->defers});
+    lpc_coroutine_acatch_t m{static_cast<int>(f->pc - current_prog->program),
+                             static_cast<int>(f->save_sp - fp), f->defers};
+#ifdef DEBUG
+    /* see the field's comment: carried relative to the body's base */
+    m.temporaries_offset = f->save_temporaries - g_coroutine_temp_base;
+#endif
+    coro->markers.push_back(m);
     f->defers = nullptr;
   }
 
@@ -1595,7 +2112,32 @@ void coroutine_await_pending(promise_t* awaited) {
   if (n > 0) {
     coro->frame = new svalue_t[n];
     memcpy(coro->frame, fp, n * sizeof(svalue_t));
+    /* Relocate frame-relative lvalues. The resume rebuilds this slice at a
+     * DIFFERENT fp, so a T_LVALUE pointing into it (a foreach loop variable
+     * is the common one) would be stale on arrival. Held as an OFFSET while
+     * parked, and as a T_NUMBER rather than a T_LVALUE carrying an offset in
+     * its pointer, so nothing in between -- free_svalue on the frame, the
+     * debug ref checker's mark_svalue -- can be handed a pointer that no
+     * longer addresses anything. The scan above has already refused every
+     * lvalue kind that is NOT relocatable this way. */
+    for (int i = 0; i < n; i++) {
+      if (coro->frame[i].type != T_LVALUE) {
+        continue;
+      }
+      coro->frame_lvalues.push_back(i);
+      coro->frame[i].type = T_NUMBER;
+      coro->frame[i].subtype = 0;
+      coro->frame[i].u.number = coro->frame[i].u.lvalue - fp;
+    }
   }
+
+#ifdef DEBUG
+  /* The foreach temporaries above fp leave the stack with the frame, so the
+   * global count hands its body-owned part over to the coroutine and drops
+   * back to what the enclosing frames legitimately have. */
+  coro->temporaries = stack_in_use_as_temporary - g_coroutine_temp_base;
+  stack_in_use_as_temporary = g_coroutine_temp_base;
+#endif
 
   /* registered from the moment it exists: every free_coroutine() erases */
   g_live_coroutines[coro->id] = coro;
@@ -1917,6 +2459,25 @@ void mark_promise_queue() {
   for (auto* p : g_pending_yields) {
     p->extra_ref++;
   }
+  /* Combinators, likewise off-graph -- and marked ONCE per aggregate rather
+   * than from each of the N reactions pointing at it, because those N share
+   * a single reference to `result` and `slots`. Marking per reaction would
+   * report N-1 references nobody holds. */
+  for (auto* c : g_live_combinators) {
+    if (c->result) {
+      c->result->extra_ref++;
+    }
+    if (c->slots) {
+      /* Only the combinator's own reference: `slots` is an ordinary
+       * allocated array, so the sweep that reaches this one reaches its
+       * TAG_ARRAY block too and marks every item there (checkmemory.cc's
+       * TAG_ARRAY case). Marking them again here would report one ref
+       * nobody holds per refcounted delivered value -- unlike a
+       * coroutine's frame[], which is a bare new[] the sweep never sees
+       * and which mark_coroutine() therefore does have to walk. */
+      c->slots->extra_ref++;
+    }
+  }
   auto mark_one = [](QueuedReaction& qr) {
     if (qr.on_fulfilled) {
       qr.on_fulfilled->hdr.extra_ref++;
@@ -2017,7 +2578,7 @@ void promise_cleanup() {
     svalue_t err;
     err.type = T_STRING;
     err.subtype = STRING_CONSTANT;
-    err.u.string = "*async_yield never ran: the driver shut down";
+    err.u.string = PROMISE_REASON_YIELD_SHUTDOWN;
     (void)promise_settle(p, &err, 1);
     free_promise(p);
   }

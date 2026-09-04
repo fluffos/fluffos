@@ -480,6 +480,11 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
           svalue_to_string(&obj->u.prom->result, outbuf, indent + 2, 0, 1);
           outbuf_add(outbuf, " )");
           break;
+        case PROMISE_CANCELLED:
+          outbuf_add(outbuf, "( cancelled: ");
+          svalue_to_string(&obj->u.prom->result, outbuf, indent + 2, 0, 1);
+          outbuf_add(outbuf, " )");
+          break;
         default:
           outbuf_add(outbuf, "( pending )");
           break;

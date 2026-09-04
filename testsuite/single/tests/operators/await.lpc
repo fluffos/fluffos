@@ -85,24 +85,48 @@ async void local_compound_ok() {
   RELEASE_LATCH("local compound assign across a park");
 }
 
-// What the guard DOES cover: a foreach loop keeps an lvalue slot live for
-// its loop variable for the whole body, so a pending await inside one
-// refuses to suspend and acatch observes the error.
-async void foreach_guarded() {
+// A foreach keeps an lvalue slot live for its loop variable across the whole
+// body. For a LOCAL loop variable that lvalue addresses a slot inside the
+// frame, which is exactly what parking copies and rebuilds, so it is
+// relocated across the suspension and the loop resumes normally. (This used
+// to be refused along with everything else; see async_foreach.lpc.)
+async void foreach_local_suspends() {
   int *a = ({ 1, 2 });
   int completed = 0;
+  int total = 0;
   mixed err;
 
   err = acatch {
     foreach (int v in a) {
+      total += v * await pend;
+    }
+    completed = 1;
+  };
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(1, completed);
+  ASSERT_EQ(30, total);  // (1 + 2) * 10
+  RELEASE_LATCH("foreach lvalue relocates across a park");
+}
+
+// What the guard still DOES cover: a GLOBAL loop variable's lvalue points
+// into the object's variable block, a second relocation base this does not
+// attempt, so it refuses and acatch observes the error.
+nosave int foreach_global;
+
+async void foreach_global_guarded() {
+  int completed = 0;
+  mixed err;
+
+  err = acatch {
+    foreach (foreach_global in ({ 1, 2 })) {
       await pend;
     }
     completed = 1;  // must stay 0: the loop must NOT resume normally
   };
-  ASSERT_EQ(0, completed);  // the loop must NOT have resumed normally
+  ASSERT_EQ(0, completed);
   ASSERT(stringp(err));
   ASSERT(strsrch(err, "cannot suspend") != -1);
-  RELEASE_LATCH("foreach lvalue refuses to suspend");
+  RELEASE_LATCH("foreach global lvalue refuses to suspend");
 }
 
 // suspension-limit fixtures: park on a promise that never settles during
@@ -157,8 +181,11 @@ void do_tests() {
   compound_ok();
   EXPECT_LATCH("local compound assign across a park");
   local_compound_ok();
-  EXPECT_LATCH("foreach lvalue refuses to suspend");
-  foreach_guarded();
+  EXPECT_LATCH("foreach lvalue relocates across a park");
+  foreach_local_suspends();
+
+  EXPECT_LATCH("foreach global lvalue refuses to suspend");
+  foreach_global_guarded();
 
   // the runaway-exhaustion guard: parking past the configured limit is a
   // clean error at the await point. 256 + 66 is __RC_MAX_SUSPENDED_ASYNC__

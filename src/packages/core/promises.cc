@@ -1,6 +1,7 @@
 #include "base/package_api.h"
 
 #include "packages/core/call_out.h"
+#include "include/promise.h"  // LPC-visible rejection reasons
 
 /*
  * Promise efuns (issue #1319 phase 1). The T_PROMISE machinery itself lives
@@ -78,7 +79,7 @@ void f_promise_reject() {
   svalue_t default_reason;
   default_reason.type = T_STRING;
   default_reason.subtype = STRING_CONSTANT;
-  default_reason.u.string = "*promise rejected";
+  default_reason.u.string = PROMISE_REASON_NO_REASON;
   promise_settle(p, (num_arg > 1) ? sp : &default_reason, 1);
   pop_n_elems(num_arg);
 }
@@ -160,14 +161,60 @@ void f_promise_result() {
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
   }
-  if (p->state == PROMISE_REJECTED) {
-    /* reading a rejection counts as observing it */
+  if (p->state == PROMISE_REJECTED || p->state == PROMISE_CANCELLED) {
+    /* reading a rejection or cancellation counts as observing it */
     p->handled = true;
   }
   svalue_t result;
   assign_svalue_no_free(&result, &p->result);
   free_svalue(sp, "f_promise_result");
   *sp = result;
+}
+#endif
+
+/* shared body of the four combinators; the array arg is spec-typed, so only
+ * its ELEMENTS need checking (AGENTS.md section 2) -- and they need none: a
+ * non-promise element is defined to count as already fulfilled with itself,
+ * so map() output drops straight in. */
+static void promise_combinator_efun(uint8_t kind) {
+  array_t* inputs = sp->u.arr;
+
+  if (kind == PROMISE_COMB_RACE && inputs->size == 0) {
+    /* JS lets this hang forever. Here a hung await is a parked frame holding
+     * its object, its program and one `max suspended async functions` slot
+     * for the life of the driver, so refuse it where the mistake is. */
+    error("promise_race: needs at least one promise; an empty array would never settle.\n");
+  }
+  promise_t* result = promise_combinator_start(kind, inputs);
+  free_svalue(sp, "promise_combinator_efun");
+  sp->type = T_PROMISE;
+  sp->subtype = 0;
+  sp->u.prom = result;
+}
+
+#ifdef F_PROMISE_ALL
+void f_promise_all() { promise_combinator_efun(PROMISE_COMB_ALL); }
+#endif
+
+#ifdef F_PROMISE_ANY
+void f_promise_any() { promise_combinator_efun(PROMISE_COMB_ANY); }
+#endif
+
+#ifdef F_PROMISE_RACE
+void f_promise_race() { promise_combinator_efun(PROMISE_COMB_RACE); }
+#endif
+
+#ifdef F_PROMISE_ALL_SETTLED
+void f_promise_all_settled() { promise_combinator_efun(PROMISE_COMB_ALL_SETTLED); }
+#endif
+
+#ifdef F_PROMISE_CANCEL
+void f_promise_cancel() {
+  /* validated (and possibly error()ed) before the stack is touched */
+  int const armed = promise_request_cancel(sp->u.prom);
+
+  free_svalue(sp, "f_promise_cancel");
+  put_number(armed);
 }
 #endif
 

@@ -30,10 +30,34 @@
  * any value.
  */
 
+/* The state codes are LPC-visible (promise_status() returns them), so they
+ * are defined in include/promise.h and shared with the mudlib rather than
+ * duplicated here. */
+#include "include/promise.h"
+
+/* promise_all() / promise_any() / promise_race() / promise_all_settled() */
 enum : uint8_t {
-  PROMISE_PENDING = 0,
-  PROMISE_FULFILLED = 1,
-  PROMISE_REJECTED = 2,
+  PROMISE_COMB_ALL = 0,
+  PROMISE_COMB_ANY = 1,
+  PROMISE_COMB_RACE = 2,
+  PROMISE_COMB_ALL_SETTLED = 3,
+};
+
+/* Aggregation state shared by every input reaction of ONE combinator call.
+ * Ref-counted with one reference per outstanding input reaction, so it dies
+ * with the last of them however they end (delivered, or dropped at shutdown).
+ *
+ * It is an OFF-GRAPH holder of `result` and `slots` (AGENTS.md section 3):
+ * reachable only from reaction records, and reachable from SEVERAL of them at
+ * once. That is why the debug ref checker marks it from its own registry
+ * rather than from each reaction -- marking per reaction would bump
+ * extra_ref once per input against a single real reference. */
+struct promise_combinator_t {
+  uint32_t ref;
+  uint8_t kind;             /* PROMISE_COMB_* */
+  struct promise_t* result; /* ref held; settled when the rule below is met */
+  struct array_t* slots;    /* ref held; one entry per input, filled in place */
+  int remaining;            /* inputs not yet settled */
 };
 
 struct promise_reaction_t {
@@ -42,6 +66,8 @@ struct promise_reaction_t {
   struct promise_t* next;           /* ref held; chained promise to settle; may be null */
   struct object_t* command_giver;   /* ref held; may be null */
   struct lpc_coroutine_t* coro;     /* owned; a parked await to resume; may be null */
+  struct promise_combinator_t* comb; /* ref held; may be null */
+  int comb_index;                   /* which input of `comb` this reaction is */
 };
 
 struct promise_t {
@@ -71,6 +97,26 @@ struct promise_t {
    * state unreachable by never handing out an async function's resolver;
    * here promises are first-class, so the refusal has to be explicit. */
   bool body_owned;
+  /* A cancellation has been requested on this async body and not yet
+   * delivered. CONSUME-ONCE: the raise clears it, so a body that catches its
+   * cancellation in acatch() can still await cleanup and even return a value
+   * -- cancel is a request the body may decline, not a verdict. Lives on the
+   * promise rather than on lpc_coroutine_t because the promise is the only
+   * LPC-reachable handle AND the durable identity of the body across all its
+   * parks: each park allocates a fresh coroutine and each resume frees it,
+   * and a body running its first synchronous stretch has no coroutine at
+   * all. */
+  bool cancelled;
+  /* This settlement is a cancellation -- either this promise is the
+   * cancelled body, or it inherited that body's reason through await / then
+   * / adoption / a combinator. promise_settle() records PROMISE_CANCELLED
+   * rather than PROMISE_REJECTED when the bit is set, which is what
+   * promise_status() returns. dealloc_promise() also skips the unhandled-
+   * rejection report: cancel is a delivered outcome, not a fault, and
+   * stamping handled on the target alone left every downstream link to spam
+   * the driver log (PR #1353). Copied with the reason, not inferred from
+   * the string, which a mudlib can forge. */
+  bool from_cancel;
   /* the declared payload tag of an `async T f()`'s promise, as the runtime
    * T_* mask (0 = unannotated, e.g. promise_create()). The authoritative
    * copy lives in the svalue's subtype -- this is the record that survives
@@ -109,6 +155,19 @@ void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rej
 
 void push_refed_promise(promise_t* p);
 
+/* Build a combinator over `inputs` and return its result promise with one
+ * reference for the caller. An element that is not a promise counts as
+ * already fulfilled with itself (so the output of an ordinary map() works).
+ * Never settles the result before the caller receives it unless every input
+ * was a plain value. */
+promise_t* promise_combinator_start(uint8_t kind, struct array_t* inputs);
+
+/* Request cancellation of the async function body that owns `p`. Returns 1
+ * if a cancellation was armed, 0 if there was nothing left to cancel (the
+ * body already finished, or its fate is already committed to an adoption).
+ * error()s if `p` is not an async function's promise. Runs no LPC. */
+int promise_request_cancel(promise_t* p);
+
 /* A promise fulfilled with 0 on the next pass of the event loop -- after the
  * driver has polled sockets, queued commands and fired due timers. This is
  * the cooperative preemption point for a long async function: `await
@@ -143,6 +202,20 @@ struct lpc_coroutine_acatch_t {
   int pc_offset; /* continuation (code after the region), relative to prog->program */
   int sp_offset; /* value-stack top at region entry, relative to fp */
   struct defer_list* defers;
+#ifdef DEBUG
+  /* The frame's recorded foreach-temporaries count (control_stack_t::
+   * save_temporaries), relative to the BODY's base -- relative for exactly
+   * the reason sp_offset is relative to fp: the absolute value is meaningless
+   * once the frame is rebuilt on a resume, where the base is different.
+   *
+   * Without carrying it, resume_coroutine() re-pushes these markers AFTER it
+   * has added the body's temporaries back, so each frame records the inflated
+   * count instead of the one at region entry -- and an error unwinding to the
+   * region then restores the counter to that, leaving it high by however many
+   * loops were open inside the region. `acatch { foreach (...) { await p;
+   * error(); } }` is the shape. */
+  int temporaries_offset = 0;
+#endif
 };
 
 struct lpc_coroutine_t {
@@ -175,6 +248,16 @@ struct lpc_coroutine_t {
   struct defer_list* defers; /* the async frame's defers */
   svalue_t* frame;           /* owned bitwise copy of [fp .. sp] */
   int frame_size;
+  /* Slots of `frame` that held a T_LVALUE pointing INTO the frame -- a
+   * foreach loop variable, typically. The resume rebuilds the slice at a
+   * different fp, so those are stored as offsets (and as T_NUMBER, so no
+   * stale pointer exists at any point) and re-derived on arrival. */
+  std::vector<int> frame_lvalues;
+#ifdef DEBUG
+  /* open foreach loops whose temporaries travel inside `frame`. Handed back
+   * to the global counter on resume; see g_coroutine_temp_base. */
+  int temporaries;
+#endif
   /* True from the moment a settle hands this coroutine to the microtask queue
    * until the delivery consumes it. Ownership has moved to the queue by then,
    * so destruct-time abandonment must leave it alone -- freeing it would

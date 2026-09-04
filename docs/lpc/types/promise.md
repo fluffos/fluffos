@@ -4,8 +4,11 @@ title: types / promise
 # promise
 
 A `promise` is a first-class value standing for a result that is not
-available yet. It is in one of three states — **pending**, **fulfilled**
-with a value, or **rejected** with a reason — and it settles at most once.
+available yet. It is in one of four states — **pending**, **fulfilled**
+with a value, **rejected** with a reason, or **cancelled** — and it
+settles at most once. Cancelled is a negative settlement (await and
+`then` treat it like a rejection) that `promise_status()` reports as 3
+so a cancellation can be told from a fault.
 
 ```c
 promise p = promise_create();   // pending
@@ -82,3 +85,6 @@ tagged `int`; nothing re-checks it at settle time.
 * `promise_create`, `promise_resolve`, `promise_reject`, `promise_then`,
   `promise_catch`, `promise_status`, `promise_result`, `promisep`,
   `async_yield`, `async_info`
+* combinators: `promise_all`, `promise_any`, `promise_race`,
+  `promise_all_settled`
+* `promise_cancel` — ask an `async` body to give up at its next `await`

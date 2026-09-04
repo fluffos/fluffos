@@ -14,7 +14,9 @@ form of `catch`. This page is the execution-model specification.
 
 A promise is a first-class LPC value holding the eventual result of an
 asynchronous operation. It is created pending and settles exactly once —
-**fulfilled** with a value or **rejected** with a reason. See
+**fulfilled** with a value, **rejected** with a reason, or **cancelled**.
+Cancelled is reported by `promise_status()` as 3: a negative settlement
+that is not a fault. See
 `promise_create()`, `promise_resolve()`, `promise_reject()`,
 `promise_then()`, `promise_catch()`, `promise_status()`,
 `promise_result()`, and `async_info()`.
@@ -131,12 +133,19 @@ object alive and keeps its suspension slot. Note that JS cannot reach this
 state at all, since an async function's resolver is never handed out; here
 promises are first-class, so the refusal has to be explicit.
 
-There is no cancellation primitive in phase 1, and the refusal removes the
-one thing that looked like one. Two replacements, depending on which side
-you are on.
+To ask a body to stop, use `promise_cancel()`, which is the real primitive
+the refusal above pointed at: it makes the body's **next `await` raise** a
+catchable `"*async function cancelled"`, unwinding through `acatch` and
+running `defer` handlers on the way out. It is cooperative — a body part-way
+through straight-line code finishes that stretch, and one that never awaits
+again runs to completion — and the request is **consumed** by the raise, so
+a body that catches its cancellation can still `await` cleanup and return
+normally. It does not propagate into promises the body is awaiting.
 
-A body that should be able to give up early `await`s a gate the caller
-holds:
+Two patterns remain useful alongside it, depending on which side you are on.
+
+A body that wants a cheaper, purely voluntary check `await`s a gate the
+caller holds:
 
 ```c
 async int worker(promise cancel) {
@@ -167,8 +176,20 @@ The `promise_status()` guards are not optional, and this is where LPC
 differs from JS: there, settling an already-settled promise is a silent
 no-op, which is what lets `Promise.race` be written in userland. Here it is
 an **error**, so the unguarded version throws on whichever of the two paths
-finishes second — the common case, not a rare one. Note also that the
-underlying work is not stopped by either shape; only your wait ends.
+finishes second — the common case, not a rare one.
+
+In practice `promise_race()` does this for you, and is what you should reach
+for first:
+
+```c
+promise with_timeout(promise p, int secs) {
+    return promise_race(({ p, timer_that_rejects(secs) }));
+}
+```
+
+Neither shape stops the underlying work; only your wait ends. To stop the
+work as well, the operation has to be an `async` function you can
+`promise_cancel()`.
 
 `return value` fulfills the promise (a returned promise is adopted). An
 uncaught error inside the body rejects it — an async body behaves as if
@@ -295,14 +316,21 @@ compile-time or runtime error, never silent misbehavior:
 2. `await` is not allowed inside `catch(...)` or `time_expression(...)`
    (their implementation recurses the C++ stack). Use `acatch`.
 3. An `await` cannot suspend while a transient reference sits on the value
-   stack. In practice this means **any `foreach` loop** (over arrays,
-   mappings, strings or buffers — the loop keeps an lvalue slot live for its
-   variable for the whole body) and a `ref` argument. It is a runtime error
+   stack that suspension cannot relocate. A `foreach` over a **local** loop
+   variable is fine — arrays, mappings, strings, buffers, nested loops
+   included — because that variable's lvalue addresses a slot inside the
+   frame, and the frame is exactly what parking copies and rebuilds, so it
+   is carried across as an offset. What is still refused is a `foreach` over
+   a **global** loop variable (its lvalue points into the object's variable
+   block, a second relocation base), a **`ref`** loop variable or `ref`
+   argument, and a string-char or buffer-byte lvalue (`s[i]`, `b[i]` —
+   those are backed by shared VM scratch state, one instance at a time by
+   construction, so they can never be per-frame). It is a runtime error
    rather than a compile error because it depends on what the awaited
-   promise turns out to be; use an indexed `for` loop when the body needs to
-   suspend. Compound assignment is *not* affected — `arr[i] += await p`,
-   `s += await p` and friends evaluate the right-hand side before pinning
-   the target, so they park and resume normally.
+   promise turns out to be; use a local loop variable, or an indexed `for`.
+   Compound assignment is *not* affected — `arr[i] += await p`, `s += await
+   p` and friends evaluate the right-hand side before pinning the target, so
+   they park and resume normally.
 4. If the object is destructed, recompiled by `recompile_object()`, or has
    its program swapped by `replace_program()` while a function is
    suspended, the resume is abandoned and the function's promise rejects
