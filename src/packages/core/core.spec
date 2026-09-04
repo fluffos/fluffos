@@ -235,6 +235,7 @@ mapping unique_mapping(mixed *, string | function, ...);
 string *deep_inherit_list(object default:F__THIS_OBJECT);
 string *shallow_inherit_list(object default:F__THIS_OBJECT);
 string *inherit_list shallow_inherit_list(object default:F__THIS_OBJECT);
+string *include_list(object default:F__THIS_OBJECT);
 void printf(string, ...);
 string sprintf(string, ...);
 int mapp(mixed);

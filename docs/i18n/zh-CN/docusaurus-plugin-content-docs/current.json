@@ -2143,6 +2143,10 @@
     "message": "function_profile",
     "description": "The label for the doc item 'function_profile' in sidebar 'docs', linking to the doc efun/system/function_profile"
   },
+  "sidebar.docs.doc.efun/system/include_list": {
+    "message": "include_list",
+    "description": "The label for the doc item 'include_list' in sidebar 'docs', linking to the doc efun/system/include_list"
+  },
   "sidebar.docs.doc.efun/system/inherit_list": {
     "message": "inherit_list",
     "description": "The label for the doc item 'inherit_list' in sidebar 'docs', linking to the doc efun/system/inherit_list"

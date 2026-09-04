@@ -42,6 +42,7 @@ void filter_array(svalue_t*, int);
 void filter_string(svalue_t*, int);
 array_t* deep_inherit_list(struct object_t*);
 array_t* inherit_list(struct object_t*);
+array_t* include_list(struct object_t*);
 array_t* children(const char*);
 array_t* livings(void);
 array_t* objects(funptr_t*);

@@ -3450,6 +3450,11 @@ static program_t* epilog(void) {
     size += align(num_func * sizeof(unsigned short));
   }
 
+  /* A_INCLUDES is outside NUMPAREAS (compile-time only historically);
+   * persist it so include_list() can report the files this program
+   * actually opened (issue #1356). */
+  size += align(mem_block[A_INCLUDES].current_size);
+
   /* file_info header is two ints:
    *   [0] total bytes of the file_info+line_info allocation
    *       (dump_line_numbers / dump_prog_json use it as li_end)
@@ -3615,6 +3620,14 @@ static program_t* epilog(void) {
     copy_in(A_INHERITS, &p);
   } else {
     prog->inherit = nullptr;
+  }
+
+  prog->include_names_size = mem_block[A_INCLUDES].current_size;
+  if (prog->include_names_size) {
+    prog->include_names = p;
+    copy_in(A_INCLUDES, &p);
+  } else {
+    prog->include_names = nullptr;
   }
 
   prog->apply_lookup_table.reset(nullptr);

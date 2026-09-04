@@ -1,0 +1,84 @@
+// include_list() reports every file this program actually #included
+// (nested includes included, first-seen order, duplicates dropped).
+// The main source is omitted. The configured global include file is
+// listed when it was opened -- in the testsuite that is <globals.h>,
+// which pulls in tests.h.
+
+#include "/include/tests.h"
+
+#define GEN "/data/include_list_gen.c"
+#define HDR_A "/data/include_list_a.h"
+#define HDR_B "/data/include_list_b.h"
+#define HDR_NEST "/data/include_list_nest.h"
+#define HDR_SKIP "/data/include_list_skipped.h"
+
+private void cleanup() {
+  rm(GEN);
+  rm(HDR_A);
+  rm(HDR_B);
+  rm(HDR_NEST);
+  rm(HDR_SKIP);
+}
+
+void do_tests() {
+  object ob;
+  string *l, *mine;
+  int i, pos_a, pos_nest, pos_b;
+
+  mine = include_list();
+  ASSERT_EQ(mine, include_list(this_object()));
+  ASSERT(member_array("/include/globals.h", mine) != -1);
+  ASSERT(member_array("/include/tests.h", mine) != -1);
+
+  cleanup();
+  write_file(HDR_NEST, "#define NEST 1\n");
+  write_file(HDR_A, "#include \"include_list_nest.h\"\n#define A 1\n");
+  write_file(HDR_B, "#define B 1\n");
+  write_file(HDR_SKIP, "#define SKIPPED 1\n");
+  write_file(GEN,
+    "#include \"/data/include_list_a.h\"\n"
+    "#include \"/data/include_list_b.h\"\n"
+    "#include \"/data/include_list_b.h\"\n"
+    "#if 0\n"
+    "#include \"/data/include_list_skipped.h\"\n"
+    "#endif\n"
+    "int ok() { return A + B + NEST; }\n");
+
+  ob = load_object(GEN);
+  ASSERT2(ob, "generated file compiles");
+  if (!ob) {
+    cleanup();
+    return;
+  }
+  ASSERT_EQ(3, ob->ok());
+
+  l = include_list(ob);
+  ASSERT(member_array("/include/globals.h", l) != -1);
+  ASSERT(member_array("/include/tests.h", l) != -1);
+  ASSERT(member_array("/data/include_list_a.h", l) != -1);
+  ASSERT(member_array("/data/include_list_nest.h", l) != -1);
+  ASSERT(member_array("/data/include_list_b.h", l) != -1);
+  ASSERT(member_array("/data/include_list_skipped.h", l) == -1);
+  ASSERT(member_array(GEN, l) == -1);
+
+  // Duplicate #include of b.h is one entry.
+  ASSERT_EQ(1, sizeof(filter(l, (: $1 == "/data/include_list_b.h" :))));
+
+  // First-seen order: a, then the nested header it opened, then b.
+  pos_a = pos_nest = pos_b = -1;
+  for (i = 0; i < sizeof(l); i++) {
+    if (l[i] == "/data/include_list_a.h") {
+      pos_a = i;
+    }
+    if (l[i] == "/data/include_list_nest.h") {
+      pos_nest = i;
+    }
+    if (l[i] == "/data/include_list_b.h") {
+      pos_b = i;
+    }
+  }
+  ASSERT(pos_a >= 0 && pos_nest > pos_a && pos_b > pos_nest);
+
+  destruct(ob);
+  cleanup();
+}
