@@ -107,6 +107,14 @@ struct promise_t {
    * and a body running its first synchronous stretch has no coroutine at
    * all. */
   bool cancelled;
+  /* This rejection exists because a cancellation propagated here -- either
+   * this promise is the cancelled body, or it inherited that body's reason
+   * through await / then / adoption / a combinator. dealloc_promise() skips
+   * the unhandled-rejection report: cancel is a delivered outcome, not a
+   * fault, and stamping handled on the target alone left every downstream
+   * link to spam the driver log (PR #1353). Copied with the reason, not
+   * inferred from the string, which a mudlib can forge. */
+  bool from_cancel;
   /* the declared payload tag of an `async T f()`'s promise, as the runtime
    * T_* mask (0 = unannotated, e.g. promise_create()). The authoritative
    * copy lives in the svalue's subtype -- this is the record that survives

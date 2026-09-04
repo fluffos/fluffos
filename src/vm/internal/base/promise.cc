@@ -46,7 +46,8 @@ extern int stack_in_use_as_temporary;
  * namespace but CALLED from inside it, and declaring them in there would
  * name a different, never-defined symbol. */
 void free_combinator(promise_combinator_t* c);
-void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected);
+void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected,
+                       bool from_cancel = false);
 
 namespace {
 
@@ -553,7 +554,7 @@ void deliver_reaction(QueuedReaction* qr) {
   if (qr->comb) {
     /* Pure aggregation: runs no LPC, so it needs neither an eval budget nor
      * the command_giver dance below, and cannot re-enter the drain. */
-    deliver_combinator(qr->comb, qr->comb_index, &src->result, rejected);
+    deliver_combinator(qr->comb, qr->comb_index, &src->result, rejected, src->from_cancel);
     free_queued_reaction(qr);
     return;
   }
@@ -590,6 +591,9 @@ void deliver_reaction(QueuedReaction* qr) {
     /* pass-through: propagate the source's state to the chained promise */
     if (qr->next) {
       if (rejected) {
+        if (src->from_cancel) {
+          qr->next->from_cancel = true;
+        }
         promise_settle(qr->next, &src->result, 1);
       } else {
         promise_resolve_with(qr->next, &src->result);
@@ -1130,6 +1134,9 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     /* no acatch() region spans the await: the rejection propagates
      * straight to the coroutine's own promise, no need to rebuild the
      * frame at all (no catch may span an await by construction). */
+    if (source->from_cancel || reason == &cancel_reason) {
+      coro->result_promise->from_cancel = true;
+    }
     free_coroutine(coro, reason, true);
     return;
   }
@@ -1367,6 +1374,7 @@ promise_t* promise_alloc() {
   p->resolving = false;
   p->body_owned = false;
   p->cancelled = false;
+  p->from_cancel = false;
   p->value_type = 0;
   p->result = const0;
   p->reactions = nullptr;
@@ -1407,7 +1415,7 @@ void free_promise(promise_t* p) {
 }
 
 void dealloc_promise(promise_t* p) {
-  if (p->state == PROMISE_REJECTED && !p->handled) {
+  if (p->state == PROMISE_REJECTED && !p->handled && !p->from_cancel) {
     /* Where it was rejected. Without this the report is a bare reason with no
      * object, function or line -- and it is printed at DEALLOCATION, which
      * can be arbitrarily far from the rejection, so there is nothing else in
@@ -1511,7 +1519,7 @@ void dealloc_promise(promise_t* p) {
         err.type = T_STRING;
         err.subtype = STRING_CONSTANT;
         err.u.string = PROMISE_REASON_COLLECTED;
-        deliver_combinator(r.comb, r.comb_index, &err, true);
+        deliver_combinator(r.comb, r.comb_index, &err, true, p->from_cancel);
         free_combinator(r.comb);
       }
     }
@@ -1641,15 +1649,22 @@ svalue_t* promise_map_slot(mapping_t* m, const char* key) {
 
 /* One input settled (or was a plain value). Records it and settles the result
  * if this input decided the outcome. Runs no LPC. */
-void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected) {
+void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected,
+                       bool from_cancel) {
   switch (c->kind) {
     case PROMISE_COMB_RACE:
       /* first to settle decides, either way */
+      if (rejected && from_cancel) {
+        c->result->from_cancel = true;
+      }
       (void)promise_settle(c->result, value, rejected ? 1 : 0);
       break;
 
     case PROMISE_COMB_ALL:
       if (rejected) {
+        if (from_cancel) {
+          c->result->from_cancel = true;
+        }
         (void)promise_settle(c->result, value, 1); /* fail fast */
       } else {
         assign_svalue(&c->slots->item[index], value);
@@ -1809,8 +1824,10 @@ int promise_request_cancel(promise_t* p) {
   p->cancelled = true;
   /* The canceller has forced the outcome, so the rejection below is not
    * "unhandled" even if nobody attached a handler; without this a
-   * fire-and-forget cancel logs a rejection report when the promise dies. */
+   * fire-and-forget cancel logs a rejection report when the promise dies.
+   * from_cancel travels with the reason to every downstream link. */
   p->handled = true;
+  p->from_cancel = true;
 
   /* Find the parked frame, if there is one. A linear scan over at most
    * `max suspended async functions` entries, on a rare user-initiated efun.
