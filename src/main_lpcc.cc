@@ -227,10 +227,10 @@ static int lpcc_main(int argc, char** argv) {
     // mappings. Consumers accumulate `segments` in order to translate an
     // absolute line to (file, line-within-file).
     nlohmann::json seg = nlohmann::json::array();
-    unsigned short* fi = obj->prog->file_info;
+    lpc_file_info_t* fi = obj->prog->file_info;
     if (obj->prog->line_info != nullptr && fi != nullptr) {
       auto* li_start = reinterpret_cast<unsigned char*>(fi + fi[1]);
-      for (unsigned short* p = fi + 2; p < reinterpret_cast<unsigned short*>(li_start); p += 2) {
+      for (lpc_file_info_t* p = fi + 2; p < reinterpret_cast<lpc_file_info_t*>(li_start); p += 2) {
         seg.push_back({{"lines", p[0]}, {"file", obj->prog->strings[p[1] - 1]}});
       }
     }

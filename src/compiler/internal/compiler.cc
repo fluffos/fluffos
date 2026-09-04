@@ -3297,7 +3297,8 @@ static void handle_functions() {
  * The program has been compiled. Prepare a 'program_t' to be returned.
  */
 static program_t* epilog(void) {
-  int size, i, lnsz, lnoff;
+  int size, i;
+  size_t lnsz, lnoff;
   char* p;
   int num_func;
   ident_hash_elem_t* ihe;
@@ -3449,6 +3450,20 @@ static program_t* epilog(void) {
     size += align(num_func * sizeof(unsigned short));
   }
 
+  /* file_info header is two ints:
+   *   [0] total bytes of the file_info+line_info allocation
+   *       (dump_line_numbers / dump_prog_json use it as li_end)
+   *   [1] offset in lpc_file_info_t units to the line-number bytes
+   *       (find_line, main_lpcc, the disassembler)
+   * Then (count, file-id) pairs. Words are int so they match current_line
+   * and the rest of the line-number pipeline (issue #1359). Compute the
+   * sizes in size_t to avoid signed overflow, then store as int -- they
+   * fit whenever mem_block could build the table.
+   */
+  lnoff = 2 + static_cast<size_t>(mem_block[A_FILE_INFO].current_size) / sizeof(lpc_file_info_t);
+  lnsz = lnoff * sizeof(lpc_file_info_t) +
+         static_cast<size_t>(mem_block[A_LINENUMBERS].current_size);
+
   p = reinterpret_cast<char*>(DMALLOC(size, TAG_PROGRAM, "epilog: 1"));
   prog = new (p) program_t;
   prog->total_size = size;
@@ -3470,16 +3485,13 @@ static program_t* epilog(void) {
   total_num_prog_blocks++;
   total_prog_block_size += size;
 
-  /* Format is now:
-   * <short total size> <short line_info_offset> <file info> <line info>
+  /* Format:
+   * <int total size> <int line_info_offset> <file info> <line info>
    */
-  lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
-  lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
+  prog->file_info = reinterpret_cast<lpc_file_info_t*>(DMALLOC(lnsz, TAG_LINENUMBERS, "epilog"));
 
-  prog->file_info = reinterpret_cast<unsigned short*>(DMALLOC(lnsz, TAG_LINENUMBERS, "epilog"));
-
-  prog->file_info[0] = static_cast<unsigned short>(lnsz);
-  prog->file_info[1] = static_cast<unsigned short>(lnoff);
+  prog->file_info[0] = static_cast<lpc_file_info_t>(lnsz);
+  prog->file_info[1] = static_cast<lpc_file_info_t>(lnoff);
 
   memcpy((reinterpret_cast<char*>(&prog->file_info[2])), mem_block[A_FILE_INFO].block,
          mem_block[A_FILE_INFO].current_size);
@@ -3902,11 +3914,12 @@ void prepare_cases(parse_node_t* pn, int start) {
       save_file_info(current_file_id, current_line - current_line_saved);
       current_line_saved = current_line;
 
-      translate_absolute_line(
-          (*ce)->line, reinterpret_cast<unsigned short*>(mem_block[A_FILE_INFO].block), &fi1, &l1);
-      translate_absolute_line((*(ce - 1))->line,
-                              reinterpret_cast<unsigned short*>(mem_block[A_FILE_INFO].block), &fi2,
-                              &l2);
+      {
+        auto* fi_base = reinterpret_cast<lpc_file_info_t*>(mem_block[A_FILE_INFO].block);
+        auto* fi_end = fi_base + mem_block[A_FILE_INFO].current_size / sizeof(lpc_file_info_t);
+        translate_absolute_line((*ce)->line, fi_base, &fi1, &l1, fi_end);
+        translate_absolute_line((*(ce - 1))->line, fi_base, &fi2, &l2, fi_end);
+      }
       f1 = PROG_STRING(fi1 - 1);
       f2 = PROG_STRING(fi2 - 1);
 
@@ -3950,35 +3963,16 @@ void prepare_cases(parse_node_t* pn, int start) {
 }
 
 void save_file_info(int file_id, int lines) {
-  /* The count is 16 bits wide (the whole table is unsigned short pairs), so
-   * a file -- or one contiguous stretch of a file between #includes -- of
-   * 65536 lines used to wrap to 0. translate_absolute_line()'s first pass
-   * then subtracts 0 without ever reducing the line it is looking for, walks
-   * off the end of the table, and returns whatever garbage it lands on as a
-   * file index; the caller feeds that straight to progp->strings[idx - 1].
-   * The first runtime error reported from such a file segfaults the driver.
-   *
-   * Emit the count in chunks of at most 65535 carrying the same file id.
-   * The format is unchanged and the decoder needs no change either: its
-   * second pass already sums every earlier entry with the same file id when
-   * it reconstructs the file-relative line, so a split file decodes exactly
-   * as an unsplit one would have.
-   *
-   * do/while, not while: a zero-line entry is legitimate (an #include on the
-   * first line of a file leaves no lines before it) and must still emit
-   * exactly one entry, as it always did. */
-  do {
-    unsigned short fi[2];
-    int const chunk = (lines > 0xffff) ? 0xffff : lines;
+  /* One (count, file-id) pair per contiguous stretch. Words are int, so
+   * a 65536-line file is a single entry -- the 16-bit wrap that used to
+   * make translate_absolute_line() walk off the table (issue #1355 /
+   * #1359) cannot happen. A zero-line entry is still legitimate (an
+   * #include on the first line of a file) and must emit exactly one pair. */
+  lpc_file_info_t fi[2];
 
-    /* unsigned short, not short: this is how the table is read back, and
-     * storing a count above 32767 through a signed short was needless
-     * implementation-defined behaviour. */
-    fi[0] = static_cast<unsigned short>(chunk);
-    fi[1] = static_cast<unsigned short>(file_id);
-    add_to_mem_block(A_FILE_INFO, (char*)&fi[0], sizeof(fi));
-    lines -= chunk;
-  } while (lines > 0);
+  fi[0] = lines < 0 ? 0 : lines;
+  fi[1] = file_id;
+  add_to_mem_block(A_FILE_INFO, reinterpret_cast<char*>(&fi[0]), sizeof(fi));
 }
 
 int add_program_file(const char* name, int top) {

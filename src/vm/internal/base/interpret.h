@@ -208,7 +208,7 @@ void call___INIT(object_t*);
 array_t* call_all_other(array_t*, const char*, int);
 const char* function_exists(const char*, object_t*, int);
 void mark_apply_low_cache(void);
-void translate_absolute_line(int, unsigned short*, int*, int*, unsigned short* end = nullptr);
+void translate_absolute_line(int, lpc_file_info_t*, int*, int*, lpc_file_info_t* end = nullptr);
 char* add_slash(const char* const);
 int strpref(const char*, const char*);
 void do_trace(const char*, const char*, const char*);

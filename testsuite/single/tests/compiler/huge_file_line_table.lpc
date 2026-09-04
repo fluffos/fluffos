@@ -1,22 +1,16 @@
 // A file of 65536+ lines must not corrupt the line table.
 //
-// The per-file line count in prog->file_info is 16 bits (the table is
-// unsigned short pairs), and save_file_info() stored it without capping. At
-// exactly 65536 lines the count wrapped to 0, and
-// translate_absolute_line()'s first pass -- `while (line_tmp > *p1)
-// { line_tmp -= *p1; p1 += 2; }` -- then advanced without ever reducing
-// line_tmp, walked off the end of the table, and returned whatever it landed
-// on as a file index. The caller feeds that straight to
-// progp->strings[idx - 1], so the FIRST runtime error reported from such a
-// file segfaulted the driver.
+// The per-file line count used to be 16 bits. At exactly 65536 lines it
+// wrapped to 0, and translate_absolute_line()'s first pass --
+// `while (line_tmp > *p1) { line_tmp -= *p1; p1 += 2; }` -- then advanced
+// without ever reducing line_tmp, walked off the table, and returned
+// whatever it landed on as a file index. The caller feeds that to
+// progp->strings[idx - 1], so the FIRST runtime error reported from such
+// a file segfaulted the driver.
 //
-// Not exotic: it is one large generated or accumulated mudlib file. The
-// count is now emitted in <=65535 chunks carrying the same file id, which
-// the decoder already reassembles (its second pass sums earlier entries with
-// a matching id), and the decoder's walk is bounded as well.
-//
-// This test drives the reporting path that crashed -- catching an error
-// forces the driver to translate an absolute line into (file, line).
+// Counts are int now (lpc_file_info_t), so a 65536-line stretch is one
+// entry. The decoder walk is still bounded. This drives the reporting
+// path that crashed -- catching an error forces a line-table translate.
 
 #include "/include/tests.h"
 

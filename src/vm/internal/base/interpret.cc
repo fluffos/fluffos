@@ -4992,9 +4992,9 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   call_program(current_prog, funp->address);
 }
 
-void translate_absolute_line(int abs_line, unsigned short* file_info, int* ret_file,
-                             int* ret_line, unsigned short* end) {
-  unsigned short *p1, *p2;
+void translate_absolute_line(int abs_line, lpc_file_info_t* file_info, int* ret_file,
+                             int* ret_line, lpc_file_info_t* end) {
+  lpc_file_info_t *p1, *p2;
   int file;
   int line_tmp = abs_line;
 

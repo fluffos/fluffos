@@ -927,7 +927,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
 #define INCLUDE_DEPTH 10
 
 static void dump_line_numbers(FILE* f, program_t* prog) {
-  unsigned short* fi;
+  lpc_file_info_t* fi;
   unsigned char* li_start;
   unsigned char* li_end;
   unsigned char* li;
@@ -941,13 +941,15 @@ static void dump_line_numbers(FILE* f, program_t* prog) {
   }
 
   fi = prog->file_info;
+  /* fi[0] is the allocation size in bytes; fi[1] is the offset in
+   * lpc_file_info_t units to the line-number bytes. */
   li_end = reinterpret_cast<unsigned char*>((reinterpret_cast<char*>(fi)) + fi[0]);
   li_start = reinterpret_cast<unsigned char*>(fi + fi[1]);
 
   fi += 2;
   fprintf(f, "\nabsolute line -> (file, line) table:\n");
-  while (fi < reinterpret_cast<unsigned short*>(li_start)) {
-    fprintf(f, "%i lines from %i [%s]\n", fi[0], fi[1], prog->strings[fi[1] - 1]);
+  while (fi < reinterpret_cast<lpc_file_info_t*>(li_start)) {
+    fprintf(f, "%d lines from %d [%s]\n", fi[0], fi[1], prog->strings[fi[1] - 1]);
     fi += 2;
   }
 
@@ -1021,12 +1023,13 @@ static nlohmann::json prog_details_json(program_t* prog, int flags) {
 
   if ((flags & 2) && prog->line_info != nullptr && prog->file_info != nullptr) {
     // Mirrors dump_line_numbers()'s walk.
-    unsigned short* fi = prog->file_info;
+    lpc_file_info_t* fi = prog->file_info;
+    // Same bounds as dump_line_numbers(): fi[0] bytes, fi[1] words.
     auto* li_end = reinterpret_cast<unsigned char*>((reinterpret_cast<char*>(fi)) + fi[0]);
     auto* li_start = reinterpret_cast<unsigned char*>(fi + fi[1]);
 
     p["line_files"] = nlohmann::json::array();
-    for (unsigned short* q = fi + 2; q < reinterpret_cast<unsigned short*>(li_start); q += 2) {
+    for (lpc_file_info_t* q = fi + 2; q < reinterpret_cast<lpc_file_info_t*>(li_start); q += 2) {
       p["line_files"].push_back({{"lines", q[0]}, {"file", prog->strings[q[1] - 1]}});
     }
 
