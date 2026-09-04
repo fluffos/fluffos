@@ -20,6 +20,6 @@ void do_tests() {
 
   l = include_list(ob);
   ASSERT_EQ(({ "/include/globals.h", "/include/tests.h",
-               "/clone/include_list_a.h", "/clone/include_list_nest.h",
-               "/clone/include_list_b.h" }), l);
+    "/clone/include_list_a.h", "/clone/include_list_nest.h",
+    "/clone/include_list_b.h" }), l);
 }
