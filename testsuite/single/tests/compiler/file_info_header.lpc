@@ -1,0 +1,103 @@
+// The file_info table is int words (header and (count, file-id) pairs).
+// A 16-bit header used to wrap: [0] (total bytes, used as li_end by
+// dump_line_numbers) and [1] (offset to the line-number bytes). A 16-bit
+// per-file count wrapped at 65536 lines (#1355). Those sizes must compile
+// and run.
+//
+// A single huge function hits Bison's "memory exhausted" stack first
+// (~10k statements), so the [0] case is many tiny functions. The [1]
+// case is sequential includes of one header (~32767 entries used to wrap).
+// Error-report translation of a 65536-line file is huge_file_line_table.lpc.
+
+#include "/include/tests.h"
+
+#define GEN_OK "/data/file_info_header_ok.c"
+#define GEN_BIG "/data/file_info_header_big.c"
+#define GEN_INC "/data/file_info_header_inc.c"
+#define HDR "/data/file_info_hdr.h"
+
+private void write_increments(string path, int n) {
+  string chunk;
+  int i;
+
+  rm(path);
+  write_file(path, "int probe() {\n  int x = 0;\n");
+  chunk = "";
+  for (i = 0; i < n; i++) {
+    chunk += "  x++;\n";
+    if (sizeof(chunk) > 4000) {
+      write_file(path, chunk);
+      chunk = "";
+    }
+  }
+  write_file(path, chunk);
+  write_file(path, "  return x;\n}\n");
+}
+
+private void write_functions(string path, int n) {
+  string chunk;
+  int i;
+
+  rm(path);
+  chunk = "";
+  for (i = 0; i < n; i++) {
+    chunk += "int f" + i + "() { return " + i + "; }\n";
+    if (sizeof(chunk) > 4000) {
+      write_file(path, chunk);
+      chunk = "";
+    }
+  }
+  write_file(path, chunk);
+}
+
+private void write_includes(string path, int n) {
+  string chunk;
+  int i;
+
+  rm(HDR);
+  write_file(HDR, "//\n");
+  rm(path);
+  chunk = "";
+  for (i = 0; i < n; i++) {
+    chunk += "#include \"file_info_hdr.h\"\n";
+    if (sizeof(chunk) > 4000) {
+      write_file(path, chunk);
+      chunk = "";
+    }
+  }
+  write_file(path, chunk);
+  write_file(path, "int ok() { return 1; }\n");
+}
+
+void do_tests() {
+  object ob;
+
+  write_increments(GEN_OK, 2000);
+  ob = load_object(GEN_OK);
+  ASSERT2(ob, "2000 statements compile");
+  if (ob) {
+    ASSERT_EQ(2000, ob->probe());
+    destruct(ob);
+  }
+  rm(GEN_OK);
+
+  write_functions(GEN_BIG, 15000);
+  ob = load_object(GEN_BIG);
+  ASSERT2(ob, "15000 functions compile");
+  if (ob) {
+    ASSERT_EQ(0, ob->f0());
+    ASSERT_EQ(14999, ob->f14999());
+    destruct(ob);
+  }
+  rm(GEN_BIG);
+
+  write_includes(GEN_INC, 32800);
+  ob = load_object(GEN_INC);
+  ASSERT2(ob, "32800 includes compile");
+  if (ob) {
+    ASSERT_EQ(1, ob->ok());
+    destruct(ob);
+  }
+  rm(GEN_INC);
+  rm(HDR);
+}

@@ -1,6 +1,7 @@
 #ifndef PROGRAM_H
 #define PROGRAM_H
 
+#include <cstddef>
 #include <cstdint>
 
 #include "vm/internal/base/svalue.h" /* lpc_type_t */
@@ -168,6 +169,10 @@ typedef struct {
 #define ADDRESS_MAX UINT16_MAX
 #endif
 
+/* file_info header and (count, file-id) pairs. int matches current_line,
+ * save_file_info(), and translate_absolute_line() (issue #1359). */
+using lpc_file_info_t = int;
+
 struct function_t {
   const char* funcname;
   lpc_type_t type;
@@ -218,7 +223,10 @@ struct program_t {
 #endif
   char* program;            /* The binary instructions */
   unsigned char* line_info; /* Line number information */
-  unsigned short* file_info;
+  /* file_info[0] = total bytes of this block (disassembler li_end);
+   * file_info[1] = offset in lpc_file_info_t units to line_info; then
+   * (count, file-id) pairs up to that offset. */
+  lpc_file_info_t* file_info;
   int line_swap_index; /* Where line number info is swapped */
   function_t* function_table;
   unsigned short* function_flags; /* separate for alignment reasons */
