@@ -18,8 +18,10 @@
 
 nosave promise never, gate;
 nosave promise held, caught_body, defer_body;
+nosave promise status_leaf, status_all, status_race, status_settled;
+nosave promise catch_then_fail_p;
 nosave int body_ran_past_await, defer_ran, cleanup_awaited;
-nosave mixed caught;
+nosave mixed caught, declined_caught;
 
 // Parked on a promise nothing will ever settle.
 private async int stuck() {
@@ -49,6 +51,13 @@ private async int with_defer() {
 
 private async int quick() { return 3; }
 
+// Catches its own cancellation, then faults for a different reason.
+// from_cancel must not stick: the settlement is a rejection, not a cancel.
+private async int catch_then_fail() {
+  declined_caught = acatch(await never);
+  error("real fault");
+}
+
 private void check_stuck() {
   EXPECT_LATCH("stuck");
   held = stuck();
@@ -58,7 +67,10 @@ private void check_stuck() {
   promise_catch(held, function(mixed reason) {
     ASSERT_EQ("*async function cancelled", reason);
     ASSERT_EQ(0, body_ran_past_await);
-    ASSERT_EQ(2, promise_status(held));
+    // 3 == PROMISE_CANCELLED (src/include/promise.h). Not 2: cancel is
+    // a negative settlement, not a fault.
+    ASSERT_EQ(3, promise_status(held));
+    ASSERT_EQ("*async function cancelled", promise_result(held));
     RELEASE_LATCH("stuck");
   });
 }
@@ -240,6 +252,45 @@ private void check_cancel_propagate() {
   call_out((: cancel_check_log :), 1);
 }
 
+// PROMISE_CANCELLED == 3. Combinators inherit it: all / race fail-fast as
+// cancelled; all_settled reports status 3 with a reason and no value.
+private void check_cancel_status() {
+  EXPECT_LATCH("cancel-status");
+  status_leaf = cancel_leaf();
+  status_all = promise_all(({ status_leaf }));
+  status_race = promise_race(({ status_leaf }));
+  status_settled = promise_all_settled(({ status_leaf }));
+  ASSERT_EQ(1, promise_cancel(status_leaf));
+
+  promise_then(status_settled, function(mixed v) {
+    ASSERT_EQ(3, promise_status(status_leaf));
+    ASSERT_EQ("*async function cancelled", promise_result(status_leaf));
+    ASSERT_EQ(3, promise_status(status_all));
+    ASSERT_EQ("*async function cancelled", promise_result(status_all));
+    ASSERT_EQ(3, promise_status(status_race));
+    ASSERT_EQ(1, promise_status(status_settled));
+    ASSERT_EQ(3, v[0]["status"]);
+    ASSERT_EQ("*async function cancelled", v[0]["reason"]);
+    ASSERT2(undefinedp(v[0]["value"]), "a cancelled entry carries no value");
+    RELEASE_LATCH("cancel-status");
+  });
+}
+
+private void check_catch_then_fail() {
+  EXPECT_LATCH("catch-then-fail");
+  catch_then_fail_p = catch_then_fail();
+  ASSERT_EQ(1, promise_cancel(catch_then_fail_p));
+
+  promise_catch(catch_then_fail_p, function(mixed reason) {
+    // Declined the cancel, then faulted: rejected, not cancelled.
+    ASSERT_EQ(2, promise_status(catch_then_fail_p));
+    ASSERT2(stringp(reason) && strsrch(reason, "real fault") != -1,
+      "declined cancel then faulted: " + reason);
+    ASSERT_EQ("*async function cancelled", declined_caught);
+    RELEASE_LATCH("catch-then-fail");
+  });
+}
+
 void do_tests() {
   never = promise_create();
   gate = promise_create();
@@ -266,4 +317,6 @@ void do_tests() {
   }
 
   check_cancel_propagate();
+  check_cancel_status();
+  check_catch_then_fail();
 }

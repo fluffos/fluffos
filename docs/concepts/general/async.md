@@ -14,7 +14,9 @@ form of `catch`. This page is the execution-model specification.
 
 A promise is a first-class LPC value holding the eventual result of an
 asynchronous operation. It is created pending and settles exactly once —
-**fulfilled** with a value or **rejected** with a reason. See
+**fulfilled** with a value, **rejected** with a reason, or **cancelled**.
+Cancelled is reported by `promise_status()` as 3: a negative settlement
+that is not a fault. See
 `promise_create()`, `promise_resolve()`, `promise_reject()`,
 `promise_then()`, `promise_catch()`, `promise_status()`,
 `promise_result()`, and `async_info()`.

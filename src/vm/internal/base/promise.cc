@@ -214,13 +214,17 @@ constexpr LPC_INT kDefaultDrainBudgetUs = 1000;
  * newline. No trailing newline: this is a value handed to a rejection
  * handler, not a message printed by error(). */
 constexpr const char* kDestructedRejection = PROMISE_REASON_DESTRUCTED;
-/* What a cancelled body's next await raises, and what its promise rejects
- * with if nothing catches it. Matched by CONTENT, like every other reason in
- * this family -- a plain string is forgeable by throw(), which is accepted:
- * discriminating cancellation authoritatively would need a driver-reserved
- * value kind, and promise_status() already answers the question from
- * outside. */
+/* What a cancelled body's next await raises, and what its promise settles
+ * with as PROMISE_CANCELLED if nothing catches it. Matched by CONTENT for
+ * the raise itself -- a plain string is forgeable by throw() -- but
+ * promise_status() is the authoritative test from outside. */
 constexpr const char* kCancelledRejection = PROMISE_REASON_CANCELLED;
+
+/* Cancelled is a negative settlement: await / then / combinators treat it
+ * like a rejection, but promise_status() reports PROMISE_CANCELLED. */
+bool promise_failed(const promise_t* p) {
+  return p->state == PROMISE_REJECTED || p->state == PROMISE_CANCELLED;
+}
 
 /* Consecutive slices that ended with work still queued. Routine under load;
  * a long run of them means the queue is not keeping up. Reset by any slice
@@ -549,7 +553,7 @@ void deliver_reaction(QueuedReaction* qr) {
     return;
   }
 
-  bool const rejected = (src->state == PROMISE_REJECTED);
+  bool const rejected = promise_failed(src);
 
   if (qr->comb) {
     /* Pure aggregation: runs no LPC, so it needs neither an eval budget nor
@@ -924,6 +928,14 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
         } catch (const char*) {
         }
         if (unwound) {
+          /* The body caught the raise. If this was a cancellation, it was
+           * declined -- later settlement is ordinary fulfill or reject, not
+           * PROMISE_CANCELLED. Matched by the driver's constant pointer, not
+           * by string content: a mudlib throw of the same letters is a
+           * rejection. */
+          if (catch_value.type == T_STRING && catch_value.u.string == kCancelledRejection) {
+            p->from_cancel = false;
+          }
           continue;
         }
       }
@@ -1074,7 +1086,7 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
 }
 
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
-  bool rejected = (source->state == PROMISE_REJECTED);
+  bool rejected = promise_failed(source);
   /* -1 = "no resumed frame to account for"; see the frame restore below */
   int resumed_temp_base = -1;
   /* what the resumed await yields, or rejects with -- the source's result
@@ -1282,7 +1294,14 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     assign_svalue_no_free(sp, reason);
     entry = coro->prog->program + coro->pc_offset;
   } else {
-    /* re-raise at the await point; the innermost acatch() catches it */
+    /* re-raise at the await point; the innermost acatch() catches it.
+     * Catching THIS body's own cancel (reason == &cancel_reason) declines
+     * it -- later settlement is ordinary. An inherited cancelled await is
+     * just a catchable rejection here; from_cancel was never set on this
+     * result. */
+    if (reason == &cancel_reason) {
+      coro->result_promise->from_cancel = false;
+    }
     assign_svalue(&catch_value, reason);
     entry = unwind_to_acatch_marker(csp);
   }
@@ -1536,7 +1555,13 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected) {
   if (rejected && p->reject_origin == nullptr) {
     p->reject_origin = capture_reject_origin();
   }
-  p->state = rejected ? PROMISE_REJECTED : PROMISE_FULFILLED;
+  if (!rejected) {
+    p->state = PROMISE_FULFILLED;
+  } else if (p->from_cancel) {
+    p->state = PROMISE_CANCELLED;
+  } else {
+    p->state = PROMISE_REJECTED;
+  }
   assign_svalue(&p->result, value);
   if (p->reactions) {
     std::vector<promise_reaction_t>* reactions = p->reactions;
@@ -1680,13 +1705,14 @@ void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, boo
       break;
 
     case PROMISE_COMB_ALL_SETTLED: {
-      /* ([ "status": 1|2, "value"|"reason": v ]) -- the status codes are
+      /* ([ "status": 1|2|3, "value"|"reason": v ]) -- the status codes are
        * promise_status()'s, so one vocabulary covers both. */
       mapping_t* m = allocate_mapping(2);
       svalue_t* slot = promise_map_slot(m, "status");
       slot->type = T_NUMBER;
       slot->subtype = 0;
-      slot->u.number = rejected ? PROMISE_REJECTED : PROMISE_FULFILLED;
+      slot->u.number = rejected ? (from_cancel ? PROMISE_CANCELLED : PROMISE_REJECTED)
+                                : PROMISE_FULFILLED;
       slot = promise_map_slot(m, rejected ? "reason" : "value");
       assign_svalue_no_free(slot, value);
       free_svalue(&c->slots->item[index], "deliver_combinator");

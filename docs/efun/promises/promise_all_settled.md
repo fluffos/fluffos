@@ -19,11 +19,12 @@ title: promises / promise_all_settled
 
         ([ "status": 1, "value":  v ])   fulfilled
         ([ "status": 2, "reason": r ])   rejected
+        ([ "status": 3, "reason": r ])   cancelled
 
     The status codes are promise_status(3)'s, so one vocabulary covers both.
-    A fulfilled entry has no `"reason"` key and a rejected entry has no
-    `"value"` key, so `undefinedp()` distinguishes them as reliably as
-    `"status"` does.
+    A fulfilled entry has no `"reason"` key and a rejected or cancelled
+    entry has no `"value"` key, so `undefinedp()` distinguishes them as
+    reliably as `"status"` does.
 
     Use this instead of promise_all(3) when a partial failure is a result
     rather than an error -- fanning work out over many objects and reporting
@@ -45,7 +46,7 @@ async void reindex(object *rooms) {
     int i;
 
     foreach (mixed r in results) {
-        if (r["status"] == 2) {
+        if (r["status"] != 1) {
             write("room " + i + " failed: " + r["reason"] + "\n");
         }
         i++;

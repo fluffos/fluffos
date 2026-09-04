@@ -161,8 +161,8 @@ void f_promise_result() {
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
   }
-  if (p->state == PROMISE_REJECTED) {
-    /* reading a rejection counts as observing it */
+  if (p->state == PROMISE_REJECTED || p->state == PROMISE_CANCELLED) {
+    /* reading a rejection or cancellation counts as observing it */
     p->handled = true;
   }
   svalue_t result;

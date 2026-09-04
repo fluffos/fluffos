@@ -12,9 +12,8 @@
  * are values handed to a rejection handler, not messages printed by error().
  *
  * They are matched by CONTENT, which means a mudlib can forge one with
- * throw(). That is accepted: discriminating them authoritatively would need a
- * driver-reserved value kind, and promise_status() already answers the
- * question from outside.
+ * throw(). That is accepted: the authoritative test is promise_status() --
+ * PROMISE_CANCELLED is a real settlement, not a reserved string.
  */
 
 #ifndef _PROMISE_H_
@@ -25,10 +24,12 @@
 #define PROMISE_PENDING   0
 #define PROMISE_FULFILLED 1
 #define PROMISE_REJECTED  2
+#define PROMISE_CANCELLED 3
 
-/* What a cancelled body's next await raises, and what its promise rejects
- * with if nothing catches it. Identical on every delivery path -- body
- * running, queued, or parked -- so one comparison catches all three. */
+/* What a cancelled body's next await raises, and what its promise settles
+ * with as PROMISE_CANCELLED if nothing catches it. Identical on every
+ * delivery path -- body running, queued, or parked -- so one comparison
+ * catches all three. */
 #define PROMISE_REASON_CANCELLED "*async function cancelled"
 
 /* The suspended body's owner went away underneath it, so the body can never

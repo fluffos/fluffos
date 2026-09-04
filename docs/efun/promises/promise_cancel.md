@@ -24,7 +24,11 @@ title: promises / promise_cancel
 
     The raise behaves like any other rejection arriving at that `await`: it
     unwinds through enclosing `acatch` regions, runs `defer()` handlers in
-    order, and — if nothing catches it — rejects `p` with the same reason.
+    order, and — if nothing catches it — **cancels** `p` (promise_status(3)
+    returns 3) with the same reason. That is not a rejection: `acatch` still
+    yields the string, but `promise_status(p) == 3` is the test that cannot
+    be forged. Downstream `await` / `then` / `promise_all` / `promise_race`
+    links inherit the cancellation the same way.
 
     A body parked on a promise that will never settle is still cancelled
     promptly: it is detached from that promise and its rejection is

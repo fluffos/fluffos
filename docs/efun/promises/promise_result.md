@@ -10,12 +10,13 @@ title: promises / promise_result
     mixed promise_result(promise p);
 
 ### DESCRIPTION
-    Returns the fulfillment value or rejection reason of the settled
-    promise `p`. It is an error to call this on a pending promise (check
-    promise_status(3) first, or use promise_then(3) / `await` instead).
+    Returns the fulfillment value, rejection reason, or cancellation
+    reason of the settled promise `p`. It is an error to call this on a
+    pending promise (check promise_status(3) first, or use promise_then(3)
+    / `await` instead).
 
-    Reading a rejected promise's result counts as observing the rejection:
-    the unhandled-rejection report is suppressed for it.
+    Reading a rejected or cancelled promise's result counts as observing
+    it: the unhandled-rejection report is suppressed for it.
 
 ### SEE ALSO
     promise_status(3), promise_then(3)
