@@ -135,12 +135,16 @@ void do_tests() {
   ASSERT_EQ(1, floatp(marr[0]));
   ASSERT_EQ(6.5, marr[0]);
 
-  // issue #1365: call_other is statically mixed even when the callee is
-  // declared float, so the TYPE_REAL compile-time coercion never fired
-  // and a declared int was promoted at runtime. Same contract as
-  // `i += 1.5` above: keep the declared type. this_object()-> is enough;
-  // a direct give_float() would be statically float and miss the gap.
+  // issue #1365: call_other / evaluate / (*f)() are statically mixed even
+  // when the callee is declared float, so the TYPE_REAL compile-time
+  // coercion never fired and a declared int was promoted at runtime.
+  // Same contract as `i += 1.5` above, for every arithmetic op=.
+  // this_object()-> is enough; a direct give_float() is statically float
+  // and would miss the gap.
   ASSERT_EQ(1, floatp(this_object()->give_float()));
+  ASSERT_EQ(1, floatp(call_other(this_object(), "give_float")));
+  ASSERT_EQ(1, floatp(evaluate((: give_float :))));
+  ASSERT_EQ(1, floatp((* (: give_float :))()));
 
   i = 10; i += this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(11, i);
   i = 10; i -= this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(9, i);
@@ -149,25 +153,65 @@ void do_tests() {
   i = 4; i *= this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(4, i);
   i = 7; i /= this_object()->give_float(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(7, i);
 
+  i = 10; i += call_other(this_object(), "give_float"); ASSERT_EQ(1, intp(i)); ASSERT_EQ(11, i);
+  i = 10; i -= call_other(this_object(), "give_float"); ASSERT_EQ(1, intp(i)); ASSERT_EQ(9, i);
+  i = 4; i *= call_other(this_object(), "give_float"); ASSERT_EQ(1, intp(i)); ASSERT_EQ(4, i);
+  i = 7; i /= call_other(this_object(), "give_float"); ASSERT_EQ(1, intp(i)); ASSERT_EQ(7, i);
+
+  i = 10; i += evaluate((: give_float :)); ASSERT_EQ(1, intp(i)); ASSERT_EQ(11, i);
+  i = 10; i -= evaluate((: give_float :)); ASSERT_EQ(1, intp(i)); ASSERT_EQ(9, i);
+  i = 4; i *= evaluate((: give_float :)); ASSERT_EQ(1, intp(i)); ASSERT_EQ(4, i);
+  i = 7; i /= evaluate((: give_float :)); ASSERT_EQ(1, intp(i)); ASSERT_EQ(7, i);
+
+  i = 10; i += (* (: give_float :))(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(11, i);
+  i = 10; i -= (* (: give_float :))(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(9, i);
+  i = 4; i *= (* (: give_float :))(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(4, i);
+  i = 7; i /= (* (: give_float :))(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(7, i);
+
   i = 10; i += this_object()->give_int(); ASSERT_EQ(1, intp(i)); ASSERT_EQ(12, i);
 
   int *iarr = ({ 10 });
   iarr[0] += this_object()->give_float();
   ASSERT_EQ(1, intp(iarr[0]));
   ASSERT_EQ(11, iarr[0]);
+  iarr[0] = 10; iarr[0] -= this_object()->give_float();
+  ASSERT_EQ(1, intp(iarr[0]));
+  ASSERT_EQ(9, iarr[0]);
+  iarr[0] = 4; iarr[0] *= this_object()->give_float();
+  ASSERT_EQ(1, intp(iarr[0]));
+  ASSERT_EQ(4, iarr[0]);
+  iarr[0] = 7; iarr[0] /= this_object()->give_float();
+  ASSERT_EQ(1, intp(iarr[0]));
+  ASSERT_EQ(7, iarr[0]);
 
-  // A mixed *variable* is still untyped at the use site, so op= promotes
-  // (wrapping every mixed RHS in to_int() would also swallow
-  // `str[0] += mixed_string`, which must stay a runtime error).
-  mixed held = 1.5;
+  // A mixed *variable* is still untyped at the use site, so every
+  // arithmetic op= promotes (wrapping every mixed RHS in to_int() would
+  // also swallow `str[0] += mixed_string`, which must stay a runtime error).
+  mixed held = 0.5;
+  i = 10; i += held; ASSERT_EQ(1, floatp(i)); ASSERT_EQ(10.5, i);
+  i = 10; i -= held; ASSERT_EQ(1, floatp(i)); ASSERT_EQ(9.5, i);
+  i = 4; i *= held; ASSERT_EQ(1, floatp(i)); ASSERT_EQ(2.0, i);
+  i = 5; i /= held; ASSERT_EQ(1, floatp(i)); ASSERT_EQ(10.0, i);
+
+  // Declared float + call_other stays float (symmetric wrap), all four ops.
+  f = 10.0; f += this_object()->give_int(); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(12.0, f);
+  f = 10.0; f -= this_object()->give_int(); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(8.0, f);
+  f = 10.0; f *= this_object()->give_int(); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(20.0, f);
+  f = 10.0; f /= this_object()->give_int(); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(5.0, f);
+
+  f = 10.0; f += evaluate((: give_int :)); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(12.0, f);
+  f = 10.0; f -= evaluate((: give_int :)); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(8.0, f);
+  f = 10.0; f *= evaluate((: give_int :)); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(20.0, f);
+  f = 10.0; f /= evaluate((: give_int :)); ASSERT_EQ(1, floatp(f)); ASSERT_EQ(5.0, f);
+
+  // %= and the bitwise op= forms are int-only: a float RHS is a runtime
+  // type error, not a promotion — same for a literal and a dyn call.
   i = 10;
-  i += held;
-  ASSERT_EQ(1, floatp(i));
-  ASSERT_EQ(11.5, i);
-
-  // Declared float + call_other stays float (symmetric wrap).
-  f = 10.0;
-  f += this_object()->give_int();
-  ASSERT_EQ(1, floatp(f));
-  ASSERT_EQ(12.0, f);
+  ASSERT(catch(i %= 1.5));
+  ASSERT(catch(i %= this_object()->give_float()));
+  ASSERT(catch(i &= this_object()->give_float()));
+  ASSERT(catch(i |= this_object()->give_float()));
+  ASSERT(catch(i ^= this_object()->give_float()));
+  ASSERT(catch(i <<= this_object()->give_float()));
+  ASSERT(catch(i >>= this_object()->give_float()));
 }
