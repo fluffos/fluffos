@@ -381,14 +381,18 @@ promise fulfilled with the value the callback would have received, or
 rejected with the failure value (e.g. `async_read`'s negative int) —
 `string s = await async_read(path);`.
 
-`external_create(index, args)` allocates a handle. `external_start(handle)`
-starts the process and returns a promise fulfilled with `0` when it
-exits, or rejected with a socket error / `"*external process aborted"`.
-After it fulfills, `external_stdout()`, `external_stderr()` and
-`external_exit_code()` read the results from the handle (a non-zero
-exit still fulfills). The classic
+`external_start(index, args)` — the same efun with the socket callbacks
+**omitted** — returns a promise fulfilled with `({ output, exit_code })`
+when the process exits (a non-zero exit still fulfills), or rejected
+with a socket error / `"*external process aborted"`. The classic
 `external_start(index, args, read, write, close)` form is unchanged and
 still returns the socket fd.
+
+`external_create(index, args)` allocates a handle. `external_start(handle)`
+starts the process and returns a promise fulfilled with `0` when it
+exits (same reject reasons). After it fulfills, `external_stdout()`,
+`external_stderr()` and `external_exit_code()` read the results from
+the handle.
 
 `async_yield()` returns a promise fulfilled with `0` on the event loop's
 next pass — `await async_yield();` is the cooperative preemption point for a

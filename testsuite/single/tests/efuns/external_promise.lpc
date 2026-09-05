@@ -1,14 +1,25 @@
-// Handle API (issue #1319): external_create() returns a handle,
-// external_start(handle) is awaitable, then stdout/stderr/exit_code
-// are read from the handle. Classic callback form is untouched.
-// PACKAGE_EXTERNAL is off on wasm.
+// Three forms of external_start(), all live:
 //
-// run_echo() finishes after do_tests() returns (child process, then
-// pipe EOF + waitpid, then settle, then resume), so it is an EXIT LATCH.
+// 1. Classic (master API, unchanged): callbacks, returns the socket fd.
+// 2. Omit-callback (issue #1319): await external_start(index, args)
+//    fulfills with ({ output, exit_code }).
+// 3. Handle: external_create() + await external_start(handle), then
+//    stdout/stderr/exit_code from the handle.
+//
+// PACKAGE_EXTERNAL is off on wasm. Each live child is an EXIT LATCH.
+// await cannot suspend inside foreach (phase 1): use an indexed for.
 
 #ifdef __PACKAGE_EXTERNAL__
-void classic_cb(int fd, string data) { /* classic form still works */ }
-void classic_wcb(int fd) {}
+string classic_out = "";
+int classic_fd = -1;
+
+void classic_read(int fd, string data) { classic_out += data; }
+void classic_write(int fd) {}
+void classic_close(int fd) {
+  if (fd == classic_fd && strsrch(classic_out, "hello-from-external") != -1) {
+    RELEASE_LATCH("external_start classic form");
+  }
+}
 
 mixed *echo_args(int slot) {
   // Slot 6 is Windows cmd.exe (see etc/config.test). Unix echo takes the
@@ -28,12 +39,54 @@ int try_create(int slot) {
   return intp(h) ? h : 0;
 }
 
-async void run_echo() {
+async void run_omit_callback() {
+  mixed p, s, err;
+  int i, slot;
+  mixed *slots = ({ 3, 4, 6 });
+
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
+    err = catch(p = external_start(slot, echo_args(slot)));
+    if (err) {
+      continue;
+    }
+    ASSERT_EQ("promise", typeof(p));
+    err = acatch { s = await p; };
+    if (err) {
+      ASSERT(intp(err));
+      continue;
+    }
+    if (arrayp(s) && sizeof(s) == 2 && stringp(s[0]) &&
+      strsrch(s[0], "hello-from-external") != -1) {
+      ASSERT_EQ(0, s[1]);
+      mixed *fails = ({ 7, 8 });
+      int j, fslot;
+      for (j = 0; j < sizeof(fails); j++) {
+        fslot = fails[j];
+        err = catch(p = external_start(fslot, ({})));
+        if (err) {
+          continue;
+        }
+        err = acatch { s = await p; };
+        if (err) {
+          ASSERT(intp(err));
+          continue;
+        }
+        ASSERT(arrayp(s) && sizeof(s) == 2);
+        ASSERT(s[1] != 0);
+        break;
+      }
+      RELEASE_LATCH("external_start promise form");
+      return;
+    }
+  }
+}
+
+async void run_handle() {
   mixed p, err, code;
   int i, slot, h, j, fslot;
   mixed *slots = ({ 3, 4, 6 });
 
-  // Indexed for: await cannot suspend inside foreach (phase 1).
   for (i = 0; i < sizeof(slots); i++) {
     slot = slots[i];
     h = try_create(slot);
@@ -58,7 +111,6 @@ async void run_echo() {
       ASSERT(stringp(external_stderr(h)));
       external_close(h);
 
-      // non-zero exit still fulfills; the code lives on the handle
       mixed *fails = ({ 7, 8 });
       for (j = 0; j < sizeof(fails); j++) {
         fslot = fails[j];
@@ -85,8 +137,22 @@ async void run_echo() {
 
 void do_tests() {
   mixed p, err, h;
-  int slot;
+  int slot, fd;
 
+  // Omit-callback form still returns a promise (the #1319 API).
+  p = 0;
+  foreach (slot in ({ 3, 4, 6 })) {
+    err = catch(p = external_start(slot, echo_args(slot)));
+    if (!err && typeof(p) == "promise") {
+      break;
+    }
+    p = 0;
+  }
+  ASSERT2(p, "omit-callback form returns a promise");
+  ASSERT_EQ("promise", typeof(p));
+  promise_catch(p, (: 0 :));
+
+  // Handle form.
   h = 0;
   foreach (slot in ({ 3, 4, 6 })) {
     err = catch(h = external_create(slot, echo_args(slot)));
@@ -108,17 +174,33 @@ void do_tests() {
   err = catch(external_create(5, ({ "x" })));
   ASSERT2(err, "unconfigured slot errors in external_create");
 
-  ASSERT(catch(external_start(5, ({ "x" }), (: classic_cb :), (: classic_wcb :))) ||
-    1);
+  err = catch(external_start(5, ({ "x" })));
+  ASSERT2(err, "unconfigured slot still errors in the omit-callback form");
 
-  err = catch(external_start(3, ({ "x" })));
-  ASSERT2(err, "two arguments is neither form");
-
-  err = catch(external_start(3, ({ "x" }), (: classic_cb :)));
+  err = catch(external_start(3, ({ "x" }), (: classic_read :)));
   ASSERT2(err, "three arguments is neither form");
 
+  EXPECT_LATCH("external_start classic form");
+  EXPECT_LATCH("external_start promise form");
   EXPECT_LATCH("external_create handle");
-  call_out(function() { run_echo(); }, 1);
+
+  // Classic form: int fd, required callbacks. Must compile as an int
+  // assignment (the master return type) and must not throw on a live slot.
+  // Latch is already registered so a fast close cannot release early.
+  fd = -1;
+  foreach (slot in ({ 3, 4, 6 })) {
+    err = catch(fd = external_start(slot, echo_args(slot),
+      (: classic_read :), (: classic_write :), (: classic_close :)));
+    if (!err && intp(fd) && fd >= 0) {
+      classic_fd = fd;
+      break;
+    }
+    fd = -1;
+  }
+  ASSERT2(classic_fd >= 0, "classic form still returns a socket fd");
+
+  call_out(function() { run_omit_callback(); }, 1);
+  call_out(function() { run_handle(); }, 1);
 }
 #else
 void do_tests() { ASSERT(1); }

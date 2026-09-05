@@ -56,6 +56,9 @@ struct ExternalHandle {
   std::vector<std::string> args;
   HandleState state = HandleState::Created;
   promise_t* prom = nullptr;
+  /* Omit-callback form: not visible to LPC. Fulfill with
+   * ({ stdout+stderr, exit_code }) and free the slot. */
+  bool ephemeral = false;
   std::string out;
   std::string err;
   LPC_INT exit_code = -1;
@@ -189,6 +192,41 @@ void free_pipe_events(ExternalHandle* h) {
   close_pipe_fd(&h->err_fd);
 }
 
+void fulfill_handle_promise(int id) {
+  ExternalHandle* h = g_handles[id - 1];
+  if (!h->prom) {
+    if (h->ephemeral) {
+      delete h;
+      g_handles[id - 1] = nullptr;
+    }
+    return;
+  }
+  promise_t* p = h->prom;
+  h->prom = nullptr;
+  if (h->ephemeral) {
+    std::string output = h->out;
+    if (!h->err.empty()) {
+      output += h->err;
+    }
+    array_t* arr = allocate_array(2);
+    arr->item[0].type = T_STRING;
+    arr->item[0].subtype = STRING_MALLOC;
+    arr->item[0].u.string = string_copy(output.c_str(), "external_promise");
+    arr->item[1].u.number = h->exit_code;
+    push_refed_array(arr);
+    promise_settle(p, sp, 0);
+    pop_stack();
+    free_promise(p);
+    delete h;
+    g_handles[id - 1] = nullptr;
+    return;
+  }
+  push_number(0);
+  promise_settle(p, sp, 0);
+  pop_stack();
+  free_promise(p);
+}
+
 void try_finish_handle(int id) {
   if (id < 1 || id > static_cast<int>(g_handles.size()) || !g_handles[id - 1]) {
     return;
@@ -202,13 +240,7 @@ void try_finish_handle(int id) {
   }
   h->state = HandleState::Done;
   free_pipe_events(h);
-  if (h->prom) {
-    push_number(0);
-    promise_settle(h->prom, sp, 0);
-    pop_stack();
-    free_promise(h->prom);
-    h->prom = nullptr;
-  }
+  fulfill_handle_promise(id);
 }
 
 void abort_handle(int id, int kill_child) {
@@ -537,6 +569,23 @@ int spawn_handle(ExternalHandle* h, int id) {
 #endif
 }
 
+/* Spawn a Created handle. On failure the handle is deleted and the
+ * returned promise is already rejected (caller just pushes it). */
+promise_t* start_created_handle(ExternalHandle* h, int id) {
+  promise_t* p = promise_alloc();
+  int const rc = spawn_handle(h, id);
+  if (rc < 0) {
+    g_handles[id - 1] = nullptr;
+    delete h;
+    reject_with_number(p, rc);
+    return p;
+  }
+  h->state = HandleState::Running;
+  h->prom = p;
+  p->ref++;
+  return p;
+}
+
 #ifndef _WIN32
 template <typename Out>
 void split(const std::string& s, char delim, Out result) {
@@ -814,6 +863,8 @@ void f_external_create() {
 
 #ifdef F_EXTERNAL_START
 void f_external_start() {
+  /* Latch arity first: check_valid_socket() runs a master apply that
+   * overwrites st_num_arg (same trap as f_async_read). */
   int const num_arg = st_num_arg;
   svalue_t* arg = sp - num_arg + 1;
 
@@ -849,10 +900,46 @@ void f_external_start() {
     return;
   }
 
+  if (num_arg == 2) {
+    /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
+     * ({ output, exit_code }). Classic 4/5-arg path below is unchanged. */
+    if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
+      st_num_arg = num_arg;
+      promise_t* p = promise_alloc();
+      reject_with_number(p, EESECURITY);
+      pop_n_elems(num_arg);
+      push_refed_promise(p);
+      return;
+    }
+    st_num_arg = num_arg;
+
+    auto which = arg[0].u.number;
+    if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
+      error("Bad argument 1 to external_start()\n");
+    }
+
+    std::vector<std::string> extra;
+    parse_cmd_args(arg + 1, &extra);
+
+    int const id = alloc_handle_id();
+    auto* h = new ExternalHandle{};
+    h->owner = current_object;
+    h->cmd_index = static_cast<int>(which);
+    h->args = std::move(extra);
+    h->ephemeral = true;
+    g_handles[id - 1] = h;
+
+    promise_t* p = start_created_handle(h, id);
+    pop_n_elems(num_arg);
+    push_refed_promise(p);
+    return;
+  }
+
   if (num_arg != 4 && num_arg != 5) {
     error(
-        "external_start: pass a handle from external_create(), or the classic "
-        "read/write callbacks.\n");
+        "external_start: omit the callbacks for the promise form, pass a "
+        "handle from external_create(), or pass the classic read/write "
+        "callbacks.\n");
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {

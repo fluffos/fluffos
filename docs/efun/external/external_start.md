@@ -14,6 +14,7 @@ title: external / external_start
                        string|function read_call_back,
                        string|function write_call_back,
                        void | string|function close_call_back);
+    promise external_start(int external_index, string | string * args);
     promise external_start(int handle);
 
 ### DESCRIPTION
@@ -25,7 +26,8 @@ title: external / external_start
     argument to external_start `external_index`. 
 
     This function returns the socket number which you should record for later
-    processing of the results from the external command.
+    processing of the results from the external command. The classic
+    callback form is unchanged: it still returns that socket fd (`int`).
 
     `args` - An array of the arguments passed to the external command,
     or a space-separated string of arguments.
@@ -35,12 +37,22 @@ title: external / external_start
     command, but, this is a required parameter.
     `close_call_back` - When the socket closes, this function is called.
 
-    With a handle from `external_create()` (issue #1319): starts the
-    process and returns a promise fulfilled with `0` when it exits, or
-    rejected with a socket error (`EESECURITY`, `EESOCKET`, ...) if spawn
-    fails -- or with `"*external process aborted"` if the owner is
-    destructed / the handle is closed first. After it fulfills, read
-    stdout, stderr and the wait status from the handle:
+    Omit the callbacks (issue #1319, same pattern as `async_read(path)`
+    and `call_out(delay)`) and `external_start(index, args)` returns a
+    promise fulfilled with `({ output, exit_code })` when the process
+    exits (a non-zero exit still fulfills -- read `r[1]`), or rejected
+    with a socket error (`EESECURITY`, `EESOCKET`, ...) if spawn fails
+    -- or with `"*external process aborted"` if the owner is destructed
+    first:
+
+        mixed *r = await external_start(CURL_CMD, ({ "-s", url }));
+        string body = r[0];
+        int code = r[1];
+
+    With a handle from `external_create()`: starts the process and
+    returns a promise fulfilled with `0` when it exits (same reject
+    reasons as the omit-callback form). After it fulfills, read stdout,
+    stderr and the wait status from the handle:
 
         int h = external_create(CURL_CMD, ({ "-s", url }));
         await external_start(h);
