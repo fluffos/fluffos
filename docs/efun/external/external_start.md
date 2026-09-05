@@ -28,6 +28,8 @@ title: external / external_start
     This function returns the socket number which you should record for later
     processing of the results from the external command. The classic
     callback form is unchanged: it still returns that socket fd (`int`).
+    The child is started with `posix_spawn()` on POSIX and `CreateProcess`
+    on Win32 (no `posix_spawn` there).
 
     `args` - An array of the arguments passed to the external command,
     or a space-separated string of arguments.
@@ -44,7 +46,7 @@ title: external / external_start
     rejected with a socket error (`EESECURITY`, `EESOCKET`, ...) if
     spawn fails -- or with `"*external process aborted"` if the owner
     is destructed first. The child is started with `posix_spawn()`
-    (vfork fast path on glibc):
+    (vfork fast path on glibc; Win32 uses `CreateProcess`):
 
         mixed *r = await external_start(CURL_CMD, ({ "-s", url }));
         string body = r[0];

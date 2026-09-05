@@ -386,7 +386,7 @@ rejected with the failure value (e.g. `async_read`'s negative int) —
 `({ stdout, stderr, exit_code })` when the process exits (a non-zero
 exit still fulfills), or rejected with a socket error /
 `"*external process aborted"`. The child is started with
-`posix_spawn()`. The classic
+`posix_spawn()` (Win32: `CreateProcess`). The classic
 `external_start(index, args, read, write, close)` form is unchanged and
 still returns the socket fd.
 

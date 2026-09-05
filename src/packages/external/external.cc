@@ -360,8 +360,10 @@ void arm_pipe_reader(ExternalHandle* h, int id, int stream, evutil_socket_t fd) 
 }
 
 #ifndef _WIN32
-/* posix_spawn + POSIX_SPAWN_USEVFORK (glibc) is the fast path: vfork/clone
- * instead of a full fork of the driver address space. */
+/* Shared by the classic callback form and the handle/promise form.
+ * POSIX_SPAWN_USEVFORK (glibc) is the fast path: vfork/clone instead of
+ * a full fork of the driver address space. Win32 has no posix_spawn;
+ * see win32_create_process(). */
 int posix_spawn_fast(pid_t* pid, const char* path,
                      const posix_spawn_file_actions_t* file_actions, char** argv, char** envp) {
   posix_spawnattr_t attr;
@@ -481,6 +483,20 @@ int spawn_handle_posix(ExternalHandle* h, int id) {
 #endif
 
 #ifdef _WIN32
+/* Win32 special case: no posix_spawn. CreateProcess is used by both the
+ * classic callback form and the handle/promise form. Returns 1 on
+ * success. The caller decides whether to error() or reject. */
+int win32_create_process(std::string* cmdline, HANDLE h_in, HANDLE h_out, HANDLE h_err,
+                         PROCESS_INFORMATION* pi) {
+  STARTUPINFOA si = {sizeof(si)};
+  si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+  si.wShowWindow = SW_HIDE;
+  si.hStdInput = h_in;
+  si.hStdOutput = h_out;
+  si.hStdError = h_err;
+  return CreateProcessA(NULL, cmdline->data(), NULL, NULL, TRUE, 0, NULL, NULL, &si, pi) ? 1 : 0;
+}
+
 std::string quote_argument(const std::string& arg) {
   if (arg.empty()) {
     return "\"\"";
@@ -541,15 +557,9 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
   HANDLE nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
                            OPEN_EXISTING, 0, nullptr);
 
-  STARTUPINFOA si = {sizeof(si)};
-  si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-  si.wShowWindow = SW_HIDE;
-  si.hStdInput = nul;
-  si.hStdOutput = reinterpret_cast<HANDLE>(out_sv[0]);
-  si.hStdError = reinterpret_cast<HANDLE>(err_sv[0]);
   PROCESS_INFORMATION processInfo{};
-
-  if (!CreateProcessA(NULL, cmdline.data(), NULL, NULL, TRUE, 0, NULL, NULL, &si, &processInfo)) {
+  if (!win32_create_process(&cmdline, nul, reinterpret_cast<HANDLE>(out_sv[0]),
+                            reinterpret_cast<HANDLE>(err_sv[0]), &processInfo)) {
     if (nul != INVALID_HANDLE_VALUE) {
       CloseHandle(nul);
     }
@@ -620,6 +630,8 @@ void split(const std::string& s, char delim, Out result) {
 }  // namespace
 
 #ifndef _WIN32
+/* Classic callback form: same posix_spawn_fast() as the handle path.
+ * Stdio still shares one socketpair so the LPC socket callbacks work. */
 int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, svalue_t* arg3) {
   std::vector<std::string> newargs_data = {std::string(external_cmd[which])};
   if (args->type == T_ARRAY) {
@@ -707,18 +719,7 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
 
   pid_t pid;
   char* newenviron[] = {nullptr};
-  posix_spawnattr_t spawn_attr;
-  int const attr_ok = posix_spawnattr_init(&spawn_attr) == 0;
-#ifdef POSIX_SPAWN_USEVFORK
-  if (attr_ok) {
-    posix_spawnattr_setflags(&spawn_attr, POSIX_SPAWN_USEVFORK);
-  }
-#endif
-  ret = posix_spawn(&pid, newargs[0], &file_actions, attr_ok ? &spawn_attr : nullptr,
-                    newargs.data(), newenviron);
-  if (attr_ok) {
-    posix_spawnattr_destroy(&spawn_attr);
-  }
+  ret = posix_spawn_fast(&pid, newargs[0], &file_actions, newargs.data(), newenviron);
   if (ret) {
     debug(external_start, "external_start: posix_spawn() error: %s\n", strerror(ret));
     socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
@@ -748,6 +749,7 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
 #endif
 
 #ifdef _WIN32
+/* Classic callback form, Win32 special case: CreateProcess (no posix_spawn). */
 int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, svalue_t* arg3) {
   int fd;
 
@@ -808,15 +810,10 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
   event_add(sock->ev_write, NULL);
   event_add(sock->ev_read, NULL);
 
-  STARTUPINFOA si = {sizeof(si)};
-  si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-  si.wShowWindow = SW_HIDE;
-  si.hStdInput = reinterpret_cast<HANDLE>(sv[0]);
-  si.hStdError = reinterpret_cast<HANDLE>(sv[0]);
-  si.hStdOutput = reinterpret_cast<HANDLE>(sv[0]);
   PROCESS_INFORMATION processInfo{};
-
-  if (!CreateProcessA(NULL, cmdline.data(), NULL, NULL, TRUE, 0, NULL, NULL, &si, &processInfo)) {
+  if (!win32_create_process(&cmdline, reinterpret_cast<HANDLE>(sv[0]),
+                            reinterpret_cast<HANDLE>(sv[0]), reinterpret_cast<HANDLE>(sv[0]),
+                            &processInfo)) {
     error("CreateProcess() in external_start() failed: %s\n", strerror(errno));
     return EESOCKET;
   }
