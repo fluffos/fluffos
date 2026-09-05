@@ -38,7 +38,9 @@ title: promises / promise_reject
     a pre-settled async_read(3) promise discards the file contents, and a
     pre-resolved one turns a read failure into an apparent success. Settle a
     promise you did not create only when you mean to stop caring about its
-    result.
+    result. Exception: rejecting an `external_start` / `external_run`
+    promise also kills the child process. To stop a handle and still
+    read the result, use `external_kill(handle)` instead.
 
     A rejected promise whose rejection is never observed (no handler
     attached, result never read) is reported to the debug log when it is

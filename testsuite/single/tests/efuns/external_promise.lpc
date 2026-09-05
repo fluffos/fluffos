@@ -195,12 +195,12 @@ async void run_stdin() {
 }
 
 async void run_cancel() {
-  mixed p, err, h;
+  mixed p, err, h, r;
   int i, slot;
   mixed *slots = ({ 9, 10, 6 });
 
-  // promise_reject() is cancel: the child must die (SIGTERM / TerminateProcess)
-  // rather than run out its sleep. First settle wins, so status is rejected.
+  // Omit-callback: promise_reject() kills (no handle to hang kill on).
+  // Handle: external_kill() stops the child; the run promise still fulfills.
   for (i = 0; i < sizeof(slots); i++) {
     slot = slots[i];
     err = catch(p = external_start(slot, sleep_args(slot)));
@@ -216,12 +216,15 @@ async void run_cancel() {
 
     err = catch(h = external_create(slot, sleep_args(slot)));
     if (!err && intp(h) && h > 0) {
+      ASSERT_EQ(0, external_kill(h));
       err = catch(p = external_run(h));
       if (!err && typeof(p) == "promise") {
-        promise_catch(p, (: 0 :));
-        promise_reject(p, "stop");
-        ASSERT_EQ(2, promise_status(p));
-        // Waitpid after SIGTERM should record a status well before sleep 20.
+        ASSERT_EQ(1, external_kill(h));
+        err = acatch { r = await p; };
+        if (!err) {
+          ASSERT(arrayp(r) && sizeof(r) == 3);
+          ASSERT(r[2] != 0);
+        }
         await call_out(1);
         ASSERT(external_exit_code(h) != -1);
       }

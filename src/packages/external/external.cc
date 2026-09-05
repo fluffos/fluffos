@@ -257,7 +257,8 @@ void kill_handle_child(ExternalHandle* h) {
   }
 #else
   if (h->pi.hProcess) {
-    TerminateProcess(h->pi.hProcess, 1);
+    /* 143 == 128 + SIGTERM so Win32 reports the same wait status as POSIX. */
+    TerminateProcess(h->pi.hProcess, 143);
   }
 #endif
 }
@@ -1255,6 +1256,19 @@ void f_external_stderr() {
 void f_external_exit_code() {
   ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
   sp->u.number = h->exit_code;
+}
+#endif
+
+#ifdef F_EXTERNAL_KILL
+void f_external_kill() {
+  int const id = static_cast<int>(sp->u.number);
+  ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
+  if (h->state != HandleState::Running) {
+    sp->u.number = 0;
+    return;
+  }
+  kill_handle_child(h);
+  sp->u.number = 1;
 }
 #endif
 

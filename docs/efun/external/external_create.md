@@ -37,7 +37,8 @@ title: external / external_create
 
 ### SEE ALSO
 
-    external_run(3), external_start(3), external_write(3),
+    external_run(3), external_kill(3), external_start(3),
+    external_write(3),
     external_close_stdin(3),
     external_stdout(3), external_stderr(3),
     external_exit_code(3), external_close(3)

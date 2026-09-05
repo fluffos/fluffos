@@ -19,4 +19,5 @@ string external_stderr(int);
 int external_exit_code(int);
 int external_write(int, string);
 void external_close_stdin(int);
+int external_kill(int);
 void external_close(int);
