@@ -21,6 +21,14 @@ void classic_close(int fd) {
   }
 }
 
+mixed *sleep_args(int slot) {
+  // Long-running child so cancel has something to kill. Slot 6 is cmd.exe.
+  if (slot == 6) {
+    return ({ "/c", "ping", "-n", "20", "127.0.0.1" });
+  }
+  return ({ "20" });
+}
+
 mixed *echo_args(int slot) {
   // Slot 6 is Windows cmd.exe (see etc/config.test). Unix echo takes the
   // payload as argv; cmd.exe needs /c echo.
@@ -186,6 +194,47 @@ async void run_stdin() {
   }
 }
 
+async void run_cancel() {
+  mixed p, err, h, r;
+  int i, slot;
+  mixed *slots = ({ 9, 10, 6 });
+
+  // Omit-callback: promise_reject() kills (no handle to hang kill on).
+  // Handle: external_kill() stops the child; the run promise still fulfills.
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
+    err = catch(p = external_start(slot, sleep_args(slot)));
+    if (err || typeof(p) != "promise") {
+      continue;
+    }
+    promise_catch(p, (: 0 :));
+    err = catch(promise_reject(p, "stop"));
+    if (err) {
+      continue;
+    }
+    ASSERT_EQ(2, promise_status(p));
+
+    err = catch(h = external_create(slot, sleep_args(slot)));
+    if (!err && intp(h) && h > 0) {
+      ASSERT_EQ(0, external_kill(h));
+      err = catch(p = external_run(h));
+      if (!err && typeof(p) == "promise") {
+        ASSERT_EQ(1, external_kill(h));
+        err = acatch { r = await p; };
+        if (!err) {
+          ASSERT(arrayp(r) && sizeof(r) == 3);
+          ASSERT(r[2] != 0);
+        }
+        await call_out(1);
+        ASSERT(external_exit_code(h) != -1);
+      }
+      external_close(h);
+    }
+    RELEASE_LATCH("external_start cancel kills");
+    return;
+  }
+}
+
 void do_tests() {
   mixed p, err, h;
   int slot, fd;
@@ -276,6 +325,7 @@ void do_tests() {
   EXPECT_LATCH("external_start promise form");
   EXPECT_LATCH("external_create handle");
   EXPECT_LATCH("external_start stdin");
+  EXPECT_LATCH("external_start cancel kills");
 
   // Classic form: int fd, required callbacks. Must compile as an int
   // assignment (the master return type) and must not throw on a live slot.
@@ -295,6 +345,7 @@ void do_tests() {
   call_out(function() { run_omit_callback(); }, 1);
   call_out(function() { run_handle(); }, 1);
   call_out(function() { run_stdin(); }, 1);
+  call_out(function() { run_cancel(); }, 1);
 }
 #else
 void do_tests() { ASSERT(1); }

@@ -168,7 +168,9 @@ differs from JS: there, settling an already-settled promise is a silent
 no-op, which is what lets `Promise.race` be written in userland. Here it is
 an **error**, so the unguarded version throws on whichever of the two paths
 finishes second — the common case, not a rare one. Note also that the
-underlying work is not stopped by either shape; only your wait ends.
+underlying work is not stopped by either shape; only your wait ends
+(exception: `promise_reject` of an `external_start` / `external_run`
+promise kills the child; `external_kill(handle)` is the handle form).
 
 `return value` fulfills the promise (a returned promise is adopted). An
 uncaught error inside the body rejects it — an async body behaves as if
@@ -386,7 +388,9 @@ rejected with the failure value (e.g. `async_read`'s negative int) —
 `({ stdout, stderr, exit_code })` when the process exits (a non-zero
 exit still fulfills), or rejected with a socket error /
 `"*external process aborted"`. The child is started with
-`posix_spawn()` (Win32: `CreateProcess`). The classic
+`posix_spawn()` (Win32: `CreateProcess`). `promise_reject` of that
+promise kills the child. A handle is stopped with `external_kill(h)`
+(keep the result) or `external_close(h)` (discard). The classic
 `external_start(index, args, read, write, close)` form is unchanged and
 still returns the socket fd.
 

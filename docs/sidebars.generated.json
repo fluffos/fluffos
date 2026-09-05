@@ -799,6 +799,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/external/external_kill",
+            "key": "efun/external/external_kill",
+            "label": "external_kill"
+          },
+          {
+            "type": "doc",
             "id": "efun/external/external_run",
             "key": "efun/external/external_run",
             "label": "external_run"

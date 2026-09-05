@@ -37,8 +37,18 @@ title: external / external_run
     A handle can be run only once. Use `external_start(index, args)`
     when there is no handle.
 
+### CANCELLING
+
+    `external_kill(h)` stops the child and keeps the handle: the run
+    promise still fulfills with `({ stdout, stderr, 143 })`.
+    `external_close(h)` stops the child, frees the handle, and rejects
+    the run promise with `"*external process aborted"`. Destructing
+    the owner does the same as `external_close`.
+    `promise_reject(p)` of the run promise also kills the child; the
+    promise stays rejected with the given reason.
+
 ### SEE ALSO
 
-    external_create(3), external_start(3), external_write(3),
-    external_close_stdin(3), external_stdout(3), external_stderr(3),
-    external_exit_code(3), external_close(3)
+    external_create(3), external_start(3), external_kill(3),
+    external_write(3), external_close_stdin(3), external_stdout(3),
+    external_stderr(3), external_exit_code(3), external_close(3)

@@ -55,6 +55,17 @@ title: external / external_start
     A handle from `external_create()` is started with `external_run()`,
     not this efun. See [external_run](/efun/external/external_run).
 
+### CANCELLING
+
+    This form has no handle. `promise_reject(p, reason)` of the start
+    promise kills the child; `p` stays rejected with `reason`. That is
+    the one driver promise where rejecting also stops the work.
+    `with_timeout()` rejects a gate and does **not** kill the child.
+
+    For a handle, use `external_kill(h)` (stop, keep the result) or
+    `external_close(h)` (stop, discard). See
+    [external_kill](/efun/external/external_kill).
+
 ### RUNTIME CONFIGURATION
 
     You can configure your runtime configuration to know about various external
@@ -144,7 +155,8 @@ void close_call_back(int fd) {
 
 ### SEE ALSO
 
-    external_create(3), external_run(3), external_write(3),
+    external_create(3), external_run(3), external_kill(3),
+    external_write(3),
     external_close_stdin(3),
     external_stdout(3), external_stderr(3),
     external_exit_code(3), external_close(3), socket_write(3),

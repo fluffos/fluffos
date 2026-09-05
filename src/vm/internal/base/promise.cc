@@ -1250,7 +1250,29 @@ promise_t* promise_alloc() {
   p->result = const0;
   p->reactions = nullptr;
   p->reject_origin = nullptr;
+  p->on_cancel = nullptr;
+  p->cancel_data = nullptr;
   return p;
+}
+
+void promise_set_cancel_handler(promise_t* p, void (*fn)(void*), void* data) {
+  p->on_cancel = fn;
+  p->cancel_data = data;
+}
+
+void promise_clear_cancel_handler(promise_t* p) {
+  p->on_cancel = nullptr;
+  p->cancel_data = nullptr;
+}
+
+static void fire_cancel_handler(promise_t* p) {
+  void (*fn)(void*) = p->on_cancel;
+  void* data = p->cancel_data;
+  p->on_cancel = nullptr;
+  p->cancel_data = nullptr;
+  if (fn) {
+    fn(data);
+  }
 }
 
 /* "/obj/name:42" for the currently executing LPC, or null if there is none
@@ -1286,6 +1308,9 @@ void free_promise(promise_t* p) {
 }
 
 void dealloc_promise(promise_t* p) {
+  if (p->state == PROMISE_PENDING) {
+    fire_cancel_handler(p);
+  }
   if (p->state == PROMISE_REJECTED && !p->handled) {
     /* Where it was rejected. Without this the report is a bare reason with no
      * object, function or line -- and it is printed at DEALLOCATION, which
@@ -1393,6 +1418,11 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected) {
   }
   if (rejected && p->reject_origin == nullptr) {
     p->reject_origin = capture_reject_origin();
+  }
+  if (rejected) {
+    fire_cancel_handler(p);
+  } else {
+    promise_clear_cancel_handler(p);
   }
   p->state = rejected ? PROMISE_REJECTED : PROMISE_FULFILLED;
   assign_svalue(&p->result, value);
