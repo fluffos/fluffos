@@ -155,38 +155,32 @@ async void run_stdin() {
 
   for (i = 0; i < sizeof(slots); i++) {
     slot = slots[i];
-    err = catch(p = external_start(slot, cat_args(slot), "hello-from-stdin\n"));
-    if (err || typeof(p) != "promise") {
+    err = catch(h = external_create(slot, cat_args(slot)));
+    if (err || !intp(h) || h <= 0) {
       continue;
     }
+    external_write(h, "hello-from-handle\n");
+    err = catch(p = external_start(h));
+    if (err || typeof(p) != "promise") {
+      external_close(h);
+      continue;
+    }
+    external_write(h, "second-line\n");
+    external_close_stdin(h);
     err = acatch { r = await p; };
     if (err) {
       ASSERT(intp(err));
+      external_close(h);
       continue;
     }
     if (arrayp(r) && sizeof(r) == 3 && stringp(r[0]) &&
-      strsrch(r[0], "hello-from-stdin") != -1) {
-      err = catch(h = external_create(slot, cat_args(slot)));
-      if (!err && intp(h) && h > 0) {
-        external_write(h, "hello-from-handle\n");
-        err = catch(p = external_start(h));
-        if (!err && typeof(p) == "promise") {
-          external_write(h, "second-line\n");
-          external_close_stdin(h);
-          err = acatch { r = await p; };
-          if (!err && arrayp(r) && stringp(r[0]) &&
-            strsrch(r[0], "hello-from-handle") != -1 &&
-            strsrch(r[0], "second-line") != -1) {
-            external_close(h);
-            RELEASE_LATCH("external_start stdin");
-            return;
-          }
-        }
-        external_close(h);
-      }
+      strsrch(r[0], "hello-from-handle") != -1 &&
+      strsrch(r[0], "second-line") != -1) {
+      external_close(h);
       RELEASE_LATCH("external_start stdin");
       return;
     }
+    external_close(h);
   }
 }
 
@@ -252,16 +246,8 @@ void do_tests() {
   err = catch(external_start(3, ({ "x" }), (: classic_read :)));
   ASSERT2(err, "three arguments with a callback is neither form");
 
-  p = 0;
-  foreach (slot in ({ 11, 12, 6 })) {
-    err = catch(p = external_start(slot, cat_args(slot), "hello-from-stdin\n"));
-    if (!err && typeof(p) == "promise") {
-      break;
-    }
-    p = 0;
-  }
-  ASSERT2(p, "omit-callback form accepts a stdin string");
-  promise_catch(p, (: 0 :));
+  err = catch(external_start(3, ({ "x" }), "hello-from-stdin\n"));
+  ASSERT2(err, "three arguments with a string is neither form");
 
   EXPECT_LATCH("external_start classic form");
   EXPECT_LATCH("external_start promise form");

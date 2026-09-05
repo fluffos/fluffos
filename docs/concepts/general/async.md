@@ -395,9 +395,7 @@ starts the process the same way and fulfills with the same
 `({ stdout, stderr, exit_code })` tuple. After it fulfills,
 `external_stdout()`, `external_stderr()` and `external_exit_code()`
 also read the results from the handle. `external_write()` /
-`external_close_stdin()` drive the child's stdin; the omit-callback
-form also accepts an optional stdin string,
-`await external_start(index, args, payload)`.
+`external_close_stdin()` drive the child's stdin.
 
 `async_yield()` returns a promise fulfilled with `0` on the event loop's
 next pass — `await async_yield();` is the cooperative preemption point for a

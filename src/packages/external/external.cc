@@ -1056,10 +1056,10 @@ void f_external_start() {
     return;
   }
 
-  if (num_arg == 2 || (num_arg == 3 && arg[2].type == T_STRING)) {
+  if (num_arg == 2) {
     /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
-     * ({ stdout, stderr, exit_code }). Optional third string is stdin
-     * (written then closed). Classic 4/5-arg path below is unchanged. */
+     * ({ stdout, stderr, exit_code }). Classic 4/5-arg path below is
+     * unchanged. Drive stdin on a handle with external_write(). */
     if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
       st_num_arg = num_arg;
       promise_t* p = promise_alloc();
@@ -1084,10 +1084,6 @@ void f_external_start() {
     h->cmd_index = static_cast<int>(which);
     h->args = std::move(extra);
     h->ephemeral = true;
-    if (num_arg == 3) {
-      append_capped(h->in_buf, arg[2].u.string, SVALUE_STRLEN(arg + 2));
-      h->close_stdin_after_flush = true;
-    }
     g_handles[id - 1] = h;
 
     promise_t* p = start_created_handle(h, id);
@@ -1099,8 +1095,8 @@ void f_external_start() {
   if (num_arg != 4 && num_arg != 5) {
     error(
         "external_start: omit the callbacks for the promise form, pass a "
-        "handle from external_create(), pass stdin as a third string, or "
-        "pass the classic read/write callbacks.\n");
+        "handle from external_create(), or pass the classic read/write "
+        "callbacks.\n");
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {

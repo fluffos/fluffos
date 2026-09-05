@@ -9,8 +9,7 @@
    with the same ({ stdout, stderr, exit_code }) tuple.
    `int h = external_create(1, ({ "-s", url }));
     mixed *r = await external_start(h);`
-   Optional third string to the omit-callback form is stdin (written, then
-   closed). Drive a handle with external_write() / external_close_stdin(). */
+   Drive a handle's stdin with external_write() / external_close_stdin(). */
 int external_create(int, string | string *);
 mixed external_start(int, void | string | string *, void | string | function,
                      void | string | function, void | string | function);

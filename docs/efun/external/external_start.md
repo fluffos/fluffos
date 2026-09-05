@@ -15,7 +15,6 @@ title: external / external_start
                        string|function write_call_back,
                        void | string|function close_call_back);
     promise external_start(int external_index, string | string * args);
-    promise external_start(int external_index, string | string * args, string stdin);
     promise external_start(int handle);
 
 ### DESCRIPTION
@@ -53,12 +52,6 @@ title: external / external_start
         string body = r[0];
         string err = r[1];
         int code = r[2];
-
-    An optional third string is written to the child's stdin and then
-    the write end is closed (EOF), so tools that read until end-of-file
-    (`cat`, `curl --data-binary @-`) finish:
-
-        mixed *r = await external_start(CAT_CMD, ({}), payload);
 
     With a handle from `external_create()`: starts the process the same
     way and returns a promise fulfilled with the same
