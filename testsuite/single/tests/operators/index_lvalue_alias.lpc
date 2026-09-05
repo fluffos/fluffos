@@ -1,0 +1,54 @@
+// Two live index lvalues must not share a global scratch slot (issue #1358).
+// Under the old T_LVALUE sentinels, `s[0] = s[1] = 'x'` armed the same
+// codepoint global twice, so both assigns wrote index 1.
+
+void set_chars(int ref a, int ref b) {
+  a = 'X';
+  b = 'Y';
+}
+
+void set_bytes(int ref a, int ref b) {
+  a = 10;
+  b = 11;
+}
+
+void do_tests() {
+  string s;
+  buffer b;
+  mixed *a;
+
+  s = "ab";
+  s[0] = s[1] = 'x';
+  ASSERT_EQ("xx", s);
+
+  s = "ab";
+  s[1] = s[0] = 'y';
+  ASSERT_EQ("yy", s);
+
+  b = allocate_buffer(2);
+  b[0] = 1;
+  b[1] = 2;
+  b[0] = b[1] = 9;
+  ASSERT_EQ(9, b[0]);
+  ASSERT_EQ(9, b[1]);
+
+  a = ({ 1, 2, 3 });
+  a[0] = a[2] = 7;
+  ASSERT_EQ(({ 7, 2, 7 }), a);
+
+  s = "az";
+  s[0] += 1;
+  ASSERT_EQ("bz", s);
+
+  // Two live refs to different indexes must not share a scratch slot.
+  s = "ab";
+  set_chars(ref s[0], ref s[1]);
+  ASSERT_EQ("XY", s);
+
+  b = allocate_buffer(2);
+  b[0] = 1;
+  b[1] = 2;
+  set_bytes(ref b[0], ref b[1]);
+  ASSERT_EQ(10, b[0]);
+  ASSERT_EQ(11, b[1]);
+}

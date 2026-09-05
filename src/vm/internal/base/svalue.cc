@@ -233,6 +233,9 @@ void int_free_svalue(svalue_t* v)
   } else if (v->type == T_ERROR_HANDLER) {
     (*v->u.error_handler)();
     v->type |= T_FREED;
+  } else if (v->type == T_LVALUE_CODEPOINT || v->type == T_LVALUE_RANGE) {
+    free_indexed_lvalue(v);
+    v->type |= T_FREED;
   }
 #ifdef DEBUG
   else if (v->type & T_FREED) {

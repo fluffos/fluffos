@@ -31,6 +31,10 @@ union u {
   void (*error_handler)(void);
 
   struct promise_t* prom;
+  /* Heap boxes for index/range lvalues (issue #1358). Live on the stack
+   * (or in ref_t::sv); T_LVALUE itself is only a pointer to a real slot. */
+  struct codepoint_lvalue_t* cp_lv;
+  struct range_lvalue_t* range_lv;
 };
 
 /*
@@ -53,19 +57,25 @@ struct ref_t {
   struct ref_t *next, *prev;
   struct control_stack_t* csp;
   svalue_t* lvalue;
+  /* Keep-alive for the container (array / mapping / string / buffer) when
+   * lvalue points inside it. Foreach mapping refs also lock the mapping
+   * here. Foreach string/buffer refs store the per-iteration box here. */
   svalue_t sv;
+  /* Transferred index lvalue from F_MAKE_REF (`ref s[i]`, `ref b[i]`,
+   * `ref x[a..b]`). Separate from sv so the container stay-alive copy
+   * is not overwritten by the box. Unused refs leave this as T_NUMBER. */
+  svalue_t index_sv;
 
-  /* Set alongside lvalue == &global_lvalue_codepoint_sv (interpret.cc): this
-   * ref's OWN owning string and EGC index, so a concurrently-armed string-char
-   * lvalue elsewhere (another ref, or a plain s[i]) can't corrupt what this
-   * ref reads/writes. The shared global is re-armed from these right before
-   * each use (read via F_REF, write via F_REF_LVALUE); unused otherwise.
-   * ref_t is raw-malloc'd (make_ref()), so these carry no implicit default --
-   * make_ref() sets them, and they are only meaningful once the codepoint
-   * arming site (F_NEXT_FOREACH) also sets lvalue to the sentinel above. */
+  /* String-char refs keep owner+index here so a read (F_REF) does not
+   * depend on the heap box still being armed. The box itself lives in
+   * index_sv (F_MAKE_REF) or sv (foreach). */
   svalue_t* codepoint_owner;
   int32_t codepoint_index;
 };
+
+struct codepoint_lvalue_t;
+struct range_lvalue_t;
+void free_indexed_lvalue(svalue_t* v);
 
 /* values for type field of svalue struct */
 #define T_INVALID 0x0u
@@ -88,6 +98,19 @@ struct ref_t {
 #define T_FREED 0x2000u
 #define T_REF 0x4000u
 #define T_LVALUE_CODEPOINT 0x8000u /* UTF8 codepoint */
+
+static inline int is_stack_lvalue(const svalue_t* v) {
+  return v->type == T_LVALUE || v->type == T_LVALUE_BYTE || v->type == T_LVALUE_RANGE ||
+         v->type == T_LVALUE_CODEPOINT;
+}
+
+/* T_LVALUE wraps a real slot; typed index lvalues ARE the target. */
+static inline svalue_t* lvalue_target(svalue_t* slot) {
+  if (slot->type == T_LVALUE) {
+    return slot->u.lvalue;
+  }
+  return slot;
+}
 
 /* The 16 low bits are fully allocated; new value types start at 0x10000
  * (svalue_t::type is 32-bit). */

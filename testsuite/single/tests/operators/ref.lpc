@@ -1,7 +1,7 @@
 // Thorough tests for pass-by-reference: the ref keyword and its & sugar in
 // parameter declarations, call arguments, and foreach loops -- plus the
 // string-char cases, which share one arming/assignment path with s[i]
-// lvalues (aim_lvalue_codepoint / assign_lvalue_codepoint in interpret.cc).
+// lvalues (arm_codepoint_lvalue / assign_lvalue_codepoint in interpret.cc).
 
 class Pt {
   int x;
