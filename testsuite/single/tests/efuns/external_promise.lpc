@@ -64,7 +64,8 @@ void do_tests() {
   // path awaits a (possibly different) slot below
   promise_catch(p, (: 0 :));
 
-  ASSERT(intp(external_start(5, ({ "x" }), (: classic_cb :), (: classic_wcb :))) ||
+  // unconfigured slot: classic form error()s (same as external_start.lpc)
+  ASSERT(catch(external_start(5, ({ "x" }), (: classic_cb :), (: classic_wcb :))) ||
     1);
 
   err = catch(external_start(5, ({ "x" })));
