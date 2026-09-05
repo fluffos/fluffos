@@ -55,6 +55,12 @@ title: external / external_start
     A handle from `external_create()` is started with `external_run()`,
     not this efun. See [external_run](/efun/external/external_run).
 
+    Cancelling the start promise with `promise_reject(p)` (first settle
+    wins) kills the child (`SIGTERM` / `TerminateProcess`).
+    `external_close(h)` and destructing the owner do the same. A
+    non-zero exit from the kill (`128 + SIGTERM` on POSIX) is not
+    reported on a cancelled promise -- the promise is already rejected.
+
 ### RUNTIME CONFIGURATION
 
     You can configure your runtime configuration to know about various external

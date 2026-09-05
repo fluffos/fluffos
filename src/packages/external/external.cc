@@ -247,6 +247,50 @@ void push_external_result(const std::string& out, const std::string& err, LPC_IN
   push_refed_array(arr);
 }
 
+void kill_handle_child(ExternalHandle* h) {
+  if (h->state != HandleState::Running) {
+    return;
+  }
+#ifndef _WIN32
+  if (h->pid > 0) {
+    kill(h->pid, SIGTERM);
+  }
+#else
+  if (h->pi.hProcess) {
+    TerminateProcess(h->pi.hProcess, 1);
+  }
+#endif
+}
+
+/* promise_reject() / last-ref drop: stop the child. The promise is already
+ * settling or dying -- do not settle it again. Pipes stay armed so a
+ * non-ephemeral handle can still collect leftover output + the wait status. */
+void on_external_cancel(void* data) {
+  int const id = static_cast<int>(reinterpret_cast<intptr_t>(data));
+  if (id < 1 || id > static_cast<int>(g_handles.size()) || !g_handles[id - 1]) {
+    return;
+  }
+  ExternalHandle* h = g_handles[id - 1];
+  promise_t* p = h->prom;
+  h->prom = nullptr;
+  kill_handle_child(h);
+  /* Drop the driver ref. Safe during dealloc (ref already 0) and during
+   * promise_settle(reject): LPC still holds the caller's ref. */
+  if (p) {
+    free_promise(p);
+  }
+}
+
+void attach_start_promise(ExternalHandle* h, int id, promise_t* p) {
+  /* Driver-owned ref keeps the promise alive across `await external_run()`
+   * / `await external_start()` (the temporary is consumed when await
+   * parks). Reject still cancels. */
+  h->prom = p;
+  p->ref++;
+  promise_set_cancel_handler(p, on_external_cancel,
+                             reinterpret_cast<void*>(static_cast<intptr_t>(id)));
+}
+
 void fulfill_handle_promise(int id) {
   ExternalHandle* h = g_handles[id - 1];
   if (!h->prom) {
@@ -258,6 +302,7 @@ void fulfill_handle_promise(int id) {
   }
   promise_t* p = h->prom;
   h->prom = nullptr;
+  promise_clear_cancel_handler(p);
   push_external_result(h->out, h->err, h->exit_code);
   promise_settle(p, sp, 0);
   pop_stack();
@@ -289,24 +334,22 @@ void abort_handle(int id, int kill_child) {
     return;
   }
   ExternalHandle* h = g_handles[id - 1];
-  if (h->state == HandleState::Running && kill_child) {
-#ifndef _WIN32
-    if (h->pid > 0) {
-      kill(h->pid, SIGTERM);
-    }
-#else
-    if (h->pi.hProcess) {
-      TerminateProcess(h->pi.hProcess, 1);
-    }
-#endif
+  if (kill_child) {
+    kill_handle_child(h);
   }
   free_pipe_events(h);
   if (h->prom) {
-    push_constant_string("*external process aborted");
-    promise_settle(h->prom, sp, 1);
-    pop_stack();
-    free_promise(h->prom);
+    promise_t* p = h->prom;
     h->prom = nullptr;
+    /* Clear first: settle(reject) would otherwise fire the cancel handler
+     * and free_promise a second time. */
+    promise_clear_cancel_handler(p);
+    if (p->state == PROMISE_PENDING) {
+      push_constant_string("*external process aborted");
+      promise_settle(p, sp, 1);
+      pop_stack();
+    }
+    free_promise(p);
   }
   h->state = HandleState::Done;
 }
@@ -814,8 +857,7 @@ promise_t* start_created_handle(ExternalHandle* h, int id) {
     return p;
   }
   h->state = HandleState::Running;
-  h->prom = p;
-  p->ref++;
+  attach_start_promise(h, id, p);
   return p;
 }
 
@@ -1116,8 +1158,7 @@ void f_external_run() {
     return;
   }
   h->state = HandleState::Running;
-  h->prom = p;
-  p->ref++;
+  attach_start_promise(h, id, p);
   pop_n_elems(num_arg);
   push_refed_promise(p);
 }

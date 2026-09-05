@@ -87,7 +87,17 @@ struct promise_t {
    * failure is the one worth naming. Only rejections pay for it -- a fulfilled
    * promise never allocates this. Malloced (FREE_MSTR), null if unknown. */
   char* reject_origin;
+  /* Optional: notified once if this promise is rejected, or deallocated
+   * while still pending. Efuns that own external work (a child process,
+   * a timer) use it to stop that work when the caller cancels via
+   * promise_reject(). Not called on fulfillment. Cleared before the
+   * efun's own settle so it does not re-enter. */
+  void (*on_cancel)(void* data);
+  void* cancel_data;
 };
+
+void promise_set_cancel_handler(promise_t* p, void (*fn)(void*), void* data);
+void promise_clear_cancel_handler(promise_t* p);
 
 promise_t* promise_alloc();
 void free_promise(promise_t* p);

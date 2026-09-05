@@ -367,8 +367,11 @@ external_cmd_6 : c:\Windows\System32\cmd.exe
 # false: non-zero exit for the promise-form return-code check
 external_cmd_7 : /bin/false
 external_cmd_8 : /usr/bin/false
+# sleep: cancel-the-promise-kills-the-child (external_promise.lpc)
+external_cmd_9 : /bin/sleep
+external_cmd_10 : /usr/bin/sleep
 # cat: stdin echo for the promise-form write path. Slot 6 (cmd.exe) uses
-# `findstr ^` in the test. Slots 9-10 are reserved on the cancel branch.
+# `findstr ^` in the test.
 external_cmd_11 : /bin/cat
 external_cmd_12 : /usr/bin/cat
 

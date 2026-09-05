@@ -37,6 +37,12 @@ title: external / external_run
     A handle can be run only once. Use `external_start(index, args)`
     when there is no handle.
 
+    Cancelling the run promise with `promise_reject(p)` (first settle
+    wins) kills the child (`SIGTERM` / `TerminateProcess`).
+    `external_close(h)` and destructing the owner do the same. A
+    non-zero exit from the kill (`128 + SIGTERM` on POSIX) is not
+    reported on a cancelled promise -- the promise is already rejected.
+
 ### SEE ALSO
 
     external_create(3), external_start(3), external_write(3),
