@@ -1105,6 +1105,14 @@ void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
   {
     auto pos = cp->index;
 
+    /* Another live codepoint lvalue (chained `s[i] = s[j] = x`, or two
+     * `ref s[i]` parameters) may have already replaced the owner string.
+     * The box's iterator still names the previous bytes -- and F_MAKE_REF
+     * keep-alive can hold that allocation, so a write would copy the stale
+     * value (`set_chars(ref s[0], ref s[1])` left "aY"). Always retarget
+     * from the current owner before copying. */
+    cp->iter->reset(cp->owner->u.string, SVALUE_STRLEN(cp->owner));
+
     UChar32 c = u8_egc_index_as_single_codepoint(cp->owner->u.string, SVALUE_STRLEN(cp->owner), pos);
     if (c < 0) {
       error("Invalid string index, multi-codepoint character.\n");
