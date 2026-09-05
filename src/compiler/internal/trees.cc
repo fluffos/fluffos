@@ -406,6 +406,12 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
             expr->r.expr = expr->l.expr;
             expr->v.number = F_VOID_ASSIGN_LOCAL;
             expr->l.number = tmp;
+          } else if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_GLOBAL_LVALUE)) {
+            LPC_INT tmp = expr->r.expr->l.number;
+            expr->kind = NODE_UNARY_OP_1;
+            expr->r.expr = expr->l.expr;
+            expr->v.number = F_VOID_ASSIGN_GLOBAL;
+            expr->l.number = tmp;
           } else {
             expr->v.number = F_VOID_ASSIGN;
           }

@@ -439,7 +439,8 @@ void i_generate_node(parse_node_t* expr) {
       end_pushes();
       ins_byte(expr->v.number);
 
-      if ((expr->v.number == F_GLOBAL) || (expr->v.number == F_GLOBAL_LVALUE)) {
+      if ((expr->v.number == F_GLOBAL) || (expr->v.number == F_GLOBAL_LVALUE) ||
+          (expr->v.number == F_ASSIGN_GLOBAL) || (expr->v.number == F_VOID_ASSIGN_GLOBAL)) {
         INS_GLOBAL_INDEX(expr->l.number);
       } else if (expr->v.number == F_MAP_MEMBER || expr->v.number == F_MAP_MEMBER_LVALUE ||
                  expr->v.number == F_MAP_MEMBER_OPTIONAL) {
@@ -1260,6 +1261,8 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_NEXT_FOREACH:
       case F_GLOBAL:
       case F_GLOBAL_LVALUE:
+      case F_ASSIGN_GLOBAL:
+      case F_VOID_ASSIGN_GLOBAL:
       case F_STRING:
 #ifdef F_JUMP_WHEN_ZERO
       case F_JUMP_WHEN_ZERO:
@@ -1282,6 +1285,8 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_BYTE:
       case F_NBYTE:
       case F_TRANSFER_LOCAL:
+      case F_VOID_ASSIGN_LOCAL:
+      case F_ASSIGN_LOCAL:
         pc++;
         break;
       case F_FUNCTION_CONSTRUCTOR:

@@ -585,6 +585,8 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         break;
       }
       case F_GLOBAL_LVALUE:
+      case F_ASSIGN_GLOBAL:
+      case F_VOID_ASSIGN_GLOBAL:
       case F_GLOBAL: {
         short iarg;
         LOAD2(iarg, pc);
@@ -610,6 +612,7 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
       case F_LOCAL:
       case F_LOCAL_LVALUE:
       case F_VOID_ASSIGN_LOCAL:
+      case F_ASSIGN_LOCAL:
       case F_REF:
       case F_REF_LVALUE:
         sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));

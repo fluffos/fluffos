@@ -104,6 +104,12 @@ static inline int is_stack_lvalue(const svalue_t* v) {
          v->type == T_LVALUE_CODEPOINT;
 }
 
+/* Destinations that need the index-kind switch. A T_LVALUE unwraps to a
+ * real slot and is a plain assign_svalue. */
+static inline int is_indexed_lvalue(const svalue_t* v) {
+  return v->type == T_LVALUE_BYTE || v->type == T_LVALUE_RANGE || v->type == T_LVALUE_CODEPOINT;
+}
+
 /* T_LVALUE wraps a real slot; typed index lvalues ARE the target. */
 static inline svalue_t* lvalue_target(svalue_t* slot) {
   if (slot->type == T_LVALUE) {

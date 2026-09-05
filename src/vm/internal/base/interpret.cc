@@ -3431,26 +3431,65 @@ void eval_instruction(char* p) {
         push_refed_mapping(m);
         break;
       }
-      case F_ASSIGN:
+      case F_ASSIGN: {
 #ifdef DEBUG
         if (!is_stack_lvalue(sp)) {
           fatal("Bad argument to F_ASSIGN\n");
         }
 #endif
-        assign_value_to_lvalue(lvalue_target(sp), sp - 1, "F_ASSIGN");
+        /* Index/range dests need the kind switch; a T_LVALUE unwraps to a
+         * real slot and is a plain store (issue #1358). */
+        svalue_t* dest = lvalue_target(sp);
+        if (is_indexed_lvalue(dest)) {
+          assign_value_to_lvalue(dest, sp - 1, "F_ASSIGN");
+        } else {
+          assign_svalue(dest, sp - 1);
+        }
         free_svalue(sp--, "F_ASSIGN");
         /* rvalue is already in the correct place */
         break;
+      }
       case F_ASSIGN_VALUE: {
         if (is_stack_lvalue(sp) || !is_stack_lvalue(sp - 1)) {
           error("Invalid Program: bad stack for F_ASSIGN_VALUE.");
         }
         svalue_t* value = sp;
         svalue_t* lval_slot = sp - 1;
-        assign_value_to_lvalue(lvalue_target(lval_slot), value, "F_ASSIGN_VALUE");
+        svalue_t* dest = lvalue_target(lval_slot);
+        if (is_indexed_lvalue(dest)) {
+          assign_value_to_lvalue(dest, value, "F_ASSIGN_VALUE");
+        } else {
+          assign_svalue(dest, value);
+        }
         free_svalue(lval_slot, "F_ASSIGN_VALUE");
         assign_svalue_no_free(lval_slot, value);
         free_svalue(sp--, "F_ASSIGN_VALUE");
+        break;
+      }
+      case F_ASSIGN_LOCAL: {
+        lval = fp + EXTRACT_UCHAR(pc++);
+        if ((lval - fp) >= csp->num_local_variables) {
+          error("Invalid Program: op F_ASSIGN_LOCAL Tried to assign non-existent local.\n");
+        }
+        assign_svalue(lval, sp);
+        break;
+      }
+      case F_ASSIGN_GLOBAL: {
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        assign_svalue(find_value(idx + variable_index_offset), sp);
+        break;
+      }
+      case F_VOID_ASSIGN_GLOBAL: {
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        lval = find_value(idx + variable_index_offset);
+        if (sp->type != T_INVALID) {
+          free_svalue(lval, "F_VOID_ASSIGN_GLOBAL");
+          *lval = *sp--;
+        } else {
+          sp--;
+        }
         break;
       }
       case F_VOID_ASSIGN_LOCAL:

@@ -1,0 +1,55 @@
+// Plain local/global `x = y` is a specialized store (issue #1358): no
+// T_LVALUE push, no index-kind switch. Index/member/ref assigns still
+// go through F_ASSIGN.
+
+int g;
+int g2;
+
+int keep_local(int n) {
+  int x;
+  return x = n;
+}
+
+int keep_global(int n) {
+  return g = n;
+}
+
+void do_tests() {
+  int a, b, c;
+
+  a = 1;
+  ASSERT_EQ(1, a);
+
+  b = a = 2;
+  ASSERT_EQ(2, a);
+  ASSERT_EQ(2, b);
+
+  c = (a = b = 3);
+  ASSERT_EQ(3, a);
+  ASSERT_EQ(3, b);
+  ASSERT_EQ(3, c);
+
+  ASSERT_EQ(7, keep_local(7));
+  ASSERT_EQ(8, keep_global(8));
+  ASSERT_EQ(8, g);
+
+  g = g2 = 9;
+  ASSERT_EQ(9, g);
+  ASSERT_EQ(9, g2);
+
+  g = keep_local(10);
+  ASSERT_EQ(10, g);
+
+  // Index assign is not specialized and must still write.
+  string s;
+  s = "ab";
+  s[0] = 'X';
+  ASSERT_EQ("Xb", s);
+  s[0] = s[1] = 'Y';
+  ASSERT_EQ("YY", s);
+
+  int *arr;
+  arr = ({ 1, 2 });
+  arr[0] = arr[1] = 4;
+  ASSERT_EQ(({ 4, 4 }), arr);
+}
