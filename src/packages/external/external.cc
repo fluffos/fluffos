@@ -539,9 +539,14 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
   }
   cmdline += fmt::to_string(fmt::join(quoted.begin(), quoted.end(), " "));
 
+  /* socks[0] is the ReadFile-capable end (see socketpair_win32). All three
+   * std handles must be sockets -- mixing a real NUL HANDLE with sockets
+   * makes CreateProcess fail. Classic uses one socket for all three. */
   SOCKET out_sv[2];
   SOCKET err_sv[2];
-  if (socketpair_win32(out_sv, 0) != 0 || socketpair_win32(err_sv, 0) != 0) {
+  SOCKET in_sv[2];
+  if (socketpair_win32(out_sv, 0) != 0 || socketpair_win32(err_sv, 0) != 0 ||
+      socketpair_win32(in_sv, 0) != 0) {
     return EESOCKET;
   }
   if (evutil_make_socket_nonblocking(out_sv[1]) == -1 ||
@@ -550,28 +555,25 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
     evutil_closesocket(out_sv[1]);
     evutil_closesocket(err_sv[0]);
     evutil_closesocket(err_sv[1]);
+    evutil_closesocket(in_sv[0]);
+    evutil_closesocket(in_sv[1]);
     return EESOCKET;
   }
 
-  SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
-  HANDLE nul = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
-                           OPEN_EXISTING, 0, nullptr);
-
   PROCESS_INFORMATION processInfo{};
-  if (!win32_create_process(&cmdline, nul, reinterpret_cast<HANDLE>(out_sv[0]),
+  if (!win32_create_process(&cmdline, reinterpret_cast<HANDLE>(in_sv[0]),
+                            reinterpret_cast<HANDLE>(out_sv[0]),
                             reinterpret_cast<HANDLE>(err_sv[0]), &processInfo)) {
-    if (nul != INVALID_HANDLE_VALUE) {
-      CloseHandle(nul);
-    }
     evutil_closesocket(out_sv[0]);
     evutil_closesocket(out_sv[1]);
     evutil_closesocket(err_sv[0]);
     evutil_closesocket(err_sv[1]);
+    evutil_closesocket(in_sv[0]);
+    evutil_closesocket(in_sv[1]);
     return EESOCKET;
   }
-  if (nul != INVALID_HANDLE_VALUE) {
-    CloseHandle(nul);
-  }
+  evutil_closesocket(in_sv[0]);
+  evutil_closesocket(in_sv[1]);
   evutil_closesocket(out_sv[0]);
   evutil_closesocket(err_sv[0]);
   h->pi = processInfo;

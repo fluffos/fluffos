@@ -157,24 +157,38 @@ void do_tests() {
   ASSERT_EQ("promise", typeof(p));
   promise_catch(p, (: 0 :));
 
-  // Handle form.
+  // Handle form. Create succeeds for any configured path; spawn may still
+  // reject (Windows has /bin/echo in the config but no such binary). Only
+  // a start that leaves the handle Running makes a second start error().
   h = 0;
+  p = 0;
   foreach (slot in ({ 3, 4, 6 })) {
     err = catch(h = external_create(slot, echo_args(slot)));
-    if (!err && intp(h) && h > 0) {
+    if (err || !intp(h) || h <= 0) {
+      h = 0;
+      continue;
+    }
+    ASSERT_EQ(-1, external_exit_code(h));
+    ASSERT_EQ("", external_stdout(h));
+    ASSERT_EQ("", external_stderr(h));
+    err = catch(p = external_start(h));
+    if (err || typeof(p) != "promise") {
+      external_close(h);
+      h = 0;
+      p = 0;
+      continue;
+    }
+    promise_catch(p, (: 0 :));
+    err = catch(external_start(h));
+    if (stringp(err)) {
       break;
     }
+    external_close(h);
     h = 0;
+    p = 0;
   }
   ASSERT2(h, "external_create returns a handle");
-  ASSERT_EQ(-1, external_exit_code(h));
-  ASSERT_EQ("", external_stdout(h));
-  ASSERT_EQ("", external_stderr(h));
-
-  p = external_start(h);
   ASSERT_EQ("promise", typeof(p));
-  promise_catch(p, (: 0 :));
-  ASSERT(stringp(catch(external_start(h))));
 
   err = catch(external_create(5, ({ "x" })));
   ASSERT2(err, "unconfigured slot errors in external_create");
