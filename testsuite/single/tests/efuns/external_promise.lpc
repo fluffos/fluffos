@@ -1,9 +1,9 @@
-// Three forms of external_start(), all live:
+// Two forms of external_start(), plus a separate handle efun:
 //
 // 1. Classic (master API, unchanged): callbacks, returns the socket fd.
 // 2. Omit-callback (issue #1319): await external_start(index, args)
 //    fulfills with ({ stdout, stderr, exit_code }).
-// 3. Handle: external_create() + await external_start(handle) fulfills
+// 3. Handle: external_create() + await external_run(handle) fulfills
 //    with the same 3-tuple; stdout/stderr/exit_code also on the handle.
 //
 // PACKAGE_EXTERNAL is off on wasm. Each live child is an EXIT LATCH.
@@ -103,7 +103,7 @@ async void run_handle() {
     if (!h) {
       continue;
     }
-    err = catch(p = external_start(h));
+    err = catch(p = external_run(h));
     if (err) {
       external_close(h);
       continue;
@@ -131,7 +131,7 @@ async void run_handle() {
         if (err) {
           continue;
         }
-        err = acatch { await external_start(h); };
+        err = acatch { await external_run(h); };
         if (err) {
           ASSERT(intp(err));
           external_close(h);
@@ -160,7 +160,7 @@ async void run_stdin() {
       continue;
     }
     external_write(h, "hello-from-handle\n");
-    err = catch(p = external_start(h));
+    err = catch(p = external_run(h));
     if (err || typeof(p) != "promise") {
       external_close(h);
       continue;
@@ -215,7 +215,7 @@ void do_tests() {
     ASSERT_EQ(-1, external_exit_code(h));
     ASSERT_EQ("", external_stdout(h));
     ASSERT_EQ("", external_stderr(h));
-    err = catch(p = external_start(h));
+    err = catch(p = external_run(h));
     if (err || typeof(p) != "promise") {
       external_close(h);
       h = 0;
@@ -223,7 +223,7 @@ void do_tests() {
       continue;
     }
     promise_catch(p, (: 0 :));
-    err = catch(p = external_start(h));
+    err = catch(p = external_run(h));
     if (stringp(err)) {
       break;
     }
@@ -248,6 +248,9 @@ void do_tests() {
 
   err = catch(external_start(3, ({ "x" }), "hello-from-stdin\n"));
   ASSERT2(err, "three arguments with a string is neither form");
+
+  err = catch(external_run(0));
+  ASSERT2(err, "external_run rejects an invalid handle");
 
   EXPECT_LATCH("external_start classic form");
   EXPECT_LATCH("external_start promise form");

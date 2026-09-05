@@ -1017,44 +1017,48 @@ void f_external_create() {
 }
 #endif
 
+#ifdef F_EXTERNAL_RUN
+void f_external_run() {
+  /* Latch arity first: check_valid_socket() runs a master apply that
+   * overwrites st_num_arg (same trap as f_async_read). */
+  int const num_arg = st_num_arg;
+  int const id = static_cast<int>(sp->u.number);
+  ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
+  if (h->state != HandleState::Created) {
+    error("external_run: handle has already been started.\n");
+  }
+  if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
+    st_num_arg = num_arg;
+    promise_t* p = promise_alloc();
+    reject_with_number(p, EESECURITY);
+    pop_n_elems(num_arg);
+    push_refed_promise(p);
+    return;
+  }
+  st_num_arg = num_arg;
+
+  int const rc = spawn_handle(h, id);
+  promise_t* p = promise_alloc();
+  if (rc < 0) {
+    reject_with_number(p, rc);
+    pop_n_elems(num_arg);
+    push_refed_promise(p);
+    return;
+  }
+  h->state = HandleState::Running;
+  h->prom = p;
+  p->ref++;
+  pop_n_elems(num_arg);
+  push_refed_promise(p);
+}
+#endif
+
 #ifdef F_EXTERNAL_START
 void f_external_start() {
   /* Latch arity first: check_valid_socket() runs a master apply that
    * overwrites st_num_arg (same trap as f_async_read). */
   int const num_arg = st_num_arg;
   svalue_t* arg = sp - num_arg + 1;
-
-  if (num_arg == 1) {
-    ExternalHandle* h = lookup_handle(static_cast<int>(arg[0].u.number), /*require_owner=*/1);
-    int const id = static_cast<int>(arg[0].u.number);
-    if (h->state != HandleState::Created) {
-      error("external_start: handle has already been started.\n");
-    }
-    if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-      st_num_arg = num_arg;
-      promise_t* p = promise_alloc();
-      reject_with_number(p, EESECURITY);
-      pop_n_elems(num_arg);
-      push_refed_promise(p);
-      return;
-    }
-    st_num_arg = num_arg;
-
-    int const rc = spawn_handle(h, id);
-    promise_t* p = promise_alloc();
-    if (rc < 0) {
-      reject_with_number(p, rc);
-      pop_n_elems(num_arg);
-      push_refed_promise(p);
-      return;
-    }
-    h->state = HandleState::Running;
-    h->prom = p;
-    p->ref++;
-    pop_n_elems(num_arg);
-    push_refed_promise(p);
-    return;
-  }
 
   if (num_arg == 2) {
     /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
@@ -1094,9 +1098,9 @@ void f_external_start() {
 
   if (num_arg != 4 && num_arg != 5) {
     error(
-        "external_start: omit the callbacks for the promise form, pass a "
-        "handle from external_create(), or pass the classic read/write "
-        "callbacks.\n");
+        "external_start: omit the callbacks for the promise form, or pass "
+        "the classic read/write callbacks. Use external_run() for a handle "
+        "from external_create().\n");
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {

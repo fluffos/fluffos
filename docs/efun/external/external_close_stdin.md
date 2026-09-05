@@ -22,4 +22,4 @@ title: external / external_close_stdin
 
 ### SEE ALSO
 
-    external_write(3), external_start(3), external_close(3)
+    external_write(3), external_run(3), external_close(3)

@@ -14,7 +14,7 @@ title: external / external_write
 ### DESCRIPTION
 
     Append `data` to the stdin of a handle from `external_create()`.
-    Writes before `external_start()` are buffered and flushed when the
+    Writes before `external_run()` are buffered and flushed when the
     process starts. Writes after start go to the pipe (or the shared
     stdio socket on Win32).
 
@@ -24,7 +24,7 @@ title: external / external_write
 
         int h = external_create(CAT_CMD, ({}));
         external_write(h, "one\n");
-        mixed p = external_start(h);
+        mixed p = external_run(h);
         external_write(h, "two\n");
         external_close_stdin(h);
         mixed *r = await p;
@@ -34,5 +34,5 @@ title: external / external_write
 
 ### SEE ALSO
 
-    external_create(3), external_start(3), external_close_stdin(3),
+    external_create(3), external_run(3), external_close_stdin(3),
     external_close(3)

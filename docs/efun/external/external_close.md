@@ -20,4 +20,4 @@ title: external / external_close
 
 ### SEE ALSO
 
-    external_create(3), external_start(3)
+    external_create(3), external_run(3)

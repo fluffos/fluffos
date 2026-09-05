@@ -18,4 +18,4 @@ title: external / external_stderr
 
 ### SEE ALSO
 
-    external_create(3), external_start(3), external_stdout(3)
+    external_create(3), external_run(3), external_stdout(3)

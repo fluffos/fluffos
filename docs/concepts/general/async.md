@@ -390,7 +390,7 @@ exit still fulfills), or rejected with a socket error /
 `external_start(index, args, read, write, close)` form is unchanged and
 still returns the socket fd.
 
-`external_create(index, args)` allocates a handle. `external_start(handle)`
+`external_create(index, args)` allocates a handle. `external_run(handle)`
 starts the process the same way and fulfills with the same
 `({ stdout, stderr, exit_code })` tuple. After it fulfills,
 `external_stdout()`, `external_stderr()` and `external_exit_code()`

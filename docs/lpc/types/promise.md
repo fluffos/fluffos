@@ -17,7 +17,7 @@ promise_result(p);              // 42
 Promises are produced by [`async` functions](../constructs/async), by the
 promise efuns, and by the promise forms of the callback efuns
 (`call_out(delay)`, `async_read(path)`, `external_start(index, args)`,
-`external_start(handle)`, ...). They are consumed with
+`external_run(handle)`, ...). They are consumed with
 `await`, or with `promise_then()` / `promise_catch()` handlers.
 
 ## Value semantics

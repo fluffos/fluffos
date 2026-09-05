@@ -799,6 +799,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/external/external_run",
+            "key": "efun/external/external_run",
+            "label": "external_run"
+          },
+          {
+            "type": "doc",
             "id": "efun/external/external_start",
             "key": "efun/external/external_start",
             "label": "external_start"

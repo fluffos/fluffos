@@ -14,12 +14,12 @@ title: external / external_create
 ### DESCRIPTION
 
     Allocate a handle for a command configured as `external_cmd_N`. The
-    process is not started. Pass the handle to `external_start()` to run
+    process is not started. Pass the handle to `external_run()` to run
     it (awaitable), then read `external_stdout()`, `external_stderr()`
     and `external_exit_code()` from the same handle.
 
         int h = external_create(CURL_CMD, ({ "-s", url }));
-        mixed *r = await external_start(h);
+        mixed *r = await external_run(h);
         string body = r[0];       /* also external_stdout(h) */
         string err = r[1];
         int code = r[2];
@@ -37,6 +37,7 @@ title: external / external_create
 
 ### SEE ALSO
 
-    external_start(3), external_write(3), external_close_stdin(3),
+    external_run(3), external_start(3), external_write(3),
+    external_close_stdin(3),
     external_stdout(3), external_stderr(3),
     external_exit_code(3), external_close(3)
