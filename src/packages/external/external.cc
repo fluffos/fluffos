@@ -539,54 +539,39 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
   }
   cmdline += fmt::to_string(fmt::join(quoted.begin(), quoted.end(), " "));
 
-  /* socks[0] is the ReadFile-capable end (see socketpair_win32). All three
-   * std handles must be sockets -- mixing a real NUL HANDLE with sockets
-   * makes CreateProcess fail. Classic uses one socket for all three. */
-  SOCKET out_sv[2];
-  SOCKET err_sv[2];
-  SOCKET in_sv[2];
-  if (socketpair_win32(out_sv, 0) != 0 || socketpair_win32(err_sv, 0) != 0 ||
-      socketpair_win32(in_sv, 0) != 0) {
+  /* Same stdio as the classic form: one socketpair, socks[0] for all three
+   * child handles. Separate stdout/stderr socketpairs do not deliver data
+   * through CreateProcess on Win32 (classic latch passed; handle latches
+   * never released). stderr is reported empty. */
+  SOCKET sv[2];
+  if (socketpair_win32(sv, 0) != 0) {
     return EESOCKET;
   }
-  if (evutil_make_socket_nonblocking(out_sv[1]) == -1 ||
-      evutil_make_socket_nonblocking(err_sv[1]) == -1) {
-    evutil_closesocket(out_sv[0]);
-    evutil_closesocket(out_sv[1]);
-    evutil_closesocket(err_sv[0]);
-    evutil_closesocket(err_sv[1]);
-    evutil_closesocket(in_sv[0]);
-    evutil_closesocket(in_sv[1]);
+  if (evutil_make_socket_nonblocking(sv[1]) == -1) {
+    evutil_closesocket(sv[0]);
+    evutil_closesocket(sv[1]);
     return EESOCKET;
   }
 
   PROCESS_INFORMATION processInfo{};
-  if (!win32_create_process(&cmdline, reinterpret_cast<HANDLE>(in_sv[0]),
-                            reinterpret_cast<HANDLE>(out_sv[0]),
-                            reinterpret_cast<HANDLE>(err_sv[0]), &processInfo)) {
-    evutil_closesocket(out_sv[0]);
-    evutil_closesocket(out_sv[1]);
-    evutil_closesocket(err_sv[0]);
-    evutil_closesocket(err_sv[1]);
-    evutil_closesocket(in_sv[0]);
-    evutil_closesocket(in_sv[1]);
+  if (!win32_create_process(&cmdline, reinterpret_cast<HANDLE>(sv[0]),
+                            reinterpret_cast<HANDLE>(sv[0]),
+                            reinterpret_cast<HANDLE>(sv[0]), &processInfo)) {
+    evutil_closesocket(sv[0]);
+    evutil_closesocket(sv[1]);
     return EESOCKET;
   }
-  evutil_closesocket(in_sv[0]);
-  evutil_closesocket(in_sv[1]);
-  evutil_closesocket(out_sv[0]);
-  evutil_closesocket(err_sv[0]);
   h->pi = processInfo;
+  h->err_eof = true;
+  arm_pipe_reader(h, id, 0, sv[1]);
 
-  arm_pipe_reader(h, id, 0, out_sv[1]);
-  arm_pipe_reader(h, id, 1, err_sv[1]);
-
-  std::thread([id, processInfo]() {
+  std::thread([id, processInfo, child_fd = sv[0]]() {
     WaitForSingleObject(processInfo.hProcess, INFINITE);
     DWORD exitCode = static_cast<DWORD>(-1);
     GetExitCodeProcess(processInfo.hProcess, &exitCode);
     CloseHandle(processInfo.hProcess);
     CloseHandle(processInfo.hThread);
+    evutil_closesocket(child_fd);
     note_child_exit(id, static_cast<LPC_INT>(exitCode));
   }).detach();
   return 0;

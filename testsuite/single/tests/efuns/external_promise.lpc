@@ -179,9 +179,12 @@ void do_tests() {
       continue;
     }
     promise_catch(p, (: 0 :));
-    err = catch(external_start(h));
+    err = catch(p = external_start(h));
     if (stringp(err)) {
       break;
+    }
+    if (typeof(p) == "promise") {
+      promise_catch(p, (: 0 :));
     }
     external_close(h);
     h = 0;
