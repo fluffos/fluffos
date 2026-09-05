@@ -21,24 +21,31 @@ mixed *echo_args(int slot) {
 
 async void run_echo() {
   mixed p, s, err;
-  int slot;
+  int i, slot;
+  mixed *slots = ({ 3, 4, 6 });
 
   // Prefer /bin/echo (slot 3); then /usr/bin/echo (slot 4, MSYS2);
   // then cmd.exe (slot 6) on native Windows. CreateProcess error()s
   // when the binary is missing, so the start is inside catch().
-  foreach (slot in ({ 3, 4, 6 })) {
+  // Indexed for: await cannot suspend inside foreach (phase 1).
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
     err = catch(p = external_start(slot, echo_args(slot)));
     if (err) {
       continue;
     }
     ASSERT_EQ("promise", typeof(p));
-    s = acatch(await p);
+    // acatch is catch: 0 on success, the rejection reason on failure.
+    err = acatch { s = await p; };
+    if (err) {
+      // rejected with a socket error (command missing): try the next slot
+      ASSERT(intp(err));
+      continue;
+    }
     if (stringp(s) && strsrch(s, "hello-from-external") != -1) {
       RELEASE_LATCH("external_start promise form");
       return;
     }
-    // rejected with a socket error (command missing): try the next slot
-    ASSERT(intp(s));
   }
   // do not release -- an unreleased latch fails the run
 }
