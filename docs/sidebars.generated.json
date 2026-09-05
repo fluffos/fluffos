@@ -775,9 +775,57 @@
         "items": [
           {
             "type": "doc",
+            "id": "efun/external/external_close",
+            "key": "efun/external/external_close",
+            "label": "external_close"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_close_stdin",
+            "key": "efun/external/external_close_stdin",
+            "label": "external_close_stdin"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_create",
+            "key": "efun/external/external_create",
+            "label": "external_create"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_exit_code",
+            "key": "efun/external/external_exit_code",
+            "label": "external_exit_code"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_run",
+            "key": "efun/external/external_run",
+            "label": "external_run"
+          },
+          {
+            "type": "doc",
             "id": "efun/external/external_start",
             "key": "efun/external/external_start",
             "label": "external_start"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_stderr",
+            "key": "efun/external/external_stderr",
+            "label": "external_stderr"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_stdout",
+            "key": "efun/external/external_stdout",
+            "label": "external_stdout"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_write",
+            "key": "efun/external/external_write",
+            "label": "external_write"
           }
         ]
       },

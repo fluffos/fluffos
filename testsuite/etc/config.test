@@ -357,6 +357,20 @@ enable msdp : 1
 # External commands
 external_cmd_1 : /usr/bin/curl
 external_cmd_2 : c:\Windows\System32\curl.exe
+# echo: used by external_start's promise-form test. Slot 3 is the Unix
+# path; slot 4 covers MSYS2 where /bin/echo may not exist; slot 6 is
+# native Windows (echo is a cmd builtin). Slot 5 is deliberately left
+# unconfigured so the efun's bad-index path stays pinned.
+external_cmd_3 : /bin/echo
+external_cmd_4 : /usr/bin/echo
+external_cmd_6 : c:\Windows\System32\cmd.exe
+# false: non-zero exit for the promise-form return-code check
+external_cmd_7 : /bin/false
+external_cmd_8 : /usr/bin/false
+# cat: stdin echo for the promise-form write path. Slot 6 (cmd.exe) uses
+# `findstr ^` in the test. Slots 9-10 are reserved on the cancel branch.
+external_cmd_11 : /bin/cat
+external_cmd_12 : /usr/bin/cat
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

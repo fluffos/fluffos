@@ -381,6 +381,22 @@ promise fulfilled with the value the callback would have received, or
 rejected with the failure value (e.g. `async_read`'s negative int) —
 `string s = await async_read(path);`.
 
+`external_start(index, args)` — the same efun with the socket callbacks
+**omitted** — returns a promise fulfilled with
+`({ stdout, stderr, exit_code })` when the process exits (a non-zero
+exit still fulfills), or rejected with a socket error /
+`"*external process aborted"`. The child is started with
+`posix_spawn()` (Win32: `CreateProcess`). The classic
+`external_start(index, args, read, write, close)` form is unchanged and
+still returns the socket fd.
+
+`external_create(index, args)` allocates a handle. `external_run(handle)`
+starts the process the same way and fulfills with the same
+`({ stdout, stderr, exit_code })` tuple. After it fulfills,
+`external_stdout()`, `external_stderr()` and `external_exit_code()`
+also read the results from the handle. `external_write()` /
+`external_close_stdin()` drive the child's stdin.
+
 `async_yield()` returns a promise fulfilled with `0` on the event loop's
 next pass — `await async_yield();` is the cooperative preemption point for a
 long computation, letting the driver serve players between chunks. It is the

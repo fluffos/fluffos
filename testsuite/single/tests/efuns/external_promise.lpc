@@ -1,0 +1,301 @@
+// Two forms of external_start(), plus a separate handle efun:
+//
+// 1. Classic (master API, unchanged): callbacks, returns the socket fd.
+// 2. Omit-callback (issue #1319): await external_start(index, args)
+//    fulfills with ({ stdout, stderr, exit_code }).
+// 3. Handle: external_create() + await external_run(handle) fulfills
+//    with the same 3-tuple; stdout/stderr/exit_code also on the handle.
+//
+// PACKAGE_EXTERNAL is off on wasm. Each live child is an EXIT LATCH.
+// await cannot suspend inside foreach (phase 1): use an indexed for.
+
+#ifdef __PACKAGE_EXTERNAL__
+string classic_out = "";
+int classic_fd = -1;
+
+void classic_read(int fd, string data) { classic_out += data; }
+void classic_write(int fd) {}
+void classic_close(int fd) {
+  if (fd == classic_fd && strsrch(classic_out, "hello-from-external") != -1) {
+    RELEASE_LATCH("external_start classic form");
+  }
+}
+
+mixed *echo_args(int slot) {
+  // Slot 6 is Windows cmd.exe (see etc/config.test). Unix echo takes the
+  // payload as argv; cmd.exe needs /c echo.
+  if (slot == 6) {
+    return ({ "/c", "echo", "hello-from-external" });
+  }
+  return ({ "hello-from-external" });
+}
+
+mixed *cat_args(int slot) {
+  // Slots 11/12 are Unix cat. Slot 6 is cmd.exe. `^` is cmd's escape
+  // character, so `findstr ^` never reaches findstr as a pattern.
+  // `/R .*` copies every non-empty stdin line.
+  if (slot == 6) {
+    return ({ "/c", "findstr", "/R", ".*" });
+  }
+  return ({});
+}
+
+int try_create(int slot) {
+  mixed err, h;
+  err = catch(h = external_create(slot, echo_args(slot)));
+  if (err) {
+    return 0;
+  }
+  return intp(h) ? h : 0;
+}
+
+async void run_omit_callback() {
+  mixed p, s, err;
+  int i, slot;
+  mixed *slots = ({ 3, 4, 6 });
+
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
+    err = catch(p = external_start(slot, echo_args(slot)));
+    if (err) {
+      continue;
+    }
+    ASSERT_EQ("promise", typeof(p));
+    err = acatch { s = await p; };
+    if (err) {
+      ASSERT(intp(err));
+      continue;
+    }
+    if (arrayp(s) && sizeof(s) == 3 && stringp(s[0]) &&
+      strsrch(s[0], "hello-from-external") != -1) {
+      ASSERT(stringp(s[1]));
+      ASSERT_EQ(0, s[2]);
+      mixed *fails = ({ 7, 8 });
+      int j, fslot;
+      for (j = 0; j < sizeof(fails); j++) {
+        fslot = fails[j];
+        err = catch(p = external_start(fslot, ({})));
+        if (err) {
+          continue;
+        }
+        err = acatch { s = await p; };
+        if (err) {
+          ASSERT(intp(err));
+          continue;
+        }
+        ASSERT(arrayp(s) && sizeof(s) == 3);
+        ASSERT(stringp(s[0]) && stringp(s[1]));
+        ASSERT(s[2] != 0);
+        break;
+      }
+      RELEASE_LATCH("external_start promise form");
+      return;
+    }
+  }
+}
+
+async void run_handle() {
+  mixed p, err, r;
+  int i, slot, h, j, fslot;
+  mixed *slots = ({ 3, 4, 6 });
+
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
+    h = try_create(slot);
+    if (!h) {
+      continue;
+    }
+    err = catch(p = external_run(h));
+    if (err) {
+      external_close(h);
+      continue;
+    }
+    ASSERT_EQ("promise", typeof(p));
+    err = acatch { r = await p; };
+    if (err) {
+      ASSERT(intp(err));
+      external_close(h);
+      continue;
+    }
+    ASSERT(arrayp(r) && sizeof(r) == 3);
+    ASSERT_EQ(0, r[2]);
+    if (strsrch(r[0], "hello-from-external") != -1) {
+      ASSERT_EQ(r[0], external_stdout(h));
+      ASSERT_EQ(r[1], external_stderr(h));
+      ASSERT_EQ(r[2], external_exit_code(h));
+      ASSERT(stringp(external_stderr(h)));
+      external_close(h);
+
+      mixed *fails = ({ 7, 8 });
+      for (j = 0; j < sizeof(fails); j++) {
+        fslot = fails[j];
+        err = catch(h = external_create(fslot, ({})));
+        if (err) {
+          continue;
+        }
+        err = acatch { await external_run(h); };
+        if (err) {
+          ASSERT(intp(err));
+          external_close(h);
+          continue;
+        }
+        ASSERT(external_exit_code(h) != 0);
+        external_close(h);
+        break;
+      }
+      RELEASE_LATCH("external_create handle");
+      return;
+    }
+    external_close(h);
+  }
+}
+
+async void run_stdin() {
+  mixed p, err, r, h;
+  int i, slot;
+  mixed *slots = ({ 11, 12, 6 });
+
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
+    err = catch(h = external_create(slot, cat_args(slot)));
+    if (err || !intp(h) || h <= 0) {
+      continue;
+    }
+    external_write(h, "hello-from-handle\n");
+    err = catch(p = external_run(h));
+    if (err || typeof(p) != "promise") {
+      external_close(h);
+      continue;
+    }
+    external_write(h, "second-line\n");
+    external_close_stdin(h);
+    err = acatch { r = await p; };
+    if (err) {
+      ASSERT(intp(err));
+      external_close(h);
+      continue;
+    }
+    if (arrayp(r) && sizeof(r) == 3 && stringp(r[0]) &&
+      strsrch(r[0], "hello-from-handle") != -1 &&
+      strsrch(r[0], "second-line") != -1) {
+      external_close(h);
+      RELEASE_LATCH("external_start stdin");
+      return;
+    }
+    external_close(h);
+  }
+}
+
+void do_tests() {
+  mixed p, err, h;
+  int slot, fd;
+
+  // Omit-callback form still returns a promise (the #1319 API).
+  p = 0;
+  foreach (slot in ({ 3, 4, 6 })) {
+    err = catch(p = external_start(slot, echo_args(slot)));
+    if (!err && typeof(p) == "promise") {
+      break;
+    }
+    p = 0;
+  }
+  ASSERT2(p, "omit-callback form returns a promise");
+  ASSERT_EQ("promise", typeof(p));
+  promise_catch(p, (: 0 :));
+
+  // Handle form. Create succeeds for any configured path; spawn may still
+  // reject (Windows has /bin/echo in the config but no such binary). Only
+  // a start that leaves the handle Running makes a second start error().
+  h = 0;
+  p = 0;
+  foreach (slot in ({ 3, 4, 6 })) {
+    err = catch(h = external_create(slot, echo_args(slot)));
+    if (err || !intp(h) || h <= 0) {
+      h = 0;
+      continue;
+    }
+    ASSERT_EQ(-1, external_exit_code(h));
+    ASSERT_EQ("", external_stdout(h));
+    ASSERT_EQ("", external_stderr(h));
+    err = catch(p = external_run(h));
+    if (err || typeof(p) != "promise") {
+      external_close(h);
+      h = 0;
+      p = 0;
+      continue;
+    }
+    promise_catch(p, (: 0 :));
+    err = catch(p = external_run(h));
+    if (stringp(err)) {
+      break;
+    }
+    if (typeof(p) == "promise") {
+      promise_catch(p, (: 0 :));
+    }
+    external_close(h);
+    h = 0;
+    p = 0;
+  }
+  ASSERT2(h, "external_create returns a handle");
+  ASSERT_EQ("promise", typeof(p));
+  // Drop the leftover Running child so later async cases are not sharing
+  // a socket with a process that sits until suite shutdown.
+  external_close(h);
+  h = 0;
+  p = 0;
+
+  err = catch(external_create(5, ({ "x" })));
+  ASSERT2(err, "unconfigured slot errors in external_create");
+
+  err = catch(external_start(5, ({ "x" })));
+  ASSERT2(err, "unconfigured slot still errors in the omit-callback form");
+
+  err = catch(external_start(3, ({ "x" }), (: classic_read :)));
+  ASSERT2(err, "three arguments with a callback is neither form");
+
+  err = catch(external_start(3, ({ "x" }), "hello-from-stdin\n"));
+  ASSERT2(err, "three arguments with a string is neither form");
+
+  err = catch(external_run(0));
+  ASSERT2(err, "external_run rejects an invalid handle");
+
+  h = 0;
+  foreach (slot in ({ 3, 4, 6 })) {
+    h = try_create(slot);
+    if (h) {
+      break;
+    }
+  }
+  ASSERT2(h, "external_write needs a live handle");
+  ASSERT_EQ(1, external_write(h, "pre-close\n"));
+  external_close_stdin(h);
+  ASSERT_EQ(0, external_write(h, "post-close\n"));
+  external_close(h);
+
+  EXPECT_LATCH("external_start classic form");
+  EXPECT_LATCH("external_start promise form");
+  EXPECT_LATCH("external_create handle");
+  EXPECT_LATCH("external_start stdin");
+
+  // Classic form: int fd, required callbacks. Must compile as an int
+  // assignment (the master return type) and must not throw on a live slot.
+  // Latch is already registered so a fast close cannot release early.
+  fd = -1;
+  foreach (slot in ({ 3, 4, 6 })) {
+    err = catch(fd = external_start(slot, echo_args(slot),
+      (: classic_read :), (: classic_write :), (: classic_close :)));
+    if (!err && intp(fd) && fd >= 0) {
+      classic_fd = fd;
+      break;
+    }
+    fd = -1;
+  }
+  ASSERT2(classic_fd >= 0, "classic form still returns a socket fd");
+
+  call_out(function() { run_omit_callback(); }, 1);
+  call_out(function() { run_handle(); }, 1);
+  call_out(function() { run_stdin(); }, 1);
+}
+#else
+void do_tests() { ASSERT(1); }
+#endif
