@@ -31,9 +31,11 @@ mixed *echo_args(int slot) {
 }
 
 mixed *cat_args(int slot) {
-  // Slots 11/12 are Unix cat. Slot 6 is cmd.exe; findstr copies stdin lines.
+  // Slots 11/12 are Unix cat. Slot 6 is cmd.exe. `^` is cmd's escape
+  // character, so `findstr ^` never reaches findstr as a pattern.
+  // `/R .*` copies every non-empty stdin line.
   if (slot == 6) {
-    return ({ "/c", "findstr", "^" });
+    return ({ "/c", "findstr", "/R", ".*" });
   }
   return ({});
 }
@@ -236,6 +238,11 @@ void do_tests() {
   }
   ASSERT2(h, "external_create returns a handle");
   ASSERT_EQ("promise", typeof(p));
+  // Drop the leftover Running child so later async cases are not sharing
+  // a socket with a process that sits until suite shutdown.
+  external_close(h);
+  h = 0;
+  p = 0;
 
   err = catch(external_create(5, ({ "x" })));
   ASSERT2(err, "unconfigured slot errors in external_create");

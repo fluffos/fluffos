@@ -15,8 +15,10 @@ title: external / external_write
 
     Append `data` to the stdin of a handle from `external_create()`.
     Writes before `external_run()` are buffered and flushed when the
-    process starts. Writes after start go to the pipe (or the shared
-    stdio socket on Win32).
+    process starts. Writes after start go to the stdin pipe (POSIX and
+    Win32). On Win32, stdout/stderr still share one socketpair; stdin
+    is a separate anonymous pipe so the child can ReadFile and WriteFile
+    without deadlocking.
 
     The write end stays open until `external_close_stdin()` or
     `external_close()`. Commands that read until EOF need the explicit

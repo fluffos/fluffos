@@ -81,6 +81,10 @@ struct ExternalHandle {
   pid_t pid = -1;
 #else
   PROCESS_INFORMATION pi{};
+  /* Separate from the stdout socketpair: console programs ReadFile
+   * stdin and WriteFile stdout. One TCP socket for both deadlocks
+   * (findstr) and closesocket() can RST unread stdout. */
+  HANDLE in_handle = nullptr;
 #endif
 };
 
@@ -181,6 +185,27 @@ void close_pipe_fd(evutil_socket_t* fd) {
   *fd = -1;
 }
 
+bool stdin_writable(const ExternalHandle* h) {
+  if (h->in_closed) {
+    return false;
+  }
+#ifdef _WIN32
+  if (h->in_handle) {
+    return true;
+  }
+#endif
+  return h->in_fd >= 0;
+}
+
+#ifdef _WIN32
+void close_win32_stdin(ExternalHandle* h) {
+  if (h->in_handle) {
+    CloseHandle(h->in_handle);
+    h->in_handle = nullptr;
+  }
+}
+#endif
+
 void free_pipe_events(ExternalHandle* h) {
   if (h->ev_out) {
     event_free(h->ev_out);
@@ -198,6 +223,9 @@ void free_pipe_events(ExternalHandle* h) {
   h->out_watch = nullptr;
   delete h->err_watch;
   h->err_watch = nullptr;
+#ifdef _WIN32
+  close_win32_stdin(h);
+#endif
   if (h->in_fd >= 0 && h->in_fd != h->out_fd) {
     close_pipe_fd(&h->in_fd);
   } else {
@@ -327,35 +355,40 @@ void on_handle_pipe_read(evutil_socket_t fd, short /*what*/, void* arg) {
   }
   ExternalHandle* h = g_handles[id - 1];
   char buf[kPipeBuf];
+  for (;;) {
 #ifdef _WIN32
-  int cc = recv(fd, buf, sizeof(buf) - 1, 0);
+    int cc = recv(fd, buf, sizeof(buf) - 1, 0);
 #else
-  int cc = static_cast<int>(read(fd, buf, sizeof(buf) - 1));
+    int cc = static_cast<int>(read(fd, buf, sizeof(buf) - 1));
 #endif
-  if (cc > 0) {
-    buf[cc] = '\0';
-    auto res = u8_sanitize(buf);
-    append_capped(watch->stream == 0 ? h->out : h->err, res.c_str(), res.size());
+    if (cc > 0) {
+      buf[cc] = '\0';
+      auto res = u8_sanitize(buf);
+      append_capped(watch->stream == 0 ? h->out : h->err, res.c_str(), res.size());
+      continue;
+    }
+    if (cc < 0) {
+#ifdef _WIN32
+      if (evutil_socket_geterror(fd) == WSAEWOULDBLOCK) {
+        return;
+      }
+#else
+      if (errno == EINTR) {
+        continue;
+      }
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        return;
+      }
+#endif
+    }
+    if (watch->stream == 0) {
+      h->out_eof = true;
+    } else {
+      h->err_eof = true;
+    }
+    try_finish_handle(id);
     return;
   }
-  if (cc < 0) {
-#ifdef _WIN32
-    int err = evutil_socket_geterror(fd);
-    if (err == WSAEWOULDBLOCK) {
-      return;
-    }
-#else
-    if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-      return;
-    }
-#endif
-  }
-  if (watch->stream == 0) {
-    h->out_eof = true;
-  } else {
-    h->err_eof = true;
-  }
-  try_finish_handle(id);
 }
 
 void arm_pipe_reader(ExternalHandle* h, int id, int stream, evutil_socket_t fd) {
@@ -382,6 +415,9 @@ void close_stdin_write(ExternalHandle* h) {
     event_free(h->ev_in);
     h->ev_in = nullptr;
   }
+#ifdef _WIN32
+  close_win32_stdin(h);
+#endif
   if (h->in_fd >= 0) {
     if (h->in_fd == h->out_fd) {
 #ifdef _WIN32
@@ -410,7 +446,7 @@ void on_handle_stdin_writable(evutil_socket_t /*fd*/, short /*what*/, void* arg)
 }
 
 void arm_stdin_writer(ExternalHandle* h, int id) {
-  if (h->in_fd < 0 || h->in_closed) {
+  if (!stdin_writable(h) || h->in_fd < 0) {
     return;
   }
   if (!h->ev_in) {
@@ -421,9 +457,27 @@ void arm_stdin_writer(ExternalHandle* h, int id) {
 }
 
 void flush_stdin(ExternalHandle* h, int id) {
-  if (h->in_closed || h->in_fd < 0) {
+  if (!stdin_writable(h)) {
     return;
   }
+#ifdef _WIN32
+  if (h->in_handle) {
+    while (!h->in_buf.empty()) {
+      DWORD written = 0;
+      size_t chunk = std::min(h->in_buf.size(), static_cast<size_t>(kPipeBuf));
+      if (!WriteFile(h->in_handle, h->in_buf.data(), static_cast<DWORD>(chunk), &written, nullptr) ||
+          written == 0) {
+        close_stdin_write(h);
+        return;
+      }
+      h->in_buf.erase(0, static_cast<size_t>(written));
+    }
+    if (h->close_stdin_after_flush) {
+      close_stdin_write(h);
+    }
+    return;
+  }
+#endif
   while (!h->in_buf.empty()) {
     size_t chunk = std::min(h->in_buf.size(), static_cast<size_t>(kPipeBuf));
 #ifdef _WIN32
@@ -676,10 +730,11 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
   }
   cmdline += fmt::to_string(fmt::join(quoted.begin(), quoted.end(), " "));
 
-  /* Same stdio as the classic form: one socketpair, socks[0] for all three
-   * child handles. Separate stdout/stderr socketpairs do not deliver data
-   * through CreateProcess on Win32 (classic latch passed; handle latches
-   * never released). stderr is reported empty. */
+  /* stdout/stderr still share one socketpair (separate output pairs do
+   * not deliver data through CreateProcess). stdin is a real anonymous
+   * pipe: console tools ReadFile stdin and WriteFile stdout, so one TCP
+   * socket for both deadlocks, and cmd.exe treats `^` as an escape.
+   * stderr is reported empty. */
   SOCKET sv[2];
   if (socketpair_win32(sv, 0) != 0) {
     return EESOCKET;
@@ -690,18 +745,39 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
     return EESOCKET;
   }
 
-  PROCESS_INFORMATION processInfo{};
-  if (!win32_create_process(&cmdline, reinterpret_cast<HANDLE>(sv[0]),
-                            reinterpret_cast<HANDLE>(sv[0]),
-                            reinterpret_cast<HANDLE>(sv[0]), &processInfo)) {
+  SECURITY_ATTRIBUTES sa{};
+  sa.nLength = sizeof(sa);
+  sa.bInheritHandle = TRUE;
+  HANDLE stdin_rd = nullptr;
+  HANDLE stdin_wr = nullptr;
+  if (!CreatePipe(&stdin_rd, &stdin_wr, &sa, 65536)) {
     evutil_closesocket(sv[0]);
     evutil_closesocket(sv[1]);
     return EESOCKET;
   }
+  /* Child must not inherit the write end, or CloseHandle never delivers EOF. */
+  if (!SetHandleInformation(stdin_wr, HANDLE_FLAG_INHERIT, 0)) {
+    CloseHandle(stdin_rd);
+    CloseHandle(stdin_wr);
+    evutil_closesocket(sv[0]);
+    evutil_closesocket(sv[1]);
+    return EESOCKET;
+  }
+
+  PROCESS_INFORMATION processInfo{};
+  if (!win32_create_process(&cmdline, stdin_rd, reinterpret_cast<HANDLE>(sv[0]),
+                            reinterpret_cast<HANDLE>(sv[0]), &processInfo)) {
+    CloseHandle(stdin_rd);
+    CloseHandle(stdin_wr);
+    evutil_closesocket(sv[0]);
+    evutil_closesocket(sv[1]);
+    return EESOCKET;
+  }
+  CloseHandle(stdin_rd);
   h->pi = processInfo;
   h->err_eof = true;
   arm_pipe_reader(h, id, 0, sv[1]);
-  h->in_fd = sv[1];
+  h->in_handle = stdin_wr;
   flush_stdin(h, id);
 
   std::thread([id, processInfo, child_fd = sv[0]]() {
@@ -710,6 +786,7 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
     GetExitCodeProcess(processInfo.hProcess, &exitCode);
     CloseHandle(processInfo.hProcess);
     CloseHandle(processInfo.hThread);
+    shutdown(child_fd, SD_SEND);
     evutil_closesocket(child_fd);
     note_child_exit(id, static_cast<LPC_INT>(exitCode));
   }).detach();
