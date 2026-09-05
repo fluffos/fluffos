@@ -9,7 +9,7 @@ title: external / external_write
 
 ### SYNOPSIS
 
-    void external_write(int handle, string data);
+    int external_write(int handle, string data);
 
 ### DESCRIPTION
 
@@ -29,8 +29,9 @@ title: external / external_write
         external_close_stdin(h);
         mixed *r = await p;
 
-    Errors if the handle is not owned by this object, stdin was already
-    closed, or the process has exited.
+    Returns `1` if the data was queued or written, `0` if stdin is
+    already closed or the process has exited (the data is dropped).
+    Errors only if the handle is invalid or not owned by this object.
 
 ### SEE ALSO
 

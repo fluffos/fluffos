@@ -462,17 +462,15 @@ void flush_stdin(ExternalHandle* h, int id) {
   }
 }
 
-void queue_stdin(ExternalHandle* h, int id, const char* data, size_t len) {
-  if (h->in_closed) {
-    error("external_write: stdin is closed.\n");
-  }
-  if (h->state == HandleState::Done) {
-    error("external_write: process has already exited.\n");
+int queue_stdin(ExternalHandle* h, int id, const char* data, size_t len) {
+  if (h->in_closed || h->close_stdin_after_flush || h->state == HandleState::Done) {
+    return 0;
   }
   append_capped(h->in_buf, data, len);
   if (h->state == HandleState::Running) {
     flush_stdin(h, id);
   }
+  return 1;
 }
 
 #ifndef _WIN32
@@ -995,12 +993,7 @@ void f_external_create() {
   int const num_arg = st_num_arg;
   svalue_t* arg = sp - num_arg + 1;
 
-  if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    st_num_arg = num_arg;
-    error("external_create: permission denied.\n");
-  }
-  st_num_arg = num_arg;
-
+  /* Allocation is not privileged; valid_socket is checked at run. */
   int const cmd = validate_cmd_index(arg[0].u.number);
   std::vector<std::string> extra;
   parse_cmd_args(arg + 1, &extra);
@@ -1162,8 +1155,9 @@ void f_external_write() {
   svalue_t* arg = sp - num_arg + 1;
   int const id = static_cast<int>(arg[0].u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
-  queue_stdin(h, id, arg[1].u.string, SVALUE_STRLEN(arg + 1));
+  int const ok = queue_stdin(h, id, arg[1].u.string, SVALUE_STRLEN(arg + 1));
   pop_n_elems(num_arg);
+  push_number(ok);
 }
 #endif
 

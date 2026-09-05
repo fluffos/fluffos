@@ -252,6 +252,19 @@ void do_tests() {
   err = catch(external_run(0));
   ASSERT2(err, "external_run rejects an invalid handle");
 
+  h = 0;
+  foreach (slot in ({ 3, 4, 6 })) {
+    h = try_create(slot);
+    if (h) {
+      break;
+    }
+  }
+  ASSERT2(h, "external_write needs a live handle");
+  ASSERT_EQ(1, external_write(h, "pre-close\n"));
+  external_close_stdin(h);
+  ASSERT_EQ(0, external_write(h, "post-close\n"));
+  external_close(h);
+
   EXPECT_LATCH("external_start classic form");
   EXPECT_LATCH("external_start promise form");
   EXPECT_LATCH("external_create handle");

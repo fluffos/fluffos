@@ -17,6 +17,6 @@ mixed external_start(int, string | string *, void | string | function,
 string external_stdout(int);
 string external_stderr(int);
 int external_exit_code(int);
-void external_write(int, string);
+int external_write(int, string);
 void external_close_stdin(int);
 void external_close(int);
