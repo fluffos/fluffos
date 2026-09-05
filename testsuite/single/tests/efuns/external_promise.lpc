@@ -1,10 +1,10 @@
-// external_start() promise form (issue #1319): omit the socket callbacks
-// and the efun returns a promise fulfilled with ({ output, exit_code })
-// when the process exits. Classic callback form is untouched and still
-// returns the socket fd (int). PACKAGE_EXTERNAL is off on wasm.
+// Handle API (issue #1319): external_create() returns a handle,
+// external_start(handle) is awaitable, then stdout/stderr/exit_code
+// are read from the handle. Classic callback form is untouched.
+// PACKAGE_EXTERNAL is off on wasm.
 //
 // run_echo() finishes after do_tests() returns (child process, then
-// socket EOF, then settle, then resume), so it is an EXIT LATCH.
+// pipe EOF + waitpid, then settle, then resume), so it is an EXIT LATCH.
 
 #ifdef __PACKAGE_EXTERNAL__
 void classic_cb(int fd, string data) { /* classic form still works */ }
@@ -19,89 +19,105 @@ mixed *echo_args(int slot) {
   return ({ "hello-from-external" });
 }
 
+int try_create(int slot) {
+  mixed err, h;
+  err = catch(h = external_create(slot, echo_args(slot)));
+  if (err) {
+    return 0;
+  }
+  return intp(h) ? h : 0;
+}
+
 async void run_echo() {
-  mixed p, s, err;
-  int i, slot;
+  mixed p, err, code;
+  int i, slot, h, j, fslot;
   mixed *slots = ({ 3, 4, 6 });
 
-  // Prefer /bin/echo (slot 3); then /usr/bin/echo (slot 4, MSYS2);
-  // then cmd.exe (slot 6) on native Windows. CreateProcess error()s
-  // when the binary is missing, so the start is inside catch().
   // Indexed for: await cannot suspend inside foreach (phase 1).
   for (i = 0; i < sizeof(slots); i++) {
     slot = slots[i];
-    err = catch(p = external_start(slot, echo_args(slot)));
+    h = try_create(slot);
+    if (!h) {
+      continue;
+    }
+    err = catch(p = external_start(h));
     if (err) {
+      external_close(h);
       continue;
     }
     ASSERT_EQ("promise", typeof(p));
-    // acatch is catch: 0 on success, the rejection reason on failure.
-    err = acatch { s = await p; };
+    err = acatch { code = await p; };
     if (err) {
-      // rejected with a socket error (command missing): try the next slot
       ASSERT(intp(err));
+      external_close(h);
       continue;
     }
-    if (arrayp(s) && sizeof(s) == 2 && stringp(s[0]) &&
-      strsrch(s[0], "hello-from-external") != -1) {
-      ASSERT_EQ(0, s[1]);
-      // non-zero exit is still a fulfillment -- the mudlib reads r[1]
+    ASSERT_EQ(0, code);
+    if (strsrch(external_stdout(h), "hello-from-external") != -1) {
+      ASSERT_EQ(0, external_exit_code(h));
+      ASSERT(stringp(external_stderr(h)));
+      external_close(h);
+
+      // non-zero exit still fulfills; the code lives on the handle
       mixed *fails = ({ 7, 8 });
-      int j, fslot;
       for (j = 0; j < sizeof(fails); j++) {
         fslot = fails[j];
-        err = catch(p = external_start(fslot, ({})));
+        err = catch(h = external_create(fslot, ({})));
         if (err) {
           continue;
         }
-        err = acatch { s = await p; };
+        err = acatch { await external_start(h); };
         if (err) {
           ASSERT(intp(err));
+          external_close(h);
           continue;
         }
-        ASSERT(arrayp(s) && sizeof(s) == 2);
-        ASSERT(s[1] != 0);
+        ASSERT(external_exit_code(h) != 0);
+        external_close(h);
         break;
       }
-      RELEASE_LATCH("external_start promise form");
+      RELEASE_LATCH("external_create handle");
       return;
     }
+    external_close(h);
   }
-  // do not release -- an unreleased latch fails the run
 }
 
 void do_tests() {
-  mixed p, err;
+  mixed p, err, h;
   int slot;
 
-  // promise form returns a promise immediately; classic form still returns
-  // an int (fd, or a negative error). Try each echo slot: a missing binary
-  // either rejects the promise (posix_spawn) or throws (Windows CreateProcess).
-  p = 0;
+  h = 0;
   foreach (slot in ({ 3, 4, 6 })) {
-    err = catch(p = external_start(slot, echo_args(slot)));
-    if (!err && typeof(p) == "promise") {
+    err = catch(h = external_create(slot, echo_args(slot)));
+    if (!err && intp(h) && h > 0) {
       break;
     }
-    p = 0;
+    h = 0;
   }
-  ASSERT2(p, "promise form returns a promise for a configured echo slot");
-  ASSERT_EQ("promise", typeof(p));
-  // don't leave an unhandled rejection if echo is missing -- the latch
-  // path awaits a (possibly different) slot below
-  promise_catch(p, (: 0 :));
+  ASSERT2(h, "external_create returns a handle");
+  ASSERT_EQ(-1, external_exit_code(h));
+  ASSERT_EQ("", external_stdout(h));
+  ASSERT_EQ("", external_stderr(h));
 
-  // unconfigured slot: classic form error()s (same as external_start.lpc)
+  p = external_start(h);
+  ASSERT_EQ("promise", typeof(p));
+  promise_catch(p, (: 0 :));
+  ASSERT(stringp(catch(external_start(h))));
+
+  err = catch(external_create(5, ({ "x" })));
+  ASSERT2(err, "unconfigured slot errors in external_create");
+
   ASSERT(catch(external_start(5, ({ "x" }), (: classic_cb :), (: classic_wcb :))) ||
     1);
 
-  err = catch(external_start(5, ({ "x" })));
-  ASSERT2(err, "unconfigured slot still errors in the promise form");
+  err = catch(external_start(3, ({ "x" })));
+  ASSERT2(err, "two arguments is neither form");
 
   err = catch(external_start(3, ({ "x" }), (: classic_cb :)));
   ASSERT2(err, "three arguments is neither form");
 
-  EXPECT_LATCH("external_start promise form");
+  EXPECT_LATCH("external_create handle");
   call_out(function() { run_echo(); }, 1);
 }
 #else

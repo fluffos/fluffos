@@ -14,7 +14,7 @@ title: external / external_start
                        string|function read_call_back,
                        string|function write_call_back,
                        void | string|function close_call_back);
-    promise external_start(int external_index, string | string * args);
+    promise external_start(int handle);
 
 ### DESCRIPTION
 
@@ -35,19 +35,17 @@ title: external / external_start
     command, but, this is a required parameter.
     `close_call_back` - When the socket closes, this function is called.
 
-    With the callbacks OMITTED, returns a promise instead (issue #1319):
-    fulfilled with `({ output, exit_code })` when the process exits --
-    `output` is the concatenation of every string the read callback would
-    have received, `exit_code` is the child's wait status (0 on success;
-    on POSIX a signal death is `128 + signo`, matching the shell).
-    Rejected with the negative socket error the classic form would have
-    returned (`EESECURITY`, `EESOCKET`, ...) -- or with
-    `"*external process aborted"` if the calling object is destructed
-    first. Inside an async function:
+    With a handle from `external_create()` (issue #1319): starts the
+    process and returns a promise fulfilled with `0` when it exits, or
+    rejected with a socket error (`EESECURITY`, `EESOCKET`, ...) if spawn
+    fails -- or with `"*external process aborted"` if the owner is
+    destructed / the handle is closed first. After it fulfills, read
+    stdout, stderr and the wait status from the handle:
 
-        mixed *r = await external_start(CURL_CMD, ({ "-s", url }));
-        string body = r[0];
-        int code = r[1];
+        int h = external_create(CURL_CMD, ({ "-s", url }));
+        await external_start(h);
+        string body = external_stdout(h);
+        int code = external_exit_code(h);
 
 ### RUNTIME CONFIGURATION
 
@@ -138,4 +136,6 @@ void close_call_back(int fd) {
 
 ### SEE ALSO
 
-    socket_write(3), socket_close(3), async_read(3), call_out(3)
+    external_create(3), external_stdout(3), external_stderr(3),
+    external_exit_code(3), external_close(3), socket_write(3),
+    socket_close(3), async_read(3), call_out(3)

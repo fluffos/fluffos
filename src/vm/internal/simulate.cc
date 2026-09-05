@@ -1354,6 +1354,9 @@ void destruct_object(object_t* ob) {
     close_referencing_sockets(ob);
   }
 #endif
+#ifdef PACKAGE_EXTERNAL
+  external_owner_destructed(ob);
+#endif
 #ifdef PACKAGE_PARSER
   if (ob->pinfo) {
     parse_free(ob->pinfo);

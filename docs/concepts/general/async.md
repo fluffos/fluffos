@@ -381,13 +381,12 @@ promise fulfilled with the value the callback would have received, or
 rejected with the failure value (e.g. `async_read`'s negative int) —
 `string s = await async_read(path);`.
 
-`external_start(index, args)` — omit the socket callbacks — returns a
-promise fulfilled with `({ output, exit_code })` when the process
-exits, or rejected with the negative socket error the classic form
-would have returned (`EESECURITY`, `EESOCKET`, ...) or
-`"*external process aborted"` if the calling object is destructed
-first. `exit_code` is the child's wait status (0 on success; on POSIX a
-signal death is `128 + signo`). The classic
+`external_create(index, args)` allocates a handle. `external_start(handle)`
+starts the process and returns a promise fulfilled with `0` when it
+exits, or rejected with a socket error / `"*external process aborted"`.
+After it fulfills, `external_stdout()`, `external_stderr()` and
+`external_exit_code()` read the results from the handle (a non-zero
+exit still fulfills). The classic
 `external_start(index, args, read, write, close)` form is unchanged and
 still returns the socket fd.
 

@@ -8,9 +8,6 @@
 #include "base/package_api.h"
 
 #include "packages/sockets/socket_efuns.h"
-#ifdef PACKAGE_EXTERNAL
-#include "packages/external/external.h"
-#endif
 #include "net/tls.h"
 
 #include <cinttypes>
@@ -1444,20 +1441,6 @@ void socket_read_select_handler(int fd) {
 #endif
           debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
-#ifdef PACKAGE_EXTERNAL
-          if (lpc_socks[fd].flags & S_EXTERNAL) {
-            if (lpc_socks[fd].flags & S_BINARY) {
-              if (external_promise_take_read(fd, buf, cc)) {
-                return;
-              }
-            } else {
-              auto res = u8_sanitize(buf);
-              if (external_promise_take_read(fd, res.c_str(), static_cast<int>(res.size()))) {
-                return;
-              }
-            }
-          }
-#endif
           push_number(fd);
           if (lpc_socks[fd].flags & S_BINARY) {
             buffer_t* b;
@@ -1733,15 +1716,6 @@ int socket_close(int fd, int flags) {
   if (!(flags & SC_FORCE) && lpc_socks[fd].owner_ob != current_object) {
     return EESECURITY;
   }
-
-#ifdef PACKAGE_EXTERNAL
-  if (lpc_socks[fd].flags & S_EXTERNAL) {
-    /* Normal EOF close (SC_DO_CALLBACK) fulfills the promise form;
-     * object-destruct / shutdown / force-close without the callback
-     * rejects it. Classic-form sockets have no job and this is a no-op. */
-    external_promise_closed(fd, !(flags & SC_DO_CALLBACK));
-  }
-#endif
 
   if (flags & SC_DO_CALLBACK) {
     debug(sockets, ("socket_close: apply close callback\n"));
