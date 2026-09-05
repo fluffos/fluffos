@@ -2,9 +2,9 @@
 //
 // 1. Classic (master API, unchanged): callbacks, returns the socket fd.
 // 2. Omit-callback (issue #1319): await external_start(index, args)
-//    fulfills with ({ output, exit_code }).
-// 3. Handle: external_create() + await external_start(handle), then
-//    stdout/stderr/exit_code from the handle.
+//    fulfills with ({ stdout, stderr, exit_code }).
+// 3. Handle: external_create() + await external_start(handle) fulfills
+//    with the same 3-tuple; stdout/stderr/exit_code also on the handle.
 //
 // PACKAGE_EXTERNAL is off on wasm. Each live child is an EXIT LATCH.
 // await cannot suspend inside foreach (phase 1): use an indexed for.
@@ -56,9 +56,10 @@ async void run_omit_callback() {
       ASSERT(intp(err));
       continue;
     }
-    if (arrayp(s) && sizeof(s) == 2 && stringp(s[0]) &&
+    if (arrayp(s) && sizeof(s) == 3 && stringp(s[0]) &&
       strsrch(s[0], "hello-from-external") != -1) {
-      ASSERT_EQ(0, s[1]);
+      ASSERT(stringp(s[1]));
+      ASSERT_EQ(0, s[2]);
       mixed *fails = ({ 7, 8 });
       int j, fslot;
       for (j = 0; j < sizeof(fails); j++) {
@@ -72,8 +73,9 @@ async void run_omit_callback() {
           ASSERT(intp(err));
           continue;
         }
-        ASSERT(arrayp(s) && sizeof(s) == 2);
-        ASSERT(s[1] != 0);
+        ASSERT(arrayp(s) && sizeof(s) == 3);
+        ASSERT(stringp(s[0]) && stringp(s[1]));
+        ASSERT(s[2] != 0);
         break;
       }
       RELEASE_LATCH("external_start promise form");
@@ -83,7 +85,7 @@ async void run_omit_callback() {
 }
 
 async void run_handle() {
-  mixed p, err, code;
+  mixed p, err, r;
   int i, slot, h, j, fslot;
   mixed *slots = ({ 3, 4, 6 });
 
@@ -99,15 +101,18 @@ async void run_handle() {
       continue;
     }
     ASSERT_EQ("promise", typeof(p));
-    err = acatch { code = await p; };
+    err = acatch { r = await p; };
     if (err) {
       ASSERT(intp(err));
       external_close(h);
       continue;
     }
-    ASSERT_EQ(0, code);
-    if (strsrch(external_stdout(h), "hello-from-external") != -1) {
-      ASSERT_EQ(0, external_exit_code(h));
+    ASSERT(arrayp(r) && sizeof(r) == 3);
+    ASSERT_EQ(0, r[2]);
+    if (strsrch(r[0], "hello-from-external") != -1) {
+      ASSERT_EQ(r[0], external_stdout(h));
+      ASSERT_EQ(r[1], external_stderr(h));
+      ASSERT_EQ(r[2], external_exit_code(h));
       ASSERT(stringp(external_stderr(h)));
       external_close(h);
 

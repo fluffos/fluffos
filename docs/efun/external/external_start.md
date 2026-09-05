@@ -39,25 +39,28 @@ title: external / external_start
 
     Omit the callbacks (issue #1319, same pattern as `async_read(path)`
     and `call_out(delay)`) and `external_start(index, args)` returns a
-    promise fulfilled with `({ output, exit_code })` when the process
-    exits (a non-zero exit still fulfills -- read `r[1]`), or rejected
-    with a socket error (`EESECURITY`, `EESOCKET`, ...) if spawn fails
-    -- or with `"*external process aborted"` if the owner is destructed
-    first:
+    promise fulfilled with `({ stdout, stderr, exit_code })` when the
+    process exits (a non-zero exit still fulfills -- read `r[2]`), or
+    rejected with a socket error (`EESECURITY`, `EESOCKET`, ...) if
+    spawn fails -- or with `"*external process aborted"` if the owner
+    is destructed first. The child is started with `posix_spawn()`
+    (vfork fast path on glibc):
 
         mixed *r = await external_start(CURL_CMD, ({ "-s", url }));
         string body = r[0];
-        int code = r[1];
+        string err = r[1];
+        int code = r[2];
 
-    With a handle from `external_create()`: starts the process and
-    returns a promise fulfilled with `0` when it exits (same reject
-    reasons as the omit-callback form). After it fulfills, read stdout,
-    stderr and the wait status from the handle:
+    With a handle from `external_create()`: starts the process the same
+    way and returns a promise fulfilled with the same
+    `({ stdout, stderr, exit_code })` tuple (same reject reasons).
+    After it fulfills, the streams and wait status are also on the
+    handle:
 
         int h = external_create(CURL_CMD, ({ "-s", url }));
-        await external_start(h);
-        string body = external_stdout(h);
-        int code = external_exit_code(h);
+        mixed *r = await external_start(h);
+        string body = external_stdout(h);  /* same as r[0] */
+        int code = external_exit_code(h);  /* same as r[2] */
 
 ### RUNTIME CONFIGURATION
 

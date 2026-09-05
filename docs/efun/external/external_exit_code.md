@@ -14,9 +14,10 @@ title: external / external_exit_code
 ### DESCRIPTION
 
     `-1` if the process has not exited yet. After `await external_start(h)`
-    fulfills, the child's wait status: `0` on success, the exit code on a
-    normal exit, and `128 + signo` on POSIX if the child died from a
-    signal. A non-zero code does not reject the start promise.
+    fulfills, the child's wait status (same as `r[2]` of the fulfillment
+    tuple): `0` on success, the exit code on a normal exit, and
+    `128 + signo` on POSIX if the child died from a signal. A non-zero
+    code does not reject the start promise.
 
 ### SEE ALSO
 

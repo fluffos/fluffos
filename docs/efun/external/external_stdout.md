@@ -15,8 +15,10 @@ title: external / external_stdout
 
     Return the stdout collected so far for `handle`. Safe to call while
     the process is still running (partial output) or after
-    `external_start(handle)` has fulfilled (complete output, UTF-8
-    sanitized, capped at `__MAX_STRING_LENGTH__`).
+    `external_start(handle)` has fulfilled. After fulfillment this is
+    the same string as `r[0]` of `({ stdout, stderr, exit_code })`
+    (complete output, UTF-8 sanitized, capped at
+    `__MAX_STRING_LENGTH__`).
 
 ### SEE ALSO
 

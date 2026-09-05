@@ -19,9 +19,10 @@ title: external / external_create
     and `external_exit_code()` from the same handle.
 
         int h = external_create(CURL_CMD, ({ "-s", url }));
-        await external_start(h);
-        string body = external_stdout(h);
-        int code = external_exit_code(h);
+        mixed *r = await external_start(h);
+        string body = r[0];       /* also external_stdout(h) */
+        string err = r[1];
+        int code = r[2];
         external_close(h);
 
     `args` is an array of arguments, or a space-separated string.

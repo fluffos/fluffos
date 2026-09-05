@@ -57,7 +57,7 @@ struct ExternalHandle {
   HandleState state = HandleState::Created;
   promise_t* prom = nullptr;
   /* Omit-callback form: not visible to LPC. Fulfill with
-   * ({ stdout+stderr, exit_code }) and free the slot. */
+   * ({ stdout, stderr, exit_code }) and free the slot. */
   bool ephemeral = false;
   std::string out;
   std::string err;
@@ -192,6 +192,18 @@ void free_pipe_events(ExternalHandle* h) {
   close_pipe_fd(&h->err_fd);
 }
 
+void push_external_result(const std::string& out, const std::string& err, LPC_INT code) {
+  array_t* arr = allocate_array(3);
+  arr->item[0].type = T_STRING;
+  arr->item[0].subtype = STRING_MALLOC;
+  arr->item[0].u.string = string_copy(out.c_str(), "external_stdout");
+  arr->item[1].type = T_STRING;
+  arr->item[1].subtype = STRING_MALLOC;
+  arr->item[1].u.string = string_copy(err.c_str(), "external_stderr");
+  arr->item[2].u.number = code;
+  push_refed_array(arr);
+}
+
 void fulfill_handle_promise(int id) {
   ExternalHandle* h = g_handles[id - 1];
   if (!h->prom) {
@@ -203,28 +215,14 @@ void fulfill_handle_promise(int id) {
   }
   promise_t* p = h->prom;
   h->prom = nullptr;
-  if (h->ephemeral) {
-    std::string output = h->out;
-    if (!h->err.empty()) {
-      output += h->err;
-    }
-    array_t* arr = allocate_array(2);
-    arr->item[0].type = T_STRING;
-    arr->item[0].subtype = STRING_MALLOC;
-    arr->item[0].u.string = string_copy(output.c_str(), "external_promise");
-    arr->item[1].u.number = h->exit_code;
-    push_refed_array(arr);
-    promise_settle(p, sp, 0);
-    pop_stack();
-    free_promise(p);
-    delete h;
-    g_handles[id - 1] = nullptr;
-    return;
-  }
-  push_number(0);
+  push_external_result(h->out, h->err, h->exit_code);
   promise_settle(p, sp, 0);
   pop_stack();
   free_promise(p);
+  if (h->ephemeral) {
+    delete h;
+    g_handles[id - 1] = nullptr;
+  }
 }
 
 void try_finish_handle(int id) {
@@ -362,6 +360,53 @@ void arm_pipe_reader(ExternalHandle* h, int id, int stream, evutil_socket_t fd) 
 }
 
 #ifndef _WIN32
+/* posix_spawn + POSIX_SPAWN_USEVFORK (glibc) is the fast path: vfork/clone
+ * instead of a full fork of the driver address space. */
+int posix_spawn_fast(pid_t* pid, const char* path,
+                     const posix_spawn_file_actions_t* file_actions, char** argv, char** envp) {
+  posix_spawnattr_t attr;
+  if (posix_spawnattr_init(&attr) != 0) {
+    return posix_spawn(pid, path, file_actions, nullptr, argv, envp);
+  }
+  short flags = 0;
+#ifdef POSIX_SPAWN_USEVFORK
+  flags |= POSIX_SPAWN_USEVFORK;
+#endif
+  if (flags != 0) {
+    posix_spawnattr_setflags(&attr, flags);
+  }
+  int const ret = posix_spawn(pid, path, file_actions, &attr, argv, envp);
+  posix_spawnattr_destroy(&attr);
+  return ret;
+}
+
+void close_pipe_pair(int p[2]) {
+  if (p[0] >= 0) {
+    close(p[0]);
+  }
+  if (p[1] >= 0) {
+    close(p[1]);
+  }
+  p[0] = p[1] = -1;
+}
+
+/* Parent read end is nonblocking; write end stays blocking so the child
+ * does not see EAGAIN. CLOEXEC so the child's unused ends vanish at exec
+ * without extra file_actions_addclose. */
+int open_spawn_pipe(int p[2]) {
+  p[0] = p[1] = -1;
+  if (pipe(p) != 0) {
+    return -1;
+  }
+  fcntl(p[0], F_SETFD, FD_CLOEXEC);
+  fcntl(p[1], F_SETFD, FD_CLOEXEC);
+  if (evutil_make_socket_nonblocking(p[0]) == -1) {
+    close_pipe_pair(p);
+    return -1;
+  }
+  return 0;
+}
+
 int spawn_handle_posix(ExternalHandle* h, int id) {
   std::vector<std::string> argv_data = {std::string(external_cmd[h->cmd_index])};
   argv_data.insert(argv_data.end(), h->args.begin(), h->args.end());
@@ -373,63 +418,38 @@ int spawn_handle_posix(ExternalHandle* h, int id) {
 
   int outp[2] = {-1, -1};
   int errp[2] = {-1, -1};
-  if (pipe(outp) != 0 || pipe(errp) != 0) {
-    if (outp[0] >= 0) {
-      close(outp[0]);
-    }
-    if (outp[1] >= 0) {
-      close(outp[1]);
-    }
-    if (errp[0] >= 0) {
-      close(errp[0]);
-    }
-    if (errp[1] >= 0) {
-      close(errp[1]);
-    }
-    return EESOCKET;
-  }
-  if (evutil_make_socket_nonblocking(outp[0]) == -1 ||
-      evutil_make_socket_nonblocking(errp[0]) == -1) {
-    close(outp[0]);
-    close(outp[1]);
-    close(errp[0]);
-    close(errp[1]);
+  if (open_spawn_pipe(outp) != 0 || open_spawn_pipe(errp) != 0) {
+    close_pipe_pair(outp);
+    close_pipe_pair(errp);
     return EESOCKET;
   }
 
   posix_spawn_file_actions_t file_actions;
   int ret = posix_spawn_file_actions_init(&file_actions);
   if (ret != 0) {
-    close(outp[0]);
-    close(outp[1]);
-    close(errp[0]);
-    close(errp[1]);
+    close_pipe_pair(outp);
+    close_pipe_pair(errp);
     return EESOCKET;
   }
   DEFER { posix_spawn_file_actions_destroy(&file_actions); };
 
+  /* CLOEXEC drops the parent read ends at exec; only dup2 + stdin null. */
   ret = posix_spawn_file_actions_adddup2(&file_actions, outp[1], 1) ||
         posix_spawn_file_actions_adddup2(&file_actions, errp[1], 2) ||
-        posix_spawn_file_actions_addopen(&file_actions, 0, "/dev/null", O_RDONLY, 0) ||
-        posix_spawn_file_actions_addclose(&file_actions, outp[0]) ||
-        posix_spawn_file_actions_addclose(&file_actions, errp[0]);
+        posix_spawn_file_actions_addopen(&file_actions, 0, "/dev/null", O_RDONLY, 0);
   if (ret != 0) {
-    close(outp[0]);
-    close(outp[1]);
-    close(errp[0]);
-    close(errp[1]);
+    close_pipe_pair(outp);
+    close_pipe_pair(errp);
     return EESOCKET;
   }
 
   pid_t pid;
   char* newenviron[] = {nullptr};
-  ret = posix_spawn(&pid, argv[0], &file_actions, nullptr, argv.data(), newenviron);
+  ret = posix_spawn_fast(&pid, argv[0], &file_actions, argv.data(), newenviron);
   if (ret != 0) {
     debug(external_start, "external_start: posix_spawn() error: %s\n", strerror(ret));
-    close(outp[0]);
-    close(outp[1]);
-    close(errp[0]);
-    close(errp[1]);
+    close_pipe_pair(outp);
+    close_pipe_pair(errp);
     return EESOCKET;
   }
   close(outp[1]);
@@ -687,7 +707,18 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
 
   pid_t pid;
   char* newenviron[] = {nullptr};
-  ret = posix_spawn(&pid, newargs[0], &file_actions, nullptr, newargs.data(), newenviron);
+  posix_spawnattr_t spawn_attr;
+  int const attr_ok = posix_spawnattr_init(&spawn_attr) == 0;
+#ifdef POSIX_SPAWN_USEVFORK
+  if (attr_ok) {
+    posix_spawnattr_setflags(&spawn_attr, POSIX_SPAWN_USEVFORK);
+  }
+#endif
+  ret = posix_spawn(&pid, newargs[0], &file_actions, attr_ok ? &spawn_attr : nullptr,
+                    newargs.data(), newenviron);
+  if (attr_ok) {
+    posix_spawnattr_destroy(&spawn_attr);
+  }
   if (ret) {
     debug(external_start, "external_start: posix_spawn() error: %s\n", strerror(ret));
     socket_close(fd, SC_FORCE | SC_FINAL_CLOSE);
@@ -902,7 +933,7 @@ void f_external_start() {
 
   if (num_arg == 2) {
     /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
-     * ({ output, exit_code }). Classic 4/5-arg path below is unchanged. */
+     * ({ stdout, stderr, exit_code }). Classic 4/5-arg path below is unchanged. */
     if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
       st_num_arg = num_arg;
       promise_t* p = promise_alloc();
