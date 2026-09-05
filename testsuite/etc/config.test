@@ -357,6 +357,13 @@ enable msdp : 1
 # External commands
 external_cmd_1 : /usr/bin/curl
 external_cmd_2 : c:\Windows\System32\curl.exe
+# echo: used by external_start's promise-form test. Slot 3 is the Unix
+# path; slot 4 covers MSYS2 where /bin/echo may not exist; slot 6 is
+# native Windows (echo is a cmd builtin). Slot 5 is deliberately left
+# unconfigured so the efun's bad-index path stays pinned.
+external_cmd_3 : /bin/echo
+external_cmd_4 : /usr/bin/echo
+external_cmd_6 : c:\Windows\System32\cmd.exe
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

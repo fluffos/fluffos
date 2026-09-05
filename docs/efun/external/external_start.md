@@ -10,10 +10,11 @@ title: external / external_start
 ### SYNOPSIS
 
     int external_start(int external_index,
-                       string *args,
+                       string | string * args,
                        string|function read_call_back,
                        string|function write_call_back,
-                       string|function close_call_back)
+                       void | string|function close_call_back);
+    promise external_start(int external_index, string | string * args);
 
 ### DESCRIPTION
 
@@ -26,12 +27,23 @@ title: external / external_start
     This function returns the socket number which you should record for later
     processing of the results from the external command.
 
-    `args` - An array of the arguments passed to the external command.
+    `args` - An array of the arguments passed to the external command,
+    or a space-separated string of arguments.
     `read_call_back` - As data becomes available, this function will be called
     with a string containing that data.
     `write_call_back` - I am not 100% sure what would be written to the external
     command, but, this is a required parameter.
     `close_call_back` - When the socket closes, this function is called.
+
+    With the callbacks OMITTED, returns a promise instead (issue #1319):
+    fulfilled with the collected stdout/stderr (the concatenation of every
+    string the read callback would have received) when the process exits,
+    or rejected with the negative socket error the classic form would have
+    returned (`EESECURITY`, `EESOCKET`, ...) -- or with
+    `"*external process aborted"` if the calling object is destructed
+    first. Inside an async function:
+
+        string body = await external_start(CURL_CMD, ({ "-s", url }));
 
 ### RUNTIME CONFIGURATION
 
@@ -119,3 +131,7 @@ void close_call_back(int fd) {
 ### ADDITIONAL INFORMATION
 
     This efun requires that PACKAGE_EXTERNAL be compiled into the driver.
+
+### SEE ALSO
+
+    socket_write(3), socket_close(3), async_read(3), call_out(3)

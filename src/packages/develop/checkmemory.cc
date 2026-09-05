@@ -37,6 +37,9 @@
 #ifdef PACKAGE_JSBRIDGE
 #include "packages/jsbridge/jsbridge.h"
 #endif
+#ifdef PACKAGE_EXTERNAL
+#include "packages/external/external.h"
+#endif
 
 #include <functional>
 #include <unordered_map>
@@ -751,6 +754,9 @@ void check_all_blocks(int flag) {
 #endif
 #ifdef PACKAGE_ASYNC
     async_mark_request();
+#endif
+#ifdef PACKAGE_EXTERNAL
+    mark_external();
 #endif
     free_svalue(&apply_ret_value, "checkmemory");
     apply_ret_value = const0u;

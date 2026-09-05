@@ -381,6 +381,14 @@ promise fulfilled with the value the callback would have received, or
 rejected with the failure value (e.g. `async_read`'s negative int) —
 `string s = await async_read(path);`.
 
+`external_start(index, args)` — omit the socket callbacks — returns a
+promise fulfilled with the collected stdout/stderr when the process
+exits, or rejected with the negative socket error the classic form
+would have returned (`EESECURITY`, `EESOCKET`, ...) or
+`"*external process aborted"` if the calling object is destructed
+first. The classic `external_start(index, args, read, write, close)`
+form is unchanged and still returns the socket fd.
+
 `async_yield()` returns a promise fulfilled with `0` on the event loop's
 next pass — `await async_yield();` is the cooperative preemption point for a
 long computation, letting the driver serve players between chunks. It is the

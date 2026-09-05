@@ -49,6 +49,9 @@ void db_cleanup(void);  // FIXME
 #ifdef PACKAGE_JSBRIDGE
 #include "packages/jsbridge/jsbridge.h"
 #endif
+#ifdef PACKAGE_EXTERNAL
+#include "packages/external/external.h"
+#endif
 #ifdef PACKAGE_SOCKETS
 #include "packages/sockets/socket_efuns.h"
 #endif
@@ -97,6 +100,12 @@ void shutdownMudOS(int exit_code) {
   // Must precede clear_tick_events(): pending delivery events reference
   // the entries this frees, and are discarded unrun there.
   jsbridge_cleanup();
+#endif
+#ifdef PACKAGE_EXTERNAL
+  /* Settle leftover external_start() promises before promise_cleanup()
+   * latches the queue (and before lpc_socks_closeall() force-closes the
+   * child sockets). Same ordering as jsbridge / call_out. */
+  external_cleanup();
 #endif
   // Freeing a leftover call_out settle-rejects its promise, which ENQUEUES
   // a reaction -- so this must run before promise_cleanup() drains the

@@ -1,16 +1,19 @@
 #include "base/package_api.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <cstdlib>  // for exit
 #include <thread>
 #include <string>
+#include <unordered_map>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <event2/event.h>
 
 #include "include/socket_err.h"
+#include "packages/external/external.h"
 #include "packages/sockets/socket_efuns.h"
 
 #ifndef _WIN32
@@ -328,20 +331,140 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
 }
 #endif
 
+namespace {
+
+/* Promise-form jobs (issue #1319): collect stdout/stderr, settle when the
+ * child socket closes. Keyed by LPC socket index. */
+struct ExternalPromiseJob {
+  promise_t* prom;
+  std::string output;
+};
+
+std::unordered_map<int, ExternalPromiseJob*> g_external_jobs;
+
+void reject_with_number(promise_t* p, LPC_INT n) {
+  push_number(n);
+  promise_settle(p, sp, 1);
+  pop_stack();
+}
+
+void attach_external_job(int fd, promise_t* p) {
+  auto* job = new ExternalPromiseJob{};
+  job->prom = p;
+  g_external_jobs[fd] = job;
+}
+
+void finish_external_job(int fd, int aborted) {
+  auto it = g_external_jobs.find(fd);
+  if (it == g_external_jobs.end()) {
+    return;
+  }
+  ExternalPromiseJob* job = it->second;
+  g_external_jobs.erase(it);
+
+  if (aborted) {
+    push_constant_string("*external process aborted");
+    promise_settle(job->prom, sp, 1);
+    pop_stack();
+  } else {
+    copy_and_push_string(job->output.c_str());
+    promise_settle(job->prom, sp, 0);
+    pop_stack();
+  }
+  free_promise(job->prom);
+  delete job;
+}
+
+}  // namespace
+
+int external_promise_take_read(int fd, const char* data, int len) {
+  auto it = g_external_jobs.find(fd);
+  if (it == g_external_jobs.end()) {
+    return 0;
+  }
+  if (data && len > 0) {
+    auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+    auto& out = it->second->output;
+    size_t room = (max_string_length > 0 && static_cast<size_t>(max_string_length) > out.size())
+                      ? static_cast<size_t>(max_string_length) - out.size()
+                      : 0;
+    if (room > 0) {
+      out.append(data, std::min(static_cast<size_t>(len), room));
+    }
+  }
+  return 1;
+}
+
+void external_promise_closed(int fd, int aborted) { finish_external_job(fd, aborted); }
+
+void external_cleanup() {
+  while (!g_external_jobs.empty()) {
+    finish_external_job(g_external_jobs.begin()->first, /*aborted=*/1);
+  }
+}
+
+#ifdef DEBUGMALLOC_EXTENSIONS
+void mark_external() {
+  for (auto& entry : g_external_jobs) {
+    if (entry.second->prom) {
+      entry.second->prom->extra_ref++;
+    }
+  }
+}
+#endif
+
 #ifdef F_EXTERNAL_START
 void f_external_start() {
-  int fd, num_arg = st_num_arg;
+  /* Latch arity first: check_valid_socket() runs a master apply that
+   * overwrites st_num_arg (same trap as f_async_read / f_async_db_exec). */
+  int const num_arg = st_num_arg;
   svalue_t* arg = sp - num_arg + 1;
+  int const promise_form = (num_arg == 2);
+
+  if (num_arg != 2 && num_arg < 4) {
+    error(
+        "external_start: promise form takes two arguments; classic form needs "
+        "read and write callbacks.\n");
+  }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
+    st_num_arg = num_arg;
+    if (promise_form) {
+      promise_t* p = promise_alloc();
+      reject_with_number(p, EESECURITY);
+      pop_n_elems(num_arg);
+      push_refed_promise(p);
+      return;
+    }
     pop_n_elems(num_arg - 1);
     sp->u.number = EESECURITY;
     return;
   }
+  st_num_arg = num_arg;
 
   auto which = arg[0].u.number;
   if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
     error("Bad argument 1 to external_start()\n");
+  }
+
+  int fd;
+  if (promise_form) {
+    /* Spawn first: Windows CreateProcess error()s, so no promise is live
+     * across that unwind. Attach the job only after we have an fd. */
+    fd = external_start(which, arg + 1, nullptr, nullptr, nullptr);
+    if (fd < 0) {
+      promise_t* p = promise_alloc();
+      reject_with_number(p, fd);
+      pop_n_elems(num_arg);
+      push_refed_promise(p);
+      return;
+    }
+    promise_t* p = promise_alloc();
+    p->ref++; /* the job's ref; push_refed_promise takes the other */
+    attach_external_job(fd, p);
+    pop_n_elems(num_arg);
+    push_refed_promise(p);
+    return;
   }
 
   fd = external_start(which, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : nullptr));
