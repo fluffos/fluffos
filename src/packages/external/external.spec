@@ -8,11 +8,15 @@
    Handle form: external_create() then external_start(handle) fulfills
    with the same ({ stdout, stderr, exit_code }) tuple.
    `int h = external_create(1, ({ "-s", url }));
-    mixed *r = await external_start(h);` */
+    mixed *r = await external_start(h);`
+   Optional third string to the omit-callback form is stdin (written, then
+   closed). Drive a handle with external_write() / external_close_stdin(). */
 int external_create(int, string | string *);
 mixed external_start(int, void | string | string *, void | string | function,
                      void | string | function, void | string | function);
 string external_stdout(int);
 string external_stderr(int);
 int external_exit_code(int);
+void external_write(int, string);
+void external_close_stdin(int);
 void external_close(int);

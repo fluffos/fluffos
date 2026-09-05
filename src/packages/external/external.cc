@@ -34,6 +34,7 @@ extern int socketpair_win32(SOCKET socks[2], int make_overlapped);  // in socket
 #include <fcntl.h>
 #include <sstream>
 #include <spawn.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -67,10 +68,15 @@ struct ExternalHandle {
   bool status_done = false;
   evutil_socket_t out_fd = -1;
   evutil_socket_t err_fd = -1;
+  evutil_socket_t in_fd = -1;
   struct event* ev_out = nullptr;
   struct event* ev_err = nullptr;
+  struct event* ev_in = nullptr;
   PipeWatch* out_watch = nullptr;
   PipeWatch* err_watch = nullptr;
+  std::string in_buf;
+  bool in_closed = false;
+  bool close_stdin_after_flush = false;
 #ifndef _WIN32
   pid_t pid = -1;
 #else
@@ -184,10 +190,19 @@ void free_pipe_events(ExternalHandle* h) {
     event_free(h->ev_err);
     h->ev_err = nullptr;
   }
+  if (h->ev_in) {
+    event_free(h->ev_in);
+    h->ev_in = nullptr;
+  }
   delete h->out_watch;
   h->out_watch = nullptr;
   delete h->err_watch;
   h->err_watch = nullptr;
+  if (h->in_fd >= 0 && h->in_fd != h->out_fd) {
+    close_pipe_fd(&h->in_fd);
+  } else {
+    h->in_fd = -1;
+  }
   close_pipe_fd(&h->out_fd);
   close_pipe_fd(&h->err_fd);
 }
@@ -359,6 +374,107 @@ void arm_pipe_reader(ExternalHandle* h, int id, int stream, evutil_socket_t fd) 
   event_add(ev, nullptr);
 }
 
+void close_stdin_write(ExternalHandle* h) {
+  if (h->in_closed) {
+    return;
+  }
+  if (h->ev_in) {
+    event_free(h->ev_in);
+    h->ev_in = nullptr;
+  }
+  if (h->in_fd >= 0) {
+    if (h->in_fd == h->out_fd) {
+#ifdef _WIN32
+      shutdown(h->in_fd, SD_SEND);
+#else
+      shutdown(h->in_fd, SHUT_WR);
+#endif
+      h->in_fd = -1;
+    } else {
+      close_pipe_fd(&h->in_fd);
+    }
+  }
+  h->in_closed = true;
+  h->in_buf.clear();
+}
+
+void arm_stdin_writer(ExternalHandle* h, int id);
+void flush_stdin(ExternalHandle* h, int id);
+
+void on_handle_stdin_writable(evutil_socket_t /*fd*/, short /*what*/, void* arg) {
+  int const id = static_cast<int>(reinterpret_cast<intptr_t>(arg));
+  if (id < 1 || id > static_cast<int>(g_handles.size()) || !g_handles[id - 1]) {
+    return;
+  }
+  flush_stdin(g_handles[id - 1], id);
+}
+
+void arm_stdin_writer(ExternalHandle* h, int id) {
+  if (h->in_fd < 0 || h->in_closed) {
+    return;
+  }
+  if (!h->ev_in) {
+    h->ev_in = event_new(g_event_base, h->in_fd, EV_WRITE | EV_PERSIST, on_handle_stdin_writable,
+                         reinterpret_cast<void*>(static_cast<intptr_t>(id)));
+  }
+  event_add(h->ev_in, nullptr);
+}
+
+void flush_stdin(ExternalHandle* h, int id) {
+  if (h->in_closed || h->in_fd < 0) {
+    return;
+  }
+  while (!h->in_buf.empty()) {
+    size_t chunk = std::min(h->in_buf.size(), static_cast<size_t>(kPipeBuf));
+#ifdef _WIN32
+    int n = send(h->in_fd, h->in_buf.data(), static_cast<int>(chunk), 0);
+#else
+    int n = static_cast<int>(write(h->in_fd, h->in_buf.data(), chunk));
+#endif
+    if (n > 0) {
+      h->in_buf.erase(0, static_cast<size_t>(n));
+      continue;
+    }
+    if (n < 0) {
+#ifdef _WIN32
+      if (evutil_socket_geterror(h->in_fd) == WSAEWOULDBLOCK) {
+        arm_stdin_writer(h, id);
+        return;
+      }
+#else
+      if (errno == EINTR) {
+        continue;
+      }
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        arm_stdin_writer(h, id);
+        return;
+      }
+#endif
+    }
+    close_stdin_write(h);
+    return;
+  }
+  if (h->ev_in) {
+    event_del(h->ev_in);
+  }
+  if (h->close_stdin_after_flush) {
+    close_stdin_write(h);
+  }
+}
+
+void queue_stdin(ExternalHandle* h, int id, const char* data, size_t len) {
+  if (h->in_closed) {
+    error("external_write: stdin is closed.\n");
+  }
+  if (h->state == HandleState::Done) {
+    error("external_write: process has already exited.\n");
+  }
+  append_capped(h->in_buf, data, len);
+  if (h->state == HandleState::Running) {
+    flush_stdin(h, id);
+  }
+}
+
 #ifndef _WIN32
 /* Shared by the classic callback form and the handle/promise form.
  * POSIX_SPAWN_USEVFORK (glibc) is the fast path: vfork/clone instead of
@@ -409,6 +525,21 @@ int open_spawn_pipe(int p[2]) {
   return 0;
 }
 
+/* Parent write end is nonblocking (EV_WRITE). Child read end stays blocking. */
+int open_stdin_pipe(int p[2]) {
+  p[0] = p[1] = -1;
+  if (pipe(p) != 0) {
+    return -1;
+  }
+  fcntl(p[0], F_SETFD, FD_CLOEXEC);
+  fcntl(p[1], F_SETFD, FD_CLOEXEC);
+  if (evutil_make_socket_nonblocking(p[1]) == -1) {
+    close_pipe_pair(p);
+    return -1;
+  }
+  return 0;
+}
+
 int spawn_handle_posix(ExternalHandle* h, int id) {
   std::vector<std::string> argv_data = {std::string(external_cmd[h->cmd_index])};
   argv_data.insert(argv_data.end(), h->args.begin(), h->args.end());
@@ -420,9 +551,11 @@ int spawn_handle_posix(ExternalHandle* h, int id) {
 
   int outp[2] = {-1, -1};
   int errp[2] = {-1, -1};
-  if (open_spawn_pipe(outp) != 0 || open_spawn_pipe(errp) != 0) {
+  int inp[2] = {-1, -1};
+  if (open_spawn_pipe(outp) != 0 || open_spawn_pipe(errp) != 0 || open_stdin_pipe(inp) != 0) {
     close_pipe_pair(outp);
     close_pipe_pair(errp);
+    close_pipe_pair(inp);
     return EESOCKET;
   }
 
@@ -431,17 +564,19 @@ int spawn_handle_posix(ExternalHandle* h, int id) {
   if (ret != 0) {
     close_pipe_pair(outp);
     close_pipe_pair(errp);
+    close_pipe_pair(inp);
     return EESOCKET;
   }
   DEFER { posix_spawn_file_actions_destroy(&file_actions); };
 
-  /* CLOEXEC drops the parent read ends at exec; only dup2 + stdin null. */
+  /* CLOEXEC drops the parent ends at exec; dup2 stdin/stdout/stderr. */
   ret = posix_spawn_file_actions_adddup2(&file_actions, outp[1], 1) ||
         posix_spawn_file_actions_adddup2(&file_actions, errp[1], 2) ||
-        posix_spawn_file_actions_addopen(&file_actions, 0, "/dev/null", O_RDONLY, 0);
+        posix_spawn_file_actions_adddup2(&file_actions, inp[0], 0);
   if (ret != 0) {
     close_pipe_pair(outp);
     close_pipe_pair(errp);
+    close_pipe_pair(inp);
     return EESOCKET;
   }
 
@@ -452,14 +587,18 @@ int spawn_handle_posix(ExternalHandle* h, int id) {
     debug(external_start, "external_start: posix_spawn() error: %s\n", strerror(ret));
     close_pipe_pair(outp);
     close_pipe_pair(errp);
+    close_pipe_pair(inp);
     return EESOCKET;
   }
   close(outp[1]);
   close(errp[1]);
+  close(inp[0]);
   h->pid = pid;
+  h->in_fd = inp[1];
 
   arm_pipe_reader(h, id, 0, outp[0]);
   arm_pipe_reader(h, id, 1, errp[0]);
+  flush_stdin(h, id);
 
   std::thread([id, pid]() {
     int status = 0;
@@ -564,6 +703,8 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
   h->pi = processInfo;
   h->err_eof = true;
   arm_pipe_reader(h, id, 0, sv[1]);
+  h->in_fd = sv[1];
+  flush_stdin(h, id);
 
   std::thread([id, processInfo, child_fd = sv[0]]() {
     WaitForSingleObject(processInfo.hProcess, INFINITE);
@@ -915,9 +1056,10 @@ void f_external_start() {
     return;
   }
 
-  if (num_arg == 2) {
+  if (num_arg == 2 || (num_arg == 3 && arg[2].type == T_STRING)) {
     /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
-     * ({ stdout, stderr, exit_code }). Classic 4/5-arg path below is unchanged. */
+     * ({ stdout, stderr, exit_code }). Optional third string is stdin
+     * (written then closed). Classic 4/5-arg path below is unchanged. */
     if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
       st_num_arg = num_arg;
       promise_t* p = promise_alloc();
@@ -942,6 +1084,10 @@ void f_external_start() {
     h->cmd_index = static_cast<int>(which);
     h->args = std::move(extra);
     h->ephemeral = true;
+    if (num_arg == 3) {
+      append_capped(h->in_buf, arg[2].u.string, SVALUE_STRLEN(arg + 2));
+      h->close_stdin_after_flush = true;
+    }
     g_handles[id - 1] = h;
 
     promise_t* p = start_created_handle(h, id);
@@ -953,8 +1099,8 @@ void f_external_start() {
   if (num_arg != 4 && num_arg != 5) {
     error(
         "external_start: omit the callbacks for the promise form, pass a "
-        "handle from external_create(), or pass the classic read/write "
-        "callbacks.\n");
+        "handle from external_create(), pass stdin as a third string, or "
+        "pass the classic read/write callbacks.\n");
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
@@ -1006,6 +1152,29 @@ void f_external_close() {
   int const id = static_cast<int>(sp->u.number);
   lookup_handle(id, /*require_owner=*/1);
   destroy_handle(id, /*kill_child=*/1);
+  pop_stack();
+}
+#endif
+
+#ifdef F_EXTERNAL_WRITE
+void f_external_write() {
+  int const num_arg = st_num_arg;
+  svalue_t* arg = sp - num_arg + 1;
+  int const id = static_cast<int>(arg[0].u.number);
+  ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
+  queue_stdin(h, id, arg[1].u.string, SVALUE_STRLEN(arg + 1));
+  pop_n_elems(num_arg);
+}
+#endif
+
+#ifdef F_EXTERNAL_CLOSE_STDIN
+void f_external_close_stdin() {
+  int const id = static_cast<int>(sp->u.number);
+  ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
+  h->close_stdin_after_flush = true;
+  if (h->state == HandleState::Running) {
+    flush_stdin(h, id);
+  }
   pop_stack();
 }
 #endif

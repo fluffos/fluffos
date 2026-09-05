@@ -781,6 +781,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/external/external_close_stdin",
+            "key": "efun/external/external_close_stdin",
+            "label": "external_close_stdin"
+          },
+          {
+            "type": "doc",
             "id": "efun/external/external_create",
             "key": "efun/external/external_create",
             "label": "external_create"
@@ -808,6 +814,12 @@
             "id": "efun/external/external_stdout",
             "key": "efun/external/external_stdout",
             "label": "external_stdout"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_write",
+            "key": "efun/external/external_write",
+            "label": "external_write"
           }
         ]
       },

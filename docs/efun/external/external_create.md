@@ -25,13 +25,18 @@ title: external / external_create
         int code = r[2];
         external_close(h);
 
+    Write to the child's stdin with `external_write()` (buffered until
+    start, then flushed). `external_close_stdin()` closes the write end
+    so the child sees EOF.
+
     `args` is an array of arguments, or a space-separated string.
 
     The handle is owned by the calling object: another object cannot
-    start, read, or close it. Destructing the owner aborts a running
+    start, read, write, or close it. Destructing the owner aborts a running
     process and frees the handle.
 
 ### SEE ALSO
 
-    external_start(3), external_stdout(3), external_stderr(3),
+    external_start(3), external_write(3), external_close_stdin(3),
+    external_stdout(3), external_stderr(3),
     external_exit_code(3), external_close(3)

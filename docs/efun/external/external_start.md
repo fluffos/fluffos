@@ -15,6 +15,7 @@ title: external / external_start
                        string|function write_call_back,
                        void | string|function close_call_back);
     promise external_start(int external_index, string | string * args);
+    promise external_start(int external_index, string | string * args, string stdin);
     promise external_start(int handle);
 
 ### DESCRIPTION
@@ -53,6 +54,12 @@ title: external / external_start
         string err = r[1];
         int code = r[2];
 
+    An optional third string is written to the child's stdin and then
+    the write end is closed (EOF), so tools that read until end-of-file
+    (`cat`, `curl --data-binary @-`) finish:
+
+        mixed *r = await external_start(CAT_CMD, ({}), payload);
+
     With a handle from `external_create()`: starts the process the same
     way and returns a promise fulfilled with the same
     `({ stdout, stderr, exit_code })` tuple (same reject reasons).
@@ -63,6 +70,14 @@ title: external / external_start
         mixed *r = await external_start(h);
         string body = external_stdout(h);  /* same as r[0] */
         int code = external_exit_code(h);  /* same as r[2] */
+
+    Drive stdin on a handle with `external_write()` (before or after
+    start) and `external_close_stdin()` when the child should see EOF:
+
+        int h = external_create(CAT_CMD, ({}));
+        external_write(h, payload);
+        external_close_stdin(h);
+        mixed *r = await external_start(h);
 
 ### RUNTIME CONFIGURATION
 
@@ -153,6 +168,7 @@ void close_call_back(int fd) {
 
 ### SEE ALSO
 
-    external_create(3), external_stdout(3), external_stderr(3),
+    external_create(3), external_write(3), external_close_stdin(3),
+    external_stdout(3), external_stderr(3),
     external_exit_code(3), external_close(3), socket_write(3),
     socket_close(3), async_read(3), call_out(3)

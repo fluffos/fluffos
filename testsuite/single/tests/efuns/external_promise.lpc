@@ -30,6 +30,14 @@ mixed *echo_args(int slot) {
   return ({ "hello-from-external" });
 }
 
+mixed *cat_args(int slot) {
+  // Slots 11/12 are Unix cat. Slot 6 is cmd.exe; findstr copies stdin lines.
+  if (slot == 6) {
+    return ({ "/c", "findstr", "^" });
+  }
+  return ({});
+}
+
 int try_create(int slot) {
   mixed err, h;
   err = catch(h = external_create(slot, echo_args(slot)));
@@ -140,6 +148,48 @@ async void run_handle() {
   }
 }
 
+async void run_stdin() {
+  mixed p, err, r, h;
+  int i, slot;
+  mixed *slots = ({ 11, 12, 6 });
+
+  for (i = 0; i < sizeof(slots); i++) {
+    slot = slots[i];
+    err = catch(p = external_start(slot, cat_args(slot), "hello-from-stdin\n"));
+    if (err || typeof(p) != "promise") {
+      continue;
+    }
+    err = acatch { r = await p; };
+    if (err) {
+      ASSERT(intp(err));
+      continue;
+    }
+    if (arrayp(r) && sizeof(r) == 3 && stringp(r[0]) &&
+      strsrch(r[0], "hello-from-stdin") != -1) {
+      err = catch(h = external_create(slot, cat_args(slot)));
+      if (!err && intp(h) && h > 0) {
+        external_write(h, "hello-from-handle\n");
+        err = catch(p = external_start(h));
+        if (!err && typeof(p) == "promise") {
+          external_write(h, "second-line\n");
+          external_close_stdin(h);
+          err = acatch { r = await p; };
+          if (!err && arrayp(r) && stringp(r[0]) &&
+            strsrch(r[0], "hello-from-handle") != -1 &&
+            strsrch(r[0], "second-line") != -1) {
+            external_close(h);
+            RELEASE_LATCH("external_start stdin");
+            return;
+          }
+        }
+        external_close(h);
+      }
+      RELEASE_LATCH("external_start stdin");
+      return;
+    }
+  }
+}
+
 void do_tests() {
   mixed p, err, h;
   int slot, fd;
@@ -200,11 +250,23 @@ void do_tests() {
   ASSERT2(err, "unconfigured slot still errors in the omit-callback form");
 
   err = catch(external_start(3, ({ "x" }), (: classic_read :)));
-  ASSERT2(err, "three arguments is neither form");
+  ASSERT2(err, "three arguments with a callback is neither form");
+
+  p = 0;
+  foreach (slot in ({ 11, 12, 6 })) {
+    err = catch(p = external_start(slot, cat_args(slot), "hello-from-stdin\n"));
+    if (!err && typeof(p) == "promise") {
+      break;
+    }
+    p = 0;
+  }
+  ASSERT2(p, "omit-callback form accepts a stdin string");
+  promise_catch(p, (: 0 :));
 
   EXPECT_LATCH("external_start classic form");
   EXPECT_LATCH("external_start promise form");
   EXPECT_LATCH("external_create handle");
+  EXPECT_LATCH("external_start stdin");
 
   // Classic form: int fd, required callbacks. Must compile as an int
   // assignment (the master return type) and must not throw on a live slot.
@@ -223,6 +285,7 @@ void do_tests() {
 
   call_out(function() { run_omit_callback(); }, 1);
   call_out(function() { run_handle(); }, 1);
+  call_out(function() { run_stdin(); }, 1);
 }
 #else
 void do_tests() { ASSERT(1); }
