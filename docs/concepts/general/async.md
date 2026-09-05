@@ -382,12 +382,14 @@ rejected with the failure value (e.g. `async_read`'s negative int) —
 `string s = await async_read(path);`.
 
 `external_start(index, args)` — omit the socket callbacks — returns a
-promise fulfilled with the collected stdout/stderr when the process
+promise fulfilled with `({ output, exit_code })` when the process
 exits, or rejected with the negative socket error the classic form
 would have returned (`EESECURITY`, `EESOCKET`, ...) or
 `"*external process aborted"` if the calling object is destructed
-first. The classic `external_start(index, args, read, write, close)`
-form is unchanged and still returns the socket fd.
+first. `exit_code` is the child's wait status (0 on success; on POSIX a
+signal death is `128 + signo`). The classic
+`external_start(index, args, read, write, close)` form is unchanged and
+still returns the socket fd.
 
 `async_yield()` returns a promise fulfilled with `0` on the event loop's
 next pass — `await async_yield();` is the cooperative preemption point for a

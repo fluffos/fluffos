@@ -2,26 +2,246 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
+#include <cinttypes>
 #include <cstring>
 #include <cstdlib>  // for exit
-#include <thread>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
 #include <event2/event.h>
 
+#include "backend.h"
 #include "include/socket_err.h"
 #include "packages/external/external.h"
 #include "packages/sockets/socket_efuns.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <fcntl.h>
+extern int socketpair_win32(SOCKET socks[2], int make_overlapped);  // in socketpair.cc
+#endif
+
 #ifndef _WIN32
 #include <sstream>
-#include <vector>
 #include <spawn.h>
 #include <sys/wait.h>
+#endif
 
+namespace {
+
+/* Promise-form jobs (issue #1319): collect stdout/stderr, then settle when
+ * BOTH the child socket has closed and waitpid/GetExitCode has reported
+ * the return code. Keyed by LPC socket index. */
+struct ExternalPromiseJob {
+  promise_t* prom = nullptr;
+  std::string output;
+  LPC_INT exit_code = 0;
+  bool io_done = false;
+  bool status_done = false;
+  bool aborted = false;
+};
+
+struct ChildWatch {
+#ifdef _WIN32
+  PROCESS_INFORMATION pi{};
+  SOCKET child_sock = static_cast<SOCKET>(INVALID_SOCKET);
+#else
+  pid_t pid = -1;
+#endif
+};
+
+std::unordered_map<int, ExternalPromiseJob*> g_external_jobs;
+std::unordered_map<int, ChildWatch> g_child_watches;
+
+std::mutex g_exit_mu;
+struct ChildExitNote {
+  int fd;
+  LPC_INT code;
+};
+std::vector<ChildExitNote> g_exit_notes;
+
+void reject_with_number(promise_t* p, LPC_INT n) {
+  push_number(n);
+  promise_settle(p, sp, 1);
+  pop_stack();
+}
+
+void settle_and_drop_job(int fd) {
+  auto it = g_external_jobs.find(fd);
+  if (it == g_external_jobs.end()) {
+    return;
+  }
+  ExternalPromiseJob* job = it->second;
+  g_external_jobs.erase(it);
+
+  if (job->aborted) {
+    push_constant_string("*external process aborted");
+    promise_settle(job->prom, sp, 1);
+    pop_stack();
+  } else {
+    array_t* arr = allocate_array(2);
+    arr->item[0].type = T_STRING;
+    arr->item[0].subtype = STRING_MALLOC;
+    arr->item[0].u.string = string_copy(job->output.c_str(), "external_promise");
+    arr->item[1].u.number = job->exit_code;
+    push_refed_array(arr);
+    promise_settle(job->prom, sp, 0);
+    pop_stack();
+  }
+  free_promise(job->prom);
+  delete job;
+}
+
+void try_finish_job(int fd) {
+  auto it = g_external_jobs.find(fd);
+  if (it == g_external_jobs.end()) {
+    return;
+  }
+  ExternalPromiseJob* job = it->second;
+  if (job->aborted || (job->io_done && job->status_done)) {
+    settle_and_drop_job(fd);
+  }
+}
+
+void attach_external_job(int fd, promise_t* p) {
+  auto* job = new ExternalPromiseJob{};
+  job->prom = p;
+  g_external_jobs[fd] = job;
+}
+
+void drain_child_exits() {
+  std::vector<ChildExitNote> notes;
+  {
+    std::lock_guard<std::mutex> const lock(g_exit_mu);
+    notes.swap(g_exit_notes);
+  }
+  for (auto& note : notes) {
+    auto it = g_external_jobs.find(note.fd);
+    if (it == g_external_jobs.end()) {
+      continue;
+    }
+    it->second->exit_code = note.code;
+    it->second->status_done = true;
+    try_finish_job(note.fd);
+  }
+}
+
+/* Called from the waitpid / WaitForSingleObject thread. Must not touch
+ * LPC; the wall-time event runs drain_child_exits() on the main loop. */
+void note_child_exit(int fd, LPC_INT code) {
+  {
+    std::lock_guard<std::mutex> const lock(g_exit_mu);
+    g_exit_notes.push_back(ChildExitNote{fd, code});
+  }
+  add_walltime_event(std::chrono::milliseconds(0), TickEvent::callback_type([] { drain_child_exits(); }));
+}
+
+#ifndef _WIN32
+void stash_posix_child(int fd, pid_t pid) { g_child_watches[fd] = ChildWatch{pid}; }
+#else
+void stash_win32_child(int fd, PROCESS_INFORMATION pi, SOCKET child_sock) {
+  ChildWatch w;
+  w.pi = pi;
+  w.child_sock = child_sock;
+  g_child_watches[fd] = w;
+}
+#endif
+
+void watch_child(int fd) {
+  auto it = g_child_watches.find(fd);
+  if (it == g_child_watches.end()) {
+    return;
+  }
+  ChildWatch w = it->second;
+  g_child_watches.erase(it);
+
+#ifndef _WIN32
+  pid_t const pid = w.pid;
+  std::thread([=]() {
+    int status = 0;
+    LPC_INT code = -1;
+    do {
+      const int s = waitpid(pid, &status, WUNTRACED | WCONTINUED);
+      if (s == -1) {
+        debug(external_start, "external_start: waitpid() error: %s (%d).\n", strerror(errno),
+              errno);
+        note_child_exit(fd, -1);
+        return;
+      }
+      if (WIFEXITED(status)) {
+        code = WEXITSTATUS(status);
+        debug(external_start, "external_start: child %jd exited, status=%d\n", (intmax_t)pid,
+              WEXITSTATUS(status));
+      } else if (WIFSIGNALED(status)) {
+        code = 128 + WTERMSIG(status);
+        debug(external_start, "external_start: child %jd killed by signal %d\n", (intmax_t)pid,
+              WTERMSIG(status));
+      } else if (WIFSTOPPED(status)) {
+        debug(external_start, "external_start: child %jd stopped by signal %d\n", (intmax_t)pid,
+              WSTOPSIG(status));
+      } else if (WIFCONTINUED(status)) {
+        debug(external_start, "external_start: child %jd continued\n", (intmax_t)pid);
+      }
+    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    note_child_exit(fd, code);
+  }).detach();
+#else
+  PROCESS_INFORMATION const processInfo = w.pi;
+  SOCKET const child_sock = w.child_sock;
+  std::thread([=]() {
+    WaitForSingleObject(processInfo.hProcess, INFINITE);
+    DWORD exitCode = static_cast<DWORD>(-1);
+    GetExitCodeProcess(processInfo.hProcess, &exitCode);
+    debug(external_start, "external_start: pid: %d exited with %d.\n", processInfo.dwProcessId,
+          exitCode);
+    CloseHandle(processInfo.hProcess);
+    CloseHandle(processInfo.hThread);
+    evutil_closesocket(child_sock);
+    note_child_exit(fd, static_cast<LPC_INT>(exitCode));
+  }).detach();
+#endif
+}
+
+std::string quote_argument(const std::string& arg) {
+  if (arg.empty()) {
+    return "\"\"";
+  }
+  if (arg.find_first_of(" \t\n\v\"") == std::string::npos) {
+    return arg;
+  }
+  std::string res = "\"";
+  // from
+  // https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
+  for (auto It = arg.begin();; ++It) {
+    unsigned NumberBackslashes = 0;
+
+    while (It != arg.end() && *It == '\\') {
+      ++It;
+      ++NumberBackslashes;
+    }
+
+    if (It == arg.end()) {
+      res.append(NumberBackslashes * 2, '\\');
+      break;
+    } else if (*It == '"') {
+      res.append(NumberBackslashes * 2 + 1, '\\');
+      res.push_back(*It);
+    } else {
+      res.append(NumberBackslashes, '\\');
+      res.push_back(*It);
+    }
+  }
+  res.push_back('"');
+  return res;
+}
+
+#ifndef _WIN32
 template <typename Out>
 void split(const std::string& s, char delim, Out result) {
   std::istringstream iss(s);
@@ -30,14 +250,11 @@ void split(const std::string& s, char delim, Out result) {
     *result++ = item;
   }
 }
+#endif
 
-// Added because debug() macro won't take a struct tm as an argument.
-std::string format_time(const struct tm& timeinfo) {
-  char buffer[64];
-  strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
-  return std::string(buffer);
-}
+}  // namespace
 
+#ifndef _WIN32
 int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, svalue_t* arg3) {
   std::vector<std::string> newargs_data = {std::string(external_cmd[which])};
   if (args->type == T_ARRAY) {
@@ -140,96 +357,21 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
 
   evutil_closesocket(sv[1]);
   sv[1] = -1;
-
-  evutil_socket_t childfd = sv[0];
   sv[0] = -1;
 
   debug(external_start, "external_start: Launching external command '%s %s', pid: %jd.\n",
         external_cmd[which], args->type == T_STRING ? args->u.string : "<ARRAY>", (intmax_t)pid);
 
-  std::thread([=]() {
-    int status;
-    do {
-      const int s = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-      if (s == -1) {
-        debug(external_start, "external_start: waitpid() error: %s (%d).\n", strerror(errno),
-              errno);
-        return;
-      }
-      std::string res = fmt::format(FMT_STRING("external_start(): child {} status: "), pid);
-      if (WIFEXITED(status)) {
-        res += fmt::format(FMT_STRING("exited, status={}\n"), WEXITSTATUS(status));
-      } else if (WIFSIGNALED(status)) {
-        res += fmt::format(FMT_STRING("killed by signal {}\n"), WTERMSIG(status));
-      } else if (WIFSTOPPED(status)) {
-        res += fmt::format(FMT_STRING("stopped by signal {}\n"), WSTOPSIG(status));
-      } else if (WIFCONTINUED(status)) {
-        res += "continued\n";
-      }
-
-      debug(external_start, "external_start: %s\n", format_time(res).c_str());
-    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-  }).detach();
-
+  /* Reaper starts after the caller attaches a promise job (if any), so a
+   * fast child cannot post its exit code before the job exists. */
+  stash_posix_child(fd, pid);
   return fd;
 }
 #endif
 
-namespace {
-std::string quote_argument(const std::string& arg) {
-  if (arg.empty()) {
-    return "\"\"";
-  }
-  if (arg.find_first_of(" \t\n\v\"") == std::string::npos) {
-    return arg;
-  }
-  std::string res = "\"";
-  // from
-  // https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
-  for (auto It = arg.begin();; ++It) {
-    unsigned NumberBackslashes = 0;
-
-    while (It != arg.end() && *It == '\\') {
-      ++It;
-      ++NumberBackslashes;
-    }
-
-    if (It == arg.end()) {
-      //
-      // Escape all backslashes, but let the terminating
-      // double quotation mark we add below be interpreted
-      // as a metacharacter.
-      //
-      res.append(NumberBackslashes * 2, '\\');
-      break;
-    } else if (*It == '"') {
-      //
-      // Escape all backslashes and the following
-      // double quotation mark.
-      //
-      res.append(NumberBackslashes * 2 + 1, '\\');
-      res.push_back(*It);
-    } else {
-      //
-      // Backslashes aren't special here.
-      //
-      res.append(NumberBackslashes, '\\');
-      res.push_back(*It);
-    }
-  }
-  res.push_back('"');
-  return res;
-}
-}  // namespace
-
 #ifdef _WIN32
-#include <windows.h>
-#include <fcntl.h>
-extern int socketpair_win32(SOCKET socks[2], int make_overlapped);  // in socketpair.cc
-
 int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, svalue_t* arg3) {
   int fd;
-  pid_t ret;
 
   std::string cmd = external_cmd[which];
   // guard against long path with spaces.
@@ -315,67 +457,10 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
   debug(external_start, "external_start: Launching external command '%s', pid: %d.\n",
         cmdline.c_str(), processInfo.dwProcessId);
 
-  std::thread([=]() {
-    WaitForSingleObject(processInfo.hProcess, INFINITE);
-    DWORD exitCode = -1;
-    // Get the exit code.
-    GetExitCodeProcess(processInfo.hProcess, &exitCode);
-    debug(external_start, "external_start: pid: %d exited with %d.\n", processInfo.dwProcessId,
-          exitCode);
-    CloseHandle(processInfo.hProcess);
-    CloseHandle(processInfo.hThread);
-    evutil_closesocket(sv[0]);
-  }).detach();
-
+  stash_win32_child(fd, processInfo, sv[0]);
   return fd;
 }
 #endif
-
-namespace {
-
-/* Promise-form jobs (issue #1319): collect stdout/stderr, settle when the
- * child socket closes. Keyed by LPC socket index. */
-struct ExternalPromiseJob {
-  promise_t* prom;
-  std::string output;
-};
-
-std::unordered_map<int, ExternalPromiseJob*> g_external_jobs;
-
-void reject_with_number(promise_t* p, LPC_INT n) {
-  push_number(n);
-  promise_settle(p, sp, 1);
-  pop_stack();
-}
-
-void attach_external_job(int fd, promise_t* p) {
-  auto* job = new ExternalPromiseJob{};
-  job->prom = p;
-  g_external_jobs[fd] = job;
-}
-
-void finish_external_job(int fd, int aborted) {
-  auto it = g_external_jobs.find(fd);
-  if (it == g_external_jobs.end()) {
-    return;
-  }
-  ExternalPromiseJob* job = it->second;
-  g_external_jobs.erase(it);
-
-  if (aborted) {
-    push_constant_string("*external process aborted");
-    promise_settle(job->prom, sp, 1);
-    pop_stack();
-  } else {
-    copy_and_push_string(job->output.c_str());
-    promise_settle(job->prom, sp, 0);
-    pop_stack();
-  }
-  free_promise(job->prom);
-  delete job;
-}
-
-}  // namespace
 
 int external_promise_take_read(int fd, const char* data, int len) {
   auto it = g_external_jobs.find(fd);
@@ -395,12 +480,28 @@ int external_promise_take_read(int fd, const char* data, int len) {
   return 1;
 }
 
-void external_promise_closed(int fd, int aborted) { finish_external_job(fd, aborted); }
+void external_promise_closed(int fd, int aborted) {
+  auto it = g_external_jobs.find(fd);
+  if (it == g_external_jobs.end()) {
+    return;
+  }
+  if (aborted) {
+    it->second->aborted = true;
+  } else {
+    it->second->io_done = true;
+  }
+  try_finish_job(fd);
+}
 
 void external_cleanup() {
   while (!g_external_jobs.empty()) {
-    finish_external_job(g_external_jobs.begin()->first, /*aborted=*/1);
+    auto fd = g_external_jobs.begin()->first;
+    g_external_jobs.begin()->second->aborted = true;
+    settle_and_drop_job(fd);
   }
+  g_child_watches.clear();
+  std::lock_guard<std::mutex> const lock(g_exit_mu);
+  g_exit_notes.clear();
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -450,7 +551,8 @@ void f_external_start() {
   int fd;
   if (promise_form) {
     /* Spawn first: Windows CreateProcess error()s, so no promise is live
-     * across that unwind. Attach the job only after we have an fd. */
+     * across that unwind. Attach the job, then start the reaper so a
+     * fast child cannot post its exit code before the job exists. */
     fd = external_start(which, arg + 1, nullptr, nullptr, nullptr);
     if (fd < 0) {
       promise_t* p = promise_alloc();
@@ -462,12 +564,16 @@ void f_external_start() {
     promise_t* p = promise_alloc();
     p->ref++; /* the job's ref; push_refed_promise takes the other */
     attach_external_job(fd, p);
+    watch_child(fd);
     pop_n_elems(num_arg);
     push_refed_promise(p);
     return;
   }
 
   fd = external_start(which, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : nullptr));
+  if (fd >= 0) {
+    watch_child(fd);
+  }
   pop_n_elems(num_arg - 1);
   sp->u.number = fd;
 }

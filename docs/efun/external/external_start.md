@@ -36,14 +36,18 @@ title: external / external_start
     `close_call_back` - When the socket closes, this function is called.
 
     With the callbacks OMITTED, returns a promise instead (issue #1319):
-    fulfilled with the collected stdout/stderr (the concatenation of every
-    string the read callback would have received) when the process exits,
-    or rejected with the negative socket error the classic form would have
+    fulfilled with `({ output, exit_code })` when the process exits --
+    `output` is the concatenation of every string the read callback would
+    have received, `exit_code` is the child's wait status (0 on success;
+    on POSIX a signal death is `128 + signo`, matching the shell).
+    Rejected with the negative socket error the classic form would have
     returned (`EESECURITY`, `EESOCKET`, ...) -- or with
     `"*external process aborted"` if the calling object is destructed
     first. Inside an async function:
 
-        string body = await external_start(CURL_CMD, ({ "-s", url }));
+        mixed *r = await external_start(CURL_CMD, ({ "-s", url }));
+        string body = r[0];
+        int code = r[1];
 
 ### RUNTIME CONFIGURATION
 

@@ -19,7 +19,8 @@ int external_promise_take_read(int fd, const char* data, int len);
 /* Called from socket_close() for every close of an LPC socket. `aborted`
  * is 1 when the close is not a normal EOF (object destruct, shutdown,
  * explicit force-close without SC_DO_CALLBACK): the promise is rejected.
- * A normal close fulfills with the collected stdout/stderr. */
+ * A normal close marks I/O complete; the promise fulfills with
+ * ({ output, exit_code }) once waitpid has also reported. */
 void external_promise_closed(int fd, int aborted);
 
 /* Drop every in-flight promise job -- called on driver shutdown, before

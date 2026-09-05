@@ -364,6 +364,9 @@ external_cmd_2 : c:\Windows\System32\curl.exe
 external_cmd_3 : /bin/echo
 external_cmd_4 : /usr/bin/echo
 external_cmd_6 : c:\Windows\System32\cmd.exe
+# false: non-zero exit for the promise-form return-code check
+external_cmd_7 : /bin/false
+external_cmd_8 : /usr/bin/false
 
 ###############################################################################
 #          The following aren't currently used or implemented (yet)           #

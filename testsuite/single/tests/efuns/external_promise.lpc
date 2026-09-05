@@ -1,5 +1,5 @@
 // external_start() promise form (issue #1319): omit the socket callbacks
-// and the efun returns a promise fulfilled with collected stdout/stderr
+// and the efun returns a promise fulfilled with ({ output, exit_code })
 // when the process exits. Classic callback form is untouched and still
 // returns the socket fd (int). PACKAGE_EXTERNAL is off on wasm.
 //
@@ -42,7 +42,27 @@ async void run_echo() {
       ASSERT(intp(err));
       continue;
     }
-    if (stringp(s) && strsrch(s, "hello-from-external") != -1) {
+    if (arrayp(s) && sizeof(s) == 2 && stringp(s[0]) &&
+      strsrch(s[0], "hello-from-external") != -1) {
+      ASSERT_EQ(0, s[1]);
+      // non-zero exit is still a fulfillment -- the mudlib reads r[1]
+      mixed *fails = ({ 7, 8 });
+      int j, fslot;
+      for (j = 0; j < sizeof(fails); j++) {
+        fslot = fails[j];
+        err = catch(p = external_start(fslot, ({})));
+        if (err) {
+          continue;
+        }
+        err = acatch { s = await p; };
+        if (err) {
+          ASSERT(intp(err));
+          continue;
+        }
+        ASSERT(arrayp(s) && sizeof(s) == 2);
+        ASSERT(s[1] != 0);
+        break;
+      }
       RELEASE_LATCH("external_start promise form");
       return;
     }
