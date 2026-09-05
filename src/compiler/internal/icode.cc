@@ -403,6 +403,34 @@ void i_generate_node(parse_node_t* expr) {
       expr = expr->r.expr;
     /* fall through */
     case NODE_BINARY_OP:
+      /* Plain local/global/parameter stores (issue #1358). Done here, not
+       * in the pragma-gated tree optimizer, so `#pragma no_optimize`,
+       * functionals, anonymous functions, `$1 = v`, and file-scope
+       * `int g = 1` all emit the specialized opcode. */
+      if (expr->v.number == F_ASSIGN || expr->v.number == F_VOID_ASSIGN) {
+        parse_node_t* dest = expr->r.expr;
+        if (IS_NODE(dest, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
+          i_generate_node(expr->l.expr);
+          end_pushes();
+          ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_LOCAL : F_VOID_ASSIGN_LOCAL);
+          ins_byte(dest->l.number);
+          break;
+        }
+        if (dest && dest->kind == NODE_PARAMETER_LVALUE) {
+          i_generate_node(expr->l.expr);
+          end_pushes();
+          ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_LOCAL : F_VOID_ASSIGN_LOCAL);
+          ins_byte(dest->v.number + current_num_values);
+          break;
+        }
+        if (IS_NODE(dest, NODE_OPCODE_1, F_GLOBAL_LVALUE)) {
+          i_generate_node(expr->l.expr);
+          end_pushes();
+          ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_GLOBAL : F_VOID_ASSIGN_GLOBAL);
+          INS_GLOBAL_INDEX(dest->l.number);
+          break;
+        }
+      }
       i_generate_node(expr->l.expr);
     /* fall through */
     case NODE_UNARY_OP:

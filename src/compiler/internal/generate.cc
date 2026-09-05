@@ -93,35 +93,19 @@ static parse_node_t* optimize(parse_node_t* expr) {
       OPT(expr->r.expr->r.expr);
       break;
     case NODE_BINARY_OP:
-      /* Value-keeping `x = y` / `g = y`: emit a specialized store so the
-       * interpreter never pushes a T_LVALUE or runs the index-kind switch
-       * (issue #1358). Void forms are rewritten earlier in
-       * insert_pop_value(). */
+      OPT(expr->l.expr);
       if (expr->v.number == F_ASSIGN) {
         if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
-          LPC_INT tmp = expr->r.expr->l.number;
-          expr->kind = NODE_UNARY_OP_1;
-          expr->v.number = F_ASSIGN_LOCAL;
-          expr->r.expr = expr->l.expr;
-          expr->l.number = tmp;
-          OPT(expr->r.expr);
-          if (!optimizer_state && optimizer_local_slot(tmp) && last_local_refs[tmp]) {
-            last_local_refs[tmp]->v.number = F_TRANSFER_LOCAL;
-            last_local_refs[tmp] = nullptr;
+          if (!optimizer_state) {
+            int x = expr->r.expr->l.number;
+
+            if (optimizer_local_slot(x) && last_local_refs[x]) {
+              last_local_refs[x]->v.number = F_TRANSFER_LOCAL;
+              last_local_refs[x] = nullptr;
+            }
           }
-          break;
-        }
-        if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_GLOBAL_LVALUE)) {
-          LPC_INT tmp = expr->r.expr->l.number;
-          expr->kind = NODE_UNARY_OP_1;
-          expr->v.number = F_ASSIGN_GLOBAL;
-          expr->r.expr = expr->l.expr;
-          expr->l.number = tmp;
-          OPT(expr->r.expr);
-          break;
         }
       }
-      OPT(expr->l.expr);
       OPT(expr->r.expr);
       break;
     case NODE_UNARY_OP:
@@ -140,7 +124,7 @@ static parse_node_t* optimize(parse_node_t* expr) {
       break;
     case NODE_UNARY_OP_1:
       OPT(expr->r.expr);
-      if (expr->v.number == F_VOID_ASSIGN_LOCAL || expr->v.number == F_ASSIGN_LOCAL) {
+      if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
         /* A local index the scratch array was not sized for. It should not
          * happen (generate_function() sizes it from the function's local
          * count), but the array is a peephole optimisation only, so degrade

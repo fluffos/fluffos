@@ -1,6 +1,6 @@
-// Plain local/global `x = y` is a specialized store (issue #1358): no
-// T_LVALUE push, no index-kind switch. Index/member/ref assigns still
-// go through F_ASSIGN.
+// Specialized plain-slot stores (issue #1358). Functional checks plus a
+// dump_prog listing so a revert of the emit rewrite cannot hide behind
+// ordinary `=` semantics (those already worked).
 
 int g;
 int g2;
@@ -40,7 +40,6 @@ void do_tests() {
   g = keep_local(10);
   ASSERT_EQ(10, g);
 
-  // Index assign is not specialized and must still write.
   string s;
   s = "ab";
   s[0] = 'X';
@@ -52,4 +51,47 @@ void do_tests() {
   arr = ({ 1, 2 });
   arr[0] = arr[1] = 4;
   ASSERT_EQ(({ 4, 4 }), arr);
+
+#ifdef __PACKAGE_DEVELOP__
+  {
+    object ob;
+    string txt, src, al, ag, vag, llv, glv, asg;
+
+    // Needles assembled at runtime so they do not sit in this file's
+    // string table (dump_prog prints that table too).
+    al = "assign" + "_local";
+    ag = "assign" + "_global";
+    vag = "(void)assign" + "_global";
+    llv = "local" + "_lvalue";
+    glv = "global" + "_lvalue";
+    asg = "assign";
+
+    src = "#pragma no_optimize\n"
+      "int g;\n"
+      "int ginit = 5;\n"
+      "int keep(int n) { int x; return x = n; }\n"
+      "void unused() { int x; function f; x = 1; g = 2; f = (: g = 3 :); }\n";
+    rm("/gen_assign_spec.c");
+    write_file("/gen_assign_spec.c", src);
+    ob = load_object("/gen_assign_spec");
+    ASSERT(objectp(ob));
+    dump_prog(ob, 1, "/gen_assign_spec_dump.txt");
+    txt = read_file("/gen_assign_spec_dump.txt");
+    destruct(ob);
+    rm("/gen_assign_spec.c");
+    rm("/gen_assign_spec_dump.txt");
+    ASSERT(stringp(txt));
+    ASSERT(strsrch(txt, al) != -1);
+    ASSERT(strsrch(txt, ag) != -1);
+    ASSERT(strsrch(txt, vag) != -1);
+    // No plain-slot assign in this object should still push an lvalue.
+    ASSERT(strsrch(txt, llv) == -1);
+    ASSERT(strsrch(txt, glv) == -1);
+    // And none of those stores should fall back to generic assign.
+    // The word "assign" appears inside assign_local / assign_global; look
+    // for the bare opcode name as its own token.
+    ASSERT(strsrch(txt, " " + asg + "\n") == -1);
+    ASSERT(strsrch(txt, "(void)" + asg + "\n") == -1);
+  }
+#endif
 }
