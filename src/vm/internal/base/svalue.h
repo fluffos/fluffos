@@ -193,6 +193,7 @@ void assign_svalue_no_free(svalue_t*, svalue_t*);
 void free_compound(void* ptr, uint32_t type);
 
 #ifdef DEBUG
+void int_free_svalue(svalue_t*, const char*);
 #define free_svalue(x, y) int_free_svalue(x, y)
 #else
 /* Also declared in machine.h, which includes this header before getting to it. */
