@@ -35,6 +35,19 @@ void trunc_arr_elem(int ref c) {
   c = 'Z';
 }
 
+void splice_then_write(int ref c) {
+  c = 'Z';
+  g_trunc[0..1] = "é";
+  c = 'Y';
+}
+
+void splice_then_overflow(int ref c) {
+  c = 'Z';
+  g_trunc[0..1] = "é";
+  g_trunc[4..5] = "é";
+  c = 'Q';
+}
+
 void do_tests() {
   string s;
   buffer b;
@@ -121,4 +134,13 @@ void do_tests() {
     ASSERT_EQ(oob, catch(trunc_arr_elem(ref arr_trunc[0][2])));
     ASSERT_EQ("ab", arr_trunc[0]);
   }
+
+  // In-place same-length range splice can flip ASCII at the same address.
+  // reset() used to keep ascii_ and then write at the wrong byte offset.
+  g_trunc = "abcdef";
+  splice_then_write(ref g_trunc[4]);
+  ASSERT_EQ("écdZY", g_trunc);
+  g_trunc = "1234567";
+  splice_then_overflow(ref g_trunc[4]);
+  ASSERT_EQ("é34ZQ", g_trunc);
 }

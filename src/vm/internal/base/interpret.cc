@@ -1164,7 +1164,13 @@ void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
     if (!cp->owner || cp->owner->type != T_STRING) {
       error("Reference is invalid.\n");
     }
-    cp->iter->reset(cp->owner->u.string, SVALUE_STRLEN(cp->owner));
+    /* Rebuild, do not reset(). reset() has a subrange fast path that
+     * keeps ascii_ when the new range sits inside the old one. An
+     * in-place same-length range splice (g[0..1] = "é") can turn those
+     * bytes non-ASCII at the same address, so the shortcut then feeds
+     * u8_copy_and_replace_codepoint_at a stale byte offset and a short
+     * allocation. Master re-armed a fresh iterator on every F_REF_LVALUE. */
+    cp->iter = std::make_unique<EGCSmartIterator>(cp->owner->u.string, SVALUE_STRLEN(cp->owner));
 
     UChar32 c = u8_egc_index_as_single_codepoint(cp->owner->u.string, SVALUE_STRLEN(cp->owner), pos);
     /* 0 / -2 mean the index is at or past the last EGC (same as
