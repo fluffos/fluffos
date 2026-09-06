@@ -21,13 +21,12 @@ void f_and() {
 }
 
 void f_and_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
     sp->u.arr = argp->u.arr = intersect_array(argp->u.arr, sp->u.arr);
     sp->u.arr->ref++; /* since we put it in two places */
-    free_svalue(&lvslot, "f_and_eq");
     return;
   }
   if (argp->type != T_NUMBER) {
@@ -39,12 +38,11 @@ void f_and_eq() {
   sp->u.number = argp->u.number &= sp->u.number;
   argp->subtype = 0;
   sp->subtype = 0;
-  free_svalue(&lvslot, "f_and_eq");
 }
 
 void f_div_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -99,7 +97,6 @@ void f_div_eq() {
       }
     }
   }
-  free_svalue(&lvslot, "f_div_eq");
 }
 
 void f_eq() {
@@ -381,8 +378,8 @@ void f_lsh() {
 }
 
 void f_lsh_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to <<=\n");
@@ -393,12 +390,11 @@ void f_lsh_eq() {
   sp->u.number = argp->u.number <<= (sp->u.number & 63);
   argp->subtype = 0;
   sp->subtype = 0;
-  free_svalue(&lvslot, "f_lsh_eq");
 }
 
 void f_mod_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to %%=\n");
@@ -417,12 +413,11 @@ void f_mod_eq() {
   argp->subtype = 0;
   sp->u.number = argp->u.number;
   sp->subtype = 0;
-  free_svalue(&lvslot, "f_mod_eq");
 }
 
 void f_mult_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -468,7 +463,6 @@ void f_mult_eq() {
       }
     }
   }
-  free_svalue(&lvslot, "f_mult_eq");
 }
 
 void f_ne() {
@@ -585,12 +579,11 @@ void f_or() {
 }
 
 void f_or_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
     argp->u.arr = sp->u.arr = union_array(argp->u.arr, sp->u.arr);
     sp->u.arr->ref++; /* because we put it in two places */
-    free_svalue(&lvslot, "f_or_eq");
     return;
   }
 
@@ -603,7 +596,6 @@ void f_or_eq() {
   sp->u.number = argp->u.number |= sp->u.number;
   argp->subtype = 0;
   sp->subtype = 0;
-  free_svalue(&lvslot, "f_or_eq");
 }
 
 void f_parse_command() {
@@ -925,8 +917,8 @@ void f_rsh() {
 }
 
 void f_rsh_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to >>=\n");
@@ -937,12 +929,11 @@ void f_rsh_eq() {
   sp->u.number = argp->u.number >>= (sp->u.number & 63);
   argp->subtype = 0;
   sp->subtype = 0;
-  free_svalue(&lvslot, "f_rsh_eq");
 }
 
 void f_sub_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -1008,7 +999,6 @@ void f_sub_eq() {
       }
     }
   }
-  free_svalue(&lvslot, "f_sub_eq");
 }
 
 /*
@@ -1240,8 +1230,8 @@ void f_xor() {
 }
 
 void f_xor_eq() {
-  svalue_t lvslot;
-  svalue_t* argp = pop_lvalue(&lvslot);
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to ^=\n");
@@ -1252,7 +1242,6 @@ void f_xor_eq() {
   sp->u.number = argp->u.number ^= sp->u.number;
   argp->subtype = 0;
   sp->subtype = 0;
-  free_svalue(&lvslot, "f_xor_eq");
 }
 
 void f_function_constructor() {

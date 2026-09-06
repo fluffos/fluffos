@@ -172,12 +172,35 @@ ref_t* make_ref(void);
 /* += / -= on a T_LVALUE_CODEPOINT slot; returns the resulting codepoint. */
 LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
 
-/* Pop the stack lvalue into `saved` (caller free_svalue's it) and return
- * the target to read/write. */
-static inline svalue_t* pop_lvalue(svalue_t* saved) {
-  *saved = *sp--;
-  return lvalue_target(saved);
-}
+/* Owns a popped (or stolen) stack lvalue. error() unwinds via a C++
+ * exception (do_catch / safe_apply), so the destructor releases the box
+ * on that path too -- a bare `svalue_t lvslot = *sp--` leaked every
+ * T_LVALUE_CODEPOINT / T_LVALUE_RANGE that hit error() before the
+ * matching free_svalue (issue #1358). */
+class PoppedLvalue {
+ public:
+  enum Mode { Pop, Steal };
+
+  explicit PoppedLvalue(Mode mode = Pop) {
+    slot_ = *sp;
+    if (mode == Pop) {
+      sp--;
+    } else {
+      /* Leave the stack slot but drop its claim on the box so unwind
+       * and this destructor cannot both delete it. */
+      sp->type = T_NUMBER;
+      sp->subtype = 0;
+      sp->u.number = 0;
+    }
+  }
+  ~PoppedLvalue() { free_svalue(&slot_, "PoppedLvalue"); }
+  PoppedLvalue(const PoppedLvalue&) = delete;
+  PoppedLvalue& operator=(const PoppedLvalue&) = delete;
+  svalue_t* target() { return lvalue_target(&slot_); }
+
+ private:
+  svalue_t slot_;
+};
 
 /* Convert a string (raw UTF-8 bytes) or array of ints 0..255 into a fresh
  * buffer; errors on anything else. Caller owns the result. */

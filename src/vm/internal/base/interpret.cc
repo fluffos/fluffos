@@ -68,6 +68,51 @@ template <typename F>
 void assign_lvalue_codepoint(svalue_t* lval, F&& func);
 void assign_lvalue_range(svalue_t* lval, svalue_t* from);
 
+/* Materialize x[a..b] as an rvalue (the slice). Used by ||= / &&= / ??=
+ * when the dest is already "truthy" and we keep the current value.
+ * Must not bit-copy the heap box -- that double-frees it. */
+static void copy_range_lvalue_as_rvalue(svalue_t* dest, svalue_t* range_slot) {
+  range_lvalue_t* box = range_slot->u.range_lv;
+  svalue_t* owner = box->owner;
+  int ind1 = static_cast<int>(box->ind1);
+  int ind2 = static_cast<int>(box->ind2);
+  dest->subtype = 0;
+  switch (owner->type) {
+    case T_ARRAY: {
+      owner->u.arr->ref++;
+      dest->type = T_ARRAY;
+      dest->u.arr = slice_array(owner->u.arr, ind1, ind2 - 1);
+      break;
+    }
+    case T_STRING: {
+      int n = ind2 - ind1;
+      if (n < 0) {
+        n = 0;
+      }
+      char* tmp = new_string(n, "copy_range_lvalue_as_rvalue");
+      memcpy(tmp, owner->u.string + ind1, n);
+      tmp[n] = '\0';
+      dest->type = T_STRING;
+      dest->subtype = STRING_MALLOC;
+      dest->u.string = tmp;
+      break;
+    }
+    case T_BUFFER: {
+      int n = ind2 - ind1;
+      if (n < 0) {
+        n = 0;
+      }
+      buffer_t* b = allocate_buffer(n);
+      memcpy(b->item, owner->u.buf->item + ind1, n);
+      dest->type = T_BUFFER;
+      dest->u.buf = b;
+      break;
+    }
+    default:
+      error("Range lvalue on illegal type\n");
+  }
+}
+
 static inline void replace_lvalue_with_value_on_stack(svalue_t* slot, const char* where) {
   svalue_t tmp;
   tmp.type = T_NUMBER;
@@ -80,6 +125,10 @@ static inline void replace_lvalue_with_value_on_stack(svalue_t* slot, const char
     codepoint_lvalue_t* cp = target->u.cp_lv;
     tmp.u.number =
         u8_egc_index_as_single_codepoint(cp->owner->u.string, SVALUE_STRLEN(cp->owner), cp->index);
+  } else if (target->type == T_LVALUE_RANGE && target->u.range_lv) {
+    copy_range_lvalue_as_rvalue(&tmp, target);
+  } else if (is_indexed_lvalue(target)) {
+    error("Illegal lhs to ||= / &&= / ??=\n");
   } else {
     assign_svalue_no_free(&tmp, target);
   }
@@ -2331,8 +2380,8 @@ void eval_instruction(char* p) {
           error("Invalid Program: non-lvalue argument to ++\n");
         }
         {
-          svalue_t lvslot;
-          lval = pop_lvalue(&lvslot);
+          PoppedLvalue lv;
+          lval = lv.target();
           switch (lval->type) {
             case T_NUMBER:
               lval->u.number++;
@@ -2353,7 +2402,6 @@ void eval_instruction(char* p) {
             default:
               error("++ of non-numeric argument\n");
           }
-          free_svalue(&lvslot, "F_INC");
         }
         break;
       case F_WHILE_DEC: {
@@ -2946,8 +2994,8 @@ void eval_instruction(char* p) {
       case F_ADD_EQ:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to +=.");
         {
-        svalue_t lvslot;
-        lval = pop_lvalue(&lvslot);
+        PoppedLvalue lv;
+        lval = lv.target();
         if (lval->type == T_LVALUE_CODEPOINT || lval->type == T_LVALUE_BYTE) {
           LPC_INT res;
 
@@ -2963,7 +3011,6 @@ void eval_instruction(char* p) {
             }
             *lval->u.lvalue_byte = static_cast<unsigned char>(res);
           }
-          free_svalue(&lvslot, "F_ADD_EQ");
           if (instruction == F_ADD_EQ) { /* reuse the RHS slot as the rvalue */
             sp->subtype = 0;
             sp->u.number = res;
@@ -3088,7 +3135,6 @@ void eval_instruction(char* p) {
            */
           sp--;
         }
-        free_svalue(&lvslot, "F_ADD_EQ");
         }
         break;
       case F_AND:
@@ -3531,8 +3577,8 @@ void eval_instruction(char* p) {
         }
 #endif
         {
-          svalue_t lvslot;
-          lval = pop_lvalue(&lvslot);
+          PoppedLvalue lv;
+          lval = lv.target();
           if (sp->type != T_INVALID) {
             switch (lval->type) {
               case T_LVALUE_BYTE: {
@@ -3568,7 +3614,6 @@ void eval_instruction(char* p) {
           } else {
             sp--;
           }
-          free_svalue(&lvslot, "F_VOID_ASSIGN");
         }
         break;
 #ifdef DEBUG
@@ -3703,8 +3748,8 @@ void eval_instruction(char* p) {
       case F_PRE_DEC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
         {
-          svalue_t lvslot = *sp;
-          lval = lvalue_target(&lvslot);
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
           switch (lval->type) {
             case T_NUMBER:
               sp->type = T_NUMBER;
@@ -3737,14 +3782,13 @@ void eval_instruction(char* p) {
             default:
               error("-- of non-numeric argument\n");
           }
-          free_svalue(&lvslot, "F_PRE_DEC");
         }
         break;
       case F_DEC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
         {
-          svalue_t lvslot;
-          lval = pop_lvalue(&lvslot);
+          PoppedLvalue lv;
+          lval = lv.target();
           switch (lval->type) {
             case T_NUMBER:
               lval->u.number--;
@@ -3764,7 +3808,6 @@ void eval_instruction(char* p) {
             default:
               error("-- of non-numeric argument\n");
           }
-          free_svalue(&lvslot, "F_DEC");
         }
         break;
       case F_DIVIDE: {
@@ -3848,8 +3891,8 @@ void eval_instruction(char* p) {
       case F_PRE_INC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
         {
-          svalue_t lvslot = *sp;
-          lval = lvalue_target(&lvslot);
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
           switch (lval->type) {
             case T_NUMBER:
               sp->type = T_NUMBER;
@@ -3879,7 +3922,6 @@ void eval_instruction(char* p) {
             default:
               error("++ of non-numeric argument\n");
           }
-          free_svalue(&lvslot, "F_PRE_INC");
         }
         break;
       case F_MEMBER: {
@@ -4308,8 +4350,8 @@ void eval_instruction(char* p) {
       case F_POST_DEC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
         {
-          svalue_t lvslot = *sp;
-          lval = lvalue_target(&lvslot);
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
           switch (lval->type) {
             case T_NUMBER:
               sp->type = T_NUMBER;
@@ -4342,14 +4384,13 @@ void eval_instruction(char* p) {
             default:
               error("-- of non-numeric argument\n");
           }
-          free_svalue(&lvslot, "F_POST_DEC");
         }
         break;
       case F_POST_INC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
         {
-          svalue_t lvslot = *sp;
-          lval = lvalue_target(&lvslot);
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
           switch (lval->type) {
             case T_NUMBER:
               sp->type = T_NUMBER;
@@ -4382,7 +4423,6 @@ void eval_instruction(char* p) {
             default:
               error("++ of non-numeric argument\n");
           }
-          free_svalue(&lvslot, "F_POST_INC");
         }
         break;
       case F_GLOBAL_LVALUE: {

@@ -82,16 +82,16 @@ void do_tests() {
     rm("/gen_assign_spec_dump.txt");
     ASSERT(stringp(txt));
     ASSERT(strsrch(txt, al) != -1);
-    ASSERT(strsrch(txt, ag) != -1);
+    // Leading spaces so this does not also match "(void)assign_global".
+    ASSERT(strsrch(txt, "  " + ag) != -1);
     ASSERT(strsrch(txt, vag) != -1);
     // No plain-slot assign in this object should still push an lvalue.
     ASSERT(strsrch(txt, llv) == -1);
     ASSERT(strsrch(txt, glv) == -1);
-    // And none of those stores should fall back to generic assign.
-    // The word "assign" appears inside assign_local / assign_global; look
-    // for the bare opcode name as its own token.
-    ASSERT(strsrch(txt, " " + asg + "\n") == -1);
-    ASSERT(strsrch(txt, "(void)" + asg + "\n") == -1);
+    // dump_prog pads opcode names: "  assign                    ; "
+    // A trailing space after the token excludes assign_local / assign_global.
+    ASSERT(strsrch(txt, " " + asg + " ") == -1);
+    ASSERT(strsrch(txt, "(void)" + asg + " ") == -1);
   }
 #endif
 }

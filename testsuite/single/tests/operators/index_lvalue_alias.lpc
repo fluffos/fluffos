@@ -16,6 +16,8 @@ void do_tests() {
   string s;
   buffer b;
   mixed *a;
+  mixed kept;
+  int i;
 
   s = "ab";
   s[0] = s[1] = 'x';
@@ -51,4 +53,20 @@ void do_tests() {
   set_bytes(ref b[0], ref b[1]);
   ASSERT_EQ(10, b[0]);
   ASSERT_EQ(11, b[1]);
+
+  // ||= / ??= on a range used to bit-copy the heap box and double-free it.
+  a = ({ 1, 2, 3 });
+  kept = (a[0..1] ||= ({ 9 }));
+  ASSERT_EQ(({ 1, 2 }), kept);
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+  kept = (a[0..1] ??= ({ 9 }));
+  ASSERT_EQ(({ 1, 2 }), kept);
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+
+  // error() between pop and free must not leak (or crash) the box.
+  s = "ab";
+  for (i = 0; i < 20; i++) {
+    catch(s[0] += ({ 1 }));
+  }
+  ASSERT_EQ("ab", s);
 }

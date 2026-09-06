@@ -201,10 +201,12 @@ void int_free_svalue(svalue_t*);
 /* int_free_svalue() is called several million times on an interpreter-bound
  * workload -- roughly once per dispatched opcode that drops a stack slot -- and
  * it is not inlined across the call boundary. It only has real work to do for a
- * value that owns something: a string, a refcounted
- * pointer, or an error handler (which it invokes). For every other type --
- * T_NUMBER and T_REAL above all -- the entire body reduces to marking the slot
- * T_FREED, and outside DEBUG builds nothing ever reads that bit back:
+ * value that owns something: a string, a refcounted pointer, an error handler
+ * (which it invokes), or a heap-boxed index lvalue (T_LVALUE_CODEPOINT /
+ * T_LVALUE_RANGE, issue #1358). T_LVALUE_BYTE is a raw pointer, not a box.
+ * For every other type -- T_NUMBER and T_REAL above all -- the entire body
+ * reduces to marking the slot T_FREED, and outside DEBUG builds nothing ever
+ * reads that bit back:
  * assign_svalue_no_free() clears it on overwrite, sprintf.cc masks it out with
  * (type & ~T_FREED), and the only remaining readers -- the "*freed*" type name
  * in interpret.cc and the double-free fatal in svalue.cc -- are both #ifdef
@@ -213,7 +215,7 @@ void int_free_svalue(svalue_t*);
  * DEBUG builds keep calling the out-of-line version unconditionally, so the
  * double-free detection that depends on the bit being set keeps working. */
 inline void free_svalue_maybe_refed(svalue_t* v) {
-  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER)) {
+  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER | T_LVALUE_CODEPOINT | T_LVALUE_RANGE)) {
     int_free_svalue(v);
   }
 }
