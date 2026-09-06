@@ -254,8 +254,8 @@ void kill_ref(ref_t* ref) {
    * counted owner (F_MAKE_REF, lvalue set) or an uncounted tag
    * (T_NUMBER / T_LVALUE_BYTE) for which this is a no-op. */
   free_svalue(&ref->sv, "kill_ref");
-  /* F_MAKE_REF of s[i] / b[i] / x[a..b] parks the box here so sv can
-   * still hold the container. */
+  /* F_MAKE_REF of s[i] / b[i] parks the box here so sv can still hold
+   * the container. */
   free_svalue(&ref->index_sv, "kill_ref");
   /* Clear the stale tags: when the last T_REF svalue holding this ref_t is
    * later freed, free_svalue() re-enters kill_ref, and the MAP_LOCKED
@@ -305,8 +305,6 @@ ref_t* make_ref(void) {
   ref->index_sv.type = T_NUMBER;
   ref->index_sv.subtype = 0;
   ref->index_sv.u.number = 0;
-  ref->codepoint_owner = nullptr;
-  ref->codepoint_index = 0;
   return ref;
 }
 
@@ -1151,6 +1149,9 @@ void copy_lvalue_range(svalue_t* lval, svalue_t* from) {
 template <typename F>
 void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
   codepoint_lvalue_t* cp = lval->u.cp_lv;
+  if (!cp) {
+    error("Reference is invalid.\n");
+  }
   {
     auto pos = cp->index;
 
@@ -1160,11 +1161,20 @@ void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
      * keep-alive can hold that allocation, so a write would copy the stale
      * value (`set_chars(ref s[0], ref s[1])` left "aY"). Always retarget
      * from the current owner before copying. */
+    if (!cp->owner || cp->owner->type != T_STRING) {
+      error("Reference is invalid.\n");
+    }
     cp->iter->reset(cp->owner->u.string, SVALUE_STRLEN(cp->owner));
 
     UChar32 c = u8_egc_index_as_single_codepoint(cp->owner->u.string, SVALUE_STRLEN(cp->owner), pos);
-    if (c < 0) {
-      error("Invalid string index, multi-codepoint character.\n");
+    /* 0 / -2 mean the index is at or past the last EGC (same as
+     * arm_codepoint_lvalue). A stale ref after the owner was truncated
+     * used to treat 0 as U+0000, size the replacement one byte short,
+     * and write past the allocation. */
+    if (c == -2 || c == 0) {
+      error("Index out of bounds in string index lvalue.\n");
+    } else if (c < 0) {
+      error("Indexed character is multi-codepoint.\n");
     }
     auto old_len = U8_LENGTH(c);
     DEBUG_CHECK(old_len == 0, "Invalid UTF-8 Codepoint: assign_lvalue_codepoint");
@@ -2436,8 +2446,12 @@ void eval_instruction(char* p) {
          * inside structures may not, however ...
          */
         ref = make_ref();
-        if (sp->type == T_LVALUE_CODEPOINT || sp->type == T_LVALUE_BYTE ||
-            sp->type == T_LVALUE_RANGE) {
+        if (sp->type == T_LVALUE_RANGE) {
+          /* rule_expr_ref rejects this; keep the runtime trap so a box
+           * is never parked in a ref F_REF would bit-copy. */
+          error("Illegal to make reference to range\n");
+        }
+        if (sp->type == T_LVALUE_CODEPOINT || sp->type == T_LVALUE_BYTE) {
           /* Transfer the per-instance box into index_sv so it outlives
            * this stack slot. sv still holds the container keep-alive
            * below -- stuffing both into sv was clobbering the box, so
@@ -2445,14 +2459,13 @@ void eval_instruction(char* p) {
            * the buffer unchanged. */
           ref->index_sv = *sp;
           ref->lvalue = &ref->index_sv;
-          if (sp->type == T_LVALUE_CODEPOINT) {
-            ref->codepoint_owner = sp->u.cp_lv->owner;
-            ref->codepoint_index = sp->u.cp_lv->index;
-          }
           sp->type = T_NUMBER;
           sp->subtype = 0;
           sp->u.number = 0;
         } else {
+          /* Nested `ref c` on a parameter that is already a ref: lvalue
+           * points at the outer ref's index_sv (the box). Do not snapshot
+           * owner/index -- F_REF reads the box. */
           ref->lvalue = sp->u.lvalue;
         }
         if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE && op != F_REF_LVALUE) {
@@ -2510,12 +2523,23 @@ void eval_instruction(char* p) {
             push_number(*reflval->u.lvalue_byte);
             break;
           } else if (reflval->type == T_LVALUE_CODEPOINT) {
-            // Read from THIS ref's own owner/index, not the shared scratch
-            // global -- a concurrently-armed string-char lvalue elsewhere
-            // (another ref, or a plain s[i]) must not corrupt this read.
-            svalue_t* owner = s->u.ref->codepoint_owner;
-            push_number(u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner),
-                                                          s->u.ref->codepoint_index));
+            /* Read the box (index_sv or a nested ref's pointer to it).
+             * A snapshot on the ref itself was only filled when F_MAKE_REF
+             * saw T_LVALUE_CODEPOINT on the stack -- `inner(ref c)` after
+             * `outer(ref s[0])` saw T_LVALUE and left codepoint_owner
+             * null, then segfaulted on the read. */
+            codepoint_lvalue_t* cp = reflval->u.cp_lv;
+            if (!cp || !cp->owner || cp->owner->type != T_STRING) {
+              error("Reference is invalid.\n");
+            }
+            UChar32 c = u8_egc_index_as_single_codepoint(cp->owner->u.string,
+                                                         SVALUE_STRLEN(cp->owner), cp->index);
+            if (c == -2 || c == 0) {
+              error("Index out of bounds in string index lvalue.\n");
+            } else if (c < 0) {
+              error("Indexed character is multi-codepoint.\n");
+            }
+            push_number(c);
             break;
           }
         }
@@ -3300,8 +3324,6 @@ void eval_instruction(char* p) {
               }
               arm_codepoint_lvalue(&r->sv, owner, idx);
               r->lvalue = &r->sv;
-              r->codepoint_owner = owner;
-              r->codepoint_index = idx;
             } else {
               free_svalue(sp->u.lvalue, "foreach-string");
               sp->u.lvalue->type = T_NUMBER;

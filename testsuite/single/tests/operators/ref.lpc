@@ -50,6 +50,22 @@ void set_char(int ref c) {
   c = 'Z';
 }
 
+void inner_read_char(int ref d, int ref out) {
+  out = d;
+}
+
+void outer_read_char(int ref c, int ref out) {
+  inner_read_char(ref c, ref out);
+}
+
+void inner_write_char(int ref d) {
+  d = 'Q';
+}
+
+void outer_write_char(int ref c) {
+  inner_write_char(ref c);
+}
+
 void by_value(int value) {
   value = 999;
 }
@@ -446,6 +462,19 @@ void do_tests() {
   ASSERT(gen_load_error(
     "gen_ref_mapkey",
     "void f() { mapping m = ([ \"a\": 1 ]); foreach(string ref k, int v in m) {} }\n"));
+
+  // Nested ref forwarding of s[i]: F_MAKE_REF sees T_LVALUE (the outer
+  // ref's box), not T_LVALUE_CODEPOINT. Reading through the snapshot
+  // fields used to NULL-deref.
+  {
+    string s = "abc";
+    int v = 0;
+
+    outer_read_char(ref s[0], ref v);
+    ASSERT_EQ('a', v);
+    outer_write_char(ref s[1]);
+    ASSERT_EQ("aQc", s);
+  }
 
   // Bitwise & and &= still parse and evaluate as binary AND
   {

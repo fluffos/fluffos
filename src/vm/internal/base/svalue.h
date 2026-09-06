@@ -61,16 +61,11 @@ struct ref_t {
    * lvalue points inside it. Foreach mapping refs also lock the mapping
    * here. Foreach string/buffer refs store the per-iteration box here. */
   svalue_t sv;
-  /* Transferred index lvalue from F_MAKE_REF (`ref s[i]`, `ref b[i]`,
-   * `ref x[a..b]`). Separate from sv so the container stay-alive copy
-   * is not overwritten by the box. Unused refs leave this as T_NUMBER. */
+  /* Transferred index lvalue from F_MAKE_REF (`ref s[i]`, `ref b[i]`).
+   * Separate from sv so the container stay-alive copy is not overwritten
+   * by the box. Unused refs leave this as T_NUMBER. `ref x[a..b]` is a
+   * compile error (rule_expr_ref). */
   svalue_t index_sv;
-
-  /* String-char refs keep owner+index here so a read (F_REF) does not
-   * depend on the heap box still being armed. The box itself lives in
-   * index_sv (F_MAKE_REF) or sv (foreach). */
-  svalue_t* codepoint_owner;
-  int32_t codepoint_index;
 };
 
 struct codepoint_lvalue_t;

@@ -12,6 +12,29 @@ void set_bytes(int ref a, int ref b) {
   b = 11;
 }
 
+string g_trunc;
+mixed *arr_trunc;
+
+void trunc_then_write(int ref c) {
+  g_trunc = "ab";
+  c = 'Z';
+}
+
+void trunc_then_inc(int ref c) {
+  g_trunc = "ab";
+  c++;
+}
+
+void trunc_then_add(int ref c) {
+  g_trunc = "ab";
+  c += 1;
+}
+
+void trunc_arr_elem(int ref c) {
+  arr_trunc[0] = "ab";
+  c = 'Z';
+}
+
 void do_tests() {
   string s;
   buffer b;
@@ -78,4 +101,24 @@ void do_tests() {
     catch(mm[0..1] &= 1);
   }
   ASSERT_EQ(({ 1, 2, 3 }), mm);
+
+  // A ref holds the box across the call. Truncating the owner to exactly
+  // the armed index used to skip the 0/-2 bounds check, size the new
+  // string one byte short, and overflow.
+  {
+    string oob = "*Index out of bounds in string index lvalue.\n";
+
+    g_trunc = "abc";
+    ASSERT_EQ(oob, catch(trunc_then_write(ref g_trunc[2])));
+    ASSERT_EQ("ab", g_trunc);
+    g_trunc = "abc";
+    ASSERT_EQ(oob, catch(trunc_then_inc(ref g_trunc[2])));
+    ASSERT_EQ("ab", g_trunc);
+    g_trunc = "abc";
+    ASSERT_EQ(oob, catch(trunc_then_add(ref g_trunc[2])));
+    ASSERT_EQ("ab", g_trunc);
+    arr_trunc = ({ "abc" });
+    ASSERT_EQ(oob, catch(trunc_arr_elem(ref arr_trunc[0][2])));
+    ASSERT_EQ("ab", arr_trunc[0]);
+  }
 }
