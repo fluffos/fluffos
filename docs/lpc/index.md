@@ -15,6 +15,7 @@ title: lpc
 * [include](constructs/include)
 * [inherit](constructs/inherit)
 * [prototypes](constructs/prototypes)
+* [shadowing](constructs/shadowing)
 * [switch](constructs/switch)
 * [text_blocks](constructs/text_blocks)
 * [while](constructs/while)

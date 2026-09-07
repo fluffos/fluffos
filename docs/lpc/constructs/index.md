@@ -8,6 +8,7 @@ title: constructs
 * [inherit](inherit)
 * [prototypes](prototypes)
 * [ref](ref)
+* [shadowing](shadowing)
 * [switch](switch)
 * [text_blocks](text_blocks)
 * [while](while)
