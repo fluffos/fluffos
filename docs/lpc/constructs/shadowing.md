@@ -252,15 +252,46 @@ void demo() {
 }
 ```
 
-This is a supported way to specialise behaviour for one object. Your function
-wins for the whole file. `efun::name` reaches past it to the driver's version
-(your mudlib's master object can veto this through `valid_override`, so some
-muds restrict it).
+This is a supported way to specialise behaviour for one object. `efun::name`
+reaches past it to the driver's version (your mudlib's master object can veto
+this through `valid_override`, so some muds restrict it).
 
 The precedence chain here is worth stating plainly: **your object's own
 function beats a simul_efun, and a simul_efun beats an efun.** That's how a
 mudlib provides its own `strlen` mud-wide, and how a single object can then
 override even that.
+
+**But the override only applies from the point the compiler has seen it.** Each
+call is bound where it is written, and at that moment the compiler only knows
+about the functions declared above it. A call that appears *before* your
+`strlen` still gets the efun:
+
+```c
+int before() { return strlen("abcd"); }   // 4   -- the efun
+
+int strlen(string s) { return 999; }
+
+int after()  { return strlen("abcd"); }   // 999 -- your function
+```
+
+Both compile without a warning, and the same file now means two different
+things by `strlen()` depending on the line number. Put a **prototype** at the
+top of the file and both calls bind to your version:
+
+```c
+int strlen(string s);
+
+int before() { return strlen("abcd"); }   // 999 -- your function now
+
+int strlen(string s) { return 999; }
+```
+
+This is why "wins for the whole file" is only true when you prototype it, and
+it's the single reason to bother prototyping in a file that overrides an efun
+or simul_efun. Note that it applies to overriding your *own* functions too —
+any call written above a definition binds to whatever that name meant at that
+point, which for a plain unprototyped helper is nothing at all and gets you an
+undefined-function error instead.
 
 ### A global with the same name as a function — fine
 
