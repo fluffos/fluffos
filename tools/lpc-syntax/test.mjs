@@ -195,12 +195,48 @@ check('a quote in a directive never extends it past its physical line'
         const d2 = tokenize('#define BAD "abc\n#define UND(x) #x\nmixed q = UND(3+4);\n').filter((t) => t.kind === 'directive');
         const d3 = tokenize('#define X 1 /* c\nc */ + 2\nint y;\n').filter((t) => t.kind === 'directive');
         const d4 = tokenize('#define S "abc\\\ndef"\nint y;\n').filter((t) => t.kind === 'directive');
+        const d5 = tokenize('#define H "abc// \\\n def"\nint y;\n').filter((t) => t.kind === 'directive');
         const masked = formatLPC('#define BAD "abc\n#define UND(x) #x\nmixed q = UND(3+4);\n');
         return d1.length === 1 && d1[0].text === "#define Q it'" &&
                d2.length === 2 &&
                d3.length === 1 && d3[0].text.includes('+ 2') &&
                d4.length === 1 && d4[0].text.includes('def"') &&
+               d5.length === 1 && d5[0].text.includes('//') && d5[0].text.includes('def"') &&
                masked.includes('UND(3+4)');
+      })());
+check('C splice-first on a directive: a trailing \\ after // continues the'
+      + ' comment, and a comment-open split by a continuation is still a'
+      + ' comment -- the next physical line stays inside the directive token',
+      (() => {
+        const d1 = tokenize('#define FOO 1 // note \\\nint x = 2;\nint v = FOO;\n')
+                     .filter((t) => t.kind === 'directive');
+        const d2 = tokenize('#define FOO 10 /\\\n* c */ + 5\nint v = FOO;\n')
+                     .filter((t) => t.kind === 'directive');
+        return d1.length === 1 && d1[0].text.includes('int x = 2') &&
+               !d1[0].text.includes('int v') &&
+               d2.length === 1 && d2[0].text.includes('+ 5') &&
+               d2[0].text.includes('* c');
+      })());
+check('formatter keeps the gcc continuation-plus-// shapes: a do/while'
+      + ' body joined by \\ with // only on the last line; a continued'
+      + ' object-like body with a // tail; and // note \\ eating the next'
+      + ' line (that line stays inside the directive, not reformatted as code)',
+      (() => {
+        const add = '#define ADD(x, y) do { \\\n    r += (x); \\\n    r += (y); \\\n'
+                  + '} while (0) // this comment ends here\nADD(1, 2);\n';
+        const bar = '#define BAR 10 \\\n    + 5 // tail, no backslash\nint v = BAR;\n';
+        const foo = '#define FOO 1 // note \\\nint x = 99;\nint v = FOO;\n';
+        const a = formatLPC(add);
+        const b = formatLPC(bar);
+        const f = formatLPC(foo);
+        const fTok = tokenize(f).filter((t) => t.kind === 'directive');
+        return a.includes('} while (0) // this comment ends here\nADD(1, 2);') &&
+               formatLPC(a) === a &&
+               b.includes('+ 5 // tail, no backslash\nint v = BAR;') &&
+               formatLPC(b) === b &&
+               fTok.length === 1 && fTok[0].text.includes('int x = 99') &&
+               !fTok[0].text.includes('int v') &&
+               formatLPC(f) === f;
       })());
 check('template fragments + interpolated expression tokens',
       (() => {
@@ -1503,5 +1539,17 @@ check('tmLanguage: function-call excludes reserved words (no "if (" misfire as e
 check('tmLanguage: operators longest-match ordered',
       (() => { const parts = tml.repository.operators.match.split('|');
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());
+check('tmLanguage: a # line uses splice-first // (begin/end, continues on \\)'
+      + ' and does not include the physical-line //.*$ comment rule',
+      (() => {
+        const pp = tml.repository.preprocessor;
+        const line = pp.patterns.find((p) => p.name === 'comment.line.double-slash.lpc');
+        const usesGlobalComments = pp.patterns.some((p) => p.include === '#comments');
+        return line && line.begin === '//' && line.end === '(?<!\\\\)$' &&
+               pp.end === '(?<!\\\\)$' &&
+               !usesGlobalComments &&
+               tml.repository['block-comment'] &&
+               tml.repository.comments.patterns.some((p) => p.match === '//.*$');
+      })());
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

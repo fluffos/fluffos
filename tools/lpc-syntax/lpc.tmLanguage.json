@@ -60,11 +60,14 @@
           "match": "//.*$"
         },
         {
-          "name": "comment.block.lpc",
-          "begin": "/\\*",
-          "end": "\\*/"
+          "include": "#block-comment"
         }
       ]
+    },
+    "block-comment": {
+      "name": "comment.block.lpc",
+      "begin": "/\\*",
+      "end": "\\*/"
     },
     "preprocessor": {
       "name": "meta.preprocessor.lpc",
@@ -77,10 +80,18 @@
       "end": "(?<!\\\\)$",
       "patterns": [
         {
-          "include": "#comments"
+          "name": "comment.line.double-slash.lpc",
+          "begin": "//",
+          "end": "(?<!\\\\)$"
+        },
+        {
+          "include": "#block-comment"
         },
         {
           "include": "#strings"
+        },
+        {
+          "include": "#template"
         },
         {
           "name": "string.quoted.other.include.lpc",

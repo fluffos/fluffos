@@ -217,7 +217,23 @@ WS_NO_NL    [ \t\r\v\f]
  *
  * SC_COND_SKIP: inside a false #if/#ifdef branch -- lines are consumed
  * without tokenizing, watching only for the nested/closing conditional
- * directives. See the directive rules below. */
+ * directives. See the directive rules below.
+ * SC_DIRECTIVE -> SC_DIRECTIVE_WORD -> SC_DIRECTIVE_DATA: a '#' line
+ * is three phases, and a comment or backslash-continuation is legal
+ * in every gap (and inside the data). SC_DIRECTIVE is the header
+ * (whitespace after '#'). SC_DIRECTIVE_WORD is the keyword
+ * (`define` / `if` / `include` / ...), which may itself be split by
+ * `\\\n`. SC_DIRECTIVE_DATA is the payload and is allowed to span
+ * physical lines the same way -- `\\\n` and a block comment that
+ * closes later (#1236) do not end it. Splice is first (C phase 2):
+ * `\\\n` is dropped before a comment-open is decided, so a slash
+ * held across a continuation still opens a comment, and a '//'
+ * comment runs to the logical newline. SC_DIRECTIVE_SLASH holds that
+ * pending slash; SC_DIRECTIVE_LINE_COMMENT is the '//' tail. A '"'
+ * or '`' in the data pushes SC_DIRECTIVE_STRING / SC_DIRECTIVE_TEMPLATE
+ * so comment markers inside a literal cannot match the comment rules
+ * (#1382). A raw newline still ends the directive: an unterminated
+ * quote is not a spanning literal. */
 %x SC_CHAR_BODY
 %x SC_CHAR_CLOSE
 %x SC_BLOCK_COMMENT
@@ -226,6 +242,12 @@ WS_NO_NL    [ \t\r\v\f]
 %x SC_HEREDOC_TERM
 %x SC_COND_SKIP
 %x SC_DIRECTIVE
+%x SC_DIRECTIVE_WORD
+%x SC_DIRECTIVE_DATA
+%x SC_DIRECTIVE_SLASH
+%x SC_DIRECTIVE_LINE_COMMENT
+%x SC_DIRECTIVE_STRING
+%x SC_DIRECTIVE_TEMPLATE
 
 %%
 
@@ -617,47 +639,159 @@ WS_NO_NL    [ \t\r\v\f]
      * else fights.
      */
 <INITIAL,SC_COND_SKIP>^[ \t]*"#" {
-    /* A directive is scanned, not captured-then-repaired. The old rule
-     * matched the whole physical line with one pattern and then had to
-     * hand-read the rest whenever the line did not end where the pattern
-     * thought it did -- a block comment opened on it may close on a LATER
-     * line (#1236) -- which meant a second, hand-written statement of
-     * where literals and comments begin and end, and it disagreed with
-     * these rules about an apostrophe (#1362 and its directive twin).
-     * SC_DIRECTIVE accumulates the logical line through the rules below,
-     * so the scanner is the only thing that decides that. */
+    /* A directive is scanned, not captured-then-repaired. C does this
+     * as phases 2 (backslash-newline splice), 3 (comments -> space),
+     * then 4 (the '#' line). We do the same in one scan: three start
+     * conditions, comments and '\\\n' legal in every gap, payload in
+     * SC_DIRECTIVE_DATA allowed to span physical lines. The text handed
+     * to lpc_lex_on_directive is still one logical line -- the same
+     * bytes the old single-state soup accumulated -- so existing
+     * #define / #if / #include parsing does not change. */
     yyextra->directive_accum.assign(yytext, yyleng);
     yyextra->directive_line = current_line;
     yy_push_state(SC_DIRECTIVE, yyscanner);
 }
 
-    /* Comments are whitespace, and one space of it (C phase 3), folded
-     * away HERE so nothing downstream has to strip them. The block form
-     * reuses SC_BLOCK_COMMENT -- its newlines are counted by that state's
-     * own rule and it returns control here when it closes, which is what
-     * makes a comment spanning physical lines cost nothing special. */
-<SC_DIRECTIVE>"/*"          { yyextra->directive_accum += ' '; yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
-<SC_DIRECTIVE>"//"[^\n\x00]*  { yyextra->directive_accum += ' '; }
-
-    /* A backslash-continuation is dropped and counted: the logical line
-     * carries on, and the physical line it crossed is a line like any
-     * other. Nothing downstream folds these out any more. */
-<SC_DIRECTIVE>"\\"\r?\n     { lpc_lex_newline(yyscanner); }
-
-    /* Literals, appended raw. Line-bounded on purpose (AGENTS.md 7): an
-     * unterminated one is not a literal, its opening quote falls through
-     * to the catch-all below as an ordinary character, and the payload
-     * parsers see it as such. The character-literal pattern is the DFA's
-     * own model -- one escape or one byte, then the close quote -- and it
-     * beats the catch-all by longest match, so a lone apostrophe costs
-     * exactly one character and can never swallow a line. */
-<SC_DIRECTIVE>\"([^\\\"\n\x00]|\\[^\n\x00])*\" |
-<SC_DIRECTIVE>`([^\\`\n\x00]|\\[^\n\x00])*` |
-<SC_DIRECTIVE>'(\\([0-7]+|x[0-9a-fA-F]+|[^\n\x00])|[^\\'\n\x00])' {
-    yyextra->directive_accum.append(yytext, yyleng);
+    /* Comments are whitespace (C phase 3), folded HERE. Splice is first
+     * (C phase 2): a slash is held until the next non-continuation byte
+     * so a comment-open split by a backslash-newline is still a comment,
+     * and a '//' tail runs to the logical newline. The block form reuses
+     * SC_BLOCK_COMMENT so a comment that closes on a LATER line (#1236)
+     * costs nothing special and does not end the directive. A comment
+     * after the keyword ends the word (a comment is a space, so define
+     * glued to FOO via a comment is `define` then payload `FOO`, never
+     * the keyword `defineFOO`). BEGIN before the pending-slash push so
+     * a word-ending comment returns to DATA. */
+<SC_DIRECTIVE,SC_DIRECTIVE_DATA>"/" {
+    yy_push_state(SC_DIRECTIVE_SLASH, yyscanner);
+}
+<SC_DIRECTIVE_WORD>"/" {
+    BEGIN(SC_DIRECTIVE_DATA);
+    yy_push_state(SC_DIRECTIVE_SLASH, yyscanner);
+}
+<SC_DIRECTIVE_SLASH>"\\"\r?\n {
+    lpc_lex_newline(yyscanner);
+}
+<SC_DIRECTIVE_SLASH>"*" {
+    yy_pop_state(yyscanner);
+    yyextra->directive_accum += ' ';
+    yy_push_state(SC_BLOCK_COMMENT, yyscanner);
+}
+<SC_DIRECTIVE_SLASH>"/" {
+    yy_pop_state(yyscanner);
+    yyextra->directive_accum += ' ';
+    yy_push_state(SC_DIRECTIVE_LINE_COMMENT, yyscanner);
+}
+<SC_DIRECTIVE_SLASH>\n {
+    yyextra->directive_accum += '/';
+    yy_pop_state(yyscanner);
+    LPC_YYLESS(0);
+}
+<SC_DIRECTIVE_SLASH><<EOF>> {
+    yyextra->directive_accum += '/';
+    yy_pop_state(yyscanner);
+}
+<SC_DIRECTIVE_SLASH>[^\n\x00] {
+    yyextra->directive_accum += '/';
+    yy_pop_state(yyscanner);
+    LPC_YYLESS(0);
 }
 
-<SC_DIRECTIVE>\n {
+    /* '//' body: discarded. A backslash-newline splices; a raw newline
+     * is pushed back so the parent state ends the directive. */
+<SC_DIRECTIVE_LINE_COMMENT>"\\"\r?\n {
+    lpc_lex_newline(yyscanner);
+}
+<SC_DIRECTIVE_LINE_COMMENT>"\\" { /* lone backslash, not a splice */ }
+<SC_DIRECTIVE_LINE_COMMENT>[^\n\x00\\]+ { /* discarded */ }
+<SC_DIRECTIVE_LINE_COMMENT>\n {
+    yy_pop_state(yyscanner);
+    LPC_YYLESS(0);
+}
+<SC_DIRECTIVE_LINE_COMMENT><<EOF>> {
+    yy_pop_state(yyscanner);
+}
+
+    /* A backslash-continuation is dropped and counted in every phase:
+     * the keyword may be split (`#def\` `ine`), and so may the data
+     * (`#define FOO \` `1`). Nothing downstream folds these out. */
+<SC_DIRECTIVE,SC_DIRECTIVE_WORD,SC_DIRECTIVE_DATA>"\\"\r?\n {
+    lpc_lex_newline(yyscanner);
+}
+
+<SC_DIRECTIVE>[ \t]+ { yyextra->directive_accum.append(yytext, yyleng); }
+<SC_DIRECTIVE>[a-zA-Z_] {
+    yyextra->directive_accum += yytext[0];
+    BEGIN(SC_DIRECTIVE_WORD);
+}
+<SC_DIRECTIVE>. {
+    LPC_YYLESS(0);
+    BEGIN(SC_DIRECTIVE_DATA);
+}
+
+<SC_DIRECTIVE_WORD>[a-zA-Z0-9_]+ {
+    yyextra->directive_accum.append(yytext, yyleng);
+}
+<SC_DIRECTIVE_WORD>[ \t]+ {
+    yyextra->directive_accum.append(yytext, yyleng);
+    BEGIN(SC_DIRECTIVE_DATA);
+}
+<SC_DIRECTIVE_WORD>. {
+    LPC_YYLESS(0);
+    BEGIN(SC_DIRECTIVE_DATA);
+}
+
+    /* Payload. Character literals stay the DFA's one-escape-or-one-byte
+     * form so a lone apostrophe (`#warn that's`) cannot swallow a line.
+     * A '"' / '`' pushes a sub-scan so comment markers inside a literal
+     * that spans a continuation stay data (#1382). A raw newline still
+     * ends the directive -- an unterminated quote is not a spanning
+     * literal. */
+<SC_DIRECTIVE_DATA>'(\\([0-7]+|x[0-9a-fA-F]+|[^\n\x00])|[^\\'\n\x00])' {
+    yyextra->directive_accum.append(yytext, yyleng);
+}
+<SC_DIRECTIVE_DATA>\" {
+    yyextra->directive_accum += '"';
+    yy_push_state(SC_DIRECTIVE_STRING, yyscanner);
+}
+<SC_DIRECTIVE_DATA>` {
+    yyextra->directive_accum += '`';
+    yy_push_state(SC_DIRECTIVE_TEMPLATE, yyscanner);
+}
+<SC_DIRECTIVE_DATA>[^\n\x00] { yyextra->directive_accum += yytext[0]; }
+
+<SC_DIRECTIVE_STRING>\" {
+    yyextra->directive_accum += '"';
+    yy_pop_state(yyscanner);
+}
+<SC_DIRECTIVE_TEMPLATE>` {
+    yyextra->directive_accum += '`';
+    yy_pop_state(yyscanner);
+}
+<SC_DIRECTIVE_STRING,SC_DIRECTIVE_TEMPLATE>"\\"\r?\n {
+    lpc_lex_newline(yyscanner);
+}
+<SC_DIRECTIVE_STRING,SC_DIRECTIVE_TEMPLATE>"\\"[^\n\x00] {
+    yyextra->directive_accum.append(yytext, yyleng);
+}
+<SC_DIRECTIVE_STRING>[^\\\"\n\x00]+ {
+    yyextra->directive_accum.append(yytext, yyleng);
+}
+<SC_DIRECTIVE_TEMPLATE>[^\\`\n\x00]+ {
+    yyextra->directive_accum.append(yytext, yyleng);
+}
+<SC_DIRECTIVE_STRING,SC_DIRECTIVE_TEMPLATE>"\\" {
+    yyextra->directive_accum += '\\';
+}
+<SC_DIRECTIVE_STRING,SC_DIRECTIVE_TEMPLATE>\n {
+    yy_pop_state(yyscanner);
+    LPC_YYLESS(0);
+}
+<SC_DIRECTIVE_STRING,SC_DIRECTIVE_TEMPLATE><<EOF>> {
+    yy_pop_state(yyscanner);
+}
+
+<SC_DIRECTIVE,SC_DIRECTIVE_WORD,SC_DIRECTIVE_DATA>\n {
     yy_pop_state(yyscanner);
     lpc_lex_newline(yyscanner);
     LpcDirectiveAction act = lpc_lex_on_directive(
@@ -672,10 +806,10 @@ WS_NO_NL    [ \t\r\v\f]
 
     /* End of input ends the directive too -- and ends it HERE, without
      * reaching into a parent buffer: a '#' at the start of a pushed
-     * splice must not turn that buffer's parent into directive text. The
-     * state is popped without consuming anything, so the ordinary <<EOF>>
-     * handling pops the splice (or finishes the file) next. */
-<SC_DIRECTIVE><<EOF>> {
+     * splice must not turn that buffer's parent into directive text.
+     * BEGIN() between the three phases does not push, so one pop still
+     * restores INITIAL / SC_COND_SKIP. */
+<SC_DIRECTIVE,SC_DIRECTIVE_WORD,SC_DIRECTIVE_DATA><<EOF>> {
     yy_pop_state(yyscanner);
     LpcDirectiveAction act = lpc_lex_on_directive(
         yyextra->directive_accum.c_str(), (int)yyextra->directive_accum.size(),
@@ -686,8 +820,6 @@ WS_NO_NL    [ \t\r\v\f]
         BEGIN(INITIAL);
     }
 }
-
-<SC_DIRECTIVE>[^\n\x00]     { yyextra->directive_accum += yytext[0]; }
 
     /* Dead-branch text, never tokenized -- but it must not swallow a line
      * that starts a directive, or the #else/#endif that ends the branch is

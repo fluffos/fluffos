@@ -388,17 +388,35 @@ def emit_tm_language(data, script_dir):
         ],
         "repository": {
             "comments": {"patterns": [
+                # Ordinary source: '//' ends at the physical newline
+                # (lexer.l's INITIAL rule). A trailing '\' is comment
+                # text and does not continue the comment.
                 {"name": "comment.line.double-slash.lpc", "match": "//.*$"},
-                {"name": "comment.block.lpc", "begin": "/\\*", "end": "\\*/"},
+                {"include": "#block-comment"},
             ]},
+            "block-comment": {
+                "name": "comment.block.lpc",
+                "begin": "/\\*",
+                "end": "\\*/",
+            },
             "preprocessor": {
+                # C splice-first on a '#' line (lexer.l SC_DIRECTIVE*):
+                # '\'-newline joins the region; '//' then runs to the
+                # logical newline, so a trailing '\' continues the
+                # comment. Ordinary '#comments' must not be included
+                # here -- its "//.*$" would close at the physical
+                # newline and leave the next line highlighted as code.
                 "name": "meta.preprocessor.lpc",
                 "begin": "^\\s*(#\\s*[A-Za-z_]*)",
                 "beginCaptures": {"1": {"name": "keyword.control.directive.lpc"}},
                 "end": "(?<!\\\\)$",
                 "patterns": [
-                    {"include": "#comments"},
+                    {"name": "comment.line.double-slash.lpc",
+                     "begin": "//",
+                     "end": "(?<!\\\\)$"},
+                    {"include": "#block-comment"},
                     {"include": "#strings"},
+                    {"include": "#template"},
                     {"name": "string.quoted.other.include.lpc", "match": "<[^>\\n]*>"},
                     {"include": "#numbers"},
                     {"name": "constant.character.escape.line-continuation.lpc",

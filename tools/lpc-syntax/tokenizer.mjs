@@ -147,15 +147,32 @@ function skipTemplateSpan(src, i) {
   return j;
 }
 
+// Bytes consumed by a C phase-2 splice at `k`, or 0.
+function backslashNewlineLen(src, k) {
+  if (src[k] !== '\\') return 0;
+  if (src[k + 1] === '\n') return 2;
+  if (src[k + 1] === '\r' && src[k + 2] === '\n') return 3;
+  return 0;
+}
+
+function peekAfterSplices(src, k) {
+  for (;;) {
+    const n = backslashNewlineLen(src, k);
+    if (!n) return k;
+    k += n;
+  }
+}
+
 // A directive's raw '\n' terminator, scanning from `j` (inside the
-// directive, past its '#'). A '/* ... */' block comment opened on a
-// directive line is invisible whitespace to the directive and may close
-// on a LATER physical line (docs/lpc/preprocessor/) -- the newline(s)
-// inside it don't end the directive; keep scanning past the comment's
-// close for the directive's REAL terminating newline instead. A '//'
-// comment (which always runs to end of physical line) or a string/char
-// literal's own '/*'-or-'//'-shaped content must not be misread as a
-// real comment start, hence routing through skipStringSpan/skipCharSpan.
+// directive, past its '#'). Comments are recognized after splices (C
+// phase 2 then 3): a block comment opened on a directive line is
+// invisible whitespace and may close on a LATER physical line
+// (docs/lpc/preprocessor/) -- the newline(s) inside it don't end the
+// directive; keep scanning past the comment's close for the directive's
+// REAL terminating newline instead. A '//' comment runs to the logical
+// newline (a trailing '\' continues it). A string/char literal's own
+// comment-shaped content must not be misread as a real comment start,
+// hence routing through skipStringSpan/skipCharSpan.
 function directiveLineEnd(src, j) {
   let k = j;
   while (k < src.length && src[k] !== '\n') {
@@ -171,22 +188,42 @@ function directiveLineEnd(src, j) {
     // backslash-newline inside the span still continues the directive:
     // the caller's '\'-continuation check sees the '\' before this
     // returned newline, matching the driver's splice-first folding.)
-    if (c === '"' || c === "'") {
-      const e = c === '"' ? skipStringSpan(src, k) : skipCharSpan(src, k);
+    if (c === '"' || c === "'" || c === '`') {
+      const e = c === "'" ? skipCharSpan(src, k)
+        : c === '`' ? skipTemplateSpan(src, k)
+        : skipStringSpan(src, k);
       const nl = src.indexOf('\n', k);
       if (nl >= 0 && nl < e) return nl;
       k = e;
       continue;
     }
-    if (c === '/' && src[k + 1] === '*') {
-      const e = src.indexOf('*/', k + 2);
-      k = e < 0 ? src.length : e + 2;
-      continue;
-    }
-    if (c === '/' && src[k + 1] === '/') {
-      const nl = src.indexOf('\n', k);
-      k = nl < 0 ? src.length : nl;
-      continue;
+    if (c === '/') {
+      const after = peekAfterSplices(src, k + 1);
+      if (src[after] === '*') {
+        let p = after + 1;
+        while (p < src.length) {
+          const n = backslashNewlineLen(src, p);
+          if (n) { p += n; continue; }
+          if (src[p] === '*') {
+            const close = peekAfterSplices(src, p + 1);
+            if (src[close] === '/') { k = close + 1; break; }
+          }
+          p++;
+        }
+        if (p >= src.length) return src.length;
+        continue;
+      }
+      if (src[after] === '/') {
+        let p = after + 1;
+        while (p < src.length) {
+          const n = backslashNewlineLen(src, p);
+          if (n) { p += n; continue; }
+          if (src[p] === '\n') { k = p; break; }
+          p++;
+        }
+        if (p >= src.length) return src.length;
+        continue;
+      }
     }
     k++;
   }
@@ -253,8 +290,10 @@ export function tokenize(src) {
       continue;
     }
 
-    // preprocessor directive: '#' at line start; '\'-continuations join,
-    // and so does an unclosed '/* ... */' comment (see directiveLineEnd).
+    // preprocessor directive: '#' at line start. Splice first (C phase 2),
+    // then comments (phase 3): '\'-continuations join, a '//' that ends
+    // with '\' continues the comment, and an unclosed block comment does
+    // not end the directive (see directiveLineEnd).
     if (c === '#' && atLineStart) {
       let j = i;
       for (;;) {

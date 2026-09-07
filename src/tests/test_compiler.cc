@@ -1543,6 +1543,178 @@ int v = 100;
 )");
 }
 
+// The documented multi-line function-like form (docs/lpc/preprocessor/define.md)
+// and the testsuite OUTPUT/SAFE shape. Continuations sit OUTSIDE any literal;
+// the #1382 string sub-scan must not steal those backslashes.
+TEST(Preprocessor, MultilineDoWhileMacro) {
+  EXPECT_EQ(pp("#define LONG_MACRO(x) do { \\\n"
+               "    write(x);              \\\n"
+               "} while (0)\n"
+               "LONG_MACRO(v);\n"),
+            "do { write(v); } while (0);");
+}
+
+TEST(Preprocessor, DoWhileMacroIsOneStatementUnderIfElse) {
+  // The textbook C form: '\' joins the body (not a comment), and
+  // do/while(0) is one statement so else still binds to the if.
+  EXPECT_EQ(pp("#define foo(x) do { \\\n"
+               "    n += (x); \\\n"
+               "} while (0)\n"
+               "int n = 0;\n"
+               "if (1)\n"
+               "    foo(3);\n"
+               "else\n"
+               "    foo(99);\n"),
+            "int n = 0; if (1) do { n += (3); } while (0); else do { n += (99); } while (0);");
+}
+
+TEST(Preprocessor, DoWhileMacroCommentBetweenContinuedLines) {
+  EXPECT_EQ(pp("#define foo(x) do { \\\n"
+               "    /* always */ \\\n"
+               "    n += (x); \\\n"
+               "} while (0)\n"
+               "foo(3);\n"),
+            "do { n += (3); } while (0);");
+}
+
+TEST(Preprocessor, DoWhileMacroTrailingLineCommentDoesNotContinue) {
+  // gcc: '\' joins the do/while body; '//' on the last physical line
+  // has no trailing '\' so it stops there. The next line is code.
+  EXPECT_EQ(pp("#define ADD(x, y) do { \\\n"
+               "    r += (x); \\\n"
+               "    r += (y); \\\n"
+               "} while (0) // this comment ends here\n"
+               "ADD(1, 2);\n"),
+            "do { r += (1); r += (2); } while (0);");
+}
+
+TEST(Preprocessor, ContinuedBodyThenLineCommentTail) {
+  // gcc: '\' continues the body; '//' is only a tail (no '\').
+  EXPECT_EQ(pp("#define BAR 10 \\\n"
+               "    + 5 // tail, no backslash\n"
+               "int v = BAR;\n"),
+            "int v = 10 + 5;");
+}
+
+TEST(Preprocessor, MultilineMacroContinuationAfterClosedString) {
+  EXPECT_EQ(pp("#define GREET \"hello\" \\\n"
+               "    \" world\"\n"
+               "string s = GREET;\n"),
+            "string s = \"hello\" \" world\";");
+}
+
+TEST(Preprocessor, MultilineMacroParamList) {
+  EXPECT_EQ(pp("#define ADD(a, \\\n"
+               "            b) ((a) + (b))\n"
+               "int v = ADD(2, 3);\n"),
+            "int v = ((2) + (3));");
+}
+
+TEST(Preprocessor, MultilineIfDirective) {
+  EXPECT_EQ(pp("#if 1 \\\n"
+               "    && 1\n"
+               "int v = 1;\n"
+               "#endif\n"),
+            "int v = 1;");
+}
+
+// C `#` / keyword / payload: comments and `\` are legal in every gap.
+// The logical line handed to dispatch is unchanged, so these are the
+// same expansions master already produced (no new meaning).
+
+TEST(Preprocessor, SpaceAfterHashLikeC) {
+  EXPECT_EQ(pp("# define FOO 1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, CommentBetweenHashAndDirectiveName) {
+  EXPECT_EQ(pp("# /*c*/ define FOO 1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, SpanningCommentBetweenHashAndDirectiveName) {
+  EXPECT_EQ(pp("# /*c\n*/ define FOO 1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, CommentBetweenDirectiveNameAndData) {
+  EXPECT_EQ(pp("#define /*c*/ FOO 1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, CommentGluedAfterDefineKeyword) {
+  EXPECT_EQ(pp("#define/*c*/FOO 1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, SplicedDirectiveKeyword) {
+  EXPECT_EQ(pp("#def\\\nine FOO 1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, CommentBetweenContinuedDataLines) {
+  EXPECT_EQ(pp("#define FOO \\\n    /*c*/ \\\n    1\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, FunctionLikeRequiresImmediateParen) {
+  // C: NAME( is function-like; NAME <space> ( is object-like.
+  EXPECT_EQ(pp("#define F(x) (x)+1\nint v = F(2);\n"), "int v = (2) + 1;");
+  EXPECT_EQ(pp("#define G (x)\nint x = 3; int v = G;\n"), "int x = 3; int v = (x);");
+}
+
+TEST(Preprocessor, CommentBetweenNameAndParenIsObjectLike) {
+  // C phase 3: a comment is a space, so FOO/*c*/(x) is object-like.
+  EXPECT_EQ(pp("#define FOO/*c*/(x)\nint x = 3; int v = FOO;\n"), "int x = 3; int v = (x);");
+}
+
+TEST(Preprocessor, LineCommentOnDefineSplicesLikeC) {
+  // gcc: '#define FOO 1 // note \' then `int x = 99;` -- x is the comment.
+  EXPECT_EQ(pp("#define FOO 1 // note \\\nint x = 99;\nint v = FOO;\n"), "int v = 1;");
+}
+
+TEST(Preprocessor, SplicedSlashStarOpensBlockComment) {
+  EXPECT_EQ(pp("#define FOO 10 /\\\n* c */ + 5\nint v = FOO;\n"), "int v = 10 + 5;");
+}
+
+TEST(Preprocessor, SplicedSlashSlashOpensLineComment) {
+  EXPECT_EQ(pp("#define FOO 1 /\\\n/ c\nint v = FOO;\n"), "int v = 1;");
+}
+
+// #1382: SC_DIRECTIVE's string rule was line-bounded, so a '"' that did
+// not close on the same physical line fell through one character at a
+// time until '//' / '/*' matched and ate the continuation backslash.
+// The pre-#1363 scanner spliced first and never saw this; both markers
+// plus a continuation are required, and only on a directive line.
+
+TEST(Preprocessor, ContinuedDefineStringKeepsLineCommentMarker) {
+  EXPECT_EQ(pp("#define H \"abc// \\\n def\"\nstring s = H;\n"),
+            "string s = \"abc//  def\";");
+}
+
+TEST(Preprocessor, ContinuedDefineStringKeepsBlockCommentMarker) {
+  EXPECT_EQ(pp("#define H \"abc/* \\\n def\"\nstring s = H;\n"),
+            "string s = \"abc/*  def\";");
+}
+
+TEST(Preprocessor, ContinuedDefineTemplateKeepsLineCommentMarker) {
+  EXPECT_EQ(pp("#define H `abc// \\\n def`\nstring s = H;\n"), "string s = `abc//  def`;");
+}
+
+TEST(Preprocessor, ContinuedDefineStringCrlfKeepsLineCommentMarker) {
+  EXPECT_EQ(pp("#define H \"abc// \\\r\n def\"\r\nstring s = H;\r\n"),
+            "string s = \"abc//  def\";");
+}
+
+TEST(Preprocessor, SameLineDefineStringWithSlashIsUnchanged) {
+  EXPECT_EQ(pp("#define H \"abc// def\"\nstring s = H;\n"), "string s = \"abc// def\";");
+}
+
+TEST(Preprocessor, ContinuedDefineStringWithoutMarkerStillJoins) {
+  EXPECT_EQ(pp("#define H \"abc\\\ndef\"\nstring s = H;\n"), "string s = \"abcdef\";");
+}
+
+TEST(Preprocessor, UnterminatedDefineStringDoesNotSwallowNextLine) {
+  EXPECT_EQ(pp("#define BAD \"abc\nint x = 1;\n"), "int x = 1;");
+}
+
+TEST(Preprocessor, ContinuedDefineStringKeepsLineCount) {
+  EXPECT_EQ(pp("#define H \"abc// \\\n def\"\nint l = __LINE__;\n"), "int l = 3;");
+}
+
 // ---------------------------------------------------------------------------
 // 8. String / char literals: macros must not expand inside them
 // ---------------------------------------------------------------------------
