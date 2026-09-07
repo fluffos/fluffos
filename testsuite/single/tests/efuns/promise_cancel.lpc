@@ -143,8 +143,8 @@ private async int cancel_in_nested_loop() {
 
 // Cancelling a body that another dropped awaiter is waiting on must not
 // print "Unhandled promise rejection" for the downstream link. The
-// canceller stamped handled on the TARGET only; the reason has to carry
-// from_cancel with it (PR #1353). Read the debug log, same channel as
+// winning settle carries from_cancel so dealloc_promise() skips the
+// report (PR #1353). Read the debug log, same channel as
 // unhandled_rejection_locus.lpc.
 
 #define DEBUG_LOG_FILE 10
@@ -357,12 +357,18 @@ private void check_stale_combinator_flag() {
     ASSERT_EQ(2, promise_status(stale_all));
     ASSERT_EQ("*plain", reason);
     ASSERT_EQ(1, promise_cancel(stale_leaf));
-    stale_waiter = stale_await_all();
-    promise_catch(stale_waiter, function(mixed wreason) {
-      ASSERT_EQ(2, promise_status(stale_waiter));
-      ASSERT_EQ("*plain", wreason);
-      ASSERT_EQ(2, promise_status(stale_all));
-      RELEASE_LATCH("stale-combinator");
+    // The leaf's combinator reaction was attached first, so it is
+    // delivered before this handler. Create the awaiter only once the
+    // stale input has been applied -- otherwise the waiter can resume
+    // before the flip and the test passes on the unfixed binary.
+    promise_catch(stale_leaf, function(mixed lreason) {
+      stale_waiter = stale_await_all();
+      promise_catch(stale_waiter, function(mixed wreason) {
+        ASSERT_EQ(2, promise_status(stale_waiter));
+        ASSERT_EQ("*plain", wreason);
+        ASSERT_EQ(2, promise_status(stale_all));
+        RELEASE_LATCH("stale-combinator");
+      });
     });
   });
 }
