@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cstdlib>  // for exit
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -48,11 +49,13 @@ enum class HandleState : uint8_t { Created, Running, Done };
 
 struct PipeWatch {
   int handle;
+  uint64_t gen;
   int stream; /* 0 = stdout, 1 = stderr */
 };
 
 struct ExternalHandle {
   object_t* owner = nullptr;
+  uint64_t gen = 0;
   int cmd_index = -1; /* 0-based */
   std::vector<std::string> args;
   HandleState state = HandleState::Created;
@@ -77,6 +80,7 @@ struct ExternalHandle {
   std::string in_buf;
   bool in_closed = false;
   bool close_stdin_after_flush = false;
+  bool stdin_retry_armed = false;
 #ifndef _WIN32
   pid_t pid = -1;
 #else
@@ -89,11 +93,19 @@ struct ExternalHandle {
 };
 
 std::vector<ExternalHandle*> g_handles; /* handle id = index + 1 */
+uint64_t g_next_handle_gen = 1;
 
 std::mutex g_exit_mu;
 struct ChildExitNote {
-  int handle;
-  LPC_INT code;
+  int handle = 0;
+  uint64_t gen = 0;
+  LPC_INT code = -1;
+#ifndef _WIN32
+  pid_t pid = -1;
+#else
+  HANDLE process = nullptr;
+  HANDLE thread = nullptr;
+#endif
 };
 std::vector<ChildExitNote> g_exit_notes;
 
@@ -151,7 +163,6 @@ void parse_cmd_args(svalue_t* args, std::vector<std::string>* extra) {
       extra->emplace_back(item.u.string);
     }
   } else {
-#ifndef _WIN32
     std::istringstream iss(args->u.string);
     std::string item;
     while (std::getline(iss, item, ' ')) {
@@ -159,9 +170,6 @@ void parse_cmd_args(svalue_t* args, std::vector<std::string>* extra) {
         extra->push_back(item);
       }
     }
-#else
-    extra->emplace_back(args->u.string);
-#endif
   }
 }
 
@@ -248,7 +256,9 @@ void push_external_result(const std::string& out, const std::string& err, LPC_IN
 }
 
 void kill_handle_child(ExternalHandle* h) {
-  if (h->state != HandleState::Running) {
+  /* status_done means the waiter has already reaped: the pid/HANDLE must
+   * not be signalled (PID recycle / closed HANDLE). */
+  if (h->state != HandleState::Running || h->status_done) {
     return;
   }
 #ifndef _WIN32
@@ -364,6 +374,22 @@ void destroy_handle(int id, int kill_child) {
   g_handles[id - 1] = nullptr;
 }
 
+void reap_exit_note(const ChildExitNote& note) {
+#ifndef _WIN32
+  if (note.pid > 0) {
+    int st = 0;
+    (void)waitpid(note.pid, &st, 0);
+  }
+#else
+  if (note.process) {
+    CloseHandle(note.process);
+  }
+  if (note.thread) {
+    CloseHandle(note.thread);
+  }
+#endif
+}
+
 void drain_child_exits() {
   std::vector<ChildExitNote> notes;
   {
@@ -371,21 +397,34 @@ void drain_child_exits() {
     notes.swap(g_exit_notes);
   }
   for (auto& note : notes) {
+    /* Always reap/close from the note. The handle may already have been
+     * destroyed (close / owner destruct); the pid must not stay a zombie
+     * and the Win32 HANDLEs must not leak. */
+    reap_exit_note(note);
     if (note.handle < 1 || note.handle > static_cast<int>(g_handles.size()) ||
         !g_handles[note.handle - 1]) {
       continue;
     }
     ExternalHandle* h = g_handles[note.handle - 1];
+    if (h->gen != note.gen || h->state != HandleState::Running) {
+      continue;
+    }
     h->exit_code = note.code;
     h->status_done = true;
+#ifndef _WIN32
+    h->pid = -1;
+#else
+    h->pi.hProcess = nullptr;
+    h->pi.hThread = nullptr;
+#endif
     try_finish_handle(note.handle);
   }
 }
 
-void note_child_exit(int handle, LPC_INT code) {
+void post_child_exit(ChildExitNote note) {
   {
     std::lock_guard<std::mutex> const lock(g_exit_mu);
-    g_exit_notes.push_back(ChildExitNote{handle, code});
+    g_exit_notes.push_back(note);
   }
   add_walltime_event(std::chrono::milliseconds(0),
                      TickEvent::callback_type([] { drain_child_exits(); }));
@@ -398,6 +437,9 @@ void on_handle_pipe_read(evutil_socket_t fd, short /*what*/, void* arg) {
     return;
   }
   ExternalHandle* h = g_handles[id - 1];
+  if (h->gen != watch->gen) {
+    return;
+  }
   char buf[kPipeBuf];
   for (;;) {
 #ifdef _WIN32
@@ -436,7 +478,7 @@ void on_handle_pipe_read(evutil_socket_t fd, short /*what*/, void* arg) {
 }
 
 void arm_pipe_reader(ExternalHandle* h, int id, int stream, evutil_socket_t fd) {
-  auto* watch = new PipeWatch{id, stream};
+  auto* watch = new PipeWatch{id, h->gen, stream};
   struct event* ev =
       event_new(g_event_base, fd, EV_READ | EV_PERSIST, on_handle_pipe_read, watch);
   if (stream == 0) {
@@ -509,9 +551,53 @@ void flush_stdin(ExternalHandle* h, int id) {
     while (!h->in_buf.empty()) {
       DWORD written = 0;
       size_t chunk = std::min(h->in_buf.size(), static_cast<size_t>(kPipeBuf));
-      if (!WriteFile(h->in_handle, h->in_buf.data(), static_cast<DWORD>(chunk), &written, nullptr) ||
-          written == 0) {
+      if (!WriteFile(h->in_handle, h->in_buf.data(), static_cast<DWORD>(chunk), &written, nullptr)) {
+        DWORD const err = GetLastError();
+        /* PIPE_NOWAIT: buffer full. Retry on a short timer so the driver
+         * event loop is not blocked by a synchronous WriteFile. */
+        if (err == ERROR_NO_DATA || err == ERROR_IO_PENDING) {
+          if (!h->stdin_retry_armed) {
+            h->stdin_retry_armed = true;
+            int const retry_id = id;
+            uint64_t const retry_gen = h->gen;
+            add_walltime_event(std::chrono::milliseconds(10), TickEvent::callback_type([retry_id,
+                                                                                       retry_gen] {
+              if (retry_id < 1 || retry_id > static_cast<int>(g_handles.size()) ||
+                  !g_handles[retry_id - 1]) {
+                return;
+              }
+              ExternalHandle* rh = g_handles[retry_id - 1];
+              if (rh->gen != retry_gen) {
+                return;
+              }
+              rh->stdin_retry_armed = false;
+              flush_stdin(rh, retry_id);
+            }));
+          }
+          return;
+        }
         close_stdin_write(h);
+        return;
+      }
+      if (written == 0) {
+        if (!h->stdin_retry_armed) {
+          h->stdin_retry_armed = true;
+          int const retry_id = id;
+          uint64_t const retry_gen = h->gen;
+          add_walltime_event(std::chrono::milliseconds(10), TickEvent::callback_type([retry_id,
+                                                                                     retry_gen] {
+            if (retry_id < 1 || retry_id > static_cast<int>(g_handles.size()) ||
+                !g_handles[retry_id - 1]) {
+              return;
+            }
+            ExternalHandle* rh = g_handles[retry_id - 1];
+            if (rh->gen != retry_gen) {
+              return;
+            }
+            rh->stdin_retry_armed = false;
+            flush_stdin(rh, retry_id);
+          }));
+        }
         return;
       }
       h->in_buf.erase(0, static_cast<size_t>(written));
@@ -696,22 +782,18 @@ int spawn_handle_posix(ExternalHandle* h, int id) {
   arm_pipe_reader(h, id, 1, errp[0]);
   flush_stdin(h, id);
 
-  std::thread([id, pid]() {
-    int status = 0;
-    LPC_INT code = -1;
-    do {
-      const int s = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-      if (s == -1) {
-        note_child_exit(id, -1);
-        return;
-      }
-      if (WIFEXITED(status)) {
-        code = WEXITSTATUS(status);
-      } else if (WIFSIGNALED(status)) {
-        code = 128 + WTERMSIG(status);
-      }
-    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-    note_child_exit(id, code);
+  uint64_t const gen = h->gen;
+  std::thread([id, gen, pid]() {
+    siginfo_t si{};
+    /* WNOWAIT leaves the zombie so the pid cannot be recycled until the
+     * main thread reaps in drain_child_exits(). kill() between waitid and
+     * drain therefore cannot hit a reused pid. */
+    if (waitid(P_PID, pid, &si, WEXITED | WNOWAIT) == -1) {
+      post_child_exit(ChildExitNote{id, gen, -1, pid});
+      return;
+    }
+    LPC_INT code = (si.si_code == CLD_EXITED) ? si.si_status : 128 + si.si_status;
+    post_child_exit(ChildExitNote{id, gen, code, pid});
   }).detach();
   return 0;
 }
@@ -807,6 +889,12 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
     evutil_closesocket(sv[1]);
     return EESOCKET;
   }
+  /* Anonymous pipes are synchronous; PIPE_NOWAIT keeps WriteFile from
+   * stalling the driver when the child's stdin buffer is full. */
+  {
+    DWORD mode = PIPE_NOWAIT;
+    (void)SetNamedPipeHandleState(stdin_wr, &mode, nullptr, nullptr);
+  }
 
   PROCESS_INFORMATION processInfo{};
   if (!win32_create_process(&cmdline, stdin_rd, reinterpret_cast<HANDLE>(sv[0]),
@@ -824,15 +912,17 @@ int spawn_handle_win32(ExternalHandle* h, int id) {
   h->in_handle = stdin_wr;
   flush_stdin(h, id);
 
-  std::thread([id, processInfo, child_fd = sv[0]]() {
+  uint64_t const gen = h->gen;
+  std::thread([id, gen, processInfo, child_fd = sv[0]]() {
     WaitForSingleObject(processInfo.hProcess, INFINITE);
     DWORD exitCode = static_cast<DWORD>(-1);
     GetExitCodeProcess(processInfo.hProcess, &exitCode);
-    CloseHandle(processInfo.hProcess);
-    CloseHandle(processInfo.hThread);
+    /* Do not CloseHandle here: the main thread reaps in drain_child_exits
+     * so TerminateProcess cannot run on a recycled HANDLE. */
     shutdown(child_fd, SD_SEND);
     evutil_closesocket(child_fd);
-    note_child_exit(id, static_cast<LPC_INT>(exitCode));
+    post_child_exit(
+        ChildExitNote{id, gen, static_cast<LPC_INT>(exitCode), processInfo.hProcess, processInfo.hThread});
   }).detach();
   return 0;
 }
@@ -1121,6 +1211,7 @@ void f_external_create() {
   int const id = alloc_handle_id();
   auto* h = new ExternalHandle{};
   h->owner = current_object;
+  h->gen = ++g_next_handle_gen;
   h->cmd_index = cmd;
   h->args = std::move(extra);
   g_handles[id - 1] = h;
@@ -1149,6 +1240,12 @@ void f_external_run() {
     return;
   }
   st_num_arg = num_arg;
+  /* check_valid_socket() is a master apply: the owner may have been
+   * destructed and this slot reused. Re-lookup before spawn. */
+  h = lookup_handle(id, /*require_owner=*/1);
+  if (h->state != HandleState::Created) {
+    error("external_run: handle has already been started.\n");
+  }
 
   int const rc = spawn_handle(h, id);
   promise_t* p = promise_alloc();
@@ -1197,6 +1294,7 @@ void f_external_start() {
     int const id = alloc_handle_id();
     auto* h = new ExternalHandle{};
     h->owner = current_object;
+    h->gen = ++g_next_handle_gen;
     h->cmd_index = static_cast<int>(which);
     h->args = std::move(extra);
     h->ephemeral = true;
@@ -1263,7 +1361,7 @@ void f_external_exit_code() {
 void f_external_kill() {
   int const id = static_cast<int>(sp->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
-  if (h->state != HandleState::Running) {
+  if (h->state != HandleState::Running || h->status_done) {
     sp->u.number = 0;
     return;
   }

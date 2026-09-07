@@ -235,6 +235,60 @@ async void run_cancel() {
   }
 }
 
+// Close a Running child, reuse the slot, run a short command. A stale
+// exit note from the first child must not settle the new handle.
+async void run_handle_reuse() {
+  mixed err, p, r;
+  int i, j, slot, h1, h2;
+  mixed *sleeps = ({ 9, 10, 6 });
+  mixed *echoes = ({ 3, 4, 6 });
+
+  for (i = 0; i < sizeof(sleeps); i++) {
+    slot = sleeps[i];
+    err = catch(h1 = external_create(slot, sleep_args(slot)));
+    if (err || !intp(h1) || h1 <= 0) {
+      continue;
+    }
+    err = catch(p = external_run(h1));
+    if (err || typeof(p) != "promise") {
+      external_close(h1);
+      continue;
+    }
+    promise_catch(p, (: 0 :));
+    external_close(h1);
+
+    h2 = 0;
+    for (j = 0; j < sizeof(echoes); j++) {
+      err = catch(h2 = external_create(echoes[j], echo_args(echoes[j])));
+      if (!err && intp(h2) && h2 > 0) {
+        break;
+      }
+      h2 = 0;
+    }
+    if (!h2) {
+      return;
+    }
+    // Lowest free slot is reused in the same tick.
+    ASSERT_EQ(h1, h2);
+    await call_out(1);
+    err = catch(p = external_run(h2));
+    if (err || typeof(p) != "promise") {
+      external_close(h2);
+      continue;
+    }
+    err = acatch {
+      r = await p;
+    };
+    ASSERT2(!err, "reused handle ran");
+    ASSERT(arrayp(r) && sizeof(r) == 3);
+    ASSERT_EQ(0, r[2]);
+    ASSERT(stringp(r[0]) && strsrch(r[0], "hello-from-external") != -1);
+    external_close(h2);
+    RELEASE_LATCH("external handle reuse");
+    return;
+  }
+}
+
 void do_tests() {
   mixed p, err, h;
   int slot, fd;
@@ -326,6 +380,7 @@ void do_tests() {
   EXPECT_LATCH("external_create handle");
   EXPECT_LATCH("external_start stdin");
   EXPECT_LATCH("external_start cancel kills");
+  EXPECT_LATCH("external handle reuse");
 
   // Classic form: int fd, required callbacks. Must compile as an int
   // assignment (the master return type) and must not throw on a live slot.
@@ -346,6 +401,7 @@ void do_tests() {
   call_out(function() { run_handle(); }, 1);
   call_out(function() { run_stdin(); }, 1);
   call_out(function() { run_cancel(); }, 1);
+  call_out(function() { run_handle_reuse(); }, 1);
 }
 #else
 void do_tests() { ASSERT(1); }
