@@ -349,6 +349,10 @@ export function formatLPC(source, options = {}) {
     else sawLineZero = true;
 
     if (t.kind === 'directive') {
+      // One token, possibly several physical lines: '\' continuations,
+      // a spanning block comment, or a '//' that splices onto the next
+      // line (C phase 2). Emitted verbatim at column 0; the tokenizer
+      // already decided which following lines belong to this directive.
       flush();
       lines.push(t.text.replace(/[ \t]+(\r?)$/g, '$1'));
       continue;
@@ -806,9 +810,10 @@ function nextNonComment(toks, idx) {
 
 // Mirrors the driver's own preprocessing of a directive's text before any
 // macro analysis (fold_backslash_newlines + strip_directive_comments in
-// lexer_rules_pp.cc): `\`-line-splices vanish, block comments become a
-// single space (but NOT inside string/char literals -- the driver skips
-// quoted spans atomically), and a `//` comment ends the body. The
+// lexer_rules_pp.cc): `\`-line-splices vanish first (C phase 2), block
+// comments become a single space (but NOT inside string/char literals --
+// the driver skips quoted spans atomically), and a `//` comment then
+// ends the body (C phase 3). The
 // stringize analysis below must run on this folded form or a `#define
 // SC(x) #/*c*/x`, a `# \<newline>x`, or a spliced parameter list all
 // hide their stringize from the detector -- driver-verified semantic

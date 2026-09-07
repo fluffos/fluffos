@@ -488,6 +488,10 @@
       "rhs": []
     },
     {
+      "lhs": "tree_context_start",
+      "rhs": []
+    },
+    {
       "lhs": "dollar_start",
       "rhs": []
     },
@@ -1550,6 +1554,7 @@
       "lhs": "tree",
       "rhs": [
         "L_TREE",
+        "tree_context_start",
         "block"
       ]
     },
