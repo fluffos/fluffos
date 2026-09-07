@@ -250,42 +250,37 @@ async void run_handle_reuse() {
       continue;
     }
     err = catch(p = external_run(h1));
-    if (err || typeof(p) != "promise") {
+    // Spawn failure still returns a rejected promise (Windows /bin/sleep).
+    if (err || typeof(p) != "promise" || promise_status(p) != 0) {
       external_close(h1);
       continue;
     }
     promise_catch(p, (: 0 :));
     external_close(h1);
 
-    h2 = 0;
     for (j = 0; j < sizeof(echoes); j++) {
       err = catch(h2 = external_create(echoes[j], echo_args(echoes[j])));
-      if (!err && intp(h2) && h2 > 0) {
-        break;
+      if (err || !intp(h2) || h2 <= 0) {
+        continue;
       }
-      h2 = 0;
-    }
-    if (!h2) {
+      ASSERT_EQ(h1, h2);
+      await call_out(1);
+      err = catch(p = external_run(h2));
+      if (err || typeof(p) != "promise" || promise_status(p) != 0) {
+        external_close(h2);
+        continue;
+      }
+      err = acatch {
+        r = await p;
+      };
+      ASSERT2(!err, "reused handle ran");
+      ASSERT(arrayp(r) && sizeof(r) == 3);
+      ASSERT_EQ(0, r[2]);
+      ASSERT(stringp(r[0]) && strsrch(r[0], "hello-from-external") != -1);
+      external_close(h2);
+      RELEASE_LATCH("external handle reuse");
       return;
     }
-    // Lowest free slot is reused in the same tick.
-    ASSERT_EQ(h1, h2);
-    await call_out(1);
-    err = catch(p = external_run(h2));
-    if (err || typeof(p) != "promise") {
-      external_close(h2);
-      continue;
-    }
-    err = acatch {
-      r = await p;
-    };
-    ASSERT2(!err, "reused handle ran");
-    ASSERT(arrayp(r) && sizeof(r) == 3);
-    ASSERT_EQ(0, r[2]);
-    ASSERT(stringp(r[0]) && strsrch(r[0], "hello-from-external") != -1);
-    external_close(h2);
-    RELEASE_LATCH("external handle reuse");
-    return;
   }
 }
 
