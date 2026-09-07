@@ -19,9 +19,10 @@
 nosave promise never, gate;
 nosave promise held, caught_body, defer_body;
 nosave promise status_leaf, status_all, status_race, status_settled;
-nosave promise catch_then_fail_p;
+nosave promise catch_then_fail_p, running_fail_p, armed_fault_p;
+nosave promise stale_x, stale_leaf, stale_all, stale_waiter;
 nosave int body_ran_past_await, defer_ran, cleanup_awaited;
-nosave mixed caught, declined_caught;
+nosave mixed caught, declined_caught, declined_running;
 
 // Parked on a promise nothing will ever settle.
 private async int stuck() {
@@ -291,6 +292,81 @@ private void check_catch_then_fail() {
   });
 }
 
+// Same contract on the RUNNING route: cancel after a resume, catch at the
+// next await, then fault. from_cancel must not have been stamped at request
+// time (unwind_to_acatch_marker() already replaced catch_value, so the old
+// decline check could never fire).
+private async int catch_then_fail_running() {
+  await gate;
+  ASSERT_EQ(1, promise_cancel(running_fail_p));
+  declined_running = acatch(await never);
+  error("running-route fault");
+}
+
+private void check_catch_then_fail_running() {
+  EXPECT_LATCH("catch-then-fail-running");
+  running_fail_p = catch_then_fail_running();
+  promise_catch(running_fail_p, function(mixed reason) {
+    ASSERT_EQ(2, promise_status(running_fail_p));
+    ASSERT2(stringp(reason) && strsrch(reason, "running-route fault") != -1,
+      "running-route declined cancel then faulted: " + reason);
+    ASSERT_EQ("*async function cancelled", declined_running);
+    RELEASE_LATCH("catch-then-fail-running");
+  });
+}
+
+// Cancel armed, no further await: the body faults for real. Docs: a body
+// that never awaits again runs to completion; the settlement is the fault,
+// not PROMISE_CANCELLED.
+private async int armed_then_fault() {
+  await gate;
+  ASSERT_EQ(1, promise_cancel(armed_fault_p));
+  error("armed no-await fault");
+}
+
+private void check_armed_then_fault() {
+  EXPECT_LATCH("armed-then-fault");
+  armed_fault_p = armed_then_fault();
+  promise_catch(armed_fault_p, function(mixed reason) {
+    ASSERT_EQ(2, promise_status(armed_fault_p));
+    ASSERT2(stringp(reason) && strsrch(reason, "armed no-await fault") != -1,
+      "armed cancel never delivered, real fault: " + reason);
+    RELEASE_LATCH("armed-then-fault");
+  });
+}
+
+private async int stale_leaf_body() {
+  await never;
+  return 1;
+}
+
+private async int stale_await_all() {
+  return await stale_all;
+}
+
+// A late cancelled input must not flip from_cancel on an already-settled
+// combinator. Otherwise `return await all` inherits PROMISE_CANCELLED with
+// the original plain-rejection reason.
+private void check_stale_combinator_flag() {
+  EXPECT_LATCH("stale-combinator");
+  stale_x = promise_create();
+  stale_leaf = stale_leaf_body();
+  stale_all = promise_all(({ stale_x, stale_leaf }));
+  promise_reject(stale_x, "*plain");
+  promise_catch(stale_all, function(mixed reason) {
+    ASSERT_EQ(2, promise_status(stale_all));
+    ASSERT_EQ("*plain", reason);
+    ASSERT_EQ(1, promise_cancel(stale_leaf));
+    stale_waiter = stale_await_all();
+    promise_catch(stale_waiter, function(mixed wreason) {
+      ASSERT_EQ(2, promise_status(stale_waiter));
+      ASSERT_EQ("*plain", wreason);
+      ASSERT_EQ(2, promise_status(stale_all));
+      RELEASE_LATCH("stale-combinator");
+    });
+  });
+}
+
 void do_tests() {
   never = promise_create();
   gate = promise_create();
@@ -319,4 +395,7 @@ void do_tests() {
   check_cancel_propagate();
   check_cancel_status();
   check_catch_then_fail();
+  check_catch_then_fail_running();
+  check_armed_then_fault();
+  check_stale_combinator_flag();
 }

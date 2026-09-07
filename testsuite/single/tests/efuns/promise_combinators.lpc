@@ -11,6 +11,7 @@
 #include "/include/tests.h"
 
 nosave promise a, b, c;
+nosave promise race_probe_in, race_probe;
 
 // A combinator still PENDING when the file ends leaves its already delivered
 // slots there for the post-file check_memory() to walk. `slots` is an
@@ -203,7 +204,11 @@ void do_tests() {
   c = slow(2, 0);
 
   ASSERT_EQ("promise", typeof(promise_all(({}))));
-  ASSERT2(promisep(promise_race(({ promise_create() }))), "promise_race returns a promise");
+  // Hold both ends so a temporary promise_race(({ promise_create() }))
+  // does not collect the input and log "Unhandled promise rejection".
+  race_probe_in = promise_create();
+  race_probe = promise_race(({ race_probe_in }));
+  ASSERT2(promisep(race_probe), "promise_race returns a promise");
 
   check_all();
   check_all_fail();

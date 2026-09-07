@@ -84,7 +84,8 @@ promise_t* g_coroutine_promise = nullptr;
 int g_coroutine_temp_base = 0;
 #endif
 
-void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc);
+void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc,
+                    bool from_cancel = false);
 bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_frame,
                         int resumed_temp_base = -1);
 
@@ -595,10 +596,7 @@ void deliver_reaction(QueuedReaction* qr) {
     /* pass-through: propagate the source's state to the chained promise */
     if (qr->next) {
       if (rejected) {
-        if (src->from_cancel) {
-          qr->next->from_cancel = true;
-        }
-        promise_settle(qr->next, &src->result, 1);
+        promise_settle(qr->next, &src->result, 1, src->from_cancel);
       } else {
         promise_resolve_with(qr->next, &src->result);
       }
@@ -928,14 +926,10 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
         } catch (const char*) {
         }
         if (unwound) {
-          /* The body caught the raise. If this was a cancellation, it was
-           * declined -- later settlement is ordinary fulfill or reject, not
-           * PROMISE_CANCELLED. Matched by the driver's constant pointer, not
-           * by string content: a mudlib throw of the same letters is a
-           * rejection. */
-          if (catch_value.type == T_STRING && catch_value.u.string == kCancelledRejection) {
-            p->from_cancel = false;
-          }
+          /* Declined: later settlement is ordinary fulfill or reject. Do
+           * not stamp from_cancel here -- catch_value has already been
+           * replaced by unwind_to_acatch_marker(), and from_cancel is a
+           * settle-time fact anyway. */
           continue;
         }
       }
@@ -943,7 +937,16 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
       svalue_t err = catch_value;
       catch_value = const1;
       restore_context(&econ);
-      (void)promise_settle(p, &err, 1);
+#ifdef DEBUG
+      /* do_catch() parity: restore_context() does not carry the foreach
+       * temporary counter. An uncaught error inside foreach would otherwise
+       * leave it elevated and silently disable break_point()'s stack check. */
+      stack_in_use_as_temporary = g_coroutine_temp_base;
+#endif
+      /* Settle-time cancel: only the driver's constant pointer, never a
+       * pre-stamped flag that would outlive a declined cancel. */
+      (void)promise_settle(p, &err, 1,
+                           err.type == T_STRING && err.u.string == kCancelledRejection);
       free_svalue(&err, "run_coroutine_body");
       too_deep_error = 0;
       if (max_eval_error) {
@@ -973,7 +976,8 @@ void discard_defer_list(struct defer_list* d) {
  * are discarded. `reject_with`, if non-null, rejects the result promise
  * (promise_settle only queues -- no LPC runs synchronously, so this is
  * safe from deallocation paths too). */
-void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) {
+void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc,
+                    bool from_cancel) {
   /* Latched before free_object() below nulls coro->ob: the owner index is
    * keyed on that pointer, and losing it would strand the entry -- so the
    * object's next destruct would find no frames and skip abandoning them.
@@ -1053,7 +1057,7 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc) 
     coro->frame = nullptr;
   }
   if (reject_with) {
-    (void)promise_settle(coro->result_promise, reject_with, 1);
+    (void)promise_settle(coro->result_promise, reject_with, 1, from_cancel);
   }
   free_promise(coro->result_promise);
   free_object(&coro->ob, "free_coroutine");
@@ -1146,10 +1150,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     /* no acatch() region spans the await: the rejection propagates
      * straight to the coroutine's own promise, no need to rebuild the
      * frame at all (no catch may span an await by construction). */
-    if (source->from_cancel || reason == &cancel_reason) {
-      coro->result_promise->from_cancel = true;
-    }
-    free_coroutine(coro, reason, true);
+    free_coroutine(coro, reason, true, source->from_cancel || reason == &cancel_reason);
     return;
   }
 
@@ -1295,13 +1296,8 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     entry = coro->prog->program + coro->pc_offset;
   } else {
     /* re-raise at the await point; the innermost acatch() catches it.
-     * Catching THIS body's own cancel (reason == &cancel_reason) declines
-     * it -- later settlement is ordinary. An inherited cancelled await is
-     * just a catchable rejection here; from_cancel was never set on this
-     * result. */
-    if (reason == &cancel_reason) {
-      coro->result_promise->from_cancel = false;
-    }
+     * Catching THIS body's own cancel declines it -- later settlement is
+     * ordinary because from_cancel is recorded only when settle wins. */
     assign_svalue(&catch_value, reason);
     entry = unwind_to_acatch_marker(csp);
   }
@@ -1573,9 +1569,9 @@ void dealloc_promise(promise_t* p) {
   FREE(p);
 }
 
-int promise_settle(promise_t* p, svalue_t* value, int rejected) {
+int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel) {
   if (p->state != PROMISE_PENDING) {
-    return 0; /* first settle wins */
+    return 0; /* first settle wins -- do not rewrite from_cancel */
   }
   if (rejected && p->reject_origin == nullptr) {
     p->reject_origin = capture_reject_origin();
@@ -1585,9 +1581,12 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected) {
   } else {
     promise_clear_cancel_handler(p);
   }
+  /* Record the bit only when this settle wins. A late combinator input or
+   * a declined cancel must not flip an already-decided promise. */
+  p->from_cancel = rejected && from_cancel;
   if (!rejected) {
     p->state = PROMISE_FULFILLED;
-  } else if (p->from_cancel) {
+  } else if (from_cancel) {
     p->state = PROMISE_CANCELLED;
   } else {
     p->state = PROMISE_REJECTED;
@@ -1709,18 +1708,12 @@ void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, boo
   switch (c->kind) {
     case PROMISE_COMB_RACE:
       /* first to settle decides, either way */
-      if (rejected && from_cancel) {
-        c->result->from_cancel = true;
-      }
-      (void)promise_settle(c->result, value, rejected ? 1 : 0);
+      (void)promise_settle(c->result, value, rejected ? 1 : 0, rejected && from_cancel);
       break;
 
     case PROMISE_COMB_ALL:
       if (rejected) {
-        if (from_cancel) {
-          c->result->from_cancel = true;
-        }
-        (void)promise_settle(c->result, value, 1); /* fail fast */
+        (void)promise_settle(c->result, value, 1, from_cancel); /* fail fast */
       } else {
         assign_svalue(&c->slots->item[index], value);
       }
@@ -1878,12 +1871,12 @@ int promise_request_cancel(promise_t* p) {
   }
 
   p->cancelled = true;
-  /* The canceller has forced the outcome, so the rejection below is not
-   * "unhandled" even if nobody attached a handler; without this a
-   * fire-and-forget cancel logs a rejection report when the promise dies.
-   * from_cancel travels with the reason to every downstream link. */
-  p->handled = true;
-  p->from_cancel = true;
+  /* Do not stamp from_cancel or handled here. from_cancel is a settle-time
+   * fact: a body that declines the raise and then faults (or returns) must
+   * not be recorded as PROMISE_CANCELLED, and a declined cancel must not
+   * suppress a later unhandled-rejection report. Fire-and-forget cancel
+   * still skips that report because dealloc_promise() keys on from_cancel
+   * of the winning settle. */
 
   /* Find the parked frame, if there is one. A linear scan over at most
    * `max suspended async functions` entries, on a rare user-initiated efun.
@@ -1934,7 +1927,7 @@ int promise_request_cancel(promise_t* p) {
   reason.type = T_STRING;
   reason.subtype = STRING_CONSTANT;
   reason.u.string = kCancelledRejection;
-  (void)promise_settle(s, &reason, 1);
+  (void)promise_settle(s, &reason, 1, true);
   /* nothing will attach a handler to a promise only the driver can see */
   s->handled = true;
   coro->awaiting = s;

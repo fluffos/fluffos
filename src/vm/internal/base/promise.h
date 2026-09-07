@@ -109,13 +109,12 @@ struct promise_t {
   bool cancelled;
   /* This settlement is a cancellation -- either this promise is the
    * cancelled body, or it inherited that body's reason through await / then
-   * / adoption / a combinator. promise_settle() records PROMISE_CANCELLED
-   * rather than PROMISE_REJECTED when the bit is set, which is what
-   * promise_status() returns. dealloc_promise() also skips the unhandled-
-   * rejection report: cancel is a delivered outcome, not a fault, and
-   * stamping handled on the target alone left every downstream link to spam
-   * the driver log (PR #1353). Copied with the reason, not inferred from
-   * the string, which a mudlib can forge. */
+   * / adoption / a combinator. Set only when promise_settle() WINS, never
+   * at cancel-request time: a declined cancel (acatch then a later fault
+   * or return) must settle as ordinary fulfill/reject, and a late input
+   * on an already-settled combinator must not flip this bit. Copied with
+   * the reason, not inferred from the string, which a mudlib can forge.
+   * dealloc_promise() skips the unhandled-rejection report when set. */
   bool from_cancel;
   /* the declared payload tag of an `async T f()`'s promise, as the runtime
    * T_* mask (0 = unannotated, e.g. promise_create()). The authoritative
@@ -151,8 +150,10 @@ void free_promise(promise_t* p);
 void dealloc_promise(promise_t* p);
 
 /* First settle wins: returns 1 if this call settled the promise, 0 if it was
- * already settled (the value is not consumed in that case). */
-int promise_settle(promise_t* p, svalue_t* value, int rejected);
+ * already settled (the value is not consumed in that case, and from_cancel
+ * is not written). A winning rejection with from_cancel records
+ * PROMISE_CANCELLED rather than PROMISE_REJECTED. */
+int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel = false);
 /* Fulfill with a plain value, or adopt the eventual state of a promise value
  * (flattening). Self-resolution rejects the promise. */
 void promise_resolve_with(promise_t* p, svalue_t* value);
