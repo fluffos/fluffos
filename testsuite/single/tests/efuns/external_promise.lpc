@@ -263,7 +263,9 @@ async void run_handle_reuse() {
       if (err || !intp(h2) || h2 <= 0) {
         continue;
       }
-      ASSERT_EQ(h1, h2);
+      // Same id is the reuse case (stale exit note). Concurrent tests in
+      // this file may have taken the slot; a different id still has to
+      // settle with its own exit, not a leftover 143.
       await call_out(1);
       err = catch(p = external_run(h2));
       if (err || typeof(p) != "promise" || promise_status(p) != 0) {
