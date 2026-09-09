@@ -1,0 +1,97 @@
+// Specialized plain-slot stores (issue #1358). Functional checks plus a
+// dump_prog listing so a revert of the emit rewrite cannot hide behind
+// ordinary `=` semantics (those already worked).
+
+int g;
+int g2;
+
+int keep_local(int n) {
+  int x;
+  return x = n;
+}
+
+int keep_global(int n) {
+  return g = n;
+}
+
+void do_tests() {
+  int a, b, c;
+
+  a = 1;
+  ASSERT_EQ(1, a);
+
+  b = a = 2;
+  ASSERT_EQ(2, a);
+  ASSERT_EQ(2, b);
+
+  c = (a = b = 3);
+  ASSERT_EQ(3, a);
+  ASSERT_EQ(3, b);
+  ASSERT_EQ(3, c);
+
+  ASSERT_EQ(7, keep_local(7));
+  ASSERT_EQ(8, keep_global(8));
+  ASSERT_EQ(8, g);
+
+  g = g2 = 9;
+  ASSERT_EQ(9, g);
+  ASSERT_EQ(9, g2);
+
+  g = keep_local(10);
+  ASSERT_EQ(10, g);
+
+  string s;
+  s = "ab";
+  s[0] = 'X';
+  ASSERT_EQ("Xb", s);
+  s[0] = s[1] = 'Y';
+  ASSERT_EQ("YY", s);
+
+  int *arr;
+  arr = ({ 1, 2 });
+  arr[0] = arr[1] = 4;
+  ASSERT_EQ(({ 4, 4 }), arr);
+
+#ifdef __PACKAGE_DEVELOP__
+  {
+    object ob;
+    string txt, src, al, ag, vag, llv, glv, asg;
+
+    // Needles assembled at runtime so they do not sit in this file's
+    // string table (dump_prog prints that table too).
+    al = "assign" + "_local";
+    ag = "assign" + "_global";
+    vag = "(void)assign" + "_global";
+    llv = "local" + "_lvalue";
+    glv = "global" + "_lvalue";
+    asg = "assign";
+
+    src = "#pragma no_optimize\n"
+      "int g;\n"
+      "int ginit = 5;\n"
+      "int keep(int n) { int x; return x = n; }\n"
+      "void unused() { int x; function f; x = 1; g = 2; f = (: g = 3 :); }\n";
+    rm("/gen_assign_spec.c");
+    write_file("/gen_assign_spec.c", src);
+    ob = load_object("/gen_assign_spec");
+    ASSERT(objectp(ob));
+    dump_prog(ob, 1, "/gen_assign_spec_dump.txt");
+    txt = read_file("/gen_assign_spec_dump.txt");
+    destruct(ob);
+    rm("/gen_assign_spec.c");
+    rm("/gen_assign_spec_dump.txt");
+    ASSERT(stringp(txt));
+    ASSERT(strsrch(txt, al) != -1);
+    // Leading spaces so this does not also match "(void)assign_global".
+    ASSERT(strsrch(txt, "  " + ag) != -1);
+    ASSERT(strsrch(txt, vag) != -1);
+    // No plain-slot assign in this object should still push an lvalue.
+    ASSERT(strsrch(txt, llv) == -1);
+    ASSERT(strsrch(txt, glv) == -1);
+    // dump_prog pads opcode names: "  assign                    ; "
+    // A trailing space after the token excludes assign_local / assign_global.
+    ASSERT(strsrch(txt, " " + asg + " ") == -1);
+    ASSERT(strsrch(txt, "(void)" + asg + " ") == -1);
+  }
+#endif
+}

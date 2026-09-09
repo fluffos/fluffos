@@ -31,6 +31,10 @@ union u {
   void (*error_handler)(void);
 
   struct promise_t* prom;
+  /* Heap boxes for index/range lvalues (issue #1358). Live on the stack
+   * (or in ref_t::sv); T_LVALUE itself is only a pointer to a real slot. */
+  struct codepoint_lvalue_t* cp_lv;
+  struct range_lvalue_t* range_lv;
 };
 
 /*
@@ -53,19 +57,20 @@ struct ref_t {
   struct ref_t *next, *prev;
   struct control_stack_t* csp;
   svalue_t* lvalue;
+  /* Keep-alive for the container (array / mapping / string / buffer) when
+   * lvalue points inside it. Foreach mapping refs also lock the mapping
+   * here. Foreach string/buffer refs store the per-iteration box here. */
   svalue_t sv;
-
-  /* Set alongside lvalue == &global_lvalue_codepoint_sv (interpret.cc): this
-   * ref's OWN owning string and EGC index, so a concurrently-armed string-char
-   * lvalue elsewhere (another ref, or a plain s[i]) can't corrupt what this
-   * ref reads/writes. The shared global is re-armed from these right before
-   * each use (read via F_REF, write via F_REF_LVALUE); unused otherwise.
-   * ref_t is raw-malloc'd (make_ref()), so these carry no implicit default --
-   * make_ref() sets them, and they are only meaningful once the codepoint
-   * arming site (F_NEXT_FOREACH) also sets lvalue to the sentinel above. */
-  svalue_t* codepoint_owner;
-  int32_t codepoint_index;
+  /* Transferred index lvalue from F_MAKE_REF (`ref s[i]`, `ref b[i]`).
+   * Separate from sv so the container stay-alive copy is not overwritten
+   * by the box. Unused refs leave this as T_NUMBER. `ref x[a..b]` is a
+   * compile error (rule_expr_ref). */
+  svalue_t index_sv;
 };
+
+struct codepoint_lvalue_t;
+struct range_lvalue_t;
+void free_indexed_lvalue(svalue_t* v);
 
 /* values for type field of svalue struct */
 #define T_INVALID 0x0u
@@ -88,6 +93,25 @@ struct ref_t {
 #define T_FREED 0x2000u
 #define T_REF 0x4000u
 #define T_LVALUE_CODEPOINT 0x8000u /* UTF8 codepoint */
+
+static inline int is_stack_lvalue(const svalue_t* v) {
+  return v->type == T_LVALUE || v->type == T_LVALUE_BYTE || v->type == T_LVALUE_RANGE ||
+         v->type == T_LVALUE_CODEPOINT;
+}
+
+/* Destinations that need the index-kind switch. A T_LVALUE unwraps to a
+ * real slot and is a plain assign_svalue. */
+static inline int is_indexed_lvalue(const svalue_t* v) {
+  return v->type == T_LVALUE_BYTE || v->type == T_LVALUE_RANGE || v->type == T_LVALUE_CODEPOINT;
+}
+
+/* T_LVALUE wraps a real slot; typed index lvalues ARE the target. */
+static inline svalue_t* lvalue_target(svalue_t* slot) {
+  if (slot->type == T_LVALUE) {
+    return slot->u.lvalue;
+  }
+  return slot;
+}
 
 /* The 16 low bits are fully allocated; new value types start at 0x10000
  * (svalue_t::type is 32-bit). */
@@ -164,6 +188,7 @@ void assign_svalue_no_free(svalue_t*, svalue_t*);
 void free_compound(void* ptr, uint32_t type);
 
 #ifdef DEBUG
+void int_free_svalue(svalue_t*, const char*);
 #define free_svalue(x, y) int_free_svalue(x, y)
 #else
 /* Also declared in machine.h, which includes this header before getting to it. */
@@ -172,10 +197,12 @@ void int_free_svalue(svalue_t*);
 /* int_free_svalue() is called several million times on an interpreter-bound
  * workload -- roughly once per dispatched opcode that drops a stack slot -- and
  * it is not inlined across the call boundary. It only has real work to do for a
- * value that owns something: a string, a refcounted
- * pointer, or an error handler (which it invokes). For every other type --
- * T_NUMBER and T_REAL above all -- the entire body reduces to marking the slot
- * T_FREED, and outside DEBUG builds nothing ever reads that bit back:
+ * value that owns something: a string, a refcounted pointer, an error handler
+ * (which it invokes), or a heap-boxed index lvalue (T_LVALUE_CODEPOINT /
+ * T_LVALUE_RANGE, issue #1358). T_LVALUE_BYTE is a raw pointer, not a box.
+ * For every other type -- T_NUMBER and T_REAL above all -- the entire body
+ * reduces to marking the slot T_FREED, and outside DEBUG builds nothing ever
+ * reads that bit back:
  * assign_svalue_no_free() clears it on overwrite, sprintf.cc masks it out with
  * (type & ~T_FREED), and the only remaining readers -- the "*freed*" type name
  * in interpret.cc and the double-free fatal in svalue.cc -- are both #ifdef
@@ -184,7 +211,7 @@ void int_free_svalue(svalue_t*);
  * DEBUG builds keep calling the out-of-line version unconditionally, so the
  * double-free detection that depends on the bit being set keeps working. */
 inline void free_svalue_maybe_refed(svalue_t* v) {
-  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER)) {
+  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER | T_LVALUE_CODEPOINT | T_LVALUE_RANGE)) {
     int_free_svalue(v);
   }
 }

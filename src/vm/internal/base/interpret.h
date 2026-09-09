@@ -158,7 +158,6 @@ extern int function_index_offset;
 extern int variable_index_offset;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
-extern svalue_t global_lvalue_byte;
 extern int num_varargs;
 extern int st_num_arg;
 
@@ -170,9 +169,38 @@ extern const char* lv_owner_str;
 void kill_ref(ref_t*);
 ref_t* make_ref(void);
 
-/* += / -= on the active string codepoint lvalue (T_LVALUE_CODEPOINT);
- * returns the resulting codepoint. */
-LPC_INT codepoint_lvalue_add(LPC_INT delta);
+/* += / -= on a T_LVALUE_CODEPOINT slot; returns the resulting codepoint. */
+LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
+
+/* Owns a popped (or stolen) stack lvalue. error() unwinds via a C++
+ * exception (do_catch / safe_apply), so the destructor releases the box
+ * on that path too -- a bare `svalue_t lvslot = *sp--` leaked every
+ * T_LVALUE_CODEPOINT / T_LVALUE_RANGE that hit error() before the
+ * matching free_svalue (issue #1358). */
+class PoppedLvalue {
+ public:
+  enum Mode { Pop, Steal };
+
+  explicit PoppedLvalue(Mode mode = Pop) {
+    slot_ = *sp;
+    if (mode == Pop) {
+      sp--;
+    } else {
+      /* Leave the stack slot but drop its claim on the box so unwind
+       * and this destructor cannot both delete it. */
+      sp->type = T_NUMBER;
+      sp->subtype = 0;
+      sp->u.number = 0;
+    }
+  }
+  ~PoppedLvalue() { free_svalue(&slot_, "PoppedLvalue"); }
+  PoppedLvalue(const PoppedLvalue&) = delete;
+  PoppedLvalue& operator=(const PoppedLvalue&) = delete;
+  svalue_t* target() { return lvalue_target(&slot_); }
+
+ private:
+  svalue_t slot_;
+};
 
 /* Convert a string (raw UTF-8 bytes) or array of ints 0..255 into a fresh
  * buffer; errors on anything else. Caller owns the result. */
@@ -219,8 +247,8 @@ char* get_line_number(char*, const program_t*);
 void get_line_number_info(const char**, int*);
 void reset_machine(int);
 void unlink_string_svalue(svalue_t*);
-void copy_lvalue_range(svalue_t*);
-void assign_lvalue_range(svalue_t*);
+void copy_lvalue_range(svalue_t* lval, svalue_t* from);
+void assign_lvalue_range(svalue_t* lval, svalue_t* from);
 void debug_perror(const char*, const char*);
 
 #ifndef NO_SHADOWS

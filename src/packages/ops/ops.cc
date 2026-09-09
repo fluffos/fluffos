@@ -21,9 +21,8 @@ void f_and() {
 }
 
 void f_and_eq() {
-  svalue_t* argp;
-
-  argp = (sp--)->u.lvalue;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
     sp->u.arr = argp->u.arr = intersect_array(argp->u.arr, sp->u.arr);
@@ -42,7 +41,8 @@ void f_and_eq() {
 }
 
 void f_div_eq() {
-  svalue_t* argp = (sp--)->u.lvalue;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -378,12 +378,13 @@ void f_lsh() {
 }
 
 void f_lsh_eq() {
-  svalue_t* argp;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
-  if ((argp = sp->u.lvalue)->type != T_NUMBER) {
+  if (argp->type != T_NUMBER) {
     error("Bad left type to <<=\n");
   }
-  if ((--sp)->type != T_NUMBER) {
+  if (sp->type != T_NUMBER) {
     error("Bad right type to <<=\n");
   }
   sp->u.number = argp->u.number <<= (sp->u.number & 63);
@@ -392,12 +393,13 @@ void f_lsh_eq() {
 }
 
 void f_mod_eq() {
-  svalue_t* argp;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
-  if ((argp = sp->u.lvalue)->type != T_NUMBER) {
+  if (argp->type != T_NUMBER) {
     error("Bad left type to %%=\n");
   }
-  if ((--sp)->type != T_NUMBER) {
+  if (sp->type != T_NUMBER) {
     error("Bad right type to %%=\n");
   }
   if (sp->u.number == 0) {
@@ -414,7 +416,8 @@ void f_mod_eq() {
 }
 
 void f_mult_eq() {
-  svalue_t* argp = (sp--)->u.lvalue;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -576,9 +579,8 @@ void f_or() {
 }
 
 void f_or_eq() {
-  svalue_t* argp;
-
-  argp = (sp--)->u.lvalue;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
     argp->u.arr = sp->u.arr = union_array(argp->u.arr, sp->u.arr);
     sp->u.arr->ref++; /* because we put it in two places */
@@ -915,12 +917,13 @@ void f_rsh() {
 }
 
 void f_rsh_eq() {
-  svalue_t* argp;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
-  if ((argp = sp->u.lvalue)->type != T_NUMBER) {
+  if (argp->type != T_NUMBER) {
     error("Bad left type to >>=\n");
   }
-  if ((--sp)->type != T_NUMBER) {
+  if (sp->type != T_NUMBER) {
     error("Bad right type to >>=\n");
   }
   sp->u.number = argp->u.number >>= (sp->u.number & 63);
@@ -929,7 +932,8 @@ void f_rsh_eq() {
 }
 
 void f_sub_eq() {
-  svalue_t* argp = (sp--)->u.lvalue;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -980,7 +984,7 @@ void f_sub_eq() {
     }
 
     case T_LVALUE_CODEPOINT | T_NUMBER: {
-      sp->u.number = codepoint_lvalue_add(-sp->u.number);
+      sp->u.number = codepoint_lvalue_add(argp, -sp->u.number);
       sp->subtype = 0;
       break;
     }
@@ -1226,12 +1230,13 @@ void f_xor() {
 }
 
 void f_xor_eq() {
-  svalue_t* argp;
+  PoppedLvalue lv;
+  svalue_t* argp = lv.target();
 
-  if ((argp = sp->u.lvalue)->type != T_NUMBER) {
+  if (argp->type != T_NUMBER) {
     error("Bad left type to ^=\n");
   }
-  if ((--sp)->type != T_NUMBER) {
+  if (sp->type != T_NUMBER) {
     error("Bad right type to ^=\n");
   }
   sp->u.number = argp->u.number ^= sp->u.number;

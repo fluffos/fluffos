@@ -66,6 +66,11 @@ operator lor_eq, land_eq, nullish_eq, assign_value;
 
 operator void_add_eq, void_assign, void_assign_local;
 
+/* Specialized plain-slot stores (issue #1358). Appended so the
+ * F_ADD_EQ..F_ASSIGN range used by lvalue conversion stays intact.
+ * Bytecode is not persisted; adding operators only shifts efun numbers. */
+operator assign_local, assign_global, void_assign_global;
+
 operator add, subtract, multiply, divide, mod, and, or, xor, lsh, rsh;
 operator not, negate, compl;
 

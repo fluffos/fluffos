@@ -114,6 +114,10 @@ void init_instrs() {
   add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
   add_instr_name("(void)assign_local", "c_void_assign_local(fp + %i);\n", F_VOID_ASSIGN_LOCAL,
                  T_NUMBER);
+  add_instr_name("assign_local", "c_assign_local(fp + %i);\n", F_ASSIGN_LOCAL, T_ANY);
+  add_instr_name("assign_global", "c_assign_global(%i);\n", F_ASSIGN_GLOBAL, T_ANY);
+  add_instr_name("(void)assign_global", "c_void_assign_global(%i);\n", F_VOID_ASSIGN_GLOBAL,
+                 T_NUMBER);
   add_instr_name("assign", "c_assign();\n", F_ASSIGN, T_ANY);
   add_instr_name("branch", 0, F_BRANCH, -1);
   add_instr_name("bbranch", 0, F_BBRANCH, -1);
