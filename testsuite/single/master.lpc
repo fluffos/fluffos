@@ -521,6 +521,11 @@ mixed get_include_path(string file) {
     case "/clone/mgip4.c":
     case "/clone/mgip4.lpc":
       return ({});          // should yield error message
+    case "/clone/mgip5":
+    case "/clone/mgip5.c":
+    case "/clone/mgip5.lpc":
+      // Trailing slash: a legal way to spell a directory.
+      return ({ "/include/m_gip1/", "/include" });
     default:
       return ({ ":DEFAULT:" }); ;
   }

@@ -1,0 +1,5 @@
+/* Include path supplied by master::get_include_path() with a trailing
+ * slash -- the join must not double the separator. */
+#include <m_gip_test.h>
+
+void create() {}
