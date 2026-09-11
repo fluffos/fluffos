@@ -2933,7 +2933,10 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   int saved_current_line = current_line;
   int saved_current_line_base = current_line_base;
   int saved_current_line_saved = current_line_saved;
-  int saved_total_lines = total_lines;
+  // total_lines is a process-wide compile statistic for
+  // query_load_average()'s "comp lines/s", not per-file state. Nested
+  // compile_file() (inherit) and this DEFER must leave it accumulated;
+  // restoring it here zeroed every load after the Flex migration (#1385).
   const char* saved_current_file = current_file;
   int saved_current_file_id = current_file_id;
   int saved_pragmas = pragmas;
@@ -3039,7 +3042,6 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
       current_line = saved_current_line;
       current_line_base = saved_current_line_base;
       current_line_saved = saved_current_line_saved;
-      total_lines = saved_total_lines;
       current_file = saved_current_file;
       current_file_id = saved_current_file_id;
       pragmas = saved_pragmas;

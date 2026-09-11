@@ -2816,6 +2816,24 @@ TEST(CompileEntry, CompileFileFdSuccess) {
   deallocate_program(prog);
 }
 
+// compile_file() used to restore total_lines to its pre-call value on the
+// way out, so load_object()'s update_compile_av(total_lines) always saw 0
+// (issue #1385). Ordinary source newlines go through lpc_lex_newline();
+// the statistic must survive the compile's DEFER.
+TEST(CompileEntry, TotalLinesAccumulatesOrdinarySource) {
+  ensure_compile_env();
+  int const before = total_lines;
+  program_t* prog = compile_file(
+      "int a;\n"
+      "int b;\n"
+      "int c;\n"
+      "int f() { return 1; }\n",
+      "/total_lines_probe");
+  ASSERT_NE(prog, nullptr);
+  EXPECT_GE(total_lines - before, 4);
+  deallocate_program(prog);
+}
+
 TEST(CompileEntry, CompileFileFdBadFdThenViewStillWorks) {
   ensure_compile_env();
   // A failing fd load must not poison the next compile (the fd flag is
