@@ -19,7 +19,12 @@ title: promises / promise_resolve
     If `value` is itself a promise, `p` adopts its eventual state instead
     of fulfilling immediately (flattening): `p` stays pending until `value`
     settles, then settles the same way. Resolving a promise with itself is
-    an error.
+    an error when the cycle is a direct `promise_resolve(p, p)` — that
+    call errors before anything is allocated. When the cycle arrives
+    indirectly — a `promise_then()` handler returning the very promise its
+    result settles, or an `async` body returning its own promise — there
+    is no call to fail, and `p` rejects with `PROMISE_REASON_SELF_RESOLVED`
+    (`"*promise resolved with itself"`) instead.
 
     It is an error to settle a promise that is already settled — including
     one whose fate is already committed to a pending adoption: after

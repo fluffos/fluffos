@@ -11,11 +11,19 @@ title: promises / promise_reject
     void promise_reject(promise p, mixed reason);
 
 ### DESCRIPTION
-    Rejects the pending promise `p` with `reason` (0 if omitted). Rejection
+    Rejects the pending promise `p` with `reason`. Omitting `reason` does
+    not reject with `0` — the driver substitutes `PROMISE_REASON_NO_REASON`
+    (`"*promise rejected"`), so that a bare reject is never falsy: `acatch`
+    signals failure by yielding the reason and success by yielding `0`, so
+    a falsy reason would read as success. An explicitly falsy reason
+    (`promise_reject(p, 0)`) is still the caller's choice, and still
+    ambiguous — `promise_status()` is the unambiguous test. Rejection
     handlers attached with promise_then(3)/promise_catch(3) run from the
     microtask drain — never synchronously from this call, but still within
     the same gametick. An `await` suspended on `p` raises `reason` as an
     error at the await point (catchable with `acatch`).
+
+    It is an error to reject a promise with itself (`promise_reject(p, p)`).
 
     It is an error to settle a promise that is already settled — including
     one whose fate is already committed to a pending adoption (see
