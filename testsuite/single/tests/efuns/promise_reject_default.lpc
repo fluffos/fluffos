@@ -22,6 +22,8 @@
 // files happened to hold latches that deferred the recap past the drain.
 // The shutdown(-1) guard never fired either, for the same reason.
 
+nosave promise src, chained;
+
 async void probe() {
   mixed p = promise_create();
   mixed err;
@@ -31,7 +33,22 @@ async void probe() {
   ASSERT2(err, "a bare promise_reject() must reject with a TRUTHY reason, "
     "or acatch() cannot tell it from success");
   ASSERT_EQ("string", typeof(err));
+  // The substituted reason is PROMISE_REASON_NO_REASON (issue #1387).
+  ASSERT_EQ("*promise rejected", err);
   RELEASE_LATCH("bare reject is truthy");
+}
+
+// Indirect self-resolve: a then-handler returning the chained promise
+// itself. promise_resolve(p, p) errors; this path rejects instead (#1388).
+async void probe_self() {
+  mixed err;
+
+  src = promise_create();
+  chained = promise_then(src, (: chained :));
+  promise_resolve(src, 1);
+  err = acatch(await chained);
+  ASSERT_EQ("*promise resolved with itself", err);
+  RELEASE_LATCH("indirect self-resolve rejects");
 }
 
 void do_tests() {
@@ -43,5 +60,7 @@ void do_tests() {
   ASSERT_EQ("explicit reason", promise_result(p2));
 
   EXPECT_LATCH("bare reject is truthy");
+  EXPECT_LATCH("indirect self-resolve rejects");
   probe();
+  probe_self();
 }
