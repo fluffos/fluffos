@@ -12,4 +12,7 @@ void do_tests() {
 
   ob = load_object("/clone/mgip4");
   ASSERT_EQ(3, ob->doit());
+
+  ob = load_object("/clone/mgip5");
+  ASSERT_EQ(1, ob->doit());
 }
