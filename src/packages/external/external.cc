@@ -698,9 +698,8 @@ int open_spawn_pipe(int p[2]) {
   if (pipe(p) != 0) {
     return -1;
   }
-  fcntl(p[0], F_SETFD, FD_CLOEXEC);
-  fcntl(p[1], F_SETFD, FD_CLOEXEC);
-  if (evutil_make_socket_nonblocking(p[0]) == -1) {
+  if (evutil_make_socket_closeonexec(p[0]) == -1 || evutil_make_socket_closeonexec(p[1]) == -1 ||
+      evutil_make_socket_nonblocking(p[0]) == -1) {
     close_pipe_pair(p);
     return -1;
   }
@@ -713,9 +712,8 @@ int open_stdin_pipe(int p[2]) {
   if (pipe(p) != 0) {
     return -1;
   }
-  fcntl(p[0], F_SETFD, FD_CLOEXEC);
-  fcntl(p[1], F_SETFD, FD_CLOEXEC);
-  if (evutil_make_socket_nonblocking(p[1]) == -1) {
+  if (evutil_make_socket_closeonexec(p[0]) == -1 || evutil_make_socket_closeonexec(p[1]) == -1 ||
+      evutil_make_socket_nonblocking(p[1]) == -1) {
     close_pipe_pair(p);
     return -1;
   }

@@ -416,7 +416,9 @@ void i_generate_node(parse_node_t* expr) {
           ins_byte(dest->l.number);
           break;
         }
-        if (dest && dest->kind == NODE_PARAMETER_LVALUE) {
+        /* dest was already used above; a null check here is REVERSE_INULL
+         * (Coverity CID 1686623). A well-formed assign always has a dest. */
+        if (dest->kind == NODE_PARAMETER_LVALUE) {
           i_generate_node(expr->l.expr);
           end_pushes();
           ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_LOCAL : F_VOID_ASSIGN_LOCAL);

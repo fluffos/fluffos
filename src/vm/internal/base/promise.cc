@@ -218,8 +218,18 @@ constexpr const char* kDestructedRejection = PROMISE_REASON_DESTRUCTED;
 /* What a cancelled body's next await raises, and what its promise settles
  * with as PROMISE_CANCELLED if nothing catches it. Matched by CONTENT for
  * the raise itself -- a plain string is forgeable by throw() -- but
- * promise_status() is the authoritative test from outside. */
-constexpr const char* kCancelledRejection = PROMISE_REASON_CANCELLED;
+ * promise_status() is the authoritative test from outside.
+ *
+ * Unique storage, not a pointer alias of the string literal: settle-time
+ * from_cancel is pointer identity against this object (a mudlib throw() of
+ * the same text must not stamp PROMISE_CANCELLED). Coverity CID 1686645
+ * flagged `== PROMISE_REASON_CANCELLED` as BAD_COMPARE because the old
+ * constexpr alias inlined to a literal. */
+static const char kCancelledRejection[] = PROMISE_REASON_CANCELLED;
+
+static bool is_driver_cancelled_reason(const svalue_t* v) {
+  return v->type == T_STRING && v->u.string == kCancelledRejection;
+}
 
 /* Cancelled is a negative settlement: await / then / combinators treat it
  * like a rejection, but promise_status() reports PROMISE_CANCELLED. */
@@ -945,8 +955,7 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
 #endif
       /* Settle-time cancel: only the driver's constant pointer, never a
        * pre-stamped flag that would outlive a declined cancel. */
-      (void)promise_settle(p, &err, 1,
-                           err.type == T_STRING && err.u.string == kCancelledRejection);
+      (void)promise_settle(p, &err, 1, is_driver_cancelled_reason(&err));
       free_svalue(&err, "run_coroutine_body");
       too_deep_error = 0;
       if (max_eval_error) {
