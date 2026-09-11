@@ -340,30 +340,17 @@ int a = 222;            // warning: Redeclaration of global variable 'a'.
 Your object now has **two** variables called `a`. Your code sees yours; the
 inherited object's code sees its own. So far so tolerable.
 
-Then you call `save_object()`, and the save file gets two lines with the same
-key — the inherited one first, yours second:
+Then you call `save_object()`. The compiler marks the shadowing declaration
+`nosave` so the save file has one line for that name — the inherited one:
 
 ```
 a 111
-a 222
 ```
 
-On `restore_object()`, both lines are matched by name, and name matching finds
-the *first* one — so both values land in the inherited variable, and the second
-line wins. The inherited `a` ends up holding *your* saved value, and your own
-`a` is never restored at all: it comes back **undefined**, not zero.
-
-That distinction matters when you go looking for the bug. An undefined int
-prints as `0` and compares equal to `0`, so nothing looks wrong until you test
-it properly:
-
-```c
-// after restore_object()
-a                  // 0     -- looks fine
-undefinedp(a)      // 1     -- it was never actually restored
-```
-
-Nothing errors. Nothing warns. The data is just quietly wrong from then on.
+`restore_object()` writes that value back into the inherited slot. Your own
+`a` is not saved and is not cleared: it keeps whatever it held at restore
+time. The two variables are still two slots; only the inherited one is
+persistent.
 
 If you inherit something and want a variable of your own, give it a different
 name. If you want the inherited one, use it — it's already there.
@@ -386,8 +373,8 @@ scarier.
 
 * Don't name a `function` variable or parameter after any existing function.
   It will not be callable.
-* Don't redeclare a variable your inherited object already declares. It breaks
-  `save_object` / `restore_object` silently.
+* Don't redeclare a variable your inherited object already declares. The
+  compiler will persist only the inherited one.
 * Do use `nomask` on things nobody should override. It turns a subtle bug into
   a compile error, which is a trade you want.
 * Do turn on `#pragma warnings` in objects that inherit from more than one

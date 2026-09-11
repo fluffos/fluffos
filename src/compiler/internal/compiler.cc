@@ -1991,7 +1991,11 @@ int define_new_variable(const char* name, int type) {
   np = reinterpret_cast<const char**>(allocate_in_mem_block(A_VAR_NAME, sizeof(char*)));
   *np = name;
   tp = reinterpret_cast<lpc_type_t*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(lpc_type_t)));
-  *tp = type;
+  // define_variable() may add DECL_NOSAVE when this name already exists
+  // (inherited or earlier in this file) so save_object() emits one key.
+  // That flag used to live only in A_VAR_TEMP and never reached
+  // prog->variable_types (#1381).
+  *tp = VAR_TEMP(n)->type;
   symbol_record(OP_SYMBOL_VAR, current_file, current_line, name);
   return n;
 }

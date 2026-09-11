@@ -1,0 +1,12 @@
+// Fixture for /single/tests/efuns/save_object_shadow.lpc: shadows inherited
+// `a`. The compiler marks this declaration nosave so save_object() emits
+// one key (issue #1381).
+inherit "/clone/save_shadow_parent";
+int a = 222;
+int query_child_a() { return a; }
+void set_child_a(int v) { a = v; }
+int child_a_undef() { return undefinedp(a); }
+string do_save() { return save_object(0); }
+void save_to(string f) { save_object(f, 1); }
+void do_restore(string f) { restore_object(f); }
+void do_restore_str(string s) { restore_object(s); }
