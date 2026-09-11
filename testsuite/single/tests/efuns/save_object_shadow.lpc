@@ -1,0 +1,39 @@
+// A global that shadows an inherited one used to be saved under the same
+// key as the inherited slot. restore_object() applied both lines to the
+// inherited variable and left the child's undefined (issue #1381).
+// The compiler marks the shadowing declaration nosave so only one key
+// is emitted.
+
+void do_tests() {
+  object ob, fresh;
+  string saved, expected;
+
+  ob = clone_object("/clone/save_shadow_child");
+  ASSERT(objectp(ob));
+  ASSERT_EQ(222, ob->query_child_a());
+  ASSERT_EQ(111, ob->query_parent_a());
+
+  saved = ob->do_save();
+  expected = "#/clone/save_shadow_child.lpc\na 111\n";
+  ASSERT_EQ(expected, saved);
+  // The child's value must not appear as a second `a` line.
+  ASSERT_EQ(-1, strsrch(saved, "a 222"));
+
+  ob->set_child_a(888);
+  ob->set_parent_a(999);
+  ob->save_to("/sf_shadow");
+
+  fresh = clone_object("/clone/save_shadow_child");
+  fresh->set_child_a(888);
+  fresh->set_parent_a(777);
+  fresh->do_restore("/sf_shadow");
+  // Inherited slot is restored; child's nosave slot is left as-is.
+  ASSERT_EQ(999, fresh->query_parent_a());
+  ASSERT_EQ(888, fresh->query_child_a());
+  ASSERT_EQ(0, fresh->parent_a_undef());
+  ASSERT_EQ(0, fresh->child_a_undef());
+
+  destruct(ob);
+  destruct(fresh);
+  rm("/sf_shadow.o");
+}
