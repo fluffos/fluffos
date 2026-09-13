@@ -49,7 +49,6 @@ Chinese collection (pick a slug under libs/):
 ## Language and concepts
 
 - https://www.fluffos.info/lpc/
-- https://www.fluffos.info/lpc/dev-environment
 - https://www.fluffos.info/lpc/source-files
 - https://www.fluffos.info/lpc/constructs/foreach
 - https://www.fluffos.info/lpc/constructs/async

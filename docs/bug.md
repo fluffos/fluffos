@@ -27,27 +27,41 @@ Otherwise the committed generated lexer is used.
 
 ## Boot and connection
 
-**`Bad mudlib directory`.** You started the driver from the wrong cwd.
-`testsuite/etc/config.test` sets `mudlib directory` to `./`. Run:
+These apply to **the mudlib you picked**. Do not switch to `testsuite/` to
+“fix” a boot problem unless you are changing the driver.
+
+**`Bad mudlib directory`.** The process cwd does not match `mudlib directory`.
+If the config says `./`, start the driver from that lib’s root:
+
+```bash
+cd /path/to/mudlib
+/path/to/fluffos/build/bin/driver CONFIG_FILE
+```
+
+**`Address already in use`.** Another process owns the port that lib’s config
+binds. Stop it; do not start two drivers.
+
+**Driver prints a version then exits.** Read the console and **that lib’s**
+log directory. A missing master object, a compile error in the master, or a
+bad `include directories` line will abort startup.
+
+**Telnet connects and drops.** `master::connect()` failed while cloning the
+login object. Same log.
+
+**Browser page is empty.** Confirm you opened the websocket / HTTP port the
+lib documents, not a telnet-only port.
+
+### If you are running the driver testsuite
+
+`testsuite/etc/config.test` uses `mudlib directory : ./` and ports 4000–4003:
 
 ```bash
 cd testsuite
 ../build/bin/driver etc/config.test
 ```
 
-**`Address already in use` / failed to bind 4000–4003.** Another driver (or
-service) owns those ports. Stop it; do not start two drivers.
-
-**Driver prints a version then exits.** Read the console and
-`testsuite/log/debug.log`. A missing master object, a compile error in
-`/single/master`, or a bad `include directories` line will abort startup.
-
-**Telnet connects and drops.** `master::connect()` failed while cloning the
-login object. Same log.
-
-**Browser page is empty on port 4001.** Confirm `websocket http dir` points at
-`../src/www` (as in `config.test`) and that you opened the websocket port, not
-plain telnet.
+Logs: `testsuite/log/debug.log`. Built-in web client: port 4001, with
+`websocket http dir` pointing at `../src/www`.
 
 ## Driver vs sanitizers vs Valgrind
 

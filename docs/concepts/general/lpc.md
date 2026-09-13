@@ -60,7 +60,7 @@ compact tokenized form before being interpreted).
 
 LPC has no unions, but it does provide class types (also called structs),
 which group a fixed set of named members much like a C structure (see the
-[classes documentation](../../lpc/types/classes.md)). The mapping datatype
+[classes documentation](../../lpc/types/classes)). The mapping datatype
 can also serve as an effective
 substitute for structures in some situations. Note that the `->` operator serves
 two purposes in LPC: a call to another object (`call_other()`), and access to a

@@ -17,7 +17,7 @@ Org page: [https://github.com/fluffos](https://github.com/fluffos)
 
 | Repository | Role |
 |---|---|
-| **[fluffos/fluffos](https://github.com/fluffos/fluffos)** | The driver: LPC compiler and VM, networking, efuns, this documentation site, and the `testsuite/` reference mudlib. Use `master` or a current `v2026.*` / `v2025.*` release. |
+| **[fluffos/fluffos](https://github.com/fluffos/fluffos)** | The driver: LPC compiler and VM, networking, efuns, this documentation site, and the `testsuite/` LPC **test harness** (not a starter game). Use `master` or a current `v2026.*` / `v2025.*` release. |
 
 Companion sites (not git repos):
 
@@ -57,7 +57,7 @@ tree. Check each repo's README for which FluffOS version it last targeted
 | **[fluffos/nt7](https://github.com/fluffos/nt7)** | 泥潭 7, UTF-8, FluffOS v2019. |
 | **[fluffos/xkx100](https://github.com/fluffos/xkx100)** | 侠客行 100, UTF-8, FluffOS v2019. |
 | **[fluffos/sanguozhi](https://github.com/fluffos/sanguozhi)** | 三国志 MUD. Last noted on FluffOS v2017 — expect more porting. |
-| **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** | Collection of older Chinese mudlibs, for history and ports. |
+| **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** | ~199 restored Chinese games. Play first at [mudlibs.fluffos.info](https://mudlibs.fluffos.info/); locally `cd libs/<slug>`. |
 | **[fluffos/lpc-test](https://github.com/fluffos/lpc-test)** | Extra LPC test lib for the driver, not a playable game. |
 
 **Do not start with `testsuite/`.** That tree is the driver’s LPC test

@@ -21,18 +21,33 @@ title: 排障
 
 ## 启动与连接
 
-**`Bad mudlib directory`。** 当前目录不对。`config.test` 的 mudlib 是 `./`：
+这些针对**你选定的 mudlib**。不要为了「修好启动」去跑 `testsuite/`，除非你在改驱动。
+
+**`Bad mudlib directory`。** 进程 cwd 和 `mudlib directory` 对不上。配置写 `./` 时，从该 lib 根目录启动：
+
+```bash
+cd /path/to/mudlib
+/path/to/fluffos/build/bin/driver CONFIG_FILE
+```
+
+**端口占用 / `Address already in use`。** 该 lib 配置里的端口已被占用。不要同时跑两个驱动。
+
+**打印版本后立刻退出。** 看控制台和**这份 lib** 的日志目录。常见原因：找不到 master、master 编译失败、`include directories` 写错。
+
+**Telnet 连上立刻断开。** `master::connect()` 克隆 login 对象失败。同一份日志。
+
+**网页是空的。** 确认打开的是该 lib 文档写明的 websocket / HTTP 端口，不是纯 telnet 口。
+
+### 若你在跑驱动测试套件
+
+`testsuite/etc/config.test` 的 mudlib 是 `./`，端口 4000–4003：
 
 ```bash
 cd testsuite
 ../build/bin/driver etc/config.test
 ```
 
-**端口占用 / `Address already in use`。** 4000–4003 已被占用。不要同时跑两个驱动。
-
-**打印版本后立刻退出。** 看控制台和 `testsuite/log/debug.log`。常见原因：找不到 master、`/single/master` 编译失败、`include directories` 写错。
-
-**Telnet 连上立刻断开。** `master::connect()` 克隆 login 对象失败。同一份日志。
+日志：`testsuite/log/debug.log`。内置网页客户端：4001，`websocket http dir` 指向 `../src/www`。
 
 ## 消毒器与 Valgrind
 

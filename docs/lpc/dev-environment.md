@@ -177,9 +177,14 @@ your-mudlib/
 ```
 
 Many mudlibs still use `.c` for LPC. Associating those files with the
-LPC language is how the highlighter actually runs. Then fill
-[Mudlib AGENTS.md](../mudlib-agents) so the next session knows ports
-and the master path.
+LPC language is how the highlighter actually runs.
+
+**Do not** put this `files.associations` block in the `fluffos/fluffos`
+driver repo — that tree’s `.c` / `.h` files are C++. Only use it in a
+mudlib workspace.
+
+Then fill [Mudlib AGENTS.md](../mudlib-agents) so the next session knows
+ports and the master path.
 
 ## Related
 

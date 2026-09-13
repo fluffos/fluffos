@@ -140,7 +140,11 @@ your-mudlib/
 }
 ```
 
-很多 mudlib 仍用 `.c` 当 LPC。把这些文件关联到 LPC 语言，高亮才会生效。然后填好 [Mudlib AGENTS.md](../mudlib-agents)。
+很多 mudlib 仍用 `.c` 当 LPC。把这些文件关联到 LPC 语言，高亮才会生效。
+
+**不要**把这段 `files.associations` 写进 `fluffos/fluffos` 驱动仓库——那里的 `.c` / `.h` 是 C++。只用于 mudlib 工作区。
+
+然后填好 [Mudlib AGENTS.md](../mudlib-agents)。
 
 ## 相关
 

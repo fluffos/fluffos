@@ -14,7 +14,7 @@ FluffOS 是一个 GitHub **组织**，不是单个仓库。驱动是
 
 | 仓库 | 角色 |
 |---|---|
-| **[fluffos/fluffos](https://github.com/fluffos/fluffos)** | 驱动：LPC 编译器与 VM、网络、efun、本文档站、以及 `testsuite/` 参考 mudlib。使用 `master` 或当前的 `v2026.*` / `v2025.*`。 |
+| **[fluffos/fluffos](https://github.com/fluffos/fluffos)** | 驱动：LPC 编译器与 VM、网络、efun、本文档站，以及 `testsuite/` LPC **测试套件**（不是新手村）。使用 `master` 或当前的 `v2026.*` / `v2025.*`。 |
 
 站点（不是 git 仓库）：
 
@@ -22,7 +22,7 @@ FluffOS 是一个 GitHub **组织**，不是单个仓库。驱动是
 - 论坛：[https://forum.fluffos.info](https://forum.fluffos.info)
 - Intermud 列表：[https://imud.fluffos.info](https://imud.fluffos.info)（[源码](https://github.com/fluffos/imud)）
 - 容器：`ghcr.io/fluffos/fluffos:master`
-- Discord：LPC 服务器的 `#fluffos`
+- Discord：LPC 服务器的 `#fluffos`（[邀请](https://discord.gg/E5ycwE8NCc)）
 - QQ：451819151
 
 ## 编辑器
