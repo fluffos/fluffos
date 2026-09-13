@@ -1,64 +1,130 @@
 ---
 title: LLM onboarding
 slug: /llm
-description: Point an LLM at this URL to build FluffOS and boot a running mud.
+description: Point an LLM at this URL. Ask the user which mudlib to work on, then build FluffOS and boot that lib.
 ---
 
 # LLM onboarding
 
 **Canonical URL:** [https://www.fluffos.info/llm](https://www.fluffos.info/llm)
 
-This page is the FluffOS onboarding contract for language models and for
-anyone who pastes this URL into an assistant. Follow it in order. Do not
-invent efuns, apply names, config keys, CMake flags, or mudlib layout.
+This page is the FluffOS onboarding contract for language models. Follow it
+in order. Do not invent efuns, apply names, config keys, or a mudlib.
 
-A machine-readable site map lives at
-[https://www.fluffos.info/llms.txt](https://www.fluffos.info/llms.txt).
-The human-facing twin of this page is [From zero to a running mud](start).
-The full GitHub org map is [the FluffOS ecosystem](ecosystem).
+Site map: [https://www.fluffos.info/llms.txt](https://www.fluffos.info/llms.txt).
+Humans: [From zero to a running mud](start). Org map: [ecosystem](ecosystem).
+Mudlib assistant file: [Mudlib AGENTS.md](mudlib-agents).
 
 ## What you are doing
 
-FluffOS is an LPMUD **driver** (game engine): an LPC compiler + VM + network
-server. A **mudlib** is a tree of LPC files that *is* the game. The driver
-does not ship a production game world.
+FluffOS is only the **driver** (LPC compiler + VM + Telnet/WebSocket/TLS).
+The **mudlib** is the game. Nobody ships a game by booting the driver’s
+`testsuite/`. That directory is the LPC regression harness for people
+changing the engine.
 
 ```
-Mudlib  — LPC files: rooms, objects, login, commands
-Driver  — this repo: compiles LPC, runs it, talks Telnet / WebSocket / TLS
-LPC     — the language those files are written in
+Mudlib  — the game (rooms, login, commands). The user picks this.
+Driver  — fluffos/fluffos. You may need to build it.
+LPC     — the language the mudlib is written in
 ```
 
-**Goal of this page:** clone `fluffos/fluffos` on `master`, build the
-driver, boot the bundled `testsuite/` mudlib, and connect. That *is* a
-running mud (the historic *Lil* bootstrap plus the driver's LPC test
-harness). It is not a full game; it is the correct first mud.
+**Goal:** the user has a chosen mudlib, a driver binary, a config that
+points at that lib, a prompt they can type into, and an `AGENTS.md` in
+the mudlib root so the next session does not start from zero.
+
+## Mandatory: ask which lib
+
+**Do not clone or boot a mudlib until the user has picked one.** Present
+the menu below (short form is fine) and wait.
+
+Ask, in this order:
+
+1. Do you already have a mudlib on disk? If yes, use that path.
+2. If not, which family do you want — and name a specific tree.
+
+If they say “just get something running” and will not pick, recommend
+**Dead Souls** (English, batteries included) or **侠客行 / 泥潭** from
+[fluffos/mudlibs](https://github.com/fluffos/mudlibs) (Chinese, playable
+in the browser first). Still confirm before cloning.
+
+### English / general-purpose libs
+
+| Pick | What you get | Clone / start |
+|---|---|---|
+| **Dead Souls** | Beginner-friendly full game (races, combat, town, OLC). Best English “I want a mud.” | [fluffos/dead-souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules` then `./build.sh && ./run.sh`. Web `http://localhost:5555`, telnet `:6666`. Upstream docs: [dead-souls.net](https://dead-souls.net/). |
+| **Lima** | Modular, modern-ish, well documented. Often the other English default. | Preferred upstream: [limalib/lima](https://github.com/limalib/lima) (`git clone --recurse-submodules`, then `cd adm/dist && ./rebuild`). Telnet/web often `:7878`. Org snapshot: [fluffos/lima](https://github.com/fluffos/lima) (archived). Install notes: [docs.limamudlib.dev](https://docs.limamudlib.dev/Installation.html). |
+| **Nightmare 3** | Slimmer historic lib; common tutorial starting point. | [fluffos/nightmare3](https://github.com/fluffos/nightmare3) — `git clone --recurse-submodules`. Read that README for config/ports. |
+| **Discworld lib** | Powers Discworld MUD (since 1991). Heavy, not a 10-minute boot. | Point the user at [dwwiki.mooo.com](https://dwwiki.mooo.com/) and their published lib tarball. Do not pretend a one-line clone exists under `fluffos/*`. |
+| **User’s own tree** | Existing production or hobby lib. | Use their path. Generate or edit **their** config. Do not overwrite it with `config.test`. |
+
+### Chinese libs (standalone org snapshots)
+
+| Pick | What you get | Clone / start |
+|---|---|---|
+| **泥潭 7** | Classic 泥潭, UTF-8, FluffOS v2019-era. | [fluffos/nt7](https://github.com/fluffos/nt7) — `driver config.ini`. Ports in README: 5555 GBK, 6666 UTF-8, 8888 web. Admin ids `mudren` / `lonely`. |
+| **侠客行 100** | 侠客行 100, UTF-8. | [fluffos/xkx100](https://github.com/fluffos/xkx100) — read the repo README for config and ports. |
+| **三国志** | 三国志 MUD; older (v2017-era). Expect porting. | [fluffos/sanguozhi](https://github.com/fluffos/sanguozhi) |
+
+### Chinese collection — pick a *slug*, not “mudlibs”
+
+[fluffos/mudlibs](https://github.com/fluffos/mudlibs) is **~199 restored
+classic Chinese LPC games** (侠客行, 笑傲江湖, 金庸群侠传, 西游记, 风云,
+大唐双龙, 书剑天下, 东方故事, 仙侣情缘, …). Play first with no install:
+
+**https://mudlibs.fluffos.info/**
+
+Native: clone that repo, then `cd libs/<slug>` and run that slug’s
+`config.fluffos` (each lib has its own port; table is in the mudlibs
+README). Do **not** boot the collection root. Ask the user for a **game
+name or slug** (`xkx2001`, `fengyun434`, `nt7`, `shzs`, …).
+
+Seeded local admin on many of those restored libs is documented in that
+repo (change it before a public bind).
+
+### Other `fluffos/*` (not mudlibs)
+
+| Repo | Use |
+|---|---|
+| [fluffos/fluffos](https://github.com/fluffos/fluffos) | Driver only |
+| [fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode) | Editor extension |
+| [fluffos/gbk2utf8](https://github.com/fluffos/gbk2utf8) | GBK/GB18030 ↔ UTF-8 when importing a legacy tree |
+| [fluffos/lpc-test](https://github.com/fluffos/lpc-test) | Extra LPC tests — not a game |
+| [fluffos/imud](https://github.com/fluffos/imud) | imud.fluffos.info |
+| [fluffos/libtelnet](https://github.com/fluffos/libtelnet), [widecharwidth](https://github.com/fluffos/widecharwidth) | Vendored C libs |
+
+Live games people mention (ThresholdRPG, SWmud, Merentha, Reinos de Leyenda,
+Discworld MUD) are **not** “clone this and hack” unless the user has their
+own copy.
+
+Full org notes: [ecosystem](ecosystem).
 
 ## Success criteria
 
 Stop when all of these are true:
 
-1. `build/bin/driver` exists (after `make install`) or `build/src/driver` exists (incremental build without install).
-2. The driver process is running `etc/config.test` from `testsuite/`.
-3. A telnet client to `localhost:4000` shows `Welcome to Lil!` and a `>` prompt.
-4. Typing `who` and `eval return 1 + 1;` both produce output (do not require `tests` unless asked — that run takes minutes).
+1. The user named a mudlib (path or clone URL + slug).
+2. `build/bin/driver` exists (after `make install`) or `build/src/driver` exists, **or** the chosen lib’s own `./build.sh` / `./rebuild` produced a driver.
+3. The driver is running **that lib’s** config (not `testsuite/etc/config.test`).
+4. A client reaches a login or welcome prompt on the port the lib documents.
+5. The mudlib root has an `AGENTS.md` filled in from [the template](mudlib-agents).
 
-If the user only asked to *build*, stop after step 1 and report the binary path.
+If they only asked to build the engine, stop after a driver binary and
+still ask which lib they will attach.
 
 ## Hard rules
 
-- Use branch **`master`** or a `v2026.*` / `v2025.*` release tag. Do **not** use v2017, CYGWIN, or autoconf.
-- Run the driver **from `testsuite/`**. `mudlib directory` in `config.test` is `./`, resolved against the process cwd.
-- After `cmake && make install`, the binary is **`build/bin/driver`**. Incremental trees without `install` use **`build/src/driver`**. There is no `build/bin/` until install.
-- Do **not** invent efuns. If a function is not on [the efun index](/efun/) or in a `src/packages/*/*.spec` file, it does not exist.
-- Do **not** start a second driver on the same ports. `config.test` binds **4000** (telnet), **4001** (websocket), **4002** (websocket TLS), **4003** (telnet TLS).
-- LPC sources in `testsuite/` use the **`.lpc`** extension. Extension-less names prefer `.lpc`, then `.c`.
-- Prefer Ubuntu 22.04+ / Debian (or WSL with the repo on the Linux filesystem, never `/mnt/c/...`).
-- When editing the driver C++ itself, also read the repo-root `AGENTS.md`. This page is for *getting a mud running*, not for changing the VM.
+- Use driver branch **`master`** or a `v2026.*` / `v2025.*` tag. No v2017, CYGWIN, autoconf.
+- After `cmake && make install`, the binary is **`build/bin/driver`**. Incremental trees use **`build/src/driver`**.
+- `mudlib directory : ./` is the process **cwd**. Start the driver from the directory that lib’s README says, or set an absolute mudlib path.
+- **Do not invent efuns.** Source of truth: [efun index](/efun/) and `src/packages/*/*.spec`.
+- **Do not** start a second driver on the same ports.
+- **Do not** boot `testsuite/` unless the user is developing FluffOS itself.
+- Prefer Ubuntu 22.04+ / Debian (WSL: repo on the Linux filesystem, never `/mnt/c/...`).
+- Driver C++ work: read the **driver** repo `AGENTS.md`. Mudlib LPC work: read the **mudlib** `AGENTS.md`.
 
-## Procedure (Ubuntu / Debian / WSL)
+## Procedure after they pick
 
-### 1. Dependencies
+### 1. Build a driver (skip if the lib’s script already does)
 
 ```bash
 sudo apt update
@@ -66,13 +132,7 @@ sudo apt install -y build-essential cmake bison expect \
   libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
   libssl-dev libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
-```
 
-`flex` is only required if you edit `src/compiler/internal/lexer.l`.
-
-### 2. Clone and build
-
-```bash
 git clone https://github.com/fluffos/fluffos.git
 cd fluffos
 git checkout master
@@ -81,141 +141,106 @@ cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 make -j"$(nproc)" install
 ```
 
-Expect `bin/driver` under `build/`. Other platforms: [Build from Source](build).
-WebAssembly (browser): [Build for WebAssembly](build-wasm).
+Other platforms: [Build from Source](build). WASM: [Build for WebAssembly](build-wasm).
+Image only: `docker pull ghcr.io/fluffos/fluffos:master` (still needs the mudlib + config).
 
-**Docker-only binary** (still needs a mudlib directory and config):
+`flex` is only required if you edit `src/compiler/internal/lexer.l`.
 
-```bash
-docker pull ghcr.io/fluffos/fluffos:master
-```
+If the chosen repo has `./build.sh`, `./run.sh`, or `adm/dist/rebuild`,
+**prefer those** over inventing a config.
 
-### 3. Boot the testsuite mudlib
-
-From the **repo root**:
+### 2. Get the mudlib
 
 ```bash
-cd testsuite
-../build/bin/driver etc/config.test
+# examples — use the URL the user picked
+git clone --recurse-submodules https://github.com/fluffos/dead-souls.git
+# or
+git clone --recurse-submodules https://github.com/limalib/lima.git
+# or
+git clone https://github.com/fluffos/mudlibs.git   # then cd libs/<slug>
 ```
 
-A healthy boot prints the FluffOS version, `Execution root:`, `Initializing internal stuff`, then listens. It does **not** exit.
+GBK-only historic tree: ask before running
+[gbk2utf8](https://github.com/fluffos/gbk2utf8).
 
-One-shot LPC suite (no interactive server; minutes long):
+### 3. Config
 
-```bash
-cd testsuite
-../build/bin/driver etc/config.test -ftest
-```
-
-A clean run prints `Checks succeeded.` and exits 0.
-
-### 4. Connect
-
-**Telnet** (primary):
-
-```bash
-telnet localhost 4000
-```
-
-You should see `Welcome to Lil!`, the motd, and `>`.
-
-Useful verbs (full pathnames where noted): `who`, `say hello`, `eval return sizeof(({1,2,3}));`, `ed`, `update`, `dest`, `quit`, `shutdown`. `tests` runs the LPC suite from inside the mud.
-
-**Browser / WebSocket:** open `http://127.0.0.1:4001/` — the driver serves `src/www` on the websocket port (`websocket http dir` in `config.test`). The TLS twin is `https://127.0.0.1:4002/` with the self-signed test certs in `testsuite/etc/` (the browser will warn; do not use `http://` on 4002).
-
-### 5. If something fails
-
-| Symptom | Likely cause |
-|---|---|
-| `Bad mudlib directory` | Cwd is not `testsuite/` |
-| `Address already in use` / port bind failure | Another driver (or process) owns 4000–4003 |
-| Missing `libicu` / `jemalloc` / `ssl` at cmake time | Install the `-dev` packages above |
-| `Welcome to Lil!` never appears | Driver died; read the console and `testsuite/log/debug.log` |
-| Telnet connects then immediately closes | Master `connect()` failed; same log |
-
-More: [Troubleshooting](bug). File issues at
-[github.com/fluffos/fluffos/issues](https://github.com/fluffos/fluffos/issues)
-with the version line the driver printed at start, the full console, and a
-minimal LPC repro if you have one.
-
-## After it is running — what to tell the user
-
-1. `testsuite/` is a **reference mudlib**, not a game to ship. For a real world, pick a mudlib from [the ecosystem](ecosystem) (Dead Souls, Lima, Nightmare, or a Chinese lib such as 泥潭 / 侠客行) and point a generated config at it.
-2. Learn LPC next: [language index](lpc/), especially [source files](lpc/source-files), [foreach](lpc/constructs/foreach), [async](lpc/constructs/async), and [concepts / async](concepts/general/async).
-3. Driver↔LPC contract: [applies](/apply/) (`create`, `logon`, `connect`, `valid_*`) and [efuns](/efun/).
-4. Runtime knobs: from the **repo root**, `./build/bin/driver --generate-config > my.cfg` then [config reference](driver/config). Never invent option names; they come from `src/base/internal/rc.cc`.
-
-## Generate a config for a different mudlib
-
-From the **repo root**:
+If the lib ships a config, use it. Otherwise, from the **driver** repo root:
 
 ```bash
 ./build/bin/driver --generate-config > /path/to/mudlib/config.cfg
 ```
 
-Then edit at least:
+Edit at least:
 
 - `name`
 - `mudlib directory` (absolute path to that mudlib)
-- `master file`
+- `master file` (find it: `master.c` / `master.lpc` under secure/adm/single — do not guess a Dead Souls path on a 侠客行 tree)
 - `include directories`
-- `external_port_1 : telnet <port>` (the template already emits this; do **not** add a legacy `port number` line next to it — the driver will ignore `external_port_1`)
+- `external_port_1 : telnet <port>` (the template already emits this; do **not** add a legacy `port number` line next to it)
 
-Boot with cwd or an absolute `mudlib directory` that actually contains the
-master object. Do not copy `config.test` blindly onto a third-party mudlib —
-port lines, master path, and include paths differ.
+### 4. Write `AGENTS.md`
 
-## Repo map (this repository)
+Copy [the mudlib AGENTS.md template](mudlib-agents) into the mudlib root.
+Fill every `TODO` from that lib’s README and the config you just used.
+If an `AGENTS.md` already exists (e.g. fluffos/mudlibs), **do not replace
+it** — add a short top section with this tree’s ports and boot line.
+
+### 5. Boot and connect
+
+```bash
+cd /path/to/mudlib
+/path/to/fluffos/build/bin/driver CONFIG_FILE
+```
+
+A healthy boot prints the FluffOS version, `Execution root:`,
+`Initializing internal stuff`, then listens. It does **not** exit.
+
+Connect on the port the README names (`telnet`, or the websocket URL).
+First-login / wizard steps are lib-specific — follow that README, not Lil
+verbs from `testsuite/`.
+
+### 6. If something fails
+
+| Symptom | Likely cause |
+|---|---|
+| `Bad mudlib directory` | Cwd or `mudlib directory` does not contain the master object |
+| Missing master / compile error at boot | Wrong `master file` or include path; read the console and the lib’s log dir |
+| `Address already in use` | Another driver owns that port |
+| Immediate disconnect | `connect()` / login object failed — same log |
+| GBK garbage in the client | Port or encoding mismatch (泥潭 5555 vs 6666 is a typical example) |
+
+More: [Troubleshooting](bug). Driver bugs:
+[github.com/fluffos/fluffos/issues](https://github.com/fluffos/fluffos/issues)
+with version line, full console, and a minimal LPC repro.
+
+## When `testsuite/` is appropriate
+
+Only if the user is changing the **driver** (efuns, compiler, networking).
+Then: `cd testsuite && ../build/bin/driver etc/config.test` or `-ftest`
+(`Checks succeeded.` + exit 0). Ports 4000–4003. That is not a game to
+hand a player.
+
+## Driver repo map
 
 | Path | Role |
 |---|---|
-| `src/` | Driver (VM, compiler, network, packages) |
-| `src/packages/*/*.spec` | Efun signatures — source of truth |
-| `src/vm/internal/applies` | Apply names — source of truth |
-| `src/base/internal/rc.cc` | Config keys — source of truth |
-| `testsuite/` | First mudlib + LPC regression suite |
-| `docs/` | This site (`https://www.fluffos.info`) |
-| `tools/lpc-syntax/` | LPC formatter / grammar (Node ≥ 18, no npm install) |
-| `src/www/` | Built-in websocket web client |
-| `AGENTS.md` | Contributor / coding-agent guide for the C++ driver |
+| `src/` | Driver |
+| `src/packages/*/*.spec` | Efun signatures |
+| `src/vm/internal/applies` | Apply names |
+| `src/base/internal/rc.cc` | Config keys |
+| `testsuite/` | LPC suite for the driver — not the default mud |
+| `docs/` | This site |
+| `tools/lpc-syntax/` | LPC formatter (Node ≥ 18, no npm install) |
+| `src/www/` | Built-in websocket client |
+| `AGENTS.md` | C++ / contributor guide |
 
-## Ecosystem (other `fluffos/*` repos)
+## Next documents (only what the task needs)
 
-Do not clone these to *boot* the testsuite. Use them when the user wants a
-full game, an editor, or a conversion tool. Details: [ecosystem](ecosystem).
+- [Mudlib AGENTS.md](mudlib-agents) · [start](start) · [ecosystem](ecosystem)
+- [LPC](lpc/) · [Efuns](/efun/) · [Applies](/apply/) · [Concepts](/concepts/)
+- [Async](concepts/general/async) · [WebSocket](concepts/general/websocket) · [TLS](concepts/general/tls)
+- [Config](driver/config) · [CLI driver](cli/driver) · [License](license)
 
-| Repo | Use |
-|---|---|
-| [fluffos/fluffos](https://github.com/fluffos/fluffos) | Driver + docs + testsuite (this project) |
-| [fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode) | VS Code / editor extension (pins this repo) |
-| [fluffos/dead-souls](https://github.com/fluffos/dead-souls) | Dead Souls mudlib snapshot |
-| [fluffos/lima](https://github.com/fluffos/lima) | Lima mudlib snapshot (archived repo; still the org copy) |
-| [fluffos/nightmare3](https://github.com/fluffos/nightmare3) | Nightmare 3 mudlib snapshot |
-| [fluffos/nt7](https://github.com/fluffos/nt7) | 泥潭 7 UTF-8 |
-| [fluffos/xkx100](https://github.com/fluffos/xkx100) | 侠客行 100 UTF-8 |
-| [fluffos/sanguozhi](https://github.com/fluffos/sanguozhi) | 三国志 MUD (older driver) |
-| [fluffos/mudlibs](https://github.com/fluffos/mudlibs) | Archive of historic Chinese mudlibs |
-| [fluffos/lpc-test](https://github.com/fluffos/lpc-test) | Additional LPC test lib |
-| [fluffos/gbk2utf8](https://github.com/fluffos/gbk2utf8) | GB2312/GBK/GB18030 ↔ UTF-8 |
-| [fluffos/imud](https://github.com/fluffos/imud) | Source for imud.fluffos.info |
-| [fluffos/libtelnet](https://github.com/fluffos/libtelnet) | Telnet library (also vendored in the driver) |
-| [fluffos/widecharwidth](https://github.com/fluffos/widecharwidth) | wcwidth helper (also vendored) |
-
-Community (not GitHub repos): [forum.fluffos.info](https://forum.fluffos.info),
-Discord `#fluffos` on the [LPC server](https://discord.gg/E5ycwE8NCc),
-QQ group 451819151.
-
-## Next documents (read only what the task needs)
-
-- [From zero to a running mud](start) — same procedure, written for humans
-- [LPC language](lpc/) · [Efuns](/efun/) · [Applies](/apply/) · [Concepts](/concepts/)
-- [Stdlib](/stdlib/) (LPC helpers that ship *in the testsuite*, not as efuns)
-- [Async / promises](concepts/general/async) · [WebSocket](concepts/general/websocket) · [TLS](concepts/general/tls)
-- [WASM cookbook](driver/wasm) · [CLI `driver`](cli/driver)
-- [License](license)
-
-If you are an LLM writing LPC: match existing testsuite style (2-space
-indent, `foreach`, `#pragma strict_types` where the surrounding file uses
-it). Format with `testsuite/format.sh` from the repo root when you touch
-`testsuite/**/*.lpc`.
+When writing LPC, match the **chosen lib’s** style. Do not reformat the
+driver `testsuite/` unless that is the tree you were asked to edit.

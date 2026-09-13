@@ -12,15 +12,15 @@ compiler and VM, a network server (Telnet, WebSocket, TLS), and hundreds of
 built-in functions (**efuns**) your mudlib calls.
 
 It is **not** a complete game. A **mudlib** — a tree of LPC files — is the
-game. This repository ships a reference mudlib under `testsuite/` so you can
-boot something real in minutes.
+game. Pick one (Dead Souls, Lima, 泥潭, 侠客行, or anything in
+[fluffos/mudlibs](https://github.com/fluffos/mudlibs)), then point the driver at it.
 
 :::tip[Get a mud running]
-**Humans:** [From zero to a running mud](/start) — clone, build, telnet to port 4000.
+**Humans:** [Pick a mudlib and boot it](/start).
 
-**Language models:** point the assistant at
-**[https://www.fluffos.info/llm](https://www.fluffos.info/llm)**
-(site map: [llms.txt](/llms.txt)).
+**Language models:** [https://www.fluffos.info/llm](https://www.fluffos.info/llm)
+— the assistant must **ask which lib** before cloning.
+(site map: [llms.txt](/llms.txt) · mudlib file: [AGENTS.md template](/mudlib-agents)).
 :::
 
 The current release is branch `master` (CMake, Ubuntu / macOS / Windows
@@ -44,7 +44,7 @@ Full org map — mudlibs, VS Code, converters: [the FluffOS ecosystem](/ecosyste
     <div className="card" style={{height: '100%'}}>
       <div className="card__header"><h3>Start a mud</h3></div>
       <div className="card__body">
-        Build the driver and boot <code>testsuite/</code> until you get a prompt.
+        Pick a mudlib, build the driver, and boot that lib until you get a prompt.
       </div>
       <div className="card__footer">
         <a className="button button--primary button--block" href="/start">Onboarding</a>
@@ -55,7 +55,7 @@ Full org map — mudlibs, VS Code, converters: [the FluffOS ecosystem](/ecosyste
     <div className="card" style={{height: '100%'}}>
       <div className="card__header"><h3>LLM contract</h3></div>
       <div className="card__body">
-        Exact commands, success criteria, and rules so an assistant can do the same path.
+        Ask which mudlib, then build, boot that lib, and write its AGENTS.md.
       </div>
       <div className="card__footer">
         <a className="button button--secondary button--block" href="/llm">www.fluffos.info/llm</a>

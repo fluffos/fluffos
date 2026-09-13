@@ -543,6 +543,10 @@
     "message": "LLM 入门约定",
     "description": "The label for the doc item 'LLM onboarding' in sidebar 'docs', linking to the doc llm"
   },
+  "sidebar.docs.doc.Mudlib AGENTS.md": {
+    "message": "Mudlib AGENTS.md",
+    "description": "The label for the doc item 'Mudlib AGENTS.md' in sidebar 'docs', linking to the doc mudlib-agents"
+  },
   "sidebar.docs.doc.Ecosystem": {
     "message": "生态",
     "description": "The label for the doc item 'Ecosystem' in sidebar 'docs', linking to the doc ecosystem"

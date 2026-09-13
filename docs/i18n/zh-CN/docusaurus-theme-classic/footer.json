@@ -23,6 +23,10 @@
     "message": "LLM 入门约定",
     "description": "The label of footer link with label=LLM onboarding linking to /llm"
   },
+  "link.item.label.Mudlib AGENTS.md": {
+    "message": "Mudlib AGENTS.md",
+    "description": "The label of footer link with label=Mudlib AGENTS.md linking to /mudlib-agents"
+  },
   "link.item.label.Build from Source": {
     "message": "从源码构建",
     "description": "The label of footer link with label=Build from Source linking to /build"

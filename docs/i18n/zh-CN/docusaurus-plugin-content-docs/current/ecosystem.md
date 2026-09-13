@@ -43,10 +43,10 @@ FluffOS 是一个 GitHub **组织**，不是单个仓库。驱动是
 | **[fluffos/nt7](https://github.com/fluffos/nt7)** | 泥潭 7，UTF-8 |
 | **[fluffos/xkx100](https://github.com/fluffos/xkx100)** | 侠客行 100，UTF-8 |
 | **[fluffos/sanguozhi](https://github.com/fluffos/sanguozhi)** | 三国志（较旧，v2017） |
-| **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** | 较老的中文 mudlib 合集 |
+| **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** | 约 199 份已修复的中文经典。先玩：[mudlibs.fluffos.info](https://mudlibs.fluffos.info/)，本机 `cd libs/<slug>` |
 | **[fluffos/lpc-test](https://github.com/fluffos/lpc-test)** | 额外 LPC 测试库，不是可玩的游戏 |
 
-**第一份**要启动的 mudlib 仍在驱动树里：[`testsuite/`](https://github.com/fluffos/fluffos/tree/master/testsuite)。见 [从零到一个能连上的 MUD](start)。
+**不要从 `testsuite/` 开始。** 那是驱动的 LPC 测试套件。选一份真正的 lib：[入门](start) / [LLM 约定](llm)，然后写入 [Mudlib AGENTS.md](mudlib-agents)。
 
 ## 库与转码
 

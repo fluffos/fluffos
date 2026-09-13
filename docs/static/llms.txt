@@ -5,21 +5,45 @@
 > Source: https://github.com/fluffos/fluffos
 > Org: https://github.com/fluffos
 
-This file is a map for language models. The onboarding contract — clone,
-build, boot testsuite/, connect — is:
+Onboarding contract for language models:
 
 https://www.fluffos.info/llm
 
+STOP. Ask the user which mudlib to work on before cloning or booting.
+Do not boot fluffos/fluffos/testsuite/ unless they are changing the driver.
+
+Mudlib AGENTS.md template (copy into the chosen lib):
+https://www.fluffos.info/mudlib-agents
+
 Human twin: https://www.fluffos.info/start
-Ecosystem (every fluffos/* repo): https://www.fluffos.info/ecosystem
+Ecosystem: https://www.fluffos.info/ecosystem
+Chinese game catalog (browser): https://mudlibs.fluffos.info/
 
 ## Do first
 
 - https://www.fluffos.info/llm
+- https://www.fluffos.info/mudlib-agents
 - https://www.fluffos.info/start
 - https://www.fluffos.info/ecosystem
 - https://www.fluffos.info/build
 - https://www.fluffos.info/bug
+
+## Example mudlibs (user must pick)
+
+English:
+- https://github.com/fluffos/dead-souls
+- https://github.com/limalib/lima
+- https://github.com/fluffos/lima
+- https://github.com/fluffos/nightmare3
+
+Chinese snapshots:
+- https://github.com/fluffos/nt7
+- https://github.com/fluffos/xkx100
+- https://github.com/fluffos/sanguozhi
+
+Chinese collection (pick a slug under libs/):
+- https://github.com/fluffos/mudlibs
+- https://mudlibs.fluffos.info/
 
 ## Language and concepts
 
@@ -44,13 +68,13 @@ Ecosystem (every fluffos/* repo): https://www.fluffos.info/ecosystem
 - https://www.fluffos.info/build-wasm
 - https://www.fluffos.info/license
 
-## Source-of-truth files in the driver repo
+## Source of truth (driver repo)
 
 - src/packages/*/*.spec — efun signatures
 - src/vm/internal/applies — apply names
 - src/base/internal/rc.cc — config keys
-- AGENTS.md — C++ / contributor contract
-- testsuite/ — first mudlib + LPC suite
+- AGENTS.md — C++ / driver-contributor contract
+- testsuite/ — driver LPC suite only
 
 ## Other fluffos/* repositories
 

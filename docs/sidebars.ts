@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
         { type: 'doc', id: 'index', label: 'Overview' },
         { type: 'doc', id: 'start', label: 'From zero to a running mud' },
         { type: 'doc', id: 'llm', label: 'LLM onboarding' },
+        { type: 'doc', id: 'mudlib-agents', label: 'Mudlib AGENTS.md' },
         { type: 'doc', id: 'ecosystem', label: 'Ecosystem' },
         { type: 'doc', id: 'build', label: 'Build from Source' },
         { type: 'doc', id: 'build-wasm', label: 'Build for WebAssembly' },

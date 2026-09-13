@@ -120,6 +120,7 @@ const config: Config = {
           items: [
             { label: 'From zero to a running mud', to: '/start' },
             { label: 'LLM onboarding', to: '/llm' },
+            { label: 'Mudlib AGENTS.md', to: '/mudlib-agents' },
             { label: 'Build from Source', to: '/build' },
             { label: 'Troubleshooting', to: '/bug' },
           ],

@@ -57,12 +57,18 @@ tree. Check each repo's README for which FluffOS version it last targeted
 | **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** | Collection of older Chinese mudlibs, for history and ports. |
 | **[fluffos/lpc-test](https://github.com/fluffos/lpc-test)** | Extra LPC test lib for the driver, not a playable game. |
 
-The **first** mudlib to boot is still in-tree: [`testsuite/`](https://github.com/fluffos/fluffos/tree/master/testsuite)
-(*Lil* + the official LPC suite). See [From zero to a running mud](start).
+**Do not start with `testsuite/`.** That tree is the driver’s LPC test
+harness. Pick a real lib: [onboarding](start) / [LLM contract](llm).
 
-Upstream mudlibs not mirrored under the org (still commonly used with
-FluffOS) include the live Dead Souls and Discworld trees. The driver does
-not vendor them.
+**Chinese catalog (play in the browser):** [https://mudlibs.fluffos.info/](https://mudlibs.fluffos.info/)
+— hundreds of restored games in [fluffos/mudlibs](https://github.com/fluffos/mudlibs).
+Ask for a **slug** (`libs/<slug>`), not the collection root.
+
+**English upstreams** not only in this org: [Dead Souls](https://dead-souls.net/),
+[limalib/lima](https://github.com/limalib/lima),
+[Discworld](https://dwwiki.mooo.com/).
+
+After you pick a tree, copy the [mudlib AGENTS.md template](mudlib-agents).
 
 ## Libraries and conversion tools
 

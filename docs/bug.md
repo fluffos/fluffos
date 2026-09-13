@@ -5,7 +5,7 @@ title: Troubleshooting
 # Troubleshooting
 
 This page covers build and boot failures, then how to file a useful crash
-report. To get a mud running in the first place, see
+report. To get a mud running, pick a mudlib first:
 [From zero to a running mud](start) or the [LLM contract](llm).
 
 ## Build failures

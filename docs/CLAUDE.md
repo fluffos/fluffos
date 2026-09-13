@@ -243,8 +243,9 @@ stale.
 Root-level documentation about building and deploying FluffOS.
 
 **Key Files:**
-- `start.md` - Human onboarding: clone, build, boot `testsuite/`, connect
-- `llm.md` - LLM onboarding contract (canonical URL `/llm`); keep commands exact
+- `start.md` - Human onboarding: pick a mudlib, build, boot that lib
+- `llm.md` - LLM contract (`/llm`): **ask which mudlib** before cloning; do not default to `testsuite/`
+- `mudlib-agents.md` - Template `AGENTS.md` to copy into the chosen mudlib
 - `ecosystem.md` - Map of every public `fluffos/*` repository
 - `build.mdx` - Comprehensive build guide for all platforms (MDX, per-platform tabs)
 - `index.mdx` - Main documentation landing page (MDX, card grid)

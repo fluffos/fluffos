@@ -7,14 +7,15 @@ slug: /
 
 FluffOS 是高性能 **LPMUD 驱动**（游戏引擎）：LPC 编译器与虚拟机、网络服务（Telnet / WebSocket / TLS），以及 mudlib 可调用的数百个内置函数（**efun**）。它是仍在维护的 MudOS 后继。
 
-它**不是**完整游戏。**Mudlib**（一棵 LPC 文件树）才是游戏。本仓库在 `testsuite/` 里带了一份参考 mudlib，几分钟就能真正跑起来。
+它**不是**完整游戏。**Mudlib**（一棵 LPC 文件树）才是游戏。先选一份
+（Dead Souls、Lima、泥潭、侠客行，或 [fluffos/mudlibs](https://github.com/fluffos/mudlibs) 里的游戏），再把驱动指过去。
 
 :::tip[先跑起来]
-**人类：**[从零到一个能连上的 MUD](/zh-CN/start) — 编译后 telnet 到 4000 端口。
+**人类：**[选一份 mudlib 并启动](/zh-CN/start)。
 
-**语言模型：**把助手指向
-**[https://www.fluffos.info/llm](https://www.fluffos.info/llm)**
-（站点地图：[llms.txt](/llms.txt)）。
+**语言模型：**[https://www.fluffos.info/llm](https://www.fluffos.info/llm)
+——助手必须**先问用哪份 lib**再克隆。
+（[llms.txt](/llms.txt) · [AGENTS.md 模板](/zh-CN/mudlib-agents)）。
 :::
 
 当前版本是 `master` 分支（CMake；Ubuntu / macOS / Windows MSYS2 / WebAssembly）。参见 [GitHub Releases](https://github.com/fluffos/fluffos/releases)。
@@ -37,7 +38,7 @@ FluffOS 是高性能 **LPMUD 驱动**（游戏引擎）：LPC 编译器与虚拟
     <div className="card" style={{height: '100%'}}>
       <div className="card__header"><h3>跑起来</h3></div>
       <div className="card__body">
-        编译驱动并启动 <code>testsuite/</code>，直到出现命令提示符。
+        先选一份 mudlib，再编译驱动并启动，直到出现命令提示符。
       </div>
       <div className="card__footer">
         <a className="button button--primary button--block" href="/zh-CN/start">入门</a>
