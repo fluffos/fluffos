@@ -4,8 +4,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'FluffOS Docs',
-  tagline: 'A high-performance LPMUD game engine',
-  favicon: undefined,
+  tagline: 'LPC driver — from zero to a running mud',
+  favicon: 'img/favicon.svg',
   url: 'https://www.fluffos.info',
   baseUrl: '/',
   organizationName: 'fluffos',
@@ -75,14 +75,31 @@ const config: Config = {
   ],
 
   themeConfig: {
+    image: 'img/favicon.svg',
+    metadata: [
+      {
+        name: 'description',
+        content:
+          'FluffOS documentation: build the driver, boot a mud, LPC language, efuns, applies, and the fluffos/* ecosystem.',
+      },
+    ],
     navbar: {
       title: 'FluffOS',
+      logo: {
+        alt: 'FluffOS',
+        src: 'img/favicon.svg',
+      },
       items: [
+        { to: '/start', label: 'Start', position: 'left' },
+        { to: '/llm', label: 'LLM', position: 'left' },
+        { to: '/lpc/', label: 'LPC', position: 'left' },
+        { to: '/efun/', label: 'Efuns', position: 'left' },
+        { to: '/ecosystem', label: 'Ecosystem', position: 'left' },
         {
           type: 'docSidebar',
           sidebarId: 'docs',
           position: 'left',
-          label: 'Documentation',
+          label: 'Docs',
         },
         {
           type: 'localeDropdown',
@@ -99,24 +116,31 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Documentation',
+          title: 'Start',
           items: [
-            { label: 'Getting Started', to: '/build' },
+            { label: 'From zero to a running mud', to: '/start' },
+            { label: 'LLM onboarding', to: '/llm' },
+            { label: 'Build from Source', to: '/build' },
+            { label: 'Troubleshooting', to: '/bug' },
+          ],
+        },
+        {
+          title: 'Reference',
+          items: [
+            { label: 'LPC', to: '/lpc/' },
             { label: 'Efuns', to: '/efun/' },
             { label: 'Applies', to: '/apply/' },
+            { label: 'Ecosystem', to: '/ecosystem' },
           ],
         },
         {
           title: 'Community',
           items: [
-            {
-              label: 'GitHub',
-              href: 'https://github.com/fluffos/fluffos',
-            },
-            {
-              label: 'Issues',
-              href: 'https://github.com/fluffos/fluffos/issues',
-            },
+            { label: 'GitHub org', href: 'https://github.com/fluffos' },
+            { label: 'Driver repo', href: 'https://github.com/fluffos/fluffos' },
+            { label: 'Releases', href: 'https://github.com/fluffos/fluffos/releases' },
+            { label: 'Forum', href: 'https://forum.fluffos.info' },
+            { label: 'License', to: '/license' },
           ],
         },
       ],

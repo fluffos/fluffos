@@ -185,6 +185,7 @@
       "socket_efuns",
       "tls",
       "websocket",
+      "async",
       "tracing"
     ],
     "labels": {
@@ -201,6 +202,7 @@
       "socket_efuns": "Socket Efuns",
       "tls": "TLS",
       "websocket": "WebSocket",
+      "async": "Async and Promises",
       "tracing": "Tracing"
     }
   },

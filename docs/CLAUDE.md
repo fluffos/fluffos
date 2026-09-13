@@ -243,10 +243,15 @@ stale.
 Root-level documentation about building and deploying FluffOS.
 
 **Key Files:**
+- `start.md` - Human onboarding: clone, build, boot `testsuite/`, connect
+- `llm.md` - LLM onboarding contract (canonical URL `/llm`); keep commands exact
+- `ecosystem.md` - Map of every public `fluffos/*` repository
 - `build.mdx` - Comprehensive build guide for all platforms (MDX, per-platform tabs)
-- `build_v2017.md` - Legacy build instructions
 - `index.mdx` - Main documentation landing page (MDX, card grid)
-- `bug.md` - Bug reporting guidelines
+- `bug.md` - Troubleshooting and bug reporting
+- `license.md` - License (full text; do not dump it on the homepage)
+- `static/llms.txt` - Machine-readable site map at `/llms.txt`
+- Legacy v2017 build notes live in `archive/` (not published)
 
 ### 6. Concepts Documentation (`/docs/concepts/`)
 

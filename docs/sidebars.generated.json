@@ -3812,15 +3812,15 @@
           },
           {
             "type": "doc",
-            "id": "concepts/general/tracing",
-            "key": "concepts/general/tracing",
-            "label": "Tracing"
+            "id": "concepts/general/async",
+            "key": "concepts/general/async",
+            "label": "Async and Promises"
           },
           {
             "type": "doc",
-            "id": "concepts/general/async",
-            "key": "concepts/general/async",
-            "label": "async"
+            "id": "concepts/general/tracing",
+            "key": "concepts/general/tracing",
+            "label": "Tracing"
           }
         ]
       }

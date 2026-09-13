@@ -5,42 +5,72 @@ slug: /
 
 # FluffOS
 
-FluffOS 是一个高性能游戏引擎（LPMUD 驱动），常用于构建 MUD —— 参见
-[LPMud](https://en.wikipedia.org/wiki/LPMud)。FluffOS 最初是针对 MudOS 最后一个版本的补丁集，
-经过多次大规模重写和缺陷修复，在支持新特性的同时保持了对现有 mudlib 的向后兼容。
+FluffOS 是高性能 **LPMUD 驱动**（游戏引擎）：LPC 编译器与虚拟机、网络服务（Telnet / WebSocket / TLS），以及 mudlib 可调用的数百个内置函数（**efun**）。它是仍在维护的 MudOS 后继。
 
-代码库由三部分组成：
+它**不是**完整游戏。**Mudlib**（一棵 LPC 文件树）才是游戏。本仓库在 `testsuite/` 里带了一份参考 mudlib，几分钟就能真正跑起来。
 
-- **LPC 解释器** —— 解析并执行 LPC 程序。
-- **网络服务器** —— 管理客户端连接并暴露给 LPC，支持 TELNET、TLS 和 WebSocket 协议。
-- **粘合接口**
-  - **Efun** —— LPC 程序可调用的内置 C/C++ 函数。
-  - **Apply** —— 驱动在各类游戏事件发生时回调 LPC 对象的函数。
+:::tip[先跑起来]
+**人类：**[从零到一个能连上的 MUD](/zh-CN/start) — 编译后 telnet 到 4000 端口。
 
-:::tip[当前版本]
-当前版本为 `master` 分支 —— CMake 构建系统，支持 Ubuntu、macOS、Windows（MSYS2/MinGW64）
-以及 WebAssembly。参见 [GitHub 上的所有版本](https://github.com/fluffos/fluffos/releases)。
+**语言模型：**把助手指向
+**[https://www.fluffos.info/llm](https://www.fluffos.info/llm)**
+（站点地图：[llms.txt](/llms.txt)）。
 :::
 
-## 浏览文档
+当前版本是 `master` 分支（CMake；Ubuntu / macOS / Windows MSYS2 / WebAssembly）。参见 [GitHub Releases](https://github.com/fluffos/fluffos/releases)。
+
+## 三层结构
+
+| 层 | 是什么 |
+|---|---|
+| **LPC** | 面向对象、类 C 的语言。房间、物品、玩家都是对象。 |
+| **驱动（FluffOS）** | 编译并运行 LPC，管理连接、数据库和 efun。 |
+| **Mudlib** | 你的游戏：登录、命令、房间、战斗、策略。换 mudlib，二进制可以不变。 |
+
+组织下的全部仓库（mudlib、VS Code、转码工具等）：[FluffOS 生态](/zh-CN/ecosystem)
+（`fluffos/fluffos`、`fluffos/dead-souls`、`fluffos/nt7`、`fluffos/fluffos-vscode` …）。
+
+## 浏览
 
 <div className="row">
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>🚀 快速开始</h3></div>
+      <div className="card__header"><h3>跑起来</h3></div>
       <div className="card__body">
-        在 Linux、macOS、Windows 上从源码构建驱动，或构建可在浏览器中运行的 WebAssembly 版本。
+        编译驱动并启动 <code>testsuite/</code>，直到出现命令提示符。
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/zh-CN/build">构建指南</a>
+        <a className="button button--primary button--block" href="/zh-CN/start">入门</a>
       </div>
     </div>
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>📖 LPC 语言</h3></div>
+      <div className="card__header"><h3>LLM 约定</h3></div>
       <div className="card__body">
-        FluffOS 实现的 LPC 语言：类型、语法结构、预处理器和编译诊断。
+        给助手的精确命令、成功标准和禁止事项。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/llm">www.fluffos.info/llm</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>生态</h3></div>
+      <div className="card__body">
+        所有公开的 <code>fluffos/*</code> 仓库：mudlib、编辑器、GBK 转码等。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/ecosystem">组织地图</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>LPC 语言</h3></div>
+      <div className="card__body">
+        类型、foreach、运算符、async/await、预处理器、编译诊断。
       </div>
       <div className="card__footer">
         <a className="button button--secondary button--block" href="/zh-CN/lpc/">语言参考</a>
@@ -49,9 +79,9 @@ FluffOS 是一个高性能游戏引擎（LPMUD 驱动），常用于构建 MUD �
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>⚙️ Efun 函数</h3></div>
+      <div className="card__header"><h3>Efun</h3></div>
       <div className="card__body">
-        驱动提供给 LPC 代码调用的全部内置函数参考，按主题分类。
+        驱动提供给 LPC 的内置函数，按主题分类。
       </div>
       <div className="card__footer">
         <a className="button button--secondary button--block" href="/zh-CN/efun/">Efun 参考</a>
@@ -60,9 +90,9 @@ FluffOS 是一个高性能游戏引擎（LPMUD 驱动），常用于构建 MUD �
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>🔔 Apply 回调</h3></div>
+      <div className="card__header"><h3>Apply</h3></div>
       <div className="card__body">
-        驱动回调对象的函数：master 安全钩子、对象生命周期和玩家连接。
+        驱动回调：master 安全钩子、对象生命周期、玩家连接。
       </div>
       <div className="card__footer">
         <a className="button button--secondary button--block" href="/zh-CN/apply/">Apply 参考</a>
@@ -71,9 +101,9 @@ FluffOS 是一个高性能游戏引擎（LPMUD 驱动），常用于构建 MUD �
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>💡 概念</h3></div>
+      <div className="card__header"><h3>概念</h3></div>
       <div className="card__body">
-        LPC、对象与驱动如何协同工作 —— simul_efun、热重载、网络等。
+        对象、simul_efun、热重载、网络、异步与 Promise。
       </div>
       <div className="card__footer">
         <a className="button button--secondary button--block" href="/zh-CN/concepts/">概念指南</a>
@@ -82,33 +112,46 @@ FluffOS 是一个高性能游戏引擎（LPMUD 驱动），常用于构建 MUD �
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>🔧 驱动内部</h3></div>
+      <div className="card__header"><h3>标准库</h3></div>
       <div className="card__body">
-        运行时配置、VM 栈机、内存分配，以及如何添加自己的 efun。
+        随 testsuite 提供的纯 LPC 助手：TUI、数据库、字符串。
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/zh-CN/driver/">驱动文档</a>
+        <a className="button button--secondary button--block" href="/zh-CN/stdlib/">Stdlib</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>WebAssembly</h3></div>
+      <div className="card__body">
+        在浏览器里跑完整 mudlib，并与页面 JavaScript 互调。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/build-wasm">WASM 构建</a>
       </div>
     </div>
   </div>
 </div>
 
 :::note
-中文文档目前覆盖 efun 参考、apply 回调和构建指南；尚未翻译的页面会自动显示英文内容。
-欢迎在 [GitHub](https://github.com/fluffos/fluffos) 上贡献翻译。
+中文文档目前覆盖 efun / apply 的大部分，以及本页与入门页。尚未翻译的页面会回退到英文。欢迎在 [GitHub](https://github.com/fluffos/fluffos) 贡献翻译。
 :::
 
 ## 特性
 
-- 使用 CMake 在 Ubuntu、macOS 和 Windows 上原生构建 —— 另有可在浏览器中运行完整 mudlib 的 WebAssembly 目标。
-- 原生 UTF-8，透明的输入/输出编码转换支持。（支持 Emoji！）
-- WebSocket 支持！
-- TLS 支持！
-- 默认 SHA512 crypt。
+- 用 CMake 在 Ubuntu、macOS、Windows（MSYS2/MinGW64）上构建，另有 WebAssembly 目标。
+- 原生 UTF-8（含 Emoji）与透明的输入/输出转码。
+- 同一进程上的 Telnet、WebSocket、TLS；`src/www` 内置网页客户端。
+- 默认 SHA-512 crypt；SQLite / MySQL / PostgreSQL；异步文件与数据库 I/O。
+- LPC 原生 Promise 与 `async` / `await`。
+- 热重载：`recompile_object()` 更新正在运行的程序及其所有 clone。
+- LPC `int` 恒为 64 位，`float` 为 C `double`。
+- 兼容 MudOS mudlib；请升级，不要继续使用已停止支持的 v2017。
 
-## 许可证与版权
+## 构建与贡献
 
-> Copyright 2019-2023 Yucong Sun
-
-许可条款见英文版页面及仓库中的
-[Copyright](https://github.com/fluffos/fluffos/blob/master/Copyright) 文件。
+- [从源码构建](/zh-CN/build) · [构建 WebAssembly](/zh-CN/build-wasm) · [排障](/zh-CN/bug)
+- [驱动内部](/zh-CN/driver/) · [命令行工具](/zh-CN/cli/driver)
+- 源码：[github.com/fluffos/fluffos](https://github.com/fluffos/fluffos)
+- [许可证](/zh-CN/license)

@@ -1,7 +1,7 @@
 {
-  "name": "docs",
+  "name": "fluffos-docs",
   "version": "1.0.0",
-  "description": "",
+  "description": "Documentation site for FluffOS (https://www.fluffos.info)",
   "scripts": {
     "dev": "docusaurus start --host 0.0.0.0",
     "build": "docusaurus build",

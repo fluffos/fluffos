@@ -3,6 +3,34 @@
     "message": "FluffOS",
     "description": "The title in the navbar"
   },
+  "logo.alt": {
+    "message": "FluffOS",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.Start": {
+    "message": "入门",
+    "description": "Navbar item with label Start"
+  },
+  "item.label.LLM": {
+    "message": "LLM",
+    "description": "Navbar item with label LLM"
+  },
+  "item.label.LPC": {
+    "message": "LPC",
+    "description": "Navbar item with label LPC"
+  },
+  "item.label.Efuns": {
+    "message": "Efun",
+    "description": "Navbar item with label Efuns"
+  },
+  "item.label.Ecosystem": {
+    "message": "生态",
+    "description": "Navbar item with label Ecosystem"
+  },
+  "item.label.Docs": {
+    "message": "文档",
+    "description": "Navbar item with label Docs"
+  },
   "item.label.Documentation": {
     "message": "文档",
     "description": "Navbar item with label Documentation"

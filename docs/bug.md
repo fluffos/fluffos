@@ -1,74 +1,111 @@
 ---
 title: Troubleshooting
 ---
+
 # Troubleshooting
 
-### Where To File
+This page covers build and boot failures, then how to file a useful crash
+report. To get a mud running in the first place, see
+[From zero to a running mud](start) or the [LLM contract](llm).
 
-Please creates a [New Issue on GitHub](https://github.com/fluffos/fluffos/issues?direction=desc&milestone=none&sort=popularity&state=open).
+## Build failures
 
-### Bug Report content
+**CMake cannot find ICU, OpenSSL, PCRE, jemalloc, MySQL, SQLite, or PostgreSQL.**
+Install the matching `-dev` / Homebrew / MSYS2 packages from the
+[build guide](build). Re-run CMake from a clean `build/` after installing.
 
-Please be sure to include these in your bug report.
+**CMake is too old.** FluffOS needs CMake 3.22+. Ubuntu 22.04+ is fine.
 
-- The version number, driver will output this on start.
+**WSL build is extremely slow.** The tree must live on the Linux filesystem
+(`~/fluffos`), not `/mnt/c/...`.
 
-- The full output, the driver will at least print out some backtrace or error message. Include those.
+**Windows crypto / MySQL errors.** The documented MSYS2 flags disable those
+packages: `-DPACKAGE_CRYPTO=OFF -DPACKAGE_DB_MYSQL="" -DPACKAGE_DB_SQLITE=1`.
 
-- If you can, try to narrow down to a small LPC program that reproduce the
-  problem easily. If you can not, Try using Valgrind method first.
+**`flex` missing.** You only need flex if you edit `src/compiler/internal/lexer.l`.
+Otherwise the committed generated lexer is used.
 
-## GDB
+## Boot and connection
 
-If you have met an crash, the driver should automatically print out an list of backtrace, but sometime that doesn't really contain enough information.
+**`Bad mudlib directory`.** You started the driver from the wrong cwd.
+`testsuite/etc/config.test` sets `mudlib directory` to `./`. Run:
 
-If you want to catch the crash, try running driver under GDB directly
-
-```shell
-$ gdb --args driver <arguments>
-
-then in GDB prompt
-> handle SIGPIPE nostop noprint pass
-> run
+```bash
+cd testsuite
+../build/bin/driver etc/config.test
 ```
 
-Or all at once
+**`Address already in use` / failed to bind 4000–4003.** Another driver (or
+service) owns those ports. Stop it; do not start two drivers.
 
-```shell
-$ gdb -ex "handle SIGPIPE nostop noprint pass" -ex "run" --args driver <arguments>
+**Driver prints a version then exits.** Read the console and
+`testsuite/log/debug.log`. A missing master object, a compile error in
+`/single/master`, or a bad `include directories` line will abort startup.
+
+**Telnet connects and drops.** `master::connect()` failed while cloning the
+login object. Same log.
+
+**Browser page is empty on port 4001.** Confirm `websocket http dir` points at
+`../src/www` (as in `config.test`) and that you opened the websocket port, not
+plain telnet.
+
+## Driver vs sanitizers vs Valgrind
+
+Most "random" crashes are earlier memory corruption. Prefer
+**AddressSanitizer + UBSan** on Linux with Clang:
+
+```bash
+export CC=clang CXX=clang++
+cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON ..
+make -j"$(nproc)" install
 ```
 
-and when you met an crash, do this
+You also want `libdw-dev` and `libbz2-dev` on Ubuntu. The process is slower;
+raise `maximum eval cost` in the config if eval-cost kills are getting in
+the way.
 
-```shell
-> bt
-> info locals
+**Valgrind** is optional and much slower. Use it when you cannot run ASan
+(or to confirm a leak ASan already named). Do not treat Valgrind as the
+default first tool — the sanitizer build is.
+
+ASan/UBSan stop at the **first** invalid access and print a stack. That is
+the report you want. Valgrind's `Invalid read of size 1` is the same class
+of bug, found later.
+
+## Catching a native crash (GDB)
+
+The driver usually prints a backtrace itself. To catch it live:
+
+```bash
+gdb -ex "handle SIGPIPE nostop noprint pass" -ex "run" --args \
+  ../build/bin/driver etc/config.test
 ```
 
-and paste the result to your issue!
+When it stops:
 
-### Sanitizer
-
-Most of the crashing bug is actually caused by previous silent memory corruption, which it is very hard to detect.
-
-The currently preferred way to detect any sort of memory corruption is to use Sanitizer, that way you catch the
- problem when it happens, not when it causes other problems. However it mostly only works under Linux.
-
-Here is how you should generate a bug report with Sanitizer.
-
-Build driver in sanitizer enabled mode
-
-```shell
-cmake .. -DENABLE_SANITIZER=ON
+```text
+bt
+info locals
 ```
 
-Launch driver as usual
+Paste both, plus the version line from startup.
 
-```shell
-./driver <args>
-```
+## Filing an issue
 
-Login to your lib as usual, do something fishy.
+Open a [GitHub issue](https://github.com/fluffos/fluffos/issues). Include:
 
-(it will be slow, that is okay) You may also have to relax your `maximum eval cost` setting, if necessary. When
- Valgrind halts and prints out a backtrace with `Invalid read of size 1`, or `Invalid write of size 1`, save the entire stack trace.
+1. The **version string** the driver printed at start (`master` commit or tag).
+2. Host OS and compiler (`gcc --version` / `clang --version`).
+3. The **full** console output and `debug.log` excerpt, not a paraphrase.
+4. A **minimal LPC file** that reproduces the problem if you have one.
+5. For memory bugs: an ASan/UBSan log from a Debug sanitizer build.
+
+Do not file "it crashed" with no log. Do not paste only the last line of a
+thousand-line sanitizer report — include the first `ERROR` block and the
+`#0` stack.
+
+## Related
+
+- [Build from Source](build)
+- [CLI `driver`](cli/driver)
+- [Runtime configuration](driver/config)

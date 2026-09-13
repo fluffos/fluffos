@@ -1,95 +1,141 @@
 ---
 title: FluffOS
 slug: /
+description: FluffOS is a high-performance LPMUD driver — LPC compiler, VM, and Telnet/WebSocket/TLS server.
 ---
 
 # FluffOS
 
-FluffOS is a high-performance game engine (an LPMUD driver), commonly used for building MUDs — see
-[LPMud](https://en.wikipedia.org/wiki/LPMud). Started as a collection of patches to the last release
-of MudOS, FluffOS has gone through major rewrites and bugfixes to support new features while
-maintaining backward compatibility with existing mudlibs.
+FluffOS is a high-performance **game engine** (an LPMUD driver) for persistent
+multiplayer worlds. It is the actively maintained successor to MudOS: an LPC
+compiler and VM, a network server (Telnet, WebSocket, TLS), and hundreds of
+built-in functions (**efuns**) your mudlib calls.
 
-The codebase has three parts:
+It is **not** a complete game. A **mudlib** — a tree of LPC files — is the
+game. This repository ships a reference mudlib under `testsuite/` so you can
+boot something real in minutes.
 
-- **LPC interpreter** — parses and executes LPC programs.
-- **Network server** — manages client connections and exposes them to LPC. Supports TELNET, TLS and WebSocket.
-- **Glue interface**
-  - **Efuns** — built-in C/C++ functions callable from LPC programs.
-  - **Applies** — callback functions the driver invokes on LPC objects for game events.
+:::tip[Get a mud running]
+**Humans:** [From zero to a running mud](/start) — clone, build, telnet to port 4000.
 
-:::tip[Current release]
-The current release is branch `master` — CMake build system, supported on Ubuntu, macOS,
-Windows (MSYS2/MinGW64), and WebAssembly.
-See [all releases on GitHub](https://github.com/fluffos/fluffos/releases).
+**Language models:** point the assistant at
+**[https://www.fluffos.info/llm](https://www.fluffos.info/llm)**
+(site map: [llms.txt](/llms.txt)).
 :::
 
-## Explore the documentation
+The current release is branch `master` (CMake, Ubuntu / macOS / Windows
+MSYS2 / WebAssembly). See [releases](https://github.com/fluffos/fluffos/releases).
+
+## The three layers
+
+| Layer | What it is |
+|---|---|
+| **LPC** | Object-oriented, C-like language. Every room, item, and player is an object. |
+| **Driver (FluffOS)** | Compiles LPC, runs it, owns connections, databases, and efuns. |
+| **Mudlib** | Your game: login, commands, rooms, combat, policy. Swap the mudlib, keep the binary. |
+
+Full org map — mudlibs, VS Code, converters: [the FluffOS ecosystem](/ecosystem)
+(`fluffos/fluffos`, `fluffos/dead-souls`, `fluffos/nt7`, `fluffos/fluffos-vscode`, …).
+
+## Explore
 
 <div className="row">
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>🚀 Getting Started</h3></div>
+      <div className="card__header"><h3>Start a mud</h3></div>
       <div className="card__body">
-        Build the driver from source on Linux, macOS, Windows — or for the browser with WebAssembly.
+        Build the driver and boot <code>testsuite/</code> until you get a prompt.
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/build">Build Guide</a>
+        <a className="button button--primary button--block" href="/start">Onboarding</a>
       </div>
     </div>
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>📖 LPC Language</h3></div>
+      <div className="card__header"><h3>LLM contract</h3></div>
       <div className="card__body">
-        The LPC language as implemented by FluffOS: types, constructs, the preprocessor, and compiler diagnostics.
+        Exact commands, success criteria, and rules so an assistant can do the same path.
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/lpc/">Language Reference</a>
+        <a className="button button--secondary button--block" href="/llm">www.fluffos.info/llm</a>
       </div>
     </div>
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>⚙️ Efuns</h3></div>
+      <div className="card__header"><h3>Ecosystem</h3></div>
       <div className="card__body">
-        The complete reference of built-in functions the driver exposes to LPC code, grouped by topic.
+        Every public <code>fluffos/*</code> repo: mudlibs, VS Code, GBK conversion, more.
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/efun/">Efun Reference</a>
+        <a className="button button--secondary button--block" href="/ecosystem">Org map</a>
       </div>
     </div>
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>🔔 Applies</h3></div>
+      <div className="card__header"><h3>LPC language</h3></div>
       <div className="card__body">
-        Callbacks the driver invokes on your objects: master security hooks, object lifecycle, and player connections.
+        Types, foreach, operators, async/await, preprocessor, diagnostics.
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/apply/">Apply Reference</a>
+        <a className="button button--secondary button--block" href="/lpc/">Language</a>
       </div>
     </div>
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>💡 Concepts</h3></div>
+      <div className="card__header"><h3>Efuns</h3></div>
       <div className="card__body">
-        How LPC, objects, and the driver fit together — simul_efuns, hot reload, networking, and more.
+        Built-in functions the driver exposes to LPC, grouped by topic.
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/concepts/">Concept Guides</a>
+        <a className="button button--secondary button--block" href="/efun/">Efun reference</a>
       </div>
     </div>
   </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
-      <div className="card__header"><h3>🔧 Driver Internals</h3></div>
+      <div className="card__header"><h3>Applies</h3></div>
       <div className="card__body">
-        Runtime configuration, the VM stack machine, memory allocation, and how to add your own efuns.
+        Callbacks the driver invokes: master security, object lifecycle, connections.
       </div>
       <div className="card__footer">
-        <a className="button button--secondary button--block" href="/driver/">Driver Docs</a>
+        <a className="button button--secondary button--block" href="/apply/">Apply reference</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>Concepts</h3></div>
+      <div className="card__body">
+        Objects, simul_efuns, hot reload, networking, async and promises.
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/concepts/">Guides</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>Standard library</h3></div>
+      <div className="card__body">
+        Pure-LPC helpers shipped with the testsuite: TUI, database, strings.
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/stdlib/">Stdlib</a>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>WebAssembly</h3></div>
+      <div className="card__body">
+        Run a full mudlib in the browser, with an LPC ↔ JavaScript bridge.
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/build-wasm">WASM build</a>
       </div>
     </div>
   </div>
@@ -97,42 +143,18 @@ See [all releases on GitHub](https://github.com/fluffos/fluffos/releases).
 
 ## Features
 
-- Builds on Ubuntu, macOS, and Windows natively with CMake — plus a WebAssembly target that runs a full mudlib in the browser.
-- UTF-8 native, with transparent input/output encoding support. (Emojis!)
-- WebSocket support!
-- TLS support!
-- SHA512 crypt by default.
+- CMake builds on Ubuntu, macOS, and Windows (MSYS2/MinGW64), plus a WebAssembly target.
+- Native UTF-8 (including emoji) and transparent I/O transcoding.
+- Telnet, WebSocket, and TLS on the same driver; built-in web client in `src/www`.
+- SHA-512 crypt by default; SQLite, MySQL, and PostgreSQL; async file and DB I/O.
+- Native promises and `async` / `await` in LPC.
+- Hot reload: `recompile_object()` updates a live program and its clones.
+- 64-bit LPC `int` (always) and `float` as C `double`.
+- MudOS-compatible mudlibs still run; upgrade from v2017 rather than staying there.
 
-### Features previously released
+## Build and contribute
 
-- Mostly backward-compatible with MudOS. (Upgrading should be easy!)
-- Lots of bug fixes, including a full CHECK_MEMORY-enabled testsuite pass.
-- Compiles on modern Linux distros, 32-bit & 64-bit, CYGWIN support.
-- 64-bit LPC runtime: LPC `int` is always a 64-bit int, LPC `float` is a C double.
-- MXP, GMCP, ZLIB.
-- IPv6 support (optional).
-- ICONV support: code in UTF-8, dynamic translation on output (optional).
-- POSIX timer for better time precision (optional).
-- Stricter type checking (optional).
-- libevent integration, epoll backend.
-
-## License & Copyright
-
-> Copyright 2019-2023 Yucong Sun
-
-> Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-> documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
-> rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
-> persons to whom the Software is furnished to do so, subject to the following conditions:
-> The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
-> Software.
-> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-> COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-> OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-### Historical
-
-For the pre-2019 license and copyright, see
-[Copyright](https://github.com/fluffos/fluffos/blob/master/Copyright); for older release notes, see
-[ChangeLog.fluffos-3.x](https://github.com/fluffos/fluffos/blob/next-3.0/ChangeLog.fluffos-3.x).
+- [Build from Source](/build) · [Build for WebAssembly](/build-wasm) · [Troubleshooting](/bug)
+- [Driver internals](/driver/) · [Command-line tools](/cli/driver)
+- Source: [github.com/fluffos/fluffos](https://github.com/fluffos/fluffos)
+- [License](/license)

@@ -60,6 +60,13 @@ pages automatically fall back to the English content.
 
 ## Layout
 
+Published onboarding URLs:
+
+- [https://www.fluffos.info/start](https://www.fluffos.info/start) — human path to a running mud
+- [https://www.fluffos.info/llm](https://www.fluffos.info/llm) — LLM contract (same path, stricter)
+- [https://www.fluffos.info/llms.txt](https://www.fluffos.info/llms.txt) — machine-readable map
+- [https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem) — every public `fluffos/*` repo
+
 | Path | Contents |
 |------|----------|
 | `docusaurus.config.ts` | Site config: navbar, footer, docs plugin, search theme |
@@ -85,6 +92,7 @@ pages automatically fall back to the English content.
 | `gen_sidebar.py` | Regenerates `sidebars.generated.json` from the reference doc trees + `sidebar_meta.json` (`--check` verifies freshness, used by CI) |
 | `gen_config_docs.py` | Regenerates `driver/config.md` from `src/base/internal/rc.cc` |
 | `add_missing_efuns.py` | Creates stub pages under `efun/general/` for undocumented efuns (needs a `keywords.json` from the `generate_keywords` tool) |
+| `lint_manpages.py` | Advisory scan for leftover man-page headings (`SYNOPSYS`, `name(3)`, `layout: doc`) |
 
 ## Conventions & Gotchas
 

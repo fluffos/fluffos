@@ -8,6 +8,12 @@
 Welcome to FluffOS
 ==================
 
+**Get a mud running:** [https://www.fluffos.info/start](https://www.fluffos.info/start)
+
+**Point an LLM at this URL:** [https://www.fluffos.info/llm](https://www.fluffos.info/llm) · site map [llms.txt](https://www.fluffos.info/llms.txt)
+
+**Ecosystem** (`fluffos/*` repos): [https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem)
+
 FluffOS is a high-performance **game engine** for building persistent, multiplayer virtual worlds. It is the modern, actively maintained successor to **MudOS** — one of the most influential engines in the history of online gaming.
 
 If you are still running MudOS, it is time to upgrade. FluffOS is fully backward-compatible with existing MudOS mudlibs and adds over a decade of performance optimizations, modern protocols (WebSockets, TLS), database integrations (SQLite3, MySQL, PostgreSQL), and UTF-8 support.
@@ -303,10 +309,11 @@ make test
 
 ### LPC Tests & Integration
 ```bash
-# Run the driver with the testsuite configuration
-./build/bin/driver testsuite/etc/config.test
+# Interactive mud (cwd must be testsuite/ — config.test uses mudlib directory : ./)
+cd testsuite
+../build/bin/driver etc/config.test
 
-# Or run the LPC test suite directly
+# One-shot LPC suite
 cd testsuite
 ../build/bin/driver etc/config.test -ftest
 ```
