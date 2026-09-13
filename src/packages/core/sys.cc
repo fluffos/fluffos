@@ -70,9 +70,11 @@ void f_sys_reload_tls() {
   }
   if (port->kind == PORT_TYPE_WEBSOCKET) {
     // Same semantics as the telnet path: new connections pick up the
-    // cert/key currently on disk; existing sessions keep the old SSL_CTX
-    // until they reconnect. lws_tls_cert_updated() reloads the vhost
-    // ssl_ctx in place, matched by the filepaths stored at listen time.
+    // cert/key currently on disk; existing sessions keep the handshake
+    // they already completed. lws_tls_cert_updated() is not used: it
+    // only reloads vhosts whose stored filepath strcmp-equals the
+    // caller, and CONTEXT_PORT_NO_LISTEN_SERVER does not keep that
+    // match reliably.
     int rc = reload_websocket_tls(port);
     if (rc == 1) {
       error("Port %" LPC_INT_FMTSTR_P " is not TLS enabled\n", port_index_display);

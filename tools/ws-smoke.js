@@ -82,7 +82,7 @@ const path = require('path');
 const crypto = require('crypto');
 const http = require('http');
 const os = require('os');
-const { spawn, execFileSync } = require('child_process');
+const { spawn, spawnSync, execFileSync } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 const driverPath = path.resolve(process.argv[2] || path.join(repoRoot, 'build/src/driver'));
@@ -122,6 +122,21 @@ function tlsFilePaths() {
     cert: path.resolve(suiteDir, m[1]),
     key: path.resolve(suiteDir, m[2]),
   };
+}
+
+function opensslPeerCert(port) {
+  const sclient = spawnSync('openssl', [
+    's_client', '-connect', `127.0.0.1:${port}`,
+  ], { input: '', encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  const x509 = spawnSync('openssl', [
+    'x509', '-noout', '-subject', '-fingerprint', '-sha256',
+  ], { input: sclient.stdout, encoding: 'utf8' });
+  if (x509.status !== 0 || !x509.stdout.trim()) {
+    throw new Error(
+      'openssl could not read the peer cert on port ' + port + ': ' +
+      ((x509.stderr || sclient.stderr || '').toString().slice(-400)));
+  }
+  return x509.stdout.trim();
 }
 
 function writeFreshSelfSigned(certPath, keyPath) {
@@ -320,7 +335,15 @@ function connectWS(port, subprotocol, useTls, offerPmd) {
   return new Promise((resolve, reject) => {
     const to = setTimeout(() => reject(new Error('ws connect timeout')), 15000);
     const sock = useTls
-      ? tls.connect({ port, host: '127.0.0.1', rejectUnauthorized: false }, onUp)
+      ? tls.connect({
+          port,
+          host: '127.0.0.1',
+          rejectUnauthorized: false,
+          // Session resume reuses the previous peer cert and hides a
+          // live SSL_CTX rotation. Disable the client cache so the
+          // post-reload handshake must present whatever is on the CTX.
+          maxCachedSessions: 0,
+        }, onUp)
       : net.connect(port, '127.0.0.1', onUp);
     sock.on('error', (e) => { clearTimeout(to); reject(e); });
     let ws;
@@ -652,11 +675,20 @@ async function main() {
           gotTlsBp && st.text.length > 4700000, st.text.length + ' chars');
     const fpBefore = wsT.peerFingerprint;
     check('wss: first handshake presents a peer certificate', !!fpBefore, fpBefore || 'none');
+    let opensslBefore;
+    try {
+      opensslBefore = opensslPeerCert(tlsPort);
+    } catch (e) {
+      check('wss: openssl s_client reads the boot certificate', false, e.message);
+    }
+    if (opensslBefore) {
+      check('wss: openssl s_client reads the boot certificate', true, opensslBefore);
+    }
 
-    // Issue #1395: prove the vhost SSL_CTX is replaced, not just that
-    // sys_reload_tls() returns. Overwrite the on-disk cert/key with a
-    // newly generated pair, reload, keep the existing session (old CTX),
-    // and require a fresh client to see a different fingerprint.
+    // Issue #1395: prove new handshakes present the on-disk cert, not just
+    // that sys_reload_tls() returns. Overwrite the cert/key with a newly
+    // generated pair, reload, keep the existing session, and require a
+    // fresh client (Node and openssl s_client) to see a different cert.
     const tlsFiles = tlsFilePaths();
     const origCert = fs.readFileSync(tlsFiles.cert);
     const origKey = fs.readFileSync(tlsFiles.key);
@@ -681,6 +713,17 @@ async function main() {
       check('wss: new client is presented the replacement certificate',
             !!fpAfter && fpAfter !== fpBefore,
             fpAfter ? `before ${fpBefore} after ${fpAfter}` : 'no peer cert');
+      let opensslAfter;
+      try {
+        opensslAfter = opensslPeerCert(tlsPort);
+      } catch (e) {
+        check('wss: openssl s_client sees the replacement certificate', false, e.message);
+      }
+      if (opensslAfter) {
+        check('wss: openssl s_client sees the replacement certificate',
+              opensslAfter !== opensslBefore,
+              `before ${opensslBefore} after ${opensslAfter}`);
+      }
       check('wss: new client reaches the banner after the cert swap',
             await waitFor(() => st2.text.length > 50, 15000));
     } finally {

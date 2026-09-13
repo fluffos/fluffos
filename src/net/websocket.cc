@@ -10,14 +10,67 @@
 #include "net/ws_telnet.h"
 #include "net/tls.h"
 
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+
 enum PROTOCOL_ID {
   WS_HTTP = 0,
   WS_ASCII = PROTOCOL_WS_ASCII,
   WS_TELNET = PROTOCOL_WS_TELNET,
 };
 
+// Capture the vhost SSL_CTX at create time. lws_tls_cert_updated() only
+// reloads vhosts whose stored filepath pointers strcmp-equal the caller's
+// strings, and with CONTEXT_PORT_NO_LISTEN_SERVER that match is not
+// reliable (observed: reload logged success, new wss clients still saw
+// the boot cert). OpenSSL 3 also keeps serving the boot leaf after
+// SSL_CTX_use_certificate_chain_file() on that CTX succeeds
+// (SSL_CTX_get0_certificate updates; new handshakes still send the old
+// cert). Keep a side SSL_CTX loaded the same way telnet does, and install
+// a cert callback so each handshake applies that chain to the SSL*.
+static int ws_ssl_cert_cb(SSL* ssl, void* arg) {
+  auto* port = static_cast<port_def_t*>(arg);
+  if (!port || !port->lws_reload_ctx) {
+    return 0;
+  }
+  X509* cert = SSL_CTX_get0_certificate(port->lws_reload_ctx);
+  EVP_PKEY* pkey = SSL_CTX_get0_privatekey(port->lws_reload_ctx);
+  if (!cert || !pkey) {
+    return 0;
+  }
+  STACK_OF(X509)* chain = nullptr;
+  SSL_CTX_get0_chain_certs(port->lws_reload_ctx, &chain);
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  if (SSL_use_cert_and_key(ssl, cert, pkey, chain, 1) != 1) {
+    return 0;
+  }
+#else
+  if (SSL_use_certificate(ssl, cert) != 1 || SSL_use_PrivateKey(ssl, pkey) != 1) {
+    return 0;
+  }
+  (void)chain;
+#endif
+  return 1;
+}
+
+static int ws_http_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user, void* in,
+                            size_t len) {
+  if (reason == LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS) {
+    auto* port = static_cast<port_def_t*>(lws_context_user(lws_get_context(wsi)));
+    auto* vh = static_cast<struct lws_vhost*>(in);
+    const char* name = vh ? lws_get_vhost_name(vh) : nullptr;
+    // Adopted sockets bind to the "default" vhost. The system vhost that
+    // heads context->vhost_list also gets this callback; its CTX is not
+    // the one new wss connections use.
+    if (port && name && strcmp(name, "default") == 0) {
+      port->lws_ssl_ctx = static_cast<SSL_CTX*>(user);
+    }
+  }
+  return lws_callback_http_dummy(wsi, reason, user, in, len);
+}
+
 static struct lws_protocols protocols[] = {
-    {"http", lws_callback_http_dummy, 0, 0, WS_HTTP},
+    {"http", ws_http_callback, 0, 0, WS_HTTP},
     {"ascii", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_ASCII},
     {"telnet", ws_telnet_callback, sizeof(struct ws_telnet_session), 4096, WS_TELNET},
     // for backward compatiblity with fluffos 2.x
@@ -141,24 +194,41 @@ void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
   }
 }
 
-void close_websocket_context(struct lws_context* context) { lws_context_destroy(context); }
+void close_websocket_context(struct lws_context* context) {
+  if (auto* port = static_cast<port_def_t*>(lws_context_user(context))) {
+    if (port->lws_reload_ctx) {
+      tls_server_close(port->lws_reload_ctx);
+      port->lws_reload_ctx = nullptr;
+    }
+    port->lws_ssl_ctx = nullptr;
+  }
+  lws_context_destroy(context);
+}
 
 int reload_websocket_tls(port_def_t* port) {
   if (!port || !port->lws_context || port->tls_cert.empty() || port->tls_key.empty()) {
     return 1;
   }
 
-  // lws_tls_cert_updated() always returns 0 even when SSL_CTX_use_* fails
-  // (or when no vhost matches the paths). Probe with the same loader the
-  // telnet path uses so a missing/corrupt cert still errors to LPC.
+  // Same loader as the telnet path: missing/corrupt PEM errors to LPC,
+  // and a successful load keeps the full chain for new handshakes.
   SSL_CTX* probe = tls_server_init(port->tls_cert, port->tls_key);
   if (!probe) {
     return 2;
   }
-  tls_server_close(probe);
-
-  lws_tls_cert_updated(port->lws_context, port->tls_cert.c_str(), port->tls_key.c_str(), nullptr, 0,
-                       nullptr, 0);
+  SSL_CTX* ctx = port->lws_ssl_ctx;
+  if (!ctx) {
+    tls_server_close(probe);
+    return 2;
+  }
+  if (port->lws_reload_ctx) {
+    tls_server_close(port->lws_reload_ctx);
+  }
+  port->lws_reload_ctx = probe;
+  SSL_CTX_set_cert_cb(ctx, ws_ssl_cert_cb, port);
+  // Drop tickets issued under the old cert so a resumed handshake cannot
+  // keep presenting it after rotation.
+  SSL_CTX_flush_sessions(ctx, 0);
   return 0;
 }
 
