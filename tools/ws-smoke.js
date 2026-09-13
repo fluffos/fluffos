@@ -62,7 +62,12 @@
 //     without pmd has shipped "works in the test client, dies in the
 //     browser" bugs twice before (see src/www/AGENTS.md)
 //   * a TLS (`wss`) telnet connection: banner, then the same forced
-//     backpressure through the TLS partial-write path
+//     backpressure through the TLS partial-write path, then a real
+//     cert swap: overwrite the on-disk cert/key with a newly generated
+//     pair, sys_reload_tls() on the live wss port, and assert the next
+//     handshake presents the NEW fingerprint (issue #1395 -- the efun
+//     used to refuse websocket ports; reloading the same files is not
+//     enough to prove the vhost SSL_CTX was replaced)
 //
 // No npm dependencies: the websocket client (handshake + framing) is
 // implemented on net/tls sockets below. Exit code 0 = all checks passed.
@@ -76,7 +81,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const http = require('http');
-const { spawn } = require('child_process');
+const os = require('os');
+const { spawn, spawnSync, execFileSync } = require('child_process');
 
 const repoRoot = path.resolve(__dirname, '..');
 const driverPath = path.resolve(process.argv[2] || path.join(repoRoot, 'build/src/driver'));
@@ -93,11 +99,59 @@ const TelnetClient = eval(
 function wsPorts() {
   const conf = fs.readFileSync(path.join(suiteDir, configRel), 'utf8');
   const ports = [];
-  for (const m of conf.matchAll(/^external_port_\d+\s*:\s*websocket\s+(\d+)/gm)) {
-    ports.push(parseInt(m[1], 10));
+  let tlsIndex = 0;
+  let tlsPort;
+  for (const m of conf.matchAll(/^external_port_(\d+)\s*:\s*websocket\s+(\d+)/gm)) {
+    const index = parseInt(m[1], 10);
+    const port = parseInt(m[2], 10);
+    ports.push(port);
+    if (new RegExp('^external_port_' + index + '_tls\\s*:', 'm').test(conf)) {
+      tlsIndex = index;
+      tlsPort = port;
+    }
   }
   if (ports.length < 1) throw new Error('no websocket ports in ' + configRel);
-  return { plain: ports[0], tlsPort: ports[1] };  // config.test: 4001, 4002 (TLS)
+  return { plain: ports[0], tlsPort, tlsIndex };  // config.test: 4001, 4002 (TLS, index 3)
+}
+
+function tlsFilePaths() {
+  const conf = fs.readFileSync(path.join(suiteDir, configRel), 'utf8');
+  const m = conf.match(/^external_port_\d+_tls\s*:\s*cert=(\S+)\s+key=(\S+)/m);
+  if (!m) throw new Error('no external_port_N_tls cert=/key= in ' + configRel);
+  return {
+    cert: path.resolve(suiteDir, m[1]),
+    key: path.resolve(suiteDir, m[2]),
+  };
+}
+
+function opensslPeerCert(port) {
+  const sclient = spawnSync('openssl', [
+    's_client', '-connect', `127.0.0.1:${port}`,
+  ], { input: '', encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  const x509 = spawnSync('openssl', [
+    'x509', '-noout', '-subject', '-fingerprint', '-sha256',
+  ], { input: sclient.stdout, encoding: 'utf8' });
+  if (x509.status !== 0 || !x509.stdout.trim()) {
+    throw new Error(
+      'openssl could not read the peer cert on port ' + port + ': ' +
+      ((x509.stderr || sclient.stderr || '').toString().slice(-400)));
+  }
+  return x509.stdout.trim();
+}
+
+function writeFreshSelfSigned(certPath, keyPath) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fluffos-ws-cert-'));
+  const newCert = path.join(tmp, 'cert.pem');
+  const newKey = path.join(tmp, 'key.pem');
+  execFileSync('openssl', [
+    'req', '-x509', '-newkey', 'rsa:2048', '-sha256',
+    '-keyout', newKey, '-out', newCert,
+    '-days', '2', '-nodes',
+    '-subj', '/CN=fluffos-ws-reload-1395',
+  ], { stdio: 'pipe' });
+  fs.copyFileSync(newCert, certPath);
+  fs.copyFileSync(newKey, keyPath);
+  fs.rmSync(tmp, { recursive: true, force: true });
 }
 
 // A deterministic multi-window burst: 5000 'x' bytes (more than two
@@ -281,12 +335,24 @@ function connectWS(port, subprotocol, useTls, offerPmd) {
   return new Promise((resolve, reject) => {
     const to = setTimeout(() => reject(new Error('ws connect timeout')), 15000);
     const sock = useTls
-      ? tls.connect({ port, host: '127.0.0.1', rejectUnauthorized: false }, onUp)
+      ? tls.connect({
+          port,
+          host: '127.0.0.1',
+          rejectUnauthorized: false,
+          // Session resume reuses the previous peer cert and hides a
+          // live SSL_CTX rotation. Disable the client cache so the
+          // post-reload handshake must present whatever is on the CTX.
+          maxCachedSessions: 0,
+        }, onUp)
       : net.connect(port, '127.0.0.1', onUp);
     sock.on('error', (e) => { clearTimeout(to); reject(e); });
     let ws;
     function onUp() {
       ws = new WSClient(sock, '127.0.0.1', port, subprotocol, offerPmd);
+      if (useTls) {
+        const cert = sock.getPeerCertificate();
+        ws.peerFingerprint = cert && (cert.fingerprint256 || cert.fingerprint);
+      }
       const poll = setInterval(() => {
         if (ws.established) {
           clearInterval(poll); clearTimeout(to);
@@ -343,7 +409,7 @@ function telnetSession(ws) {
 // ---- the test -----------------------------------------------------------
 
 async function main() {
-  const { plain, tlsPort } = wsPorts();
+  const { plain, tlsPort, tlsIndex } = wsPorts();
 
   if (!fs.existsSync(driverPath)) {
     console.error('driver not found: ' + driverPath);
@@ -607,6 +673,64 @@ async function main() {
     const gotTlsBp = await waitFor(() => st.text.includes('|END|'), 20000);
     check('wss: recovers from genuine backpressure',
           gotTlsBp && st.text.length > 4700000, st.text.length + ' chars');
+    const fpBefore = wsT.peerFingerprint;
+    check('wss: first handshake presents a peer certificate', !!fpBefore, fpBefore || 'none');
+    let opensslBefore;
+    try {
+      opensslBefore = opensslPeerCert(tlsPort);
+    } catch (e) {
+      check('wss: openssl s_client reads the boot certificate', false, e.message);
+    }
+    if (opensslBefore) {
+      check('wss: openssl s_client reads the boot certificate', true, opensslBefore);
+    }
+
+    // Issue #1395: prove new handshakes present the on-disk cert, not just
+    // that sys_reload_tls() returns. Overwrite the cert/key with a newly
+    // generated pair, reload, keep the existing session, and require a
+    // fresh client (Node and openssl s_client) to see a different cert.
+    const tlsFiles = tlsFilePaths();
+    const origCert = fs.readFileSync(tlsFiles.cert);
+    const origKey = fs.readFileSync(tlsFiles.key);
+    let wsT2;
+    try {
+      writeFreshSelfSigned(tlsFiles.cert, tlsFiles.key);
+      st.text = '';
+      st.sendText(
+        `eval sys_reload_tls(${tlsIndex}); write("|TLS-RELOAD|"); return 0\r\n`);
+      const gotReload = await waitFor(() => st.text.includes('|TLS-RELOAD|'), 15000);
+      check('wss: sys_reload_tls() reloads after the cert files change',
+            gotReload && driverLog.includes('Reloading TLS config for port ' + tlsPort),
+            gotReload ? 'reload marker; log ' + (driverLog.includes('Reloading TLS config for port ' + tlsPort) ? 'ok' : 'missing')
+                      : st.text.slice(-200));
+      st.text = '';
+      st.sendText('eval write("|STILL-ALIVE|"); return 0\r\n');
+      check('wss: existing session survives the cert reload',
+            await waitFor(() => st.text.includes('|STILL-ALIVE|'), 15000));
+      wsT2 = await connectWS(tlsPort, 'telnet', true);
+      const st2 = telnetSession(wsT2);
+      const fpAfter = wsT2.peerFingerprint;
+      check('wss: new client is presented the replacement certificate',
+            !!fpAfter && fpAfter !== fpBefore,
+            fpAfter ? `before ${fpBefore} after ${fpAfter}` : 'no peer cert');
+      let opensslAfter;
+      try {
+        opensslAfter = opensslPeerCert(tlsPort);
+      } catch (e) {
+        check('wss: openssl s_client sees the replacement certificate', false, e.message);
+      }
+      if (opensslAfter) {
+        check('wss: openssl s_client sees the replacement certificate',
+              opensslAfter !== opensslBefore,
+              `before ${opensslBefore} after ${opensslAfter}`);
+      }
+      check('wss: new client reaches the banner after the cert swap',
+            await waitFor(() => st2.text.length > 50, 15000));
+    } finally {
+      fs.writeFileSync(tlsFiles.cert, origCert);
+      fs.writeFileSync(tlsFiles.key, origKey);
+      if (wsT2) wsT2.close();
+    }
     wsT.close();
   }
 
@@ -619,7 +743,7 @@ async function main() {
 const watchdog = setTimeout(() => {
   console.error('ws-smoke: global timeout');
   process.exit(2);
-}, 180000);
+}, 240000);
 watchdog.unref();
 
 main().catch((e) => {

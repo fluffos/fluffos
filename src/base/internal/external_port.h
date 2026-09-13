@@ -33,6 +33,9 @@ struct port_def_t {
   struct evconnlistener* ev_conn;
   // websocket context
   struct lws_context* lws_context;
+  // Current adopt vhost ("default" at boot; "tls-N" after sys_reload_tls()).
+  std::string lws_vhost_name;
+  int lws_tls_generation;
   // ssl context
   SSL_CTX* ssl;
   std::string tls_cert;

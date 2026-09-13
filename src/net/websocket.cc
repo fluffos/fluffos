@@ -8,6 +8,11 @@
 
 #include "net/ws_ascii.h"
 #include "net/ws_telnet.h"
+#include "net/tls.h"
+
+#include <openssl/ssl.h>
+
+#include <cstdio>
 
 enum PROTOCOL_ID {
   WS_HTTP = 0,
@@ -43,6 +48,34 @@ static struct lws_http_mount init_mount() {
   return m;
 }
 static struct lws_http_mount mount = init_mount();
+
+static const char* k_ws_ciphers =
+    "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-"
+    "RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384";
+
+// lws_tls_cert_updated() and SSL_CTX_use_certificate_chain_file() on the
+// live vhost CTX both report success while new wss clients still see the
+// boot leaf (OpenSSL 3 + CONTEXT_PORT_NO_LISTEN_SERVER). A new vhost
+// loads the on-disk chain the same way boot does; new adoptions go there
+// and existing sessions stay on the vhost they already handshook.
+static void fill_ws_tls_info(struct lws_context_creation_info* info, port_def_t* port) {
+  info->options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+  info->options |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
+  info->options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
+  info->ssl_cipher_list = k_ws_ciphers;
+  info->ssl_cert_filepath = port->tls_cert.c_str();
+  info->ssl_private_key_filepath = port->tls_key.c_str();
+  info->ssl_options_clear = SSL_OP_CIPHER_SERVER_PREFERENCE;
+  info->ssl_options_set = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+}
+
+static const char* current_ws_vhost_name(port_def_t* port) {
+  if (port && !port->lws_vhost_name.empty()) {
+    return port->lws_vhost_name.c_str();
+  }
+  return "default";
+}
 
 void lws_log(int severity, const char* msg) {
   if (severity == LLL_ERR) {
@@ -80,17 +113,7 @@ struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
   info.options = LWS_SERVER_OPTION_LIBEVENT | LWS_SERVER_OPTION_VALIDATE_UTF8;
 
   if (!port->tls_cert.empty() && !port->tls_key.empty()) {
-    info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-    info.options |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
-    info.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
-    info.ssl_cipher_list =
-        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:"
-        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-"
-        "RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384";
-    info.ssl_cert_filepath = port->tls_cert.c_str();
-    info.ssl_private_key_filepath = port->tls_key.c_str();
-    info.ssl_options_clear = SSL_OP_CIPHER_SERVER_PREFERENCE;
-    info.ssl_options_set = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+    fill_ws_tls_info(&info, port);
   }
   // info.options |= LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
   info.user = (void*)port;
@@ -101,6 +124,9 @@ struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
     lwsl_err("lws init failed\n");
     return nullptr;
   }
+
+  port->lws_vhost_name = "default";
+  port->lws_tls_generation = 0;
 
   std::string res;
   for (auto& p : protocols) {
@@ -118,7 +144,8 @@ struct lws* init_user_websocket(struct lws_context* context, evutil_socket_t fd)
   // Since lws v4.3 the context's vhost list is headed by an internal "system"
   // vhost, which carries none of our ws protocols; lws_adopt_socket() adopts
   // onto the list head, so adopt explicitly onto our own vhost instead.
-  auto* vhost = lws_get_vhost_by_name(context, "default");
+  auto* port = static_cast<port_def_t*>(lws_context_user(context));
+  auto* vhost = lws_get_vhost_by_name(context, current_ws_vhost_name(port));
   if (!vhost) {
     return nullptr;
   }
@@ -140,7 +167,48 @@ void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
   }
 }
 
-void close_websocket_context(struct lws_context* context) { lws_context_destroy(context); }
+void close_websocket_context(struct lws_context* context) {
+  if (auto* port = static_cast<port_def_t*>(lws_context_user(context))) {
+    port->lws_vhost_name.clear();
+    port->lws_tls_generation = 0;
+  }
+  lws_context_destroy(context);
+}
+
+int reload_websocket_tls(port_def_t* port) {
+  if (!port || !port->lws_context || port->tls_cert.empty() || port->tls_key.empty()) {
+    return 1;
+  }
+
+  // Same loader as the telnet path so a missing/corrupt PEM errors to LPC
+  // before we create a live vhost.
+  SSL_CTX* probe = tls_server_init(port->tls_cert, port->tls_key);
+  if (!probe) {
+    return 2;
+  }
+  tls_server_close(probe);
+
+  char name[32];
+  snprintf(name, sizeof(name), "tls-%d", port->lws_tls_generation + 1);
+
+  struct lws_context_creation_info info = {0};
+  info.vhost_name = name;
+  info.port = CONTEXT_PORT_NO_LISTEN_SERVER;
+  info.protocols = protocols;
+  info.extensions = extensions;
+  info.mounts = &mount;
+  info.options = LWS_SERVER_OPTION_VALIDATE_UTF8;
+  fill_ws_tls_info(&info, port);
+
+  struct lws_vhost* vh = lws_create_vhost(port->lws_context, &info);
+  if (!vh) {
+    return 2;
+  }
+
+  port->lws_tls_generation++;
+  port->lws_vhost_name = name;
+  return 0;
+}
 
 void close_user_websocket(struct lws* wsi) {
   bool close_from_writable = false;
