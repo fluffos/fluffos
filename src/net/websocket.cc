@@ -11,7 +11,8 @@
 #include "net/tls.h"
 
 #include <openssl/ssl.h>
-#include <openssl/x509.h>
+
+#include <cstdio>
 
 enum PROTOCOL_ID {
   WS_HTTP = 0,
@@ -19,58 +20,8 @@ enum PROTOCOL_ID {
   WS_TELNET = PROTOCOL_WS_TELNET,
 };
 
-// Capture the vhost SSL_CTX at create time. lws_tls_cert_updated() only
-// reloads vhosts whose stored filepath pointers strcmp-equal the caller's
-// strings, and with CONTEXT_PORT_NO_LISTEN_SERVER that match is not
-// reliable (observed: reload logged success, new wss clients still saw
-// the boot cert). OpenSSL 3 also keeps serving the boot leaf after
-// SSL_CTX_use_certificate_chain_file() on that CTX succeeds
-// (SSL_CTX_get0_certificate updates; new handshakes still send the old
-// cert). Keep a side SSL_CTX loaded the same way telnet does, and install
-// a cert callback so each handshake applies that chain to the SSL*.
-static int ws_ssl_cert_cb(SSL* ssl, void* arg) {
-  auto* port = static_cast<port_def_t*>(arg);
-  if (!port || !port->lws_reload_ctx) {
-    return 0;
-  }
-  X509* cert = SSL_CTX_get0_certificate(port->lws_reload_ctx);
-  EVP_PKEY* pkey = SSL_CTX_get0_privatekey(port->lws_reload_ctx);
-  if (!cert || !pkey) {
-    return 0;
-  }
-  STACK_OF(X509)* chain = nullptr;
-  SSL_CTX_get0_chain_certs(port->lws_reload_ctx, &chain);
-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
-  if (SSL_use_cert_and_key(ssl, cert, pkey, chain, 1) != 1) {
-    return 0;
-  }
-#else
-  if (SSL_use_certificate(ssl, cert) != 1 || SSL_use_PrivateKey(ssl, pkey) != 1) {
-    return 0;
-  }
-  (void)chain;
-#endif
-  return 1;
-}
-
-static int ws_http_callback(struct lws* wsi, enum lws_callback_reasons reason, void* user, void* in,
-                            size_t len) {
-  if (reason == LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS) {
-    auto* port = static_cast<port_def_t*>(lws_context_user(lws_get_context(wsi)));
-    auto* vh = static_cast<struct lws_vhost*>(in);
-    const char* name = vh ? lws_get_vhost_name(vh) : nullptr;
-    // Adopted sockets bind to the "default" vhost. The system vhost that
-    // heads context->vhost_list also gets this callback; its CTX is not
-    // the one new wss connections use.
-    if (port && name && strcmp(name, "default") == 0) {
-      port->lws_ssl_ctx = static_cast<SSL_CTX*>(user);
-    }
-  }
-  return lws_callback_http_dummy(wsi, reason, user, in, len);
-}
-
 static struct lws_protocols protocols[] = {
-    {"http", ws_http_callback, 0, 0, WS_HTTP},
+    {"http", lws_callback_http_dummy, 0, 0, WS_HTTP},
     {"ascii", ws_ascii_callback, sizeof(struct ws_ascii_session), 4096, WS_ASCII},
     {"telnet", ws_telnet_callback, sizeof(struct ws_telnet_session), 4096, WS_TELNET},
     // for backward compatiblity with fluffos 2.x
@@ -97,6 +48,34 @@ static struct lws_http_mount init_mount() {
   return m;
 }
 static struct lws_http_mount mount = init_mount();
+
+static const char* k_ws_ciphers =
+    "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-"
+    "RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384";
+
+// lws_tls_cert_updated() and SSL_CTX_use_certificate_chain_file() on the
+// live vhost CTX both report success while new wss clients still see the
+// boot leaf (OpenSSL 3 + CONTEXT_PORT_NO_LISTEN_SERVER). A new vhost
+// loads the on-disk chain the same way boot does; new adoptions go there
+// and existing sessions stay on the vhost they already handshook.
+static void fill_ws_tls_info(struct lws_context_creation_info* info, port_def_t* port) {
+  info->options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+  info->options |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
+  info->options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
+  info->ssl_cipher_list = k_ws_ciphers;
+  info->ssl_cert_filepath = port->tls_cert.c_str();
+  info->ssl_private_key_filepath = port->tls_key.c_str();
+  info->ssl_options_clear = SSL_OP_CIPHER_SERVER_PREFERENCE;
+  info->ssl_options_set = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+}
+
+static const char* current_ws_vhost_name(port_def_t* port) {
+  if (port && !port->lws_vhost_name.empty()) {
+    return port->lws_vhost_name.c_str();
+  }
+  return "default";
+}
 
 void lws_log(int severity, const char* msg) {
   if (severity == LLL_ERR) {
@@ -134,17 +113,7 @@ struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
   info.options = LWS_SERVER_OPTION_LIBEVENT | LWS_SERVER_OPTION_VALIDATE_UTF8;
 
   if (!port->tls_cert.empty() && !port->tls_key.empty()) {
-    info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-    info.options |= LWS_SERVER_OPTION_ALLOW_NON_SSL_ON_SSL_PORT;
-    info.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
-    info.ssl_cipher_list =
-        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:"
-        "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-"
-        "RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384";
-    info.ssl_cert_filepath = port->tls_cert.c_str();
-    info.ssl_private_key_filepath = port->tls_key.c_str();
-    info.ssl_options_clear = SSL_OP_CIPHER_SERVER_PREFERENCE;
-    info.ssl_options_set = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+    fill_ws_tls_info(&info, port);
   }
   // info.options |= LWS_SERVER_OPTION_HTTP_HEADERS_SECURITY_BEST_PRACTICES_ENFORCE;
   info.user = (void*)port;
@@ -155,6 +124,9 @@ struct lws_context* init_websocket_context(event_base* base, port_def_t* port) {
     lwsl_err("lws init failed\n");
     return nullptr;
   }
+
+  port->lws_vhost_name = "default";
+  port->lws_tls_generation = 0;
 
   std::string res;
   for (auto& p : protocols) {
@@ -172,7 +144,8 @@ struct lws* init_user_websocket(struct lws_context* context, evutil_socket_t fd)
   // Since lws v4.3 the context's vhost list is headed by an internal "system"
   // vhost, which carries none of our ws protocols; lws_adopt_socket() adopts
   // onto the list head, so adopt explicitly onto our own vhost instead.
-  auto* vhost = lws_get_vhost_by_name(context, "default");
+  auto* port = static_cast<port_def_t*>(lws_context_user(context));
+  auto* vhost = lws_get_vhost_by_name(context, current_ws_vhost_name(port));
   if (!vhost) {
     return nullptr;
   }
@@ -196,11 +169,8 @@ void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
 
 void close_websocket_context(struct lws_context* context) {
   if (auto* port = static_cast<port_def_t*>(lws_context_user(context))) {
-    if (port->lws_reload_ctx) {
-      tls_server_close(port->lws_reload_ctx);
-      port->lws_reload_ctx = nullptr;
-    }
-    port->lws_ssl_ctx = nullptr;
+    port->lws_vhost_name.clear();
+    port->lws_tls_generation = 0;
   }
   lws_context_destroy(context);
 }
@@ -210,25 +180,33 @@ int reload_websocket_tls(port_def_t* port) {
     return 1;
   }
 
-  // Same loader as the telnet path: missing/corrupt PEM errors to LPC,
-  // and a successful load keeps the full chain for new handshakes.
+  // Same loader as the telnet path so a missing/corrupt PEM errors to LPC
+  // before we create a live vhost.
   SSL_CTX* probe = tls_server_init(port->tls_cert, port->tls_key);
   if (!probe) {
     return 2;
   }
-  SSL_CTX* ctx = port->lws_ssl_ctx;
-  if (!ctx) {
-    tls_server_close(probe);
+  tls_server_close(probe);
+
+  char name[32];
+  snprintf(name, sizeof(name), "tls-%d", port->lws_tls_generation + 1);
+
+  struct lws_context_creation_info info = {0};
+  info.vhost_name = name;
+  info.port = CONTEXT_PORT_NO_LISTEN_SERVER;
+  info.protocols = protocols;
+  info.extensions = extensions;
+  info.mounts = &mount;
+  info.options = LWS_SERVER_OPTION_VALIDATE_UTF8;
+  fill_ws_tls_info(&info, port);
+
+  struct lws_vhost* vh = lws_create_vhost(port->lws_context, &info);
+  if (!vh) {
     return 2;
   }
-  if (port->lws_reload_ctx) {
-    tls_server_close(port->lws_reload_ctx);
-  }
-  port->lws_reload_ctx = probe;
-  SSL_CTX_set_cert_cb(ctx, ws_ssl_cert_cb, port);
-  // Drop tickets issued under the old cert so a resumed handshake cannot
-  // keep presenting it after rotation.
-  SSL_CTX_flush_sessions(ctx, 0);
+
+  port->lws_tls_generation++;
+  port->lws_vhost_name = name;
   return 0;
 }
 
