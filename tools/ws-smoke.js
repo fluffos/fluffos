@@ -62,7 +62,9 @@
 //     without pmd has shipped "works in the test client, dies in the
 //     browser" bugs twice before (see src/www/AGENTS.md)
 //   * a TLS (`wss`) telnet connection: banner, then the same forced
-//     backpressure through the TLS partial-write path
+//     backpressure through the TLS partial-write path, then
+//     sys_reload_tls() on the live wss port and a fresh handshake
+//     (issue #1395 -- the efun used to refuse websocket ports)
 //
 // No npm dependencies: the websocket client (handshake + framing) is
 // implemented on net/tls sockets below. Exit code 0 = all checks passed.
@@ -93,11 +95,19 @@ const TelnetClient = eval(
 function wsPorts() {
   const conf = fs.readFileSync(path.join(suiteDir, configRel), 'utf8');
   const ports = [];
-  for (const m of conf.matchAll(/^external_port_\d+\s*:\s*websocket\s+(\d+)/gm)) {
-    ports.push(parseInt(m[1], 10));
+  let tlsIndex = 0;
+  let tlsPort;
+  for (const m of conf.matchAll(/^external_port_(\d+)\s*:\s*websocket\s+(\d+)/gm)) {
+    const index = parseInt(m[1], 10);
+    const port = parseInt(m[2], 10);
+    ports.push(port);
+    if (new RegExp('^external_port_' + index + '_tls\\s*:', 'm').test(conf)) {
+      tlsIndex = index;
+      tlsPort = port;
+    }
   }
   if (ports.length < 1) throw new Error('no websocket ports in ' + configRel);
-  return { plain: ports[0], tlsPort: ports[1] };  // config.test: 4001, 4002 (TLS)
+  return { plain: ports[0], tlsPort, tlsIndex };  // config.test: 4001, 4002 (TLS, index 3)
 }
 
 // A deterministic multi-window burst: 5000 'x' bytes (more than two
@@ -343,7 +353,7 @@ function telnetSession(ws) {
 // ---- the test -----------------------------------------------------------
 
 async function main() {
-  const { plain, tlsPort } = wsPorts();
+  const { plain, tlsPort, tlsIndex } = wsPorts();
 
   if (!fs.existsSync(driverPath)) {
     console.error('driver not found: ' + driverPath);
@@ -607,7 +617,25 @@ async function main() {
     const gotTlsBp = await waitFor(() => st.text.includes('|END|'), 20000);
     check('wss: recovers from genuine backpressure',
           gotTlsBp && st.text.length > 4700000, st.text.length + ' chars');
+    // Issue #1395: sys_reload_tls() used to refuse websocket ports. Reload
+    // from disk on the live driver (same cert files) and confirm a fresh
+    // wss client still completes the handshake. Existing sessions keep the
+    // old SSL_CTX -- this connection is closed first so the reconnect is a
+    // new one.
+    st.text = '';
+    st.sendText(
+      `eval sys_reload_tls(${tlsIndex}); write("|TLS-RELOAD|"); return 0\r\n`);
+    const gotReload = await waitFor(() => st.text.includes('|TLS-RELOAD|'), 15000);
+    check('wss: sys_reload_tls() reloads the websocket TLS port',
+          gotReload && driverLog.includes('Reloading TLS config for port ' + tlsPort),
+          gotReload ? 'reload marker; log ' + (driverLog.includes('Reloading TLS config for port ' + tlsPort) ? 'ok' : 'missing')
+                    : st.text.slice(-200));
     wsT.close();
+    const wsT2 = await connectWS(tlsPort, 'telnet', true);
+    const st2 = telnetSession(wsT2);
+    check('wss: new client reaches the banner after sys_reload_tls()',
+          await waitFor(() => st2.text.length > 50, 15000));
+    wsT2.close();
   }
 
   kill();

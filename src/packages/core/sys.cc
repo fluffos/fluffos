@@ -1,6 +1,9 @@
 #include "base/package_api.h"
 
 #include "net/tls.h"
+#ifdef F_SYS_RELOAD_TLS
+#include "net/websocket.h"
+#endif
 
 #ifdef F_SYS_NETWORK_PORTS
 void f_sys_network_ports() {
@@ -66,7 +69,18 @@ void f_sys_reload_tls() {
     error("Invalid port index: %d\n", port_index_display);
   }
   if (port->kind == PORT_TYPE_WEBSOCKET) {
-    error("Reloading websocket TLS config is not supported for port %d.\n", port->port);
+    // Same semantics as the telnet path: new connections pick up the
+    // cert/key currently on disk; existing sessions keep the old SSL_CTX
+    // until they reconnect. lws_tls_cert_updated() reloads the vhost
+    // ssl_ctx in place, matched by the filepaths stored at listen time.
+    int rc = reload_websocket_tls(port);
+    if (rc == 1) {
+      error("Port %d is not TLS enabled\n", port_index_display);
+    }
+    if (rc == 2) {
+      error("Failed to reload TLS context for port %d\n", port->port);
+    }
+    debug_message("Reloading TLS config for port %d.\n", port->port);
   } else {
     if (port->ssl == nullptr) {
       error("Port %d is not TLS enabled\n", port_index_display);

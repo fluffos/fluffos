@@ -8,6 +8,7 @@
 
 #include "net/ws_ascii.h"
 #include "net/ws_telnet.h"
+#include "net/tls.h"
 
 enum PROTOCOL_ID {
   WS_HTTP = 0,
@@ -141,6 +142,25 @@ void websocket_send_text(struct lws* wsi, const char* data, size_t len) {
 }
 
 void close_websocket_context(struct lws_context* context) { lws_context_destroy(context); }
+
+int reload_websocket_tls(port_def_t* port) {
+  if (!port || !port->lws_context || port->tls_cert.empty() || port->tls_key.empty()) {
+    return 1;
+  }
+
+  // lws_tls_cert_updated() always returns 0 even when SSL_CTX_use_* fails
+  // (or when no vhost matches the paths). Probe with the same loader the
+  // telnet path uses so a missing/corrupt cert still errors to LPC.
+  SSL_CTX* probe = tls_server_init(port->tls_cert, port->tls_key);
+  if (!probe) {
+    return 2;
+  }
+  tls_server_close(probe);
+
+  lws_tls_cert_updated(port->lws_context, port->tls_cert.c_str(), port->tls_key.c_str(), nullptr, 0,
+                       nullptr, 0);
+  return 0;
+}
 
 void close_user_websocket(struct lws* wsi) {
   bool close_from_writable = false;
