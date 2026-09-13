@@ -113,6 +113,12 @@ rules and once-bitten lessons.
 
 ## Testing expectations
 
+* `sys_reload_tls()` on a websocket TLS port is gated by
+  `node tools/ws-tls-reload.js` (ctest `ws-tls-reload`, CI unit-test
+  step): overwrite the on-disk cert, reload, require openssl s_client
+  and a Node TLS client to see the new fingerprint. Reloading the same
+  files is not enough. Keep it green when touching `src/net/websocket.cc`
+  or `f_sys_reload_tls()`.
 * Any change to these pages, `telnet.js`, or `src/net/ws_*.cc` must keep
   `node tools/ws-smoke.js` green (CI runs it: boots the real driver,
   telnet + ascii subprotocols, SGA switch, multi-window bursts,

@@ -128,7 +128,8 @@ set_tests_properties(testsuite PROPERTIES
         PASS_REGULAR_EXPRESSION "Checks succeeded\\."
         FAIL_REGULAR_EXPRESSION "\\[  FAILED  \\]"
         TIMEOUT 600
-        LABELS "testsuite")
+        LABELS "testsuite"
+        RESOURCE_LOCK "fluffos_external_ports")
 
 # lpcshell drives the REPL binary itself in script mode against the same
 # mudlib: the wrapping it is being tested for (deciding whether typed text
@@ -201,3 +202,21 @@ set_tests_properties(lpcshell-warning-at-exit PROPERTIES
         PASS_REGULAR_EXPRESSION "Unknown escape sequence"
         TIMEOUT 120
         LABELS "lpcshell")
+
+# Issue #1395: sys_reload_tls() on a websocket TLS port must present a
+# newly written on-disk cert to the next handshake. GTest and the LPC
+# suite cannot inspect the peer certificate; this Node+openssl client
+# is the gate. Label `websocket` so `ctest -LE testsuite` (CI unit tests)
+# still runs it. RESOURCE_LOCK shares the config.test ports with the LPC
+# suite. Skipped when node or openssl is missing (Windows CI).
+find_program(NODE_EXECUTABLE node)
+find_program(OPENSSL_EXECUTABLE openssl)
+if (NODE_EXECUTABLE AND OPENSSL_EXECUTABLE)
+  add_test(NAME ws-tls-reload
+          COMMAND "${NODE_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/ws-tls-reload.js"
+                  $<TARGET_FILE:driver> "${CMAKE_SOURCE_DIR}/testsuite")
+  set_tests_properties(ws-tls-reload PROPERTIES
+          TIMEOUT 90
+          LABELS "websocket"
+          RESOURCE_LOCK "fluffos_external_ports")
+endif ()
