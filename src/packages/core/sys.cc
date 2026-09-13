@@ -62,11 +62,11 @@ void f_sys_reload_tls() {
   // for an out-of-bounds read and a wild tls_server_close()/port->ssl write).
   if (port_index < 0 ||
       port_index >= (LPC_INT)(sizeof(external_port) / sizeof(external_port[0]))) {
-    error("Invalid port index: %d\n", port_index_display);
+    error("Invalid port index: %" LPC_INT_FMTSTR_P "\n", port_index_display);
   }
   auto* port = &external_port[port_index];
   if (port->kind == PORT_TYPE_UNDEFINED) {
-    error("Invalid port index: %d\n", port_index_display);
+    error("Invalid port index: %" LPC_INT_FMTSTR_P "\n", port_index_display);
   }
   if (port->kind == PORT_TYPE_WEBSOCKET) {
     // Same semantics as the telnet path: new connections pick up the
@@ -75,7 +75,7 @@ void f_sys_reload_tls() {
     // ssl_ctx in place, matched by the filepaths stored at listen time.
     int rc = reload_websocket_tls(port);
     if (rc == 1) {
-      error("Port %d is not TLS enabled\n", port_index_display);
+      error("Port %" LPC_INT_FMTSTR_P " is not TLS enabled\n", port_index_display);
     }
     if (rc == 2) {
       error("Failed to reload TLS context for port %d\n", port->port);
@@ -83,7 +83,7 @@ void f_sys_reload_tls() {
     debug_message("Reloading TLS config for port %d.\n", port->port);
   } else {
     if (port->ssl == nullptr) {
-      error("Port %d is not TLS enabled\n", port_index_display);
+      error("Port %" LPC_INT_FMTSTR_P " is not TLS enabled\n", port_index_display);
     }
     auto* ctx = tls_server_init(port->tls_cert, port->tls_key);
     if (ctx == nullptr) {
