@@ -10,6 +10,13 @@ FluffOS 是**引擎**。**Mudlib** 才是游戏。先选 lib，再编译驱动�
 给助手：[https://www.fluffos.info/llm](https://www.fluffos.info/llm)。
 选定后把 [Mudlib AGENTS.md](mudlib-agents) 放进该树。
 
+```mermaid
+flowchart LR
+  LPC[LPC 语言] --> Driver[FluffOS 驱动]
+  Mudlib[你的 mudlib] --> Driver
+  Driver --> Clients[Telnet / WebSocket / TLS]
+```
+
 驱动仓库里的 `testsuite/` 是 LPC **测试套件**，不是给你玩的新手村。
 
 ## 1. 选一份 mudlib

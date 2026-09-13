@@ -491,7 +491,7 @@ python3 docs/gen_sidebar.py --check
 
 The documentation is built using **Docusaurus 3** (`@docusaurus/preset-classic`). Key files:
 
-- `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin path
+- `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin, mermaid, redirects, sitemap, image zoom, `future.faster`
 - `docs/sidebars.ts` — sidebar navigation tree (Docusaurus `SidebarsConfig` format)
 - `docs/src/css/custom.css` — Infima CSS variable overrides
 - `docs/package.json` — npm scripts: `dev`, `build`, `preview`, `clear`

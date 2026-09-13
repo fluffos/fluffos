@@ -81,13 +81,13 @@ After you pick a tree, copy the [mudlib AGENTS.md template](mudlib-agents).
 
 ## How the pieces fit
 
-```
-fluffos/fluffos          engine + docs + testsuite + lpc-syntax
-        │
-        ├── fluffos/fluffos-vscode     editor (submodule / pin of the driver)
-        ├── fluffos/{dead-souls,lima,nightmare3,nt7,xkx100,…}
-        │         mudlibs you point `mudlib directory` at
-        └── fluffos/gbk2utf8           encode a legacy lib, then boot it
+```mermaid
+flowchart TB
+  Driver[fluffos/fluffos driver]
+  Driver --> VSCode[fluffos-vscode]
+  Driver --> EN[dead-souls / lima / nightmare3]
+  Driver --> CN[nt7 / xkx100 / mudlibs slugs]
+  Driver --> Tools[gbk2utf8]
 ```
 
 To attach a third-party mudlib: generate a config

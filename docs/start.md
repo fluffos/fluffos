@@ -21,6 +21,13 @@ tree so the next session keeps ports and the master path.
 | **Driver** | Compiler, VM, efuns, Telnet / WebSocket / TLS — this repo’s `src/` |
 | **Mudlib** | The game. You choose it. The driver does not ship one you would play. |
 
+```mermaid
+flowchart LR
+  LPC[LPC language] --> Driver[FluffOS driver]
+  Mudlib[Your mudlib] --> Driver
+  Driver --> Clients[Telnet / WebSocket / TLS]
+```
+
 `testsuite/` in the driver repo is the LPC **test harness**, not a starter
 world. Use it only when you are changing FluffOS itself.
 

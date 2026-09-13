@@ -57,6 +57,15 @@ FluffOS 是一个 GitHub **组织**，不是单个仓库。驱动是
 | **[fluffos/widecharwidth](https://github.com/fluffos/widecharwidth)** | `wcwidth`（驱动内也有一份）。 |
 | **[fluffos/imud](https://github.com/fluffos/imud)** | imud.fluffos.info 的代码。 |
 
+```mermaid
+flowchart TB
+  Driver[fluffos/fluffos 驱动]
+  Driver --> VSCode[fluffos-vscode]
+  Driver --> EN[dead-souls / lima / nightmare3]
+  Driver --> CN[nt7 / xkx100 / mudlibs slugs]
+  Driver --> Tools[gbk2utf8]
+```
+
 把第三方 mudlib 接上：`driver --generate-config`，填写 `mudlib directory`、`master file`、`include directories` 和端口。不要原样复用 `testsuite/etc/config.test`。
 
 v2017 已停止支持。许可证见 [许可证](license)。

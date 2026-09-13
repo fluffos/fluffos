@@ -37,6 +37,20 @@ the mudlib root so the next session does not start from zero.
 **Do not clone or boot a mudlib until the user has picked one.** Present
 the menu below (short form is fine) and wait.
 
+```mermaid
+flowchart TD
+  ReadPage[Read /llm] --> Ask{Already have a mudlib on disk?}
+  Ask -->|yes| UsePath[Use that path]
+  Ask -->|no| Menu[Show lib menu and wait]
+  Menu --> Pick[User names a slug or URL]
+  UsePath --> Driver[Build or reuse the FluffOS driver]
+  Pick --> Driver
+  Driver --> Cfg[Lib config or generate-config]
+  Cfg --> AgentsMd[Write mudlib AGENTS.md]
+  AgentsMd --> Boot[Boot that lib]
+  Boot --> Prompt[Login or welcome prompt]
+```
+
 Ask, in this order:
 
 1. Do you already have a mudlib on disk? If yes, use that path.

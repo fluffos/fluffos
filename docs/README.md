@@ -29,6 +29,22 @@ npm run preview   # serve the production build locally
 npm run clear     # clear the Docusaurus cache
 ```
 
+## Plugins and site features
+
+Configured in `docusaurus.config.ts`:
+
+| Piece | Role |
+|------|------|
+| `@docusaurus/theme-mermaid` | Mermaid diagrams in fenced `mermaid` code blocks |
+| `@docusaurus/plugin-client-redirects` | `/foo.html` → `/foo`, plus aliases (`/getting-started` → `/start`, `/llms` → `/llm`, …) |
+| `@docusaurus/faster` | SWC + Rspack production builds (`future.faster`) |
+| `docusaurus-plugin-image-zoom` | Click-to-zoom on markdown images |
+| Classic **sitemap** | `/sitemap.xml` with `lastmod` |
+| Local search | `@easyops-cn/docusaurus-search-local` (see below) |
+| Last update | `showLastUpdateTime` / `showLastUpdateAuthor` on each page (needs git history; CI uses `fetch-depth: 0`) |
+
+`static/robots.txt` points crawlers at the sitemap and mentions `/llms.txt`.
+
 ## Search
 
 Full-text search is provided by

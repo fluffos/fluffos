@@ -17,6 +17,20 @@ Mudlib 助手文件：[Mudlib AGENTS.md](mudlib-agents)。生态：[ecosystem](e
 
 ## 必须先问：用哪份 lib
 
+```mermaid
+flowchart TD
+  ReadPage[阅读 /llm] --> Ask{磁盘上已有 mudlib?}
+  Ask -->|是| UsePath[用那个路径]
+  Ask -->|否| Menu[列出候选并等待]
+  Menu --> Pick[用户点名 slug 或 URL]
+  UsePath --> Driver[编译或复用 FluffOS 驱动]
+  Pick --> Driver
+  Driver --> Cfg[lib 配置或 generate-config]
+  Cfg --> AgentsMd[写 mudlib AGENTS.md]
+  AgentsMd --> Boot[启动这份 lib]
+  Boot --> Prompt[登录或欢迎提示]
+```
+
 按这个顺序问，然后**等回复**：
 
 1. 磁盘上是否已有 mudlib？有就用那个路径。

@@ -31,3 +31,7 @@
     font-weight: 700;
     letter-spacing: 0.02em;
 }
+
+.theme-doc-markdown .mermaid {
+    margin: 1.25rem 0;
+}

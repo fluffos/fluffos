@@ -12,6 +12,13 @@ const config: Config = {
   projectName: 'fluffos',
   onBrokenLinks: 'throw',
 
+  future: {
+    // Needed for faster.ssgWorkerThreads; do not set v4: true (that
+    // turns off MDX v1 compat, which this corpus still needs).
+    v4: { removeLegacyPostBuildHeadAttribute: true },
+    faster: true,
+  },
+
   i18n: {
     defaultLocale: 'en',
     locales: ['en', 'zh-CN'],
@@ -24,6 +31,7 @@ const config: Config = {
   markdown: {
     // treat .md files as standard Markdown (not MDX) so existing docs don't need conversion
     format: 'detect',
+    mermaid: true,
     hooks: {
       onBrokenMarkdownLinks: 'warn',
     },
@@ -38,6 +46,8 @@ const config: Config = {
           path: '.',
           routeBasePath: '/',
           editUrl: 'https://github.com/fluffos/fluffos/edit/master/docs/',
+          showLastUpdateTime: true,
+          showLastUpdateAuthor: true,
           exclude: [
             '**/node_modules/**',
             '**/archive/**',
@@ -49,6 +59,12 @@ const config: Config = {
           ],
         },
         blog: false,
+        sitemap: {
+          lastmod: 'datetime',
+          changefreq: 'weekly',
+          priority: 0.5,
+          filename: 'sitemap.xml',
+        },
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -56,7 +72,26 @@ const config: Config = {
     ],
   ],
 
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        // Jekyll / VitePress leftover: /build.html → /build
+        fromExtensions: ['html'],
+        redirects: [
+          { from: '/llms', to: '/llm' },
+          { from: '/getting-started', to: '/start' },
+          { from: '/agents', to: '/mudlib-agents' },
+          { from: '/build_v2017', to: '/build' },
+          { from: '/reporting-bugs', to: '/bug' },
+        ],
+      },
+    ],
+    'docusaurus-plugin-image-zoom',
+  ],
+
   themes: [
+    '@docusaurus/theme-mermaid',
     [
       '@easyops-cn/docusaurus-search-local',
       {
@@ -83,6 +118,16 @@ const config: Config = {
           'FluffOS documentation: build the driver, boot a mud, LPC language, efuns, applies, and the fluffos/* ecosystem.',
       },
     ],
+    mermaid: {
+      theme: { light: 'neutral', dark: 'dark' },
+    },
+    zoom: {
+      selector: '.markdown :not(em) > img',
+      background: {
+        light: 'rgb(255, 255, 255)',
+        dark: 'rgb(26, 35, 50)',
+      },
+    },
     navbar: {
       title: 'FluffOS',
       logo: {
@@ -150,8 +195,10 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ['c', 'cpp', 'bash', 'json', 'cmake', 'ini', 'diff'],
     },
-  } satisfies Preset.ThemeConfig,
+    // mermaid + image-zoom keys are not on Preset.ThemeConfig
+  } as Preset.ThemeConfig,
 };
 
 export default config;
