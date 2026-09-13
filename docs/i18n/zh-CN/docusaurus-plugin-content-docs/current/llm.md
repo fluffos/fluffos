@@ -43,7 +43,7 @@ flowchart TD
 | 选择 | 得到什么 | 怎么开始 |
 |---|---|---|
 | **Dead Souls** | 最适合英文「我要一个能玩的 MUD」 | [fluffos/dead-souls](https://github.com/fluffos/dead-souls) — `--recurse-submodules` 后 `./build.sh && ./run.sh`。网页 `:5555`，telnet `:6666`。[dead-souls.net](https://dead-souls.net/) |
-| **Lima** | 模块化、文档较好 | 上游 [limalib/lima](https://github.com/limalib/lima)，`adm/dist/rebuild`，常见端口 `7878`。组织快照 [fluffos/lima](https://github.com/fluffos/lima)（已 archived） |
+| **Lima** | 模块化、文档较好 | 上游 [limalib/lima](https://github.com/limalib/lima)，`--recurse-submodules` 后 `cd adm/dist && ./rebuild`，常见端口 `7878`。试玩：[lima.lostsouls.org](https://lima.lostsouls.org)。组织快照 [fluffos/lima](https://github.com/fluffos/lima)（已 archived） |
 | **Nightmare 3** | 更瘦的历史 lib | [fluffos/nightmare3](https://github.com/fluffos/nightmare3) |
 | **用户自己的树** | 已有游戏 | 用他们的路径和配置，不要套 `config.test` |
 
@@ -66,7 +66,7 @@ flowchart TD
 ## 成功标准
 
 1. 用户点名了 mudlib（路径或 URL + slug）
-2. 有驱动二进制（`build/bin/driver` 或 lib 自带的 `./build.sh`）
+2. 有驱动二进制（`build/bin/driver`、增量树的 `build/src/driver`，或 lib 自带的 `./build.sh` / Lima 的 `cd adm/dist && ./rebuild`）
 3. 跑的是**这份 lib 的配置**，不是 `testsuite/etc/config.test`
 4. 客户端在文档写明的端口上看到登录/欢迎
 5. mudlib 根目录有按 [模板](mudlib-agents) 填好的 `AGENTS.md`（合集里若已有长篇 AGENTS.md，只补端口和启动行，不要覆盖）

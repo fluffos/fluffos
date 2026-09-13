@@ -48,7 +48,11 @@ FluffOS 是一个 GitHub **组织**，不是单个仓库。驱动是
 | **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** | 约 199 份已修复的中文经典。先玩：[mudlibs.fluffos.info](https://mudlibs.fluffos.info/)，本机 `cd libs/<slug>` |
 | **[fluffos/lpc-test](https://github.com/fluffos/lpc-test)** | 额外 LPC 测试库，不是可玩的游戏 |
 
-**不要从 `testsuite/` 开始。** 那是驱动的 LPC 测试套件。选一份真正的 lib：[入门](start) / [LLM 约定](llm)，然后写入 [Mudlib AGENTS.md](mudlib-agents)。
+**不要从 `testsuite/` 开始。** 那是驱动的 LPC 测试套件。选一份真正的 lib：[入门](start) / [LLM 约定](llm)。
+
+英文上游不只在本组织：[Dead Souls](https://dead-souls.net/)、[limalib/lima](https://github.com/limalib/lima)（试玩 [lima.lostsouls.org](https://lima.lostsouls.org)）、[Discworld](https://dwwiki.mooo.com/)。
+
+选定后把 [Mudlib AGENTS.md 模板](mudlib-agents) 拷进该树。
 
 ## 库与转码
 

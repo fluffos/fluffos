@@ -32,6 +32,14 @@
     letter-spacing: 0.02em;
 }
 
+.theme-doc-markdown .docusaurus-mermaid-container,
 .theme-doc-markdown .mermaid {
     margin: 1.25rem 0;
+    overflow-x: auto;
+}
+
+.theme-doc-markdown .docusaurus-mermaid-container svg,
+.theme-doc-markdown .mermaid-svg {
+    max-width: 100%;
+    height: auto;
 }

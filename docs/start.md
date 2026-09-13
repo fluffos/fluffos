@@ -41,7 +41,7 @@ You need a path on disk or a git URL.
 [Dead Souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules` then `./build.sh && ./run.sh`. Browser [http://localhost:5555](http://localhost:5555), telnet `:6666`. Docs: [dead-souls.net](https://dead-souls.net/).
 
 **Want a modular English lib?**
-[Lima](https://github.com/limalib/lima) — clone with `--recurse-submodules`, `cd adm/dist && ./rebuild`, often port `7878`. [Install guide](https://docs.limamudlib.dev/Installation.html). Org snapshot: [fluffos/lima](https://github.com/fluffos/lima).
+[Lima](https://github.com/limalib/lima) — clone with `--recurse-submodules`, then `cd adm/dist && ./rebuild`, often port `7878`. Play: [lima.lostsouls.org](https://lima.lostsouls.org). [Install guide](https://docs.limamudlib.dev/Installation.html). Org snapshot: [fluffos/lima](https://github.com/fluffos/lima).
 
 **Want a smaller historic English lib?**
 [Nightmare 3](https://github.com/fluffos/nightmare3).

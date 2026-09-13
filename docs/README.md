@@ -39,7 +39,7 @@ Configured in `docusaurus.config.ts`:
 | `@docusaurus/plugin-client-redirects` | `/foo.html` → `/foo`, plus aliases (`/getting-started` → `/start`, `/llms` → `/llm`, …) |
 | `@docusaurus/faster` | SWC + Rspack production builds (`future.faster`) |
 | `docusaurus-plugin-image-zoom` | Click-to-zoom on markdown images |
-| LPC highlighter | First-party Prism language (`tools/lpc-syntax/prism-lpc.cjs`) plus a remark plugin that remaps leftover ` ```c ` to `lpc` except under `driver/` / `build-wasm` |
+| LPC highlighter | First-party Prism language (`tools/lpc-syntax/prism-lpc.cjs`) plus a remark plugin that remaps leftover ` ```c ` to `lpc` except under `driver/` / `build-wasm` (LPC on those pages uses ` ```lpc `) |
 | Classic **sitemap** | `/sitemap.xml` with `lastmod` |
 | Local search | `@easyops-cn/docusaurus-search-local` (see below) |
 | Last update | `showLastUpdateTime` / `showLastUpdateAuthor` on each page (needs git history; CI uses `fetch-depth: 0`) |

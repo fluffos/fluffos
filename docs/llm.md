@@ -66,7 +66,7 @@ in the browser first). Still confirm before cloning.
 | Pick | What you get | Clone / start |
 |---|---|---|
 | **Dead Souls** | Beginner-friendly full game (races, combat, town, OLC). Best English “I want a mud.” | [fluffos/dead-souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules` then `./build.sh && ./run.sh`. Web `http://localhost:5555`, telnet `:6666`. Upstream docs: [dead-souls.net](https://dead-souls.net/). |
-| **Lima** | Modular, modern-ish, well documented. Often the other English default. | Preferred upstream: [limalib/lima](https://github.com/limalib/lima) (`git clone --recurse-submodules`, then `cd adm/dist && ./rebuild`). Telnet/web often `:7878`. Org snapshot: [fluffos/lima](https://github.com/fluffos/lima) (archived). Install notes: [docs.limamudlib.dev](https://docs.limamudlib.dev/Installation.html). |
+| **Lima** | Modular, modern-ish, well documented. Often the other English default. | Preferred upstream: [limalib/lima](https://github.com/limalib/lima) (`git clone --recurse-submodules`, then `cd adm/dist && ./rebuild`). Telnet/web often `:7878`. Play: [lima.lostsouls.org](https://lima.lostsouls.org). Org snapshot: [fluffos/lima](https://github.com/fluffos/lima) (archived). Install notes: [docs.limamudlib.dev](https://docs.limamudlib.dev/Installation.html). |
 | **Nightmare 3** | Slimmer historic lib; common tutorial starting point. | [fluffos/nightmare3](https://github.com/fluffos/nightmare3) — `git clone --recurse-submodules`. Read that README for config/ports. |
 | **Discworld lib** | Powers Discworld MUD (since 1991). Heavy, not a 10-minute boot. | Point the user at [dwwiki.mooo.com](https://dwwiki.mooo.com/) and their published lib tarball. Do not pretend a one-line clone exists under `fluffos/*`. |
 | **User’s own tree** | Existing production or hobby lib. | Use their path. Generate or edit **their** config. Do not overwrite it with `config.test`. |
@@ -160,8 +160,8 @@ Image only: `docker pull ghcr.io/fluffos/fluffos:master` (still needs the mudlib
 
 `flex` is only required if you edit `src/compiler/internal/lexer.l`.
 
-If the chosen repo has `./build.sh`, `./run.sh`, or `adm/dist/rebuild`,
-**prefer those** over inventing a config.
+If the chosen repo has `./build.sh`, `./run.sh`, or Lima’s
+`cd adm/dist && ./rebuild`, **prefer those** over inventing a config.
 
 ### 2. Get the mudlib
 

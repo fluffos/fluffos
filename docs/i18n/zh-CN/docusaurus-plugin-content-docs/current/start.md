@@ -25,7 +25,7 @@ flowchart LR
 
 **要英文完整游戏？** [Dead Souls](https://github.com/fluffos/dead-souls) — `--recurse-submodules` 后 `./build.sh && ./run.sh`。网页 `:5555`，telnet `:6666`。
 
-**要模块化英文 lib？** [Lima](https://github.com/limalib/lima) — `adm/dist/rebuild`，常见 `7878`。
+**要模块化英文 lib？** [Lima](https://github.com/limalib/lima) — `--recurse-submodules` 后 `cd adm/dist && ./rebuild`，常见 `7878`。试玩：[lima.lostsouls.org](https://lima.lostsouls.org)。
 
 **要更瘦的历史英文 lib？** [Nightmare 3](https://github.com/fluffos/nightmare3)。
 
@@ -38,7 +38,8 @@ flowchart LR
 
 ## 2. 编译驱动
 
-若 lib 自带 `./build.sh` / `./rebuild` 可跳过。Ubuntu / Debian / WSL：
+若 lib 自带 `./build.sh` 或 Lima 的 `cd adm/dist && ./rebuild` 可跳过。
+Ubuntu / Debian / WSL（仓库放在 Linux 文件系统上，不要放 `/mnt/c`）：
 
 ```bash
 sudo apt update
@@ -55,6 +56,7 @@ make -j"$(nproc)" install
 ```
 
 二进制：`build/bin/driver`。其他平台见 [构建指南](build)。
+也可 `docker pull ghcr.io/fluffos/fluffos:master`。
 
 ## 3. 配置并启动
 
@@ -81,5 +83,5 @@ cd /path/to/mudlib
 ## 5. 接下来
 
 1. [开发环境](lpc/dev-environment) — VS Code / Cursor 插件、LPC 高亮、格式化
-2. [LPC](lpc/) · [Apply](/apply/) · [Efun](/efun/)
+2. [LPC](lpc/) · [Apply](apply/) · [Efun](efun/)
 3. [排障](bug)

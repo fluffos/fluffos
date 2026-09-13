@@ -86,8 +86,9 @@ HELP;
 ```
 
 Existing ` ```c ` fences on language, efun, apply, stdlib, and concept
-pages are treated as LPC at build time. Real C in `docs/driver/` and
-`build-wasm` stays `c` / `cpp`.
+pages are treated as LPC at build time. The remark plugin leaves
+`docs/driver/` and `build-wasm` alone, so LPC samples there must use
+` ```lpc `. Real C stays ` ```c ` / ` ```cpp `.
 
 Prefer ` ```lpc ` on new pages.
 
@@ -103,8 +104,10 @@ From a fluffos checkout:
 require('/path/to/fluffos/tools/lpc-syntax/prism-lpc.cjs');
 ```
 
-2. Optional — remap leftover ` ```c ` fences to LPC, except driver C.
-   Use ` ```cpp ` for actual C samples outside `docs/driver/`.
+2. Optional — remap leftover ` ```c ` fences to LPC, except paths you
+   pass in `keepCAsC` (this site keeps `docs/driver/` and `build-wasm`).
+   Use ` ```lpc ` for LPC on those pages, and ` ```cpp ` for C samples
+   elsewhere.
 
 ```js
 // docusaurus.config.js
@@ -119,7 +122,7 @@ presets: [
 ];
 ```
 
-The remark plugin leaves `docs/driver/**` and `build-wasm` as C.
+The remark plugin does not rewrite `docs/driver/**` or `build-wasm`.
 
 HTML highlighter (no Prism) for static pages or a mudlib help site:
 

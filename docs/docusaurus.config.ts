@@ -53,8 +53,9 @@ const config: Config = {
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
           // ```c fences on language / efun / apply pages are LPC, not C.
-          // Real C stays ```c under docs/driver/ and build-wasm; use ```cpp
-          // for C samples elsewhere (see concepts/general/lpc.md).
+          // Real C stays ```c under docs/driver/. LPC on build-wasm and
+          // new pages should use ```lpc. Use ```cpp for C samples
+          // elsewhere (see concepts/general/lpc.md).
           remarkPlugins: [lpcSyntaxPlugin],
           exclude: [
             '**/node_modules/**',
@@ -86,15 +87,26 @@ const config: Config = {
       {
         // Jekyll / VitePress leftover: /build.html → /build
         fromExtensions: ['html'],
-        redirects: [
-          { from: '/llms', to: '/llm' },
-          { from: '/getting-started', to: '/start' },
-          { from: '/agents', to: '/mudlib-agents' },
-          { from: '/build_v2017', to: '/build' },
-          { from: '/reporting-bugs', to: '/bug' },
-          { from: '/dev-environment', to: '/lpc/dev-environment' },
-          { from: '/dev-setup', to: '/lpc/dev-environment' },
-        ],
+        // Alias → canonical. createRedirects also emits /zh-CN/… variants
+        // so locale-prefixed bookmarks stay in zh-CN.
+        createRedirects(existingPath: string) {
+          const aliases: Record<string, string[]> = {
+            '/llm': ['/llms'],
+            '/start': ['/getting-started'],
+            '/mudlib-agents': ['/agents'],
+            '/build': ['/build_v2017'],
+            '/bug': ['/reporting-bugs'],
+            '/lpc/dev-environment': ['/dev-environment', '/dev-setup'],
+          };
+          const localePrefix = existingPath.startsWith('/zh-CN/')
+            ? '/zh-CN'
+            : '';
+          const unprefixed = localePrefix
+            ? existingPath.slice(localePrefix.length)
+            : existingPath;
+          const extra = aliases[unprefixed];
+          return extra ? extra.map((from) => localePrefix + from) : undefined;
+        },
       },
     ],
     'docusaurus-plugin-image-zoom',

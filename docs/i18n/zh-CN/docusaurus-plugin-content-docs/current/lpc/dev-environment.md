@@ -65,7 +65,7 @@ foreach (string name, int weight in ([ "sword": 4, "lamp": 1 ])) {
 }
 ```
 
-语言 / efun / apply / stdlib / 概念页上已有的 ` ```c ` 在构建时按 LPC 处理。`docs/driver/` 和 `build-wasm` 里真正的 C 仍用 `c` / `cpp`。
+语言 / efun / apply / stdlib / 概念页上已有的 ` ```c ` 在构建时按 LPC 处理。remark 插件不改 `docs/driver/` 和 `build-wasm`，那些页上的 LPC 请写 ` ```lpc `。真正的 C 仍用 `c` / `cpp`。
 
 新页面请写 ` ```lpc `。
 
@@ -79,8 +79,8 @@ foreach (string name, int weight in ([ "sword": 4, "lamp": 1 ])) {
 require('/path/to/fluffos/tools/lpc-syntax/prism-lpc.cjs');
 ```
 
-2. 可选：把遗留的 ` ```c ` 改成 LPC（`docs/driver/` 和 `build-wasm` 除外）。
-   那些目录之外的真正 C 请写 ` ```cpp `。
+2. 可选：把遗留的 ` ```c ` 改成 LPC（本站的 `keepCAsC` 含 `docs/driver/` 和 `build-wasm`）。
+   那些页上的 LPC 请写 ` ```lpc `，别处真正的 C 请写 ` ```cpp `。
 
 ```js
 presets: [

@@ -68,7 +68,7 @@ harness. Pick a real lib: [onboarding](start) / [LLM contract](llm).
 Ask for a **slug** (`libs/<slug>`), not the collection root.
 
 **English upstreams** not only in this org: [Dead Souls](https://dead-souls.net/),
-[limalib/lima](https://github.com/limalib/lima),
+[limalib/lima](https://github.com/limalib/lima) (play [lima.lostsouls.org](https://lima.lostsouls.org)),
 [Discworld](https://dwwiki.mooo.com/).
 
 After you pick a tree, copy the [mudlib AGENTS.md template](mudlib-agents).
