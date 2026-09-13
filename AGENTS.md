@@ -269,7 +269,7 @@ The FluffOS documentation site lives in the `docs/` directory and is built with 
 * **Framework**: Docusaurus 3 (`@docusaurus/preset-classic`). Do **not** confuse with VitePress or Jekyll — the site was migrated from those frameworks and their leftover directories (`.vitepress/`, `_layouts/`, `css/`) have been removed.
 * **Node**: Use NVM. The active version is managed via `~/.nvm`. Always `source "$NVM_DIR/nvm.sh"` before running npm commands.
 * **Key config files**:
-  - `docs/docusaurus.config.ts` — site config, navbar, footer, mermaid, client redirects, sitemap, image zoom, `future.faster`
+  - `docs/docusaurus.config.ts` — site config, navbar, footer, mermaid, client redirects, sitemap, image zoom, LPC Prism highlighter (`tools/lpc-syntax/prism-lpc.cjs`), `future.faster`
   - `docs/sidebars.ts` — hand-authored sidebar skeleton (Docusaurus `SidebarsConfig` format, NOT VitePress format); imports `sidebars.generated.json`
   - `docs/sidebars.generated.json` + `docs/sidebar_meta.json` — generated sidebar trees and their curated metadata (see "Sidebar" below)
   - `docs/src/css/custom.css` — Infima CSS variable overrides

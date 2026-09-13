@@ -24,6 +24,7 @@ Chinese game catalog (browser): https://mudlibs.fluffos.info/
 - https://www.fluffos.info/llm
 - https://www.fluffos.info/mudlib-agents
 - https://www.fluffos.info/start
+- https://www.fluffos.info/lpc/dev-environment
 - https://www.fluffos.info/ecosystem
 - https://www.fluffos.info/build
 - https://www.fluffos.info/bug
@@ -48,6 +49,7 @@ Chinese collection (pick a slug under libs/):
 ## Language and concepts
 
 - https://www.fluffos.info/lpc/
+- https://www.fluffos.info/lpc/dev-environment
 - https://www.fluffos.info/lpc/source-files
 - https://www.fluffos.info/lpc/constructs/foreach
 - https://www.fluffos.info/lpc/constructs/async

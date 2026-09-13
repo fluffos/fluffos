@@ -9,6 +9,7 @@ item, NPC, and player is an LPC object.
 
 * [source files & object names](source-files)
 * [compiler diagnostics](diagnostics)
+* [development environment](dev-environment) — editor plugin, docs highlighter, formatter
 * [style guide](style-guide)
 * [formatter](formatter)
 

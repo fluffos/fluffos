@@ -2743,6 +2743,18 @@
     "message": "格式化工具",
     "description": "The label for the doc item 'Formatter' in sidebar 'docs', linking to the doc lpc/formatter"
   },
+  "sidebar.docs.doc.Dev environment": {
+    "message": "开发环境",
+    "description": "The label for the doc item 'Dev environment' in sidebar 'docs', linking to the doc lpc/dev-environment"
+  },
+  "sidebar.docs.doc.getting-started-dev-env": {
+    "message": "开发环境",
+    "description": "The label for the Getting Started sidebar item linking to lpc/dev-environment"
+  },
+  "sidebar.docs.doc.lpc-dev-env": {
+    "message": "开发环境",
+    "description": "The label for the LPC Language sidebar item linking to lpc/dev-environment"
+  },
   "sidebar.docs.doc.stdlib/ffi_util": {
     "message": "FFI 工具",
     "description": "The label for the doc item 'FFI Utilities' in sidebar 'docs', linking to the doc stdlib/ffi_util"

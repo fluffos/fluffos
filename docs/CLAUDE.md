@@ -244,6 +244,7 @@ Root-level documentation about building and deploying FluffOS.
 
 **Key Files:**
 - `start.md` - Human onboarding: pick a mudlib, build, boot that lib
+- `lpc/dev-environment.md` - Editor plugin, docs-site LPC highlighter, formatter
 - `llm.md` - LLM contract (`/llm`): **ask which mudlib** before cloning; do not default to `testsuite/`
 - `mudlib-agents.md` - Template `AGENTS.md` to copy into the chosen mudlib
 - `ecosystem.md` - Map of every public `fluffos/*` repository
@@ -491,7 +492,7 @@ python3 docs/gen_sidebar.py --check
 
 The documentation is built using **Docusaurus 3** (`@docusaurus/preset-classic`). Key files:
 
-- `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin, mermaid, redirects, sitemap, image zoom, `future.faster`
+- `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin, mermaid, redirects, sitemap, image zoom, LPC Prism highlighter, `future.faster`
 - `docs/sidebars.ts` — sidebar navigation tree (Docusaurus `SidebarsConfig` format)
 - `docs/src/css/custom.css` — Infima CSS variable overrides
 - `docs/package.json` — npm scripts: `dev`, `build`, `preview`, `clear`

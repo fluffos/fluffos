@@ -31,6 +31,8 @@ FluffOS 是一个 GitHub **组织**，不是单个仓库。驱动是
 |---|---|
 | **[fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode)** | VS Code 扩展。钉住某个 fluffos 提交，打包驱动仓库 `tools/lpc-syntax/` 里的语法 / 高亮 / 格式化。语言引擎改动进 **fluffos/fluffos**；扩展 UI 进这里。 |
 
+安装步骤（编辑器 + 文档站高亮）：[开发环境](lpc/dev-environment)。
+
 ## Mudlib（游戏框架）
 
 换 mudlib 就是换世界，驱动二进制可以不变。这些是组织托管的快照。请看各仓库 README 所针对的 FluffOS 版本——不少仍写着 v2019，在当前 `master` 上可能要改配置或少量 LPC。

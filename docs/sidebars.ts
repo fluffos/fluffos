@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
       items: [
         { type: 'doc', id: 'index', label: 'Overview' },
         { type: 'doc', id: 'start', label: 'From zero to a running mud' },
+        { type: 'doc', id: 'lpc/dev-environment', label: 'Dev environment', key: 'getting-started-dev-env' },
         { type: 'doc', id: 'llm', label: 'LLM onboarding' },
         { type: 'doc', id: 'mudlib-agents', label: 'Mudlib AGENTS.md' },
         { type: 'doc', id: 'ecosystem', label: 'Ecosystem' },
@@ -35,6 +36,7 @@ const sidebars: SidebarsConfig = {
       items: [
         { type: 'doc', id: 'lpc/source-files', label: 'Source Files & Object Names' },
         { type: 'doc', id: 'lpc/diagnostics', label: 'Compiler Diagnostics' },
+        { type: 'doc', id: 'lpc/dev-environment', label: 'Dev environment', key: 'lpc-dev-env' },
         { type: 'doc', id: 'lpc/style-guide', label: 'Style Guide' },
         { type: 'doc', id: 'lpc/formatter', label: 'Formatter' },
         {

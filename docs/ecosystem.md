@@ -34,6 +34,9 @@ Companion sites (not git repos):
 |---|---|
 | **[fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode)** | VS Code (and compatible) extension. It pins a fluffos commit and packages the grammar / highlighter / formatter from `tools/lpc-syntax/` in the driver repo. Language-engine changes go in **fluffos/fluffos**; extension UI and packaging go here. |
 
+Setup (VS Code / Cursor `.vsix`, docs-site highlighter, formatter):
+[LPC development environment](lpc/dev-environment).
+
 The in-tree formatter (Node ≥ 18, no `npm install`) is
 [documented with the language](lpc/formatter). There is no separate
 formatter product you need to install to format `testsuite/` LPC.

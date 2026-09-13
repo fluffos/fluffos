@@ -1,6 +1,10 @@
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const lpcSyntaxPlugin = require('../tools/lpc-syntax/docusaurus-plugin.cjs');
 
 const config: Config = {
   title: 'FluffOS Docs',
@@ -48,6 +52,8 @@ const config: Config = {
           editUrl: 'https://github.com/fluffos/fluffos/edit/master/docs/',
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
+          // ```c fences on language / efun / apply pages are LPC, not C.
+          remarkPlugins: [lpcSyntaxPlugin.remarkLpcFences],
           exclude: [
             '**/node_modules/**',
             '**/archive/**',
@@ -84,10 +90,13 @@ const config: Config = {
           { from: '/agents', to: '/mudlib-agents' },
           { from: '/build_v2017', to: '/build' },
           { from: '/reporting-bugs', to: '/bug' },
+          { from: '/dev-environment', to: '/lpc/dev-environment' },
+          { from: '/dev-setup', to: '/lpc/dev-environment' },
         ],
       },
     ],
     'docusaurus-plugin-image-zoom',
+    lpcSyntaxPlugin,
   ],
 
   themes: [
@@ -166,6 +175,7 @@ const config: Config = {
             { label: 'From zero to a running mud', to: '/start' },
             { label: 'LLM onboarding', to: '/llm' },
             { label: 'Mudlib AGENTS.md', to: '/mudlib-agents' },
+            { label: 'Dev environment', to: '/lpc/dev-environment' },
             { label: 'Build from Source', to: '/build' },
             { label: 'Troubleshooting', to: '/bug' },
           ],

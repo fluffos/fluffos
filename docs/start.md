@@ -104,7 +104,8 @@ TODOs (ports, master path, how to wiz).
 
 ## 5. Where to go next
 
-1. [LPC](lpc/) · [Applies](/apply/) · [Efuns](/efun/)
-2. [Concepts](/concepts/) — objects, simul_efuns, [hot reload](concepts/general/hot_reload), [async](concepts/general/async)
-3. [Runtime config](driver/config)
-4. [Troubleshooting](bug)
+1. [Dev environment](lpc/dev-environment) — VS Code / Cursor plugin, LPC highlighting, formatter
+2. [LPC](lpc/) · [Applies](/apply/) · [Efuns](/efun/)
+3. [Concepts](/concepts/) — objects, simul_efuns, [hot reload](concepts/general/hot_reload), [async](concepts/general/async)
+4. [Runtime config](driver/config)
+5. [Troubleshooting](bug)

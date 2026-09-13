@@ -77,3 +77,9 @@ cd /path/to/mudlib
 ## 4. 留下 AGENTS.md
 
 把 [模板](mudlib-agents) 拷进 mudlib 根目录并填好 TODO。
+
+## 5. 接下来
+
+1. [开发环境](lpc/dev-environment) — VS Code / Cursor 插件、LPC 高亮、格式化
+2. [LPC](lpc/) · [Apply](/apply/) · [Efun](/efun/)
+3. [排障](bug)

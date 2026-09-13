@@ -27,6 +27,10 @@
     "message": "Mudlib AGENTS.md",
     "description": "The label of footer link with label=Mudlib AGENTS.md linking to /mudlib-agents"
   },
+  "link.item.label.Dev environment": {
+    "message": "开发环境",
+    "description": "The label of footer link with label=Dev environment linking to /lpc/dev-environment"
+  },
   "link.item.label.Build from Source": {
     "message": "从源码构建",
     "description": "The label of footer link with label=Build from Source linking to /build"

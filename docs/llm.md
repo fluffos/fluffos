@@ -100,7 +100,7 @@ repo (change it before a public bind).
 | Repo | Use |
 |---|---|
 | [fluffos/fluffos](https://github.com/fluffos/fluffos) | Driver only |
-| [fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode) | Editor extension |
+| [fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode) | Editor extension — install: [dev environment](lpc/dev-environment) |
 | [fluffos/gbk2utf8](https://github.com/fluffos/gbk2utf8) | GBK/GB18030 ↔ UTF-8 when importing a legacy tree |
 | [fluffos/lpc-test](https://github.com/fluffos/lpc-test) | Extra LPC tests — not a game |
 | [fluffos/imud](https://github.com/fluffos/imud) | imud.fluffos.info |
@@ -245,7 +245,7 @@ hand a player.
 | `src/base/internal/rc.cc` | Config keys |
 | `testsuite/` | LPC suite for the driver — not the default mud |
 | `docs/` | This site |
-| `tools/lpc-syntax/` | LPC formatter (Node ≥ 18, no npm install) |
+| `tools/lpc-syntax/` | LPC formatter + Prism highlighter (Node ≥ 18, no npm install). Editor setup: [dev environment](lpc/dev-environment) |
 | `src/www/` | Built-in websocket client |
 | `AGENTS.md` | C++ / contributor guide |
 

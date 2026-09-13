@@ -8,6 +8,7 @@ import { lintLPC } from './lint.mjs';
 import { readFileSync as readF } from 'node:fs';
 import { fileURLToPath as f2p } from 'node:url';
 import { dirname as dirN, join as joinP } from 'node:path';
+import { createRequire } from 'node:module';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {
@@ -1551,5 +1552,75 @@ check('tmLanguage: a # line uses splice-first // (begin/end, continues on \\)'
                tml.repository['block-comment'] &&
                tml.repository.comments.patterns.some((p) => p.match === '//.*$');
       })());
+
+// --- Prism / Docusaurus highlighter plugin ------------------------------------
+const req = createRequire(import.meta.url);
+const { buildLpcLanguage, registerLPC, grammar: prismGrammar } = req('./prism-lpc.cjs');
+const lpcPrismPlugin = req('./docusaurus-plugin.cjs');
+
+const prismLang = buildLpcLanguage();
+check('prism-lpc: grammar contract is the same file',
+      prismGrammar.keywords.includes('foreach') &&
+      prismGrammar.typeKeywords.includes('mapping'));
+check('prism-lpc: keywords / types / modifiers from the contract',
+      prismLang.keyword.source.includes('foreach') &&
+      prismLang['type-keyword'].pattern.source.includes('mapping') &&
+      prismLang.builtin.source.includes('nomask') &&
+      prismLang.keyword.source.includes('await'));
+check('prism-lpc: class/struct are class-name, not keyword.control',
+      prismLang['class-name'] &&
+      prismLang['class-name'].source.includes('class') &&
+      !prismLang.keyword.source.includes('class') &&
+      !prismLang.keyword.source.includes('struct'));
+check('prism-lpc: operators longest-match ordered',
+      (() => {
+        const parts = prismLang.operator.source.split('|');
+        return parts.indexOf('>>=') < parts.indexOf('>>') &&
+               parts.indexOf('\\(:') !== -1;
+      })());
+check('prism-lpc: function-call excludes reserved words',
+      (() => {
+        const re = prismLang.function;
+        return !re.test('if(') && !re.test('while (') && !re.test('new(') &&
+               !re.test('catch(') && re.test('foo(') && re.test('write(');
+      })());
+check('prism-lpc: every token is a RegExp or {pattern: RegExp}',
+      (() => {
+        const ok = (v) => {
+          if (v instanceof RegExp) return true;
+          if (Array.isArray(v)) return v.every(ok);
+          if (v && typeof v === 'object' && v.pattern instanceof RegExp) {
+            return !v.inside || Object.values(v.inside).every(ok);
+          }
+          return false;
+        };
+        return Object.values(prismLang).every(ok);
+      })());
+check('prism-lpc: registerLPC installs lpc + LPC aliases',
+      (() => {
+        const fake = { languages: {} };
+        registerLPC(fake);
+        return fake.languages.lpc === fake.languages.LPC &&
+               fake.languages.lpc.keyword;
+      })());
+check('docusaurus-plugin: remaps ```c to ```lpc outside driver/',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/lpc/foreach.md' });
+        return tree.children[0].lang === 'lpc';
+      })());
+check('docusaurus-plugin: leaves ```c alone under driver/',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/driver/ffi.md' });
+        return tree.children[0].lang === 'c';
+      })());
+check('docusaurus-plugin: leaves ```c alone on build-wasm',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/build-wasm.md' });
+        return tree.children[0].lang === 'c';
+      })());
+
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
