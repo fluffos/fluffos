@@ -1,9 +1,8 @@
-// Docusaurus plugin + remark helper for FluffOS LPC highlighting.
+// Remark helper for FluffOS LPC highlighting on Docusaurus sites.
 //
-//   plugins: [require('../tools/lpc-syntax/docusaurus-plugin.cjs')]
 //   docs: {
 //     remarkPlugins: [
-//       require('../tools/lpc-syntax/docusaurus-plugin.cjs').remarkLpcFences,
+//       require('../tools/lpc-syntax/docusaurus-plugin.cjs'),
 //     ],
 //   }
 //
@@ -12,8 +11,6 @@
 // docs/src/theme/prism-include-languages.js.
 
 'use strict';
-
-const { registerLPC } = require('./prism-lpc.cjs');
 
 const DEFAULT_KEEP_C = [/[/\\]driver[/\\]/, /build-wasm/];
 
@@ -38,14 +35,7 @@ function remarkLpcFences(options = {}) {
   };
 }
 
-function plugin() {
-  return {
-    name: 'docusaurus-plugin-lpc-syntax',
-  };
-}
+remarkLpcFences.remarkLpcFences = remarkLpcFences;
+remarkLpcFences.DEFAULT_KEEP_C = DEFAULT_KEEP_C;
 
-plugin.remarkLpcFences = remarkLpcFences;
-plugin.registerLPC = registerLPC;
-plugin.DEFAULT_KEEP_C = DEFAULT_KEEP_C;
-
-module.exports = plugin;
+module.exports = remarkLpcFences;

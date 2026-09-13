@@ -103,7 +103,7 @@ function buildLpcLanguage() {
     },
     constant: new RegExp(`\\b(?:${wordAlt(grammar.builtinMacros)})\\b`),
     number:
-      /\b(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|[0-9][0-9_]*(?:\.(?!\.)[0-9_]*)?(?:[eE][+-]?[0-9][0-9_]*)?)\b/,
+      /\b(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|[0-9][0-9_]*(?:\.(?!\.)[0-9_]*)?(?:[eE][+-]?[0-9][0-9_]*)?)(?![A-Za-z0-9_])/,
     function: new RegExp(
       `\\b(?!(?:${wordAlt(reserved)})\\b)[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()`,
     ),

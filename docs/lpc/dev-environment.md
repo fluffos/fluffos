@@ -103,21 +103,23 @@ From a fluffos checkout:
 require('/path/to/fluffos/tools/lpc-syntax/prism-lpc.cjs');
 ```
 
-2. Optional — remap leftover ` ```c ` fences to LPC, except driver C:
+2. Optional — remap leftover ` ```c ` fences to LPC, except driver C.
+   Use ` ```cpp ` for actual C samples outside `docs/driver/`.
 
 ```js
-const lpcSyntax = require('/path/to/fluffos/tools/lpc-syntax/docusaurus-plugin.cjs');
-
 // docusaurus.config.js
-plugins: [lpcSyntax],
 presets: [
   ['classic', {
-    docs: { remarkPlugins: [lpcSyntax.remarkLpcFences] },
+    docs: {
+      remarkPlugins: [
+        require('/path/to/fluffos/tools/lpc-syntax/docusaurus-plugin.cjs'),
+      ],
+    },
   }],
 ];
 ```
 
-`remarkLpcFences` leaves `docs/driver/**` and `build-wasm` as C.
+The remark plugin leaves `docs/driver/**` and `build-wasm` as C.
 
 HTML highlighter (no Prism) for static pages or a mudlib help site:
 

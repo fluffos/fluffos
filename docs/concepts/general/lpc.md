@@ -46,7 +46,7 @@ ack = foo + bar;
 
 are equivalent to the C statements:
 
-```c
+```cpp
 char *ack;
 
 ack = (char *)malloc(strlen(foo) + 1);

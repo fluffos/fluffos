@@ -1584,6 +1584,9 @@ check('prism-lpc: function-call excludes reserved words',
         return !re.test('if(') && !re.test('while (') && !re.test('new(') &&
                !re.test('catch(') && re.test('foo(') && re.test('write(');
       })());
+check('prism-lpc: trailing-dot numbers match (1.) and 10foo does not',
+      prismLang.number.test('1.') && prismLang.number.test('3.14') &&
+      !prismLang.number.test('10foo'));
 check('prism-lpc: every token is a RegExp or {pattern: RegExp}',
       (() => {
         const ok = (v) => {

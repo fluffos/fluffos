@@ -79,15 +79,17 @@ foreach (string name, int weight in ([ "sword": 4, "lamp": 1 ])) {
 require('/path/to/fluffos/tools/lpc-syntax/prism-lpc.cjs');
 ```
 
-2. 可选：把遗留的 ` ```c ` 改成 LPC（驱动里的 C 除外）：
+2. 可选：把遗留的 ` ```c ` 改成 LPC（`docs/driver/` 和 `build-wasm` 除外）。
+   那些目录之外的真正 C 请写 ` ```cpp `。
 
 ```js
-const lpcSyntax = require('/path/to/fluffos/tools/lpc-syntax/docusaurus-plugin.cjs');
-
-plugins: [lpcSyntax],
 presets: [
   ['classic', {
-    docs: { remarkPlugins: [lpcSyntax.remarkLpcFences] },
+    docs: {
+      remarkPlugins: [
+        require('/path/to/fluffos/tools/lpc-syntax/docusaurus-plugin.cjs'),
+      ],
+    },
   }],
 ];
 ```

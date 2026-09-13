@@ -53,7 +53,9 @@ const config: Config = {
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
           // ```c fences on language / efun / apply pages are LPC, not C.
-          remarkPlugins: [lpcSyntaxPlugin.remarkLpcFences],
+          // Real C stays ```c under docs/driver/ and build-wasm; use ```cpp
+          // for C samples elsewhere (see concepts/general/lpc.md).
+          remarkPlugins: [lpcSyntaxPlugin],
           exclude: [
             '**/node_modules/**',
             '**/archive/**',
@@ -96,7 +98,6 @@ const config: Config = {
       },
     ],
     'docusaurus-plugin-image-zoom',
-    lpcSyntaxPlugin,
   ],
 
   themes: [
