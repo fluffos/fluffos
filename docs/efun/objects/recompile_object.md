@@ -75,12 +75,19 @@ title: objects / recompile_object
 
 ### CAVEATS
 
-    Function pointers made before the update whose behavior depends on
-    the owner's program layout (pointers to local functions, and
-    functionals / anonymous functions) become STALE: calling them after
-    a recompile_object of their owner raises a clean "Stale function pointer"
-    error instead of running mis-indexed code. Recreate them after the
-    update. Efun and simul_efun pointers are unaffected.
+    A pointer to a local function made before the update keeps working
+    when the new program still defines that function: it is re-resolved
+    by name, the same way global variables carry over, and runs the new
+    code. It stays the same value, so it still compares equal to a fresh
+    reference to that function -- a callback registered before the update
+    can be removed by naming it afterwards. A pointer to a function the
+    new program no longer has becomes STALE.
+
+    Functionals and anonymous functions are code inside the old program,
+    so they always become STALE. Calling a stale pointer raises a clean
+    "Stale function pointer" error instead of running mis-indexed code;
+    recreate those after the update. Efun and simul_efun pointers are
+    unaffected.
 
     Programs that INHERIT the updated program are not recompiled - like
     with the destruct/reload cycle, a child program stays bound to the

@@ -79,21 +79,26 @@ private void run_checks() {
   ASSERT_EQ("t2", ob->who());
 
   // --- call_outs armed BEFORE the swap fire AFTER it: the name-based
-  // one must run the NEW program's code; the funptr-based one is stale
-  // and must fail with the clean staleness error, not corrupt anything.
-  // Both fire post-run (this suite executes synchronously), so a
-  // deferred verifier enforces the outcome by exiting nonzero.
+  // one must run the NEW program's code, and so must the funptr-based one
+  // to a function v2 still defines (re-resolved by name). The funptr to a
+  // function v2 removed is stale and must fail with the clean staleness
+  // error, not corrupt anything. All fire post-run (this suite executes
+  // synchronously), so a deferred verifier enforces the outcome by exiting
+  // nonzero.
   rm(MARK);
   rm(MARK + "_fp");
+  rm(MARK + "_gone");
   write_src(DIR + "/co.lpc",
-    "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
+    "void fpmark() { write_file(\"" + MARK + "_fp\", \"v1 ran\", 1); }\n" +
+    "void gone() { write_file(\"" + MARK + "_gone\", \"x\", 1); }\n" +
     "void late_tick() { write_file(\"" + MARK + "\", \"v1 ran\", 1); }\n" +
-    "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
+    "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0);\n" +
+    "             call_out((: gone :), 0); }\n" +
     "int pending() { return find_call_out(\"late_tick\"); }\n");
   ob = load_object(DIR + "/co");
   ob->arm();
   write_src(DIR + "/co.lpc",
-    "void fpmark() { write_file(\"" + MARK + "_fp\", \"x\", 1); }\n" +
+    "void fpmark() { write_file(\"" + MARK + "_fp\", \"v2 code ran\", 1); }\n" +
     "void late_tick() { write_file(\"" + MARK + "\", \"v2 code ran\", 1); }\n" +
     "void arm() { call_out(\"late_tick\", 0); call_out((: fpmark :), 0); }\n" +
     "int pending() { return find_call_out(\"late_tick\"); }\n");
@@ -146,16 +151,26 @@ protected void verify_callouts() {
     shutdown(-1);
     return;
   }
-  // The funptr call_out was made against the OLD program layout, so it
-  // is stale: it must fail cleanly (safe_call_function_pointer catches
-  // it) and its target must NOT have run -- no crash, no mis-indexed
-  // execution.
-  if (file_size(MARK + "_fp") != -1) {
+  // The funptr call_outs were made against the OLD program layout. The one
+  // naming a function v2 still defines is re-resolved by name and must have
+  // run v2's code.
+  mark = read_file(MARK + "_fp");
+  if (!mark || strsrch(mark, "v2 code ran") == -1) {
+    debug_message("POST-RUN callout check: funptr call_out did not run v2 code: " +
+      sprintf("%O", mark));
+    shutdown(-1);
+    return;
+  }
+  // The one naming a function v2 removed is stale: it must fail cleanly
+  // (safe_call_function_pointer catches it) and its target must NOT have
+  // run -- no crash, no mis-indexed execution.
+  if (file_size(MARK + "_gone") != -1) {
     debug_message("POST-RUN callout check: stale funptr call_out RAN (should have been refused)");
     shutdown(-1);
     return;
   }
   rm(MARK);
+  rm(MARK + "_fp");
   // The co object was kept alive across the run so its call_outs could
   // fire; clean it up now.
   if (find_object(DIR + "/co")) destruct(find_object(DIR + "/co"));
