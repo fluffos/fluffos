@@ -1,6 +1,7 @@
 ---
 title: 许可证
 slug: /license
+description: FluffOS 许可证与 LPmud / MudOS 历史声明。
 ---
 
 # 许可证

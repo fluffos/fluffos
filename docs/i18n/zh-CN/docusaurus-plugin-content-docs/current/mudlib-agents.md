@@ -1,6 +1,7 @@
 ---
 title: Mudlib AGENTS.md
 slug: /mudlib-agents
+description: FluffOS mudlib 的 AGENTS.md 起步模板。拷进 mudlib 根目录并填空。
 ---
 
 # Mudlib `AGENTS.md`

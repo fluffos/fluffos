@@ -1,6 +1,7 @@
 ---
 title: FluffOS 生态
 slug: /ecosystem
+description: fluffos/* 公开仓库一览，以及它们和驱动的关系。
 ---
 
 # FluffOS 生态

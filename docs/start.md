@@ -38,7 +38,7 @@ You need a path on disk or a git URL.
 **Already have a lib?** Use that. Generate or edit *its* config.
 
 **Want an English full game?**
-[Dead Souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules` then `./build.sh && ./run.sh`. Browser [http://localhost:5555](http://localhost:5555), telnet `:6666`. Docs: [dead-souls.net](https://dead-souls.net/).
+[Dead Souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules https://github.com/fluffos/dead-souls.git` then `./build.sh && ./run.sh`. Browser [http://localhost:5555](http://localhost:5555), telnet `:6666`. Docs: [dead-souls.net](https://dead-souls.net/).
 
 **Want a modular English lib?**
 [Lima](https://github.com/limalib/lima) — clone with `--recurse-submodules`, then `cd adm/dist && ./rebuild`, often port `7878`. Play: [lima.lostsouls.org](https://lima.lostsouls.org). [Install guide](https://docs.limamudlib.dev/Installation.html). Org snapshot: [fluffos/lima](https://github.com/fluffos/lima).
@@ -55,7 +55,7 @@ More: [ecosystem](ecosystem).
 
 ## 2. Build the driver
 
-Skip this if the lib’s own `./build.sh` / `./rebuild` already builds FluffOS.
+Skip this if the lib’s own `./build.sh` or Lima’s `cd adm/dist && ./rebuild` already builds FluffOS.
 
 Ubuntu / Debian / WSL (repo on the Linux filesystem, not `/mnt/c`):
 

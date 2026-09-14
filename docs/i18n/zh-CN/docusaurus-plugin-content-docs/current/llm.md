@@ -1,6 +1,7 @@
 ---
 title: LLM 入门约定
 slug: /llm
+description: 把这个 URL 交给助手。先问用户用哪份 mudlib，再编译 FluffOS 并启动那份 lib。
 ---
 
 # LLM 入门约定
@@ -42,7 +43,7 @@ flowchart TD
 
 | 选择 | 得到什么 | 怎么开始 |
 |---|---|---|
-| **Dead Souls** | 最适合英文「我要一个能玩的 MUD」 | [fluffos/dead-souls](https://github.com/fluffos/dead-souls) — `--recurse-submodules` 后 `./build.sh && ./run.sh`。网页 `:5555`，telnet `:6666`。[dead-souls.net](https://dead-souls.net/) |
+| **Dead Souls** | 最适合英文「我要一个能玩的 MUD」 | [fluffos/dead-souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules https://github.com/fluffos/dead-souls.git`，然后 `./build.sh && ./run.sh`。网页 `:5555`，telnet `:6666`。[dead-souls.net](https://dead-souls.net/) |
 | **Lima** | 模块化、文档较好 | 上游 [limalib/lima](https://github.com/limalib/lima)，`--recurse-submodules` 后 `cd adm/dist && ./rebuild`，常见端口 `7878`。试玩：[lima.lostsouls.org](https://lima.lostsouls.org)。组织快照 [fluffos/lima](https://github.com/fluffos/lima)（已 archived） |
 | **Nightmare 3** | 更瘦的历史 lib | [fluffos/nightmare3](https://github.com/fluffos/nightmare3) |
 | **用户自己的树** | 已有游戏 | 用他们的路径和配置，不要套 `config.test` |
@@ -61,7 +62,7 @@ flowchart TD
 
 先玩（不用装）：**https://mudlibs.fluffos.info/**
 
-本机：克隆后 `cd libs/<slug>`，用该目录的 `config.fluffos`。问用户要哪个**游戏名或 slug**。
+本机：克隆后 **`cd libs/<slug>`**，用该目录的 `config.fluffos`。不要从 `fluffos/mudlibs` 仓库根启动驱动。问用户要哪个**游戏名或 slug**。
 
 ## 成功标准
 
@@ -75,7 +76,7 @@ flowchart TD
 
 1. 需要的话按英文页编译驱动（Ubuntu 依赖与 `cmake && make install`）。
 2. 克隆用户选的树（Dead Souls / Lima 用 `--recurse-submodules`）。
-3. 优先用 lib 自带配置；否则 `driver --generate-config`，改 `name`、绝对 `mudlib directory`、`master file`、`include directories`、`external_port_1`（不要再加 `port number`）。
+3. 优先用 lib 自带配置；否则在**驱动仓库根**运行 `./build/bin/driver --generate-config > /path/to/mudlib/config.cfg`，改 `name`、绝对 `mudlib directory`、`master file`、`include directories`、`external_port_1`（不要再加 `port number`）。
 4. 写入 [Mudlib AGENTS.md](mudlib-agents)。
 5. 在 mudlib 目录启动：`/path/to/fluffos/build/bin/driver CONFIG_FILE`。
 

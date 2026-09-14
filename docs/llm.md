@@ -117,7 +117,7 @@ Full org notes: [ecosystem](ecosystem).
 Stop when all of these are true:
 
 1. The user named a mudlib (path or clone URL + slug).
-2. `build/bin/driver` exists (after `make install`) or `build/src/driver` exists, **or** the chosen lib’s own `./build.sh` / `./rebuild` produced a driver.
+2. `build/bin/driver` exists (after `make install`) or `build/src/driver` exists, **or** the chosen lib’s own `./build.sh` or Lima’s `cd adm/dist && ./rebuild` produced a driver.
 3. The driver is running **that lib’s** config (not `testsuite/etc/config.test`).
 4. A client reaches a login or welcome prompt on the port the lib documents.
 5. The mudlib root has an `AGENTS.md` filled in from [the template](mudlib-agents).

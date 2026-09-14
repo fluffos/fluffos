@@ -214,7 +214,7 @@ When editing compiler, VM, or package features, keep these structural mechanics 
 
 ### Mudlib vs Driver Separation
 * **The Driver (FluffOS)**: Written in C++, executes as the operating system, virtual machine, and compiler for LPC. It exposes built-in commands as "external functions" (efuns).
-* **The Mudlib**: Written in LPC, contains the game logic, rooms, user logins, and rule definitions. It sits in a separate folder (e.g. `testsuite/` or game folders) and is loaded by the driver.
+* **The Mudlib**: Written in LPC, contains the game logic, rooms, user logins, and rule definitions. It sits in a separate folder (the game tree the user picked) and is loaded by the driver. `testsuite/` is the driver’s LPC harness, not a starter mudlib.
 
 ### Source File Extensions (`.lpc` / `.c`)
 * LPC source files may use either `.lpc` (preferred) or `.c` (legacy). Resolution, implemented in `load_object()` (`src/vm/internal/simulate.cc`) and pinned by `testsuite/single/tests/efuns/dual_extension.lpc`:

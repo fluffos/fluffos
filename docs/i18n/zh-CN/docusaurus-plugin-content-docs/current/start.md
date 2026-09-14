@@ -1,6 +1,7 @@
 ---
 title: 从零到一个能连上的 MUD
 slug: /start
+description: 先选一份 mudlib，再编译 FluffOS，启动这份 lib 并连上。
 ---
 
 # 从零到一个能连上的 MUD
@@ -23,7 +24,7 @@ flowchart LR
 
 **已有 lib？** 用那个路径。
 
-**要英文完整游戏？** [Dead Souls](https://github.com/fluffos/dead-souls) — `--recurse-submodules` 后 `./build.sh && ./run.sh`。网页 `:5555`，telnet `:6666`。
+**要英文完整游戏？** [Dead Souls](https://github.com/fluffos/dead-souls) — `git clone --recurse-submodules https://github.com/fluffos/dead-souls.git`，然后 `./build.sh && ./run.sh`。网页 `:5555`，telnet `:6666`。
 
 **要模块化英文 lib？** [Lima](https://github.com/limalib/lima) — `--recurse-submodules` 后 `cd adm/dist && ./rebuild`，常见 `7878`。试玩：[lima.lostsouls.org](https://lima.lostsouls.org)。
 

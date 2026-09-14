@@ -1,6 +1,7 @@
 ---
 title: 开发环境
 slug: /lpc/dev-environment
+description: 配置 VS Code / Cursor、LPC 高亮和格式化，让 LPC 按 LPC 高亮。
 ---
 
 # LPC 开发环境
@@ -104,7 +105,8 @@ const html = highlightLPC('int f() { return `v=${x}`; }');
 ## 4. 不用编辑器也能格式化
 
 ```bash
-testsuite/format.sh
+testsuite/format.sh            # 格式化 testsuite/**/*.lpc,*.c
+testsuite/format.sh --check    # 只检查，CI
 find lib -name '*.lpc' | node tools/lpc-syntax/bin/format-corpus.mjs
 ```
 

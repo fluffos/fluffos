@@ -81,12 +81,14 @@ FluffOS is the engine. It sits between your LPC source files and the operating s
 
 A **mudlib** is the game itself: a tree of LPC files that defines rooms, items, NPCs, combat, spells, the command parser, the login screen, and the rules of the world. The driver loads the mudlib at startup; everything above `/src/` in a typical MUD installation is mudlib code.
 
-FluffOS ships with a built-in testsuite mudlib under `testsuite/`. For real games, you choose or build a mudlib separately. Popular choices that work with FluffOS out of the box include:
+The driver repo’s `testsuite/` is an LPC **test harness**, not a starter game.
+Pick a real mudlib first ([onboarding](https://www.fluffos.info/start)):
 
-- **[Dead Souls](https://dead-souls.net/)** — well-documented, beginner-friendly, modern tooling.
-- **[Lima](https://github.com/Valdaris/lima)** — mature, modular, widely used.
-- **[Discworld](https://dwwiki.mooo.com/)** — powers the long-running Discworld MUD (since 1991).
-- **[Nightmare](http://mud.seraph.org/)** — one of the oldest and most influential mudlib families.
+- **[Dead Souls](https://github.com/fluffos/dead-souls)** — well-documented English full game (`./build.sh && ./run.sh`).
+- **[Lima](https://github.com/limalib/lima)** — modular English lib (`cd adm/dist && ./rebuild`). Play [lima.lostsouls.org](https://lima.lostsouls.org). Org snapshot: [fluffos/lima](https://github.com/fluffos/lima).
+- **[Nightmare 3](https://github.com/fluffos/nightmare3)** — slimmer historic English lib.
+- **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** — ~199 restored Chinese games; play first at [mudlibs.fluffos.info](https://mudlibs.fluffos.info/).
+- **[Discworld](https://dwwiki.mooo.com/)** — powers Discworld MUD (since 1991); not a one-line `fluffos/*` clone.
 
 Two MUDs sharing the same FluffOS binary but different mudlibs can feel entirely different — the driver imposes no game mechanics.
 

@@ -91,9 +91,13 @@ of bug, found later.
 The driver usually prints a backtrace itself. To catch it live:
 
 ```bash
+# use the config for the mudlib you are running
 gdb -ex "handle SIGPIPE nostop noprint pass" -ex "run" --args \
-  ../build/bin/driver etc/config.test
+  /path/to/fluffos/build/bin/driver /path/to/mudlib/CONFIG_FILE
 ```
+
+If you are debugging the driver testsuite, `cd testsuite` first and pass
+`etc/config.test` instead.
 
 When it stops:
 

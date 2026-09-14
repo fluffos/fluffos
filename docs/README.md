@@ -13,7 +13,9 @@ Markdown files live directly in this directory (the docs plugin is configured wi
 
 ## Local Development
 
-Requires Node.js 18+ (Node 22 recommended).
+Requires Node.js 18+ (Node 22 recommended; Node 23+ can fail
+`future.faster` SSG worker threads — use Node 22 or
+`DOCUSAURUS_SSG_WORKER_THREADS=0`).
 
 ```bash
 cd docs
