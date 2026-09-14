@@ -150,6 +150,51 @@ int a = evaluate(f1, 3, 4);    // works
 int b = f2(3, 4);              // works
 ```
 
+## Comparing Function Pointers
+
+Function values compare by identity: `==`, `!=`, array subtraction and
+intersection, [`member_array()`](../../efun/arrays/member_array), and mapping
+keys all ask whether two values are the *same* function pointer, not whether
+they would call the same code.
+
+A reference to a named function with no bound arguments is always the same
+value within an object. Local functions, simul efuns, and efuns all behave this
+way, whether written bare or wrapped in `(: :)`. So a callback can be
+registered and later removed just by naming it, with nothing stored in between:
+
+```c
+function *callbacks = ({});
+
+void add_callback(function f)    { callbacks += ({ f }); }
+void remove_callback(function f) { callbacks -= ({ f }); }
+
+void start() { add_callback(on_sight); }
+void stop()  { remove_callback(on_sight); }  // removes what start() added
+```
+
+```c
+on_sight == on_sight          // 1
+on_sight == (: on_sight :)    // 1
+write == (: write :)          // 1
+```
+
+Every other kind of function pointer is a new value each time its expression
+runs. Store it if you need to compare it later:
+
+```c
+(: on_sight, 1 :) == (: on_sight, 1 :)   // 0 -- bound arguments
+(: $1 + 1 :) == (: $1 + 1 :)             // 0 -- functional
+```
+
+The object that makes a pointer is part of its value. The same function named
+in two different objects gives two different pointers, and so does
+[`bind()`](../../efun/functions/bind), which copies a pointer to a new owner.
+After [`recompile_object()`](../../efun/objects/recompile_object), a pointer to
+a local function made before the recompile is stale and refuses to be called,
+so naming the function again gives a new value. Efun and simul efun pointers
+don't depend on the object's program and keep their identity across a
+recompile.
+
 ## Available kinds of function pointers
 
 The simplest function pointers are the ones shown above. These simply point to

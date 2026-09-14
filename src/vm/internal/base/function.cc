@@ -7,6 +7,122 @@
 
 #include "packages/core/replace_program.h"
 
+#include <unordered_map>
+
+/* A named-function reference with no bound arguments -- `cb`, `(: cb :)`,
+ * `write`, a simul_efun name -- evaluates to ONE function pointer per
+ * (owner, function) for as long as that pointer is alive, so `cb == cb` holds
+ * and `arr -= ({ cb })` removes what `arr += ({ cb })` added. Every equality
+ * site in the driver (==, array set operations, member_array, mapping keys)
+ * compares function values by pointer, so interning at construction is the
+ * one place this has to be decided.
+ *
+ * The table is WEAK: it holds no reference. An entry lives exactly as long as
+ * the pointer it names, and dealloc_funp() removes it. That is all the
+ * semantics need -- two evaluations can only be compared while something
+ * holds the first one, which keeps its entry -- and it means the table
+ * creates no owner <-> pointer cycle and needs no mark in check_memory().
+ *
+ * The key is safe to trust for the entry's lifetime: the pointer holds a ref
+ * on its owner (and an FP_LOCAL on its program), so neither address can be
+ * reused while the entry exists. The one path that drops an owner ref early,
+ * reclaim_objects(), un-interns first.
+ *
+ * FP_LOCAL keys include the owner's program and prog_generation: an index is
+ * relative to that layout, and a pointer from before recompile_object() is
+ * stale (call_function_pointer() refuses it), so it must not be handed out
+ * for a fresh evaluation. Efun and simul_efun pointers don't depend on the
+ * owner's layout and stay the same value across a recompile.
+ *
+ * Addresses are stored XOR-masked (as md.h's chain pointers are) so the
+ * table does not make a leaked pointer or its owner look reachable to
+ * LeakSanitizer. */
+namespace {
+
+const uintptr_t kNamedFunpMask = static_cast<uintptr_t>(0xA5A5A5A5A5A5A5A5ull);
+
+struct NamedFunpKey {
+  uintptr_t owner;
+  uintptr_t prog;
+  uint32_t gen;
+  short kind;
+  short index;
+
+  bool operator==(const NamedFunpKey& o) const {
+    return owner == o.owner && prog == o.prog && gen == o.gen && kind == o.kind &&
+           index == o.index;
+  }
+};
+
+struct NamedFunpKeyHash {
+  size_t operator()(const NamedFunpKey& k) const {
+    size_t h = std::hash<uintptr_t>{}(k.owner);
+    auto mix = [&h](size_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+    mix(std::hash<uintptr_t>{}(k.prog));
+    mix(k.gen);
+    mix(static_cast<size_t>(k.kind) << 16 | static_cast<uint16_t>(k.index));
+    return h;
+  }
+};
+
+/* Never destroyed: pointers can still be freed while the driver tears down
+ * after static destructors have started. */
+std::unordered_map<NamedFunpKey, uintptr_t, NamedFunpKeyHash>& named_funps =
+    *new std::unordered_map<NamedFunpKey, uintptr_t, NamedFunpKeyHash>();
+
+NamedFunpKey named_funp_key(short kind, int index, object_t* owner, program_t* prog,
+                            uint32_t gen) {
+  return NamedFunpKey{reinterpret_cast<uintptr_t>(owner) ^ kNamedFunpMask,
+                      prog ? (reinterpret_cast<uintptr_t>(prog) ^ kNamedFunpMask) : 0, gen, kind,
+                      static_cast<short>(index)};
+}
+
+/* Returns the live interned pointer for `key` with a new reference taken, or
+ * nullptr. */
+funptr_t* find_named_funp(const NamedFunpKey& key) {
+  auto it = named_funps.find(key);
+  if (it == named_funps.end()) {
+    return nullptr;
+  }
+  auto* fp = reinterpret_cast<funptr_t*>(it->second ^ kNamedFunpMask);
+  fp->hdr.ref++;
+  return fp;
+}
+
+void intern_named_funp(const NamedFunpKey& key, funptr_t* fp) {
+  named_funps[key] = reinterpret_cast<uintptr_t>(fp) ^ kNamedFunpMask;
+}
+
+}  // namespace
+
+void unintern_funp(funptr_t* fp) {
+  if (fp->hdr.args || !fp->hdr.owner || named_funps.empty()) {
+    return;
+  }
+  NamedFunpKey key;
+  switch (fp->hdr.type) {
+    case FP_LOCAL | FP_NOT_BINDABLE:
+      key = named_funp_key(FP_LOCAL, fp->f.local.index, fp->hdr.owner, fp->f.local.prog,
+                           fp->hdr.owner_gen);
+      break;
+    case FP_EFUN:
+      key = named_funp_key(FP_EFUN, fp->f.efun.index, fp->hdr.owner, nullptr, 0);
+      break;
+    case FP_SIMUL:
+      key = named_funp_key(FP_SIMUL, fp->f.simul.index, fp->hdr.owner, nullptr, 0);
+      break;
+    default:
+      return;
+  }
+  /* Only the pointer the entry names may remove it: bind() copies, and a
+   * pointer whose bound args were detached by the cycle breakers, match a
+   * key without being the interned value. */
+  auto it = named_funps.find(key);
+  if (it != named_funps.end() && it->second == (reinterpret_cast<uintptr_t>(fp) ^ kNamedFunpMask)) {
+    named_funps.erase(it);
+  }
+}
+
 void dealloc_funp(funptr_t* fp) {
   program_t* prog = nullptr;
 
@@ -19,6 +135,8 @@ void dealloc_funp(funptr_t* fp) {
       prog = fp->f.functional.prog;
       break;
   }
+
+  unintern_funp(fp);
 
   if (fp->hdr.owner) {
     free_object(&fp->hdr.owner, "free_funp");
@@ -93,6 +211,15 @@ int merge_arg_lists(int num_arg, array_t* arr, int start) {
 
 funptr_t* make_efun_funp(int opcode, svalue_t* args) {
   funptr_t* fp;
+  bool const named = args->type != T_ARRAY;
+  NamedFunpKey key{};
+
+  if (named) {
+    key = named_funp_key(FP_EFUN, opcode, current_object, nullptr, 0);
+    if ((fp = find_named_funp(key))) {
+      return fp;
+    }
+  }
 
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_efun_funp"));
   fp->hdr.owner = current_object;
@@ -102,7 +229,7 @@ funptr_t* make_efun_funp(int opcode, svalue_t* args) {
 
   fp->f.efun.index = opcode;
 
-  if (args->type == T_ARRAY) {
+  if (!named) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
@@ -110,6 +237,9 @@ funptr_t* make_efun_funp(int opcode, svalue_t* args) {
   }
 
   fp->hdr.ref = 1;
+  if (named) {
+    intern_named_funp(key, fp);
+  }
   return fp;
 }
 
@@ -123,6 +253,22 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
         "replace_program()\n");
   }
 
+  newindex = index + function_index_offset;
+  if (current_object->prog->function_flags[newindex] & FUNC_ALIAS) {
+    newindex = current_object->prog->function_flags[newindex] & ~FUNC_ALIAS;
+  }
+
+  bool const named = args->type != T_ARRAY;
+  NamedFunpKey key{};
+
+  if (named) {
+    key = named_funp_key(FP_LOCAL, newindex, current_object, current_object->prog,
+                         current_object->prog_generation);
+    if ((fp = find_named_funp(key))) {
+      return fp;
+    }
+  }
+
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_lfun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
@@ -134,13 +280,9 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
   debug(d_flag, "add func ref /%s: now %i\n", fp->f.local.prog->filename,
         fp->f.local.prog->func_ref);
 
-  newindex = index + function_index_offset;
-  if (current_object->prog->function_flags[newindex] & FUNC_ALIAS) {
-    newindex = current_object->prog->function_flags[newindex] & ~FUNC_ALIAS;
-  }
   fp->f.local.index = newindex;
 
-  if (args->type == T_ARRAY) {
+  if (!named) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
@@ -148,11 +290,23 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
   }
 
   fp->hdr.ref = 1;
+  if (named) {
+    intern_named_funp(key, fp);
+  }
   return fp;
 }
 
 funptr_t* make_simul_funp(int index, svalue_t* args) {
   funptr_t* fp;
+  bool const named = args->type != T_ARRAY;
+  NamedFunpKey key{};
+
+  if (named) {
+    key = named_funp_key(FP_SIMUL, index, current_object, nullptr, 0);
+    if ((fp = find_named_funp(key))) {
+      return fp;
+    }
+  }
 
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_simul_funp"));
   fp->hdr.owner = current_object;
@@ -162,7 +316,7 @@ funptr_t* make_simul_funp(int index, svalue_t* args) {
 
   fp->f.simul.index = index;
 
-  if (args->type == T_ARRAY) {
+  if (!named) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
@@ -170,6 +324,9 @@ funptr_t* make_simul_funp(int index, svalue_t* args) {
   }
 
   fp->hdr.ref = 1;
+  if (named) {
+    intern_named_funp(key, fp);
+  }
   return fp;
 }
 

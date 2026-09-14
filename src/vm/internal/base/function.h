@@ -66,6 +66,9 @@ union string_or_func {
 };
 
 void dealloc_funp(funptr_t*);
+/* Drop fp from the named-function intern table (function.cc) if it is the
+ * entry. Must run before anything clears fp->hdr.owner. */
+void unintern_funp(funptr_t*);
 void push_refed_funp(funptr_t*);
 void push_funp(funptr_t*);
 void free_funp(funptr_t*);

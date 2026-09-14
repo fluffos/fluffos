@@ -1,0 +1,165 @@
+// A named-function reference with no bound arguments -- `cb`, `(: cb :)`,
+// an efun or simul_efun name -- is one value per (object, function) for as
+// long as it is alive, so it compares equal to itself however many times it
+// is evaluated. Everything that compares function values (==, array set
+// operations, member_array, mapping keys) sees the same pointer.
+//
+// Functionals and pointers with bound arguments are still made fresh by each
+// evaluation, and a local function's identity does not survive
+// recompile_object() (the old pointer is stale and refuses to be called).
+//
+// Fixtures: /clone/named_fn_base.lpc, /clone/named_fn_child.lpc.
+
+#define RELOAD "/data/named_fn_reload"
+
+int add(int a, int b) { return a + b; }
+int sub(int a, int b) { return a - b; }
+
+private void test_local() {
+  function f = add;
+  mixed *inits = ({});
+  mapping m = ([]);
+
+  ASSERT(add == add);
+  ASSERT(add == (: add :));
+  ASSERT(f == add);
+  ASSERT(add != sub);
+
+  // The mudlib shape that surfaced this: register and unregister a callback
+  // by naming it, with nothing stored in between.
+  inits += ({ add });
+  inits += ({ sub });
+  inits -= ({ add });
+  ASSERT_EQ(1, sizeof(inits));
+  ASSERT(inits[0] == sub);
+  inits -= ({ sub });
+  ASSERT_EQ(0, sizeof(inits));
+
+  ASSERT_EQ(1, member_array(sub, ({ add, sub })));
+  ASSERT_EQ(({ add }), ({ add, sub }) & ({ add }));
+
+  m[add] = "add";
+  ASSERT_EQ("add", m[add]);
+  ASSERT_EQ(1, sizeof(m + ([ (: add :): "again" ])));
+}
+
+private void test_efun_and_simul() {
+  ASSERT(write == write);
+  ASSERT(write == (: write :));
+  ASSERT(write != (: say :));
+  ASSERT(same == same);
+  ASSERT(same == (: same :));
+}
+
+private void test_not_named() {
+  function *made = ({});
+
+  // Bound arguments make a new pointer every time.
+  ASSERT((: add, 1 :) != (: add, 1 :));
+
+  // A functional is a new value per evaluation, even from the same source.
+  for (int i = 0; i < 2; i++) {
+    made += ({ (: $1 + 1 :) });
+  }
+  ASSERT(made[0] != made[1]);
+}
+
+private function local_ref_here() { return add; }
+
+private void test_owners_and_inherits() {
+  object a = load_object("/clone/named_fn_child");
+  object b = new("/clone/named_fn_child");
+
+  // An inherited function is the same value whether referenced from the
+  // program that defines it or from the program that inherits it.
+  ASSERT(a->base_ref() == a->child_ref());
+  ASSERT(a->local_ref() == a->local_ref());
+  ASSERT(a->efun_ref() == a->efun_ref());
+  ASSERT(a->bound_ref() != a->bound_ref());
+
+  // The owner is part of the value: the same function in another object is
+  // a different pointer, and so is this object's efun pointer.
+  ASSERT(a->local_ref() != b->local_ref());
+  ASSERT(a->efun_ref() != b->efun_ref());
+  ASSERT(a->local_ref() != local_ref_here());
+
+  // bind() makes a copy with a new owner (local-function pointers can't be
+  // rebound, efun pointers can); it is not the other object's own reference.
+#if efun_defined(bind)
+  ASSERT(bind(a->efun_ref(), b) != b->efun_ref());
+#endif
+
+  destruct(b);
+}
+
+// reclaim_objects() only walks object variables, so the pointers it should
+// release have to be held by one.
+nosave function *held = ({});
+
+private void test_reclaim() {
+#if efun_defined(reclaim_objects)
+  // reclaim_objects() drops a destructed owner's ref from the pointers that
+  // name it, so it un-interns them first: once the owner can be freed, a new
+  // object could reuse its address. The reuse itself can't be forced from
+  // here -- destructed objects are only freed by the backend's sweep, after
+  // the run -- so this pins what is observable: reclaimed pointers stay out of
+  // the way of new owners' references, which stay callable.
+
+  for (int i = 0; i < 8; i++) {
+    object o = new("/clone/named_fn_child");
+    held += ({ o->local_ref() });
+    destruct(o);
+  }
+  reclaim_objects();
+  for (int i = 0; i < 8; i++) {
+    object o = new("/clone/named_fn_child");
+    function f = o->local_ref();
+    ASSERT(member_array(f, held) == -1);
+    ASSERT_EQ(2, evaluate(f));
+    destruct(o);
+  }
+  held = ({});
+#endif
+}
+
+private void test_recompile() {
+#if efun_defined(recompile_object)
+  object ob;
+  function local, efun_fp;
+
+  ASSERT(write_file(RELOAD + ".lpc",
+    "int tick() { return 1; }\n"
+    "function local_ref() { return tick; }\n"
+    "function efun_ref() { return write; }\n", 1));
+  ob = load_object(RELOAD);
+  local = ob->local_ref();
+  efun_fp = ob->efun_ref();
+  ASSERT(ob->local_ref() == local);
+
+  ASSERT(write_file(RELOAD + ".lpc",
+    "int pad() { return 0; }\n"
+    "int tick() { return 2; }\n"
+    "function local_ref() { return tick; }\n"
+    "function efun_ref() { return write; }\n", 1));
+  ASSERT_EQ(1, recompile_object(ob));
+
+  // The pre-recompile pointer is stale, so a fresh reference is a new value
+  // that works; an efun pointer does not depend on the program's layout.
+  ASSERT(ob->local_ref() != local);
+  ASSERT_EQ(2, evaluate(ob->local_ref()));
+  ASSERT(catch(evaluate(local)));
+  ASSERT(ob->efun_ref() == efun_fp);
+
+  destruct(ob);
+  rm(RELOAD + ".lpc");
+#endif
+}
+
+void do_tests() {
+  test_local();
+  test_efun_and_simul();
+  test_not_named();
+  test_owners_and_inherits();
+  test_reclaim();
+  test_recompile();
+}
