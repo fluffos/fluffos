@@ -15,4 +15,22 @@ void do_tests() {
 
   ob = load_object("/clone/mgip5");
   ASSERT_EQ(1, ob->doit());
+
+  // valid_read() sees each #include candidate spelled from the directory the
+  // master returned -- absolute stays absolute. Only the name the program
+  // records (include_list()) is normalized, so a mudlib whose include policy
+  // keys on the leading slash keeps working. A trailing-slash directory still
+  // joins with a single separator.
+  foreach (string name in ({ "/clone/mgip1", "/clone/mgip5" })) {
+    string *reads;
+
+    if (ob = find_object(name)) destruct(ob);
+    master()->clear_include_reads();
+    ob = load_object(name);
+    reads = master()->query_include_reads();
+    ASSERT2(member_array("/include/m_gip1/m_gip_test.h", reads) != -1,
+      sprintf("%s: valid_read saw %O", name, reads));
+    ASSERT_EQ(({ "/include/m_gip1/m_gip_test.h" }),
+      filter(include_list(ob), (: strsrch($1, "m_gip_test.h") != -1 :)));
+  }
 }

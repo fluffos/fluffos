@@ -2214,12 +2214,11 @@ void init_include_path() {
           current_file, elem);
       return;
     }
-    /* Store what set_inc_list() stores: a root-relative directory with no
-     * leading slash. The mudlib may legitimately spell an absolute directory
-     * ("/std/object/include"), but keeping that slash here made every name
-     * built from it come back out of add_slash() doubled ("//std/..."), which
-     * include_list() then handed to LPC as a path stat() cannot open. */
-    path.emplace_back(check);
+    /* Kept exactly as the master spelled it: inc_open() hands each candidate
+     * built from it to valid_read(), and a mudlib may key its include policy
+     * on that spelling. The name recorded for the program is normalized
+     * there instead. */
+    path.emplace_back(elem);
   }
   inc_path = std::move(path);
 }
@@ -2265,6 +2264,13 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
 #ifdef _WIN32
         _setmode(fd, _O_BINARY);
 #endif
+        /* The resolved name becomes current_file and, through add_slash(),
+         * an include_list() entry, so it takes the root-relative form a
+         * configured include dir produces. A master::get_include_path()
+         * directory is spelled absolute ("/std/include"), and keeping its
+         * slash came back out of add_slash() as "//std/include/foo.h", a
+         * path stat() cannot open. */
+        buf.erase(0, buf.find_first_not_of('/'));
         return {fd, buf};
       }
     }
