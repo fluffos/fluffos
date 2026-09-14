@@ -13,7 +13,9 @@ Markdown files live directly in this directory (the docs plugin is configured wi
 
 ## Local Development
 
-Requires Node.js 18+ (Node 22 recommended).
+Requires Node.js 18+ (Node 22 recommended; Node 23+ can fail
+`future.faster` SSG worker threads — use Node 22 or
+`DOCUSAURUS_SSG_WORKER_THREADS=0`).
 
 ```bash
 cd docs
@@ -28,6 +30,23 @@ npm run build     # production build → docs/build/
 npm run preview   # serve the production build locally
 npm run clear     # clear the Docusaurus cache
 ```
+
+## Plugins and site features
+
+Configured in `docusaurus.config.ts`:
+
+| Piece | Role |
+|------|------|
+| `@docusaurus/theme-mermaid` | Mermaid diagrams in fenced `mermaid` code blocks |
+| `@docusaurus/plugin-client-redirects` | `/foo.html` → `/foo`, plus aliases (`/getting-started` → `/start`, `/llms` → `/llm`, …) |
+| `@docusaurus/faster` | SWC + Rspack production builds (`future.faster`) |
+| `docusaurus-plugin-image-zoom` | Click-to-zoom on markdown images |
+| LPC highlighter | First-party Prism language (`tools/lpc-syntax/prism-lpc.cjs`) plus a remark plugin that remaps leftover ` ```c ` to `lpc` except under `driver/` / `build-wasm` (LPC on those pages uses ` ```lpc `) |
+| Classic **sitemap** | `/sitemap.xml` with `lastmod` |
+| Local search | `@easyops-cn/docusaurus-search-local` (see below) |
+| Last update | `showLastUpdateTime` / `showLastUpdateAuthor` on each page (needs git history; CI uses `fetch-depth: 0`) |
+
+`static/robots.txt` points crawlers at the sitemap and mentions `/llms.txt`.
 
 ## Search
 
@@ -60,6 +79,13 @@ pages automatically fall back to the English content.
 
 ## Layout
 
+Published onboarding URLs:
+
+- [https://www.fluffos.info/start](https://www.fluffos.info/start) — human path to a running mud
+- [https://www.fluffos.info/llm](https://www.fluffos.info/llm) — LLM contract (same path, stricter)
+- [https://www.fluffos.info/llms.txt](https://www.fluffos.info/llms.txt) — machine-readable map
+- [https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem) — every public `fluffos/*` repo
+
 | Path | Contents |
 |------|----------|
 | `docusaurus.config.ts` | Site config: navbar, footer, docs plugin, search theme |
@@ -85,6 +111,7 @@ pages automatically fall back to the English content.
 | `gen_sidebar.py` | Regenerates `sidebars.generated.json` from the reference doc trees + `sidebar_meta.json` (`--check` verifies freshness, used by CI) |
 | `gen_config_docs.py` | Regenerates `driver/config.md` from `src/base/internal/rc.cc` |
 | `add_missing_efuns.py` | Creates stub pages under `efun/general/` for undocumented efuns (needs a `keywords.json` from the `generate_keywords` tool) |
+| `lint_manpages.py` | Advisory scan for leftover man-page headings (`SYNOPSYS`, `name(3)`, `layout: doc`) |
 
 ## Conventions & Gotchas
 

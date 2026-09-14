@@ -18,9 +18,16 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         { type: 'doc', id: 'index', label: 'Overview' },
+        { type: 'doc', id: 'lpmud', label: 'MudOS, LPMUD, LPC' },
+        { type: 'doc', id: 'start', label: 'From zero to a running mud' },
+        { type: 'doc', id: 'lpc/dev-environment', label: 'Dev environment', key: 'getting-started-dev-env' },
+        { type: 'doc', id: 'llm', label: 'LLM onboarding' },
+        { type: 'doc', id: 'mudlib-agents', label: 'Mudlib AGENTS.md' },
+        { type: 'doc', id: 'ecosystem', label: 'Ecosystem' },
         { type: 'doc', id: 'build', label: 'Build from Source' },
         { type: 'doc', id: 'build-wasm', label: 'Build for WebAssembly' },
-        { type: 'doc', id: 'bug', label: 'Reporting Bugs' },
+        { type: 'doc', id: 'bug', label: 'Troubleshooting' },
+        { type: 'doc', id: 'license', label: 'License' },
       ],
     },
     {
@@ -30,6 +37,7 @@ const sidebars: SidebarsConfig = {
       items: [
         { type: 'doc', id: 'lpc/source-files', label: 'Source Files & Object Names' },
         { type: 'doc', id: 'lpc/diagnostics', label: 'Compiler Diagnostics' },
+        { type: 'doc', id: 'lpc/dev-environment', label: 'Dev environment', key: 'lpc-dev-env' },
         { type: 'doc', id: 'lpc/style-guide', label: 'Style Guide' },
         { type: 'doc', id: 'lpc/formatter', label: 'Formatter' },
         {
@@ -55,11 +63,16 @@ const sidebars: SidebarsConfig = {
           link: { type: 'doc', id: 'lpc/constructs/index' },
           items: [
             'lpc/constructs/async',
+            'lpc/constructs/catch',
+            'lpc/constructs/do-while',
             'lpc/constructs/for',
+            'lpc/constructs/foreach',
             'lpc/constructs/function',
             'lpc/constructs/if',
             'lpc/constructs/include',
             'lpc/constructs/inherit',
+            'lpc/constructs/modifiers',
+            'lpc/constructs/operators',
             'lpc/constructs/prototypes',
             'lpc/constructs/ref',
             'lpc/constructs/shadowing',
@@ -87,13 +100,6 @@ const sidebars: SidebarsConfig = {
     gen['concepts'],
     gen['driver'],
     gen['cli'],
-    {
-      type: 'category',
-      label: 'Historical',
-      items: [
-        { type: 'doc', id: 'build_v2017', label: 'Build (v2017, legacy)' },
-      ],
-    },
   ],
 };
 

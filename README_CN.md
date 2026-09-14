@@ -7,6 +7,14 @@
 欢迎使用 FluffOS
 ================
 
+**跑起来：**先选一份 mudlib，再看 [https://www.fluffos.info/start](https://www.fluffos.info/start)
+
+**MudOS / LPMUD / LPC：**[https://www.fluffos.info/lpmud](https://www.fluffos.info/lpmud)
+
+**给语言模型：**[https://www.fluffos.info/llm](https://www.fluffos.info/llm) — 必须先问用哪份 lib · [llms.txt](https://www.fluffos.info/llms.txt) · [Mudlib AGENTS.md](https://www.fluffos.info/mudlib-agents)
+
+**生态**（`fluffos/*` 仓库）：[https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem)
+
 FluffOS 是一款高性能**游戏引擎**，专为构建持久性多人虚拟世界而设计。它是 **MudOS** 的现代继任者，也是网络游戏史上最具影响力的引擎之一，目前仍在积极维护。
 
 如果您仍在运行 MudOS，现在是升级的时候了。FluffOS 与现有的 MudOS mudlib **完全向后兼容**，同时新增了十余年的性能优化、现代协议（WebSocket、TLS）、数据库集成（SQLite3、MySQL、PostgreSQL）和 UTF-8 支持。
@@ -72,12 +80,14 @@ FluffOS 是引擎，位于 LPC 源文件与操作系统之间，提供运行 MUD
 
 **Mudlib** 就是游戏本身：一棵 LPC 文件树，定义了房间、物品、NPC、战斗、法术、命令解析器、登录界面以及世界规则。驱动程序启动时加载 mudlib；一个典型 MUD 安装中 `/src/` 以上的所有内容都是 mudlib 代码。
 
-FluffOS 内置了 `testsuite/` 目录下的测试用 mudlib。对于真实游戏，您需要单独选择或构建 mudlib。以下是与 FluffOS 开箱即用的流行选择：
+驱动仓库里的 `testsuite/` 是 LPC **测试套件**，不是新手村。
+请先选一份真正的 mudlib（[入门](https://www.fluffos.info/start)）：
 
-- **[Dead Souls](https://dead-souls.net/)** — 文档完善，对新手友好，工具链现代化。
-- **[Lima](https://github.com/Valdaris/lima)** — 成熟、模块化、应用广泛。
-- **[Discworld](https://dwwiki.mooo.com/)** — 为长期运营的 Discworld MUD（自 1991 年起）提供支持。
-- **[Nightmare](http://mud.seraph.org/)** — 最古老、最具影响力的 mudlib 家族之一。
+- **[Dead Souls](https://github.com/fluffos/dead-souls)** — 文档完善的英文完整游戏（`./build.sh && ./run.sh`）。
+- **[Lima](https://github.com/limalib/lima)** — 模块化英文 lib（`cd adm/dist && ./rebuild`）。试玩 [lima.lostsouls.org](https://lima.lostsouls.org)。组织快照：[fluffos/lima](https://github.com/fluffos/lima)。
+- **[Nightmare 3](https://github.com/fluffos/nightmare3)** — 更瘦的历史英文 lib。
+- **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** — 约 199 份已修复的中文经典；先玩 [mudlibs.fluffos.info](https://mudlibs.fluffos.info/)。
+- **[Discworld](https://dwwiki.mooo.com/)** — 长期运营的 Discworld MUD（自 1991 年起）；不是一行就能克隆的 `fluffos/*` 仓库。
 
 使用同一个 FluffOS 二进制文件但不同 mudlib 的两个 MUD 可以给玩家完全不同的体验——驱动程序本身不强加任何游戏机制。
 

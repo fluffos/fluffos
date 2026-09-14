@@ -159,7 +159,7 @@ The WASM driver ships the `jsbridge` package: LPC code can reach the
 page's JavaScript — `fetch()`, canvas/WebGL, storage, anything the page
 exposes — and get called back asynchronously.
 
-```c
+```lpc
 // synchronous eval; result as a string
 write(js_eval("navigator.userAgent"));
 
@@ -181,7 +181,7 @@ M.fluffos.handlers = {
 
 The reverse direction — the page calling into LPC — is `js_export`:
 
-```c
+```lpc
 js_export("add", (: lpc_add :));   // mixed lpc_add(string *args, int id)
 ```
 

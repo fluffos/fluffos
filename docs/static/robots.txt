@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.fluffos.info/sitemap.xml
+Sitemap: https://www.fluffos.info/zh-CN/sitemap.xml
+# Machine-readable docs map: https://www.fluffos.info/llms.txt

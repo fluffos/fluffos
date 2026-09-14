@@ -535,6 +535,26 @@
     "message": "概览",
     "description": "The label for the doc item 'Overview' in sidebar 'docs', linking to the doc index"
   },
+  "sidebar.docs.doc.MudOS, LPMUD, LPC": {
+    "message": "MudOS、LPMUD、LPC",
+    "description": "The label for the doc item 'MudOS, LPMUD, LPC' in sidebar 'docs', linking to the doc lpmud"
+  },
+  "sidebar.docs.doc.From zero to a running mud": {
+    "message": "从零到一个能连上的 MUD",
+    "description": "The label for the doc item 'From zero to a running mud' in sidebar 'docs', linking to the doc start"
+  },
+  "sidebar.docs.doc.LLM onboarding": {
+    "message": "LLM 入门约定",
+    "description": "The label for the doc item 'LLM onboarding' in sidebar 'docs', linking to the doc llm"
+  },
+  "sidebar.docs.doc.Mudlib AGENTS.md": {
+    "message": "Mudlib AGENTS.md",
+    "description": "The label for the doc item 'Mudlib AGENTS.md' in sidebar 'docs', linking to the doc mudlib-agents"
+  },
+  "sidebar.docs.doc.Ecosystem": {
+    "message": "生态",
+    "description": "The label for the doc item 'Ecosystem' in sidebar 'docs', linking to the doc ecosystem"
+  },
   "sidebar.docs.doc.Build from Source": {
     "message": "从源码构建",
     "description": "The label for the doc item 'Build from Source' in sidebar 'docs', linking to the doc build"
@@ -542,6 +562,14 @@
   "sidebar.docs.doc.Build for WebAssembly": {
     "message": "构建 WebAssembly 版本",
     "description": "The label for the doc item 'Build for WebAssembly' in sidebar 'docs', linking to the doc build-wasm"
+  },
+  "sidebar.docs.doc.Troubleshooting": {
+    "message": "排障",
+    "description": "The label for the doc item 'Troubleshooting' in sidebar 'docs', linking to the doc bug"
+  },
+  "sidebar.docs.doc.License": {
+    "message": "许可证",
+    "description": "The label for the doc item 'License' in sidebar 'docs', linking to the doc license"
   },
   "sidebar.docs.doc.Reporting Bugs": {
     "message": "报告问题",
@@ -2718,6 +2746,18 @@
   "sidebar.docs.doc.Formatter": {
     "message": "格式化工具",
     "description": "The label for the doc item 'Formatter' in sidebar 'docs', linking to the doc lpc/formatter"
+  },
+  "sidebar.docs.doc.Dev environment": {
+    "message": "开发环境",
+    "description": "The label for the doc item 'Dev environment' in sidebar 'docs', linking to the doc lpc/dev-environment"
+  },
+  "sidebar.docs.doc.getting-started-dev-env": {
+    "message": "开发环境",
+    "description": "The label for the Getting Started sidebar item linking to lpc/dev-environment"
+  },
+  "sidebar.docs.doc.lpc-dev-env": {
+    "message": "开发环境",
+    "description": "The label for the LPC Language sidebar item linking to lpc/dev-environment"
   },
   "sidebar.docs.doc.stdlib/ffi_util": {
     "message": "FFI 工具",

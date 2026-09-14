@@ -1,0 +1,104 @@
+# FluffOS
+
+> High-performance LPMUD driver (LPC compiler, VM, Telnet/WebSocket/TLS).
+> Docs: https://www.fluffos.info
+> Source: https://github.com/fluffos/fluffos
+> Org: https://github.com/fluffos
+
+Onboarding contract for language models:
+
+https://www.fluffos.info/llm
+
+STOP. Ask the user which mudlib to work on before cloning or booting.
+Do not boot fluffos/fluffos/testsuite/ unless they are changing the driver.
+
+Mudlib AGENTS.md template (copy into the chosen lib):
+https://www.fluffos.info/mudlib-agents
+
+Human twin: https://www.fluffos.info/start
+Glossary (MudOS, LPMUD, LPC): https://www.fluffos.info/lpmud
+Ecosystem: https://www.fluffos.info/ecosystem
+Chinese game catalog (browser): https://mudlibs.fluffos.info/
+
+## Do first
+
+- https://www.fluffos.info/llm
+- https://www.fluffos.info/mudlib-agents
+- https://www.fluffos.info/start
+- https://www.fluffos.info/lpmud
+- https://www.fluffos.info/lpc/dev-environment
+- https://www.fluffos.info/ecosystem
+- https://www.fluffos.info/build
+- https://www.fluffos.info/bug
+
+## Example mudlibs (user must pick)
+
+English:
+- https://github.com/fluffos/dead-souls
+- https://github.com/limalib/lima
+- https://github.com/fluffos/lima
+- https://github.com/fluffos/nightmare3
+
+Chinese snapshots:
+- https://github.com/fluffos/nt7
+- https://github.com/fluffos/xkx100
+- https://github.com/fluffos/sanguozhi
+
+Chinese collection (pick a slug under libs/):
+- https://github.com/fluffos/mudlibs
+- https://mudlibs.fluffos.info/
+
+## Language and concepts
+
+- https://www.fluffos.info/lpc/
+- https://www.fluffos.info/lpc/source-files
+- https://www.fluffos.info/lpc/constructs/foreach
+- https://www.fluffos.info/lpc/constructs/async
+- https://www.fluffos.info/concepts/general/async
+- https://www.fluffos.info/concepts/general/objects
+- https://www.fluffos.info/concepts/general/hot_reload
+- https://www.fluffos.info/concepts/general/websocket
+- https://www.fluffos.info/concepts/general/tls
+
+## Reference
+
+- https://www.fluffos.info/efun/
+- https://www.fluffos.info/apply/
+- https://www.fluffos.info/stdlib/
+- https://www.fluffos.info/driver/config
+- https://www.fluffos.info/cli/driver
+- https://www.fluffos.info/driver/wasm
+- https://www.fluffos.info/build-wasm
+- https://www.fluffos.info/license
+
+## Source of truth (driver repo)
+
+- src/packages/*/*.spec — efun signatures
+- src/vm/internal/applies — apply names
+- src/base/internal/rc.cc — config keys
+- AGENTS.md — C++ / driver-contributor contract
+- testsuite/ — driver LPC suite only
+
+## Other fluffos/* repositories
+
+- https://github.com/fluffos/fluffos
+- https://github.com/fluffos/fluffos-vscode
+- https://github.com/fluffos/dead-souls
+- https://github.com/fluffos/lima
+- https://github.com/fluffos/nightmare3
+- https://github.com/fluffos/nt7
+- https://github.com/fluffos/xkx100
+- https://github.com/fluffos/sanguozhi
+- https://github.com/fluffos/mudlibs
+- https://github.com/fluffos/lpc-test
+- https://github.com/fluffos/gbk2utf8
+- https://github.com/fluffos/imud
+- https://github.com/fluffos/libtelnet
+- https://github.com/fluffos/widecharwidth
+
+## Community
+
+- https://forum.fluffos.info
+- https://imud.fluffos.info
+- https://discord.gg/E5ycwE8NCc
+- https://github.com/fluffos/fluffos/releases
