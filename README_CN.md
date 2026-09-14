@@ -9,6 +9,8 @@
 
 **跑起来：**先选一份 mudlib，再看 [https://www.fluffos.info/start](https://www.fluffos.info/start)
 
+**MudOS / LPMUD / LPC：**[https://www.fluffos.info/lpmud](https://www.fluffos.info/lpmud)
+
 **给语言模型：**[https://www.fluffos.info/llm](https://www.fluffos.info/llm) — 必须先问用哪份 lib · [llms.txt](https://www.fluffos.info/llms.txt) · [Mudlib AGENTS.md](https://www.fluffos.info/mudlib-agents)
 
 **生态**（`fluffos/*` 仓库）：[https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem)

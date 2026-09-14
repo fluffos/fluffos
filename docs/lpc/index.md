@@ -1,11 +1,21 @@
 ---
-title: lpc
+title: LPC language (Lars Pensjö C)
+description: LPC is the C-like language LPMUD games use. FluffOS — the MudOS successor — compiles and runs this LPC dialect.
+keywords:
+  - LPC
+  - Lars Pensjö C
+  - LPMUD
+  - MudOS
+  - FluffOS
 ---
 
 # The LPC language
 
-LPC (Lars Pensjö C) is the language FluffOS compiles and runs. Every room,
+**LPC** (Lars Pensjö C) is the language **LPMUD** games are written in.
+**FluffOS** (the **MudOS** successor) compiles and runs it. Every room,
 item, NPC, and player is an LPC object.
+
+Glossary: [MudOS, LPMUD, and LPC](../lpmud).
 
 * [source files & object names](source-files)
 * [compiler diagnostics](diagnostics)

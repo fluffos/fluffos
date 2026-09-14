@@ -19,6 +19,7 @@ flowchart LR
 ```
 
 驱动仓库里的 `testsuite/` 是 LPC **测试套件**，不是给你玩的新手村。
+术语：[MudOS、LPMUD、LPC](lpmud)。
 
 ## 1. 选一份 mudlib
 

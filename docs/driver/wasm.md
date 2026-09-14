@@ -11,7 +11,7 @@ package lets LPC call into the browser — `fetch()`, canvas/WebGL, audio,
 storage — and get called back.
 
 This page is the *what can I build with it* guide. For building the
-driver itself (deps, presets, CI) see [Build (WebAssembly)](../build-wasm.md);
+driver itself (deps, presets, CI) see [Build (WebAssembly)](../build-wasm);
 for the internals see
 [`src/wasm/README.md`](https://github.com/fluffos/fluffos/blob/master/src/wasm/README.md).
 

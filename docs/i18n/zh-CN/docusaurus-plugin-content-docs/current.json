@@ -535,6 +535,10 @@
     "message": "概览",
     "description": "The label for the doc item 'Overview' in sidebar 'docs', linking to the doc index"
   },
+  "sidebar.docs.doc.MudOS, LPMUD, LPC": {
+    "message": "MudOS、LPMUD、LPC",
+    "description": "The label for the doc item 'MudOS, LPMUD, LPC' in sidebar 'docs', linking to the doc lpmud"
+  },
   "sidebar.docs.doc.From zero to a running mud": {
     "message": "从零到一个能连上的 MUD",
     "description": "The label for the doc item 'From zero to a running mud' in sidebar 'docs', linking to the doc start"

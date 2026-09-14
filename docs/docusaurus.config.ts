@@ -6,15 +6,116 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const lpcSyntaxPlugin = require('../tools/lpc-syntax/docusaurus-plugin.cjs');
 
+const siteUrl = 'https://www.fluffos.info';
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${siteUrl}/#org`,
+      name: 'FluffOS',
+      url: siteUrl,
+      logo: `${siteUrl}/img/favicon.svg`,
+      sameAs: [
+        'https://github.com/fluffos',
+        'https://github.com/fluffos/fluffos',
+        'https://forum.fluffos.info',
+      ],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${siteUrl}/#website`,
+      url: siteUrl,
+      name: 'FluffOS',
+      alternateName: [
+        'FluffOS Docs',
+        'MudOS',
+        'MudOS successor',
+        'LPMUD',
+        'LPMud',
+        'LPC',
+        'LPC language',
+      ],
+      description:
+        'Documentation for FluffOS, the actively maintained MudOS successor: an LPMUD driver with an LPC compiler and VM.',
+      publisher: { '@id': `${siteUrl}/#org` },
+      inLanguage: ['en', 'zh-CN'],
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'FluffOS',
+      alternateName: ['MudOS', 'FluffOS LPMUD driver'],
+      applicationCategory: 'GameEngine',
+      operatingSystem: 'Linux, macOS, Windows, WebAssembly',
+      programmingLanguage: ['LPC', 'C++'],
+      url: siteUrl,
+      downloadUrl: 'https://github.com/fluffos/fluffos',
+      softwareHelp: `${siteUrl}/lpmud`,
+      license: `${siteUrl}/license`,
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      description:
+        'Actively maintained MudOS successor. LPMUD driver: LPC compiler, virtual machine, Telnet, WebSocket, and TLS.',
+    },
+    {
+      '@type': 'FAQPage',
+      '@id': `${siteUrl}/lpmud#faq`,
+      url: `${siteUrl}/lpmud`,
+      mainEntity: [
+        {
+          '@type': 'Question',
+          name: 'What is MudOS?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'MudOS is an LPMUD driver (LPC compiler and virtual machine) from the 1990s. It is no longer maintained. FluffOS is the actively maintained MudOS successor and runs existing MudOS mudlibs.',
+          },
+        },
+        {
+          '@type': 'Question',
+          name: 'What is LPMUD?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'LPMUD (also spelled LPMud) is a multiplayer text-world architecture that splits the game (the mudlib, written in LPC) from the engine (the driver). FluffOS is a current LPMUD driver.',
+          },
+        },
+        {
+          '@type': 'Question',
+          name: 'What is LPC?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'LPC (Lars Pensjö C) is the object-oriented, C-like language used to write LPMUD games. FluffOS compiles and runs LPC. It is not C, Pike, or a general-purpose compiler.',
+          },
+        },
+        {
+          '@type': 'Question',
+          name: 'Is FluffOS compatible with MudOS?',
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: 'Yes. FluffOS is backward-compatible with MudOS mudlibs. Use current master, not the unsupported v2017 branch.',
+          },
+        },
+      ],
+    },
+  ],
+};
+
 const config: Config = {
-  title: 'FluffOS Docs',
-  tagline: 'LPC driver — from zero to a running mud',
+  title: 'FluffOS',
+  tagline: 'MudOS successor · LPMUD driver · LPC language',
   favicon: 'img/favicon.svg',
-  url: 'https://www.fluffos.info',
+  url: siteUrl,
   baseUrl: '/',
   organizationName: 'fluffos',
   projectName: 'fluffos',
   onBrokenLinks: 'throw',
+  headTags: [
+    {
+      tagName: 'script',
+      attributes: { type: 'application/ld+json' },
+      innerHTML: JSON.stringify(jsonLd),
+    },
+  ],
 
   future: {
     // Needed for faster.ssgWorkerThreads; do not set v4: true (that
@@ -73,6 +174,26 @@ const config: Config = {
           changefreq: 'weekly',
           priority: 0.5,
           filename: 'sitemap.xml',
+          createSitemapItems: async (params) => {
+            const { defaultCreateSitemapItems, ...rest } = params;
+            const items = await defaultCreateSitemapItems(rest);
+            const bump = (path: string, priority: number) => {
+              for (const item of items) {
+                const u = item.url.replace(/\/$/, '') || siteUrl;
+                if (u === `${siteUrl}${path}` || u === `${siteUrl}/zh-CN${path}`) {
+                  item.priority = priority;
+                  item.changefreq = 'weekly';
+                }
+              }
+            };
+            bump('', 1);
+            bump('/lpmud', 0.9);
+            bump('/lpc', 0.9);
+            bump('/start', 0.8);
+            bump('/efun', 0.7);
+            bump('/apply', 0.7);
+            return items;
+          },
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -97,6 +218,14 @@ const config: Config = {
             '/build': ['/build_v2017'],
             '/bug': ['/reporting-bugs'],
             '/lpc/dev-environment': ['/dev-environment', '/dev-setup'],
+            '/lpmud': [
+              '/mudos',
+              '/lpmud-driver',
+              '/lp-mud',
+              '/lpc-language',
+              '/what-is-lpc',
+              '/what-is-mudos',
+            ],
           };
           const localePrefix = existingPath.startsWith('/zh-CN/')
             ? '/zh-CN'
@@ -132,13 +261,21 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/favicon.svg',
+    image: 'img/og.png',
     metadata: [
       {
         name: 'description',
         content:
-          'FluffOS documentation: build the driver, boot a mud, LPC language, efuns, applies, and the fluffos/* ecosystem.',
+          'FluffOS is the actively maintained MudOS successor: an LPMUD driver with an LPC compiler and VM. Language reference, efuns, mudlibs, and how to boot a game.',
       },
+      {
+        name: 'keywords',
+        content:
+          'FluffOS, MudOS, LPMUD, LPMud, LPC, LPC language, LPMUD driver, MudOS successor, Lars Pensjö C, mudlib',
+      },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: 'FluffOS' },
     ],
     mermaid: {
       theme: { light: 'neutral', dark: 'dark' },
@@ -196,6 +333,7 @@ const config: Config = {
         {
           title: 'Reference',
           items: [
+            { label: 'MudOS, LPMUD, LPC', to: '/lpmud' },
             { label: 'LPC', to: '/lpc/' },
             { label: 'Efuns', to: '/efun/' },
             { label: 'Applies', to: '/apply/' },

@@ -43,6 +43,10 @@
     "message": "快速开始",
     "description": "The label of footer link with label=Getting Started linking to /build"
   },
+  "link.item.label.MudOS, LPMUD, LPC": {
+    "message": "MudOS、LPMUD、LPC",
+    "description": "The label of footer link with label=MudOS, LPMUD, LPC linking to /lpmud"
+  },
   "link.item.label.LPC": {
     "message": "LPC",
     "description": "The label of footer link with label=LPC linking to /lpc/"

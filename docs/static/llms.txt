@@ -16,6 +16,7 @@ Mudlib AGENTS.md template (copy into the chosen lib):
 https://www.fluffos.info/mudlib-agents
 
 Human twin: https://www.fluffos.info/start
+Glossary (MudOS, LPMUD, LPC): https://www.fluffos.info/lpmud
 Ecosystem: https://www.fluffos.info/ecosystem
 Chinese game catalog (browser): https://mudlibs.fluffos.info/
 
@@ -24,6 +25,7 @@ Chinese game catalog (browser): https://mudlibs.fluffos.info/
 - https://www.fluffos.info/llm
 - https://www.fluffos.info/mudlib-agents
 - https://www.fluffos.info/start
+- https://www.fluffos.info/lpmud
 - https://www.fluffos.info/lpc/dev-environment
 - https://www.fluffos.info/ecosystem
 - https://www.fluffos.info/build

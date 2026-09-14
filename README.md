@@ -10,6 +10,8 @@ Welcome to FluffOS
 
 **Get a mud running:** pick a mudlib, then [https://www.fluffos.info/start](https://www.fluffos.info/start)
 
+**MudOS / LPMUD / LPC:** [https://www.fluffos.info/lpmud](https://www.fluffos.info/lpmud)
+
 **Point an LLM at this URL:** [https://www.fluffos.info/llm](https://www.fluffos.info/llm) — it must ask which lib · [llms.txt](https://www.fluffos.info/llms.txt) · [mudlib AGENTS.md](https://www.fluffos.info/mudlib-agents)
 
 **Ecosystem** (`fluffos/*` repos): [https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem)

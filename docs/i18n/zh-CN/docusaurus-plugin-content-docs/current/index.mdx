@@ -1,12 +1,19 @@
 ---
-title: FluffOS
+title: FluffOS — MudOS 后继、LPMUD 驱动、LPC 语言
 slug: /
-description: FluffOS 是高性能 LPMUD 驱动：LPC 编译器、虚拟机，以及 Telnet / WebSocket / TLS 服务。
+description: FluffOS 是仍在维护的 MudOS 后继：带 LPC 编译器与虚拟机的 LPMUD 驱动（Telnet / WebSocket / TLS）。LPC、efun 与 mudlib 文档。
+keywords:
+  - FluffOS
+  - MudOS
+  - LPMUD
+  - LPC
 ---
 
 # FluffOS
 
-FluffOS 是高性能 **LPMUD 驱动**（游戏引擎）：LPC 编译器与虚拟机、网络服务（Telnet / WebSocket / TLS），以及 mudlib 可调用的数百个内置函数（**efun**）。它是仍在维护的 MudOS 后继。
+FluffOS 是高性能 **LPMUD 驱动**（游戏引擎）：**LPC** 编译器与虚拟机、网络服务（Telnet / WebSocket / TLS），以及 mudlib 可调用的数百个内置函数（**efun**）。它是仍在维护的 **MudOS** 后继。
+
+在搜 **MudOS**、**LPMUD** 或 **LPC**？先看 [MudOS、LPMUD 与 LPC](/zh-CN/lpmud)。
 
 它**不是**完整游戏。**Mudlib**（一棵 LPC 文件树）才是游戏。先选一份
 （Dead Souls、Lima、泥潭、侠客行，或 [fluffos/mudlibs](https://github.com/fluffos/mudlibs) 里的游戏），再把驱动指过去。
@@ -32,9 +39,23 @@ FluffOS 是高性能 **LPMUD 驱动**（游戏引擎）：LPC 编译器与虚拟
 组织下的全部仓库（mudlib、VS Code、转码工具等）：[FluffOS 生态](/zh-CN/ecosystem)
 （`fluffos/fluffos`、`fluffos/dead-souls`、`fluffos/nt7`、`fluffos/fluffos-vscode` …）。
 
+**MudOS** 是已停止维护的前身。**LPMUD** 是驱动 + mudlib 分层。**LPC** 是语言。
+术语表：[MudOS、LPMUD 与 LPC](/zh-CN/lpmud)。
+
 ## 浏览
 
 <div className="row">
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>MudOS · LPMUD · LPC</h3></div>
+      <div className="card__body">
+        这些词是什么意思，以及为什么 FluffOS 是 MudOS 的后继。
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/zh-CN/lpmud">术语表</a>
+      </div>
+    </div>
+  </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
       <div className="card__header"><h3>跑起来</h3></div>

@@ -1,7 +1,7 @@
 ---
 title: From zero to a running mud
 slug: /start
-description: Pick a mudlib, build FluffOS, boot that lib, and connect.
+description: Pick a mudlib, build the FluffOS LPMUD driver (MudOS successor), boot that lib, and connect. LPC language next.
 ---
 
 # From zero to a running mud
@@ -17,7 +17,7 @@ tree so the next session keeps ports and the master path.
 
 | Layer | What it is |
 |---|---|
-| **LPC** | Language for rooms, NPCs, commands — [reference](lpc/) |
+| **LPC** | Language for rooms, NPCs, commands — [reference](lpc/). Glossary: [MudOS, LPMUD, LPC](lpmud) |
 | **Driver** | Compiler, VM, efuns, Telnet / WebSocket / TLS — this repo’s `src/` |
 | **Mudlib** | The game. You choose it. The driver does not ship one you would play. |
 

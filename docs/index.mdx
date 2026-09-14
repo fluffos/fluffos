@@ -1,15 +1,26 @@
 ---
-title: FluffOS
+title: FluffOS — MudOS successor, LPMUD driver, LPC language
 slug: /
-description: FluffOS is a high-performance LPMUD driver — LPC compiler, VM, and Telnet/WebSocket/TLS server.
+description: FluffOS is the actively maintained MudOS successor — an LPMUD driver with an LPC compiler and VM (Telnet, WebSocket, TLS). Docs for LPC, efuns, and mudlibs.
+keywords:
+  - FluffOS
+  - MudOS
+  - LPMUD
+  - LPMud
+  - LPC
+  - LPMUD driver
+  - LPC language
 ---
 
 # FluffOS
 
-FluffOS is a high-performance **game engine** (an LPMUD driver) for persistent
-multiplayer worlds. It is the actively maintained successor to MudOS: an LPC
-compiler and VM, a network server (Telnet, WebSocket, TLS), and hundreds of
-built-in functions (**efuns**) your mudlib calls.
+FluffOS is a high-performance **LPMUD driver** (game engine) for persistent
+multiplayer worlds. It is the actively maintained **MudOS** successor: an
+**LPC** compiler and VM, a network server (Telnet, WebSocket, TLS), and
+hundreds of built-in functions (**efuns**) your mudlib calls.
+
+Looking up **MudOS**, **LPMUD**, or **LPC**? Start with
+[MudOS, LPMUD, and LPC](/lpmud).
 
 It is **not** a complete game. A **mudlib** — a tree of LPC files — is the
 game. Pick one (Dead Souls, Lima, 泥潭, 侠客行, or anything in
@@ -37,9 +48,23 @@ MSYS2 / WebAssembly). See [releases](https://github.com/fluffos/fluffos/releases
 Full org map — mudlibs, VS Code, converters: [the FluffOS ecosystem](/ecosystem)
 (`fluffos/fluffos`, `fluffos/dead-souls`, `fluffos/nt7`, `fluffos/fluffos-vscode`, …).
 
+**MudOS** is the unmaintained ancestor. **LPMUD** is the driver + mudlib
+split. **LPC** is the language. Glossary: [MudOS, LPMUD, and LPC](/lpmud).
+
 ## Explore
 
 <div className="row">
+  <div className="col col--4 margin-bottom--lg">
+    <div className="card" style={{height: '100%'}}>
+      <div className="card__header"><h3>MudOS · LPMUD · LPC</h3></div>
+      <div className="card__body">
+        What those words mean, and why FluffOS is the MudOS successor.
+      </div>
+      <div className="card__footer">
+        <a className="button button--secondary button--block" href="/lpmud">Glossary</a>
+      </div>
+    </div>
+  </div>
   <div className="col col--4 margin-bottom--lg">
     <div className="card" style={{height: '100%'}}>
       <div className="card__header"><h3>Start a mud</h3></div>

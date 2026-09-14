@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         { type: 'doc', id: 'index', label: 'Overview' },
+        { type: 'doc', id: 'lpmud', label: 'MudOS, LPMUD, LPC' },
         { type: 'doc', id: 'start', label: 'From zero to a running mud' },
         { type: 'doc', id: 'lpc/dev-environment', label: 'Dev environment', key: 'getting-started-dev-env' },
         { type: 'doc', id: 'llm', label: 'LLM onboarding' },
