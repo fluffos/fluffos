@@ -1016,6 +1016,10 @@ int recompile_object(object_t* target) {
     reference_prog(new_prog, "recompile_object");
     ob->prog = new_prog;
     ob->prog_generation++;
+    // Re-resolve this object's named local-function pointers against the new
+    // program now, before its __INIT (or anything else) can evaluate a
+    // reference and mint a second pointer for the same function.
+    refresh_named_funps(ob);
     ob->variables = allocate_object_variables(new_n);
     tot_alloc_object_size +=
         ((new_n ? new_n : 1) - (old_n ? old_n : 1)) * static_cast<int>(sizeof(svalue_t));

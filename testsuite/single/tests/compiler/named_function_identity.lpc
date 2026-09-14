@@ -5,8 +5,8 @@
 // operations, member_array, mapping keys) sees the same pointer.
 //
 // Functionals and pointers with bound arguments are still made fresh by each
-// evaluation, and a local function's identity does not survive
-// recompile_object() (the old pointer is stale and refuses to be called).
+// evaluation. A local function keeps its identity across recompile_object()
+// when the new program still defines it: the pointer is re-resolved by name.
 //
 // Fixtures: /clone/named_fn_base.lpc, /clone/named_fn_child.lpc.
 
@@ -122,36 +122,90 @@ private void test_reclaim() {
 #endif
 }
 
-private void test_recompile() {
-#if efun_defined(recompile_object)
-  object ob;
-  function local, efun_fp;
-
+private void write_reload(string body) {
   ASSERT(write_file(RELOAD + ".lpc",
+    "inherit \"/clone/named_fn_base\";\n" + body, 1));
+}
+
+private void recompile_checks() {
+  object ob;
+  function local, inherited, stored, gone, bound, functional, efun_fp;
+  function *inits;
+
+  write_reload(
     "int tick() { return 1; }\n"
+    "int gone() { return 1; }\n"
+    "int plus(int n) { return n + 1; }\n"
+    "private nosave function stored = tick;\n"
     "function local_ref() { return tick; }\n"
-    "function efun_ref() { return write; }\n", 1));
+    "function inherited_ref() { return base_fn; }\n"
+    "function stored_ref() { return stored; }\n"
+    "function gone_ref() { return gone; }\n"
+    "function bound_ref() { return (: plus, 10 :); }\n"
+    "function functional_ref() { return (: tick() :); }\n"
+    "function efun_ref() { return write; }\n");
   ob = load_object(RELOAD);
   local = ob->local_ref();
+  inherited = ob->inherited_ref();
+  ASSERT(ob->base_ref() == inherited);
+  stored = ob->stored_ref();
+  gone = ob->gone_ref();
+  bound = ob->bound_ref();
+  functional = ob->functional_ref();
   efun_fp = ob->efun_ref();
-  ASSERT(ob->local_ref() == local);
+  ASSERT(stored == local);
+  inits = ({ local });
 
-  ASSERT(write_file(RELOAD + ".lpc",
+  // Functions added before the survivors shift every index, one is removed,
+  // and the survivors change behaviour.
+  write_reload(
     "int pad() { return 0; }\n"
+    "int pad2() { return 0; }\n"
     "int tick() { return 2; }\n"
+    "int plus(int n) { return n + 2; }\n"
+    "private nosave function stored = tick;\n"
     "function local_ref() { return tick; }\n"
-    "function efun_ref() { return write; }\n", 1));
+    "function inherited_ref() { return base_fn; }\n"
+    "function stored_ref() { return stored; }\n"
+    "function bound_ref() { return (: plus, 10 :); }\n"
+    "function functional_ref() { return (: tick() :); }\n"
+    "function efun_ref() { return write; }\n");
   ASSERT_EQ(1, recompile_object(ob));
 
-  // The pre-recompile pointer is stale, so a fresh reference is a new value
-  // that works; an efun pointer does not depend on the program's layout.
-  ASSERT(ob->local_ref() != local);
-  ASSERT_EQ(2, evaluate(ob->local_ref()));
-  ASSERT(catch(evaluate(local)));
-  ASSERT(ob->efun_ref() == efun_fp);
+  // A named function the new program still has is the same value, now
+  // running the new code -- including one held in a carried-over variable,
+  // and one registered with a callback list before the recompile.
+  ASSERT(ob->local_ref() == local);
+  ASSERT(ob->stored_ref() == local);
+  ASSERT_EQ(2, evaluate(local));
+  inits -= ({ ob->local_ref() });
+  ASSERT_EQ(0, sizeof(inits));
 
-  destruct(ob);
+  // So is an inherited one, from either program's code.
+  ASSERT(ob->inherited_ref() == inherited);
+  ASSERT(ob->base_ref() == inherited);
+  ASSERT_EQ(1, evaluate(inherited));
+
+  // Bound arguments don't matter to re-resolution; they are refreshed when
+  // called.
+  ASSERT_EQ(12, evaluate(bound));
+
+  // A removed function stays stale, and a functional is code in the old
+  // program, so it is stale too. Efun pointers never depended on the layout.
+  ASSERT(catch(evaluate(gone)));
+  ASSERT(catch(evaluate(functional)));
+  ASSERT(ob->efun_ref() == efun_fp);
+}
+
+private void test_recompile() {
+#if efun_defined(recompile_object)
+  // Clean up even when a check errors, so the generated source never lingers.
+  string err = catch(recompile_checks());
+  object ob = find_object(RELOAD);
+
+  if (ob) destruct(ob);
   rm(RELOAD + ".lpc");
+  if (err) error(err);
 #endif
 }
 

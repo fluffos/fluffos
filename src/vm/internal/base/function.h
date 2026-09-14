@@ -13,6 +13,10 @@ typedef simul_ptr_t efun_ptr_t;
 /* FP_LOCAL */
 typedef struct {
   short index;
+  /* The slot the reference named before FUNC_ALIAS resolution (an override's
+     inherited slot still names the inherited function). It is what identifies
+     the function by name when recompile_object() re-resolves the pointer. */
+  short ref_index;
   /* The owner's program when the pointer was made: `index` is relative
      to ITS function table, and it is the program whose func_ref this
      pointer holds. The owner's live prog can move on (recompile_object),
@@ -69,6 +73,13 @@ void dealloc_funp(funptr_t*);
 /* Drop fp from the named-function intern table (function.cc) if it is the
  * entry. Must run before anything clears fp->hdr.owner. */
 void unintern_funp(funptr_t*);
+/* Re-resolve an FP_LOCAL pointer whose owner was recompiled against the
+ * owner's current program, by defining program and function name. Returns
+ * false (pointer left stale) if that function no longer exists. */
+bool refresh_local_funp(funptr_t*);
+/* Refresh every interned local-function pointer owned by ob. Called by
+ * recompile_object() right after the program swap, before new code runs. */
+void refresh_named_funps(object_t*);
 void push_refed_funp(funptr_t*);
 void push_funp(funptr_t*);
 void free_funp(funptr_t*);

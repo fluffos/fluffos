@@ -189,11 +189,16 @@ runs. Store it if you need to compare it later:
 The object that makes a pointer is part of its value. The same function named
 in two different objects gives two different pointers, and so does
 [`bind()`](../../efun/functions/bind), which copies a pointer to a new owner.
-After [`recompile_object()`](../../efun/objects/recompile_object), a pointer to
-a local function made before the recompile is stale and refuses to be called,
-so naming the function again gives a new value. Efun and simul efun pointers
-don't depend on the object's program and keep their identity across a
-recompile.
+
+A named function also keeps its identity across
+[`recompile_object()`](../../efun/objects/recompile_object). A pointer to a
+local function is re-resolved by name against the new program, just as the
+object's variables are carried over, so it runs the new code and is still equal
+to a fresh reference. That includes a pointer held in a variable that the
+recompile carried over. If the new program no longer defines the function, the
+pointer is stale, and calling it raises an error. A functional is code inside
+the old program, so it is always stale after a recompile. Efun and simul efun
+pointers don't depend on the object's program at all.
 
 ## Available kinds of function pointers
 
