@@ -434,17 +434,24 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
      * TYPE_ANY / TYPE_UNKNOWN on a *call_other* (or evaluate()) is the
      * #1365 gap: `ob->f()` is statically mixed even when f() is declared
      * float, so the TYPE_REAL branch above never fires and the runtime
-     * then promotes a genuine int-declared lvalue. Wrap those in
-     * to_int()/to_float(). Do NOT wrap a mixed *variable*: to_int("x")
-     * succeeds (returns 0) and would hide `str[0] += mixed_string`, which
-     * must still be a runtime type error.
+     * then promotes a genuine int-declared lvalue. Mapping / array index
+     * and map-member lookups are the same hole (#1384): `m["x"]` and
+     * `a[0]` are TYPE_ANY even when the element happens to hold a float.
+     * Wrap those in to_int()/to_float(). Do NOT wrap a mixed *variable*:
+     * to_int("x") succeeds (returns 0) and would hide
+     * `str[0] += mixed_string`, which must still be a runtime type error.
      * to_int() is a no-op on T_NUMBER, so an int-returning call_other is
      * unchanged. */
     const bool dyn_call =
         rval->kind == NODE_EFUN && (rval->v.number == predefs[arrow_efun].token ||
                                     rval->v.number == predefs[evaluate_efun].token);
-    const bool unknown_rhs =
-        dyn_call && (rval->type == TYPE_ANY || rval->type == TYPE_UNKNOWN);
+    const bool index_rhs =
+        (rval->kind == NODE_BINARY_OP &&
+         (rval->v.number == F_INDEX || rval->v.number == F_RINDEX)) ||
+        (rval->kind == NODE_UNARY_OP_1 &&
+         (rval->v.number == F_MAP_MEMBER || rval->v.number == F_MAP_MEMBER_OPTIONAL));
+    const bool unknown_rhs = (dyn_call || index_rhs) &&
+                             (rval->type == TYPE_ANY || rval->type == TYPE_UNKNOWN);
     if (opcode == F_ADD_EQ || opcode == F_SUB_EQ || opcode == F_MULT_EQ || opcode == F_DIV_EQ) {
       if (lval->type == TYPE_REAL && (rval->type == TYPE_NUMBER || unknown_rhs)) {
         (*result)->l.expr = promote_to_float(rval);
