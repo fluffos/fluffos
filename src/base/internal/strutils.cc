@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <cstring>
+#include <unordered_set>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
@@ -648,6 +649,102 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
     }
   }
   return result;
+}
+
+namespace {
+
+std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
+  std::unordered_set<UChar32> set;
+  const auto* s = reinterpret_cast<const uint8_t*>(chars.data());
+  int32_t i = 0;
+  const int32_t len = static_cast<int32_t>(chars.size());
+  while (i < len) {
+    UChar32 c;
+    U8_NEXT(s, i, len, c);
+    if (c < 0) {
+      c = 0xfffd;
+    }
+    set.insert(c);
+  }
+  return set;
+}
+
+int32_t u8_ltrim_off(const uint8_t* s, int32_t len, const std::unordered_set<UChar32>& set) {
+  int32_t i = 0;
+  while (i < len) {
+    int32_t prev = i;
+    UChar32 c;
+    U8_NEXT(s, i, len, c);
+    if (c < 0 || set.find(c) == set.end()) {
+      return prev;
+    }
+  }
+  return len;
+}
+
+int32_t u8_rtrim_off(const uint8_t* s, int32_t start, int32_t end,
+                     const std::unordered_set<UChar32>& set) {
+  int32_t i = end;
+  while (i > start) {
+    int32_t prev = i;
+    UChar32 c;
+    U8_PREV(s, start, i, c);
+    if (c < 0 || set.find(c) == set.end()) {
+      return prev;
+    }
+  }
+  return start;
+}
+
+}  // namespace
+
+// Trim by Unicode scalar value. The charset is a set of code points, so a
+// multi-byte character cannot donate individual UTF-8 bytes to the match
+// (U+3000 / 《 share E3 80 under find_first_not_of -- issue #1401).
+std::string ltrim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t off = u8_ltrim_off(s, len, set);
+  if (off == 0) {
+    return str;
+  }
+  return str.substr(static_cast<size_t>(off));
+}
+
+std::string rtrim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t end = u8_rtrim_off(s, 0, len, set);
+  if (end == len) {
+    return str;
+  }
+  return str.substr(0, static_cast<size_t>(end));
+}
+
+std::string trim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t start = u8_ltrim_off(s, len, set);
+  if (start == len) {
+    return {};
+  }
+  const int32_t end = u8_rtrim_off(s, start, len, set);
+  if (start == 0 && end == len) {
+    return str;
+  }
+  return str.substr(static_cast<size_t>(start), static_cast<size_t>(end - start));
 }
 
 // See the declaration in strutils.h. The scan itself is EGCIterator's
