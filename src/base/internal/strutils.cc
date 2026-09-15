@@ -651,9 +651,6 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
   return result;
 }
 
-// See the declaration in strutils.h. The scan itself is EGCIterator's
-// (all_ascii); this only adds the per-string memoization, which is what
-// makes a repeated sizeof() on the same string O(1) instead of O(n).
 namespace {
 
 std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
@@ -672,53 +669,87 @@ std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
   return set;
 }
 
-}  // namespace
-
-// Trim by Unicode scalar value. The charset is a set of code points, so a
-// multi-byte character cannot donate individual UTF-8 bytes to the match
-// (U+3000 / 《 share E3 80 under find_first_not_of -- issue #1401).
-std::string u8_ltrim(const std::string& str, const std::string& chars) {
-  if (str.empty()) {
-    return str;
-  }
-  const auto set = u8_charset_set(chars);
-  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+int32_t u8_ltrim_off(const uint8_t* s, int32_t len, const std::unordered_set<UChar32>& set) {
   int32_t i = 0;
-  const int32_t len = static_cast<int32_t>(str.size());
   while (i < len) {
     int32_t prev = i;
     UChar32 c;
     U8_NEXT(s, i, len, c);
     if (c < 0 || set.find(c) == set.end()) {
-      return str.substr(static_cast<size_t>(prev));
+      return prev;
     }
   }
-  return {};
+  return len;
 }
 
-std::string u8_rtrim(const std::string& str, const std::string& chars) {
-  if (str.empty()) {
-    return str;
-  }
-  const auto set = u8_charset_set(chars);
-  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
-  int32_t i = static_cast<int32_t>(str.size());
-  const int32_t start = 0;
+int32_t u8_rtrim_off(const uint8_t* s, int32_t start, int32_t end,
+                     const std::unordered_set<UChar32>& set) {
+  int32_t i = end;
   while (i > start) {
     int32_t prev = i;
     UChar32 c;
     U8_PREV(s, start, i, c);
     if (c < 0 || set.find(c) == set.end()) {
-      return str.substr(0, static_cast<size_t>(prev));
+      return prev;
     }
   }
-  return {};
+  return start;
 }
 
-std::string u8_trim(const std::string& str, const std::string& chars) {
-  return u8_ltrim(u8_rtrim(str, chars), chars);
+}  // namespace
+
+// Trim by Unicode scalar value. The charset is a set of code points, so a
+// multi-byte character cannot donate individual UTF-8 bytes to the match
+// (U+3000 / 《 share E3 80 under find_first_not_of -- issue #1401).
+std::string ltrim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t off = u8_ltrim_off(s, len, set);
+  if (off == 0) {
+    return str;
+  }
+  return str.substr(static_cast<size_t>(off));
 }
 
+std::string rtrim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t end = u8_rtrim_off(s, 0, len, set);
+  if (end == len) {
+    return str;
+  }
+  return str.substr(0, static_cast<size_t>(end));
+}
+
+std::string trim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t start = u8_ltrim_off(s, len, set);
+  if (start == len) {
+    return {};
+  }
+  const int32_t end = u8_rtrim_off(s, start, len, set);
+  if (start == 0 && end == len) {
+    return str;
+  }
+  return str.substr(static_cast<size_t>(start), static_cast<size_t>(end - start));
+}
+
+// See the declaration in strutils.h. The scan itself is EGCIterator's
+// (all_ascii); this only adds the per-string memoization, which is what
+// makes a repeated sizeof() on the same string O(1) instead of O(n).
 bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted) {
   if (!counted) {  // no block header to memoize into
     return EGCIterator::scan_is_ascii(str, len);
