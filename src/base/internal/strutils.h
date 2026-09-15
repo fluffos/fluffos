@@ -27,10 +27,6 @@
 /// One UTF-8 walk; no ASCII find_*_not_of twin.
 // --------------------------------------------------------------------------
 std::string ltrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
-inline std::string& ltrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str = ltrim(static_cast<const std::string&>(str), chars);
-  return str;
-}
 
 // --------------------------------------------------------------------------
 /// @brief removes given characters from end of string
@@ -41,10 +37,6 @@ inline std::string& ltrim(std::string&& str, const std::string& chars = "\t\n\v\
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
 std::string rtrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
-inline std::string& rtrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str = rtrim(static_cast<const std::string&>(str), chars);
-  return str;
-}
 
 // --------------------------------------------------------------------------
 /// @brief removes given chars from beginning and end of string
@@ -55,10 +47,6 @@ inline std::string& rtrim(std::string&& str, const std::string& chars = "\t\n\v\
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
 std::string trim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
-inline std::string& trim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str = trim(static_cast<const std::string&>(str), chars);
-  return str;
-}
 
 // --------------------------------------------------------------------------
 /// @brief checks beginning of string1 for presens of string2
