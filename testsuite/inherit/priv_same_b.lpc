@@ -1,0 +1,5 @@
+private int same_name() { return 2; }
+
+int b_call() { return same_name(); }
+
+function b_fp() { return (: same_name :); }

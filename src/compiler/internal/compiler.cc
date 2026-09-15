@@ -1086,11 +1086,12 @@ static void overload_function(program_t* prog, int index, program_t* defprog, in
   if ((pragmas & PRAGMA_WARNINGS) &&
       !((oldflags | newflags) & (FUNC_NO_CODE | DECL_PRIVATE | DECL_HIDDEN)) &&
       (oldflags & FUNC_INHERITED)) {
-    /* don't scream if one is private.  Why not?  Because I said so.
-     * private is pretty screwed up anyway.  In the future there
-     * won't be such a clash b/c private won't come up the tree.
-     * This also give the coder a way to shut the compiler up when
-     * you do inherit the same object twice in different branches :)
+    /* don't scream if one is private. Hidden/private slots keep their
+     * own definition (see handle_functions); a later inherit with the
+     * same private name is not an override of the earlier inherit's
+     * internal calls (issue #1400). This also gives the coder a way to
+     * shut the compiler up when you inherit the same object twice in
+     * different branches.
      */
     if (!(oldflags & (DECL_PRIVATE | DECL_HIDDEN)) && !(newflags & (DECL_PRIVATE | DECL_HIDDEN))) {
       char buf[1024];
@@ -3292,7 +3293,16 @@ static void handle_functions() {
         /* except the case where new_index is actually final_index */
 
         if (new_index != final_index) {
-          prog_flags[new_index] = FUNC_ALIAS | final_index;
+          /* A hidden (inherited private) slot must keep its own definition.
+           * F_CALL_FUNCTION_BY_ADDRESS in the inherit's bytecode indexes
+           * this slot via function_index_offset; aliasing it to a later
+           * inherit's same-named private made pa->a_call() run pb's
+           * function (issue #1400). Public/visible overloads still alias. */
+          if (cur_def->flags & DECL_HIDDEN) {
+            prog_flags[new_index] = cur_def->flags;
+          } else {
+            prog_flags[new_index] = FUNC_ALIAS | final_index;
+          }
         }
       }
     }
