@@ -463,3 +463,36 @@ TEST(MstrAsciiTag, StringUnlinkProducesADefinedTag) {
   FREE_MSTR(acopy);
   FREE_MSTR(a);
 }
+
+// ---------------------------------------------------------------------------
+// trim / ltrim / rtrim: the charset is a set of Unicode scalar values, not
+// raw bytes. U+3000 (E3 80 80) must not slice 《 (E3 80 8A) (issue #1401).
+// ---------------------------------------------------------------------------
+
+TEST(U8Trim, AsciiCharsetUnchanged) {
+  EXPECT_EQ("abc", trim("  abc  "));
+  EXPECT_EQ("abc", trim("\t abc \n"));
+  EXPECT_EQ("b", trim("xxbxx", "x"));
+  EXPECT_EQ("", trim("   "));
+  EXPECT_EQ("abc", trim("abc"));
+  EXPECT_EQ("abc  ", ltrim("  abc  "));
+  EXPECT_EQ("  abc", rtrim("  abc  "));
+}
+
+TEST(U8Trim, IdeographicSpaceDoesNotSliceCjkPunct) {
+  const std::string src = "《三字经》";
+  const std::string ideo = "　";  // U+3000
+  EXPECT_EQ(src, trim(src, ideo));
+  EXPECT_EQ(src, ltrim(src, ideo));
+  EXPECT_EQ(src, rtrim(src, ideo));
+
+  EXPECT_EQ("《三字经》", trim("　《三字经》　", ideo));
+  EXPECT_EQ("《三字经》　", ltrim("　《三字经》　", ideo));
+  EXPECT_EQ("　《三字经》", rtrim("　《三字经》　", ideo));
+}
+
+TEST(U8Trim, MixedAsciiAndCjkCharset) {
+  EXPECT_EQ("三字经", trim("  《三字经》  ", " 《》"));
+  EXPECT_EQ("三字经》  ", ltrim("  《三字经》  ", " 《"));
+  EXPECT_EQ("  《三字经", rtrim("  《三字经》  ", "》 "));
+}

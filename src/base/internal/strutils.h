@@ -15,6 +15,17 @@
 
 #include "base/internal/EGCIterator.h"
 
+// UTF-8 codepoint-set trim. `chars` is a set of Unicode scalar values, not
+// a set of raw bytes -- find_first_not_of would treat U+3000 (E3 80 80) as
+// three bytes and slice 《 (E3 80 8A) into a lone 8A (issue #1401).
+std::string u8_ltrim(const std::string& str, const std::string& chars);
+std::string u8_rtrim(const std::string& str, const std::string& chars);
+std::string u8_trim(const std::string& str, const std::string& chars);
+
+inline bool str_bytes_are_ascii(const std::string& s) {
+  return std::all_of(s.begin(), s.end(), [](unsigned char c) { return c < 0x80; });
+}
+
 // --------------------------------------------------------------------------
 /// @brief removes given characters from beginning of string
 ///
@@ -24,15 +35,21 @@
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
 inline std::string& ltrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str.erase(0, str.find_first_not_of(chars));
+  if (str_bytes_are_ascii(str) && str_bytes_are_ascii(chars)) {
+    str.erase(0, str.find_first_not_of(chars));
+    return str;
+  }
+  str = u8_ltrim(str, chars);
   return str;
 }
 
 inline std::string ltrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ") {
-  std::string ret{str};
-
-  ret.erase(0, str.find_first_not_of(chars));
-  return ret;
+  if (str_bytes_are_ascii(str) && str_bytes_are_ascii(chars)) {
+    std::string ret{str};
+    ret.erase(0, str.find_first_not_of(chars));
+    return ret;
+  }
+  return u8_ltrim(str, chars);
 }
 
 // --------------------------------------------------------------------------
@@ -44,15 +61,21 @@ inline std::string ltrim(const std::string& str, const std::string& chars = "\t\
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
 inline std::string& rtrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str.erase(str.find_last_not_of(chars) + 1);
+  if (str_bytes_are_ascii(str) && str_bytes_are_ascii(chars)) {
+    str.erase(str.find_last_not_of(chars) + 1);
+    return str;
+  }
+  str = u8_rtrim(str, chars);
   return str;
 }
 
 inline std::string rtrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ") {
-  std::string ret{str};
-
-  ret.erase(str.find_last_not_of(chars) + 1);
-  return ret;
+  if (str_bytes_are_ascii(str) && str_bytes_are_ascii(chars)) {
+    std::string ret{str};
+    ret.erase(str.find_last_not_of(chars) + 1);
+    return ret;
+  }
+  return u8_rtrim(str, chars);
 }
 
 // --------------------------------------------------------------------------
@@ -64,7 +87,16 @@ inline std::string rtrim(const std::string& str, const std::string& chars = "\t\
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
 inline std::string& trim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  return ltrim(rtrim(str, chars), chars);
+  // Edit in place. `return ltrim(rtrim(str), chars)` is a dangling
+  // reference: named `str` is an lvalue, so rtrim(const&) returns a
+  // temporary that ltrim(string&&) then refers to.
+  if (str_bytes_are_ascii(str) && str_bytes_are_ascii(chars)) {
+    str.erase(str.find_last_not_of(chars) + 1);
+    str.erase(0, str.find_first_not_of(chars));
+    return str;
+  }
+  str = u8_trim(str, chars);
+  return str;
 }
 
 inline std::string trim(const std::string& str, const std::string& chars = "\t\n\v\f\r ") {

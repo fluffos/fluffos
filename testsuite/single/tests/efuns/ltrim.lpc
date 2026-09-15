@@ -2,4 +2,9 @@ void do_tests() {
   ASSERT_EQ("abc  ", ltrim("  abc  "));
   ASSERT_EQ("bxx", ltrim("xxbxx", "x"));
   ASSERT_EQ("abc", ltrim("abc"));
+
+  // issue #1401
+  string book = "《三字经》";
+  ASSERT_EQ(book, ltrim(book, "　"));
+  ASSERT_EQ(book + "　", ltrim("　" + book + "　", "　"));
 }
