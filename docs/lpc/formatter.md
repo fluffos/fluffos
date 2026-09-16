@@ -78,10 +78,12 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 The formatter follows the source instead of canonicalizing both ways —
 the opposite of clang-format's full reflow:
 
-* **`#include` / `inherit` order.** A later include is never hoisted
-  above inherit. Typical object headers write `#include <ansi.h>`
-  then `inherit NPC;` then `#include "fight.h"`; that order is
-  left alone.
+* **Statement order.** The non-whitespace token sequence is an
+  invariant — `#include`, `inherit`, declarations, and everything
+  else stay in source order. A later include is never hoisted
+  above inherit (`#include <ansi.h>` / `inherit NPC;` /
+  `#include "fight.h"`). `formatLPC` throws if a pass would
+  reorder tokens.
 * **Your line breaks.** A one-line block stays one line (if it fits);
   a multi-line call or declaration keeps its layout, including whether
   the closing `)` / `");` / `});` is glued to the last element or on

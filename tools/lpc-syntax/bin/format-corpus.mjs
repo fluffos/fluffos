@@ -13,16 +13,14 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { formatLPC } = await import(join(here, '..', 'format.mjs'));
+const { formatLPC, tokenSequence } = await import(join(here, '..', 'format.mjs'));
 const { tokenize } = await import(join(here, '..', 'tokenizer.mjs'));
 
 const checkOnly = process.argv.includes('--check');
 const files = readFileSync(0, 'utf8').split('\n').filter(Boolean);
 
 function sig(src) {
-  return tokenize(src).filter((t) => t.kind !== 'whitespace')
-    .map((t) => t.kind + ':' + (t.kind === 'directive' ? t.text.replace(/[ \t]+$/g, '') : t.text))
-    .join('\n');
+  return tokenSequence(src).join('\n');
 }
 
 // Literal-bearing token text must survive formatting BYTE-IDENTICAL --
