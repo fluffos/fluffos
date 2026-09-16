@@ -2445,9 +2445,21 @@
           },
           {
             "type": "doc",
+            "id": "efun/pcre/pcre_convert",
+            "key": "efun/pcre/pcre_convert",
+            "label": "pcre_convert"
+          },
+          {
+            "type": "doc",
             "id": "efun/pcre/pcre_extract",
             "key": "efun/pcre/pcre_extract",
             "label": "pcre_extract"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_info",
+            "key": "efun/pcre/pcre_info",
+            "label": "pcre_info"
           },
           {
             "type": "doc",

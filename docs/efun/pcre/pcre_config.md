@@ -57,6 +57,21 @@ title: pcre / pcre_config
     Limits (ReDoS guards): `match_limit`, `depth_limit`, `heap_limit`,
     `offset_limit` — integers. Exceeding a limit is a catchable error.
 
+    Start position: `offset` (byte offset into the subject).
+
+    Compile context: `newline` (`cr`/`lf`/`crlf`/`any`/`anycrlf`/`nul`),
+    `bsr` (`unicode`/`anycrlf`), `no_jit`, and `extra_*` (`extra_match_word`,
+    `extra_match_line`, `extra_alt_bsux`, `extra_bad_escape_is_literal`,
+    `extra_escaped_cr_is_lf`, `extra_allow_surrogate_escapes`,
+    `extra_allow_lookaround_bsk`).
+
+    Related efuns: `pcre_info(pattern)` (compiled metadata),
+    `pcre_convert(pattern, (["glob": 1]))` (glob / POSIX → PCRE2).
+
+    Not exposed, on purpose: callouts (LPC callbacks during match), DFA
+    matching, and serialized bytecode. Those need C function pointers or
+    raw `pcre2_code*` lifetimes.
+
     Combine leftover int bits with names via `flags`:
 
         pcre_match(s, pat, (["caseless": 1, "match_limit": 100000]))

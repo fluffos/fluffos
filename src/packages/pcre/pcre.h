@@ -27,16 +27,23 @@ typedef struct {
   uint32_t namecount;
   uint32_t name_entry_size;
   uint32_t compile_flags;
+  uint32_t extra_options;
+  uint32_t newline;
+  uint32_t bsr;
   uint32_t exec_flags;
   uint32_t substitute_flags;
   uint32_t match_limit;
   uint32_t depth_limit;
   uint32_t heap_limit;
   PCRE2_SIZE offset_limit;
+  PCRE2_SIZE start_offset;
   int has_match_limit;
   int has_depth_limit;
   int has_heap_limit;
   int has_offset_limit;
+  int has_newline;
+  int has_bsr;
+  int no_jit;
   int* ovector;
   int ovecsize;
   int rc;
@@ -45,8 +52,12 @@ typedef struct {
 struct pcre_cache_bucket_t {
   pcre2_code* compiled_pattern;  // value1
   const char* pattern;           // key
-  uint32_t compile_flags;        // compile options used
-  int size;                      // size in bytes
+  uint32_t compile_flags;
+  uint32_t extra_options;
+  uint32_t newline;
+  uint32_t bsr;
+  int no_jit;
+  int size;  // size in bytes
   struct pcre_cache_bucket_t* next;
 };
 

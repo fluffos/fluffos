@@ -1,6 +1,8 @@
 
 string pcre_version(void);
 mapping pcre_config(void);
+mapping pcre_info(string, void | int | mapping);
+string pcre_convert(string, mapping);
 mixed pcre_match(string | string *, string, void | int | mapping, void | int | mapping);
 mixed pcre_match_all(string, string, void | int | mapping);
 mixed *pcre_assoc(string, string *, mixed *, mixed | void, void | int | mapping);

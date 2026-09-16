@@ -30,6 +30,12 @@
  *      mapping pcre_config();
  *         - PCRE2 library capabilities (JIT, Unicode, default limits)
  *
+ *      mapping pcre_info(string, void | int | mapping);
+ *         - compiled pattern metadata (captures, names, JIT, limits)
+ *
+ *      string pcre_convert(string, mapping);
+ *         - glob / POSIX pattern → PCRE2 pattern
+ *
  *      mixed pcre_match(string | string *, string, void | int);
  *         - analog with regexp(string | string *, string, void | int);
  *           for backwards compatibility reasons but utilizing the PCRE
@@ -70,16 +76,23 @@
 
 struct pcre_options {
   uint32_t compile_flags;
+  uint32_t extra_options;
+  uint32_t newline;
+  uint32_t bsr;
   uint32_t exec_flags;
   uint32_t substitute_flags;
   uint32_t match_limit;
   uint32_t depth_limit;
   uint32_t heap_limit;
   PCRE2_SIZE offset_limit;
+  PCRE2_SIZE start_offset;
   int has_match_limit;
   int has_depth_limit;
   int has_heap_limit;
   int has_offset_limit;
+  int has_newline;
+  int has_bsr;
+  int no_jit;
 };
 
 // Prototype declarations
@@ -105,10 +118,8 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
 static char* pcre_get_replace(pcre_t* run, array_t* replacements);
 static array_t* pcre_get_substrings(pcre_t* run, bool include_names);
 // Caching functions
-static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const char* pattern,
-                              uint32_t compile_flags);
-static pcre2_code* pcre_get_cached_pattern(struct pcre_cache_t* table, const char* pattern,
-                                           uint32_t compile_flags);
+static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const pcre_t* p);
+static pcre2_code* pcre_get_cached_pattern(struct pcre_cache_t* table, const pcre_t* p);
 static mapping_t* pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
@@ -180,6 +191,154 @@ void f_pcre_config() {
   }
 #endif
   push_refed_mapping(m);
+}
+
+void f_pcre_info() {
+  pcre_options opts = default_pcre_options();
+  if (st_num_arg >= 2) {
+    apply_options_svalue(&opts, sp);
+    pop_stack();
+    st_num_arg--;
+  }
+  if (sp->type != T_STRING) {
+    error("Bad argument 1 to pcre_info()\n");
+  }
+
+  pcre_t* run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_info : run");
+  run->pattern = sp->u.string;
+  assign_run_options(run, opts);
+  DEFER { pcre_free_memory(run); };
+
+  if (pcre_ensure_compiled(run) < 0) {
+    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
+  }
+
+  mapping_t* m = allocate_mapping(20);
+  uint32_t u = 0;
+  PCRE2_SIZE sz = 0;
+
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_CAPTURECOUNT, &u) == 0) {
+    add_mapping_pair(m, "captures", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_BACKREFMAX, &u) == 0) {
+    add_mapping_pair(m, "backref_max", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_MINLENGTH, &u) == 0) {
+    add_mapping_pair(m, "minlength", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_MAXLOOKBEHIND, &u) == 0) {
+    add_mapping_pair(m, "max_lookbehind", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_MATCHEMPTY, &u) == 0) {
+    add_mapping_pair(m, "match_empty", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_HASCRORLF, &u) == 0) {
+    add_mapping_pair(m, "has_cr_or_lf", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_HASBACKSLASHC, &u) == 0) {
+    add_mapping_pair(m, "has_backslash_c", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_NEWLINE, &u) == 0) {
+    add_mapping_pair(m, "newline", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_BSR, &u) == 0) {
+    add_mapping_pair(m, "bsr", u);
+  }
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_SIZE, &sz) == 0) {
+    add_mapping_pair(m, "size", static_cast<long>(sz));
+  }
+#ifdef PCRE2_INFO_JITSIZE
+  if (pcre2_pattern_info(run->re, PCRE2_INFO_JITSIZE, &sz) == 0) {
+    add_mapping_pair(m, "jit_size", static_cast<long>(sz));
+    add_mapping_pair(m, "jit", sz > 0 ? 1 : 0);
+  }
+#endif
+
+  uint32_t namecount = 0, name_entry_size = 0;
+  PCRE2_SPTR name_table = nullptr;
+  pcre2_pattern_info(run->re, PCRE2_INFO_NAMECOUNT, &namecount);
+  pcre2_pattern_info(run->re, PCRE2_INFO_NAMEENTRYSIZE, &name_entry_size);
+  pcre2_pattern_info(run->re, PCRE2_INFO_NAMETABLE, &name_table);
+  mapping_t* names = allocate_mapping(namecount);
+  for (uint32_t i = 0; i < namecount && name_table != nullptr; i++) {
+    auto* entry = name_table + i * name_entry_size;
+    int const group = (entry[0] << 8) | entry[1];
+    add_mapping_pair(names, reinterpret_cast<const char*>(entry + 2), group);
+  }
+  {
+    svalue_t key;
+    key.type = T_STRING;
+    key.subtype = STRING_SHARED;
+    key.u.string = make_shared_string("names");
+    svalue_t* slot = find_for_insert(m, &key, 1);
+    free_string(key.u.string);
+    if (slot != nullptr) {
+      slot->type = T_MAPPING;
+      slot->subtype = 0;
+      slot->u.map = names;
+    } else {
+      free_mapping(names);
+    }
+  }
+
+  pop_stack();
+  push_refed_mapping(m);
+}
+
+void f_pcre_convert() {
+  uint32_t cflags = PCRE2_CONVERT_UTF;
+  int have_kind = 0;
+
+  if (st_num_arg < 2 || sp->type != T_MAPPING) {
+    error("pcre_convert() requires a mapping of convert options (glob, posix_basic, or posix_extended).\n");
+  }
+
+  mapping_t* map = sp->u.map;
+  auto on = [&](const char* key) {
+    svalue_t* v = find_string_in_mapping(map, key);
+    return v && v->type == T_NUMBER && v->u.number != 0;
+  };
+  if (on("glob")) {
+    cflags |= PCRE2_CONVERT_GLOB;
+    have_kind = 1;
+  }
+  if (on("posix_basic")) {
+    cflags |= PCRE2_CONVERT_POSIX_BASIC;
+    have_kind = 1;
+  }
+  if (on("posix_extended")) {
+    cflags |= PCRE2_CONVERT_POSIX_EXTENDED;
+    have_kind = 1;
+  }
+  if (on("glob_no_starstar")) {
+    cflags |= PCRE2_CONVERT_GLOB_NO_STARSTAR;
+  }
+  if (on("glob_no_wild_separator")) {
+    cflags |= PCRE2_CONVERT_GLOB_NO_WILD_SEPARATOR;
+  }
+  if (on("no_utf_check")) {
+    cflags |= PCRE2_CONVERT_NO_UTF_CHECK;
+  }
+  if (!have_kind) {
+    error("pcre_convert() mapping must set glob, posix_basic, or posix_extended.\n");
+  }
+
+  const char* pat = (sp - 1)->u.string;
+  PCRE2_UCHAR* out = nullptr;
+  PCRE2_SIZE outlen = 0;
+  int rc = pcre2_pattern_convert((PCRE2_SPTR)pat, PCRE2_ZERO_TERMINATED, cflags, &out, &outlen,
+                                 nullptr);
+  if (rc < 0) {
+    char err[256];
+    pcre2_get_error_message(rc, reinterpret_cast<PCRE2_UCHAR*>(err), sizeof(err));
+    error("PCRE convert failed: %s\n", err);
+  }
+  char* ret = new_string(static_cast<int>(outlen), "pcre_convert");
+  memcpy(ret, out, outlen);
+  ret[outlen] = '\0';
+  pcre2_converted_pattern_free(out);
+  pop_2_elems();
+  push_malloced_string(ret);
 }
 
 void f_pcre_match() {
@@ -562,6 +721,14 @@ static void set_sub_bit(pcre_options* o, uint32_t bit, int on) {
   }
 }
 
+static void set_extra_bit(pcre_options* o, uint32_t bit, int on) {
+  if (on) {
+    o->extra_options |= bit;
+  } else {
+    o->extra_options &= ~bit;
+  }
+}
+
 static int apply_one_option(mapping_t* /*m*/, mapping_node_t* n, void* extra) {
   auto* o = static_cast<pcre_options*>(extra);
   const svalue_t* key = n->values;
@@ -702,6 +869,88 @@ static int apply_one_option(mapping_t* /*m*/, mapping_node_t* n, void* extra) {
     if (n < 0) error("PCRE option \"offset_limit\" must be >= 0.\n");
     o->offset_limit = static_cast<PCRE2_SIZE>(n);
     o->has_offset_limit = 1;
+  } else if (strcmp(k, "offset") == 0) {
+    LPC_INT n = sval_int(val, k);
+    if (n < 0) error("PCRE option \"offset\" must be >= 0.\n");
+    o->start_offset = static_cast<PCRE2_SIZE>(n);
+  } else if (strcmp(k, "no_jit") == 0) {
+    o->no_jit = on(k);
+  } else if (strcmp(k, "newline") == 0) {
+    if (val->type == T_NUMBER) {
+      LPC_INT n = val->u.number;
+      if (n < PCRE2_NEWLINE_CR || n > PCRE2_NEWLINE_NUL) {
+        error("PCRE option \"newline\" must be cr/lf/crlf/any/anycrlf/nul.\n");
+      }
+      o->newline = static_cast<uint32_t>(n);
+    } else if (val->type == T_STRING) {
+      const char* s = val->u.string;
+      if (strcmp(s, "cr") == 0) {
+        o->newline = PCRE2_NEWLINE_CR;
+      } else if (strcmp(s, "lf") == 0) {
+        o->newline = PCRE2_NEWLINE_LF;
+      } else if (strcmp(s, "crlf") == 0) {
+        o->newline = PCRE2_NEWLINE_CRLF;
+      } else if (strcmp(s, "any") == 0) {
+        o->newline = PCRE2_NEWLINE_ANY;
+      } else if (strcmp(s, "anycrlf") == 0) {
+        o->newline = PCRE2_NEWLINE_ANYCRLF;
+      } else if (strcmp(s, "nul") == 0) {
+        o->newline = PCRE2_NEWLINE_NUL;
+      } else {
+        error("PCRE option \"newline\" must be cr/lf/crlf/any/anycrlf/nul.\n");
+      }
+    } else {
+      error("PCRE option \"newline\" must be a string or int.\n");
+    }
+    o->has_newline = 1;
+  } else if (strcmp(k, "bsr") == 0) {
+    if (val->type == T_NUMBER) {
+      LPC_INT n = val->u.number;
+      if (n != PCRE2_BSR_UNICODE && n != PCRE2_BSR_ANYCRLF) {
+        error("PCRE option \"bsr\" must be unicode or anycrlf.\n");
+      }
+      o->bsr = static_cast<uint32_t>(n);
+    } else if (val->type == T_STRING) {
+      const char* s = val->u.string;
+      if (strcmp(s, "unicode") == 0) {
+        o->bsr = PCRE2_BSR_UNICODE;
+      } else if (strcmp(s, "anycrlf") == 0) {
+        o->bsr = PCRE2_BSR_ANYCRLF;
+      } else {
+        error("PCRE option \"bsr\" must be unicode or anycrlf.\n");
+      }
+    } else {
+      error("PCRE option \"bsr\" must be a string or int.\n");
+    }
+    o->has_bsr = 1;
+#ifdef PCRE2_EXTRA_ALLOW_SURROGATE_ESCAPES
+  } else if (strcmp(k, "extra_allow_surrogate_escapes") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_ALLOW_SURROGATE_ESCAPES, on(k));
+#endif
+#ifdef PCRE2_EXTRA_BAD_ESCAPE_IS_LITERAL
+  } else if (strcmp(k, "extra_bad_escape_is_literal") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_BAD_ESCAPE_IS_LITERAL, on(k));
+#endif
+#ifdef PCRE2_EXTRA_MATCH_WORD
+  } else if (strcmp(k, "extra_match_word") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_MATCH_WORD, on(k));
+#endif
+#ifdef PCRE2_EXTRA_MATCH_LINE
+  } else if (strcmp(k, "extra_match_line") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_MATCH_LINE, on(k));
+#endif
+#ifdef PCRE2_EXTRA_ESCAPED_CR_IS_LF
+  } else if (strcmp(k, "extra_escaped_cr_is_lf") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_ESCAPED_CR_IS_LF, on(k));
+#endif
+#ifdef PCRE2_EXTRA_ALT_BSUX
+  } else if (strcmp(k, "extra_alt_bsux") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_ALT_BSUX, on(k));
+#endif
+#ifdef PCRE2_EXTRA_ALLOW_LOOKAROUND_BSK
+  } else if (strcmp(k, "extra_allow_lookaround_bsk") == 0) {
+    set_extra_bit(o, PCRE2_EXTRA_ALLOW_LOOKAROUND_BSK, on(k));
+#endif
   } else {
     error("Unknown PCRE option \"%s\".\n", k);
   }
@@ -724,16 +973,23 @@ static void apply_options_svalue(pcre_options* o, svalue_t* sv) {
 
 static void assign_run_options(pcre_t* run, const pcre_options& o) {
   run->compile_flags = o.compile_flags;
+  run->extra_options = o.extra_options;
+  run->newline = o.newline;
+  run->bsr = o.bsr;
   run->exec_flags = o.exec_flags;
   run->substitute_flags = o.substitute_flags;
   run->match_limit = o.match_limit;
   run->depth_limit = o.depth_limit;
   run->heap_limit = o.heap_limit;
   run->offset_limit = o.offset_limit;
+  run->start_offset = o.start_offset;
   run->has_match_limit = o.has_match_limit;
   run->has_depth_limit = o.has_depth_limit;
   run->has_heap_limit = o.has_heap_limit;
   run->has_offset_limit = o.has_offset_limit;
+  run->has_newline = o.has_newline;
+  run->has_bsr = o.has_bsr;
+  run->no_jit = o.no_jit;
 }
 
 static pcre2_match_context* pcre_run_context(pcre_t* p) {
@@ -775,31 +1031,57 @@ static void pcre_throw_if_limit_error(int rc) {
     error("PCRE heap limit exceeded.\n");
   }
 #endif
+#ifdef PCRE2_ERROR_BADOFFSET
+  if (rc == PCRE2_ERROR_BADOFFSET) {
+    error("PCRE option \"offset\" is past the end of the subject.\n");
+  }
+#endif
 }
 
 static pcre2_code* pcre_local_compile(pcre_t* p) {
   int errorcode = 0;
   PCRE2_SIZE erroffset = 0;
+  pcre2_compile_context* ctx = nullptr;
+  if (p->extra_options || p->has_newline || p->has_bsr) {
+    ctx = pcre2_compile_context_create(nullptr);
+    if (ctx == nullptr) {
+      error("PCRE compile context: out of memory\n");
+    }
+    if (p->has_newline) {
+      pcre2_set_newline(ctx, p->newline);
+    }
+    if (p->has_bsr) {
+      pcre2_set_bsr(ctx, p->bsr);
+    }
+    if (p->extra_options) {
+      pcre2_set_compile_extra_options(ctx, p->extra_options);
+    }
+  }
   p->re = pcre2_compile((PCRE2_SPTR)p->pattern, PCRE2_ZERO_TERMINATED, p->compile_flags, &errorcode,
-                        &erroffset, nullptr);
+                        &erroffset, ctx);
+  if (ctx != nullptr) {
+    pcre2_compile_context_free(ctx);
+  }
   p->erroffset = static_cast<int>(erroffset);
   if (p->re == nullptr) {
     pcre2_get_error_message(errorcode, reinterpret_cast<PCRE2_UCHAR*>(p->error), sizeof(p->error));
     return nullptr;
   }
   p->error[0] = '\0';
-#ifndef __EMSCRIPTEN__
-  pcre2_jit_compile(p->re, PCRE2_JIT_COMPLETE);
+#if !defined(__EMSCRIPTEN__)
+  if (!p->no_jit) {
+    pcre2_jit_compile(p->re, PCRE2_JIT_COMPLETE);
+  }
 #endif
   return p->re;
 }
 
 static int pcre_ensure_compiled(pcre_t* p) {
-  p->re = pcre_get_cached_pattern(&pcre_cache, p->pattern, p->compile_flags);
+  p->re = pcre_get_cached_pattern(&pcre_cache, p);
   if (p->re == nullptr) {
     pcre_local_compile(p);
     if (p->re != nullptr) {
-      pcre_cache_pattern(&pcre_cache, p->re, p->pattern, p->compile_flags);
+      pcre_cache_pattern(&pcre_cache, p->re, p);
     }
   }
   return p->re == nullptr ? -1 : 1;
@@ -814,13 +1096,13 @@ static char* pcre_substitute_template(pcre_t* run, const char* repl, size_t repl
   pcre2_match_context* ctx = pcre_run_context(run);
   PCRE2_SIZE outlen = run->s_length + 16;
   auto* out = static_cast<PCRE2_UCHAR*>(DMALLOC(outlen + 1, TAG_TEMPORARY, "pcre_substitute"));
-  int rc = pcre2_substitute(run->re, (PCRE2_SPTR)run->subject, run->s_length, 0, options, md, ctx,
-                            (PCRE2_SPTR)repl, repl_len, out, &outlen);
+  int rc = pcre2_substitute(run->re, (PCRE2_SPTR)run->subject, run->s_length, run->start_offset,
+                            options, md, ctx, (PCRE2_SPTR)repl, repl_len, out, &outlen);
   if (rc == PCRE2_ERROR_NOMEMORY) {
     FREE(out);
     out = static_cast<PCRE2_UCHAR*>(DMALLOC(outlen + 1, TAG_TEMPORARY, "pcre_substitute"));
-    rc = pcre2_substitute(run->re, (PCRE2_SPTR)run->subject, run->s_length, 0, options, md, ctx,
-                          (PCRE2_SPTR)repl, repl_len, out, &outlen);
+    rc = pcre2_substitute(run->re, (PCRE2_SPTR)run->subject, run->s_length, run->start_offset,
+                          options, md, ctx, (PCRE2_SPTR)repl, repl_len, out, &outlen);
   }
   pcre2_match_data_free(md);
   if (rc < 0) {
@@ -871,7 +1153,7 @@ static int pcre_local_exec(pcre_t* p) {
   pcre2_pattern_info(p->re, PCRE2_INFO_NAMEENTRYSIZE, &p->name_entry_size);
   pcre2_pattern_info(p->re, PCRE2_INFO_NAMETABLE, &p->name_table);
 
-  p->rc = pcre_exec_at(p, 0, 0);
+  p->rc = pcre_exec_at(p, p->start_offset, 0);
   pcre_throw_if_limit_error(p->rc);
   return p->rc;
 }
@@ -905,11 +1187,11 @@ auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern
 
   DEFER { pcre_free_memory(run); };
 
-  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern, run->compile_flags);
+  run->re = pcre_get_cached_pattern(&pcre_cache, run);
 
   if (run->re == nullptr) {
     pcre_local_compile(run);
-    pcre_cache_pattern(&pcre_cache, run->re, run->pattern, run->compile_flags);
+    pcre_cache_pattern(&pcre_cache, run->re, run);
   }
 
   if (run->re == nullptr) {
@@ -919,7 +1201,7 @@ auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern
   std::vector<std::vector<svalue_t>> matches;
 
   int rc = 0;
-  size_t offset = 0;
+  size_t offset = run->start_offset;
   int retry_flags = 0;
   while (offset < run->s_length) {
     rc = pcre_exec_at(run, offset, retry_flags);
@@ -1002,7 +1284,7 @@ static array_t* pcre_match(array_t* v, const char* pattern, int flag, const pcre
   run->pattern = pattern;
   assign_run_options(run, o);
 
-  run->re = pcre_get_cached_pattern(&pcre_cache, run->pattern, run->compile_flags);
+  run->re = pcre_get_cached_pattern(&pcre_cache, run);
 
   DEFER { pcre_free_memory(run); };
 
@@ -1013,7 +1295,7 @@ static array_t* pcre_match(array_t* v, const char* pattern, int flag, const pcre
 
       error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
     } else {
-      pcre_cache_pattern(&pcre_cache, run->re, run->pattern, run->compile_flags);
+      pcre_cache_pattern(&pcre_cache, run->re, run);
     }
   }
 
@@ -1117,7 +1399,7 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
       rgpp[i]->ovecsize = 0;
       rgpp[i]->pattern = pat->item[i].u.string;
       assign_run_options(rgpp[i], o);
-      rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, rgpp[i]->pattern, rgpp[i]->compile_flags);
+      rgpp[i]->re = pcre_get_cached_pattern(&pcre_cache, rgpp[i]);
 
       if (rgpp[i]->re == nullptr) {
         if (pcre_local_compile(rgpp[i]) == nullptr) {
@@ -1133,7 +1415,7 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
           free_empty_array(ret);
           error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
         } else {
-          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]->pattern, rgpp[i]->compile_flags);
+          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]);
         }
       }
     }
@@ -1448,13 +1730,24 @@ static void pcre_free_memory(pcre_t* p) {
   FREE(p);
 }
 
+static int pcre_same_compile(const pcre_t* p, const struct pcre_cache_bucket_t* node) {
+  return node->compile_flags == p->compile_flags && node->extra_options == p->extra_options &&
+         node->newline == p->newline && node->bsr == p->bsr && node->no_jit == p->no_jit;
+}
+
+static unsigned pcre_cache_bucket_of(const char* shared_pattern, const pcre_t* p) {
+  unsigned h = HASH(BLOCK(shared_pattern)) ^ p->compile_flags ^ p->extra_options ^ p->newline ^ p->bsr;
+  if (p->no_jit) {
+    h ^= 0x9e3779b9u;
+  }
+  return h % PCRE_CACHE_SIZE;
+}
+
 // Caching functions, add new ones at the front of the bucket so we find them
 // faster
-static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const char* pattern,
-                              uint32_t compile_flags)  // must be shared string
-{
-  const auto* shared_pattern = make_shared_string(pattern);
-  unsigned int const bucket = (HASH(BLOCK(shared_pattern)) ^ compile_flags) % PCRE_CACHE_SIZE;
+static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const pcre_t* p) {
+  const auto* shared_pattern = make_shared_string(p->pattern);
+  unsigned int const bucket = pcre_cache_bucket_of(shared_pattern, p);
   PCRE2_SIZE sz = 0;
   struct pcre_cache_bucket_t* tmp;
   struct pcre_cache_bucket_t* node;
@@ -1466,7 +1759,7 @@ static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, cons
 
   full = (pcrecachesize > 2 * PCRE_CACHE_SIZE);
   while (tmp) {
-    if (shared_pattern == tmp->pattern && tmp->compile_flags == compile_flags) {
+    if (shared_pattern == tmp->pattern && pcre_same_compile(p, tmp)) {
       break;
     }
 
@@ -1514,23 +1807,26 @@ static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, cons
   }
 
   node->pattern = shared_pattern;
-  node->compile_flags = compile_flags;
+  node->compile_flags = p->compile_flags;
+  node->extra_options = p->extra_options;
+  node->newline = p->newline;
+  node->bsr = p->bsr;
+  node->no_jit = p->no_jit;
   node->compiled_pattern = cpat;
   node->size = static_cast<int>(sz);
 
   return 0;
 }
 
-static pcre2_code* pcre_get_cached_pattern(struct pcre_cache_t* table, const char* pattern,
-                                           uint32_t compile_flags) {
-  const auto* shared_pattern = make_shared_string(pattern);
-  unsigned int const bucket = (HASH(BLOCK(shared_pattern)) ^ compile_flags) % PCRE_CACHE_SIZE;
+static pcre2_code* pcre_get_cached_pattern(struct pcre_cache_t* table, const pcre_t* p) {
+  const auto* shared_pattern = make_shared_string(p->pattern);
+  unsigned int const bucket = pcre_cache_bucket_of(shared_pattern, p);
   struct pcre_cache_bucket_t* node;
   struct pcre_cache_bucket_t* lnode = nullptr;
   node = table->buckets[bucket];
 
   while (node) {
-    if (shared_pattern == node->pattern && node->compile_flags == compile_flags) {
+    if (shared_pattern == node->pattern && pcre_same_compile(p, node)) {
       if (node != table->buckets[bucket]) {
         // not at the front, move it there, so the most used pattern is fastest
         lnode->next = node->next;
@@ -1571,9 +1867,10 @@ static mapping_t* pcre_get_cache() {
       node = pcre_cache.buckets[i];
 
       while (node) {
-        size_t keylen = strlen(node->pattern) + 16;
+        size_t keylen = strlen(node->pattern) + 64;
         char* key = (char*)DMALLOC(keylen, TAG_TEMPORARY, "pcre_cache key");
-        snprintf(key, keylen, "%s|0x%x", node->pattern, node->compile_flags);
+        snprintf(key, keylen, "%s|0x%x|0x%x|n%u|b%u|j%d", node->pattern, node->compile_flags,
+                 node->extra_options, node->newline, node->bsr, node->no_jit);
         add_mapping_pair(ret, key, node->size);
         FREE(key);
         node = node->next;
