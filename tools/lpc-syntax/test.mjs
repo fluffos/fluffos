@@ -1206,6 +1206,23 @@ check('conventions from the final pristine audit: empty for-header clauses'
                formatLPC(brk) === brk &&
                formatLPC(marco) === marco && formatLPC(formatLPC(marco)) === formatLPC(marco);
       })());
+check('a run of #include directives is one block: consecutive includes stay'
+      + ' packed, and a blank line is inserted before the next non-directive'
+      + ' token (`inherit`, a declaration) even when the source omitted it;'
+      + ' an existing blank stays one (not two); a comment between includes'
+      + ' stays inside the include block',
+      (() => {
+        const glued = '#include <ansi.h>\n#include "fight.h"\ninherit NPC;\nvoid create() {}\n';
+        const want = '#include <ansi.h>\n#include "fight.h"\n\ninherit NPC;\nvoid create() {}\n';
+        const already = '#include <tui.h>\n\ninherit TUI_WIDGET;\n';
+        const between = '#include "a.h"\n// more\n#include "b.h"\ninherit NPC;\n';
+        const betweenWant = '#include "a.h"\n// more\n#include "b.h"\n\ninherit NPC;\n';
+        const ifdef = '#ifdef FOO\n#include "x.h"\n#endif\ninherit NPC;\n';
+        return formatLPC(glued) === want && formatLPC(formatLPC(glued)) === want &&
+               formatLPC(already) === already && formatLPC(formatLPC(already)) === already &&
+               formatLPC(between) === betweenWant &&
+               formatLPC(ifdef) === ifdef;
+      })());
 check('blank-line RUNS follow the source exactly -- a two-blank separator'
       + ' stays two blanks (call_out.lpc), a single blank stays single;'
       + ' trailing blanks at EOF are still trimmed',

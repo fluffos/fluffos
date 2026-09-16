@@ -348,6 +348,28 @@ export function formatLPC(source, options = {}) {
     if (t.line > 0) lastLine = t.line + (t.text.match(/\n/g) || []).length;
     else sawLineZero = true;
 
+    // A run of `#include`s is one block. The next non-directive token
+    // (`inherit`, a declaration, a function) starts a new section -- put
+    // a blank line between them. Consecutive includes stay packed; a
+    // comment sitting BETWEEN includes stays in the include block.
+    // Idempotent: a blank the source already wrote (or we just inserted)
+    // makes the last emitted line `''`, so this does not fire again.
+    if (t.kind !== 'directive' && lines.length > 0 && cur.length === 0) {
+      const last = lines[lines.length - 1].replace(/\r$/, '');
+      if (last !== '' && /^#\s*include\b/.test(last)) {
+        let nxt = t;
+        if (t.kind === 'comment') {
+          nxt = null;
+          for (let j = idx + 1; j < toks.length; j++) {
+            if (toks[j].kind !== 'comment') { nxt = toks[j]; break; }
+          }
+        }
+        if (nxt && nxt.kind !== 'directive') {
+          lines.push('');
+        }
+      }
+    }
+
     if (t.kind === 'directive') {
       // One token, possibly several physical lines: '\' continuations,
       // a spanning block comment, or a '//' that splices onto the next

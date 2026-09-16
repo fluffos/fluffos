@@ -39,6 +39,9 @@ touch.
   changes program behavior or meaning: string/template/heredoc
   literals, comments, and a trailing comment's line.
 * Preprocessor directives start at **column 0**, never indented.
+* A run of `#include`s is one block. Put **one blank line** after the
+  last include, before `inherit` or any other code. Consecutive
+  includes stay packed; do not sort them.
 
 ### Braces
 

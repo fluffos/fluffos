@@ -1,5 +1,6 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+
 // End-to-end pin for the tools/ffi generator: the emitted binding object
 // (/clone/ffi_genmath, generated from a C header) compiles and its
 // wrappers call real native functions.

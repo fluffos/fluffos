@@ -5,6 +5,7 @@
 // package is compiled in.
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+
 int available() {
   int lib, ok;
   lib = ffi_load("");

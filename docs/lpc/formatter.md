@@ -66,7 +66,9 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 * Empty blocks collapse to `{}`.
 * Trailing `//` comments get at least two spaces before them; a wider
   hand-aligned gap is kept exactly.
-* Preprocessor directives move to column 0.
+* Preprocessor directives move to column 0. A run of `#include`s is
+  kept packed; one blank line is inserted after the last include
+  before `inherit` or other code.
 * A rendered line longer than `printWidth` is split at its outermost
   bracket group (call arguments, array/mapping elements), one element
   per line, recursively as needed.

@@ -1,3 +1,4 @@
 // The only program that actually defines proto_fn().
 #include "proto_decl.h"
+
 int proto_fn() { return 42; }

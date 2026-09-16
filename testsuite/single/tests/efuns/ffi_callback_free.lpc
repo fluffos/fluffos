@@ -1,5 +1,6 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+
 int noop() { return 0; }
 #endif
 void do_tests() {
