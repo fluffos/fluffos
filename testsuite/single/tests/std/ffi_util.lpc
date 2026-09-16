@@ -4,7 +4,6 @@
 // unavailable.
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
-
 inherit "/std/ffi_util";
 
 private int near(float a, float b) { return (a > b ? a - b : b - a) < 1e-9; }

@@ -66,9 +66,9 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 * Empty blocks collapse to `{}`.
 * Trailing `//` comments get at least two spaces before them; a wider
   hand-aligned gap is kept exactly.
-* Preprocessor directives move to column 0. A run of `#include`s is
-  kept packed; one blank line is inserted after the last include
-  before `inherit` or other code.
+* Preprocessor directives move to column 0. `#include` and `inherit`
+  keep the order they were written — includes may sit both before
+  and after inherit. They are not hoisted, sorted, or regrouped.
 * A rendered line longer than `printWidth` is split at its outermost
   bracket group (call arguments, array/mapping elements), one element
   per line, recursively as needed.
@@ -78,6 +78,10 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 The formatter follows the source instead of canonicalizing both ways —
 the opposite of clang-format's full reflow:
 
+* **`#include` / `inherit` order.** A later include is never hoisted
+  above inherit. Typical object headers write `#include <ansi.h>`
+  then `inherit NPC;` then `#include "fight.h"`; that order is
+  left alone.
 * **Your line breaks.** A one-line block stays one line (if it fits);
   a multi-line call or declaration keeps its layout, including whether
   the closing `)` / `");` / `});` is glued to the last element or on

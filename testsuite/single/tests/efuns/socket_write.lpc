@@ -1,6 +1,5 @@
 #ifdef __PACKAGE_SOCKETS__
 #include <socket.h>
-
 void rcb(int fd) {}
 void do_tests() {
   // Writing an unconnected stream socket fails cleanly.

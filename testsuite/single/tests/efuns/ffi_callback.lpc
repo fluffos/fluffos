@@ -1,6 +1,5 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
-
 // qsort comparator implemented in LPC, invoked from C via a libffi
 // closure: a/b are int* addresses, compare the 4-byte ints they point at.
 int cmp(int a_addr, int b_addr) {

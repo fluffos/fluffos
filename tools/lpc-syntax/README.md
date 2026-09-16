@@ -90,10 +90,9 @@ language-common rule so the repo reads as one style:
   comma/semicolon spacing, no space inside parens, trailing `//`
   comments two spaces off the code (`SpacesBeforeTrailingComments: 2`)
   with hand-aligned wider gaps preserved (`AlignTrailingComments` in
-  spirit, without ever moving a comment), directives at column 0, a
-  packed `#include` block followed by one blank line before `inherit`
-  or other code, no
-  include sorting.
+  spirit, without ever moving a comment), directives at column 0, no
+  include sorting or hoisting (`#include` / `inherit` keep source
+  order, including inherit-between-includes).
 * **LPC-specific by design**: `type *name` binds the `*` to the name
   (the opposite of `PointerAlignment: Left` -- LPC's `*` is the array
   marker, and the corpus writes `string *arr` ~5:1); array/mapping

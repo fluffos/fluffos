@@ -1206,21 +1206,24 @@ check('conventions from the final pristine audit: empty for-header clauses'
                formatLPC(brk) === brk &&
                formatLPC(marco) === marco && formatLPC(formatLPC(marco)) === formatLPC(marco);
       })());
-check('a run of #include directives is one block: consecutive includes stay'
-      + ' packed, and a blank line is inserted before the next non-directive'
-      + ' token (`inherit`, a declaration) even when the source omitted it;'
-      + ' an existing blank stays one (not two); a comment between includes'
-      + ' stays inside the include block',
+check('#include and inherit keep source order -- never hoist a later'
+      + ' #include above inherit (the usual mud object header is'
+      + ' #include <ansi.h> / inherit NPC; / #include "fight.h").'
+      + ' Adjacent include+inherit stay adjacent; a blank the source'
+      + ' wrote stays; grouped-includes-then-inherit is left as written'
+      + ' rather than treated as canonical',
       (() => {
-        const glued = '#include <ansi.h>\n#include "fight.h"\ninherit NPC;\nvoid create() {}\n';
-        const want = '#include <ansi.h>\n#include "fight.h"\n\ninherit NPC;\nvoid create() {}\n';
+        const mud = '#include <ansi.h>\ninherit NPC;\n#include "fight.h"\nvoid create() {}\n';
+        const inheritFirst = 'inherit NPC;\n#include "fight.h"\n';
+        const includeFirst = '#include "fight.h"\ninherit NPC;\n';
         const already = '#include <tui.h>\n\ninherit TUI_WIDGET;\n';
-        const between = '#include "a.h"\n// more\n#include "b.h"\ninherit NPC;\n';
-        const betweenWant = '#include "a.h"\n// more\n#include "b.h"\n\ninherit NPC;\n';
+        const packed = '#include <ansi.h>\n#include "fight.h"\ninherit NPC;\n';
         const ifdef = '#ifdef FOO\n#include "x.h"\n#endif\ninherit NPC;\n';
-        return formatLPC(glued) === want && formatLPC(formatLPC(glued)) === want &&
-               formatLPC(already) === already && formatLPC(formatLPC(already)) === already &&
-               formatLPC(between) === betweenWant &&
+        return formatLPC(mud) === mud && formatLPC(formatLPC(mud)) === mud &&
+               formatLPC(inheritFirst) === inheritFirst &&
+               formatLPC(includeFirst) === includeFirst &&
+               formatLPC(already) === already &&
+               formatLPC(packed) === packed &&
                formatLPC(ifdef) === ifdef;
       })());
 check('blank-line RUNS follow the source exactly -- a two-blank separator'
