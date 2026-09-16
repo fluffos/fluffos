@@ -231,7 +231,7 @@ void f_pcre_extract() {
     push_refed_array(&the_null_array);
     return;
   }
-  if (run->rc > (run->ovecsize / 3 - 1)) {
+  if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
     error("Too many substrings.\n");
   }
 
@@ -282,7 +282,7 @@ void f_pcre_replace() {
     return;
   }
 
-  if (run->rc > (run->ovecsize / 3 - 1)) {
+  if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
     error("Too many substrings.\n");
   }
   if ((run->rc - 1) != replacements->size) {
@@ -351,7 +351,7 @@ void f_pcre_replace_callback() {
     return;
   }
 
-  if (run->rc > (run->ovecsize / 3 - 1)) {
+  if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
     error("Too many substrings.\n");
   }
 
