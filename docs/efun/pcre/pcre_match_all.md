@@ -9,7 +9,7 @@ title: pcre / pcre_match_all
 
 ### SYNOPSIS
 
-    mixed pcre_match_all(string input, string pattern, void|int pcre_flags);
+    mixed pcre_match_all(string input, string pattern, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 

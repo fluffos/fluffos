@@ -9,7 +9,7 @@ title: pcre / pcre_replace_callback
 
 ### SYNOPSIS
 
-    string pcre_replace_callback(string, string, string | function, ..., void|int pcre_flags);
+    string pcre_replace_callback(string, string, string | function, ..., void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 

@@ -9,17 +9,16 @@ title: pcre / pcre_assoc
 
 ### SYNOPSIS
 
-    mixed *pcre_assoc(string input, string *patterns, mixed *token_aray, void|mixed default, void|int pcre_flags);
+    mixed *pcre_assoc(string input, string *patterns, mixed *token_aray, void|mixed default, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 
     analog with reg_assoc efun for backwards compatibility reasons but utilizing
-    the PCRE library.
+    the PCRE2 library.
 
-    The optional `pcre_flags` set PCRE options (e.g., `PCRE_I` case-insensitive,
-    `PCRE_M` multiline). Defaults to 0.
+    The optional `pcre_flags` are integer bits from `src/include/pcre_flags.h`
+    or a mapping of named PCRE2 options (see `pcre_config()`). Defaults to 0.
 
 ### SEE ALSO
 
-    reg_assoc(3)
-sssss
+    pcre_config(3), reg_assoc(3)

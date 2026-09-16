@@ -2439,6 +2439,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/pcre/pcre_config",
+            "key": "efun/pcre/pcre_config",
+            "label": "pcre_config"
+          },
+          {
+            "type": "doc",
             "id": "efun/pcre/pcre_extract",
             "key": "efun/pcre/pcre_extract",
             "label": "pcre_extract"

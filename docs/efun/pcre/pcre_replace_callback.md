@@ -11,11 +11,11 @@ title: pcre / pcre_replace_callback
 
     string pcre_replace_callback(string subject, string pattern,
                                  function fun,
-                                 mixed extra..., void|int pcre_flags);
+                                 mixed extra..., void|int|mapping pcre_flags);
 
     string pcre_replace_callback(string subject, string pattern,
                                  string fun, object|string ob,
-                                 mixed extra..., void|int pcre_flags);
+                                 mixed extra..., void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 
@@ -45,20 +45,15 @@ title: pcre / pcre_replace_callback
     If `pattern` does not match `subject`, the callback is not
     invoked and `subject` is returned unchanged.
 
-    The optional `pcre_flags` argument sets PCRE options:
-
-      PCRE_I   case-insensitive matching
-      PCRE_M   multiline (^ and $ match at line breaks)
-      PCRE_S   dotall (`.` also matches newline)
-      PCRE_U   ungreedy quantifiers
-      PCRE_X   extended (ignore unescaped whitespace and `#` comments)
-      PCRE_A   anchored matching
+    The optional `pcre_flags` argument is integer bits from
+    `src/include/pcre_flags.h` or a mapping of named PCRE2 options (see
+    `pcre_config()`). UTF-8, Unicode properties, and JIT are on by default.
 
     Flags may be combined with `|`. Defaults to 0. When supplied,
-    `pcre_flags` must be the final argument and an int. Because a
-    trailing int is always consumed as `pcre_flags`, an extra
-    argument intended for the callback must not be a bare int at the
-    tail of the argument list.
+    `pcre_flags` must be the final argument (int or mapping). Because a
+    trailing int or mapping is always consumed as `pcre_flags`, an extra
+    argument intended for the callback must not be a bare int or mapping
+    at the tail of the argument list.
 
 ### EXAMPLES
 
@@ -96,5 +91,5 @@ title: pcre / pcre_replace_callback
 
 ### SEE ALSO
 
-    pcre_assoc(3), pcre_cache(3), pcre_extract(3), pcre_match(3),
+    pcre_assoc(3), pcre_cache(3), pcre_config(3), pcre_extract(3), pcre_match(3),
     pcre_match_all(3), pcre_replace(3), pcre_version(3)

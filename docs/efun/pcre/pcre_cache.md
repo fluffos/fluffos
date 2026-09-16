@@ -17,4 +17,4 @@ title: pcre / pcre_cache
 
 ### SEE ALSO
 
-    pcre_extract(3), pcre_version(3), pcre_replace(3)
+    pcre_config(3), pcre_extract(3), pcre_version(3), pcre_replace(3)

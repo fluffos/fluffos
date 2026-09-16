@@ -13,5 +13,9 @@ void do_tests() {
   ASSERT_EQ(({ "dog" }), pcre_match(({ "cat", "dog", "car" }), "^ca", 2));
   // Array form with all 4 arguments (flag + pcre_flags).
   ASSERT_EQ(({ "cat", "car" }), pcre_match(({ "cat", "dog", "car" }), "^ca", 0, 0));
+  ASSERT_EQ(
+    ({ "cat", "car" }),
+    pcre_match(({ "cat", "dog", "car" }), "^CA", 0, ([ "caseless": 1 ]))
+  );
 }
 #endif

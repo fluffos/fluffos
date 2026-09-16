@@ -1,0 +1,32 @@
+#ifdef __PACKAGE_PCRE__
+void do_tests() {
+  int no_ucp = 1 << 22;  // PCRE_NO_UCP
+  mapping cfg;
+
+  // UCP is on by default: \d matches Nd, \w matches letters, \p{...} works.
+  ASSERT(pcre_match("３", "\\d"));
+  ASSERT(pcre_match("你", "\\p{Han}"));
+  ASSERT(pcre_match("café", "\\w+$"));
+  ASSERT(!pcre_match("３", "\\d", no_ucp));
+  ASSERT(!pcre_match("３", "\\d", ([ "no_ucp": 1 ])));
+  ASSERT(pcre_match("abc", "ABC", ([ "caseless": 1 ])));
+  ASSERT(!pcre_match("abc", "ABC", ([ "caseless": 0 ])));
+  ASSERT(pcre_match("zabc", "abc"));
+  ASSERT(!pcre_match("zabc", "abc", ([ "anchored": 1 ])));
+  ASSERT(pcre_match("ab", "abcd", ([ "partial": 1 ])));
+
+  ASSERT(pcre_match(pcre_version(), "^[0-9]+\\.[0-9]+"));
+
+  cfg = pcre_config();
+  ASSERT(mapp(cfg));
+  ASSERT(pcre_match(cfg["version"], "^[0-9]+\\.[0-9]+"));
+  ASSERT(undefinedp(cfg["unicode"]) || cfg["unicode"] == 1);
+  ASSERT(member_array("jit", keys(cfg)) != -1);
+  ASSERT(member_array("match_limit", keys(cfg)) != -1);
+
+  // Mapping flags and the leftover int bits can be mixed via "flags".
+  ASSERT_EQ(({ "HELLO" }), pcre_extract("HELLO", "(hello)", 0, ([ "flags": 1 << 16 ])));
+
+  ASSERT(catch(pcre_match("a", "a", ([ "no_such_option": 1 ]))));
+}
+#endif

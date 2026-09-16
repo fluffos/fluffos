@@ -1,13 +1,10 @@
-/* OVECCOUNT is the return vector of matches.
+/* OVECCOUNT is the return vector of matches (PCRE2: two slots per group).
    ovector[0] = start of entire match
    ovector[1] = end of entire match
    ovector[2] = start of first capture group
    ovector[3] = end of first capture group
    ovector[4] = start of second capture group
      etc
-
-The maximum number of capturing groups is:
-   (n+1)*3
 */
 #ifndef PACKAGS_PCRE_H
 #define PACKAGS_PCRE_H
@@ -19,6 +16,7 @@ The maximum number of capturing groups is:
 
 typedef struct {
   pcre2_code* re;
+  pcre2_match_context* mcontext;
   char error[256];
   const char* pattern;
   const char* subject;
@@ -28,18 +26,26 @@ typedef struct {
   int find_all;
   uint32_t namecount;
   uint32_t name_entry_size;
-  int compile_flags;
-  int exec_flags;
+  uint32_t compile_flags;
+  uint32_t exec_flags;
+  uint32_t substitute_flags;
+  uint32_t match_limit;
+  uint32_t depth_limit;
+  uint32_t heap_limit;
+  PCRE2_SIZE offset_limit;
+  int has_match_limit;
+  int has_depth_limit;
+  int has_heap_limit;
+  int has_offset_limit;
   int* ovector;
   int ovecsize;
   int rc;
-  /* EXTRA */
 } pcre_t;
 
 struct pcre_cache_bucket_t {
   pcre2_code* compiled_pattern;  // value1
   const char* pattern;           // key
-  int compile_flags;             // compile options used
+  uint32_t compile_flags;        // compile options used
   int size;                      // size in bytes
   struct pcre_cache_bucket_t* next;
 };
