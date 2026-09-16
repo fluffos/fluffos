@@ -10,6 +10,27 @@ import { tokenize, skipStringSpan, skipCharSpan } from './tokenizer.mjs';
 // language-common rule.
 export const DEFAULT_PRINT_WIDTH = 100;
 export const DEFAULT_INDENT_SIZE = 2;
+
+// Non-whitespace token sequence. Formatting may change spacing and
+// line breaks, never this order -- `#include` / `inherit` / any other
+// statement staying put is the same rule. Directive tokens compare
+// with trailing blanks stripped (the formatter itself strips them).
+export function tokenSequence(source) {
+  return tokenize(source).filter((t) => t.kind !== 'whitespace')
+    .map((t) => t.kind + ':' + (t.kind === 'directive' ? t.text.replace(/[ \t]+$/g, '') : t.text));
+}
+
+function assertSameTokenOrder(source, formatted) {
+  const before = tokenSequence(source);
+  const after = tokenSequence(formatted);
+  if (before.length === after.length && before.every((t, i) => t === after[i])) return;
+  let i = 0;
+  while (i < before.length && i < after.length && before[i] === after[i]) i++;
+  throw new Error(
+    'formatter reordered tokens at index ' + i +
+    ' (statement order must be preserved): ' +
+    (before[i] || '<eof>') + ' => ' + (after[i] || '<eof>'));
+}
 // Sanity cap on how many indent levels the source-line-break-preservation
 // mechanism (below) will stack up. Real code never gets close to this;
 // it exists for adversarial input (e.g. a "crasher" test nesting 100+
@@ -349,6 +370,9 @@ export function formatLPC(source, options = {}) {
     else sawLineZero = true;
 
     if (t.kind === 'directive') {
+      // Emit in source order. Do not hoist or regroup `#include` past
+      // `inherit` -- mud objects often write `#include <ansi.h>` then
+      // `inherit NPC;` then `#include "fight.h"`.
       // One token, possibly several physical lines: '\' continuations,
       // a spanning block comment, or a '//' that splices onto the next
       // line (C phase 2). Emitted verbatim at column 0; the tokenizer
@@ -766,6 +790,7 @@ export function formatLPC(source, options = {}) {
   if (crlfCount > 0 && bareLfCount === 0) {
     joined = joined.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
   }
+  assertSameTokenOrder(source, joined);
   return joined;
 }
 

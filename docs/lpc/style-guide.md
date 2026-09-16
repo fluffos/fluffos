@@ -39,6 +39,10 @@ touch.
   changes program behavior or meaning: string/template/heredoc
   literals, comments, and a trailing comment's line.
 * Preprocessor directives start at **column 0**, never indented.
+* `#include` and `inherit` keep written order. A later include is
+  not hoisted above inherit — the usual object header is
+  `#include <ansi.h>` then `inherit NPC;` then `#include "fight.h"`.
+  Do not sort or regroup includes.
 
 ### Braces
 

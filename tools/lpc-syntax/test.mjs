@@ -3,9 +3,9 @@
 // and the generated VS Code assets directly.
 import { tokenize, grammar } from './tokenizer.mjs';
 import { highlightLPC } from './highlight.mjs';
-import { formatLPC, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
+import { formatLPC, tokenSequence, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
 import { lintLPC } from './lint.mjs';
-import { readFileSync as readF } from 'node:fs';
+import { readFileSync as readF, readdirSync } from 'node:fs';
 import { fileURLToPath as f2p } from 'node:url';
 import { dirname as dirN, join as joinP } from 'node:path';
 import { createRequire } from 'node:module';
@@ -1205,6 +1205,103 @@ check('conventions from the final pristine audit: empty for-header clauses'
                formatLPC('void f() { x = $(width); }\n').includes('$(width)') &&
                formatLPC(brk) === brk &&
                formatLPC(marco) === marco && formatLPC(formatLPC(marco)) === formatLPC(marco);
+      })());
+// Statement / token order is an invariant: formatLPC may respace and
+// reindent, never move a statement past another. Same sequence used
+// by format-corpus.mjs and by formatLPC's own post-pass gate.
+function sameTokenOrder(src) {
+  const out = formatLPC(src);
+  const a = tokenSequence(src);
+  const b = tokenSequence(out);
+  return a.length === b.length && a.every((t, i) => t === b[i]);
+}
+function topLevelStatements(src) {
+  const toks = tokenize(src).filter((t) => t.kind !== 'whitespace' && t.kind !== 'comment');
+  const out = [];
+  let depth = 0;
+  let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    out.push(buf.map((t) => t.text).join(' ').replace(/ ;$/, ''));
+    buf = [];
+  };
+  for (const t of toks) {
+    if (depth === 0 && t.kind === 'directive') {
+      flush();
+      out.push(t.text.replace(/[ \t]+$/g, ''));
+      continue;
+    }
+    buf.push(t);
+    if (t.text === '{' || t.text === '(' || t.text === '[' || t.text === '(:') depth++;
+    else if (t.text === '}' || t.text === ')' || t.text === ']' || t.text === ':)') {
+      depth = Math.max(0, depth - 1);
+    }
+    if (depth === 0 && (t.text === ';' || t.text === '}')) flush();
+  }
+  flush();
+  return out;
+}
+check('statement order is invariant: #include / inherit / declarations'
+      + ' stay in source order through format (the 1dai.c header is'
+      + ' #include <ansi.h> / inherit NPC; / #include "fight.h" -- a'
+      + ' later include is never hoisted above inherit). Messy'
+      + ' whitespace still keeps the same token sequence; every'
+      + ' permutation below is also a formatLPC fixed point after one'
+      + ' pass',
+      (() => {
+        const cases = [
+          '#include <ansi.h>\ninherit NPC;\n#include "fight.h"\nvoid create() {}\n',
+          'inherit NPC;\n#include "fight.h"\n',
+          '#include "fight.h"\ninherit NPC;\n',
+          '#include    <ansi.h>\n  inherit   NPC ;\n#include"fight.h"\nvoid  create(){}\n',
+          '#include <ansi.h>\ninherit F_DBASE;\ninherit NPC;\n#include "fight.h"\n#include "skill.h"\n',
+          'private inherit FOO;\n#include "bar.h"\npublic inherit BAZ;\n',
+          '#include <ansi.h>\n#include "fight.h"\ninherit NPC;\nvoid create() {}\n',
+          '#include <tui.h>\n\ninherit TUI_WIDGET;\n',
+          '#ifdef FOO\n#include "x.h"\n#endif\ninherit NPC;\n#include "y.h"\n',
+          'int x;\ninherit NPC;\nint y;\n',
+          'void f() {\n  a &= 3; ASSERT_EQ(2, a);\n  b();\n}\n',
+        ];
+        const mud = cases[0];
+        const messy = cases[3];
+        return cases.every((src) => sameTokenOrder(src) &&
+               JSON.stringify(topLevelStatements(src)) ===
+               JSON.stringify(topLevelStatements(formatLPC(src)))) &&
+               formatLPC(mud) === mud &&
+               topLevelStatements(formatLPC(messy)).join('|') ===
+               '#include    <ansi.h>|inherit NPC|#include"fight.h"|void create ( ) { }';
+      })());
+check('statement order is invariant across the testsuite corpus'
+      + ' (every *.lpc / *.c that format.sh feeds the formatter keeps'
+      + ' the same non-whitespace token sequence after formatLPC)',
+      (() => {
+        const root = joinP(dirN(f2p(import.meta.url)), '..', '..', 'testsuite');
+        const skip = new Set([
+          'single/tests/compiler/fail/bad_utf8_string.lpc',
+          'single/tests/compiler/fail/bad_utf8_arrayblock.lpc',
+          'single/tests/compiler/fail/eof_in_string.lpc',
+          'single/tests/compiler/fail/eof_in_comment.lpc',
+          'single/tests/compiler/fail/bad_at_block.lpc',
+        ]);
+        const files = [];
+        const walk = (dir, rel = '') => {
+          for (const ent of readdirSync(dir, { withFileTypes: true })) {
+            const r = rel ? rel + '/' + ent.name : ent.name;
+            if (ent.isDirectory()) walk(joinP(dir, ent.name), r);
+            else if (/\.(lpc|c)$/.test(ent.name) && !skip.has(r)) files.push(joinP(dir, ent.name));
+          }
+        };
+        walk(root);
+        const bad = [];
+        for (const f of files) {
+          const src = readF(f, 'utf8');
+          try {
+            if (!sameTokenOrder(src)) bad.push(f);
+          } catch (e) {
+            bad.push(f + ' (' + e.message + ')');
+          }
+        }
+        return files.length >= 900 && bad.length === 0;
       })());
 check('blank-line RUNS follow the source exactly -- a two-blank separator'
       + ' stays two blanks (call_out.lpc), a single blank stays single;'
