@@ -142,10 +142,14 @@ FluffOS 支持多个目标平台。请根据您的部署目标选择对应的方
 ```bash
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
   pkg-config libffi-dev libdw-dev libbz2-dev
+sudo apt install -y libpcre3-dev   # PCRE 8.x；不是 libpcre2-dev
 ```
+
+> [!NOTE]
+> `libpcre3-dev` 是经典 PCRE 8.x（`pcre.h`）。Debian 13 与 Ubuntu 26.04 已移除；Ubuntu 24.04 在 **universe**。**不要**用 `libpcre2-dev` 顶替。apt 找不到该包时：`cmake .. -DPACKAGE_PCRE=OFF`，或从源码编译 PCRE 8.x，见 [docs/build.mdx](docs/build.mdx)。
 
 > [!NOTE]
 > 仅当你修改 LPC 词法分析器（`src/compiler/internal/lexer.l`）时才需要 `flex`；否则构建将使用预先提交的生成文件。

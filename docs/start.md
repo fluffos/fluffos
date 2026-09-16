@@ -62,9 +62,10 @@ Ubuntu / Debian / WSL (repo on the Linux filesystem, not `/mnt/c`):
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpq-dev libsqlite3-dev \
   libssl-dev libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
+sudo apt install -y libpcre3-dev || echo "no libpcre3-dev; add -DPACKAGE_PCRE=OFF (not libpcre2-dev)"
 
 git clone https://github.com/fluffos/fluffos.git
 cd fluffos
@@ -72,6 +73,10 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 make -j"$(nproc)" install
 ```
+
+If `libpcre3-dev` has no installation candidate (Debian 13+, Ubuntu 26.04+, or
+Ubuntu 24.04 without universe), do **not** install `libpcre2-dev`. Either add
+`-DPACKAGE_PCRE=OFF` to cmake or follow [Build from Source](build).
 
 Binary: `build/bin/driver`. Other platforms: [build guide](build).
 Or `docker pull ghcr.io/fluffos/fluffos:master`.

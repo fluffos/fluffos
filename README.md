@@ -144,10 +144,14 @@ This is the primary supported platform (Ubuntu 24.04 LTS).
 ```bash
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
   pkg-config libffi-dev libdw-dev libbz2-dev
+sudo apt install -y libpcre3-dev   # PCRE 8.x; not libpcre2-dev
 ```
+
+> [!NOTE]
+> `libpcre3-dev` is classic PCRE 8.x (`pcre.h`). Debian 13 and Ubuntu 26.04 removed it; Ubuntu 24.04 keeps it in **universe**. Do **not** substitute `libpcre2-dev`. If apt cannot find the package, either `cmake .. -DPACKAGE_PCRE=OFF` or build PCRE 8.x from source — see [docs/build.mdx](docs/build.mdx).
 
 > [!NOTE]
 > `flex` is only needed if you modify the LPC lexer (`src/compiler/internal/lexer.l`). Otherwise the build uses the pre-committed generated lexer.

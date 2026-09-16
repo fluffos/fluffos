@@ -55,10 +55,28 @@ This is the best Linux distro to build & run FluffOS; support for other distros 
 ```shell
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
+# PCRE 8.x. Debian named this libpcre3-dev; libpcre2-dev is a different library.
+sudo apt install -y libpcre3-dev
 ```
+
+:::note[PCRE 8.x — `libpcre3-dev`, not `libpcre2-dev`]
+FluffOS links classic PCRE 8.x (`pcre.h` / `libpcre`). The Debian/Ubuntu package
+for that is **`libpcre3-dev`**. **`libpcre2-dev` will not satisfy CMake.**
+
+| Distro | `libpcre3-dev` |
+|--------|----------------|
+| Ubuntu 22.04 | yes (main) |
+| Ubuntu 24.04 / 25.10 | yes, in **universe** (`sudo add-apt-repository universe` if apt says it has no installation candidate) |
+| Debian 12 | yes |
+| Debian 13+ / Ubuntu 26.04+ | **removed** |
+
+If the second `apt install` fails: either configure with `-DPACKAGE_PCRE=OFF`
+(drops `pcre_*` efuns) or [build PCRE 8.x from source](#pcre-8x-from-source).
+Alpine is `pcre-dev`; Homebrew and MSYS2 are still `pcre` (not `pcre2`).
+:::
 
 :::note
 `flex` is only needed if you modify the LPC lexer (`src/compiler/internal/lexer.l`). Otherwise the
@@ -304,7 +322,27 @@ Common package options:
   - `=2` enables SQLite3 API version 2 (recommended, includes newer features)
 - `PACKAGE_DB_MYSQL=""`: disable MySQL (or set to enable)
 - `PACKAGE_CRYPTO=OFF`: disable the crypto package (typical on Windows)
-- `PACKAGE_PCRE=OFF`: disable the PCRE package
+- `PACKAGE_PCRE=OFF`: disable the PCRE package (required on Debian 13+ / Ubuntu
+  26.04+ unless you [build PCRE 8.x from source](#pcre-8x-from-source); do not
+  install `libpcre2-dev` as a substitute)
+
+### PCRE 8.x from source
+
+Debian 13 and Ubuntu 26.04 dropped `libpcre3-dev`. The driver still needs PCRE
+8.x for `pcre_*` efuns (`FindPCRE` looks for `pcre.h` and `libpcre`):
+
+```shell
+curl -fsSLO http://archive.ubuntu.com/ubuntu/pool/main/p/pcre3/pcre3_8.39.orig.tar.bz2
+tar xjf pcre3_8.39.orig.tar.bz2
+cd pcre-8.39
+./configure --prefix=/usr/local
+make -j"$(nproc)"
+sudo make install
+sudo ldconfig
+```
+
+Then pass `-DCMAKE_PREFIX_PATH=/usr/local` to CMake if it does not pick up
+`/usr/local` on its own.
 
 ### Build types
 

@@ -46,9 +46,10 @@ Ubuntu / Debian / WSL（仓库放在 Linux 文件系统上，不要放 `/mnt/c`�
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpq-dev libsqlite3-dev \
   libssl-dev libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
+sudo apt install -y libpcre3-dev || echo "没有 libpcre3-dev；给 cmake 加 -DPACKAGE_PCRE=OFF（不要装 libpcre2-dev）"
 
 git clone https://github.com/fluffos/fluffos.git
 cd fluffos
@@ -56,6 +57,8 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 make -j"$(nproc)" install
 ```
+
+若 apt 提示没有 `libpcre3-dev`（Debian 13+、Ubuntu 26.04+，或 24.04 未开 universe），**不要**装 `libpcre2-dev`。给 cmake 加 `-DPACKAGE_PCRE=OFF`，或看 [构建指南](build)。
 
 二进制：`build/bin/driver`。其他平台见 [构建指南](build)。
 也可 `docker pull ghcr.io/fluffos/fluffos:master`。

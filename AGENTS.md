@@ -130,12 +130,14 @@ Don't rediscover the dependency list one CMake configure failure at a time. CI's
 
 ```bash
 sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-  bison flex libicu-dev libssl-dev zlib1g-dev libpcre3-dev \
+  bison flex libicu-dev libssl-dev zlib1g-dev \
   libjemalloc-dev libgtest-dev libffi-dev libmysqlclient-dev
+sudo apt-get install -y libpcre3-dev || echo "no libpcre3-dev; use -DPACKAGE_PCRE=OFF (not libpcre2-dev)"
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo   # or Debug
 ninja -C build driver
 ```
 
+* **`libpcre3-dev` is PCRE 8.x** (`pcre.h` / `libpcre`). `libpcre2-dev` is a different library and will not satisfy `FindPCRE`. Debian 13 and Ubuntu 26.04 removed the package; Ubuntu 24.04 keeps it in universe. If apt has no candidate: `-DPACKAGE_PCRE=OFF` or build PCRE 8.39 from the Ubuntu archive tarball (same URL as the WASM note below).
 * **The binary is `build/src/driver`** — there is no `build/bin/`.
 * **No MySQL client dev package on the host?** Configure with `-DPACKAGE_DB=OFF` instead of hunting for one (`FindMySQL` hard-fails the configure otherwise; Debian's metapackage name is `default-libmysqlclient-dev`). `libpq-dev`/`libsqlite3-dev` are only needed for the non-default DB backends.
 * **libevent is vendored** (`src/thirdparty/libevent`) — no system libevent needed. GTest is optional: configure proceeds without it, you just lose the unit-test targets.

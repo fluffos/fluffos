@@ -145,9 +145,10 @@ valgrind --leak-check=full ./build/bin/driver config.test
 ### Ubuntu/Debian
 ```bash
 # 安装依赖
-sudo apt install build-essential bison libmysqlclient-dev libpcre3-dev \
+sudo apt install build-essential bison libmysqlclient-dev \
   libpq-dev libsqlite3-dev libssl-dev libz-dev libjemalloc-dev libicu-dev \
   pkg-config libffi-dev
+sudo apt install libpcre3-dev   # PCRE 8.x；Debian 13+ / Ubuntu 26.04+ 已移除，勿用 libpcre2-dev 顶替
 ```
 
 ### macOS
