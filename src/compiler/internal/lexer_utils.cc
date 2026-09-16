@@ -2214,6 +2214,10 @@ void init_include_path() {
           current_file, elem);
       return;
     }
+    /* Kept exactly as the master spelled it: inc_open() hands each candidate
+     * built from it to valid_read(), and a mudlib may key its include policy
+     * on that spelling. The name recorded for the program is normalized
+     * there instead. */
     path.emplace_back(elem);
   }
   inc_path = std::move(path);
@@ -2246,7 +2250,12 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
   for (const auto& path : inc_path) {
     buf.clear();
     buf.append(path);
-    buf += '/';
+    /* A mudlib that spells its include dirs with a trailing slash
+     * ("/std/object/include/") is not an error; joining blindly just made
+     * "/std/object/include//header.h". */
+    if (!buf.empty() && buf.back() != '/') {
+      buf += '/';
+    }
     buf.append(name);
     const char* tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
     if (tmp) {
@@ -2255,6 +2264,13 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
 #ifdef _WIN32
         _setmode(fd, _O_BINARY);
 #endif
+        /* The resolved name becomes current_file and, through add_slash(),
+         * an include_list() entry, so it takes the root-relative form a
+         * configured include dir produces. A master::get_include_path()
+         * directory is spelled absolute ("/std/include"), and keeping its
+         * slash came back out of add_slash() as "//std/include/foo.h", a
+         * path stat() cannot open. */
+        buf.erase(0, buf.find_first_not_of('/'));
         return {fd, buf};
       }
     }
