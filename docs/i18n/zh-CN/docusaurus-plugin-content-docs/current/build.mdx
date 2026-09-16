@@ -32,29 +32,15 @@ CI 覆盖的配置见仓库 `.github/workflows/ci.yml`：Ubuntu 24.04（GCC / Cl
 ```shell
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
-# PCRE 8.x。Debian 包名是 libpcre3-dev；libpcre2-dev 是另一个库。
-sudo apt install -y libpcre3-dev
 
 git clone https://github.com/fluffos/fluffos.git
 cd fluffos
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 make -j "$(nproc)" install
-```
-
-`libpcre3-dev` 是经典 PCRE 8.x（`pcre.h` / `libpcre`）。**不要装 `libpcre2-dev` 顶替。** Ubuntu 24.04 在 **universe**（`sudo add-apt-repository universe`）。Debian 13+ / Ubuntu 26.04+ 已移除：`cmake .. -DPACKAGE_PCRE=OFF`（会去掉 `pcre_*` efun），或从源码编 PCRE 8.x：
-
-```shell
-curl -fsSLO http://archive.ubuntu.com/ubuntu/pool/main/p/pcre3/pcre3_8.39.orig.tar.bz2
-tar xjf pcre3_8.39.orig.tar.bz2
-cd pcre-8.39
-./configure --prefix=/usr/local
-make -j"$(nproc)"
-sudo make install
-sudo ldconfig
 ```
 
 二进制在 `build/bin/`。WSL 下仓库必须在 Linux 文件系统（`~/fluffos`），不要 `/mnt/c/...`。
@@ -65,7 +51,7 @@ sudo ldconfig
 <TabItem value="macos" label="macOS">
 
 ```shell
-brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
+brew install cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c \
   mysql sqlite3 googletest libffi
 
 git clone https://github.com/fluffos/fluffos.git
@@ -83,7 +69,7 @@ make -j "$(sysctl -n hw.ncpu)" install
 ```shell
 pacman --noconfirm -S --needed \
   git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
+  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre2 \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
   mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \

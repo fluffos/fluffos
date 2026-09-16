@@ -70,8 +70,9 @@
 
 // Prototype declarations
 static void pcre_free_memory(pcre_t* p);
-static pcre* pcre_local_compile(pcre_t* p);
+static pcre2_code* pcre_local_compile(pcre_t* p);
 static int pcre_local_exec(pcre_t* p);
+static int pcre_exec_at(pcre_t* p, size_t offset, int extra_flags);
 static int pcre_magic(pcre_t* p);
 static int pcre_query_match(pcre_t* p);
 static inline int compute_compile_options(int flags);
@@ -83,10 +84,10 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
 static char* pcre_get_replace(pcre_t* run, array_t* replacements);
 static array_t* pcre_get_substrings(pcre_t* run, bool include_names);
 // Caching functions
-static int pcre_cache_pattern(struct pcre_cache_t* table, pcre* cpat, const char* pattern,
+static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const char* pattern,
                               int compile_flags);
-static pcre* pcre_get_cached_pattern(struct pcre_cache_t* table, const char* pattern,
-                                     int compile_flags);
+static pcre2_code* pcre_get_cached_pattern(struct pcre_cache_t* table, const char* pattern,
+                                           int compile_flags);
 static mapping_t* pcre_get_cache();
 int pcrecachesize = 0;
 // Globals
@@ -94,9 +95,12 @@ struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
 void f_pcre_version() {
-  char* version;
-  version = (char*)pcre_version();
-  push_constant_string(version);
+  char version[80];
+  if (pcre2_config(PCRE2_CONFIG_VERSION, version) < 0) {
+    push_constant_string("unknown");
+    return;
+  }
+  copy_and_push_string(version);
 }
 
 void f_pcre_match() {
@@ -408,49 +412,71 @@ void f_pcre_cache() {
 
 // Internal functions utilized by the efuns
 static inline int compute_compile_options(int flags) {
-  int opts = PCRE_UTF8;
-  if (flags & PCRE_I) opts |= PCRE_CASELESS;
-  if (flags & PCRE_M) opts |= PCRE_MULTILINE;
-  if (flags & PCRE_S) opts |= PCRE_DOTALL;
-  if (flags & PCRE_U) opts |= PCRE_UNGREEDY;
-  if (flags & PCRE_X) opts |= PCRE_EXTENDED;
+  int opts = PCRE2_UTF;
+  if (flags & PCRE_I) opts |= PCRE2_CASELESS;
+  if (flags & PCRE_M) opts |= PCRE2_MULTILINE;
+  if (flags & PCRE_S) opts |= PCRE2_DOTALL;
+  if (flags & PCRE_U) opts |= PCRE2_UNGREEDY;
+  if (flags & PCRE_X) opts |= PCRE2_EXTENDED;
   return opts;
 }
 
 static inline int compute_exec_options(int flags) {
   int opts = 0;
-  if (flags & PCRE_A) opts |= PCRE_ANCHORED;
+  if (flags & PCRE_A) opts |= PCRE2_ANCHORED;
   return opts;
 }
 
-static pcre* pcre_local_compile(pcre_t* p) {
-  p->re = pcre_compile(p->pattern, p->compile_flags, &p->error, &p->erroffset, nullptr);
-
+static pcre2_code* pcre_local_compile(pcre_t* p) {
+  int errorcode = 0;
+  PCRE2_SIZE erroffset = 0;
+  p->re = pcre2_compile((PCRE2_SPTR)p->pattern, PCRE2_ZERO_TERMINATED, p->compile_flags, &errorcode,
+                        &erroffset, nullptr);
+  p->erroffset = static_cast<int>(erroffset);
+  if (p->re == nullptr) {
+    pcre2_get_error_message(errorcode, reinterpret_cast<PCRE2_UCHAR*>(p->error), sizeof(p->error));
+  } else {
+    p->error[0] = '\0';
+  }
   return p->re;
 }
 
-static int pcre_local_exec(pcre_t* p) {
-  int capture_count = 0;
-  pcre_fullinfo(p->re, nullptr, PCRE_INFO_CAPTURECOUNT, &capture_count);
-  capture_count += 2;
-  capture_count *= 3;
-  if (p->ovector) {
-    FREE(p->ovector);
+static int pcre_exec_at(pcre_t* p, size_t offset, int extra_flags) {
+  pcre2_match_data* md = pcre2_match_data_create_from_pattern(p->re, nullptr);
+  if (md == nullptr) {
+    return PCRE2_ERROR_NOMEMORY;
   }
-  p->ovector = (int*)DCALLOC(capture_count + 1, sizeof(int), TAG_TEMPORARY,
-                             "pcre_local_exec");  // too much, but who cares
-  p->ovecsize = capture_count;
+  int rc = pcre2_match(p->re, (PCRE2_SPTR)p->subject, p->s_length, offset,
+                       p->exec_flags | extra_flags, md, nullptr);
+  if (rc >= 0) {
+    PCRE2_SIZE* ov = pcre2_get_ovector_pointer(md);
+    uint32_t n = pcre2_get_ovector_count(md);
+    int need = static_cast<int>(n * 2);
+    if (p->ovector == nullptr || p->ovecsize < need) {
+      if (p->ovector) {
+        FREE(p->ovector);
+      }
+      p->ovector = (int*)DCALLOC(need, sizeof(int), TAG_TEMPORARY, "pcre_exec_at");
+      p->ovecsize = need;
+    }
+    for (uint32_t i = 0; i < n; i++) {
+      p->ovector[2 * i] = static_cast<int>(ov[2 * i]);
+      p->ovector[2 * i + 1] = static_cast<int>(ov[2 * i + 1]);
+    }
+  }
+  pcre2_match_data_free(md);
+  return rc;
+}
 
+static int pcre_local_exec(pcre_t* p) {
   p->namecount = 0;
   p->name_entry_size = 0;
   p->name_table = nullptr;
-  pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMECOUNT, &p->namecount);
-  pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMEENTRYSIZE, &p->name_entry_size);
-  pcre_fullinfo(p->re, nullptr, PCRE_INFO_NAMETABLE, &p->name_table);
+  pcre2_pattern_info(p->re, PCRE2_INFO_NAMECOUNT, &p->namecount);
+  pcre2_pattern_info(p->re, PCRE2_INFO_NAMEENTRYSIZE, &p->name_entry_size);
+  pcre2_pattern_info(p->re, PCRE2_INFO_NAMETABLE, &p->name_table);
 
-  p->rc = pcre_exec(p->re, nullptr, p->subject, p->s_length, 0, p->exec_flags, p->ovector,
-                    capture_count);
-
+  p->rc = pcre_exec_at(p, 0, 0);
   return p->rc;
 }
 
@@ -503,27 +529,13 @@ auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
-  {
-    int size = 0;
-    pcre_fullinfo(run->re, nullptr, PCRE_INFO_CAPTURECOUNT, &size);
-    size += 2;
-    size *= 3;
-    if (run->ovector) {
-      FREE(run->ovector);
-    }
-    run->ovector = (int*)DCALLOC(size + 1, sizeof(int), TAG_TEMPORARY,
-                                 "pcre_local_exec");  // too much, but who cares
-    run->ovecsize = size;
-  }
-
   std::vector<std::vector<svalue_t>> matches;
 
   int rc = 0;
-  int offset = 0;
+  size_t offset = 0;
   int retry_flags = 0;
   while (offset < run->s_length) {
-    rc = pcre_exec(run->re, nullptr, run->subject, run->s_length, offset,
-                   run->exec_flags | retry_flags, run->ovector, run->ovecsize);
+    rc = pcre_exec_at(run, offset, retry_flags);
     if (rc < 0) {
       if (retry_flags == 0) {
         break;
@@ -555,8 +567,8 @@ auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern
     matches.push_back(match);
     // An empty match would rescan the same offset forever; require the next
     // match at this position to be non-empty (the standard pcredemo idiom).
-    retry_flags = (run->ovector[1] == run->ovector[0]) ? (PCRE_NOTEMPTY_ATSTART | PCRE_ANCHORED) : 0;
-    offset = run->ovector[1];
+    retry_flags = (run->ovector[1] == run->ovector[0]) ? (PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED) : 0;
+    offset = static_cast<size_t>(run->ovector[1]);
   }
 
   return matches;
@@ -933,7 +945,7 @@ static array_t* pcre_get_substrings(pcre_t* run, bool include_names) {
         svalue_t key;
         key.type = T_STRING;
         key.subtype = STRING_SHARED;
-        key.u.string = make_shared_string(reinterpret_cast<char*>(entry + 2));
+        key.u.string = make_shared_string(reinterpret_cast<const char*>(entry + 2));
 
         svalue_t* slot = find_for_insert(map, &key, 1);
         free_string(key.u.string);
@@ -1050,20 +1062,19 @@ static void pcre_free_memory(pcre_t* p) {
 
 // Caching functions, add new ones at the front of the bucket so we find them
 // faster
-static int pcre_cache_pattern(struct pcre_cache_t* table, pcre* cpat, const char* pattern,
+static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const char* pattern,
                               int compile_flags)  // must be shared string
 {
   const auto* shared_pattern = make_shared_string(pattern);
   unsigned int const bucket = (HASH(BLOCK(shared_pattern)) ^ compile_flags) % PCRE_CACHE_SIZE;
-  size_t sz;
+  PCRE2_SIZE sz = 0;
   struct pcre_cache_bucket_t* tmp;
   struct pcre_cache_bucket_t* node;
   int full;
 
   tmp = table->buckets[bucket];
 
-  // Calculate size of compiled pattern, require size_t!
-  pcre_fullinfo(cpat, nullptr, PCRE_INFO_SIZE, &sz);
+  pcre2_pattern_info(cpat, PCRE2_INFO_SIZE, &sz);
 
   full = (pcrecachesize > 2 * PCRE_CACHE_SIZE);
   while (tmp) {
@@ -1076,7 +1087,7 @@ static int pcre_cache_pattern(struct pcre_cache_t* table, pcre* cpat, const char
 
   if (tmp) {
     // does this even make sense? same pattern will always compile the same way?
-    pcre_free(tmp->compiled_pattern);
+    pcre2_code_free(tmp->compiled_pattern);
     node = tmp;
   } else {
     node = (struct pcre_cache_bucket_t*)DCALLOC(1, sizeof(struct pcre_cache_bucket_t),
@@ -1093,7 +1104,7 @@ static int pcre_cache_pattern(struct pcre_cache_t* table, pcre* cpat, const char
         }
         if (tmp == table->buckets[bucket]) {  // if the hash version works, most
                                               // of the time
-          pcre_free(tmp->compiled_pattern);
+          pcre2_code_free(tmp->compiled_pattern);
           free_string(tmp->pattern);
           FREE(tmp);
           table->buckets[bucket] = nullptr;
@@ -1103,7 +1114,7 @@ static int pcre_cache_pattern(struct pcre_cache_t* table, pcre* cpat, const char
           while (tmp2->next != tmp) {
             tmp2 = tmp2->next;  // shouldn't get here often
           }
-          pcre_free(tmp->compiled_pattern);
+          pcre2_code_free(tmp->compiled_pattern);
           free_string(tmp->pattern);
           FREE(tmp);
           tmp2->next = nullptr;
@@ -1117,13 +1128,13 @@ static int pcre_cache_pattern(struct pcre_cache_t* table, pcre* cpat, const char
   node->pattern = shared_pattern;
   node->compile_flags = compile_flags;
   node->compiled_pattern = cpat;
-  node->size = sz;
+  node->size = static_cast<int>(sz);
 
   return 0;
 }
 
-static pcre* pcre_get_cached_pattern(struct pcre_cache_t* table, const char* pattern,
-                                     int compile_flags) {
+static pcre2_code* pcre_get_cached_pattern(struct pcre_cache_t* table, const char* pattern,
+                                           int compile_flags) {
   const auto* shared_pattern = make_shared_string(pattern);
   unsigned int const bucket = (HASH(BLOCK(shared_pattern)) ^ compile_flags) % PCRE_CACHE_SIZE;
   struct pcre_cache_bucket_t* node;

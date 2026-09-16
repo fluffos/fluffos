@@ -143,10 +143,9 @@ still ask which lib they will attach.
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake bison expect \
-  libmysqlclient-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
-sudo apt install -y libpcre3-dev || echo "no libpcre3-dev; add -DPACKAGE_PCRE=OFF (not libpcre2-dev)"
 
 git clone https://github.com/fluffos/fluffos.git
 cd fluffos
@@ -155,9 +154,6 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 make -j"$(nproc)" install
 ```
-
-If `libpcre3-dev` has no installation candidate, do **not** install `libpcre2-dev`.
-Add `-DPACKAGE_PCRE=OFF` to cmake or follow [Build from Source](build).
 
 Other platforms: [Build from Source](build). WASM: [Build for WebAssembly](build-wasm).
 Image only: `docker pull ghcr.io/fluffos/fluffos:master` (still needs the mudlib + config).

@@ -14,19 +14,20 @@ The maximum number of capturing groups is:
 
 #define PCRE_CACHE_SIZE 256
 
-#include <pcre.h>
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
 
 typedef struct {
-  pcre* re;
-  const char* error;
+  pcre2_code* re;
+  char error[256];
   const char* pattern;
   const char* subject;
-  unsigned char* name_table;
+  PCRE2_SPTR name_table;
   size_t s_length;
   int erroffset;
   int find_all;
-  int namecount;
-  int name_entry_size;
+  uint32_t namecount;
+  uint32_t name_entry_size;
   int compile_flags;
   int exec_flags;
   int* ovector;
@@ -36,10 +37,10 @@ typedef struct {
 } pcre_t;
 
 struct pcre_cache_bucket_t {
-  pcre* compiled_pattern;  // value1
-  const char* pattern;     // key
-  int compile_flags;       // compile options used
-  int size;                // size in bytes
+  pcre2_code* compiled_pattern;  // value1
+  const char* pattern;           // key
+  int compile_flags;             // compile options used
+  int size;                      // size in bytes
   struct pcre_cache_bucket_t* next;
 };
 

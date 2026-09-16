@@ -142,14 +142,10 @@ FluffOS 支持多个目标平台。请根据您的部署目标选择对应的方
 ```bash
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
   pkg-config libffi-dev libdw-dev libbz2-dev
-sudo apt install -y libpcre3-dev   # PCRE 8.x；不是 libpcre2-dev
 ```
-
-> [!NOTE]
-> `libpcre3-dev` 是经典 PCRE 8.x（`pcre.h`）。Debian 13 与 Ubuntu 26.04 已移除；Ubuntu 24.04 在 **universe**。**不要**用 `libpcre2-dev` 顶替。apt 找不到该包时：`cmake .. -DPACKAGE_PCRE=OFF`，或从源码编译 PCRE 8.x，见 [docs/build.mdx](docs/build.mdx)。
 
 > [!NOTE]
 > 仅当你修改 LPC 词法分析器（`src/compiler/internal/lexer.l`）时才需要 `flex`；否则构建将使用预先提交的生成文件。
@@ -167,7 +163,7 @@ make -j$(nproc) install
 
 **1. 安装依赖（Homebrew）：**
 ```bash
-brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
+brew install cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c \
   mysql sqlite3 googletest libffi
 ```
 
@@ -188,7 +184,7 @@ make -j$(nproc) install
 ```bash
 pacman --noconfirm -S --needed \
   git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
+  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre2 \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
   mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
@@ -234,7 +230,7 @@ git clone https://github.com/fluffos/fluffos ~/fluffos
 apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
   mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
   openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-  pcre-dev bison git musl-dev libelf-static elfutils-dev \
+  pcre2-dev bison git musl-dev libelf-static elfutils-dev \
   pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 

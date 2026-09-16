@@ -160,4 +160,4 @@ after a tokenizer/format.mjs change touching comment/directive/macro-
 adjacent handling). This doesn't require `flex` (the pinned, committed
 lexer/parser sources are used if it's missing) but does need the usual
 driver dependencies (`libicu-dev`, `libjemalloc-dev`, a MySQL/MariaDB
-client dev package, `libpcre3-dev` for PCRE 8.x — not `libpcre2-dev`) if they aren't already installed. Debian 13 / Ubuntu 26.04 dropped `libpcre3-dev`; use `-DPACKAGE_PCRE=OFF` or build PCRE 8.x from source.
+client dev package, `libpcre2-dev`) if they aren't already installed.

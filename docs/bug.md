@@ -14,12 +14,6 @@ report. To get a mud running, pick a mudlib first:
 Install the matching `-dev` / Homebrew / MSYS2 packages from the
 [build guide](build). Re-run CMake from a clean `build/` after installing.
 
-**`libpcre3-dev` has no installation candidate / CMake cannot find PCRE.**
-That package is PCRE 8.x (`pcre.h`). Debian 13 and Ubuntu 26.04 removed it;
-Ubuntu 24.04 keeps it in universe. **`libpcre2-dev` is not a substitute.**
-Either `cmake .. -DPACKAGE_PCRE=OFF` or build PCRE 8.x from source — see
-[Build from Source](build).
-
 **CMake is too old.** FluffOS needs CMake 3.22+. Ubuntu 22.04+ is fine.
 
 **WSL build is extremely slow.** The tree must live on the Linux filesystem

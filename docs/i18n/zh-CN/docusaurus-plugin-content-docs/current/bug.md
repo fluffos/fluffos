@@ -13,10 +13,6 @@ description: 编译和启动失败，以及如何提交有用的崩溃报告。
 **CMake 找不到 ICU、OpenSSL、PCRE、jemalloc、MySQL、SQLite 或 PostgreSQL。**
 按 [构建指南](build) 安装对应 `-dev` / Homebrew / MSYS2 包，装完后清空 `build/` 再跑 CMake。
 
-**`libpcre3-dev` 没有安装候选 / CMake 找不到 PCRE。**
-该包是 PCRE 8.x（`pcre.h`）。Debian 13 与 Ubuntu 26.04 已移除；Ubuntu 24.04 在 universe。
-**`libpcre2-dev` 不能顶替。** `cmake .. -DPACKAGE_PCRE=OFF`，或按 [构建指南](build) 从源码编 PCRE 8.x。
-
 **CMake 太旧。** 需要 3.22+。Ubuntu 22.04+ 即可。
 
 **WSL 极慢。** 树必须在 Linux 文件系统（`~/fluffos`），不要 `/mnt/c/...`。
