@@ -1,0 +1,6 @@
+// Fixture for tests/compiler/named_function_identity.lpc: a function
+// defined in an inherited program, referenced from the base's own code.
+
+int base_fn() { return 1; }
+
+function base_ref() { return base_fn; }
