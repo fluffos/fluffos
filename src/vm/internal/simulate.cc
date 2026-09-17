@@ -163,7 +163,8 @@ static void init_privs_for_object(object_t*);
 static int give_uid_to_object(object_t* /*ob*/);
 #endif
 static int init_object(object_t* /*ob*/);
-static object_t* load_virtual_object(const char* /*name*/, int /*clone*/);
+static object_t* load_virtual_object(const char* /*name*/, int /*clone*/,
+                                     int /*redirect_depth*/ = 0);
 static char* make_new_name(const char* /*str*/);
 #ifndef NO_ENVIRONMENT
 static void send_say(object_t* /*ob*/, const char* /*text*/, array_t* /*avoid*/);
@@ -301,7 +302,7 @@ static int init_object(object_t* ob) {
 #endif
 }
 
-static object_t* load_virtual_object(const char* name, int clone) {
+static object_t* load_virtual_object(const char* name, int clone, int redirect_depth) {
   int argc = 2;
   char* new_name;
   object_t *new_ob, *ob;
@@ -323,12 +324,56 @@ static object_t* load_virtual_object(const char* name, int clone) {
     argc++;
     clone = 1;
   }
-  push_malloced_string(add_slash(name));
-  push_number(clone);
-  if (args) {
-    push_refed_array(args);
+
+  // master::compile_object() may return a string instead of an object to
+  // redirect the request under a different name: for a plain load (clone
+  // == 0) go back through load_object() so a real on-disk file at the
+  // redirected path is compiled normally, only re-consulting the master
+  // if it's ALSO missing; for a clone request the redirect stays inside
+  // the master's virtual-object namespace and retries compile_object()
+  // directly under the new name with the same constructor args. Either
+  // way, a chain of redirects is capped at MAX_VIRTUAL_REDIRECTS (set at
+  // build time, e.g. -DMAX_VIRTUAL_REDIRECTS=3) so a misbehaving master
+  // can't loop the driver forever.
+  std::string current_name(name);
+  for (;;) {
+    push_malloced_string(add_slash(current_name.c_str()));
+    push_number(clone);
+    if (args) {
+      args->ref++;  // this attempt's push_refed_array() consumes one ref
+      push_refed_array(args);
+    }
+    v = apply_master_ob(APPLY_COMPILE_OBJECT, argc);
+    if (!v || v->type != T_STRING) {
+      break;
+    }
+    if (++redirect_depth > MAX_VIRTUAL_REDIRECTS) {
+      if (args) {
+        free_array(args);
+      }
+      error("Too many virtual object redirects (> %d) resolving '/%s'.\n", MAX_VIRTUAL_REDIRECTS,
+            name);
+    }
+    if (!clone) {
+      std::string redirect_target(v->u.string);
+      // Mirror load_object()'s own inherit-resolution pattern: check for
+      // an already-loaded object under the redirect target's name before
+      // calling load_object(), which would otherwise unconditionally
+      // recompile and insert a second object under the same obname.
+      char redirect_obname[MAX_OBJECT_NAME_SIZE];
+      if (filename_to_obname(redirect_target.c_str(), redirect_obname, sizeof redirect_obname)) {
+        if (object_t* existing = ObjectTable::instance().find(redirect_obname)) {
+          return existing;
+        }
+      }
+      return load_object(redirect_target.c_str(), 1, redirect_depth);
+    }
+    current_name.assign(v->u.string);
   }
-  v = apply_master_ob(APPLY_COMPILE_OBJECT, argc);
+  if (args) {
+    free_array(args);
+  }
+
   if (!v || (v->type != T_OBJECT)) {
     return nullptr;
   }
@@ -351,7 +396,7 @@ static object_t* load_virtual_object(const char* name, int clone) {
   } else {
     /* Make sure O_CLONE is set */
     new_ob->flags |= O_CLONE;
-    new_name = make_new_name(name);
+    new_name = make_new_name(current_name.c_str());
   }
 
 #ifdef PACKAGE_MUDLIB_STATS
@@ -452,7 +497,7 @@ int filename_to_obname(const char* src, char* dest, int size) {
  * it.
  *
  */
-object_t* load_object(const char* lname, int callcreate) {
+object_t* load_object(const char* lname, int callcreate, int redirect_depth) {
   ScopedTracer _tracer("LPC Load Object", EventCategory::VM_LOAD_OBJECT,
                        [=] { return json{lname}; });
 
@@ -524,7 +569,7 @@ object_t* load_object(const char* lname, int callcreate) {
 
   if (stat(real_name, &c_st) == -1 || S_ISDIR(c_st.st_mode)) {
     save_command_giver(command_giver);
-    ob = load_virtual_object(actualname, 0);
+    ob = load_virtual_object(actualname, 0, redirect_depth);
     restore_command_giver();
     num_objects_this_thread--;
     return ob;

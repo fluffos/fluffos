@@ -1,0 +1,44 @@
+// master::compile_object() (testsuite/single/master.lpc) may return a
+// string instead of an object to redirect the load under a different
+// name -- load_virtual_object()'s redirect chain (src/vm/internal/
+// simulate.cc). Pins:
+//   1. a redirect to another virtual name resolves through the normal
+//      virtual-object dance; the returned object is virtual, and its
+//      name is the FINAL resolved target, not the original request --
+//      and a second request for the same redirect name reuses it
+//      rather than compiling a duplicate.
+//   2. a redirect to a real on-disk file goes back through
+//      load_object(): the result is NOT virtual, since the master is
+//      never re-consulted once a real file is found on disk.
+//   3. an unbounded redirect chain hits MAX_VIRTUAL_REDIRECTS and
+//      error()s cleanly instead of looping forever.
+void do_tests() {
+  object ob;
+  mixed err;
+
+  // (1) Redirect to another virtual name: /test/virtual is itself
+  // handled by compile_object() (loads /single/void), so this chases
+  // through two redirect hops (string -> load_object -> virtual again).
+  ob = load_object("/test/virtual_redirect_once");
+  ASSERT(objectp(ob));
+  ASSERT_EQ(1, virtualp(ob));
+  ASSERT_EQ("/test/virtual", file_name(ob));
+
+  // A second request for the SAME redirect-once name must reuse the
+  // already-loaded target rather than compiling a duplicate.
+  ASSERT_EQ(ob, load_object("/test/virtual_redirect_once"));
+
+  // (2) Redirect to a real on-disk file: load_object() must compile it
+  // directly, never re-asking the master for /clone/virtual_redirect_real.
+  ob = load_object("/test/virtual_redirect_real");
+  ASSERT(objectp(ob));
+  ASSERT_EQ(0, virtualp(ob));
+  ASSERT_EQ("/clone/virtual_redirect_real", file_name(ob));
+  ASSERT_EQ(1, ob->marker());
+
+  // (3) A redirect chain that never resolves must give up cleanly
+  // instead of looping the driver forever.
+  err = catch(load_object("/test/virtual_redirect_loop"));
+  ASSERT(stringp(err));
+  ASSERT(strsrch(err, "Too many virtual object redirects") != -1);
+}

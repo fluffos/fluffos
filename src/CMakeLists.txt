@@ -1,4 +1,6 @@
 # List of compile options to tweak
+set(MAX_VIRTUAL_REDIRECTS "8" CACHE STRING "Max chained master::compile_object() virtual-object redirects before load_object()/clone_object() gives up with an error")
+add_compile_definitions(MAX_VIRTUAL_REDIRECTS=${MAX_VIRTUAL_REDIRECTS})
 option(MARCH_NATIVE "use march=native for GCC" ON)
 option(STATIC "Build static version of driver" OFF)
 option(USE_JEMALLOC "Build driver with jemalloc support" ON)

@@ -35,7 +35,10 @@ int get_char(svalue_t*, int, int, svalue_t*);
 
 char* check_name(char*);
 int filename_to_obname(const char*, char*, int);
-object_t* load_object(const char*, int);
+// redirect_depth counts master::compile_object() virtual-object redirects
+// already followed for this load chain; callers outside simulate.cc should
+// never pass it (default 0 starts a fresh chain).
+object_t* load_object(const char*, int, int redirect_depth = 0);
 /* `arena`, when given, is used for the compile's transient allocations and
  * is left untouched -- the CALLER owns it, so compiler output (diagnostics)
  * stays readable after this returns. lpcshell relies on that; the driver
