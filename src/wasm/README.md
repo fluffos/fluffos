@@ -119,7 +119,7 @@ save files etc.) is the natural next step — see §5.
 | OpenSSL, `net/tls.cc` | **removed** | no TLS endpoint to terminate (the page/browser owns TLS); the `sys_reload_tls` efun does not exist on this target; 2 struct fields typedef'd via `net/net_compat.h` |
 | libtelnet, `net/telnet.cc`, `net/msp.cc`, mssp | **kept** | pure C / portable; the page speaks telnet |
 | ICU (uc + data) | **kept** (cross-built) | core string handling: grapheme iteration, charset conversion, sprintf width |
-| libpcre (classic 8.x) | **kept** (cross-built) | pcre package efuns; plain C, JIT off (no executable pages in wasm) |
+| libpcre2-8 | **kept** (cross-built) | pcre package efuns; plain C, JIT off (no executable pages in wasm) |
 | zlib | **removed** | nothing on this target needs it: MCCP + the compress package are off, and the core's gzip'd file support is gated behind `HAVE_ZLIB` (compressed `save_object` degrades to a plain save; `write_file` flag 2 errors; reads use stdio) |
 | `thirdparty/crypt` (musl crypt) | **kept** | pure C |
 | backward-cpp | **removed** | no native unwinder in wasm |
@@ -140,7 +140,7 @@ Package matrix (`src/CMakeLists.txt` forces these under `EMSCRIPTEN`):
 | db | off | MySQL/SQLite/PG client libs |
 | crypto | off | OpenSSL EVP (see §5: sha1 stays) |
 | ffi | off | libffi + dlopen |
-| **pcre** | **on** | libpcre 8.x cross-built into the wasm-deps prefix by `tools/wasm/build-deps.sh`; all `pcre_*` efuns work |
+| **pcre** | **on** | libpcre2-8 cross-built into the wasm-deps prefix by `tools/wasm/build-deps.sh`; all `pcre_*` efuns work |
 
 DNS (`packages/core/dns.cc`): the resolver half is a synthetic resolver
 (`dns_stub.cc`) — `resolve()` keeps the native call/return shapes but
@@ -261,7 +261,7 @@ order:
    bytes out per socket id). Inter-mud protocols would then work.
 5. **Size/latency budget — done.** ICU data is trimmed to brkitr only
    (§3.1), DWARF is dropped at link (§3.2), MCCP/compress are off:
-   `fluffos.wasm` is ~3.6MB raw (libpcre included, +~210KB) and
+   `fluffos.wasm` is ~3.6MB raw (libpcre2 included) and
    **~0.8MB brotli** (~1.1MB gzip) over the wire, plus ~110KB of JS
    glue. Remaining knobs if more is
    ever needed: strip the name section (`--profiling-funcs` costs

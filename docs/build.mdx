@@ -55,7 +55,7 @@ This is the best Linux distro to build & run FluffOS; support for other distros 
 ```shell
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
 ```
@@ -124,7 +124,7 @@ If not already installed, go to [https://brew.sh](https://brew.sh/) and follow t
 ### Install dependencies
 
 ```shell
-brew install cmake pkg-config mysql pcre libgcrypt openssl jemalloc icu4c \
+brew install cmake pkg-config mysql pcre2 libgcrypt openssl jemalloc icu4c \
   sqlite3 googletest libffi
 ```
 
@@ -185,7 +185,7 @@ nothing left to upgrade.
 ```shell
 pacman --noconfirm -S --needed \
   git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
+  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre2 \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
   mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
@@ -235,7 +235,7 @@ Alpine Linux is used for building static binaries suitable for Docker containers
 apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
     mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
     openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-    pcre-dev bison git musl-dev libelf-static elfutils-dev \
+    pcre2-dev bison git musl-dev libelf-static elfutils-dev \
     pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 

@@ -62,7 +62,7 @@ Ubuntu / Debian / WSL (repo on the Linux filesystem, not `/mnt/c`):
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
 

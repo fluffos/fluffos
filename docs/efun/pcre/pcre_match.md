@@ -9,18 +9,19 @@ title: pcre / pcre_match
 
 ### SYNOPSIS
 
-    mixed pcre_match(string|string *lines, string pattern, void|int flag, void|int pcre_flags);
+    mixed pcre_match(string|string *lines, string pattern, void|int|mapping flag, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 
     analog with regexp efun for backwards compatibility reasons but utilizing
-    the PCRE library.
+    the PCRE2 library. UTF-8, Unicode properties, and JIT are on by default.
 
-    The optional `pcre_flags` set PCRE options (e.g., `PCRE_I` case-insensitive,
-    `PCRE_M` multiline). For string input, the 3rd argument is treated as
-    `pcre_flags`; for array input, the 3rd argument remains the legacy flag and
+    The optional `pcre_flags` are integer bits from `src/include/pcre_flags.h`
+    or a mapping of named PCRE2 options (see `pcre_config()`). For string
+    input, the 3rd argument is treated as `pcre_flags`; for array input, the
+    3rd argument remains the legacy flag (or a mapping of flags) and
     `pcre_flags` is the 4th argument. Defaults to 0.
 
 ### SEE ALSO
 
-    regexp(3)
+    pcre_config(3), regexp(3)

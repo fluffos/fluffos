@@ -9,7 +9,7 @@ title: pcre / pcre_extract
 
 ### SYNOPSIS
 
-    string *pcre_extract(string input, string pattern, void|int include_named, void|int pcre_flags);
+    string *pcre_extract(string input, string pattern, void|int|mapping include_named, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 
@@ -21,8 +21,10 @@ title: pcre / pcre_extract
     named groups (or none participated), the mapping is empty; otherwise only
     participating named groups are present.
 
-    The optional fourth argument `pcre_flags` sets PCRE options (e.g., `PCRE_I`
-    for case-insensitive, `PCRE_M` for multiline). Defaults to 0.
+    The optional fourth argument `pcre_flags` is integer bits from
+    `src/include/pcre_flags.h` or a mapping of named PCRE2 options (see
+    `pcre_config()`). A mapping as the third argument is treated as flags
+    with `include_named` left off. Defaults to 0.
 
     Example (named groups):
 

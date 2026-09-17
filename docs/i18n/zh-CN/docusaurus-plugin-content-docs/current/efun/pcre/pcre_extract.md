@@ -9,7 +9,7 @@ title: pcre / pcre_extract
 
 ### SYNOPSIS
 
-    string *pcre_extract(string, string, void|int include_named, void|int pcre_flags);
+    string *pcre_extract(string, string, void|int|mapping include_named, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 

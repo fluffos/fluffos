@@ -1,0 +1,53 @@
+#ifdef __PACKAGE_PCRE__
+#include <pcre_flags.h>
+void do_tests() {
+  mapping cfg;
+  mapping info;
+  string glob;
+
+  // UCP is on by default: \d matches Nd, \w matches letters, \p{...} works.
+  ASSERT(pcre_match("３", "\\d"));
+  ASSERT(pcre_match("你", "\\p{Han}"));
+  ASSERT(pcre_match("café", "\\w+$"));
+  ASSERT(!pcre_match("３", "\\d", PCRE_NO_UCP));
+  ASSERT(!pcre_match("３", "\\d", ([ "no_ucp": 1 ])));
+  ASSERT(pcre_match("abc", "ABC", ([ "caseless": 1 ])));
+  ASSERT(!pcre_match("abc", "ABC", ([ "caseless": 0 ])));
+  ASSERT(pcre_match("zabc", "abc"));
+  ASSERT(!pcre_match("zabc", "abc", ([ "anchored": 1 ])));
+  ASSERT(pcre_match("ab", "abcd", ([ "partial": 1 ])));
+
+  ASSERT(pcre_match(pcre_version(), "^[0-9]+\\.[0-9]+"));
+
+  cfg = pcre_config();
+  ASSERT(mapp(cfg));
+  ASSERT(pcre_match(cfg["version"], "^[0-9]+\\.[0-9]+"));
+  ASSERT(undefinedp(cfg["unicode"]) || cfg["unicode"] == 1);
+  ASSERT(member_array("jit", keys(cfg)) != -1);
+  ASSERT(member_array("match_limit", keys(cfg)) != -1);
+
+  // Mapping flags and the leftover int bits can be mixed via "flags".
+  ASSERT_EQ(({ "HELLO" }), pcre_extract("HELLO", "(hello)", 0, ([ "flags": PCRE_I ])));
+
+  ASSERT(pcre_match("xxabc", "abc", ([ "offset": 2 ])));
+  ASSERT(!pcre_match("xxabc", "abc", ([ "offset": 3 ])));
+  ASSERT(pcre_match("the cat", "cat", ([ "extra_match_word": 1 ])));
+  ASSERT(!pcre_match("catapult", "cat", ([ "extra_match_word": 1 ])));
+  ASSERT(pcre_match("a1", "a1", ([ "no_jit": 1 ])));
+
+  info = pcre_info("(?<word>\\w+) (?<num>\\d+)");
+  ASSERT(mapp(info));
+  ASSERT_EQ(2, info["captures"]);
+  ASSERT_EQ(1, info["names"]["word"]);
+  ASSERT_EQ(2, info["names"]["num"]);
+  ASSERT(member_array("jit", keys(info)) != -1);
+
+  glob = pcre_convert("*.c", ([ "glob": 1 ]));
+  ASSERT(stringp(glob) && sizeof(glob));
+  ASSERT(pcre_match("foo.c", glob));
+  ASSERT(!pcre_match("foo.cc", glob));
+  ASSERT(catch(pcre_convert("*.c", ([]))));
+
+  ASSERT(catch(pcre_match("a", "a", ([ "no_such_option": 1 ]))));
+}
+#endif

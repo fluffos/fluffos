@@ -28,7 +28,7 @@ runs:
       run: |
         pacman --noconfirm -S --needed \
           mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib \
-          mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
+          mingw-w64-x86_64-pcre2 mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
           mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
           mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
           bison make ${{ inputs.extra-packages }}

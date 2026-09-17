@@ -9,7 +9,7 @@ title: pcre / pcre_assoc
 
 ### SYNOPSIS
 
-    mixed *pcre_assoc(string, string *, mixed *, mixed | void, void | int pcre_flags);
+    mixed *pcre_assoc(string, string *, mixed *, mixed | void, void | int | mapping pcre_flags);
 
 ### DESCRIPTION
 
