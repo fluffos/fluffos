@@ -220,8 +220,25 @@ mixed compile_object(string file) {
   if (file[0..12] == "/data/hu/virt" && file_size("/data/hu/vbase.lpc") > 0) {
     return load_object("/data/hu/vbase");
   }
+  // Virtual-redirect fixtures for load_virtual_object()'s string-return
+  // redirect (src/vm/internal/simulate.cc): a string return asks the
+  // driver to retry the load under a different name.
+  if (file == "/test/virtual_redirect_once") {
+    return "/test/virtual";
+  }
+  if (file == "/test/virtual_redirect_real") {
+    return "/clone/virtual_redirect_real";
+  }
+  if (strlen(file) >= strlen("/test/virtual_redirect_loop") &&
+      file[0..strlen("/test/virtual_redirect_loop") - 1] == "/test/virtual_redirect_loop") {
+    // Never resolves: every attempt returns a brand new, still-missing
+    // name, so the driver's MAX_VIRTUAL_REDIRECTS cap must eventually
+    // error() out rather than loop forever.
+    return file + "x";
+  }
   return 0;
 }
+
 
 // This is called when there is a driver segmentation fault or a bus error,
 // etc.  As it's static it can't be called by anything but the driver (and

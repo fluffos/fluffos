@@ -1,0 +1,5 @@
+// Real on-disk backing object for the virtual-redirect test
+// (testsuite/single/tests/efuns/virtual_redirect.lpc): reached only when
+// load_virtual_object()'s redirect goes back through load_object() and
+// finds this file on disk, without re-consulting the master.
+int marker() { return 1; }
