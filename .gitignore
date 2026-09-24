@@ -18,3 +18,7 @@
 **/Testing/Temporary
 .vscode/c_cpp_properties.json
 /compile_commands.json
+
+# Local AI development data
+/.codegraph/
+/.zread/
