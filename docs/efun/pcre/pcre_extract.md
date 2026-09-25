@@ -30,6 +30,15 @@ title: pcre / pcre_extract
 
         ({"alpha", "99", (["word": "alpha", "num": "99"])})
 
+:::warning[Unicode properties are on by default]
+
+Patterns compile with `PCRE2_UCP`, so `\d` matches any Unicode digit and `\w`
+any letter. Patterns used to *validate* input now accept more than they did
+before the PCRE2 upgrade. Pass `PCRE_NO_UCP` (or `([ "no_ucp": 1 ])`) to get the
+ASCII-only classes back -- see [pcre_match](pcre_match) for the full note.
+
+:::
+
 ### SEE ALSO
 
     pcre_version(3), pcre_replace(3)

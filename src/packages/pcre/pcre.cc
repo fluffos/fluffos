@@ -67,6 +67,7 @@
 // store reg->error & reg->erroffset before error(..)
 
 #include <cstring>
+#include <memory>
 #include <thirdparty/scope_guard/scope_guard.hpp>
 #include "base/package_api.h"
 
@@ -598,10 +599,13 @@ void f_pcre_replace_callback() {
 
   arr = pcre_get_substrings(run, false);
 
+  // arr is not reachable from the VM stack until push_refed_array() below, so
+  // nothing would free it if process_efun_callback() rejects the callback first.
+  std::unique_ptr<array_t, decltype(&free_array)> arr_owner(arr, &free_array);
+
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
     process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
   } else {  // 0
-    free_array(arr);
     error("Illegal third argument (0) to pcre_replace_callback");
   }
 
@@ -609,6 +613,7 @@ void f_pcre_replace_callback() {
 
   push_refed_array(r);
   push_refed_array(arr);
+  (void)arr_owner.release();  // the VM stack owns it from here; arr already holds the pointer
   error_context_t econ;
 
   save_context(&econ);
@@ -1173,6 +1178,15 @@ static int pcre_query_match(pcre_t* p) {
   return 0;
 }
 
+static void pcre_free_match_list(std::vector<std::vector<svalue_t>>* matches) {
+  for (auto& match : *matches) {
+    for (auto& sv : match) {
+      free_svalue(&sv, "pcre_match_all");
+    }
+  }
+  matches->clear();
+}
+
 auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern,
                     const pcre_options& o) {
   pcre_t* run;
@@ -1190,15 +1204,22 @@ auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern
   run->re = pcre_get_cached_pattern(&pcre_cache, run);
 
   if (run->re == nullptr) {
-    pcre_local_compile(run);
+    // Only a SUCCESSFUL compile may be cached: pcre_cache_pattern() would
+    // otherwise evict a good bucket entry and park a null pcre2_code* in its
+    // place, and hand that null straight to pcre2_pattern_info().
+    if (pcre_local_compile(run) == nullptr) {
+      error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
+    }
     pcre_cache_pattern(&pcre_cache, run->re, run);
   }
 
-  if (run->re == nullptr) {
-    error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
-  }
-
   std::vector<std::vector<svalue_t>> matches;
+
+  // svalue_t is POD, so the vector's destructor drops the extracted strings
+  // without freeing them. pcre_exec_at() below can error() out of the middle of
+  // the scan (an exceeded match/depth/heap limit), long after the first matches
+  // have been collected.
+  SCOPE_FAIL { pcre_free_match_list(&matches); };
 
   int rc = 0;
   size_t offset = run->start_offset;
@@ -1378,6 +1399,12 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
 
   ret = allocate_empty_array(2);
 
+  // ret's two slots stay uninitialized until the result arrays are built at the
+  // very end, so anything that error()s before then has to release the (empty)
+  // container -- free_empty_array(), not free_array(), precisely because the
+  // elements are not yet svalues. Released at each return once ret is complete.
+  std::unique_ptr<array_t, decltype(&free_empty_array)> ret_owner(ret, &free_empty_array);
+
   if (size) {
     pcre_t** rgpp;
     struct RegMatch {
@@ -1393,6 +1420,25 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
 
     rgpp = (pcre_t**)DCALLOC(size, sizeof(pcre_t*), TAG_TEMPORARY, "pcre_assoc : rgpp");
 
+    // Both of these run on the success path and on every error() unwind below:
+    // pcre_local_exec() throws on an exceeded match/depth/heap limit from the
+    // middle of the scan loop, where there is no normal-return cleanup to reach.
+    DEFER {
+      for (size_t j = 0; j < size; j++) {
+        if (rgpp[j] != nullptr) {
+          pcre_free_memory(rgpp[j]);
+        }
+      }
+      FREE(rgpp);
+    };
+    DEFER {
+      struct RegMatch* cur;
+      while ((cur = rmph) != nullptr) {
+        rmph = cur->next;
+        FREE((char*)cur);
+      }
+    };
+
     for (i = 0; i < size; i++) {
       rgpp[i] = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "pcre_assoc : rgpp[i]");
       rgpp[i]->ovector = nullptr;
@@ -1403,20 +1449,12 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
 
       if (rgpp[i]->re == nullptr) {
         if (pcre_local_compile(rgpp[i]) == nullptr) {
-          const char* rerror = rgpp[i]->error;
-          int const offset = rgpp[i]->erroffset;
-
-          pcre_free_memory(rgpp[i]);
-          while (i--) {
-            pcre_free_memory(rgpp[i]);
-          }
-
-          FREE(rgpp);
-          free_empty_array(ret);
-          error("PCRE compilation failed at offset %d: %s\n", offset, rerror);
-        } else {
-          pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]);
+          // pcre_t::error is an array embedded IN the struct, so the message
+          // must outlive the cleanup: let the guards above free rgpp[i] during
+          // the unwind, after error() has already formatted its text.
+          error("PCRE compilation failed at offset %d: %s\n", rgpp[i]->erroffset, rgpp[i]->error);
         }
+        pcre_cache_pattern(&pcre_cache, rgpp[i]->re, rgpp[i]);
       }
     }
 
@@ -1480,18 +1518,9 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
     }
 
     // Validate the result array size BEFORE allocating it: allocate_empty_array()
-    // itself error()s past this limit, which would unwind past rgpp/rmph/ret
-    // (none of which are RAII-guarded here) and leak them all.
+    // reports this limit with its own generic message, and reporting it here
+    // names the efun and the count that overflowed.
     if (2 * num_match + 1 > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
-      for (i = 0; i < size; i++) {
-        pcre_free_memory(rgpp[i]);
-      }
-      FREE(rgpp);
-      while ((rmp = rmph)) {
-        rmph = rmp->next;
-        FREE((char*)rmp);
-      }
-      free_empty_array(ret);
       error("Too many matches (%d) for pcre_assoc().\n", num_match);
     }
 
@@ -1540,17 +1569,7 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
     sv1->u.string = string_copy(tmp, "pcre_assoc");
     assign_svalue_no_free(sv2, def);
 
-    for (i = 0; i < size; i++) {
-      pcre_free_memory(rgpp[i]);
-    }
-
-    FREE(rgpp);
-
-    while ((rmp = rmph)) {
-      rmph = rmp->next;
-      FREE((char*)rmp);
-    }
-    return ret;
+    return ret_owner.release();
   }
   svalue_t* temp;
   svalue_t* sv;
@@ -1561,7 +1580,7 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
   sv = &ret->item[1];
   sv->type = T_ARRAY;
   assign_svalue_no_free((sv->u.arr = allocate_empty_array(1))->item, def);
-  return ret;
+  return ret_owner.release();
 }
 
 static array_t* pcre_get_substrings(pcre_t* run, bool include_names) {
@@ -1746,6 +1765,10 @@ static unsigned pcre_cache_bucket_of(const char* shared_pattern, const pcre_t* p
 // Caching functions, add new ones at the front of the bucket so we find them
 // faster
 static int pcre_cache_pattern(struct pcre_cache_t* table, pcre2_code* cpat, const pcre_t* p) {
+  if (cpat == nullptr) {
+    return -1;
+  }
+
   const auto* shared_pattern = make_shared_string(p->pattern);
   unsigned int const bucket = pcre_cache_bucket_of(shared_pattern, p);
   PCRE2_SIZE sz = 0;
@@ -1910,6 +1933,22 @@ void f_pcre_match_all() {
   auto subject_len = SVALUE_STRLEN(sp - 1);
 
   auto matches = pcre_match_all(subject, subject_len, pattern, opts);
+  SCOPE_FAIL { pcre_free_match_list(&matches); };
+
+  // Validate EVERY array size before allocating anything: allocate_array()
+  // error()s past this limit, and once the loop below is under way a throw
+  // would strand both the strings still held in `matches` and the result array
+  // built so far (v is not reachable from the VM stack until the very end).
+  // With the sizes checked up front that loop cannot throw at all.
+  auto const max_array_size = static_cast<size_t>(CONFIG_INT(__MAX_ARRAY_SIZE__));
+  if (matches.size() > max_array_size) {
+    error("Too many matches (%zu) for pcre_match_all().\n", matches.size());
+  }
+  for (auto& match : matches) {
+    if (match.size() > max_array_size) {
+      error("Too many capture groups (%zu) for pcre_match_all().\n", match.size());
+    }
+  }
 
   pop_2_elems();
 
@@ -1922,6 +1961,9 @@ void f_pcre_match_all() {
     for (int j = 0; j < match.size(); j++) {
       match_array->item[j] = match[j];
     }
+    // The strings belong to match_array now; keep `matches` and the guard above
+    // from claiming them a second time.
+    match.clear();
   }
 
   push_refed_array(v);

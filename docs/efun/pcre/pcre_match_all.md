@@ -40,3 +40,12 @@ title: pcre / pcre_match_all
 
     There are 1 match in the entire string, the first item in the array is the
     matched substring, then all the captured groups.
+
+:::warning[Unicode properties are on by default]
+
+Patterns compile with `PCRE2_UCP`, so `\d` matches any Unicode digit and `\w`
+any letter. Patterns used to *validate* input now accept more than they did
+before the PCRE2 upgrade. Pass `PCRE_NO_UCP` (or `([ "no_ucp": 1 ])`) to get the
+ASCII-only classes back -- see [pcre_match](pcre_match) for the full note.
+
+:::

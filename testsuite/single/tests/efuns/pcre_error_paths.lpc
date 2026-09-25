@@ -1,0 +1,44 @@
+#ifdef __PACKAGE_PCRE__
+// Error paths through the pcre package: every one of these used to leak, and
+// the compile-error report used to read out of a pcre_t it had already freed.
+void do_tests() {
+  string bad = "zz_uncacheable_probe_[0-9";
+  string key;
+  int cached_a_failure = 0;
+
+  // A pattern that fails to compile must never reach the cache: pcre_match_all()
+  // used to hand pcre_cache_pattern() the null pcre2_code* left behind by the
+  // failed compile, evicting whatever lived in that bucket to park a null there.
+  ASSERT(catch(pcre_match_all("anything", bad)));
+  foreach (key in keys(pcre_cache())) {
+    if (strsrch(key, bad) == 0) cached_a_failure = 1;
+  }
+  ASSERT_EQ(0, cached_a_failure);
+
+  // pcre_assoc() compiles every pattern up front and only then scans, so an
+  // exceeded match limit error()s out of the middle of the scan loop -- past
+  // cleanup that used to sit on the normal-return path only. "b" matches first
+  // (allocating a match-list node) and "(a+)+$" then blows the limit, so this
+  // covers the result array, the pattern vector, each compiled pattern, its
+  // ovector and the match list in one go.
+  ASSERT(catch(pcre_assoc("b" + repeat_string("a", 30), ({ "b", "(a+)+$" }), ({ 1, 2 }), 0,
+    ([ "match_limit": 4, "no_jit": 1 ]))));
+
+  // Same shape in pcre_match_all(), whose collected matches are plain svalues in
+  // a std::vector -- its destructor drops them without freeing the strings.
+  ASSERT(catch(pcre_match_all("b" + repeat_string("a", 30), "b|(a+)+$",
+    ([ "match_limit": 4, "no_jit": 1 ]))));
+
+  // More matches than one array can hold: allocate_array() error()s on the size
+  // AFTER every match string has been extracted, so the size is checked first.
+  ASSERT(catch(pcre_match_all(repeat_string("x", 100001), "x")));
+
+  // pcre_replace_callback() extracts the substrings before it validates the
+  // callback, and the array is not on the VM stack yet when that rejects.
+  ASSERT(catch(pcre_replace_callback("abc", "(a)(b)", "cb", "/no/such/object/here")));
+
+  // The compile-error path reports a message that lives inside the pcre_t it
+  // frees on the way out; reading it must not outlive the struct.
+  ASSERT(catch(pcre_assoc("foo", ({ "bar", "+" }), ({ 0, 1 }))));
+}
+#endif

@@ -37,6 +37,15 @@ title: pcre / pcre_info
     APIs need C callbacks or raw pointers, which LPC must not hold. See
     `pcre_config()`.
 
+:::warning[Unicode properties are on by default]
+
+Patterns compile with `PCRE2_UCP`, so `\d` matches any Unicode digit and `\w`
+any letter. Patterns used to *validate* input now accept more than they did
+before the PCRE2 upgrade. Pass `PCRE_NO_UCP` (or `([ "no_ucp": 1 ])`) to get the
+ASCII-only classes back -- see [pcre_match](pcre_match) for the full note.
+
+:::
+
 ### SEE ALSO
 
     pcre_config(3), pcre_convert(3), pcre_match(3)

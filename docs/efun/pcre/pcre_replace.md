@@ -31,6 +31,15 @@ title: pcre / pcre_replace
     UTF-8, Unicode properties, and JIT are on unless you pass `PCRE_NO_UCP`
     or `(["no_ucp": 1])`.
 
+:::warning[Unicode properties are on by default]
+
+Patterns compile with `PCRE2_UCP`, so `\d` matches any Unicode digit and `\w`
+any letter. Patterns used to *validate* input now accept more than they did
+before the PCRE2 upgrade. Pass `PCRE_NO_UCP` (or `([ "no_ucp": 1 ])`) to get the
+ASCII-only classes back -- see [pcre_match](pcre_match) for the full note.
+
+:::
+
 ### SEE ALSO
 
     pcre_assoc(3), pcre_cache(3), pcre_config(3), pcre_extract(3), pcre_replace_callback(3)
