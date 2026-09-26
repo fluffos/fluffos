@@ -43,10 +43,63 @@ runs:
           -DPACKAGE_CRYPTO=OFF \
           -DPACKAGE_DB_MYSQL="" \
           -DPACKAGE_DB_SQLITE=${{ inputs.db-sqlite }} \
+          -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST \
           ..
         VERBOSE=1 make -j 2 install
 
+    # ---------------------------------------------------------------------
+    # TEMPORARY DIAGNOSTIC -- remove before merging.
+    #
+    # gtest discovery (`<exe> --gtest_list_tests`) prints the complete test
+    # list and then exits 3 (MSVCRT abort()) on the current MSYS2 toolchain.
+    # CMake's GoogleTestAddTests.cmake only captures stdout, so the abort
+    # message is thrown away. Run the binaries by hand with stderr attached,
+    # and under gdb, to find out what aborts.
+    - name: DIAGNOSTIC -- capture teardown abort
+      if: always()
+      shell: 'msys2 {0}'
+      run: |
+        set +e
+        cd build
+        echo "=================== toolchain versions ==================="
+        pacman -Q mingw-w64-x86_64-crt mingw-w64-x86_64-headers \
+                  mingw-w64-x86_64-gcc mingw-w64-x86_64-gcc-libs \
+                  mingw-w64-x86_64-cmake mingw-w64-x86_64-gtest \
+                  mingw-w64-x86_64-binutils mingw-w64-x86_64-jemalloc \
+                  mingw-w64-x86_64-icu mingw-w64-x86_64-openssl
+        echo "=================== binaries present ==================="
+        ls -la src/*.exe src/tests/*.exe 2>&1
+        echo
+        for exe in src/driver.exe src/lpcc.exe src/o2json.exe src/symbol.exe \
+                   src/tests/strutils_tests.exe src/tests/ofile_tests.exe \
+                   src/tests/lexer_tests.exe src/tests/compiler_tests.exe \
+                   src/tests/lpc_tests.exe; do
+          if [ ! -f "$exe" ]; then echo "########## $exe MISSING"; continue; fi
+          case "$exe" in
+            *tests.exe)  args=--gtest_list_tests ;;
+            *driver.exe) args=--generate-config ;;
+            *)           args=--help ;;
+          esac
+          echo "########## $exe $args"
+          ./$exe $args >/dev/null 2>/tmp/err.txt
+          echo "### exit=$?"
+          echo "### stderr:"
+          cat /tmp/err.txt
+          echo
+        done
+        echo "=================== gdb: ofile_tests --gtest_list_tests ==================="
+        gdb -batch -nx -ex 'set confirm off' -ex 'set pagination off' \
+            -ex run -ex 'echo \n==== bt ====\n' -ex 'bt full' \
+            -ex 'echo \n==== threads ====\n' -ex 'thread apply all bt' \
+            --args ./src/tests/ofile_tests.exe --gtest_list_tests 2>&1 | tail -150
+        echo "=================== gdb: driver --generate-config ==================="
+        gdb -batch -nx -ex 'set confirm off' -ex 'set pagination off' \
+            -ex run -ex 'echo \n==== bt ====\n' -ex 'bt full' \
+            --args ./src/driver.exe --generate-config 2>&1 | tail -80
+        exit 0
+
     - name: Run tests
+      if: always()
       shell: 'msys2 {0}'
       run: |
         cd build
