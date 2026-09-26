@@ -3,7 +3,7 @@
 // and the generated VS Code assets directly.
 import { tokenize, grammar } from './tokenizer.mjs';
 import { highlightLPC } from './highlight.mjs';
-import { formatLPC, tokenSequence, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
+import { formatLPC, tokenSequence, trimDirectiveTrailingBlanks, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
 import { lintLPC } from './lint.mjs';
 import { readFileSync as readF, readdirSync } from 'node:fs';
 import { fileURLToPath as f2p } from 'node:url';
@@ -1207,8 +1207,9 @@ check('conventions from the final pristine audit: empty for-header clauses'
                formatLPC(marco) === marco && formatLPC(formatLPC(marco)) === formatLPC(marco);
       })());
 // Statement / token order is an invariant: formatLPC may respace and
-// reindent, never move a statement past another. Same sequence used
-// by format-corpus.mjs and by formatLPC's own post-pass gate.
+// reindent, never move a statement past another -- this is the same
+// sequence formatLPC's own internal post-pass gate (assertSameTokenOrder)
+// already enforces on every call; this test exercises that gate directly.
 function sameTokenOrder(src) {
   const out = formatLPC(src);
   const a = tokenSequence(src);
@@ -1228,7 +1229,7 @@ function topLevelStatements(src) {
   for (const t of toks) {
     if (depth === 0 && t.kind === 'directive') {
       flush();
-      out.push(t.text.replace(/[ \t]+$/g, ''));
+      out.push(trimDirectiveTrailingBlanks(t.text));
       continue;
     }
     buf.push(t);
@@ -1261,6 +1262,16 @@ check('statement order is invariant: #include / inherit / declarations'
           '#ifdef FOO\n#include "x.h"\n#endif\ninherit NPC;\n#include "y.h"\n',
           'int x;\ninherit NPC;\nint y;\n',
           'void f() {\n  a &= 3; ASSERT_EQ(2, a);\n  b();\n}\n',
+          // CRLF with trailing spaces/tabs on a directive line: the tokenizer's
+          // directive token ends in '\r' (stops right before the '\n'), so the
+          // trailing-blank run sits before that '\r', not at the string's
+          // absolute end -- an unanchored trim regex never strips it on one
+          // side of the comparison. Regression for the false-positive
+          // "formatter reordered tokens" throw on any CRLF file with trailing
+          // whitespace on a '#' line (would break format-on-save in the
+          // VS Code extension, which calls formatLPC() directly).
+          '#include <a.h>   \r\ninherit NPC;\r\nvoid create() {}\r\n',
+          '#include <a.h>\t \r\ninherit NPC;\r\n#include "fight.h"   \r\n',
         ];
         const mud = cases[0];
         const messy = cases[3];

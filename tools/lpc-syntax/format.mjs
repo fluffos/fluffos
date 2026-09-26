@@ -11,13 +11,28 @@ import { tokenize, skipStringSpan, skipCharSpan } from './tokenizer.mjs';
 export const DEFAULT_PRINT_WIDTH = 100;
 export const DEFAULT_INDENT_SIZE = 2;
 
+// A directive token's trailing run of spaces/tabs, stripped for comparison
+// purposes -- the formatter re-flows a directive's own trailing blanks away,
+// so two directive tokens that differ only there must still compare equal.
+// On a CRLF source the directive token's text ends in '\r' (the tokenizer
+// stops right before the '\n', see tokenizer.mjs), so the run being
+// stripped sits BEFORE that '\r', not at the absolute end of the string --
+// an unanchored `/[ \t]+$/` never matches there and silently leaves the
+// blanks in place on one side of a comparison but not the other (the
+// formatter's own rendering already strips them). Capturing an optional
+// trailing '\r' and keeping it in the replacement is what makes this work
+// on both LF and CRLF input.
+export function trimDirectiveTrailingBlanks(text) {
+  return text.replace(/[ \t]+(\r?)$/g, '$1');
+}
+
 // Non-whitespace token sequence. Formatting may change spacing and
 // line breaks, never this order -- `#include` / `inherit` / any other
 // statement staying put is the same rule. Directive tokens compare
 // with trailing blanks stripped (the formatter itself strips them).
 export function tokenSequence(source) {
   return tokenize(source).filter((t) => t.kind !== 'whitespace')
-    .map((t) => t.kind + ':' + (t.kind === 'directive' ? t.text.replace(/[ \t]+$/g, '') : t.text));
+    .map((t) => t.kind + ':' + (t.kind === 'directive' ? trimDirectiveTrailingBlanks(t.text) : t.text));
 }
 
 function assertSameTokenOrder(source, formatted) {
@@ -378,7 +393,7 @@ export function formatLPC(source, options = {}) {
       // line (C phase 2). Emitted verbatim at column 0; the tokenizer
       // already decided which following lines belong to this directive.
       flush();
-      lines.push(t.text.replace(/[ \t]+(\r?)$/g, '$1'));
+      lines.push(trimDirectiveTrailingBlanks(t.text));
       continue;
     }
     if (t.kind === 'comment') {
