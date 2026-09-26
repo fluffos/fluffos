@@ -46,7 +46,7 @@ Ubuntu / Debian / WSL（仓库放在 Linux 文件系统上，不要放 `/mnt/c`�
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libz-dev telnet libjemalloc-dev libicu-dev \
   libgtest-dev pkg-config libffi-dev
 

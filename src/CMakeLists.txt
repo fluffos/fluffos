@@ -55,13 +55,13 @@ if (EMSCRIPTEN)
   set(PACKAGE_EXTERNAL OFF)  # posix_spawn + socketpair
   set(PACKAGE_FFI OFF)       # libffi/dlopen
   set(PACKAGE_SOCKETS OFF)   # BSD sockets
-  # pcre stays ON: build-deps.sh cross-builds a static libpcre into the
+  # pcre stays ON: build-deps.sh cross-builds a static libpcre2-8 into the
   # wasm-deps prefix, which CMAKE_FIND_ROOT_PATH below lets FindPCRE see.
   set(MARCH_NATIVE OFF)
   set(USE_JEMALLOC OFF)
   set(STATIC OFF)
 
-  # Cross-built static ICU + PCRE (see tools/wasm/build-deps.sh).
+  # Cross-built static ICU + PCRE2 (see tools/wasm/build-deps.sh).
   set(FLUFFOS_WASM_DEPS "/opt/wasm-deps" CACHE PATH
       "Prefix containing wasm-built static ICU/PCRE")
   list(APPEND CMAKE_FIND_ROOT_PATH "${FLUFFOS_WASM_DEPS}")

@@ -9,7 +9,7 @@ title: pcre / pcre_extract
 
 ### SYNOPSIS
 
-    string *pcre_extract(string, string, void|int include_named, void|int pcre_flags);
+    string *pcre_extract(string, string, void|int|mapping include_named, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 
@@ -22,6 +22,15 @@ title: pcre / pcre_extract
     示例（命名分组）：
 
         ({"alpha", "99", (["word": "alpha", "num": "99"])})
+
+:::warning[默认启用 Unicode 属性]
+
+模式以 `PCRE2_UCP` 编译，因此 `\d` 匹配任意 Unicode 数字、`\w` 匹配任意字母。
+用于*校验*输入的模式会比 PCRE2 升级之前接受更多字符串。传入 `PCRE_NO_UCP`
+（或 `([ "no_ucp": 1 ])`）可恢复仅 ASCII 的字符类 —— 详见
+[pcre_match](pcre_match)。
+
+:::
 
 ### SEE ALSO
 

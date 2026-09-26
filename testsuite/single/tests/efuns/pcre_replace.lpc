@@ -17,5 +17,14 @@ void do_tests() {
 
   // Text outside groups is preserved around a single group.
   ASSERT_EQ("aXc", pcre_replace("abc", "(b)", ({ "X" })));
+
+  // String replacement is PCRE2 substitute: $n / ${name}, all matches.
+  ASSERT_EQ("1a", pcre_replace("a1", "([a-z])([0-9])", "$2$1"));
+  ASSERT_EQ("X-X", pcre_replace("a-b", "[a-z]", "X"));
+  ASSERT_EQ("[foo] bar", pcre_replace("foo bar", "(?<w>foo)", "[${w}]"));
+  ASSERT_EQ("abc", pcre_replace("abc", "zzz", "X"));
+  ASSERT_EQ("X-b", pcre_replace("a-b", "[a-z]", "X", ([ "replace_global": 0 ])));
+  ASSERT_EQ("$2$1", pcre_replace("a1", "([a-z])([0-9])", "$2$1", ([ "replace_literal": 1 ])));
+  ASSERT_EQ("A1", pcre_replace("a1", "A1", "A1", ([ "caseless": 1, "replace_global": 0 ])));
 }
 #endif

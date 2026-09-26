@@ -144,7 +144,7 @@ This is the primary supported platform (Ubuntu 24.04 LTS).
 ```bash
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
   pkg-config libffi-dev libdw-dev libbz2-dev
 ```
@@ -165,7 +165,7 @@ make -j$(nproc) install
 
 **1. Install dependencies (Homebrew):**
 ```bash
-brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
+brew install cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c \
   mysql sqlite3 googletest libffi
 ```
 
@@ -186,7 +186,7 @@ To build a **Windows-native** FluffOS binary, you must use the **MSYS2 / MinGW64
 ```bash
 pacman --noconfirm -S --needed \
   git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
+  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre2 \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
   mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
@@ -232,7 +232,7 @@ git clone https://github.com/fluffos/fluffos ~/fluffos
 apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
   mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
   openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-  pcre-dev bison git musl-dev libelf-static elfutils-dev \
+  pcre2-dev bison git musl-dev libelf-static elfutils-dev \
   pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 
