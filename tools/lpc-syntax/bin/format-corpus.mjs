@@ -1,11 +1,13 @@
-// Formats a list of LPC files in place (or checks them with --check),
-// with the corpus safety net: a file is only written if the formatted
-// output is TOKEN-SEQUENCE-EQUIVALENT to the input (tokenize both sides,
-// compare kind+text ignoring whitespace; directive tokens compare with
-// trailing blanks stripped) AND the output is idempotent. A file that
-// fails either check is reported and left untouched, and the run exits
-// nonzero. Driven by testsuite/format.sh, which owns the file list and
-// the exclusions; file paths arrive on stdin, one per line.
+// Formats a list of LPC files in place (or checks them with --check), with
+// the corpus safety net: formatLPC() itself refuses to return a result whose
+// non-whitespace token sequence differs from the input's (see
+// assertSameTokenOrder() in format.mjs), so a file is only written here if
+// that already-passed formatting is ALSO literal-content-preserving (no
+// string/template/heredoc/comment/char/directive text was altered) AND
+// idempotent. A file that fails either remaining check is reported and left
+// untouched, and the run exits nonzero. Driven by testsuite/format.sh, which
+// owns the file list and the exclusions; file paths arrive on stdin, one per
+// line.
 //
 // Usage: node format-corpus.mjs [--check] < files.txt
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -13,23 +15,21 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { formatLPC, tokenSequence } = await import(join(here, '..', 'format.mjs'));
+const { formatLPC, trimDirectiveTrailingBlanks } = await import(join(here, '..', 'format.mjs'));
 const { tokenize } = await import(join(here, '..', 'tokenizer.mjs'));
 
 const checkOnly = process.argv.includes('--check');
 const files = readFileSync(0, 'utf8').split('\n').filter(Boolean);
 
-function sig(src) {
-  return tokenSequence(src).join('\n');
-}
-
 // Literal-bearing token text must survive formatting BYTE-IDENTICAL --
 // a formatter may re-flow code, never alter string/template/heredoc/
-// comment/char/directive content.
+// comment/char/directive content. (Directive text compares with trailing
+// blanks stripped, same as formatLPC's own token-order check, since the
+// formatter re-flows those away -- see trimDirectiveTrailingBlanks.)
 const LITERAL_KINDS = new Set(['string', 'template', 'textblock', 'char', 'comment', 'directive']);
 function literalText(src) {
   return tokenize(src).filter((t) => LITERAL_KINDS.has(t.kind))
-    .map((t) => (t.kind === 'directive' ? t.text.replace(/[ \t]+$/g, '') : t.text))
+    .map((t) => (t.kind === 'directive' ? trimDirectiveTrailingBlanks(t.text) : t.text))
     .join('\u0000');
 }
 
@@ -52,11 +52,6 @@ for (const f of files) {
     continue;
   }
   if (out === src) { unchanged++; continue; }
-  if (sig(src) !== sig(out)) {
-    errors++;
-    console.error(`TOKEN MISMATCH, refusing to write: ${f}`);
-    continue;
-  }
   if (literalText(src) !== literalText(out)) {
     errors++;
     console.error(`LITERAL CONTENT CHANGED, refusing to write: ${f}`);
