@@ -68,6 +68,7 @@
 
 #include <cstring>
 #include <memory>
+#include <utility>
 #include <thirdparty/scope_guard/scope_guard.hpp>
 #include "base/package_api.h"
 
@@ -134,8 +135,7 @@ void f_pcre_version() {
     push_constant_string("unknown");
     return;
   }
-  pcre2_config(PCRE2_CONFIG_JIT, &jit);
-  if (jit) {
+  if (pcre2_config(PCRE2_CONFIG_JIT, &jit) >= 0 && jit) {
     size_t n = strlen(version);
     if (n + 5 < sizeof(version)) {
       memcpy(version + n, " JIT", 5);
@@ -612,8 +612,8 @@ void f_pcre_replace_callback() {
   r = allocate_array(run->rc - 1);  // can't use the empty variant in case we error below
 
   push_refed_array(r);
-  push_refed_array(arr);
-  (void)arr_owner.release();  // the VM stack owns it from here; arr already holds the pointer
+  // Transfer ownership to the VM stack; arr still holds the same pointer for the loop below.
+  push_refed_array(arr_owner.release());
   error_context_t econ;
 
   save_context(&econ);
@@ -1255,7 +1255,7 @@ auto pcre_match_all(const char* subject, size_t subject_len, const char* pattern
       };
       match.push_back(item);
     }
-    matches.push_back(match);
+    matches.push_back(std::move(match));
     // An empty match would rescan the same offset forever; require the next
     // match at this position to be non-empty (the standard pcredemo idiom).
     retry_flags = (run->ovector[1] == run->ovector[0]) ? (PCRE2_NOTEMPTY_ATSTART | PCRE2_ANCHORED) : 0;
@@ -1569,6 +1569,12 @@ static array_t* pcre_assoc(svalue_t* str, array_t* pat, array_t* tok, svalue_t* 
     sv1->u.string = string_copy(tmp, "pcre_assoc");
     assign_svalue_no_free(sv2, def);
 
+    // Drain the match list on the success path (the DEFER above is then a
+    // no-op). Coverity does not see through DEFER/SCOPE_EXIT.
+    while ((rmp = rmph) != nullptr) {
+      rmph = rmp->next;
+      FREE((char*)rmp);
+    }
     return ret_owner.release();
   }
   svalue_t* temp;
