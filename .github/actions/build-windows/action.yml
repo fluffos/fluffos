@@ -43,10 +43,68 @@ runs:
           -DPACKAGE_CRYPTO=OFF \
           -DPACKAGE_DB_MYSQL="" \
           -DPACKAGE_DB_SQLITE=${{ inputs.db-sqlite }} \
+          -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST \
           ..
         VERBOSE=1 make -j 2 install
 
+    # ---------------------------------------------------------------------
+    # TEMPORARY DIAGNOSTIC -- remove before merging, together with the
+    # PRE_TEST line above.
+    #
+    # Every binary this project produced used to run correctly, print its full
+    # output, and then terminate with exit code 3 during teardown:
+    # ~backward::SignalHandling (a static destructor, since backward.cpp
+    # defines a namespace-scope `backward::sh`) threw std::system_error out of
+    # std::mutex::lock() -- EINVAL, which mingw-w64 >= r420 returns for a
+    # zeroed mutex handle where it used to silently re-initialize it -- and a
+    # throw from a noexcept destructor aborts the process. Verify the fix, and
+    # if it is still failing, use a watchpoint to name whatever zeroes the
+    # mutex handle.
+    - name: DIAGNOSTIC -- verify no binary aborts at exit
+      if: always()
+      shell: 'msys2 {0}'
+      run: |
+        set +e
+        cd build
+        pacman -Q mingw-w64-x86_64-crt mingw-w64-x86_64-winpthreads \
+                  mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+        echo
+        bad=0
+        for exe in src/driver.exe src/lpcc.exe src/symbol.exe \
+                   src/tests/strutils_tests.exe src/tests/ofile_tests.exe \
+                   src/tests/lexer_tests.exe src/tests/compiler_tests.exe \
+                   src/tests/lpc_tests.exe; do
+          if [ ! -f "$exe" ]; then echo "  $exe MISSING"; continue; fi
+          case "$exe" in
+            *tests.exe)  args=--gtest_list_tests ;;
+            *driver.exe) args=--generate-config ;;
+            *)           args=--help ;;
+          esac
+          ./$exe $args >/dev/null 2>/tmp/err.txt
+          rc=$?
+          # symbol/lpcc --help legitimately return nonzero; only 3 (abort) matters.
+          printf '  %-34s exit=%s %s\n' "$exe" "$rc" \
+            "$( [ "$rc" = 3 ] && { echo '<-- STILL ABORTING'; bad=1; } )"
+          [ -s /tmp/err.txt ] && sed 's/^/      stderr: /' /tmp/err.txt
+        done
+        echo
+        if [ "$bad" = 1 ]; then
+          echo "=== still aborting: watchpoint on the mutex handle ==="
+          gdb -batch -nx -ex 'set confirm off' -ex 'set pagination off' \
+              -ex 'set breakpoint pending on' \
+              -ex 'start' \
+              -ex 'watch -l backward::SignalHandling::mtx()::data' \
+              -ex 'continue' -ex 'bt' \
+              -ex 'continue' -ex 'bt' \
+              -ex 'continue' -ex 'bt' \
+              --args ./src/tests/strutils_tests.exe --gtest_list_tests 2>&1 | tail -90
+        else
+          echo "=== no binary exits 3 -- the teardown abort is fixed ==="
+        fi
+        exit 0
+
     - name: Run tests
+      if: always()
       shell: 'msys2 {0}'
       run: |
         cd build
