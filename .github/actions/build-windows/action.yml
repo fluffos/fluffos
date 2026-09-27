@@ -33,16 +33,6 @@ runs:
           mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
           bison make ${{ inputs.extra-packages }}
 
-    # TEMPORARY DIAGNOSTIC -- remove before merging.
-    # Runs BEFORE the (slow) build so its result is never blocked by one.
-    # Every fluffos binary on this toolchain -- driver.exe included -- prints
-    # its full output and then exits 3 with EMPTY stderr, and gdb sees a clean
-    # process exit (no signal). Does a hello-world do it too?
-    - name: DIAGNOSTIC -- minimal reproducer matrix (no fluffos code)
-      if: always()
-      shell: 'msys2 {0}'
-      run: bash "$GITHUB_ACTION_PATH/diagnose-minirepro.sh"
-
     - name: Configure & build
       shell: 'msys2 {0}'
       run: |
@@ -58,87 +48,59 @@ runs:
         VERBOSE=1 make -j 2 install
 
     # ---------------------------------------------------------------------
-    # TEMPORARY DIAGNOSTIC -- remove before merging.
+    # TEMPORARY DIAGNOSTIC -- remove before merging, together with the
+    # PRE_TEST line above.
     #
-    # gtest discovery (`<exe> --gtest_list_tests`) prints the complete test
-    # list and then exits 3 (MSVCRT abort()) on the current MSYS2 toolchain.
-    # CMake's GoogleTestAddTests.cmake only captures stdout, so the abort
-    # message is thrown away. Run the binaries by hand with stderr attached,
-    # and under gdb, to find out what aborts.
-    - name: DIAGNOSTIC -- capture teardown abort
+    # Every binary this project produced used to run correctly, print its full
+    # output, and then terminate with exit code 3 during teardown:
+    # ~backward::SignalHandling (a static destructor, since backward.cpp
+    # defines a namespace-scope `backward::sh`) threw std::system_error out of
+    # std::mutex::lock() -- EINVAL, which mingw-w64 >= r420 returns for a
+    # zeroed mutex handle where it used to silently re-initialize it -- and a
+    # throw from a noexcept destructor aborts the process. Verify the fix, and
+    # if it is still failing, use a watchpoint to name whatever zeroes the
+    # mutex handle.
+    - name: DIAGNOSTIC -- verify no binary aborts at exit
       if: always()
       shell: 'msys2 {0}'
       run: |
         set +e
         cd build
-        echo "=================== toolchain versions ==================="
-        pacman -Q mingw-w64-x86_64-crt mingw-w64-x86_64-headers \
-                  mingw-w64-x86_64-gcc mingw-w64-x86_64-gcc-libs \
-                  mingw-w64-x86_64-cmake mingw-w64-x86_64-gtest \
-                  mingw-w64-x86_64-binutils mingw-w64-x86_64-jemalloc \
-                  mingw-w64-x86_64-icu mingw-w64-x86_64-openssl
-        echo "=================== binaries present ==================="
-        ls -la src/*.exe src/tests/*.exe 2>&1
+        pacman -Q mingw-w64-x86_64-crt mingw-w64-x86_64-winpthreads \
+                  mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
         echo
-        for exe in src/driver.exe src/lpcc.exe src/o2json.exe src/symbol.exe \
+        bad=0
+        for exe in src/driver.exe src/lpcc.exe src/symbol.exe \
                    src/tests/strutils_tests.exe src/tests/ofile_tests.exe \
                    src/tests/lexer_tests.exe src/tests/compiler_tests.exe \
                    src/tests/lpc_tests.exe; do
-          if [ ! -f "$exe" ]; then echo "########## $exe MISSING"; continue; fi
+          if [ ! -f "$exe" ]; then echo "  $exe MISSING"; continue; fi
           case "$exe" in
             *tests.exe)  args=--gtest_list_tests ;;
             *driver.exe) args=--generate-config ;;
             *)           args=--help ;;
           esac
-          echo "########## $exe $args"
           ./$exe $args >/dev/null 2>/tmp/err.txt
-          echo "### exit=$?"
-          echo "### stderr:"
-          cat /tmp/err.txt
-          echo
+          rc=$?
+          # symbol/lpcc --help legitimately return nonzero; only 3 (abort) matters.
+          printf '  %-34s exit=%s %s\n' "$exe" "$rc" \
+            "$( [ "$rc" = 3 ] && { echo '<-- STILL ABORTING'; bad=1; } )"
+          [ -s /tmp/err.txt ] && sed 's/^/      stderr: /' /tmp/err.txt
         done
-        # The exit code is 3 no matter what the program returns, stderr is
-        # empty, and gdb sees a normal exit -- so find WHO terminates the
-        # process by breaking on every exit/abort entry point.
-        echo "=================== STAGE 6: link-only isolation ==================="
-        # Does merely LINKING fluffos's static libs into a do-nothing main
-        # reproduce the exit-3? backward-cpp installs process-wide handlers
-        # from a static object, so linking alone might be enough.
-        B="$PWD"
-        mkdir -p /tmp/linkonly && cd /tmp/linkonly
-        printf 'int main(void){return 0;}\n' > lo.cc
-        probe() {
-          label="$1"; shift
-          rm -f lo.exe
-          if ! g++ -O0 -g lo.cc -o lo.exe "$@" 2> lerr.txt; then
-            printf '  %-28s BUILD FAILED: %s\n' "$label" "$(head -2 lerr.txt | tr -d '\r\n')"
-            return
-          fi
-          ./lo.exe > lout.txt 2> lerr2.txt
-          printf '  %-28s exit=%s stderr=%s\n' "$label" "$?" "'$(tr -d '\r\n' < lerr2.txt)'"
-        }
-        probe "bare static c++" -static -static-libgcc -static-libstdc++
-        probe "+backward object" -static -static-libgcc -static-libstdc++ \
-              "$B/src/thirdparty/backward-cpp/CMakeFiles/backward_object.dir/backward.cpp.obj" \
-              -ldbghelp -lpsapi
-        probe "+libdriver.a" -static -static-libgcc -static-libstdc++ \
-              -Wl,--start-group "$B/src/liblibdriver.a" "$B/src/libautogen.a" -Wl,--end-group
-        cd "$B"
-
-        echo "=================== gdb: who exits? (strutils_tests) ==================="
-        gdb -batch -nx -ex 'set confirm off' -ex 'set pagination off' \
-            -ex 'set breakpoint pending on' \
-            -ex 'handle SIGABRT stop print nopass' \
-            -ex 'break abort'   -ex 'break _exit'  -ex 'break exit' \
-            -ex 'break raise'   -ex 'break _assert' -ex 'break _wassert' \
-            -ex 'break __stack_chk_fail' -ex 'break ExitProcess' \
-            -ex 'break _c_exit' -ex 'break _cexit' \
-            -ex run \
-            -ex 'echo \n==== stop 1 ====\n' -ex bt -ex 'info args' -ex continue \
-            -ex 'echo \n==== stop 2 ====\n' -ex bt -ex 'info args' -ex continue \
-            -ex 'echo \n==== stop 3 ====\n' -ex bt -ex 'info args' -ex continue \
-            -ex 'echo \n==== stop 4 ====\n' -ex bt -ex 'info args' -ex continue \
-            --args ./src/tests/strutils_tests.exe --gtest_list_tests 2>&1 | tail -120
+        echo
+        if [ "$bad" = 1 ]; then
+          echo "=== still aborting: watchpoint on the mutex handle ==="
+          gdb -batch -nx -ex 'set confirm off' -ex 'set pagination off' \
+              -ex 'set breakpoint pending on' \
+              -ex 'start' \
+              -ex 'watch -l backward::SignalHandling::mtx()::data' \
+              -ex 'continue' -ex 'bt' \
+              -ex 'continue' -ex 'bt' \
+              -ex 'continue' -ex 'bt' \
+              --args ./src/tests/strutils_tests.exe --gtest_list_tests 2>&1 | tail -90
+        else
+          echo "=== no binary exits 3 -- the teardown abort is fixed ==="
+        fi
         exit 0
 
     - name: Run tests
