@@ -171,7 +171,7 @@ void handle_request(const djson& msg) try {
     if (!s.attached) {
       push_constant_string(s.client_addr.c_str());
       svalue_t* mret = safe_apply_master_ob(APPLY_VALID_DEBUGGER, 1);
-      if (mret && !MASTER_APPROVED(mret)) {
+      if (mret && !MASTER_APPROVED(mret, "valid_debugger")) {
         debug_message("Debugger: attach denied by master::valid_debugger() for %s.\n",
                       s.client_addr.c_str());
         send_response(msg, false, nullptr, "attach denied");
