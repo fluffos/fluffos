@@ -143,14 +143,8 @@ static int lpcc_main(int argc, char** argv) {
       struct object_t* obj = nullptr;
       error_context_t econ{};
       save_context(&econ);
-      const char* err_msg = nullptr;
       try {
         obj = find_object(f.c_str());
-      } catch (const char* e) {
-        // error() throws the diagnostic text; without reporting it the only
-        // output is a generic "Fail to load object".
-        err_msg = e;
-        restore_context(&econ);
       } catch (...) {
         restore_context(&econ);
       }
@@ -159,9 +153,6 @@ static int lpcc_main(int argc, char** argv) {
 
       bool ok = obj != nullptr && obj->prog != nullptr;
       if (!ok) {
-        if (err_msg != nullptr) {
-          fprintf(stderr, "%s", err_msg);
-        }
         fprintf(stderr, "Fail to load object %s.\n", f.c_str());
         failed++;
       }
@@ -217,13 +208,6 @@ static int lpcc_main(int argc, char** argv) {
         current_object = master_ob;
         obj = find_object(file);
       }
-    } catch (const char* e) {
-      // error() throws the diagnostic text; report it instead of dropping it
-      // on the floor and printing only the generic failure below.
-      if (e != nullptr) {
-        fprintf(stderr, "%s", e);
-      }
-      restore_context(&econ);
     } catch (...) {
       restore_context(&econ);
     }
