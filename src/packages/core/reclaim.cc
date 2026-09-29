@@ -67,6 +67,10 @@ static void check_svalue(svalue_t* v) {
         // could deallocate a program the funptr still referenced). FP_FUNCTIONAL
         // funptrs, which take no special-case here, are already handled
         // correctly this way.
+        // Un-intern while the owner still names the key: once the ref is
+        // gone the object_t can be freed and its address reused, and a new
+        // object's evaluation of the same function must not find this one.
+        unintern_funp(v->u.fp);
         free_object(&v->u.fp->hdr.owner, "reclaim_objects");
         v->u.fp->hdr.owner = nullptr;
         cleaned++;

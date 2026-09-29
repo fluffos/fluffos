@@ -7,6 +7,275 @@
 
 #include "packages/core/replace_program.h"
 
+#include <cstring>
+#include <unordered_map>
+#include <vector>
+
+/* A named-function reference with no bound arguments -- `cb`, `(: cb :)`,
+ * `write`, a simul_efun name -- evaluates to ONE function pointer per
+ * (owner, function) for as long as that pointer is alive, so `cb == cb` holds
+ * and `arr -= ({ cb })` removes what `arr += ({ cb })` added. Every equality
+ * site in the driver (==, array set operations, member_array, mapping keys)
+ * compares function values by pointer, so interning at construction is the
+ * one place this has to be decided.
+ *
+ * The table is WEAK: it holds no reference. An entry lives exactly as long as
+ * the pointer it names, and dealloc_funp() removes it. That is all the
+ * semantics need -- two evaluations can only be compared while something
+ * holds the first one, which keeps its entry -- and it means the table
+ * creates no owner <-> pointer cycle and needs no mark in check_memory().
+ *
+ * Entries are grouped by owner so recompile_object() can find an object's
+ * pointers without scanning everyone's. The key is safe to trust for the
+ * entry's lifetime: the pointer holds a ref on its owner (and an FP_LOCAL on
+ * its program), so neither address can be reused while the entry exists. The
+ * one path that drops an owner ref early, reclaim_objects(), un-interns first.
+ *
+ * FP_LOCAL keys include the program and prog_generation the index is relative
+ * to. recompile_object() re-resolves the owner's local-function pointers by
+ * name against the new program (refresh_named_funps()) and re-keys them
+ * before any of the new program's code runs, so a reference evaluated after
+ * the recompile finds the same pointer. Efun and simul_efun pointers don't
+ * depend on the owner's layout; their keys never change.
+ *
+ * Addresses are stored XOR-masked (as md.h's chain pointers are) so the
+ * table does not make a leaked pointer or its owner look reachable to
+ * LeakSanitizer. */
+namespace {
+
+const uintptr_t kNamedFunpMask = static_cast<uintptr_t>(0xA5A5A5A5A5A5A5A5ull);
+
+uintptr_t mask_ptr(const void* p) { return reinterpret_cast<uintptr_t>(p) ^ kNamedFunpMask; }
+
+struct NamedFunpKey {
+  uintptr_t prog;
+  uint32_t gen;
+  short kind;
+  short index;
+
+  bool operator==(const NamedFunpKey& o) const {
+    return prog == o.prog && gen == o.gen && kind == o.kind && index == o.index;
+  }
+};
+
+struct NamedFunpKeyHash {
+  size_t operator()(const NamedFunpKey& k) const {
+    size_t h = std::hash<uintptr_t>{}(k.prog);
+    h ^= std::hash<uint32_t>{}(k.gen) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    h ^= (static_cast<size_t>(k.kind) << 16 | static_cast<uint16_t>(k.index)) +
+         0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    return h;
+  }
+};
+
+using OwnerFunps = std::unordered_map<NamedFunpKey, uintptr_t, NamedFunpKeyHash>;
+
+/* Never destroyed: pointers can still be freed while the driver tears down
+ * after static destructors have started. */
+std::unordered_map<uintptr_t, OwnerFunps>& named_funps =
+    *new std::unordered_map<uintptr_t, OwnerFunps>();
+
+NamedFunpKey named_funp_key(short kind, int index, program_t* prog, uint32_t gen) {
+  return NamedFunpKey{prog ? mask_ptr(prog) : 0, gen, kind, static_cast<short>(index)};
+}
+
+/* The key fp was interned under, if it is the kind of pointer that is. */
+bool named_funp_key_of(const funptr_t* fp, NamedFunpKey* key) {
+  if (fp->hdr.args || !fp->hdr.owner) {
+    return false;
+  }
+  switch (fp->hdr.type) {
+    case FP_LOCAL | FP_NOT_BINDABLE:
+      *key = named_funp_key(FP_LOCAL, fp->f.local.index, fp->f.local.prog, fp->hdr.owner_gen);
+      return true;
+    case FP_EFUN:
+      *key = named_funp_key(FP_EFUN, fp->f.efun.index, nullptr, 0);
+      return true;
+    case FP_SIMUL:
+      *key = named_funp_key(FP_SIMUL, fp->f.simul.index, nullptr, 0);
+      return true;
+    default:
+      return false;
+  }
+}
+
+/* The interned pointer for `key` (no reference taken), or nullptr. */
+funptr_t* peek_named_funp(object_t* owner, const NamedFunpKey& key) {
+  auto bucket = named_funps.find(mask_ptr(owner));
+  if (bucket == named_funps.end()) {
+    return nullptr;
+  }
+  auto it = bucket->second.find(key);
+  if (it == bucket->second.end()) {
+    return nullptr;
+  }
+  return reinterpret_cast<funptr_t*>(it->second ^ kNamedFunpMask);
+}
+
+/* Returns the live interned pointer for `key` with a new reference taken, or
+ * nullptr. */
+funptr_t* find_named_funp(object_t* owner, const NamedFunpKey& key) {
+  funptr_t* fp = peek_named_funp(owner, key);
+  if (fp) {
+    fp->hdr.ref++;
+  }
+  return fp;
+}
+
+void intern_named_funp(object_t* owner, const NamedFunpKey& key, funptr_t* fp) {
+  named_funps[mask_ptr(owner)][key] = mask_ptr(fp);
+}
+
+/* Remove fp's entry if fp is what the entry names. Returns whether it was. */
+bool unintern_named_funp(funptr_t* fp) {
+  NamedFunpKey key;
+  if (named_funps.empty() || !named_funp_key_of(fp, &key)) {
+    return false;
+  }
+  auto bucket = named_funps.find(mask_ptr(fp->hdr.owner));
+  if (bucket == named_funps.end()) {
+    return false;
+  }
+  /* Only the pointer the entry names may remove it: bind() copies, and a
+   * pointer whose bound args were detached by the cycle breakers, match a
+   * key without being the interned value. */
+  auto it = bucket->second.find(key);
+  if (it == bucket->second.end() || it->second != mask_ptr(fp)) {
+    return false;
+  }
+  bucket->second.erase(it);
+  if (bucket->second.empty()) {
+    named_funps.erase(bucket);
+  }
+  return true;
+}
+
+/* The program that defines runtime function slot `slot` of `prog`, and the
+ * slot's index in that program's function_table. The walk is by POSITION --
+ * inherited slots occupy [0, last_inherited), partitioned by each inherit's
+ * function_index_offset -- rather than by FUNC_INHERITED, because an
+ * override's inherited slot is a FUNC_ALIAS word whose low bits hold the
+ * alias target, not flags. So unlike get_function_at_index() this never
+ * follows an alias: the slot still names the inherited definition. */
+std::pair<program_t*, int> defining_function(program_t* prog, int slot) {
+  while (slot < prog->last_inherited) {
+    int low = 0;
+    int high = prog->num_inherited - 1;
+    while (high > low) {
+      int mid = (low + high + 1) >> 1;
+      if (prog->inherit[mid].function_index_offset > slot) {
+        high = mid - 1;
+      } else {
+        low = mid;
+      }
+    }
+    slot -= prog->inherit[low].function_index_offset;
+    prog = prog->inherit[low].prog;
+  }
+  return {prog, slot - prog->last_inherited};
+}
+
+bool same_function(program_t* prog, int slot, const char* file, const char* name) {
+  auto def = defining_function(prog, slot);
+  const char* funcname = def.first->function_table[def.second].funcname;
+  return funcname && !strcmp(funcname, name) && !strcmp(def.first->filename, file);
+}
+
+/* The slot in new_prog that names the same function old_slot named in
+ * old_prog: same defining program file, same function name, and the same
+ * occurrence among slots matching both -- a program inherited twice has one
+ * copy of each function per inherit, each with its own variables. -1 when
+ * the function is gone. */
+int find_same_function(program_t* old_prog, int old_slot, program_t* new_prog) {
+  auto def = defining_function(old_prog, old_slot);
+  const char* file = def.first->filename;
+  const char* name = def.first->function_table[def.second].funcname;
+  if (!name) {
+    return -1;
+  }
+
+  int occurrence = 0;
+  for (int s = 0; s < old_slot; s++) {
+    if (same_function(old_prog, s, file, name)) {
+      occurrence++;
+    }
+  }
+  int total = new_prog->last_inherited + new_prog->num_functions_defined;
+  for (int s = 0; s < total; s++) {
+    if (same_function(new_prog, s, file, name) && occurrence-- == 0) {
+      return s;
+    }
+  }
+  return -1;
+}
+
+}  // namespace
+
+void unintern_funp(funptr_t* fp) { unintern_named_funp(fp); }
+
+bool refresh_local_funp(funptr_t* fp) {
+  object_t* owner = fp->hdr.owner;
+  if (!owner || (owner->flags & O_DESTRUCTED)) {
+    return false;
+  }
+  if (fp->hdr.owner_gen == owner->prog_generation) {
+    return true;
+  }
+  program_t* old_prog = fp->f.local.prog;
+  program_t* new_prog = owner->prog;
+  int slot = find_same_function(old_prog, fp->f.local.ref_index, new_prog);
+  if (slot < 0) {
+    return false;
+  }
+  int index = slot;
+  if (new_prog->function_flags[index] & FUNC_ALIAS) {
+    index = new_prog->function_flags[index] & ~FUNC_ALIAS;
+  }
+
+  bool const interned = unintern_named_funp(fp);
+
+  new_prog->func_ref++;
+  fp->f.local.prog = new_prog;
+  fp->f.local.index = index;
+  fp->f.local.ref_index = slot;
+  fp->hdr.owner_gen = owner->prog_generation;
+
+  old_prog->func_ref--;
+  if (!old_prog->func_ref && !old_prog->ref) {
+    deallocate_program(old_prog);
+  }
+
+  if (interned) {
+    NamedFunpKey key;
+    named_funp_key_of(fp, &key);
+    /* recompile_object() re-keys before any new code runs, so nothing can
+     * already hold this key; if something ever did, it stays canonical and
+     * this pointer simply stops being the interned one. */
+    if (!peek_named_funp(owner, key)) {
+      intern_named_funp(owner, key, fp);
+    }
+  }
+  return true;
+}
+
+void refresh_named_funps(object_t* ob) {
+  auto bucket = named_funps.find(mask_ptr(ob));
+  if (bucket == named_funps.end()) {
+    return;
+  }
+  // Collected first: refreshing re-keys entries in this very bucket.
+  std::vector<funptr_t*> locals;
+  for (const auto& entry : bucket->second) {
+    auto* fp = reinterpret_cast<funptr_t*>(entry.second ^ kNamedFunpMask);
+    if (fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE)) {
+      locals.push_back(fp);
+    }
+  }
+  for (funptr_t* fp : locals) {
+    refresh_local_funp(fp);
+  }
+}
+
 void dealloc_funp(funptr_t* fp) {
   program_t* prog = nullptr;
 
@@ -19,6 +288,8 @@ void dealloc_funp(funptr_t* fp) {
       prog = fp->f.functional.prog;
       break;
   }
+
+  unintern_funp(fp);
 
   if (fp->hdr.owner) {
     free_object(&fp->hdr.owner, "free_funp");
@@ -93,6 +364,15 @@ int merge_arg_lists(int num_arg, array_t* arr, int start) {
 
 funptr_t* make_efun_funp(int opcode, svalue_t* args) {
   funptr_t* fp;
+  bool const named = args->type != T_ARRAY;
+  NamedFunpKey key{};
+
+  if (named) {
+    key = named_funp_key(FP_EFUN, opcode, nullptr, 0);
+    if ((fp = find_named_funp(current_object, key))) {
+      return fp;
+    }
+  }
 
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_efun_funp"));
   fp->hdr.owner = current_object;
@@ -102,7 +382,7 @@ funptr_t* make_efun_funp(int opcode, svalue_t* args) {
 
   fp->f.efun.index = opcode;
 
-  if (args->type == T_ARRAY) {
+  if (!named) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
@@ -110,6 +390,9 @@ funptr_t* make_efun_funp(int opcode, svalue_t* args) {
   }
 
   fp->hdr.ref = 1;
+  if (named) {
+    intern_named_funp(current_object, key, fp);
+  }
   return fp;
 }
 
@@ -123,6 +406,23 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
         "replace_program()\n");
   }
 
+  int const ref_index = index + function_index_offset;
+  newindex = ref_index;
+  if (current_object->prog->function_flags[newindex] & FUNC_ALIAS) {
+    newindex = current_object->prog->function_flags[newindex] & ~FUNC_ALIAS;
+  }
+
+  bool const named = args->type != T_ARRAY;
+  NamedFunpKey key{};
+
+  if (named) {
+    key = named_funp_key(FP_LOCAL, newindex, current_object->prog,
+                         current_object->prog_generation);
+    if ((fp = find_named_funp(current_object, key))) {
+      return fp;
+    }
+  }
+
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_lfun_funp"));
   fp->hdr.owner = current_object;
   add_ref(current_object, "make_lfun_funp");
@@ -134,13 +434,10 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
   debug(d_flag, "add func ref /%s: now %i\n", fp->f.local.prog->filename,
         fp->f.local.prog->func_ref);
 
-  newindex = index + function_index_offset;
-  if (current_object->prog->function_flags[newindex] & FUNC_ALIAS) {
-    newindex = current_object->prog->function_flags[newindex] & ~FUNC_ALIAS;
-  }
   fp->f.local.index = newindex;
+  fp->f.local.ref_index = ref_index;
 
-  if (args->type == T_ARRAY) {
+  if (!named) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
@@ -148,11 +445,23 @@ funptr_t* make_lfun_funp(int index, svalue_t* args) {
   }
 
   fp->hdr.ref = 1;
+  if (named) {
+    intern_named_funp(current_object, key, fp);
+  }
   return fp;
 }
 
 funptr_t* make_simul_funp(int index, svalue_t* args) {
   funptr_t* fp;
+  bool const named = args->type != T_ARRAY;
+  NamedFunpKey key{};
+
+  if (named) {
+    key = named_funp_key(FP_SIMUL, index, nullptr, 0);
+    if ((fp = find_named_funp(current_object, key))) {
+      return fp;
+    }
+  }
 
   fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "make_simul_funp"));
   fp->hdr.owner = current_object;
@@ -162,7 +471,7 @@ funptr_t* make_simul_funp(int index, svalue_t* args) {
 
   fp->f.simul.index = index;
 
-  if (args->type == T_ARRAY) {
+  if (!named) {
     fp->hdr.args = args->u.arr;
     args->u.arr->ref++;
   } else {
@@ -170,6 +479,9 @@ funptr_t* make_simul_funp(int index, svalue_t* args) {
   }
 
   fp->hdr.ref = 1;
+  if (named) {
+    intern_named_funp(current_object, key, fp);
+  }
   return fp;
 }
 
@@ -229,6 +541,15 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
      re-laid-out variables. Fail cleanly instead. */
   switch (funp->hdr.type & FP_MASK) {
     case FP_LOCAL:
+      /* A named function survives the recompile if the new program still has
+       * it: re-resolve by name, as recompile_object() does for variables. The
+       * owner's argument-less pointers were already refreshed during the
+       * recompile; this catches the ones carrying bound arguments. */
+      if (funp->hdr.owner_gen != funp->hdr.owner->prog_generation && !refresh_local_funp(funp)) {
+        error("Stale function pointer: owner /%s was recompiled since it was created.\n",
+              funp->hdr.owner->obname);
+      }
+      break;
     case FP_FUNCTIONAL:
       if (funp->hdr.owner_gen != funp->hdr.owner->prog_generation) {
         error("Stale function pointer: owner /%s was recompiled since it was created.\n",
