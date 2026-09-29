@@ -1,0 +1,9 @@
+// Base for compiler/fail/async_override_mismatch.lpc: a plain (non-async)
+// function, plus a call to it compiled HERE, against THIS declaration.
+int f(int n) { return n + 1; }
+
+int use() {
+  int x = f(1);
+
+  return x;
+}

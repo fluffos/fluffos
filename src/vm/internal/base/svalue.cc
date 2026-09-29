@@ -85,13 +85,18 @@ namespace {
 // only that each is eventually dealloc'd exactly once.
 struct PendingCompoundFree {
   void* ptr;
-  unsigned short type;  // T_ARRAY, T_CLASS, or T_MAPPING
+  uint32_t type;  // T_ARRAY, T_CLASS, T_MAPPING, or T_PROMISE
 };
 bool g_freeing_compound = false;
 std::vector<PendingCompoundFree>* g_pending_compound_frees = nullptr;
 
-void dealloc_one_compound(void* ptr, unsigned short type) {
+}  // namespace
+
+static void dealloc_one_compound(void* ptr, uint32_t type) {
   switch (type) {
+    case T_PROMISE:
+      dealloc_promise(reinterpret_cast<promise_t*>(ptr));
+      break;
     case T_CLASS:
       dealloc_class(reinterpret_cast<array_t*>(ptr));
       break;
@@ -107,7 +112,7 @@ void dealloc_one_compound(void* ptr, unsigned short type) {
 // Dispatches one T_ARRAY/T_CLASS/T_MAPPING deallocation, deferring to the
 // queue above if a dealloc_*() call is already in progress further up the
 // (now-flat) call chain.
-void free_compound(void* ptr, unsigned short type) {
+void free_compound(void* ptr, uint32_t type) {
   if (g_freeing_compound) {
     if (!g_pending_compound_frees) {
       g_pending_compound_frees = new std::vector<PendingCompoundFree>();
@@ -124,7 +129,6 @@ void free_compound(void* ptr, unsigned short type) {
   }
   g_freeing_compound = false;
 }
-}  // namespace
 
 /*
  * Free the data that an svalue is pointing to. Not the svalue
@@ -173,15 +177,23 @@ void int_free_svalue(svalue_t* v)
     }
 #endif
     /* TODO: Set to 0 on condition that REF overflow to negative. */
+    bool reached_zero = false;
     if (v->u.refed->ref > 0) {
       v->u.refed->ref--;
+      reached_zero = (v->u.refed->ref == 0);
 #ifdef DEBUGMALLOC_EXTENSIONS
       if (v->u.refed != (void*)&the_null_array && v->u.refed != (void*)&null_buf) {
         md_record_ref_journal(PTR_TO_NODET(v->u.refed), false, v->u.refed->ref, tag);
       }
 #endif  // DEBUGMALLOC_EXTENSIONS
     }
-    if (v->u.refed->ref == 0) {
+    /* Only deallocate when THIS call performed the 1 -> 0 decrement. The
+     * underflow guard above used to suppress just the decrement while the
+     * unconditional `ref == 0` check still ran the dealloc -- so a second
+     * aliased svalue freeing an already-deallocated value (ref reads 0 from
+     * freed memory) triggered a second dealloc instead of containing the
+     * corruption. */
+    if (reached_zero) {
       switch (v->type) {
         case T_OBJECT:
           dealloc_object(v->u.ob, "free_svalue");
@@ -205,6 +217,11 @@ void int_free_svalue(svalue_t* v)
         case T_FUNCTION:
           dealloc_funp(v->u.fp);
           break;
+        case T_PROMISE:
+          /* deferred like arrays/mappings: dropping a long then()-chain
+           * must not recurse the C stack away. */
+          free_compound(v->u.prom, T_PROMISE);
+          break;
         case T_REF:
           if (!v->u.ref->lvalue) {
             kill_ref(v->u.ref);
@@ -215,6 +232,9 @@ void int_free_svalue(svalue_t* v)
     }
   } else if (v->type == T_ERROR_HANDLER) {
     (*v->u.error_handler)();
+    v->type |= T_FREED;
+  } else if (v->type == T_LVALUE_CODEPOINT || v->type == T_LVALUE_RANGE) {
+    free_indexed_lvalue(v);
     v->type |= T_FREED;
   }
 #ifdef DEBUG
@@ -248,6 +268,17 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
       return {{"ref", (intptr_t)obj->u.ref->lvalue}};
     case T_FUNCTION:
       return "function";
+    case T_PROMISE:
+      switch (obj->u.prom->state) {
+        case PROMISE_FULFILLED:
+          return "promise (fulfilled)";
+        case PROMISE_REJECTED:
+          return "promise (rejected)";
+        case PROMISE_CANCELLED:
+          return "promise (cancelled)";
+        default:
+          return "promise (pending)";
+      }
     case T_NUMBER:
       return obj->u.number;
     case T_REAL:
@@ -285,7 +316,7 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
     }
     case T_MAPPING: {
       json res = json::object();
-      auto limit = std::min(5u, obj->u.map->count);
+      auto limit = std::min(5u, MAP_COUNT(obj->u.map));
       for (int i = 0; i < obj->u.map->table_size; i++) {
         mapping_node_t* elm;
         for (elm = obj->u.map->table[i]; elm; elm = elm->next) {
@@ -301,8 +332,8 @@ json svalue_to_json_summary(const svalue_t* obj, int depth) {
           }
         }
       }
-      if (obj->u.map->count > 4) {
-        res["_sizeof"] = std::to_string(obj->u.map->count);
+      if (MAP_COUNT(obj->u.map) > 4) {
+        res["_sizeof"] = std::to_string(MAP_COUNT(obj->u.map));
       }
       return res;
     }

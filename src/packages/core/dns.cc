@@ -3,6 +3,7 @@
 #include "packages/core/dns.h"
 
 #ifndef _WIN32
+#include <arpa/inet.h>   // for inet_ntop
 #include <netdb.h>       // for getnameinfo
 #include <netinet/in.h>  // for sockaddr_storage
 #include <sys/socket.h>
@@ -89,8 +90,27 @@ const char* query_ip_number(object_t* ob) {
   if (!ob || ob->interactive == nullptr) {
     return nullptr;
   }
+  auto* sa = reinterpret_cast<sockaddr*>(&ob->interactive->addr);
+
+  // Pass the connection's real address length, not sizeof(sockaddr_storage):
+  // strict getnameinfo() implementations (emscripten's in particular) reject
+  // an oversized salen outright, and with the result unchecked the
+  // uninitialized buffer used to be interned as the "IP string".
   char host[NI_MAXHOST];
-  getnameinfo(reinterpret_cast<sockaddr*>(&ob->interactive->addr), sizeof(ob->interactive->addr),
-              host, sizeof(host), nullptr, 0, NI_NUMERICHOST);
+  int ret = getnameinfo(sa, ob->interactive->addrlen, host, sizeof(host), nullptr, 0,
+                        NI_NUMERICHOST);
+  if (ret != 0) {
+    // Fall back to converting the raw address directly, so a quirky
+    // getnameinfo() can never leave callers without a dotted-quad.
+    const void* src = nullptr;
+    if (sa->sa_family == AF_INET) {
+      src = &reinterpret_cast<sockaddr_in*>(sa)->sin_addr;
+    } else if (sa->sa_family == AF_INET6) {
+      src = &reinterpret_cast<sockaddr_in6*>(sa)->sin6_addr;
+    }
+    if (src == nullptr || inet_ntop(sa->sa_family, src, host, sizeof(host)) == nullptr) {
+      strcpy(host, "0.0.0.0");
+    }
+  }
   return make_shared_string(host);
 }

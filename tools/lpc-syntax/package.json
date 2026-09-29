@@ -2,10 +2,17 @@
   "name": "lpc-syntax",
   "private": true,
   "version": "1.0.0",
-  "description": "Grammar-driven LPC tokenizer/highlighter/formatter/linter tooling. Dependency-free (node >= 18); see ../../testsuite/format.sh for the corpus formatter CLI.",
+  "description": "Grammar-driven LPC tokenizer/highlighter/formatter/linter tooling, plus a Prism / Docusaurus highlighter plugin. Dependency-free (node >= 18); see ../../testsuite/format.sh for the corpus formatter CLI.",
   "type": "module",
   "engines": {
     "node": ">=18"
+  },
+  "exports": {
+    "./prism-lpc": "./prism-lpc.cjs",
+    "./docusaurus-plugin": "./docusaurus-plugin.cjs",
+    "./highlight": "./highlight.mjs",
+    "./format": "./format.mjs",
+    "./tokenizer": "./tokenizer.mjs"
   },
   "scripts": {
     "test": "node test.mjs",

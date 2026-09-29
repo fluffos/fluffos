@@ -1,0 +1,3 @@
+// Fixture for efuns/acatch_dwlib_latch.lpc: the plain object doing the
+// referring. Ordinary and visible.
+string query_name() { return "bob"; }

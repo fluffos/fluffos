@@ -4,9 +4,22 @@ on:
   push:
     branches: [master]
     paths-ignore: ['docs/**']
+  # No `branches:` filter on purpose: a pull request must be checked whatever
+  # its base is, so a PR stacked on another PR's branch still gets signal.
+  # (`push` stays master-only -- that is about building the mainline, not
+  # about gating review.)
   pull_request:
-    branches: [master]
     paths-ignore: ['docs/**']
+
+# Supersede an in-flight run when the same ref is pushed again. Without this
+# every push starts a full matrix and none of the older ones ever stop, so a
+# branch pushed a few times in quick succession has several complete runs
+# competing for the same runners and starving each other -- which looks
+# exactly like a CI outage. The default branch is exempt: master runs are the
+# release record and each commit's result is worth keeping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
@@ -40,7 +53,7 @@ jobs:
             cxx: g++
             build: Debug
             cmake_flags: -DPACKAGE_DWLIB=ON
-            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: gcc
@@ -48,7 +61,7 @@ jobs:
             cxx: g++
             build: RelWithDebInfo
             cmake_flags: -DPACKAGE_DWLIB=ON
-            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
 
           # Ubuntu - Clang
           - platform: Ubuntu
@@ -57,14 +70,14 @@ jobs:
             cc: clang
             cxx: clang++
             build: Debug
-            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: clang
             cc: clang
             cxx: clang++
             build: RelWithDebInfo
-            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
 
           # Ubuntu - Clang with Sanitizer
           - platform: Ubuntu
@@ -75,7 +88,7 @@ jobs:
             build: Debug
             sanitizer: true
             cmake_flags: -DENABLE_SANITIZER=ON
-            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libdw-dev libbz2-dev libffi-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libdw-dev libbz2-dev libffi-dev
           - platform: Ubuntu
             os: ubuntu-24.04
             compiler: clang
@@ -84,19 +97,19 @@ jobs:
             build: RelWithDebInfo
             sanitizer: true
             cmake_flags: -DENABLE_SANITIZER=ON
-            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libdw-dev libbz2-dev libffi-dev
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libdw-dev libbz2-dev libffi-dev
 
           # macOS
           - platform: macOS
             os: macos-14
             build: Debug
-            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
+            packages: cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
           - platform: macOS
             os: macos-14
             build: RelWithDebInfo
-            packages: cmake pkg-config pcre libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
+            packages: cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
 

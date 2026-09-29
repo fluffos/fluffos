@@ -11,7 +11,7 @@
 #include "mainlib.h"
 #include "vm/vm.h"
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 // ---------------------------------------------------------------------------
 // bench_compile -- WHOLE-compile throughput across many rounds, i.e. the

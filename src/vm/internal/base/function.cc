@@ -307,13 +307,32 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
     case FP_LOCAL | FP_NOT_BINDABLE: {
       function_t* func;
 
-      fp = sp - num_arg + 1;
-
       if (current_object->prog->function_flags[funp->f.local.index] &
           (FUNC_PROTOTYPE | FUNC_UNDEFINED)) {
         error("Undefined lfun pointer called: %s\n",
               function_name(current_object->prog, funp->f.local.index));
       }
+      /* Function-pointer calls must fill default arguments like a direct
+       * call -- `(: foo :)()` used to run foo with zeros instead of its
+       * declared defaults. Fill BEFORE fp is set: the helpers push the
+       * missing values as ordinary arguments. */
+      bool local_is_async = false;
+      {
+        auto* cprog = current_object->prog;
+        int roff = funp->f.local.index;
+        if (cprog->function_flags[roff] & FUNC_ALIAS) {
+          roff = cprog->function_flags[roff] & ~FUNC_ALIAS;
+        }
+        local_is_async = (cprog->function_flags[roff] & FUNC_ASYNC) != 0;
+        auto result = get_function_at_index(cprog, roff);
+        if (result.first != nullptr) {
+          num_arg = fill_default_args(result.first, &result.first->function_table[result.second],
+                                      cprog->function_flags[roff], num_arg);
+        }
+      }
+
+      fp = sp - num_arg + 1;
+
       push_control_stack(FRAME_FUNCTION);
       current_prog = funp->hdr.owner->prog;
 
@@ -322,7 +341,12 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       csp->num_local_variables = num_arg;
       func = setup_new_frame(funp->f.local.index);
 
-      call_program(current_prog, func->address);
+      if (local_is_async) {
+        csp->framekind |= FRAME_ASYNC;
+        run_async_function(current_prog->program + func->address, func);
+      } else {
+        call_program(current_prog, func->address);
+      }
       break;
     }
     case FP_FUNCTIONAL:

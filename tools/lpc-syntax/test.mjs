@@ -3,11 +3,12 @@
 // and the generated VS Code assets directly.
 import { tokenize, grammar } from './tokenizer.mjs';
 import { highlightLPC } from './highlight.mjs';
-import { formatLPC, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
+import { formatLPC, tokenSequence, trimDirectiveTrailingBlanks, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
 import { lintLPC } from './lint.mjs';
-import { readFileSync as readF } from 'node:fs';
+import { readFileSync as readF, readdirSync } from 'node:fs';
 import { fileURLToPath as f2p } from 'node:url';
 import { dirname as dirN, join as joinP } from 'node:path';
+import { createRequire } from 'node:module';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {
@@ -95,6 +96,30 @@ check("format.mjs never re-spaces a macro argument that's stringized via a"
         const out = formatLPC(src);
         return out === src && formatLPC(out) === out;
       })());
+check('an unpaired apostrophe on a directive line does not hide a comment'
+      + ' from the stringize detector -- a lone "\'" is one character, not a'
+      + ' quote that scans forward for a partner (lexer.l scans a char'
+      + ' literal as one escape or one byte then the close quote), so the'
+      + ' comment in `#define S(x) don\'t#/*c*/x` still folds to a space and'
+      + ' S(1+2) keeps stringizing to "1+2" (driver bug #1362, same shape)',
+      (() => {
+        const src = "#define S(x) don't#/*c*/x\nvoid f() { string a = S(1+2); }\n";
+        const out = formatLPC(src);
+        // The baseline without the apostrophe is already pinned above; the
+        // point here is that adding one changes nothing.
+        const plain = formatLPC('#define S(x) #/*c*/x\nvoid f() { string a = S(1+2); }\n');
+        return out.includes('S(1+2)') && plain.includes('S(1+2)');
+      })());
+
+check("a template literal on a directive line is closed by its own backtick,"
+      + ' not by the next double quote (skipStringSpan takes the delimiter it'
+      + ' opened with)',
+      (() => {
+        const src = '#define T(x) `a${x}b` #x\nvoid f() { string a = T(1+2); }\n';
+        const out = formatLPC(src);
+        return out.includes('T(1+2)');
+      })());
+
 check("'##' token paste is NOT stringize -- a macro using only '##' on its"
       + " parameters (`#define GLUE(a, b) a##b`) leaves its call-site"
       + ' arguments free to be reformatted normally, and an unrelated'
@@ -171,12 +196,48 @@ check('a quote in a directive never extends it past its physical line'
         const d2 = tokenize('#define BAD "abc\n#define UND(x) #x\nmixed q = UND(3+4);\n').filter((t) => t.kind === 'directive');
         const d3 = tokenize('#define X 1 /* c\nc */ + 2\nint y;\n').filter((t) => t.kind === 'directive');
         const d4 = tokenize('#define S "abc\\\ndef"\nint y;\n').filter((t) => t.kind === 'directive');
+        const d5 = tokenize('#define H "abc// \\\n def"\nint y;\n').filter((t) => t.kind === 'directive');
         const masked = formatLPC('#define BAD "abc\n#define UND(x) #x\nmixed q = UND(3+4);\n');
         return d1.length === 1 && d1[0].text === "#define Q it'" &&
                d2.length === 2 &&
                d3.length === 1 && d3[0].text.includes('+ 2') &&
                d4.length === 1 && d4[0].text.includes('def"') &&
+               d5.length === 1 && d5[0].text.includes('//') && d5[0].text.includes('def"') &&
                masked.includes('UND(3+4)');
+      })());
+check('C splice-first on a directive: a trailing \\ after // continues the'
+      + ' comment, and a comment-open split by a continuation is still a'
+      + ' comment -- the next physical line stays inside the directive token',
+      (() => {
+        const d1 = tokenize('#define FOO 1 // note \\\nint x = 2;\nint v = FOO;\n')
+                     .filter((t) => t.kind === 'directive');
+        const d2 = tokenize('#define FOO 10 /\\\n* c */ + 5\nint v = FOO;\n')
+                     .filter((t) => t.kind === 'directive');
+        return d1.length === 1 && d1[0].text.includes('int x = 2') &&
+               !d1[0].text.includes('int v') &&
+               d2.length === 1 && d2[0].text.includes('+ 5') &&
+               d2[0].text.includes('* c');
+      })());
+check('formatter keeps the gcc continuation-plus-// shapes: a do/while'
+      + ' body joined by \\ with // only on the last line; a continued'
+      + ' object-like body with a // tail; and // note \\ eating the next'
+      + ' line (that line stays inside the directive, not reformatted as code)',
+      (() => {
+        const add = '#define ADD(x, y) do { \\\n    r += (x); \\\n    r += (y); \\\n'
+                  + '} while (0) // this comment ends here\nADD(1, 2);\n';
+        const bar = '#define BAR 10 \\\n    + 5 // tail, no backslash\nint v = BAR;\n';
+        const foo = '#define FOO 1 // note \\\nint x = 99;\nint v = FOO;\n';
+        const a = formatLPC(add);
+        const b = formatLPC(bar);
+        const f = formatLPC(foo);
+        const fTok = tokenize(f).filter((t) => t.kind === 'directive');
+        return a.includes('} while (0) // this comment ends here\nADD(1, 2);') &&
+               formatLPC(a) === a &&
+               b.includes('+ 5 // tail, no backslash\nint v = BAR;') &&
+               formatLPC(b) === b &&
+               fTok.length === 1 && fTok[0].text.includes('int x = 99') &&
+               !fTok[0].text.includes('int v') &&
+               formatLPC(f) === f;
       })());
 check('template fragments + interpolated expression tokens',
       (() => {
@@ -276,10 +337,13 @@ check('trailing "//" comment forces a line break before following code',
         const twice = formatLPC(once);
         return once === twice && !once.split('\n').some((l) => /\/\/note.+\S/.test(l));
       })());
-check('formatter is stable on a source that swallows to EOF (unterminated construct)',
+check('a source that swallows to EOF (unterminated construct) is REFUSED,'
+      + ' not formatted: formatLPC throws (driver ground truth: "End of'
+      + ' file in string" is a hard lexerror, so the tokenization past the'
+      + ' opener is nonsense and any reformatting of it is corruption)',
       (() => {
-        const once = formatLPC('void f() {\n  "\n}\n');
-        return formatLPC(once) === once;
+        try { formatLPC('void f() {\n  "\n}\n'); return false; }
+        catch (e) { return /unterminated string/.test(e.message); }
       })());
 check('case/default label colon has no leading space (unlike ternary/mapping colons)',
       formatLPC('int f(int x) { switch (x) { case 1: return 1; default: return 0; } }\n')
@@ -765,12 +829,13 @@ check('short code is unaffected by a small printWidth when it already fits',
 check('token-merge safety net: two tokens are never butted together if their'
       + ' concatenation re-lexes as a different token sequence -- `a - --b`'
       + ' must not become `a ---b` (which re-lexes as `(a--) - b`), `- -x`'
-      + ' must not become `--x` (a pre-decrement!), and `f( ::g() )` must'
-      + ' not become `f(::g())` (whose `(:` re-lexes as a functional-literal'
-      + ' opener); already-tight `i--`/`a[0]`/`-1`/`efun::` forms stay tight',
+      + ' must not become `--x` (a pre-decrement!); already-tight'
+      + ' `i--`/`a[0]`/`-1`/`efun::` forms stay tight, and a bare `::` after'
+      + ' `(` goes tight too (`f( ::g() )` -> `f(::g())`) now that the'
+      + ' tokenizer itself (not this safety net) gets "(::" right',
       (() => {
         const cases = [
-          ['x = f( ::g() );\n', 'f( ::g());'],
+          ['x = f( ::g() );\n', 'f(::g());'],
           ['y = a - --b;\n', 'a - --b'],
           ['y = a + ++b;\n', 'a + ++b'],
           ['y = - -x;\n', '- -x'],
@@ -784,6 +849,41 @@ check('token-merge safety net: two tokens are never butted together if their'
                              ['x = efun::sizeof(a);\n', 'efun::sizeof(a)'],
                              ['x = a[0];\n', 'a[0]']]) {
           if (!formatLPC(tight[0]).includes(tight[1])) return false;
+        }
+        return true;
+      })());
+// A bare parent-call `::name(...)` immediately inside a control-flow
+// condition (`if (::name())`) used to mis-tokenize: the tokenizer's naive
+// "(' followed by ':'" check matched "(:" (the functional-literal open)
+// before ever considering that "(::" is "(' + '::" (the scope-resolution
+// operator), leaving a lone ':' behind and corrupting everything the
+// formatter built on top of that token (the '::' rendered as ': :', and
+// the `if`'s condition/body structure came out wrong -- an extra `{`
+// materialized in one real-world case). Caught across a ~91-mudlib
+// corpus scan; two mudlibs' boot broke on exactly this (a player-body
+// class's `::move()`/`::query()` guard). Fixed by tokenizer.mjs's
+// isParentCallOpenParen(), mirroring lexer.l's own `"("{WS}*"::"` guard.
+check('bare `::name(...)` guard in an `if` condition tokenizes and formats'
+      + ' correctly -- the "(::" ambiguity with the "(:" functional-literal'
+      + ' opener must resolve to \'(\' + \'::\', not \'(:\' + \':\'',
+      (() => {
+        const cases = [
+          // Single-line guard directly on the condition.
+          ['if (::valid_leave(me, dir)) return notify_fail("no\\n");\n',
+           'if (::valid_leave(me, dir)) return notify_fail("no\\n");\n'],
+          // The `if (cond) {` shape from the original bug report.
+          ['if (::do_read(arg)) {\n  return 1;\n}\n',
+           'if (::do_read(arg)) {\n  return 1;\n}\n'],
+          // Whitespace/newline between '(' and '::' (lexer.l's WS* class).
+          ['if ( ::do_read(arg)) return 1;\n',
+           'if (::do_read(arg)) return 1;\n'],
+        ];
+        for (const [src, want] of cases) {
+          const out = formatLPC(src);
+          if (out !== want) return false;
+          if (formatLPC(out) !== out) return false;
+          // The tokenizer must see one '::' operator token, not two ':'s.
+          if (!kinds(out).includes('operator:::')) return false;
         }
         return true;
       })());
@@ -809,6 +909,54 @@ check('keyword-tail safety net: a reserved word never has the next token'
         for (const [src, want] of [...spaced, ...tight]) {
           const out = formatLPC(src);
           if (!out.includes(want) || formatLPC(out) !== out) return false;
+        }
+        return true;
+      })());
+// The unescaped quote-char literal `'''` (an old MudOS-ism, valid per
+// lexer.l: <SC_CHAR_BODY>[^\\] matches ANY raw byte including a literal
+// quote, then <SC_CHAR_CLOSE> takes the third quote) used to mis-lex:
+// the tokenizer scanned "to the next quote" string-style, reading `'''`
+// as an empty `''` plus a stray `'` that opened a bogus literal running
+// to the next quote anywhere on the line. In one real 1990s mudlib
+// (`case ''':	//'` -- a trailing `//'` comment whose quote balances
+// editors' highlighting) that bogus literal swallowed the `:` and the
+// comment opener, and the formatter merged the case label, comment, and
+// the NEXT line's statement into one line -- the `//` then commented
+// out the statement on recompile, silently deleting it. Caught in the
+// same ~91-mudlib corpus scan as the "(::" bug; equally invisible to
+// the token-equivalence self-check (same mis-lex on both sides).
+check("unescaped quote-char literal `'''` lexes as ONE char token (lexer.l:"
+      + ' one raw body byte -- even a quote -- then the closing quote), so a'
+      + " `case ''':` with a trailing `//'` comment never swallows the"
+      + ' following statement',
+      (() => {
+        // Tokenizer ground truth first: one 3-char token, not ''+stray.
+        if (kinds("c = ''';").join(',') !==
+            "identifier:c,operator:=,char:''',punctuation:;") return false;
+        // The sibling escaped forms must be unaffected.
+        if (kinds("c = '\\'';")[2] !== "char:'\\''") return false;
+        if (kinds("c = '\\\"';")[2] !== "char:'\\\"'") return false;
+        // The real-world shape: the comment must stay a comment token and
+        // the next line's statement must survive formatting on its own line.
+        const src = 'void f(string cmd) {\n'
+                  + '\tswitch(cmd[0]) {\n'
+                  + "\t\tcase ''':\t//'\n"
+                  + '\t\t\tcmd = "say " + cmd[1..];\n'
+                  + '\t\t\tbreak;\n'
+                  + '\t\tcase \'\\"\':\t//"\n'
+                  + '\t\t\tcmd = "tell " + cmd[1..];\n'
+                  + '\t\t\tbreak;\n'
+                  + '\t}\n'
+                  + '}\n';
+        const out = formatLPC(src);
+        if (formatLPC(out) !== out) return false;
+        // The case label keeps its literal and its trailing comment...
+        if (!out.includes("case ''':  //'\n")) return false;
+        if (!out.includes("case '\\\"':  //\"\n")) return false;
+        // ...and the statements survive, NOT on a comment-bearing line.
+        for (const stmt of ['cmd = "say " + cmd[1..];', 'cmd = "tell " + cmd[1..];']) {
+          const line = out.split('\n').find((l) => l.includes(stmt));
+          if (!line || line.includes('//')) return false;
         }
         return true;
       })());
@@ -1058,6 +1206,114 @@ check('conventions from the final pristine audit: empty for-header clauses'
                formatLPC(brk) === brk &&
                formatLPC(marco) === marco && formatLPC(formatLPC(marco)) === formatLPC(marco);
       })());
+// Statement / token order is an invariant: formatLPC may respace and
+// reindent, never move a statement past another -- this is the same
+// sequence formatLPC's own internal post-pass gate (assertSameTokenOrder)
+// already enforces on every call; this test exercises that gate directly.
+function sameTokenOrder(src) {
+  const out = formatLPC(src);
+  const a = tokenSequence(src);
+  const b = tokenSequence(out);
+  return a.length === b.length && a.every((t, i) => t === b[i]);
+}
+function topLevelStatements(src) {
+  const toks = tokenize(src).filter((t) => t.kind !== 'whitespace' && t.kind !== 'comment');
+  const out = [];
+  let depth = 0;
+  let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    out.push(buf.map((t) => t.text).join(' ').replace(/ ;$/, ''));
+    buf = [];
+  };
+  for (const t of toks) {
+    if (depth === 0 && t.kind === 'directive') {
+      flush();
+      out.push(trimDirectiveTrailingBlanks(t.text));
+      continue;
+    }
+    buf.push(t);
+    if (t.text === '{' || t.text === '(' || t.text === '[' || t.text === '(:') depth++;
+    else if (t.text === '}' || t.text === ')' || t.text === ']' || t.text === ':)') {
+      depth = Math.max(0, depth - 1);
+    }
+    if (depth === 0 && (t.text === ';' || t.text === '}')) flush();
+  }
+  flush();
+  return out;
+}
+check('statement order is invariant: #include / inherit / declarations'
+      + ' stay in source order through format (the 1dai.c header is'
+      + ' #include <ansi.h> / inherit NPC; / #include "fight.h" -- a'
+      + ' later include is never hoisted above inherit). Messy'
+      + ' whitespace still keeps the same token sequence; every'
+      + ' permutation below is also a formatLPC fixed point after one'
+      + ' pass',
+      (() => {
+        const cases = [
+          '#include <ansi.h>\ninherit NPC;\n#include "fight.h"\nvoid create() {}\n',
+          'inherit NPC;\n#include "fight.h"\n',
+          '#include "fight.h"\ninherit NPC;\n',
+          '#include    <ansi.h>\n  inherit   NPC ;\n#include"fight.h"\nvoid  create(){}\n',
+          '#include <ansi.h>\ninherit F_DBASE;\ninherit NPC;\n#include "fight.h"\n#include "skill.h"\n',
+          'private inherit FOO;\n#include "bar.h"\npublic inherit BAZ;\n',
+          '#include <ansi.h>\n#include "fight.h"\ninherit NPC;\nvoid create() {}\n',
+          '#include <tui.h>\n\ninherit TUI_WIDGET;\n',
+          '#ifdef FOO\n#include "x.h"\n#endif\ninherit NPC;\n#include "y.h"\n',
+          'int x;\ninherit NPC;\nint y;\n',
+          'void f() {\n  a &= 3; ASSERT_EQ(2, a);\n  b();\n}\n',
+          // CRLF with trailing spaces/tabs on a directive line: the tokenizer's
+          // directive token ends in '\r' (stops right before the '\n'), so the
+          // trailing-blank run sits before that '\r', not at the string's
+          // absolute end -- an unanchored trim regex never strips it on one
+          // side of the comparison. Regression for the false-positive
+          // "formatter reordered tokens" throw on any CRLF file with trailing
+          // whitespace on a '#' line (would break format-on-save in the
+          // VS Code extension, which calls formatLPC() directly).
+          '#include <a.h>   \r\ninherit NPC;\r\nvoid create() {}\r\n',
+          '#include <a.h>\t \r\ninherit NPC;\r\n#include "fight.h"   \r\n',
+        ];
+        const mud = cases[0];
+        const messy = cases[3];
+        return cases.every((src) => sameTokenOrder(src) &&
+               JSON.stringify(topLevelStatements(src)) ===
+               JSON.stringify(topLevelStatements(formatLPC(src)))) &&
+               formatLPC(mud) === mud &&
+               topLevelStatements(formatLPC(messy)).join('|') ===
+               '#include    <ansi.h>|inherit NPC|#include"fight.h"|void create ( ) { }';
+      })());
+check('statement order is invariant across the testsuite corpus'
+      + ' (every *.lpc / *.c that format.sh feeds the formatter keeps'
+      + ' the same non-whitespace token sequence after formatLPC)',
+      (() => {
+        const root = joinP(dirN(f2p(import.meta.url)), '..', '..', 'testsuite');
+        const skip = new Set([
+          'single/tests/compiler/fail/bad_utf8_string.lpc',
+          'single/tests/compiler/fail/bad_utf8_arrayblock.lpc',
+          'single/tests/compiler/fail/eof_in_string.lpc',
+          'single/tests/compiler/fail/eof_in_comment.lpc',
+          'single/tests/compiler/fail/bad_at_block.lpc',
+        ]);
+        const files = [];
+        const walk = (dir, rel = '') => {
+          for (const ent of readdirSync(dir, { withFileTypes: true })) {
+            const r = rel ? rel + '/' + ent.name : ent.name;
+            if (ent.isDirectory()) walk(joinP(dir, ent.name), r);
+            else if (/\.(lpc|c)$/.test(ent.name) && !skip.has(r)) files.push(joinP(dir, ent.name));
+          }
+        };
+        walk(root);
+        const bad = [];
+        for (const f of files) {
+          const src = readF(f, 'utf8');
+          try {
+            if (!sameTokenOrder(src)) bad.push(f);
+          } catch (e) {
+            bad.push(f + ' (' + e.message + ')');
+          }
+        }
+        return files.length >= 900 && bad.length === 0;
+      })());
 check('blank-line RUNS follow the source exactly -- a two-blank separator'
       + ' stays two blanks (call_out.lpc), a single blank stays single;'
       + ' trailing blanks at EOF are still trimmed',
@@ -1269,6 +1525,65 @@ check('a leading comment glued to the next token on its source line stays'
         return p1 === formatLPC(p1, { printWidth: 40 }) && p1.includes('/*x*/ 2_000_000,');
       })());
 
+// A file with PRE-EXISTING broken quoting -- one stray unbalanced '"'
+// somewhere, common in 1990s mudlib archives that shipped files that
+// never compiled -- used to be silently rewritten into shredded garbage:
+// past the stray quote the tokenizer's string/code sense is inverted, so
+// real string content lexes as code tokens (every CJK char a separate
+// 'unknown', '\n' escapes torn into '\ n') and the formatter re-spaces
+// them. The driver (lexer.l) hard-errors on such a file ("End of file in
+// string" at <<EOF>>), so it has NO well-defined lex -- the only correct
+// behavior is refusal. Invisible to the corpus token-equivalence +
+// idempotency self-check (input and output mis-lex identically -- same
+// blind spot as the "(::" and "'''" tokenizer fixes); the gate is the
+// tokenizer's `unterminated` flag plus formatLPC throwing on it, which
+// format-corpus.mjs turns into report-and-leave-byte-identical. Found as
+// 200+ corrupted files in the same ~91-real-world-mudlib corpus scan.
+check('broken quoting (stray unbalanced \'"\') is REFUSED: the tokenizer'
+      + ' flags the EOF-swallowing token `unterminated` and formatLPC'
+      + ' throws instead of shredding the inverted string/code regions',
+      (() => {
+        // Real-world shape: a key string missing its closing quote, CJK
+        // string content with escape sequences following it.
+        const broken = 'void create() {\n'
+                     + '  set("short, "棋苑");\n'
+                     + '  set("long", "一张桌子。\\n");\n'
+                     + '}\n';
+        // Tokenizer ground truth: exactly one flagged token, the final
+        // string, and its span runs to end-of-input.
+        const flagged = tokenize(broken).filter((t) => t.unterminated);
+        if (flagged.length !== 1 || flagged[0].kind !== 'string' ||
+            flagged[0].end !== broken.length) return false;
+        try { formatLPC(broken); return false; }
+        catch (e) { if (!/unterminated string/.test(e.message)) return false; }
+        // The balanced sibling lexes clean and still formats fine.
+        const fixed = broken.replace('"short, "', '"short", "');
+        if (tokenize(fixed).some((t) => t.unterminated)) return false;
+        const out = formatLPC(fixed);
+        return formatLPC(out) === out && out.includes('\\n');
+      })());
+check('every EOF-swallowing construct is refused the same way (driver'
+      + ' lexerrors: string, char, template, block comment, text block)',
+      (() => {
+        const cases = [
+          ['string s = "abc;\n', 'string'],
+          ["int c = 'x;\n", 'char'],
+          ['string s = `abc;\n', 'template'],
+          ['/* never ends\nint x;\n', 'comment'],
+          ['string s = @END\nbody line\n', 'textblock'],
+        ];
+        for (const [src, kind] of cases) {
+          const flagged = tokenize(src).filter((t) => t.unterminated);
+          if (flagged.length !== 1 || flagged[0].kind !== kind) return false;
+          try { formatLPC(src); return false; }
+          catch (e) { if (!e.message.includes(`unterminated ${kind}`)) return false; }
+        }
+        // Terminated siblings carry no flag.
+        return !tokenize('string s = "abc";\nint c = \'x\';\n/* ok */\n'
+                         + 'string t = `tpl`;\nstring u = @END\nbody\nEND\n')
+                  .some((t) => t.unterminated);
+      })());
+
 // --- lint ---------------------------------------------------------------------
 const msgs = (src) => lintLPC(src).map((d) => d.message);
 check('lint: clean file is clean',
@@ -1333,5 +1648,90 @@ check('tmLanguage: function-call excludes reserved words (no "if (" misfire as e
 check('tmLanguage: operators longest-match ordered',
       (() => { const parts = tml.repository.operators.match.split('|');
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());
+check('tmLanguage: a # line uses splice-first // (begin/end, continues on \\)'
+      + ' and does not include the physical-line //.*$ comment rule',
+      (() => {
+        const pp = tml.repository.preprocessor;
+        const line = pp.patterns.find((p) => p.name === 'comment.line.double-slash.lpc');
+        const usesGlobalComments = pp.patterns.some((p) => p.include === '#comments');
+        return line && line.begin === '//' && line.end === '(?<!\\\\)$' &&
+               pp.end === '(?<!\\\\)$' &&
+               !usesGlobalComments &&
+               tml.repository['block-comment'] &&
+               tml.repository.comments.patterns.some((p) => p.match === '//.*$');
+      })());
+
+// --- Prism / Docusaurus highlighter plugin ------------------------------------
+const req = createRequire(import.meta.url);
+const { buildLpcLanguage, registerLPC, grammar: prismGrammar } = req('./prism-lpc.cjs');
+const lpcPrismPlugin = req('./docusaurus-plugin.cjs');
+
+const prismLang = buildLpcLanguage();
+check('prism-lpc: grammar contract is the same file',
+      prismGrammar.keywords.includes('foreach') &&
+      prismGrammar.typeKeywords.includes('mapping'));
+check('prism-lpc: keywords / types / modifiers from the contract',
+      prismLang.keyword.source.includes('foreach') &&
+      prismLang['type-keyword'].pattern.source.includes('mapping') &&
+      prismLang.builtin.source.includes('nomask') &&
+      prismLang.keyword.source.includes('await'));
+check('prism-lpc: class/struct are class-name, not keyword.control',
+      prismLang['class-name'] &&
+      prismLang['class-name'].source.includes('class') &&
+      !prismLang.keyword.source.includes('class') &&
+      !prismLang.keyword.source.includes('struct'));
+check('prism-lpc: operators longest-match ordered',
+      (() => {
+        const parts = prismLang.operator.source.split('|');
+        return parts.indexOf('>>=') < parts.indexOf('>>') &&
+               parts.indexOf('\\(:') !== -1;
+      })());
+check('prism-lpc: function-call excludes reserved words',
+      (() => {
+        const re = prismLang.function;
+        return !re.test('if(') && !re.test('while (') && !re.test('new(') &&
+               !re.test('catch(') && re.test('foo(') && re.test('write(');
+      })());
+check('prism-lpc: trailing-dot numbers match (1.) and 10foo does not',
+      prismLang.number.test('1.') && prismLang.number.test('3.14') &&
+      !prismLang.number.test('10foo'));
+check('prism-lpc: every token is a RegExp or {pattern: RegExp}',
+      (() => {
+        const ok = (v) => {
+          if (v instanceof RegExp) return true;
+          if (Array.isArray(v)) return v.every(ok);
+          if (v && typeof v === 'object' && v.pattern instanceof RegExp) {
+            return !v.inside || Object.values(v.inside).every(ok);
+          }
+          return false;
+        };
+        return Object.values(prismLang).every(ok);
+      })());
+check('prism-lpc: registerLPC installs lpc + LPC aliases',
+      (() => {
+        const fake = { languages: {} };
+        registerLPC(fake);
+        return fake.languages.lpc === fake.languages.LPC &&
+               fake.languages.lpc.keyword;
+      })());
+check('docusaurus-plugin: remaps ```c to ```lpc outside driver/',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/lpc/foreach.md' });
+        return tree.children[0].lang === 'lpc';
+      })());
+check('docusaurus-plugin: leaves ```c alone under driver/',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/driver/ffi.md' });
+        return tree.children[0].lang === 'c';
+      })());
+check('docusaurus-plugin: leaves ```c alone on build-wasm',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/build-wasm.md' });
+        return tree.children[0].lang === 'c';
+      })());
+
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

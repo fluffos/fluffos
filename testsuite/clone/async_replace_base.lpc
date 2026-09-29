@@ -1,0 +1,20 @@
+// The program that gets replaced INTO the object while one of its async
+// functions is parked. replace_program() swaps ob->prog and rewrites the
+// variable block without bumping prog_generation, so the parked frame's
+// variable_index_offset goes stale: resuming it reads the wrong globals
+// (Debug: "Illegal variable access" abort). The resume must be refused.
+
+nosave mixed gate;
+nosave int marker;
+
+void set_gate(mixed p) { gate = p; }
+
+async int park2(int n) {
+  int v;
+
+  marker = 111;
+  v = await gate;
+  return n + v + marker;
+}
+
+void do_replace() { replace_program("/clone/async_replace_base"); }

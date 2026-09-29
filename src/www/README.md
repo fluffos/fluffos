@@ -55,8 +55,19 @@ the page's input modes (`src/net/telnet.cc`):
   (streaming `TextDecoder`).
 
 **The pages** own UI (status bar, line-input bar with history, the
-connection panel on `index.html`, the error modal + jsbridge handlers on
-`wasm/index.html`) and the transport glue.
+connection panel on `index.html`, the error modal + jsbridge handlers +
+the tab bar on `wasm/index.html`) and the transport glue. On the wasm
+page each Game tab is a separate connection into the same in-page
+driver — its own xterm, `TelnetClient` and bridge queues — like several
+telnet clients dialed into one mud. `+` opens another connection; every
+game tab has a ↻ reload icon that redials just that connection
+(`fluffos_disconnect` + `fluffos_connect` with a fresh client-side
+`TelnetClient`, so negotiation restarts cleanly); tabs after the first
+also have a × close (the first tab is permanent). Driver stdout/stderr
+(`Module.print`/`printErr`: boot noise, compile diagnostics,
+`debug_message`) go to a separate Logs tab — stderr in red,
+auto-scrolling unless scrolled up — and output landing on any inactive
+tab lights an unread-count badge instead of stealing focus.
 
 ## Line mode vs char mode
 

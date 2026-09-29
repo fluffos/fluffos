@@ -3,6 +3,7 @@
 #include "vm/internal/simulate.h"
 
 #include <fcntl.h>     // for O_RDONLY
+#include <memory>      // for unique_ptr
 #include <stdlib.h>    // for exit
 #include <sys/stat.h>  // for load_object struct stat
 #include <stdarg.h>    // for va_start
@@ -48,6 +49,9 @@ void db_cleanup(void);  // FIXME
 #endif
 #ifdef PACKAGE_JSBRIDGE
 #include "packages/jsbridge/jsbridge.h"
+#endif
+#ifdef PACKAGE_EXTERNAL
+#include "packages/external/external.h"
 #endif
 #ifdef PACKAGE_SOCKETS
 #include "packages/sockets/socket_efuns.h"
@@ -98,6 +102,22 @@ void shutdownMudOS(int exit_code) {
   // the entries this frees, and are discarded unrun there.
   jsbridge_cleanup();
 #endif
+#ifdef PACKAGE_EXTERNAL
+  /* Settle leftover external_start() promises before promise_cleanup()
+   * latches the queue (and before lpc_socks_closeall() force-closes the
+   * child sockets). Same ordering as jsbridge / call_out. */
+  external_cleanup();
+#endif
+  // Freeing a leftover call_out settle-rejects its promise, which ENQUEUES
+  // a reaction -- so this must run before promise_cleanup() drains the
+  // queue, or those reactions (and any parked coroutine they own) leak
+  // into the dead queue at exit.
+  clear_call_outs();
+  // Same ordering constraint as jsbridge above: drop queued promise
+  // deliveries before their drain event is discarded by
+  // clear_tick_events(). promise_cleanup() also latches the queue shut, so
+  // any later settle frees its reaction instead of queueing it.
+  promise_cleanup();
   shutdown_external_ports();
   lpc_debugger_shutdown();
 
@@ -108,7 +128,6 @@ void shutdownMudOS(int exit_code) {
 
   /* clean up heap allocations so valgrind don't consider them lost.*/
   reset_machine(0);
-  clear_call_outs();
   clear_tick_events();
   clear_heartbeats();
 #ifdef PROFILING
@@ -644,7 +663,7 @@ object_t* load_object(const char* lname, int callcreate) {
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret)) {
+  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
     destruct_object(ob);
     error("master object: %s() denied permission to load '/%s'.\n",
           applies_table[APPLY_VALID_OBJECT], name);
@@ -681,13 +700,13 @@ object_t* load_object(const char* lname, int callcreate) {
 // recompile the same string. Without this, inline inherit source could
 // only inherit programs that happened to be loaded already.
 object_t* load_object_from_source(const std::string& source, const char* virtual_name,
-                                  int callcreate) {
+                                  int callcreate, ScratchArena* arena) {
   auto inherit_chain_size = CONFIG_INT(__INHERIT_CHAIN_SIZE__);
   program_t* prog = nullptr;
 
   for (int rounds = 0;; rounds++) {
     save_command_giver(command_giver);
-    prog = compile_file(source, virtual_name);
+    prog = compile_file(source, virtual_name, &g_driver_vm_context, arena);
     restore_command_giver();
 
     if (!inherit_file) {
@@ -768,7 +787,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   save_command_giver(command_giver);
   push_object(ob);
   svalue_t* mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret)) {
+  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
     destruct_object(ob);
     restore_command_giver();
     error("master object: %s() denied permission to load in-memory object '/%s'.\n",
@@ -965,7 +984,7 @@ int recompile_object(object_t* target) {
   recompile_variable_names(new_prog, names);
   std::vector<int> old_index(new_n, -1);
   for (int i = 0; i < new_n; i++) {
-    unsigned short vtype;
+    lpc_type_t vtype;
     old_index[i] = find_global_variable(old_prog, names[i], &vtype, 0);
   }
 
@@ -1227,10 +1246,13 @@ object_t* object_present(svalue_t* v, object_t* ob) {
   if (ob->super) {
     push_svalue(v);
     ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
-    if (ob->super->flags & O_DESTRUCTED) {
+    /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
+       sets ob->super to nullptr (destruct_object), or destruct the
+       environment. */
+    if ((ob->flags & O_DESTRUCTED) || !ob->super || (ob->super->flags & O_DESTRUCTED)) {
       return nullptr;
     }
-    if (!IS_ZERO(ret)) {
+    if (APPLY_SAYS_YES(ret)) {
       return ob->super;
     }
     return object_present2(v->u.string, ob->super->contains);
@@ -1277,7 +1299,7 @@ static object_t* object_present2(const char* str, object_t* ob) {
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }
-    if (IS_ZERO(ret)) {
+    if (!APPLY_SAYS_YES(ret)) {
       continue;
     }
     if (--count > 0) {
@@ -1339,6 +1361,9 @@ void destruct_object(object_t* ob) {
   if (ob->flags & O_EFUN_SOCKET) {
     close_referencing_sockets(ob);
   }
+#endif
+#ifdef PACKAGE_EXTERNAL
+  external_owner_destructed(ob);
 #endif
 #ifdef PACKAGE_PARSER
   if (ob->pinfo) {
@@ -1550,13 +1575,25 @@ void destruct_object(object_t* ob) {
   ob->next_inv = nullptr;
   ob->contains = nullptr;
 #endif
-  ob->next_all = obj_list_destruct;
-  if (obj_list_destruct) {
-    obj_list_destruct->prev_all = ob;
-  }
-  ob->prev_all = nullptr;
+  /* Queue for the remove_destructed_objects() sweep via the queue's own
+   * dedicated link. The queue used to ride on next_all/prev_all, which DEBUG
+   * builds immediately reuse below for the obj_list_dangling leak-hunting
+   * list -- so once a sweep left a still-referenced survivor behind, the
+   * next sweep's next_all walk strayed into the dangling chain and ran
+   * destruct2() (an object-ref decrement) on already-swept objects. */
+  ob->next_destruct = obj_list_destruct;
   obj_list_destruct = ob;
+  ob->next_all = nullptr;
+  ob->prev_all = nullptr;
   set_heart_beat(ob, 0);
+  /* The object's call_outs stay for the lazy reclaim (fire-path skip /
+   * reclaim_call_outs), but any PROMISE awaiting one rejects now -- see
+   * reject_call_out_promises(). */
+  reject_call_out_promises(ob);
+  /* ... and any async function suspended INSIDE this object: otherwise it is
+   * only noticed when the awaited promise settles, which for a promise that
+   * never settles is never. */
+  abandon_coroutines_of_object(ob);
   ob->flags |= O_DESTRUCTED;
   /* moved this here from destruct2() -- see comments in destruct2() */
   if (ob->interactive) {
@@ -1929,6 +1966,9 @@ void print_svalue(svalue_t* arg) {
       case T_BUFFER:
         tell_object(command_giver, "<BUFFER>", strlen("<BUFFER>"));
         break;
+      case T_PROMISE:
+        tell_object(command_giver, "<PROMISE>", strlen("<PROMISE>"));
+        break;
       default:
         tell_object(command_giver, "<UNKNOWN>", strlen("<UNKNOWN>"));
         break;
@@ -2235,7 +2275,10 @@ static int num_mudlib_error = 0;
  */
 
 [[noreturn]] void throw_error() {
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
+  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ) {
+    /* inside a catch(), or inside an async function body (where the thrown
+     * value becomes the rejection reason / acatch() result) */
     throw("throw error");
     fatal("Throw_error failed!");
   }
@@ -2266,14 +2309,25 @@ static void add_message_with_location(char* err) {
 }
 
 static void mudlib_error_handler(char* err, int katch) {
-  mapping_t* m;
   const char* file = nullptr;
   int line = 0;
   svalue_t* mret;
 
-  m = allocate_mapping(6);
+  // A raw m + only-on-success push_refed_mapping(m) would leak m (and
+  // everything already inserted into it) if any add_mapping_*() call below
+  // itself error()s -- e.g. mapping_too_large() when __MAX_MAPPING_SIZE__
+  // is configured smaller than this diagnostic mapping needs. That's a
+  // second error() firing while already inside error handling for a first
+  // one; per AGENTS.md section 4 this needs the same RAII treatment as any
+  // other error()-adjacent allocation.
+  std::unique_ptr<mapping_t, void (*)(mapping_t*)> m_owned(allocate_mapping(6), free_mapping);
+  mapping_t* m = m_owned.get();
   add_mapping_string(m, "error", err);
   if (current_prog) {
+    // add_mapping_malloced_string() owns the throwing call (insert_in_
+    // mapping(), which can mapping_too_large()/OOM) internally now, so a
+    // plain call is safe: it frees add_slash()'s allocation on its own
+    // unwind if the insert never happens, same as every other caller.
     add_mapping_malloced_string(m, "program", add_slash(current_prog->filename));
   }
   if (current_object) {
@@ -2290,7 +2344,7 @@ static void mudlib_error_handler(char* err, int katch) {
     add_mapping_pair(m, "line", line);
   }
 
-  push_refed_mapping(m);
+  push_refed_mapping(m_owned.release());
   if (katch) {
     STACK_INC;
     *sp = const1;
@@ -2372,15 +2426,21 @@ void _error_handler(char* err) {
     fatal("error() without a context: %s", err + 1);
   }
 
+  // The error is "caught" when it unwinds to a catch() frame -- or to a running
+  // async function body's boundary, where it becomes a promise rejection (or
+  // resumes an acatch() region); either way the value travels via catch_value.
+  const bool caught_by_lpc =
+      (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ;
+
   // Source-level debugger: optionally stop here, where the control stack is
   // still fully intact (same reason mudlib_error_handler can collect a trace).
   if (g_lpc_debug_flags) {
-    lpc_debugger_on_error(
-        err, ((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH);
+    lpc_debugger_on_error(err, caught_by_lpc);
   }
 
-  if (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) {
-    /* user catches this error */
+  if (caught_by_lpc) {
+    /* user catches this error -- see caught_by_lpc above */
     /* This is added so that catches generate messages in the log file. */
     if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);

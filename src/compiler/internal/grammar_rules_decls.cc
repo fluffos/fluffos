@@ -4,7 +4,7 @@
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 
@@ -28,6 +28,35 @@ static bool buffer_promotable(int type, int exprtype) {
 }
 
 void rule_def_global_var(LPC_INT type_val) {
+  /* End of a global declaration: every initializer in it has been compiled
+   * into the __INIT tree, so the names those initializers declared go out of
+   * scope here.
+   *
+   * release_local_names(), NOT free_all_local_names(), and the difference is
+   * the whole point. Every global initializer in a file is compiled into ONE
+   * frame -- __INIT -- so its slot numbering has to keep climbing across
+   * declarations, exactly as it does across sibling scopes inside a function
+   * (which is why pop_n_locals() lowers current_number_of_locals but never
+   * max_num_locals). Resetting max_num_locals here as well made successive
+   * initializers ALIAS slot 0, and a local declared WITHOUT an initializer
+   * emits no code at all -- rule_new_local_def() leaves it undefined until
+   * first assigned, relying on the frame's one-time zero-fill -- so it read
+   * the previous declaration's leftover value:
+   *
+   *   mixed g1 = catch { int a = 42; };
+   *   mixed g2 = catch { int b; seen = b; };   // seen == 42, not 0
+   *
+   * across types too: a `class A a;` reading a live `class B` left by an
+   * earlier initializer, with no diagnostic.
+   *
+   * max_num_locals is reset instead where a genuinely new frame begins, in
+   * rule_func_type() for each function definition. That is what keeps the
+   * next function's parameters at slots 0..n-1 -- without it, one local
+   * declared in a global initializer's block shifted them all and
+   * `int id(int a) { return a; }` silently returned 0. __INIT's own frame is
+   * sized from the compile-wide high-water mark (compile_max_num_locals). */
+  release_local_names(0);
+
   if (!(type_val & ~(DECL_MODS))) {
     /* A typeless declaration immediately after a class body is almost
        certainly the C-style combined form 'class Foo { ... } var;', which
@@ -53,13 +82,17 @@ ScratchString* rule_new_local_name_redefine(ident_hash_elem_t* ihe) {
 }
 
 void rule_new_name(LPC_INT star_modifier, const ScratchString* identifier) {
-  if (current_type & (FUNC_VARARGS << 16)) {
+  if (current_type & PACK_TYPE_MODS(FUNC_VARARGS)) {
     yyerror("Illegal to declare varargs variable.");
-    current_type &= ~(FUNC_VARARGS << 16);
+    current_type &= ~PACK_TYPE_MODS(FUNC_VARARGS);
+  }
+  if (current_type & PACK_TYPE_MODS(FUNC_ASYNC)) {
+    yyerror("Illegal to declare async variable.");
+    current_type &= ~PACK_TYPE_MODS(FUNC_ASYNC);
   }
 
-  if (current_type & 0xffff0000) {
-    current_type = (current_type >> 16) | (current_type & 0xffff);
+  if (current_type & ~BASIC_TYPE_MASK) {
+    current_type = PACKED_TYPE_MODS(current_type) | PACKED_TYPE_BASIC(current_type);
   }
 
   current_type |= global_modifiers;
@@ -69,6 +102,11 @@ void rule_new_name(LPC_INT star_modifier, const ScratchString* identifier) {
   if ((current_type & ~DECL_MODS) == TYPE_VOID)
     yyerror("Illegal to declare global variable of type void.");
 
+  /* No synthesized initializer here even for `float`: a declared variable
+   * with no initializer must start undefined (const0u, undefinedp() == 1).
+   * Its declared type is enforced on first assignment instead -- '=' via
+   * do_promotions() and op= via the compile-time RHS coercion in
+   * rule_expr_assign(). */
   define_new_variable(identifier, current_type | star_modifier);
 }
 
@@ -77,13 +115,17 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
   parse_node_t *expr_node, *newnode;
   int type;
 
-  if (current_type & (FUNC_VARARGS << 16)) {
+  if (current_type & PACK_TYPE_MODS(FUNC_VARARGS)) {
     yyerror("Illegal to declare varargs variable.");
-    current_type &= ~(FUNC_VARARGS << 16);
+    current_type &= ~PACK_TYPE_MODS(FUNC_VARARGS);
+  }
+  if (current_type & PACK_TYPE_MODS(FUNC_ASYNC)) {
+    yyerror("Illegal to declare async variable.");
+    current_type &= ~PACK_TYPE_MODS(FUNC_ASYNC);
   }
 
-  if (current_type & 0xffff0000) {
-    current_type = (current_type >> 16) | (current_type & 0xffff);
+  if (current_type & ~BASIC_TYPE_MASK) {
+    current_type = PACKED_TYPE_MODS(current_type) | PACKED_TYPE_BASIC(current_type);
   }
 
   current_type |= global_modifiers;
@@ -108,7 +150,7 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
       p = get_two_types(p, end, type, expr->type);
       p = strput(p, end, " when initializing ");
       p = strput(p, end, identifier->c_str());
-      yyerror(buff);
+      yyerror("%s", buff);
     }
   } else
     type = 0;
@@ -124,6 +166,25 @@ void rule_new_name_with_init(LPC_INT star_modifier, const ScratchString* identif
 void rule_block(decl_t* result, parse_node_t* stmts_node, int entry_locals) {
   result->node = stmts_node;
   result->num = current_number_of_locals - entry_locals;
+  if (result->num < 0) {
+    /* Bison error recovery can discard a production that had opened a nested
+     * locals scope before the rule that would have restored it ever runs --
+     * `function (int x, ) { ... }`, a stray comma, leaves
+     * rule_lambda_return_type()'s scope switch unwound by
+     * rule_primary_expr_anon_func(). The enclosing block then closes with
+     * fewer locals than it entered with, and the count it hands up is
+     * NEGATIVE: a clean fatal("pop_n_locals called with num < 0") on Debug,
+     * and a SIGSEGV on a build where DEBUG_CHECK is compiled out, from a
+     * syntax error in one line of mudlib source.
+     *
+     * The count is only ever used to decide how many names to take back out
+     * of scope, and the compile is already failing, so clamping is exactly
+     * right: it turns the crash back into the diagnostic the user should
+     * have got. (Deliberately here rather than inside pop_n_locals(), whose
+     * DEBUG_CHECK stays a real invariant for callers that compute a count
+     * some other way.) */
+    result->num = 0;
+  }
 }
 
 parse_node_t* rule_new_local_def(const ScratchString* name, LPC_INT type_star) {
@@ -131,6 +192,8 @@ parse_node_t* rule_new_local_def(const ScratchString* name, LPC_INT type_star) {
     yyerror("Illegal to declare local variable as reference");
     current_type &= ~LOCAL_MOD_REF;
   }
+  /* Like rule_new_name(): no synthesized `= 0.0` for a bare `float` local --
+   * it must start undefined (push_undefineds/const0u) until first assigned. */
   add_local_name(name, current_type | type_star | LOCAL_MOD_UNUSED);
   return nullptr;
 }
@@ -155,7 +218,7 @@ parse_node_t* rule_new_local_def_with_init(const ScratchString* name, LPC_INT ty
     p = get_two_types(p, end, type, expr->type);
     p = strput(p, end, " when initializing ");
     p = strput(p, end, name->c_str());
-    yyerror(buff);
+    yyerror("%s", buff);
   }
 
   expr = do_promotions(expr, type);
@@ -185,7 +248,7 @@ parse_node_t* rule_single_new_local_def_with_init(LPC_INT local_num, LPC_INT ass
     p = strput(buff, end, "Type mismatch ");
     p = get_two_types(p, end, type, expr->type);
     p = strput(p, end, " when initializing.");
-    yyerror(buff);
+    yyerror("%s", buff);
   }
 
   expr = do_promotions(expr, type);

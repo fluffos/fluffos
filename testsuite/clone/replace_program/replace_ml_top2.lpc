@@ -1,0 +1,10 @@
+// Fixture (expected-NOT-noop, safety-critical negative case): top2
+// inherits mid2 only (no own vars/funcs); mid2 = mixin(var+func) + X.
+// top2's create() redundantly targets X, two levels up, where X's vars
+// sit at a nonzero offset accumulated ACROSS two inherit levels. This
+// must NOT be treated as a no-op: applying the swap for real would
+// discard mixin_var and make mixin_func() unreachable. Guards against a
+// bug in search_inherited()'s recursive var_offset accumulation
+// (`*offpnt += ...`) ever computing 0 when the true offset is nonzero.
+inherit "/clone/replace_program/replace_ml_mid2";
+void create() { replace_program("/clone/replace_program/replace_min_target"); }

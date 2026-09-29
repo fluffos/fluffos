@@ -119,6 +119,7 @@ save files etc.) is the natural next step — see §5.
 | OpenSSL, `net/tls.cc` | **removed** | no TLS endpoint to terminate (the page/browser owns TLS); the `sys_reload_tls` efun does not exist on this target; 2 struct fields typedef'd via `net/net_compat.h` |
 | libtelnet, `net/telnet.cc`, `net/msp.cc`, mssp | **kept** | pure C / portable; the page speaks telnet |
 | ICU (uc + data) | **kept** (cross-built) | core string handling: grapheme iteration, charset conversion, sprintf width |
+| libpcre2-8 | **kept** (cross-built) | pcre package efuns; plain C, JIT off (no executable pages in wasm) |
 | zlib | **removed** | nothing on this target needs it: MCCP + the compress package are off, and the core's gzip'd file support is gated behind `HAVE_ZLIB` (compressed `save_object` degrades to a plain save; `write_file` flag 2 errors; reads use stdio) |
 | `thirdparty/crypt` (musl crypt) | **kept** | pure C |
 | backward-cpp | **removed** | no native unwinder in wasm |
@@ -139,12 +140,13 @@ Package matrix (`src/CMakeLists.txt` forces these under `EMSCRIPTEN`):
 | db | off | MySQL/SQLite/PG client libs |
 | crypto | off | OpenSSL EVP (see §5: sha1 stays) |
 | ffi | off | libffi + dlopen |
-| pcre | off | libpcre not cross-built yet (regexp package efuns; core regexp stays) |
+| **pcre** | **on** | libpcre2-8 cross-built into the wasm-deps prefix by `tools/wasm/build-deps.sh`; all `pcre_*` efuns work |
 
-DNS (`packages/core/dns.cc`): the resolver half is stubbed to fail the
-same way as a native host without a nameserver (`resolve()` raises an LPC
-error); the address-cache half (`query_ip_name`/`query_ip_number`) is
-compiled unchanged.
+DNS (`packages/core/dns.cc`): the resolver half is a synthetic resolver
+(`dns_stub.cc`) — `resolve()` keeps the native call/return shapes but
+completes on the next tick with `127.0.0.1` (or the input echoed back
+when it is already numeric); the address-cache half
+(`query_ip_name`/`query_ip_number`) is compiled unchanged.
 
 ## 3. Build system
 
@@ -246,8 +248,8 @@ order:
    mudlib's write paths (`/data`, save files, logs) and
    `FS.syncfs()` on a timer + on `visibilitychange`, so player data
    survives page reloads.
-3. **More packages.** PCRE cross-builds with emconfigure (or switch the
-   pcre package to PCRE2, which has better wasm support). `crypto` can
+3. **More packages.** PCRE is **done** (cross-built by
+   `tools/wasm/build-deps.sh`, package on). `crypto` can
    come back once OpenSSL's libcrypto is cross-built (or be rebased onto
    smaller portable digests). `async` can return as synchronous fallbacks
    (the efuns' contracts allow completing "later" on the next tick).
@@ -259,8 +261,9 @@ order:
    bytes out per socket id). Inter-mud protocols would then work.
 5. **Size/latency budget — done.** ICU data is trimmed to brkitr only
    (§3.1), DWARF is dropped at link (§3.2), MCCP/compress are off:
-   `fluffos.wasm` is ~3.6MB raw and **~0.8MB brotli** (~1.0MB gzip)
-   over the wire, plus ~110KB of JS glue. Remaining knobs if more is
+   `fluffos.wasm` is ~3.6MB raw (libpcre2 included) and
+   **~0.8MB brotli** (~1.1MB gzip) over the wire, plus ~110KB of JS
+   glue. Remaining knobs if more is
    ever needed: strip the name section (`--profiling-funcs` costs
    ~0.4MB raw for readable stack traces) and `-Oz` on the code
    (~1.7MB of the raw size is code).
@@ -272,12 +275,20 @@ order:
 ## 6. Known limitations (current state)
 
 - No eval limit: `while(1);` in LPC blocks the tab (phase 1 above).
-- `resolve()` raises "DNS resolver is not available"; `query_ip_number()`
-  reports 127.0.0.1 for web connections.
+  This is also the one place the async scheduler behaves differently:
+  a drain turn is still bounded by `async drain eval budget` (measured
+  on `steady_clock`, which emscripten maps to `performance.now()`), but
+  the PER-DELIVERY budget that stops any single handler running away is
+  a no-op here, so one runaway promise handler blocks the tab exactly
+  like the `while(1)` above. Nothing async-specific is wrong; the
+  platform simply has no eval limit for anything.
+- No real DNS: `query_ip_number()` reports 127.0.0.1 for web
+  connections, and `resolve()` resolves everything to 127.0.0.1
+  synthetically (native callback shape, next tick).
 - Disabled-package efuns (`socket_*`, `external_start`, `db_*`, ffi,
-  async I/O, PCRE efuns, `compress*`/`uncompress*`) don't exist; their
+  async I/O, `compress*`/`uncompress*`) don't exist; their
   testsuite files skip themselves via `__PACKAGE_*__` guards and the
-  suite passes clean.
+  suite passes clean. (PCRE efuns exist — the pcre package is on.)
 - No zlib: gzip'd `write_file` (flag 2) raises an error, compressed
   `save_object` falls back to a plain-text save, and `.gz` files are
   not transparently decompressed by `read_file`/`restore_object`.

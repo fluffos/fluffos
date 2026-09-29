@@ -150,11 +150,18 @@ void remove_destructed_objects() {
   }
 
   if (obj_list_destruct) {
-    object_t *ob, *next;
-    for (ob = obj_list_destruct; ob; ob = next) {
-      next = ob->next_all;
+    /* Detach the whole queue up front: destruct2() frees object variables,
+     * which can re-enter destruct_object() -- those pushes must land on a
+     * fresh queue for the next sweep instead of being dropped when the head
+     * is cleared afterwards. Each object is unlinked before its destruct2()
+     * so a still-referenced survivor keeps no stale queue link. */
+    object_t* ob = obj_list_destruct;
+    obj_list_destruct = nullptr;
+    object_t* next;
+    for (; ob; ob = next) {
+      next = ob->next_destruct;
+      ob->next_destruct = nullptr;
       destruct2(ob);
     }
-    obj_list_destruct = nullptr;
   }
 } /* remove_destructed_objects() */

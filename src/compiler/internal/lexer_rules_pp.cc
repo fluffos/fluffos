@@ -3,10 +3,14 @@
 #include "compiler/internal/lexer_rules_pp.h"
 
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>  // memchr (embedded-NUL rejection in lpc_lex_on_directive)
+#include <new>  // placement new (EsPendingCall lands on the arena)
 
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
+#include "compiler/internal/lexer_scan.h"
 #include "compiler/internal/lexer_utils.h"
 // grammar_rules.h must precede grammar.autogen.h (decl_t/func_block_t);
 // needed for the token ids and YYSTYPE the #if token evaluator consumes.
@@ -28,168 +32,37 @@ std::string_view trim(std::string_view s) {
   return s.substr(a, b - a + 1);
 }
 
-ScratchString strip_directive_comments(std::string_view s) {
-  ScratchString r;
-  r.reserve(s.size());
+// A directive's captured text, fed to the shared classifier one unit at a
+// time. Every consumed byte lands in `unit` in order, so the caller can
+// take the unit's raw spelling or replace it.
+namespace {
+// Captured text -- an expansion's argument list, a macro body -- classified
+// one unit at a time. peek() never consumes; advance() consumes exactly one
+// byte and records it, so `unit` holds the raw spelling of whatever
+// scan_one_unit() just decided on.
+//
+// This is expansion-time text: no scanner is running over it, which is why
+// these walkers need the classifier rather than the DFA.
+struct CapturedTextSrc {
+  std::string_view s;
   size_t i = 0;
-  while (i < s.size()) {
-    if (s[i] == '"' || s[i] == '\'' || s[i] == '`') {
-      char q = s[i++];
-      r += q;
-      while (i < s.size() && s[i] != q) {
-        if (s[i] == '\\') {
-          r += s[i++];
-        }
-        if (i < s.size()) r += s[i++];
-      }
-      if (i < s.size()) r += s[i++];
-    } else if (i + 1 < s.size() && s[i] == '/' && s[i + 1] == '/') {
-      break;  // rest is a comment
-    } else if (i + 1 < s.size() && s[i] == '/' && s[i + 1] == '*') {
-      i += 2;
-      while (i + 1 < s.size() && (s[i] != '*' || s[i + 1] != '/')) i++;
-      if (i + 1 < s.size()) i += 2;
-      // A comment is ONE space (C translation phase 3), not nothing:
-      // eliding it entirely would paste the surrounding tokens together
-      // ("1/*x*/2" must stay two tokens, not become "12").
-      r += ' ';
-    } else {
-      r += s[i++];
-    }
+  size_t consumed = 0;
+  ScratchString unit;
+
+  int peek(int k) const {
+    size_t at = i + static_cast<size_t>(k);
+    return at < s.size() ? static_cast<unsigned char>(s[at]) : 0;
   }
-  return r;
-}
-
-// Index of the first '/*' that never closes within `s`, or npos when
-// every block comment in `s` is terminated. Quote/'//' handling mirrors
-// strip_directive_comments() above -- a '/*' inside a string literal or
-// after '//' does not open a comment.
-static size_t open_comment_start(std::string_view s) {
-  size_t i = 0;
-  while (i < s.size()) {
-    if (s[i] == '"' || s[i] == '\'' || s[i] == '`') {
-      char q = s[i++];
-      while (i < s.size() && s[i] != q) {
-        if (s[i] == '\\') i++;
-        if (i < s.size()) i++;
-      }
-      if (i < s.size()) i++;
-    } else if (i + 1 < s.size() && s[i] == '/' && s[i + 1] == '/') {
-      return std::string_view::npos;  // '//' runs to the newline that ends the capture
-    } else if (i + 1 < s.size() && s[i] == '/' && s[i + 1] == '*') {
-      size_t start = i;
-      i += 2;
-      while (i + 1 < s.size() && (s[i] != '*' || s[i + 1] != '/')) i++;
-      if (i + 1 >= s.size()) return start;  // ran off the capture: still open
-      i += 2;
-    } else {
-      i++;
-    }
+  void advance() {
+    if (i < s.size()) keep(static_cast<unsigned char>(s[i++]));
   }
-  return std::string_view::npos;
-}
-
-bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, ScratchString* out,
-                                int* pulled_lines) {
-  std::string_view sv(text, len);
-  size_t open = open_comment_start(sv);
-  if (open == std::string_view::npos) return false;
-
-  int kind = lpc_lex_top_buffer_kind();
-  if (kind == LPC_BUF_PLAIN || kind == LPC_BUF_EXPANSION || kind == LPC_BUF_IF_EXPR) return false;
-
-  out->assign(sv.substr(0, open));
-  *out += ' ';
-
-  // Newlines consumed here that do NOT end up in *out (comment-internal
-  // ones and the terminator) get the same bookkeeping the rule's own
-  // terminator consumption does (native yylineno advance inside
-  // lpc_lex_getc() + lpc_lex_newline() for total_lines); kept
-  // continuation newlines are counted from the text later, exactly like
-  // capture-embedded ones.
-  int consumed = 0;
-  bool in_comment = true;
-  bool in_line_comment = false;
-  char in_quote = 0;
-  bool quote_escape = false;
-  int prev = 0;
-  for (;;) {
-    int c = lpc_lex_getc(yyscanner);
-    if (c <= 0) {
-      // Same terminal case as SC_BLOCK_COMMENT's <<EOF>> rule (and
-      // lpc_lex_getc() already continued into parent buffers, matching
-      // its lpc_lex_pop_splice_if_any step).
-      lexerror("End of file in a comment (opened on a preprocessor directive)");
-      break;
-    }
-    if (in_comment) {
-      if (c == '\n') {
-        lpc_lex_newline(yyscanner);
-        consumed++;
-        prev = 0;
-      } else if (prev == '*' && c == '/') {
-        in_comment = false;
-        prev = 0;
-      } else if (prev == '/' && c == '*') {
-        yywarn("/* found in comment.");  // same warning as SC_BLOCK_COMMENT
-        prev = 0;
-      } else {
-        prev = c;
-      }
-      continue;
-    }
-    if (c == '\n') {
-      // A backslash before the newline splices the next physical line
-      // in, matching the capture pattern's (\\\r?\n[^\n]*)* tail (and C,
-      // where splicing precedes comment recognition -- so it applies
-      // inside '//' too).
-      size_t n = out->size();
-      bool spliced = (n >= 1 && (*out)[n - 1] == '\\') ||
-                     (n >= 2 && (*out)[n - 1] == '\r' && (*out)[n - 2] == '\\');
-      if (spliced) {
-        *out += '\n';
-        continue;
-      }
-      lpc_lex_newline(yyscanner);
-      consumed++;
-      break;  // the logical line's terminator
-    }
-    if (in_line_comment) {
-      *out += static_cast<char>(c);
-      continue;
-    }
-    if (in_quote) {
-      *out += static_cast<char>(c);
-      if (quote_escape) {
-        quote_escape = false;
-      } else if (c == '\\') {
-        quote_escape = true;
-      } else if (c == in_quote) {
-        in_quote = 0;
-      }
-      continue;
-    }
-    *out += static_cast<char>(c);
-    if (c == '"' || c == '\'' || c == '`') {
-      in_quote = static_cast<char>(c);
-      quote_escape = false;
-      continue;
-    }
-    size_t n = out->size();
-    if (n >= 2 && (*out)[n - 2] == '/' && (*out)[n - 1] == '*') {
-      out->resize(n - 2);
-      *out += ' ';
-      in_comment = true;
-      prev = 0;
-    } else if (n >= 2 && (*out)[n - 2] == '/' && (*out)[n - 1] == '/') {
-      in_line_comment = true;
-    }
+  void keep(int c) {
+    unit += static_cast<char>(c);
+    consumed++;
   }
-  // The formula in lpc_lex_on_directive() already subtracts the
-  // terminator; report only the newlines beyond it.
-  *pulled_lines = consumed > 0 ? consumed - 1 : 0;
-  return true;
-}
+};
+}  // namespace
+
 
 ScratchString stringize(std::string_view s) {
   ScratchString r("\"");
@@ -207,21 +80,24 @@ ScratchVector<ScratchString> collect_args(std::string_view text, size_t& i) {
   ScratchVector<ScratchString> args;
   ScratchString arg;
   int depth = 0;
-  char inq = 0;
-  while (i < text.size()) {
-    char c = text[i++];
-    if (inq) {
-      if (c == '\\' && i < text.size()) {
-        arg += c;
-        arg += text[i++];
-        continue;
-      }
-      arg += c;
-      if (c == inq) inq = 0;
-    } else if (c == '"' || c == '\'' || c == '`') {
-      inq = c;
-      arg += c;
-    } else if (c == '(') {
+  // Same classifier as every other reader (lexer_scan.h): this walked
+  // quotes by hand too, with the same "'" -- as -- scanning-quote model that
+  // made an apostrophe swallow text everywhere else it appeared.
+  CapturedTextSrc src{text, i};
+  for (;;) {
+    src.unit.clear();
+    lpc_lex::UnitInfo u = lpc_lex::scan_one_unit(src);
+    if (u.unit == lpc_lex::Unit::kEof) break;
+    if (u.unit == lpc_lex::Unit::kBlockComment || u.unit == lpc_lex::Unit::kLineComment) {
+      arg += ' ';
+      continue;
+    }
+    if (u.unit != lpc_lex::Unit::kOrdinary) {
+      arg += src.unit;  // a literal's raw spelling; nothing in it is syntax
+      continue;
+    }
+    char c = u.ch;
+    if (c == '(') {
       depth++;
       arg += c;
     } else if (c == ')') {
@@ -238,6 +114,7 @@ ScratchVector<ScratchString> collect_args(std::string_view text, size_t& i) {
       arg += c;
     }
   }
+  i = src.i;
   return args;
 }
 
@@ -325,13 +202,18 @@ ScratchString substitute(std::string_view body, const std::vector<std::string>& 
     }
 
     if (body[i] == '"' || body[i] == '\'') {
-      char q = body[i++];
-      temp += q;
-      while (i < body.size() && body[i] != q) {
-        if (body[i] == '\\') temp += body[i++];
-        if (i < body.size()) temp += body[i++];
-      }
-      if (i < body.size()) temp += body[i++];
+      // NOT '`': a template's "${...}" holds ordinary code, and macros in
+      // it must still expand (pinned by compiler/template_literal.lpc's
+      // PAIR("x", `n=${PAIR(1, 2)}`)). Argument COLLECTION does treat a
+      // template as one unit -- a ',' in it is not a separator -- but that
+      // is a different question from what may expand inside one.
+      // A literal is copied verbatim, and what counts as one is the shared
+      // classifier's business, not a fourth private copy of the rule: a "'"
+      // that does not close is one apostrophe, not a quote that runs on.
+      CapturedTextSrc lit{body, i};
+      lpc_lex::scan_one_unit(lit);
+      temp += lit.unit;
+      i = lit.i;
       continue;
     }
 
@@ -342,13 +224,18 @@ ScratchString substitute(std::string_view body, const std::vector<std::string>& 
   i = 0;
   while (i < temp.size()) {
     if (temp[i] == '"' || temp[i] == '\'') {
-      char q = temp[i++];
-      result += q;
-      while (i < temp.size() && temp[i] != q) {
-        if (temp[i] == '\\') result += temp[i++];
-        if (i < temp.size()) result += temp[i++];
-      }
-      if (i < temp.size()) result += temp[i++];
+      // NOT '`': a template's "${...}" holds ordinary code, and macros in
+      // it must still expand (pinned by compiler/template_literal.lpc's
+      // PAIR("x", `n=${PAIR(1, 2)}`)). Argument COLLECTION does treat a
+      // template as one unit -- a ',' in it is not a separator -- but that
+      // is a different question from what may expand inside one.
+      // A literal is copied verbatim, and what counts as one is the shared
+      // classifier's business, not a fourth private copy of the rule: a "'"
+      // that does not close is one apostrophe, not a quote that runs on.
+      CapturedTextSrc lit{std::string_view(temp), i};
+      lpc_lex::scan_one_unit(lit);
+      result += lit.unit;
+      i = lit.i;
       continue;
     }
 
@@ -400,8 +287,11 @@ namespace {
 // ---------------------------------------------------------------------------
 
 struct IfTok {
-  int op;    // 0 = number; otherwise an operator code (see ifexpr_binop)
-  long val;  // the number when op == 0
+  int op;       // 0 = number; otherwise an operator code (see ifexpr_eval)
+  int64_t val;  // the number when op == 0 -- 64-bit to match LPC_INT (a plain
+                // `long` is 32-bit on Windows/LLP64, which would truncate #if
+                // arithmetic and disagree with the runtime opcode / constant
+                // folder, and make the `& 63` shift mask below UB there).
 };
 
 struct IfTokState {
@@ -418,208 +308,280 @@ void ifexpr_set_error(IfTokState* st, const char* msg) {
   if (st->error.empty()) st->error = msg;
 }
 
-long ifexpr_top(IfTokState* st);
-
-long ifexpr_atom(IfTokState* st) {
-  if (ifexpr_at_end(st)) return 0;
-  const IfTok& t = (*st->toks)[st->pos];
-  if (t.op == 0) {
-    st->pos++;
-    return t.val;
+// The binary-operator table shared by the evaluator: token code ->
+// {op, precedence}. prec stays -1 for anything that is not a binary
+// operator (including '?' / ':', which the ternary frames handle).
+void ifexpr_binop_of(int c0, int* op, int* prec) {
+  *prec = -1;
+  *op = 0;
+  if (c0 == 'O') {
+    *op = 'O';
+    *prec = 1;
+  } else if (c0 == 'A') {
+    *op = 'A';
+    *prec = 2;
+  } else if (c0 == 'E') {
+    *op = 'E';
+    *prec = 6;
+  } else if (c0 == 'N') {
+    *op = 'N';
+    *prec = 6;
+  } else if (c0 == 'L') {
+    *op = 'L';
+    *prec = 7;
+  } else if (c0 == 'G') {
+    *op = 'G';
+    *prec = 7;
+  } else if (c0 == 's') {
+    *op = 's';
+    *prec = 8;
+  } else if (c0 == 'S') {
+    *op = 'S';
+    *prec = 8;
+  } else if (c0 == '|') {
+    *op = '|';
+    *prec = 3;
+  } else if (c0 == '^') {
+    *op = '^';
+    *prec = 4;
+  } else if (c0 == '&') {
+    *op = '&';
+    *prec = 5;
+  } else if (c0 == '<') {
+    *op = '<';
+    *prec = 7;
+  } else if (c0 == '>') {
+    *op = '>';
+    *prec = 7;
+  } else if (c0 == '+') {
+    *op = '+';
+    *prec = 9;
+  } else if (c0 == '-') {
+    *op = '-';
+    *prec = 9;
+  } else if (c0 == '*') {
+    *op = '*';
+    *prec = 10;
+  } else if (c0 == '/') {
+    *op = '/';
+    *prec = 10;
+  } else if (c0 == '%') {
+    *op = '%';
+    *prec = 10;
   }
-  switch (t.op) {
-    case '(': {
+}
+
+int64_t ifexpr_combine(IfTokState* st, int op, int64_t lhs, int64_t rhs) {
+  switch (op) {
+    case 'O':
+      return lhs || rhs;
+    case 'A':
+      return lhs && rhs;
+    case '|':
+      return lhs | rhs;
+    case '^':
+      return lhs ^ rhs;
+    case '&':
+      return lhs & rhs;
+    case 'E':
+      return lhs == rhs;
+    case 'N':
+      return lhs != rhs;
+    case 'L':
+      return lhs <= rhs;
+    case 'G':
+      return lhs >= rhs;
+    case '<':
+      return lhs < rhs;
+    case '>':
+      return lhs > rhs;
+    case 's':
+      // A raw negative or >=64-bit (lhs/rhs are 64-bit int64_t) shift count
+      // is undefined behavior; mask to the low 6 bits (mod 64) instead of
+      // rejecting the expression, matching the runtime opcode.
+      return lhs << (rhs & 63);
+    case 'S':
+      return lhs >> (rhs & 63);
+    case '+':
+      return lhs + rhs;
+    case '-':
+      return lhs - rhs;
+    case '*':
+      return lhs * rhs;
+    case '/':
+      if (rhs == 0) {
+        ifexpr_set_error(st, "division by 0 in #if");
+        return 0;
+      }
+      if (rhs == -1) {
+        // x / -1 == -x; direct division traps (SIGFPE) for INT64_MIN.
+        return (int64_t)(0ULL - (uint64_t)lhs);
+      }
+      return lhs / rhs;
+    case '%':
+      if (rhs == 0) {
+        ifexpr_set_error(st, "modulo by 0 in #if");
+        return 0;
+      }
+      if (rhs == -1) {
+        return 0;  // x % -1 == 0; direct computation traps for LONG_MIN.
+      }
+      return lhs % rhs;
+    default:
+      return lhs;
+  }
+}
+
+// The expression evaluator, C precedence + ternary, as an explicit-stack
+// machine. This used to be three mutually recursive functions
+// (top/binop/atom); crafted input could drive each one C-stack-frame-deep
+// per TOKEN -- one atom frame per unary in a `!!!!...1` run, one top
+// frame per chained `1 ? 1 :`, several frames per '(' -- and macro
+// expansion amplifies a short #if line into hundreds of thousands of
+// such tokens, far past any stack. Frames live on the heap now, at most
+// a few per token, so depth is bounded by the token count and needs no
+// separate cap. Control flow, token consumption order, and error wording
+// are a bit-exact port of the recursive version.
+struct IfEvalFrame {
+  uint8_t kind;   // 0 = top, 1 = binop, 2 = atom
+  uint8_t state;  // continuation point within the kind
+  int op;         // binop: pending operator; atom: unary operator
+  int min_prec;   // binop only
+  int64_t a;      // top: cond / binop: lhs
+  int64_t b;      // top: true_val
+};
+
+int64_t ifexpr_eval(IfTokState* st) {
+  constexpr uint8_t kTop = 0, kBinop = 1, kAtom = 2;
+  std::vector<IfEvalFrame> stack;
+  stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+  int64_t ret = 0;
+  while (!stack.empty()) {
+    IfEvalFrame& f = stack.back();  // pushes only as the last action before continue
+    if (f.kind == kTop) {
+      if (f.state == 0) {
+        // cond = binop(0)
+        f.state = 1;
+        stack.push_back(IfEvalFrame{kBinop, 0, 0, 0, 0, 0});
+        continue;
+      }
+      if (f.state == 1) {
+        f.a = ret;  // cond
+        if (ifexpr_peek_op(st) == '?') {
+          st->pos++;
+          f.state = 2;  // true_val = top()
+          stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+          continue;
+        }
+        ret = f.a;
+        stack.pop_back();
+        continue;
+      }
+      if (f.state == 2) {
+        f.b = ret;  // true_val
+        if (ifexpr_peek_op(st) == ':') {
+          st->pos++;
+        } else {
+          ifexpr_set_error(st, "'?' without ':' in #if");
+        }
+        f.state = 3;  // false_val = top()
+        stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+        continue;
+      }
+      // state 3: ret holds false_val
+      ret = f.a ? f.b : ret;
+      stack.pop_back();
+      continue;
+    }
+    if (f.kind == kBinop) {
+      if (f.state == 0) {
+        // lhs = atom()
+        f.state = 1;
+        stack.push_back(IfEvalFrame{kAtom, 0, 0, 0, 0, 0});
+        continue;
+      }
+      // state 1: ret holds lhs (from atom); state 2: ret holds rhs
+      f.a = (f.state == 1) ? ret : ifexpr_combine(st, f.op, f.a, ret);
+      int op = 0, prec = -1;
+      if (!ifexpr_at_end(st)) {
+        ifexpr_binop_of(ifexpr_peek_op(st), &op, &prec);
+      }
+      if (prec < f.min_prec) {
+        ret = f.a;
+        stack.pop_back();
+        continue;
+      }
       st->pos++;
-      long v = ifexpr_top(st);
+      f.op = op;
+      f.state = 2;  // rhs = binop(prec + 1)
+      stack.push_back(IfEvalFrame{kBinop, 0, 0, prec + 1, 0, 0});
+      continue;
+    }
+    // kAtom
+    if (f.state == 0) {
+      if (ifexpr_at_end(st)) {
+        ret = 0;
+        stack.pop_back();
+        continue;
+      }
+      const IfTok& t = (*st->toks)[st->pos];
+      if (t.op == 0) {
+        st->pos++;
+        ret = t.val;
+        stack.pop_back();
+        continue;
+      }
+      switch (t.op) {
+        case '(':
+          st->pos++;
+          f.state = 1;  // v = top(), then expect ')'
+          stack.push_back(IfEvalFrame{kTop, 0, 0, 0, 0, 0});
+          continue;
+        case '!':
+        case '~':
+        case '-':
+        case '+':
+          st->pos++;
+          f.op = t.op;
+          f.state = 2;  // operand = atom()
+          stack.push_back(IfEvalFrame{kAtom, 0, 0, 0, 0, 0});
+          continue;
+        default:
+          // Mirrors the old walker's unknown-atom behavior: consume, 0.
+          st->pos++;
+          ret = 0;
+          stack.pop_back();
+          continue;
+      }
+    }
+    if (f.state == 1) {
+      // ret holds the parenthesized value
       if (ifexpr_peek_op(st) == ')') {
         st->pos++;
       } else {
         ifexpr_set_error(st, "bracket not paired in #if");
       }
-      return v;
+      stack.pop_back();
+      continue;
     }
-    case '!':
-      st->pos++;
-      return !ifexpr_atom(st);
-    case '~':
-      st->pos++;
-      return ~ifexpr_atom(st);
-    case '-':
-      st->pos++;
-      return -ifexpr_atom(st);
-    case '+':
-      st->pos++;
-      return ifexpr_atom(st);
-    default:
-      // Mirrors the old walker's unknown-atom behavior: consume, 0.
-      st->pos++;
-      return 0;
-  }
-}
-
-long ifexpr_binop(IfTokState* st, int min_prec) {
-  long lhs = ifexpr_atom(st);
-  for (;;) {
-    if (ifexpr_at_end(st)) break;
-
-    int c0 = ifexpr_peek_op(st);
-    int prec = -1, op = 0;
-
-    if (c0 == 'O') {
-      op = 'O';
-      prec = 1;
-    } else if (c0 == 'A') {
-      op = 'A';
-      prec = 2;
-    } else if (c0 == 'E') {
-      op = 'E';
-      prec = 6;
-    } else if (c0 == 'N') {
-      op = 'N';
-      prec = 6;
-    } else if (c0 == 'L') {
-      op = 'L';
-      prec = 7;
-    } else if (c0 == 'G') {
-      op = 'G';
-      prec = 7;
-    } else if (c0 == 's') {
-      op = 's';
-      prec = 8;
-    } else if (c0 == 'S') {
-      op = 'S';
-      prec = 8;
-    } else if (c0 == '|') {
-      op = '|';
-      prec = 3;
-    } else if (c0 == '^') {
-      op = '^';
-      prec = 4;
-    } else if (c0 == '&') {
-      op = '&';
-      prec = 5;
-    } else if (c0 == '<') {
-      op = '<';
-      prec = 7;
-    } else if (c0 == '>') {
-      op = '>';
-      prec = 7;
-    } else if (c0 == '+') {
-      op = '+';
-      prec = 9;
-    } else if (c0 == '-') {
-      op = '-';
-      prec = 9;
-    } else if (c0 == '*') {
-      op = '*';
-      prec = 10;
-    } else if (c0 == '/') {
-      op = '/';
-      prec = 10;
-    } else if (c0 == '%') {
-      op = '%';
-      prec = 10;
-    }
-
-    if (prec < min_prec) break;
-
-    st->pos++;
-    long rhs = ifexpr_binop(st, prec + 1);
-
-    switch (op) {
-      case 'O':
-        lhs = lhs || rhs;
+    // state 2: ret holds the unary operand
+    switch (f.op) {
+      case '!':
+        ret = !ret;
         break;
-      case 'A':
-        lhs = lhs && rhs;
-        break;
-      case '|':
-        lhs = lhs | rhs;
-        break;
-      case '^':
-        lhs = lhs ^ rhs;
-        break;
-      case '&':
-        lhs = lhs & rhs;
-        break;
-      case 'E':
-        lhs = lhs == rhs;
-        break;
-      case 'N':
-        lhs = lhs != rhs;
-        break;
-      case 'L':
-        lhs = lhs <= rhs;
-        break;
-      case 'G':
-        lhs = lhs >= rhs;
-        break;
-      case '<':
-        lhs = lhs < rhs;
-        break;
-      case '>':
-        lhs = lhs > rhs;
-        break;
-      case 's':
-        // A raw negative or >=64-bit (lhs/rhs are `long`) shift count is
-        // undefined behavior; mask to the low 6 bits (mod 64) instead of
-        // rejecting the expression, matching the runtime opcode.
-        lhs = lhs << (rhs & 63);
-        break;
-      case 'S':
-        lhs = lhs >> (rhs & 63);
-        break;
-      case '+':
-        lhs = lhs + rhs;
+      case '~':
+        ret = ~ret;
         break;
       case '-':
-        lhs = lhs - rhs;
+        ret = -ret;
         break;
-      case '*':
-        lhs = lhs * rhs;
-        break;
-      case '/':
-        if (rhs == 0) {
-          ifexpr_set_error(st, "division by 0 in #if");
-          lhs = 0;
-        } else if (rhs == -1) {
-          // x / -1 == -x; direct division traps (SIGFPE) for LONG_MIN.
-          lhs = (long)(0ULL - (unsigned long)lhs);
-        } else {
-          lhs = lhs / rhs;
-        }
-        break;
-      case '%':
-        if (rhs == 0) {
-          ifexpr_set_error(st, "modulo by 0 in #if");
-          lhs = 0;
-        } else if (rhs == -1) {
-          lhs = 0;  // x % -1 == 0; direct computation traps for LONG_MIN.
-        } else {
-          lhs = lhs % rhs;
-        }
-        break;
-      default:
+      default:  // '+'
         break;
     }
+    stack.pop_back();
+    continue;
   }
-  return lhs;
-}
-
-long ifexpr_top(IfTokState* st) {
-  long cond = ifexpr_binop(st, 0);
-  if (ifexpr_peek_op(st) == '?') {
-    st->pos++;
-    long true_val = ifexpr_top(st);
-    if (ifexpr_peek_op(st) == ':') {
-      st->pos++;
-    } else {
-      ifexpr_set_error(st, "'?' without ':' in #if");
-    }
-    long false_val = ifexpr_top(st);
-    return cond ? true_val : false_val;
-  }
-  return cond;
+  return ret;
 }
 
 // The name of an identifier-flavored token, for defined()'s operand.
@@ -635,7 +597,7 @@ ScratchString ifexpr_token_name(int tok, const union YYSTYPE* lv) {
 // suppressed and evaluate it. Consumes through the closing ')' (or the
 // bare name). Returns the 0/1 result; sets *ended when the expression
 // ran out mid-operand.
-long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
+int64_t ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
   compiler_context_t* ctx = yyget_extra(yyscanner);
   ctx->suppress_expansion = true;
   union YYSTYPE lv;
@@ -645,7 +607,7 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
     paren = true;
     tok = lpc_lex_ifexpr_next(&lv, yyscanner);
   }
-  long result = 0;
+  int64_t result = 0;
   if (tok == LPC_IFEXPR_END || tok <= 0) {
     *ended = true;
     ctx->suppress_expansion = false;
@@ -673,7 +635,7 @@ long ifexpr_pull_defined(bool efun_form, void* yyscanner, bool* ended) {
 
 }  // namespace
 
-long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
+int64_t lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
   std::vector<IfTok> toks;
   ScratchString text(trim(expr));
   if (!text.empty()) {
@@ -687,7 +649,7 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
           ended = true;
           break;
         case L_NUMBER:
-          toks.push_back(IfTok{0, static_cast<long>(lv.number)});
+          toks.push_back(IfTok{0, static_cast<int64_t>(lv.number)});
           break;
         case L_REAL:
           lexerror("floating point constants are not allowed in #if");
@@ -759,7 +721,7 @@ long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner) {
 
   IfTokState st;
   st.toks = &toks;
-  long result = ifexpr_top(&st);
+  int64_t result = ifexpr_eval(&st);
   if (!st.error.empty()) {
     lexerror(st.error.c_str());
     return 0;
@@ -824,19 +786,6 @@ bool lpc_lex_emitting() {
   return true;
 }
 
-// total_lines += for each '\n' embedded in the matched text
-// (backslash-continuation line breaks inside a directive) -- the LINE
-// counter itself advances natively (%option yylineno scans the matched
-// text). Called exactly once per captured line, by lpc_lex_on_directive().
-static void count_directive_newlines(const char* text, int len) {
-  for (int i = 0; i < len; i++) {
-    if (text[i] == '\n') {
-      total_lines++;  // the newline itself is counted natively
-                      // (%option yylineno scans the matched text)
-    }
-  }
-}
-
 bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
   if (name == "__LINE__") {
     char buf[32];
@@ -859,100 +808,213 @@ bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
   return false;
 }
 
-ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard) {
+namespace {
+// One pending function-like invocation inside lpc_lex_expand_string's
+// work stack: raw arguments already collected from the invoking frame's
+// text; each argument is pre-expanded into expanded_args by its own text
+// frame, then the body is substituted and rescanned. Arena-allocated
+// (placement new, destructor never runs: every member allocates from the
+// arena) so member addresses survive the frame vector's reallocation.
+struct EsPendingCall {
+  const PpMacro* m;
+  ScratchString name;  // guard entry for the substituted body's rescan
+  ScratchVector<ScratchString> raw_args;
+  ScratchVector<ScratchString> expanded_args;  // pre-sized; filled one frame at a time
+  size_t next_arg;
+  ScratchString subst;  // owns the substituted body while its frame scans it
+  ScratchString* out;   // where the rescan appends
+};
+
+// One level of lpc_lex_expand_string's explicit work stack: either a
+// text-scan frame (call == nullptr: scan [text,len) from pos, appending
+// to *out) or a call-driver frame (call != nullptr: feed the pending
+// invocation's arguments through their own frames, then morph into the
+// substituted body's text frame). guard_restore is the guard stack's
+// size at frame entry; frame exit truncates back to it.
+struct EsFrame {
+  const char* text;
+  size_t len;
+  size_t pos;
+  ScratchString* out;
+  size_t guard_restore;
+  EsPendingCall* call;
+};
+}  // namespace
+
+ScratchString lpc_lex_expand_string(std::string_view text) {
   if (!g_compile.pp_active) return ScratchString(text);
-  ScratchString result;
-  size_t i = 0;
-  while (i < text.size()) {
-    if (text[i] == '"' || text[i] == '\'') {
-      char q = text[i++];
-      result += q;
-      while (i < text.size() && text[i] != q) {
-        if (text[i] == '\\') result += text[i++];
-        if (i < text.size()) result += text[i++];
-      }
-      if (i < text.size()) result += text[i++];
-      continue;
+
+  ScratchString final_out;
+
+  // The guard chain (names currently being expanded, outermost first) as
+  // ONE shared stack plus a name->count map for O(1) membership tests;
+  // each frame truncates back to its entry size on exit. The old
+  // recursive version copied the whole guard vector per level -- O(n^2)
+  // arena memory over a deep chain -- and burned a C-stack frame per
+  // level, which is why it could not survive kLpcMaxExpansionNesting-deep
+  // input.
+  ScratchVector<ScratchString> guards;
+  std::unordered_map<std::string, int> guard_counts;
+  const auto guard_push = [&](std::string_view name) {
+    guards.emplace_back(name);
+    ++guard_counts[std::string(name)];
+  };
+  const auto guards_restore = [&](size_t mark) {
+    while (guards.size() > mark) {
+      auto it = guard_counts.find(std::string(guards.back().data(), guards.back().size()));
+      if (it != guard_counts.end() && --it->second == 0) guard_counts.erase(it);
+      guards.pop_back();
     }
-    if (std::isalpha(static_cast<unsigned char>(text[i])) || text[i] == '_') {
-      size_t start = i;
-      while (i < text.size() &&
-             (std::isalnum(static_cast<unsigned char>(text[i])) || text[i] == '_'))
-        i++;
-      std::string_view id = text.substr(start, i - start);
+  };
+  const auto guarded = [&](std::string_view id) {
+    return !guard_counts.empty() && guard_counts.find(std::string(id)) != guard_counts.end();
+  };
 
-      {
-        ScratchString builtin;
-        if (lpc_lex_builtin_macro(id, &builtin)) {
-          result += builtin;
-          continue;
-        }
-      }
+  std::vector<EsFrame> frames;
+  frames.push_back(EsFrame{text.data(), text.size(), 0, &final_out, 0, nullptr});
 
-      bool guarded = false;
-      for (const auto& g : guard) {
-        if (g == id) {
-          guarded = true;
-          break;
-        }
-      }
+  // Depth gate for every push below: at the cap, report once and leave
+  // the too-deep reference literal (the compile is failing anyway; the
+  // machine stays memory-safe and terminates).
+  bool reported_too_deep = false;
+  const auto depth_ok = [&]() {
+    if (frames.size() < kLpcMaxExpansionNesting) return true;
+    if (!reported_too_deep) {
+      reported_too_deep = true;
+      lexerror("Macro expansion nested too deep");
+    }
+    return false;
+  };
 
-      const PpMacro* found = pp_find_macro(id);
-      if (!guarded && found != nullptr) {
-        const PpMacro& m = *found;
-        if (!m.is_function_like) {
-          auto g2 = guard;
-          g2.emplace_back(id);
-          result += lpc_lex_expand_string(m.body, std::move(g2));
+  while (!frames.empty()) {
+    const size_t fi = frames.size() - 1;
+
+    if (frames[fi].call != nullptr) {
+      EsPendingCall& c = *frames[fi].call;  // arena-stable across frame pushes
+      if (c.next_arg < c.raw_args.size()) {
+        const size_t a = c.next_arg++;
+        // Arguments are pre-expanded under the CALLER's guard set (the
+        // invoked macro's own name is NOT yet guarded) -- C's "arguments
+        // are fully expanded first" step, which lets SECOND(1, SECOND(2,
+        // 3))'s inner reference expand even while the outer invocation
+        // is in flight.
+        if (depth_ok()) {
+          frames.push_back(EsFrame{c.raw_args[a].data(), c.raw_args[a].size(), 0,
+                                   &c.expanded_args[a], guards.size(), nullptr});
         } else {
-          size_t j = i;
-          while (j < text.size() && (text[j] == ' ' || text[j] == '\t')) j++;
-          if (j < text.size() && text[j] == '(') {
-            j++;
-            auto args = collect_args(text, j);
-            i = j;
-            ScratchVector<ScratchString> expanded_args;
-            auto g2 = guard;
-            g2.emplace_back(id);
-            // Argument pre-expansion deliberately passes no
-            for (const auto& a : args) expanded_args.push_back(lpc_lex_expand_string(a, guard));
-            ScratchString subst = substitute(m.body, m.params, expanded_args);
-            result += lpc_lex_expand_string(subst, std::move(g2));
-          } else {
-            // Function-like macro name with no argument list in
-            // this text: left literal and NOT counted -- if its
-            // '(' turns out to follow in the input stream after
-            // this text is spliced, the rescan may legitimately
-            // expand it there (C behavior).
-            result += id;
-          }
+          c.expanded_args[a] = c.raw_args[a];
         }
-      } else {
-        result += id;
-      }
-      continue;
-    }
-    result += text[i++];
-  }
-  return result;
-}
-
-static ScratchString fold_backslash_newlines(std::string_view text) {
-  ScratchString result;
-  result.reserve(text.size());
-  for (size_t i = 0; i < text.size();) {
-    if (text[i] == '\\') {
-      size_t j = i + 1;
-      if (j < text.size() && text[j] == '\r') j++;
-      if (j < text.size() && text[j] == '\n') {
-        i = j + 1;
         continue;
       }
+      // All arguments expanded: substitute, then rescan the result with
+      // the macro's own name guarded for the body's duration.
+      c.subst = substitute(c.m->body, c.m->params, c.expanded_args);
+      guard_push(c.name);
+      EsFrame& f = frames[fi];
+      f.text = c.subst.data();
+      f.len = c.subst.size();
+      f.pos = 0;
+      f.out = c.out;
+      f.guard_restore = guards.size() - 1;
+      f.call = nullptr;
+      continue;
     }
-    result.push_back(text[i]);
-    i++;
+
+    if (frames[fi].pos >= frames[fi].len) {
+      guards_restore(frames[fi].guard_restore);
+      frames.pop_back();
+      continue;
+    }
+
+    // Text scan: consume until a macro reference needs a sub-frame (then
+    // break out with `pushed`) or the frame's text runs dry. `result`
+    // and `t` stay valid across frame pushes (they alias arena / macro
+    // table storage, not the frames vector); the frame reference `f`
+    // does NOT, so its fields are written before any push.
+    EsFrame& f = frames[fi];
+    const std::string_view t(f.text, f.len);
+    ScratchString& result = *f.out;
+    size_t i = f.pos;
+    bool pushed = false;
+    while (i < t.size() && !pushed) {
+      if (t[i] == '"' || t[i] == '\'') {
+        // NOT '`': a template's "${...}" holds ordinary code, and macros in
+        // it must still expand (pinned by compiler/template_literal.lpc's
+        // PAIR("x", `n=${PAIR(1, 2)}`)). Argument COLLECTION does treat a
+        // template as one unit -- a ',' in it is not a separator -- but that
+        // is a different question from what may expand inside one.
+        CapturedTextSrc lit{t, i};
+        lpc_lex::scan_one_unit(lit);
+        result += lit.unit;
+        i = lit.i;
+        continue;
+      }
+      if (std::isalpha(static_cast<unsigned char>(t[i])) || t[i] == '_') {
+        size_t start = i;
+        while (i < t.size() && (std::isalnum(static_cast<unsigned char>(t[i])) || t[i] == '_')) i++;
+        std::string_view id = t.substr(start, i - start);
+
+        {
+          ScratchString builtin;
+          if (lpc_lex_builtin_macro(id, &builtin)) {
+            result += builtin;
+            continue;
+          }
+        }
+
+        const PpMacro* found = pp_find_macro(id);
+        if (guarded(id) || found == nullptr) {
+          result += id;
+          continue;
+        }
+        const PpMacro& m = *found;
+        if (!m.is_function_like) {
+          if (depth_ok()) {
+            f.pos = i;
+            guard_push(id);
+            frames.push_back(
+                EsFrame{m.body.data(), m.body.size(), 0, &result, guards.size() - 1, nullptr});
+            pushed = true;
+          } else {
+            result += id;
+          }
+          continue;
+        }
+        size_t j = i;
+        while (j < t.size() && (t[j] == ' ' || t[j] == '\t')) j++;
+        if (j < t.size() && t[j] == '(') {
+          j++;
+          if (depth_ok()) {
+            auto args = collect_args(t, j);
+            f.pos = j;  // consumed through the closing ')'
+            void* mem = scratch_raw_allocate(sizeof(EsPendingCall), alignof(EsPendingCall));
+            auto* call = new (mem) EsPendingCall{&m, ScratchString(id), std::move(args),
+                                                 {},   0,               {},
+                                                 &result};
+            call->expanded_args.resize(call->raw_args.size());
+            frames.push_back(EsFrame{nullptr, 0, 0, nullptr, guards.size(), call});
+            pushed = true;
+          } else {
+            // At the cap: the name stays literal and the argument list
+            // is NOT consumed; it flows through as plain text.
+            result += id;
+          }
+        } else {
+          // Function-like macro name with no argument list in this
+          // text: left literal and NOT counted -- if its '(' turns out
+          // to follow in the input stream after this text is spliced,
+          // the rescan may legitimately expand it there (C behavior).
+          result += id;
+        }
+        continue;
+      }
+      result += t[i++];
+    }
+    if (!pushed) {
+      frames[fi].pos = i;  // exhausted; popped (and guards restored) next iteration
+    }
   }
-  return result;
+  return final_out;
 }
 
 // Applies one already-parsed directive: `dir` is the directive keyword,
@@ -968,7 +1030,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
       // tail otherwise lands in the stored body and -- expansion buffers
       // carry no newline to end it -- comments out the rest of whatever
       // spliced text the macro later expands into (#1240).
-      ScratchString rest_stripped = strip_directive_comments(rest);
+      ScratchString rest_stripped = ScratchString(rest);
       rest = std::string_view(rest_stripped);
       size_t idx = 0;
       while (idx < rest.size() && (rest[idx] == ' ' || rest[idx] == '\t')) idx++;
@@ -1039,9 +1101,16 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
           // (respects #pragma no_warnings, does not fail the
           // compile). Identical-body redefinition stays silent.
           if (!existing->second.def_file.empty()) {
-            compiler_pending_notes.push_back("previous definition of '" + std::string(name) +
-                                             "' was at /" + existing->second.def_file + ":" +
-                                             std::to_string(existing->second.def_line));
+            // Built on the arena, like everything else staged for a
+            // Diagnostic -- the note text never touches the heap.
+            ScratchString note("previous definition of '");
+            note.append(name.data(), name.size());
+            note.append("' was at /");
+            note.append(existing->second.def_file.data(), existing->second.def_file.size());
+            note.append(":");
+            auto line_str = std::to_string(existing->second.def_line);
+            note.append(line_str.data(), line_str.size());
+            compiler_pending_notes.push_back(std::move(note));
           }
           yywarn("Macro '%s' redefined", std::string(name).c_str());
         }
@@ -1059,7 +1128,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     if (lpc_lex_emitting()) {
       // Same phase-3 rule as #define: "#undef X // why" names X, not
       // "X // why" (which silently erased nothing).
-      std::string name(trim(std::string_view(strip_directive_comments(rest))));
+      std::string name(trim(rest));
       if (pp_is_predefined(name)) {
         lexerror("Illegal to #undef a predefined value.");
       } else {
@@ -1069,17 +1138,17 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
   } else if (dir == "ifdef") {
     // Strip comments or "#ifdef X // why" looks up the wrong name and
     // silently takes the false branch.
-    bool def = pp_find_macro(trim(std::string_view(strip_directive_comments(rest)))) != nullptr;
+    bool def = pp_find_macro(trim(rest)) != nullptr;
     bool emit = lpc_lex_emitting() && def;
     g_compile.conds.push_back({emit, emit});
   } else if (dir == "ifndef") {
-    bool def = pp_find_macro(trim(std::string_view(strip_directive_comments(rest)))) != nullptr;
+    bool def = pp_find_macro(trim(rest)) != nullptr;
     bool emit = lpc_lex_emitting() && !def;
     g_compile.conds.push_back({emit, emit});
   } else if (dir == "if") {
     bool cond = false;
     if (lpc_lex_emitting()) {
-      ScratchString stripped = strip_directive_comments(rest);
+      ScratchString stripped = ScratchString(rest);
       ScratchString trimmed(trim(std::string_view(stripped)));
       if (trimmed.empty()) {
         lexerror("missing expression in #if");
@@ -1097,7 +1166,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
       bool outer = lpc_lex_emitting();
       bool cond = false;
       if (outer && !had) {
-        ScratchString stripped = strip_directive_comments(rest);
+        ScratchString stripped = ScratchString(rest);
         ScratchString trimmed(trim(std::string_view(stripped)));
         if (trimmed.empty()) {
           lexerror("missing expression in #elif");
@@ -1150,7 +1219,7 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     if (lpc_lex_emitting()) {
       // Pragma payloads are word lists, so a trailing comment would read
       // as an unknown pragma word -- strip like the other parsed forms.
-      ScratchString rest_str(trim(std::string_view(strip_directive_comments(rest))));
+      ScratchString rest_str(trim(rest));
       handle_pragma(const_cast<char*>(rest_str.c_str()));
     }
   } else if (dir == "line" ||
@@ -1192,30 +1261,37 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
 }
 
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
-                                        bool in_skip_mode, int pulled_lines) {
-  // The directive's own first line, for error attribution: the lexer.l
-  // rule consumed + counted the terminating newline before calling us,
-  // so current_line is already one past the directive's LAST physical
-  // line; its embedded continuations haven't been counted yet, so its
-  // FIRST line is exactly current_line - 1 -- minus any extra physical
-  // lines lpc_lex_complete_directive() pulled for a spanning /* comment.
-  // Published around the dispatch calls below via
-  // compiler_directive_start_line (see its comment in compiler.h) so
-  // yyerror()/yywarn() attribute to the directive rather than the line
-  // after it.
-  int directive_line = current_line - 1 - pulled_lines;
+                                        bool in_skip_mode, int directive_line) {
+  // The directive's own first line, for error attribution, is recorded by
+  // SC_DIRECTIVE at the '#' and handed straight here. It used to be
+  // derived -- current_line minus the terminator minus however many lines
+  // the hand-written completer had pulled -- and every physical line a
+  // directive can legally span (a backslash continuation, a block comment
+  // closing later) was a term in that subtraction. Published around the
+  // dispatch calls below via compiler_directive_start_line (see its
+  // comment in compiler.h) so yyerror()/yywarn() attribute to the
+  // directive rather than to the line after it.
+  //
+  // Continuation and comment newlines are counted where they are scanned
+  // (SC_DIRECTIVE's rules and SC_BLOCK_COMMENT's), so `text` holds one
+  // logical line with no newlines in it and nothing is counted here.
 
-  // Embedded continuation newlines are physical lines regardless of scan
-  // mode or whether the directive dispatches -- counted exactly once,
-  // here (the terminating newline is the lexer.l rule's job, not ours).
-  count_directive_newlines(text, len);
+  // A raw NUL inside the captured directive line: the directive rule's
+  // [^\n] classes are the ONE place that still deliberately absorbs NUL
+  // bytes (so the whole-line capture stays intact for diagnostics); every
+  // other path reports it via the <*> NUL rule at the top of lexer.l.
+  // Reject it here -- this line only runs for '#'-directive lines, so
+  // unlike a whole-file pre-scan it costs nothing on ordinary source.
+  if (memchr(text, '\0', static_cast<size_t>(len)) != nullptr) {
+    lexerror("Illegal embedded NUL byte (0x00) in preprocessor directive");
+    return LpcDirectiveAction::kNone;
+  }
 
   if (!g_compile.pp_active) return LpcDirectiveAction::kNone;
 
   // Fold + parse the captured line exactly once: both the skip-mode
   // classification and the full dispatch below read the same name/rest.
-  ScratchString folded = fold_backslash_newlines(std::string_view(text, len));
-  std::string_view sv(folded);
+  std::string_view sv(text, static_cast<size_t>(len));
   size_t i = 0;
   while (i < sv.size() && (sv[i] == ' ' || sv[i] == '\t')) i++;
   if (i < sv.size() && sv[i] == '#') i++;

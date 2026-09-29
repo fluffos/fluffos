@@ -1,0 +1,17 @@
+// Fixture for Bug 1 (see replace_bug1_shell.lpc for the full scenario
+// writeup): the shell's SECOND (no-op relative to the shell) replace_program()
+// target. Inherits Y and adds its own marker on top, so BASE strictly
+// contains MORE than Y -- making replace_bug1_shell's create() call order
+// (Y first, then BASE) exercise both a genuine swap (Y) and a true no-op
+// (BASE) against the same shell.
+//
+// try_bind() lives HERE (inherited unchanged by the shell), matching the
+// convention established by replace_stateful_base.lpc: the closure that
+// must fail to bind while a swap is pending is defined on the shared base
+// class, not re-declared on every fixture that inherits it.
+inherit "/clone/replace_program/replace_bug1_y";
+string base_marker() { return "base"; }
+mixed try_bind() {
+  mixed fp;
+  return catch(fp = (: base_marker, 1 :));
+}

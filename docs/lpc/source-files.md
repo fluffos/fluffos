@@ -42,7 +42,8 @@ Consequently object identity is **extension-blind**:
 The **program name** (`prog->filename`) is different: it records the
 real file that was compiled, extension included. That is the name
 reported by `inherit_list()`, `deep_inherit_list()`, error tracebacks,
-and compiler diagnostics.
+and compiler diagnostics. `include_list()` reports the same style of
+path for every file the program `#include`d.
 
 ```c
 object ob = load_object("/std/room");      // loads /std/room.lpc

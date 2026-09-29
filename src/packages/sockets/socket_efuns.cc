@@ -249,7 +249,7 @@ int check_valid_socket(const char* const what, int fd, object_t* owner, const ch
   push_refed_array(info);
 
   mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-  return MASTER_APPROVED(mret);
+  return MASTER_APPROVED(mret, "valid_socket");
 }
 
 static void clear_socket(int which, int dofree) {
@@ -1837,6 +1837,12 @@ int socket_acquire(int fd, svalue_t* read_callback, svalue_t* write_callback,
   lpc_socks[fd].flags &= ~S_RELEASE;
   lpc_socks[fd].owner_ob = current_object;
   lpc_socks[fd].release_ob = nullptr;
+  // Match socket_create()/socket_accept()/socket_connect(): destruct_object()
+  // only force-closes an object's sockets (close_referencing_sockets()) when
+  // O_EFUN_SOCKET is set. Without it, destructing the acquiring object while
+  // it still owns this fd leaves owner_ob dangling -- the next network event
+  // on this fd would dereference freed object memory.
+  current_object->flags |= O_EFUN_SOCKET;
 
   set_read_callback(fd, read_callback);
   set_write_callback(fd, write_callback);
@@ -2041,6 +2047,13 @@ void mark_sockets() {
       lpc_socks[i].close_callback.f->hdr.extra_ref++;
     } else if ((s = lpc_socks[i].close_callback.s)) {
       EXTRA_REF(BLOCK(s))++;
+    }
+    // f_socket_set_option() stores ref-counted strings (TLS SNI hostname /
+    // cert / key paths) into options[] via assign_svalue -- these are held
+    // off the object graph, so mark them too or check_memory() reports a
+    // bad ref count for a socket carrying a live TLS option (AGENTS.md §3).
+    for (auto& opt : lpc_socks[i].options) {
+      mark_svalue(&opt);
     }
   }
 }

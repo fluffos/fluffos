@@ -1,0 +1,75 @@
+// An adopted promise whose SOURCE is collected must not freeze.
+//
+// promise_resolve(target, src) with a pending src commits target's fate to
+// src: target stays PENDING, latches `resolving`, and both promise_resolve()
+// and promise_reject() refuse it from then on, on the grounds that the
+// adoption owns the outcome. Deliberately, target does NOT take a reference
+// on src -- that would build the refcount cycle the shutdown teardown exists
+// to break.
+//
+// So when src's last reference dies while it is still pending, target was
+// left PENDING with its fate already spoken for and nothing able to settle
+// it: not the mudlib (the efuns refuse), not the driver. It was not even
+// reported, because a promise stuck pending is not a rejection.
+//
+// The consequence is worse than a stuck value. Anything awaiting target is
+// parked for the life of the driver, holding its object, its program, its
+// heap frame slice and one `max suspended async functions` slot -- and it is
+// invisible to both abandon routes, because the object is alive and the
+// promise it awaits is alive. It is the source that died.
+//
+// Three routes reach it, all ordinary: resolving with a promise nobody keeps,
+// a then-handler returning one, and an async body returning one.
+
+nosave promise stranded;
+nosave int waiter_ran;
+
+private async void waiter() {
+  // acatch, not a bare await: the fix settles `stranded` as a REJECTION, so
+  // resuming here re-raises it. Swallowing it keeps the exit latch's release
+  // on the normal path and leaves no unhandled rejection in the log.
+  mixed err = acatch(await stranded);
+
+  waiter_ran = err ? 1 : 2;
+  ASSERT2(err, "the stranded await should resume with the collection error");
+  RELEASE_LATCH("adoption source collected");
+}
+
+void do_tests() {
+  promise target = promise_create();
+  promise src = promise_create();
+  promise chained;
+  promise from_async;
+
+  promise_resolve(target, src);
+  ASSERT2(promise_status(target) == 0,
+    "adopting a pending promise leaves the target pending");
+
+  // The last reference to the source dies here.
+  src = 0;
+  ASSERT2(promise_status(target) != 0,
+    "the adopted promise is stuck PENDING forever: its source was collected, and "
+    "promise_resolve()/promise_reject() both refuse it, so nothing can settle it");
+  ASSERT_EQ(2, promise_status(target));
+
+  // Same shape reached through a then-handler that returns a promise it does
+  // not keep.
+  chained = promise_then(promise_create(), function(mixed v) {
+    return promise_create();
+  });
+  promise_resolve(chained, promise_create());
+  ASSERT2(promise_status(chained) != 0,
+    "a chained promise adopted onto a collected source is stuck pending");
+
+  // ... and through an async body returning one.
+  from_async = promise_create();
+  promise_resolve(from_async, promise_create());
+  ASSERT2(promise_status(from_async) != 0,
+    "a promise adopted onto a collected source is stuck pending");
+
+  // The consequence: a frame awaiting one of these used to park forever.
+  stranded = promise_create();
+  promise_resolve(stranded, promise_create());
+  EXPECT_LATCH("adoption source collected");
+  waiter();
+}

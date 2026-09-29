@@ -13,6 +13,7 @@
 // input-stack push and macro expansion's ring-buffer splicing live in
 // lexer_utils.cc, next to the buffer machinery they manipulate.
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -20,15 +21,25 @@
 #include <unordered_map>
 
 #include "compiler/internal/compiler.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 // PpMacro / CondState / LpcMacroTable live in compiler.h (they are
 // CompileState members).
 
+// Cap on macro-expansion nesting depth, shared by BOTH expansion engines:
+// the rescan-driven one (lpc_lex_resolve_identifier, counted in LIVE
+// expansion buffers) and the textual argument pre-expander
+// (lpc_lex_expand_string, counted in work-stack frames). Both are
+// iterative -- a level costs a Flex buffer / a work-stack entry on the
+// heap, never a C-stack frame -- so this bounds runaway chains and their
+// memory, not stack safety. Kept at 65535 as a deliberately generous
+// "any sane program fits" limit (~a few hundred bytes per level at full
+// depth).
+inline constexpr size_t kLpcMaxExpansionNesting = 65535;
+
 // Helpers
 ScratchString normalize_filename(const char* filename);
 std::string_view trim(std::string_view s);
-ScratchString strip_directive_comments(std::string_view s);
 ScratchString stringize(std::string_view s);
 ScratchVector<ScratchString> collect_args(std::string_view text, size_t& i);
 // Parameter substitution (with # stringize marking and ## paste in its
@@ -50,7 +61,7 @@ ScratchString substitute(std::string_view body, const std::vector<std::string>& 
 // any parse problem (unpaired bracket, division/modulo by zero, trailing
 // '?' without ':', leftover content) calls lexerror() directly and
 // returns 0.
-long lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
+int64_t lpc_lex_eval_if_expr(std::string_view expr, void* yyscanner);
 
 // There is NO session object. The preprocessor state lives directly in
 // g_compile: `macros` holds USER #defines only (predefines are immutable
@@ -91,32 +102,13 @@ enum class LpcDirectiveAction {
   kEnterSkip,  // a condition turned false: BEGIN(SC_COND_SKIP)
   kExitSkip,   // the dead branch ended: BEGIN(INITIAL)
 };
-// pulled_lines: physical newlines lpc_lex_complete_directive() consumed
-// beyond the terminating one (0 when the rule's capture was already the
-// whole logical line) -- backed out of the first-line attribution below.
+// directive_line: the physical line the '#' sat on, recorded by
+// SC_DIRECTIVE when it entered. A directive may legally span physical
+// lines (a backslash continuation, a block comment that closes on a later
+// line), so its first line is carried from the scan rather than derived
+// from current_line afterwards.
 LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscanner,
-                                        bool in_skip_mode, int pulled_lines = 0);
-
-// The directive rule's capture stops at the first physical newline (plus
-// backslash continuations), which cannot span a /* comment that closes on
-// a LATER line -- the comment's remaining lines used to be tokenized as
-// code (#1236). Called by the rule action BEFORE
-// lpc_lex_consume_directive_newline(): scans the captured text
-// (quote-aware, same rules as strip_directive_comments()) and, when it
-// ends inside an open /* comment, keeps pulling raw bytes through
-// lpc_lex_getc() until the comment closes and the logical line really
-// ends. Each comment is folded to a single space (a comment is
-// whitespace, so text after the close still belongs to the directive, and
-// another /* there may open again). Returns false -- out/pulled_lines
-// untouched, nothing consumed -- when the capture has no open comment
-// (the common case costs one scan of the captured text) or the top buffer
-// is a splice/if-expr buffer (no newlines to pull; same guard as
-// lpc_lex_consume_directive_newline()). Returns true when it pulled the
-// tail: *out is the completed logical line, *pulled_lines the newline
-// count for lpc_lex_on_directive(), and the terminating newline has been
-// consumed AND counted -- the rule action must NOT consume it again.
-bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, ScratchString* out,
-                                int* pulled_lines);
+                                        bool in_skip_mode, int directive_line);
 
 // #include implementation: resolves `rest` (macro-expanding it first when
 // unquoted), records the including file's identity on the include
@@ -127,16 +119,19 @@ bool lpc_lex_complete_directive(const char* text, int len, void* yyscanner, Scra
 // used by start_new_file() for the configured __GLOBAL_INCLUDE_FILE__.
 bool lpc_lex_handle_include(std::string_view rest, void* yyscanner);
 
-// Textual macro expansion (object-like and function-like, with `guard`
-// carrying the names currently being expanded for self-reference
-// termination). ONLY two textual consumers remain -- function-like
-// ARGUMENT pre-expansion (C's "arguments are fully expanded first" step)
-// and #include's unquoted-filename form; both consume the result as
-// text, never rescanned. Ordinary macro expansion is rescan-driven
-// (lpc_lex_resolve_identifier pushes the RAW substituted body as a Flex
-// buffer) and #if/#elif expressions are evaluated over TOKENS
-// (lpc_lex_eval_if_expr below).
-ScratchString lpc_lex_expand_string(std::string_view text, ScratchVector<ScratchString> guard = {});
+// Textual macro expansion (object-like and function-like, with an
+// internal guard chain of the names currently being expanded for
+// self-reference termination). ONLY two textual consumers remain --
+// function-like ARGUMENT pre-expansion (C's "arguments are fully
+// expanded first" step) and #include's unquoted-filename form; both
+// consume the result as text, never rescanned. Ordinary macro expansion
+// is rescan-driven (lpc_lex_resolve_identifier pushes the RAW
+// substituted body as a Flex buffer) and #if/#elif expressions are
+// evaluated over TOKENS (lpc_lex_eval_if_expr below). Runs as an
+// explicit work-stack machine, not C recursion: a deep chain costs heap
+// frames only, bounded by kLpcMaxExpansionNesting (one "Macro expansion
+// nested too deep" report; deeper references stay literal).
+ScratchString lpc_lex_expand_string(std::string_view text);
 
 // __LINE__/__FILE__/__DIR__ expand from the compiler's LIVE position
 // (current_line/current_file) -- one line counter, one file name is the

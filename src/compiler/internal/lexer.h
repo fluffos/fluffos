@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 #define DEFMAX 65536  // at least 4 times MAXLINE
 #define MAXLINE 4096
@@ -73,9 +73,9 @@ extern lpc_predef_t* lpc_predefs;
 
 typedef struct {
   short max_arg, min_arg; /* Can't use char to represent -1 */
-  short type[4];          /* need a short to hold the biggest type flag */
+  uint32_t type[4];       /* runtime T_* masks; the low 16 bits are full */
   short Default;
-  unsigned short ret_type;
+  uint32_t ret_type; /* compiler TYPE_* for efuns; runtime T_* for operators */
   const char* name;
   int arg_index;
 } instr_t;
@@ -99,6 +99,15 @@ struct compiler_context_t {
   // die at scratch_destroy while this context object survives (scanner
   // reuse), so lpc_lex_reset_context() re-initializes them per compile.
   ScratchString str_accum;
+  // The logical line SC_DIRECTIVE / WORD / DATA is accumulating, and the
+  // physical line its '#' sat on. The line is recorded at the '#' rather
+  // than derived afterwards from current_line: a directive may legally
+  // span physical lines (a backslash continuation, or a block comment
+  // that closes on a later line, #1236), and reconstructing where it
+  // started by subtracting what was consumed is exactly the arithmetic
+  // that kept going wrong.
+  ScratchString directive_accum;
+  int directive_line = 0;
   ScratchString heredoc_terminator;
   bool heredoc_is_array = false;
   // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
@@ -174,6 +183,7 @@ extern const char* current_file;
 extern int current_file_id;
 extern int pragmas;
 extern int num_parse_error;
+extern int num_parse_warn;
 extern lpc_predef_t* lpc_predefs;
 extern int efun_arg_types[];
 extern int context;
@@ -268,6 +278,15 @@ enum LpcPushedBufferKind {
 // Pseudo-token yylex() returns when a LPC_BUF_IF_EXPR buffer runs dry
 // (never reaches the parser: only the #if evaluator's pulls see it).
 #define LPC_IFEXPR_END (-2)
+
+// Pseudo-token lpc_lex_resolve_identifier() returns when the identifier
+// was a macro reference it consumed: the expansion (possibly empty) was
+// pushed as a fresh buffer and NO token was produced. The identifier
+// rule's action simply falls through so the CURRENT yylex() frame keeps
+// scanning the pushed buffer -- nesting a macro expansion costs one Flex
+// buffer, never a C-stack frame, which is what lets chains up to
+// kLpcMaxExpansionNesting (65535) deep work. Never escapes yylex().
+#define LPC_TOKEN_RESCAN (-3)
 
 // Push `text` as a fresh Flex buffer on top of the current one; scanning
 // consumes it fully, then pops back to the parent buffer at exactly the
@@ -379,6 +398,11 @@ int lpc_lex_buffer_count(void* yyscanner);
 int* lpc_lex_buffer_lineno(void* yyscanner, int i);
 int lpc_lex_buffer_extents(void* yyscanner, int i, const char** base, const char** limit,
                            const char** pos, char* held);
+
+// Look ahead k bytes (0 = next) without consuming; 0 at end of input.
+// Walks the buffer stack like lpc_lex_getc(), but pops nothing. Defined in
+// lexer_utils.cc; used by every reader that must classify before consuming.
+int lpc_lex_peek(void* yyscanner, int k);
 
 // Pull one token for the #if/#elif expression evaluator: yylex() under
 // the INITIAL start condition (the surrounding scan may be in

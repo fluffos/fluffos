@@ -9,6 +9,7 @@
 
 #include "include/function.h"  // for F_SIMUL etc , FIXME
 #include "efuns.autogen.h"
+#include "keyword.h"                  // predefs[]: FP_EFUN name resolution
 #include "vm/internal/base/number.h"  // for formatting lpc int
 
 #include "compiler.h"  // for CURRENT_PROGRAM_SIZE
@@ -69,6 +70,11 @@ int g_optimize_depth = 0;
 constexpr int kMaxOptimizeDepth = 500;
 }  // namespace
 
+/* Is `n` a slot the optimizer's per-function scratch actually covers? */
+static bool optimizer_local_slot(int n) {
+  return last_local_refs != nullptr && n >= 0 && n < optimizer_num_locals;
+}
+
 static parse_node_t* optimize(parse_node_t* expr) {
   if (!expr) {
     return nullptr;
@@ -93,7 +99,7 @@ static parse_node_t* optimize(parse_node_t* expr) {
           if (!optimizer_state) {
             int x = expr->r.expr->l.number;
 
-            if (last_local_refs[x]) {
+            if (optimizer_local_slot(x) && last_local_refs[x]) {
               last_local_refs[x]->v.number = F_TRANSFER_LOCAL;
               last_local_refs[x] = nullptr;
             }
@@ -119,6 +125,15 @@ static parse_node_t* optimize(parse_node_t* expr) {
     case NODE_UNARY_OP_1:
       OPT(expr->r.expr);
       if (expr->v.number == F_VOID_ASSIGN_LOCAL) {
+        /* A local index the scratch array was not sized for. It should not
+         * happen (generate_function() sizes it from the function's local
+         * count), but the array is a peephole optimisation only, so degrade
+         * to "no peephole" rather than reading off the end -- a tree that
+         * out-counts its function crashed the driver at compile time once
+         * already (__INIT, see compile_max_num_locals in compiler.cc). */
+        if (!optimizer_local_slot(expr->l.number)) {
+          break;
+        }
         if (last_local_refs[expr->l.number] && !optimizer_state) {
           last_local_refs[expr->l.number]->v.number = F_TRANSFER_LOCAL;
           last_local_refs[expr->l.number] = nullptr;
@@ -127,6 +142,9 @@ static parse_node_t* optimize(parse_node_t* expr) {
       break;
     case NODE_OPCODE_1:
       if (expr->v.number == F_LOCAL || expr->v.number == F_LOCAL_LVALUE) {
+        if (!optimizer_local_slot(expr->l.number)) {
+          break;
+        }
         if (expr->v.number == F_LOCAL) {
           if (!optimizer_state) {
             last_local_refs[expr->l.number] = expr;
@@ -231,6 +249,7 @@ static parse_node_t* optimize(parse_node_t* expr) {
       break;
     }
     case NODE_CATCH:
+    case NODE_ACATCH:
       OPT(expr->r.expr);
       break;
     case NODE_LVALUE_EFUN:
@@ -295,6 +314,7 @@ static void optimizer_start_function(int n) {
     }
   } else {
     last_local_refs = nullptr;
+    optimizer_num_locals = 0;
   }
 }
 
@@ -420,7 +440,13 @@ const char* lpc_tree_name[] = {"return",
                                "number",
                                "string",
                                "function",
-                               "catch"};
+                               "catch",
+                               /* keep in step with trees.h's node-kind enum:
+                                * lpc_tree_form() indexes this table by kind
+                                * for NODE_CATCH/NODE_ACATCH, so a missing
+                                * entry is an out-of-bounds read (__TREE__ of
+                                * an acatch segfaulted on Debug builds) */
+                               "acatch"};
 
 static void lpc_tree(parse_node_t* dest, int num) {
   parse_node_t* pn;
@@ -554,14 +580,37 @@ static void ast_json_children(nlohmann::json& node, parse_node_t* expr) {
 }
 
 static void ast_json_seq(nlohmann::json& arr, parse_node_t* expr) {
-  if (!expr) return;
-  if (expr->kind == NODE_TWO_VALUES) { // splice nested sequences flat
-    ast_json_seq(arr, expr->l.expr);
-    ast_json_seq(arr, expr->r.expr);
-    return;
+  // Same NODE_TWO_VALUES chain (one node per top-level definition/statement)
+  // that i_generate_node()/optimize() flatten iteratively instead of
+  // recursing -- walking it recursively here would scale C-stack depth with
+  // an object's definition/statement count, not just genuine expression
+  // nesting (github.com/fluffos/fluffos/issues/1267). Push right-then-left
+  // so popping (left-to-right) preserves the original recursive order.
+  std::vector<parse_node_t*> work{expr};
+  while (!work.empty()) {
+    parse_node_t* node = work.back();
+    work.pop_back();
+    if (!node) continue;
+    if (node->kind == NODE_TWO_VALUES) { // splice nested sequences flat
+      work.push_back(node->r.expr);
+      work.push_back(node->l.expr);
+    } else {
+      arr.push_back(ast_json(node));
+    }
   }
-  arr.push_back(ast_json(expr));
 }
+
+namespace {
+// Mirrors optimize()'s guard (see above): ast_json() is a third recursive
+// walker over the same parse-tree shape as optimize()/i_generate_node(), for
+// `lpcc --ast`/`--ast --json`, and runs BEFORE codegen -- so without its own
+// cap it can stack-overflow on a pathologically deep (non-constant-foldable)
+// expression before optimize()'s own cap ever gets a chance to reject it.
+// Diagnostic output only, so going over just truncates the subtree instead
+// of failing anything.
+int g_ast_json_depth = 0;
+constexpr int kMaxAstJsonDepth = 500;
+}  // namespace
 
 static nlohmann::json ast_json(parse_node_t* expr) {
   nlohmann::json n = nlohmann::json::object();
@@ -569,6 +618,12 @@ static nlohmann::json ast_json(parse_node_t* expr) {
     n["k"] = "nil";
     return n;
   }
+  if (++g_ast_json_depth > kMaxAstJsonDepth) {
+    --g_ast_json_depth;
+    n["k"] = "too_deep";
+    return n;
+  }
+  DEFER { --g_ast_json_depth; };
   if (expr->line > 0) n["l"] = expr->line;
   auto kids = [&](parse_node_t* e) { if (e) n["c"].push_back(ast_json(e)); };
   auto scalar = [&](LPC_INT v) { n["a"].push_back(v); };
@@ -716,6 +771,10 @@ static nlohmann::json ast_json(parse_node_t* expr) {
       n["k"] = "catch";
       kids(expr->r.expr);
       break;
+    case NODE_ACATCH:
+      n["k"] = "acatch";
+      kids(expr->r.expr);
+      break;
     case NODE_LVALUE_EFUN: {
       n["k"] = "lvalue_efun";
       kids(expr->l.expr);
@@ -730,7 +789,11 @@ static nlohmann::json ast_json(parse_node_t* expr) {
       if (expr->r.expr) ast_json_children(n, expr->r.expr);
       switch (expr->v.number & 0xff) {
         case FP_EFUN:
-          n["a"].push_back(instr_name(expr->v.number >> 8));
+          // At AST time v.number>>8 is a predefs[] index (icode translates
+          // it to the instruction via predefs[idx].token when emitting).
+          // Resolving it against instrs[] directly printed an unrelated,
+          // build-dependent opcode name for every (: efun :) node.
+          n["a"].push_back(predefs[expr->v.number >> 8].word);
           break;
         case FP_FUNCTIONAL:
         case FP_FUNCTIONAL | FP_NOT_BINDABLE:
@@ -794,6 +857,20 @@ void dump_program_ast_json(const char* filename, parse_node_t* tree_main,
          envelope.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace).c_str());
 }
 
+namespace {
+// Mirrors ast_json()'s guard (see above): lpc_tree_form()/lpc_tree_expr()
+// are a FOURTH mutually-recursive walker over the same parse-tree shape as
+// optimize()/i_generate_node()/ast_json(), backing the DEBUG-only `tree`
+// keyword's pretty-printer (grammar_rules.cc's rule_tree_block()/
+// rule_tree_expr()) -- found missing its own cap by AFL++ fuzzing the
+// compiler (a deeply-nested expression inside `tree(...)` C-stack-overflows
+// here). Diagnostic output only, so going over just renders the subtree as
+// a placeholder leaf instead of failing anything -- same tradeoff ast_json()
+// makes, for the same reason (github.com/fluffos/fluffos/issues/1267).
+int g_lpc_tree_depth = 0;
+constexpr int kMaxLpcTreeDepth = 500;
+}  // namespace
+
 void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
   if (!expr) {
     dest->kind = NODE_NUMBER;
@@ -801,6 +878,14 @@ void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
     dest->v.number = 0;
     return;
   }
+  if (++g_lpc_tree_depth > kMaxLpcTreeDepth) {
+    --g_lpc_tree_depth;
+    dest->kind = NODE_NUMBER;
+    dest->type = TYPE_ANY;
+    dest->v.number = 0;
+    return;
+  }
+  DEFER { --g_lpc_tree_depth; };
 
   switch (expr->kind) {
     case NODE_TERNARY_OP:
@@ -919,6 +1004,7 @@ void lpc_tree_form(parse_node_t* expr, parse_node_t* dest) {
       lpc_tree_expr(ARG_3, expr->r.expr);
       break;
     case NODE_CATCH:
+    case NODE_ACATCH:
       lpc_tree(dest, 2);
       lpc_tree_expr(ARG_2, expr->r.expr);
       break;

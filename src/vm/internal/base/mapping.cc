@@ -5,6 +5,7 @@
 #include <deque>
 #include <map>
 #include <functional>
+#include <memory>
 
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "vm/internal/base/machine.h"
@@ -214,7 +215,11 @@ void unlock_mapping(mapping_t* m) {
       /* take it out of the locked list ... */
       tmp = *mn;
       *mn = (*mn)->next;
-      /* and add it to the free list */
+      /* and add it to the free list -- with both slots zeroed, upholding
+       * new_map_node()'s invariant that free-list nodes carry no stale
+       * svalues (free_node's unlocked branch does the same) */
+      tmp->values[0] = const0u;
+      tmp->values[1] = const0u;
       tmp->next = free_nodes;
       free_nodes = tmp;
     } else {
@@ -232,6 +237,9 @@ void free_node(mapping_t* m, mapping_node_t* mn) {
   } else {
     free_svalue(mn->values + 1, "free_node");
     *(mn->values + 1) = const0u;
+    /* callers free the key before calling free_node; clear the stale tag
+     * so free-list nodes never carry a dangling-looking svalue */
+    *(mn->values) = const0u;
     mn->next = free_nodes;
     free_nodes = mn;
   }
@@ -365,7 +373,7 @@ static mapping_t* copyMapping(mapping_t* m) {
     FREE((char*)newmap);
     error("copyMapping 2 - out of memory.\n");
   }
-  newmap->count = m->count;
+  newmap->count = MAP_COUNT(m); /* never copy the MAP_LOCKED bit */
   total_mapping_nodes += MAP_COUNT(m);
   memset(c, 0, k * sizeof(mapping_node_t*));
   total_mapping_size +=
@@ -410,7 +418,14 @@ int restore_hash_string(char** val, svalue_t* sv) {
         char* news = cp - 1;
 
         if ((c = *news++ = *cp++)) {
-          while ((c = *cp++) != '"') {
+          // The condition must stop on '\0' too, not just '"': an
+          // unterminated escaped string (no closing quote before the end
+          // of the buffer) otherwise falls into the plain-character branch
+          // below, which copies the NUL byte and keeps looping -- an
+          // unbounded read past the end of the allocation. The `if (!c)`
+          // check after the loop only catches this correctly once the loop
+          // itself can actually exit on NUL.
+          while ((c = *cp++) != '"' && c) {
             if (c == '\\') {
               if (!(c = *news++ = *cp++)) {
                 return ROB_STRING_ERROR;
@@ -534,6 +549,12 @@ svalue_t* find_for_insert(mapping_t* m, svalue_t* lv, int doTheFree) {
         debug(mapping, "mapping.c: found %p\n", (void*)(n->values));
         if (doTheFree) {
           free_svalue(n->values + 1, "find_for_insert");
+          /* Zero the slot: the value's ref is gone, but the mapping is
+           * still live LPC-visible data. If the caller runs arbitrary LPC
+           * before overwriting the slot (allocate_mapping2's callback) and
+           * that LPC error()s, the unwind frees the mapping -- and a stale
+           * populated slot here would be freed a SECOND time. */
+          *(n->values + 1) = const0u;
         }
         return n->values + 1;
       }
@@ -728,6 +749,13 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
         total_mapping_size += sizeof(mapping_node_t) * (m->count = count);
         total_mapping_nodes += count;
         free_mapping(m);
+        // Same reasoning as the mapping_too_large() path below: these
+        // remaining elements are invisible to error()'s unwind (the
+        // caller already moved the VM's real sp below this whole
+        // aggregate) and would otherwise leak.
+        for (int k = 0; k < n; k++) {
+          free_svalue(sp + k, "load_mapping_from_aggregate: out of memory");
+        }
         error("Out of memory\n");
       }
     }
@@ -740,6 +768,18 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
       total_mapping_nodes += count;
 
       free_mapping(m);
+      // The caller (F_AGGREGATE_ASSOC, interpret.cc) already moved the VM's
+      // real sp below this entire aggregate before calling in ("sp -=
+      // offset"), so error()'s unwind (pop_n_elems, walking down to the
+      // saved sp) never revisits these slots. Every remaining element from
+      // here on -- this pair (sp[0]/sp[1], already hashed/shared-string-
+      // converted by svalue_to_int above) plus any pairs still unprocessed
+      // beyond it -- would otherwise leak. Already-inserted pairs don't
+      // need this: their ownership was transferred into map nodes that
+      // free_mapping() just freed above.
+      for (int k = 0; k < n; k++) {
+        free_svalue(sp + k, "load_mapping_from_aggregate: too large");
+      }
       mapping_too_large();
     }
 
@@ -1223,9 +1263,14 @@ static svalue_t* insert_in_mapping(mapping_t* m, const char* key) {
   lv.type = T_STRING;
   lv.subtype = STRING_CONSTANT;
   lv.u.string = key;
+  /* lv.u.string will have been converted to a shared string (ref-bumped)
+   * by find_for_insert()'s svalue_to_int() hash, before it can possibly
+   * mapping_too_large()/"Out of memory" error() -- release that ref
+   * unconditionally, including on the throwing path, or every insert
+   * rejected for being over a configured __MAX_MAPPING_SIZE__ (or OOM)
+   * leaks one ref on the key string. */
+  DEFER { free_string(lv.u.string); };
   ret = find_for_insert(m, &lv, 1);
-  /* lv.u.string will have been converted to a shared string */
-  free_string(lv.u.string);
   return ret;
 }
 
@@ -1250,10 +1295,18 @@ void add_mapping_string(mapping_t* m, const char* key, const char* value) {
 void add_mapping_malloced_string(mapping_t* m, const char* key, char* value) {
   svalue_t* s;
 
+  // insert_in_mapping() (via find_for_insert()) can error()/throw --
+  // mapping_too_large(), OOM -- before `value` is ever stored below. Own it
+  // here for the duration of that call so the unwind frees it on the
+  // throwing path; every caller passes a value it expects this function to
+  // take unconditional ownership of (new_string()-family allocation, freed
+  // with FREE_MSTR), so the ownership transfer belongs in ONE place here,
+  // not duplicated as a RAII wrapper at each call site.
+  std::unique_ptr<char, void (*)(char*)> owned(value, [](char* p) { FREE_MSTR(p); });
   s = insert_in_mapping(m, key);
   s->type = T_STRING;
   s->subtype = STRING_MALLOC;
-  s->u.string = value;
+  s->u.string = owned.release();
 }
 
 void add_mapping_object(mapping_t* m, const char* key, object_t* value) {
@@ -1264,6 +1317,18 @@ void add_mapping_object(mapping_t* m, const char* key, object_t* value) {
   s->subtype = 0;
   s->u.ob = value;
   add_ref(value, "add_mapping_object");
+}
+
+void add_mapping_promise(mapping_t* m, const char* key, promise_t* value) {
+  svalue_t* s;
+
+  s = insert_in_mapping(m, key);
+  s->type = T_PROMISE;
+  /* carry the declared payload tag, so a promise reached through a mapping
+   * (async_info()) renders like the value the async call returned */
+  s->subtype = value->value_type;
+  s->u.prom = value;
+  value->ref++;
 }
 
 void add_mapping_array(mapping_t* m, const char* key, array_t* value) {

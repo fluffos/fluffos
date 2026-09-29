@@ -1,0 +1,10 @@
+// Fixture for include_list(): nested include, a duplicate include, and
+// an #include inside #if 0 that must not be opened.
+#include "include_list_a.h"
+#include "include_list_b.h"
+#include "include_list_b.h"
+#if 0
+#include "include_list_skipped.h"
+#endif
+
+int ok() { return A + B + NEST; }

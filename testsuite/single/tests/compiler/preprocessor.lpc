@@ -11,6 +11,50 @@
 #define ML(a) ((a) \
     * 3)
 
+// Documented multi-line function-like form: continuations sit outside
+// any literal. A string on a continued line, and two adjacent strings
+// joined by a continuation between them, must still be one logical
+// directive.
+#define LONG_MACRO(x) do { \
+    x; \
+} while (0)
+
+// Textbook C form: '\' continues the body, and do/while(0) is one
+// statement so this `if`/`else` still binds. A block comment between
+// continued lines is whitespace, not a new directive.
+#define foo(x) do { \
+    /* always */ \
+    n += (x); \
+} while (0)
+
+// gcc-shaped: '\' joins the body; '//' on the last line has no '\'
+// so the next line is still compiled.
+#define ADD(x, y) do { \
+    r += (x); \
+    r += (y); \
+} while (0) // this comment ends here
+#define BAR 10 \
+    + 5 // tail, no backslash
+#define GREET "hello" \
+    " world"
+#define INSIDE "hel\
+lo"
+
+// C-shaped gaps: comment between '#' and the keyword, glued to the
+// keyword, and between continued data lines. Same meaning as today.
+# /*c*/ define C_GAP_FOO 1
+#define/*c*/ C_GAP_BAR 2
+#define C_GAP_BAZ \
+    /*c*/ \
+    3
+
+// C splice-first: a comment-open may be split by a backslash-newline,
+// and a '//' comment continues onto the next physical line.
+#define C_SPLICE_STAR 10 /\
+* eaten */ + 5
+#define C_SPLICE_LINE 1 // note \
+this line is not compiled
+
 // Redefining with a different body is a WARNING (non-fatal); the new
 // definition takes effect.
 #define REDEF 1
@@ -65,6 +109,19 @@ this is not code and must never be compiled
 // A string literal on the directive line must not open a comment.
 #define CMT_STR "a/*b"
 
+// #1382: '//' / '/*' inside a backslash-continued string on a directive
+// line is data. The marker plus the continuation are both required; a
+// same-line marker or a continuation without one already worked.
+#define SLASH_CONT "abc// \
+ def"
+#define STAR_CONT "abc/* \
+ def"
+#define TMPL_CONT `abc// \
+ def`
+#define HEADER_CONT "// made by X.\n// \
+Continued line\n// \
+final part\n"
+
 // #1240: comments are whitespace in a directive's payload -- a '//'
 // tail must NOT be captured into the body (it would comment out the
 // rest of whatever spliced line the macro expands into), and trailing
@@ -85,6 +142,14 @@ this is not code and must never be compiled
 #define UNDEF_ME 5
 #undef UNDEF_ME // gone
 
+// #1362: comments are whitespace inside an argument LIST too. The macro
+// argument collector reads raw characters, so nothing strips comments out
+// from under it -- an apostrophe in one ("a guild's") opened a character
+// literal that ran to end of file, and a '//' survived into the argument
+// text to comment out the rest of it once that text was rescanned.
+#define MES(y) ("[" + y + "]")
+#define ARG_ID(x) (x)
+
 void do_tests() {
   // ## token paste builds an identifier.
   int GLUE(fo, o) = 42;
@@ -102,6 +167,28 @@ void do_tests() {
 
   // Multi-line (backslash-continued) macro.
   ASSERT_EQ(21, ML(7));
+  int long_macro_v = 0;
+  LONG_MACRO(long_macro_v = 4);
+  ASSERT_EQ(4, long_macro_v);
+  int n = 0;
+  if (1)
+    foo(3);
+  else
+    foo(99);
+  ASSERT_EQ(3, n);
+  foo(4);
+  ASSERT_EQ(7, n);
+  int r = 0;
+  ADD(1, 2);
+  ASSERT_EQ(3, r);
+  ASSERT_EQ(15, BAR);
+  ASSERT_EQ("hello world", GREET);
+  ASSERT_EQ("hello", INSIDE);
+  ASSERT_EQ(1, C_GAP_FOO);
+  ASSERT_EQ(2, C_GAP_BAR);
+  ASSERT_EQ(3, C_GAP_BAZ);
+  ASSERT_EQ(15, C_SPLICE_STAR);
+  ASSERT_EQ(1, C_SPLICE_LINE);
 
   // Self-referencing macro stops expanding at the self-reference, so
   // SELF is usable as an ordinary identifier.
@@ -121,6 +208,10 @@ void do_tests() {
   ASSERT_EQ(15, CMT_TAIL);
   ASSERT_EQ(1, CMT_IF_OK);
   ASSERT_EQ("a/*b", CMT_STR);
+  ASSERT_EQ("abc//  def", SLASH_CONT);
+  ASSERT_EQ("abc/*  def", STAR_CONT);
+  ASSERT_EQ("abc//  def", TMPL_CONT);
+  ASSERT_EQ("// made by X.\n// Continued line\n// final part\n", HEADER_CONT);
 
   // #1240 -- trailing comments on directives are whitespace.
   mapping economies = ([ "e": ([ "credits": 100 ]) ]);
@@ -129,6 +220,34 @@ void do_tests() {
   ASSERT_EQ(1, IFDEF_CMT_OK);
   int UNDEF_ME = 9;
   ASSERT_EQ(9, UNDEF_ME);
+
+  // #1362 -- comments inside an argument list.
+  ASSERT_EQ("[AAA\nBBB\n]", MES("AAA\n" +
+    /* a comment with a guild's apostrophe in it */
+    "BBB\n"));
+  ASSERT_EQ("[AAA\nBBB\n]", MES("AAA\n" +  // another guild's apostrophe
+  "BBB\n"));
+  ASSERT_EQ("[ab]", MES("a" /* no apostrophe in this one */ + "b"));
+
+  // An apostrophe inside a STRING argument is ordinary text, as ever.
+  ASSERT_EQ("[it's]", MES("it's"));
+
+  // A comment is ONE space here too (DOUBLE_NEG above pins the same rule
+  // for a macro body), so it separates tokens rather than pasting them.
+  // Stringized, because that is the only spelling the corpus formatter is
+  // guaranteed not to re-space out from under the pin (see AGENTS.md).
+  ASSERT_EQ("a b", STR(a/*sep*/b));
+
+  // A comment may sit between the macro name and its '(' -- that is still
+  // an invocation, not a bare identifier.
+  ASSERT_EQ("[x]", MES /* why is this here? */ ("x"));
+
+  // Newlines inside an argument-list comment are counted exactly once.
+  int line_a = __LINE__;
+  ASSERT_EQ(1, ARG_ID(/* one
+                         two
+                         three */ 1));
+  ASSERT_EQ(4, __LINE__ - line_a);
 
   // Builtin macros: __FILE__ / __DIR__ / __LINE__.
   ASSERT_EQ("/single/tests/compiler/preprocessor.lpc", __FILE__);

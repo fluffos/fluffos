@@ -689,7 +689,7 @@ void f_roulette_wheel() {
 
   // Loop through the mapping, adding up the weights.
   j = m->table_size;
-  if (!j || !m->count) {
+  if (!j || !MAP_COUNT(m)) {
     error("empty mapping in roulette_wheel.\n");
   }
   num = 0;

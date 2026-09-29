@@ -1,0 +1,169 @@
+// A self-feeding then-chain must not hold the event loop: the drain delivers
+// at most "async drain eval budget" of eval cost per turn and then re-posts itself,
+// letting the driver read sockets and fire timers in between.
+//
+// The chain is sized so that its own cost spans several turns, and it must be
+// sized in the budget's unit -- TIME. An early version used 40 trivial links,
+// which pinned nothing once the drain counted work created during a turn
+// toward the same turn: the whole chain ran in one turn and yielded zero
+// times, passing only because other test files' backlog moved the global
+// counter inside its window. The version after that used 40000 trivial links,
+// which is a delivery COUNT standing in for a time budget: it happens to
+// exceed the budget everywhere, but by wildly different margins -- on a
+// sanitizer build, where one delivery costs hundreds of microseconds against
+// a 1000 us turn, it ran for tens of thousands of turns, took over a minute
+// on its own and tripped the driver's own "drain has yielded N times in a
+// row" warning four times.
+//
+// So each link burns a calibrated quarter of the budget instead, and a couple
+// of dozen links then span several turns on any machine -- milliseconds of
+// work rather than a minute, with the same guarantee.
+//
+// The chain runs entirely after do_tests() has returned, so it is declared
+// with an EXIT LATCH and the checks are counted like any other.
+
+
+// Each link burns this fraction of the turn budget, so this many links fill a
+// turn; the chain is this many turns' worth.
+#define LINKS_PER_TURN 4
+#define TARGET_TURNS 6
+#define MAX_LINK_US 2000
+#define MAX_LINKS 400
+#define CALIBRATE_START 100000
+#define CALIBRATE_TRIES 24
+#define CALIBRATE_FLOOR 200
+
+nosave int n;
+nosave int done;
+nosave int chain_len;
+nosave int yields_before;
+nosave int batch;
+nosave int link_us;
+nosave int burn_iters;
+
+private void check_chain();
+
+private void burn(int count) {
+  int i, x;
+
+  for (i = 0; i < count; i++) {
+    x += i;
+  }
+}
+
+// Iterations of burn() costing about link_us microseconds. Wall clock is the
+// unit: the drain measures its turn on the monotonic clock, so the
+// microseconds time_expression reports are the ones it spends.
+private void calibrate() {
+  int iters = CALIBRATE_START;
+  int cost = 0;
+  int i;
+
+  for (i = 0; i < CALIBRATE_TRIES; i++) {
+    cost = time_expression {
+      burn(iters);
+    };
+    if (cost >= CALIBRATE_FLOOR) {
+      break;
+    }
+    iters *= 4;
+  }
+  if (cost < 1) {
+    cost = 1;
+  }
+  burn_iters = iters * link_us / cost;
+  if (burn_iters < 100) {
+    burn_iters = 100;
+  }
+}
+
+void feed() {
+  mixed p;
+
+  if (++n > chain_len) {
+    // Not reachable by construction -- the link below is only chained while
+    // the chain is short -- so this fires only if the drain delivered one
+    // reaction twice, which a re-post that fails to consume its queue entry
+    // would do.
+    ASSERT2(0, "a chain link was delivered more than once (n=" + n + ")");
+    return;
+  }
+  burn(burn_iters);
+  if (n == chain_len) {
+    done = 1;
+    // Checked from the LAST link rather than after a fixed delay, for the
+    // reason the sibling drain tests give: how long the chain takes to run
+    // is a throughput property of the batch size and of whatever else the
+    // suite has queued, not of anything this file pins. If the chain
+    // stalls, the exit latch fails the run naming it.
+    check_chain();
+    return;
+  }
+  p = promise_create();
+  promise_then(p, (: feed :));
+  promise_resolve(p, 0);
+}
+
+private void check_chain() {
+  mapping now = async_info(1);
+  int yields = now["drain_yields"] - yields_before;
+
+  // Nothing was stranded by a yield: reaching here at all means every link
+  // was delivered, and feed()'s over-count guard means none was delivered
+  // twice. (A count assertion here would be tautological -- this function is
+  // called from the link that makes the count come out right.)
+  //
+  // The lower bound is deliberately 2, not a derived number. Under the old
+  // count-based batch the yield count was exactly chain_len / batch; under an
+  // eval-cost budget it is chain_len * cost_per_delivery / budget, and
+  // cost_per_delivery varies with the machine and the build. Requiring a
+  // computed count here would encode a timing assumption and fail on a fast
+  // host -- exactly the trap testsuite/README.md warns about. What this test
+  // exists to catch is a drain that does NOT re-post and holds the event loop
+  // for the whole chain; two yields proves re-posting is repeating.
+  //
+  // Note which way the global counter can mislead: other files' yields land
+  // in this window too, so unrelated traffic can only ever push the delta UP
+  // -- that is the false-PASS direction, not a safety margin. What makes the
+  // guard sound is that a drain which never re-posts leaves the counter at
+  // zero for the whole suite, so there is no traffic to hide behind. (This
+  // file's own chain measures 5-6 yields against the required 2.)
+  ASSERT2(yields >= 2,
+    sprintf("a %d-link self-feeding chain burning about %d us per link yielded only "
+      "%d times against a %d us budget: the drain is not re-posting, so it holds "
+      "the event loop for the whole chain",
+      chain_len, link_us, yields, batch));
+  RELEASE_LATCH("drain budget chain");
+}
+
+private void start_chain() {
+  link_us = batch / LINKS_PER_TURN;
+  if (link_us < 1) {
+    link_us = 1;
+  }
+  if (link_us > MAX_LINK_US) {
+    link_us = MAX_LINK_US;
+  }
+  chain_len = TARGET_TURNS * batch / link_us + LINKS_PER_TURN;
+  if (chain_len > MAX_LINKS) {
+    // A turn budget this large would need minutes of burning to span several
+    // turns. Nothing to observe -- deliberately not a failure.
+    RELEASE_LATCH("drain budget chain");
+    return;
+  }
+  calibrate();
+  yields_before = async_info(1)["drain_yields"];
+  feed();
+}
+
+void do_tests() {
+  mapping info = async_info(1);
+
+  batch = info["drain_eval_budget"];
+
+  ASSERT2(batch > 0, "async_info(1) should report the effective drain budget");
+
+  EXPECT_LATCH("drain budget chain");
+
+  call_out((: start_chain :), 1);
+}

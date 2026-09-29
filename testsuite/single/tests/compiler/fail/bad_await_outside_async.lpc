@@ -1,0 +1,4 @@
+// await is only legal directly inside an async function body
+int f() {
+  return await 1;
+}

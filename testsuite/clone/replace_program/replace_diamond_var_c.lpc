@@ -1,0 +1,17 @@
+// Fixture (expected-NOT-noop, safety-critical case): inherits both
+// branches of a STATEFUL diamond. dvar is duplicated (once via each
+// path), so this object's total variable count is DOUBLE the base's --
+// must NOT be treated as a no-op (the num_variables_total equality
+// check must catch the mismatch).
+//
+// Deliberately defines nothing of its own beyond create(): try_bind()
+// comes from replace_diamond_var_x.lpc (previously defined locally here,
+// which masked the discriminator this fixture claims to isolate -- with
+// a local try_bind(), the check would correctly refuse regardless of
+// whether the variable-count equality logic worked). var_offset still
+// resolves to 0 here (search_inherited finds x through the first branch,
+// replace_diamond_var_a), so the num_variables_total equality check
+// really is the sole remaining guard.
+inherit "/clone/replace_program/replace_diamond_var_a";
+inherit "/clone/replace_program/replace_diamond_var_b";
+void create() { replace_program("/clone/replace_program/replace_diamond_var_x"); }

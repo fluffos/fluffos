@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FluffOS — WebAssembly driver</title>
 <link rel="stylesheet" href="vendor/xterm.css">
 <style>
@@ -11,20 +11,166 @@
     --panel: #11151f; --border: #232a38;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; overscroll-behavior: none; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     background: var(--bg); color: var(--fg);
     font: 14px/1.45 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     display: flex; flex-direction: column;
+    /* Pinned to the layout viewport by default; on touch devices the boot
+       script keeps top/height synced to window.visualViewport instead, so
+       the on-screen keyboard (which iOS/Android only shrink the *visual*
+       viewport for, not this layout one) can never cover #inputbar -- see
+       the "mobile viewport" section of the main script below. */
+    position: fixed; inset: 0;
+    overflow: hidden;
+    /* Side notch/rounded-corner insets (viewport-fit=cover draws edge-to-
+       edge under them). Only left/right here on purpose -- top/bottom are
+       JS-synced to window.visualViewport for keyboard avoidance (see
+       syncVisualViewport() below) and handled per-element there instead.
+       Landscape phones are exactly where a notch sits on a SIDE rather
+       than the top, which is also when body.compact kicks in -- padding
+       the flex column itself covers every child (header/tabs/term/
+       inputbar) in one place instead of threading env() through each. */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
+  /* manipulation on the terminal pane too: without it, double-tapping game
+     text to select a word (the natural mobile gesture) can trigger the
+     browser's native double-tap-zoom alongside/instead of xterm's own
+     selection handling. */
+  button, .tab, #cmd, #term .pane { touch-action: manipulation; }
   header {
     padding: 10px 16px; border-bottom: 1px solid var(--border);
     background: var(--panel); display: flex; align-items: baseline; gap: 12px;
   }
   header h1 { font-size: 15px; margin: 0; color: var(--accent); font-weight: 600; }
   header #status { color: var(--dim); font-size: 12px; }
-  #term { flex: 1; min-height: 0; padding: 6px 8px; }
-  #term .xterm { height: 100%; }
+  /* Fullscreen toggle: hidden until the boot script verifies the
+     Fullscreen API actually exists here (iPhone Safari, some webviews:
+     it does not) -- see the "fullscreen toggle" section of the script. */
+  /* wrapToggle carries the margin-left:auto that pushes both header
+     buttons to the right (it comes first in source order); fsToggle just
+     follows it with the header's normal gap. */
+  #fsToggle {
+    align-self: center; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0; border-radius: 4px;
+    color: var(--dim); cursor: pointer; padding: 4px 6px; line-height: 0;
+  }
+  #fsToggle:hover { color: var(--accent); background: var(--border); }
+  #fsToggle[hidden] { display: none; }
+  /* Wrap toggle: a real toggle button (not hidden/feature-detected like
+     fsToggle -- this is pure CSS/JS, always available). ".on" reflects
+     wrapMode; unlike fsToggle there's no external event that can desync
+     it, so the class is just set directly from the click handler. */
+  #wrapToggle {
+    margin-left: auto; align-self: center; flex: none;
+    background: transparent; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--dim); cursor: pointer; padding: 3px 8px; font: inherit; font-size: 11px;
+  }
+  #wrapToggle:hover { color: var(--fg); border-color: var(--dim); }
+  #wrapToggle.on { color: var(--accent); border-color: var(--accent); }
+  /* Icon pair swaps on .fs-active, which JS toggles off the
+     fullscreenchange EVENT (never a local flag -- Esc/system exits must
+     not desync it).  Class-based on purpose: SVG elements do not reflect
+     the .hidden IDL property, so el.hidden=true would silently no-op. */
+  #fsToggle #fsIconExit, #fsToggle.fs-active #fsIconEnter { display: none; }
+  #fsToggle.fs-active #fsIconExit { display: inline; }
+  #tabs {
+    display: flex; gap: 2px; padding: 0 10px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  #tabs .tab {
+    display: flex; align-items: center; gap: 7px; cursor: pointer;
+    background: transparent; border: 0; border-bottom: 2px solid transparent;
+    color: var(--dim); font: inherit; font-size: 12px; padding: 7px 12px 5px;
+  }
+  #tabs .tab:hover { color: var(--fg); }
+  #tabs .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  #tabs .tab:disabled { opacity: 0.5; cursor: default; }
+  #gameTabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+  #tabs .tab .reload, #tabs .tab .close {
+    color: var(--dim); border-radius: 3px; padding: 0 4px;
+  }
+  #tabs .tab .close { margin-right: -6px; }
+  #tabs .tab .reload { margin-right: -4px; }
+  #tabs .tab .reload:hover { color: var(--accent); background: var(--border); }
+  #tabs .tab .close:hover { color: #f7768e; background: var(--border); }
+  #tabAdd { font-size: 14px; }
+  #tabs .badge {
+    background: var(--accent); color: var(--bg); border-radius: 9px;
+    font-size: 10px; font-weight: 600; line-height: 1; padding: 2px 6px;
+  }
+  #term { flex: 1; min-height: 0; padding: 6px 8px; position: relative; }
+  #term.hidden { display: none; }
+  #term .pane { height: 100%; display: none; }
+  #term .pane.active { display: block; }
+  #term .pane .xterm { height: 100%; }
+  /* Wrap-off mode (see the wrapToggle JS): xterm always wraps at `cols`,
+     it has no native "don't wrap" state, and fit() always shrinks cols to
+     match the pane's pixel width -- so on a phone that mangles anything
+     wider than ~30-40 cols, including most of this project's ASCII-art
+     login banners (authored for the traditional 80-col MUD client). The
+     JS side pins cols at NOWRAP_COLS instead of fitting them; this side
+     lets the wider result actually be seen: .xterm normally stretches to
+     100% of .pane by ordinary block-width rules, which would just clip a
+     wider grid, so let it size to its own (now wider) content instead and
+     scroll the pane under it. xterm.js sets the .xterm-screen canvas
+     layer's pixel dimensions from cols/rows directly, so max-content
+     here tracks that real rendered width. */
+  #term .pane.nowrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #term .pane.nowrap .xterm { width: max-content; }
+  #logs {
+    flex: 1; min-height: 0; overflow-y: auto; display: none;
+    padding: 8px 16px; font-size: 12px; line-height: 1.5;
+    overscroll-behavior: contain;
+  }
+  #logs.active { display: block; }
+  #logs .log-line { white-space: pre-wrap; word-break: break-word; }
+  #logs .log-line.err { color: #f7768e; }
+  #logs .log-ts { color: var(--dim); margin-right: 8px; user-select: none; }
+  /* Boot progress overlay: covers the (blank) terminal area while the wasm
+     driver + packed mudlib download, unpack and boot.  Driven by the
+     BootProgress script below; removed once the first session connects. */
+  #boot {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    background: var(--bg); text-align: center; padding: 24px;
+  }
+  #boot.done { opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  #bootBar {
+    width: min(420px, 82%); height: 6px; border-radius: 3px;
+    background: var(--border); overflow: hidden;
+  }
+  #bootFill {
+    display: block; height: 100%; width: 100%;
+    background: var(--accent); border-radius: 3px;
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.15s linear;
+  }
+  /* Indeterminate: a sliding block.  transform-only on purpose, so the
+     compositor keeps it moving even while the main thread is blocked --
+     the data-blob unpack into the in-memory FS and the LPC preload
+     compile are long synchronous stretches on big libs. */
+  #bootBar.indet #bootFill {
+    width: 40%; transform: none; transition: none;
+    animation: bootslide 1.1s ease-in-out infinite;
+  }
+  @keyframes bootslide {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(350%); }
+  }
+  #bootText { color: var(--dim); font-size: 12px; max-width: 90%; }
+  #term .pane .xterm-viewport {
+    overscroll-behavior: contain;
+    /* xterm.css hardcodes background-color:#000 on the viewport (a macOS
+       scrollbar-opacity workaround); the sub-row remainder of the pane
+       shows through it as a black strip above #inputbar -- repaint it in
+       the page/terminal background instead. */
+    background-color: var(--bg);
+  }
   #jscanvas {
     display: none; position: fixed; right: 16px; top: 56px;
     border: 1px solid var(--border); border-radius: 6px; background: #04060a;
@@ -33,11 +179,75 @@
   #inputbar {
     display: flex; border-top: 1px solid var(--border); background: var(--panel);
   }
-  #inputbar.hidden { display: none; }
+  #inputbar.hidden, #inputbar.logs-active { display: none; }
   #inputbar .prompt { padding: 10px 0 10px 16px; color: var(--accent); }
+  /* Custom command input: NOT a real <input>/<textarea> -- #cmd is a plain
+     div that renders text/caret/placeholder itself, overlaying an
+     invisible #cmdReal that does the actual keystroke/IME capture
+     (#cmdReal rules below). A real, on-screen, focusable <input> or
+     <textarea> is what iOS keys its system-level AutoFill accessory bar
+     (the passwords/cards/contacts icon row above the keyboard) off of --
+     confirmed live on both Safari and Chrome for iOS (same WebKit engine
+     underneath) even with autocomplete=off, autocapitalize=off, and
+     (previously) CSS-only password masking that never touched `type`:
+     none of that stopped it, because the bar isn't solely a
+     type="password"/autocomplete heuristic but a broader system feature
+     tied to focusing a real FORM control specifically. Making that
+     control merely invisible (an earlier version of this fix) did NOT
+     help -- iOS keys the bar off the focused element's type, not its
+     visual opacity, so a hidden-but-real <textarea> still triggered it.
+     #cmdReal is therefore a contenteditable div, not a form element at
+     all: no `name`, not part of a <form>, never submitted -- outside
+     the category iOS's AutoFill heuristics look at -- while still giving
+     real OS text editing (selection, IME composition, copy/paste, undo)
+     underneath. contenteditable="plaintext-only" (not "true") keeps
+     pasted content flat text with no child markup, so the rest of this
+     file can keep treating cmdReal's content as a single string via
+     .textContent instead of dealing with arbitrary rich-text DOM. */
   #cmd {
     flex: 1; background: transparent; border: 0; outline: 0; color: var(--fg);
     font: inherit; padding: 10px 16px 10px 8px;
+    position: relative; white-space: pre; overflow-x: auto; overflow-y: hidden;
+    cursor: text;
+  }
+  /* Scrollbar-less horizontal scroll (overflow-x:auto above is what lets
+     renderCmd()'s scrollIntoView bring a caret past the visible edge back
+     into view -- this just hides the resulting scrollbar chrome). */
+  #cmd { scrollbar-width: none; -ms-overflow-style: none; }
+  #cmd::-webkit-scrollbar { display: none; }
+  #cmd .cmd-placeholder { color: var(--dim); }
+  #cmd.has-text .cmd-placeholder { display: none; }
+  #cmd .cmd-caret {
+    display: inline-block; width: 1px; height: 1em; background: var(--fg);
+    vertical-align: text-bottom; margin-left: -1px; visibility: hidden;
+  }
+  #cmd.focused .cmd-caret {
+    visibility: visible; animation: cmd-caret-blink 1s step-end infinite;
+  }
+  @keyframes cmd-caret-blink { 50% { opacity: 0; } }
+  #cmd.disabled { color: var(--dim); cursor: default; }
+  #cmd.disabled .cmd-caret { visibility: hidden; }
+  #cmdReal {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; padding: inherit; border: 0; outline: 0;
+    overflow: hidden; background: transparent; font: inherit;
+    white-space: pre; color: transparent; caret-color: transparent;
+    /* Belt-and-suspenders on top of color:transparent: masks the real
+       value even from a long-press text-selection loupe on WebKit, which
+       renders actual glyphs at the OS compositing level rather than
+       going through page CSS color. Harmless to leave on unconditionally
+       (this element is never visible either way) even when the session
+       isn't currently password-masked. Documented as an <input>/<textarea>
+       property; left on in case some engine still honors it on a
+       contenteditable div, but the real masking guarantee for this
+       element is that it's never visible at all (renderCmd() does the
+       actual on-screen masking, in the separate #cmd display layer). */
+    -webkit-text-security: disc;
+    /* contenteditable elements have no built-in empty-state affordance
+       (a real <textarea> just shows nothing); without this, an empty
+       #cmdReal can collapse to zero height in some layout contexts and
+       stop accepting focus/taps. */
+    min-height: 1em;
   }
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(4, 6, 10, 0.72);
@@ -86,19 +296,139 @@
   }
   .modal-footer button:hover { border-color: var(--accent); color: var(--accent); }
   .modal-footer button.primary { border-color: var(--accent); color: var(--accent); }
+
+  /* ------------------------------------------------------------------ *
+   * Mobile: legible text + tappable controls at phone widths (~360-430px
+   * CSS px is the realistic target), without pinch-zoom or horizontal
+   * scroll for ordinary game text. xterm's own font size is set in JS
+   * (see fontSizeForViewport() below) since it renders to a canvas, not text.
+   * ------------------------------------------------------------------ */
+  @media (max-width: 600px) {
+    header { padding: max(8px, env(safe-area-inset-top, 0px)) 12px 8px; gap: 8px; }
+    header h1 { font-size: 14px; }
+    header #status {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    #tabs { padding: 0 6px; }
+    #tabs .tab { padding: 10px 10px 8px; font-size: 12.5px; }
+    #term, #logs { padding: 5px 6px; }
+    #logs { font-size: 13px; }
+    /* font-size matches #cmd below -- .prompt and the input text share a
+       baseline, so a size mismatch here reads as the two being on
+       different lines even though they're the same flex row. */
+    #inputbar .prompt { padding: 10px 0 10px 12px; font-size: 16px; }
+    #cmd {
+      padding: 11px 12px 11px 6px;
+      /* >=16px stops iOS Safari's auto-zoom-on-focus (see pointer:coarse
+         below for the non-width-gated version of this same fix). */
+      font-size: 16px;
+    }
+    #inputbar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  }
+
+  /* Touch-target sizing + iOS zoom-on-focus fix: gated on pointer type
+     rather than width, since any touchscreen (including a wide tablet in
+     landscape) hits both problems this addresses. */
+  @media (pointer: coarse) {
+    #cmd, #inputbar .prompt { font-size: 16px; }
+    #tabs .tab { min-height: 40px; }
+    #tabs .tab .reload, #tabs .tab .close {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 24px; min-height: 24px;
+    }
+    /* display:inline-flex above would defeat the UA's [hidden]{display:none},
+       un-hiding the close button that updateCloseButtons() hides on the
+       permanent first tab -- restore it explicitly. */
+    #tabs .tab .reload[hidden], #tabs .tab .close[hidden] { display: none; }
+    #tabAdd { min-width: 40px; }
+    #fsToggle { min-width: 36px; min-height: 36px; }
+    #wrapToggle { min-height: 36px; }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Compact chrome: when the VISIBLE viewport is short -- a phone in
+   * landscape, or the on-screen keyboard eating a portrait screen --
+   * the header (title + status) merges into the tab row (one grid row
+   * instead of two stacked bars) and the input bar / tabs shed their
+   * touch-generous padding, down to but not below ~36px tap targets.
+   * Driven by JS (body.compact, see updateCompact() below) off the
+   * same visualViewport plumbing as the keyboard avoidance, because
+   * the real trigger is "how much height is left right now", which an
+   * orientation media query can't see (a keyboard open in portrait is
+   * the same problem as landscape).
+   * ------------------------------------------------------------------ */
+  body.compact {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  body.compact header {
+    grid-area: 1 / 1; display: flex; align-items: center; gap: 8px;
+    padding: 0 4px 0 10px;
+  }
+  body.compact header h1, body.compact header #status {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  body.compact header h1 { font-size: 12px; max-width: 32vw; }
+  body.compact header #status { font-size: 11px; max-width: 26vw; }
+  body.compact #wrapToggle { padding: 2px 6px; font-size: 10px; }
+  body.compact #tabs { grid-area: 1 / 2; }
+  body.compact #tabs .tab { padding: 5px 10px 4px; min-height: 36px; }
+  body.compact #tabAdd { min-width: 36px; }
+  body.compact #term, body.compact #logs { grid-area: 2 / 1 / 3 / 3; }
+  body.compact #term { padding: 3px 6px; }
+  body.compact #inputbar { grid-area: 3 / 1 / 4 / 3; }
+  /* keep the row tappable but tight: 16px text + 2*7px = ~37px */
+  body.compact #inputbar .prompt { padding: 7px 0 7px 12px; }
+  body.compact #cmd { padding: 7px 12px 7px 6px; }
+  @media (max-width: 600px) {
+    /* short AND narrow (keyboard open in portrait): width is scarce
+       too -- drop the title text, keep status + tabs.  Landscape has
+       width to spare, so the title survives there. */
+    body.compact header h1 { display: none; }
+    body.compact #inputbar { padding-bottom: 0; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>FluffOS / WebAssembly</h1>
   <div id="status">loading wasm…</div>
+  <button id="wrapToggle" type="button" class="on" aria-pressed="true"
+          title="Wrap long lines to fit the screen"
+          aria-label="Wrap long lines to fit the screen">Wrap</button>
+  <button id="fsToggle" type="button" hidden
+          title="Enter fullscreen" aria-label="Enter fullscreen">
+    <svg id="fsIconEnter" width="14" height="14" viewBox="0 0 14 14"
+         fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 1.5H1.5V5M9 1.5h3.5V5M12.5 9v3.5H9M5 12.5H1.5V9"/>
+    </svg>
+    <svg id="fsIconExit" width="14" height="14" viewBox="0 0 14 14"
+         fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M1.5 5H5V1.5M9 1.5V5h3.5M12.5 9H9v3.5M5 12.5V9H1.5"/>
+    </svg>
+  </button>
 </header>
-<div id="term"></div>
+<nav id="tabs">
+  <div id="gameTabs"></div>
+  <button id="tabAdd" class="tab" type="button" disabled
+          title="Open another connection to this mud">+</button>
+  <button id="tabLogs" class="tab" type="button">Logs
+    <span id="logsBadge" class="badge" hidden>0</span></button>
+</nav>
+<div id="term">
+  <div id="boot">
+    <div id="bootBar" class="indet"><span id="bootFill"></span></div>
+    <div id="bootText">loading driver…</div>
+  </div>
+</div>
+<div id="logs" aria-label="Driver logs" aria-live="off"></div>
 <canvas id="jscanvas" width="300" height="130"></canvas>
 <div id="inputbar">
   <span class="prompt">&gt;</span>
-  <input id="cmd" autocomplete="off" spellcheck="false" autofocus
-         placeholder="loading…" disabled>
+  <div id="cmd"><span id="cmdPlaceholder" class="cmd-placeholder"></span><span id="cmdBefore" class="cmd-text"></span><span id="cmdCaret" class="cmd-caret"></span><span id="cmdAfter" class="cmd-text"></span><div id="cmdReal" contenteditable="false" tabindex="0" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send"></div></div>
 </div>
 
 <div id="errorModal" class="modal-overlay" hidden>
@@ -213,15 +543,95 @@
   }
 </script>
 <script>
+  // Boot progress indicator (the #boot overlay in the terminal area + the
+  // small header status text).  The mudlib image can be tens of MB, so on
+  // a slow mobile connection the old blank-terminal boot looked exactly
+  // like a hung page -- give the user a bar to stare at instead.
+  //
+  // set(msg, frac): frac in [0,1] draws a determinate bar; null/undefined
+  // switches to the indeterminate slide animation.  finish() fades the
+  // overlay out and removes it; further set() calls become no-ops (late
+  // stragglers like the glue's trailing setStatus('') must not resurrect
+  // stale text in the header).
+  var BootProgress = (() => {
+    const box = document.getElementById('boot');
+    const bar = document.getElementById('bootBar');
+    const fill = document.getElementById('bootFill');
+    const text = document.getElementById('bootText');
+    const statusEl = document.getElementById('status');
+    let done = false;
+    const fmtMB = (n) => (n / (1024 * 1024)).toFixed(1);
+    function set(msg, frac) {
+      if (done) return;
+      text.textContent = msg;
+      statusEl.textContent = msg;
+      if (frac == null) {
+        bar.classList.add('indet');
+      } else {
+        bar.classList.remove('indet');
+        fill.style.transform = 'scaleX(' + Math.min(1, Math.max(0, frac)) + ')';
+      }
+    }
+    function finish() {
+      if (done) return;
+      done = true;
+      box.classList.add('done');
+      setTimeout(() => box.remove(), 300);
+    }
+    return { set, finish, fmtMB };
+  })();
+</script>
+<script>
   // Mudlib image (created by emscripten's file_packager, see
   // tools/wasm/pack-mudlib.sh) attaches itself to this global before
   // the runtime factory consumes it.  pageLog is defined by the main
   // script below; these callbacks only fire after it exists.
+  //
+  // Progress hooks, verified against the code actually in use (this must
+  // be defined before the mudlib.js <script> below -- its data fetch
+  // starts at script-parse time):
+  //   - file_packager's fetchRemotePackage() (mudlib.js) calls setStatus
+  //     with "Downloading data... (loaded/total)" per received fetch
+  //     chunk -- real byte counts against Content-Length, the only
+  //     determinate signal in the whole boot.
+  //   - the fluffos.js glue's run() calls setStatus("Running...") then
+  //     setStatus("") -- never any percentage.
+  //   - monitorRunDependencies(n) brackets the synchronous unpack of the
+  //     data blob into the in-memory FS during preRun.
+  //   - the wasm binary itself loads via fetch+instantiateStreaming with
+  //     no progress callback at all; those stretches (and the unpack/boot
+  //     tail) show the indeterminate bar.
   var Module = {
     print: (s) => pageLog(s),
-    printErr: (s) => pageLog(s),
+    printErr: (s) => pageLog(s, true),
     locateFile: (f) => f,
+    setStatus: (msg) => {
+      if (!msg) return;
+      const m = /\((\d+)\/(\d+)\)/.exec(msg);
+      if (m) {
+        const loaded = +m[1], total = +m[2];
+        if (total && loaded >= total) {
+          // Download done; the unpack/compile that follows has no byte
+          // counter -- don't leave a full bar sitting at 100%.
+          BootProgress.set('preparing game files…', null);
+        } else {
+          BootProgress.set(
+            'downloading game data — ' + BootProgress.fmtMB(loaded) +
+            ' / ' + BootProgress.fmtMB(total) + ' MB',
+            total ? loaded / total : null);
+        }
+      } else if (msg.startsWith('Downloading data')) {
+        BootProgress.set('downloading game data…', null);
+      } else if (msg === 'Running...') {
+        BootProgress.set('starting driver…', null);
+      }
+    },
+    monitorRunDependencies: (n) => {
+      BootProgress.set(n > 0 ? 'preparing game files…' : 'starting driver…',
+                       null);
+    },
     onAbort: (what) => {
+      BootProgress.finish();
       status.textContent = 'driver aborted';
       ErrorModal.show('WebAssembly runtime aborted', what,
         'The wasm module called abort() -- this usually means an ' +
@@ -241,16 +651,22 @@
 // ==========================================================================
 // The web terminal: xterm.js does the terminal emulation (rendering, SGR,
 // alternate screen, mouse reporting, bracketed paste, keyboard encoding);
-// this page supplies the two things xterm.js does not:
+// this page supplies what xterm.js does not:
 //
 //   TelnetClient  the telnet protocol: ECHO, SGA (= the driver's char-mode
 //                 signal, src/net/telnet.cc set_charmode), NAWS, TTYPE.
 //   input glue    line mode = the input bar (a MUD-style local-edit line);
 //                 char mode = xterm.js keystrokes stream straight to the
 //                 driver.  Switches automatically on the SGA negotiation.
+//   sessions      any number of Game tabs, each a separate connection into
+//                 the same in-page driver (own Terminal, TelnetClient,
+//                 queues, conn id) -- like several telnet clients dialed
+//                 into one mud.  "+" opens another connection; a Logs tab
+//                 collects driver stdout/stderr; inactive tabs light
+//                 unread badges instead of stealing focus.
 // ==========================================================================
 
-const term = new Terminal({
+const TERM_OPTIONS = {
   fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
   fontSize: 14,
   scrollback: 2000,
@@ -263,122 +679,778 @@ const term = new Terminal({
     brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
     brightCyan: '#7dcfff', brightWhite: '#c0caf5',
   },
-});
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById('term'));
-fitAddon.fit();
-window.term = term;   // devtools + tests
+};
 
-// Driver stdout/stderr (boot noise, debug_message) -- dim, above the game.
-function pageLog(s) { term.write('\x1b[2m' + s + '\x1b[0m\r\n'); }
+// xterm renders to a canvas, not text, so CSS media queries can't resize
+// its font -- read the same breakpoint here and apply a modest bump
+// (14 -> 15px) at phone widths, applied when each Terminal is constructed
+// and re-applied live if the breakpoint is crossed (see the mqNarrow
+// 'change' listener near updateCloseButtons() below).
+const mqNarrow = window.matchMedia('(max-width: 480px)');
+function fontSizeForViewport() { return mqNarrow.matches ? 15 : 14; }
 
-// (TelnetClient comes from the shared telnet.js)
+// --- soft-wrap toggle ------------------------------------------------------
+// xterm has no native "don't wrap" mode -- it always wraps at `cols`, and
+// fit() always shrinks cols to match the pane's actual pixel width. On a
+// phone that mangles anything wider than ~30-40 cols, which includes most
+// of this project's ASCII-art login banners (authored for the traditional
+// 80-col MUD client this whole genre targets). "Wrap off" instead pins
+// cols at NOWRAP_COLS and lets the pane scroll horizontally (see the
+// .pane.nowrap CSS) so art renders at its intended width; "wrap on"
+// (default, matches all prior behavior) keeps fitting cols to the
+// viewport. This is a display preference, not a per-session/per-connection
+// one, hence one global flag (persisted) rather than living on each session.
+// NOWRAP_COLS=200: a survey of every lib's login banner found real
+// grid-aligned art up to 154 cols wide (colon/dot-shaded pictures, not just
+// text) -- 200 gives that headroom to grow without re-breaking "wrap off"
+// the way the original 80 did.
+const NOWRAP_COLS = 200;
+let wrapMode = localStorage.getItem('fluffos-wrap') !== 'off';
 
-// --- Boot ---------------------------------------------------------------
+// Cap on each session's command history (see makeSession()'s history/
+// historyIndex/historyDraft) so an extremely long session doesn't grow
+// the array forever; oldest entries drop off the front.
+const HISTORY_MAX = 200;
+
+// Single choke point for sizing a session's terminal to the current
+// viewport, mode-aware -- replaces every raw fit() call below. fit() (and
+// proposeDimensions()) are no-ops on a hidden pane either way (the addon
+// bails on NaN geometry), so callers can always call this unconditionally,
+// same as the raw fit() calls it replaces.
+function refit(s) {
+  s.pane.classList.toggle('nowrap', !wrapMode);
+  if (wrapMode) {
+    s.fit.fit();
+    return;
+  }
+  const dims = s.fit.proposeDimensions();
+  if (dims && dims.rows) s.term.resize(NOWRAP_COLS, dims.rows);
+}
+
+// The full command hint clips mid-word at phone widths; keep it for wide
+// screens.  Applied after boot and re-applied on breakpoint crossings.
+function placeholderForViewport() {
+  return mqNarrow.matches
+    ? 'type a command…'
+    : 'type a command — try: eval return 1+1, tuidemo, who';
+}
+
+// On a touch screen the ↻/× icons sit only a few px from the tap point of
+// a tab-switching tap (verified: Playwright's tap on the tab's center hit
+// the ↻ and silently dropped/redialed the session).  Guard both icons on
+// coarse pointers: a tap on an INACTIVE tab's icon only activates the tab;
+// reload/close take a deliberate second tap once the tab is frontmost.
+// Mouse users (fine pointers) keep the direct one-click behavior.
+const mqCoarse = window.matchMedia('(pointer: coarse)');
+function iconTapGuard(s) {
+  if (!mqCoarse.matches || view === s) return false;
+  activateSession(s);
+  return true;
+}
+
 const status = document.getElementById('status');
-const input = document.getElementById('cmd');
+// The custom command input -- see the big comment on #cmd's CSS for why
+// this isn't a real visible <input>/<textarea>: cmdWrap is the plain div
+// that renders text/caret/placeholder itself; cmdReal is the invisible
+// contenteditable div doing actual keystroke/IME/selection capture
+// underneath it. Everything that used to read/write a native input's
+// .value/.selectionStart/.disabled/.focus()/.placeholder now goes through
+// renderCmd() plus these refs (and the cmdRealValue/setCmdRealValue/
+// getCaretOffset/setCaretOffset helpers just below) instead.
+const cmdWrap = document.getElementById('cmd');
+const cmdReal = document.getElementById('cmdReal');
+const cmdBefore = document.getElementById('cmdBefore');
+const cmdAfter = document.getElementById('cmdAfter');
+const cmdPlaceholder = document.getElementById('cmdPlaceholder');
 const inputBar = document.getElementById('inputbar');
+const termEl = document.getElementById('term');
+const logsEl = document.getElementById('logs');
+const gameTabsEl = document.getElementById('gameTabs');
+const tabAdd = document.getElementById('tabAdd');
+const tabLogs = document.getElementById('tabLogs');
+const logsBadge = document.getElementById('logsBadge');
 const utf8enc = new TextEncoder();
 
+// --- cmdReal helpers (contenteditable stand-ins for <textarea>.value /
+// .selectionStart) ----------------------------------------------------
+// cmdReal's content is always either empty or a single text node: every
+// programmatic write goes through setCmdRealValue() (.textContent=, which
+// collapses to one text node or none), and typed/pasted input stays flat
+// because of contenteditable="plaintext-only" plus the paste handler
+// below. getCaretOffset/setCaretOffset lean on that invariant instead of
+// walking arbitrary rich-text DOM.
+function cmdRealValue() {
+  return cmdReal.textContent;
+}
+function setCmdRealValue(text) {
+  cmdReal.textContent = text;
+}
+function getCaretOffset() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return cmdReal.textContent.length;
+  const range = sel.getRangeAt(0);
+  if (!cmdReal.contains(range.startContainer)) return cmdReal.textContent.length;
+  const preRange = document.createRange();
+  preRange.selectNodeContents(cmdReal);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  return preRange.toString().length;
+}
+function setCaretOffset(offset) {
+  const sel = window.getSelection();
+  const range = document.createRange();
+  const node = cmdReal.firstChild;
+  if (!node) {
+    range.selectNodeContents(cmdReal);
+    range.collapse(true);
+  } else {
+    const len = node.textContent.length;
+    range.setStart(node, Math.max(0, Math.min(len, offset)));
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// --- custom command input rendering ---------------------------------------
+// Syncs cmdWrap's visible spans to cmdReal's real value + cursor position.
+// Called after anything that could change either: typing, IME composition,
+// paste, undo, arrow/Home/End navigation, a click repositioning the caret,
+// programmatic value changes (submit-clear, history recall, tab-switch
+// draft restore), and the masked-class toggle. Cheap enough to just call
+// liberally rather than track precisely what changed.
+function renderCmd() {
+  const val = cmdRealValue();
+  const masked = cmdWrap.classList.contains('masked');
+  const display = masked ? '•'.repeat(val.length) : val;
+  // Tracks the real (invisible) editable region's cursor -- this is what
+  // lets Left/Right/Home/End/click-to-position keep working underneath a
+  // custom-rendered caret instead of only supporting append-at-the-end
+  // editing.
+  const pos = Math.max(0, Math.min(display.length, getCaretOffset()));
+  cmdBefore.textContent = display.slice(0, pos);
+  cmdAfter.textContent = display.slice(pos);
+  cmdWrap.classList.toggle('has-text', val.length > 0);
+  // Keep the caret scrolled into view -- a real <input> does this
+  // automatically when its content overflows; #cmd is a plain div and
+  // won't unless told to. 'nearest' is a no-op when already visible, so
+  // this is cheap to call on every render.
+  cmdCaret.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// A MUD command line is conceptually single-line, but a paste (or some
+// exotic IME path) could still land a literal '\n' in cmdReal's content
+// despite plaintext-only mode and the paste handler below. Flatten it
+// rather than let renderCmd() (white-space: pre) show a broken-looking
+// embedded line break, or Enter-to-submit later send a multi-line blob to
+// the driver as one "line".
+cmdReal.addEventListener('input', () => {
+  if (cmdRealValue().includes('\n')) {
+    const pos = getCaretOffset();
+    setCmdRealValue(cmdRealValue().replace(/\r?\n/g, ' '));
+    setCaretOffset(pos);
+  }
+  renderCmd();
+});
+// contenteditable has no 'select' event (that's <input>/<textarea>-only)
+// and no .value, so a paste isn't a simple string assignment either --
+// insert plain text through the normal editing pipeline (keeps
+// undo/IME semantics intact) instead of letting the browser's default
+// paste behavior insert whatever rich content/markup the clipboard holds.
+cmdReal.addEventListener('paste', (ev) => {
+  ev.preventDefault();
+  const text = (ev.clipboardData || window.clipboardData).getData('text/plain').replace(/\r?\n/g, ' ');
+  document.execCommand('insertText', false, text);
+});
+// keyup/click cover cursor-position changes that 'input' alone misses
+// (arrow keys, Home/End, clicking to reposition); selectionchange (below)
+// is the general-purpose backstop (drag-selection, Cmd/Ctrl+A, ...) that
+// 'select' would have covered on a real <textarea>.
+for (const ev of ['keyup', 'click']) {
+  cmdReal.addEventListener(ev, renderCmd);
+}
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if (sel.rangeCount && cmdReal.contains(sel.getRangeAt(0).startContainer)) renderCmd();
+});
+cmdReal.addEventListener('focus', () => cmdWrap.classList.add('focused'));
+cmdReal.addEventListener('blur', () => cmdWrap.classList.remove('focused'));
+// Clicking anywhere in the rendered area should feel like clicking a
+// normal input -- cmdReal already covers the full box (position:absolute;
+// inset:0) and sits last in DOM order so it naturally receives the click
+// directly; this is just for the rare case something intercepts it first.
+cmdWrap.addEventListener('click', () => cmdReal.focus());
+
+const sessions = [];      // game sessions, tab order
+const byId = new Map();   // driver conn id -> session
+let view = null;          // what the pane area shows: a session, or 'logs'
+let activeGame = null;    // last active game session (owns the input bar)
+let connecting = null;    // session whose fluffos_connect() is in flight
+let connectSession = null;// assigned once the driver is booted (see .then)
+let driver = null;        // the emscripten module M, once booted
+let sessionSeq = 0;
+
+function bumpBadge(badgeEl, n) {
+  badgeEl.textContent = n > 999 ? '999+' : String(n);
+  badgeEl.hidden = n === 0;
+}
+
+// --- Logs pane -----------------------------------------------------------
+// Driver diagnostics (boot noise, compile warnings/errors, debug_message)
+// arrive through Module.print/printErr and land here, keeping the game
+// terminals clean.  stderr lines render red (compile errors vs. warnings
+// often differ by stream).  The pane auto-scrolls unless the user has
+// scrolled up; while another tab is showing, new lines only light the
+// badge on the Logs tab (cleared on opening it).
+const LOG_MAX_LINES = 5000;
+let logsAtBottom = true;
+let unreadLogs = 0;
+
+logsEl.addEventListener('scroll', () => {
+  logsAtBottom =
+    logsEl.scrollTop + logsEl.clientHeight >= logsEl.scrollHeight - 4;
+});
+
+function pageLog(s, isErr) {
+  const line = document.createElement('div');
+  line.className = isErr ? 'log-line err' : 'log-line';
+  const ts = document.createElement('span');
+  ts.className = 'log-ts';
+  ts.textContent = new Date().toTimeString().slice(0, 8);
+  line.appendChild(ts);
+  line.appendChild(document.createTextNode(String(s)));
+  logsEl.appendChild(line);
+  while (logsEl.childElementCount > LOG_MAX_LINES) {
+    logsEl.firstElementChild.remove();
+  }
+  if (logsAtBottom) logsEl.scrollTop = logsEl.scrollHeight;
+  if (view !== 'logs') {
+    unreadLogs++;
+    bumpBadge(logsBadge, unreadLogs);
+  }
+}
+
+// --- Sessions ------------------------------------------------------------
+// Each session is one connection into the in-page driver, with its own
+// xterm, telnet parser and the two decoupling queues the synchronous wasm
+// bridge requires: fluffos_input() can emit output before it returns, and
+// onOutput arrives while the telnet parser is mid-byte-stream, so sends
+// flush from a 0-timeout (never inside receive()) and inbound chunks
+// drain through a non-reentrant loop.  Keep it that way.
+function makeSession() {
+  const s = {
+    label: 'Game ' + (++sessionSeq),
+    connId: -1,
+    charMode: false,
+    serverEchoes: false,
+    disconnected: false,
+    inputValue: '',   // unsent draft in the input bar, saved on tab switch
+    history: [],      // submitted lines, oldest first, per-session shell-style recall
+    historyIndex: -1, // -1 = editing a fresh line; 0 = newest entry; counts backward
+    historyDraft: '', // the in-progress line stashed when ArrowUp starts browsing
+    unread: 0,
+    pendingIn: [],    // [id, bytes] arriving before our conn id is known
+    outbox: [],       // page -> driver, flushed outside receive()
+    flushScheduled: false,
+    inbox: [],        // driver -> page, drained non-reentrantly
+    receiving: false,
+  };
+
+  s.pane = document.createElement('div');
+  s.pane.className = 'pane';
+  termEl.appendChild(s.pane);
+  s.term = new Terminal({ ...TERM_OPTIONS, fontSize: fontSizeForViewport() });
+  s.fit = new FitAddon.FitAddon();
+  s.term.loadAddon(s.fit);
+  s.term.open(s.pane);
+
+  s.tab = document.createElement('button');
+  s.tab.type = 'button';
+  s.tab.className = 'tab';
+  s.tab.appendChild(document.createTextNode(s.label));
+  s.badge = document.createElement('span');
+  s.badge.className = 'badge';
+  s.badge.hidden = true;
+  s.tab.appendChild(s.badge);
+  s.reload = document.createElement('span');
+  s.reload.className = 'reload';
+  s.reload.textContent = '↻';
+  s.reload.title = 'Reconnect: drop this tab’s session and dial a fresh one';
+  s.tab.appendChild(s.reload);
+  s.close = document.createElement('span');
+  s.close.className = 'close';
+  s.close.textContent = '×';
+  s.close.title = 'Disconnect and close this tab';
+  s.tab.appendChild(s.close);
+  s.tab.addEventListener('click', () => activateSession(s));
+  s.reload.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (iconTapGuard(s)) return;
+    reconnectSession(s);
+  });
+  s.close.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (iconTapGuard(s)) return;
+    closeSession(s);
+  });
+  gameTabsEl.appendChild(s.tab);
+
+  s.flushOutbox = () => {
+    s.flushScheduled = false;
+    while (s.connId >= 0 && s.outbox.length) {
+      const bytes = s.outbox.shift();
+      driver.ccall('fluffos_input', null, ['number', 'array', 'number'],
+                   [s.connId, bytes, bytes.length]);
+    }
+  };
+  s.sendToDriver = (bytes) => {
+    s.outbox.push(bytes);
+    if (s.connId >= 0 && !s.flushScheduled) {
+      s.flushScheduled = true;
+      setTimeout(s.flushOutbox, 0);
+    }
+  };
+  s.deliver = (bytes) => {
+    s.inbox.push(bytes);
+    if (s.receiving) return;
+    s.receiving = true;
+    try {
+      while (s.inbox.length) s.telnet.receive(s.inbox.shift());
+    } finally {
+      s.receiving = false;
+    }
+  };
+  // raw application data (telnet.sendRaw doubles IAC bytes)
+  s.sendData = (bytes) => s.telnet.sendRaw(bytes);
+
+  // (Re)create the telnet layer with fresh negotiation state.  Called at
+  // session creation and again on Reconnect: each fluffos_connect() is a
+  // brand-new telnet session on the driver side, so the client-side
+  // parser must start from scratch too.
+  s.setupTelnet = () => {
+    s.telnet = new TelnetClient(s.sendToDriver);
+    s.telnet.onText = (t) => s.term.write(t);
+    s.telnet.onEcho = (on) => {
+      s.serverEchoes = on;
+      // Custom-rendered masking, never a real type="password" -- see the
+      // #cmd/#cmdReal CSS comment. Re-render immediately: if there's
+      // already buffered text when echo state flips mid-line, it should
+      // switch to/from dots right away, not just on the next keystroke.
+      if (view === s && !s.charMode) {
+        cmdWrap.classList.toggle('masked', on);
+        renderCmd();
+      }
+    };
+    s.telnet.onCharMode = (on) => {
+      if (on === s.charMode) return;
+      s.charMode = on;
+      if (view === s) applyInputState(s);
+    };
+    // Real geometry (the fit runs when the pane shows), so the NAWS
+    // answer to the driver's initial DO NAWS carries it.
+    s.telnet.size = { cols: s.term.cols, rows: s.term.rows };
+  };
+  s.setupTelnet();
+
+  // Char mode: xterm.js encodes keys, mouse reports and bracketed pastes
+  // into the exact byte sequences a terminal would send -- forward them.
+  s.term.onData((d) => {
+    if (s.charMode) s.sendData(Array.from(utf8enc.encode(d)));
+  });
+  s.term.onBinary((d) => {
+    if (s.charMode) s.sendData(Array.from(d, (c) => c.charCodeAt(0) & 0xff));
+  });
+  // refit -> onResize fires -> NAWS; the driver re-fires the window_size
+  // apply, so full-screen TUIs relayout live.
+  s.term.onResize(({ cols, rows }) => s.telnet.setSize(cols, rows));
+
+  sessions.push(s);
+  updateCloseButtons();
+  return s;
+}
+
+function updateCloseButtons() {
+  // The first game tab is permanent; only later tabs can be closed.
+  for (const [i, s] of sessions.entries()) s.close.hidden = i === 0;
+}
+
+// Crossing the phone-width breakpoint (e.g. rotating to/from landscape,
+// or a foldable) live-updates every session's font size; fit() is a
+// no-op on hidden panes (guarded on NaN geometry) so only the visible
+// one actually refits here -- the rest catch up on activation.
+mqNarrow.addEventListener('change', () => {
+  const size = fontSizeForViewport();
+  for (const s of sessions) {
+    s.term.options.fontSize = size;
+    if (view === s) refit(s);
+  }
+  cmdPlaceholder.textContent = placeholderForViewport();
+});
+
+// Reflect the active session's state onto the shared input bar/status.
+function applyInputState(s) {
+  if (s.charMode) {
+    inputBar.classList.add('hidden');
+    status.textContent = 'char mode — keys go straight to the mud';
+    // Always a real fit here, NOT refit(): char mode is a full-screen TUI
+    // taking over the raw keystream (see s.term.onData below), which lays
+    // itself out from the real NAWS geometry -- pinning cols to
+    // NOWRAP_COLS regardless of wrapMode would misreport the actual
+    // terminal size to an app that genuinely needs it.
+    s.fit.fit();
+    s.term.focus();
+  } else {
+    inputBar.classList.remove('hidden');
+    status.textContent = s.disconnected ? 'disconnected'
+      : s.connId >= 0 ? 'connected (conn ' + s.connId + ')'
+      : 'connecting…';
+    cmdWrap.classList.toggle('masked', s.serverEchoes);
+    // .disabled is a plain custom property here (divs have no native
+    // disabled state) -- contentEditable is what actually stops input.
+    cmdReal.disabled = s.disconnected || s.connId < 0;
+    cmdReal.contentEditable = cmdReal.disabled ? 'false' : 'plaintext-only';
+    cmdWrap.classList.toggle('disabled', cmdReal.disabled);
+    renderCmd();
+    refit(s);
+    if (!cmdReal.disabled && view === s) cmdReal.focus();
+  }
+}
+
+function saveDraft() {
+  if (view && view !== 'logs') view.inputValue = cmdRealValue();
+}
+
+function activateSession(s) {
+  if (view === s) return;
+  saveDraft();
+  view = s;
+  activeGame = s;
+  window.term = s.term;   // devtools + tests: the active terminal
+  s.unread = 0;
+  s.badge.hidden = true;
+  tabLogs.classList.remove('active');
+  logsEl.classList.remove('active');
+  termEl.classList.remove('hidden');
+  inputBar.classList.remove('logs-active');
+  for (const o of sessions) {
+    o.tab.classList.toggle('active', o === s);
+    o.pane.classList.toggle('active', o === s);
+  }
+  setCmdRealValue(s.inputValue);
+  renderCmd();
+  // fit() no-ops while a pane is display:none (the addon bails on NaN
+  // geometry), so refit now that this one is visible again.
+  applyInputState(s);
+}
+
+function showLogs() {
+  if (view === 'logs') return;
+  saveDraft();
+  view = 'logs';
+  tabLogs.classList.add('active');
+  for (const o of sessions) o.tab.classList.remove('active');
+  termEl.classList.add('hidden');
+  logsEl.classList.add('active');
+  inputBar.classList.add('logs-active');
+  unreadLogs = 0;
+  logsBadge.hidden = true;
+  if (logsAtBottom) logsEl.scrollTop = logsEl.scrollHeight;
+}
+tabLogs.addEventListener('click', showLogs);
+
+function closeSession(s) {
+  const i = sessions.indexOf(s);
+  if (i <= 0) return;   // the first game tab is permanent
+  if (driver && s.connId >= 0 && !s.disconnected) {
+    driver.ccall('fluffos_disconnect', null, ['number'], [s.connId]);
+  }
+  byId.delete(s.connId);
+  sessions.splice(i, 1);
+  s.tab.remove();
+  s.pane.remove();
+  s.term.dispose();
+  pageLog(s.label + ': closed');
+  if (activeGame === s) activeGame = sessions[Math.min(i, sessions.length - 1)];
+  if (view === s) {
+    view = null;
+    activateSession(activeGame);
+  }
+  updateCloseButtons();
+}
+
+// Per-tab reload (the ↻ icon): drop this tab's connection and dial a
+// fresh one into the same running driver (mudlib state survives; login
+// starts over) -- a per-connection reconnect, not a page reload.
+function reconnectSession(s) {
+  if (!driver || !connectSession || !s) return;
+  if (s.connId >= 0 && !s.disconnected) {
+    driver.ccall('fluffos_disconnect', null, ['number'], [s.connId]);
+  }
+  byId.delete(s.connId);
+  s.connId = -1;
+  s.outbox.length = 0;
+  s.inbox.length = 0;
+  s.pendingIn.length = 0;
+  s.charMode = false;
+  s.serverEchoes = false;
+  s.disconnected = false;
+  s.setupTelnet();   // fresh client-side negotiation state
+  s.term.write('\r\n\x1b[2m*** reconnecting ***\x1b[0m\r\n');
+  pageLog(s.label + ': reconnect');
+  if (view !== s) activateSession(s);
+  connectSession(s);
+}
+
+// (No driver-reset control: reloading the page already boots a fresh
+// driver from the packed image, so the browser's reload button IS the
+// reset; the per-tab ↻ above only redials one connection.)
+
+// "+" tab: another connection into the same driver (enabled after boot).
+tabAdd.addEventListener('click', () => {
+  if (!connectSession) return;
+  const s = makeSession();
+  activateSession(s);   // visible + fitted first, so NAWS reports for real
+  connectSession(s);
+});
+
+// --- line mode input (shared bar, routed to the active session) ----------
+// ArrowUp/ArrowDown: shell-style per-session history recall. `history` is
+// oldest-first; `historyIndex` counts back from the newest entry (-1 =
+// not browsing / editing a fresh line, 0 = the single most recent entry,
+// 1 = the one before that, ...), so history[history.length - 1 -
+// historyIndex] is always the entry currently shown. `historyDraft`
+// stashes whatever was being typed the moment ArrowUp first starts
+// browsing, so ArrowDown-ing back past the newest entry restores it
+// instead of leaving a stale value or an empty line.
+cmdReal.addEventListener('keydown', (ev) => {
+  if (!activeGame) return;
+  const s = activeGame;
+  if (ev.key === 'ArrowUp') {
+    if (!s.history.length || s.historyIndex >= s.history.length - 1) return;
+    ev.preventDefault();
+    if (s.historyIndex === -1) s.historyDraft = cmdRealValue();
+    s.historyIndex++;
+    setCmdRealValue(s.history[s.history.length - 1 - s.historyIndex]);
+    setCaretOffset(cmdRealValue().length);
+    renderCmd();
+    return;
+  }
+  if (ev.key === 'ArrowDown') {
+    if (s.historyIndex === -1) return;
+    ev.preventDefault();
+    s.historyIndex--;
+    setCmdRealValue(s.historyIndex === -1
+      ? s.historyDraft
+      : s.history[s.history.length - 1 - s.historyIndex]);
+    setCaretOffset(cmdRealValue().length);
+    renderCmd();
+    return;
+  }
+  // isComposing: mid-IME-composition (e.g. choosing a Pinyin candidate)
+  // Enter confirms the composition, it must NOT also submit the line.
+  if (ev.key !== 'Enter' || ev.isComposing) return;
+  ev.preventDefault();
+  const line = cmdRealValue();
+  setCmdRealValue('');
+  renderCmd();
+  if (line.length && s.history[s.history.length - 1] !== line) {
+    s.history.push(line);
+    if (s.history.length > HISTORY_MAX) s.history.shift();
+  }
+  s.historyIndex = -1;
+  s.historyDraft = '';
+  if (!s.serverEchoes) s.term.write(line + '\r\n');
+  s.sendData(Array.from(utf8enc.encode(line + '\r\n')));
+});
+
+// --- viewport / on-screen-keyboard handling -------------------------------
+// Two related mobile problems, both about "what is actually visible right
+// now":
+//
+//   1. Refit xterm whenever the visible area changes: window resize,
+//      orientation change, or the on-screen keyboard opening/closing.
+//
+//   2. The keyboard specifically: iOS Safari (and some Android browsers)
+//      do NOT shrink the layout viewport when the keyboard opens -- only
+//      window.visualViewport shrinks. #inputbar is the last child of the
+//      flex column <body>, which normally spans the layout viewport, so
+//      without help it ends up positioned behind the keyboard instead of
+//      just above it. Fix: keep <body> (position: fixed, see the
+//      stylesheet) sized/positioned to match the *visual* viewport
+//      instead; #term is the flex:1 child, so it shrinks to make room and
+//      #inputbar naturally lands at the bottom of the visible area.
+let viewportTimer = 0;
+function refitVisible() {
+  if (view === 'logs' || !activeGame) return;
+  // Char mode: always a real fit, never nowrap-pinned -- same reasoning
+  // as applyInputState's charMode branch.
+  if (activeGame.charMode) activeGame.fit.fit();
+  else refit(activeGame);
+}
+function syncVisualViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  document.body.style.top = vv.offsetTop + 'px';
+  document.body.style.height = vv.height + 'px';
+}
+// Compact chrome (see the body.compact styles): below this many CSS px of
+// VISIBLE height, the header merges into the tab row and the bars shed
+// padding.  620 covers every phone in landscape (~360-430px) and a portrait
+// phone with the keyboard open (a ~670-930px screen minus a ~300-350px
+// keyboard leaves ~350-600px), while normal portrait phones (>=640px, even
+// an iPhone SE), tablets and typical desktop windows keep the roomier
+// two-row layout.
+const COMPACT_MAX_HEIGHT = 620;
+function updateCompact() {
+  const vv = window.visualViewport;
+  const h = vv ? vv.height : window.innerHeight;
+  document.body.classList.toggle('compact', h < COMPACT_MAX_HEIGHT);
+}
+function onViewportChange() {
+  updateCompact();
+  syncVisualViewport();
+  clearTimeout(viewportTimer);
+  viewportTimer = setTimeout(refitVisible, 120);
+}
+window.addEventListener('resize', onViewportChange);
+// Some mobile browsers fire 'resize'/visualViewport events late after a
+// rotation; a second pass once the dust settles keeps xterm's geometry
+// (and NAWS) honest.
+window.addEventListener('orientationchange', () => setTimeout(onViewportChange, 300));
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', onViewportChange);
+  window.visualViewport.addEventListener('scroll', onViewportChange);
+  syncVisualViewport();
+}
+updateCompact();   // initial state (e.g. the page opens in landscape)
+
+// --- wrap toggle -----------------------------------------------------------
+// See the "soft-wrap toggle" section (wrapMode/refit()) above for why this
+// exists. Applies to every session (a display preference, not a per-tab
+// one): only the visible pane needs an immediate refit -- fit()/refit() on
+// a hidden pane is already a no-op elsewhere in this file, so the rest
+// pick up the new mode next time they're activated, same pattern as the
+// mqNarrow breakpoint listener.
+const wrapToggle = document.getElementById('wrapToggle');
+function updateWrapToggle() {
+  wrapToggle.classList.toggle('on', wrapMode);
+  wrapToggle.setAttribute('aria-pressed', String(wrapMode));
+  const label = wrapMode
+    ? 'Wrap long lines to fit the screen'
+    : 'Wrapping off — long lines keep their full width, scroll to see them';
+  wrapToggle.title = label;
+  wrapToggle.setAttribute('aria-label', label);
+}
+updateWrapToggle();
+wrapToggle.addEventListener('click', () => {
+  wrapMode = !wrapMode;
+  localStorage.setItem('fluffos-wrap', wrapMode ? 'on' : 'off');
+  updateWrapToggle();
+  if (view !== 'logs' && activeGame && !activeGame.charMode) refit(activeGame);
+});
+
+// --- fullscreen toggle ----------------------------------------------------
+// After compact chrome squeezed the page's own bars, the biggest remaining
+// space hog on a phone is the browser's chrome (address bar & co.); the
+// Fullscreen API hands that back on request.  Support is genuinely absent
+// in places -- iPhone Safari has no element fullscreen at all, embedded
+// webviews often block it -- so the button stays hidden unless the API is
+// really there, and a rejected request (permissions policy, user-gesture
+// rules) lands in the Logs pane instead of surfacing as an uncaught
+// rejection.  Icon state follows the fullscreenchange EVENT, never a local
+// flag: the user can exit via Esc / back-swipe / system UI and the button
+// must not desync.  webkit-prefixed fallbacks cover older iPadOS Safari,
+// the one mobile platform whose support was prefix-only.
+const fsToggle = document.getElementById('fsToggle');
+const fsRoot = document.documentElement;
+const fsElement = () =>
+  document.fullscreenElement || document.webkitFullscreenElement || null;
+const fsSupported =
+  !!(fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen) &&
+  (document.fullscreenEnabled ?? document.webkitFullscreenEnabled) !== false;
+if (fsSupported) {
+  fsToggle.hidden = false;
+  fsToggle.addEventListener('click', () => {
+    let p;
+    try {
+      p = fsElement()
+        ? (document.exitFullscreen
+             ? document.exitFullscreen()
+             : document.webkitExitFullscreen())
+        : (fsRoot.requestFullscreen
+             ? fsRoot.requestFullscreen({ navigationUI: 'hide' })
+             : fsRoot.webkitRequestFullscreen());
+    } catch (e) {
+      p = Promise.reject(e);
+    }
+    // The prefixed calls return undefined; Promise.resolve() unifies.
+    Promise.resolve(p).catch((e) => pageLog('fullscreen: ' + e, true));
+  });
+  const onFsChange = () => {
+    const fs = !!fsElement();
+    fsToggle.classList.toggle('fs-active', fs);
+    const label = fs ? 'Exit fullscreen' : 'Enter fullscreen';
+    fsToggle.title = label;
+    fsToggle.setAttribute('aria-label', label);
+    // Entering/leaving fullscreen is a viewport change like any other:
+    // rerun the compact-chrome/keyboard plumbing and refit xterm, with the
+    // same late second pass as orientationchange -- some browsers report
+    // the final geometry only after the transition animation settles.
+    onViewportChange();
+    setTimeout(onViewportChange, 300);
+  };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+}
+
+// Belt-and-suspenders for the same keyboard problem: on a browser without
+// window.visualViewport, pull a freshly-focused input back into view
+// rather than trusting the browser's own scroll-into-view behavior.
+cmdReal.addEventListener('focus', () => {
+  if (window.visualViewport) return;
+  setTimeout(() => inputBar.scrollIntoView({ block: 'end', behavior: 'smooth' }), 50);
+});
+
+// The first game tab exists before the driver finishes loading, so the
+// page shows a terminal immediately; it is dialed in the boot flow below.
+const firstSession = makeSession();
+activateSession(firstSession);
+
+// --- Boot ---------------------------------------------------------------
 // Mount point + config file, written by the packer (fluffos-boot.js).
 if (!window.FLUFFOS_BOOT) {
   pageLog('warning: fluffos-boot.js missing (bundle not built by the ' +
-          'packer?) — falling back to the testsuite defaults');
+          'packer?) — falling back to the testsuite defaults', true);
 }
 const BOOT = window.FLUFFOS_BOOT || { mount: '/testsuite', config: 'etc/config.test' };
 
 createFluffOS(Module).then((M) => {
-  status.textContent = 'booting driver…';
+  driver = M;
+  BootProgress.set('booting driver…', null);
   M.FS.chdir(BOOT.mount);
-
-  // The wasm bridge is synchronous BOTH ways: fluffos_input() can emit
-  // output before it returns, and onOutput arrives while our telnet parser
-  // is mid-byte-stream. Calling back into the driver from inside receive()
-  // therefore re-enters the parser and corrupts its state (negotiation
-  // ping-pong until stack overflow). Decouple both directions with queues:
-  // sends flush from a 0-timeout (never inside receive()), and inbound
-  // chunks drain through a non-reentrant loop.
-  const connId = { value: -1 };
-  const pendingIn = [];   // driver -> page, before the id is known
-  const outbox = [];      // page -> driver, flushed outside receive()
-  let flushScheduled = false;
-  const flushOutbox = () => {
-    flushScheduled = false;
-    while (connId.value >= 0 && outbox.length) {
-      const bytes = outbox.shift();
-      M.ccall('fluffos_input', null, ['number', 'array', 'number'],
-              [connId.value, bytes, bytes.length]);
-    }
-  };
-  const sendToDriver = (bytes) => {
-    outbox.push(bytes);
-    if (connId.value >= 0 && !flushScheduled) {
-      flushScheduled = true;
-      setTimeout(flushOutbox, 0);
-    }
-  };
-  const inbox = [];
-  let receiving = false;
-  const deliver = (bytes) => {
-    inbox.push(bytes);
-    if (receiving) return;
-    receiving = true;
-    try {
-      while (inbox.length) telnet.receive(inbox.shift());
-    } finally {
-      receiving = false;
-    }
-  };
-  const telnet = new TelnetClient(sendToDriver);
-  telnet.onText = (t) => term.write(t);
-
-  let charMode = false;
-  let serverEchoes = false;
-  telnet.onEcho = (on) => {
-    serverEchoes = on;
-    if (!charMode) input.type = on ? 'password' : 'text';
-  };
-  telnet.onCharMode = (on) => {
-    if (on === charMode) return;
-    charMode = on;
-    if (on) {
-      inputBar.classList.add('hidden');
-      status.textContent = 'char mode — keys go straight to the mud';
-      fitAddon.fit();
-      term.focus();
-    } else {
-      inputBar.classList.remove('hidden');
-      status.textContent = 'connected (conn ' + connId.value + ')';
-      input.type = serverEchoes ? 'password' : 'text';
-      fitAddon.fit();
-      input.focus();
-    }
-  };
-
-  // raw application data (telnet.sendRaw doubles IAC bytes)
-  const sendData = (bytes) => telnet.sendRaw(bytes);
-
-  // Char mode: xterm.js encodes keys, mouse reports and bracketed pastes
-  // into the exact byte sequences a terminal would send -- forward them.
-  term.onData((d) => {
-    if (charMode) sendData(Array.from(utf8enc.encode(d)));
-  });
-  term.onBinary((d) => {
-    if (charMode) sendData(Array.from(d, (c) => c.charCodeAt(0) & 0xff));
-  });
 
   M.fluffos = {
     onOutput: (id, bytes) => {
-      if (connId.value === -1) pendingIn.push(bytes);
-      else if (id === connId.value) deliver(bytes);
+      const s = byId.get(id);
+      if (s) {
+        s.deliver(bytes);
+        if (view !== s) {
+          s.unread++;
+          bumpBadge(s.badge, s.unread);
+        }
+      } else if (connecting) {
+        // The synchronous bridge can emit before fluffos_connect()
+        // returns the id; buffer for the session being dialed.
+        connecting.pendingIn.push([id, bytes]);
+      }
     },
     onDisconnect: (id) => {
-      if (id === connId.value) {
-        pageLog('*** disconnected ***');
-        input.disabled = true;
-        status.textContent = 'disconnected';
-      }
+      const s = byId.get(id);
+      if (!s) return;
+      s.disconnected = true;
+      // Player-facing: show it in that game terminal (dim), and record
+      // it in the Logs pane too.
+      s.term.write('\x1b[2m*** disconnected ***\x1b[0m\r\n');
+      pageLog(s.label + ' (conn ' + id + '): disconnected');
+      if (view === s) applyInputState(s);
     },
     // JS handlers callable from LPC through the jsbridge package:
     //   js_call("fetch_text", ({ url }), (: callback :))
@@ -428,44 +1500,56 @@ createFluffOS(Module).then((M) => {
   window.fluffos = M.fluffos;
 
   const rc = M.ccall('fluffos_boot', 'number', ['string'], [BOOT.config]);
-  if (rc !== 0) { status.textContent = 'boot failed (' + rc + ')'; return; }
-
-  // Real geometry before connecting, so the NAWS answer to the driver's
-  // initial DO NAWS carries it.
-  telnet.size = { cols: term.cols, rows: term.rows };
-  term.onResize(({ cols, rows }) => telnet.setSize(cols, rows));
+  if (rc !== 0) {
+    BootProgress.finish();
+    status.textContent = 'boot failed (' + rc + ')';
+    return;
+  }
 
   // Drive the game loop: heartbeats, call_outs and buffered commands all
-  // run inside fluffos_tick().
-  setInterval(() => {
-    M.ccall('fluffos_tick', 'number', ['number'], [performance.now()]);
-  }, 50);
+  // run inside fluffos_tick(), which returns the delay in ms until it next
+  // wants to be called. Honour it rather than polling on a fixed interval:
+  // promise deliveries are drained one batch per call, so a fixed 50ms tick
+  // capped async throughput at 20 batches/s no matter how much work was
+  // ready. The driver asks for 1ms while it has a drain continuation
+  // pending and for the full gametick period when idle, so this both speeds
+  // async work up and stops waking a quiet mud 20 times a second.
+  const tick = () => {
+    let delay = 50;
+    try {
+      delay = M.ccall('fluffos_tick', 'number', ['number'], [performance.now()]);
+    } finally {
+      // Nested setTimeout is clamped to ~4ms by browsers, which is the real
+      // floor here; the upper bound keeps a long idle delay from making the
+      // page feel unresponsive to its own bookkeeping.
+      setTimeout(tick, Math.min(Math.max(delay || 1, 1), 100));
+    }
+  };
+  tick();
 
-  connId.value = M.ccall('fluffos_connect', 'number', [], []);
-  for (const bytes of pendingIn.splice(0)) deliver(bytes);
-  flushOutbox();   // negotiation replies buffered while connId was unknown
-  status.textContent = 'connected (conn ' + connId.value + ')';
-  input.disabled = false;
-  input.placeholder = 'type a command — try: eval return 1+1, tuidemo, who';
-  input.focus();
+  connectSession = (s) => {
+    connecting = s;
+    s.connId = M.ccall('fluffos_connect', 'number', [], []);
+    connecting = null;
+    byId.set(s.connId, s);
+    for (const [id, bytes] of s.pendingIn.splice(0)) {
+      const target = id === s.connId ? s : byId.get(id);
+      if (target) target.deliver(bytes);
+    }
+    s.flushOutbox();   // negotiation replies buffered while id was unknown
+    if (view === s) applyInputState(s);
+  };
 
-  // window resize -> refit xterm -> onResize fires -> NAWS; the driver
-  // re-fires the window_size apply, so full-screen TUIs relayout live.
-  let resizeTimer = 0;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => fitAddon.fit(), 120);
-  });
-
-  // --- line mode input ---
-  input.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Enter') return;
-    const line = input.value;
-    input.value = '';
-    if (input.type !== 'password') term.write(line + '\r\n');
-    sendData(Array.from(utf8enc.encode(line + '\r\n')));
-  });
+  connectSession(firstSession);
+  // The first session is dialed and interactive -- the boot indicator has
+  // done its job.  (connectSession -> applyInputState already wrote the
+  // 'connected (conn N)' status; finish() only clears the overlay.)
+  BootProgress.finish();
+  cmdPlaceholder.textContent = placeholderForViewport();
+  cmdReal.focus();
+  tabAdd.disabled = false;
 }).catch((e) => {
+  BootProgress.finish();
   status.textContent = 'failed to load: ' + e;
   ErrorModal.show('Failed to load WebAssembly driver', e,
     'mount: ' + BOOT.mount + '\nconfig: ' + BOOT.config);

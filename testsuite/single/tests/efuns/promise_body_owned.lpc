@@ -1,0 +1,103 @@
+// An async function's own promise is not the mudlib's to settle.
+//
+// The promise an `async` function returns is that function's result channel:
+// the body settles it when it returns or fails. Nothing stopped LPC from
+// settling it first, and the result was silent and lossy -- promise_reject()
+// on a parked body succeeded, the body then ran to completion, and its
+// `return` value was dropped by promise_settle()'s "first settle wins" rule
+// with no error anywhere. That contradicts what promise.md documents for
+// every other promise ("settling a promise that is already settled is an
+// error") and it is not a state JS can reach, because there the resolver
+// functions are never handed out.
+//
+// It also was not the cancellation it looked like: the body kept running,
+// kept its object and its suspension slot, and kept mutating state. Only the
+// caller's view was thrown away.
+//
+// So both settle efuns now refuse a promise owned by an async function body.
+// The refusal is checked AFTER the already-settled guard, so a body that has
+// already finished still reports the more specific "already settled".
+
+#include "/include/tests.h"
+
+nosave promise gate;
+nosave promise held;
+nosave int body_ran;
+
+private async int slow() {
+  await gate;
+  body_ran = 1;
+
+  return 7;
+}
+
+// never suspends: its promise is fulfilled before the caller ever sees it
+private async int quick() { return 3; }
+
+void do_tests() {
+  promise done;
+  promise sibling;
+  mixed err;
+
+  gate = promise_create();
+  held = slow();
+  ASSERT_EQ(0, promise_status(held));
+
+  err = catch(promise_reject(held, "cancelled"));
+  ASSERT2(err, "promise_reject() on a parked async body's promise must be refused");
+  ASSERT2(stringp(err) && strsrch(err, "async function") != -1,
+    "the refusal names the reason: " + err);
+  ASSERT_EQ(0, promise_status(held));
+
+  err = catch(promise_resolve(held, 99));
+  ASSERT2(err, "promise_resolve() on a parked async body's promise must be refused");
+  ASSERT_EQ(0, promise_status(held));
+
+  // A body that already returned reports the ordinary already-settled error:
+  // the more specific message is the useful one, so ownership is checked
+  // second.
+  done = quick();
+  ASSERT_EQ(1, promise_status(done));
+  err = catch(promise_reject(done, "late"));
+  ASSERT2(err, "an already-settled body promise is still refused");
+  ASSERT2(stringp(err) && strsrch(err, "already settled") != -1,
+    "a settled promise reports already-settled, not ownership: " + err);
+
+  // THE OTHER SIDE OF THE BOUNDARY, pinned deliberately. The refusal covers
+  // async function promises and nothing else: the promises the driver hands
+  // out for a pending operation stay settleable from LPC. That is not an
+  // oversight to be tidied up later -- it is what makes a consumer-side
+  // timeout possible at all (reject the promise you are waiting on, or a
+  // gate wrapping it) while there is no promise_race()/promise_cancel().
+  // Extending body_owned to these would break that idiom silently, so make
+  // it break a test instead.
+  // promise_result() on each is not decoration: it proves the settle really
+  // took, and reading a rejection marks it observed, so these deliberate
+  // rejections do not each log an unhandled-rejection line.
+  sibling = promise_create();
+  err = catch(promise_reject(sibling, "*mine to settle"));
+  ASSERT2(!err, "a promise_create() promise is settleable: " + err);
+  ASSERT_EQ("*mine to settle", promise_result(sibling));
+
+  sibling = promise_then(promise_create(), function(mixed v) { return v; });
+  err = catch(promise_reject(sibling, "*chain link settled by hand"));
+  ASSERT2(!err, "a promise_then() chained promise is settleable: " + err);
+  ASSERT_EQ("*chain link settled by hand", promise_result(sibling));
+
+  sibling = call_out(60);
+  err = catch(promise_reject(sibling, "*timed out waiting"));
+  ASSERT2(!err, "a call_out(delay) promise is settleable: " + err);
+  ASSERT_EQ(2, promise_status(sibling));
+  ASSERT_EQ("*timed out waiting", promise_result(sibling));
+
+  // Releasing the gate lets the body finish. Its `return 7` must survive:
+  // that is the value the refusal above exists to protect.
+  EXPECT_LATCH("body result kept");
+  promise_then(held, function(mixed v) {
+    ASSERT_EQ(7, v);
+    ASSERT_EQ(1, body_ran);
+    ASSERT_EQ(1, promise_status(held));
+    RELEASE_LATCH("body result kept");
+  });
+  promise_resolve(gate, 0);
+}

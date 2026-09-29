@@ -81,6 +81,40 @@ db_t* find_db_conn(int);
 static int create_db_conn();
 static void free_db_conn(db_t*);
 
+// package/async runs db_exec() queries on a DETACHED WORKER THREAD
+// (async.cc's dbexecthread), which locks db_mut around its
+// find_db_conn()+execute() on the shared db_conn_list / dbconn_t. Every
+// main-thread efun that touches a connection (or the list) must take the
+// SAME lock, or a concurrent async_db_exec() races a main-thread
+// db_close()/db_fetch()/db_commit()/db_rollback() on the same handle -- a
+// use-after-free (close frees the dbconn_t the worker is mid-execute on) or
+// a data race on the result set. Only f_db_exec() took the lock; the others
+// forgot it (the same "teardown path missing the primitive its sibling uses"
+// shape as AGENTS.md section 13's socket_acquire flag gap).
+//
+// db_mut is lazily created by the first async_db_exec(); a null db_mut means
+// no worker thread was ever spawned, so there is nothing to race and the
+// lock is unnecessary. Guarding on non-null keeps this a no-op for the
+// common (no async DB) case and avoids locking an uninitialized mutex.
+#ifdef PACKAGE_ASYNC
+extern pthread_mutex_t* db_mut;
+namespace {
+struct DbAsyncLock {
+  DbAsyncLock() {
+    if (db_mut) pthread_mutex_lock(db_mut);
+  }
+  ~DbAsyncLock() {
+    if (db_mut) pthread_mutex_unlock(db_mut);
+  }
+  DbAsyncLock(const DbAsyncLock&) = delete;
+  DbAsyncLock& operator=(const DbAsyncLock&) = delete;
+};
+}  // namespace
+#define DB_ASYNC_LOCK() DbAsyncLock _db_async_lock_guard
+#else
+#define DB_ASYNC_LOCK() ((void)0)
+#endif
+
 #ifdef USE_MSQL
 static int msql_connect(dbconn_t*, const char*, const char*, const char*, const char*);
 static int msql_close(dbconn_t*);
@@ -180,6 +214,9 @@ void f_db_close() {
     error("Attempt to close an invalid database handle\n");
   }
 
+  // Serialize against package/async's DB worker thread (see DbAsyncLock).
+  DB_ASYNC_LOCK();
+
   /* Cleanup any memory structures left around */
   if (db->type->cleanup) {
     db->type->cleanup(&(db->c));
@@ -217,6 +254,8 @@ void f_db_commit() {
   if (!db) {
     error("Attempt to commit an invalid database handle\n");
   }
+
+  DB_ASYNC_LOCK();  // serialize against the async DB worker thread
 
   if (db->type->commit) {
     ret = db->type->commit(&(db->c));
@@ -441,6 +480,8 @@ void f_db_fetch() {
     error("Attempt to fetch from an invalid database handle\n");
   }
 
+  DB_ASYNC_LOCK();  // serialize against the async DB worker thread
+
   if (db->type->fetch) {
     ret = db->type->fetch(&(db->c), sp->u.number);
   } else {
@@ -483,6 +524,8 @@ void f_db_rollback() {
     error("Attempt to rollback an invalid database handle\n");
   }
 
+  DB_ASYNC_LOCK();  // serialize against the async DB worker thread
+
   if (db->type->rollback) {
     ret = db->type->rollback(&(db->c));
   }
@@ -507,6 +550,10 @@ void f_db_status() {
   outbuffer_t out;
 
   outbuf_zero(&out);
+
+  // Reads every live connection's db->c (via type->status) while the async
+  // worker may be mid-execute on one of them; serialize the whole walk.
+  DB_ASYNC_LOCK();
 
   for (i = 0; i < db_conn_alloc; i++) {
     if (db_conn_list[i].flags & DB_FLAG_EMPTY) {

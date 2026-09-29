@@ -25,8 +25,10 @@ title: calls / catch
     string (with a leading '*') will be returned.  The value of the body
     expression itself is discarded.
 
-    The function throw() can also be used to immediately return any  value,
-    except 0.
+    The function throw() can also be used to immediately return any value.
+    The one exception is 0, which is not rejected but cannot be detected:
+    catch() already returns 0 to mean "no error", so throw(0) cannot be
+    told apart from the body finishing normally.
 
     It is a compile-time error to `break` or `continue` out of a catch
     block.
@@ -60,6 +62,37 @@ title: calls / catch
     }
 
     // ERR: "*Error in loading object '/u/g/gesslar/two'"
+
+    // A caught value is not always an error message.  throw() hands back
+    // whatever it was given, so a class makes a tidy typed failure that
+    // the catching code can inspect field by field instead of parsing a
+    // string.
+    class failure {
+        string kind ;
+        mixed detail ;
+    }
+
+    private void charge(object who, int amount) {
+        int have = who->query_coins() ;
+
+        if(have < amount)
+            throw(new(class failure,
+                      kind: "insufficient_funds",
+                      detail: amount - have)) ;
+
+        who->add_coins(-amount) ;
+    }
+
+    void example3(object who, int price) {
+        mixed err = catch( charge(who, price) ) ;
+
+        // classp() must be tested first: err is just as likely to be a
+        // driver error string, and the && stops there when it is.
+        if(classp(err) && err.kind == "insufficient_funds")
+            write("You are " + err.detail + " coins short.\n") ;
+        else if(err)
+            throw(err) ;    // not ours to handle -- pass it along
+    }
     ```
 
 ### SEE ALSO

@@ -1,0 +1,7 @@
+// Two leaked declarations shifted by two.
+mixed leaked = time_expression {
+  int f = 1;
+  int h = 2;
+};
+
+int add2(int a, int b) { return a + b; }

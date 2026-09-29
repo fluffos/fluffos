@@ -41,6 +41,11 @@ templateChar = ? any character except "`", "$" ? | escapeSequence ;
 textBlock = "@", identifier, ? newline ?, ? raw lines ?, identifier ;
 textArrayBlock = "@@", identifier, ? newline ?, ? raw lines ?, identifier ;
 
+(* In ordinary source a '//' comment ends at the physical newline.
+   On a directive line, comments are recognized AFTER '\'-newline
+   splices (C phase 2 then 3), so a '//' that ends with '\' continues
+   onto the next physical line. A comment-open may itself be split by
+   a splice ("/" , "\", newline, "*" is still a block comment). *)
 lineComment = "//", { ? any character except newline ? } ;
 blockComment = "/*", { ? any character sequence not containing "*/" ? }, "*/" ;
 
@@ -59,9 +64,20 @@ functionalParameter = "$", decimalNumber ;
 
 (* ============================================================================
    Layer 2: PREPROCESSOR GRAMMAR (hand-authored; source of truth:
-   lexer_rules_pp.cc). Preprocessing is interleaved with lexing in ONE
-   scan -- directives take effect at exactly their position in the token
-   stream. A '\' at end of line continues any directive line.
+   lexer.l's SC_DIRECTIVE / WORD / DATA scan and lexer_rules_pp.cc).
+   Preprocessing is interleaved with lexing in ONE scan -- directives
+   take effect at exactly their position in the token stream.
+
+   C translation phases 2-4 in one scan: a backslash immediately
+   followed by a newline is deleted first (splice); comments then
+   become one space; then the '#' line is parsed. A comment is legal
+   between '#', the keyword, and the payload. A block comment may
+   close on a later physical line. A '//' comment runs to the logical
+   newline, so a trailing '\' continues it. A '"' / '`' on the payload
+   is a literal: '//' or '/*' inside it is data, including across a
+   continuation. The directive ends at the next newline that was not
+   spliced and is not inside a block comment. An unterminated quote
+   still ends the directive at that raw newline.
    ============================================================================ *)
 
 directiveLine = ? line start ?, [ ? whitespace ? ], "#", directive ;

@@ -1,0 +1,34 @@
+// Regression: mudlib_error_handler() (src/vm/internal/simulate.cc) builds a
+// diagnostic mapping to hand to the master's error handler. It held that
+// mapping in a raw pointer and only pushed (transferred ownership) on the
+// success path. If populating the mapping itself error()s -- e.g.
+// mapping_too_large() when __MAX_MAPPING_SIZE__ is configured below what the
+// ~6-entry diagnostic needs -- that second error() unwound with the mapping
+// (and its keys/strings) leaked. Tracing that down also surfaced two more
+// general leaks on the same throw paths: insert_in_mapping() not releasing a
+// key's shared-string conversion, and load_mapping_from_aggregate() (backing
+// mapping literals) not freeing the remaining pairs (the caller has already
+// moved sp below the whole aggregate, hiding them from the normal unwind
+// sweep). All are RAII/explicit-free fixed now.
+//
+// On a Debug build this is guarded by check_memory()'s post-file ref-count
+// sweep: the unfixed driver reports "Bad ref count for mapping/string ..."
+// after this file. On any build it must at least not crash. The test simply
+// drives the path and restores the config; the leak detection is automatic.
+void do_tests() {
+  int orig_max = get_config(269);  // __MAX_MAPPING_SIZE__ (CFG_INT(13))
+
+  // Shrink the mapping-size limit below what the error handler's own
+  // diagnostic mapping needs, then trigger an error whose handling builds a
+  // mapping literal (copy() of one) -- so both the error handler's mapping
+  // and the literal's load_mapping_from_aggregate() hit the limit.
+  set_config(269, 1);
+  ASSERT2(catch(copy(([ "x": 1, "y": 2 ]))),
+    "shrunk mapping-size limit should make this error");
+  // Restore before asserting anything else, and unconditionally.
+  set_config(269, orig_max);
+
+  // A normal mapping works again with the limit restored -- proves nothing
+  // was left in a broken state.
+  ASSERT_EQ(2, sizeof(([ "a": 1, "b": 2 ])));
+}

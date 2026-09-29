@@ -55,8 +55,30 @@ void do_tests() {
   ASSERT_EQ(0, undefinedp(u));
   ASSERT_EQ(0, u);
 
-  // Plain (non-assign) `|` on an undefined operand must not carry the
-  // "undefined" subtype into a real computed result either.
+  // Plain (non-assign) binary ops on an undefined operand must not carry
+  // the "undefined" subtype into a real computed result either. `|` and
+  // `&` already handled this; `^`, `<<`, `>>` did not (f_xor()/f_lsh()/
+  // f_rsh() reuse the left operand's stack slot for the result, same as
+  // their siblings, but were missing the sp->subtype = 0 reset).
+  //
+  // undefinedp() only trips when BOTH subtype==T_UNDEFINED and the
+  // resulting u.number == 0 (see f_undefinedp() in efuns_main.cc), so
+  // each RHS below is chosen to keep the result 0 -- a nonzero result
+  // (e.g. u | 5 == 5) would pass this assertion even with the stale
+  // subtype bug present, silently failing to exercise the fix.
   u = m["missing"];
-  ASSERT_EQ(0, undefinedp(u | 5));
+  ASSERT_EQ(0, undefinedp(u | 0));
+
+  u = m["missing"];
+  ASSERT_EQ(0, undefinedp(u & 5));
+
+  u = m["missing"];
+  ASSERT_EQ(0, undefinedp(u ^ 0));
+  ASSERT_EQ(5, m["missing"] ^ 5);
+
+  u = m["missing"];
+  ASSERT_EQ(0, undefinedp(u << 3));
+
+  u = m["missing"];
+  ASSERT_EQ(0, undefinedp(u >> 3));
 }

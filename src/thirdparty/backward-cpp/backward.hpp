@@ -4337,14 +4337,32 @@ public:
   bool loaded() const { return true; }
 
   ~SignalHandling() {
-    {
-      std::unique_lock<std::mutex> lk(mtx());
-      crashed() = crash_status::normal_exit;
+    // FluffOS local patch: a destructor is implicitly noexcept, so anything
+    // thrown here escapes into __cxa_call_terminate -> std::terminate ->
+    // abort(), replacing an already-successful exit status with 3. Since this
+    // runs as a static destructor at process teardown there is nothing useful
+    // left to report, so degrade to detaching the reporter thread instead:
+    // never abort, and never block forever waiting for a thread that cannot
+    // have been woken. (~thread on a still-joinable thread would itself call
+    // std::terminate, so one of join/detach must always happen.)
+    try {
+      {
+        std::unique_lock<std::mutex> lk(mtx());
+        crashed() = crash_status::normal_exit;
+      }
+
+      cv().notify_one();
+
+      reporter_thread_.join();
+    } catch (...) {
+      try {
+        if (reporter_thread_.joinable()) {
+          reporter_thread_.detach();
+        }
+      } catch (...) {
+        // Nothing left to try; the process is exiting either way.
+      }
     }
-
-    cv().notify_one();
-
-    reporter_thread_.join();
   }
 
 private:
@@ -4360,14 +4378,27 @@ private:
     return data;
   }
 
+  // FluffOS local patch: these two are reached from ~SignalHandling, which
+  // runs as a static destructor (backward.cpp defines a namespace-scope
+  // `backward::sh`). An ordinary function-local static is registered with
+  // __cxa_atexit on first use -- by the reporter thread -- so its own
+  // destruction can be sequenced BEFORE ~SignalHandling, leaving the
+  // destructor to lock/notify an already-destroyed primitive. Give them
+  // immortal storage so they are never destroyed and that ordering cannot
+  // arise. (std::condition_variable's destructor really does call
+  // pthread_cond_destroy; on MinGW/winpthreads a destroyed synchronization
+  // object zeroes its handle slot, and since mingw-w64 14.0.0.r420 operating
+  // on a zeroed one returns EINVAL rather than silently re-initializing it,
+  // which made std::mutex::lock() throw out of this noexcept destructor and
+  // abort() every process at exit -- after main() had already succeeded.)
   static std::mutex &mtx() {
-    static std::mutex data;
-    return data;
+    static std::mutex *data = new std::mutex();
+    return *data;
   }
 
   static std::condition_variable &cv() {
-    static std::condition_variable data;
-    return data;
+    static std::condition_variable *data = new std::condition_variable();
+    return *data;
   }
 
   static HANDLE &thread_handle() {

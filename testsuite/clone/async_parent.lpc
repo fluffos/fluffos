@@ -1,0 +1,3 @@
+// fixture for tests/compiler/async_await_context.lpc: an inherited async
+// function (FUNC_ASYNC must propagate through inheritance)
+async int pf() { return 42; }

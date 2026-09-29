@@ -1,0 +1,42 @@
+// The #if preprocessor expression evaluator (ifexpr_* in
+// src/compiler/internal/lexer_rules_pp.cc) must compute in 64-bit, matching
+// LPC_INT and the runtime opcode / trees.cc constant folder. It used to use
+// a plain `long`, which is 32-bit on Windows/LLP64: there, a #if value wider
+// than 32 bits silently truncated (disagreeing with the same expression at
+// runtime) and a masked shift count of 32..63 was undefined behavior on the
+// 32-bit operand. On LP64 (Linux/macOS) `long` was already 64-bit, so this
+// test passes there regardless -- it pins the cross-platform contract and
+// guards against a regression back to a 32-bit evaluator type.
+void do_tests() {
+  object ob;
+  string src;
+
+  // shift_ok: a left shift past bit 31 -- 0 in a 32-bit evaluator, correct
+  // in 64-bit. mul_ok: a product that overflows 32 bits but fits 64.
+  // big_literal_ok: a literal above 2^32 must survive un-truncated.
+  src = "#if (1 << 40) == 1099511627776\n"
+    "int shift_ok() { return 1; }\n"
+    "#else\n"
+    "int shift_ok() { return 0; }\n"
+    "#endif\n"
+    "#if (1000000 * 1000000) == 1000000000000\n"
+    "int mul_ok() { return 1; }\n"
+    "#else\n"
+    "int mul_ok() { return 0; }\n"
+    "#endif\n"
+    "#if 5000000000 > 4294967296\n"
+    "int big_literal_ok() { return 1; }\n"
+    "#else\n"
+    "int big_literal_ok() { return 0; }\n"
+    "#endif\n";
+
+  rm("/gen_if_expr_64bit.c");
+  write_file("/gen_if_expr_64bit.c", src);
+  ob = load_object("/gen_if_expr_64bit");
+  ASSERT(objectp(ob));
+  ASSERT_EQ(1, ob->shift_ok());
+  ASSERT_EQ(1, ob->mul_ok());
+  ASSERT_EQ(1, ob->big_literal_ok());
+  destruct(ob);
+  rm("/gen_if_expr_64bit.c");
+}

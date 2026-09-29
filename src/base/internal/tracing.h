@@ -87,10 +87,14 @@ class Tracer {
   static void end(const std::string_view&, const EventCategory& category);
 
   static inline void start(const char* file) {
-    // If there is already events, flush it out first.
-    if (is_enabled) {
-      collect();
-    }
+    // Flush any pending events first -- unconditionally, NOT only when still
+    // enabled. A trace that hit MAX_EVENTS has already had is_enabled cleared
+    // by TraceWriter::log() while its buffer stayed full, and gating here
+    // both stranded those events and then re-pointed `filename` at the new
+    // trace below, so the old trace's million events would eventually be
+    // dumped under the NEW trace's name. collect() self-guards on an empty
+    // filename, so this is a no-op when there is genuinely nothing pending.
+    collect();
 #ifdef _WIN32
     QueryPerformanceCounter(&basetime);
 #else

@@ -1,0 +1,172 @@
+// async_yield() is the cooperative preemption point inside a long async
+// function: `await async_yield();` parks the frame and resumes it only after
+// the driver has been back to its event loop -- polled sockets, queued
+// commands, fired due timers.
+//
+// It is not the same as awaiting an already-settled promise. That parks too,
+// but its resume is re-queued into the SAME drain turn, which is deliberate:
+// it is what lets
+//
+//     for (i = 0; i < n; i++) sum += await compute(i);
+//
+// run at full speed instead of paying an event-loop turn per iteration. So a
+// plain `await` does not give the loop a turn, and neither does
+// `await call_out(0)` (a call_out(0) runs on the same gametick, and
+// `call_out(0) nest level` errors out if one is used as a yield in a loop).
+// async_yield() is the primitive that actually reaches the poll: it rides
+// the same event-loop yield the microtask drain uses to re-post itself.
+//
+// The observable is async_info(1)'s "drain_arms_loop", which counts settles
+// that arrive from OUTSIDE gametick dispatch and outside a running drain --
+// i.e. from the event loop itself. A resume that came back inside the same
+// drain turn cannot have moved it; a resume that went through the loop must
+// have. The two legs are measured in one async function so that the control
+// leg's window is a single drain turn with no loop pass inside it, which is
+// what makes its reading deterministic rather than a race against whatever
+// else the suite has in flight.
+//
+// If the turn happens to end inside the control leg anyway (the suite's own
+// backlog shares these turns), that leg proves nothing and the probe simply
+// runs again, rather than asserting on a coincidence.
+
+#define MAX_ATTEMPTS 20
+
+nosave int attempts;
+nosave int finished;
+
+private async void probe();
+private async void adoption();
+private void ceiling();
+
+private void finish(mixed complaint) {
+  if (finished++) {
+    return;
+  }
+  if (complaint) {
+    ASSERT2(0, complaint);
+  }
+  // Last, deliberately: it saturates the process-wide pending-yield registry,
+  // and every async_yield() made before the loop's next pass shares that
+  // ceiling -- including the probe's own, which would then error instead of
+  // parking. Anything added to this file that yields must go BEFORE here.
+  ceiling();
+  RELEASE_LATCH("async yield");
+}
+
+private async void probe() {
+  promise settled;
+  int before, after_settled, after_yield;
+
+  before = async_info(1)["drain_arms_loop"];
+
+  // Control leg: parks, but resumes inside the turn that delivered the park.
+  settled = promise_create();
+  promise_resolve(settled, 0);
+  await settled;
+  after_settled = async_info(1)["drain_arms_loop"];
+
+  if (after_settled != before) {
+    // The turn ended inside the control leg, so it says nothing about
+    // whether a plain await reaches the loop. Try again.
+    if (++attempts < MAX_ATTEMPTS) {
+      probe();
+      return;
+    }
+    finish(sprintf("after %d attempts the control leg never ran inside a single "
+      "drain turn, so this file never tested anything",
+      attempts));
+    return;
+  }
+
+  // The real leg.
+  await async_yield();
+  after_yield = async_info(1)["drain_arms_loop"];
+
+  ASSERT2(after_yield > after_settled,
+    sprintf("await async_yield() resumed without the event loop getting a turn "
+      "(drain_arms_loop stayed at %d, where an await of an already-settled "
+      "promise leaves it too) -- it is behaving like an ordinary await, so it "
+      "is not a preemption point",
+      after_yield));
+  finish(0);
+}
+
+// A pending yield stays allocated after the caller drops it (the driver
+// still holds it until the loop runs), so a loop that discards them retains
+// memory where `promise_create()` would not. That is bounded by the same
+// `max pending promise deliveries` ceiling as queued reactions.
+private void ceiling() {
+  // Generously above the default ceiling (100000), so the guard fires long
+  // before this bound. Reaching the bound with no error means the limit is
+  // disabled or configured higher, which the message names rather than
+  // reporting as a driver fault.
+  int cap = 200000;
+  int i;
+  mixed err;
+
+  err = catch {
+    for (i = 0; i < cap; i++) {
+      async_yield();
+    }
+  };
+  ASSERT2(err && strsrch(err, "too many yields") != -1,
+    sprintf("a loop discarding %d async_yield() promises was not stopped by the "
+      "pending ceiling (%s) -- either the guard is gone, or `max pending "
+      "promise deliveries` is disabled or set above %d",
+      i, err ? err : "no error", cap));
+}
+
+private async void value_semantics() {
+  promise p = async_yield();
+
+  ASSERT_EQ("promise", typeof(p));
+  // Cannot settle synchronously: the loop has not run yet.
+  ASSERT_EQ(0, promise_status(p));
+  ASSERT_EQ(0, await p);
+  // Settled after the fact, fulfilled rather than rejected.
+  ASSERT_EQ(1, promise_status(p));
+
+  // Two calls before the loop runs are distinct promises sharing one wake-up.
+  p = async_yield();
+  ASSERT2(p != async_yield(), "async_yield() handed out the same promise twice");
+
+  adoption();
+}
+
+// A yield promise whose fate LPC has already committed to an adoption must
+// not be settled out from under it when the loop's wake-up arrives.
+// promise_resolve(y, other) with `other` still pending makes y follow other;
+// y stays PENDING, but its outcome is decided. The wake-up settling y with 0
+// anyway discards the adopted value silently -- and is not even a
+// double-settle the efuns would refuse, because it comes from the driver.
+private async void adoption() {
+  promise y = async_yield();
+  promise other = promise_create();
+  int got;
+
+  promise_resolve(y, other);
+  ASSERT_EQ(0, promise_status(y));
+
+  // A call_out is a later gametick; the yield wake-up is the next pass of the
+  // event loop. So the wake-up is guaranteed to have come and gone before
+  // `other` carries a value, which is what makes the reading below decisive.
+  call_out((: promise_resolve, other, 42 :), 1);
+
+  got = await y;
+  ASSERT2(got == 42,
+    sprintf("the yield wake-up overrode an adoption: awaiting the yield promise "
+      "produced %O instead of the adopted value 42",
+      got));
+
+  probe();
+}
+
+void do_tests() {
+  EXPECT_LATCH("async yield");
+
+  // From a call_out: master::flag() holds the stack for the whole run, so
+  // nothing queued during do_tests() is serviced until it returns, and
+  // starting from a call_out keeps the ordering call_out-to-call_out, which
+  // is defined (testsuite/README.md).
+  call_out((: value_semantics :), 1);
+}

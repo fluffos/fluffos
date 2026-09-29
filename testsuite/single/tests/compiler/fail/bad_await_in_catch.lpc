@@ -1,0 +1,5 @@
+// await may not appear inside catch (do_catch()'s C++ recursion cannot be
+// suspended); acatch is the async-aware form
+async int f() {
+  return catch(await 1);
+}

@@ -1,0 +1,7 @@
+// await may not appear inside an anonymous function body: it runs in its
+// own frame, which is not the async function's
+async int f() {
+  function g = function() { return await 1; };
+
+  return 0;
+}

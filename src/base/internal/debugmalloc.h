@@ -84,8 +84,10 @@ static const int TAG_OBJ_VARS = (TAG_PERMANENT + 40);
 // and made check_string_stats() misreport live malloc-string counts
 // whenever any program compiled with "debugger port" set was still
 // loaded, a hard `-ftest` failure. Cross-check EVERY category below, not
-// just TAG_PERMANENT, before reusing a number.
-static const int TAG_LOCAL_NAMES = (TAG_PERMANENT + 53);
+// just TAG_PERMANENT, before reusing a number. (This one moved 53 -> 54 when
+// the branch was merged with master, which had meanwhile spent 53 on
+// TAG_DEFERS below: a textually clean merge that handed two tags one value.)
+static const int TAG_LOCAL_NAMES = (TAG_PERMANENT + 54);
 // Compile-arena chunks (compiler/internal/scratchpad.cc): retained across
 // compiles by design -- whitelisted in check_all_blocks like the other
 // persistent driver infrastructure.
@@ -95,6 +97,17 @@ static const int TAG_SCRATCHPAD = (TAG_PERMANENT + 50);
 // replace_programs() sweep -- legitimately survive a between-executions
 // check_all_blocks, so they get their own whitelisted tag.
 static const int TAG_REPLACE_OB = (TAG_PERMANENT + 51);
+// defer() list nodes (packages/core/efuns_main.cc f_defer): normally
+// consumed at frame pop within one execution, but a node parked in a
+// suspended async coroutine (vm/internal/base/promise.cc) legitimately
+// survives a between-executions check_all_blocks.
+// NB: 50/51/52 are already taken by TAG_SCRATCHPAD/TAG_REPLACE_OB and the
+// package tags TAG_DB/TAG_INTERPRETER/TAG_PCRE_CACHE below (a pre-existing
+// set of collisions). 53 is genuinely free, per the uniqueness rule above:
+// duplicating a number merges the two in check_memory(1)'s per-tag totals
+// and lets one tag's blocks match the other's `case` in the unaccounted-
+// block classifier.
+static const int TAG_DEFERS = (TAG_PERMANENT + 53);
 static const int TAG_STRING = (TAG_DATA + 40);
 static const int TAG_MALLOC_STRING = (TAG_DATA + 41);
 static const int TAG_SHARED_STRING = (TAG_DATA + 42);
@@ -105,6 +118,7 @@ static const int TAG_MAP_NODE_BLOCK = (TAG_DATA + 46);
 static const int TAG_MAP_TBL = (TAG_DATA + 47);
 static const int TAG_BUFFER = (TAG_DATA + 48);
 static const int TAG_CLASS = (TAG_DATA + 49);
+static const int TAG_PROMISE = (TAG_DATA + 50);
 #ifdef PACKAGE_DB
 static const int TAG_DB = (TAG_PERMANENT + 50);
 #endif

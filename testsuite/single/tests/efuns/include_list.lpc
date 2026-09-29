@@ -1,0 +1,25 @@
+// include_list() reports every file this program actually #included
+// (nested includes included, first-seen order, duplicates dropped).
+// The main source is omitted. The configured global include file is
+// listed when it was opened -- in the testsuite that is <globals.h>,
+// which pulls in tests.h.
+//
+// Fixture: /clone/include_list_src.lpc.
+
+void do_tests() {
+  object ob;
+  string *l, *mine;
+
+  mine = include_list();
+  ASSERT_EQ(mine, include_list(this_object()));
+  ASSERT(member_array("/include/globals.h", mine) != -1);
+  ASSERT(member_array("/include/tests.h", mine) != -1);
+
+  ob = load_object("/clone/include_list_src");
+  ASSERT_EQ(3, ob->ok());
+
+  l = include_list(ob);
+  ASSERT_EQ(({ "/include/globals.h", "/include/tests.h",
+    "/clone/include_list_a.h", "/clone/include_list_nest.h",
+    "/clone/include_list_b.h" }), l);
+}

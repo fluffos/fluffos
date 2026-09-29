@@ -67,7 +67,7 @@ int valid_hide(object_t* obj) {
   }
   push_object(obj);
   ret = safe_apply_master_ob(APPLY_VALID_HIDE, 1);
-  return MASTER_APPROVED(ret);
+  return MASTER_APPROVED(ret, "valid_hide");
 }
 #endif
 
@@ -85,6 +85,29 @@ static void reset_restore_scratch() {
     FREE((char*)sizes);
     sizes = nullptr;
   }
+}
+
+// restore_array()/restore_mapping()/restore_class() recurse in lockstep
+// with the one-shot sizing pre-pass (restore_size()/restore_internal_size(),
+// which populates sizes[0..N-1] as it walks the string) ONLY as long as
+// both parsers agree on where each nested container starts. They are two
+// independent hand-written parsers over the same untrusted bytes, and a
+// malformed byte sequence can desync them -- e.g. parse_numeric() silently
+// treats whatever byte follows a numeral as an already-consumed delimiter
+// without validating it, so a numeral directly followed by a stray "({"
+// makes the real parse believe it has entered a nested array the sizing
+// pass never saw (it read that same span as one opaque scalar token via
+// its coarser "scan to the next delimiter" fallback). When that happens,
+// save_svalue_depth can exceed what the sizing pass ever populated --
+// `sizes` may still be null, or the depth may exceed max_depth -- and
+// indexing sizes[save_svalue_depth - 1] reads off the end of (or into a
+// null) allocation. Treat that as the malformed input it is.
+static bool get_restore_size(int* out) {
+  if (!sizes || save_svalue_depth > max_depth) {
+    return false;
+  }
+  *out = sizes[save_svalue_depth - 1];
+  return true;
 }
 
 int svalue_save_size(svalue_t* v) {
@@ -253,6 +276,7 @@ void save_svalue(svalue_t* v, char** buf) {
     }
     case T_OBJECT:
     case T_FUNCTION:
+    case T_PROMISE:
       // ignored
       break;
     default:
@@ -517,7 +541,15 @@ static int restore_interior_string(char** val, svalue_t* sv) {
         char* news = cp - 1;
 
         if ((*news++ = *cp++)) {
-          while ((c = *cp++) != '"') {
+          // The condition must stop on '\0' too, not just '"': an
+          // unterminated escaped string (no closing quote before the end
+          // of the buffer) otherwise falls into the plain-character branch
+          // below, which copies the NUL byte and keeps looping -- an
+          // unbounded read past the end of the allocation. The `if (c ==
+          // '\0')` check after the loop only catches this correctly once
+          // the loop itself can actually exit on NUL. (Sibling of the same
+          // bug in restore_hash_string(), mapping.cc.)
+          while ((c = *cp++) != '"' && c) {
             if (c == '\\') {
               if (!(*news++ = *cp++)) {
                 return ROB_STRING_ERROR;
@@ -693,7 +725,9 @@ static int restore_mapping(char** str, svalue_t* sv) {
   int err;
 
   if (save_svalue_depth) {
-    size = sizes[save_svalue_depth - 1];
+    if (!get_restore_size(&size)) {
+      return ROB_MAPPING_ERROR;
+    }
   } else if ((size = restore_size((const char**)str, 1)) < 0) {
     // A malformed / too-deeply-nested mapping must be reported as an error like
     // restore_array/restore_class do; returning 0 here signalled "success" yet
@@ -922,18 +956,30 @@ key_error:
 static int restore_class(char** str, svalue_t* ret) {
   int size;
   char c;
-  array_t* v;
   svalue_t* sv;
   char* cp = *str;
   int err;
 
   if (save_svalue_depth) {
-    size = sizes[save_svalue_depth - 1];
+    if (!get_restore_size(&size)) {
+      return ROB_CLASS_ERROR;
+    }
   } else if ((size = restore_size((const char**)str, 0)) < 0) {
     return ROB_CLASS_ERROR;
   }
 
-  v = allocate_class_by_size(size); /* after this point we have to clean up
+  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    // Same reasoning as restore_array()'s guard above: allocate_class_by_size()
+    // now validates and error()s cleanly on an out-of-range size (previously
+    // it didn't validate at all), but that error() still needs to run before
+    // it leaves save_svalue_depth/sizes[] dirty for the next restore.
+    reset_restore_scratch();
+  }
+  // Owned via RAII -- same reasoning as restore_array()'s v_owned above: a
+  // nested restore call below can throw and skip the goto-based `error:`
+  // cleanup, leaking this class.
+  std::unique_ptr<array_t, void (*)(array_t*)> v_owned(allocate_class_by_size(size), free_class);
+  array_t* v = v_owned.get(); /* after this point we have to clean up
                                          or we'll leak */
   sv = v->item;
 
@@ -1004,7 +1050,7 @@ static int restore_class(char** str, svalue_t* ret) {
 
   cp += 2;
   *str = cp;
-  ret->u.arr = v;
+  ret->u.arr = v_owned.release();
   ret->type = T_CLASS;
   return 0;
 /* something went wrong */
@@ -1014,25 +1060,40 @@ numeral_error:
 generic_error:
   err = ROB_CLASS_ERROR;
 error:
-  free_class(v);
   return err;
 }
 
 static int restore_array(char** str, svalue_t* ret) {
   int size;
   char c;
-  array_t* v;
   svalue_t* sv;
   char* cp = *str;
   int err;
 
   if (save_svalue_depth) {
-    size = sizes[save_svalue_depth - 1];
+    if (!get_restore_size(&size)) {
+      return ROB_ARRAY_ERROR;
+    }
   } else if ((size = restore_size((const char**)str, 0)) < 0) {
     return ROB_ARRAY_ERROR;
   }
 
-  v = allocate_array(size); /* after this point we have to clean up
+  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
+    // Unlike the two restore_mapping() error sites, allocate_array()'s own
+    // "Illegal array size" error() below was unguarded: it skips
+    // restore_svalue()'s cleanup the same way OOM/mapping-too-large do,
+    // leaving save_svalue_depth/sizes[] dirty for the *next* restore_svalue()
+    // call, which can then read a stale/uninitialized sizes[] entry.
+    reset_restore_scratch();
+  }
+  // Owned via RAII: a nested restore_mapping()/restore_array()/
+  // restore_class() call below can itself throw (a deeper oversized
+  // element, OOM, mapping-too-large), which would skip the goto-based
+  // `error:` cleanup entirely and leak this array. The destructor covers
+  // every exit uniformly, so the explicit free_array() at `error:` below
+  // is no longer needed either.
+  std::unique_ptr<array_t, void (*)(array_t*)> v_owned(allocate_array(size), free_array);
+  array_t* v = v_owned.get(); /* after this point we have to clean up
                                  or we'll leak */
   sv = v->item;
 
@@ -1103,7 +1164,7 @@ static int restore_array(char** str, svalue_t* ret) {
 
   cp += 2;
   *str = cp;
-  ret->u.arr = v;
+  ret->u.arr = v_owned.release();
   ret->type = T_ARRAY;
   return 0;
 /* something went wrong */
@@ -1113,7 +1174,6 @@ numeral_error:
 generic_error:
   err = ROB_ARRAY_ERROR;
 error:
-  free_array(v);
   return err;
 }
 
@@ -1306,7 +1366,7 @@ static int safe_restore_svalue(char* cp, svalue_t* v) {
   return 0;
 }
 
-static int fgv_recurse(program_t* prog, int* idx, const char* name, unsigned short* type,
+static int fgv_recurse(program_t* prog, int* idx, const char* name, lpc_type_t* type,
                        int check_nosave) {
   int i;
   for (i = 0; i < prog->num_inherited; i++) {
@@ -1328,7 +1388,7 @@ static int fgv_recurse(program_t* prog, int* idx, const char* name, unsigned sho
   return 0;
 }
 
-int find_global_variable(program_t* prog, const char* const name, unsigned short* type,
+int find_global_variable(program_t* prog, const char* const name, lpc_type_t* type,
                          int check_nosave) {
   int idx = 0;
   const char* str = findstring(name);
@@ -1347,7 +1407,7 @@ void restore_object_from_line(object_t* ob, char* line, int noclear) {
   int idx;
   svalue_t* sv = ob->variables;
   int rc;
-  unsigned short t;
+  lpc_type_t t;
 
   if (line[0] == '#') { /* ignore 'comments' in savefiles */
     return;
@@ -1913,6 +1973,8 @@ void restore_variable(svalue_t* var, char* str) {
       error("restore_object(): Illegal string format.\n");
     } else if (rc & ROB_STRING_UTF8_ERROR) {
       error("restore_object(): string is not valid utf8.\n");
+    } else if (rc & ROB_CLASS_ERROR) {
+      error("restore_object(): Illegal class format.\n");
     }
   }
 }
@@ -1939,6 +2001,19 @@ void dealloc_object(object_t* ob, const char* from) {
    * declarations.
    */
   if (ob->prog) {
+    /* Release the variable block's CONTENTS while prog (the count) is
+     * still around. On the normal teardown path destruct2() already
+     * zeroed them, but an object whose ref count drops to 0 while still
+     * on the destruct queue (before its remove_destructed_objects()
+     * sweep) arrives here with the contents intact -- freeing just the
+     * block leaked every reference the globals held. A variable
+     * containing this very object is safe: its ref is already 0, so
+     * int_free_svalue's underflow guard makes the nested free a no-op. */
+    if (ob->variables) {
+      for (int i = 0; i < ob->prog->num_variables_total; i++) {
+        free_svalue(&ob->variables[i], "dealloc_object");
+      }
+    }
     tot_alloc_object_size -=
         (ob->prog->num_variables_total - 1) * sizeof(svalue_t) + sizeof(object_t);
     free_prog(&ob->prog);
@@ -1965,20 +2040,26 @@ void dealloc_object(object_t* ob, const char* from) {
     FREE((char*)ob->obname);
     SETOBNAME(ob, nullptr);
   }
-#ifdef DEBUG
-  // obj_list_destruct (destruct_object()'s "not yet swept by
-  // remove_destructed_objects()" queue, simulate.cc) is NOT gated by
-  // DEBUG, unlike obj_list_dangling below -- but in a DEBUG build the two
-  // lists happen to share this object's next_all/prev_all storage
-  // (destruct_object() pushes onto both, one right after the other, so
-  // the two chains are always structurally identical until something is
-  // unlinked). The neighbor fixup the obj_list_dangling unlink below
-  // performs therefore already keeps the underlying chain correct for
-  // obj_list_destruct's own forward walk too; only its separate head
-  // *variable* needs updating here.
+  // Unlink from the destruct queue if this object is still awaiting its
+  // remove_destructed_objects() sweep -- an early drop to ref 0 (e.g.
+  // reclaim_objects() freeing a stray reference to a destructed object)
+  // reaches here first, and leaving it queued would have the sweep call
+  // destruct2() on freed memory (an ASan-confirmed heap-use-after-free).
+  // The queue lives on its own next_destruct link, so this unlink can
+  // never disturb next_all/prev_all (which DEBUG builds use below for the
+  // obj_list_dangling leak-hunting list).
   if (obj_list_destruct == ob) {
-    obj_list_destruct = ob->next_all;
+    obj_list_destruct = ob->next_destruct;
+  } else if (obj_list_destruct) {
+    for (object_t* q = obj_list_destruct; q->next_destruct; q = q->next_destruct) {
+      if (q->next_destruct == ob) {
+        q->next_destruct = ob->next_destruct;
+        break;
+      }
+    }
   }
+  ob->next_destruct = nullptr;
+#ifdef DEBUG
   prev_all = ob->prev_all;
   if (prev_all) {
     prev_all->next_all = ob->next_all;
@@ -1994,27 +2075,6 @@ void dealloc_object(object_t* ob, const char* from) {
   ob->next_all = 0;
   ob->prev_all = 0;
   tot_dangling_object--;
-#else
-  // No obj_list_dangling bookkeeping exists in this build to perform the
-  // equivalent neighbor fixup as a side effect (see the DEBUG branch
-  // above), so unlink from obj_list_destruct explicitly here. Otherwise a
-  // later destruct_object() call anywhere in the driver can dereference
-  // this object's now-freed address via a stale obj_list_destruct head or
-  // a neighbor's stale next_all/prev_all -- a real, ASan-confirmed
-  // heap-use-after-free (reachable via reclaim_objects() freeing a stray
-  // reference to a destructed object still queued mid-chain, or simply an
-  // object whose only reference drops immediately after destruct()).
-  if (obj_list_destruct == ob) {
-    obj_list_destruct = ob->next_all;
-    if (obj_list_destruct) {
-      obj_list_destruct->prev_all = nullptr;
-    }
-  } else if (ob->prev_all) {
-    ob->prev_all->next_all = ob->next_all;
-    if (ob->next_all) {
-      ob->next_all->prev_all = ob->prev_all;
-    }
-  }
 #endif
   tot_alloc_object--;
   FREE((char*)ob);

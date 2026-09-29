@@ -40,13 +40,13 @@ const wide = formatLPC(source, { printWidth: 120 });    // default 100
 const four = formatLPC(source, { indentSize: 4 });      // default 2
 ```
 
-In VS Code, the extension (developed in the
+In VS Code / Cursor, the extension (developed in the
 [fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode)
 repo, which builds it from this engine via a pinned fluffos submodule)
 provides *Format Document* and format-on-save with the same engine,
 configured
 by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
-(default 2).
+(default 2). Install steps: [development environment](dev-environment).
 
 ## Options
 
@@ -66,7 +66,9 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 * Empty blocks collapse to `{}`.
 * Trailing `//` comments get at least two spaces before them; a wider
   hand-aligned gap is kept exactly.
-* Preprocessor directives move to column 0.
+* Preprocessor directives move to column 0. `#include` and `inherit`
+  keep the order they were written — includes may sit both before
+  and after inherit. They are not hoisted, sorted, or regrouped.
 * A rendered line longer than `printWidth` is split at its outermost
   bracket group (call arguments, array/mapping elements), one element
   per line, recursively as needed.
@@ -76,6 +78,12 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 The formatter follows the source instead of canonicalizing both ways —
 the opposite of clang-format's full reflow:
 
+* **Statement order.** The non-whitespace token sequence is an
+  invariant — `#include`, `inherit`, declarations, and everything
+  else stay in source order. A later include is never hoisted
+  above inherit (`#include <ansi.h>` / `inherit NPC;` /
+  `#include "fight.h"`). `formatLPC` throws if a pass would
+  reorder tokens.
 * **Your line breaks.** A one-line block stays one line (if it fits);
   a multi-line call or declaration keeps its layout, including whether
   the closing `)` / `");` / `});` is glued to the last element or on
@@ -110,19 +118,31 @@ Every write through `format.sh` / `format-corpus.mjs` is gated; a file
 that would violate any of these is reported, left untouched, and the
 run exits nonzero:
 
-1. **Token-sequence equivalence** — the output re-tokenizes to exactly
+1. **Clean lex** — the input must tokenize without hitting end-of-file
+   inside a string, char literal, template literal, block comment, or
+   text block. Each of those is a hard lexerror in the driver
+   (`src/compiler/internal/lexer.l`, "End of file in string" etc.), so
+   such a file has no well-defined token stream — e.g. one stray
+   unbalanced `"` inverts string/code sense for the whole rest of the
+   file, and "formatting" the inverted regions shreds real string
+   content. `formatLPC` throws instead of producing output. This gate
+   exists because the token-equivalence check below cannot catch it:
+   input and output mis-lex identically, so both sides compare clean.
+2. **Token-sequence equivalence** — the output re-tokenizes to exactly
    the input's token kinds and spellings; the formatter cannot change
    what the compiler sees.
-2. **Literal byte-identity** — every string/template/heredoc/char/
+3. **Literal byte-identity** — every string/template/heredoc/char/
    comment/directive token's content is byte-identical.
-3. **Idempotency** — formatting the output again reproduces it
+4. **Idempotency** — formatting the output again reproduces it
    exactly.
 
-Deliberately malformed fixtures that are not valid text (the two
-raw-byte bad-UTF-8 compiler fixtures under
-`testsuite/single/tests/compiler/fail/`) are excluded by
-`testsuite/format.sh`; anything the tokenizer cannot fully understand
-is refused rather than guessed at.
+Deliberately malformed fixtures under
+`testsuite/single/tests/compiler/fail/` are excluded by
+`testsuite/format.sh`: the two raw-byte bad-UTF-8 fixtures (not valid
+text), and the three deliberately-unterminated EOF-lexerror fixtures
+(`eof_in_string.lpc`, `eof_in_comment.lpc`, `bad_at_block.lpc`) that
+guarantee 1 refuses by design; anything the tokenizer cannot fully
+understand is refused rather than guessed at.
 
 Beyond the built-in gates, formatter changes are validated against the
 real driver: the whole reformatted testsuite must still pass

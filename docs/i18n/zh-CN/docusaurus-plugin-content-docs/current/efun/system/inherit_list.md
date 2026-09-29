@@ -17,7 +17,7 @@ title: system / inherit_list
 
 ### 参考
 
-    deep_inherit_list(3), inherits(3)
+    deep_inherit_list(3), inherits(3), include_list(3)
 
 ### 翻译
 

@@ -775,9 +775,63 @@
         "items": [
           {
             "type": "doc",
+            "id": "efun/external/external_close",
+            "key": "efun/external/external_close",
+            "label": "external_close"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_close_stdin",
+            "key": "efun/external/external_close_stdin",
+            "label": "external_close_stdin"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_create",
+            "key": "efun/external/external_create",
+            "label": "external_create"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_exit_code",
+            "key": "efun/external/external_exit_code",
+            "label": "external_exit_code"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_kill",
+            "key": "efun/external/external_kill",
+            "label": "external_kill"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_run",
+            "key": "efun/external/external_run",
+            "label": "external_run"
+          },
+          {
+            "type": "doc",
             "id": "efun/external/external_start",
             "key": "efun/external/external_start",
             "label": "external_start"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_stderr",
+            "key": "efun/external/external_stderr",
+            "label": "external_stderr"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_stdout",
+            "key": "efun/external/external_stdout",
+            "label": "external_stdout"
+          },
+          {
+            "type": "doc",
+            "id": "efun/external/external_write",
+            "key": "efun/external/external_write",
+            "label": "external_write"
           }
         ]
       },
@@ -2397,9 +2451,27 @@
           },
           {
             "type": "doc",
+            "id": "efun/pcre/pcre_config",
+            "key": "efun/pcre/pcre_config",
+            "label": "pcre_config"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_convert",
+            "key": "efun/pcre/pcre_convert",
+            "label": "pcre_convert"
+          },
+          {
+            "type": "doc",
             "id": "efun/pcre/pcre_extract",
             "key": "efun/pcre/pcre_extract",
             "label": "pcre_extract"
+          },
+          {
+            "type": "doc",
+            "id": "efun/pcre/pcre_info",
+            "key": "efun/pcre/pcre_info",
+            "label": "pcre_info"
           },
           {
             "type": "doc",
@@ -2430,6 +2502,109 @@
             "id": "efun/pcre/pcre_version",
             "key": "efun/pcre/pcre_version",
             "label": "pcre_version"
+          }
+        ]
+      },
+      {
+        "type": "category",
+        "key": "efun/promises",
+        "label": "Promises",
+        "link": {
+          "type": "generated-index",
+          "title": "Promises",
+          "slug": "/efun/promises/",
+          "description": "Native promises: the eventual results of asynchronous operations, consumed with async/await or then-chaining."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/promises/async_info",
+            "key": "efun/promises/async_info",
+            "label": "async_info"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/async_yield",
+            "key": "efun/promises/async_yield",
+            "label": "async_yield"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_all",
+            "key": "efun/promises/promise_all",
+            "label": "promise_all"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_all_settled",
+            "key": "efun/promises/promise_all_settled",
+            "label": "promise_all_settled"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_any",
+            "key": "efun/promises/promise_any",
+            "label": "promise_any"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_cancel",
+            "key": "efun/promises/promise_cancel",
+            "label": "promise_cancel"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_catch",
+            "key": "efun/promises/promise_catch",
+            "label": "promise_catch"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_create",
+            "key": "efun/promises/promise_create",
+            "label": "promise_create"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_race",
+            "key": "efun/promises/promise_race",
+            "label": "promise_race"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_reject",
+            "key": "efun/promises/promise_reject",
+            "label": "promise_reject"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_resolve",
+            "key": "efun/promises/promise_resolve",
+            "label": "promise_resolve"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_result",
+            "key": "efun/promises/promise_result",
+            "label": "promise_result"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_status",
+            "key": "efun/promises/promise_status",
+            "label": "promise_status"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promise_then",
+            "key": "efun/promises/promise_then",
+            "label": "promise_then"
+          },
+          {
+            "type": "doc",
+            "id": "efun/promises/promisep",
+            "key": "efun/promises/promisep",
+            "label": "promisep"
           }
         ]
       },
@@ -2769,6 +2944,12 @@
             "id": "efun/system/function_profile",
             "key": "efun/system/function_profile",
             "label": "function_profile"
+          },
+          {
+            "type": "doc",
+            "id": "efun/system/include_list",
+            "key": "efun/system/include_list",
+            "label": "include_list"
           },
           {
             "type": "doc",
@@ -3664,6 +3845,12 @@
             "id": "concepts/general/websocket",
             "key": "concepts/general/websocket",
             "label": "WebSocket"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/async",
+            "key": "concepts/general/async",
+            "label": "Async and Promises"
           },
           {
             "type": "doc",

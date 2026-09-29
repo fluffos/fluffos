@@ -10,6 +10,7 @@ title: async / async_read
 ### SYNOPSIS
 
     void async_read( string file, function callback );
+    promise async_read( string file );
 
 ### DESCRIPTION
 
@@ -23,6 +24,13 @@ title: async / async_read
             // -1 for file not read
             // string file contents otherwise
         }
+
+
+    With the callback OMITTED, returns a promise instead: fulfilled with
+    the file's contents, or rejected with the negative int the callback
+    would have received on failure. Inside an async function:
+
+        string s = await async_read( "/log/access" );
 
 ### NOTE
 

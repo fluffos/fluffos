@@ -1,0 +1,191 @@
+// sizeof() on a string counts grapheme clusters. Pure-ASCII strings take a
+// fast path that answers from the byte length, and counted strings memoize
+// "am I ASCII?" in their block header (MSTR_ASCII_*, src/base/internal/
+// stralloc.h) so repeat queries are O(1).
+//
+// These tests exist to catch a STALE cached tag: every case below asks for
+// sizeof() BEFORE mutating, so the tag is already populated, then mutates and
+// asks again. A cache that failed to invalidate would return the pre-mutation
+// answer.
+void do_tests() {
+  string s;
+  string wide;
+
+  // --- baseline: ASCII is one cluster per byte ---
+  s = "hello";
+  ASSERT_EQ(5, sizeof(s));
+  ASSERT_EQ(5, sizeof(s));  // again: served from the cache
+
+  ASSERT_EQ(0, sizeof(""));
+
+  // --- CR-LF is ONE grapheme cluster (UAX #29 GB3), so a CR-bearing string
+  // must not take the byte-length path ---
+  s = "a\r\nb";
+  ASSERT_EQ(3, sizeof(s));  // 'a', CRLF, 'b' -- not 4
+  ASSERT_EQ(3, sizeof(s));
+  s = "a\rb";  // lone CR is its own cluster
+  ASSERT_EQ(3, sizeof(s));
+
+  // --- non-ASCII counts clusters, not bytes ---
+  wide = "你好";  // 你好: 2 clusters, 6 bytes
+  ASSERT_EQ(2, sizeof(wide));
+  ASSERT_EQ(2, sizeof(wide));
+
+  // --- ASCII, then grow it with non-ASCII: the tag must be re-evaluated ---
+  s = "abc";
+  ASSERT_EQ(3, sizeof(s));  // populate the cache as ASCII
+  s += wide;
+  ASSERT_EQ(5, sizeof(s));  // 3 + 2 clusters, NOT 3 + 6 bytes
+
+  // --- the in-place realloc path: a MALLOC string with refcount 1 is grown
+  // by extend_string() rather than reallocated fresh, so the tag must be
+  // invalidated there specifically. Build one at runtime so it is neither a
+  // shared literal nor multiply referenced. ---
+  s = "";
+  for (int i = 0; i < 5; i++) {
+    s += "a";
+  }
+  ASSERT_EQ(5, sizeof(s));  // populate the cache as ASCII
+  s += wide;                // grows in place
+  ASSERT_EQ(7, sizeof(s));  // 5 + 2 clusters, NOT 5 + 6 bytes
+
+  // --- the CR-LF seam: concatenation propagates the tag as
+  // ascii(a+b) == ascii(a) && ascii(b), which is only exact because a CR
+  // disqualifies a string outright. Joining "...\r" with "\n..." forms one
+  // CRLF cluster ACROSS the seam, so a propagated "both ASCII" would be a
+  // wrong answer here -- both sides must already be tagged non-ASCII. ---
+  s = "a\r";
+  ASSERT_EQ(2, sizeof(s));  // tag it before joining
+  s += "\nb";
+  ASSERT_EQ(3, sizeof(s));  // 'a', CRLF, 'b' -- not 4
+
+  // --- <non-string> + string takes a THIRD concat path in f_add
+  // (SVALUE_STRING_ADD_LEFT, for int/float/object on the left), which builds
+  // the result fresh instead of extending either operand. The left operand is
+  // held in a variable so the expression cannot be constant-folded away before
+  // f_add ever runs.
+  //
+  // Cluster counts here are correct whether or not the tag is propagated -- an
+  // untagged result just gets rescanned. What this pins is the direction that
+  // would NOT be self-correcting: propagating "ASCII" across a seam that forms
+  // a CRLF, which would answer from the byte length and be wrong. ---
+  int n = 12;
+  s = n + "abc";
+  ASSERT_EQ("12abc", s);
+  ASSERT_EQ(5, sizeof(s));
+  s = n + wide;  // non-ASCII on the right must not come back tagged ASCII
+  ASSERT_EQ(2 + sizeof(wide), sizeof(s));
+  n = 1;
+  s = n + "\r\nb";  // '1', CRLF, 'b' -- a propagated "ASCII" would say 4
+  ASSERT_EQ(3, sizeof(s));
+
+  // --- non-ASCII, then reduced back to ASCII ---
+  s = wide + "xy";
+  ASSERT_EQ(4, sizeof(s));
+  s = s[2..3];
+  ASSERT_EQ(2, sizeof(s));
+
+  // --- write a non-ASCII codepoint through a string-char lvalue after the
+  // string has been cached as ASCII ---
+  s = "abc";
+  ASSERT_EQ(3, sizeof(s));
+  s[1] = 20320;             // U+4F60 你 -- character constants are ASCII-only
+  ASSERT_EQ(3, sizeof(s));  // still 3 clusters, now 5 bytes
+  ASSERT_EQ(20320, s[1]);
+
+  // --- and the reverse: cached as non-ASCII, then overwritten with ASCII ---
+  s = "a你c";
+  ASSERT_EQ(3, sizeof(s));
+  s[1] = 'b';
+  ASSERT_EQ(3, sizeof(s));
+  ASSERT_EQ("abc", s);
+
+  // --- indexing and ranges agree with the cluster count on both paths ---
+  s = "0123456789";
+  ASSERT_EQ(10, sizeof(s));
+  ASSERT_EQ('5', s[5]);
+  ASSERT_EQ("345", s[3..5]);
+  ASSERT_EQ('9', s[<1]);
+
+  wide = "你好世";  // 你好世
+  ASSERT_EQ(3, sizeof(wide));
+  ASSERT_EQ("好", wide[1..1]);
+  ASSERT_EQ("世", wide[<1..]);
+
+  // --- a shared string (interned) reused via a second reference keeps a
+  // correct tag ---
+  s = "shared literal";
+  ASSERT_EQ(14, sizeof(s));
+  ASSERT_EQ(14, sizeof("shared literal"));
+
+  // --- in-place range assignment (same-byte-length replacement) mutates the
+  // string's bytes directly via strncpy in assign_lvalue_range() /
+  // copy_lvalue_range() (interpret.cc), rather than through extend_string()
+  // or new_string() -- the two places that otherwise reset MSTR_ASCII. If
+  // the destination was already tagged ASCII, splicing in non-ASCII bytes of
+  // the SAME byte length would leave a stale cached tag: sizeof() would
+  // answer from the (unchanged) byte length instead of rescanning.
+  //
+  // "a" and "b" are plain string LOCAL VARIABLES (not a literal concat
+  // expression) so the compiler cannot constant-fold "a + b" -- it must go
+  // through the real runtime SVALUE_STRING_JOIN path and allocate a fresh
+  // STRING_MALLOC buffer with ref==1, tagged ASCII via concatenation
+  // propagation. Critically, push_lvalue_range()'s unlink_string_svalue() is
+  // a no-op for an already-unshared (ref==1) STRING_MALLOC string, so the
+  // cached tag survives into the in-place mutation below untouched.
+  //
+  // Covers both C++ implementations of the in-place branch: the
+  // void-statement path (copy_lvalue_range, `s[0..1] = x;` as a full
+  // statement) and the used-as-expression-value path (assign_lvalue_range,
+  // the assignment's result consumed by an enclosing expression). ---
+  {
+    string a = "hello ";
+    string b = "world";
+    s = a + b;                 // fresh STRING_MALLOC, ref==1, tag=ASCII via join
+    ASSERT_EQ(11, sizeof(s));
+    s[0..1] = "\xc3\xa9";       // 2-byte UTF-8 char (é, U+00E9), same byte length as "he"
+    ASSERT_EQ(10, sizeof(s));  // 1 wide cluster + 9 ascii clusters, NOT 11 (stale byte length)
+  }
+  {
+    string a = "hello ";
+    string b = "world";
+    string result;
+    s = a + b;
+    ASSERT_EQ(11, sizeof(s));
+    result = (s[0..1] = "\xc3\xa9");  // used as a value -> assign_lvalue_range
+    ASSERT_EQ("\xc3\xa9", result);
+    ASSERT_EQ(10, sizeof(s));
+  }
+
+  // --- replace_string()'s single-byte in-place branch (pattern length 1,
+  // replacement length 1) writes the replacement byte straight into the
+  // unlinked buffer and, alone among the in-place branches, never reaches
+  // extend_string() -- so nothing resets the cached ASCII tag. Every valid
+  // 1-byte replacement is ASCII, but "\r" is the one that breaks the
+  // byte==cluster identity: splicing it in front of an existing "\n" forms a
+  // single CRLF cluster while the byte length is unchanged.
+  //
+  // The argument is a runtime `a + b` temp: a fresh STRING_MALLOC with
+  // ref==1, tagged ASCII by concat propagation, which unlink_string_svalue()
+  // passes through untouched -- exactly the shape that carries a stale tag
+  // out of the efun. ---
+  {
+    string a = "xy";
+    string b = "\nz";
+    s = replace_string(a + b, "y", "\r");  // "x\r\nz": 4 bytes, 3 clusters
+    ASSERT_EQ(3, sizeof(s));               // 'x', CRLF, 'z' -- not 4
+  }
+
+  // --- map() over a string (map_string) writes each callback return value
+  // straight into the unlinked buffer -- any byte, including '\r' -- and
+  // never reallocates, so nothing on that path resets the cached ASCII tag
+  // either. Same stale-tag shape as above: ASCII-tagged ref==1 temp in,
+  // CR spliced in place, byte length unchanged. ---
+  {
+    string a = "xy";
+    string b = "\nz";
+    s = map(a + b, (: $1 == 'y' ? 13 : 0 :));  // 'y' -> '\r'
+    ASSERT_EQ("x\r\nz", s);
+    ASSERT_EQ(3, sizeof(s));  // 'x', CRLF, 'z' -- not 4
+  }
+}

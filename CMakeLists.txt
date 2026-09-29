@@ -128,7 +128,8 @@ set_tests_properties(testsuite PROPERTIES
         PASS_REGULAR_EXPRESSION "Checks succeeded\\."
         FAIL_REGULAR_EXPRESSION "\\[  FAILED  \\]"
         TIMEOUT 600
-        LABELS "testsuite")
+        LABELS "testsuite"
+        RESOURCE_LOCK "fluffos_external_ports")
 
 # lpcshell drives the REPL binary itself in script mode against the same
 # mudlib: the wrapping it is being tested for (deciding whether typed text
@@ -175,3 +176,47 @@ set_tests_properties(lpcshell-predefine PROPERTIES
         PASS_REGULAR_EXPRESSION "LPCSHELL_PREDEFINED"
         TIMEOUT 120
         LABELS "lpcshell")
+
+# Regression guard for a heap-use-after-free at clean process exit: a
+# statement that compiles successfully but produces a warning WITH an
+# attached fix-it (compiler_pending_fixits -> Diagnostic::fixits, a
+# ScratchVector), and nothing evaluated afterward. compiler_diags (holding
+# that Diagnostic) is only ever dropped at the TOP of the next Eval() --
+# there is no next call here, so it is still holding it, backed by
+# Session::arena, when main() returns and destroys `session`. Without
+# Session::~Session() calling compiler_drop_arena_state() first,
+# ~ScratchArena() frees the arena's chunks while compiler_diags' elements
+# still reference them, and destroying compiler_diags at static-teardown
+# (g_compile's) reads freed memory -- confirmed under ASan as a
+# heap-use-after-free in Diagnostic::FixIt::~FixIt().
+#
+# (A warning with only plain ScratchString fields -- no populated
+# ScratchVector member such as notes/expansions/fixits/ranges/included_from
+# -- would NOT reproduce this: destroying a ScratchString never dereferences
+# its own buffer, only a non-empty ScratchVector's destructor walks its
+# arena-allocated backing array to destroy each element.)
+add_test(NAME lpcshell-warning-at-exit
+        COMMAND $<TARGET_FILE:lpcshell> etc/config.test lpcshell/warning_at_exit.lpcs
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/testsuite")
+set_tests_properties(lpcshell-warning-at-exit PROPERTIES
+        PASS_REGULAR_EXPRESSION "Unknown escape sequence"
+        TIMEOUT 120
+        LABELS "lpcshell")
+
+# Issue #1395: sys_reload_tls() on a websocket TLS port must present a
+# newly written on-disk cert to the next handshake. GTest and the LPC
+# suite cannot inspect the peer certificate; this Node+openssl client
+# is the gate. Label `websocket` so `ctest -LE testsuite` (CI unit tests)
+# still runs it. RESOURCE_LOCK shares the config.test ports with the LPC
+# suite. Skipped when node or openssl is missing (Windows CI).
+find_program(NODE_EXECUTABLE node)
+find_program(OPENSSL_EXECUTABLE openssl)
+if (NODE_EXECUTABLE AND OPENSSL_EXECUTABLE)
+  add_test(NAME ws-tls-reload
+          COMMAND "${NODE_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/ws-tls-reload.js"
+                  $<TARGET_FILE:driver> "${CMAKE_SOURCE_DIR}/testsuite")
+  set_tests_properties(ws-tls-reload PROPERTIES
+          TIMEOUT 90
+          LABELS "websocket"
+          RESOURCE_LOCK "fluffos_external_ports")
+endif ()

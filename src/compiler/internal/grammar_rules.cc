@@ -4,7 +4,7 @@
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 #include "debugger/debug_hook.h"
@@ -51,7 +51,7 @@ bool rule_inheritence(parse_node_t** result_node, int type_mod,
     p = strput(buf, end, "Multiple access modifiers (");
     p = get_type_modifiers(p, end, acc_mod);
     p = strput(p, end, ") for inheritance");
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 #endif
 
@@ -166,7 +166,7 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
 #endif
   pending_func_decl_line = current_line_base + current_line;
   func_present = 1;
-  flags = (type >> 16);
+  flags = PACKED_TYPE_MODS(type);
 
   flags |= global_modifiers;
 
@@ -180,7 +180,7 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
     p = strput(buf, end, "Multiple access modifiers (");
     p = get_type_modifiers(p, end, flags);
     p = strput(p, end, ") for function");
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 #endif
 
@@ -191,14 +191,26 @@ LPC_INT rule_func_type(LPC_INT type, LPC_INT optional_star, const ScratchString*
     flags &= ~DECL_NOSAVE;
   }
 #endif
-  type = (flags << 16) | (type & 0xffff);
+  /* the body about to be parsed may (or may not) use await/acatch */
+  compiling_async_function = (flags & FUNC_ASYNC) != 0;
+  type = PACK_TYPE_MODS(flags) | PACKED_TYPE_BASIC(type);
+  /* A function definition starts here, so a NEW frame starts here: restart
+   * slot numbering. Inside a file this matters only after a global
+   * initializer, which shares __INIT's single frame and therefore leaves
+   * max_num_locals climbing (see rule_def_global_var); without this reset the
+   * first function after such an initializer had its parameters allocated
+   * above the initializer's locals while the VM kept pushing arguments at
+   * 0..n-1, and returned the wrong values with no diagnostic. Harmless
+   * everywhere else -- rule_func() already resets on the way out. */
+  free_all_local_names(0);
+
   /* Handle type checking here so we know whether to typecheck
      'argument' */
-  if (type & 0xffff) {
+  if (PACKED_TYPE_BASIC(type)) {
     if (CONFIG_INT(__RC_OLD_TYPE_BEHAVIOR__)) {
       exact_types = 0;
     } else {
-      exact_types = (type & 0xffff) | optional_star;
+      exact_types = PACKED_TYPE_BASIC(type) | optional_star;
     }
   } else {
     if (pragmas & PRAGMA_STRICT_TYPES) {
@@ -233,9 +245,10 @@ LPC_INT rule_func_proto(LPC_INT type, LPC_INT optional_star, const ScratchString
   if (argument.flags & ARG_IS_VARARGS) {
     func_types |= (FUNC_TRUE_VARARGS | FUNC_VARARGS);
   }
-  func_types |= (type >> 16);
+  func_types |= PACKED_TYPE_MODS(type);
 
-  define_new_function(shared, argument.num_arg, 0, func_types, (type & 0xffff) | optional_star);
+  define_new_function(shared, argument.num_arg, 0, func_types,
+                      PACKED_TYPE_BASIC(type) | optional_star);
   /* Dropping our ref is safe: the function table's ref keeps the shared
      string alive, so *shared_name_out can't be dangling. */
   free_string(shared);
@@ -262,7 +275,7 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
 
     // Creating functions for argument defaults
     fun = define_new_function(identifier, argument.num_arg, max_num_locals - argument.num_arg,
-                              *func_types, (type & 0xffff) | optional_star);
+                              *func_types, PACKED_TYPE_BASIC(type) | optional_star);
     if (fun != -1) {
       // Snapshot local/argument names for the debugger's variable inspector
       // (DESIGN.md §9) before free_all_local_names() discards them below.
@@ -333,9 +346,20 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
               return;
             }
             FUNCTION_DEF(fun)->min_arg--;
-            // TODO: generate a unique name for the function
-            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), get_current_time(), identifier,
-                                        local.ihe->name, local.ihe->name);
+            // The helper's name must be unique across the whole inherit
+            // chain: it is defined DECL_NOMASK, so a parent and child both
+            // defining foo(int a: (: ... :)) with colliding helper names is
+            // an "Illegal to redefine 'nomask' function" compile error.
+            // A wall-clock timestamp only disambiguated compiles that
+            // happened in DIFFERENT seconds -- overriding an inherited
+            // default-arg function failed whenever parent and child
+            // compiled within the same second (the normal case), and
+            // compiles were unreproducible byte-wise. A process-global
+            // counter is unique for every compile in the process and
+            // deterministic given compile order.
+            static uint64_t default_arg_seq = 0;
+            auto funcname = fmt::format(FMT_STRING("#__{}_{}_{}"), ++default_arg_seq, identifier,
+                                        local.ihe->name);
             // the funcnum here will change in epilog().
             auto funcnum = define_new_function(
                 funcname.c_str(), 0, 0,
@@ -374,6 +398,7 @@ void rule_func(parse_node_t** function, LPC_INT type, LPC_INT optional_star, con
       *function = 0;
   } else
     *function = 0;
+  compiling_async_function = 0;
   free_all_local_names(!!(*block_or_semi));
 }
 
@@ -447,14 +472,33 @@ void rule_define_class_members(struct ident_hash_elem_t* class_ihe, LPC_INT clas
 
 LPC_INT rule_loop_open() {
   LPC_INT saved = context;
-  context = LOOP_CONTEXT;
+  /* NO_SUSPEND_CONTEXT survives loop entry (a loop nested inside
+   * catch{}/time_expression{} still cannot park), while SPECIAL_CONTEXT
+   * does NOT: break/continue targeting this loop never crosses the catch
+   * boundary, and rejecting it would break ordinary mudlib code. */
+  context = (context & NO_SUSPEND_CONTEXT) | LOOP_CONTEXT;
   return saved;
 }
 
 LPC_INT rule_special_context_open() {
-  LPC_INT saved = context;
-  context = SPECIAL_CONTEXT;
+  LPC_INT saved = PACK_SAVED_CONTEXT(context, current_type);
+  /* catch{} / time_expression{}: break/continue may not cross out of it
+   * (SPECIAL_CONTEXT), and nothing inside may suspend, at any nesting
+   * depth (NO_SUSPEND_CONTEXT, which loops/switches carry through) */
+  context = SPECIAL_CONTEXT | NO_SUSPEND_CONTEXT;
   return saved;
+}
+
+LPC_INT rule_tree_context_open() {
+  /* __TREE__ {} needs the SAVED value (so rule_tree_block can put
+   * current_type back) and nothing else. It must not borrow
+   * rule_special_context_open(), which also SETS
+   * context = SPECIAL_CONTEXT | NO_SUSPEND_CONTEXT: __TREE__ discards the
+   * block's code entirely and imposes no restriction of its own, so doing
+   * that made `break`/`continue` inside a __TREE__ block in a loop, and
+   * `await` inside one, compile errors -- reported against constructs the
+   * source never mentions. AGENTS.md section 13 item 22. */
+  return PACK_SAVED_CONTEXT(context, current_type);
 }
 
 LPC_INT rule_block_open() { return (LPC_INT)current_number_of_locals; }
@@ -474,12 +518,21 @@ void rule_program_append(parse_node_t** result, parse_node_t* prog, parse_node_t
   CREATE_TWO_VALUES(*result, 0, prog, def);
 }
 
-void rule_tree_block(parse_node_t** result, parse_node_t* block_node) {
+void rule_tree_block(parse_node_t** result, decl_t decl_val, LPC_INT saved_context) {
+  /* __TREE__ {} is a block in EXPRESSION position, so it owes the same two
+   * duties as catch {} and time_expression {}: pop the block's
+   * locals (rule_expr_or_block_block explains what leaking them costs), and
+   * put back the current_type the enclosing declarator is about to read.
+   * It was the last such production doing neither -- reachable only on
+   * DEBUG builds, since L_TREE is registered under #ifdef DEBUG, but that
+   * is a CI configuration. */
+  pop_n_locals(decl_val.num);
+  context = SAVED_CONTEXT_FLAGS(saved_context);
+  current_type = SAVED_CONTEXT_TYPE(saved_context);
 #ifdef DEBUG
   *result = new_node_no_line();
-  lpc_tree_form(block_node, *result);
+  lpc_tree_form(decl_val.node, *result);
 #else
-  (void)block_node;
   *result = nullptr;
 #endif
 }

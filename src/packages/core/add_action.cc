@@ -447,6 +447,28 @@ static int user_parser(char* buff) {
       }
     }
 
+    /* An async verb function hands back a promise the instant its body parks,
+     * before it has decided whether it wants this command. The test below
+     * treats any non-zero, non-number return as "handled", so a promise used
+     * to consume the command: the verb's real answer was discarded, the
+     * remaining sentences on the verb were never tried, and
+     * notify_no_command() never fired.
+     *
+     * A verb that has not answered has not claimed the command, so this is
+     * NOT handled -- the same rule check_valid_path() applies to an async
+     * valid_read(). The compile-time refusal of `async` on applies cannot
+     * reach here: verb names are arbitrary runtime strings, and
+     * add_action((: f :), "verb") has no name at all. */
+    if (ret && ret->type == T_PROMISE) {
+      /* verb_buff, not s->verb: the sentence may be dangling here (the
+       * comment above the not-found check says so), and this branch has no
+       * `s == command_giver->sent` guard to lean on. */
+      debug_message(
+          "Verb '%s' returned a promise: a verb function cannot be async -- the driver needs "
+          "its answer now. Treating the command as unhandled.\n",
+          verb_buff);
+      ret = nullptr;
+    }
     if (ret && (ret->type != T_NUMBER || ret->u.number != 0)) {
 #ifdef PACKAGE_MUDLIB_STATS
       if (command_giver && command_giver->interactive
@@ -632,7 +654,11 @@ static int remove_action(svalue_t* act, const char* verb) {
 void remove_sent(object_t* ob, object_t* user) {
   sentence_t** s;
 
-  if (!(user->flags & O_ENABLE_COMMANDS)) {
+  /* Gate on the list, not on O_ENABLE_COMMANDS: sentences can outlive the
+   * flag (disable_commands does not clear user->sent, and command() makes
+   * any object a command giver), and skipping them here left sentences
+   * whose s->ob dangled after the defining object was destructed. */
+  if (!user->sent) {
     return;
   }
 

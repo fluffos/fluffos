@@ -1,9 +1,13 @@
-int percent(int num, int den) {
+// Genuinely polymorphic: with a float argument this returns a float, with
+// int arguments it returns a truncated int -- declared `mixed`, not `int`,
+// so the compiler doesn't coerce the float branch's result back to int
+// (see AGENTS.md's note on rule_return_expr()'s return-type coercion).
+mixed percent(mixed num, mixed den) {
   if (floatp(num) || floatp(den)) return num * 100.0 / den;
   else return num * 100 / den;
 }
 
-int percent_of(int percent, int base) {
+mixed percent_of(mixed percent, mixed base) {
   if (floatp(percent) || floatp(base)) return percent * base / 100.0;
   else return percent * base / 100;
 }

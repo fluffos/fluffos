@@ -17,7 +17,7 @@
 
 #define add_instr_name(w, x, y, z) int_add_instr_name(w, y, z)
 
-static void int_add_instr_name(const char* name, int n, short t) {
+static void int_add_instr_name(const char* name, int n, uint32_t t) {
   instrs[n].name = name;
   instrs[n].ret_type = t;
 }
@@ -114,6 +114,10 @@ void init_instrs() {
   add_instr_name("(void)assign", "c_void_assign();\n", F_VOID_ASSIGN, T_NUMBER);
   add_instr_name("(void)assign_local", "c_void_assign_local(fp + %i);\n", F_VOID_ASSIGN_LOCAL,
                  T_NUMBER);
+  add_instr_name("assign_local", "c_assign_local(fp + %i);\n", F_ASSIGN_LOCAL, T_ANY);
+  add_instr_name("assign_global", "c_assign_global(%i);\n", F_ASSIGN_GLOBAL, T_ANY);
+  add_instr_name("(void)assign_global", "c_void_assign_global(%i);\n", F_VOID_ASSIGN_GLOBAL,
+                 T_NUMBER);
   add_instr_name("assign", "c_assign();\n", F_ASSIGN, T_ANY);
   add_instr_name("branch", 0, F_BRANCH, -1);
   add_instr_name("bbranch", 0, F_BBRANCH, -1);
@@ -192,6 +196,9 @@ void init_instrs() {
   add_instr_name("!=", "f_ne();\n", F_NE, T_NUMBER);
   add_instr_name("catch", 0, F_CATCH, T_ANY);
   add_instr_name("end_catch", 0, F_END_CATCH, -1);
+  add_instr_name("await", 0, F_AWAIT, T_ANY);
+  add_instr_name("acatch", 0, F_ACATCH, T_ANY);
+  add_instr_name("end_acatch", 0, F_END_ACATCH, -1);
   add_instr_name("-", "c_negate();\n", F_NEGATE, T_NUMBER | T_REAL);
   add_instr_name("~", "c_compl();\n", F_COMPL, T_NUMBER);
   add_instr_name("++x", "c_pre_inc();\n", F_PRE_INC, T_NUMBER | T_REAL);

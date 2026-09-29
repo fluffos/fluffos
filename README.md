@@ -8,6 +8,14 @@
 Welcome to FluffOS
 ==================
 
+**Get a mud running:** pick a mudlib, then [https://www.fluffos.info/start](https://www.fluffos.info/start)
+
+**MudOS / LPMUD / LPC:** [https://www.fluffos.info/lpmud](https://www.fluffos.info/lpmud)
+
+**Point an LLM at this URL:** [https://www.fluffos.info/llm](https://www.fluffos.info/llm) — it must ask which lib · [llms.txt](https://www.fluffos.info/llms.txt) · [mudlib AGENTS.md](https://www.fluffos.info/mudlib-agents)
+
+**Ecosystem** (`fluffos/*` repos): [https://www.fluffos.info/ecosystem](https://www.fluffos.info/ecosystem)
+
 FluffOS is a high-performance **game engine** for building persistent, multiplayer virtual worlds. It is the modern, actively maintained successor to **MudOS** — one of the most influential engines in the history of online gaming.
 
 If you are still running MudOS, it is time to upgrade. FluffOS is fully backward-compatible with existing MudOS mudlibs and adds over a decade of performance optimizations, modern protocols (WebSockets, TLS), database integrations (SQLite3, MySQL, PostgreSQL), and UTF-8 support.
@@ -76,12 +84,14 @@ FluffOS is the engine. It sits between your LPC source files and the operating s
 
 A **mudlib** is the game itself: a tree of LPC files that defines rooms, items, NPCs, combat, spells, the command parser, the login screen, and the rules of the world. The driver loads the mudlib at startup; everything above `/src/` in a typical MUD installation is mudlib code.
 
-FluffOS ships with a built-in testsuite mudlib under `testsuite/`. For real games, you choose or build a mudlib separately. Popular choices that work with FluffOS out of the box include:
+The driver repo’s `testsuite/` is an LPC **test harness**, not a starter game.
+Pick a real mudlib first ([onboarding](https://www.fluffos.info/start)):
 
-- **[Dead Souls](https://dead-souls.net/)** — well-documented, beginner-friendly, modern tooling.
-- **[Lima](https://github.com/Valdaris/lima)** — mature, modular, widely used.
-- **[Discworld](https://dwwiki.mooo.com/)** — powers the long-running Discworld MUD (since 1991).
-- **[Nightmare](http://mud.seraph.org/)** — one of the oldest and most influential mudlib families.
+- **[Dead Souls](https://github.com/fluffos/dead-souls)** — well-documented English full game (`./build.sh && ./run.sh`).
+- **[Lima](https://github.com/limalib/lima)** — modular English lib (`cd adm/dist && ./rebuild`). Play [lima.lostsouls.org](https://lima.lostsouls.org). Org snapshot: [fluffos/lima](https://github.com/fluffos/lima).
+- **[Nightmare 3](https://github.com/fluffos/nightmare3)** — slimmer historic English lib.
+- **[fluffos/mudlibs](https://github.com/fluffos/mudlibs)** — ~199 restored Chinese games; play first at [mudlibs.fluffos.info](https://mudlibs.fluffos.info/).
+- **[Discworld](https://dwwiki.mooo.com/)** — powers Discworld MUD (since 1991); not a one-line `fluffos/*` clone.
 
 Two MUDs sharing the same FluffOS binary but different mudlibs can feel entirely different — the driver imposes no game mechanics.
 
@@ -135,7 +145,7 @@ This is the primary supported platform (Ubuntu 24.04 LTS).
 ```bash
 sudo apt update
 sudo apt install -y build-essential autoconf automake bison expect \
-  libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev \
+  libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev \
   libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev \
   pkg-config libffi-dev libdw-dev libbz2-dev
 ```
@@ -156,7 +166,7 @@ make -j$(nproc) install
 
 **1. Install dependencies (Homebrew):**
 ```bash
-brew install cmake pkg-config pcre libgcrypt openssl jemalloc icu4c \
+brew install cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c \
   mysql sqlite3 googletest libffi
 ```
 
@@ -177,7 +187,7 @@ To build a **Windows-native** FluffOS binary, you must use the **MSYS2 / MinGW64
 ```bash
 pacman --noconfirm -S --needed \
   git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake \
-  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre \
+  mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre2 \
   mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 \
   mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest \
   mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi \
@@ -223,7 +233,7 @@ git clone https://github.com/fluffos/fluffos ~/fluffos
 apk add --no-cache linux-headers gcc g++ clang-dev make cmake bash \
   mariadb-dev mariadb-static postgresql-dev sqlite-dev sqlite-static \
   openssl-dev openssl-libs-static zlib-dev zlib-static icu-dev icu-static \
-  pcre-dev bison git musl-dev libelf-static elfutils-dev \
+  pcre2-dev bison git musl-dev libelf-static elfutils-dev \
   pkgconf libffi-dev zstd-static bzip2-static xz-static
 ```
 
@@ -304,10 +314,11 @@ make test
 
 ### LPC Tests & Integration
 ```bash
-# Run the driver with the testsuite configuration
-./build/bin/driver testsuite/etc/config.test
+# Interactive mud (cwd must be testsuite/ — config.test uses mudlib directory : ./)
+cd testsuite
+../build/bin/driver etc/config.test
 
-# Or run the LPC test suite directly
+# One-shot LPC suite
 cd testsuite
 ../build/bin/driver etc/config.test -ftest
 ```
@@ -322,7 +333,7 @@ The driver processes untrusted input (mudlib code, network bytes, save files), s
 * Build **both** a Debug + sanitizer tree (`-DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON`) and a `RelWithDebInfo` tree, and run the LPC suite 2–3× in each (it randomizes file order) — some defects are release-only, some only trip ASan/UBSan, and the Debug build's per-file ref-count checker (`Bad ref count …`) is a hard gate.
 * Add a regression test that demonstrably fails on the *unfixed* binary.
 * The driver builds with `-fwrapv`, so plain signed `+`/`-`/`*` overflow is defined wraparound (LPC scripts rely on this) — but that's not the same as *safe*: a wrapped size/offset/count is still a memory-safety bug the moment it reaches an allocation or `memcpy`. `error()` is a real C++ `throw` (not a raw longjmp), so RAII cleans up correctly across it, but any plain post-call cleanup statement does not run. See AGENTS.md §2 and §4 for both nuances in detail.
-* **[AGENTS.md](AGENTS.md) §13 is the memory-safety audit checklist** (the recurring bug classes — unbounded copies, integer overflow before alloc, `-fwrapv` scope, `INT_MIN / -1` and shift UB, unbounded recursion on nested data, tainted format strings, sentinel-value collisions, `error()`-path leaks, off-graph/cross-thread refs, unmetered backtracking); §2–§4 cover the generic efun type-check dispatch, reference counting, the debug ref-count checker, and stack-unwinding safety in detail.
+* **[AGENTS.md](AGENTS.md) §13 is the memory-safety audit checklist** (the recurring bug classes — unbounded copies, integer overflow before alloc, `-fwrapv` scope, `INT_MIN / -1` and shift UB, unbounded recursion on nested data, tainted format strings, sentinel-value collisions, `error()`-path leaks, off-graph/cross-thread refs, unmetered backtracking, soft-capped push/pop desync, cached handles outliving their owning resource, and a flag/lock some sibling path forgets to set/take); §2–§4 cover the generic efun type-check dispatch, reference counting, the debug ref-count checker, and stack-unwinding safety in detail. Bear in mind not every crash path has a driver-LPC regression route (offline-`lpcc`-only paths; async-timing paths a single-file test run can't service) — §13's closing note covers how to handle those.
 
 ---
 

@@ -120,6 +120,7 @@ nosave mixed *_efuns = ({
   ({ "id_matrix", (: id_matrix :) }),
 #endif
   ({ "implode", (: implode :) }),
+  ({ "include_list", (: include_list :) }),
   ({ "in_edit", (: in_edit :) }),
   ({ "in_input", (: in_input :) }),
   ({ "inherit_list", (: inherit_list :) }),

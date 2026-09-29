@@ -645,7 +645,7 @@ void f_parse_refresh() {
       return;
     }
 
-    if (!IS_ZERO(ret)) {
+    if (APPLY_SAYS_YES(ret)) {
       pi->flags |= PI_REMOTE_LIVINGS;
     }
   }
@@ -977,7 +977,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", IS_LIVING));
   ret = safe_apply(IS_LIVING, ob, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_LIVING;
     DEBUG_PP(("(yes)"));
   }
@@ -987,7 +987,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", INVENTORY_ACCESSIBLE));
   ret = safe_apply(INVENTORY_ACCESSIBLE, ob, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_INV_ACCESSIBLE;
     DEBUG_PP(("(yes)"));
   }
@@ -997,7 +997,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", INVENTORY_VISIBLE));
   ret = safe_apply(INVENTORY_VISIBLE, ob, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_INV_VISIBLE;
     DEBUG_PP(("(yes)"));
   }
@@ -3187,6 +3187,22 @@ static void parse_recurse(char** iwords, char** ostart, char** oend) {
   int first = 1;
   int l, idx;
 
+  // parse_recurse() enumerates every way to segment the sentence's words into
+  // dictionary phrases -- a tree whose branching factor is the number of
+  // registered compound-noun prefixes, so a cooperating dictionary can make it
+  // exponential independently of parse_rule()'s own backtracking. Meter it
+  // against the SAME budget/flag as parse_rule() (it shares the counter): once
+  // tripped, every pending parse_recurse() frame returns immediately, running
+  // its normal num_words--/FREE_MSTR cleanup on the way out (a plain return
+  // chain, not an error() that would skip it -- see the flag's comment above).
+  if (parse_rule_aborted) {
+    return;
+  }
+  if (++parse_rule_steps > MAX_PARSE_RULE_STEPS) {
+    parse_rule_aborted = true;
+    return;
+  }
+
   if (*iwords[0]) {
     *buf = 0;
     p = buf;
@@ -3661,7 +3677,7 @@ void f_parse_add_rule() {
   verb_entry->node = verb_node;
 
   ret = safe_apply(LIVINGS_ARE_REMOTE, handler, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     handler->pinfo->flags |= PI_REMOTE_LIVINGS;
   }
 

@@ -1,0 +1,2 @@
+// Fixture: mixin WITH its own variable, inherited ahead of the target.
+int svar;

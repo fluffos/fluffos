@@ -1,0 +1,45 @@
+// async_info()'s "function" field must name the parked function. The frame's
+// table_index indexes the DEFINING program's function_table directly (that is
+// what setup_new_frame() stores and what the trace renderer reads), NOT the
+// runtime function_flags[] index that function_name() expects. The two
+// coincide only when the defining program inherits nothing -- which is the
+// shape of every earlier async test, so feeding the wrong index space named
+// a different function here and went unnoticed.
+//
+// The parking and the check happen after do_tests() returns, so the work is
+// declared with an EXIT LATCH: the run's recap waits for it and the check
+// below is counted like any other.
+
+nosave object clone;
+nosave mixed gate;
+
+void do_tests() {
+  EXPECT_LATCH("async_info parked name");
+
+  call_out(function() {
+    mapping *info;
+    string found = "<none>";
+
+    clone = clone_object("/clone/async_info_names");
+    gate = promise_create();
+    clone->set_gate2(gate);
+    clone->named_parker();  // parks
+
+    info = async_info();
+    foreach (mapping entry in info) {
+      if (entry["object"] == clone) found = entry["function"];
+    }
+    ASSERT_EQ("named_parker", found);
+    promise_resolve(gate, 1);
+    // Released HERE, downstream of the assertion, not from the cleanup
+    // call_out below: a latch released by an assertion-free call_out proves
+    // only that the cleanup ran. If the work above threw, this line is
+    // never reached and the latch fails the run by name.
+    RELEASE_LATCH("async_info parked name");
+  }, 1);
+
+  call_out(function() {
+    gate = 0;
+    if (clone) destruct(clone);
+  }, 3);
+}

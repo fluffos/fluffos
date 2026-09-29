@@ -5,13 +5,23 @@ on:
     branches: [master, v2019]
     paths-ignore:
       - 'docs/**'
+  # Analyze every pull request regardless of base branch, so a stacked PR
+  # is not silently unanalyzed.
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [master]
     paths-ignore:
       - 'docs/**'
   schedule:
     - cron: '0 23 * * 1'
+
+# Supersede an in-flight run when the same ref is pushed again. Without this
+# every push starts a full matrix and none of the older ones ever stop, so a
+# branch pushed a few times in quick succession has several complete runs
+# competing for the same runners and starving each other -- which looks
+# exactly like a CI outage. The default branch is exempt: master runs are the
+# release record and each commit's result is worth keeping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   analyze:
@@ -49,7 +59,7 @@ jobs:
 
     - run: |
         sudo apt update
-        sudo apt install -y build-essential autoconf automake bison expect libmysqlclient-dev libpcre3-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
+        sudo apt install -y build-essential autoconf automake bison expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
         mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug -DPACKAGE_DB_SQLITE=2 .. && make -j 2 install && cd ..
 
     - name: Perform CodeQL Analysis

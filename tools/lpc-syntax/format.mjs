@@ -3,13 +3,49 @@
 // column 0, strings/comments/text blocks verbatim. Deterministic and
 // idempotent (format(format(x)) === format(x) -- pinned by test.mjs).
 
-import { tokenize } from './tokenizer.mjs';
+import { tokenize, skipStringSpan, skipCharSpan } from './tokenizer.mjs';
 
 // 100 matches ColumnLimit in src/.clang-format -- the repo's C++ style
 // (Google base, IndentWidth 2) that this formatter mirrors for every
 // language-common rule.
 export const DEFAULT_PRINT_WIDTH = 100;
 export const DEFAULT_INDENT_SIZE = 2;
+
+// A directive token's trailing run of spaces/tabs, stripped for comparison
+// purposes -- the formatter re-flows a directive's own trailing blanks away,
+// so two directive tokens that differ only there must still compare equal.
+// On a CRLF source the directive token's text ends in '\r' (the tokenizer
+// stops right before the '\n', see tokenizer.mjs), so the run being
+// stripped sits BEFORE that '\r', not at the absolute end of the string --
+// an unanchored `/[ \t]+$/` never matches there and silently leaves the
+// blanks in place on one side of a comparison but not the other (the
+// formatter's own rendering already strips them). Capturing an optional
+// trailing '\r' and keeping it in the replacement is what makes this work
+// on both LF and CRLF input.
+export function trimDirectiveTrailingBlanks(text) {
+  return text.replace(/[ \t]+(\r?)$/g, '$1');
+}
+
+// Non-whitespace token sequence. Formatting may change spacing and
+// line breaks, never this order -- `#include` / `inherit` / any other
+// statement staying put is the same rule. Directive tokens compare
+// with trailing blanks stripped (the formatter itself strips them).
+export function tokenSequence(source) {
+  return tokenize(source).filter((t) => t.kind !== 'whitespace')
+    .map((t) => t.kind + ':' + (t.kind === 'directive' ? trimDirectiveTrailingBlanks(t.text) : t.text));
+}
+
+function assertSameTokenOrder(source, formatted) {
+  const before = tokenSequence(source);
+  const after = tokenSequence(formatted);
+  if (before.length === after.length && before.every((t, i) => t === after[i])) return;
+  let i = 0;
+  while (i < before.length && i < after.length && before[i] === after[i]) i++;
+  throw new Error(
+    'formatter reordered tokens at index ' + i +
+    ' (statement order must be preserved): ' +
+    (before[i] || '<eof>') + ' => ' + (after[i] || '<eof>'));
+}
 // Sanity cap on how many indent levels the source-line-break-preservation
 // mechanism (below) will stack up. Real code never gets close to this;
 // it exists for adversarial input (e.g. a "crasher" test nesting 100+
@@ -20,8 +56,27 @@ const MAX_MULTILINE_INDENT = 16;
 export function formatLPC(source, options = {}) {
   const printWidth = options.printWidth > 0 ? options.printWidth : DEFAULT_PRINT_WIDTH;
   const indentUnit = ' '.repeat(options.indentSize > 0 ? options.indentSize : DEFAULT_INDENT_SIZE);
-  const rawToks = tokenize(source).filter((t) => t.kind !== 'whitespace');
+  const allToks = tokenize(source);
+  // REFUSE input that does not lex cleanly: an unterminated
+  // string/char/template/comment/text block is a hard driver lexerror
+  // ("End of file in string" etc., src/compiler/internal/lexer.l), and
+  // everything after the unmatched opener is nonsense tokens -- e.g. one
+  // stray '"' flips string/code sense for the whole rest of the file, so
+  // "formatting" it shreds real string content (CJK text space-separated,
+  // '\n' escapes torn into '\ n'). The corpus token-equivalence/idempotency
+  // self-check CANNOT catch this class: input and output mis-lex
+  // identically, so both sides compare clean. Throwing here is the gate --
+  // format-corpus.mjs reports the file and leaves it byte-identical.
+  const bad = allToks.find((t) => t.unterminated);
+  if (bad) {
+    throw new Error(
+      `unterminated ${bad.kind} starting at line ${bad.line}` +
+      ' (driver lexerror at EOF; the rest of the file does not lex cleanly)' +
+      ' -- refusing to format');
+  }
+  const rawToks = allToks.filter((t) => t.kind !== 'whitespace');
   const toks = maskStringizeArguments(rawToks, source, collectStringizeMacros(rawToks));
+  markPromiseTypeArgs(toks);
   const lines = [];
   let cur = [];
   let depth = 0;
@@ -330,8 +385,15 @@ export function formatLPC(source, options = {}) {
     else sawLineZero = true;
 
     if (t.kind === 'directive') {
+      // Emit in source order. Do not hoist or regroup `#include` past
+      // `inherit` -- mud objects often write `#include <ansi.h>` then
+      // `inherit NPC;` then `#include "fight.h"`.
+      // One token, possibly several physical lines: '\' continuations,
+      // a spanning block comment, or a '//' that splices onto the next
+      // line (C phase 2). Emitted verbatim at column 0; the tokenizer
+      // already decided which following lines belong to this directive.
       flush();
-      lines.push(t.text.replace(/[ \t]+(\r?)$/g, '$1'));
+      lines.push(trimDirectiveTrailingBlanks(t.text));
       continue;
     }
     if (t.kind === 'comment') {
@@ -743,6 +805,7 @@ export function formatLPC(source, options = {}) {
   if (crlfCount > 0 && bareLfCount === 0) {
     joined = joined.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
   }
+  assertSameTokenOrder(source, joined);
   return joined;
 }
 
@@ -787,9 +850,10 @@ function nextNonComment(toks, idx) {
 
 // Mirrors the driver's own preprocessing of a directive's text before any
 // macro analysis (fold_backslash_newlines + strip_directive_comments in
-// lexer_rules_pp.cc): `\`-line-splices vanish, block comments become a
-// single space (but NOT inside string/char literals -- the driver skips
-// quoted spans atomically), and a `//` comment ends the body. The
+// lexer_rules_pp.cc): `\`-line-splices vanish first (C phase 2), block
+// comments become a single space (but NOT inside string/char literals --
+// the driver skips quoted spans atomically), and a `//` comment then
+// ends the body (C phase 3). The
 // stringize analysis below must run on this folded form or a `#define
 // SC(x) #/*c*/x`, a `# \<newline>x`, or a spliced parameter list all
 // hide their stringize from the detector -- driver-verified semantic
@@ -798,7 +862,6 @@ function foldDirectiveText(text) {
   let out = '';
   let i = 0;
   const n = text.length;
-  let quote = null;
   while (i < n) {
     const c = text[i];
     if (c === '\\') {
@@ -809,13 +872,29 @@ function foldDirectiveText(text) {
       i += 2;
       continue;
     }
-    if (quote) {
-      if (c === quote) quote = null;
-      out += c;
-      i++;
+    // Literals are skipped through the tokenizer's OWN span functions, not
+    // a second model of them here. This used to open a quote on any "'"
+    // and scan forward for a partner, which is not what the driver does: a
+    // character literal is one escape or one byte and then the close quote
+    // (lexer.l's SC_CHAR_BODY/SC_CHAR_CLOSE), so a lone apostrophe is just
+    // a character. With the old model an unpaired "'" -- legal and inert
+    // in a directive, see directiveLineEnd -- swallowed the rest of the
+    // line, leaving a following comment unfolded; a `#define S(x)
+    // don't#/*c*/x` then hid its stringize from the detector below and its
+    // call-site argument WAS re-spaced, changing what the driver
+    // stringizes ("1+2" -> "1 + 2"). Same bug the driver had (#1362).
+    if (c === '"' || c === '`') {
+      const e = skipStringSpan(text, i, c);
+      out += text.slice(i, e);
+      i = e;
       continue;
     }
-    if (c === '"' || c === "'") { quote = c; out += c; i++; continue; }
+    if (c === "'") {
+      const e = skipCharSpan(text, i);
+      out += text.slice(i, e);
+      i = e;
+      continue;
+    }
     if (c === '/' && text[i + 1] === '*') {
       const end = text.indexOf('*/', i + 2);
       out += ' ';
@@ -996,6 +1075,43 @@ const NEST_CLOSE = new Set([')', '}', ']', ':)']);
 // Do the bracket tokens within toks[start..end] (inclusive) all pair up
 // internally? Used by maskStringizeArguments to decide whether a span is
 // safe to freeze as one opaque token.
+/*
+ * `promise<T>` (issue #1319) is a TYPE with a type argument, not a pair of
+ * comparisons -- `promise` is a reserved word, so `promise` immediately
+ * followed by '<' can only ever be the parameterized-type form. Mark that
+ * '<' and its matching '>' so the spacing rules keep them tight
+ * (`promise<string *>`) instead of rendering `promise < string * >`.
+ *
+ * The payload grammar is `basic_type optional_star` -- at most `class Name *`
+ * -- and a promise payload may not itself be a promise, so the closer is the
+ * first '>' within a few tokens and nesting is impossible. If no '>' turns up
+ * in that window the source does not parse as a promise type anyway; leave it
+ * alone rather than guess.
+ */
+function markPromiseTypeArgs(toks) {
+  const MAX_PAYLOAD_TOKENS = 6;
+  for (let i = 0; i < toks.length - 1; i++) {
+    if (toks[i].text !== 'promise' || toks[i].kind !== 'type') continue;
+    let open = -1;
+    for (let j = i + 1; j < toks.length; j++) {
+      if (toks[j].kind === 'comment') continue;
+      open = j;
+      break;
+    }
+    if (open === -1 || toks[open].text !== '<') continue;
+    let close = -1;
+    for (let j = open + 1; j < toks.length && j <= open + MAX_PAYLOAD_TOKENS; j++) {
+      if (toks[j].kind === 'comment') continue;
+      if (toks[j].text === '>') { close = j; break; }
+      if (toks[j].text === '<') break;  // not a payload we understand
+    }
+    if (close === -1) continue;
+    toks[open].promiseTypeOpen = true;
+    toks[close].promiseTypeClose = true;
+    i = close;
+  }
+}
+
 function spanIsBalanced(toks, start, end) {
   let d = 0;
   for (let j = start; j <= end; j++) {
@@ -1095,7 +1211,9 @@ function precedesQualifiedScope(tok) {
 // `sscanf(`/`parse_command(` are tight in every real call site (486, 131,
 // 27, 2 occurrences respectively; exactly one spaced `catch (` site
 // exists in the pristine corpus -- 486:1).
-const CALL_LIKE_KEYWORDS = new Set(['catch', 'new', 'sscanf', 'parse_command']);
+// `acatch` is catch's async-aware twin (same expression shape), so it
+// formats the same way.
+const CALL_LIKE_KEYWORDS = new Set(['acatch', 'catch', 'new', 'sscanf', 'parse_command']);
 
 // Array-type-suffix '*' (`int *a`, `mixed ref *arr`, `int *a, *b;`) stays
 // tight against the identifier that follows it; ordinary multiplication
@@ -1105,6 +1223,10 @@ const CALL_LIKE_KEYWORDS = new Set(['catch', 'new', 'sscanf', 'parse_command']);
 // a repeated declarator, never an expression.
 function isArrayTypeStarPrefix(tok) {
   return !!tok && (tok.kind === 'type' ||
+                   // the '>' closing a promise<T> ends a type just like a
+                   // type keyword does, so `promise<int> *arr` binds the
+                   // same way as `int *arr`
+                   tok.promiseTypeClose === true ||
                    (tok.kind === 'keyword' && tok.text === 'ref') ||
                    tok.text === '&' || tok.text === '*' || tok.text === ',');
 }
@@ -1407,6 +1529,12 @@ function renderLine(toks, mappingContext = false, pendingTernary = 0) {
     let thisClosesCast = false;
     let sep = ' ';
     if (i === 0) sep = '';
+    // `promise<T>`: the type-argument brackets are part of the type name,
+    // not a pair of comparisons -- render `promise<string *>`, never
+    // `promise < string * >`. Marked by markPromiseTypeArgs(); tested
+    // first so none of the operator rules below can claim these tokens.
+    else if (t.promiseTypeOpen || t.promiseTypeClose ||
+             (prev && prev.promiseTypeOpen)) sep = '';
     // A TRAILING comment (nothing but comments after it on the line)
     // keeps the SOURCE's gap before it, with a two-space minimum for
     // '//' comments -- src/.clang-format's Google base sets
@@ -1592,17 +1720,25 @@ function renderLine(toks, mappingContext = false, pendingTernary = 0) {
         (prev.kind === 'keyword' || prev.kind === 'type' ||
          prev.kind === 'modifier' || prev.kind === 'efunkw') &&
         !(t.text === ';' || t.text === ':' || t.text === ',' || t.text === ')' ||
-          t.text === '(' || t.text === '::')) {
+          t.text === '(' || t.text === '::') &&
+        // ... and not a promise<T> type-argument bracket, whose whole point
+        // is to bind tight to the type name on either side
+        !(t.promiseTypeOpen || t.promiseTypeClose)) {
       sep = ' ';
     }
     // Token-merge safety net: never butt two tokens together whose
     // concatenation re-lexes as something else -- `a - --b` must not
     // become `a ---b` (re-lexing as `(a--) - b`), `- -x` must not become
-    // `--x` (a pre-decrement!), and `f( ::g() )` must not become
-    // `f(::g())` (whose `(:` re-lexes as a functional-literal opener).
-    // Longest-match lexing means ANY tight rule above can accidentally
-    // manufacture a longer operator; checking against the real tokenizer
-    // catches every such pair, present and future, in one place.
+    // `--x` (a pre-decrement!). (`f( ::g() )` going tight to `f(::g())`
+    // used to trip this too, back when the tokenizer's own "(:" rule
+    // didn't look past a "::" -- see isParentCallOpenParen() in
+    // tokenizer.mjs -- and mis-lexed the "(::" it produced. Now that the
+    // tokenizer itself gets that case right, `(` before a bare `::` is
+    // exactly as safe to render tight as any other qualified-scope site,
+    // e.g. `efun::`.) Longest-match lexing means ANY tight rule above can
+    // accidentally manufacture a longer operator; checking against the
+    // real tokenizer catches every such pair, present and future, in one
+    // place.
     if (sep === '' && prev && tokensWouldMerge(prev, t)) sep = ' ';
     out += sep + t.text;
 

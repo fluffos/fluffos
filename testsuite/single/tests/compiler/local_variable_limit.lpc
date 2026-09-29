@@ -1,0 +1,61 @@
+// A function may not allocate more locals than the bytecode can address.
+//
+// A local's index is emitted as a single byte (icode.cc: ins_byte(F_LOCAL);
+// ins_byte(which)), so 255 is the ceiling. Past it a function used to compile
+// and then read or write the wrong slot at runtime.
+//
+// This was once the `maximum local variables` config option, which never
+// worked: every reader spelled it CFG_INT(__MAX_LOCAL_VARIABLES__), but
+// __MAX_LOCAL_VARIABLES__ *is* CFG_INT(9) already, so the double offset
+// yielded a constant 521 and the option never reached config_int[]. 521 was
+// not encodable either. The limit is now a constant (kMaxLocalVariables),
+// since what a byte can address is a property of the instruction encoding
+// and not something a mudlib should be able to set.
+//
+// The source is generated rather than committed: the point is the boundary,
+// and a 300-declaration file is not worth reading.
+
+#include "/include/tests.h"
+
+#define GEN "/data/local_variable_limit"
+
+private string gen(int n) {
+  string s = "int probe() {\n";
+  int i;
+
+  for (i = 0; i < n; i++) {
+    s += "  int v" + i + ";\n";
+  }
+  for (i = 0; i < n; i++) {
+    s += "  v" + i + " = " + i + ";\n";
+  }
+  return s + "  return v" + (n - 1) + ";\n}\n";
+}
+
+private mixed try_locals(int n) {
+  mixed err;
+  object ob;
+
+  write_file(GEN + ".c", gen(n), 1);
+  err = catch(ob = load_object(GEN));
+  if (!err && ob) {
+    err = catch(ob->probe());
+    if (!err) {
+      err = ob->probe() == n - 1 ? 0 : "wrong value";
+    }
+    destruct(ob);
+  }
+  rm(GEN + ".c");
+  return err;
+}
+
+void do_tests() {
+  // Comfortably inside the byte-index range: compiles and reads back right.
+  ASSERT_EQ(0, try_locals(200));
+
+  // Past what a single byte can encode: must be a compile error, not silently
+  // truncated indices.
+  ASSERT2(try_locals(300) != 0,
+    "a function with 300 locals must be rejected -- its indices do not fit in "
+    "the byte the bytecode encodes them in");
+}

@@ -1,0 +1,48 @@
+// A pending async_yield() left over at shutdown must be SETTLED, not just
+// released.
+//
+// The shape below is the ordinary one, and it is a refcount cycle:
+//
+//   promise p = async_yield();   // the frame local is the surviving ref
+//   await p;
+//
+// A parked coroutine does not hold a ref on the promise it awaits, so the
+// last reference to p lives inside the coroutine's own saved frame, and the
+// coroutine is reachable only from p's reaction list. Dropping the driver's
+// reference at teardown therefore never reaches zero: the coroutine, its
+// frame svalues and both promises survive to exit. Settling instead breaks
+// the cycle, because a reaction enqueued after shutdown has begun is freed
+// synchronously.
+//
+// The leak is only observable when the driver exits with the yield still
+// queued, which is what a single-file run does -- it shuts down before the
+// loop turns. Run this file on its own under a sanitizer build to see it:
+//
+//   ../build-asan/src/driver etc/config.test \
+//       -ftest:single/tests/efuns/async_yield_shutdown.lpc
+//
+// Unfixed that reports "328 byte(s) leaked in 6 allocation(s)", every block
+// Indirect with no Direct root -- LeakSanitizer's signature for a pure
+// cycle. In a full run the yield settles normally long before shutdown and
+// this file simply passes.
+
+nosave int parked;
+
+async void parker() {
+  promise p = async_yield();
+
+  parked = 1;
+  await p;
+  parked = 2;
+}
+
+void do_tests() {
+  // Touch the filesystem so the run exercises a valid_read apply: a
+  // single-file run that triggers none of them trips the testsuite's own
+  // "MASTER valid inherit functions are not being called!" check, which
+  // would make the manual run above look like a failure of this file.
+  ASSERT(stringp(read_file("/single/master.lpc", 1, 1)));
+
+  parker();
+  ASSERT2(parked == 1, "the body should run up to its await and park there");
+}

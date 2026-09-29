@@ -1,0 +1,11 @@
+// Fixture for compiler/block_expr_scope.lpc: for() pops a fixed count rather
+// than a scope diff, so a local leaking out of the init expression made it
+// free the wrong one and the loop variable outlived the loop. This file must
+// FAIL to compile.
+int probe() {
+  int r;
+
+  for (int i = catch { int v = 1; }; i < 1; i++) {}
+  r = i;
+  return r;
+}

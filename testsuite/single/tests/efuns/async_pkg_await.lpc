@@ -1,0 +1,59 @@
+// The async PACKAGE (worker-thread async_read/async_write/async_getdir)
+// composes with await natively: omit the callback and the efun returns a
+// promise fulfilled with the value the callback would have received --
+// `string s = await async_read(path);` -- or rejected with the failure
+// value (async_read's negative int). The classic callback form is
+// untouched and still returns 0. This pins the whole path: worker thread
+// -> event delivery -> settle -> parked-coroutine resume, both outcomes.
+//
+// The async package is off on wasm (worker threads), hence the guard.
+//
+// run_native() finishes long after do_tests() returns (worker thread, then
+// event delivery, then resume), so it is declared with an EXIT LATCH: the
+// run's recap waits for it and its checks are counted like any other.
+
+#ifdef __PACKAGE_ASYNC__
+void classic_cb(mixed res) { /* classic form still works */ }
+
+async void run_native() {
+  string s;
+  mixed d, err;
+
+  // promise form: the efun itself returns the promise
+  s = await async_read("/single/tests/efuns/async_pkg_await.lpc");
+  ASSERT(stringp(s));
+  ASSERT(strsrch(s, "async_pkg_await") != -1);
+
+  d = await async_getdir("/single/tests/efuns/");
+  ASSERT(arrayp(d));
+  ASSERT(sizeof(d) > 0);
+
+  await async_write("/data/apw_test.txt", "payload\n", 1);
+  ASSERT_EQ("payload\n", read_file("/data/apw_test.txt"));
+  rm("/data/apw_test.txt");
+
+  // failure path: the rejection reason is the failure value the callback
+  // would have received (async_read's negative int), raised at the await
+  err = acatch(await async_read("/no/such/file/anywhere"));
+  ASSERT(intp(err));
+  ASSERT(err < 0);
+
+  RELEASE_LATCH("async package promise form");
+}
+
+void do_tests() {
+  mixed p;
+
+  // the promise form returns a promise immediately; the classic callback
+  // form still returns 0
+  p = async_read("/single/tests/efuns/async_pkg_await.lpc");
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+  ASSERT_EQ(0, async_read("/single/tests/efuns/async_pkg_await.lpc", (: classic_cb :)));
+
+  EXPECT_LATCH("async package promise form");
+  call_out(function() { run_native(); }, 1);
+}
+#else
+void do_tests() { ASSERT(1); }
+#endif

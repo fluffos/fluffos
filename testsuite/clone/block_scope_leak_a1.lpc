@@ -1,0 +1,9 @@
+// Fixture for compiler/block_expr_scope.lpc: a local declared inside a
+// catch{} used in expression position must NOT be visible after the block.
+// This file must FAIL to compile.
+int probe() {
+  mixed e = catch { int v = 1; };
+
+  v = 2;
+  return v;
+}

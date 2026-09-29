@@ -46,7 +46,28 @@ function copyDir(Module, src, dst) {
 
   try {
     const code = Module.ccall('fluffos_flag', 'number', ['string'], ['test']);
-    process.exit(code);
+    // master::flag() returning is not the end of the run. The suite's
+    // deferred checks live in call_outs, and anything after an `await` that
+    // parked only resumes once the microtask drain runs -- both are tick
+    // work, and the native driver gets them from its backend loop after
+    // flag() returns. Pump the host clock so they happen here too;
+    // otherwise every async suspend/resume assertion silently never runs.
+    // The suite ends by calling shutdown(), which surfaces as ExitStatus
+    // from a tick; the bound is just a stuck-run backstop.
+    let now = 0;
+    for (let i = 0; i < 20000; i++) {
+      const delay = Module.ccall('fluffos_tick', 'number', ['number'], [now]);
+      now += Math.max(1, Math.min(1000, delay > 0 ? delay : 1));
+    }
+    // Reaching here means the backstop exhausted without the driver ever
+    // shutting down (no ExitStatus was thrown). A wedged post-run phase is
+    // exactly what this suite exists to catch, so never fall through to
+    // fluffos_flag's return code -- that only reflects the counted checks
+    // and would report success for a run whose deferred checks never ran.
+    console.error('wasm testsuite: post-run tick pump exhausted without ' +
+                  'shutdown -- deferred checks did not complete ' +
+                  '(fluffos_flag rc=' + code + ')');
+    process.exit(3);
   } catch (e) {
     // The test runner finishes by shutting the driver down: exit() inside
     // the wasm runtime surfaces here as an ExitStatus.

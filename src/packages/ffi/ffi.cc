@@ -20,6 +20,7 @@
 #include "base/package_api.h"
 
 #include "packages/ffi/ffi.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"
 
 #ifdef PACKAGE_FFI
 
@@ -49,6 +50,13 @@ namespace {
 struct FfiLibrary {
   void* handle;
   std::string path;
+  // IDs (into g_funcs) of every FfiFunc whose ->addr was dlsym()'d out of
+  // this library. ffi_call() has no way to tell a stale address from a live
+  // one after dlclose(), so ffi_unload() walks this list and invalidates
+  // each one (FfiFunc::valid) instead of leaving them dangling -- refusing
+  // to unload at all would break the ordinary prepare-call-then-unload
+  // lifecycle (ffi_prepare() never has a matching "un-prepare").
+  std::vector<int> prepared_func_ids;
 };
 
 struct FfiFunc {
@@ -58,6 +66,7 @@ struct FfiFunc {
   std::vector<int> arg_codes;
   int ret_code;
   ffi_type* ret_type;
+  bool valid = true;  // false once this func's owning library is unloaded
 };
 
 struct FfiCallback {
@@ -69,6 +78,15 @@ struct FfiCallback {
   int ret_code;
   ffi_type* ret_type;
   funptr_t* fun;  // LPC function pointer, ref-held
+  // True while closure_dispatch() is on the call stack for this callback.
+  // free_callback() would ffi_closure_free(closure) -- the executable
+  // trampoline libffi is CURRENTLY EXECUTING to have reached this call at
+  // all -- so freeing it mid-dispatch (e.g. a callback that calls
+  // ffi_callback_free() on its own id) doesn't just free a struct out from
+  // under a later read (that part's fixed below); it unmaps code the CPU
+  // is still going to return into, crashing inside libffi itself. There's
+  // no legitimate reason a callback needs to free itself, so refuse it.
+  bool dispatching = false;
 };
 
 std::unordered_map<int, FfiLibrary*> g_libs;
@@ -401,9 +419,19 @@ void closure_dispatch(ffi_cif* /*cif*/, void* ret, void** args, void* user) {
   for (int i = 0; i < nargs; i++) {
     c_arg_to_lpc(cb->arg_codes[i], args[i]);
   }
+  // safe_call_function_pointer() runs arbitrary LPC, which can call
+  // ffi_callback_free() on this very callback's id -- free_callback() then
+  // deletes `cb`. Capture everything still needed from `cb` before the call
+  // so nothing reads through it afterward.
+  int ret_code = cb->ret_code;
+  // f_ffi_callback_free() checks this flag and refuses to free a
+  // dispatching callback (see its own comment) -- freeing cb->closure here
+  // would unmap the executable trampoline this very call is running from.
+  cb->dispatching = true;
+  DEFER { cb->dispatching = false; };
   set_eval(max_eval_cost);
   svalue_t* r = safe_call_function_pointer(cb->fun, nargs);
-  lpc_return_to_c(cb->ret_code, r, ret);
+  lpc_return_to_c(ret_code, r, ret);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,6 +482,15 @@ void f_ffi_unload() {
   int id = sp->u.number;
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
+    // Invalidate every FfiFunc prepared from this library before closing
+    // it: their ->addr was dlsym()'d out of the handle we're about to
+    // dlclose(), so calling one afterward would jump into unmapped memory.
+    for (int func_id : it->second->prepared_func_ids) {
+      auto fit = g_funcs.find(func_id);
+      if (fit != g_funcs.end()) {
+        fit->second->valid = false;
+      }
+    }
     plat_dlclose(it->second->handle);
     delete it->second;
     g_libs.erase(it);
@@ -517,6 +554,9 @@ void f_ffi_prepare() {
   }
   int id = g_next_handle++;
   g_funcs[id] = fn.release();
+  // Record that this FfiFunc's ->addr came from this library, so
+  // ffi_unload() can invalidate it later (see FfiLibrary::prepared_func_ids).
+  it->second->prepared_func_ids.push_back(id);
   pop_n_elems(4);
   push_number(id);
 }
@@ -532,6 +572,9 @@ void f_ffi_call() {
     error("ffi_call: invalid function handle %d\n", func_id);
   }
   FfiFunc* fn = it->second;
+  if (!fn->valid) {
+    error("ffi_call: function %d's library was unloaded with ffi_unload().\n", func_id);
+  }
   int nargs = static_cast<int>(fn->arg_codes.size());
   if (args->size != nargs) {
     error("ffi_call: expected %d args, got %d\n", nargs, args->size);
@@ -822,6 +865,14 @@ void f_ffi_callback_free() {
   int id = sp->u.number;
   auto it = g_callbacks.find(id);
   if (it != g_callbacks.end()) {
+    if (it->second->dispatching) {
+      // free_callback() would ffi_closure_free(closure) -- unmapping the
+      // executable trampoline libffi is CURRENTLY EXECUTING to have
+      // reached this call at all (a callback freeing its own id from
+      // inside its own dispatch). That crashes inside libffi itself, not
+      // just on the next read of the (also freed) FfiCallback struct.
+      error("ffi_callback_free: callback %d cannot free itself while dispatching.\n", id);
+    }
     free_callback(it->second);
     g_callbacks.erase(it);
   }

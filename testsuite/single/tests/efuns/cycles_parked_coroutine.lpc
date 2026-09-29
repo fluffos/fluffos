@@ -1,0 +1,41 @@
+// A parked coroutine is a reference holder: its saved frame slice keeps the
+// awaited promise alive in the common `mixed p = promise_create(); await p;`
+// shape, closing a loop (promise -> reaction -> coroutine -> frame slot ->
+// promise) that the cycle efuns must see through. Pins the contrib walker's
+// parked-coroutine edges: detection (has_cycle), and breaking via the
+// generic slot fix (break_cycles nulls the parked frame slot). The
+// coroutine is then resumed normally -- its local is simply 0 after the
+// break, and the function must still complete.
+
+// The detection, the break and the resume all happen after do_tests() has
+// returned, so the work is declared with an EXIT LATCH and the checks below
+// are counted like any other.
+
+nosave mixed gp;
+nosave int fDone;
+
+async void parker() {
+  mixed p = promise_create();
+
+  gp = p;
+  await p;
+  fDone++;
+}
+
+void do_tests() {
+#if efun_defined(has_cycle)
+  EXPECT_LATCH("parked-coroutine cycle");
+
+  call_out(function() {
+    parker();  // runs synchronously to the await, then parks
+    ASSERT_EQ(1, has_cycle(gp));
+    ASSERT(break_cycles(gp) >= 1);
+    promise_resolve(gp, 1);  // resume the parked frame; nothing stays parked
+  }, 1);
+  call_out(function() {
+    ASSERT_EQ(1, fDone);  // the broken frame still completes
+    gp = 0;
+    RELEASE_LATCH("parked-coroutine cycle");
+  }, 3);
+#endif
+}

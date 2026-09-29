@@ -1,0 +1,341 @@
+// async/await coroutines (issue #1319 phase 1). Most of what this file
+// checks happens after do_tests() has returned -- a resume off the
+// microtask drain, a then/catch handler, a defer running at body exit -- so
+// each independent deferred path declares its own EXIT LATCH. The runner
+// holds its recap until every latch clears, so those checks are counted
+// like any other, and a path that never runs fails the run naming its latch.
+
+nosave int order;
+nosave int syncRan, resumed, acatchSync;
+nosave int deferRan, nestedDone;
+nosave mixed trigger;  // promise resolved later from a call_out
+
+async int simple_add(int a, int b) { return a + b; }
+
+// runs synchronously to the first pending await
+async int suspender() {
+  syncRan = 1;
+  order = 1;
+  int v = await trigger;
+  resumed = v;
+  return v * 2;
+}
+
+async void void_fn() {
+  await trigger;
+  RELEASE_LATCH("async void body completes");
+}
+
+// awaiting a non-promise passes the value straight through and is NOT a
+// scheduling point, so a body that only does that finishes synchronously
+async int only_plain_awaits() {
+  int a = await 5;
+  string s = await "x";
+
+  return a + strlen(s);
+}
+
+// awaiting a promise ALWAYS parks, even one that has already settled: the
+// resume comes off the microtask drain with a fresh eval budget
+async int awaits_settled() {
+  mixed p = promise_create();
+
+  promise_resolve(p, 6);
+  return await p;
+}
+
+// rejection propagates out of the body and rejects the returned promise
+async int rejector() {
+  await trigger;
+  error("body exploded");
+  return 1;
+}
+
+// acatch: synchronous error inside the region
+async int acatch_sync_error() {
+  mixed err = acatch(error("sync boom"));
+  ASSERT(stringp(err));
+  ASSERT(strsrch(err, "sync boom") != -1);
+  acatchSync++;
+  return 0;
+}
+
+// acatch: rejected await inside the region resumes at the continuation
+async int acatch_rejected_await() {
+  mixed p = promise_create();
+  promise_reject(p, "*async boom");
+  mixed err = acatch(await p);
+  mixed err2;
+  ASSERT_EQ("*async boom", err);
+  // and success straight through: acatch yields 0
+  err2 = acatch(1 + 1);
+  ASSERT_EQ(0, err2);
+  RELEASE_LATCH("acatch over a rejected await");
+  return 0;
+}
+
+// defer inside an async function runs when the body finishes after resume.
+// The defer runs AFTER the body's last statement, so it is the defer itself
+// -- not the body -- that releases the latch.
+void deferred_marker() {
+  deferRan++;
+  ASSERT_EQ(1, deferRan);
+  RELEASE_LATCH("defer runs at async body exit");
+}
+
+async void deferred_fn() {
+  defer((: deferred_marker :));
+  await trigger;
+}
+
+nosave mixed reject_trigger;  // rejected later from a call_out
+
+// a PENDING await inside acatch: the marker survives park/resume and
+// catches the later rejection
+async void acatch_parked_await() {
+  mixed err = acatch(await reject_trigger);
+  ASSERT_EQ("*late boom", err);
+  RELEASE_LATCH("acatch over a parked await");
+}
+
+nosave int deferUnwound;
+
+void unwind_boom() {
+  deferUnwound = 1;
+  error("defer raised during acatch unwind");
+}
+
+// A defer() registered INSIDE an acatch region runs while a rejected resume
+// unwinds the control stack back to the marker -- that is mudlib code
+// executing after the frame has been rebuilt but before eval_instruction()
+// sets pc. If it errors, dump_trace()/find_line() must still see a
+// consistent (pc, current_prog) pair; a null pc against a live program is a
+// Debug-build fatal ("Illegal offset ... in object ...").
+async void defer_in_acatch() {
+  acatch {
+    defer((: unwind_boom :));
+    await reject_trigger;
+  };
+}
+
+nosave int tooDeepCaught, tooDeepResumed;
+
+int recurse_forever(int n) { return recurse_forever(n + 1); }
+
+// "Too deep recursion." is catchable by acatch exactly as by catch: only the
+// eval-cost error is unswallowable
+async void acatch_too_deep() {
+  mixed err = acatch(recurse_forever(0));
+
+  tooDeepResumed = 1;  // the region's continuation must actually run
+  tooDeepCaught = stringp(err) && strsrch(err, "Too deep recursion") != -1;
+}
+
+nosave int coFired;
+nosave object timer_clone;
+
+int co_target() {
+  coFired++;
+  return 99;
+}
+
+// The promise form of call_out(): a delay with NO callback returns a
+// promise fulfilled (with 0) when the delay elapses, so `await call_out(n)`
+// is the non-blocking pause idiom. Both call_outs here fire on the same
+// tick; same-tick events run in registration order, so the classic one has
+// fired by the time the timer's resume runs.
+async void awaits_callout() {
+  call_out((: co_target :), 1);  // classic form, registered first
+  int v = await call_out(1);     // timer form, registered second
+
+  ASSERT_EQ(0, v);
+  ASSERT_EQ(1, coFired);
+  RELEASE_LATCH("await the timer form of call_out");
+}
+
+// acatch composes with the timer form like any other awaited promise: a
+// synchronous error from the efun itself (a delay-only call_out takes no
+// other arguments) lands in the same region an awaited rejection would
+async void acatch_over_callout() {
+  mixed err = acatch(await call_out(2, "extra args are an error"));
+
+  // if the delay-only-arg validation regressed, this body would PARK on the
+  // promise instead and resume with err == 0 -- the latch keeps the run open
+  // for the ASSERT either way, so the wrong outcome is a counted failure
+  ASSERT(stringp(err));
+  RELEASE_LATCH("acatch over the timer form of call_out");
+}
+
+// an async function awaiting another async function
+async int outer() {
+  int v = await suspender();  // suspender shares `trigger`
+  nestedDone = v;
+  return v;
+}
+
+void do_tests() {
+  // defer_in_acatch() raises on purpose while a rejected resume unwinds
+  master()->expect_deferred_error("defer raised during acatch unwind");
+
+  mixed p, q;
+  mapping *info;
+
+  // modifier surface
+  ASSERT(functionp((: simple_add :)));
+
+  // async_info(): nothing parked yet in this object
+  info = async_info();
+  ASSERT(arrayp(info));
+
+  // calling an async function returns a promise; body without await
+  // completes immediately (promise already fulfilled)
+  p = simple_add(2, 3);
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(5, promise_result(p));
+
+  // awaiting only non-promises never parks: completes synchronously
+  p = only_plain_awaits();
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(6, promise_result(p));
+
+  // awaiting an already-settled promise still parks (fresh eval budget per
+  // step); the value arrives on the microtask drain
+  q = awaits_settled();
+  ASSERT_EQ(0, promise_status(q));
+  EXPECT_LATCH("await an already-settled promise");
+  promise_then(q, function(mixed v) {
+    ASSERT_EQ(6, v);
+    RELEASE_LATCH("await an already-settled promise");
+  });
+
+  // acatch of a synchronous error
+  p = acatch_sync_error();
+  ASSERT_EQ(1, promise_status(p));
+  ASSERT_EQ(1, acatchSync);
+
+  // suspension: body runs synchronously to the first pending await
+  trigger = promise_create();
+  order = 0;
+  p = suspender();
+  ASSERT_EQ(1, syncRan);
+  ASSERT_EQ(1, order);
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));  // parked
+  ASSERT_EQ(0, resumed);
+
+  // async_info() now reports the parked frame: identity, location, what
+  // it awaits, and whether its resume is already queued. Other frames may
+  // be parked too (an await on a settled promise parks until the drain),
+  // so find ours rather than assuming it is alone.
+  {
+    mapping found = 0;
+
+    info = async_info();
+    ASSERT(sizeof(info) >= 1);
+    foreach (mapping entry in info) {
+      if (entry["function"] == "suspender") found = entry;
+    }
+    ASSERT(mapp(found));
+    ASSERT_EQ(this_object(), found["object"]);
+    ASSERT_EQ("promise", typeof(found["promise"]));
+    ASSERT_EQ(p, found["promise"]);
+    ASSERT_EQ(trigger, found["awaiting"]);
+    ASSERT_EQ(0, found["ready"]);  // trigger is still pending
+    ASSERT_EQ(0, found["acatch_depth"]);
+    ASSERT(found["id"] > 0);
+    ASSERT_EQ(file_name(this_object()) + ".lpc", found["file"]);
+    ASSERT(found["line"] > 0);
+  }
+
+  EXPECT_LATCH("suspender resumes and fulfils");
+  promise_then(p, function(mixed v) {
+    ASSERT_EQ(7, resumed);  // the resume really carried the trigger's value
+    ASSERT_EQ(14, v);
+    RELEASE_LATCH("suspender resumes and fulfils");
+  });
+
+  q = rejector();
+  EXPECT_LATCH("async body rejection");
+  promise_catch(q, function(mixed err) {
+    ASSERT(stringp(err));
+    ASSERT(strsrch(err, "body exploded") != -1);
+    RELEASE_LATCH("async body rejection");
+  });
+
+  // pass-through: await the whole chain from another async fn
+  EXPECT_LATCH("async awaiting an async");
+  promise_then(outer(), function(mixed v) {
+    ASSERT_EQ(14, v);
+    ASSERT_EQ(14, nestedDone);
+    RELEASE_LATCH("async awaiting an async");
+  });
+
+  EXPECT_LATCH("async void body completes");
+  void_fn();
+  EXPECT_LATCH("defer runs at async body exit");
+  deferred_fn();
+
+  // acatch over a rejected await (self-contained; runs via microtasks)
+  EXPECT_LATCH("acatch over a rejected await");
+  acatch_rejected_await();
+
+  // acatch over a PENDING await, rejected later
+  reject_trigger = promise_create();
+  EXPECT_LATCH("acatch over a parked await");
+  acatch_parked_await();
+  promise_catch(defer_in_acatch(), (: 0 :));
+
+  // acatch catches "Too deep recursion." (runs entirely synchronously)
+  acatch_too_deep();
+  ASSERT(tooDeepResumed);
+  ASSERT(tooDeepCaught);
+
+  // The timer form: fulfilled by the delay elapsing, rejected when the
+  // call_out is removed -- or its object destructed -- before it fires.
+  // The rejection chains run FROM a call_out: their delivery is a gametick
+  // microtask, and one enqueued synchronously here (during the suite, with
+  // master::flag() on the stack) is not ordered against the overdue
+  // checker call_out below -- the section-7 trap; this was ~rarely flaky.
+  EXPECT_LATCH("await the timer form of call_out");
+  awaits_callout();
+  EXPECT_LATCH("acatch over the timer form of call_out");
+  acatch_over_callout();
+  EXPECT_LATCH("destruct rejects a parked timer");
+  call_out(function() {
+    object tc = clone_object("/clone/async_timer");
+    object tc2 = clone_object("/clone/async_timer");
+    mixed pp;
+
+    tc->park();        // parks inside acatch on await call_out(600)
+    tc->nuke();        // remove_call_out() sweeps the clone's call_outs
+    timer_clone = tc;  // rejection observed from the deferred check below
+
+    pp = tc2->park_exposed();
+    promise_catch(pp, function(mixed err) {
+      ASSERT(stringp(err));
+      RELEASE_LATCH("destruct rejects a parked timer");
+    });
+    destruct(tc2);  // abandons the parked frame, rejects its promise
+  }, 1);
+
+  // resolve the shared trigger from a call_out: everything suspended on it
+  // resumes on the following gameticks
+  call_out(function() {
+    promise_resolve(trigger, 7);
+    promise_reject(reject_trigger, "*late boom");
+  }, 1);
+
+  // the two outcomes only observable from outside the coroutines: the
+  // swept-call_out rejection the clone caught for itself, and the defer that
+  // errored during the acatch unwind
+  EXPECT_LATCH("post-resume observations");
+  call_out(function() {
+    ASSERT_EQ(1, timer_clone ? timer_clone->query_caught() : -1);
+    ASSERT_EQ(1, deferUnwound);
+    trigger = 0;
+    reject_trigger = 0;
+    if (timer_clone) destruct(timer_clone);
+    RELEASE_LATCH("post-resume observations");
+  }, 3);
+}

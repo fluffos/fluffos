@@ -1,0 +1,53 @@
+// Regression test for https://github.com/fluffos/fluffos/issues/1296
+//
+// present(str) with no target searches the caller's inventory, then calls
+// id() on the caller's environment. That apply runs arbitrary LPC: if it
+// destructs the caller, destruct_object() sets caller->super to nullptr and
+// object_present() crashed dereferencing it (reading super->flags through a
+// null pointer). Destructing the environment itself from its own id() hits
+// the same code path (the caller gets destructed when it cannot be moved
+// out). Both cases must cleanly return 0 instead.
+
+string role;
+object victim;
+
+void create(string arg) { role = arg; }
+
+void set_victim(object o) { victim = o; }
+
+int id(string name) {
+  if (role == "killer" && victim) {
+    destruct(victim);
+  }
+  if (role == "suicider") {
+    destruct(this_object());
+  }
+  return 0;
+}
+
+void move(object dest) { move_object(dest); }
+
+object probe(string what) { return present(what); }
+
+void do_tests() {
+#ifndef __NO_ENVIRONMENT__
+  object env, searcher;
+
+  // The environment's id() destructs the searching object mid-present().
+  env = new(__FILE__, "killer");
+  searcher = new(__FILE__, "searcher");
+  searcher->move(env);
+  env->set_victim(searcher);
+  ASSERT_EQ(0, searcher->probe("nothing"));
+  ASSERT_EQ(0, searcher);
+  destruct(env);
+
+  // The environment's id() destructs the environment itself mid-present().
+  env = new(__FILE__, "suicider");
+  searcher = new(__FILE__, "searcher");
+  searcher->move(env);
+  ASSERT_EQ(0, searcher->probe("nothing"));
+  ASSERT_EQ(0, env);
+  if (searcher) destruct(searcher);
+#endif
+}

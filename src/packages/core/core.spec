@@ -54,8 +54,12 @@ string *explode(string, string);
 string *explode_reversible(string, string);
 mixed implode(mixed *, string | function, void | mixed);
 
-int call_out(string | function, int|float, ...);
-int call_out_walltime(string | function, int|float, ...);
+/* classic form: call_out(fn, delay, args...) -> handle. With NO callback --
+   call_out(delay) -- returns a PROMISE fulfilled when the delay elapses
+   (issue #1319); the delay's position moves, so both forms' later args are
+   validated in int_call_out() rather than here. */
+mixed call_out(int | float | string | function, ...);
+mixed call_out_walltime(int | float | string | function, ...);
 mixed *call_out_info();
 int find_call_out(int | string);
 int remove_call_out(int | void | string);
@@ -231,6 +235,7 @@ mapping unique_mapping(mixed *, string | function, ...);
 string *deep_inherit_list(object default:F__THIS_OBJECT);
 string *shallow_inherit_list(object default:F__THIS_OBJECT);
 string *inherit_list shallow_inherit_list(object default:F__THIS_OBJECT);
+string *include_list(object default:F__THIS_OBJECT);
 void printf(string, ...);
 string sprintf(string, ...);
 int mapp(mixed);
@@ -373,6 +378,33 @@ int perf_counter_ns();
 int time_ns();
 
 mixed *sys_network_ports();
+
+/* native promises (issue #1319 phase 1) */
+promise promise_create();
+void promise_resolve(promise, void | mixed);
+void promise_reject(promise, void | mixed);
+promise promise_then(promise, void | function, void | function);
+promise promise_catch(promise, function);
+int promise_status(promise);
+mixed promise_result(promise);
+/* the *p() type test for T_PROMISE; `mixed`, not `promise`, because the
+   whole point is to ask about a value whose type is not known statically */
+int promisep(mixed);
+/* combinators over an array of promises; a non-promise element counts as
+   already fulfilled with itself, so map() output can be passed straight in */
+promise promise_all(mixed *);
+promise promise_any(mixed *);
+promise promise_race(mixed *);
+promise promise_all_settled(mixed *);
+/* ask an async function body to give up: its next await raises. Returns 1 if
+   a cancellation was armed, 0 if there was nothing left to cancel. */
+int promise_cancel(promise);
+/* pending suspended async function frames, most recently parked last */
+mixed async_info(int default: 0);
+/* a promise fulfilled on the next pass of the event loop, after the driver
+   has polled sockets and fired due timers -- `await async_yield();` is the
+   cooperative preemption point for a long async function */
+promise async_yield();
 #ifndef __EMSCRIPTEN__
 /* No TLS on the wasm target: the browser terminates TLS long before
  * bytes reach the driver, so the efun does not exist there. (The

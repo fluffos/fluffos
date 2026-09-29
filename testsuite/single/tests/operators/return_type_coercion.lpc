@@ -1,0 +1,92 @@
+// A function's `return <expr>;` is coerced to its declared return type,
+// mirroring compound_assign_float.lpc's coverage of '='/op= coercion
+// (rule_expr_assign, grammar_rules_exprs.cc): rule_return_expr()
+// (grammar_rules_loops.cc) applies the same int<->float promotion so a
+// function declared `int` whose body's return expression actually
+// evaluates to a float hands back a genuinely truncated int, not a real.
+//
+// Before this fix, compatible_types() intentionally treats int/float as
+// mutually compatible (so no compile error), but nothing coerced the
+// value -- the function genuinely returned a T_REAL svalue despite its
+// `int` declaration. A caller doing `int_var += that_call()` then hit
+// F_ADD_EQ's untyped-lvalue promotion path (meant only for mixed/mapping
+// slots) and silently promoted a genuinely int-declared variable to
+// float -- issue #1331.
+
+int returns_declared_int_from_float_body() {
+  // sqrt() returns a float; nothing here declares an intermediate
+  // variable that would trigger the assignment-side coercion.
+  return sqrt(4.0) * 1.5;  // 2.0 * 1.5 = 3.0 (real) -> must truncate to int 3
+}
+
+float returns_declared_float_from_int_body() {
+  return 5;  // reverse direction: int literal into a float-declared return
+}
+
+int returns_int_literal_zero() {
+  return 0;  // must still compile to the F_RETURN_ZERO fast path
+}
+
+float returns_float_literal_zero() {
+  // The tricky case: CREATE_NUMBER() gives a literal `0` node type
+  // TYPE_ANY (0 doubles as LPC's untyped "nil"), not TYPE_NUMBER, so this
+  // must still be recognized and promoted to a real 0.0 -- not silently
+  // fall through to the int-returning F_RETURN_ZERO fast path.
+  return 0;
+}
+
+int *returns_typed_array() {
+  // Array return types (TYPE_MOD_ARRAY set) must not be touched by the
+  // scalar int<->float coercion.
+  return ({ 1, 2, 3 });
+}
+
+mixed returns_mixed_holding_float() {
+  // An untyped (mixed) return has no declared type to enforce -- no
+  // coercion, same as a mixed variable in compound_assign_float.lpc.
+  return 1.5;
+}
+
+// The exact shape from issue #1331: a declared-int helper whose body
+// leaks a float, called directly into a declared-int lvalue's +=.
+int heat_close() {
+  return (10.0 - sqrt(4.0)) * 1.0;  // 8.0 (real) -> must truncate to int 8
+}
+
+void do_tests() {
+  int i = returns_declared_int_from_float_body();
+  ASSERT_EQ(1, intp(i));
+  ASSERT_EQ(3, i);
+
+  float f = returns_declared_float_from_int_body();
+  ASSERT_EQ(1, floatp(f));
+  ASSERT_EQ(5.0, f);
+
+  ASSERT_EQ(1, intp(returns_int_literal_zero()));
+  ASSERT_EQ(0, returns_int_literal_zero());
+
+  ASSERT_EQ(1, floatp(returns_float_literal_zero()));
+  ASSERT_EQ(0.0, returns_float_literal_zero());
+
+  ASSERT_EQ(({ 1, 2, 3 }), returns_typed_array());
+
+  ASSERT_EQ(1, floatp(returns_mixed_holding_float()));
+
+  // The reported regression: a genuinely int-declared local must stay int
+  // across += against a call whose body leaks a float.
+  int total = 0;
+  total += heat_close();
+  ASSERT_EQ(1, intp(total));
+  ASSERT_EQ(8, total);
+
+  // ... and must therefore still work with int-only operators afterward
+  // (this is exactly what broke mudlib-wide in #1331: a promoted-to-real
+  // value later hit switch()/%/array-index, which reject non-int).
+  switch (total) {
+    case 8:
+      break;
+    default:
+      ASSERT2(0, "total must be exactly the int 8 to match this switch case");
+  }
+  ASSERT_EQ(0, total % 4);
+}
