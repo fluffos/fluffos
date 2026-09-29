@@ -141,7 +141,7 @@ TEST_F(RcTest, RequiredStringsAndDefaultsAreParsed) {
   // omitted options keep their compiled-in defaults
   EXPECT_EQ(600, CONFIG_INT(__TIME_TO_CLEAN_UP__));
   EXPECT_EQ(900, CONFIG_INT(__TIME_TO_RESET__));
-  EXPECT_EQ(64, CONFIG_INT(__MAX_LOCAL_VARIABLES__));
+  EXPECT_EQ(4096, CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__));
 
   // omitted strings are still allocated, never left NULL
   EXPECT_STREQ("", CONFIG_STR(__MUD_IP__));
@@ -163,17 +163,17 @@ TEST_F(RcTest, CommentsBlankLinesAndSurroundingSpaceAreIgnored) {
 
 TEST_F(RcTest, OutOfRangeIntegersFallBackToDefault) {
   auto path = write_config("range.cfg",
-                           "maximum local variables : 10\n"  // min is 64
-                           "time to reset : -5\n");          // min is 0
+                           "object table size : 10\n"  // min is 1024
+                           "time to reset : -5\n");    // min is 0
   quiet_read_config(path);
 
-  EXPECT_EQ(64, CONFIG_INT(__MAX_LOCAL_VARIABLES__));
+  EXPECT_EQ(4096, CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__));
   EXPECT_EQ(900, CONFIG_INT(__TIME_TO_RESET__));
 
   // ...while an in-range value is accepted
-  path = write_config("range_ok.cfg", "maximum local variables : 200\n");
+  path = write_config("range_ok.cfg", "object table size : 8192\n");
   quiet_read_config(path);
-  EXPECT_EQ(200, CONFIG_INT(__MAX_LOCAL_VARIABLES__));
+  EXPECT_EQ(8192, CONFIG_INT(__OBJECT_HASH_TABLE_SIZE__));
 }
 
 TEST_F(RcTest, UnquotedGlobalIncludeFileGetsQuoted) {
