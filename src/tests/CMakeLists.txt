@@ -88,7 +88,7 @@ if(${GTEST_FOUND})
 
   if(NOT EMSCRIPTEN)
     add_executable(debugger_tests test_debugger.cc)
-    target_link_libraries(debugger_tests PRIVATE ${FLUFFOS_LINK} GTest::GTest GTest::Main)
+    target_link_libraries(debugger_tests PRIVATE ${FLUFFOS_LINK} ${FLUFFOS_GTEST_LIBS})
     target_compile_definitions(debugger_tests PRIVATE -DTESTSUITE_DIR="${CMAKE_SOURCE_DIR}/testsuite")
   endif()
 
