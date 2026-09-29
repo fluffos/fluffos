@@ -501,7 +501,7 @@ TEST_F(DebuggerTest, LocalNamesLeaveGapForScopedOutLoopVariable) {
 
 namespace {
 svalue_t* fixture_global(object_t* ob, const char* name) {
-  unsigned short type;
+  lpc_type_t type;
   int idx = find_global_variable(ob->prog, name, &type, 0);
   return idx == -1 ? nullptr : &ob->variables[idx];
 }

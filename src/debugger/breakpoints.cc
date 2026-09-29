@@ -63,9 +63,13 @@ std::set<int> file_ids_for(program_t* p, const std::string& canon) {
   if (!p->file_info || !p->line_info) {
     return ids;
   }
-  unsigned short* fi = p->file_info;
+  // file_info words are lpc_file_info_t (int, issue #1359 -- they were
+  // unsigned short when this walker was written): fi[1] is the offset, in
+  // WORDS, from the table start to the line-number bytes, so the (count,
+  // file-id) pairs run from fi[2] up to fi + fi[1].
+  lpc_file_info_t* fi = p->file_info;
   auto* li_start = reinterpret_cast<unsigned char*>(fi + fi[1]);
-  unsigned short* e = fi + 2;
+  lpc_file_info_t* e = fi + 2;
   while (reinterpret_cast<unsigned char*>(e) < li_start) {
     int fid = e[1];
     if (fid >= 1 && fid <= p->num_strings && !ids.count(fid)) {
@@ -88,7 +92,7 @@ struct RunStart {
 // (>255-byte lines are split into multiple entries by the encoder).
 std::vector<RunStart> line_run_starts(program_t* p, const std::set<int>& fids) {
   std::vector<RunStart> out;
-  unsigned short* fi = p->file_info;
+  lpc_file_info_t* fi = p->file_info;
   unsigned char* li = p->line_info;
   auto* li_end = reinterpret_cast<unsigned char*>(reinterpret_cast<char*>(fi) + fi[0]);
   int addr = 0;
@@ -99,7 +103,9 @@ std::vector<RunStart> line_run_starts(program_t* p, const std::set<int>& fids) {
     memcpy(&abs_line, li, sizeof(ADDRESS_TYPE));
     li += sizeof(ADDRESS_TYPE);
     int fidx = 0, lline = 0;
-    translate_absolute_line(abs_line, &fi[2], &fidx, &lline);
+    // Pass the table's end like find_line() does: a zero count would
+    // otherwise walk off the table (see translate_absolute_line()).
+    translate_absolute_line(abs_line, &fi[2], &fidx, &lline, &fi[fi[1]]);
     if (fids.count(fidx) && !(fidx == prev_file && lline == prev_line)) {
       out.push_back({addr, lline});
     }
