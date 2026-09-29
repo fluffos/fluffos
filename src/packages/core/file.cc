@@ -847,15 +847,17 @@ static int do_move(const char* from, const char* to, int flag) {
     // That frees the very buffer `from` points into, out from under us, so
     // `from` must be snapshotted before the call or unlink() below reads
     // freed memory.
-    char from_copy[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
-    strncpy(from_copy, from, sizeof(from_copy) - 1);
-    from_copy[sizeof(from_copy) - 1] = '\0';
+    //
+    // A std::string, not a fixed buffer: LPC paths are not length-bounded here,
+    // and a truncated copy would make unlink() remove a different file from the
+    // one that was just copied (and that valid_write() approved).
+    std::string const from_copy(from);
 
     if (copy_file(from, to) < 0) {
       return 1;
     }
-    if (unlink(from_copy)) {
-      error("cannot remove `/%s'", from_copy);
+    if (unlink(from_copy.c_str())) {
+      error("cannot remove `/%s'", from_copy.c_str());
       return 1;
     }
   }
