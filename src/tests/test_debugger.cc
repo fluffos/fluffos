@@ -93,6 +93,20 @@ TEST_F(DebuggerTest, LocalNamesTagDoesNotCollideWithAnotherCategory) {
   EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_OBJ_VARS & 0xff);
   EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_LINENUMBERS & 0xff);
   EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_PROGRAM & 0xff);
+  // Tags master added after this branch was cut. TAG_DEFERS took
+  // TAG_PERMANENT + 53 -- the very slot TAG_LOCAL_NAMES had been given -- and
+  // the merge was textually clean, so only a check like this notices.
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_DEFERS & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_REPLACE_OB & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_SCRATCHPAD & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_PROMISE & 0xff);
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_INTERPRETER & 0xff);
+#ifdef PACKAGE_DB
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_DB & 0xff);
+#endif
+#ifdef PACKAGE_PCRE
+  EXPECT_NE(TAG_LOCAL_NAMES & 0xff, TAG_PCRE_CACHE & 0xff);
+#endif
 }
 
 TEST_F(DebuggerTest, CanonicalPathIsExtensionAndSlashBlind) {
