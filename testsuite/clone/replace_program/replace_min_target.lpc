@@ -1,0 +1,22 @@
+// Shared minimal target base for THREE independent
+// replace_program_is_noop() generality axes (see testsuite/single/tests/
+// efuns/replace_program_noop_generality.lpc): multi-level/indirect
+// inherit (the replace_ml_* family), diamond inheritance (replace_diamond_*),
+// and var_offset correctness (replace_vo_*). Each axis previously had its
+// own near-identical one-marker-function target file (replace_ml_x.lpc /
+// replace_vo_x.lpc / replace_diamond_x.lpc) purely to keep the three
+// axes visually separate; they were merged here because this file
+// contributes NOTHING axis-specific -- it is deliberately inert (ZERO
+// variables; variable-DUPLICATION behavior is isolated separately by
+// replace_diamond_var_x.lpc, which genuinely needs its own stateful
+// target and stays a distinct file for that reason) with exactly one
+// marker function. What each axis actually discriminates lives entirely
+// in the fixtures that inherit this file (replace_ml_mid/mid2/top/top2's
+// indirection and mixin placement, replace_diamond_a/b/b_extra/c/c2's
+// multi-path inherits, replace_vo_a/b's mixin-before-target ordering) --
+// none of that changes by sharing this common leaf across them.
+string marker() { return "target"; }
+mixed try_bind() {
+  mixed fp;
+  return catch(fp = (: marker :));
+}

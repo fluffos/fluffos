@@ -1,0 +1,88 @@
+// Regression: the per-function local-type scratchpad holds lpc_type_t
+// (32-bit) entries, but its allocations were still sized with
+// sizeof(unsigned short). The compiler's local-count limit and the
+// allocation both use the same (macro-doubled) element count of 521, so
+// the 2-byte-sized block overflowed once a function declared more than
+// half that many locals, the 4-byte entry writes ran past the block (ASan
+// abort on the unfixed binary; silent heap corruption on release). The
+// limit is now a correctly enforced 255, so the overflow point moves to
+// entry 127 and 200 declarations still reach it. do_tests() drives that with a generated
+// 200-local function -- declarations alone do the compile-time writes.
+// many_locals() additionally pins ordinary behavior at a plainer width,
+// including that a promise<int> local's high type bits (16-17) survive
+// storage.
+
+async int tiny() { return 1; }
+
+int many_locals() {
+  int a1 = 1;
+  int a2 = 2;
+  int a3 = 3;
+  int a4 = 4;
+  int a5 = 5;
+  int a6 = 6;
+  int a7 = 7;
+  int a8 = 8;
+  int a9 = 9;
+  int a10 = 10;
+  int a11 = 11;
+  int a12 = 12;
+  int a13 = 13;
+  int a14 = 14;
+  string s15 = "15";
+  mixed m16 = 16;
+  float f17 = 17.0;
+  int *v18 = ({ 18 });
+  mapping mp19 = ([ "k": 19 ]);
+  promise<int> p20 = tiny();
+  int a21 = 21;
+  int a22 = 22;
+  int a23 = 23;
+  int a24 = 24;
+  int a25 = 25;
+  int a26 = 26;
+  int a27 = 27;
+  int a28 = 28;
+  int a29 = 29;
+  int a30 = 30;
+  int a31 = 31;
+  int a32 = 32;
+  int a33 = 33;
+  int a34 = 34;
+  int a35 = 35;
+  int a36 = 36;
+  int a37 = 37;
+  int a38 = 38;
+  int a39 = 39;
+  int a40 = 40;
+
+  ASSERT_EQ("promise", typeof(p20));
+  return a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + to_int(s15) + m16 + to_int(f17) + v18[0] + mp19["k"] + 20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 + a36 + a37 + a38 + a39 + a40;
+}
+
+void do_tests() {
+  string src;
+  int i;
+
+  ASSERT_EQ(820, many_locals());
+
+  // 200 bare declarations: no bytecode is emitted for them (so the
+  // byte-width runtime local index is never stressed), but every one
+  // writes a 4-byte entry into the compile-time scratchpad.
+  //
+  // This was 300 when the local-count limit was an accidental 521 (the
+  // `maximum local variables` option was inert -- see
+  // compiler/local_variable_limit.lpc). The real ceiling is 255, because a
+  // local index is emitted as one byte, and 200 still overflows a
+  // scratchpad wrongly sized with sizeof(unsigned short): 255 entries of 2
+  // bytes is 510, and the 4-byte writes run past it from entry 127 on.
+  src = "int overflow_locals() {\n";
+  for (i = 0; i < 200; i++) {
+    src += "  int gen" + i + ";\n";
+  }
+  src += "  return 7;\n}\n";
+  write_file("/data/local_type_width_gen.lpc", src, 1);
+  ASSERT_EQ(7, "/data/local_type_width_gen"->overflow_locals());
+  destruct(find_object("/data/local_type_width_gen"));
+  rm("/data/local_type_width_gen.lpc");
+}

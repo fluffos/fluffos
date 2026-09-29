@@ -1,0 +1,6 @@
+// Fixture for /single/tests/efuns/save_object_shadow.lpc: an inherited
+// global that the child redeclares under the same name.
+int a = 111;
+int query_parent_a() { return a; }
+void set_parent_a(int v) { a = v; }
+int parent_a_undef() { return undefinedp(a); }

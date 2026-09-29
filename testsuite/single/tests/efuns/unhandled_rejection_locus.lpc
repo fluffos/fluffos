@@ -1,0 +1,146 @@
+// An unhandled rejection names where it was rejected.
+//
+// The report is printed when the promise is DEALLOCATED, which can be
+// arbitrarily far from the rejection -- so without a locus the log line is a
+// bare reason with no object, no file and no line, and nothing else in the
+// log to correlate it with. The reason alone is often useless: "(int) 0" is a
+// perfectly ordinary rejection value for the promise forms of async_read and
+// friends.
+//
+// Read back out of the debug log, because that is where the report goes;
+// there is no LPC-visible channel for it. The check retries rather than
+// assuming the promise has been reclaimed by any particular tick.
+
+// get_config(10) is `debug log file`. Asking the driver rather than assuming
+// "/log/debug.log" matters: under an alternate config the report goes
+// somewhere else, and the test would otherwise read a STALE log from an
+// earlier run -- which is exactly what happened under the hostile-config
+// matrix, where it matched a line written by a previous build and reported a
+// missing locus that was not missing.
+#define DEBUG_LOG_FILE 10
+#define MAX_TRIES 12
+
+// read_file() with no range returns only the first `maximum read file size`
+// bytes of the file, and the report lands wherever in the log this file
+// happened to run -- with the suite's file order randomized, anywhere. A
+// head-anchored read passed only because the log was still under the cap;
+// enough extra output from any other test would have pushed the report out of
+// the window and failed this file for driver behaviour that was working. So
+// scan the whole log, a window of lines at a time.
+#define CHUNK_LINES 500
+#define MAX_CHUNKS 400
+
+nosave string marker;
+nosave string logfile;
+nosave int tries;
+nosave int finished;
+
+private void check_log();
+
+private void drop_a_rejection() {
+  promise p = promise_create();
+
+  promise_reject(p, marker);
+  // p is the only reference and it dies with this frame, so the promise is
+  // reclaimed with its rejection never handled.
+}
+
+private void finish(mixed complaint) {
+  if (finished++) {
+    return;
+  }
+  if (complaint) {
+    ASSERT2(0, complaint);
+  }
+  RELEASE_LATCH("unhandled rejection locus");
+}
+
+// Returns the text of the reporting line up to the marker, "" if the whole
+// log was scanned without finding it, or 0 if read_file() could not reach the
+// whole log -- its own buffer is bounded too, so past that point this test
+// declines rather than accusing the driver of not reporting.
+private mixed scan_log() {
+  int line = 1;
+  int scanned = 0;
+  int i;
+  int total = file_size(logfile);
+
+  if (total < 0) {
+    return 0;
+  }
+
+  for (i = 0; i < MAX_CHUNKS; i++) {
+    string chunk = read_file(logfile, line, CHUNK_LINES);
+    int at;
+
+    if (!chunk || chunk == "") {
+      break;
+    }
+    scanned += strlen(chunk);
+    at = strsrch(chunk, marker);
+    if (at != -1) {
+      int start = at;
+
+      while (start > 0 && chunk[start - 1] != '\n') {
+        start--;
+      }
+      // Through the end of the marker, so the result can never be "" -- the
+      // caller distinguishes "found" from "not found yet" by that.
+      return chunk[start..at + strlen(marker) - 1];
+    }
+    line += CHUNK_LINES;
+  }
+
+  return scanned >= total ? "" : 0;
+}
+
+private void check_log() {
+  mixed line = scan_log();
+
+  if (line == 0) {
+    // Out of read_file()'s reach. Not a driver failure and not evidence
+    // either way, so say nothing and stop.
+    finish(0);
+    return;
+  }
+
+  if (line == "") {
+    if (++tries < MAX_TRIES) {
+      call_out((: check_log :), 1);
+      return;
+    }
+    finish("the dropped rejection was never reported to the debug log");
+    return;
+  }
+
+  ASSERT2(strsrch(line, "Unhandled promise rejection") != -1,
+    "the marker turned up in the log but not on a rejection report: " + line);
+  ASSERT2(strsrch(line, "rejected by ") != -1,
+    "the unhandled-rejection report carries no locus: " + line);
+  ASSERT2(strsrch(line, "unhandled_rejection_locus") != -1,
+    "the locus does not name the object that rejected: " + line);
+  finish(0);
+}
+
+void do_tests() {
+  string configured = get_config(DEBUG_LOG_FILE);
+
+  marker = "unhandled-locus-probe-" + time() + "-" + random(1000000);
+
+  // No debug log configured means the report has nowhere to go and there is
+  // nothing here to read back. Say that, rather than spending the retries and
+  // then blaming the driver for "never reporting" -- which is what this file
+  // did when a hostile-config run was accidentally left without the setting.
+  if (!stringp(configured) || configured == "") {
+    return;
+  }
+  logfile = LOG_DIR + "/" + configured;
+
+  EXPECT_LATCH("unhandled rejection locus");
+
+  drop_a_rejection();
+
+  // From a call_out: master::flag() holds the stack for the whole run, so the
+  // reclamation this waits on cannot happen until do_tests() has returned.
+  call_out((: check_log :), 1);
+}

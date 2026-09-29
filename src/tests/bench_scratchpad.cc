@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 // ---------------------------------------------------------------------------
 // bench_scratchpad -- proves the compile arena beats general-purpose heap

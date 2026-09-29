@@ -1,0 +1,56 @@
+// An inherited async function yields a promise on BOTH call routes: the
+// plain call (typed via FUNCTION_FLAGS in the grammar rules) and the
+// `base::fn()` qualified call (typed in find_matching_function, which has
+// the flags in hand but used to ignore FUNC_ASYNC).
+//
+// The rejections are compiler/fail/bad_async_inherited_type.lpc and
+// bad_async_qualified_type.lpc.
+
+inherit "/clone/async_inherit_base";
+
+// `async` agrees between a prototype and its definition (a disagreement is
+// compiler/fail/bad_async_proto_mismatch.lpc); OVERRIDING an inherited
+// function with the opposite asyncness is legal, since the override is a
+// new definition rather than a promise about an existing one.
+async int proto_ok();
+async int proto_ok() { return 8; }
+
+int base_sync() { return 30; }            // was NOT async in the base
+async int overridden_async() { return 9; }
+
+async void awaits_both() {
+  int a = await base_async(1);
+  int b = await async_inherit_base::base_async(10);
+  string *s = await async_inherit_base::base_async_arr();
+
+  ASSERT_EQ(2, a);
+  ASSERT_EQ(11, b);
+  ASSERT_EQ(({ "a" }), s);
+  RELEASE_LATCH("inherited awaits");
+}
+
+void do_tests() {
+  promise<int> p, q;
+  promise<string *> r;
+
+  p = base_async(1);
+  q = async_inherit_base::base_async(10);
+  r = async_inherit_base::base_async_arr();
+
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ("promise", typeof(q));
+  ASSERT_EQ("PROMISE<int>( fulfilled: 2 )", sprintf("%O", p));
+  ASSERT_EQ("PROMISE<int>( fulfilled: 11 )", sprintf("%O", q));
+  ASSERT_EQ("PROMISE<array>", sprintf("%O", r)[0..13]);
+
+  // matching prototype, and both override directions
+  ASSERT_EQ(8, promise_result(proto_ok()));
+  ASSERT_EQ(30, base_sync());                       // override is plain int
+  ASSERT_EQ(9, promise_result(overridden_async()));  // override is a promise
+  ASSERT_EQ(3, async_inherit_base::base_sync());     // base version, still int
+
+  // awaits_both() finishes on the microtask drain, after do_tests() has
+  // returned; the EXIT LATCH holds the run open until its checks have run.
+  EXPECT_LATCH("inherited awaits");
+  call_out(function() { awaits_both(); }, 1);
+}

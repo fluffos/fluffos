@@ -120,7 +120,7 @@ parse_node_t* new_node_no_line() {
 }
 
 /* quick routine to make a generic branched node */
-parse_node_t* make_branched_node(short kind, char type, parse_node_t* l, parse_node_t* r) {
+parse_node_t* make_branched_node(short kind, lpc_type_t type, parse_node_t* l, parse_node_t* r) {
   parse_node_t* ret;
 
   ret = new_node();
@@ -146,7 +146,7 @@ parse_node_t* binary_int_op(parse_node_t* l, parse_node_t* r, char op, const cha
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, l->type);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
     if (!IS_TYPE(r->type, TYPE_NUMBER)) {
       char buf[256];
@@ -158,7 +158,7 @@ parse_node_t* binary_int_op(parse_node_t* l, parse_node_t* r, char op, const cha
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, r->type);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   }
   if (l->kind == NODE_NUMBER) {
@@ -405,6 +405,12 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
             expr->kind = NODE_UNARY_OP_1;
             expr->r.expr = expr->l.expr;
             expr->v.number = F_VOID_ASSIGN_LOCAL;
+            expr->l.number = tmp;
+          } else if (IS_NODE(expr->r.expr, NODE_OPCODE_1, F_GLOBAL_LVALUE)) {
+            LPC_INT tmp = expr->r.expr->l.number;
+            expr->kind = NODE_UNARY_OP_1;
+            expr->r.expr = expr->l.expr;
+            expr->v.number = F_VOID_ASSIGN_GLOBAL;
             expr->l.number = tmp;
           } else {
             expr->v.number = F_VOID_ASSIGN;

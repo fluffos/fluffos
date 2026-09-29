@@ -51,7 +51,11 @@ struct Request {
   int ret;
   int handle;
   std::string data;
-  function_to_call_t* fun;
+  function_to_call_t* fun; /* callback form; null in the promise form */
+  /* Promise form (issue #1319): settled at delivery instead of calling a
+     callback -- fulfilled with the value the callback would have received,
+     rejected with the failure value. Ref held by the request. */
+  struct promise_t* prom = nullptr;
   struct Request* next;
   enum atypes type;
   int status;
@@ -320,7 +324,22 @@ int aio_getdir(struct Request* req) {
 
 #endif
 
-int add_read(const char* fname, function_to_call_t* fun) {
+/* Denied valid_read/valid_write path, shared by the add_* helpers: no
+   request will ever be created to free what the efun already handed us
+   (the ref-bumped callback, or the promise), so release it before
+   unwinding. */
+static void denied(function_to_call_t* fun, promise_t* prom) {
+  if (fun) {
+    free_funp(fun->f.fp);
+    delete fun;
+  }
+  if (prom) {
+    free_promise(prom);
+  }
+  error("permission denied\n");
+}
+
+int add_read(const char* fname, function_to_call_t* fun, promise_t* prom) {
   const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
 
   if (fname) {
@@ -328,22 +347,19 @@ int add_read(const char* fname, function_to_call_t* fun) {
     // printf("fname: %s\n", fname);
     req->data.resize(read_file_max_size);
     req->fun = fun;
+    req->prom = prom;
     req->type = AREAD;
     capture_command_giver(req);
     req->path = std::string(fname);
     return aio_gzread(req);
   }
-  // Denied path: no request will ever be created to free the callback the
-  // efun already ref-bumped and handed us, so release it before unwinding.
-  free_funp(fun->f.fp);
-  delete fun;
-  error("permission denied\n");
+  denied(fun, prom);
 
   return 1;
 }
 
 #ifdef F_ASYNC_GETDIR
-int add_getdir(const char* fname, function_to_call_t* fun) {
+int add_getdir(const char* fname, function_to_call_t* fun, promise_t* prom) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   if (fname) {
@@ -351,31 +367,28 @@ int add_getdir(const char* fname, function_to_call_t* fun) {
     auto* req = new Request();
     req->data.resize(max_array_size);
     req->fun = fun;
+    req->prom = prom;
     req->type = AGETDIR;
     capture_command_giver(req);
     req->path = fname;
     return aio_getdir(req);
   }
-  // Denied path: free the callback the efun already ref-bumped and handed us.
-  free_funp(fun->f.fp);
-  delete fun;
-  error("permission denied\n");
+  denied(fun, prom);
 
   return 1;
 }
 #endif
 
-int add_write(const char* fname, const char* buf, int size, char flags, function_to_call_t* fun) {
+int add_write(const char* fname, const char* buf, int size, char flags, function_to_call_t* fun,
+              promise_t* prom) {
   if (!fname) {
-    // Denied path: free the callback the efun already ref-bumped and handed us.
-    free_funp(fun->f.fp);
-    delete fun;
-    error("permission denied\n");
+    denied(fun, prom);
   }
 
   auto* req = new Request();
   req->data = std::string(buf, size);
   req->fun = fun;
+  req->prom = prom;
   req->type = AWRITE;
   capture_command_giver(req);
   req->flags = flags;
@@ -399,20 +412,31 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
 }
 #endif
 
+/* Deliver a finished request's result, already pushed on the stack: the
+   callback form calls req->fun with it, the promise form settles req->prom
+   (both forms consume the pushed value). */
+static void deliver_result(struct Request* req, int rejected) {
+  if (req->prom) {
+    promise_settle(req->prom, sp, rejected);
+    pop_stack();
+    return;
+  }
+  set_eval(max_eval_cost);
+  safe_call_efun_callback(req->fun, 1);
+}
+
 void handle_read(struct Request* req) {
   int const val = req->ret;
   if (val < 0) {
     push_number(val);
-    set_eval(max_eval_cost);
-    safe_call_efun_callback(req->fun, 1);
+    deliver_result(req, /*rejected=*/1);
     return;
   }
   char* file = new_string(val, "read_file_async: str");
   memcpy(file, (char*)(req->data.data()), val);
   file[val] = 0;
   push_malloced_string(file);
-  set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  deliver_result(req, 0);
 }
 
 #ifdef F_ASYNC_GETDIR
@@ -443,8 +467,7 @@ void handle_getdir(struct Request* req) {
   }
 
   push_refed_array(ret);
-  set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  deliver_result(req, 0);
 }
 #endif
 
@@ -452,13 +475,11 @@ void handle_write(struct Request* req) {
   int const val = req->ret;
   if (val < 0) {
     push_number(val);
-    set_eval(max_eval_cost);
-    safe_call_efun_callback(req->fun, 1);
+    deliver_result(req, /*rejected=*/1);
     return;
   }
   push_undefined();
-  set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  deliver_result(req, 0);
 }
 
 void handle_db_exec(struct Request* req) {
@@ -515,11 +536,16 @@ void check_reqs() {
     if (req->command_giver) {
       free_object(&req->command_giver, "async: check_reqs");
     }
-    free_funp(req->fun->f.fp);
+    if (req->fun) { /* null in the promise form */
+      free_funp(req->fun->f.fp);
+      delete req->fun;
+    }
+    if (req->prom) {
+      free_promise(req->prom);
+    }
     if (req->bound_args) {
       free_array(req->bound_args);
     }
-    delete req->fun;
     delete req;
   }
 }
@@ -538,51 +564,124 @@ void complete_all_asyncio() {
 #ifdef F_ASYNC_READ
 
 void f_async_read() {
-  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-  process_efun_callback(1, cb.get(), F_ASYNC_READ);
-  // A `mixed` argument bypasses the spec's compile-time `function` check;
-  // process_efun_callback() then sets cb->ob (string-callback form) rather
-  // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
-  // char*) as a funptr_t*.
-  if (cb->ob != nullptr) {
-    error("async_read: callback must be a function pointer, not a string.\n");
-  }
-  cb->f.fp->hdr.ref++;
-  pop_stack();
+  function_to_call_t* fun = nullptr;
+  promise_t* prom = nullptr;
 
-  add_read(check_valid_path(sp->u.string, current_object, "read_file", 0), cb.release());
+  /* Before any ownership is taken: check_valid_path() pushes args and runs
+   * a master apply, either of which can error() -- with a released callback
+   * ref or a fresh promise in a raw local, that unwind would leak them
+   * (AGENTS.md section 4). Nothing below this line applies, so the returned
+   * string stays valid until add_read() copies it. The path is the FIRST
+   * argument -- sp itself is the optional callback when one was passed.
+   *
+   * st_num_arg is a bare global: ANY efun the master's valid_read calls
+   * overwrites it (the f_async_db_exec ordering comment below documents the
+   * crash). Latch it first and restore it after, so the form-detection
+   * branch and process_efun_callback() see this call's real arity. */
+  int const num_arg = st_num_arg;
+  const char* path =
+      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "read_file", 0);
+  st_num_arg = num_arg;
+
+  if (num_arg >= 2) {
+    std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+    process_efun_callback(1, cb.get(), F_ASYNC_READ);
+    // A `mixed` argument bypasses the spec's compile-time `function` check;
+    // process_efun_callback() then sets cb->ob (string-callback form) rather
+    // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
+    // char*) as a funptr_t*.
+    if (cb->ob != nullptr) {
+      error("async_read: callback must be a function pointer, not a string.\n");
+    }
+    cb->f.fp->hdr.ref++;
+    pop_stack();
+    fun = cb.release();
+  } else {
+    /* promise form: no callback, deliver by settling this (issue #1319) */
+    prom = promise_alloc();
+  }
+
+  add_read(path, fun, prom);
   pop_stack();
+  if (prom) {
+    prom->ref++; /* the request's ref stays; this one is the return value */
+    push_refed_promise(prom);
+  } else {
+    push_number(0);
+  }
 }
 #endif
 
 #ifdef F_ASYNC_WRITE
 void f_async_write() {
-  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-  process_efun_callback(3, cb.get(), F_ASYNC_WRITE);
-  if (cb->ob != nullptr) {
-    error("async_write: callback must be a function pointer, not a string.\n");
-  }
-  cb->f.fp->hdr.ref++;
-  pop_stack();
+  function_to_call_t* fun = nullptr;
+  promise_t* prom = nullptr;
 
-  add_write(check_valid_path((sp - 2)->u.string, current_object, "write_file", 1),
-            (sp - 1)->u.string, SVALUE_STRLEN((sp - 1)), sp->u.number, cb.release());
+  /* before any ownership is taken, with st_num_arg latched across the
+   * master apply -- see f_async_read(); the path is the FIRST of 3 or 4
+   * arguments */
+  int const num_arg = st_num_arg;
+  const char* path =
+      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "write_file", 1);
+  st_num_arg = num_arg;
+
+  if (num_arg >= 4) {
+    std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+    process_efun_callback(3, cb.get(), F_ASYNC_WRITE);
+    if (cb->ob != nullptr) {
+      error("async_write: callback must be a function pointer, not a string.\n");
+    }
+    cb->f.fp->hdr.ref++;
+    pop_stack();
+    fun = cb.release();
+  } else {
+    prom = promise_alloc();
+  }
+
+  add_write(path, (sp - 1)->u.string, SVALUE_STRLEN((sp - 1)), sp->u.number, fun, prom);
   pop_3_elems();
+  if (prom) {
+    prom->ref++;
+    push_refed_promise(prom);
+  } else {
+    push_number(0);
+  }
 }
 #endif
 
 #ifdef F_ASYNC_GETDIR
 void f_async_getdir() {
-  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-  process_efun_callback(1, cb.get(), F_ASYNC_GETDIR);
-  if (cb->ob != nullptr) {
-    error("async_getdir: callback must be a function pointer, not a string.\n");
-  }
-  cb->f.fp->hdr.ref++;
-  pop_stack();
+  function_to_call_t* fun = nullptr;
+  promise_t* prom = nullptr;
 
-  add_getdir(check_valid_path(sp->u.string, current_object, "get_dir", 0), cb.release());
+  /* before any ownership is taken, with st_num_arg latched across the
+   * master apply -- see f_async_read(); the path is the FIRST argument */
+  int const num_arg = st_num_arg;
+  const char* path =
+      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "get_dir", 0);
+  st_num_arg = num_arg;
+
+  if (num_arg >= 2) {
+    std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
+    process_efun_callback(1, cb.get(), F_ASYNC_GETDIR);
+    if (cb->ob != nullptr) {
+      error("async_getdir: callback must be a function pointer, not a string.\n");
+    }
+    cb->f.fp->hdr.ref++;
+    pop_stack();
+    fun = cb.release();
+  } else {
+    prom = promise_alloc();
+  }
+
+  add_getdir(path, fun, prom);
   pop_stack();
+  if (prom) {
+    prom->ref++;
+    push_refed_promise(prom);
+  } else {
+    push_number(0);
+  }
 }
 #endif
 #ifdef F_ASYNC_DB_EXEC
@@ -670,6 +769,9 @@ void async_mark_request() {
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
     }
+    if (req->prom != nullptr) {
+      req->prom->extra_ref++;
+    }
     if (req->command_giver != nullptr) {
       req->command_giver->extra_ref++;
     }
@@ -685,6 +787,9 @@ void async_mark_request() {
     if (work->data->fun != nullptr) {
       work->data->fun->f.fp->hdr.extra_ref++;
     }
+    if (work->data->prom != nullptr) {
+      work->data->prom->extra_ref++;
+    }
     if (work->data->command_giver != nullptr) {
       work->data->command_giver->extra_ref++;
     }
@@ -696,6 +801,9 @@ void async_mark_request() {
   for (auto& req : finished_reqs) {
     if (req->fun != nullptr) {
       req->fun->f.fp->hdr.extra_ref++;
+    }
+    if (req->prom != nullptr) {
+      req->prom->extra_ref++;
     }
     if (req->command_giver != nullptr) {
       req->command_giver->extra_ref++;

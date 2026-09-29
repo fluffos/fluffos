@@ -1,0 +1,4 @@
+// a promise-typed efun argument rejects a statically-known non-promise
+void f() {
+  promise_status(5);
+}

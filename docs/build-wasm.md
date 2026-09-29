@@ -40,8 +40,8 @@ and isn't supported) see
 ## 1. Build the WASM dependencies (once)
 
 The driver needs static WASM builds of **ICU** (Unicode: grapheme
-iteration, charset conversion) and **PCRE** (classic 8.x, for the pcre
-package's efuns) — the two cross-built dependencies:
+iteration, charset conversion) and **PCRE2** (for the pcre package's
+efuns) — the two cross-built dependencies:
 
 ```bash
 tools/wasm/build-deps.sh          # installs into /opt/wasm-deps
@@ -51,7 +51,7 @@ tools/wasm/build-deps.sh          # installs into /opt/wasm-deps
 This is fully scripted, including the ICU cross-compile quirks (the
 `mh-unknown` platform file, and generating the data archive as C source
 with the host `genccode` because `pkgdata` cannot emit wasm objects).
-PCRE is a plain `emconfigure`/`emmake` static build (UTF-8 + Unicode
+PCRE2 is a plain `emconfigure`/`emmake` static build (UTF-8 + Unicode
 properties on, JIT off — wasm has no executable data pages). It only
 runs once; re-runs are no-ops.
 
@@ -159,7 +159,7 @@ The WASM driver ships the `jsbridge` package: LPC code can reach the
 page's JavaScript — `fetch()`, canvas/WebGL, storage, anything the page
 exposes — and get called back asynchronously.
 
-```c
+```lpc
 // synchronous eval; result as a string
 write(js_eval("navigator.userAgent"));
 
@@ -181,7 +181,7 @@ M.fluffos.handlers = {
 
 The reverse direction — the page calling into LPC — is `js_export`:
 
-```c
+```lpc
 js_export("add", (: lpc_add :));   // mixed lpc_add(string *args, int id)
 ```
 

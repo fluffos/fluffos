@@ -19,7 +19,8 @@
 #include "compiler/internal/lexer_utils.h"
 #include "compiler/internal/grammar_rules.h"
 #include "grammar.autogen.h"
-#include "scratchpad.h"
+#include "base/internal/strutils.h"  // u8_string_is_ascii_cached
+#include "base/internal/scratchpad.h"
 #include "symbol.h"
 #include <string>
 #include <utility>
@@ -74,7 +75,7 @@ static void show_overload_warnings(void);
 
 short compatible[11] = {
     /* UNKNOWN */ 0,
-    /* ANY */ 0xfff,
+    /* ANY */ 0x7ff,
     /* NOVALUE to*/ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID) | CT(TYPE_NUMBER),
     /* VOID to*/ CT_SIMPLE(TYPE_VOID) | CT(TYPE_NUMBER),
     /* NUMBER to*/ CT_SIMPLE(TYPE_NUMBER) | CT(TYPE_REAL),
@@ -88,7 +89,7 @@ short compatible[11] = {
 
 short is_type[11] = {
     /* UNKNOWN */ 0,
-    /* ANY */ 0xfff,
+    /* ANY */ 0x7ff,
     /* NOVALUE */ CT_SIMPLE(TYPE_NOVALUE) | CT(TYPE_VOID),
     /* VOID */ CT_SIMPLE(TYPE_VOID) | CT(TYPE_NOVALUE),
     /* NUMBER */ CT_SIMPLE(TYPE_NUMBER),
@@ -115,6 +116,7 @@ int exact_types, global_modifiers;
 int current_type;
 
 int var_defined;
+int compiling_async_function;
 
 unsigned short *comp_def_index_map, *func_index_map;
 unsigned short *prog_flags, *comp_sorted_funcs;
@@ -148,34 +150,67 @@ void rule_clear_operand_ranges(void) {
 
 // Displays a compiler-internal filename (stored without a leading slash)
 // the way the mudlib names it.
-static std::string display_path(const std::string& file) {
-  if (!file.empty() && file[0] == '/') return file;
-  return "/" + file;
+// string_view so it serves both heap strings and the arena-backed ones in
+// a Diagnostic without copying either into the other's allocator.
+static std::string display_path(std::string_view file) {
+  if (!file.empty() && file[0] == '/') return std::string(file);
+  return "/" + std::string(file);
 }
 
 // Fetch one line of a mudlib-relative source file for a diagnostic
 // snippet (macro-definition notes). The driver runs chdir()ed into the
 // mudlib root, so the real path is the mud path without its leading '/'.
 // Best-effort: returns "" when unreadable (in-memory sources, gone files).
+//
+// This used to walk the file with fgetc(), one byte at a time, and a single
+// rendered diagnostic calls it once per level of a macro-expansion chain --
+// so cost was O(levels x filesize) in one-byte stdio calls. Profiling the
+// LPC testsuite measured 45.4 million fgetc() calls, 12% of the entire run,
+// for only 153 rendered diagnostics.
+//
+// Now it reads through a fixed stack buffer and finds line breaks with
+// memchr. No heap buffer and no scratchpad arena for the scan: this runs
+// both DURING a compile (report_compile_diagnostic, from yyerror/yywarn)
+// and well AFTER one (lpcshell renders stored diagnostics once the arena
+// has been reset, and the compiler GTests call it with no compile at all),
+// so arena allocation here would outlive its cycle. Rescanning per level
+// costs nothing worth caching now that the scan is memchr over 8K blocks.
 static std::string read_source_line(const char* mud_path, int line_no) {
   if (mud_path == nullptr || line_no <= 0) return "";
   const char* rel = mud_path[0] == '/' ? mud_path + 1 : mud_path;
   FILE* f = fopen(rel, "rb");
   if (f == nullptr) return "";
+
+  constexpr size_t kMaxLine = 512;  // clamp, as the byte-at-a-time reader did
+  char buf[8192];
   std::string line;
-  int cur = 1;
-  int ch;
-  while ((ch = fgetc(f)) != EOF) {
-    if (cur == line_no) {
-      if (ch == '\n') break;
-      if (line.size() < 512) line += static_cast<char>(ch);
-    } else if (ch == '\n') {
+  int cur = 1;            // line number of the bytes now being scanned
+  bool found = false;     // reached line_no
+  bool complete = false;  // ...and saw its terminating newline
+  size_t n;
+
+  while (!complete && (n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    size_t pos = 0;
+    while (pos < n) {
+      if (cur == line_no) found = true;
+      const char* nl = static_cast<const char*>(memchr(buf + pos, '\n', n - pos));
+      size_t seg_end = (nl != nullptr) ? static_cast<size_t>(nl - buf) : n;
+      if (found && line.size() < kMaxLine) {
+        line.append(buf + pos, std::min(seg_end - pos, kMaxLine - line.size()));
+      }
+      if (nl == nullptr) break;  // line continues into the next block
+      if (found) {
+        complete = true;
+        break;
+      }
       cur++;
-      if (cur > line_no) break;
+      pos = seg_end + 1;
     }
   }
   fclose(f);
-  while (!line.empty() && (line.back() == '\r')) line.pop_back();
+
+  if (!found) return "";  // line number past end of file
+  while (!line.empty() && line.back() == '\r') line.pop_back();
   return line;
 }
 
@@ -191,11 +226,47 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   // Gutter snippet, clang-shaped:
   //   %5d | <source line>
   //         | <marks>
-  auto emit_snippet = [&](int line_no, std::string shown, int caret_col,
-                          const std::vector<Diagnostic::Range>* ranges,
-                          const std::vector<Diagnostic::FixIt>* fixits) {
+  auto emit_snippet = [&](int line_no, std::string_view shown_in, int caret_col,
+                          const ScratchVector<Diagnostic::Range>* ranges,
+                          const ScratchVector<Diagnostic::FixIt>* fixits) {
+    std::string shown(shown_in);
     for (auto& ch : shown) {
       if (ch == '\t') ch = ' ';  // tab as one column, matching capture
+    }
+    /* Window a very long line around the caret, clang-style, instead of
+     * echoing the whole thing. A minified or machine-generated file can put
+     * its entire program on one line, and EVERY diagnostic reproduces that
+     * line in full: 500 warnings on a 34KB line produced 35MB of output and
+     * 24MB appended to debug.log. The echo exists to show the reader where
+     * they are, which a window does just as well.
+     *
+     * col_shift maps a source column to its column in the windowed string,
+     * and is applied to the caret, the range marks and the fix-its below so
+     * they stay aligned. */
+    constexpr size_t kMaxSnippetWidth = 200;
+    constexpr size_t kCaretMargin = 80;
+    int col_shift = 0;
+    int snippet_prefix = 0;
+    if (shown.size() > kMaxSnippetWidth) {
+      size_t const caret = caret_col > 0 ? static_cast<size_t>(caret_col - 1) : 0;
+      size_t start = caret > kCaretMargin ? caret - kCaretMargin : 0;
+      size_t end = start + kMaxSnippetWidth;
+      if (end > shown.size()) {
+        end = shown.size();
+        start = end > kMaxSnippetWidth ? end - kMaxSnippetWidth : 0;
+      }
+      std::string windowed;
+      if (start > 0) {
+        windowed = "...";
+      }
+      size_t const prefix = windowed.size();
+      windowed.append(shown, start, end - start);
+      if (end < shown.size()) {
+        windowed += "...";
+      }
+      col_shift = static_cast<int>(prefix) - static_cast<int>(start);
+      snippet_prefix = static_cast<int>(prefix);
+      shown = std::move(windowed);
     }
     char num[16];
     snprintf(num, sizeof(num), "%5d", line_no);
@@ -207,14 +278,25 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     if (ranges != nullptr) {
       for (const auto& r : *ranges) {
         if (r.line != line_no || r.col_start <= 0 || r.col_start > r.col_end) continue;
-        for (int c = r.col_start; c <= r.col_end && static_cast<size_t>(c) <= marks.size(); c++) {
+        /* Clamp the START, don't skip from it: a range that begins left of
+         * the window has c <= 0, and static_cast<size_t> then wraps to a
+         * huge value, so the loop condition failed on its FIRST test and
+         * the whole underline disappeared instead of being clipped to the
+         * visible part (which made the `if (c <= 0) continue` that used to
+         * sit here dead code). The floor is the first column of real source,
+         * PAST the "..." elision marker -- clamping to 1 instead underlines
+         * the marker itself, which is not part of any operand. */
+        for (int c = std::max(snippet_prefix + 1, r.col_start + col_shift),
+                 last = r.col_end + col_shift;
+             c <= last && static_cast<size_t>(c) <= marks.size(); c++) {
           marks[static_cast<size_t>(c - 1)] = '~';
           any = true;
         }
       }
     }
-    if (caret_col > 0 && static_cast<size_t>(caret_col) <= shown.size() + 1) {
-      marks[static_cast<size_t>(caret_col - 1)] = '^';
+    int const caret_shown = caret_col + col_shift;
+    if (caret_col > 0 && caret_shown > 0 && static_cast<size_t>(caret_shown) <= shown.size() + 1) {
+      marks[static_cast<size_t>(caret_shown - 1)] = '^';
       any = true;
     }
     if (any) {
@@ -226,10 +308,12 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
     }
     if (fixits != nullptr) {
       for (const auto& f : *fixits) {
-        if (f.col_start > 0 && static_cast<size_t>(f.col_start) <= shown.size() + 1) {
-          out += "\n      | " + std::string(static_cast<size_t>(f.col_start - 1), ' ');
+        int const fix_shown = f.col_start + col_shift;
+        if (f.col_start > 0 && fix_shown > 0 &&
+            static_cast<size_t>(fix_shown) <= shown.size() + 1) {
+          out += "\n      | " + std::string(static_cast<size_t>(fix_shown - 1), ' ');
           out += c_caret;
-          out += f.replacement;
+          out.append(f.replacement.data(), f.replacement.size());
           out += c_off;
         }
       }
@@ -252,7 +336,7 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   out += d.is_warning ? "warning: " : "error: ";
   out += c_off;
   out += c_bold;
-  out += d.message;
+  out.append(d.message.data(), d.message.size());
   out += c_off;
   if (!d.snippet.empty()) {
     emit_snippet(d.line, d.snippet, d.column, &d.ranges, &d.fixits);
@@ -272,7 +356,9 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
       out += c_note;
       out += "note: ";
       out += c_off;
-      out += "expanded from macro '" + exp.macro_name + "'";
+      out += "expanded from macro '";
+      out.append(exp.macro_name.data(), exp.macro_name.size());
+      out += "'";
       if (!def_line_text.empty()) {
         emit_snippet(exp.def_line, def_line_text, def_col, nullptr, nullptr);
       }
@@ -298,6 +384,27 @@ std::string render_diagnostic(const Diagnostic& d, bool color) {
   return out;
 }
 
+// See the declaration in compiler.h for why this has to run before the
+// arena is recycled rather than after.
+void compiler_drop_arena_state() {
+  // RELEASE, not clear(). clear() destroys the elements but KEEPS capacity,
+  // so an arena-backed container in global storage would go on holding a
+  // pointer into the arena cycle that is about to be recycled -- and the
+  // next push_back would write through it, into whatever the arena has
+  // since handed out (in practice the lexer's Flex buffers, which is how
+  // this first showed up: a segfault deep in yypop_buffer_state, nowhere
+  // near the diagnostics). Assigning a fresh instance drops the buffer.
+  //
+  // The clear() calls scattered through the diagnostic paths are fine --
+  // those all happen WITHIN one compile, where the buffer is still live.
+  // This function is the only one that runs across a recycle.
+  compiler_diags.clear();  // heap vector; its elements' arena state dies here
+  compiler_diags.shrink_to_fit();
+  compiler_pending_notes = ScratchVector<ScratchString>{};
+  compiler_pending_fixits = ScratchVector<Diagnostic::FixIt>{};
+  compiler_pending_ranges = ScratchVector<Diagnostic::Range>{};
+}
+
 // Builds and stores the structured record for one reported diagnostic --
 // called by yyerror()/yywarn() at the exact moment of the report, because
 // the provenance is LIVE state: the #include stack is popped as includes
@@ -310,11 +417,19 @@ static const Diagnostic& capture_diagnostic(bool is_warning, const char* message
   d.file = current_file != nullptr ? current_file : "";
   d.line = compiler_directive_start_line != 0 ? compiler_directive_start_line : current_line;
   d.message = message;
-  d.included_from = lpc_lex_include_stack();
+  // The lexer's provenance accessors hand back std::string (they outlive
+  // any one compile), so copy the text onto the arena here -- this is the
+  // heap/arena boundary, and the Diagnostic below owns nothing off-arena.
+  for (const auto& inc : lpc_lex_include_stack()) {
+    d.included_from.emplace_back(ScratchString(inc.first.data(), inc.first.size()), inc.second);
+  }
   auto chain = lpc_lex_expansion_chain();
   for (const auto& site : chain) {
-    d.expansions.push_back(Diagnostic::Expansion{site.name, site.def_file, site.def_line,
-                                                 site.invocation_line, site.invocation_column});
+    d.expansions.push_back(Diagnostic::Expansion{ScratchString(site.name.data(), site.name.size()),
+                                                 ScratchString(site.def_file.data(),
+                                                               site.def_file.size()),
+                                                 site.def_line, site.invocation_line,
+                                                 site.invocation_column});
   }
   // Column + snippet (8.1/8.2). Inside an expansion, attribute to the
   // OUTERMOST invocation (chain is innermost-first, so .back()) -- same
@@ -326,14 +441,17 @@ static const Diagnostic& capture_diagnostic(bool is_warning, const char* message
     } else if (void* scanner = lpc_lex_active_scanner()) {
       d.column = yyget_extra(scanner)->token_start_column + 1;
     }
-    d.snippet = lpc_lex_current_source_line();
+    auto src_line = lpc_lex_current_source_line();
+    d.snippet.assign(src_line.data(), src_line.size());
   }
   d.notes = std::move(compiler_pending_notes);
   compiler_pending_notes.clear();
   d.fixits = std::move(compiler_pending_fixits);
   compiler_pending_fixits.clear();
   if (!compiler_current_load_reason.empty()) {
-    d.notes.push_back(compiler_current_load_reason);
+    // std::string on purpose: set by simulate.cc BEFORE compile_file runs,
+    // i.e. before the arena is recycled, so it cannot live there.
+    d.notes.emplace_back(compiler_current_load_reason.data(), compiler_current_load_reason.size());
   }
   d.ranges = compiler_pending_ranges;  // copied, not moved: the owning
                                        // grammar action clears them
@@ -353,13 +471,25 @@ unsigned char string_tags[0x20];
 short freed_string;
 
 /* x_ptr is different inside nested functions */
-unsigned short *type_of_locals, *type_of_locals_ptr;
+lpc_type_t *type_of_locals, *type_of_locals_ptr;
 local_info_t *locals, *locals_ptr;
 
 int locals_size = 0;
 int type_of_locals_size = 0;
 int current_number_of_locals = 0;
 int max_num_locals = 0;
+/* High-water mark of max_num_locals across the WHOLE compile.
+ *
+ * max_num_locals is per-function and reset by free_all_local_names(), so by
+ * the time __INIT is assembled at the end of the compile it reads 0 -- even
+ * though a global initializer's block (`mixed g = catch { int f = 1; };`)
+ * declared locals that are still referenced by local index in __INIT's tree.
+ * generate_function() sizes the optimizer's last_local_refs[] from that
+ * number, and 0 means "allocate nothing", so optimizing __INIT dereferenced
+ * a null pointer and took the driver down while COMPILING one line of
+ * ordinary mudlib source. Sizing __INIT's scratch by the largest count seen
+ * anywhere in the file over-allocates a little and can never be short. */
+static int compile_max_num_locals = 0;
 
 /* This function has strput() semantics; see comments in simulate.c */
 char* get_two_types(char* where, char* end, int type1, int type2) {
@@ -373,10 +503,10 @@ char* get_two_types(char* where, char* end, int type1, int type2) {
 }
 
 void init_locals() {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
 
-  type_of_locals = reinterpret_cast<unsigned short*>(
-      DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "init_locals:1"));
+  type_of_locals = reinterpret_cast<lpc_type_t*>(
+      DCALLOC(max_local_variables, sizeof(lpc_type_t), TAG_LOCALS, "init_locals:1"));
   locals = reinterpret_cast<local_info_t*>(
       DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "init_locals:2"));
   type_of_locals_ptr = type_of_locals;
@@ -385,7 +515,10 @@ void init_locals() {
   current_number_of_locals = max_num_locals = 0;
 }
 
-void free_all_local_names(int flag) {
+/* Take every local name currently in scope back out of scope, WITHOUT
+ * touching max_num_locals -- the runtime-slot high-water mark, which must
+ * keep climbing for as long as one frame is being emitted. */
+void release_local_names(int flag) {
   int i;
 
   for (i = 0; i < current_number_of_locals; i++) {
@@ -396,8 +529,13 @@ void free_all_local_names(int flag) {
     locals_ptr[i].ihe->dn.local_num = -1;
   }
   current_number_of_locals = 0;
-  max_num_locals = 0;
   symbol_record(OP_SYMBOL_FREE, current_file, current_line, "");
+}
+
+void free_all_local_names(int flag) {
+  release_local_names(flag);
+  /* A new frame starts here, so slot numbering restarts too. */
+  max_num_locals = 0;
 }
 
 void deactivate_current_locals() {
@@ -420,10 +558,21 @@ void reactivate_current_locals() {
 void clean_up_locals() {
   int offset;
 
-  offset = locals_ptr + current_number_of_locals - locals;
+  /* Walk only the CURRENT scope, i.e. [locals_ptr, locals_ptr +
+   * current_number_of_locals), not everything from the base of the array.
+   * When a nested scope was opened by rule_lambda_return_type() and never
+   * closed (see pop_n_locals), locals_ptr sits above `locals` with a gap of
+   * entries this function never initialised, and dereferencing their `ihe`
+   * is a null-pointer member access -- the second crash site of the same
+   * root cause. Entries below locals_ptr belong to the enclosing scope and
+   * are released by whoever owns it. */
+  offset = current_number_of_locals;
   while (offset--) {
-    locals[offset].ihe->sem_value--;
-    locals[offset].ihe->dn.local_num = -1;
+    if (locals_ptr[offset].ihe == nullptr) {
+      continue;
+    }
+    locals_ptr[offset].ihe->sem_value--;
+    locals_ptr[offset].ihe->dn.local_num = -1;
   }
   current_number_of_locals = 0;
   max_num_locals = 0;
@@ -436,7 +585,29 @@ void pop_n_locals(int num) {
   int ltype_start, i1;
 
   DEBUG_CHECK(num < 0, "pop_n_locals called with num < 0");
-  if (num == 0) {
+  /* Clamp to what is actually in scope.
+   *
+   * Several callers pop a FIXED count rather than a scope difference --
+   * rule_for()/rule_foreach() pop their loop variable, rule_switch pops its
+   * pre-case declarations -- and a fixed count is only right if the scope
+   * still holds what it did when the count was decided. Bison error recovery
+   * can break that: rule_lambda_return_type() opens a nested locals scope in
+   * a mid-rule action and only rule_primary_expr_anon_func() closes it, so a
+   * syntax error between them (`for (int i = 0; ; ) { function(); }`) leaves
+   * the scope open and the fixed pop drives current_number_of_locals
+   * NEGATIVE. locals_ptr[-1] is then read for its runtime_index and the loop
+   * below writes through the garbage `ihe` it finds -- a SIGSEGV on release
+   * and Debug alike, and an ASan heap-buffer-overflow, from one malformed
+   * mudlib file. Found by fuzzing: 150 of 157 distinct crashing inputs.
+   *
+   * Clamping here rather than at each caller covers all three at once, and
+   * the compile is already failing when it fires. rule_block()'s own
+   * negative-diff clamp stays: it protects the count it computes before the
+   * value ever reaches this function. */
+  if (num > current_number_of_locals) {
+    num = current_number_of_locals;
+  }
+  if (num <= 0) {
     return;
   }
   symbol_record(OP_SYMBOL_POP, current_file, current_line, std::to_string(num).c_str());
@@ -456,7 +627,7 @@ void pop_n_locals(int num) {
 }
 
 int add_local_name(const char* str, int type, parse_node_t* optional_default_arg_value) {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
 
   if (max_num_locals == max_local_variables) {
     yyerror("Too many local variables");
@@ -474,19 +645,34 @@ int add_local_name(const char* str, int type, parse_node_t* optional_default_arg
   if (ihe->dn.local_num == -1) {
     ihe->sem_value++;
   }
+  if (max_num_locals + 1 > compile_max_num_locals) {
+    compile_max_num_locals = max_num_locals + 1;
+  }
   return ihe->dn.local_num = max_num_locals++;
 }
 
 void reallocate_locals() {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
 
   int offset;
   offset = type_of_locals_ptr - type_of_locals;
   type_of_locals = RESIZE(type_of_locals, type_of_locals_size += max_local_variables,
-                          unsigned short, TAG_LOCALS, "reallocate_locals:1");
+                          lpc_type_t, TAG_LOCALS, "reallocate_locals:1");
   type_of_locals_ptr = type_of_locals + offset;
   offset = locals_ptr - locals;
-  locals = RESIZE(locals, locals_size, local_info_t, TAG_LOCALS, "reallocate_locals:2");
+  /* locals_size += ..., not locals_size: the parallel type_of_locals array
+   * above grows, but this one was resized to the size it already had, so it
+   * never grew at all while locals_ptr kept advancing by
+   * current_number_of_locals at every nested-function scope switch
+   * (rule_lambda_return_type). Enough cumulative locals across nested
+   * anonymous functions and add_local_name() writes past the end of the
+   * allocation -- an ASan heap-buffer-overflow WRITE, and a heap-corruption
+   * abort on a Debug build, reachable from ordinary mudlib source.
+   * add_local_name()'s own "Too many local variables" check cannot bound it,
+   * because that compares the PER-LEVEL max_num_locals rather than the
+   * cumulative base locals_ptr sits at. */
+  locals = RESIZE(locals, locals_size += max_local_variables, local_info_t, TAG_LOCALS,
+                  "reallocate_locals:2");
   locals_ptr = locals + offset;
 }
 
@@ -602,7 +788,7 @@ static void copy_new_function(program_t* prog, int index, program_t* defprog, in
   ihe->dn.function_num = where;
 }
 
-static int find_class_member(int which, const char* name, unsigned short* type) {
+static int find_class_member(int which, const char* name, lpc_type_t* type) {
   int i;
   class_def_t* cd;
   class_member_entry_t* cme;
@@ -629,7 +815,7 @@ static int find_class_member(int which, const char* name, unsigned short* type) 
   }
 }
 
-int lookup_any_class_member(char* name, unsigned short* type) {
+int lookup_any_class_member(char* name, lpc_type_t* type) {
   int ret = lookup_any_class_member_soft(name, type);
   if (ret == -1) {
     yyerror("No class in scope has no member '%s'.", name);
@@ -641,7 +827,7 @@ int lookup_any_class_member(char* name, unsigned short* type) {
 // dot/arrow member-access rules to decide whether to fall back to dynamic
 // mapping-key access (F_MAP_MEMBER) instead of reporting a class-member
 // error, for callers where "not a class member" isn't necessarily wrong.
-int lookup_any_class_member_soft(const char* name, unsigned short* type) {
+int lookup_any_class_member_soft(const char* name, lpc_type_t* type) {
   int nc = mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t);
   int i, ret = -1, nret;
   const char* s = findstring(name);
@@ -664,7 +850,7 @@ int lookup_any_class_member_soft(const char* name, unsigned short* type) {
   return ret;
 }
 
-int lookup_class_member(int which, const char* name, unsigned short* type) {
+int lookup_class_member(int which, const char* name, lpc_type_t* type) {
   const char* s = findstring(name);
   int ret;
 
@@ -687,8 +873,21 @@ parse_node_t* reorder_class_values(int which, parse_node_t* node) {
   int i;
 
   cd = (reinterpret_cast<class_def_t*>(mem_block[A_CLASS_DEF].block)) + which;
-  tmp = reinterpret_cast<parse_node_t**>(
-      DCALLOC(cd->size, sizeof(parse_node_t*), TAG_COMPILER, "reorder_class_values"));
+  /* At least one element: an EMPTY class body reaches here with size 0 when
+   * it is instantiated with a named initializer -- `class E { }` then
+   * `new(class E, x: 1)` -- and DCALLOC(0, ...) trips debugmalloc's
+   * `assert(size > 0)`, so a Debug driver ABORTED while compiling that one
+   * line. Release builds were unaffected, which is why it went unnoticed.
+   *
+   * Only the allocation is special-cased, deliberately: both loops below are
+   * bounded by cd->size and do nothing for an empty class, while the member
+   * walk in between still runs and still reports `x` through
+   * lookup_class_member()'s "Class 'E' has no member 'x'" -- which is what a
+   * non-empty class does with a bogus member, and what an early return here
+   * would have silently skipped. */
+  tmp = reinterpret_cast<parse_node_t**>(DCALLOC(cd->size > 0 ? cd->size : 1,
+                                                 sizeof(parse_node_t*), TAG_COMPILER,
+                                                 "reorder_class_values"));
 
   for (i = 0; i < cd->size; i++) {
     tmp[i] = nullptr;
@@ -887,11 +1086,12 @@ static void overload_function(program_t* prog, int index, program_t* defprog, in
   if ((pragmas & PRAGMA_WARNINGS) &&
       !((oldflags | newflags) & (FUNC_NO_CODE | DECL_PRIVATE | DECL_HIDDEN)) &&
       (oldflags & FUNC_INHERITED)) {
-    /* don't scream if one is private.  Why not?  Because I said so.
-     * private is pretty screwed up anyway.  In the future there
-     * won't be such a clash b/c private won't come up the tree.
-     * This also give the coder a way to shut the compiler up when
-     * you do inherit the same object twice in different branches :)
+    /* don't scream if one is private. Hidden/private slots keep their
+     * own definition (see handle_functions); a later inherit with the
+     * same private name is not an override of the earlier inherit's
+     * internal calls (issue #1400). This also gives the coder a way to
+     * shut the compiler up when you inherit the same object twice in
+     * different branches.
      */
     if (!(oldflags & (DECL_PRIVATE | DECL_HIDDEN)) && !(newflags & (DECL_PRIVATE | DECL_HIDDEN))) {
       char buf[1024];
@@ -1059,6 +1259,106 @@ int copy_functions(program_t* from, int typemod) {
   return initializer;
 }
 
+/*
+ * promise<T> type-word helpers (issue #1319). Encoding: svalue.h's
+ * TYPE_MOD_PROMISE comment.
+ */
+
+int promise_payload_type(int t) {
+  /* not a promise (including an ARRAY of promises): `await` passes it
+   * through unchanged, so the type is unchanged too */
+  if (!IS_PROMISE(t)) {
+    return t;
+  }
+  int r = t & ~(TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY);
+  if (t & TYPE_MOD_PROMISE_VALUE_ARRAY) {
+    r |= TYPE_MOD_ARRAY;
+  }
+  return r;
+}
+
+int promise_of_type(int t) {
+  /* an async function declared to return a promise still yields exactly one
+   * promise: the runtime adopts (flattens) a returned promise */
+  if (IS_PROMISE(t)) {
+    return t;
+  }
+  if (t & TYPE_MOD_PROMISE) {
+    /* An ARRAY of promises (TYPE_MOD_PROMISE *and* TYPE_MOD_ARRAY). The
+     * array is not itself a promise, so nothing is adopted and the call
+     * yields a promise OF that array -- but there is only one promise bit,
+     * so `promise<promise<int> *>` cannot be spelled. Describe the payload
+     * as an untyped array: sound (it really is a promise of an array) and
+     * strictly weaker, instead of the bare `t` this used to return, which
+     * claimed the call site was an array and let
+     * `promise<int> *a = fa();` through with a plain promise in it. */
+    return TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY | TYPE_ANY;
+  }
+  int r = t & ~TYPE_MOD_ARRAY;
+  if (t & TYPE_MOD_ARRAY) {
+    r |= TYPE_MOD_PROMISE_VALUE_ARRAY;
+  }
+  return r | TYPE_MOD_PROMISE;
+}
+
+unsigned short promise_value_subtype(int t) {
+  if (!IS_PROMISE(t)) {
+    return 0;
+  }
+  /* Runtime tags are T_* masks, and convert_type() is the driver's one
+   * compile-time-to-runtime mapping -- go through it rather than parking a
+   * compile-time word in an svalue. That keeps classes on the general path
+   * (a runtime class value is a bare array_t with no class identity, so
+   * T_CLASS is all there is to say about one) and keeps the tag meaningful
+   * when the promise crosses objects. */
+  int const rt = convert_type(promise_payload_type(t));
+
+  /* T_ANY ("mixed") and T_INVALID (void/unknown) carry no constraint, which
+   * is exactly what an absent tag means. T_ANY also would not fit: it spans
+   * T_PROMISE at 0x10000, above subtype's 16 bits. Every concrete mask does
+   * fit, and a promise payload can never itself be a promise. */
+  if (rt == T_ANY || rt == T_INVALID) {
+    return 0;
+  }
+  return static_cast<unsigned short>(rt);
+}
+
+/*
+ * The type of an expression that calls simul_efun `n`: its declared return
+ * type, wrapped in a promise when the simul_efun is async.
+ *
+ * FUNC_ASYNC lives in program_t::function_flags, not in the function_t that
+ * SIMUL(n) hands back, so it is read here the same way call_direct() reads
+ * it when dispatching -- through the simul_efun object's program at the
+ * simul's runtime index, following FUNC_ALIAS. Without this the compiler
+ * types an async simul_efun call as its declared return type while the
+ * runtime hands back a promise, and `int x = some_async_simul();` compiles
+ * clean.
+ */
+int simul_efun_call_type(int n) {
+  int t = SIMUL(n)->type & ~DECL_MODS;
+
+  if (!simul_efun_ob || !simul_efun_ob->prog) {
+    return t;
+  }
+  program_t* p = simul_efun_ob->prog;
+  int const nflags = p->last_inherited + p->num_functions_defined;
+  int roff = simuls[n].index;
+  if (roff < 0 || roff >= nflags) {
+    return t;
+  }
+  if (p->function_flags[roff] & FUNC_ALIAS) {
+    roff = p->function_flags[roff] & ~FUNC_ALIAS;
+    if (roff < 0 || roff >= nflags) {
+      return t;
+    }
+  }
+  if (p->function_flags[roff] & FUNC_ASYNC) {
+    t = promise_of_type(t);
+  }
+  return t;
+}
+
 void type_error(const char* str, int type) {
   static char buff[512];
   char* end = EndOf(buff);
@@ -1068,7 +1368,7 @@ void type_error(const char* str, int type) {
   p = strput(p, end, ": \"");
   p = get_type_name(p, end, type);
   p = strput(p, end, "\"");
-  yyerror(buff);
+  yyerror("%s", buff);
 }
 
 /*
@@ -1093,6 +1393,20 @@ int compatible_types(int t1, int t2) {
   if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
     return 1;
   }
+  /* promise<T>: two promises are compatible when their payloads are, and a
+   * promise is never compatible with a non-promise (mixed was handled just
+   * above). An ARRAY of promises is not itself a promise, so it falls
+   * through to the ordinary array rules below with TYPE_MOD_ARRAY intact. */
+  if ((t1 | t2) & TYPE_MOD_PROMISE) {
+    if (!(t1 & TYPE_MOD_PROMISE) || !(t2 & TYPE_MOD_PROMISE) ||
+        (t1 & TYPE_MOD_ARRAY) != (t2 & TYPE_MOD_ARRAY)) {
+      return 0;
+    }
+    if (t1 & TYPE_MOD_ARRAY) {
+      return t1 == t2;
+    }
+    return compatible_types(promise_payload_type(t1), promise_payload_type(t2));
+  }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
   }
@@ -1104,7 +1418,7 @@ int compatible_types(int t1, int t2) {
   } else if (t2 & TYPE_MOD_ARRAY) {
     return 0;
   }
-  if (t1 > 10 || t1 < 0) {
+  if (t1 > TYPE_BUFFER || t1 < 0) {
     fatal("compiler.c: unknown type in compatible_types()");
   }
   return compatible[t1] & (1 << t2);
@@ -1126,6 +1440,20 @@ int compatible_types2(int t1, int t2) {
   }
   if ((t2 == (TYPE_ANY | TYPE_MOD_ARRAY) && (t1 & TYPE_MOD_ARRAY))) {
     return 1;
+  }
+  /* promise<T>: two promises are compatible when their payloads are, and a
+   * promise is never compatible with a non-promise (mixed was handled just
+   * above). An ARRAY of promises is not itself a promise, so it falls
+   * through to the ordinary array rules below with TYPE_MOD_ARRAY intact. */
+  if ((t1 | t2) & TYPE_MOD_PROMISE) {
+    if (!(t1 & TYPE_MOD_PROMISE) || !(t2 & TYPE_MOD_PROMISE) ||
+        (t1 & TYPE_MOD_ARRAY) != (t2 & TYPE_MOD_ARRAY)) {
+      return 0;
+    }
+    if (t1 & TYPE_MOD_ARRAY) {
+      return t1 == t2;
+    }
+    return compatible_types2(promise_payload_type(t1), promise_payload_type(t2));
   }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
@@ -1186,6 +1514,13 @@ static int find_matching_function(program_t* prog, const char* name, parse_node_
       node->l.number = ri;
       type = prog->function_table[i].type;
       fix_class_type(&type, prog);
+      if (flags & FUNC_ASYNC) {
+        /* Same as every other call path: an async call yields a promise OF
+           the declared return type. This is the `base::fn()` route -- a
+           plain inherited call goes through FUNCTION_FLAGS() in
+           grammar_rules_exprs.cc, and this site was missed. */
+        type = promise_of_type(type);
+      }
       node->type = type;
       return 1;
     }
@@ -1298,12 +1633,74 @@ invalid:
  */
 /* Returns an index into A_FUNCTIONS_DEFS.
  */
+/* Is `name` one of the functions the DRIVER calls -- an apply? Both tables are
+ * generated from vm/internal/applies, so neither can drift as applies are
+ * added. object_applies_table[] is the half the driver calls on ANY object;
+ * all_applies_table[] additionally covers the master-only half. */
+static bool in_applies_table(const char* const* table, const char* name) {
+  for (const char* const* apply = table; *apply != nullptr; apply++) {
+    if (strcmp(*apply, name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 int define_new_function(const char* name, int num_arg, int num_local, int flags, int type) {
   int oldindex = -1, num = -1, newindex = -1;
   unsigned short argument_start_index;
   ident_hash_elem_t* ihe;
   function_t* funp = nullptr;
   compiler_temp_t* newfunc;
+
+  /* An apply cannot usefully be async, because the DRIVER is the caller and
+   * it has nowhere to await. It reads the return value immediately, and an
+   * async function returns a promise the instant it parks -- so the driver
+   * reads a promise where it expects a value, and a promise is neither the
+   * number 0 nor a string. Consumers that treat an unrecognised tag as
+   * permissive then read it as "yes": check_valid_path() would grant access,
+   * present()'s IS_ZERO() would make an object answer to every name. Applies
+   * whose value is ignored (create(), init()) fail more quietly but no more
+   * usefully -- the driver treats the object as ready while the body is still
+   * parked.
+   *
+   * This is a LINT, not a security boundary, and it is important not to
+   * mistake it for one. It keys on the DECLARATION, so it catches the direct
+   * mistake and nothing else. It cannot see an ordinary apply that returns
+   * the result of an async call:
+   *
+   *     mixed id(string s) { return slow(); }     // slow() is async
+   *
+   * and it cannot cover add_action() verb functions at all, whose names are
+   * arbitrary mudlib strings. The consumers are where a promise actually has
+   * to be refused; check_valid_path() (packages/core/file.cc) now denies on
+   * one, which is the backstop for the security-relevant case.
+   *
+   * The fix for an apply that wants async work is to call an async function:
+   *
+   *     void create() { start_loading(); }        // apply, ordinary
+   *     async void start_loading() { ... await ... }
+   */
+  if ((flags & FUNC_ASYNC) && !(flags & FUNC_PROTOTYPE)) {
+    if (in_applies_table(object_applies_table, name)) {
+      /* The driver calls this on ANY object, so it is always wrong here. */
+      yyerror(
+          "'%s' is an apply -- the driver calls it and reads its return value, so it cannot be "
+          "'async'. Have it call an async function instead.",
+          name);
+    } else if (in_applies_table(all_applies_table, name)) {
+      /* Master-only: the driver applies it to master_ob and nothing else, so
+       * on any other object the name is the author's to use. A warning rather
+       * than an error, because refusing it outright is a real cost -- this
+       * mudlib's own std/database.lpc has a `private mixed connect()`, and a
+       * database connect is exactly the thing one would want to await. On the
+       * master itself it is still a mistake, which is what the warning says. */
+      yywarn(
+          "'%s' is a master apply: if this object is the master, the driver reads its return "
+          "value and cannot await a promise. Harmless on any other object.",
+          name);
+    }
+  }
 
   oldindex = (ihe = lookup_ident(name)) ? ihe->dn.function_num : -1;
   if (oldindex >= 0) {
@@ -1344,6 +1741,39 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
      */
     if ((funflags & DECL_NOMASK) && !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE))) {
       yyerror("Illegal to redefine 'nomask' function '%s'.", name);
+    }
+
+    /* `async` must agree between a prototype and its definition, and this is
+       an error rather than the warning its neighbours use: async changes the
+       SHAPE of what a call yields (a promise, not the declared type), and a
+       call is typed from whichever declaration the compiler has seen so far.
+       Disagree and the same call is typed one way before the definition and
+       another after it, with no runtime check to catch the difference --
+       `int x = f();` compiles clean while x holds a promise. Only a
+       prototype/definition pair is checked here; the inherited case is
+       checked separately below. */
+    if (((flags | funflags) & FUNC_PROTOTYPE) && !(funflags & FUNC_INHERITED) &&
+        ((flags ^ funflags) & FUNC_ASYNC)) {
+      yyerror("Declaration of '%s' disagrees with its %s about 'async'.", name,
+              (funflags & FUNC_PROTOTYPE) ? "prototype" : "definition");
+    }
+
+    /* The same disagreement across an INHERIT is just as unsound, in both
+       directions, and used to pass without even a warning.
+       The base program is already compiled: every call to this function
+       inside it was typed against the base's own declaration. Changing
+       async-ness in an override changes what those calls actually yield --
+       `int x = f();` in the base receives a promise, `if (f())` becomes
+       unconditionally true, and the first arithmetic on the result errors at
+       runtime, far from the cause. Changing any OTHER part of the return type
+       across an override already warns; this one is stronger than a warning
+       because there is no runtime check behind it. */
+    if ((funflags & FUNC_INHERITED) && !((flags | funflags) & (FUNC_UNDEFINED | FUNC_PROTOTYPE)) &&
+        ((flags ^ funflags) & FUNC_ASYNC)) {
+      yyerror("'%s' is declared %s in the inherited program: an override must agree, "
+              "because calls compiled there expect %s.",
+              name, (funflags & FUNC_ASYNC) ? "async" : "non-async",
+              (funflags & FUNC_ASYNC) ? "a promise" : "the declared type");
     }
 
     /* only check prototypes for matching.  It shouldn't be required that
@@ -1486,7 +1916,7 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
       }
     }
     *(reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_INDEX].block) + num) =
-        mem_block[A_ARGUMENT_TYPES].current_size / sizeof(unsigned short);
+        mem_block[A_ARGUMENT_TYPES].current_size / sizeof(lpc_type_t);
     add_to_mem_block(A_ARGUMENT_TYPES, (char*)type_of_locals_ptr,
                      num_arg * sizeof(*type_of_locals_ptr));
     if (!CONFIG_INT(__RC_SUPPRESS_ARGUMENT_WARNINGS__)) {
@@ -1553,7 +1983,7 @@ int define_variable(const char* name, int type) {
 
 int define_new_variable(const char* name, int type) {
   int n;
-  unsigned short* tp;
+  lpc_type_t* tp;
   const char** np;
 
   var_defined = 1;
@@ -1561,8 +1991,12 @@ int define_new_variable(const char* name, int type) {
   n = define_variable(name, type);
   np = reinterpret_cast<const char**>(allocate_in_mem_block(A_VAR_NAME, sizeof(char*)));
   *np = name;
-  tp = reinterpret_cast<unsigned short*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(unsigned short)));
-  *tp = type;
+  tp = reinterpret_cast<lpc_type_t*>(allocate_in_mem_block(A_VAR_TYPE, sizeof(lpc_type_t)));
+  // define_variable() may add DECL_NOSAVE when this name already exists
+  // (inherited or earlier in this file) so save_object() emits one key.
+  // That flag used to live only in A_VAR_TEMP and never reached
+  // prog->variable_types (#1381).
+  *tp = VAR_TEMP(n)->type;
   symbol_record(OP_SYMBOL_VAR, current_file, current_line, name);
   return n;
 }
@@ -1612,8 +2046,9 @@ int decl_fix(int x) {
   return rest | DECL_PROTECTED;
 }
 
-const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",   "string",
-                                     "object",  "mapping", "function", "float", "buffer"};
+const char* compiler_type_names[] = {"unknown", "mixed",   "void",     "void",  "int",
+                                     "string",  "object",  "mapping",  "function", "float",
+                                     "buffer"};
 
 /* This routine has the semantics of strput(); see comments in simulate.c */
 
@@ -1655,26 +2090,88 @@ char* get_type_modifiers(char* where, char* end, int type) {
   if (type & FUNC_VARARGS) {
     where = strput(where, end, "varargs ");
   }
+  if (type & FUNC_ASYNC) {
+    where = strput(where, end, "async ");
+  }
 
   return where;
+}
+
+/*
+ * The class name behind a TYPE_MOD_CLASS type word, or nullptr when it
+ * cannot be known here.
+ *
+ * A class index is program-local, so it only means something while the
+ * defining program's own tables are live -- that is, during its compile.
+ * get_type_name() is also called with no compile in progress (the
+ * disassembler, generate_keywords), where the same index would name a
+ * different class or nothing at all; there we print the bare kind rather
+ * than a confidently wrong name. Every lookup is bounds-checked because the
+ * type word can reach here from a partially-built or erroring compile.
+ */
+/* Set while a RUNTIME consumer (functions()/variables()/dump_prog(), i.e. a
+ * caller holding some other program's type word) is rendering. A compile can
+ * be in flight underneath it -- several master applies run mid-compile
+ * (valid_override, inherit_program, include_file, the error handler) and a
+ * mudlib is free to call reflection efuns from them -- and resolving that
+ * caller's class index against the in-flight compile's class table names a
+ * class from an unrelated program. Print the bare kind instead, which is
+ * what the driver did before class names were added. */
+static int rendering_foreign_type = 0;
+
+void set_type_name_foreign(int on) { rendering_foreign_type = on; }
+
+static const char* compiling_class_name(int idx) {
+  if (rendering_foreign_type || !current_file || !mem_block[A_CLASS_DEF].block ||
+      !mem_block[A_STRINGS].block) {
+    return nullptr;
+  }
+  if (idx < 0 || idx >= static_cast<int>(mem_block[A_CLASS_DEF].current_size / sizeof(class_def_t))) {
+    return nullptr;
+  }
+  int const sidx = CLASS(idx)->classname;
+  if (sidx < 0 || sidx >= static_cast<int>(mem_block[A_STRINGS].current_size / sizeof(char*))) {
+    return nullptr;
+  }
+  return PROG_STRING(sidx);
 }
 
 char* get_type_name(char* where, char* end, int type) {
   int pointer = 0;
 
-  where = get_type_modifiers(where, end, type);
+  /* A class type word keeps its class INDEX in bits 0-6 (CLASS_NUM_MASK),
+   * which overlap FUNC_VARARGS (0x20) and FUNC_ASYNC (0x40) -- so index 33
+   * would print as "varargs class c33" and index 65 as "async class c65".
+   * Only the DECL_* modifiers can legitimately accompany a class here: a
+   * function's FUNC_* flags live in program_t::function_flags, never in the
+   * function_t::type word this renders. Applies to promise<class T> too,
+   * whose payload index sits in the same low bits. */
+  where = get_type_modifiers(where, end,
+                             (type & TYPE_MOD_CLASS) ? (type & DECL_MODS) : type);
   type &= ~DECL_MODS;
   if (type & TYPE_MOD_ARRAY) {
     pointer = 1;
     type &= ~TYPE_MOD_ARRAY;
   }
-  if (type & TYPE_MOD_CLASS) {
-    where = strput(where, end, "class ");
-    /* we're sometimes called from outside the compiler * /
-    if (current_file)
-        where = strput(where, end, PROG_STRING(CLASS(type &
-    ~TYPE_MOD_CLASS)->name));
-        and that just doesn't work */
+  if (type & TYPE_MOD_PROMISE) {
+    /* render the payload with the same routine, minus its trailing space */
+    char inner[128];
+    char* ip = get_type_name(inner, EndOf(inner), promise_payload_type(type));
+
+    if (ip > inner && ip[-1] == ' ') {
+      *(ip - 1) = '\0';
+    }
+    where = strput(where, end, "promise<");
+    where = strput(where, end, inner);
+    where = strput(where, end, ">");
+  } else if (type & TYPE_MOD_CLASS) {
+    const char* cname = compiling_class_name(type & CLASS_NUM_MASK);
+
+    where = strput(where, end, "class");
+    if (cname) {
+      where = strput(where, end, " ");
+      where = strput(where, end, cname);
+    }
   } else {
     DEBUG_CHECK(type >= sizeof compiler_type_names / sizeof compiler_type_names[0], "Bad type\n");
     where = strput(where, end, compiler_type_names[type]);
@@ -1714,6 +2211,19 @@ short store_prog_string(const char* str) {
     str = make_shared_string(origin_str);
     is_new_string = true;
   }
+
+  // Settle "is this pure ASCII?" HERE, at compile time, once per literal.
+  //
+  // Every program string literal is interned through this one function, and
+  // the shared-string header has a field for the answer -- so paying a single
+  // scan now means sizeof()/indexing on a literal never scans at runtime, no
+  // matter how hot the loop around it is. The alternative is deriving it
+  // lazily on first use: the same scan, but on the runtime path and after the
+  // mud is live.
+  //
+  // Cheap and idempotent -- a string already interned by an earlier compile
+  // just reads its cached tag straight back.
+  u8_string_is_ascii_cached(str, static_cast<int32_t>(strlen(str)), /*counted=*/true);
 
   STRING_HASH(hash, str);
   idxp = &string_idx[hash];
@@ -1835,7 +2345,7 @@ int validate_function_call(int f, parse_node_t* args) {
   int num_arg = (args ? args->kind : 0);
   int num_var = 0;
   parse_node_t* pn = args;
-  unsigned short* arg_types = nullptr;
+  lpc_type_t* arg_types = nullptr;
   program_t* prog;
 
   while (pn) {
@@ -1884,7 +2394,7 @@ int validate_function_call(int f, parse_node_t* args) {
       int which = FUNCTION_TEMP(f)->u.index;
       int start = *(reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_INDEX].block) + which);
       if (start != INDEX_START_NONE) {
-        arg_types = reinterpret_cast<unsigned short*>(mem_block[A_ARGUMENT_TYPES].block) + start;
+        arg_types = reinterpret_cast<lpc_type_t*>(mem_block[A_ARGUMENT_TYPES].block) + start;
       }
     }
 
@@ -1919,7 +2429,7 @@ int validate_function_call(int f, parse_node_t* args) {
           p = strput(p, end, funp->funcname);
           p = strput(p, end, " ");
           p = get_two_types(p, end, arg_types[i], tmp);
-          yyerror(buff);
+          yyerror("%s", buff);
         }
         enode = enode->r.expr;
       }
@@ -1998,7 +2508,20 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
     return node;
   }
 
-  switch (intype & (~DECL_MODS)) {
+  /* Derive the runtime tag from a COPY: `intype` is also the static type of
+   * the wrapper node built below, so folding the payload away here would
+   * retype every checked expression as promise<unknown>. That is what an
+   * indexed `promise<T> *` element hits (rule_primary_expr_index strips
+   * TYPE_MOD_ARRAY and re-checks the element), leaving legal strict_types
+   * code rejected as `promise<int> vs promise<unknown>`. */
+  lpc_type_t runtype = intype;
+  if ((runtype & (TYPE_MOD_PROMISE | TYPE_MOD_ARRAY)) == TYPE_MOD_PROMISE) {
+    runtype = TYPE_MOD_PROMISE; /* the payload has no runtime representation */
+  }
+  switch (runtype & (~DECL_MODS)) {
+    case TYPE_MOD_PROMISE:
+      type = T_PROMISE;
+      break;
     case 0:
     case 3:
       // error situation, don't bother
@@ -2025,7 +2548,7 @@ parse_node_t* add_type_check(parse_node_t* node, int intype) {
       type = T_BUFFER;
       break;
     default:
-      if (intype & TYPE_MOD_ARRAY) {
+      if (runtype & TYPE_MOD_ARRAY) {
         type = T_ARRAY;
       } else {
         type = T_CLASS;
@@ -2320,19 +2843,46 @@ void yywarn(const char* fmt, ...) {
     return;
   }
 
+  /* Cap, for the same reason yyerror() caps at 5 -- but the cost here is
+   * worse than a long list. Every report echoes its source line, so N
+   * warnings on one long line cost O(N x line length): a machine-generated
+   * or minified file with 500 unused locals on one line turned 34KB of
+   * source into 35MB of output and 24MB appended to debug.log, and an object
+   * that recompiles does it again each time. Truncating the echo (see
+   * kMaxSnippetWidth in render_diagnostic) removes the line-length factor;
+   * this removes the count factor.
+   *
+   * The limit is generous -- a real file with more than this many warnings
+   * has a problem the first hundred already told you about -- and the last
+   * report says how many were dropped, so the output is never silently
+   * incomplete. */
+  constexpr int kMaxParseWarnings = 100;
+  if (num_parse_warn >= kMaxParseWarnings) {
+    if (num_parse_warn == kMaxParseWarnings) {
+      num_parse_warn++;
+      report_compile_diagnostic(capture_diagnostic(
+          /*is_warning=*/true, "too many warnings in this file; further warnings suppressed"));
+    }
+    compiler_pending_notes.clear();
+    compiler_pending_fixits.clear();
+    return;
+  }
+  num_parse_warn++;
   report_compile_diagnostic(capture_diagnostic(/*is_warning=*/true, buf));
 }
 
 /*
  * Compile an LPC file.
  */
-program_t* compile_file_fd(int fd, const char* name, vm_context_t* vm_context) {
+program_t* compile_file_fd(int fd, const char* name, vm_context_t* vm_context,
+                           ScratchArena* arena) {
   prolog_source_fd = fd;  // consumed-and-cleared by prolog (unwind-safe)
   prolog_source_is_fd = true;
-  return compile_file(std::string_view{}, name, vm_context);
+  return compile_file(std::string_view{}, name, vm_context, arena);
 }
 
-program_t* compile_file(std::string_view source, const char* name, vm_context_t* vm_context) {
+program_t* compile_file(std::string_view source, const char* name, vm_context_t* vm_context,
+                        ScratchArena* arena) {
   static int guard = 0;
   program_t* prog;
   extern int func_present;
@@ -2351,6 +2901,33 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   }
   guard = 1;
 
+  /* Borrow the caller's arena for the duration. We never reset it and
+   * never free it: the caller owns that memory and decides when it dies,
+   * which is the whole reason compiler output can outlive the compile.
+   *
+   * A caller that does not care (arena == nullptr) gets the shared default
+   * arena, which IS ours to recycle -- so it is reset here, on the way in.
+   * Recycling on entry rather than on exit is the point of the whole
+   * inversion: the previous compile's transients stay readable until the
+   * next compile actually starts.
+   *
+   * The default arena is deliberately process-lifetime rather than a local
+   * declared here. A fresh arena per compile would discard the retained
+   * chunk cache every time -- that cache is what drives a long-lived driver
+   * to zero chunk mallocs in the steady state -- and would leave
+   * scratch_stats()/mud_status() describing an arena that never took part
+   * in a compile.
+   */
+  ScratchArena& compile_arena = (arena != nullptr) ? *arena : scratch_default_arena();
+  if (arena == nullptr) {
+    // Release last compile's arena-backed records BEFORE recycling the
+    // arena they live in -- see compiler_drop_arena_state(). A caller that
+    // supplies its own arena owns this ordering itself.
+    compiler_drop_arena_state();
+    compile_arena.reset();
+  }
+  ScratchArenaBinding const arena_binding(compile_arena);
+
   // Publish this compile's identity on the one state object for the
   // duration (cleared in the DEFER below).
   g_compile.filename = name;
@@ -2361,7 +2938,10 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   int saved_current_line = current_line;
   int saved_current_line_base = current_line_base;
   int saved_current_line_saved = current_line_saved;
-  int saved_total_lines = total_lines;
+  // total_lines is a process-wide compile statistic for
+  // query_load_average()'s "comp lines/s", not per-file state. Nested
+  // compile_file() (inherit) and this DEFER must leave it accumulated;
+  // restoring it here zeroed every load after the Flex migration (#1385).
   const char* saved_current_file = current_file;
   int saved_current_file_id = current_file_id;
   int saved_pragmas = pragmas;
@@ -2406,18 +2986,26 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   int saved_current_number_of_locals = current_number_of_locals;
   int saved_max_num_locals = max_num_locals;
 
+  // Cleared only by the `function` production's final action, so an aborted
+  // compile (lex_fatal / error() unwind between a header's rule_func_type()
+  // and rule_func()) would otherwise leak a stale 1 into the NEXT compile,
+  // letting await/acatch pass their async-context check in that file's
+  // global initializers.
+  int saved_compiling_async_function = compiling_async_function;
+  compiling_async_function = 0;
+
   // Save the original pointers and sizes of local variable scratchpads
-  unsigned short* saved_type_of_locals = type_of_locals;
+  lpc_type_t* saved_type_of_locals = type_of_locals;
   local_info_t* saved_locals = locals;
   int saved_type_of_locals_size = type_of_locals_size;
   int saved_locals_size = locals_size;
-  unsigned short* saved_type_of_locals_ptr = type_of_locals_ptr;
+  lpc_type_t* saved_type_of_locals_ptr = type_of_locals_ptr;
   local_info_t* saved_locals_ptr = locals_ptr;
 
   // Allocate fresh, isolated local variable scratchpads for this compilation level
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
-  type_of_locals = reinterpret_cast<unsigned short*>(
-      DCALLOC(max_local_variables, sizeof(unsigned short), TAG_LOCALS, "compile_file:1"));
+  auto max_local_variables = kMaxLocalVariables;
+  type_of_locals = reinterpret_cast<lpc_type_t*>(
+      DCALLOC(max_local_variables, sizeof(lpc_type_t), TAG_LOCALS, "compile_file:1"));
   locals = reinterpret_cast<local_info_t*>(
       DCALLOC(max_local_variables, sizeof(local_info_t), TAG_LOCALS, "compile_file:2"));
   type_of_locals_size = max_local_variables;
@@ -2459,7 +3047,6 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
       current_line = saved_current_line;
       current_line_base = saved_current_line_base;
       current_line_saved = saved_current_line_saved;
-      total_lines = saved_total_lines;
       current_file = saved_current_file;
       current_file_id = saved_current_file_id;
       pragmas = saved_pragmas;
@@ -2496,6 +3083,7 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
 
       current_number_of_locals = saved_current_number_of_locals;
       max_num_locals = saved_max_num_locals;
+      compiling_async_function = saved_compiling_async_function;
 
       type_of_locals = saved_type_of_locals;
       locals = saved_locals;
@@ -2705,7 +3293,16 @@ static void handle_functions() {
         /* except the case where new_index is actually final_index */
 
         if (new_index != final_index) {
-          prog_flags[new_index] = FUNC_ALIAS | final_index;
+          /* A hidden (inherited private) slot must keep its own definition.
+           * F_CALL_FUNCTION_BY_ADDRESS in the inherit's bytecode indexes
+           * this slot via function_index_offset; aliasing it to a later
+           * inherit's same-named private made pa->a_call() run pb's
+           * function (issue #1400). Public/visible overloads still alias. */
+          if (cur_def->flags & DECL_HIDDEN) {
+            prog_flags[new_index] = cur_def->flags;
+          } else {
+            prog_flags[new_index] = FUNC_ALIAS | final_index;
+          }
         }
       }
     }
@@ -2716,7 +3313,8 @@ static void handle_functions() {
  * The program has been compiled. Prepare a 'program_t' to be returned.
  */
 static program_t* epilog(void) {
-  int size, i, lnsz, lnoff;
+  int size, i;
+  size_t lnsz, lnoff;
   char* p;
   int num_func;
   ident_hash_elem_t* ihe;
@@ -2755,11 +3353,24 @@ static program_t* epilog(void) {
     CREATE_RETURN(pn, nullptr);
     newnode = comp_trees[TREE_INIT];
     CREATE_TWO_VALUES(comp_trees[TREE_INIT], 0, newnode, pn);
-    fun = define_new_function(APPLY___INIT, 0, 0, DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
+    /* num_local is compile_max_num_locals, not 0: a global initializer may
+     * declare locals inside a catch {} / time_expression {} block, and __INIT
+     * has to allocate slots for them or the generated code pushes locals the
+     * frame does not have ("Invalid Program: op F_TRANSFER_LOCAL Tried to
+     * push non-existent local" at load time). Sized by the largest count seen
+     * anywhere in the file: initializers run as sequential statements so the
+     * slots are reused, and over-allocating a handful of svalues for the
+     * duration of __INIT is cheaper than threading a second high-water mark
+     * through the parser. */
+    fun = define_new_function(APPLY___INIT, 0, compile_max_num_locals,
+                              DECL_HIDDEN | FUNC_STRICT_TYPES, TYPE_VOID);
     pn = new_node_no_line();
     pn->kind = NODE_FUNCTION;
     pn->v.number = fun;
-    pn->l.number = 0;
+    /* Not 0: a global initializer may declare locals inside a catch {} /
+     * time_expression {} block, and their indices appear in this tree (see
+     * compile_max_num_locals). */
+    pn->l.number = compile_max_num_locals;
     pn->r.expr = comp_trees[TREE_INIT];
     comp_trees[TREE_INIT] = pn;
   }
@@ -2855,6 +3466,25 @@ static program_t* epilog(void) {
     size += align(num_func * sizeof(unsigned short));
   }
 
+  /* A_INCLUDES is outside NUMPAREAS (compile-time only historically);
+   * persist it so include_list() can report the files this program
+   * actually opened (issue #1356). */
+  size += align(mem_block[A_INCLUDES].current_size);
+
+  /* file_info header is two ints:
+   *   [0] total bytes of the file_info+line_info allocation
+   *       (dump_line_numbers / dump_prog_json use it as li_end)
+   *   [1] offset in lpc_file_info_t units to the line-number bytes
+   *       (find_line, main_lpcc, the disassembler)
+   * Then (count, file-id) pairs. Words are int so they match current_line
+   * and the rest of the line-number pipeline (issue #1359). Compute the
+   * sizes in size_t to avoid signed overflow, then store as int -- they
+   * fit whenever mem_block could build the table.
+   */
+  lnoff = 2 + static_cast<size_t>(mem_block[A_FILE_INFO].current_size) / sizeof(lpc_file_info_t);
+  lnsz = lnoff * sizeof(lpc_file_info_t) +
+         static_cast<size_t>(mem_block[A_LINENUMBERS].current_size);
+
   p = reinterpret_cast<char*>(DMALLOC(size, TAG_PROGRAM, "epilog: 1"));
   prog = new (p) program_t;
   prog->total_size = size;
@@ -2876,16 +3506,13 @@ static program_t* epilog(void) {
   total_num_prog_blocks++;
   total_prog_block_size += size;
 
-  /* Format is now:
-   * <short total size> <short line_info_offset> <file info> <line info>
+  /* Format:
+   * <int total size> <int line_info_offset> <file info> <line info>
    */
-  lnoff = 2 + (mem_block[A_FILE_INFO].current_size / sizeof(short));
-  lnsz = lnoff * sizeof(short) + mem_block[A_LINENUMBERS].current_size;
+  prog->file_info = reinterpret_cast<lpc_file_info_t*>(DMALLOC(lnsz, TAG_LINENUMBERS, "epilog"));
 
-  prog->file_info = reinterpret_cast<unsigned short*>(DMALLOC(lnsz, TAG_LINENUMBERS, "epilog"));
-
-  prog->file_info[0] = static_cast<unsigned short>(lnsz);
-  prog->file_info[1] = static_cast<unsigned short>(lnoff);
+  prog->file_info[0] = static_cast<lpc_file_info_t>(lnsz);
+  prog->file_info[1] = static_cast<lpc_file_info_t>(lnoff);
 
   memcpy((reinterpret_cast<char*>(&prog->file_info[2])), mem_block[A_FILE_INFO].block,
          mem_block[A_FILE_INFO].current_size);
@@ -2969,7 +3596,7 @@ static program_t* epilog(void) {
   if (mem_block[A_ARGUMENT_INDEX].current_size) {
     unsigned short* dest;
 
-    prog->argument_types = reinterpret_cast<unsigned short*>(p);
+    prog->argument_types = reinterpret_cast<lpc_type_t*>(p);
     copy_in(A_ARGUMENT_TYPES, &p);
 
     dest = prog->type_start = reinterpret_cast<unsigned short*>(p);
@@ -3000,7 +3627,7 @@ static program_t* epilog(void) {
 
   prog->variable_table = reinterpret_cast<char**>(p);
   copy_in(A_VAR_NAME, &p);
-  prog->variable_types = reinterpret_cast<unsigned short*>(p);
+  prog->variable_types = reinterpret_cast<lpc_type_t*>(p);
   copy_in(A_VAR_TYPE, &p);
 
   prog->num_inherited = mem_block[A_INHERITS].current_size / sizeof(inherit_t);
@@ -3009,6 +3636,14 @@ static program_t* epilog(void) {
     copy_in(A_INHERITS, &p);
   } else {
     prog->inherit = nullptr;
+  }
+
+  prog->include_names_size = mem_block[A_INCLUDES].current_size;
+  if (prog->include_names_size) {
+    prog->include_names = p;
+    copy_in(A_INCLUDES, &p);
+  } else {
+    prog->include_names = nullptr;
   }
 
   prog->apply_lookup_table.reset(nullptr);
@@ -3056,7 +3691,6 @@ static program_t* epilog(void) {
   }
   release_tree();
   uninitialize_parser();
-  scratch_destroy();
   clean_up_locals();
   free_unused_identifiers();
   end_new_file();
@@ -3072,6 +3706,7 @@ static bool prolog(std::string_view source, const char* name, void* scanner) {
 
   function_context.num_parameters = -1;
   num_parse_error = 0;
+  num_parse_warn = 0;
   global_modifiers = 0;
   var_defined = 0;
 
@@ -3087,6 +3722,7 @@ static bool prolog(std::string_view source, const char* name, void* scanner) {
   for (i = 0; i < NUMTREES; i++) {
     comp_trees[i] = nullptr;
   }
+  compile_max_num_locals = 0;
   prog_flags = nullptr;
   func_index_map = nullptr;
   comp_sorted_funcs = nullptr;
@@ -3194,9 +3830,6 @@ static void clean_parser() {
   release_tree();
   uninitialize_parser();
   clean_up_locals();
-  // (Buffers were torn down at the top of this function; the arena reset
-  // must still come after everything that reads arena memory.)
-  scratch_destroy();
   free_unused_identifiers();
 }
 
@@ -3310,11 +3943,12 @@ void prepare_cases(parse_node_t* pn, int start) {
       save_file_info(current_file_id, current_line - current_line_saved);
       current_line_saved = current_line;
 
-      translate_absolute_line(
-          (*ce)->line, reinterpret_cast<unsigned short*>(mem_block[A_FILE_INFO].block), &fi1, &l1);
-      translate_absolute_line((*(ce - 1))->line,
-                              reinterpret_cast<unsigned short*>(mem_block[A_FILE_INFO].block), &fi2,
-                              &l2);
+      {
+        auto* fi_base = reinterpret_cast<lpc_file_info_t*>(mem_block[A_FILE_INFO].block);
+        auto* fi_end = fi_base + mem_block[A_FILE_INFO].current_size / sizeof(lpc_file_info_t);
+        translate_absolute_line((*ce)->line, fi_base, &fi1, &l1, fi_end);
+        translate_absolute_line((*(ce - 1))->line, fi_base, &fi2, &l2, fi_end);
+      }
       f1 = PROG_STRING(fi1 - 1);
       f2 = PROG_STRING(fi2 - 1);
 
@@ -3335,7 +3969,7 @@ void prepare_cases(parse_node_t* pn, int start) {
       }
       p = strput_int(p, end, l2);
       p = strput(p, end, ".");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
     (*(ce - 1))->l.expr = *ce;
     if ((*ce)->v.expr) {
@@ -3358,11 +3992,16 @@ void prepare_cases(parse_node_t* pn, int start) {
 }
 
 void save_file_info(int file_id, int lines) {
-  short fi[2];
+  /* One (count, file-id) pair per contiguous stretch. Words are int, so
+   * a 65536-line file is a single entry -- the 16-bit wrap that used to
+   * make translate_absolute_line() walk off the table (issue #1355 /
+   * #1359) cannot happen. A zero-line entry is still legitimate (an
+   * #include on the first line of a file) and must emit exactly one pair. */
+  lpc_file_info_t fi[2];
 
-  fi[0] = lines;
+  fi[0] = lines < 0 ? 0 : lines;
   fi[1] = file_id;
-  add_to_mem_block(A_FILE_INFO, (char*)&fi[0], sizeof(fi));
+  add_to_mem_block(A_FILE_INFO, reinterpret_cast<char*>(&fi[0]), sizeof(fi));
 }
 
 int add_program_file(const char* name, int top) {

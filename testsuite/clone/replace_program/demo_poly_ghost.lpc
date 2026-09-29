@@ -1,0 +1,13 @@
+// One of three concrete monster types
+// demo_poly_shell.lpc inherits and can
+// replace_program() itself down to. See that file's header, and
+// demo_..._goblin.lpc's comment for why hp/attack_damage() are
+// duplicated per concrete type rather than shared on the base.
+inherit "/clone/replace_program/demo_poly_base";
+
+int hp = 6;
+int query_hp() { return hp; }
+
+int attack_damage() { return 2; }
+
+int is_ghost() { return 1; }

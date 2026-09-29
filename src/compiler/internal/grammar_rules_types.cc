@@ -4,7 +4,7 @@
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 
@@ -26,6 +26,10 @@ parse_node_t* rule_modifier_change(LPC_INT modifiers) {
     yyerror("Illegal modifier 'varargs' in global modifier list.");
     modifiers &= ~FUNC_VARARGS;
   }
+  if (modifiers & FUNC_ASYNC) {
+    yyerror("Illegal modifier 'async' in global modifier list.");
+    modifiers &= ~FUNC_ASYNC;
+  }
   if (!(modifiers & DECL_ACCESS)) {
     modifiers |= DECL_PUBLIC;
   }
@@ -45,6 +49,26 @@ void rule_member_list_set_type(LPC_INT basic_type) { current_type = basic_type; 
 parse_node_t* rule_default_arg_value(parse_node_t* expr) {
   if (current_function_context->num_locals) {
     yyerror("Illegal to use local variable in functional.");
+  }
+  /* A local DECLARED inside the default expression -- `int f(int a, int b :
+   * (: (catch { int q = 1; } ? 7 : 5) :))` -- does not go through
+   * num_locals above; add_local_name() puts it in the ENCLOSING function's
+   * numbering. And the parameter itself is registered only after its default
+   * has been parsed (the grammar reduces new_local_name's action in
+   * rule_param_decl_typed_name, after optional_default_arg_value), so such a
+   * declaration takes the slot the parameter was going to get and pushes the
+   * parameter one higher.
+   *
+   * The result is silent and ugly: `f` above compiled to read `b` from LV2
+   * while its caller pushes arguments at LV0..LV1, so f(1) returned 100
+   * instead of 105 and f(2, 3) returned 200 instead of 203 -- losing the
+   * argument that WAS passed. Nothing diagnosed it, and the shift shows up
+   * only if a parameter follows, which is why the same declaration inside an
+   * ordinary functional appears to work. */
+  if (max_num_locals != current_function_context->entry_num_locals) {
+    yyerror(
+        "Illegal to declare a local variable in a default argument expression: it would take "
+        "the parameter's own slot.");
   }
   if (current_function_context->values_list->r.expr) {
     current_function_context->values_list->r.expr->kind =
@@ -77,7 +101,7 @@ LPC_INT rule_type_modifier_list(LPC_INT modifier, LPC_INT list) {
 }
 
 LPC_INT rule_type(LPC_INT modifiers, LPC_INT basic_type) {
-  LPC_INT res = (modifiers << 16) | basic_type;
+  LPC_INT res = PACK_TYPE_MODS(modifiers) | basic_type;
   current_type = res;
   return res;
 }
@@ -89,6 +113,28 @@ LPC_INT rule_atomic_type_class(ident_hash_elem_t* ihe) {
   } else {
     return ihe->dn.class_num | TYPE_MOD_CLASS;
   }
+}
+
+/* bare `promise` == promise<mixed> */
+LPC_INT rule_atomic_type_promise() { return TYPE_MOD_PROMISE | TYPE_ANY; }
+
+LPC_INT rule_atomic_type_promise_of(LPC_INT payload, LPC_INT close_op) {
+  if (close_op != F_GT) {
+    /* `promise<int >= x` and friends: the shared L_ORDER token was not a
+       plain '>'. Diagnose rather than silently accepting the declaration. */
+    yyerror("Expected '>' to close a promise<...> type.");
+  }
+  if (payload & TYPE_MOD_PROMISE) {
+    /* promise<promise<T>> is meaningless: resolving a promise with a promise
+       adopts it, so a promise value is never itself a promise. */
+    yyerror("A promise payload type may not itself be a promise.");
+    payload &= ~(TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY);
+  }
+  if (payload == TYPE_VOID) {
+    yyerror("Illegal to declare a promise of type void.");
+    payload = TYPE_ANY;
+  }
+  return promise_of_type(payload);
 }
 
 LPC_INT rule_atomic_type_class_identifier(const ScratchString* identifier) {

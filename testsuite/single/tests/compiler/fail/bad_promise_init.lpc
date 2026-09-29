@@ -1,0 +1,4 @@
+// a promise-typed variable rejects a non-promise initializer
+void f() {
+  promise p = 5;
+}

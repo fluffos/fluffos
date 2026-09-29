@@ -1,0 +1,26 @@
+// issue #1400: same-named private functions in two inherits. Each
+// inherit's own code (and function pointers taken inside it) must keep
+// calling its own private. A later inherit must not steal the slot.
+void do_tests() {
+  ASSERT_EQ(1, load_object("/inherit/priv_same_a")->a_call());
+  ASSERT_EQ(2, load_object("/inherit/priv_same_b")->b_call());
+
+  object ab = load_object("/clone/priv_same_ab");
+  ASSERT_EQ(1, ab->a_call());
+  ASSERT_EQ(2, ab->b_call());
+  ASSERT_EQ(1, evaluate(ab->a_fp()));
+  ASSERT_EQ(2, evaluate(ab->b_fp()));
+
+  object ba = load_object("/clone/priv_same_ba");
+  ASSERT_EQ(1, ba->a_call());
+  ASSERT_EQ(2, ba->b_call());
+  ASSERT_EQ(1, evaluate(ba->a_fp()));
+  ASSERT_EQ(2, evaluate(ba->b_fp()));
+
+  // A public same_name() in the child is a new function. Inherited
+  // private calls still hit their own definitions.
+  object ch = load_object("/clone/priv_same_child");
+  ASSERT_EQ(1, ch->a_call());
+  ASSERT_EQ(2, ch->b_call());
+  ASSERT_EQ(9, ch->same_name());
+}

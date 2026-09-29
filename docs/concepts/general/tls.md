@@ -151,7 +151,9 @@ efun, which takes the 1-based external port number:
 sys_reload_tls(1);  // reload TLS for external_port_1
 ```
 
-(Reloading WebSocket TLS this way is not supported; only stream/telnet ports.)
+The same efun reloads a websocket TLS (`wss`) port. New connections pick
+up the renewed cert; already-connected clients keep the old context until
+they reconnect.
 
 You can drive this from a certbot deploy hook that triggers an in-game admin
 command, or from a scheduled `call_out` that reloads after renewals.

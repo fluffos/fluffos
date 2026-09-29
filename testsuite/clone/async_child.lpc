@@ -1,0 +1,6 @@
+// fixture for tests/compiler/async_await_context.lpc
+inherit "/clone/async_parent";
+
+mixed call_it() { return pf(); }
+
+mixed call_parent() { return ::pf(); }

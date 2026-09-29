@@ -1,0 +1,41 @@
+// A parked coroutine stores current_prog, which for an INHERITED async
+// function is the defining (base) program, not the object's ob->prog. The
+// resume-time staleness guard must therefore compare ob->prog against the
+// OWNER's program recorded at park time; comparing it against the defining
+// program rejects every inherited await with a bogus "program was replaced
+// while suspended" -- i.e. `await` unusable in any inherited async function.
+// Both the inherited and the locally defined function park on the same
+// gate here, so a regression shows up as one resuming and one not.
+//
+// The parking and the resumes happen after do_tests() has returned, so the
+// work is declared with an EXIT LATCH and the checks below are counted.
+
+nosave object clone;
+nosave mixed gate;
+nosave mixed base_p, child_p;
+
+void do_tests() {
+  EXPECT_LATCH("inherited park/resume");
+
+  call_out(function() {
+    clone = clone_object("/clone/async_inherit_park_child");
+    gate = promise_create();
+    clone->set_gate(gate);
+    clone->set_child_gate(gate);
+    base_p = clone->base_park(10);   // inherited: parks in the base program
+    child_p = clone->child_park(1);  // local: parks in the child program
+    promise_resolve(gate, 5);
+  }, 1);
+
+  call_out(function() {
+    // rendered rather than promise_result()ed: reading the result of a
+    // still-pending promise is an error, which would skip the release below
+    ASSERT_EQ("PROMISE<int>( fulfilled: 15 )", sprintf("%O", base_p));
+    ASSERT_EQ("PROMISE<int>( fulfilled: 6 )", sprintf("%O", child_p));
+    gate = 0;
+    base_p = 0;
+    child_p = 0;
+    if (clone) destruct(clone);
+    RELEASE_LATCH("inherited park/resume");
+  }, 3);
+}

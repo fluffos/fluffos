@@ -1,0 +1,6 @@
+// async is not allowed in a global modifier list
+async:
+
+int f() {
+  return 1;
+}

@@ -1,0 +1,21 @@
+// Regression test for Bug 2 (replace_program_is_noop()'s function-ACCESS-
+// flags comparison, src/packages/core/replace_program.cc). Fixtures:
+// /clone/replace_program/replace_bug2_private_base (a PRIVATE function),
+// /clone/replace_program/replace_bug2_wrapper (the redundant self-target boilerplate
+// inheriting it).
+//
+// This LPC-level test can only observe that a swap got PENDING -- see
+// replace_program_noop_globals.lpc's comment for why (no gametick elapses
+// mid-suite). Proving the actual BEHAVIORAL difference (self-call-other
+// permission genuinely differs pre- vs. post-swap) needs forcing the
+// deferred sweep synchronously; see
+// ReplaceProgramBug2PrivateFlagsAffectSelfCallPermission in
+// src/tests/test_lpc.cc.
+void do_tests() {
+  object ob = clone_object("/clone/replace_program/replace_bug2_wrapper");
+  // A pending swap must exist: replace_program_is_noop() must correctly
+  // see the DECL_PRIVATE (base's own slot) vs. DECL_HIDDEN (wrapper's own
+  // copy) mismatch on secret() and refuse the no-op fast path.
+  ASSERT(ob->try_bind());
+  destruct(ob);
+}

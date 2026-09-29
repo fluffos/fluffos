@@ -16,8 +16,12 @@ title: contrib / has_cycle
     Returns 1 if the reference graph of `value` contains a loop (a
     structure that can reach itself), 0 otherwise.
 
-    The walk follows array and class items, mapping keys and values, and a
-    function pointer's captured argument list. Objects are leaves: a loop
+    The walk follows array and class items, mapping keys and values, a
+    function pointer's captured argument list, and a promise's settled
+    value plus every pending reaction on it (the fulfillment and rejection
+    handlers, the chained promise, and -- for a reaction holding a parked
+    async frame -- that frame's saved value-stack slots, its pending
+    defer() handlers and its result promise). Objects are leaves: a loop
     routed through an object's global variables is reclaimed by destruct()
     and is not reported here.
 

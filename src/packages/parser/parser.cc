@@ -645,7 +645,7 @@ void f_parse_refresh() {
       return;
     }
 
-    if (!IS_ZERO(ret)) {
+    if (APPLY_SAYS_YES(ret)) {
       pi->flags |= PI_REMOTE_LIVINGS;
     }
   }
@@ -977,7 +977,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", IS_LIVING));
   ret = safe_apply(IS_LIVING, ob, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_LIVING;
     DEBUG_PP(("(yes)"));
   }
@@ -987,7 +987,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", INVENTORY_ACCESSIBLE));
   ret = safe_apply(INVENTORY_ACCESSIBLE, ob, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_INV_ACCESSIBLE;
     DEBUG_PP(("(yes)"));
   }
@@ -997,7 +997,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", INVENTORY_VISIBLE));
   ret = safe_apply(INVENTORY_VISIBLE, ob, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_INV_VISIBLE;
     DEBUG_PP(("(yes)"));
   }
@@ -3677,7 +3677,7 @@ void f_parse_add_rule() {
   verb_entry->node = verb_node;
 
   ret = safe_apply(LIVINGS_ARE_REMOTE, handler, 0, ORIGIN_DRIVER);
-  if (!IS_ZERO(ret)) {
+  if (APPLY_SAYS_YES(ret)) {
     handler->pinfo->flags |= PI_REMOTE_LIVINGS;
   }
 

@@ -1,0 +1,33 @@
+// Fixture for compiler/block_expr_scope.lpc: every global initializer in a
+// file shares ONE frame (__INIT), so their locals must not be allocated the
+// same runtime slot. A local declared without an initializer emits no code and
+// relies on the frame's one-time zero-fill, so slot aliasing made it read the
+// previous declaration's leftover value.
+nosave mixed seen_int;
+nosave mixed seen_str;
+nosave int seen_undef;
+
+mixed g1 = catch {
+  int a = 42;
+};
+
+mixed g2 = catch {
+  int b;
+
+  seen_int = b;
+  seen_undef = undefinedp(b);
+};
+
+mixed g3 = catch {
+  string s = "leftover";
+};
+
+mixed g4 = catch {
+  string t;
+
+  seen_str = t;
+};
+
+mixed query_int() { return seen_int; }
+mixed query_str() { return seen_str; }
+int query_undef() { return seen_undef; }

@@ -23,7 +23,7 @@
 #include "packages/core/call_out.h"
 #include "packages/core/dns.h"
 #include "packages/core/add_action.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "packages/core/file.h"
 #include "packages/core/regexp.h"
 #include "packages/core/sprintf.h"  // string_print_formatted
@@ -133,7 +133,7 @@ void f_bind() {
   push_object(ob);
 
   res = apply_master_ob(APPLY_VALID_BIND, 3);
-  if (!MASTER_APPROVED(res)) {
+  if (!MASTER_APPROVED(res, "valid_bind")) {
     error("Master object denied permission to bind() function pointer.\n");
   }
 
@@ -270,36 +270,51 @@ void f_call_stack() {
     error("First argument of call_stack() must be 0, 1, 2, 3, or 4.\n");
   }
 
-  ret = allocate_empty_array(n);
+  ret = allocate_array(n);
 
+  /* A frame entered from DRIVER CONTEXT (a bare tick callback, a heart_beat,
+   * a promise-reaction delivery) records a null program/object. Historically
+   * only control_stack[0] could be such a frame and the loops below start at
+   * 1, so the nulls were never dereferenced; a construct that pushes its own
+   * frame before entering LPC (the promise drain's error-capture frame) puts
+   * one at index >= 1 too. Report those honestly instead of crashing:
+   * "<driver>" for a file, 0 for an object -- the array is zero-initialized,
+   * so a skipped slot is already 0. */
   switch (sp->u.number) {
     case 0:
       ret->item[0].type = T_STRING;
       ret->item[0].subtype = STRING_MALLOC;
-      ret->item[0].u.string = add_slash(current_prog->filename);
+      ret->item[0].u.string = add_slash(current_prog ? current_prog->filename : "<driver>");
       for (i = 1; i < n; i++) {
+        const program_t* prog = (csp - i + 1)->prog;
         ret->item[i].type = T_STRING;
         ret->item[i].subtype = STRING_MALLOC;
-        ret->item[i].u.string = add_slash((csp - i + 1)->prog->filename);
+        ret->item[i].u.string = add_slash(prog ? prog->filename : "<driver>");
       }
       break;
     case 1:
-      ret->item[0].type = T_OBJECT;
-      ret->item[0].u.ob = current_object;
-      add_ref(current_object, "f_call_stack: curr");
+      if (current_object) {
+        ret->item[0].type = T_OBJECT;
+        ret->item[0].u.ob = current_object;
+        add_ref(current_object, "f_call_stack: curr");
+      }
       for (i = 1; i < n; i++) {
+        object_t* ob = (csp - i + 1)->ob;
+        if (!ob) {
+          continue; /* driver context: leave the slot 0 */
+        }
         ret->item[i].type = T_OBJECT;
-        ret->item[i].u.ob = (csp - i + 1)->ob;
-        add_ref((csp - i + 1)->ob, "f_call_stack");
+        ret->item[i].u.ob = ob;
+        add_ref(ob, "f_call_stack");
       }
       break;
     case 2:
       for (i = 0; i < n; i++) {
         ret->item[i].type = T_STRING;
-        if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
-          const program_t* prog = (i ? (csp - i + 1)->prog : current_prog);
+        const program_t* fprog = (i ? (csp - i + 1)->prog : current_prog);
+        if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION && fprog != nullptr) {
           int const index = (csp - i)->fr.table_index;
-          function_t* cfp = &prog->function_table[index];
+          function_t* cfp = &fprog->function_table[index];
 
           ret->item[i].subtype = STRING_SHARED;
           ret->item[i].u.string = cfp->funcname;
@@ -329,7 +344,10 @@ void f_call_stack() {
         char* progc = (i ? (csp - i + 1)->pc : pc);
         ret->item[i].type = T_STRING;
         ret->item[i].subtype = STRING_MALLOC;
-        ret->item[i].u.string = string_copy(get_line_number(progc, prog), "call_stack");
+        /* get_line_number() needs a real program; a driver-context frame
+         * has none (see the case-0 comment) */
+        ret->item[i].u.string =
+            prog ? string_copy(get_line_number(progc, prog), "call_stack") : string_copy("", "call_stack");
       }
       break;
   }
@@ -778,6 +796,16 @@ void f_shallow_inherit_list() {
 }
 #endif
 
+#ifdef F_INCLUDE_LIST
+void f_include_list() {
+  array_t* vec;
+
+  vec = include_list(sp->u.ob);
+  free_object(&sp->u.ob, "f_include_list");
+  put_array(vec);
+}
+#endif
+
 #ifdef F_INPUT_TO
 void f_input_to() {
   svalue_t* arg;
@@ -1135,6 +1163,11 @@ void f_member_array() {
           continue;
         case T_BUFFER:
           if (find->u.buf == sv->u.buf) {
+            break;
+          }
+          continue;
+        case T_PROMISE:
+          if (find->u.prom == sv->u.prom) {
             break;
           }
           continue;
@@ -2044,6 +2077,14 @@ void f_replace_string() {
           }
           src++;
         }
+        // Unlike every other in-place branch of this efun, this one never
+        // reaches extend_string() (which resets the cached ASCII tag), yet it
+        // just spliced *replace bytes into the unlinked STRING_MALLOC buffer.
+        // A valid 1-byte replacement is always ASCII, but "\r" is too -- and
+        // splicing CR into a CR-free string tagged MSTR_ASCII_YES breaks the
+        // byte==cluster identity ("\r\n" is one grapheme cluster), leaving
+        // sizeof() to answer from the stale tag. Reset so it re-derives.
+        MSTR_ASCII(arg->u.string) = MSTR_ASCII_UNKNOWN;
       } else { /* rlen is zero */
         while (*src) {
           if (*src++ == *pattern) {
@@ -2494,6 +2535,16 @@ void f_sizeof() {
       free_buffer(sp->u.buf);
       break;
     case T_STRING: {
+      // Pure ASCII (the overwhelming majority of mudlib text) has one
+      // grapheme cluster per byte, and counted strings remember that in
+      // their block header -- so this is O(1) with no iterator at all.
+      if (u8_string_is_ascii_cached(sp->u.string, SVALUE_STRLEN(sp),
+                                    (sp->subtype & STRING_COUNTED) != 0)) {
+        i = SVALUE_STRLEN(sp);
+        free_string_svalue(sp);
+        put_number(i);
+        return;
+      }
       EGCSmartIterator iter(sp->u.string, SVALUE_STRLEN(sp));
       if (!iter.ok()) {
         error("f_sizeof: Invalid UTF8 string!");
@@ -3413,7 +3464,7 @@ void f_next_inventory() {
 #ifdef F_DEFER
 void f_defer() {
   auto* newlist = reinterpret_cast<struct defer_list*>(
-      DMALLOC(sizeof(struct defer_list), TAG_TEMPORARY, "defer: new item"));
+      DMALLOC(sizeof(struct defer_list), TAG_DEFERS, "defer: new item"));
 
   if (CONFIG_INT(__RC_REVERSE_DEFER__)) {
     // In reverse mode, newlist always will be the last data.

@@ -21,6 +21,11 @@ svalue_t apply_ret_value;
 int convert_type(int /*type*/);
 
 int convert_type(int type) {
+  /* a promise, whatever its payload; an ARRAY of promises falls through to
+   * the TYPE_MOD_ARRAY case below */
+  if ((type & (TYPE_MOD_PROMISE | TYPE_MOD_ARRAY)) == TYPE_MOD_PROMISE) {
+    return T_PROMISE;
+  }
   switch (type & (~DECL_MODS)) {
     case TYPE_UNKNOWN:
     case TYPE_NOVALUE:
@@ -54,7 +59,7 @@ int convert_type(int type) {
 }
 
 // TODO: These should be moved somewhere else
-void check_co_args2(unsigned short* types, int num_arg, const char* name, const char* ob_name,
+void check_co_args2(lpc_type_t* types, int num_arg, const char* name, const char* ob_name,
                     int sparg) {
   int argc = sparg;
   int exptype, i = 0;
@@ -353,7 +358,12 @@ retry_for_shadow:
 #ifdef DEBUG
     save_csp = csp;
 #endif
-    call_program(current_prog, funp->address);
+    if (funflags & FUNC_ASYNC) {
+      csp->framekind |= FRAME_ASYNC;
+      run_async_function(current_prog->program + funp->address, funp);
+    } else {
+      call_program(current_prog, funp->address);
+    }
     DEBUG_CHECK(save_csp - 1 != csp, "Bad csp after execution in apply_low.\n");
     return 1;
   }

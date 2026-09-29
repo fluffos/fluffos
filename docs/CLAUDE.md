@@ -243,10 +243,17 @@ stale.
 Root-level documentation about building and deploying FluffOS.
 
 **Key Files:**
+- `start.md` - Human onboarding: pick a mudlib, build, boot that lib
+- `lpc/dev-environment.md` - Editor plugin, docs-site LPC highlighter, formatter
+- `llm.md` - LLM contract (`/llm`): **ask which mudlib** before cloning; do not default to `testsuite/`
+- `mudlib-agents.md` - Template `AGENTS.md` to copy into the chosen mudlib
+- `ecosystem.md` - Map of every public `fluffos/*` repository
 - `build.mdx` - Comprehensive build guide for all platforms (MDX, per-platform tabs)
-- `build_v2017.md` - Legacy build instructions
 - `index.mdx` - Main documentation landing page (MDX, card grid)
-- `bug.md` - Bug reporting guidelines
+- `bug.md` - Troubleshooting and bug reporting
+- `license.md` - License (full text; do not dump it on the homepage)
+- `static/llms.txt` - Machine-readable site map at `/llms.txt`
+- Legacy v2017 build notes live in `archive/` (not published)
 
 ### 6. Concepts Documentation (`/docs/concepts/`)
 
@@ -485,7 +492,7 @@ python3 docs/gen_sidebar.py --check
 
 The documentation is built using **Docusaurus 3** (`@docusaurus/preset-classic`). Key files:
 
-- `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin path
+- `docs/docusaurus.config.ts` — site config, navbar, footer, docs plugin, mermaid, redirects, sitemap, image zoom, LPC Prism highlighter, `future.faster`
 - `docs/sidebars.ts` — sidebar navigation tree (Docusaurus `SidebarsConfig` format)
 - `docs/src/css/custom.css` — Infima CSS variable overrides
 - `docs/package.json` — npm scripts: `dev`, `build`, `preview`, `clear`

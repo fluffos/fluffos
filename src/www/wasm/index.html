@@ -1507,10 +1507,25 @@ createFluffOS(Module).then((M) => {
   }
 
   // Drive the game loop: heartbeats, call_outs and buffered commands all
-  // run inside fluffos_tick().
-  setInterval(() => {
-    M.ccall('fluffos_tick', 'number', ['number'], [performance.now()]);
-  }, 50);
+  // run inside fluffos_tick(), which returns the delay in ms until it next
+  // wants to be called. Honour it rather than polling on a fixed interval:
+  // promise deliveries are drained one batch per call, so a fixed 50ms tick
+  // capped async throughput at 20 batches/s no matter how much work was
+  // ready. The driver asks for 1ms while it has a drain continuation
+  // pending and for the full gametick period when idle, so this both speeds
+  // async work up and stops waking a quiet mud 20 times a second.
+  const tick = () => {
+    let delay = 50;
+    try {
+      delay = M.ccall('fluffos_tick', 'number', ['number'], [performance.now()]);
+    } finally {
+      // Nested setTimeout is clamped to ~4ms by browsers, which is the real
+      // floor here; the upper bound keeps a long idle delay from making the
+      // page feel unresponsive to its own bookkeeping.
+      setTimeout(tick, Math.min(Math.max(delay || 1, 1), 100));
+    }
+  };
+  tick();
 
   connectSession = (s) => {
     connecting = s;

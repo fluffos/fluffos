@@ -1,0 +1,9 @@
+// The other crash site of the same root cause: clean_up_locals() walked from
+// the base of the locals array through the gap an advanced locals_ptr left
+// behind, dereferencing an uninitialised ident_hash_elem_t.
+void f() {
+  foreach (mixed v in ([ 1: 2 ])) {
+    function();
+  }
+  function(int x) { function(); };
+}

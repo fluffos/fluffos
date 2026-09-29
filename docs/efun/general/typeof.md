@@ -25,6 +25,7 @@ title: general / typeof
     T_FLOAT         "float"
     T_BUFFER        "buffer"
     T_CLASS         "class"
+    T_PROMISE       "promise"
 
     T_INVALID          "*invalid*"
     T_LVALUE           "*lvalue*"

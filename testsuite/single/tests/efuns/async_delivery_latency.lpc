@@ -1,0 +1,76 @@
+// A promise settled from OUTSIDE gametick dispatch must be handed to the
+// event loop, not to the tick queue.
+//
+// The microtask drain is armed by the settle. Inside gametick dispatch a
+// delay-0 gametick event is the right vehicle: call_tick_events() re-checks
+// its queue after every callback, so the drain runs in that same pass. But
+// call_tick_events() is only ever entered from backend_run_one_gametick(),
+// so the same event armed from anywhere ELSE -- a walltime callback, a
+// socket read -- is not looked at again until the next gametick.
+//
+// That is the path every package/async I/O completion takes: async_read,
+// async_write, async_getdir and async_db_exec all settle their promise from
+// a walltime callback. Each of them used to wait up to a full gametick (a
+// second at the default 1000ms) before its handler ran, on work that had
+// already finished. Measured in isolation on the unfixed driver: 101ms
+// against a 100ms gametick, i.e. exactly one tick; sub-millisecond fixed.
+//
+// KNOWN LIMIT: drain_arms_loop is driver-global, so in a full suite run
+// another file's I/O completion landing inside this file's window could
+// satisfy the check on its own. That makes this an exact measurement only in
+// single-file mode and a lower bound in a full run -- which is still enough
+// for the regression it guards, since arming every external settle through
+// the tick queue would leave the counter at zero in every run. Asserting a
+// companion "did not arm through the tick queue" counter instead would be
+// flaky for the mirror-image reason: another file settling inside gametick
+// dispatch would move it.
+//
+// The check is the "drain_arms_loop" counter rather than elapsed time.
+// Wall-clock latency looks like the obvious test and is not usable here: it
+// measures the QUEUE, not the arming decision. A correctly armed delivery
+// still waits behind whatever else is pending, so in a full suite run --
+// where other files leave chains and thousands of abandoned promises in
+// flight -- this same test measured 330ms on one build and 83ms on another
+// while the scheduler was behaving perfectly. The counter is exact,
+// load-independent, and works on a host-driven virtual clock where elapsed
+// time means nothing at all.
+
+#ifdef __PACKAGE_ASYNC__
+nosave int arms_before;
+nosave int delivered;
+
+private void check_delivery() {
+  mapping info = async_info(1);
+
+  ASSERT2(delivered, "async_read promise never delivered");
+  ASSERT2(info["drain_arms_loop"] > arms_before,
+    "an async_read completion armed the drain through the gametick queue: its handler "
+    "waits for a tick boundary (up to a full gametick) instead of the event loop");
+  RELEASE_LATCH("async delivery latency");
+}
+
+private void start_read() {
+  arms_before = async_info(1)["drain_arms_loop"];
+  promise_then(async_read("/single/tests/efuns/async_delivery_latency.lpc"),
+    function(mixed data) {
+      delivered = 1;
+      // Checked from the delivery itself. A second call_out would add a
+      // deadline, and a deadline measures the delivery QUEUE rather than the
+      // arming decision -- under a small `async drain eval budget`, or a gametick
+      // long enough to collapse two call_outs into one tick, a perfectly
+      // armed delivery arrives after it.
+      check_delivery();
+      return data;
+    });
+}
+#endif
+
+void do_tests() {
+#ifdef __PACKAGE_ASYNC__
+  EXPECT_LATCH("async delivery latency");
+
+  // Started from a call_out so the ordering is call_out-to-call_out, which is
+  // defined; the suite holds the stack until it finishes either way.
+  call_out((: start_read :), 1);
+#endif
+}

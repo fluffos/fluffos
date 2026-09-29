@@ -3,11 +3,12 @@
 // and the generated VS Code assets directly.
 import { tokenize, grammar } from './tokenizer.mjs';
 import { highlightLPC } from './highlight.mjs';
-import { formatLPC, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
+import { formatLPC, tokenSequence, trimDirectiveTrailingBlanks, DEFAULT_PRINT_WIDTH, DEFAULT_INDENT_SIZE } from './format.mjs';
 import { lintLPC } from './lint.mjs';
-import { readFileSync as readF } from 'node:fs';
+import { readFileSync as readF, readdirSync } from 'node:fs';
 import { fileURLToPath as f2p } from 'node:url';
 import { dirname as dirN, join as joinP } from 'node:path';
+import { createRequire } from 'node:module';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {
@@ -95,6 +96,30 @@ check("format.mjs never re-spaces a macro argument that's stringized via a"
         const out = formatLPC(src);
         return out === src && formatLPC(out) === out;
       })());
+check('an unpaired apostrophe on a directive line does not hide a comment'
+      + ' from the stringize detector -- a lone "\'" is one character, not a'
+      + ' quote that scans forward for a partner (lexer.l scans a char'
+      + ' literal as one escape or one byte then the close quote), so the'
+      + ' comment in `#define S(x) don\'t#/*c*/x` still folds to a space and'
+      + ' S(1+2) keeps stringizing to "1+2" (driver bug #1362, same shape)',
+      (() => {
+        const src = "#define S(x) don't#/*c*/x\nvoid f() { string a = S(1+2); }\n";
+        const out = formatLPC(src);
+        // The baseline without the apostrophe is already pinned above; the
+        // point here is that adding one changes nothing.
+        const plain = formatLPC('#define S(x) #/*c*/x\nvoid f() { string a = S(1+2); }\n');
+        return out.includes('S(1+2)') && plain.includes('S(1+2)');
+      })());
+
+check("a template literal on a directive line is closed by its own backtick,"
+      + ' not by the next double quote (skipStringSpan takes the delimiter it'
+      + ' opened with)',
+      (() => {
+        const src = '#define T(x) `a${x}b` #x\nvoid f() { string a = T(1+2); }\n';
+        const out = formatLPC(src);
+        return out.includes('T(1+2)');
+      })());
+
 check("'##' token paste is NOT stringize -- a macro using only '##' on its"
       + " parameters (`#define GLUE(a, b) a##b`) leaves its call-site"
       + ' arguments free to be reformatted normally, and an unrelated'
@@ -171,12 +196,48 @@ check('a quote in a directive never extends it past its physical line'
         const d2 = tokenize('#define BAD "abc\n#define UND(x) #x\nmixed q = UND(3+4);\n').filter((t) => t.kind === 'directive');
         const d3 = tokenize('#define X 1 /* c\nc */ + 2\nint y;\n').filter((t) => t.kind === 'directive');
         const d4 = tokenize('#define S "abc\\\ndef"\nint y;\n').filter((t) => t.kind === 'directive');
+        const d5 = tokenize('#define H "abc// \\\n def"\nint y;\n').filter((t) => t.kind === 'directive');
         const masked = formatLPC('#define BAD "abc\n#define UND(x) #x\nmixed q = UND(3+4);\n');
         return d1.length === 1 && d1[0].text === "#define Q it'" &&
                d2.length === 2 &&
                d3.length === 1 && d3[0].text.includes('+ 2') &&
                d4.length === 1 && d4[0].text.includes('def"') &&
+               d5.length === 1 && d5[0].text.includes('//') && d5[0].text.includes('def"') &&
                masked.includes('UND(3+4)');
+      })());
+check('C splice-first on a directive: a trailing \\ after // continues the'
+      + ' comment, and a comment-open split by a continuation is still a'
+      + ' comment -- the next physical line stays inside the directive token',
+      (() => {
+        const d1 = tokenize('#define FOO 1 // note \\\nint x = 2;\nint v = FOO;\n')
+                     .filter((t) => t.kind === 'directive');
+        const d2 = tokenize('#define FOO 10 /\\\n* c */ + 5\nint v = FOO;\n')
+                     .filter((t) => t.kind === 'directive');
+        return d1.length === 1 && d1[0].text.includes('int x = 2') &&
+               !d1[0].text.includes('int v') &&
+               d2.length === 1 && d2[0].text.includes('+ 5') &&
+               d2[0].text.includes('* c');
+      })());
+check('formatter keeps the gcc continuation-plus-// shapes: a do/while'
+      + ' body joined by \\ with // only on the last line; a continued'
+      + ' object-like body with a // tail; and // note \\ eating the next'
+      + ' line (that line stays inside the directive, not reformatted as code)',
+      (() => {
+        const add = '#define ADD(x, y) do { \\\n    r += (x); \\\n    r += (y); \\\n'
+                  + '} while (0) // this comment ends here\nADD(1, 2);\n';
+        const bar = '#define BAR 10 \\\n    + 5 // tail, no backslash\nint v = BAR;\n';
+        const foo = '#define FOO 1 // note \\\nint x = 99;\nint v = FOO;\n';
+        const a = formatLPC(add);
+        const b = formatLPC(bar);
+        const f = formatLPC(foo);
+        const fTok = tokenize(f).filter((t) => t.kind === 'directive');
+        return a.includes('} while (0) // this comment ends here\nADD(1, 2);') &&
+               formatLPC(a) === a &&
+               b.includes('+ 5 // tail, no backslash\nint v = BAR;') &&
+               formatLPC(b) === b &&
+               fTok.length === 1 && fTok[0].text.includes('int x = 99') &&
+               !fTok[0].text.includes('int v') &&
+               formatLPC(f) === f;
       })());
 check('template fragments + interpolated expression tokens',
       (() => {
@@ -1145,6 +1206,114 @@ check('conventions from the final pristine audit: empty for-header clauses'
                formatLPC(brk) === brk &&
                formatLPC(marco) === marco && formatLPC(formatLPC(marco)) === formatLPC(marco);
       })());
+// Statement / token order is an invariant: formatLPC may respace and
+// reindent, never move a statement past another -- this is the same
+// sequence formatLPC's own internal post-pass gate (assertSameTokenOrder)
+// already enforces on every call; this test exercises that gate directly.
+function sameTokenOrder(src) {
+  const out = formatLPC(src);
+  const a = tokenSequence(src);
+  const b = tokenSequence(out);
+  return a.length === b.length && a.every((t, i) => t === b[i]);
+}
+function topLevelStatements(src) {
+  const toks = tokenize(src).filter((t) => t.kind !== 'whitespace' && t.kind !== 'comment');
+  const out = [];
+  let depth = 0;
+  let buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    out.push(buf.map((t) => t.text).join(' ').replace(/ ;$/, ''));
+    buf = [];
+  };
+  for (const t of toks) {
+    if (depth === 0 && t.kind === 'directive') {
+      flush();
+      out.push(trimDirectiveTrailingBlanks(t.text));
+      continue;
+    }
+    buf.push(t);
+    if (t.text === '{' || t.text === '(' || t.text === '[' || t.text === '(:') depth++;
+    else if (t.text === '}' || t.text === ')' || t.text === ']' || t.text === ':)') {
+      depth = Math.max(0, depth - 1);
+    }
+    if (depth === 0 && (t.text === ';' || t.text === '}')) flush();
+  }
+  flush();
+  return out;
+}
+check('statement order is invariant: #include / inherit / declarations'
+      + ' stay in source order through format (the 1dai.c header is'
+      + ' #include <ansi.h> / inherit NPC; / #include "fight.h" -- a'
+      + ' later include is never hoisted above inherit). Messy'
+      + ' whitespace still keeps the same token sequence; every'
+      + ' permutation below is also a formatLPC fixed point after one'
+      + ' pass',
+      (() => {
+        const cases = [
+          '#include <ansi.h>\ninherit NPC;\n#include "fight.h"\nvoid create() {}\n',
+          'inherit NPC;\n#include "fight.h"\n',
+          '#include "fight.h"\ninherit NPC;\n',
+          '#include    <ansi.h>\n  inherit   NPC ;\n#include"fight.h"\nvoid  create(){}\n',
+          '#include <ansi.h>\ninherit F_DBASE;\ninherit NPC;\n#include "fight.h"\n#include "skill.h"\n',
+          'private inherit FOO;\n#include "bar.h"\npublic inherit BAZ;\n',
+          '#include <ansi.h>\n#include "fight.h"\ninherit NPC;\nvoid create() {}\n',
+          '#include <tui.h>\n\ninherit TUI_WIDGET;\n',
+          '#ifdef FOO\n#include "x.h"\n#endif\ninherit NPC;\n#include "y.h"\n',
+          'int x;\ninherit NPC;\nint y;\n',
+          'void f() {\n  a &= 3; ASSERT_EQ(2, a);\n  b();\n}\n',
+          // CRLF with trailing spaces/tabs on a directive line: the tokenizer's
+          // directive token ends in '\r' (stops right before the '\n'), so the
+          // trailing-blank run sits before that '\r', not at the string's
+          // absolute end -- an unanchored trim regex never strips it on one
+          // side of the comparison. Regression for the false-positive
+          // "formatter reordered tokens" throw on any CRLF file with trailing
+          // whitespace on a '#' line (would break format-on-save in the
+          // VS Code extension, which calls formatLPC() directly).
+          '#include <a.h>   \r\ninherit NPC;\r\nvoid create() {}\r\n',
+          '#include <a.h>\t \r\ninherit NPC;\r\n#include "fight.h"   \r\n',
+        ];
+        const mud = cases[0];
+        const messy = cases[3];
+        return cases.every((src) => sameTokenOrder(src) &&
+               JSON.stringify(topLevelStatements(src)) ===
+               JSON.stringify(topLevelStatements(formatLPC(src)))) &&
+               formatLPC(mud) === mud &&
+               topLevelStatements(formatLPC(messy)).join('|') ===
+               '#include    <ansi.h>|inherit NPC|#include"fight.h"|void create ( ) { }';
+      })());
+check('statement order is invariant across the testsuite corpus'
+      + ' (every *.lpc / *.c that format.sh feeds the formatter keeps'
+      + ' the same non-whitespace token sequence after formatLPC)',
+      (() => {
+        const root = joinP(dirN(f2p(import.meta.url)), '..', '..', 'testsuite');
+        const skip = new Set([
+          'single/tests/compiler/fail/bad_utf8_string.lpc',
+          'single/tests/compiler/fail/bad_utf8_arrayblock.lpc',
+          'single/tests/compiler/fail/eof_in_string.lpc',
+          'single/tests/compiler/fail/eof_in_comment.lpc',
+          'single/tests/compiler/fail/bad_at_block.lpc',
+        ]);
+        const files = [];
+        const walk = (dir, rel = '') => {
+          for (const ent of readdirSync(dir, { withFileTypes: true })) {
+            const r = rel ? rel + '/' + ent.name : ent.name;
+            if (ent.isDirectory()) walk(joinP(dir, ent.name), r);
+            else if (/\.(lpc|c)$/.test(ent.name) && !skip.has(r)) files.push(joinP(dir, ent.name));
+          }
+        };
+        walk(root);
+        const bad = [];
+        for (const f of files) {
+          const src = readF(f, 'utf8');
+          try {
+            if (!sameTokenOrder(src)) bad.push(f);
+          } catch (e) {
+            bad.push(f + ' (' + e.message + ')');
+          }
+        }
+        return files.length >= 900 && bad.length === 0;
+      })());
 check('blank-line RUNS follow the source exactly -- a two-blank separator'
       + ' stays two blanks (call_out.lpc), a single blank stays single;'
       + ' trailing blanks at EOF are still trimmed',
@@ -1479,5 +1648,90 @@ check('tmLanguage: function-call excludes reserved words (no "if (" misfire as e
 check('tmLanguage: operators longest-match ordered',
       (() => { const parts = tml.repository.operators.match.split('|');
                return parts.indexOf('>>=') < parts.indexOf('>>'); })());
+check('tmLanguage: a # line uses splice-first // (begin/end, continues on \\)'
+      + ' and does not include the physical-line //.*$ comment rule',
+      (() => {
+        const pp = tml.repository.preprocessor;
+        const line = pp.patterns.find((p) => p.name === 'comment.line.double-slash.lpc');
+        const usesGlobalComments = pp.patterns.some((p) => p.include === '#comments');
+        return line && line.begin === '//' && line.end === '(?<!\\\\)$' &&
+               pp.end === '(?<!\\\\)$' &&
+               !usesGlobalComments &&
+               tml.repository['block-comment'] &&
+               tml.repository.comments.patterns.some((p) => p.match === '//.*$');
+      })());
+
+// --- Prism / Docusaurus highlighter plugin ------------------------------------
+const req = createRequire(import.meta.url);
+const { buildLpcLanguage, registerLPC, grammar: prismGrammar } = req('./prism-lpc.cjs');
+const lpcPrismPlugin = req('./docusaurus-plugin.cjs');
+
+const prismLang = buildLpcLanguage();
+check('prism-lpc: grammar contract is the same file',
+      prismGrammar.keywords.includes('foreach') &&
+      prismGrammar.typeKeywords.includes('mapping'));
+check('prism-lpc: keywords / types / modifiers from the contract',
+      prismLang.keyword.source.includes('foreach') &&
+      prismLang['type-keyword'].pattern.source.includes('mapping') &&
+      prismLang.builtin.source.includes('nomask') &&
+      prismLang.keyword.source.includes('await'));
+check('prism-lpc: class/struct are class-name, not keyword.control',
+      prismLang['class-name'] &&
+      prismLang['class-name'].source.includes('class') &&
+      !prismLang.keyword.source.includes('class') &&
+      !prismLang.keyword.source.includes('struct'));
+check('prism-lpc: operators longest-match ordered',
+      (() => {
+        const parts = prismLang.operator.source.split('|');
+        return parts.indexOf('>>=') < parts.indexOf('>>') &&
+               parts.indexOf('\\(:') !== -1;
+      })());
+check('prism-lpc: function-call excludes reserved words',
+      (() => {
+        const re = prismLang.function;
+        return !re.test('if(') && !re.test('while (') && !re.test('new(') &&
+               !re.test('catch(') && re.test('foo(') && re.test('write(');
+      })());
+check('prism-lpc: trailing-dot numbers match (1.) and 10foo does not',
+      prismLang.number.test('1.') && prismLang.number.test('3.14') &&
+      !prismLang.number.test('10foo'));
+check('prism-lpc: every token is a RegExp or {pattern: RegExp}',
+      (() => {
+        const ok = (v) => {
+          if (v instanceof RegExp) return true;
+          if (Array.isArray(v)) return v.every(ok);
+          if (v && typeof v === 'object' && v.pattern instanceof RegExp) {
+            return !v.inside || Object.values(v.inside).every(ok);
+          }
+          return false;
+        };
+        return Object.values(prismLang).every(ok);
+      })());
+check('prism-lpc: registerLPC installs lpc + LPC aliases',
+      (() => {
+        const fake = { languages: {} };
+        registerLPC(fake);
+        return fake.languages.lpc === fake.languages.LPC &&
+               fake.languages.lpc.keyword;
+      })());
+check('docusaurus-plugin: remaps ```c to ```lpc outside driver/',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/lpc/foreach.md' });
+        return tree.children[0].lang === 'lpc';
+      })());
+check('docusaurus-plugin: leaves ```c alone under driver/',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/driver/ffi.md' });
+        return tree.children[0].lang === 'c';
+      })());
+check('docusaurus-plugin: leaves ```c alone on build-wasm',
+      (() => {
+        const tree = { type: 'root', children: [{ type: 'code', lang: 'c', value: 'int x;' }] };
+        lpcPrismPlugin.remarkLpcFences()(tree, { path: '/docs/build-wasm.md' });
+        return tree.children[0].lang === 'c';
+      })());
+
 console.log(failures === 0 ? '\nAll lpc-syntax tests passed.' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

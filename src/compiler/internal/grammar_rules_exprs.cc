@@ -3,24 +3,106 @@
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
+#include "packages_missing_efuns.autogen.h"
 #include "compiler/internal/lexer.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 #include "compiler/internal/grammar_rules.h"
 
 #include <fmt/format.h>
 
+/* An efun this driver was not built with, or nullptr.
+ *
+ * Packages are selected at compile time, so a driver built without one has no
+ * such efun at all and an ordinary "Undefined function hash" is all the
+ * compiler could say -- which gives no hint that `hash` IS an efun and merely
+ * was not compiled in (issue #1352: a user bisected driver versions over it).
+ * The generated table lists only efuns of packages this build does NOT have,
+ * so reaching here with a hit means exactly that and nothing else. */
+static const char* missing_efun_package(const char* name) {
+  for (const auto& entry : missing_efuns) {
+    if (entry.name == nullptr) {
+      break;  // sentinel
+    }
+    if (strcmp(entry.name, name) == 0) {
+      return entry.package;
+    }
+  }
+  return nullptr;
+}
+
+
 extern int context;
 extern int func_present;
 extern int num_refs;
 
-parse_node_t* rule_expr_or_block_block(decl_t decl_val) { return decl_val.node; }
+parse_node_t* rule_expr_or_block_block(decl_t decl_val) {
+  parse_node_t* node = decl_val.node;
+
+  /* Pop the block's locals, exactly as the STATEMENT path does
+   * (rule_statement_compound_stmt). `block` hands up the scope's local count
+   * in decl_val.num; dropping it left every local declared inside a
+   * catch {} / time_expression {} in scope after the closing
+   * brace, with consequences well past "an out-of-scope name still
+   * resolves":
+   *
+   *   - legal code rejected -- `mixed e = catch { int v = 1; }; int v = 2;`
+   *     is "Illegal to redeclare local name 'v'";
+   *   - for()/foreach() pop a FIXED count rather than a scope diff, so a leak
+   *     in the init expression makes them free the wrong local and the loop
+   *     variable outlives the loop;
+   *   - and, worst, a leak from a GLOBAL initializer is never cleaned up by
+   *     anything (there is no enclosing function to end), so the next
+   *     function's parameters are allocated from slot 1 up while the VM still
+   *     pushes arguments at 0..n-1: `mixed g = catch { int f = 1; }; int
+   *     id(int a) { return a; }` compiled silently and id(71) returned 0.
+   *
+   * Anonymous functions were the one construct already doing this correctly. */
+  pop_n_locals(decl_val.num);
+  return node;
+}
 
 parse_node_t* rule_expr_or_block_expr(parse_node_t* expr) { return insert_pop_value(expr); }
 
 void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context) {
   CREATE_CATCH(*result, expr_or_block);
-  context = saved_context;
+  context = SAVED_CONTEXT_FLAGS(saved_context);
+  current_type = SAVED_CONTEXT_TYPE(saved_context);
+}
+
+LPC_INT rule_acatch_context_open() {
+  LPC_INT saved = PACK_SAVED_CONTEXT(context, current_type);
+  context = (context & NO_SUSPEND_CONTEXT) | ACATCH_CONTEXT;
+  return saved;
+}
+
+void rule_acatch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context) {
+  if (!compiling_async_function || current_function_context) {
+    yyerror("acatch is only allowed directly inside an async function body");
+  }
+  if (SAVED_CONTEXT_FLAGS(saved_context) & NO_SUSPEND_CONTEXT) {
+    yyerror("acatch is not allowed inside catch or time_expression");
+  }
+  CREATE_ACATCH(*result, expr_or_block);
+  context = SAVED_CONTEXT_FLAGS(saved_context);
+  current_type = SAVED_CONTEXT_TYPE(saved_context);
+}
+
+void rule_expr_await(parse_node_t** result, parse_node_t* expr) {
+  /* await may only appear where the frame can actually be parked: directly
+   * in an async function's own body (not in a functional or anonymous
+   * function, which run in their own frames), and not under catch or
+   * time_expression, whose do_catch()-style C++ recursion cannot be
+   * suspended. acatch() regions are fine. */
+  if (!compiling_async_function || current_function_context) {
+    yyerror("await is only allowed directly inside an async function body");
+  }
+  if (context & NO_SUSPEND_CONTEXT) {
+    yyerror("await is not allowed inside catch or time_expression (use acatch)");
+  }
+  /* `await p` yields p's payload type; awaiting a non-promise (including an
+   * array of promises) passes the value -- and its type -- straight through */
+  CREATE_UNARY_OP(*result, F_AWAIT, promise_payload_type(expr->type & ~DECL_MODS), expr);
 }
 
 void rule_sscanf(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,
@@ -40,7 +122,8 @@ void rule_parse_command(parse_node_t** result, parse_node_t* expr1, parse_node_t
 void rule_time_expression(parse_node_t** result, parse_node_t* expr_or_block,
                           LPC_INT saved_context) {
   CREATE_TIME_EXPRESSION(*result, expr_or_block);
-  context = saved_context;
+  context = SAVED_CONTEXT_FLAGS(saved_context);
+  current_type = SAVED_CONTEXT_TYPE(saved_context);
 }
 
 parse_node_t* rule_lvalue_list_empty() {
@@ -117,7 +200,7 @@ LPC_INT rule_efun_override(const ScratchString* identifier) {
     share_and_push_string(identifier->c_str());
     push_malloced_string(add_slash(main_file_name()));
     svalue_t* ret = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-    if (!MASTER_APPROVED(ret)) {
+    if (!MASTER_APPROVED(ret, "valid_override")) {
       yyerror("Invalid simulated efunction override");
       res = -1;
     }
@@ -130,7 +213,7 @@ LPC_INT rule_efun_override_new() {
   push_constant_string("new");
   push_malloced_string(add_slash(main_file_name()));
   svalue_t* res = safe_apply_master_ob(APPLY_VALID_OVERRIDE, 3);
-  if (!MASTER_APPROVED(res)) {
+  if (!MASTER_APPROVED(res, "valid_override")) {
     yyerror("Invalid simulated efunction override");
     return -1;
   } else {
@@ -309,7 +392,7 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
       p = strput(buf, end, "Bad assignment ");
       p = get_two_types(p, end, lval->type, rval->type);
       p = strput(p, end, ".");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
     CREATE_LOGICAL_ASSIGN(*result, opcode, lval, rval);
   } else {
@@ -333,7 +416,7 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
       p = strput(buf, end, "Bad assignment ");
       p = get_two_types(p, end, lval->type, rval->type);
       p = strput(p, end, ".");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
 
     if (opcode == F_ASSIGN) (*result)->l.expr = do_promotions(rval, lval->type);
@@ -346,12 +429,34 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
      * declared type to enforce here and falls through unchanged; the
      * runtime opcode (F_ADD_EQ/f_*_eq()) then promotes it to float on a
      * float RHS, since that's the only way such a slot can ever become a
-     * float at all. */
+     * float at all.
+     *
+     * TYPE_ANY / TYPE_UNKNOWN on a *call_other* (or evaluate()) is the
+     * #1365 gap: `ob->f()` is statically mixed even when f() is declared
+     * float, so the TYPE_REAL branch above never fires and the runtime
+     * then promotes a genuine int-declared lvalue. Mapping / array index
+     * and map-member lookups are the same hole (#1384): `m["x"]` and
+     * `a[0]` are TYPE_ANY even when the element happens to hold a float.
+     * Wrap those in to_int()/to_float(). Do NOT wrap a mixed *variable*:
+     * to_int("x") succeeds (returns 0) and would hide
+     * `str[0] += mixed_string`, which must still be a runtime type error.
+     * to_int() is a no-op on T_NUMBER, so an int-returning call_other is
+     * unchanged. */
+    const bool dyn_call =
+        rval->kind == NODE_EFUN && (rval->v.number == predefs[arrow_efun].token ||
+                                    rval->v.number == predefs[evaluate_efun].token);
+    const bool index_rhs =
+        (rval->kind == NODE_BINARY_OP &&
+         (rval->v.number == F_INDEX || rval->v.number == F_RINDEX)) ||
+        (rval->kind == NODE_UNARY_OP_1 &&
+         (rval->v.number == F_MAP_MEMBER || rval->v.number == F_MAP_MEMBER_OPTIONAL));
+    const bool unknown_rhs = (dyn_call || index_rhs) &&
+                             (rval->type == TYPE_ANY || rval->type == TYPE_UNKNOWN);
     if (opcode == F_ADD_EQ || opcode == F_SUB_EQ || opcode == F_MULT_EQ || opcode == F_DIV_EQ) {
-      if (lval->type == TYPE_REAL && rval->type == TYPE_NUMBER) {
+      if (lval->type == TYPE_REAL && (rval->type == TYPE_NUMBER || unknown_rhs)) {
         (*result)->l.expr = promote_to_float(rval);
         (*result)->type = TYPE_REAL;
-      } else if (lval->type == TYPE_NUMBER && rval->type == TYPE_REAL) {
+      } else if (lval->type == TYPE_NUMBER && (rval->type == TYPE_REAL || unknown_rhs)) {
         (*result)->l.expr = promote_to_int(rval);
         (*result)->type = TYPE_NUMBER;
       } else if (opcode == F_ADD_EQ && lval->type == TYPE_BUFFER &&
@@ -378,7 +483,7 @@ void rule_expr_ternary(parse_node_t** result, parse_node_t* cond, parse_node_t* 
     p = strput(buf, end, "Types in ?: do not match ");
     p = get_two_types(p, end, val1->type, val2->type);
     p = strput(p, end, ".");
-    yywarn(buf);
+    yywarn("%s", buf);
   }
 
   if (IS_NODE(cond, NODE_UNARY_OP, F_NOT)) {
@@ -403,7 +508,7 @@ void rule_primary_expr_cast(parse_node_t** result, LPC_INT type, parse_node_t* e
     p = get_type_name(p, end, expr->type);
     p = strput(p, end, "to ");
     p = get_type_name(p, end, type);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 }
 
@@ -499,7 +604,7 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
       p = strput(buf, end, "Illegal to use private variable '");
       p = strput(p, end, ihe->name);
       p = strput(p, end, "'");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   } else if (ihe->dn.function_num != -1) {
     *result = new_node();
@@ -528,7 +633,7 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
     char buf[256];
     char* end = EndOf(buf);
     char* p;
-    auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+    auto max_local_variables = kMaxLocalVariables;
     p = strput(buf, end, "Undefined variable '");
     p = strput(p, end, ihe->name);
     p = strput(p, end, "'");
@@ -536,12 +641,12 @@ void rule_primary_expr_defined_name(parse_node_t** result, ident_hash_elem_t* ih
       add_local_name(ihe->name, TYPE_ANY);
     }
     CREATE_ERROR(*result);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 }
 
 void rule_primary_expr_identifier(parse_node_t** result, const ScratchString* name) {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
   if (current_number_of_locals < max_local_variables) {
     add_local_name(name, TYPE_ANY);
   }
@@ -577,7 +682,7 @@ void rule_primary_expr_member_arrow(parse_node_t** result, parse_node_t* expr,
                                     const ScratchString* identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
-    unsigned short tp;
+    lpc_type_t tp;
     if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
@@ -601,7 +706,7 @@ void rule_primary_expr_member_dot(parse_node_t** result, parse_node_t* expr,
                                   const ScratchString* identifier) {
   if (expr->type == TYPE_ANY) {
     int cmi;
-    unsigned short tp;
+    lpc_type_t tp;
     if ((cmi = lookup_any_class_member_soft(identifier, &tp)) != -1) {
       CREATE_UNARY_OP_1(*result, F_MEMBER, tp, expr, 0);
       (*result)->l.number = cmi;
@@ -775,7 +880,7 @@ void rule_primary_expr_index(parse_node_t** result, parse_node_t* expr, parse_no
 }
 
 void rule_lambda_return_type(func_block_t* saved_block, LPC_INT type) {
-  auto max_local_variables = CFG_INT(__MAX_LOCAL_VARIABLES__);
+  auto max_local_variables = kMaxLocalVariables;
   if (type != TYPE_FUNCTION) {
     yyerror("Reserved type name unexpected.");
     // Do NOT push a fresh nested local-variable scope for a rejected type:
@@ -905,7 +1010,7 @@ void rule_primary_expr_functional_1(parse_node_t** result, LPC_INT val) {
         p = strput(buf, end, "Illegal to use private variable '");
         p = strput(p, end, VAR_TEMP((*result)->l.expr->l.number)->name);
         p = strput(p, end, "'");
-        yyerror(buf);
+        yyerror("%s", buf);
       }
       break;
     default:
@@ -946,7 +1051,7 @@ void rule_primary_expr_functional_2(parse_node_t** result, LPC_INT val,
             char* p;
             p = strput(bff, end, "Too many arguments to ");
             p = strput(p, end, predefs[f].word);
-            yyerror(bff);
+            yyerror("%s", bff);
           }
         } else if (max_arg != -1 && exact_types) {
           int i, argn, tmp;
@@ -966,7 +1071,7 @@ void rule_primary_expr_functional_2(parse_node_t** result, LPC_INT val,
               p = strput(p, end, " to efun ");
               p = strput(p, end, predefs[f].word);
               p = strput(p, end, "()");
-              yyerror(buf);
+              yyerror("%s", buf);
             } else {
               if (tmp == TYPE_NUMBER && argp[i] == TYPE_REAL) {
                 for (i++; argp[i] && argp[i] != TYPE_NUMBER; i++);
@@ -1046,7 +1151,7 @@ void rule_function_call_new(parse_node_t** result, parse_node_t* opt_arg_list,
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else {
     *result = validate_efun_call(lookup_predef("clone_object"), opt_arg_list);
 #ifdef CAST_CALL_OTHERS
@@ -1071,7 +1176,7 @@ void rule_function_call_new_class(parse_node_t** result, ident_hash_elem_t* ihe,
     p = strput(buf, end, "Undefined class '");
     p = strput(p, end, ihe->name);
     p = strput(p, end, "'");
-    yyerror(buf);
+    yyerror("%s", buf);
     CREATE_ERROR(*result);
     /* class_init member-name c_str()s are arena memory; bulk-freed. */
   } else {
@@ -1110,11 +1215,16 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
     (*result)->v.number = F_CALL_FUNCTION_BY_ADDRESS;
     (*result)->l.number = f;
     (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
+    if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
+      /* an async call yields a promise OF the declared return type (which
+       * is what `return` inside the body checks against) */
+      (*result)->type = promise_of_type((*result)->type);
+    }
   } else if ((f = ihe->dn.simul_num) != -1) {
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else if ((f = ihe->dn.efun_num) != -1) {
     *result = validate_efun_call(f, opt_arg_list);
   } else if ((i = ihe->dn.local_num) != -1 &&
@@ -1161,7 +1271,7 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
       p = strput(buf, end, "Illegal to use private variable '");
       p = strput(p, end, ihe->name);
       p = strput(p, end, "'");
-      yyerror(buf);
+      yyerror("%s", buf);
     }
 
     (*result)->kind = NODE_EFUN;
@@ -1186,7 +1296,12 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
       if (*n == ':') n++;
       p = strput(buf, end, "Undefined function ");
       p = strput(p, end, n);
-      yyerror(buf);
+      if (const char* pkg = missing_efun_package(n)) {
+        p = strput(p, end, " (an efun of ");
+        p = strput(p, end, pkg);
+        p = strput(p, end, ", which this driver was not built with)");
+      }
+      yyerror("%s", buf);
     } else {
       if (current_function_context) current_function_context->bindable = FP_NOT_BINDABLE;
 
@@ -1200,6 +1315,7 @@ void rule_function_call_defined_name(parse_node_t** result, ident_hash_elem_t* i
   *result = check_refs(num_refs - saved_refs, opt_arg_list, *result);
   num_refs = saved_refs;
 }
+
 
 void rule_function_call_name(parse_node_t** result, const ScratchString* name,
                              parse_node_t* opt_arg_list, LPC_INT saved_context,
@@ -1224,7 +1340,12 @@ void rule_function_call_name(parse_node_t** result, const ScratchString* name,
       if (exact_types) {
         const char* n = name->c_str();
         if (*n == ':') n++;
-        yyerror("Undefined function %s", n);
+        if (const char* pkg = missing_efun_package(n)) {
+          yyerror("Undefined function %s (an efun of %s, which this driver was not built with)", n,
+                  pkg);
+        } else {
+          yyerror("Undefined function %s", n);
+        }
       } else {
         f = define_new_function(name->c_str(), 0, 0, DECL_PUBLIC | FUNC_UNDEFINED, TYPE_ANY);
       }
@@ -1238,6 +1359,11 @@ void rule_function_call_name(parse_node_t** result, const ScratchString* name,
         (*result)->type = TYPE_ANY;
       } else {
         (*result)->type = validate_function_call(f, opt_arg_list->r.expr);
+        if (FUNCTION_FLAGS(f) & FUNC_ASYNC) {
+          /* an async call yields a promise OF the declared return type
+           * (which is what `return` inside the body checks against) */
+          (*result)->type = promise_of_type((*result)->type);
+        }
       }
     }
   }
@@ -1322,7 +1448,7 @@ void rule_function_call_arrow(parse_node_t** result, parse_node_t* expr,
     (*result)->kind = NODE_CALL_1;
     (*result)->v.number = F_SIMUL_EFUN;
     (*result)->l.number = f;
-    (*result)->type = (SIMUL(f)->type) & ~DECL_MODS;
+    (*result)->type = simul_efun_call_type(f);
   } else {
     *result = validate_efun_call(arrow_efun, opt_arg_list);
 #ifdef CAST_CALL_OTHERS
@@ -1393,7 +1519,7 @@ void rule_expr_or(struct parse_node_t** result, struct parse_node_t* expr1,
         p = strput(buf, end, "Incompatible types for | ");
         p = get_two_types(p, end, t1, t3);
         p = strput(p, end, ".");
-        yyerror(buf);
+        yyerror("%s", buf);
       }
       t1 = TYPE_ANY | TYPE_MOD_ARRAY;
     }
@@ -1420,7 +1546,7 @@ void rule_expr_and(struct parse_node_t** result, struct parse_node_t* expr1,
         p = strput(buf, end, "Incompatible types for & ");
         p = get_two_types(p, end, t1, t3);
         p = strput(p, end, ".");
-        yyerror(buf);
+        yyerror("%s", buf);
       }
       t1 = TYPE_ANY | TYPE_MOD_ARRAY;
     }
@@ -1450,7 +1576,7 @@ void rule_expr_eq(struct parse_node_t** result, struct parse_node_t* expr1,
     p = strput(buf, end, "== always false because of incompatible types ");
     p = get_two_types(p, end, expr1->type, expr2->type);
     p = strput(p, end, ".");
-    yyerror(buf);
+    yyerror("%s", buf);
   }
   if (IS_NODE(expr1, NODE_NUMBER, 0)) {
     CREATE_UNARY_OP(*result, F_NOT, TYPE_NUMBER, expr2);
@@ -1470,7 +1596,7 @@ void rule_expr_ne(struct parse_node_t** result, struct parse_node_t* expr1,
     p = strput(buf, end, "!= always true because of incompatible types ");
     p = get_two_types(p, end, expr1->type, expr2->type);
     p = strput(p, end, ".");
-    yyerror(buf);
+    yyerror("%s", buf);
   }
   CREATE_BINARY_OP(*result, F_NE, TYPE_NUMBER, expr1, expr2);
 }
@@ -1490,7 +1616,7 @@ void rule_expr_order(struct parse_node_t** result, struct parse_node_t* expr1, L
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, t1);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!COMP_TYPE(t3, TYPE_NUMBER) && !COMP_TYPE(t3, TYPE_STRING)) {
       char buf[256];
       char* end = EndOf(buf);
@@ -1500,7 +1626,7 @@ void rule_expr_order(struct parse_node_t** result, struct parse_node_t* expr1, L
       p = strput(p, end, "' : \"");
       p = get_type_name(p, end, t3);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!compatible_types2(t1, t3)) {
       char buf[256];
       char* end = EndOf(buf);
@@ -1509,7 +1635,7 @@ void rule_expr_order(struct parse_node_t** result, struct parse_node_t* expr1, L
       p = strput(p, end, query_instr_name(op));
       p = strput(p, end, " do not have compatible types : ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   }
   CREATE_BINARY_OP(*result, op, TYPE_NUMBER, expr1, expr2);
@@ -1527,7 +1653,7 @@ void rule_expr_lt(struct parse_node_t** result, struct parse_node_t* expr1,
       p = strput(buf, end, "Bad left argument to '<' : \"");
       p = get_type_name(p, end, t1);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!COMP_TYPE(t3, TYPE_NUMBER) && !COMP_TYPE(t3, TYPE_STRING)) {
       char buf[200];
       char* end = EndOf(buf);
@@ -1535,14 +1661,14 @@ void rule_expr_lt(struct parse_node_t** result, struct parse_node_t* expr1,
       p = strput(buf, end, "Bad right argument to '<' : \"");
       p = get_type_name(p, end, t3);
       p = strput(p, end, "\"");
-      yyerror(buf);
+      yyerror("%s", buf);
     } else if (!compatible_types2(t1, t3)) {
       char buf[256];
       char* end = EndOf(buf);
       char* p;
       p = strput(buf, end, "Arguments to < do not have compatible types : ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
     }
   }
   CREATE_BINARY_OP(*result, F_LT, TYPE_NUMBER, expr1, expr2);
@@ -1632,7 +1758,7 @@ void rule_expr_add(struct parse_node_t** result, struct parse_node_t* expr1,
 
             p = strput(buf, end, "Invalid argument types to '+' ");
             p = get_two_types(p, end, t1, t3);
-            yyerror(buf);
+            yyerror("%s", buf);
             result_type = TYPE_ANY;
           }
         }
@@ -1771,7 +1897,7 @@ void rule_expr_sub(struct parse_node_t** result, struct parse_node_t* expr1,
 
       p = strput(buf, end, "Invalid types to '-' ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
       result_type = TYPE_ANY;
     }
   } else
@@ -1853,7 +1979,7 @@ void rule_expr_mul(struct parse_node_t** result, struct parse_node_t* expr1,
 
       p = strput(buf, end, "Invalid types to '*' ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
       result_type = TYPE_ANY;
     }
   } else
@@ -1931,7 +2057,7 @@ void rule_expr_div(struct parse_node_t** result, struct parse_node_t* expr1,
 
       p = strput(buf, end, "Invalid types to '/' ");
       p = get_two_types(p, end, t1, t3);
-      yyerror(buf);
+      yyerror("%s", buf);
       result_type = TYPE_ANY;
     }
   } else
@@ -2009,7 +2135,7 @@ void rule_expr_cast(struct parse_node_t** result, LPC_INT type, struct parse_nod
     p = get_type_name(p, end, expr->type);
     p = strput(p, end, "to ");
     p = get_type_name(p, end, type);
-    yyerror(buf);
+    yyerror("%s", buf);
   }
 }
 

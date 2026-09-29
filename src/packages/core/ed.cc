@@ -1345,7 +1345,7 @@ static int set() {
     push_object(current_editor);
     push_number(P_SHIFTWIDTH | P_FLAGS);
     ret = apply_master_ob(APPLY_SAVE_ED_SETUP, 2);
-    if (MASTER_APPROVED(ret)) {
+    if (MASTER_APPROVED(ret, "save_ed_setup")) {
       return 0;
     }
   }

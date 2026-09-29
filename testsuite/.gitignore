@@ -3,6 +3,7 @@ OBJ_DUMP2
 PROG_DUMP
 test_file
 testfile
+testfile_async
 testfile1
 testfile.zerolength
 /log/log
@@ -18,6 +19,8 @@ testfile.zerolength
 /rename_test1
 /trace_json.json
 /test.sqlite
+/test_async_bound.sqlite
 /sqlite.db
 /tmp.o
 /testrun.log
+/data/huge_line_table.c

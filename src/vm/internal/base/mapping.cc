@@ -1319,6 +1319,18 @@ void add_mapping_object(mapping_t* m, const char* key, object_t* value) {
   add_ref(value, "add_mapping_object");
 }
 
+void add_mapping_promise(mapping_t* m, const char* key, promise_t* value) {
+  svalue_t* s;
+
+  s = insert_in_mapping(m, key);
+  s->type = T_PROMISE;
+  /* carry the declared payload tag, so a promise reached through a mapping
+   * (async_info()) renders like the value the async call returned */
+  s->subtype = value->value_type;
+  s->u.prom = value;
+  value->ref++;
+}
+
 void add_mapping_array(mapping_t* m, const char* key, array_t* value) {
   svalue_t* s;
 

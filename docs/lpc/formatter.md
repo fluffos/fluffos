@@ -40,13 +40,13 @@ const wide = formatLPC(source, { printWidth: 120 });    // default 100
 const four = formatLPC(source, { indentSize: 4 });      // default 2
 ```
 
-In VS Code, the extension (developed in the
+In VS Code / Cursor, the extension (developed in the
 [fluffos/fluffos-vscode](https://github.com/fluffos/fluffos-vscode)
 repo, which builds it from this engine via a pinned fluffos submodule)
 provides *Format Document* and format-on-save with the same engine,
 configured
 by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
-(default 2).
+(default 2). Install steps: [development environment](dev-environment).
 
 ## Options
 
@@ -66,7 +66,9 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 * Empty blocks collapse to `{}`.
 * Trailing `//` comments get at least two spaces before them; a wider
   hand-aligned gap is kept exactly.
-* Preprocessor directives move to column 0.
+* Preprocessor directives move to column 0. `#include` and `inherit`
+  keep the order they were written — includes may sit both before
+  and after inherit. They are not hoisted, sorted, or regrouped.
 * A rendered line longer than `printWidth` is split at its outermost
   bracket group (call arguments, array/mapping elements), one element
   per line, recursively as needed.
@@ -76,6 +78,12 @@ by `lpc.format.printWidth` (default 100) and `lpc.format.indentSize`
 The formatter follows the source instead of canonicalizing both ways —
 the opposite of clang-format's full reflow:
 
+* **Statement order.** The non-whitespace token sequence is an
+  invariant — `#include`, `inherit`, declarations, and everything
+  else stay in source order. A later include is never hoisted
+  above inherit (`#include <ansi.h>` / `inherit NPC;` /
+  `#include "fight.h"`). `formatLPC` throws if a pass would
+  reorder tokens.
 * **Your line breaks.** A one-line block stays one line (if it fits);
   a multi-line call or declaration keeps its layout, including whether
   the closing `)` / `");` / `});` is glued to the last element or on

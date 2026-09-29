@@ -3,6 +3,8 @@
 #include "vm/internal/base/machine.h"
 
 #include <stdlib.h>  // for qsort
+#include <cstring>
+#include <vector>
 
 #include "vm/internal/apply.h"
 #include "vm/internal/simulate.h"
@@ -264,6 +266,9 @@ array_t* explode_string(const char* str, int slen, const char* del, int dellen, 
   auto num_leading = 0;
   auto num_trailing = 0;
 
+  // One iterator over the whole input. Each delimiter match then reset()s
+  // it to the remaining suffix/prefix; for ASCII that must not rescan (see
+  // EGCIterator::reset and issue #1366).
   EGCIterator iter(source, sourcelen);
   /*
    * Count leading 'del' strings.
@@ -400,11 +405,13 @@ char* implode_string(array_t* arr, const char* del, int del_len) {
   for (i = 0, num = 0; i < arr->size; i++) {
     if (arr->item[i].type == T_STRING) {
       if (num) {
-        strncpy(p, del, del_len);
+        // del_len is the counted LPC string length, so a byte-for-byte copy
+        // is both correct (even with embedded NULs) and faster than strncpy.
+        memcpy(p, del, del_len);
         p += del_len;
       }
       size = SVALUE_STRLEN(&arr->item[i]);
-      strncpy(p, arr->item[i].u.string, size);
+      memcpy(p, arr->item[i].u.string, size);
       p += size;
       num++;
     }
@@ -706,6 +713,8 @@ int sameval(svalue_t* arg1, svalue_t* arg2) {
       return arg1->u.real == arg2->u.real;
     case T_BUFFER:
       return arg1->u.buf == arg2->u.buf;
+    case T_PROMISE:
+      return arg1->u.prom == arg2->u.prom;
   }
   return 0;
 }
@@ -1089,6 +1098,14 @@ void map_string(svalue_t* arg, int num_arg) {
     }
   }
 
+  // The callback's return value was written straight into the unlinked
+  // STRING_MALLOC buffer, and it can be ANY byte -- including '\r' (13),
+  // which breaks the byte==grapheme-cluster identity behind a cached
+  // MSTR_ASCII_YES tag ("\r\n" is one cluster), or a >= 0x80 byte. Nothing
+  // on this path reallocates (extend_string() is what normally resets the
+  // tag), so drop the cache and let it re-derive from the new contents.
+  MSTR_ASCII(arg->u.string) = MSTR_ASCII_UNKNOWN;
+
   pop_n_elems(num_arg - 1);
   /* return value on stack */
 }
@@ -1466,17 +1483,36 @@ array_t* deep_inventory_array(array_t* arr, int take_top, funptr_t* fp) {
 }
 #endif
 
+/* Total order over raw svalue payload then type tag, used to sort the
+ * lookup table behind array '-', '&' and '|'. Every caller reads only the
+ * SIGN, so this returns -1/0/1 rather than a difference -- computing it as
+ * a subtraction is what made all three of the following wrong:
+ *
+ *  - `p1->u.number - p2->u.number` wraps (LPC_INT is 64-bit and -fwrapv
+ *    makes the overflow silent). The old guard special-cased the single
+ *    value it noticed, d == LONG_MIN, but rewrote it as `p1 > p2`, which is
+ *    0 when p1 < p2 -- i.e. "equal". bits(-x) - bits(x) is exactly LONG_MIN
+ *    for every float x > 0, so cmp(-1.0, 1.0) reported equal while
+ *    cmp(1.0, -1.0) reported greater: `({ -1.0, 1.0 }) - ({ 1.0 })` came
+ *    back empty, and the '&' of the same pair kept an element present in
+ *    neither side.
+ *  - `long` is 32-bit on the wasm32 and MinGW64 targets (both in CI), so
+ *    the 64-bit difference truncated there and any two ints agreeing modulo
+ *    2^32 compared equal -- `({ 0, 4294967296 }) - ({ 0 })` came back empty
+ *    on wasm while being correct natively.
+ *  - svalue_t::type is uint32_t, which (unlike the unsigned short it used
+ *    to be) does not integer-promote, so the tag subtraction was unsigned
+ *    and wrapped positive whenever p1's tag was the smaller one.
+ *
+ * All three shapes make the comparator asymmetric or intransitive, which
+ * sends the binary searches down the wrong half and silently drops or keeps
+ * the wrong elements -- no error, no crash. */
 static long alist_cmp(svalue_t* p1, svalue_t* p2) {
-  long d;
-
-  if ((d = p1->u.number - p2->u.number)) {
-    if (d == LONG_MIN) {
-      d = p1->u.number > p2->u.number;
-    }
-    return d;
+  if (p1->u.number != p2->u.number) {
+    return (p1->u.number > p2->u.number) ? 1 : -1;
   }
-  if ((d = p1->type - p2->type)) {
-    return d;
+  if (p1->type != p2->type) {
+    return (p1->type > p2->type) ? 1 : -1;
   }
   return 0;
 }
@@ -1991,6 +2027,47 @@ array_t* inherit_list(object_t* ob) {
     ret->item[il].type = T_STRING;
     ret->item[il].subtype = STRING_MALLOC;
     ret->item[il].u.string = add_slash(pr->filename);
+  }
+  return ret;
+}
+
+/*
+ * Files this program actually #included (nested includes included,
+ * duplicates dropped, first-seen order). The main source is omitted;
+ * the configured global include file is listed when it was opened.
+ */
+array_t* include_list(object_t* ob) {
+  program_t* prog = ob->prog;
+  if (!prog || !prog->include_names || prog->include_names_size <= 0) {
+    return &the_null_array;
+  }
+
+  std::vector<const char*> names;
+  const char* p = prog->include_names;
+  const char* end = p + prog->include_names_size;
+  while (p < end) {
+    if (*p == '\0') {
+      p++;
+      continue;
+    }
+    bool seen = false;
+    for (const char* existing : names) {
+      if (strcmp(existing, p) == 0) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) {
+      names.push_back(p);
+    }
+    p += strlen(p) + 1;
+  }
+
+  array_t* ret = allocate_empty_array(static_cast<int>(names.size()));
+  for (size_t i = 0; i < names.size(); i++) {
+    ret->item[i].type = T_STRING;
+    ret->item[i].subtype = STRING_MALLOC;
+    ret->item[i].u.string = add_slash(names[i]);
   }
   return ret;
 }

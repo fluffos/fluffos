@@ -1,0 +1,146 @@
+// Two live index lvalues must not share a global scratch slot (issue #1358).
+// Under the old T_LVALUE sentinels, `s[0] = s[1] = 'x'` armed the same
+// codepoint global twice, so both assigns wrote index 1.
+
+void set_chars(int ref a, int ref b) {
+  a = 'X';
+  b = 'Y';
+}
+
+void set_bytes(int ref a, int ref b) {
+  a = 10;
+  b = 11;
+}
+
+string g_trunc;
+mixed *arr_trunc;
+
+void trunc_then_write(int ref c) {
+  g_trunc = "ab";
+  c = 'Z';
+}
+
+void trunc_then_inc(int ref c) {
+  g_trunc = "ab";
+  c++;
+}
+
+void trunc_then_add(int ref c) {
+  g_trunc = "ab";
+  c += 1;
+}
+
+void trunc_arr_elem(int ref c) {
+  arr_trunc[0] = "ab";
+  c = 'Z';
+}
+
+void splice_then_write(int ref c) {
+  c = 'Z';
+  g_trunc[0..1] = "é";
+  c = 'Y';
+}
+
+void splice_then_overflow(int ref c) {
+  c = 'Z';
+  g_trunc[0..1] = "é";
+  g_trunc[4..5] = "é";
+  c = 'Q';
+}
+
+void do_tests() {
+  string s;
+  buffer b;
+  mixed *a;
+  mixed mm;
+  mixed kept;
+  mixed bad;
+  int i;
+
+  s = "ab";
+  s[0] = s[1] = 'x';
+  ASSERT_EQ("xx", s);
+
+  s = "ab";
+  s[1] = s[0] = 'y';
+  ASSERT_EQ("yy", s);
+
+  b = allocate_buffer(2);
+  b[0] = 1;
+  b[1] = 2;
+  b[0] = b[1] = 9;
+  ASSERT_EQ(9, b[0]);
+  ASSERT_EQ(9, b[1]);
+
+  a = ({ 1, 2, 3 });
+  a[0] = a[2] = 7;
+  ASSERT_EQ(({ 7, 2, 7 }), a);
+
+  s = "az";
+  s[0] += 1;
+  ASSERT_EQ("bz", s);
+
+  // Two live refs to different indexes must not share a scratch slot.
+  s = "ab";
+  set_chars(ref s[0], ref s[1]);
+  ASSERT_EQ("XY", s);
+
+  b = allocate_buffer(2);
+  b[0] = 1;
+  b[1] = 2;
+  set_bytes(ref b[0], ref b[1]);
+  ASSERT_EQ(10, b[0]);
+  ASSERT_EQ(11, b[1]);
+
+  // ||= / ??= on a range used to bit-copy the heap box and double-free it.
+  a = ({ 1, 2, 3 });
+  kept = (a[0..1] ||= ({ 9 }));
+  ASSERT_EQ(({ 1, 2 }), kept);
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+  kept = (a[0..1] ??= ({ 9 }));
+  ASSERT_EQ(({ 1, 2 }), kept);
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+
+  // error() between pop and free must not leak (or crash) the box.
+  // RHS is mixed so this is a runtime type error, not a compile reject.
+  s = "ab";
+  bad = ({ 1 });
+  for (i = 0; i < 20; i++) {
+    catch(s[0] += bad);
+  }
+  ASSERT_EQ("ab", s);
+  mm = ({ 1, 2, 3 });
+  for (i = 0; i < 20; i++) {
+    catch(mm[0..1] &= 1);
+  }
+  ASSERT_EQ(({ 1, 2, 3 }), mm);
+
+  // A ref holds the box across the call. Truncating the owner to exactly
+  // the armed index used to skip the 0/-2 bounds check, size the new
+  // string one byte short, and overflow.
+  {
+    string oob = "*Index out of bounds in string index lvalue.\n";
+
+    g_trunc = "abc";
+    ASSERT_EQ(oob, catch(trunc_then_write(ref g_trunc[2])));
+    ASSERT_EQ("ab", g_trunc);
+    g_trunc = "abc";
+    ASSERT_EQ(oob, catch(trunc_then_inc(ref g_trunc[2])));
+    ASSERT_EQ("ab", g_trunc);
+    g_trunc = "abc";
+    ASSERT_EQ(oob, catch(trunc_then_add(ref g_trunc[2])));
+    ASSERT_EQ("ab", g_trunc);
+    arr_trunc = ({ "abc" });
+    ASSERT_EQ(oob, catch(trunc_arr_elem(ref arr_trunc[0][2])));
+    ASSERT_EQ("ab", arr_trunc[0]);
+  }
+
+  // In-place same-length range splice can flip ASCII at the same address.
+  // reset() used to keep ascii_ and then write at the wrong byte offset.
+  g_trunc = "abcdef";
+  splice_then_write(ref g_trunc[4]);
+  ASSERT_EQ("écdZY", g_trunc);
+  g_trunc = "1234567";
+  splice_then_overflow(ref g_trunc[4]);
+  ASSERT_EQ("é34ZQ", g_trunc);
+}

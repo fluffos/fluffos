@@ -29,6 +29,12 @@ union u {
   struct ref_t* ref;
   unsigned char* lvalue_byte;
   void (*error_handler)(void);
+
+  struct promise_t* prom;
+  /* Heap boxes for index/range lvalues (issue #1358). Live on the stack
+   * (or in ref_t::sv); T_LVALUE itself is only a pointer to a real slot. */
+  struct codepoint_lvalue_t* cp_lv;
+  struct range_lvalue_t* range_lv;
 };
 
 /*
@@ -37,7 +43,10 @@ union u {
  * differently, which will affect how it should be freed.
  */
 struct svalue_t {
-  unsigned short type;
+  /* 32-bit: the 16 low type bits are fully allocated (see the T_* defines
+   * below), so new value types must use bits at 0x10000 and above. Layout is
+   * unchanged on 64-bit targets: 4 + 2 + 2 bytes padding + 8-byte union. */
+  uint32_t type;
   unsigned short subtype;
   union u u;
 };
@@ -48,19 +57,20 @@ struct ref_t {
   struct ref_t *next, *prev;
   struct control_stack_t* csp;
   svalue_t* lvalue;
+  /* Keep-alive for the container (array / mapping / string / buffer) when
+   * lvalue points inside it. Foreach mapping refs also lock the mapping
+   * here. Foreach string/buffer refs store the per-iteration box here. */
   svalue_t sv;
-
-  /* Set alongside lvalue == &global_lvalue_codepoint_sv (interpret.cc): this
-   * ref's OWN owning string and EGC index, so a concurrently-armed string-char
-   * lvalue elsewhere (another ref, or a plain s[i]) can't corrupt what this
-   * ref reads/writes. The shared global is re-armed from these right before
-   * each use (read via F_REF, write via F_REF_LVALUE); unused otherwise.
-   * ref_t is raw-malloc'd (make_ref()), so these carry no implicit default --
-   * make_ref() sets them, and they are only meaningful once the codepoint
-   * arming site (F_NEXT_FOREACH) also sets lvalue to the sentinel above. */
-  svalue_t* codepoint_owner;
-  int32_t codepoint_index;
+  /* Transferred index lvalue from F_MAKE_REF (`ref s[i]`, `ref b[i]`).
+   * Separate from sv so the container stay-alive copy is not overwritten
+   * by the box. Unused refs leave this as T_NUMBER. `ref x[a..b]` is a
+   * compile error (rule_expr_ref). */
+  svalue_t index_sv;
 };
+
+struct codepoint_lvalue_t;
+struct range_lvalue_t;
+void free_indexed_lvalue(svalue_t* v);
 
 /* values for type field of svalue struct */
 #define T_INVALID 0x0u
@@ -84,16 +94,65 @@ struct ref_t {
 #define T_REF 0x4000u
 #define T_LVALUE_CODEPOINT 0x8000u /* UTF8 codepoint */
 
+static inline int is_stack_lvalue(const svalue_t* v) {
+  return v->type == T_LVALUE || v->type == T_LVALUE_BYTE || v->type == T_LVALUE_RANGE ||
+         v->type == T_LVALUE_CODEPOINT;
+}
+
+/* Destinations that need the index-kind switch. A T_LVALUE unwraps to a
+ * real slot and is a plain assign_svalue. */
+static inline int is_indexed_lvalue(const svalue_t* v) {
+  return v->type == T_LVALUE_BYTE || v->type == T_LVALUE_RANGE || v->type == T_LVALUE_CODEPOINT;
+}
+
+/* T_LVALUE wraps a real slot; typed index lvalues ARE the target. */
+static inline svalue_t* lvalue_target(svalue_t* slot) {
+  if (slot->type == T_LVALUE) {
+    return slot->u.lvalue;
+  }
+  return slot;
+}
+
+/* The 16 low bits are fully allocated; new value types start at 0x10000
+ * (svalue_t::type is 32-bit). */
+#define T_PROMISE 0x10000u
+
+/*
+ * Compile-time type words. These are a separate namespace from the runtime
+ * T_* tags above: a base type (TYPE_* in compiler.h) or a class index, plus
+ * the TYPE_MOD_* bits here and the DECL_* / LOCAL_MOD_* bits in program.h.
+ *
+ * lpc_type_t is 32 bits wide -- the low 16 are fully allocated, and
+ * promise<T> (issue #1319) encodes its payload type in the same word as the
+ * declaration's own array modifier.
+ */
+typedef uint32_t lpc_type_t;
+
 #define TYPE_MOD_ARRAY 0x8000u /* Pointer to a basic type */
-/* Note, the following restricts class_num to < 0x40 or 64   */
-/* The reason for this is that vars still have a ushort type */
-/* This restriction is not unreasonable, since LPC is still  */
-/* catered for mini-applications (compared to say, C++ or    */
-/* java)..for now - Sym                                      */
+/* Note, the following restricts class_num to < 0x80 or 128, since the class
+ * index shares the low byte with TYPE_MOD_CLASS. */
 #define TYPE_MOD_CLASS 0x0080u /* a class */
 #define CLASS_NUM_MASK 0x007fu
 
-#define T_REFED (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF)
+/*
+ * promise<T>: TYPE_MOD_PROMISE says the declared value is a promise, and the
+ * rest of the word describes its PAYLOAD (base type or class index).
+ * TYPE_MOD_ARRAY keeps its exact ordinary meaning -- "this declaration is an
+ * array" -- so `promise<int> *` (an array of promises) is
+ * TYPE_MOD_PROMISE | TYPE_MOD_ARRAY | TYPE_NUMBER. The payload's own
+ * array-ness is TYPE_MOD_PROMISE_VALUE_ARRAY, so `promise<int *>` is
+ * TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY | TYPE_NUMBER and the two
+ * compose. Bare `promise` means promise<mixed>.
+ *
+ * These two bits sit in the gap between the basic type (bits 0-15) and the
+ * declaration modifiers the parser parks in bits 21-30 (see rule_type() and
+ * BASIC_TYPE_MASK in compiler.h).
+ */
+#define TYPE_MOD_PROMISE 0x10000u
+#define TYPE_MOD_PROMISE_VALUE_ARRAY 0x20000u
+
+#define T_REFED \
+  (T_ARRAY | T_OBJECT | T_MAPPING | T_FUNCTION | T_BUFFER | T_CLASS | T_REF | T_PROMISE)
 #define T_ANY (T_REFED | T_STRING | T_NUMBER | T_REAL)
 
 /* values for subtype field of svalue struct */
@@ -125,8 +184,11 @@ void assign_svalue(svalue_t*, svalue_t*);
  * RelWithDebInfo+sanitizer CI job. Real flexible array members would unblock
  * this. */
 void assign_svalue_no_free(svalue_t*, svalue_t*);
+/* deferred T_ARRAY/T_CLASS/T_MAPPING/T_PROMISE deallocation (svalue.cc) */
+void free_compound(void* ptr, uint32_t type);
 
 #ifdef DEBUG
+void int_free_svalue(svalue_t*, const char*);
 #define free_svalue(x, y) int_free_svalue(x, y)
 #else
 /* Also declared in machine.h, which includes this header before getting to it. */
@@ -135,10 +197,12 @@ void int_free_svalue(svalue_t*);
 /* int_free_svalue() is called several million times on an interpreter-bound
  * workload -- roughly once per dispatched opcode that drops a stack slot -- and
  * it is not inlined across the call boundary. It only has real work to do for a
- * value that owns something: a string, a refcounted
- * pointer, or an error handler (which it invokes). For every other type --
- * T_NUMBER and T_REAL above all -- the entire body reduces to marking the slot
- * T_FREED, and outside DEBUG builds nothing ever reads that bit back:
+ * value that owns something: a string, a refcounted pointer, an error handler
+ * (which it invokes), or a heap-boxed index lvalue (T_LVALUE_CODEPOINT /
+ * T_LVALUE_RANGE, issue #1358). T_LVALUE_BYTE is a raw pointer, not a box.
+ * For every other type -- T_NUMBER and T_REAL above all -- the entire body
+ * reduces to marking the slot T_FREED, and outside DEBUG builds nothing ever
+ * reads that bit back:
  * assign_svalue_no_free() clears it on overwrite, sprintf.cc masks it out with
  * (type & ~T_FREED), and the only remaining readers -- the "*freed*" type name
  * in interpret.cc and the double-free fatal in svalue.cc -- are both #ifdef
@@ -147,7 +211,7 @@ void int_free_svalue(svalue_t*);
  * DEBUG builds keep calling the out-of-line version unconditionally, so the
  * double-free detection that depends on the bit being set keeps working. */
 inline void free_svalue_maybe_refed(svalue_t* v) {
-  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER)) {
+  if (v->type & (T_STRING | T_REFED | T_ERROR_HANDLER | T_LVALUE_CODEPOINT | T_LVALUE_RANGE)) {
     int_free_svalue(v);
   }
 }
@@ -156,6 +220,34 @@ inline void free_svalue_maybe_refed(svalue_t* v) {
 
 // commonly used svalue.
 extern svalue_t const0, const1, const0u;
+
+/* Is this string svalue pure ASCII (and CR-free), i.e. byte offset == grapheme
+ * cluster index? Kept as a macro rather than an inline function so it expands
+ * where SVALUE_STRLEN/STRING_COUNTED are already visible. */
+#define SVALUE_STR_ASCII(sv)                                            \
+  u8_string_is_ascii_cached((sv)->u.string, SVALUE_STRLEN(sv), ((sv)->subtype & STRING_COUNTED) != 0)
+
+/* Tag a freshly built concatenation. ascii(a + b) == ascii(a) && ascii(b) is
+ * exact ONLY because the ASCII predicate excludes CR: with no CR on either
+ * side, no CR-LF (one cluster, UAX #29 GB3) can form across the seam. If
+ * either side is non-ASCII its bytes survive into the result, so NO likewise
+ * propagates exactly -- neither case needs to rescan the joined string.
+ *
+ * Without this, `s += x` in a loop re-derives the tag from scratch for each
+ * intermediate string, making an accompanying sizeof(s) O(n^2). */
+#define MSTR_TAG_JOIN(res, ascii_both) \
+  (MSTR_ASCII(res) = (ascii_both) ? MSTR_ASCII_YES : MSTR_ASCII_NO)
+
+/* Tag a substring (range / extract_range). ASCII propagates ONE WAY only:
+ * every byte of the result came from the source, so an ASCII-and-CR-free
+ * source can only yield an ASCII-and-CR-free substring.
+ *
+ * The converse is FALSE and must not be propagated -- "\u4f60abc"[1..3] is
+ * "abc", perfectly ASCII, from a non-ASCII source. So a non-ASCII source
+ * leaves the result UNKNOWN (new_string()'s default), to be derived lazily
+ * if anyone asks. That asymmetry is why this is not MSTR_TAG_JOIN. */
+#define MSTR_TAG_SUBSTRING(res, src_ascii) \
+  SAFE(if (src_ascii) { MSTR_ASCII(res) = MSTR_ASCII_YES; })
 
 /* These are not used anywhere */
 
@@ -169,6 +261,7 @@ extern svalue_t const0, const1, const0u;
     int ess_r;                                                                                    \
     ess_len = (ess_r = SVALUE_STRLEN(x)) + strlen(y);                                             \
     if (ess_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
+    bool ess_ascii = SVALUE_STR_ASCII(x) && u8_string_is_ascii_cached((y), ess_len - ess_r, false);\
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
       ess_res = (char*)extend_string((x)->u.string, ess_len);                                     \
       if (!ess_res) fatal("Out of memory!\n");                                                    \
@@ -181,6 +274,7 @@ extern svalue_t const0, const1, const0u;
       (x)->subtype = STRING_MALLOC;                                                               \
     }                                                                                             \
     (x)->u.string = ess_res;                                                                      \
+    MSTR_TAG_JOIN(ess_res, ess_ascii);                                                             \
   })
 
 /* <something that needs no free> + string svalue */
@@ -192,6 +286,7 @@ extern svalue_t const0, const1, const0u;
     int pss_len;                                                                                  \
     pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));                                            \
     if (pss_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
+    bool pss_ascii = SVALUE_STR_ASCII(sp) && u8_string_is_ascii_cached((y), pss_r, false);         \
     pss_res = new_string(pss_len, z);                                                             \
     strcpy(pss_res, y);                                                                           \
     strcpy(pss_res + pss_r, sp->u.string);                                                        \
@@ -199,6 +294,7 @@ extern svalue_t const0, const1, const0u;
     sp->type = T_STRING;                                                                          \
     sp->u.string = pss_res;                                                                       \
     sp->subtype = STRING_MALLOC;                                                                  \
+    MSTR_TAG_JOIN(pss_res, pss_ascii);                                                            \
   })
 
 /* basically, string + string; faster than using extend b/c of SVALUE_STRLEN */
@@ -211,6 +307,7 @@ extern svalue_t const0, const1, const0u;
     ssj_r = SVALUE_STRLEN(x);                                                                     \
     ssj_len = ssj_r + SVALUE_STRLEN(y);                                                           \
     if (ssj_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
+    bool ssj_ascii = SVALUE_STR_ASCII(x) && SVALUE_STR_ASCII(y);                                   \
     if ((x)->subtype == STRING_MALLOC && MSTR_REF((x)->u.string) == 1) {                          \
       ssj_res = (char*)extend_string((x)->u.string, ssj_len);                                     \
       if (!ssj_res) fatal("Out of memory!\n");                                                    \
@@ -225,6 +322,7 @@ extern svalue_t const0, const1, const0u;
       (x)->subtype = STRING_MALLOC;                                                               \
     }                                                                                             \
     (x)->u.string = ssj_res;                                                                      \
+    MSTR_TAG_JOIN(ssj_res, ssj_ascii);                                                             \
   })
 
 // Translate svalue into json summary, only suitable for

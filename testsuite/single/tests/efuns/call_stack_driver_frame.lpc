@@ -1,0 +1,45 @@
+// call_stack() must survive a DRIVER-CONTEXT frame anywhere on the control
+// stack. A frame entered with no current_object/current_prog (a bare tick
+// callback, a heart_beat, a promise-reaction delivery) records nulls; only
+// control_stack[0] could be such a frame historically, and every loop here
+// starts at index 1, so the nulls were never dereferenced. The promise drain
+// pushes its own error-capture frame before entering LPC, which puts a
+// null-context frame at index >= 1 -- unfixed, all five call_stack() forms
+// segfault the driver from inside a then-handler.
+//
+// Written with an EXIT LATCH: the checks below run from a promise handler,
+// after do_tests() has returned. The latch holds the end of the run open
+// until they have run, so they are counted like any other check -- no
+// deferred-counter gymnastics, and "the handler never ran at all" fails the
+// run instead of passing quietly.
+
+nosave mixed gate;
+
+mixed handler(mixed v) {
+  mixed files, obs, funcs, origins, lines;
+
+  files = call_stack(0);
+  obs = call_stack(1);
+  funcs = call_stack(2);
+  origins = call_stack(3);
+  lines = call_stack(4);
+
+  ASSERT(arrayp(files));
+  ASSERT(arrayp(obs));
+  ASSERT(arrayp(funcs));
+  ASSERT(arrayp(origins));
+  ASSERT(arrayp(lines));
+  ASSERT_EQ(sizeof(files), sizeof(obs));
+  ASSERT_EQ(sizeof(files), sizeof(funcs));
+
+  gate = 0;
+  RELEASE_LATCH("call_stack from promise handler");
+  return v;
+}
+
+void do_tests() {
+  EXPECT_LATCH("call_stack from promise handler");
+  gate = promise_create();
+  promise_then(gate, (: handler :));
+  promise_resolve(gate, 7);
+}

@@ -4,4 +4,12 @@ void do_tests() {
   ASSERT_EQ("b", trim("xxbxx", "x"));
   ASSERT_EQ("", trim("   "));
   ASSERT_EQ("abc", trim("abc"));
+
+  // issue #1401: the charset is a set of characters, not bytes.
+  // U+3000 is E3 80 80; 《 is E3 80 8A. Byte-set trim sliced 《.
+  string book = "《三字经》";
+  string ideo = "　";
+  ASSERT_EQ(book, trim(book, ideo));
+  ASSERT_EQ(book, trim(ideo + book + ideo, ideo));
+  ASSERT_EQ("三字经", trim("  《三字经》  ", " 《》"));
 }

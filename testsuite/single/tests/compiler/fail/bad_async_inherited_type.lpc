@@ -1,0 +1,6 @@
+// the plain (unqualified) call to an inherited async function is likewise
+// promise<int>
+inherit "/clone/async_inherit_base";
+void f() {
+  int x = base_async(1);
+}

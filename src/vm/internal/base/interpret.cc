@@ -47,21 +47,91 @@ void push_indexed_lvalue(int /*code*/);
 void break_point(void);
 static void do_loop_cond_number(void);
 static void do_loop_cond_local(void);
-static void do_catch(char* /*pc*/, unsigned short /*new_pc_offset*/);
+static void do_catch(char* /*pc*/, unsigned int /*new_pc_offset*/);
 int last_instructions(void);
 static const char* get_arg(int, int);
 extern inline const char* access_to_name(int /*mode*/);
 extern inline const char* origin_to_name(int /*origin*/);
 
+struct codepoint_lvalue_t {
+  int32_t index;
+  svalue_t* owner;
+  std::unique_ptr<EGCSmartIterator> iter;
+};
+
+struct range_lvalue_t {
+  size_t ind1, ind2, size;
+  svalue_t* owner;
+};
+
 template <typename F>
-void assign_lvalue_codepoint(F&& func);
+void assign_lvalue_codepoint(svalue_t* lval, F&& func);
+void assign_lvalue_range(svalue_t* lval, svalue_t* from);
+
+/* Materialize x[a..b] as an rvalue (the slice). Used by ||= / &&= / ??=
+ * when the dest is already "truthy" and we keep the current value.
+ * Must not bit-copy the heap box -- that double-frees it. */
+static void copy_range_lvalue_as_rvalue(svalue_t* dest, svalue_t* range_slot) {
+  range_lvalue_t* box = range_slot->u.range_lv;
+  svalue_t* owner = box->owner;
+  int ind1 = static_cast<int>(box->ind1);
+  int ind2 = static_cast<int>(box->ind2);
+  dest->subtype = 0;
+  switch (owner->type) {
+    case T_ARRAY: {
+      owner->u.arr->ref++;
+      dest->type = T_ARRAY;
+      dest->u.arr = slice_array(owner->u.arr, ind1, ind2 - 1);
+      break;
+    }
+    case T_STRING: {
+      int n = ind2 - ind1;
+      if (n < 0) {
+        n = 0;
+      }
+      char* tmp = new_string(n, "copy_range_lvalue_as_rvalue");
+      memcpy(tmp, owner->u.string + ind1, n);
+      tmp[n] = '\0';
+      dest->type = T_STRING;
+      dest->subtype = STRING_MALLOC;
+      dest->u.string = tmp;
+      break;
+    }
+    case T_BUFFER: {
+      int n = ind2 - ind1;
+      if (n < 0) {
+        n = 0;
+      }
+      buffer_t* b = allocate_buffer(n);
+      memcpy(b->item, owner->u.buf->item + ind1, n);
+      dest->type = T_BUFFER;
+      dest->u.buf = b;
+      break;
+    }
+    default:
+      error("Range lvalue on illegal type\n");
+  }
+}
 
 static inline void replace_lvalue_with_value_on_stack(svalue_t* slot, const char* where) {
   svalue_t tmp;
   tmp.type = T_NUMBER;
   tmp.subtype = 0;
   tmp.u.number = 0;
-  assign_svalue_no_free(&tmp, slot->u.lvalue);
+  svalue_t* target = lvalue_target(slot);
+  if (target->type == T_LVALUE_BYTE) {
+    tmp.u.number = *target->u.lvalue_byte;
+  } else if (target->type == T_LVALUE_CODEPOINT && target->u.cp_lv) {
+    codepoint_lvalue_t* cp = target->u.cp_lv;
+    tmp.u.number =
+        u8_egc_index_as_single_codepoint(cp->owner->u.string, SVALUE_STRLEN(cp->owner), cp->index);
+  } else if (target->type == T_LVALUE_RANGE && target->u.range_lv) {
+    copy_range_lvalue_as_rvalue(&tmp, target);
+  } else if (is_indexed_lvalue(target)) {
+    error("Illegal lhs to ||= / &&= / ??=\n");
+  } else {
+    assign_svalue_no_free(&tmp, target);
+  }
   free_svalue(slot, where);
   assign_svalue_no_free(slot, &tmp);
   free_svalue(&tmp, where);
@@ -85,14 +155,14 @@ static inline void assign_value_to_lvalue(svalue_t* lval, svalue_t* value, const
       break;
     }
     case T_LVALUE_RANGE:
-      assign_lvalue_range(value);
+      assign_lvalue_range(lval, value);
       break;
     case T_LVALUE_CODEPOINT: {
       if (value->type != T_NUMBER) {
         error("Illegal rhs to char lvalue\n");
       }
       UChar32 newc = value->u.number;
-      assign_lvalue_codepoint([=](UChar32 /*unused*/) { return newc; });
+      assign_lvalue_codepoint(lval, [=](UChar32 /*unused*/) { return newc; });
       break;
     }
     default:
@@ -184,13 +254,19 @@ void kill_ref(ref_t* ref) {
    * counted owner (F_MAKE_REF, lvalue set) or an uncounted tag
    * (T_NUMBER / T_LVALUE_BYTE) for which this is a no-op. */
   free_svalue(&ref->sv, "kill_ref");
-  /* Clear the stale tag: when the last T_REF svalue holding this ref_t is
+  /* F_MAKE_REF of s[i] / b[i] parks the box here so sv can still hold
+   * the container. */
+  free_svalue(&ref->index_sv, "kill_ref");
+  /* Clear the stale tags: when the last T_REF svalue holding this ref_t is
    * later freed, free_svalue() re-enters kill_ref, and the MAP_LOCKED
    * check above must not re-read the (possibly already deallocated)
    * mapping through ref->sv. */
   ref->sv.type = T_NUMBER;
   ref->sv.subtype = 0;
   ref->sv.u.number = 0;
+  ref->index_sv.type = T_NUMBER;
+  ref->index_sv.subtype = 0;
+  ref->index_sv.u.number = 0;
   if (ref->next) {
     ref->next->prev = ref->prev;
   }
@@ -222,8 +298,13 @@ ref_t* make_ref(void) {
   global_ref_list = ref;
   ref->csp = csp;
   ref->ref = 1;
-  ref->codepoint_owner = nullptr;
-  ref->codepoint_index = 0;
+  ref->lvalue = nullptr;
+  ref->sv.type = T_NUMBER;
+  ref->sv.subtype = 0;
+  ref->sv.u.number = 0;
+  ref->index_sv.type = T_NUMBER;
+  ref->index_sv.subtype = 0;
+  ref->index_sv.u.number = 0;
   return ref;
 }
 
@@ -276,6 +357,8 @@ const char* type_name(int c) {
   } while (!((limit <<= 1) & TYPE_CODES_END));
   /* Oh crap.  Take some time and figure out what we have. */
   switch (c) {
+    case T_PROMISE:
+      return "promise";
     case T_INVALID:
       return "*invalid*";
     case T_LVALUE:
@@ -358,7 +441,7 @@ int validate_shadowing(object_t* ob) {
 
   push_object(ob);
   ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
-  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret)) {
+  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret, "valid_shadow")) {
     return 1;
   }
   return 0;
@@ -593,38 +676,42 @@ void pop_stack() {
   free_svalue(sp--, "pop_stack");
 }
 
-svalue_t global_lvalue_byte = {T_LVALUE_BYTE};
-
 int lv_owner_type;
 refed_t* lv_owner;
 const char* lv_owner_str;
 
-// LVALUE points to an character(codepoint) in string
-static struct {
-  int32_t index;
-  svalue_t* owner;
-  std::unique_ptr<EGCSmartIterator> iter;
-} global_lvalue_codepoint;
-static svalue_t global_lvalue_codepoint_sv = {T_LVALUE_CODEPOINT};
+void free_indexed_lvalue(svalue_t* v) {
+  if (v->type == T_LVALUE_CODEPOINT) {
+    delete v->u.cp_lv;
+    v->u.cp_lv = nullptr;
+  } else if (v->type == T_LVALUE_RANGE) {
+    delete v->u.range_lv;
+    v->u.range_lv = nullptr;
+  }
+}
 
-/* Aim the shared string-char lvalue (global_lvalue_codepoint /
- * global_lvalue_codepoint_sv) at EGC #ind of *owner, a T_STRING svalue.
- * The character must be indexable as a single codepoint -- the same rule
- * as s[i] -- or this errors cleanly. Every consumer of the lvalue (=, ++,
- * --, +=, -=) then writes through assign_lvalue_codepoint(), so string
- * index lvalues and foreach ref loop variables share one arming and one
- * assignment path. */
-static void aim_lvalue_codepoint(svalue_t* owner, int32_t ind) {
+/* Per-instance string-char lvalue (issue #1358). Validate first so an
+ * error cannot leak the box; then put the box on the caller's slot. */
+static void arm_codepoint_lvalue(svalue_t* slot, svalue_t* owner, int32_t ind) {
   UChar32 c = u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner), ind);
   if (c == -2 || c == 0) {
     error("Index out of bounds in string index lvalue.\n");
   } else if (c < 0) {
     error("Indexed character is multi-codepoint.\n");
   }
-  global_lvalue_codepoint.index = ind;
-  global_lvalue_codepoint.owner = owner;
-  global_lvalue_codepoint.iter =
-      std::make_unique<EGCSmartIterator>(owner->u.string, SVALUE_STRLEN(owner));
+  auto* box = new codepoint_lvalue_t;
+  box->index = ind;
+  box->owner = owner;
+  box->iter = std::make_unique<EGCSmartIterator>(owner->u.string, SVALUE_STRLEN(owner));
+  slot->type = T_LVALUE_CODEPOINT;
+  slot->subtype = 0;
+  slot->u.cp_lv = box;
+}
+
+static void arm_byte_lvalue(svalue_t* slot, unsigned char* p) {
+  slot->type = T_LVALUE_BYTE;
+  slot->subtype = 1;
+  slot->u.lvalue_byte = p;
 }
 
 /*
@@ -668,9 +755,7 @@ void push_indexed_lvalue(int reverse) {
         }
         /* unlink first so the armed iterator sees the final (unshared) string */
         unlink_string_svalue(lv);
-        aim_lvalue_codepoint(lv, ind);
-        sp->type = T_LVALUE;
-        sp->u.lvalue = &global_lvalue_codepoint_sv;
+        arm_codepoint_lvalue(sp, lv, ind);
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_STRING;
         lv_owner_str = lv->u.string;
@@ -685,10 +770,7 @@ void push_indexed_lvalue(int reverse) {
         if (ind >= lv->u.buf->size || ind < 0) {
           error("Buffer index out of bounds.\n");
         }
-        sp->type = T_LVALUE;
-        sp->u.lvalue = &global_lvalue_byte;
-        global_lvalue_byte.subtype = 1;
-        global_lvalue_byte.u.lvalue_byte = &lv->u.buf->item[ind];
+        arm_byte_lvalue(sp, &lv->u.buf->item[ind]);
 #ifdef REF_RESERVED_WORD
         lv_owner_type = T_BUFFER;
         lv_owner = reinterpret_cast<refed_t*>(lv->u.buf);
@@ -762,10 +844,8 @@ void push_indexed_lvalue(int reverse) {
         lv_owner_type = T_BUFFER;
         lv_owner = reinterpret_cast<refed_t*>(sp->u.buf);
 #endif
-        (--sp)->type = T_LVALUE;
-        sp->u.lvalue = &global_lvalue_byte;
-        global_lvalue_byte.subtype = 1;
-        global_lvalue_byte.u.lvalue_byte = (sp + 1)->u.buf->item + ind;
+        --sp;
+        arm_byte_lvalue(sp, (sp + 1)->u.buf->item + ind);
         break;
       }
 
@@ -795,13 +875,6 @@ void push_indexed_lvalue(int reverse) {
   }
 }
 
-static struct lvalue_range {
-  size_t ind1, ind2, size;
-  svalue_t* owner;
-} global_lvalue_range;
-
-static svalue_t global_lvalue_range_sv = {T_LVALUE_RANGE};
-
 static void push_lvalue_range(int code) {
   int32_t ind1, ind2;
   size_t size = 0;
@@ -809,7 +882,7 @@ static void push_lvalue_range(int code) {
   std::unique_ptr<EGCSmartIterator> iter = nullptr;
 
   {
-    switch ((lv = global_lvalue_range.owner = sp->u.lvalue)->type) {
+    switch ((lv = lvalue_target(sp))->type) {
       case T_ARRAY:
         size = lv->u.arr->size;
         break;
@@ -874,11 +947,14 @@ static void push_lvalue_range(int code) {
     }
   }
 
-  global_lvalue_range.ind1 = ind1;
-  global_lvalue_range.ind2 = ind2;
-  global_lvalue_range.size = size;
-  sp->type = T_LVALUE;
-  sp->u.lvalue = &global_lvalue_range_sv;
+  auto* box = new range_lvalue_t;
+  box->ind1 = static_cast<size_t>(ind1);
+  box->ind2 = static_cast<size_t>(ind2);
+  box->size = size;
+  box->owner = lv;
+  sp->type = T_LVALUE_RANGE;
+  sp->subtype = 0;
+  sp->u.range_lv = box;
 }
 
 /* Convert a value into a fresh buffer: a string contributes its raw
@@ -914,14 +990,15 @@ buffer_t* svalue_to_buffer_bytes(svalue_t* from) {
   error("Cannot convert value to buffer: expected string or array of ints 0..255.\n");
 }
 
-void copy_lvalue_range(svalue_t* from) {
+void copy_lvalue_range(svalue_t* lval, svalue_t* from) {
   int ind1, ind2, size, fsize;
   svalue_t* owner;
+  range_lvalue_t* box = lval->u.range_lv;
 
-  ind1 = global_lvalue_range.ind1;
-  ind2 = global_lvalue_range.ind2;
-  size = global_lvalue_range.size;
-  owner = global_lvalue_range.owner;
+  ind1 = static_cast<int>(box->ind1);
+  ind2 = static_cast<int>(box->ind2);
+  size = static_cast<int>(box->size);
+  owner = box->owner;
 
   switch (owner->type) {
     case T_ARRAY: {
@@ -999,6 +1076,16 @@ void copy_lvalue_range(svalue_t* from) {
         /* because both of them can only range from 0 to len */
 
         strncpy((const_cast<char*>(owner->u.string)) + ind1, from->u.string, fsize);
+        // owner is always STRING_MALLOC here (push_lvalue_range's
+        // unlink_string_svalue() guarantees it), and this write mutates its
+        // bytes in place -- unlike extend_string()/new_string(), which reset
+        // the cached tag on every allocation, this path grows nothing and so
+        // has no natural place that does that. Left alone, a stale ASCII tag
+        // (e.g. cached YES via SVALUE_STR_ASCII/MSTR_TAG_JOIN before this
+        // assignment) would silently survive a same-byte-length splice of
+        // non-ASCII content, making a later sizeof()/index answer from the
+        // unchanged byte length instead of rescanning.
+        MSTR_ASCII(owner->u.string) = MSTR_ASCII_UNKNOWN;
       } else {
         char *tmp, *dstr = const_cast<char*>(owner->u.string);
 
@@ -1060,14 +1147,40 @@ void copy_lvalue_range(svalue_t* from) {
 }
 
 template <typename F>
-void assign_lvalue_codepoint(F&& func) {
+void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
+  codepoint_lvalue_t* cp = lval->u.cp_lv;
+  if (!cp) {
+    error("Reference is invalid.\n");
+  }
   {
-    auto pos = global_lvalue_codepoint.index;
+    auto pos = cp->index;
 
-    UChar32 c = u8_egc_index_as_single_codepoint(global_lvalue_codepoint.owner->u.string,
-                                                 SVALUE_STRLEN(global_lvalue_codepoint.owner), pos);
-    if (c < 0) {
-      error("Invalid string index, multi-codepoint character.\n");
+    /* Another live codepoint lvalue (chained `s[i] = s[j] = x`, or two
+     * `ref s[i]` parameters) may have already replaced the owner string.
+     * The box's iterator still names the previous bytes -- and F_MAKE_REF
+     * keep-alive can hold that allocation, so a write would copy the stale
+     * value (`set_chars(ref s[0], ref s[1])` left "aY"). Always retarget
+     * from the current owner before copying. */
+    if (!cp->owner || cp->owner->type != T_STRING) {
+      error("Reference is invalid.\n");
+    }
+    /* Rebuild, do not reset(). reset() has a subrange fast path that
+     * keeps ascii_ when the new range sits inside the old one. An
+     * in-place same-length range splice (g[0..1] = "é") can turn those
+     * bytes non-ASCII at the same address, so the shortcut then feeds
+     * u8_copy_and_replace_codepoint_at a stale byte offset and a short
+     * allocation. Master re-armed a fresh iterator on every F_REF_LVALUE. */
+    cp->iter = std::make_unique<EGCSmartIterator>(cp->owner->u.string, SVALUE_STRLEN(cp->owner));
+
+    UChar32 c = u8_egc_index_as_single_codepoint(cp->owner->u.string, SVALUE_STRLEN(cp->owner), pos);
+    /* 0 / -2 mean the index is at or past the last EGC (same as
+     * arm_codepoint_lvalue). A stale ref after the owner was truncated
+     * used to treat 0 as U+0000, size the replacement one byte short,
+     * and write past the allocation. */
+    if (c == -2 || c == 0) {
+      error("Index out of bounds in string index lvalue.\n");
+    } else if (c < 0) {
+      error("Indexed character is multi-codepoint.\n");
     }
     auto old_len = U8_LENGTH(c);
     DEBUG_CHECK(old_len == 0, "Invalid UTF-8 Codepoint: assign_lvalue_codepoint");
@@ -1081,35 +1194,34 @@ void assign_lvalue_codepoint(F&& func) {
     if (!new_len) {
       error("Strings cannot contain invalid utf8 codepoint.\n");
     }
-    auto res = new_string(SVALUE_STRLEN(global_lvalue_codepoint.owner) - old_len + new_len,
-                          "assign_lvalue_codepoint");
-    u8_copy_and_replace_codepoint_at(*global_lvalue_codepoint.iter, res, pos, c);
+    auto res = new_string(SVALUE_STRLEN(cp->owner) - old_len + new_len, "assign_lvalue_codepoint");
+    u8_copy_and_replace_codepoint_at(*cp->iter, res, pos, c);
 
-    free_string_svalue(global_lvalue_codepoint.owner);
+    free_string_svalue(cp->owner);
 
-    global_lvalue_codepoint.owner->u.string = res;
-    global_lvalue_codepoint.owner->subtype = STRING_MALLOC;
-    global_lvalue_codepoint.iter = std::make_unique<EGCSmartIterator>(
-        global_lvalue_codepoint.owner->u.string, SVALUE_STRLEN(global_lvalue_codepoint.owner));
+    cp->owner->u.string = res;
+    cp->owner->subtype = STRING_MALLOC;
+    cp->iter = std::make_unique<EGCSmartIterator>(cp->owner->u.string, SVALUE_STRLEN(cp->owner));
   }
 }
 
-/* Add delta to the codepoint behind the active T_LVALUE_CODEPOINT lvalue
+/* Add delta to the codepoint behind a T_LVALUE_CODEPOINT slot
  * and return the resulting codepoint (for the rvalue of += / -=). */
-LPC_INT codepoint_lvalue_add(LPC_INT delta) {
+LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta) {
   UChar32 out = 0;
-  assign_lvalue_codepoint([&out, delta](UChar32 c) { return out = c + delta; });
+  assign_lvalue_codepoint(lval, [&out, delta](UChar32 c) { return out = c + delta; });
   return out;
 }
 
-void assign_lvalue_range(svalue_t* from) {
+void assign_lvalue_range(svalue_t* lval, svalue_t* from) {
   int ind1, ind2, size, fsize;
   svalue_t* owner;
+  range_lvalue_t* box = lval->u.range_lv;
 
-  ind1 = global_lvalue_range.ind1;
-  ind2 = global_lvalue_range.ind2;
-  size = global_lvalue_range.size;
-  owner = global_lvalue_range.owner;
+  ind1 = static_cast<int>(box->ind1);
+  ind2 = static_cast<int>(box->ind2);
+  size = static_cast<int>(box->size);
+  owner = box->owner;
 
   switch (owner->type) {
     case T_ARRAY: {
@@ -1168,6 +1280,13 @@ void assign_lvalue_range(svalue_t* from) {
         /* because both of them can only range from 0 to len */
 
         strncpy((const_cast<char*>(owner->u.string)) + ind1, from->u.string, fsize);
+        // See the matching comment in copy_lvalue_range(): this is an
+        // in-place mutation of owner's bytes (always STRING_MALLOC here),
+        // and unlike extend_string()/new_string() nothing else resets the
+        // cached ASCII tag for it, so a stale YES would survive a
+        // same-byte-length splice of non-ASCII content into a previously
+        // all-ASCII string.
+        MSTR_ASCII(owner->u.string) = MSTR_ASCII_UNKNOWN;
       } else {
         char* tmp;
         const char* dstr = const_cast<char*>(owner->u.string);
@@ -1255,15 +1374,18 @@ void pop_3_elems() {
   free_svalue(sp--, "pop_3_elems");
 }
 
-static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
-  auto type = val->type;
+/* Render the names of every type bit set in `type`, separated by `sep`.
+ * type_names[] only covers the contiguous low window TYPE_CODES_START ..
+ * TYPE_CODES_END; tags above it (T_PROMISE) must be listed explicitly or
+ * the caller prints an empty type list -- "Expected:  Got: 1." */
+static void add_type_mask_names(outbuffer_t* buf, uint32_t type, const char* sep) {
   int flag = 0;
-  int j = TYPE_CODES_START;
+  uint32_t j = TYPE_CODES_START;
   int k = 0;
   do {
     if (type & j) {
       if (flag) {
-        outbuf_add(buf, " and ");
+        outbuf_add(buf, sep);
       } else {
         flag = 1;
       }
@@ -1271,6 +1393,16 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
     }
     k++;
   } while (!((j <<= 1) & TYPE_CODES_END));
+  if (type & T_PROMISE) {
+    if (flag) {
+      outbuf_add(buf, sep);
+    }
+    outbuf_add(buf, "promise");
+  }
+}
+
+static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
+  add_type_mask_names(buf, val->type, " and ");
 }
 
 [[noreturn]] void bad_arg(int arg, int instr) {
@@ -1286,20 +1418,7 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
   for (int i = 0; i < 127; i++) {
     auto type = types[i];
     if (!type) break;
-    int flag = 0;
-    int j = TYPE_CODES_START;
-    int k = 0;
-    do {
-      if (type & j) {
-        if (flag) {
-          outbuf_add(&outbuf, " or ");
-        } else {
-          flag = 1;
-        }
-        outbuf_add(&outbuf, type_names[k]);
-      }
-      k++;
-    } while (!((j <<= 1) & TYPE_CODES_END));
+    add_type_mask_names(&outbuf, type, " or ");
     outbuf_add(&outbuf, ", ");
   }
 
@@ -1314,25 +1433,12 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
 
 [[noreturn]] void bad_argument(svalue_t* val, int type, int arg, int instr) {
   outbuffer_t outbuf;
-  int flag = 0;
-  int j = TYPE_CODES_START;
-  int k = 0;
 
   outbuf_zero(&outbuf);
   outbuf_addv(&outbuf, "Bad argument %d to %s%s\nExpected: ", arg, query_instr_name(instr),
               (instr < EFUN_BASE ? "" : "()"));
 
-  do {
-    if (type & j) {
-      if (flag) {
-        outbuf_add(&outbuf, " or ");
-      } else {
-        flag = 1;
-      }
-      outbuf_add(&outbuf, type_names[k]);
-    }
-    k++;
-  } while (!((j <<= 1) & TYPE_CODES_END));
+  add_type_mask_names(&outbuf, type, " or ");
 
   outbuf_add(&outbuf, " Got: ");
   svalue_to_string(val, &outbuf, 0, 0, 0);
@@ -1357,6 +1463,9 @@ void push_control_stack(int frkind) {
   csp->function_index_offset = function_index_offset;
   csp->variable_index_offset = variable_index_offset;
   csp->defers = nullptr;
+#ifdef DEBUG
+  csp->save_temporaries = stack_in_use_as_temporary;
+#endif
   csp->trace_id.reset();
 }
 
@@ -2256,7 +2365,12 @@ void eval_instruction(char* p) {
               break;
             case PUSH_LOCAL:
               lval = fp + (i & PUSH_MASK);
-              if ((fp - lval) >= csp->num_local_variables) {
+              /* (lval - fp), not (fp - lval): the operand is an index ABOVE
+               * fp, so the reversed subtraction is -index and could only ever
+               * be >= num_local_variables for the degenerate empty frame.
+               * Every real over-index slipped straight through into an
+               * out-of-bounds svalue read. */
+              if ((lval - fp) >= csp->num_local_variables) {
                 error("Invalid Program: op PUSH Tried to push non-existent local\n");
               }
               if ((lval->type == T_OBJECT) && (lval->u.ob->flags & O_DESTRUCTED)) {
@@ -2278,29 +2392,32 @@ void eval_instruction(char* p) {
         }
         break;
       case F_INC:
-        if (sp->type != T_LVALUE) {
+        if (!is_stack_lvalue(sp)) {
           error("Invalid Program: non-lvalue argument to ++\n");
         }
-        lval = (sp--)->u.lvalue;
-        switch (lval->type) {
-          case T_NUMBER:
-            lval->u.number++;
-            break;
-          case T_REAL:
-            lval->u.real++;
-            break;
-          case T_LVALUE_BYTE:
-            if (*lval->u.lvalue_byte == 255) {
-              error("Buffer byte value out of range: must be 0..255.\n");
+        {
+          PoppedLvalue lv;
+          lval = lv.target();
+          switch (lval->type) {
+            case T_NUMBER:
+              lval->u.number++;
+              break;
+            case T_REAL:
+              lval->u.real++;
+              break;
+            case T_LVALUE_BYTE:
+              if (*lval->u.lvalue_byte == 255) {
+                error("Buffer byte value out of range: must be 0..255.\n");
+              }
+              ++*lval->u.lvalue_byte;
+              break;
+            case T_LVALUE_CODEPOINT: {
+              assign_lvalue_codepoint(lval, [](UChar32 c) { return c + 1; });
+              break;
             }
-            ++*lval->u.lvalue_byte;
-            break;
-          case T_LVALUE_CODEPOINT: {
-            assign_lvalue_codepoint([](UChar32 c) { return c + 1; });
-            break;
+            default:
+              error("++ of non-numeric argument\n");
           }
-          default:
-            error("++ of non-numeric argument\n");
         }
         break;
       case F_WHILE_DEC: {
@@ -2335,15 +2452,27 @@ void eval_instruction(char* p) {
          * inside structures may not, however ...
          */
         ref = make_ref();
-        ref->lvalue = sp->u.lvalue;
-        if (ref->lvalue == &global_lvalue_codepoint_sv) {
-          // sp->u.lvalue can be the shared codepoint sentinel here (e.g. a
-          // call-site `f(ref s[i])`, armed by push_indexed_lvalue just
-          // before this opcode runs) -- capture ITS owner/index onto this
-          // ref, or a later F_REF/F_REF_LVALUE has nothing of its own to
-          // re-arm the shared scratch state from.
-          ref->codepoint_owner = global_lvalue_codepoint.owner;
-          ref->codepoint_index = global_lvalue_codepoint.index;
+        if (sp->type == T_LVALUE_RANGE) {
+          /* rule_expr_ref rejects this; keep the runtime trap so a box
+           * is never parked in a ref F_REF would bit-copy. */
+          error("Illegal to make reference to range\n");
+        }
+        if (sp->type == T_LVALUE_CODEPOINT || sp->type == T_LVALUE_BYTE) {
+          /* Transfer the per-instance box into index_sv so it outlives
+           * this stack slot. sv still holds the container keep-alive
+           * below -- stuffing both into sv was clobbering the box, so
+           * `increment(ref b[1])` wrote a T_NUMBER in the ref and left
+           * the buffer unchanged. */
+          ref->index_sv = *sp;
+          ref->lvalue = &ref->index_sv;
+          sp->type = T_NUMBER;
+          sp->subtype = 0;
+          sp->u.number = 0;
+        } else {
+          /* Nested `ref c` on a parameter that is already a ref: lvalue
+           * points at the outer ref's index_sv (the box). Do not snapshot
+           * owner/index -- F_REF reads the box. */
+          ref->lvalue = sp->u.lvalue;
         }
         if (op != F_GLOBAL_LVALUE && op != F_LOCAL_LVALUE && op != F_REF_LVALUE) {
           ref->sv.type = lv_owner_type;
@@ -2362,8 +2491,6 @@ void eval_instruction(char* p) {
               (reinterpret_cast<mapping_t*>(lv_owner))->count |= MAP_LOCKED;
             }
           }
-        } else {
-          ref->sv.type = T_NUMBER;
         }
         sp->type = T_REF;
         sp->u.ref = ref;
@@ -2402,12 +2529,23 @@ void eval_instruction(char* p) {
             push_number(*reflval->u.lvalue_byte);
             break;
           } else if (reflval->type == T_LVALUE_CODEPOINT) {
-            // Read from THIS ref's own owner/index, not the shared scratch
-            // global -- a concurrently-armed string-char lvalue elsewhere
-            // (another ref, or a plain s[i]) must not corrupt this read.
-            svalue_t* owner = s->u.ref->codepoint_owner;
-            push_number(u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner),
-                                                          s->u.ref->codepoint_index));
+            /* Read the box (index_sv or a nested ref's pointer to it).
+             * A snapshot on the ref itself was only filled when F_MAKE_REF
+             * saw T_LVALUE_CODEPOINT on the stack -- `inner(ref c)` after
+             * `outer(ref s[0])` saw T_LVALUE and left codepoint_owner
+             * null, then segfaulted on the read. */
+            codepoint_lvalue_t* cp = reflval->u.cp_lv;
+            if (!cp || !cp->owner || cp->owner->type != T_STRING) {
+              error("Reference is invalid.\n");
+            }
+            UChar32 c = u8_egc_index_as_single_codepoint(cp->owner->u.string,
+                                                         SVALUE_STRLEN(cp->owner), cp->index);
+            if (c == -2 || c == 0) {
+              error("Index out of bounds in string index lvalue.\n");
+            } else if (c < 0) {
+              error("Indexed character is multi-codepoint.\n");
+            }
+            push_number(c);
             break;
           }
         }
@@ -2424,14 +2562,6 @@ void eval_instruction(char* p) {
 
         if (s->type == T_REF) {
           if (s->u.ref->lvalue) {
-            if (s->u.ref->lvalue == &global_lvalue_codepoint_sv) {
-              // The lvalue consumer (=, ++, --, +=, -=) reads/writes through
-              // the shared scratch global; re-arm it from THIS ref's own
-              // owner/index right before use, since it may have been
-              // retargeted by another string-char lvalue since this ref was
-              // armed.
-              aim_lvalue_codepoint(s->u.ref->codepoint_owner, s->u.ref->codepoint_index);
-            }
             STACK_INC;
             sp->type = T_LVALUE;
             sp->u.lvalue = s->u.ref->lvalue;
@@ -2618,10 +2748,10 @@ void eval_instruction(char* p) {
         pc += offset;
         break;
       case F_LOR_EQ: {
-        if (sp->type != T_LVALUE) {
+        if (!is_stack_lvalue(sp)) {
           error("Invalid Program: non-lvalue argument to ||=.");
         }
-        svalue_t* lval = sp->u.lvalue;
+        svalue_t* lval = lvalue_target(sp);
         if ((lval->type == T_NUMBER && !lval->u.number) ||
             (lval->type == T_REAL && !lval->u.real)) {
           pc += 2;
@@ -2633,10 +2763,10 @@ void eval_instruction(char* p) {
         break;
       }
       case F_LAND_EQ: {
-        if (sp->type != T_LVALUE) {
+        if (!is_stack_lvalue(sp)) {
           error("Invalid Program: non-lvalue argument to &&=.");
         }
-        svalue_t* lval = sp->u.lvalue;
+        svalue_t* lval = lvalue_target(sp);
         if ((lval->type == T_NUMBER && !lval->u.number) ||
             (lval->type == T_REAL && !lval->u.real)) {
           replace_lvalue_with_value_on_stack(sp, "F_LAND_EQ");
@@ -2648,10 +2778,10 @@ void eval_instruction(char* p) {
         break;
       }
       case F_NULLISH_EQ: {
-        if (sp->type != T_LVALUE) {
+        if (!is_stack_lvalue(sp)) {
           error("Invalid Program: non-lvalue argument to ??=.");
         }
-        svalue_t* lval = sp->u.lvalue;
+        svalue_t* lval = lvalue_target(sp);
         if (lval->type == T_NUMBER && !lval->u.number && (lval->subtype == T_UNDEFINED)) {
           pc += 2;
         } else {
@@ -2693,7 +2823,7 @@ void eval_instruction(char* p) {
         svalue_t* s;
 
         s = fp + EXTRACT_UCHAR(pc++);
-        if ((fp - s) >= csp->num_local_variables) {
+        if ((s - fp) >= csp->num_local_variables) {
           error("Invalid Program: op F_TRANSFER_LOCAL Tried to push non-existent local.");
         }
         if ((s->type == T_OBJECT) && (s->u.ob->flags & O_DESTRUCTED)) {
@@ -2708,7 +2838,7 @@ void eval_instruction(char* p) {
         svalue_t* s;
 
         s = fp + EXTRACT_UCHAR(pc++);
-        if ((fp - s) >= csp->num_local_variables)
+        if ((s - fp) >= csp->num_local_variables)
           error("Invalid Program: op F_LOCAL Tried to push non-existent local.");
 
         /*
@@ -2892,9 +3022,10 @@ void eval_instruction(char* p) {
       }
       case F_VOID_ADD_EQ:
       case F_ADD_EQ:
-        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to +=.");
-        lval = sp->u.lvalue;
-        sp--; /* points to the RHS */
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to +=.");
+        {
+        PoppedLvalue lv;
+        lval = lv.target();
         if (lval->type == T_LVALUE_CODEPOINT || lval->type == T_LVALUE_BYTE) {
           LPC_INT res;
 
@@ -2902,7 +3033,7 @@ void eval_instruction(char* p) {
             error("Bad right type to += of char lvalue.\n");
           }
           if (lval->type == T_LVALUE_CODEPOINT) {
-            res = codepoint_lvalue_add(sp->u.number);
+            res = codepoint_lvalue_add(lval, sp->u.number);
           } else {
             res = *lval->u.lvalue_byte + sp->u.number;
             if (res < 0 || res > 255) {
@@ -2948,12 +3079,13 @@ void eval_instruction(char* p) {
               lval->subtype = 0;
               /* both sides are numbers, no freeing required */
             } else if (sp->type == T_REAL) {
-              /* A statically int/float-typed lvalue never reaches here with
-               * a float rhs -- the compiler already coerced the rhs to int
-               * (rule_expr_assign, grammar_rules_exprs.cc). This is an
-               * untyped lvalue (mixed variable, mapping value): promote it
-               * to float, since op= is the only way such a slot can ever
-               * become one. */
+              /* A statically int-typed lvalue never reaches here with a
+               * float rhs -- the compiler already coerced the rhs to int
+               * (rule_expr_assign, grammar_rules_exprs.cc), including a
+               * TYPE_ANY/UNKNOWN rhs such as call_other (#1365) or a
+               * mapping/array index (#1384). This is an untyped lvalue
+               * (mixed variable, mapping value): promote it to float,
+               * since op= is the only way such a slot can ever become one. */
               LPC_FLOAT result = lval->u.number + sp->u.real;
               lval->type = T_REAL;
               lval->u.real = result;
@@ -3033,6 +3165,7 @@ void eval_instruction(char* p) {
            */
           sp--;
         }
+        }
         break;
       case F_AND:
         f_and();
@@ -3074,9 +3207,8 @@ void eval_instruction(char* p) {
           }
         } else if (sp->type == T_STRING) {
           // Validate the string up front; iteration state (the EGC cursor)
-          // lives in this loop's own stack slot, NOT in the shared
-          // global_lvalue_codepoint -- nested string foreach used to reset
-          // the shared iterator out from under the outer loop and crash.
+          // lives in this loop's own stack slot. Nested string foreach
+          // used to reset a shared iterator out from under the outer loop.
           bool valid;
           {
             EGCSmartIterator check(sp->u.string, SVALUE_STRLEN(sp));
@@ -3187,20 +3319,17 @@ void eval_instruction(char* p) {
            * multi-codepoint EGC and still iterates, matching string indexing. */
           if (c != 0 && c != -2) {
             if (sp->type == T_REF) {
-              /* Aim the shared codepoint lvalue at THIS loop's current
-               * character -- the same arming/validation as an s[i] lvalue,
-               * so a character that cannot be indexed as a single codepoint
-               * (e.g. a flag emoji) errors cleanly instead of reading as
-               * garbage. Re-arm it every iteration: any string foreach or
-               * string index lvalue in the loop body retargets the shared
-               * state. Reads/writes through the ref hit the loop's own
-               * (stack) copy of the string, so writes never reach the
-               * variable that was iterated -- pinned by
-               * tests/operators/foreach.lpc. */
-              aim_lvalue_codepoint(owner, idx);
-              sp->u.ref->lvalue = &global_lvalue_codepoint_sv;
-              sp->u.ref->codepoint_owner = owner;
-              sp->u.ref->codepoint_index = idx;
+              /* Per-instance box on this ref (issue #1358). Same
+               * validation as s[i]. Writes hit the loop's stack copy of
+               * the string -- pinned by tests/operators/foreach.lpc. */
+              ref_t* r = sp->u.ref;
+              if (r->sv.type == T_LVALUE_CODEPOINT || r->sv.type == T_LVALUE_RANGE) {
+                free_indexed_lvalue(&r->sv);
+              } else {
+                free_svalue(&r->sv, "foreach-string ref");
+              }
+              arm_codepoint_lvalue(&r->sv, owner, idx);
+              r->lvalue = &r->sv;
             } else {
               free_svalue(sp->u.lvalue, "foreach-string");
               sp->u.lvalue->type = T_NUMBER;
@@ -3219,10 +3348,9 @@ void eval_instruction(char* p) {
           if (idx < owner->u.buf->size) {
             if (sp->type == T_REF) {
               /* This loop's ref carries its OWN byte lvalue (in ref->sv),
-               * so it can't alias the shared global_lvalue_byte that b[i]
-               * uses, or another buffer ref loop. Buffers are reference
-               * types, so writes through the ref mutate the iterated buffer
-               * in place, like an array ref loop. */
+               * so it can't alias a b[i] stack slot or another buffer ref
+               * loop. Buffers are reference types, so writes through the
+               * ref mutate the iterated buffer in place. */
               ref_t* r = sp->u.ref;
               r->sv.type = T_LVALUE_BYTE;
               r->sv.subtype = 1; /* buffer bytes may be zero */
@@ -3283,14 +3411,6 @@ void eval_instruction(char* p) {
           /* array, string or buffer */
           sp -= 2;
           if (sp->type == T_STRING) {
-            /* Drop the shared codepoint lvalue only if it still points at
-             * this loop's string slot (about to be popped); an outer string
-             * foreach re-arms its own state on its next iteration. */
-            if (global_lvalue_codepoint.owner == sp) {
-              global_lvalue_codepoint.index = 0;
-              global_lvalue_codepoint.owner = nullptr;
-              global_lvalue_codepoint.iter.reset();
-            }
             free_string_svalue(sp--);
           } else if (sp->type == T_BUFFER) {
             free_buffer((sp--)->u.buf);
@@ -3385,31 +3505,92 @@ void eval_instruction(char* p) {
         push_refed_mapping(m);
         break;
       }
-      case F_ASSIGN:
+      case F_ASSIGN: {
 #ifdef DEBUG
-        if (sp->type != T_LVALUE) {
+        if (!is_stack_lvalue(sp)) {
           fatal("Bad argument to F_ASSIGN\n");
         }
 #endif
-        assign_value_to_lvalue(sp->u.lvalue, sp - 1, "F_ASSIGN");
-        sp--; /* ignore lvalue */
+        /* Index/range dests need the kind switch; a T_LVALUE unwraps to a
+         * real slot and is a plain store (issue #1358). */
+        svalue_t* dest = lvalue_target(sp);
+        if (is_indexed_lvalue(dest)) {
+          assign_value_to_lvalue(dest, sp - 1, "F_ASSIGN");
+        } else {
+          assign_svalue(dest, sp - 1);
+        }
+        free_svalue(sp--, "F_ASSIGN");
         /* rvalue is already in the correct place */
         break;
+      }
       case F_ASSIGN_VALUE: {
-        if (sp->type == T_LVALUE || (sp - 1)->type != T_LVALUE) {
+        if (is_stack_lvalue(sp) || !is_stack_lvalue(sp - 1)) {
           error("Invalid Program: bad stack for F_ASSIGN_VALUE.");
         }
         svalue_t* value = sp;
         svalue_t* lval_slot = sp - 1;
-        assign_value_to_lvalue(lval_slot->u.lvalue, value, "F_ASSIGN_VALUE");
+        svalue_t* dest = lvalue_target(lval_slot);
+        if (is_indexed_lvalue(dest)) {
+          assign_value_to_lvalue(dest, value, "F_ASSIGN_VALUE");
+        } else {
+          assign_svalue(dest, value);
+        }
         free_svalue(lval_slot, "F_ASSIGN_VALUE");
         assign_svalue_no_free(lval_slot, value);
         free_svalue(sp--, "F_ASSIGN_VALUE");
         break;
       }
+      case F_ASSIGN_LOCAL: {
+        lval = fp + EXTRACT_UCHAR(pc++);
+        if ((lval - fp) >= csp->num_local_variables) {
+          error("Invalid Program: op F_ASSIGN_LOCAL Tried to assign non-existent local.\n");
+        }
+        assign_svalue(lval, sp);
+        break;
+      }
+      case F_ASSIGN_GLOBAL: {
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        assign_svalue(find_value(idx + variable_index_offset), sp);
+        break;
+      }
+      case F_VOID_ASSIGN_GLOBAL: {
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        lval = find_value(idx + variable_index_offset);
+        if (sp->type != T_INVALID) {
+          free_svalue(lval, "F_VOID_ASSIGN_GLOBAL");
+          *lval = *sp--;
+        } else {
+          sp--;
+        }
+        break;
+      }
       case F_VOID_ASSIGN_LOCAL:
         if (sp->type != T_INVALID) {
           lval = fp + EXTRACT_UCHAR(pc++);
+          /* Bounds-check like F_LOCAL / F_TRANSFER_LOCAL / PUSH_LOCAL do. This
+           * is the WRITING local opcode and was the only one with no guard at
+           * all, so an index past the frame silently freed and overwrote
+           * whatever sat above it -- the caller's stack.
+           *
+           * Reachable today: a default-argument expression that declares a
+           * local, `int f(int a, int b : (: (catch { int q = 1; } ? 7 : 5)
+           * :))`. Its `q` is numbered in the ENCLOSING function's frame
+           * (slot 2, after a and b), but fill_default_args() invokes the
+           * helper with call_program() directly, bypassing
+           * setup_new_frame(), so the frame it runs in has no locals at all.
+           * f(1) returned 100 instead of 105 and f(2, 3) returned 200 instead
+           * of 203 -- the explicitly passed argument was destroyed too -- with
+           * a Debug build reporting a bad shared-string ref count and, in one
+           * shape, aborting on "T_FREED svalue freed".
+           *
+           * Diagnosing rather than corrupting is the fix available here; the
+           * numbering mismatch itself lives in the compiler and is a larger
+           * change. */
+          if ((lval - fp) >= csp->num_local_variables) {
+            error("Invalid Program: op F_VOID_ASSIGN_LOCAL Tried to assign non-existent local.\n");
+          }
           free_svalue(lval, "F_VOID_ASSIGN_LOCAL");
           *lval = *sp--;
         } else {
@@ -3419,45 +3600,48 @@ void eval_instruction(char* p) {
         break;
       case F_VOID_ASSIGN:
 #ifdef DEBUG
-        if (sp->type != T_LVALUE) {
+        if (!is_stack_lvalue(sp)) {
           fatal("Bad argument to F_VOID_ASSIGN\n");
         }
 #endif
-        lval = (sp--)->u.lvalue;
-        if (sp->type != T_INVALID) {
-          switch (lval->type) {
-            case T_LVALUE_BYTE: {
-              if (sp->type != T_NUMBER) {
-                error("Illegal rhs to byte lvalue\n");
-              } else {
-                LPC_INT n = (sp--)->u.number;
-                if (n < 0 || n > 255) {
-                  error("Buffer byte value out of range: must be 0..255.\n");
+        {
+          PoppedLvalue lv;
+          lval = lv.target();
+          if (sp->type != T_INVALID) {
+            switch (lval->type) {
+              case T_LVALUE_BYTE: {
+                if (sp->type != T_NUMBER) {
+                  error("Illegal rhs to byte lvalue\n");
+                } else {
+                  LPC_INT n = (sp--)->u.number;
+                  if (n < 0 || n > 255) {
+                    error("Buffer byte value out of range: must be 0..255.\n");
+                  }
+                  *lval->u.lvalue_byte = static_cast<unsigned char>(n);
                 }
-                *lval->u.lvalue_byte = static_cast<unsigned char>(n);
+                break;
               }
-              break;
-            }
-            case T_LVALUE_RANGE: {
-              copy_lvalue_range(sp--);
-              break;
-            }
-            case T_LVALUE_CODEPOINT: {
-              if (sp->type != T_NUMBER) {
-                error("Illegal rhs to byte lvalue\n");
+              case T_LVALUE_RANGE: {
+                copy_lvalue_range(lval, sp--);
+                break;
               }
-              UChar32 newc = sp->u.number;
-              assign_lvalue_codepoint([=](UChar32 c) { return newc; });
-              pop_stack();
-              break;
+              case T_LVALUE_CODEPOINT: {
+                if (sp->type != T_NUMBER) {
+                  error("Illegal rhs to byte lvalue\n");
+                }
+                UChar32 newc = sp->u.number;
+                assign_lvalue_codepoint(lval, [=](UChar32 c) { return newc; });
+                pop_stack();
+                break;
+              }
+              default: {
+                free_svalue(lval, "F_VOID_ASSIGN : 3");
+                *lval = *sp--;
+              }
             }
-            default: {
-              free_svalue(lval, "F_VOID_ASSIGN : 3");
-              *lval = *sp--;
-            }
+          } else {
+            sp--;
           }
-        } else {
-          sp--;
         }
         break;
 #ifdef DEBUG
@@ -3509,6 +3693,12 @@ void eval_instruction(char* p) {
         csp->num_local_variables = pushed_args;
         auto* funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
+        if (funflags & FUNC_ASYNC) {
+          /* run the coroutine body in its own nested interpreter; it
+           * pushes the result promise and restores this frame's state */
+          run_async_function(current_prog->program + funp->address, funp);
+          break;
+        }
         pc = current_prog->program + funp->address;
         if (Tracer::enabled()) {
           csp->trace_id = ::get_trace_id(csp);
@@ -3529,12 +3719,14 @@ void eval_instruction(char* p) {
         /* `::`-qualified calls must fill default arguments exactly like
          * F_CALL_FUNCTION_BY_ADDRESS -- this path used to skip them, so the
          * parent function ran with zeros instead of its declared defaults. */
+        bool inherited_is_async = false;
         {
           int roff = offset;
           if (temp_prog->function_flags[roff] & FUNC_ALIAS) {
             roff = temp_prog->function_flags[roff] & ~FUNC_ALIAS;
           }
           auto rflags = temp_prog->function_flags[roff];
+          inherited_is_async = (rflags & FUNC_ASYNC) != 0;
           if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
             auto result = get_function_at_index(temp_prog, roff);
             if (result.first != nullptr) {
@@ -3556,6 +3748,10 @@ void eval_instruction(char* p) {
 
         funp = setup_inherited_frame(offset);
         csp->pc = pc;
+        if (inherited_is_async) {
+          run_async_function(current_prog->program + funp->address, funp);
+          break;
+        }
         pc = current_prog->program + funp->address;
 
         if (Tracer::enabled()) {
@@ -3578,62 +3774,68 @@ void eval_instruction(char* p) {
         push_number(1);
         break;
       case F_PRE_DEC:
-        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to --.");
-        lval = sp->u.lvalue;
-        switch (lval->type) {
-          case T_NUMBER:
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = --(lval->u.number);
-            break;
-          case T_REAL:
-            sp->type = T_REAL;
-            sp->u.real = --(lval->u.real);
-            break;
-          case T_LVALUE_BYTE:
-            if (*lval->u.lvalue_byte == 0) {
-              error("Buffer byte value out of range: must be 0..255.\n");
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
+        {
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
+          switch (lval->type) {
+            case T_NUMBER:
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = --(lval->u.number);
+              break;
+            case T_REAL:
+              sp->type = T_REAL;
+              sp->u.real = --(lval->u.real);
+              break;
+            case T_LVALUE_BYTE:
+              if (*lval->u.lvalue_byte == 0) {
+                error("Buffer byte value out of range: must be 0..255.\n");
+              }
+              if (lval->subtype == 0 && *lval->u.lvalue_byte == '\x1') {
+                error("Strings cannot contain 0 bytes.\n");
+              }
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = --(*lval->u.lvalue_byte);
+              break;
+            case T_LVALUE_CODEPOINT: {
+              LPC_INT newval = 0;
+              assign_lvalue_codepoint(lval, [&newval](UChar32 c) { return newval = --c; });
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = newval;
+              break;
             }
-            if (lval->subtype == 0 && *lval->u.lvalue_byte == '\x1') {
-              error("Strings cannot contain 0 bytes.\n");
-            }
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = --(*lval->u.lvalue_byte);
-            break;
-          case T_LVALUE_CODEPOINT: {
-            LPC_INT newval = 0;
-            assign_lvalue_codepoint([&newval](UChar32 c) { return newval = --c; });
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = newval;
-            break;
+            default:
+              error("-- of non-numeric argument\n");
           }
-          default:
-            error("-- of non-numeric argument\n");
         }
         break;
       case F_DEC:
-        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to --.");
-        lval = (sp--)->u.lvalue;
-        switch (lval->type) {
-          case T_NUMBER:
-            lval->u.number--;
-            break;
-          case T_REAL:
-            lval->u.real--;
-            break;
-          case T_LVALUE_BYTE:
-            if (*lval->u.lvalue_byte == 0) {
-              error("Buffer byte value out of range: must be 0..255.\n");
-            }
-            --(*lval->u.lvalue_byte);
-            break;
-          case T_LVALUE_CODEPOINT:
-            assign_lvalue_codepoint([](UChar32 c) { return c - 1; });
-            break;
-          default:
-            error("-- of non-numeric argument\n");
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
+        {
+          PoppedLvalue lv;
+          lval = lv.target();
+          switch (lval->type) {
+            case T_NUMBER:
+              lval->u.number--;
+              break;
+            case T_REAL:
+              lval->u.real--;
+              break;
+            case T_LVALUE_BYTE:
+              if (*lval->u.lvalue_byte == 0) {
+                error("Buffer byte value out of range: must be 0..255.\n");
+              }
+              --(*lval->u.lvalue_byte);
+              break;
+            case T_LVALUE_CODEPOINT:
+              assign_lvalue_codepoint(lval, [](UChar32 c) { return c - 1; });
+              break;
+            default:
+              error("-- of non-numeric argument\n");
+          }
         }
         break;
       case F_DIVIDE: {
@@ -3715,36 +3917,39 @@ void eval_instruction(char* p) {
         break;
       }
       case F_PRE_INC:
-        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to ++.");
-        lval = sp->u.lvalue;
-        switch (lval->type) {
-          case T_NUMBER:
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = ++lval->u.number;
-            break;
-          case T_REAL:
-            sp->type = T_REAL;
-            sp->u.real = ++lval->u.real;
-            break;
-          case T_LVALUE_BYTE:
-            if (*lval->u.lvalue_byte == 255) {
-              error("Buffer byte value out of range: must be 0..255.\n");
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
+        {
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
+          switch (lval->type) {
+            case T_NUMBER:
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = ++lval->u.number;
+              break;
+            case T_REAL:
+              sp->type = T_REAL;
+              sp->u.real = ++lval->u.real;
+              break;
+            case T_LVALUE_BYTE:
+              if (*lval->u.lvalue_byte == 255) {
+                error("Buffer byte value out of range: must be 0..255.\n");
+              }
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = ++*lval->u.lvalue_byte;
+              break;
+            case T_LVALUE_CODEPOINT: {
+              LPC_INT newval = 0;
+              assign_lvalue_codepoint(lval, [&newval](UChar32 c) { return newval = ++c; });
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = newval;
+              break;
             }
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = ++*lval->u.lvalue_byte;
-            break;
-          case T_LVALUE_CODEPOINT: {
-            LPC_INT newval = 0;
-            assign_lvalue_codepoint([&newval](UChar32 c) { return newval = ++c; });
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = newval;
-            break;
+            default:
+              error("++ of non-numeric argument\n");
           }
-          default:
-            error("++ of non-numeric argument\n");
         }
         break;
       case F_MEMBER: {
@@ -4171,75 +4376,81 @@ void eval_instruction(char* p) {
         pop_stack();
         break;
       case F_POST_DEC:
-        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to --.");
-        lval = sp->u.lvalue;
-        switch (lval->type) {
-          case T_NUMBER:
-            sp->type = T_NUMBER;
-            sp->u.number = lval->u.number--;
-            sp->subtype = 0;
-            break;
-          case T_REAL:
-            sp->type = T_REAL;
-            sp->u.real = lval->u.real--;
-            break;
-          case T_LVALUE_BYTE:
-            if (*lval->u.lvalue_byte == 0) {
-              error("Buffer byte value out of range: must be 0..255.\n");
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
+        {
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
+          switch (lval->type) {
+            case T_NUMBER:
+              sp->type = T_NUMBER;
+              sp->u.number = lval->u.number--;
+              sp->subtype = 0;
+              break;
+            case T_REAL:
+              sp->type = T_REAL;
+              sp->u.real = lval->u.real--;
+              break;
+            case T_LVALUE_BYTE:
+              if (*lval->u.lvalue_byte == 0) {
+                error("Buffer byte value out of range: must be 0..255.\n");
+              }
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = (*lval->u.lvalue_byte)--;
+              break;
+            case T_LVALUE_CODEPOINT: {
+              LPC_INT oldval = 0;
+              assign_lvalue_codepoint(lval, [&oldval](UChar32 c) {
+                oldval = c;
+                return --c;
+              });
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = oldval;
+              break;
             }
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = (*lval->u.lvalue_byte)--;
-            break;
-          case T_LVALUE_CODEPOINT: {
-            LPC_INT oldval = 0;
-            assign_lvalue_codepoint([&oldval](UChar32 c) {
-              oldval = c;
-              return --c;
-            });
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = oldval;
-            break;
+            default:
+              error("-- of non-numeric argument\n");
           }
-          default:
-            error("-- of non-numeric argument\n");
         }
         break;
       case F_POST_INC:
-        if (sp->type != T_LVALUE) error("Invalid Program: non-lvalue argument to ++.");
-        lval = sp->u.lvalue;
-        switch (lval->type) {
-          case T_NUMBER:
-            sp->type = T_NUMBER;
-            sp->u.number = lval->u.number++;
-            sp->subtype = 0;
-            break;
-          case T_REAL:
-            sp->type = T_REAL;
-            sp->u.real = lval->u.real++;
-            break;
-          case T_LVALUE_BYTE:
-            if (*lval->u.lvalue_byte == 255) {
-              error("Buffer byte value out of range: must be 0..255.\n");
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
+        {
+          PoppedLvalue lv(PoppedLvalue::Steal);
+          lval = lv.target();
+          switch (lval->type) {
+            case T_NUMBER:
+              sp->type = T_NUMBER;
+              sp->u.number = lval->u.number++;
+              sp->subtype = 0;
+              break;
+            case T_REAL:
+              sp->type = T_REAL;
+              sp->u.real = lval->u.real++;
+              break;
+            case T_LVALUE_BYTE:
+              if (*lval->u.lvalue_byte == 255) {
+                error("Buffer byte value out of range: must be 0..255.\n");
+              }
+              sp->type = T_NUMBER;
+              sp->u.number = (*lval->u.lvalue_byte)++;
+              sp->subtype = 0;
+              break;
+            case T_LVALUE_CODEPOINT: {
+              LPC_INT oldval = 0;
+              assign_lvalue_codepoint(lval, [&oldval](UChar32 c) {
+                oldval = c;
+                return c + 1;
+              });
+              sp->type = T_NUMBER;
+              sp->subtype = 0;
+              sp->u.number = oldval;
+              break;
             }
-            sp->type = T_NUMBER;
-            sp->u.number = (*lval->u.lvalue_byte)++;
-            sp->subtype = 0;
-            break;
-          case T_LVALUE_CODEPOINT: {
-            LPC_INT oldval = 0;
-            assign_lvalue_codepoint([&oldval](UChar32 c) {
-              oldval = c;
-              return c + 1;
-            });
-            sp->type = T_NUMBER;
-            sp->subtype = 0;
-            sp->u.number = oldval;
-            break;
+            default:
+              error("++ of non-numeric argument\n");
           }
-          default:
-            error("++ of non-numeric argument\n");
         }
         break;
       case F_GLOBAL_LVALUE: {
@@ -4444,9 +4655,11 @@ void eval_instruction(char* p) {
          * statement.
          */
         LOAD_SHORT(offset, pc);
-        offset = (pc - 2) + offset - current_prog->program;
+        /* absolute program offset -- must not go back through the 16-bit
+         * `offset` local, see F_ACATCH */
+        unsigned int const catch_offset = (pc - 2) + offset - current_prog->program;
 
-        do_catch(pc, offset);
+        do_catch(pc, catch_offset);
         if ((csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) ==
             (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) {
           return;
@@ -4461,6 +4674,50 @@ void eval_instruction(char* p) {
         pop_control_stack();
         push_number(0);
         return; /* return to do_catch */
+      }
+      case F_AWAIT: {
+        /* A non-promise operand passes through unchanged: awaiting a plain
+         * value is a no-op, not a scheduling point. (JS yields here too,
+         * but it has no eval-cost model -- see yield_now() for the explicit
+         * spelling.) */
+        if (sp->type != T_PROMISE) {
+          break;
+        }
+        /* Awaiting a promise ALWAYS parks, even when it has already
+         * settled: the resume runs from the microtask drain with a fresh
+         * eval-cost budget, so a chain of awaits naturally breaks long
+         * work into separately-metered pieces instead of burning one
+         * budget. The settled cases are delivered by resume_coroutine()
+         * exactly like a late settle. */
+        coroutine_await_pending(sp->u.prom);
+        return;
+      }
+      case F_ACATCH: {
+        /* like F_CATCH, but a pure control-stack marker: no C++ recursion,
+         * so an await may suspend inside the protected region. Unwinding
+         * is driven from run_coroutine_body(). */
+        LOAD_SHORT(offset, pc);
+        /* Keep the continuation as a POINTER. Round-tripping it through the
+         * shared 16-bit `offset` local would truncate an absolute program
+         * offset -- addresses are 32-bit -- so any acatch past 64KB of
+         * bytecode would resume in the middle of an unrelated function. */
+        char* const continuation = (pc - 2) + offset;
+        if (!g_coroutine_econ) {
+          error("acatch: not inside an async function body.\n");
+        }
+        push_control_stack(FRAME_CATCH | FRAME_ASYNC);
+        csp->save_sp = sp;
+        csp->save_cgsp = cgsp;
+        csp->pc = continuation;
+        csp->num_local_variables = (csp - 1)->num_local_variables;
+        break;
+      }
+      case F_END_ACATCH: {
+        /* success path: pop the marker (restores pc to the continuation,
+         * which is exactly here) and yield 0, staying in this loop */
+        pop_control_stack();
+        push_number(0);
+        break;
       }
       case F_TIME_EXPRESSION: {
         long sec, usec;
@@ -4488,7 +4745,7 @@ void eval_instruction(char* p) {
         int type = sp->u.number;
         pop_stack();
         if (sp->type != type && !(sp->type == T_NUMBER && sp->u.number == 0) &&
-            !(sp->type == T_LVALUE)) {
+            !is_stack_lvalue(sp)) {
           error("Trying to put %s in %s\n", type_name(sp->type), type_name(type));
         }
         break;
@@ -4611,8 +4868,16 @@ void eval_instruction(char* p) {
   } /* while (1) */
 }
 
-static void do_catch(char* pc, unsigned short new_pc_offset) {
+static void do_catch(char* pc, unsigned int new_pc_offset) {
   error_context_t econ;
+#ifdef DEBUG
+  /* See control_stack_t::save_temporaries. The unwind below pops the value
+   * stack back to this point, so any foreach temporaries the erroring code
+   * had open go with it; without putting the counter back, a
+   * catch(foreach { error(); }) left it elevated for the rest of the
+   * process and break_point() silently stopped checking. */
+  int const saved_temporaries = stack_in_use_as_temporary;
+#endif
 
   /*
    * Save some global variables that must be restored separately after a
@@ -4634,6 +4899,9 @@ static void do_catch(char* pc, unsigned short new_pc_offset) {
      * must be restored manually here.
      */
     restore_context(&econ);
+#ifdef DEBUG
+    stack_in_use_as_temporary = saved_temporaries;
+#endif
     STACK_INC;
     *sp = catch_value;
     catch_value = const1;
@@ -4852,12 +5120,14 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   ob->time_of_ref = g_current_gametick;
   /* Direct calls (simul_efuns, heart_beat) must fill default arguments too;
    * simul_efuns with defaults used to run with zeros. */
+  bool is_async = false;
   {
     int roff = offset;
     if (prog->function_flags[roff] & FUNC_ALIAS) {
       roff = prog->function_flags[roff] & ~FUNC_ALIAS;
     }
     auto rflags = prog->function_flags[roff];
+    is_async = (rflags & FUNC_ASYNC) != 0;
     if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
       auto result = get_function_at_index(prog, roff);
       if (result.first != nullptr) {
@@ -4873,18 +5143,34 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   previous_ob = current_object;
   current_object = ob;
   funp = setup_new_frame(offset);
+  /* Same treatment as the other call paths: an async simul_efun (this is
+   * also the FP_SIMUL route) must yield a promise and be able to await,
+   * not run its body as an ordinary call and return a plain value. */
+  if (is_async) {
+    csp->framekind |= FRAME_ASYNC;
+    run_async_function(current_prog->program + funp->address, funp);
+    return;
+  }
   call_program(current_prog, funp->address);
 }
 
-void translate_absolute_line(int abs_line, unsigned short* file_info, int* ret_file,
-                             int* ret_line) {
-  unsigned short *p1, *p2;
+void translate_absolute_line(int abs_line, lpc_file_info_t* file_info, int* ret_file,
+                             int* ret_line, lpc_file_info_t* end) {
+  lpc_file_info_t *p1, *p2;
   int file;
   int line_tmp = abs_line;
 
-  /* two passes: first, find out what file we're interested in */
+  /* two passes: first, find out what file we're interested in.
+   *
+   * The `end` bound is defence in depth, not decoration. A zero count here
+   * (which a 16-bit truncation used to produce for a 65536-line file, see
+   * save_file_info) makes this loop advance without ever reducing line_tmp,
+   * so it runs off the table and returns whatever it lands on as a file
+   * index -- which the caller uses to index progp->strings. An out-of-bounds
+   * table walk feeding a string index is a far worse failure than a wrong
+   * line number, so stop at the last entry and report that file instead. */
   p1 = file_info;
-  while (line_tmp > *p1) {
+  while (line_tmp > *p1 && (end == nullptr || p1 + 2 < end)) {
     line_tmp -= *p1;
     p1 += 2;
   }
@@ -4944,7 +5230,10 @@ static int find_line(char* p, const program_t* progp, const char** ret_file, int
   COPY4(&abs_line, lns + 1);
 #endif
 
-  translate_absolute_line(abs_line, &progp->file_info[2], &file_idx, ret_line);
+  /* entries run from file_info[2] up to the line-number block at
+   * file_info[file_info[1]] */
+  translate_absolute_line(abs_line, &progp->file_info[2], &file_idx, ret_line,
+                          &progp->file_info[progp->file_info[1]]);
 
   *ret_file = progp->strings[file_idx - 1];
   return 0;

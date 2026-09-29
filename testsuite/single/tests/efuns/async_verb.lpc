@@ -1,0 +1,71 @@
+// An async verb function cannot claim a command.
+//
+// add_action() binds a function the driver calls to ask "do you want this
+// command?", and it needs that answer immediately -- it decides from it
+// whether to try the next sentence on the same verb and whether to call
+// notify_no_command(). An `async` function answers with a promise the instant
+// its body parks, before it has decided anything, and user_parser()'s
+// "handled" test is "non-zero and not the number 0", which a promise
+// satisfies. So a parked verb used to consume the command outright: its real
+// answer was discarded, the remaining sentences were never tried, and
+// notify_no_command() never fired.
+//
+// The compile-time refusal of `async` on applies does not reach this: verb
+// names are arbitrary runtime strings, and add_action((: f :), "verb") has no
+// name at all -- which is why both binding forms are checked here.
+
+nosave promise gate;
+nosave int named_ran, fp_ran, fallback_ran;
+
+async int cmd_named(string arg) {
+  named_ran++;
+  await gate;  // parks: the caller gets a promise, not an answer
+  return 1;
+}
+
+async int cmd_fp(string arg) {
+  fp_ran++;
+  await gate;
+  return 1;
+}
+
+int cmd_fallback(string arg) {
+  fallback_ran++;
+  return 1;
+}
+
+void do_tests() {
+#ifndef __NO_ADD_ACTION__
+  object tp;
+  int handled;
+
+  named_ran = fp_ran = fallback_ran = 0;
+  gate = promise_create();
+
+  SAVETP;
+  enable_commands();
+  // Sentences go on the FRONT of the list, so the last one added is tried
+  // first. The fallback goes on first, which puts the async verb ahead of it
+  // and lets the fallback prove the parser kept looking.
+  add_action((: cmd_fallback :), "zork");
+  add_action("cmd_named", "zork");
+  add_action((: cmd_fp :), "quux");
+  RESTORETP;
+
+  handled = command("zork thing");
+  ASSERT_EQ(1, named_ran);
+  ASSERT2(fallback_ran == 1,
+    "the parked verb claimed the command, so the next sentence on 'zork' was never tried");
+  ASSERT2(handled != 0, "the fallback answered, so the command was handled");
+
+  // Nothing behind the (: :) form, so this command goes unhandled outright.
+  handled = command("quux thing");
+  ASSERT_EQ(1, fp_ran);
+  ASSERT_EQ(0, handled);
+
+  // Release both parked frames. Each resumes off a later drain, returns 1,
+  // and fulfills a promise nobody kept, which is then reclaimed. Left pending
+  // they would sit parked until shutdown.
+  promise_resolve(gate, 0);
+#endif
+}

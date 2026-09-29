@@ -22,18 +22,11 @@
 /// @param chars characters to be removed, defaults to whitespace
 ///
 /// @return returns trimmed string
+///
+/// `chars` is a set of Unicode scalar values, not raw bytes (issue #1401).
+/// One UTF-8 walk; no ASCII find_*_not_of twin.
 // --------------------------------------------------------------------------
-inline std::string& ltrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str.erase(0, str.find_first_not_of(chars));
-  return str;
-}
-
-inline std::string ltrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ") {
-  std::string ret{str};
-
-  ret.erase(0, str.find_first_not_of(chars));
-  return ret;
-}
+std::string ltrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
 
 // --------------------------------------------------------------------------
 /// @brief removes given characters from end of string
@@ -43,17 +36,7 @@ inline std::string ltrim(const std::string& str, const std::string& chars = "\t\
 ///
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
-inline std::string& rtrim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  str.erase(str.find_last_not_of(chars) + 1);
-  return str;
-}
-
-inline std::string rtrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ") {
-  std::string ret{str};
-
-  ret.erase(str.find_last_not_of(chars) + 1);
-  return ret;
-}
+std::string rtrim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
 
 // --------------------------------------------------------------------------
 /// @brief removes given chars from beginning and end of string
@@ -63,13 +46,7 @@ inline std::string rtrim(const std::string& str, const std::string& chars = "\t\
 ///
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
-inline std::string& trim(std::string&& str, const std::string& chars = "\t\n\v\f\r ") {
-  return ltrim(rtrim(str, chars), chars);
-}
-
-inline std::string trim(const std::string& str, const std::string& chars = "\t\n\v\f\r ") {
-  return ltrim(rtrim(str, chars), chars);
-}
+std::string trim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
 
 // --------------------------------------------------------------------------
 /// @brief checks beginning of string1 for presens of string2
@@ -110,8 +87,28 @@ inline void ReplaceStringInPlace(std::string& subject, const std::string& search
 class EGCSmartIterator : public EGCIterator {
  public:
   EGCSmartIterator(const char* src, int32_t slen) : EGCIterator(src, slen) {}
+  void reset(const char* src, int32_t slen) override {
+    EGCIterator::reset(src, slen);
+    current_idx_ = 0;
+    count_ = -1;
+    ascii_pos_ = 0;
+  }
   size_t count() {
     if (count_ == -1) {
+      // ASCII: one cluster per byte, so the count is the byte length. This is
+      // the hot one -- sizeof(str) on a mudlib string lands here.
+      //
+      // Leave the cursor at the end, exactly where the ICU walk below leaves
+      // it. No current caller counts and then keeps iterating (they all use
+      // the value, or re-seek with index_to_offset first), but letting the
+      // two paths disagree about cursor state would make a later count() +
+      // next() silently mean different things on ASCII and non-ASCII input.
+      if (is_ascii()) {
+        count_ = len();
+        current_idx_ = count_;
+        ascii_pos_ = len();
+        return count_;
+      }
       count_ = 0;
       brk_->first();
       while (brk_->next() != icu::BreakIterator::DONE) ++count_;
@@ -120,6 +117,16 @@ class EGCSmartIterator : public EGCIterator {
     return count_;
   }
   int32_t index_to_offset(int32_t index) {
+    // ASCII: EGC index == byte offset. Boundaries are 0..len, a negative index
+    // counts back from the end, and anything outside that range is DONE --
+    // matching what the ICU walk below returns for the same input.
+    if (is_ascii()) {
+      int32_t off = index >= 0 ? index : len() + index;
+      if (off < 0 || off > len()) return icu::BreakIterator::DONE;
+      ascii_pos_ = off;
+      current_idx_ = index;
+      return off;
+    }
     if (index == 0) {
       current_idx_ = 0;
       return brk_->first();
@@ -153,19 +160,42 @@ class EGCSmartIterator : public EGCIterator {
   int32_t post_index_to_offset(int32_t index) {
     auto pos = index_to_offset(index);
     if (pos < 0) return pos;
+    if (is_ascii()) {
+      // Mirrors the ICU pair below: next() then previous(). Off the end,
+      // next() reports DONE and the following previous() still steps the
+      // cursor back one boundary -- reproduce that side effect exactly.
+      if (pos >= len()) {
+        ascii_pos_ = len() > 0 ? len() - 1 : 0;
+        return icu::BreakIterator::DONE;
+      }
+      return pos + 1;  // cursor stays at pos, as next()+previous() leaves it
+    }
     pos = brk_->next();
     brk_->previous();
     return pos;
   }
   int32_t first() {
     current_idx_ = 0;
+    if (is_ascii()) {
+      ascii_pos_ = 0;
+      return 0;
+    }
     return brk_->first();
   }
   int32_t last() {
     current_idx_ = -1;
+    if (is_ascii()) {
+      ascii_pos_ = len();
+      return len();
+    }
     return brk_->last();
   }
   int32_t next() {
+    if (is_ascii()) {
+      if (ascii_pos_ >= len()) return icu::BreakIterator::DONE;  // cursor unchanged
+      current_idx_++;
+      return ++ascii_pos_;
+    }
     auto oldpos = brk_->current();
     auto pos = brk_->next();
     if (pos == icu::BreakIterator::DONE) {
@@ -179,7 +209,22 @@ class EGCSmartIterator : public EGCIterator {
  private:
   int32_t current_idx_ = 0;
   int32_t count_ = -1;
+  int32_t ascii_pos_ = 0;  // byte offset cursor, ASCII fast path only
 };
+
+// Is this string pure ASCII (and CR-free), i.e. does byte offset equal
+// grapheme-cluster index throughout?
+//
+// Pass counted=true only for a STRING_MALLOC / STRING_SHARED string, i.e.
+// one that has a malloc_block_t/block_t header: those memoize the answer in
+// the header, so repeated queries on the same string are O(1) -- which is
+// what turns the common `for (i = 0; i < sizeof(s); i++)` from O(n^2) into
+// O(n). A STRING_CONSTANT has no header and is rescanned each time.
+// See MSTR_ASCII_* in stralloc.h.
+//
+// Takes primitives rather than an svalue_t deliberately: base/ must not
+// depend on VM types (see AGENTS.md 12).
+bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted);
 
 // Check string s is valid utf8
 bool u8_validate(char**);

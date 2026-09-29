@@ -8,5 +8,6 @@ title: types
 * [function](function)
 * [general](general)
 * [mappings](mappings)
+* [promise](promise)
 * [strings](strings)
 * [substructures](substructures)

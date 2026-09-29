@@ -1,0 +1,15 @@
+// Fixture for compiler/scope_error_recovery.lpc: a stray comma in a lambda
+// parameter list. Bison error recovery discards the production that would have
+// restored the nested locals scope opened for the lambda, so the enclosing
+// block closes with FEWER locals than it entered with. This file must fail to
+// compile -- and must not take the driver down doing so.
+void f() {
+  int a0;
+
+  for (int j = 0; j < 1; j++) {
+    mixed e = catch {
+      function(int y,) { return y; };
+    };
+  }
+  a0 = 1;
+}

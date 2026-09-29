@@ -208,8 +208,11 @@ TOKEN_SPEC = {
     # keyword families (spellings from lexer_utils.cc reswords[])
     "L_BASIC_TYPE": ("type", ["buffer", "float", "function", "int", "mapping",
                               "mixed", "object", "string", "void"]),
-    "L_TYPE_MODIFIER": ("modifier", ["nomask", "nosave", "private", "protected",
-                                     "public", "static", "varargs"]),
+    # `promise` has its own token so `promise<T>` can take a payload type
+    "L_PROMISE": ("type", ["promise"]),
+    "L_TYPE_MODIFIER": ("modifier", ["async", "nomask", "nosave", "private",
+                                     "protected", "public", "static",
+                                     "varargs"]),
     "L_IF": ("keyword", ["if"]), "L_ELSE": ("keyword", ["else"]),
     "L_SWITCH": ("keyword", ["switch"]), "L_CASE": ("keyword", ["case"]),
     "L_DEFAULT": ("keyword", ["default"]), "L_WHILE": ("keyword", ["while"]),
@@ -218,6 +221,7 @@ TOKEN_SPEC = {
     "L_BREAK": ("keyword", ["break"]), "L_CONTINUE": ("keyword", ["continue"]),
     "L_RETURN": ("keyword", ["return"]), "L_INHERIT": ("keyword", ["inherit"]),
     "L_CATCH": ("keyword", ["catch"]), "L_NEW": ("keyword", ["new"]),
+    "L_AWAIT": ("keyword", ["await"]), "L_ACATCH": ("keyword", ["acatch"]),
     # lexer_utils.cc's reswords[] maps BOTH spellings to L_CLASS (STRUCT_CLASS
     # and STRUCT_STRUCT are both unconditionally #defined in
     # options_internal.h) -- "struct" is a real keyword, not a plain name.
@@ -384,17 +388,35 @@ def emit_tm_language(data, script_dir):
         ],
         "repository": {
             "comments": {"patterns": [
+                # Ordinary source: '//' ends at the physical newline
+                # (lexer.l's INITIAL rule). A trailing '\' is comment
+                # text and does not continue the comment.
                 {"name": "comment.line.double-slash.lpc", "match": "//.*$"},
-                {"name": "comment.block.lpc", "begin": "/\\*", "end": "\\*/"},
+                {"include": "#block-comment"},
             ]},
+            "block-comment": {
+                "name": "comment.block.lpc",
+                "begin": "/\\*",
+                "end": "\\*/",
+            },
             "preprocessor": {
+                # C splice-first on a '#' line (lexer.l SC_DIRECTIVE*):
+                # '\'-newline joins the region; '//' then runs to the
+                # logical newline, so a trailing '\' continues the
+                # comment. Ordinary '#comments' must not be included
+                # here -- its "//.*$" would close at the physical
+                # newline and leave the next line highlighted as code.
                 "name": "meta.preprocessor.lpc",
                 "begin": "^\\s*(#\\s*[A-Za-z_]*)",
                 "beginCaptures": {"1": {"name": "keyword.control.directive.lpc"}},
                 "end": "(?<!\\\\)$",
                 "patterns": [
-                    {"include": "#comments"},
+                    {"name": "comment.line.double-slash.lpc",
+                     "begin": "//",
+                     "end": "(?<!\\\\)$"},
+                    {"include": "#block-comment"},
                     {"include": "#strings"},
+                    {"include": "#template"},
                     {"name": "string.quoted.other.include.lpc", "match": "<[^>\\n]*>"},
                     {"include": "#numbers"},
                     {"name": "constant.character.escape.line-continuation.lpc",

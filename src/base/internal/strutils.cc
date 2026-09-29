@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <cstring>
+#include <unordered_set>
 
 #include "thirdparty/utf8_decoder_dfa/decoder.h"
 #include "thirdparty/widecharwidth/widechar_width.h"
@@ -13,6 +14,7 @@
 #include "base/internal/log.h"
 #include "base/internal/rc.h"
 #include "base/internal/EGCIterator.h"
+#include "base/internal/stralloc.h"
 
 bool u8_validate(char** s) {
   const auto* p = (const uint8_t*)(*s);
@@ -68,14 +70,41 @@ size_t u8_incomplete_tail(std::string_view buf) {
 // Search "needle' in 'haystack', making sure it matches EGC boundary, returning byte offset.
 int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t needle_len,
                               bool reverse) {
+  if (!iter.ok()) return -1;
+
   const char* haystack = iter.data();
-  size_t const haystack_len = iter.len() == -1 ? strlen(haystack) : iter.len();
+  int32_t const raw_len = iter.len();
+  // Only -1 means NUL-terminated. Casting any other negative to size_t
+  // made the ASCII string_view path scan off the mapping (SIGSEGV).
+  if (raw_len < -1) return -1;
+  size_t const haystack_len = raw_len == -1 ? strlen(haystack) : static_cast<size_t>(raw_len);
 
   // no way
   if (needle_len > haystack_len) {
     return -1;
   }
-  if (!iter.ok()) return -1;
+
+  // Haystack already proven CR-free ASCII: every byte is a grapheme
+  // boundary, so find/rfind is EGC-correct and must not touch ICU.
+  // explode()'s trailing-delimiter walk used the reverse path, which
+  // previously always called isBoundary() and so ensure_icu()'d the
+  // whole remaining string on every token. A needle with a high bit or
+  // CR cannot occur in this haystack.
+  if (iter.is_ascii()) {
+    bool needle_ascii = true;
+    for (size_t i = 0; i < needle_len; i++) {
+      auto c = static_cast<unsigned char>(needle[i]);
+      if (c >= 0x80u || c == '\r') {
+        needle_ascii = false;
+        break;
+      }
+    }
+    if (!needle_ascii) return -1;
+    std::string_view const hay(haystack, haystack_len);
+    std::string_view const ndl(needle, needle_len);
+    auto pos = reverse ? hay.rfind(ndl) : hay.find(ndl);
+    return pos == std::string_view::npos ? -1 : static_cast<int32_t>(pos);
+  }
 
   // fast track ascii string search upto 4 characters.
   if (!reverse) {
@@ -88,11 +117,17 @@ int32_t u8_egc_find_as_offset(EGCIterator& iter, const char* needle, size_t need
       if (i == 3) is_all_ascii = false;
     }
     if (is_all_ascii) {
-      // strstr doesn't follow haystack_len, so we may overrun, wasting some cycles.
+      // strstr does not honor haystack_len. explode()'s trailing-delimiter
+      // trim shortens the count but leaves the C string intact, so a match
+      // can start inside the counted range and extend past it. Accepting
+      // that made sourcelen go negative. Reject unless the whole needle
+      // sits in [0, haystack_len).
       const auto* res = strstr(haystack, needle);
       auto ret = res == nullptr ? -1 : (decltype(haystack))res - haystack;
-      if (ret >= haystack_len) ret = -1;
-      return ret;
+      if (ret < 0 || static_cast<size_t>(ret) > haystack_len - needle_len) {
+        return -1;
+      }
+      return static_cast<int32_t>(ret);
     }
   }
 
@@ -172,6 +207,14 @@ void u8_copy_and_replace_codepoint_at(EGCSmartIterator& iter, char* dst, int32_t
 int32_t u8_offset_to_egc_index(EGCIterator& iter, int32_t offset) {
   if (offset <= 0) return offset;
   if (!iter.ok()) return -1;
+
+  // CR-free ASCII: every byte is a cluster boundary, so the EGC index is
+  // the byte offset. Driving ICU here (via operator->) is what made
+  // strsrch() of a long ASCII haystack pay a full setText + walk after
+  // strchr already found the match — same class of miss as #1366.
+  if (iter.is_ascii()) {
+    return offset > iter.len() ? -1 : offset;
+  }
 
   int idx = -1;
   int pos = 0;
@@ -567,17 +610,20 @@ size_t u8_width(const char* src, int len) {
 
 std::vector<std::string_view> u8_egc_split(const char* src, int32_t slen) {
   std::vector<std::string_view> result;
-  result.reserve(16);
+  if (slen <= 0) return result;
 
   EGCSmartIterator iter(src, slen);
   if (!iter.ok()) return result;
 
-  iter->first();
-  auto start = iter->current();
-  while (iter->next() != icu::BreakIterator::DONE) {
-    auto size = iter->current() - start;
-    result.emplace_back(src + start, size);
-    start = iter->current();
+  // Walk via EGCSmartIterator, not operator->(): the latter ensure_icu()'s
+  // the whole string, so explode(s, "") on ASCII paid a BreakIterator walk
+  // of every byte. first()/next() are arithmetic on the ASCII path.
+  result.reserve(iter.is_ascii() ? static_cast<size_t>(slen) : 16);
+  int32_t start = iter.first();
+  int32_t cur;
+  while ((cur = iter.next()) != icu::BreakIterator::DONE) {
+    result.emplace_back(src + start, cur - start);
+    start = cur;
   }
 
   return result;
@@ -603,4 +649,116 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
     }
   }
   return result;
+}
+
+namespace {
+
+std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
+  std::unordered_set<UChar32> set;
+  const auto* s = reinterpret_cast<const uint8_t*>(chars.data());
+  int32_t i = 0;
+  const int32_t len = static_cast<int32_t>(chars.size());
+  while (i < len) {
+    UChar32 c;
+    U8_NEXT(s, i, len, c);
+    if (c < 0) {
+      c = 0xfffd;
+    }
+    set.insert(c);
+  }
+  return set;
+}
+
+int32_t u8_ltrim_off(const uint8_t* s, int32_t len, const std::unordered_set<UChar32>& set) {
+  int32_t i = 0;
+  while (i < len) {
+    int32_t prev = i;
+    UChar32 c;
+    U8_NEXT(s, i, len, c);
+    if (c < 0 || set.find(c) == set.end()) {
+      return prev;
+    }
+  }
+  return len;
+}
+
+int32_t u8_rtrim_off(const uint8_t* s, int32_t start, int32_t end,
+                     const std::unordered_set<UChar32>& set) {
+  int32_t i = end;
+  while (i > start) {
+    int32_t prev = i;
+    UChar32 c;
+    U8_PREV(s, start, i, c);
+    if (c < 0 || set.find(c) == set.end()) {
+      return prev;
+    }
+  }
+  return start;
+}
+
+}  // namespace
+
+// Trim by Unicode scalar value. The charset is a set of code points, so a
+// multi-byte character cannot donate individual UTF-8 bytes to the match
+// (U+3000 / 《 share E3 80 under find_first_not_of -- issue #1401).
+std::string ltrim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t off = u8_ltrim_off(s, len, set);
+  if (off == 0) {
+    return str;
+  }
+  return str.substr(static_cast<size_t>(off));
+}
+
+std::string rtrim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t end = u8_rtrim_off(s, 0, len, set);
+  if (end == len) {
+    return str;
+  }
+  return str.substr(0, static_cast<size_t>(end));
+}
+
+std::string trim(const std::string& str, const std::string& chars) {
+  if (str.empty()) {
+    return str;
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t len = static_cast<int32_t>(str.size());
+  const int32_t start = u8_ltrim_off(s, len, set);
+  if (start == len) {
+    return {};
+  }
+  const int32_t end = u8_rtrim_off(s, start, len, set);
+  if (start == 0 && end == len) {
+    return str;
+  }
+  return str.substr(static_cast<size_t>(start), static_cast<size_t>(end - start));
+}
+
+// See the declaration in strutils.h. The scan itself is EGCIterator's
+// (all_ascii); this only adds the per-string memoization, which is what
+// makes a repeated sizeof() on the same string O(1) instead of O(n).
+bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted) {
+  if (!counted) {  // no block header to memoize into
+    return EGCIterator::scan_is_ascii(str, len);
+  }
+  unsigned char cached = MSTR_ASCII(str);
+  if (cached != MSTR_ASCII_UNKNOWN) {
+    return cached == MSTR_ASCII_YES;
+  }
+  bool ascii = EGCIterator::scan_is_ascii(str, len);
+  MSTR_ASCII(str) = ascii ? MSTR_ASCII_YES : MSTR_ASCII_NO;
+  return ascii;
 }

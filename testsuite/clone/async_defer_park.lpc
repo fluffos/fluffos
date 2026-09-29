@@ -1,0 +1,13 @@
+// Parks with a pending defer() so the abandon paths have one to deal with.
+nosave promise gate;
+nosave int defer_ran;
+
+public void set_gate(promise p) { gate = p; }
+public int query_defer_ran() { return defer_ran; }
+
+private void on_exit() { defer_ran++; }
+
+public async void park() {
+  defer((: on_exit :));
+  await gate;
+}

@@ -6,7 +6,7 @@
 #include "vm/internal/base/machine.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/generate.h"
 
 // Structs used by value in rule helpers — must match grammar.y %union fields.
@@ -54,12 +54,13 @@ void rule_define_class_members(struct ident_hash_elem_t* class_ihe, LPC_INT clas
 // These are all thin wrappers over one-liners that need compiler.h internals.
 LPC_INT rule_loop_open();
 LPC_INT rule_special_context_open();
+LPC_INT rule_tree_context_open();
 LPC_INT rule_block_open();
 void rule_number(parse_node_t** result, LPC_INT val);
 void rule_real(parse_node_t** result, LPC_FLOAT val);
 void rule_primary_expr_parameter(parse_node_t** result, LPC_INT n);
 void rule_program_append(parse_node_t** result, parse_node_t* prog, parse_node_t* def);
-void rule_tree_block(parse_node_t** result, parse_node_t* block_node);
+void rule_tree_block(parse_node_t** result, decl_t decl_val, LPC_INT saved_context);
 void rule_tree_expr(parse_node_t** result, parse_node_t* expr);
 void rule_opt_semicolon();
 ScratchString* rule_string_literal_concat(ScratchString* s1, ScratchString* s2);
@@ -76,6 +77,8 @@ LPC_INT rule_type_modifier_list(LPC_INT modifier, LPC_INT list);
 LPC_INT rule_type(LPC_INT modifiers, LPC_INT basic_type);
 LPC_INT rule_atomic_type_class(ident_hash_elem_t* ihe);
 LPC_INT rule_atomic_type_class_identifier(const ScratchString* identifier);
+LPC_INT rule_atomic_type_promise();
+LPC_INT rule_atomic_type_promise_of(LPC_INT payload, LPC_INT close_op);
 LPC_INT rule_param_decl_typed(LPC_INT type_star);
 LPC_INT rule_param_decl_typed_name(LPC_INT type_star, const ScratchString* name,
                                    parse_node_t* default_val);
@@ -190,6 +193,9 @@ ScratchString* rule_function_name_obj(ScratchString* obj, ScratchString* identif
 parse_node_t* rule_expr_or_block_block(decl_t decl_val);
 parse_node_t* rule_expr_or_block_expr(parse_node_t* expr);
 void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context);
+LPC_INT rule_acatch_context_open();
+void rule_acatch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context);
+void rule_expr_await(struct parse_node_t** result, struct parse_node_t* expr);
 void rule_sscanf(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,
                  parse_node_t* lvalue_list);
 void rule_parse_command(parse_node_t** result, parse_node_t* expr1, parse_node_t* expr2,

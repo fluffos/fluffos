@@ -1,0 +1,8 @@
+// Fixture for compiler/block_expr_scope.lpc: the block's scope ends at '}',
+// so re-declaring the same name afterwards is legal. This file must compile.
+int probe() {
+  mixed e = catch { int v = 1; };
+  int v = 2;
+
+  return v + (e ? 1 : 0);
+}

@@ -77,13 +77,31 @@ define `WARNING_LEVEL` as `1`:
 Text after the comment's close on its final line still belongs to the
 directive, matching C.
 
-Comments on a directive line are whitespace, never part of the macro:
-a trailing `//` or `/* */` after the body (or after the name on
-`#undef`/`#ifdef`) is stripped before the directive is parsed, and a
-block comment inside the body separates tokens like a space would:
+Line splicing happens first, as in C: a backslash immediately before
+the newline is deleted before comments are recognized. A `//` comment
+therefore continues onto the next physical line when it ends with `\`,
+and a comment opener may itself be split across a continuation
+(`/` + `\` + newline + `*` is still a block comment).
+
+Comments on a directive line are whitespace, never part of the macro
+— the same as C. They may sit between `#` and the keyword, between
+the keyword and the payload, or inside the payload. A trailing `//`
+or `/* */` after the body (or after the name on `#undef`/`#ifdef`)
+is stripped before the directive is parsed, and a block comment
+inside the body separates tokens like a space would:
 
 ```c
 #define CREDITS "credits" // key into the economy mapping
+```
+
+A `//` or `/*` *inside* a string or template on the directive line is
+data, including when the literal continues onto the next physical line
+with `\`. The marker does not start a comment and does not eat the
+continuation:
+
+```c
+#define HEADER "// made by X.\n// \
+Continued line\n"
 ```
 
 ## Redefinition

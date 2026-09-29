@@ -177,7 +177,7 @@ int object_visible(object_t*);
 #else
 #define object_visible(x) 1
 #endif
-int find_global_variable(program_t*, const char* const, unsigned short*, int);
+int find_global_variable(program_t*, const char* const, lpc_type_t*, int);
 svalue_t* allocate_object_variables(int num_var);
 void dealloc_object(object_t*, const char*);
 void get_objects(object_t***, int*, get_objectsfn_t, void*);

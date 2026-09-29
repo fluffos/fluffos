@@ -9,17 +9,34 @@ title: pcre / pcre_replace
 
 ### SYNOPSIS
 
-    string pcre_replace(string, string, string *, void|int pcre_flags);
+    string pcre_replace(string input, string pattern, string *replacements, void|int|mapping pcre_flags);
+    string pcre_replace(string input, string pattern, string template, void|int|mapping pcre_flags);
 
 ### DESCRIPTION
 
-    returns a string where all captured groups have been replaced by the elements
-    of the replacement array. Number of subgroups and the size of the replacement
-    array must match.
+    两种形式：
 
-    可选参数 `pcre_flags` 用于设置 PCRE 选项（如 `PCRE_I` 大小写不敏感，
-    `PCRE_M` 多行等），默认 0。
+    **数组**（旧）：替换第一次匹配的各个捕获组，组数必须与数组长度一致。
+
+    **字符串**（PCRE2 substitute）：替换每一次匹配。`$0` / `$&` 是整次匹配，
+    `$1`…`$n` 是捕获组，`${name}` 是命名组，`$$` 是字面 `$`。扩展转义
+    （`\u` `\l` `\U` `\L` `\E`）默认打开。未设置或未知的组变成空串。
+    `(["replace_global": 0])` 只替换第一次；`(["replace_literal": 1])`
+    把模板当普通文本。
+
+    可选最后一个参数是 `src/include/pcre_flags.h` 的整型位，或命名选项
+    mapping（见 `pcre_config()`）。默认开启 UTF-8、Unicode 属性（UCP）
+    和 JIT。`PCRE_NO_UCP` 或 `(["no_ucp": 1])` 可关掉 UCP。
+
+:::warning[默认启用 Unicode 属性]
+
+模式以 `PCRE2_UCP` 编译，因此 `\d` 匹配任意 Unicode 数字、`\w` 匹配任意字母。
+用于*校验*输入的模式会比 PCRE2 升级之前接受更多字符串。传入 `PCRE_NO_UCP`
+（或 `([ "no_ucp": 1 ])`）可恢复仅 ASCII 的字符类 —— 详见
+[pcre_match](pcre_match)。
+
+:::
 
 ### SEE ALSO
 
-    pcre_assoc(3), pcre_cache(3), pcre_extract(3)
+    pcre_assoc(3), pcre_cache(3), pcre_config(3), pcre_extract(3), pcre_replace_callback(3)

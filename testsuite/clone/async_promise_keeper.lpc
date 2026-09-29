@@ -1,0 +1,3 @@
+// Holds a promise so it cannot be garbage collected (see async_self_destruct).
+nosave promise kept;
+void keep(promise p) { kept = p; }

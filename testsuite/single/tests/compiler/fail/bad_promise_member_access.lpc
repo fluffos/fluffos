@@ -1,0 +1,8 @@
+// a promise<class T> is a promise, not a class: member access is rejected
+// until it is awaited
+class point { int x; }
+async class point make_point() { return new(class point); }
+async void f() {
+  promise<class point> p = make_point();
+  int bad = p->x;
+}

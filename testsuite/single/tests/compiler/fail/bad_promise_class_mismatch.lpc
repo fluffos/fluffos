@@ -1,0 +1,8 @@
+// promise payloads of two different classes are incompatible, exactly as the
+// classes themselves are
+class point { int x; }
+class other { string s; }
+async class other make_other() { return new(class other); }
+void f() {
+  promise<class point> p = make_other();
+}

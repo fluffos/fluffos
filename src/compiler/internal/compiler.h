@@ -10,7 +10,7 @@
 #include "vm/internal/base/program.h"   // for DECL_MODS etc
 #include "trees.h"
 #include "compiler/internal/compiler_utils.h"
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 
 /* The end of a static buffer */
 #define EndOf(x) (x + sizeof(x) / sizeof(x[0]))
@@ -35,8 +35,9 @@ struct mem_block_t {
 
 #define START_BLOCK_SIZE 4096
 
-/* NUMPAREAS ares are saved with the program code after compilation,
- * the rest are only temporary.
+/* NUMPAREAS areas are saved with the program code after compilation,
+ * the rest are only temporary. A_INCLUDES is outside NUMPAREAS but is
+ * copied into program_t::include_names for include_list().
  */
 #define A_PROGRAM 0 /* executable code */
 #define A_FUNCTIONS 1
@@ -86,6 +87,40 @@ struct mem_block_t {
 #define TYPE_BUFFER 10
 #define TYPE_MASK 0xf
 
+/*
+ * While parsing a declaration the grammar does not yet know whether it is
+ * looking at a function or a variable, so rule_type() parks the declaration
+ * modifiers in the HIGH half of the type word and the consumers merge them
+ * down once the kind is settled. Modifiers span bits 5-14, so the packed
+ * form uses bits 21-30 and the basic type keeps bits 0-15 -- plus the
+ * TYPE_MOD_PROMISE* bits at 16-17, which belong to the basic type and must
+ * survive the merge. Always go through these macros, never a bare
+ * `>> 16` / `& 0xffff`.
+ */
+#define TYPE_MODS_SHIFT 16
+#define BASIC_TYPE_MASK (0xffffu | TYPE_MOD_PROMISE | TYPE_MOD_PROMISE_VALUE_ARRAY)
+#define PACK_TYPE_MODS(m) ((m) << TYPE_MODS_SHIFT)
+#define PACKED_TYPE_MODS(t) (((t) & ~BASIC_TYPE_MASK) >> TYPE_MODS_SHIFT)
+#define PACKED_TYPE_BASIC(t) ((t)&BASIC_TYPE_MASK)
+
+/*
+ * promise<T> helpers (issue #1319). See the TYPE_MOD_PROMISE comment in
+ * svalue.h for the encoding.
+ */
+/* the declared value IS a promise (an ARRAY of promises is not) */
+#define IS_PROMISE(t) (((t) & (TYPE_MOD_PROMISE | TYPE_MOD_ARRAY)) == TYPE_MOD_PROMISE)
+/* the type of `await x` where x is declared `t` */
+int promise_payload_type(int t);
+/* the type an async function declared to return `t` yields at its call site */
+int promise_of_type(int t);
+/* the call-site type of simul_efun n (promise-wrapped when it is async) */
+int simul_efun_call_type(int n);
+/* the runtime tag (svalue_t::subtype of a T_PROMISE) for a promise type
+ * word: the payload's T_* mask via convert_type(), or 0 when the payload
+ * carries no constraint (mixed/void/unknown) */
+unsigned short promise_value_subtype(int t);
+int convert_type(int type); /* apply.cc: compile-time type word -> T_* mask */
+
 struct local_info_t {
   int runtime_index;
   parse_node_t* funcptr_default;
@@ -105,17 +140,59 @@ extern const char* compiler_type_names[];
 #define LOOP_FOREACH 0x80
 #define SPECIAL_CONTEXT 0x100
 #define ARG_LIST 0x200
+/* inside an acatch() region: like SPECIAL_CONTEXT (no break/continue across
+ * it) but await stays legal -- that is acatch's whole point */
+#define ACATCH_CONTEXT 0x400
+/* somewhere above us is a catch/time_expression block, whose do_catch()-style
+ * C++ recursion cannot be suspended, so `await` and `acatch` are illegal.
+ * Deliberately SEPARATE from SPECIAL_CONTEXT: this bit is carried THROUGH
+ * loop/switch entry (a loop nested in a catch still cannot park), whereas
+ * SPECIAL_CONTEXT keeps its original meaning of "a break/continue here would
+ * cross a catch boundary" and is cleared by a loop/switch, so an ordinary
+ * `for (...) { break; }` written inside catch { } still compiles. */
+#define NO_SUSPEND_CONTEXT 0x800
+
+/* A block used in EXPRESSION position -- catch {}, time_expression
+ * {} -- saves the parser state it is about to clobber on Bison's own value
+ * stack, and its reduce action restores it. The context flags are one such
+ * piece of state; current_type is the other, and it was not saved: a
+ * declaration inside the block (`mixed e = catch { float f = 1.0; };`)
+ * overwrites the file-scope current_type global, and the ENCLOSING
+ * declarator's rule reads that global only afterwards, so the declared
+ * variable silently takes the inner declaration's type -- `e` above becomes
+ * a float and `e = 5;` then stores 5.0. (AGENTS.md section 13 item 9, at the
+ * compiler level.) Both travel packed in the single LPC_INT the
+ * *_context_open() rules return, which is error-safe: the value lives on the
+ * parser stack and is discarded with it, so a parse error cannot desync a
+ * side stack. Context flags are all <= 0x800, so the low half is ample. */
+#define PACK_SAVED_CONTEXT(ctx, type)   (((LPC_INT)(uint32_t)(type) << 32) | ((LPC_INT)(ctx) & 0xffffffffLL))
+#define SAVED_CONTEXT_FLAGS(v) ((LPC_INT)((v) & 0xffffffffLL))
+#define SAVED_CONTEXT_TYPE(v) ((lpc_type_t)((LPC_INT)(v) >> 32))
 
 struct function_context_t {
   parse_node_t* values_list;
   short bindable;
   short num_parameters;
   short num_locals;
+  /* max_num_locals when this `(: :)` was opened. num_locals above counts only
+   * the functional's OWN ($1-style) locals; a local declared in a block inside
+   * the body goes through add_local_name() into the enclosing function's
+   * numbering instead, and this snapshot is what detects that.
+   *
+   * max_num_locals, not current_number_of_locals: a block pops its names at
+   * the closing brace but never lowers the slot high-water mark, so by the
+   * time the default expression finishes the name count is back where it
+   * started while the SLOT has been consumed for good -- and the consumed
+   * slot is the damage. */
+  int entry_num_locals;
   struct function_context_t* parent;
 };
 
 extern function_context_t* current_function_context;
 extern int var_defined;
+/* the function whose body is being compiled is declared `async` (set by
+ * rule_func_type, cleared when the definition ends) */
+extern int compiling_async_function;
 extern parse_node_t* comp_trees[NUMTREES];
 extern unsigned short* comp_def_index_map;
 extern unsigned short* func_index_map;
@@ -136,13 +213,19 @@ typedef struct compiler_temp_t {
  * Some good macros to have.
  */
 
-#define IS_CLASS(t) ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) == TYPE_MOD_CLASS)
+/* TYPE_MOD_PROMISE joins these masks everywhere TYPE_MOD_CLASS appears: a
+ * promise<class foo> carries TYPE_MOD_CLASS for its PAYLOAD and is not itself
+ * a class, and promise<int> is not an int. */
+#define IS_CLASS(t) \
+  ((t & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS | TYPE_MOD_PROMISE)) == TYPE_MOD_CLASS)
 #define CLASS_IDX(t) (t & ~(DECL_MODS | TYPE_MOD_CLASS))
 
-#define COMP_TYPE(e, t) \
-  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && (compatible[(e & ~DECL_MODS)] & (1 << (t))))
-#define IS_TYPE(e, t) \
-  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS)) && (is_type[(e & ~DECL_MODS)] & (1 << (t))))
+#define COMP_TYPE(e, t)                                                  \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS | TYPE_MOD_PROMISE)) &&        \
+   (compatible[(e & ~DECL_MODS)] & (1 << (t))))
+#define IS_TYPE(e, t)                                             \
+  (!(e & (TYPE_MOD_ARRAY | TYPE_MOD_CLASS | TYPE_MOD_PROMISE)) && \
+   (is_type[(e & ~DECL_MODS)] & (1 << (t))))
 
 #define FUNCTION_TEMP(n) ((compiler_temp_t*)mem_block[A_FUNCTION_DEFS].block + (n))
 #define FUNCTION_NEXT(n) (FUNCTION_TEMP(n)->next)
@@ -183,7 +266,7 @@ extern char* prog_code_max;
 extern unsigned char string_tags[0x20];
 extern short freed_string;
 extern local_info_t *locals, *locals_ptr;
-extern unsigned short *type_of_locals, *type_of_locals_ptr;
+extern lpc_type_t *type_of_locals, *type_of_locals_ptr;
 extern int current_number_of_locals;
 extern int max_num_locals;
 extern int current_tree;
@@ -199,6 +282,11 @@ extern int comp_last_inherited;
 char* get_type_modifiers(char*, char*, int);
 char* get_two_types(char*, char*, int, int);
 char* get_type_name(char*, char*, int);
+/* Runtime reflection (functions()/variables()/dump_prog()) renders type
+ * words belonging to some OTHER program than the one being compiled, if any.
+ * Bracket those calls with this so a class index is not resolved against an
+ * in-flight compile's class table -- see rendering_foreign_type. */
+void set_type_name_foreign(int on);
 void init_locals(void);
 
 void save_file_info(int, int);
@@ -211,6 +299,7 @@ void yyerror(struct YYLTYPE* llocp, void* yyscanner, const char* msg);
 void yywarn(const char* fmt, ...);
 char* the_file_name(const char*);
 void free_all_local_names(int);
+void release_local_names(int);
 void pop_n_locals(int);
 void reactivate_current_locals(void);
 void clean_up_locals(void);
@@ -261,9 +350,23 @@ extern vm_context_t g_driver_vm_context;
 // structured consumers (lpcshell) read the fields directly instead.
 // ---------------------------------------------------------------------------
 struct Diagnostic {
+  // Storage note: every variable-length field below lives on the compile's
+  // ScratchArena, not the heap -- the compiler allocates no transient
+  // outside the arena. That is only sound because a compile BORROWS its
+  // arena and never resets it (see compile_file), so these records stay
+  // readable after the compile returns, which is exactly when lpcshell and
+  // the compiler tests read them.
+  //
+  // The lifetime rule that follows: a Diagnostic is valid until its arena
+  // is reset or destroyed. For the shared default arena that is the START
+  // of the next compile -- matching the old behaviour, where the compiler
+  // freed everything at the END of each one. compiler_diags is cleared on
+  // that same boundary (start_new_file), and destroying a stale
+  // arena-backed string is safe because deallocation is a no-op; only
+  // READING one after the reset would be wrong.
   bool is_warning;
-  std::string file;  // innermost file (current_file at capture time)
-  int line;          // line within `file`
+  ScratchString file;  // innermost file (current_file at capture time)
+  int line;            // line within `file`
   // 1-based column of the diagnosed token's START (0 = unknown, so every
   // producer that never learned about columns stays valid). For an error
   // inside a macro expansion this is the OUTERMOST invocation's column --
@@ -273,28 +376,28 @@ struct Diagnostic {
   // The diagnosed physical line's text as still resident in the scanner's
   // innermost real buffer at capture time (empty = unavailable). Rendered
   // as an indented snippet with a caret at `column`.
-  std::string snippet;
-  std::string message;
+  ScratchString snippet;
+  ScratchString message;
   // The live #include stack at capture, innermost includer first:
   // (includer file, line of its #include directive). Rendered clang-style
   // as "In file included from F:N:" prefix lines, outermost first.
-  std::vector<std::pair<std::string, int>> included_from;
+  ScratchVector<std::pair<ScratchString, int>> included_from;
   // The live macro-expansion chain at capture, innermost first. Rendered
   // clang-style: each level prints its own located note
   // ("file:line:col: note: expanded from macro 'F'") with the macro
   // DEFINITION line as a gutter snippet and a caret at the name.
   struct Expansion {
-    std::string macro_name;
-    std::string def_file;  // empty for builtins/predefines
+    ScratchString macro_name;
+    ScratchString def_file;  // empty for builtins/predefines
     int def_line = 0;
     int use_line = 0;
     int use_col = 0;
   };
-  std::vector<Expansion> expansions;
+  ScratchVector<Expansion> expansions;
   // Everything else: site-supplied context (compiler_pending_notes, e.g.
   // "previous definition of 'FOO' was at ..."), the compile-session
   // chain. Rendered as indented notes after the expansion chain.
-  std::vector<std::string> notes;
+  ScratchVector<ScratchString> notes;
   // Fix-it hints (8.5): a replacement for the [col_start, col_end)
   // 1-based column span on the diagnosed line. Rendered as a clang-style
   // replacement line under the caret. Producers attach these only when
@@ -302,9 +405,9 @@ struct Diagnostic {
   struct FixIt {
     int col_start;
     int col_end;
-    std::string replacement;
+    ScratchString replacement;
   };
-  std::vector<FixIt> fixits;
+  ScratchVector<FixIt> fixits;
   // Operand/sub-expression ranges (8.3): 1-based [col_start, col_end]
   // spans, rendered as '~' runs on the caret line when `line` matches the
   // diagnosed line. Attached by grammar actions via
@@ -314,7 +417,7 @@ struct Diagnostic {
     int col_start;
     int col_end;
   };
-  std::vector<Range> ranges;
+  ScratchVector<Range> ranges;
 };
 
 // This compile's captured diagnostics, cleared by start_new_file() (i.e.
@@ -369,9 +472,14 @@ struct CompileState {
   // Structured diagnostics stream + one-shot context.
   std::vector<Diagnostic> diags;
   bool diags_quiet = false;
-  std::vector<std::string> pending_notes;
-  std::vector<Diagnostic::FixIt> pending_fixits;
-  std::vector<Diagnostic::Range> pending_ranges;
+  // Arena-backed like the Diagnostic they are moved into, so staging a
+  // note costs no allocation. These are members of a global that outlives
+  // any one compile, so they follow the documented stale-object rule:
+  // cleared at each capture and at start_new_file, never read across an
+  // arena reset.
+  ScratchVector<ScratchString> pending_notes;
+  ScratchVector<Diagnostic::FixIt> pending_fixits;
+  ScratchVector<Diagnostic::Range> pending_ranges;
   int pending_caret_line = 0;
   int pending_caret_col = 0;
   std::string next_load_reason;
@@ -419,6 +527,19 @@ std::string render_diagnostic(const Diagnostic& d, bool color = false);
 // (apply.cc's trace-driven warnings) that have no compile context.
 void report_compile_diagnostic(const Diagnostic& d);
 
+// Drop every arena-backed record the compiler is holding (compiler_diags
+// and the pending_* staging containers).
+//
+// MUST be called immediately BEFORE the arena those records live in is
+// reset or destroyed, and it is the caller of ScratchArena::reset() who is
+// responsible for it. The asymmetry that makes this necessary: a stale
+// ScratchString is harmless to destroy (its destructor never dereferences
+// the buffer, and deallocation is a no-op), but a stale ScratchVector is
+// NOT -- its destructor walks its own arena-allocated buffer to destroy
+// each element, so clearing it after a reset reads freed memory. A
+// Diagnostic contains four such vectors.
+void compiler_drop_arena_state();
+
 // When set, report_compile_diagnostic() captures but does NOT print or
 // master-report -- for structured consumers (lpcshell) that render
 // compiler_diags themselves, and specifically must not spray a doomed
@@ -431,10 +552,10 @@ inline bool& compiler_diags_quiet = g_compile.diags_quiet;
 // "previous definition of 'FOO' was at file:line" before reporting. Only
 // meaningful immediately before a report; anything stale is cleared at the
 // next capture.
-inline std::vector<std::string>& compiler_pending_notes = g_compile.pending_notes;
+inline ScratchVector<ScratchString>& compiler_pending_notes = g_compile.pending_notes;
 // Fix-it hints queued by the NEXT report's site, same one-shot contract
 // as compiler_pending_notes.
-inline std::vector<Diagnostic::FixIt>& compiler_pending_fixits = g_compile.pending_fixits;
+inline ScratchVector<Diagnostic::FixIt>& compiler_pending_fixits = g_compile.pending_fixits;
 
 // Load-chain provenance (the optional 6.x note): load_object() sets
 // compiler_next_load_reason just before recursively loading an inherited
@@ -450,7 +571,7 @@ inline std::string& compiler_current_load_reason = g_compile.current_load_reason
 // (one-shot, consumed by the next captured diagnostic; the action clears
 // them after the helper returns so they can never leak to an unrelated
 // report). Defined in compiler.cc; the grammar calls the rule_* pair.
-inline std::vector<Diagnostic::Range>& compiler_pending_ranges = g_compile.pending_ranges;
+inline ScratchVector<Diagnostic::Range>& compiler_pending_ranges = g_compile.pending_ranges;
 // The operator's own position: when set (line != 0) and it matches the
 // diagnosed line, the caret moves onto the operator -- clang's
 // `~~~~~ ^ ~~~~~` shape for binary-op type errors.
@@ -476,12 +597,31 @@ inline int& compiler_directive_start_line = g_compile.directive_start_line;
 // (the reentrancy guard rejects nesting outright, so depth is always 0);
 // kept so that if the guard were ever bypassed by a future bug, the
 // failure is a clear chained error report instead of runaway recursion.
+/* A local's index is emitted as a single byte (icode.cc: ins_byte(F_LOCAL);
+ * ins_byte(which)), so 255 is what the bytecode can address -- past that a
+ * function used to compile and then read or write the wrong slot. This is a
+ * property of the instruction encoding, not a policy, which is why it is a
+ * constant here and not a runtime config option. */
+constexpr int kMaxLocalVariables = 255;
+
 #define MAX_COMPILE_DEPTH 32
 
 // Zero-copy file form: reads fd straight into the arena scan buffer.
-program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context);
+/* A compile BORROWS the arena it is given: it allocates every transient
+ * there and leaves it exactly as it found it -- never reset, never freed.
+ * The caller owns it and decides when that memory dies, which is what lets
+ * compiler output outlive the compile.
+ *
+ * Omit it and the compile uses the shared default arena instead, which IS
+ * the compiler's to recycle: that one is reset on the way IN, so the
+ * previous compile's transients stay readable until the next compile
+ * actually starts. See scratch_default_arena() for why it is shared rather
+ * than per-call. */
+program_t* compile_file_fd(int fd, const char*, vm_context_t* vm_context = &g_driver_vm_context,
+                           ScratchArena* arena = nullptr);
 program_t* compile_file(std::string_view source, const char*,
-                        vm_context_t* vm_context = &g_driver_vm_context);
+                        vm_context_t* vm_context = &g_driver_vm_context,
+                        ScratchArena* arena = nullptr);
 
 void reset_function_blocks(void);
 void copy_variables(program_t*, int);
@@ -491,7 +631,6 @@ void type_error(const char*, int);
 int compatible_types(int, int);
 int compatible_types2(int, int);
 int arrange_call_inherited(const char*, parse_node_t*);
-void add_arg_type(unsigned short);
 int define_new_function(const char*, int, int, int, int);
 int define_variable(const char*, int);
 int define_new_variable(const char*, int);
@@ -510,14 +649,14 @@ void pop_func_block(void);
 int decl_fix(int);
 parse_node_t* check_refs(int, parse_node_t*, parse_node_t*);
 
-int lookup_any_class_member(char*, unsigned short*);
+int lookup_any_class_member(char*, lpc_type_t*);
 // Like lookup_any_class_member() but silent when no member is found.
-int lookup_any_class_member_soft(const char*, unsigned short*);
-inline int lookup_any_class_member_soft(const ScratchString* s, unsigned short* t) {
+int lookup_any_class_member_soft(const char*, lpc_type_t*);
+inline int lookup_any_class_member_soft(const ScratchString* s, lpc_type_t* t) {
   return lookup_any_class_member_soft(s->c_str(), t);
 }
-int lookup_class_member(int, const char*, unsigned short*);
-inline int lookup_class_member(int which, const ScratchString* s, unsigned short* t) {
+int lookup_class_member(int, const char*, lpc_type_t*);
+inline int lookup_class_member(int which, const ScratchString* s, lpc_type_t* t) {
   return lookup_class_member(which, s->c_str(), t);
 }
 parse_node_t* reorder_class_values(int, parse_node_t*);

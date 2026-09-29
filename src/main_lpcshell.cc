@@ -65,6 +65,7 @@
 #include <vector>
 
 #include "compiler/internal/compiler.h"
+#include "base/internal/scratchpad.h"
 #include "compiler/internal/lexer_utils.h"
 #include "mainlib.h"
 #include "vm/vm.h"
@@ -147,6 +148,24 @@ struct Session {
   std::vector<std::string> var_names;     // declaration order
   std::vector<std::string> saved_values;  // save_variable() strings, parallel to var_names
   int counter = 0;
+
+  /* lpcshell is the consumer that reads compiler output AFTER the compile
+   * that produced it: it renders compiler_diags itself once the compile has
+   * returned. So it owns the arena those transients live in, rather than
+   * letting the compiler free them out from under it. Reset at the top of
+   * each evaluation, once the previous one's diagnostics have been printed. */
+  ScratchArena arena;
+
+  /* The LAST Eval()'s diagnostics are never reclaimed by Eval() itself (only
+   * the NEXT Eval() drops them, right before it resets `arena`) -- there is
+   * no next call when the session simply ends (EOF/Ctrl-D after a statement
+   * that produced a warning). Without this, ~ScratchArena() below frees
+   * `arena`'s chunks while compiler_diags (a global outliving this Session)
+   * can still hold a Diagnostic whose ScratchVector member (notes/expansions/
+   * fixits/ranges) references them -- a heap-use-after-free the next time
+   * anything destroys compiler_diags. Members are destroyed in reverse
+   * declaration order, so this runs before `arena`'s own destructor. */
+  ~Session() { compiler_drop_arena_state(); }
 
   std::string Preamble() const {
     std::string out;
@@ -272,7 +291,9 @@ Attempt RunAttempt(Session* session, const std::string& body_src, bool want_resu
   try {
     // coverity[wrapper_escape] - the callee copies the name (shared string);
     // the c_str() pointer is not retained past this call.
-    ob = load_object_from_source(src, name.c_str(), 1);
+    // We render this compile's diagnostics AFTER it returns, so we own the
+    // arena its transients live in and keep it alive for the whole attempt.
+    ob = load_object_from_source(src, name.c_str(), 1, &session->arena);
   } catch (const char* e) {
     compiler_diags_quiet = false;
     restore_context(&econ);
@@ -365,6 +386,12 @@ std::string EnsureTrailingSemicolon(std::string s) {
 // Returns false when the statement failed to compile or errored at
 // runtime, so script mode (issue #921) can report a nonzero exit status.
 bool Eval(Session* session, std::string stmt) {
+  // The previous evaluation's diagnostics have been rendered by now, so its
+  // arena memory can go. Reclaiming here rather than at the end of the last
+  // Eval() is what keeps those records readable for the whole of it.
+  compiler_drop_arena_state();  // must precede the reset; see its declaration
+  session->arena.reset();
+
   // Trim trailing newline the REPL loop always appends.
   while (!stmt.empty() && (stmt.back() == '\n' || stmt.back() == '\r')) stmt.pop_back();
   if (stmt.find_first_not_of(" \t") == std::string::npos) return true;

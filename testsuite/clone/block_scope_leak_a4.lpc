@@ -1,0 +1,11 @@
+// Fixture for compiler/block_expr_scope.lpc: a local leaked from a GLOBAL
+// initializer is never cleaned up by an enclosing function, so it shifted the
+// runtime slots of the next function's parameters while the VM kept pushing
+// arguments at 0..n-1. id1() silently returned 0.
+mixed leaked = catch {
+  int f = 1;
+};
+
+int id1(int a) { return a; }
+int id2(int a) { return a; }
+int add2(int a, int b) { return a + b; }

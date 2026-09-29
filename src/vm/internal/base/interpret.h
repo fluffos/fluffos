@@ -25,6 +25,11 @@
 #define FRAME_EXTERNAL 8
 
 #define FRAME_RETURNED_FROM_CATCH 16
+/* async/await (issue #1319): on a FRAME_FUNCTION frame, marks the entry
+ * frame of an async coroutine body (pushed under run_async_function()); on a
+ * FRAME_CATCH frame, marks an acatch() region marker (no C++ recursion,
+ * unlike do_catch()). */
+#define FRAME_ASYNC 32
 struct defer_list {
   struct defer_list* next;
   svalue_t func;
@@ -44,6 +49,20 @@ struct control_stack_t {
   char* pc;          /* TODO: change this to unsigned char* */
 
   svalue_t* fp;
+  /* acatch() markers only (FRAME_CATCH | FRAME_ASYNC): the value-stack top
+   * and command-giver-stack top at region entry, so an unwind can cut both
+   * back to it the way restore_context() would. */
+  svalue_t* save_sp;
+  object_t** save_cgsp;
+#ifdef DEBUG
+  /* stack_in_use_as_temporary as it stood when this frame was pushed. An
+   * unwind cuts the value stack back to the frame, taking any foreach
+   * temporaries above it along, so the counter has to come back with them.
+   * Nothing else restores it -- error_context_t carries sp/csp/cgsp and not
+   * this -- and a NONZERO count silently disables break_point()'s stack
+   * check for all later LPC, so a leak here is permanent and quiet. */
+  int save_temporaries;
+#endif
   struct defer_list* defers;
   int num_local_variables;   /* Local + arguments */
   int function_index_offset; /* Used when executing functions in inherited
@@ -78,6 +97,19 @@ struct function_lookup_info_t {
 };
 
 #define IS_ZERO(x) (!(x) || (((x)->type == T_NUMBER) && ((x)->u.number == 0)))
+
+/* Did an LPC function the DRIVER called answer yes to a yes/no question?
+ *
+ * Not simply !IS_ZERO(): an async function hands back a T_PROMISE the instant
+ * its body parks, before it has decided anything, and a bare truthiness test
+ * reads that as "yes". A function that has not answered has not said yes --
+ * the same rule check_valid_path(), master_approved() and the command parser
+ * apply (AGENTS.md section 13.24). Use this wherever the driver asks an
+ * object a question and acts on the answer (id(), is_living(),
+ * inventory_accessible(), ...), NOT for an ordinary LPC callback whose result
+ * is used as a truth value -- there a promise is true, exactly as it is to
+ * the equivalent hand-written `if (cb(x))`. */
+#define APPLY_SAYS_YES(x) (!IS_ZERO(x) && (x)->type != T_PROMISE)
 #define IS_UNDEFINED(x) \
   (!(x) || (((x)->type == T_NUMBER) && ((x)->subtype == T_UNDEFINED) && ((x)->u.number == 0)))
 
@@ -126,7 +158,6 @@ extern int function_index_offset;
 extern int variable_index_offset;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
-extern svalue_t global_lvalue_byte;
 extern int num_varargs;
 extern int st_num_arg;
 
@@ -138,9 +169,38 @@ extern const char* lv_owner_str;
 void kill_ref(ref_t*);
 ref_t* make_ref(void);
 
-/* += / -= on the active string codepoint lvalue (T_LVALUE_CODEPOINT);
- * returns the resulting codepoint. */
-LPC_INT codepoint_lvalue_add(LPC_INT delta);
+/* += / -= on a T_LVALUE_CODEPOINT slot; returns the resulting codepoint. */
+LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
+
+/* Owns a popped (or stolen) stack lvalue. error() unwinds via a C++
+ * exception (do_catch / safe_apply), so the destructor releases the box
+ * on that path too -- a bare `svalue_t lvslot = *sp--` leaked every
+ * T_LVALUE_CODEPOINT / T_LVALUE_RANGE that hit error() before the
+ * matching free_svalue (issue #1358). */
+class PoppedLvalue {
+ public:
+  enum Mode { Pop, Steal };
+
+  explicit PoppedLvalue(Mode mode = Pop) {
+    slot_ = *sp;
+    if (mode == Pop) {
+      sp--;
+    } else {
+      /* Leave the stack slot but drop its claim on the box so unwind
+       * and this destructor cannot both delete it. */
+      sp->type = T_NUMBER;
+      sp->subtype = 0;
+      sp->u.number = 0;
+    }
+  }
+  ~PoppedLvalue() { free_svalue(&slot_, "PoppedLvalue"); }
+  PoppedLvalue(const PoppedLvalue&) = delete;
+  PoppedLvalue& operator=(const PoppedLvalue&) = delete;
+  svalue_t* target() { return lvalue_target(&slot_); }
+
+ private:
+  svalue_t slot_;
+};
 
 /* Convert a string (raw UTF-8 bytes) or array of ints 0..255 into a fresh
  * buffer; errors on anything else. Caller owns the result. */
@@ -176,7 +236,7 @@ void call___INIT(object_t*);
 array_t* call_all_other(array_t*, const char*, int);
 const char* function_exists(const char*, object_t*, int);
 void mark_apply_low_cache(void);
-void translate_absolute_line(int, unsigned short*, int*, int*);
+void translate_absolute_line(int, lpc_file_info_t*, int*, int*, lpc_file_info_t* end = nullptr);
 char* add_slash(const char* const);
 int strpref(const char*, const char*);
 void do_trace(const char*, const char*, const char*);
@@ -187,8 +247,8 @@ char* get_line_number(char*, const program_t*);
 void get_line_number_info(const char**, int*);
 void reset_machine(int);
 void unlink_string_svalue(svalue_t*);
-void copy_lvalue_range(svalue_t*);
-void assign_lvalue_range(svalue_t*);
+void copy_lvalue_range(svalue_t* lval, svalue_t* from);
+void assign_lvalue_range(svalue_t* lval, svalue_t* from);
 void debug_perror(const char*, const char*);
 
 #ifndef NO_SHADOWS

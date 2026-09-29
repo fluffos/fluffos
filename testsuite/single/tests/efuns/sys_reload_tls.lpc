@@ -2,14 +2,36 @@
 // there (the page terminates TLS), so this file must not reference it.
 #ifndef __WASM__
 void do_tests_real() {
+  int i;
+  int saw_ws_plain = 0;
+  int saw_ws_tls = 0;
+  mixed ports;
+
   // non tls port
   ASSERT_NE(0, catch(sys_reload_tls(0)));
 
-  // no support for websocket
-  ASSERT_NE(0, catch(sys_reload_tls(2)));
-
-  // valid tls
+  // valid telnet tls (config.test external_port_4)
   ASSERT_EQ(0, sys_reload_tls(4));
+
+  // Walk the live port table so a config.test port shuffle can't silently
+  // pin the wrong index. Plain websocket must still refuse (no cert);
+  // websocket TLS must reload from disk the same way telnet TLS does.
+  ports = sys_network_ports();
+  for (i = 0; i < sizeof(ports); i++) {
+    mixed p = ports[i];
+    if (p[1] != "websocket") {
+      continue;
+    }
+    if (p[3]) {
+      ASSERT_EQ(0, sys_reload_tls(p[0]));
+      saw_ws_tls = 1;
+    } else {
+      ASSERT_NE(0, catch(sys_reload_tls(p[0])));
+      saw_ws_plain = 1;
+    }
+  }
+  ASSERT(saw_ws_plain);
+  ASSERT(saw_ws_tls);
 
   // Regression: the index bound used sizeof(external_port) (the array's size in
   // BYTES) instead of its element count (5), letting indices in the gap slip

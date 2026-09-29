@@ -1,0 +1,27 @@
+// One of three concrete monster types
+// demo_poly_shell.lpc inherits and can
+// replace_program() itself down to. See that file's header for the full
+// pattern writeup -- IMPORTANT: replace_program() can only swap to a
+// program the caller already inherits, so the shell inherits ALL THREE
+// of these up front; what the pattern actually saves is explained there.
+inherit "/clone/replace_program/demo_poly_base";
+
+// Concrete, type-specific state. Before the shell's swap lands, an
+// instance carries an hp variable for all 3 candidate types at once (it
+// has to -- see above). After the swap, only the chosen type's hp
+// survives on that object; the other 2 candidates' hp slots are freed by
+// the driver's variable-trimming (replace_programs() in
+// src/packages/core/replace_program.cc) -- this is the actual "save
+// memory" replace_program()'s own doc comment refers to.
+int hp = 8;
+int query_hp() { return hp; }
+
+int attack_damage() { return 3; }
+
+// Distinct per-type marker names (not a shared overridden name) so each
+// one is independently observable: ALL THREE already resolve true on the
+// shell (proving it really does already contain every candidate's code),
+// and after the swap only the chosen type's marker keeps resolving --
+// the other two are genuinely GONE (function_exists() -> 0), not merely
+// shadowed.
+int is_goblin() { return 1; }

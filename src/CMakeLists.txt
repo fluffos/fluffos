@@ -55,13 +55,13 @@ if (EMSCRIPTEN)
   set(PACKAGE_EXTERNAL OFF)  # posix_spawn + socketpair
   set(PACKAGE_FFI OFF)       # libffi/dlopen
   set(PACKAGE_SOCKETS OFF)   # BSD sockets
-  # pcre stays ON: build-deps.sh cross-builds a static libpcre into the
+  # pcre stays ON: build-deps.sh cross-builds a static libpcre2-8 into the
   # wasm-deps prefix, which CMAKE_FIND_ROOT_PATH below lets FindPCRE see.
   set(MARCH_NATIVE OFF)
   set(USE_JEMALLOC OFF)
   set(STATIC OFF)
 
-  # Cross-built static ICU + PCRE (see tools/wasm/build-deps.sh).
+  # Cross-built static ICU + PCRE2 (see tools/wasm/build-deps.sh).
   set(FLUFFOS_WASM_DEPS "/opt/wasm-deps" CACHE PATH
       "Prefix containing wasm-built static ICU/PCRE")
   list(APPEND CMAKE_FIND_ROOT_PATH "${FLUFFOS_WASM_DEPS}")
@@ -395,6 +395,7 @@ set(TOOL_SRC
 
 set(GENERATRED_SOURCE
   "${CMAKE_CURRENT_BINARY_DIR}/packages.fullspec"
+  "${CMAKE_CURRENT_BINARY_DIR}/packages_missing_efuns.autogen.h"
   "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.cc"
   "${CMAKE_CURRENT_BINARY_DIR}/applies_table.autogen.h"
   "${CMAKE_CURRENT_BINARY_DIR}/efuns.autogen.cc"
@@ -414,7 +415,7 @@ add_custom_command(
 
 find_program(BASH_EXECUTABLE bash REQUIRED)
 add_custom_command(
-  OUTPUT "packages.fullspec"
+  OUTPUT "packages.fullspec" "packages_missing_efuns.autogen.h"
   COMMAND "${BASH_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/build_packages_genfiles.sh" "${CMAKE_CURRENT_SOURCE_DIR}/../" "${CMAKE_CXX_COMPILER}" "-I${CMAKE_CURRENT_BINARY_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}"
   # packages.autogen.h carries the enabled-package set: without this
   # dependency, toggling a package option left a stale efun table.
@@ -616,7 +617,7 @@ set(SRC
   "compiler/internal/lexer_rules.cc" # substantive logic behind lexer.l's rule actions (escape decoding, number parsing, etc.)
   "compiler/internal/lexer_rules_pp.cc" # preprocessing logic and expression parser
   "compiler/internal/stage_output.cc" # lpcc -E/--tokens staged dumps (lex+pp, no parse)
-  "compiler/internal/scratchpad.cc"
+  "base/internal/scratchpad.cc"
   "compiler/internal/trees.cc"
   "vm/internal/base/apply_cache.cc"
   "vm/internal/base/array.cc"
@@ -628,6 +629,7 @@ set(SRC
   "vm/internal/base/mapping.cc"
   "vm/internal/base/object.cc"
   "vm/internal/base/program.cc"
+  "vm/internal/base/promise.cc"
   "vm/internal/base/svalue.cc"
   "vm/internal/apply.cc"
   "vm/internal/eval_limit.cc"

@@ -1,0 +1,2 @@
+inherit "/inherit/priv_same_a";
+inherit "/inherit/priv_same_b";

@@ -33,7 +33,7 @@
 /* Make the generated grammar.autogen.h self-sufficient for the %union:
  * the `string` member is a ScratchString* (arena string, scratchpad.h). */
 %code requires {
-#include "compiler/internal/scratchpad.h"
+#include "base/internal/scratchpad.h"
 }
 
 %{
@@ -124,6 +124,11 @@ void yyerror(void *yyscanner, const char *msg);
 
 /* Built-in special forms */
 %token L_SSCANF L_CATCH
+
+/* async/await (issue #1319): `await expr` and `acatch(expr)`. The `async`
+ * function modifier rides L_TYPE_MODIFIER (FUNC_ASYNC in yylval). */
+%token L_AWAIT L_ACATCH
+%token L_PROMISE           /* promise<T> (issue #1319) */
 %token L_ARRAY
 %token L_REF
 %token L_PARSE_COMMAND L_TIME_EXPRESSION
@@ -212,7 +217,7 @@ void yyerror(void *yyscanner, const char *msg);
 %type <string> function_name identifier new_local_name
 %type <node> optional_default_arg_value
 %type <node> number real string string_like template_literal template_parts
-%type <node> expr comma_expr for_expr sscanf catch
+%type <node> expr comma_expr for_expr sscanf catch acatch
 %type <node> parse_command time_expression opt_arg_list arg_list opt_pair_list
 %type <node> pair_list assoc_pair primary_expr lvalue function_call lvalue_list
 %type <node> new_local_def statement stmt_while stmt_cond stmt_do stmt_switch case
@@ -231,7 +236,8 @@ void yyerror(void *yyscanner, const char *msg);
 %type <call_open> call_open
 %type <number> local_decl_header local_decl_statement_header
 %type <func_block> lambda_return_type
-%type <number> loop_start foreach_start block_start special_context_start
+%type <number> loop_start foreach_start block_start special_context_start acatch_context_start
+%type <number> tree_context_start
 %type <contextp> dollar_start
 
 %%
@@ -244,6 +250,7 @@ loop_start: %empty { $$ = rule_loop_open(); };
 foreach_start: %empty { $$ = rule_foreach_open(); };
 block_start: %empty { $$ = rule_block_open(); };
 special_context_start: %empty { $$ = rule_special_context_open(); };
+tree_context_start: %empty { $$ = rule_tree_context_open(); };
 dollar_start: %empty { $$ = rule_dollar_open(); };
 
 /* =========================================================================
@@ -488,6 +495,7 @@ expr:
   | '!' expr[val]                   { rule_expr_not(&$$, $val); }
   | '~'   expr[val]                 { rule_expr_compl(&$$, $val); }
   | '-'   expr[val]  %prec '!'    { rule_expr_neg(&$$, $val); }
+  | L_AWAIT expr[val]  %prec '!'  { rule_expr_await(&$$, $val); }
 
   | lvalue L_INC_DEC[op]  { rule_expr_post_incdec(&$$, $op, $lvalue); }
 
@@ -517,6 +525,7 @@ primary_expr:
   | string_like
   | '(' comma_expr ')'               { $$ = $comma_expr; }
   | catch
+  | acatch
   | tree
 
   /* Dollar-expression: $(expr) -- evaluates expr in the enclosing context. */
@@ -658,6 +667,17 @@ catch:
     { rule_catch(&$$, $expr_or_block, $special_context_start); }
 ;
 
+/* acatch(expr) or acatch { stmts } -- the async-aware catch: same value
+ * convention as catch, but implemented as a control-stack marker (no C++
+ * recursion), so `await` may suspend inside it. Only legal inside an async
+ * function body. */
+acatch:
+  L_ACATCH acatch_context_start expr_or_block
+    { rule_acatch(&$$, $expr_or_block, $acatch_context_start); }
+;
+
+acatch_context_start: %empty { $$ = rule_acatch_context_open(); };
+
 /* time_expression(expr) or time_expression { stmts } -- returns tick count. */
 time_expression:
   L_TIME_EXPRESSION special_context_start expr_or_block
@@ -666,8 +686,8 @@ time_expression:
 
 /* tree: debug-only parse-tree pretty-printer. */
 tree:
-  L_TREE block
-    { rule_tree_block(&$$, $block.node); }
+  L_TREE tree_context_start block
+    { rule_tree_block(&$$, $block, $tree_context_start); }
   | L_TREE '(' comma_expr ')'
     { rule_tree_expr(&$$, $comma_expr); }
 ;
@@ -833,6 +853,12 @@ atomic_type:
   L_BASIC_TYPE
   | L_CLASS L_DEFINED_NAME  { $$ = rule_atomic_type_class($L_DEFINED_NAME); }
   | L_CLASS L_IDENTIFIER    { $$ = rule_atomic_type_class_identifier($L_IDENTIFIER); }
+  /* bare `promise` means promise<mixed>. The closing '>' arrives as L_ORDER
+     (the token shared by > >= <=); the rule checks the opcode rather than
+     making the lexer special-case it. */
+  | L_PROMISE                              { $$ = rule_atomic_type_promise(); }
+  | L_PROMISE '<' basic_type optional_star L_ORDER
+      { $$ = rule_atomic_type_promise_of($basic_type | $optional_star, $L_ORDER); }
 ;
 
 /* A parameter type that may also be passed by reference:  int & */

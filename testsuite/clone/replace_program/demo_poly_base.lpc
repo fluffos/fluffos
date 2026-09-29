@@ -1,0 +1,36 @@
+// ============================================================================
+// DEMO: replace_program()'s INTENDED use -- runtime polymorphism.
+// This is the shared minimal base. See
+// demo_poly_shell.lpc for the full pattern
+// writeup and a map of the companion fixtures/tests.
+// ============================================================================
+//
+// Bare-minimum, stateless scaffolding every monster needs regardless of
+// concrete type -- deliberately carries NO variables of its own. Every
+// concrete monster type (see demo_..._goblin/wolf/ghost.lpc) inherits
+// this, and so does the shell (transitively, through each of the
+// candidate types it inherits below) -- a real, stateful base would hit
+// FluffOS's non-deduplicated diamond-inheritance behavior once inherited
+// via more than one path, which is an orthogonal wrinkle this demo
+// intentionally sidesteps (see testsuite/single/tests/efuns/
+// replace_program_noop_generality.lpc's diamond-inheritance coverage for
+// that topic on its own).
+string base_marker() { return "base"; }
+
+// Probe for /single/tests/efuns/replace_program_polymorphism_demo.lpc:
+// living HERE (the one common ancestor, reached identically via all 3
+// candidate paths -- see the shell's inherit list) means it resolves to
+// the exact same function_t through every path, so it doesn't trip the
+// diamond-inheritance function-conflict warnings the type-specific
+// query_hp()/attack_damage()/hp do. Mirrors the try_bind() convention
+// used throughout /clone/replace_program/replace_stateful_base.lpc and the shared
+// /clone/replace_program/replace_min_target.lpc (used by the diamond/ml/vo generality
+// axes): catch()ing a bound-args closure literal fails (nonzero) while a
+// replace_program() swap is genuinely pending (make_lfun_funp() refuses
+// to bind), and succeeds (0) once no swap is pending -- letting a caller
+// directly observe whether replace_program_is_noop() correctly left this
+// object's swap pending.
+mixed try_bind() {
+  mixed fp;
+  return catch(fp = (: base_marker :));
+}

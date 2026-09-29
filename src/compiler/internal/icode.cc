@@ -403,6 +403,36 @@ void i_generate_node(parse_node_t* expr) {
       expr = expr->r.expr;
     /* fall through */
     case NODE_BINARY_OP:
+      /* Plain local/global/parameter stores (issue #1358). Done here, not
+       * in the pragma-gated tree optimizer, so `#pragma no_optimize`,
+       * functionals, anonymous functions, `$1 = v`, and file-scope
+       * `int g = 1` all emit the specialized opcode. */
+      if (expr->v.number == F_ASSIGN || expr->v.number == F_VOID_ASSIGN) {
+        parse_node_t* dest = expr->r.expr;
+        if (IS_NODE(dest, NODE_OPCODE_1, F_LOCAL_LVALUE)) {
+          i_generate_node(expr->l.expr);
+          end_pushes();
+          ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_LOCAL : F_VOID_ASSIGN_LOCAL);
+          ins_byte(dest->l.number);
+          break;
+        }
+        /* dest was already used above; a null check here is REVERSE_INULL
+         * (Coverity CID 1686623). A well-formed assign always has a dest. */
+        if (dest->kind == NODE_PARAMETER_LVALUE) {
+          i_generate_node(expr->l.expr);
+          end_pushes();
+          ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_LOCAL : F_VOID_ASSIGN_LOCAL);
+          ins_byte(dest->v.number + current_num_values);
+          break;
+        }
+        if (IS_NODE(dest, NODE_OPCODE_1, F_GLOBAL_LVALUE)) {
+          i_generate_node(expr->l.expr);
+          end_pushes();
+          ins_byte(expr->v.number == F_ASSIGN ? F_ASSIGN_GLOBAL : F_VOID_ASSIGN_GLOBAL);
+          INS_GLOBAL_INDEX(dest->l.number);
+          break;
+        }
+      }
       i_generate_node(expr->l.expr);
     /* fall through */
     case NODE_UNARY_OP:
@@ -439,7 +469,8 @@ void i_generate_node(parse_node_t* expr) {
       end_pushes();
       ins_byte(expr->v.number);
 
-      if ((expr->v.number == F_GLOBAL) || (expr->v.number == F_GLOBAL_LVALUE)) {
+      if ((expr->v.number == F_GLOBAL) || (expr->v.number == F_GLOBAL_LVALUE) ||
+          (expr->v.number == F_ASSIGN_GLOBAL) || (expr->v.number == F_VOID_ASSIGN_GLOBAL)) {
         INS_GLOBAL_INDEX(expr->l.number);
       } else if (expr->v.number == F_MAP_MEMBER || expr->v.number == F_MAP_MEMBER_LVALUE ||
                  expr->v.number == F_MAP_MEMBER_OPTIONAL) {
@@ -790,6 +821,18 @@ void i_generate_node(parse_node_t* expr) {
       i_generate_node(expr->r.expr);
       ins_byte(F_END_CATCH);
       upd_short(addr, CURRENT_PROGRAM_SIZE - addr, "catch");
+      break;
+    }
+    case NODE_ACATCH: {
+      int addr;
+
+      end_pushes();
+      ins_byte(F_ACATCH);
+      addr = CURRENT_PROGRAM_SIZE;
+      ins_short(0);
+      i_generate_node(expr->r.expr);
+      ins_byte(F_END_ACATCH);
+      upd_short(addr, CURRENT_PROGRAM_SIZE - addr, "acatch");
       break;
     }
     case NODE_TIME_EXPRESSION: {
@@ -1248,6 +1291,8 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_NEXT_FOREACH:
       case F_GLOBAL:
       case F_GLOBAL_LVALUE:
+      case F_ASSIGN_GLOBAL:
+      case F_VOID_ASSIGN_GLOBAL:
       case F_STRING:
 #ifdef F_JUMP_WHEN_ZERO
       case F_JUMP_WHEN_ZERO:
@@ -1270,6 +1315,8 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_BYTE:
       case F_NBYTE:
       case F_TRANSFER_LOCAL:
+      case F_VOID_ASSIGN_LOCAL:
+      case F_ASSIGN_LOCAL:
         pc++;
         break;
       case F_FUNCTION_CONSTRUCTOR:
