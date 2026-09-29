@@ -602,7 +602,7 @@ phase 2 writes them, phase 3 executes arbitrary code. Therefore:
    consulted at attach, after the password check succeeds but before the session is marked
    attached — mudlibs can layer policy (IP allowlisting, logging, rate-limiting) without driver
    rebuilds. Permissive when undefined (same convention as `valid_object`'s
-   `if (mret && !MASTER_APPROVED(mret))` guard, not the restrictive `valid_socket`-style bare
+   `if (mret && !MASTER_APPROVED(mret, "valid_object"))` guard, not the restrictive `valid_socket`-style bare
    check): a mudlib that already configured `debugger port`/`debugger password` without knowing
    about this apply is never silently locked out by a driver upgrade. `remote_ip` comes from
    `lws_get_peer_simple()` (no reverse DNS), captured once at `LWS_CALLBACK_ESTABLISHED` into
