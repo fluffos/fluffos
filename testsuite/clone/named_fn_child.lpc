@@ -1,0 +1,11 @@
+// Fixture for tests/compiler/named_function_identity.lpc: references the
+// inherited base_fn from the child's code, and a local one of its own.
+
+inherit "/clone/named_fn_base";
+
+int local_fn() { return 2; }
+
+function child_ref() { return base_fn; }
+function local_ref() { return local_fn; }
+function efun_ref() { return write; }
+function bound_ref() { return (: local_fn, 1 :); }
