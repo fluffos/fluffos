@@ -3297,8 +3297,22 @@ static void handle_functions() {
            * F_CALL_FUNCTION_BY_ADDRESS in the inherit's bytecode indexes
            * this slot via function_index_offset; aliasing it to a later
            * inherit's same-named private made pa->a_call() run pb's
-           * function (issue #1400). Public/visible overloads still alias. */
-          if (cur_def->flags & DECL_HIDDEN) {
+           * function (issue #1400). Public/visible overloads still alias.
+           *
+           * A hidden slot can also be an ALIAS carried down from the
+           * inherit: the inherit overrode an inherited function with its
+           * own private one. Its flags are then FUNC_ALIAS plus the target's
+           * decl flags, which must never be stored as-is (the decl bits read
+           * as an alias index). Re-aim it at the inherit's own private
+           * target, rebased into this program: that target is hidden here
+           * too, so it keeps its own slot and the alias stays one hop. A
+           * same-named function in this program cannot bind to it. */
+          if ((cur_def->flags & (DECL_HIDDEN | FUNC_ALIAS)) == (DECL_HIDDEN | FUNC_ALIAS)) {
+            program_t* parent = INHERIT(cur_def->offset)->prog;
+            prog_flags[new_index] =
+                FUNC_ALIAS | (INHERIT(cur_def->offset)->function_index_offset +
+                              (parent->function_flags[cur_def->function_index_offset] & ~FUNC_ALIAS));
+          } else if (cur_def->flags & DECL_HIDDEN) {
             prog_flags[new_index] = cur_def->flags;
           } else {
             prog_flags[new_index] = FUNC_ALIAS | final_index;

@@ -1,0 +1,15 @@
+// A private function that overrides an inherited public one claims the
+// parent's internal calls. Further down the tree that claim must hold:
+// the slot used to keep FUNC_ALIAS plus decl flags, read back as a bogus
+// alias index (crash on call, or in copy_functions() one level lower).
+// Nothing in a child can bind to the private override, at any visibility.
+void do_tests() {
+  ASSERT_EQ("mid", load_object("/inherit/priv_alias_mid")->call_f());
+  ASSERT_EQ("mid", load_object("/clone/priv_alias_leaf")->call_f());
+
+  object own = load_object("/clone/priv_alias_leaf_own");
+  ASSERT_EQ("leaf", own->f());
+  ASSERT_EQ("mid", own->call_f());
+
+  ASSERT_EQ("mid", load_object("/clone/priv_alias_grandleaf")->call_f());
+}
