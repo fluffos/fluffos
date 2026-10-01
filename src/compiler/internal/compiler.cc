@@ -3306,14 +3306,26 @@ static void handle_functions() {
            * as an alias index). Re-aim it at the inherit's own private
            * target, rebased into this program: that target is hidden here
            * too, so it keeps its own slot and the alias stays one hop. A
-           * same-named function in this program cannot bind to it. */
-          if ((cur_def->flags & (DECL_HIDDEN | FUNC_ALIAS)) == (DECL_HIDDEN | FUNC_ALIAS)) {
-            program_t* parent = INHERIT(cur_def->offset)->prog;
-            prog_flags[new_index] =
-                FUNC_ALIAS | (INHERIT(cur_def->offset)->function_index_offset +
-                              (parent->function_flags[cur_def->function_index_offset] & ~FUNC_ALIAS));
-          } else if (cur_def->flags & DECL_HIDDEN) {
-            prog_flags[new_index] = cur_def->flags;
+           * same-named function in this program cannot bind to it.
+           *
+           * Only a hidden slot with a body has anything to keep. A private
+           * prototype the inherit never defined is a forward declaration
+           * that a descendant fulfils (`private void hook();` called from
+           * the inherit's code), so it aliases to the final definition like
+           * any overload. Its flags carry the PROTOTYPE/UNDEFINED bits of
+           * what it resolves to, alias or not, which also guarantees the
+           * re-aim target above has a body and is not itself re-aliased. */
+          if ((cur_def->flags & DECL_HIDDEN) &&
+              !(cur_def->flags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
+            if (cur_def->flags & FUNC_ALIAS) {
+              program_t* parent = INHERIT(cur_def->offset)->prog;
+              prog_flags[new_index] =
+                  FUNC_ALIAS |
+                  (INHERIT(cur_def->offset)->function_index_offset +
+                   (parent->function_flags[cur_def->function_index_offset] & ~FUNC_ALIAS));
+            } else {
+              prog_flags[new_index] = cur_def->flags;
+            }
           } else {
             prog_flags[new_index] = FUNC_ALIAS | final_index;
           }

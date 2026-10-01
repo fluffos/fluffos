@@ -1,0 +1,10 @@
+// A private prototype the inherit never defines is a forward declaration:
+// the inherit's code calls it and a descendant supplies the body, at any
+// visibility and any depth. Issue #1400's "hidden slots keep their own
+// definition" left such a slot bound to the bodiless prototype, so the
+// call failed at runtime with "Undefined function called".
+void do_tests() {
+  ASSERT_EQ("priv", load_object("/clone/priv_proto_priv")->run_hook());
+  ASSERT_EQ("pub", load_object("/clone/priv_proto_pub")->run_hook());
+  ASSERT_EQ("deep", load_object("/clone/priv_proto_deep")->run_hook());
+}
