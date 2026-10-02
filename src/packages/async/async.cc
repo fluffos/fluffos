@@ -104,6 +104,23 @@ std::set<struct Work*> current_works;
 std::deque<struct Request*> finished_reqs;
 std::mutex finished_reqs_lock;
 
+// FluffOS deadlocks because check_reqs() held finished_reqs_lock while
+// executing an LPC async callback; if that callback queued another async
+// operation, the main thread could wait for reqs_lock while a worker held
+// reqs_lock and waited for finished_reqs_lock, freezing the event loop.
+// This fix removes each completed request under the lock, records it as an
+// active callback, releases the lock before invoking LPC, then removes it
+// from the active set after cleanup; async_mark_request() also marks active
+// requests so Debug reference checking remains correct. A regression
+// exercises nested async callbacks and calls check_memory() from inside one,
+// deterministically reproducing the old deadlock.
+
+// Requests whose callbacks are executing on the main thread. check_reqs()
+// removes each request from finished_reqs before invoking LPC, so keep the
+// request visible to async_mark_request() until callback cleanup is complete.
+// Guarded by finished_reqs_lock.
+std::set<struct Request*> active_callbacks;
+
 void thread_func() {
   Tracer::setThreadName("Package Async thread");
 
@@ -496,10 +513,18 @@ void handle_db_exec(struct Request* req) {
 void check_reqs() {
   ScopedTracer const tracer("Async callback");
 
-  std::lock_guard<std::mutex> const lock(finished_reqs_lock);
-  while (!finished_reqs.empty()) {
-    auto* req = finished_reqs.front();
-    finished_reqs.pop_front();
+  while (true) {
+    struct Request* req;
+    {
+      std::lock_guard<std::mutex> const lock(finished_reqs_lock);
+      if (finished_reqs.empty()) {
+        return;
+      }
+
+      req = finished_reqs.front();
+      finished_reqs.pop_front();
+      active_callbacks.insert(req);
+    }
 
     enum atypes const type = (req->type);
     req->type = ADONE;
@@ -545,6 +570,12 @@ void check_reqs() {
     }
     if (req->bound_args) {
       free_array(req->bound_args);
+    }
+    delete req->fun;
+
+    {
+      std::lock_guard<std::mutex> const lock(finished_reqs_lock);
+      active_callbacks.erase(req);
     }
     delete req;
   }
@@ -804,6 +835,18 @@ void async_mark_request() {
     }
     if (req->prom != nullptr) {
       req->prom->extra_ref++;
+    }
+    if (req->command_giver != nullptr) {
+      req->command_giver->extra_ref++;
+    }
+    if (req->bound_args != nullptr) {
+      req->bound_args->extra_ref++;
+    }
+  }
+
+  for (auto* req : active_callbacks) {
+    if (req->fun != nullptr) {
+      req->fun->f.fp->hdr.extra_ref++;
     }
     if (req->command_giver != nullptr) {
       req->command_giver->extra_ref++;
