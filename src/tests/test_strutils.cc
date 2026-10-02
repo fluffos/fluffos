@@ -256,6 +256,36 @@ TEST(EGCAsciiFastPath, ResetToUnrelatedStringRescans) {
   EXPECT_TRUE(it.is_ascii());
 }
 
+// Unicode token walks must not rescan the remaining input either. Retaining
+// ICU is conservative when a suffix becomes ASCII, and must still reset the
+// cached character count and position.
+TEST(EGCAsciiFastPath, UnicodeSubrangesRetainIcuWithoutRescanning) {
+  const char* s = "\xe4\xbd\xa0" "ab\r\ncd";
+  EGCSmartIterator it(s, 9);
+  ASSERT_TRUE(it.ok());
+  ASSERT_FALSE(it.is_ascii());
+  EXPECT_EQ(6u, it.count());
+
+  it.reset(s + 3, 6);
+  ASSERT_TRUE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
+  EXPECT_EQ(5u, it.count());
+  EXPECT_EQ(2, it.index_to_offset(2));
+  EXPECT_EQ(4, it.post_index_to_offset(2));
+
+  it.reset(s + 7, 2);
+  ASSERT_TRUE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
+  EXPECT_EQ(2u, it.count());
+  EXPECT_EQ(1, it.index_to_offset(1));
+  EXPECT_EQ(1, u8_egc_find_as_offset(it, "d", 1, false));
+
+  it.reset(s + 9, 0);
+  ASSERT_TRUE(it.ok());
+  EXPECT_FALSE(it.is_ascii());
+  EXPECT_EQ(0u, it.count());
+}
+
 // explode()'s trailing-delimiter walk reset()s to a prefix (same pointer,
 // shorter length). The empty suffix at the end is the all-delimiters case
 // and must be taken from the *full* remembered range — after a prefix
