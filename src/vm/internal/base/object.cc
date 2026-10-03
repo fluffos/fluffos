@@ -37,8 +37,8 @@ namespace fs = ghc::filesystem;
 #include "packages/core/heartbeat.h"  // for set_heart_beat.
 #include "packages/core/file.h"       // for check_valid_path
 
-#ifdef PACKAGE_SOCKETS
-#include "packages/sockets/socket_efuns.h"  // for check_valid_path
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
+#include "packages/sockets/socket_efuns.h"  // for close_referencing_sockets
 #endif
 
 // Only point at has_cycle() when the contrib package actually provides it.
