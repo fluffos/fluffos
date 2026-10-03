@@ -31,6 +31,15 @@ const driverPath = path.resolve(process.argv[2] || path.join(repoRoot, 'build/sr
 const suiteDir = path.resolve(process.argv[3] || path.join(repoRoot, 'testsuite'));
 const baseConfigRel = 'etc/config.test';
 const dapConfigRel = 'etc/config.dap-smoke.test';
+// Breakpoint target: the `err = catch(login_ob = ...)` line in master::connect().
+// Located by content, not a hard-coded number, so edits above it in
+// testsuite/single/master.lpc don't silently retarget the smoke test.
+const BP_LINE = (() => {
+  const lines = fs.readFileSync(path.join(suiteDir, 'single/master.lpc'), 'utf8').split('\n');
+  const i = lines.findIndex((l) => l.includes('err = catch(login_ob = new(LOGIN_OB))'));
+  if (i < 0) throw new Error('dap-smoke: cannot find the connect() catch line in master.lpc');
+  return i + 1;
+})();
 const DEBUGGER_PORT = 47110;
 const DEBUGGER_PASSWORD = 'dap-smoke-secret';
 
@@ -266,11 +275,11 @@ async function main() {
     // Deliberately a ".c" path against a real ".lpc" file: pins the
     // extension-blind path matching documented in AGENTS.md.
     source: { path: '/single/master.c' },
-    breakpoints: [{ line: 111 }],
+    breakpoints: [{ line: BP_LINE }],
   });
   check('setBreakpoints verifies a real code line',
         bps.success && bps.body.breakpoints.length === 1 &&
-        bps.body.breakpoints[0].verified === true && bps.body.breakpoints[0].line === 111,
+        bps.body.breakpoints[0].verified === true && bps.body.breakpoints[0].line === BP_LINE,
         JSON.stringify(bps.body));
 
   await c.request('configurationDone', {});
@@ -289,7 +298,7 @@ async function main() {
   const st = await c.request('stackTrace', {});
   const top = st.body && st.body.stackFrames && st.body.stackFrames[0];
   check('stackTrace shows the stopped frame at the breakpoint line',
-        !!top && top.line === 111 && top.source.path === '/single/master.lpc',
+        !!top && top.line === BP_LINE && top.source.path === '/single/master.lpc',
         JSON.stringify(top));
 
   const scopes = await c.request('scopes', { frameId: 0 });
@@ -344,7 +353,7 @@ async function main() {
   const st2 = stepStopped ? await c.request('stackTrace', {}) : null;
   check('step (next) advances to a later line in the same frame',
         !!stepStopped && stepStopped.body.reason === 'step' &&
-        st2 && st2.body.stackFrames[0].line > 111,
+        st2 && st2.body.stackFrames[0].line > BP_LINE,
         st2 && JSON.stringify(st2.body.stackFrames[0]));
 
   let telnetData = '';
@@ -375,7 +384,7 @@ async function main() {
   c.clearMsgs();
   const hcBps = await c.request('setBreakpoints', {
     source: { path: '/single/master.c' },
-    breakpoints: [{ line: 111, hitCondition: '>= 2' }],
+    breakpoints: [{ line: BP_LINE, hitCondition: '>= 2' }],
   });
   check('setBreakpoints accepts a hitCondition and still verifies',
         hcBps.success && hcBps.body.breakpoints.length === 1 &&
