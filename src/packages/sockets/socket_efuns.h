@@ -66,6 +66,9 @@ struct lpc_socket_t {
   char* w_buf;
   int w_off;
   int w_len;
+  char u8_carry[4]; /* text-mode STREAM/STREAM_TLS: incomplete trailing UTF-8
+                       sequence held back from the previous read (0..3 bytes) */
+  int u8_carry_len;
   struct event* ev_read;
   struct event* ev_write;
   struct lpc_socket_event_data* ev_data;

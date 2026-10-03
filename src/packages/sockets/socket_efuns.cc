@@ -278,6 +278,7 @@ static void clear_socket(int which, int dofree) {
   lpc_socks[which].w_buf = nullptr;
   lpc_socks[which].w_off = 0;
   lpc_socks[which].w_len = 0;
+  lpc_socks[which].u8_carry_len = 0;
   lpc_socks[which].ev_read = nullptr;
   lpc_socks[which].ev_write = nullptr;
   for (int i = 0; i < NUM_SOCKET_OPTIONS; i++) {
@@ -1234,6 +1235,44 @@ static void call_callback(int fd, int what, int num_arg) {
 }
 
 /*
+ * Text-mode STREAM / STREAM_TLS delivery.  A multi-byte UTF-8 character can be
+ * split across two TCP reads; u8_sanitize()ing each read in isolation would
+ * turn the fragments into U+FFFD and destroy the character (and inflate the
+ * byte count, which breaks Content-Length framing in HTTP clients built on
+ * this efun).  Prepend the bytes carried from the previous read, hold back a
+ * new incomplete trailing sequence for the next one, then sanitize and push
+ * the rest as the read callback's data argument.  The caller has already
+ * pushed the socket fd.  Returns false when the whole chunk was an incomplete
+ * lead (nothing to deliver yet -- caller should pop the fd and wait).
+ *
+ * If the peer closes while carry bytes are held, those <=3 bytes are dropped
+ * rather than delivered as U+FFFD: they are an incomplete sequence that can
+ * never complete, so sanitizing them would only manufacture a replacement
+ * char, and a well-formed text/JSON body ends on an ASCII byte with the carry
+ * already empty.
+ */
+static bool push_sanitized_stream_chunk(int fd, const char *buf, int cc) {
+  std::string data;
+  data.reserve(lpc_socks[fd].u8_carry_len + cc);
+  data.append(lpc_socks[fd].u8_carry, lpc_socks[fd].u8_carry_len);
+  lpc_socks[fd].u8_carry_len = 0;
+  data.append(buf, cc);
+
+  if (const auto tail = u8_incomplete_tail(data)) {
+    memcpy(lpc_socks[fd].u8_carry, data.data() + data.size() - tail, tail);
+    lpc_socks[fd].u8_carry_len = static_cast<int>(tail);
+    data.resize(data.size() - tail);
+  }
+  if (data.empty()) {
+    return false;
+  }
+
+  auto res = u8_sanitize(data);
+  copy_and_push_string(res.c_str());
+  return true;
+}
+
+/*
  * Handle LPC efun socket read select events
  */
 void socket_read_select_handler(int fd) {
@@ -1453,9 +1492,9 @@ void socket_read_select_handler(int fd) {
             } else {
               push_number(0);
             }
-          } else {
-            auto res = u8_sanitize(buf);
-            copy_and_push_string(res.c_str());
+          } else if (!push_sanitized_stream_chunk(fd, buf, cc)) {
+            pop_stack(); /* drop the fd we pushed; wait for the rest of the char */
+            return;
           }
           debug(sockets, ("read_socket_handler: apply read callback\n"));
           call_callback(fd, S_READ_FP, 2);
@@ -1504,9 +1543,9 @@ void socket_read_select_handler(int fd) {
             } else {
               push_number(0);
             }
-          } else {
-            auto res = u8_sanitize(buf);
-            copy_and_push_string(res.c_str());
+          } else if (!push_sanitized_stream_chunk(fd, buf, cc)) {
+            pop_stack(); /* drop the fd we pushed; wait for the rest of the char */
+            return;
           }
           debug(sockets, ("read_socket_handler: apply read callback\n"));
           call_callback(fd, S_READ_FP, 2);
