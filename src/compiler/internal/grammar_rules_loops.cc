@@ -252,6 +252,7 @@ void rule_return_expr(parse_node_t** result, parse_node_t* expr) {
      * runtime, not a T_REAL 0.0. */
     expr = promote_to_float(expr);
   } else if (exact_types == TYPE_NUMBER && expr->type == TYPE_REAL) {
+    warn_float_truncated_to_int(expr);
     expr = promote_to_int(expr);
   }
 
