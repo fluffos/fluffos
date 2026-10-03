@@ -211,6 +211,21 @@ set_tests_properties(lpcshell-warning-at-exit PROPERTIES
 # suite. Skipped when node or openssl is missing (Windows CI).
 find_program(NODE_EXECUTABLE node)
 find_program(OPENSSL_EXECUTABLE openssl)
+
+# End-to-end checks that need a LIVE event loop (the LPC suite runs inside
+# master::flag(), where no network event or async completion is serviced):
+# UTF-8 split across TCP reads (#1422) and nested async_read callbacks (#1421).
+# Label `e2e` so `ctest -LE testsuite` (CI unit tests) still runs it.
+if (NODE_EXECUTABLE)
+  add_test(NAME e2e-live
+          COMMAND "${NODE_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/e2e-live.js"
+                  $<TARGET_FILE:driver> "${CMAKE_SOURCE_DIR}/testsuite")
+  set_tests_properties(e2e-live PROPERTIES
+          TIMEOUT 200
+          LABELS "e2e"
+          RESOURCE_LOCK "fluffos_external_ports")
+endif ()
+
 if (NODE_EXECUTABLE AND OPENSSL_EXECUTABLE)
   add_test(NAME ws-tls-reload
           COMMAND "${NODE_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/ws-tls-reload.js"
