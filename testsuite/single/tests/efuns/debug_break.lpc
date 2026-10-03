@@ -1,0 +1,9 @@
+// debugger_attached() / debug_break() must be exact no-ops whenever no
+// debugger client is attached -- which is always true in the testsuite,
+// since it never configures "debugger port". See src/debugger/DESIGN.md.
+void do_tests() {
+  ASSERT_EQ(0, debugger_attached());
+  debug_break();
+  ASSERT_EQ(0, debugger_attached());
+  ASSERT(1);
+}
