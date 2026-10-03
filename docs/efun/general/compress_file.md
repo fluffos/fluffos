@@ -20,6 +20,8 @@ title: general / compress_file
 
     On success, the original `source` file is DELETED (unlinked); only the
     compressed `dest` file remains. Returns 1 on success and 0 on failure.
+    On failure (unreadable source, write error, full disk) `source` is left
+    untouched and the incomplete `dest` is removed.
 
     When `dest` is omitted and `source` already ends in ".gz", the call
     fails and returns 0 (it will not double-compress). Both `source` and

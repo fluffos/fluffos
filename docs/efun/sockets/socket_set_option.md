@@ -21,6 +21,8 @@ title: sockets / socket_set_option
     before socket_connect() for client sockets or socket_accept() for
     server sockets).
 
+    The calling object must own the socket, as for every other socket efun.
+
 ### ARGUMENTS
 
 - `socket` - The socket descriptor returned by socket_create()
@@ -36,17 +38,21 @@ Controls whether the TLS/SSL peer certificate should be verified.
 - **Type**: integer
 - **Values**:
   - `0` - Do not verify peer certificate (insecure, for testing only)
-  - `1` - Verify peer certificate (default, recommended)
+  - `1` - Verify peer certificate (recommended)
+- **Default**: `0` -- verification happens only if the option is set explicitly
 - **Use Case**: Client connections to TLS servers
 
 When enabled, the driver will verify that the server's certificate:
 
 - Is signed by a trusted Certificate Authority
 - Is not expired
-- Matches the hostname being connected to
+- Matches SO_TLS_SNI_HOSTNAME, when that option is also set
 
 **Security Note**: Disabling verification (value 0) makes the connection
 vulnerable to man-in-the-middle attacks and should only be used for testing.
+Always set SO_TLS_SNI_HOSTNAME alongside it: chain validation on its own
+accepts any certificate a trusted CA issued for any name, so the hostname
+check is what ties the certificate to the server you meant to reach.
 
 #### SO_TLS_SNI_HOSTNAME (2)
 
@@ -59,6 +65,10 @@ Sets the Server Name Indication (SNI) hostname for TLS connections.
 SNI allows the server to present the correct SSL certificate when multiple
 domains are hosted on the same IP address. This is essential for modern
 HTTPS and TLS connections.
+
+When SO_TLS_VERIFY_PEER is also enabled, this hostname is the name the peer
+certificate is checked against (matched against its subjectAltName / Common
+Name, with partial wildcards rejected).
 
 #### SO_TLS_CERT (3)
 
@@ -86,6 +96,7 @@ readable by the driver.
 ### ERRORS
 
 - Generates an error if the socket descriptor is invalid
+- Generates an error if the socket is not owned by the calling object
 - Generates an error if the option is unknown
 - Generates an error if the value type doesn't match the option requirements
 

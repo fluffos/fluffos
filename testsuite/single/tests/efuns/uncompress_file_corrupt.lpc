@@ -1,0 +1,32 @@
+#ifdef __PACKAGE_COMPRESS__
+/* uncompress_file() on a corrupt gzip stream must fail cleanly and keep the
+ * source file: gzread() reports the inflate error as -1, which used to be
+ * passed straight to fwrite() as a byte count and then followed by an
+ * unconditional unlink() of the source plus a "success" return value. */
+void do_tests() {
+  string text;
+  int size;
+  int i;
+
+  text = "";
+  for (i = 0; i < 200; i++) {
+    text += "uncompress_file corrupt-stream test payload line " + i + "\n";
+  }
+  write_file("/ucf_src.txt", text, 1);
+  ASSERT_EQ(1, compress_file("/ucf_src.txt"));
+  ASSERT_EQ(-1, file_size("/ucf_src.txt"));
+
+  size = file_size("/ucf_src.txt.gz");
+  ASSERT(size > 32);
+
+  /* Damage the deflate stream (well past the gzip header). */
+  ASSERT_EQ(1, write_bytes("/ucf_src.txt.gz", size / 2, "AAAAAAAAAAAAAAAA"));
+
+  ASSERT_EQ(0, uncompress_file("/ucf_src.txt.gz"));
+  /* The unreadable source must survive a failed decompression. */
+  ASSERT(file_size("/ucf_src.txt.gz") > 0);
+
+  rm("/ucf_src.txt.gz");
+  rm("/ucf_src.txt");
+}
+#endif

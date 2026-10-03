@@ -21,7 +21,9 @@ title: general / uncompress_file
 
     On success, the original `source` file is DELETED (unlinked); only the
     decompressed `dest` file remains. Returns 1 on success and 0 on
-    failure. Both `source` and `dest` are subject to the driver's
+    failure. On failure (corrupt or truncated gzip data, write error, full
+    disk) `source` is left untouched and the incomplete `dest` is removed.
+    Both `source` and `dest` are subject to the driver's
     read/write path validation (valid_read for `source`, valid_write for
     `dest`); a rejected path causes the call to return 0.
 

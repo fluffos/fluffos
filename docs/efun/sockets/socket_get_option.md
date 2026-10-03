@@ -17,6 +17,8 @@ title: sockets / socket_get_option
     query socket configuration parameters, particularly those related to
     TLS/SSL connections.
 
+    The calling object must own the socket, as for every other socket efun.
+
 ### ARGUMENTS
 
 - `socket` - The socket descriptor returned by socket_create()
@@ -37,17 +39,28 @@ Returns whether TLS peer certificate verification is enabled.
 Returns the Server Name Indication (SNI) hostname set for the socket.
 
 - **Returns**: string
-  - The SNI hostname, or an empty string if not set
+  - The SNI hostname, or 0 if not set
+
+#### SO_TLS_CERT (3) and SO_TLS_KEY (4)
+
+Return the server-side certificate / private key paths set for the socket.
+
+- **Returns**: string
+  - The path, or 0 if not set
+
+Note that socket_connect() consumes SO_TLS_SNI_HOSTNAME and socket_listen()
+consumes SO_TLS_CERT / SO_TLS_KEY, so those read back as 0 afterwards.
 
 ### RETURN VALUE
 
 The return type depends on the option being queried:
 - SO_TLS_VERIFY_PEER returns an integer (0 or 1)
-- SO_TLS_SNI_HOSTNAME returns a string
+- the other options return a string, or 0 when unset
 
 ### ERRORS
 
 - Generates an error if the socket descriptor is invalid
+- Generates an error if the socket is not owned by the calling object
 - Generates an error if the option is unknown
 
 ### EXAMPLES
