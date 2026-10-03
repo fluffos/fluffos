@@ -109,6 +109,20 @@ void do_tests() {
     ASSERT_EQ(many, implode(explode_reversible(many, " "), " "));
   }
 
+  // Many Unicode or CR-LF tokens exercise the ICU path, including trailing
+  // delimiter trimming and reversible splitting.
+  {
+    int n = 8000;
+    foreach (string field in ({ "café你", "e\u0301👩‍💻🇦🇺", "\r\n" })) {
+      string many = repeat_string(field + " ", n);
+      mixed *parts = explode(many, " ");
+      ASSERT_EQ(n, sizeof(parts));
+      ASSERT_EQ(field, parts[0]);
+      ASSERT_EQ(field, parts[<1]);
+      ASSERT_EQ(many, implode(explode_reversible(many, " "), " "));
+    }
+  }
+
   // explode(s, "") splits on grapheme clusters. The C++ helper used to
   // drive ICU through operator->() even for ASCII (sibling of #1366).
   {
