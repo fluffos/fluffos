@@ -1,0 +1,44 @@
+// async_read callbacks that start more async work from inside the callback,
+// driven by tools/e2e-live.js against a live driver (PR #1421).
+//
+// check_reqs() used to hold finished_reqs_lock while it ran the LPC callback;
+// a callback that queued another request then needed reqs_lock, which a
+// worker could hold while waiting for finished_reqs_lock -- the main thread
+// froze. Only a live, serviced event loop with many back-to-back hops gets
+// near that interleaving, so the LPC suite cannot cover it.
+#ifdef __PACKAGE_ASYNC__
+int target, started, done, bad;
+
+void hop();
+
+void on_read(mixed res) {
+  if (!stringp(res)) {
+    bad++;
+  }
+  done++;
+  if (started < target) {
+    hop();
+  }
+}
+
+void hop() {
+  started++;
+  async_read("/etc/config.test", (: on_read :));
+}
+
+void start(int chains, int total) {
+  int i;
+
+  target = total;
+  started = 0;
+  done = 0;
+  bad = 0;
+  for (i = 0; i < chains && started < target; i++) {
+    hop();
+  }
+}
+
+string status() {
+  return sprintf("|DONE=%d/%d BAD=%d|", done, target, bad);
+}
+#endif
