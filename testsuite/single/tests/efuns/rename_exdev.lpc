@@ -1,0 +1,31 @@
+/* rename() across a cross-filesystem boundary (EXDEV) falls back to
+ * do_move()'s copy_file() + unlink() in src/packages/core/file.cc.
+ *
+ * copy_file() returns 1 on success and a negative value on failure (see
+ * docs/efun/filesystem/cp.md), but the fallback used to test its result
+ * with a plain `if (copy_file(from, to))`, which is truthy on *both*
+ * outcomes. That made every cross-filesystem rename() report failure --
+ * even after copy_file() had already copied the data successfully -- and
+ * skip the unlink() of the source, leaving a duplicate behind instead of
+ * moving it.
+ *
+ * This file only exercises the fallback when run under the
+ * `testsuite-rename-exdev-fallback` ctest, which LD_PRELOADs a rename(2)
+ * stub (testsuite/tools/force_exdev_rename.c) that always fails with
+ * EXDEV. Under a normal run (real rename() succeeds directly, no EXDEV),
+ * this test still passes -- it merely doesn't exercise the fallback path.
+ */
+void do_tests() {
+  // Defensive: a prior aborted run (e.g. hitting the bug this test guards
+  // against) can leave either file behind, and write_file() defaults to
+  // *appending* -- start from a known-clean state.
+  rm("/rename_exdev_src");
+  rm("/rename_exdev_dst");
+  write_file("/rename_exdev_src", "cross-device rename payload.", 1);
+
+  ASSERT_EQ(0, rename("/rename_exdev_src", "/rename_exdev_dst"));
+  ASSERT_EQ(-1, file_size("/rename_exdev_src"));
+  ASSERT_EQ("cross-device rename payload.", read_file("/rename_exdev_dst"));
+
+  rm("/rename_exdev_dst");
+}

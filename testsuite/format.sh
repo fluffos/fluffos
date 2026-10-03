@@ -22,6 +22,13 @@
 # to it. If a new deliberately-unterminated fail fixture is added, add
 # it here too.
 #
+# testsuite/tools/force_exdev_rename.c is real C, not LPC: an LD_PRELOAD
+# shim (built by the root CMakeLists.txt for the ctest
+# `testsuite-rename-exdev-fallback`) that makes rename(2) fail with EXDEV.
+# The `find` below picks up every *.c because legacy LPC sources use that
+# extension, so a genuine C file has to be excluded by path or the LPC
+# formatter reformats it. A future C helper under testsuite/ needs the same.
+#
 # Every write is guarded by format-corpus.mjs: a file is only touched if
 # the input lexes cleanly (no unterminated string/char/template/comment/
 # text block) and the output is token-sequence-equivalent to the input
@@ -38,6 +45,7 @@ EXCLUDES=(
   "testsuite/single/tests/compiler/fail/eof_in_string.lpc"
   "testsuite/single/tests/compiler/fail/eof_in_comment.lpc"
   "testsuite/single/tests/compiler/fail/bad_at_block.lpc"
+  "testsuite/tools/force_exdev_rename.c"
 )
 
 cd -- "${REPO_ROOT}"

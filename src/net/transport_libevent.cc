@@ -474,7 +474,9 @@ void get_user_data(interactive_t* ip) {
         ip->text_start = (nl + 1) - ip->text;
 
         *nl = 0;
-        if (*(nl - 1) == '\r') {
+        // A '\n' as the very first byte of the buffer leaves nl == ip->text,
+        // so the CR check must not step in front of the buffer.
+        if (nl > ip->text && *(nl - 1) == '\r') {
           *--nl = 0;
         }
 

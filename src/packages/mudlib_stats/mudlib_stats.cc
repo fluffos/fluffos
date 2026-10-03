@@ -482,11 +482,21 @@ static void save_stat_list(const char* file, mudlib_stats_t* list) {
     debug_message("*Error: unable to open stat file %s for writing.\n", file);
     return;
   }
+  bool ok = true;
   while (list) {
-    fprintf(f, "%s %d %d\n", list->name, list->moves, list->heart_beats);
+    if (fprintf(f, "%s %d %d\n", list->name, list->moves, list->heart_beats) < 0) {
+      ok = false;
+      break;
+    }
     list = list->next;
   }
-  fclose(f);
+  // fclose() flushes, so a full disk usually surfaces only here.
+  if (fclose(f) != 0) {
+    ok = false;
+  }
+  if (!ok) {
+    debug_message("*Error: failed to write stat file %s: %s\n", file, strerror(errno));
+  }
 }
 
 static void restore_stat_list(const char* file, mudlib_stats_t** list) {

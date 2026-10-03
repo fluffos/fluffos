@@ -1,0 +1,59 @@
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+
+// socket_tls_verify_requires_sni.lpc covers "no SO_TLS_SNI_HOSTNAME set at
+// all". This covers the sibling gap: SO_TLS_SNI_HOSTNAME set to the EMPTY
+// string. socket_set_option()'s type check (T_STRING) accepts "" just like
+// any other string, but OpenSSL's X509_VERIFY_PARAM_set1_host() treats a
+// zero-length name as "clear the host list" and returns success -- so
+// SSL_set1_host(ssl, "") silently configures NO expected hostname. With
+// SO_TLS_VERIFY_PEER still on, chain validation alone then accepts any
+// CA-issued certificate for any name: the same MITM exposure the SNI-less
+// case closes, reached through a different value instead of a missing one.
+// socket_connect() must refuse this exactly like the missing-SNI case. A
+// plain (non-TLS) local listener is enough: the check fires synchronously
+// in socket_connect() right after the TCP connect() call, before any TLS
+// handshake is attempted.
+
+nosave int server_fd = -1;
+nosave int client_fd = -1;
+
+void rcb(int fd, mixed msg) {}
+void wcb(int fd) {}
+void accept_cb(int fd) {}
+
+void do_tests() {
+  string local;
+  string *parts;
+  int port;
+  int ret;
+
+  server_fd = socket_create(STREAM, "accept_cb");
+  ASSERT2(server_fd >= 0, "failed to create server socket");
+  ASSERT_EQ(EESUCCESS, socket_bind(server_fd, 0));
+  ASSERT_EQ(EESUCCESS, socket_listen(server_fd, "accept_cb"));
+
+  local = socket_address(server_fd, 1);
+  parts = explode(local, " ");
+  ASSERT_EQ(2, sizeof(parts));
+  port = to_int(parts[1]);
+
+  client_fd = socket_create(STREAM_TLS, "rcb", "wcb");
+  ASSERT2(client_fd >= 0, "failed to create client socket");
+
+  socket_set_option(client_fd, SO_TLS_VERIFY_PEER, 1);
+  socket_set_option(client_fd, SO_TLS_SNI_HOSTNAME, "");
+
+  ret = socket_connect(client_fd, sprintf("127.0.0.1 %d", port), "rcb", "wcb");
+  ASSERT2(ret < 0, "socket_connect must refuse SO_TLS_VERIFY_PEER with an empty SNI hostname");
+
+  socket_close(client_fd);
+  socket_close(server_fd);
+}
+
+#else
+void do_tests() {
+  write("PACKAGE_SOCKETS not available, skipping test.\n");
+}
+#endif
