@@ -16,8 +16,9 @@ design rationale.
 
 ## Enabling the debugger
 
-The debugger is fully disabled — no listener, no per-instruction overhead —
-unless `debugger port` is set in your config file:
+The debugger is disabled — no listener, no session, and nothing but one
+never-taken flag test per interpreted instruction — unless `debugger port` is
+set in your config file:
 
 ```
 debugger port : 4711

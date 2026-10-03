@@ -387,7 +387,7 @@ The committed Bison/Flex outputs (`src/compiler/internal/*.autogen.*`) are pinne
 - A source-level LPC debugger built into the driver: set breakpoints, single-step, and inspect and edit the call stack, variables (shown with their real source names, not `arg0`/`local0`), and any loaded object — all live, over the network, on a running mud.
 - Speaks the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) over WebSocket, so any DAP client can attach — including the bundled [VS Code extension](tools/vscode-lpc-debug) and, for other editors, a generic ws↔stdio bridge (`tools/dap-ws-bridge.js`).
 - `debug_break()` / `debugger_attached()` efuns for programmatic breakpoints — `debug_break()` is a no-op when nothing is attached, safe to leave in shipped mudlib code.
-- Disabled and zero-cost by default; enable with `debugger port : <port>` in your config file. See the [WebSocket LPC Debugger guide](https://www.fluffos.info/concepts/general/debugger) for setup, security notes, and current limitations.
+- Disabled by default (no listener; the interpreter pays one never-taken flag test per instruction); enable with `debugger port : <port>` in your config file. See the [WebSocket LPC Debugger guide](https://www.fluffos.info/concepts/general/debugger) for setup, security notes, and current limitations.
 
 ### Networking
 - TLS support.

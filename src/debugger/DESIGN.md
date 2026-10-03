@@ -160,7 +160,7 @@ anchors, not guarantees against drift).
 | Reflection efun templates | `functions()`, `variables()`, `fetch_variable/store_variable` (packages/contrib), `debug_info`, `dump_prog` (packages/develop) |
 | Error interception point | top of `error_handler()` (simulate.cc:2350), caught-vs-uncaught decided at :2367 via `FRAME_CATCH` |
 | Expression evaluation (phase 3) | lpcshell's `load_object_from_source()` + `compiler_diags` machinery (src/main_lpcshell.cc) |
-| Config plumbing | `INT_FLAGS[]`/`STR_FLAGS[]` tables in rc.cc + `runtime_config.h` slots (free: `CFG_STR(19+)`, `CFG_INT(69+)`); regen `docs/driver/config.md` via `docs/gen_config_docs.py` |
+| Config plumbing | `INT_FLAGS[]`/`STR_FLAGS[]` tables in rc.cc + `runtime_config.h` slots (this feature took `CFG_INT(69)` and `CFG_STR(19)`/`(20)`; numbers are never reused, and another branch may have claimed the next ones -- re-read the header at merge time, a textually clean merge can still hand two options one slot); regen `docs/driver/config.md` via `docs/gen_config_docs.py` |
 | JSON | vendored `nlohmann/json` (src/thirdparty) |
 | ws e2e test harness | `tools/ws-smoke.js` (zero-dep node RFC6455 client, already in CI: ci.yml ubuntu clang Debug) |
 | Bytecode swap invalidation | `object_t::prog_generation` (object.h:87), bumped by `recompile_object()` (simulate.cc:815, which also *refuses* while the old program is on the control stack) |
