@@ -1,0 +1,40 @@
+// Text-mode STREAM echo server for tools/e2e-live.js (issue #1422).
+// Every chunk the driver hands the read callback is written straight back,
+// so the client can compare what it sent with what the LPC side received.
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+
+int listener;
+
+void on_read(int fd, mixed data, mixed addr) {
+  if (stringp(data)) {
+    socket_write(fd, data);
+  }
+}
+
+void on_write(int fd) {}
+
+void on_close(int fd) {}
+
+void on_listen(int fd) {
+  socket_accept(fd, "on_read", "on_write");
+}
+
+int start(int port) {
+  int r;
+
+  listener = socket_create(STREAM, "on_read", "on_close");
+  if (listener < 0) {
+    return listener;
+  }
+  r = socket_bind(listener, port);
+  if (r < 0) {
+    return r;
+  }
+  r = socket_listen(listener, "on_listen");
+  if (r < 0) {
+    return r;
+  }
+  return 1;
+}
+#endif
