@@ -571,7 +571,6 @@ void check_reqs() {
     if (req->bound_args) {
       free_array(req->bound_args);
     }
-    delete req->fun;
 
     {
       std::lock_guard<std::mutex> const lock(finished_reqs_lock);
