@@ -105,8 +105,24 @@ int valid_write(string, mixed, string) {
 
 // valid_read:  called exactly the same as valid_write()
 
-int valid_read(string, mixed, string) {
+// While armed by clear_include_reads(), every path the compiler offers
+// valid_read() as an #include candidate is recorded, so tests can pin the
+// spelling the apply receives --
+// /single/tests/compiler/get_include_path.lpc checks that a directory from
+// master::get_include_path() reaches it exactly as the master spelled it.
+nosave string *include_reads = 0;
+
+string *query_include_reads() {
+  return include_reads;
+}
+
+void clear_include_reads() {
+  include_reads = ({});
+}
+
+int valid_read(string file, mixed, string fun) {
   inherit_called++;
+  if (include_reads && fun == "include") include_reads += ({ file });
   member_array(0, ({ 1, 2 }), 0);  // 3-arg efun: clobber st_num_arg to 3
   return 1;
 }

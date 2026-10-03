@@ -22,4 +22,25 @@ void do_tests() {
   ASSERT_EQ(({ "/include/globals.h", "/include/tests.h",
     "/clone/include_list_a.h", "/clone/include_list_nest.h",
     "/clone/include_list_b.h" }), l);
+
+  // Every reported name is a path that can actually be opened: exactly one
+  // leading slash and no doubled separators, however the mudlib spelled the
+  // directory it came from. A master-supplied include path used to be stored
+  // with its leading slash (unlike a configured one), and the search-path
+  // join added a separator unconditionally, so a header found through
+  // master::get_include_path() came back as "//include/m_gip1/m_gip_test.h"
+  // -- or "//include/m_gip1//m_gip_test.h" when the directory was spelled
+  // with a trailing slash. stat() opens neither.
+  ob = load_object("/clone/mgip1");
+  l = include_list(ob);
+  ASSERT(member_array("/include/m_gip1/m_gip_test.h", l) != -1);
+
+  ob = load_object("/clone/mgip5");
+  l = include_list(ob);
+  ASSERT(member_array("/include/m_gip1/m_gip_test.h", l) != -1);
+
+  foreach (string f in l) {
+    ASSERT_EQ('/', f[0]);
+    ASSERT(strsrch(f, "//") == -1);
+  }
 }
