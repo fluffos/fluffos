@@ -3,6 +3,7 @@
 #include "compiler.h"
 #include "compiler/internal/compiler_utils.h"
 
+#include <cmath>    // for trunc
 #include <cstdlib>  // for qsort
 #include <cstdio>   // for sprintf
 
@@ -2460,6 +2461,26 @@ parse_node_t* promote_to_float(parse_node_t* node) {
   return expr;
 }
 
+/* Warn that a value the compiler KNOWS is a float is about to be truncated
+ * into an int slot (assignment, initializer, op=, return). The coercion
+ * itself is deliberate (#1303) but silent, so `x *= 0.85` zeroes x and
+ * `int b = 2.75` stores 2 with nothing in any log (#1413). Only call this
+ * for a statically-float value: the dynamic call_other / index paths that
+ * also reach promote_to_int() have no static type to be sure of. A float
+ * literal with no fractional part (`int i = 2.0`) loses nothing. Suppressed
+ * by `#pragma no_warnings`, which yywarn() already honours. */
+void warn_float_truncated_to_int(parse_node_t* node) {
+  if (node->type != TYPE_REAL) {
+    return;
+  }
+  if (node->kind == NODE_REAL && node->v.real == std::trunc(node->v.real)) {
+    return;
+  }
+  yywarn(
+      "Float value truncated to int; the fractional part is discarded. Use to_int() to make "
+      "the conversion explicit, or declare the destination float.");
+}
+
 parse_node_t* promote_to_int(parse_node_t* node) {
   parse_node_t* expr;
   if (node->kind == NODE_REAL) {
@@ -2567,6 +2588,7 @@ parse_node_t* do_promotions(parse_node_t* node, int type) {
     }
   }
   if (type == TYPE_NUMBER && node->type == TYPE_REAL) {
+    warn_float_truncated_to_int(node);
     return promote_to_int(node);
   }
   if (type == TYPE_BUFFER &&

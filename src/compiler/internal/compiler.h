@@ -663,6 +663,7 @@ parse_node_t* reorder_class_values(int, parse_node_t*);
 
 parse_node_t* promote_to_float(parse_node_t*);
 parse_node_t* promote_to_int(parse_node_t*);
+void warn_float_truncated_to_int(parse_node_t*);
 parse_node_t* promote_to_buffer(parse_node_t*);
 parse_node_t* add_type_check(parse_node_t*, int);
 parse_node_t* do_promotions(parse_node_t*, int);

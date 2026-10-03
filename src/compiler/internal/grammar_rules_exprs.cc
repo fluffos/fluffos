@@ -457,6 +457,7 @@ void rule_expr_assign(parse_node_t** result, parse_node_t* lval, int opcode, par
         (*result)->l.expr = promote_to_float(rval);
         (*result)->type = TYPE_REAL;
       } else if (lval->type == TYPE_NUMBER && (rval->type == TYPE_REAL || unknown_rhs)) {
+        warn_float_truncated_to_int(rval);
         (*result)->l.expr = promote_to_int(rval);
         (*result)->type = TYPE_NUMBER;
       } else if (opcode == F_ADD_EQ && lval->type == TYPE_BUFFER &&

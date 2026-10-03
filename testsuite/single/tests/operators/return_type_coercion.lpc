@@ -1,3 +1,4 @@
+#pragma no_warnings  // deliberately truncates floats; the warning itself is pinned by test_compiler.cc (#1413)
 // A function's `return <expr>;` is coerced to its declared return type,
 // mirroring compound_assign_float.lpc's coverage of '='/op= coercion
 // (rule_expr_assign, grammar_rules_exprs.cc): rule_return_expr()

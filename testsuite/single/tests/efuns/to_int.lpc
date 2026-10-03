@@ -1,3 +1,4 @@
+#pragma no_warnings  // deliberately truncates floats; the warning itself is pinned by test_compiler.cc (#1413)
 void do_tests() {
   int i = 5;
   float f = 6.7;
