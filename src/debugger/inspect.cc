@@ -159,8 +159,27 @@ const char* type_name(const svalue_t* sv) {
       return "buffer";
     case T_CLASS:
       return "class";
+    case T_PROMISE:
+      return "promise";
+    case T_REF:
+      return "ref";
     default:
       return "mixed";
+  }
+}
+
+const char* promise_state_name(uint8_t state) {
+  switch (state) {
+    case PROMISE_PENDING:
+      return "pending";
+    case PROMISE_FULFILLED:
+      return "fulfilled";
+    case PROMISE_REJECTED:
+      return "rejected";
+    case PROMISE_CANCELLED:
+      return "cancelled";
+    default:
+      return "?";
   }
 }
 
@@ -194,6 +213,16 @@ std::string preview(const svalue_t* sv) {
     case T_BUFFER:
       snprintf(buf, sizeof(buf), "<buffer %u bytes>", sv->u.buf->size);
       return buf;
+    case T_PROMISE:
+      // State only. The settled value or rejection reason lives in
+      // prom->result; it is deliberately not expanded (no handle kind for it).
+      snprintf(buf, sizeof(buf), "<promise %s>",
+               sv->u.prom ? promise_state_name(sv->u.prom->state) : "?");
+      return buf;
+    case T_REF:
+      // A `ref` parameter / foreach ref variable. Not dereferenced: the
+      // target may be a byte/codepoint/range lvalue box or already invalid.
+      return "<reference>";
     default:
       snprintf(buf, sizeof(buf), "<type 0x%x>", sv->type);
       return buf;

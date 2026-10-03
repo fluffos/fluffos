@@ -870,6 +870,38 @@ TEST_F(DebuggerTest, BuildObjectInfoReportsFunctionsAndVariables) {
       << "a destructed object must not be reported as found";
 }
 
+// T_PROMISE (0x10000) postdates this debugger. It used to fall into the
+// default arm of type_name()/preview() and render as type "mixed" with the
+// value "<type 0x10000>" -- which is exactly what the local holding another
+// async call's result looks like in a stopped frame. Driven through
+// build_object_info(), which renders object globals without needing a
+// stopped frame (the frame-scoped path shares type_name()/preview()).
+TEST_F(DebuggerTest, PromiseGlobalsRenderAsPromiseWithTheirState) {
+  object_t* ob = LoadFixture(
+      "mixed waiting = promise_create();\n"
+      "mixed done = promise_create();\n"
+      "void create() { promise_resolve(done, 7); }\n",
+      "dbgtest_promise_probe", /*callcreate=*/true);
+  ASSERT_NE(ob, nullptr);
+
+  dbg::djson info = dbg::build_object_info(std::string("/") + ob->obname);
+  ASSERT_TRUE(info["found"].get<bool>()) << info.dump();
+  bool saw_waiting = false, saw_done = false;
+  for (auto& v : info["variables"]) {
+    if (v["name"] == "waiting") {
+      saw_waiting = true;
+      EXPECT_EQ(v["type"], "promise") << v.dump();
+      EXPECT_EQ(v["value"], "<promise pending>") << v.dump();
+    }
+    if (v["name"] == "done") {
+      saw_done = true;
+      EXPECT_EQ(v["type"], "promise") << v.dump();
+      EXPECT_EQ(v["value"], "<promise fulfilled>") << v.dump();
+    }
+  }
+  EXPECT_TRUE(saw_waiting && saw_done) << info["variables"].dump();
+}
+
 TEST_F(DebuggerTest, BuildFileListListsKnownTestsuiteDirectory) {
   dbg::djson resp = dbg::build_file_list("/single");
   ASSERT_TRUE(resp.contains("files"));
