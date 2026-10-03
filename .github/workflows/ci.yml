@@ -38,7 +38,7 @@ jobs:
         run: testsuite/format.sh --check
 
   build-and-test:
-    name: ${{ matrix.platform }} (${{ matrix.compiler || 'default' }}${{ matrix.sanitizer && '+sanitizer' || '' }}, ${{ matrix.build }})
+    name: ${{ matrix.platform }} (${{ matrix.compiler || 'default' }}${{ matrix.sanitizer && '+sanitizer' || '' }}, ${{ matrix.build }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -61,6 +61,20 @@ jobs:
             cxx: g++
             build: RelWithDebInfo
             cmake_flags: -DPACKAGE_DWLIB=ON
+            packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
+          # Optional packages switched off, so the guards around them can't
+          # silently bit-rot (-DPACKAGE_SOCKETS=OFF stopped compiling once, #1407).
+          # PACKAGE_EXTERNAL stays ON here: it shares the socket table but must
+          # not need the sockets package. Debug, so check_memory() covers the
+          # table's ref marking in this configuration.
+          - platform: Ubuntu
+            os: ubuntu-24.04
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            build: Debug
+            variant: no sockets
+            cmake_flags: -DPACKAGE_SOCKETS=OFF
             packages: build-essential autoconf automake bison flex expect libmysqlclient-dev libpcre2-dev libpq-dev libsqlite3-dev libssl-dev libtool libz-dev telnet libgtest-dev libjemalloc-dev pkg-config libffi-dev
 
           # Ubuntu - Clang

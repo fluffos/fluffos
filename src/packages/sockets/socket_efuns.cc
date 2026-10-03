@@ -2096,6 +2096,10 @@ array_t* socket_status(int which) {
   return ret;
 }
 
+#endif /* PACKAGE_SOCKETS */
+
+// The helpers below only touch the shared lpc_socks table, which the external
+// package uses too, so they are built whenever either package is on.
 int lpc_socks_num() { return lpc_socks.size(); }
 
 lpc_socket_t* lpc_socks_get(int i) {
@@ -2146,7 +2150,5 @@ void lpc_socks_closeall() {
     }
   }
 }
-
-#endif /* PACKAGE_SOCKETS */
 
 #endif /* SOCKET_EFUNS */

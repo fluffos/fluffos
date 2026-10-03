@@ -190,6 +190,15 @@ TEST_F(RcTest, UnquotedGlobalIncludeFileGetsQuoted) {
   EXPECT_STREQ("<globals.h>", CONFIG_STR(__GLOBAL_INCLUDE_FILE__));
 }
 
+// Issue #1408: the line is optional. A missing one used to become the quoted
+// empty string `""`, which the lexer then tried (and failed) to #include in
+// every file it compiled.
+TEST_F(RcTest, MissingGlobalIncludeFileStaysEmpty) {
+  auto path = write_config("gif_missing.cfg", "");
+  quiet_read_config(path);
+  EXPECT_STREQ("", CONFIG_STR(__GLOBAL_INCLUDE_FILE__));
+}
+
 TEST_F(RcTest, DefaultFailMessageGetsNewlineAndFallback) {
   auto path = write_config("dfm_missing.cfg", "");
   quiet_read_config(path);
