@@ -70,6 +70,14 @@ if (EMSCRIPTEN)
   endif ()
 endif ()
 
+# The external package hands its child-process pipes to the sockets package's
+# lpc_socks table (find_new_socket, socket_close, check_valid_socket, ...), so
+# it cannot be built without it. Turn it off rather than failing to link.
+if (NOT PACKAGE_SOCKETS AND PACKAGE_EXTERNAL)
+  message(STATUS "PACKAGE_SOCKETS is OFF: disabling PACKAGE_EXTERNAL, which depends on it")
+  set(PACKAGE_EXTERNAL OFF)
+endif ()
+
 # Globally enforce CXX17 and C11
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
