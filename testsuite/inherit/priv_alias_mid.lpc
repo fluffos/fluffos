@@ -1,0 +1,3 @@
+inherit "/inherit/priv_alias_base";
+
+private string f() { return "mid"; }

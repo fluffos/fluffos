@@ -3297,9 +3297,35 @@ static void handle_functions() {
            * F_CALL_FUNCTION_BY_ADDRESS in the inherit's bytecode indexes
            * this slot via function_index_offset; aliasing it to a later
            * inherit's same-named private made pa->a_call() run pb's
-           * function (issue #1400). Public/visible overloads still alias. */
-          if (cur_def->flags & DECL_HIDDEN) {
-            prog_flags[new_index] = cur_def->flags;
+           * function (issue #1400). Public/visible overloads still alias.
+           *
+           * A hidden slot can also be an ALIAS carried down from the
+           * inherit: the inherit overrode an inherited function with its
+           * own private one. Its flags are then FUNC_ALIAS plus the target's
+           * decl flags, which must never be stored as-is (the decl bits read
+           * as an alias index). Re-aim it at the inherit's own private
+           * target, rebased into this program: that target is hidden here
+           * too, so it keeps its own slot and the alias stays one hop. A
+           * same-named function in this program cannot bind to it.
+           *
+           * Only a hidden slot with a body has anything to keep. A private
+           * prototype the inherit never defined is a forward declaration
+           * that a descendant fulfils (`private void hook();` called from
+           * the inherit's code), so it aliases to the final definition like
+           * any overload. Its flags carry the PROTOTYPE/UNDEFINED bits of
+           * what it resolves to, alias or not, which also guarantees the
+           * re-aim target above has a body and is not itself re-aliased. */
+          if ((cur_def->flags & DECL_HIDDEN) &&
+              !(cur_def->flags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
+            if (cur_def->flags & FUNC_ALIAS) {
+              program_t* parent = INHERIT(cur_def->offset)->prog;
+              prog_flags[new_index] =
+                  FUNC_ALIAS |
+                  (INHERIT(cur_def->offset)->function_index_offset +
+                   (parent->function_flags[cur_def->function_index_offset] & ~FUNC_ALIAS));
+            } else {
+              prog_flags[new_index] = cur_def->flags;
+            }
           } else {
             prog_flags[new_index] = FUNC_ALIAS | final_index;
           }
