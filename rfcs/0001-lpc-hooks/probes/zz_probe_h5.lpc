@@ -1,0 +1,45 @@
+#define P(k, v) debug_message("PROBE " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+// H5 re-run: empty-loop baseline subtracted, 5 repetitions, min and median reported.
+object t, p, s;
+int noop(int x) { return x; }
+int measure(function body, int n) {
+  int t0 = perf_counter_ns();
+  evaluate(body, n);
+  return (perf_counter_ns() - t0) / n;
+}
+int med(int *a) { a = sort_array(a, 1); return a[sizeof(a) / 2]; }
+int mn(int *a) { a = sort_array(a, 1); return a[0]; }
+void do_tests() {
+  int n = 200000, reps = 5, k, j, base, basemin;
+  mapping res = ([]);
+  function *bodies;
+  string *order;
+  t = new("/clone/probe/target");
+  p = new("/clone/probe/plain");
+  s = new("/clone/probe/shadow");
+  s->attach(t);
+  order = ({ "empty loop", "loop with int assign r=i", "direct efun::call_other", "simul-wrapped call_other()", "arrow p->noop",
+             "arrow into shadowed t->noop (shadow fwd efun::call_other)", "function_exists(noop, p)", "local call noop()" });
+  bodies = ({
+    function(int n) { int i; for (i = 0; i < n; i++) ; },
+    function(int n) { int i, r; for (i = 0; i < n; i++) r = i; },
+    function(int n) { int i; for (i = 0; i < n; i++) efun::call_other(p, "noop", i); },
+    function(int n) { int i; for (i = 0; i < n; i++) call_other(p, "noop", i); },
+    function(int n) { int i; for (i = 0; i < n; i++) p->noop(i); },
+    function(int n) { int i; for (i = 0; i < n; i++) t->noop(i); },
+    function(int n) { int i; for (i = 0; i < n; i++) function_exists("noop", p); },
+    function(int n) { int i; for (i = 0; i < n; i++) noop(i); },
+  });
+  for (k = 0; k < reps; k++) {
+    for (j = 0; j < sizeof(order); j++) {
+      if (!res[order[j]]) res[order[j]] = ({});
+      res[order[j]] += ({ measure(bodies[j], n) });
+    }
+  }
+  for (j = 0; j < sizeof(order); j++) P("H5 raw 5 reps " + order[j], res[order[j]]);
+  base = med(res["empty loop"]);
+  basemin = mn(res["empty loop"]);
+  for (j = 0; j < sizeof(order); j++)
+    P("H5 corrected (median-base, min-base) " + order[j], ({ med(res[order[j]]) - base, mn(res[order[j]]) - basemin }));
+  destruct(s); destruct(t); destruct(p);
+}

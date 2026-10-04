@@ -1,0 +1,19 @@
+#define P(k, v) debug_message("PROBE " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+// P2 extension: which driver-initiated destructs does a simul destruct() override miss?
+void do_tests() {
+  object t, s, e, c;
+  int d0;
+  // (a) shadow dying with its target
+  t = new("/clone/probe/target"); s = new("/clone/probe/shadow"); s->attach(t);
+  d0 = probe_destruct_count(); destruct(t);
+  P("P2a destruct(target with shadow): objects died=2, simul saw", probe_destruct_count() - d0);
+  // (b) explicit destruct of an environment: are its contents destructed by the driver?
+  e = new("/clone/probe/target"); c = new("/clone/probe/plain"); c->go(e) ; // plain has no go(); use move_object via target
+  c = new("/clone/probe/target"); c->go(e);
+  d0 = probe_destruct_count(); destruct(e);
+  P("P2b destruct(environment): contents still alive?", objectp(c));
+  P("P2b destruct(environment): simul saw", probe_destruct_count() - d0);
+  if (objectp(c)) destruct(c);
+  // (c) load failure paths: master valid_object deny / creator_file error -> driver destructs the new object (not observable here without master edits)
+  P("P2c other driver-initiated destruct sites in simulate.cc", "load_object/clone_object after valid_object deny or creator_file failure (simulate.cc:225,344,664,787); shutdown() destruct2 sweep (vm.cc:164); clean_up apply returning 0 does NOT destruct (backend.cc), only the object itself may destruct() in clean_up");
+}

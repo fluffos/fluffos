@@ -1,0 +1,21 @@
+
+// ---- RFC probe v3 (scratch): transparent wrapper, bound funptr cached per caller, miss check gated on undefinedp()
+int probe_co_hits, probe_co_misses;
+private mapping probe_bound = ([]);
+varargs mixed call_other(mixed ob, mixed fn, mixed args...) {
+  object po = previous_object();
+  function f;
+  mixed r;
+  probe_co_hits++;
+  if (!po) return efun::call_other(ob, fn, args...);
+  f = probe_bound[po];
+  if (!f) f = probe_bound[po] = bind((: efun::call_other :), po);
+  r = evaluate(f, ob, fn, args...);
+  if (undefinedp(r) && objectp(ob) && stringp(fn) && !function_exists(fn, ob)) probe_co_misses++;
+  return r;
+}
+int *probe_co_counts() { return ({ probe_co_hits, probe_co_misses }); }
+void probe_co_reset() { probe_co_hits = 0; probe_co_misses = 0; }
+int probe_destructs;
+varargs void destruct(object ob) { probe_destructs++; efun::destruct(ob); }
+int probe_destruct_count() { return probe_destructs; }
