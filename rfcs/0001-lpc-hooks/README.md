@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v8 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4), auto object, destruct veto and `HOOK_AROUND` resolved in this document (v5), 11 validated real-mudlib use cases and the plan completed (v6), comprehensive join-point catalogue across the driver (v7), plan consolidated into four phases (v8); see [§12](#12-review-log). Decisions in [§11](#11-decisions) |
+| Status | Draft v9 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4), auto object, destruct veto and `HOOK_AROUND` resolved in this document (v5), 11 validated real-mudlib use cases and the plan completed (v6), comprehensive join-point catalogue across the driver (v7), plan consolidated into four phases (v8), `net:` family (v9); see [§12](#12-review-log). Decisions in [§11](#11-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
 | Evidence | Probes in [`probes/`](probes/), run on master `b5714e5f` (RelWithDebInfo, gcc) |
@@ -28,7 +28,8 @@ split:
   `simul:*`, `apply:*`, `call_out:*`, `heart_beat`, function entry by any
   route), objects (load, clone, create, reset, clean_up, destruct, move,
   recompile, shadows) and sessions (logon, disconnect, exec, snoop, input,
-  commands): §5.10 is the normative catalogue. Attachments observe or deny,
+  commands) and the network layer (accept, websocket upgrade, TLS, telnet
+  protocol events, byte counts): §5.10 is the normative catalogue. Attachments observe or deny,
   and for gameplay advise functions on one object instance or a whole
   program, before, after or around them (§2A, §5.7).
 * **Policy is LPC.** Who may hook what is the master's decision; dedup,
@@ -936,6 +937,57 @@ anything is attached: always the join point's `g_hook_mask` bit first.
 | `user:input` | a line of input arrives, before `process_input()` | one helper called from the four input sites: `comm.cc` `process_input()` and the three ascii/binary port paths in `net/transport_libevent.cc` | B D | user, line | low–medium | D drops the line; re-check `IP_VALID` after the handler; no transform (`process_input()` can already rewrite) | 3 |
 | `user:command` | an `add_action` verb is about to be dispatched (typed or `command()`) | `packages/core/add_action.cc` `user_parser()` | B D A | user, verb, arg, target, fn (+ result for A) | medium | **snapshot the sentence** (verb, function, object, with refs) before any handler: a handler that moves or destructs anything frees it otherwise | 3 |
 
+#### Network
+
+The transport layer, below sessions: connections before any object exists,
+protocol negotiation, and byte flow. Every hook call lives in **shared** code
+(`comm.cc` helpers and `net/telnet.cc`); the per-target transports
+(`net/transport_libevent.cc`, `net/ws_*.cc`, `wasm/comm_wasm.cc`) only call
+those helpers, as they already call `comm_telnet_received()` and
+`on_user_logon()` (AGENTS.md §5: no `#ifdef __EMSCRIPTEN__` in shared logic).
+
+| Point | Fires | Site | Kinds | Handler args after `id` | Freq | Rules | Phase |
+|---|---|---|---|---|---|---|---|
+| `net:accept` | a TCP connection is accepted on a driver port, **before** any session or object exists | new shared helper `comm_accept_connection(port, kind, addr)`, called from `transport_libevent.cc` `new_conn_handler()` before `init_user_websocket()`/`new_user()`, and from `comm_wasm.cc` before `user_add()` | B D A, `count` | port, kind (`"telnet"`/`"ascii"`/`"binary"`/`"mud"`/`"websocket"`), tls flag, peer address | low (attack-time high) | D closes the descriptor with nothing allocated: IP bans, connection-rate limits, flood defence (today the only refusal is the master's `connect()`, after accept, negotiation and allocation). For proxied websocket clients the address here is the proxy's; refuse those at `net:ws_upgrade` | 3 |
+| `net:ws_upgrade` | a websocket upgrade request, before the `101` | a new `LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION` arm in the ws protocol callbacks → one `ws_common.cc` helper; a non-zero return rejects | B D, `count` | port, subprotocol, peer address (honouring `X-Real-IP`), Origin, Host, User-Agent, h2 flag | low | the place to refuse by the *real* client address and by Origin; needs the AGENTS.md §14 browser matrix (h1/h2 × permessage-deflate) before merge | 3 (own PR) |
+| `net:tls` | a TLS handshake completed or failed | `transport_libevent.cc` `on_user_events()` (`BEV_EVENT_CONNECTED`, today ignored; error arm with the OpenSSL error) → shared `comm_tls_established()` | A | user (0 before logon), port, version, cipher, outcome | rare | observe only: the handshake is over when the driver hears of it; no client-certificate or SNI data exists today (`net/tls.cc` sets neither) | 3 |
+| `net:telnet` | a telnet protocol event: WILL/WONT/DO/DONT, subnegotiation (GMCP, MSDP, MSSP, NAWS, TTYPE, MXP, ZMP, CHARSET, NEW-ENVIRON, unknown), IAC commands | top of `net/telnet.cc` `telnet_event_handler()`, before the per-option switch | B; D only for subnegotiation | user (0 before logon), event, option, payload | low (GMCP can be medium) | D drops a subnegotiation packet before its apply or C handling (GMCP/MSDP/ZMP policy). D on negotiation is refused: libtelnet has already run its option state machine and queued the reply. Per-protocol points (`net:gmcp` …) are not needed: filter with `args` on the option | 3 |
+| `net:read` | bytes arrive from a connection, before line assembly | the shared input funnel (`comm_telnet_received()`, `comm_text_received()`) plus the three inline native paths — the same helper as `user:input` | `count`/`time` only (deferred: coalesced) | user, port, kind, bytes | per segment, attacker-paced | no LPC per segment (1-byte segments would be one LPC frame each): C-side counting, or `HOOK_DEFERRED` **coalesced** to one `({ user, bytes })` per user per tick; no D (dropping bytes mid-stream desyncs telnet). Throttling is a C token bucket + `bufferevent_disable(EV_READ)`, a separate knob fed by these counts | 3 (coalesced: 4) |
+| `net:write` | bytes are queued to a connection | `comm.cc` `add_message()` after transcoding — the only shared outbound site | `count`/`time` only (deferred: coalesced) | user, port, bytes | per message | no inline LPC (static-buffer re-entry, see "Not join points"); count the pre-transport bytes (`websocket_send_text()` counts `inet_volume` a second time today) | 3 (coalesced: 4) |
+| `net:resolve` | the driver's reverse lookup of a user's address completed | `packages/core/dns_libevent.cc`, after the cache entry is added | A | address, name, user (looked up by address) | rare | observe only; `resolve()` results already reach LPC as a callback, and `efun:resolve` sees the request | 3 (low priority) |
+
+`user:disconnect` gains a transport cause (`"eof"`, `"error"`, `"tls"`,
+`"protocol"`, `"driver"`, `"destruct"`), which needs `BEV_EVENT_ERROR` split
+from `EOF` and a close reason on `interactive_t`; there is no separate
+`net:close`.
+
+**Network rules** (added to the primitive's rules below):
+
+* **lws callbacks**: hook handlers run only inside
+  `LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION`, `ESTABLISHED`, `RECEIVE` and
+  `CLOSED` (the last two already run LPC today), **never** inside
+  `SERVER_WRITEABLE` (AGENTS.md §14).
+* **No session before logon**: the `user` argument is 0 whenever the
+  connection is still bound to the master (`ip->ob == master_ob`), and
+  `net:accept`/`net:ws_upgrade` fire before any `interactive_t` exists, so a
+  handler can never see a half-built session in `users()`.
+* **Disconnects from the read path are deferred**: a handler inside
+  `net:telnet` or `net:read` (or `user:input`) that disconnects or destructs
+  the user must not free the session under the caller still iterating it;
+  the disconnect is marked pending and serviced when the read callback
+  returns, and the caller re-validates the connection after the handler.
+* **Address-keyed tables are bounded**: `count` rows keyed by address obey
+  `hook max rows` with the `dropped` counter, so an address flood cannot grow
+  them.
+
+Not network points: separate per-protocol points (`net:gmcp` …, use
+`net:telnet` with an option filter; outbound GMCP/MSDP/ZMP are efuns);
+static-file serving, ping/pong, compression and close frames (inside lws);
+`net:flush` (inside `SERVER_WRITEABLE`); LPC sockets (every operation is an
+efun under `valid_socket`, the accept-readiness callback is `socket:event`,
+and the peer is unknown until LPC calls `socket_accept()`); `sys_reload_tls`
+(`efun:sys_reload_tls`).
+
 #### Other
 
 | Point | Fires | Site | Kinds | Freq | Rules | Phase |
@@ -1016,7 +1068,7 @@ phase 2.
 |---|---|---|---|---|---|
 | **1. Core** | #1414, lifecycle events, Layer 0 | `valid_hook`, spec normalization, `hook_attach`/`detach`/`list`/`query`/`reset`, ownership, the contained-invocation primitive with every §5.4/§5.10 rule, `call_other:miss`, `object:load`/`clone`(B/A)/`create`/`reset`/`clean_up`/`destruct`; docs: interposition guide, auto-object recipe (§5.8, with the `get_auto_object()` fallback if the recipe fails), reference `valid_hook()`, `include/hooks.h`, release note on pre-existing `valid_hook` | new `src/vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`; `apply.cc`, `simulate.cc`, `object.cc`, `backend.cc`, `applies`, `rc.cc`, `checkmemory.cc` | authorization matrix (absent/0/2/promise/error/pre-master); miss by each route and reason, claim and decline; every destruct cause exactly once (incl. nested and in-handler destructs); owner destruct detaches; refused while compiling; GTest: eval state, `command_giver`, `current_interactive` restored after a forced overrun; auto object injected only into ordinary files | closes #1414; Debug `check_memory()` clean with attachments live; detached cachegrind gate |
 | **2. Calls** | observe and filter every call | `call_other` (B/A/D), `call_out:schedule`/`fire`/`remove`, `heart_beat`, `heart_beat:set`, `simul:<name>`, `efun:<name>` (any efun), `apply:<name>` (D only where allowed), `object:move` (B/D/A), `object:clone` D; filters incl. `args`, `PROG_HOOKED`, `O_HOOKED`, pointer set, `count`/`time`, `HOOK_DECIDE`, `HOOK_FAIL_CLOSED`, per-attachment re-entry | `apply.cc`, `interpret.cc` (`call_the_efun`, `call_direct`), `function.cc`, `simul_efun.cc`, `call_out.cc`, `heartbeat.cc`, `master.cc`, `simulate.cc` (`move_object`), `program.h`, `object.h`, instruction table | every filter key; deny with message; fail-closed; target destructed by a B handler; denied call_out settles its promise; `efun::` observed and simul_efun wrapper calls attributed to the real caller; handler destructing an efun argument gives a clean "bad argument"; D refused on `reset`/`clean_up`/`process_input`/`id`/verbs/master applies; move re-validation and no firing inside `init` dispatch | cachegrind gate on call-, efun-, heart_beat- and move-heavy loops, detached and with 1/100 non-matching filters |
-| **3. Sessions and the rest** | users, shadows, program swaps, sockets | `user:logon`/`disconnect`/`exec`/`snoop`/`input`/`command`, `shadow:attach`/`detach`, `object:recompile`/`replace_program`, `socket:event`; docs `docs/concepts/general/hooks.md` and the efun/apply pages | `comm.cc`, `interactive.cc`, `add_action.cc`, `net/transport_libevent.cc`, `replace_program.cc`, `efuns_main.cc`, `socket_efuns.cc` | input dropped on all four input paths with the `IP_VALID` re-check; command handler that destructs the verb's object (sentence snapshot); disconnect when the body is destructed; bits recomputed after `replace_program()`; e2e over a real connection (`tools/e2e-live.js`) | docs build clean |
+| **3. Sessions, network and the rest** | users, network, shadows, program swaps, sockets | `user:logon`/`disconnect` (with transport cause)/`exec`/`snoop`/`input`/`command`, `net:accept`/`tls`/`telnet`/`read`/`write`/`resolve` (`net:ws_upgrade` as its own PR with the browser matrix), `shadow:attach`/`detach`, `object:recompile`/`replace_program`, `socket:event`; docs `docs/concepts/general/hooks.md` and the efun/apply pages | `comm.cc` (shared helpers), `interactive.cc`, `add_action.cc`, `net/transport_libevent.cc`, `net/ws_common.cc`, `net/telnet.cc`, `wasm/comm_wasm.cc` (helper calls only), `dns_libevent.cc`, `replace_program.cc`, `efuns_main.cc`, `socket_efuns.cc` | `net:accept` D refuses before any allocation (and on the wasm path); a refused upgrade by real address; GMCP packet dropped by `net:telnet` D; read-path disconnect deferred, no use-after-free under ASan; `net:read` counts bounded by `hook max rows`; input dropped on all four input paths with the `IP_VALID` re-check; command handler that destructs the verb's object (sentence snapshot); disconnect when the body is destructed; bits recomputed after `replace_program()`; e2e over a real connection (`tools/e2e-live.js`) | docs build clean |
 | **4. Game design** | aspects for gameplay | `function` point (five entry sites, defining-program bitmap), `object`/`caller_object` filters, `actor`; then `HOOK_AROUND` behind the §11 prototype gate, priorities, return-type check, `nomask` rule; `expires`, `hook_list(ob)`, labels in traces, `HOOK_DEFERRED`, `call_limited()`; the example effects daemon and §2B V1–V11 as testsuite scenarios | `interpret.cc`, `function.cc`, `apply.cc` (`apply_low_dispatch`), `program.h`, `hooks.cc`, `trace.cc`, backend | every entry route observed and `FP_FUNCTIONAL` refused; no double firing with `call_other`/`apply:*`; curse, clamp, disguise; stacking by priority; a failing AROUND runs the original unmodified; expiry callback; batches revalidate destructed objects | AROUND prototype ≤ ~1.5x AFTER (otherwise ship without AROUND); gate incl. the §5.7 local-call cases |
 
 ### 8.2 Required on every phase
@@ -1175,6 +1227,7 @@ Draft v1 was reviewed from six angles; the main changes:
 | Maintainer (v5) | Keep everything in one document | Auto object as Layer 0 (§5.8; probes show inherited `protected` overrides replace efuns and `inherit` via `#include` works); destruct veto via the auto object, none in the driver; `HOOK_AROUND` behind a prototype gate (§11) |
 | Real mudlibs (v6: English libs; Chinese libs from `fluffos/mudlibs`) | 11 valid cases with file:line evidence (§2B), incl. shipped pkuxkx/es2 bugs a miss report would have caught and a disabled exp/money audit; 7 honest "no" cases. Gaps: simul_efun exemption would blind `efun:*` probes on every lib that wraps efuns; fixed efun list; no argument-value filter; `nomask` policy; efun subject; batch shape | Simul_efun wrappers transparent (§5.1); any efun hookable at dispatch with type re-check (§5.3); `args` filter; `HOOK_OVERRIDE_NOMASK`; subject rule and batch shape (§5.9); non-goal "adding functions" (§2A); API reference §5.9; full plan §8 |
 | Maintainer (v7): cover efun, simul_efun, apply, call_other, call_out, heart_beat, destruct, move, etc. | Two read-only surveys mapped every candidate to its site. Found: `(: ob, "fn" :)` is not a call route; `function` has no free flag bit (per-program bitmap instead); master applies take two routes; deny on `reset`/`clean_up`/`process_input` would permanently disable them; `object:destruct` placement double-fired; `move_object()` must re-validate recursion after LPC; `user:command` must snapshot the sentence; inline output hooks would clobber a static buffer | §5.10 normative catalogue (calls, objects, users, other, rejected) with sites, kinds, args, frequency, gates and rules; eight extra primitive rules; §8.1 phases regrouped into tracks covering every point |
+| Maintainer (v9): add hooks for "net" | A read-only survey of `src/net`, `comm.cc`, `telnet.cc`, `ws_*.cc`, `dns_libevent.cc`, `wasm/comm_wasm.cc` | `net:accept` (refuse before allocation), `net:ws_upgrade`, `net:tls`, `net:telnet`, `net:read`/`net:write` (counting only), `net:resolve`; transport cause on `user:disconnect`; rules for lws callbacks, pre-logon identity, deferred read-path disconnects and bounded address tables; all in phase 3 |
 
 ## Appendix: reproducing the probes
 

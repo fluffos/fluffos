@@ -9,4 +9,4 @@ moves to `docs/` when it is implemented.
 
 | RFC | Title | Status |
 |---|---|---|
-| [0001](0001-lpc-hooks/) | In-game hooks: eBPF-style join points for LPC | Draft v8 |
+| [0001](0001-lpc-hooks/) | In-game hooks: eBPF-style join points for LPC | Draft v9 |
