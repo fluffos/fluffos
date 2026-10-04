@@ -155,6 +155,10 @@ async function testUtf8SplitReads(wsPort) {
     wsPort,
     `eval object o = new("/clone/e2e_utf8_echo"); write("|STARTED=" + o->start(${echoPort}) + "|"); return 0`,
     '|STARTED=', 15000);
+  if (out.includes('|STARTED=-999|')) {
+    console.log(`[  SKIPPED ] e2e-live.${name} -- driver built without PACKAGE_SOCKETS`);
+    return record(name, true);
+  }
   if (!out.includes('|STARTED=1|')) {
     return record(name, false, 'echo server did not start: ' + JSON.stringify(out.slice(-200)));
   }

@@ -52,7 +52,7 @@ void db_cleanup(void);  // FIXME
 #ifdef PACKAGE_EXTERNAL
 #include "packages/external/external.h"
 #endif
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #include "packages/sockets/socket_efuns.h"
 #endif
 #ifdef PACKAGE_UIDS

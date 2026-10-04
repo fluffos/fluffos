@@ -36,7 +36,7 @@
 #ifdef PACKAGE_PARSER
 #include "include/parser_error.h"
 #endif
-#ifdef PACKAGE_SOCKETS
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
 #include "include/socket_err.h"
 #endif
 

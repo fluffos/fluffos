@@ -372,7 +372,11 @@ void read_config(const char* filename) {
 
     /* check if the global include file is quoted */
     std::string const v(tmp);
-    if (!starts_with(v, "\"") && !starts_with(v, "<")) {
+    if (v.empty()) {
+      // The line is optional: no value means no global include. Quoting the
+      // empty string would hand the lexer a `""` include that cannot be read.
+      CONFIG_STR(__GLOBAL_INCLUDE_FILE__) = alloc_cstring("", "config file: gif");
+    } else if (!starts_with(v, "\"") && !starts_with(v, "<")) {
       debug_message("Missing '\"' or '<' around global include file name; adding quotes.\n");
       // not very efficient, but who cares.
       CONFIG_STR(__GLOBAL_INCLUDE_FILE__) =

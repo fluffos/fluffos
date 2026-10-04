@@ -37,4 +37,9 @@ int start(int port) {
   }
   return 1;
 }
+#else
+// Built with -DPACKAGE_SOCKETS=OFF: tell tools/e2e-live.js to skip.
+int start(int port) {
+  return -999;
+}
 #endif
