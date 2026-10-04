@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v4 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4); see [§12](#12-review-log). Maintainer decisions in [§11](#11-decisions) |
+| Status | Draft v5 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4), auto object, destruct veto and `HOOK_AROUND` resolved in this document (v5); see [§12](#12-review-log). Decisions in [§11](#11-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
 | Evidence | Probes in [`probes/`](probes/), run on master `b5714e5f` (RelWithDebInfo, gcc) |
@@ -38,13 +38,13 @@ cannot serve:
 
 | Layer | What | Earned by |
 |---|---|---|
-| 0 | No driver change: document the mechanisms that already cover a scenario | S2 (dev), S3, S5 (with a base object), S8 |
+| 0 | No driver change: document the mechanisms that already cover a scenario, including a DGD-style **auto object** built from the global include file and the master's `include_file()` apply (§5.8) | S2 (dev), S3, S5 (with a base object), S8; permanent efun policy and an explicit-`destruct()` veto |
 | 1 | Three rare join points, zero cost on the normal path: `call_other_miss`, `object_created`, `object_destructed` | S1, S5 (no base object, with cause), S7 |
 | 2 | Call observation and filtering: `call_other`, opted-in `efun:*` and `function` join points that observe, deny or advise, with per-program/per-function/per-object gating, pointer-keyed filters, `count`/`time` actions and positional handler arguments | S2 (runtime), S4, S6, S9–S12, G1–G15 |
 
-Both layers use the same efuns and the same `valid_hook()` gate. A DGD-style
-auto object (compile-time advice on efuns) is complementary and is left to a
-separate RFC (§10).
+Both layers use the same efuns and the same `valid_hook()` gate. Compile-time
+advice on efuns (a DGD-style auto object) is part of Layer 0 and needs no
+driver change (§5.8).
 
 ## 2. Scenarios
 
@@ -564,11 +564,59 @@ to an unhooked function in a hooked program; hooked function on an unflagged
 object; one AROUND per call on a flagged object; 100 cursed players among 300;
 one charmed orc among 2,000 `/std/monster` heart_beats.
 
+**Sub-budget calls.** A handler that fans out to several subscribers (an
+effects daemon, an event bus) shares one `hook eval cost`, so one slow
+subscriber starves the rest. An optional efun `call_limited(function f, int
+eval_cost, mixed args...)` (LDMud's `limited()`) runs `f` under its own
+budget using the §5.4 primitive's save/restore, and returns `({ result })` or
+0 on overrun or error. It is useful beyond hooks, and lands in phase 4c.
+
 **Deferred or rejected here.** Environment/room-tree filters (an LPC
 `environment()` walk in the handler is ~100 ns; add only if measured hot);
-`call_limited(fp, eval, args...)` for a daemon fanning out to many subscribers
-under one budget (LDMud `limited()`; a small separate RFC); output/message
+output/message
 transform probes and per-player phasing (rejected, see §2A.2).
+
+### 5.8 Compile-time layer: the auto object (Layer 0)
+
+DGD gives every program an implicit parent, the auto object, which may
+redefine kfuns and reach the originals with `::kfun()`; kernellib builds its
+whole security and resource model there (§4.2). FluffOS can do the same today:
+
+* **An inherited `protected` function overrides the efun of the same name**
+  in every inheriting program, `efun::name()` still reaches the real efun, and
+  the override is not callable from outside (probe on `b5714e5f`: an
+  inherited `protected int sizeof()` returned 4242 to the child,
+  `efun::sizeof` returned 3, `call_other` to it returned 0; an inherited
+  `protected void destruct()` saw the child's `destruct()` call and the
+  object was destructed).
+* **An `inherit` arriving through `#include` works** (probe: an included
+  header containing `inherit "/x/auto";` made the includer inherit it).
+* **The global include file is prepended to every compile**, and the master's
+  `include_file(compiled, from, path)` apply may return per-file source text
+  (an array of strings). So the global include file names a header, and
+  `include_file()` returns `inherit "/secure/auto";` for ordinary files and an
+  empty text for the master, the simul_efun object, the auto object and its
+  own inherits. This is cloud-server's layered-auto trick
+  (`objectd.c:627-640`) with FluffOS's existing applies. The end-to-end
+  combination is **not yet verified**; phase 0 verifies it and falls back to
+  a one-line master apply if needed (§11).
+
+What it is for, and what it is not:
+
+| Use | Auto object | Hooks |
+|---|---|---|
+| Permanent efun policy (`destruct` logging and guarantees, `write`→`message`, file-efun checks) | **Yes**: zero runtime cost beyond the override's frame; `previous_object()` in callees unchanged (it is a local call) | No |
+| Veto explicit `destruct()` (LDMud `prepare_destruct`) | **Yes**: the override raises an error | No |
+| Close `efun::` bypass | With `valid_override()`: refuse `efun::name` outside the auto object | `efun:*` probes see `efun::` calls anyway |
+| Change at runtime, attach and detach | No: every change means recompiling every program | **Yes** |
+| Misses, driver-initiated destructs, `call_other` traffic | No | **Yes** |
+| Advice on mudlib functions (curses, world events) | No: the auto object only redefines efuns and adds functions | **Yes** (`function` join point) |
+
+Rules for the auto object: overrides and helpers are `protected` (callable
+inside each program, not from outside) and `nomask` where children must not
+replace them; private state lives in the auto object's own variables, which
+each inheriting object gets a copy of, so keep it small; the auto object must
+not inherit from mudlib code that itself gets the auto object injected.
 
 ## 6. Interaction with existing features
 
@@ -605,7 +653,7 @@ Each phase is one PR, reviewed and merged before the next.
 
 | Phase | Scope | Tests | Done when |
 |---|---|---|---|
-| 0 | Docs only: `docs/concepts/general/interposition.md` covering `valid_object`+`on_destruct`, `valid_write`, the tracer, `error_handler`, `valid_override`, and the transparent-wrapper idiom with its cost | — | merged |
+| 0 | Docs only: `docs/concepts/general/interposition.md` covering `valid_object`+`on_destruct`, `valid_write`, the tracer, `error_handler`, `valid_override`, the transparent-wrapper idiom with its cost, and the **auto-object recipe** (§5.8) with a testsuite example | End to end: global include + `include_file()` injects the auto object into ordinary files and not into the master, simul_efun, the auto object or its inherits; an efun override in the auto object is used by an ordinary object; `efun::` refused outside the auto object by a reference `valid_override()`; a refused explicit `destruct()`. If injection through the global include does not work, implement the `get_auto_object()` fallback (§11) here | merged |
 | 1a | `valid_hook` master apply; spec normalization; `hook_attach`/`hook_detach`/`hook_list`; ownership and owner-destruct detach; `g_hook_mask`; the contained-invocation primitive; `call_other_miss` in `apply_low()` | LPC: `valid_hook` absent / returning 0, 2, a promise or erroring denies; attach before the master loads is denied; miss via `->`, explicit, array, funptr; each reason; `undefined` preserved when declined; result when claimed with `({ value })`; promise/error = declined; no event from master/simul callers; owner destruct detaches; master can list and detach others' attachments. GTest: eval-state restore after a handler overrun. Benchmark gate §5.6 | closes #1414 |
 | 1b | `object_created`, `object_destructed` with cause | LPC: driver destructs (shadow, environment contents, refused load) each reported once with the right cause; self-destructing `create()` not reported as created; Debug `check_memory()` clean | merged |
 | 2a | `hook_*` efuns, filters, `PROG_HOOKED`, pointer-keyed set, `count`/`time`, `hook max rows`, `call_other` point | LPC: filter semantics table above; exclude; `HOOK_DECIDE` deny with message; `HOOK_FAIL_CLOSED`; re-entry guard (a handler's `write_file` seen by another probe); detach inside handler. Benchmark gate including attached cases | merged |
@@ -613,7 +661,7 @@ Each phase is one PR, reviewed and merged before the next.
 | 3 | Reference `valid_hook()` and examples (§7), `docs/concepts/general/hooks.md`, efun and apply pages (`valid_hook`, `hook_detached`), `include/hooks.h`, release-note warning about pre-existing `valid_hook` functions | the reference policy and examples run in the testsuite | merged |
 | 4a | Game design: `function` join point with per-function gating; `object`/`caller_object` filters with `O_HOOKED`; `HOOK_BEFORE`/`HOOK_AFTER`; `actor` argument; auto-detach on target destruct | LPC: **local, inherited, funptr, `call_out` and `heart_beat` routes all observed**; unflagged instances untouched; target destruct detaches. Benchmark: local-call cases in §5.7 | merged |
 | 4b | `HOOK_AROUND` with `proceed`, priorities and the deterministic chain; return-type check; apply allow-list and protected-function deny-list | LPC: G1 curse, G2 clamp (skip `proceed`), G5 disguise with `/secure/` excluded; stacking of two AROUNDs is order-independent of attach order given priorities; error/overrun/type mismatch runs the original unmodified; attach/detach inside a handler affects only the next call | merged |
-| 4c | `expires`, `hook_list(object)`, labels in traces, `HOOK_DEFERRED` batching | LPC: expiry fires `hook_detached(id, "expired")` and is refused with `HOOK_FAIL_CLOSED`; batched delivery revalidates destructed objects; G10 achievements fed through a deferred observer | merged |
+| 4c | `expires`, `hook_list(object)`, labels in traces, `HOOK_DEFERRED` batching, `call_limited()` | LPC: expiry fires `hook_detached(id, "expired")` and is refused with `HOOK_FAIL_CLOSED`; batched delivery revalidates destructed objects; G10 achievements fed through a deferred observer | merged |
 | 4d | Example **effects daemon** (mudlib code on top of hooks): status-effects view, re-attach at login/restore, rule-data API for builders | the testsuite runs G1, G2, G7 and G8 end to end through it | merged |
 
 ## 9. Security invariants (each has a test)
@@ -645,13 +693,11 @@ Each phase is one PR, reviewed and merged before the next.
 
 ## 10. Alternatives considered
 
-**A. A DGD-style auto object** (a config key naming a program every object
-implicitly inherits; it may redefine efuns, and `valid_override` keeps
-`efun::` from bypassing it). Zero runtime cost, caller identity preserved,
-the kernellib model. It needs a recompile to change, cannot see misses or
-driver-initiated destructs, and cannot observe `call_other` without the 3.4x
-wrapper. It is the right tool for S3-style efun policy that never changes at
-runtime. **Recommended as a separate RFC**; this RFC does not depend on it.
+**A. A DGD-style auto object instead of hooks.** Now part of this design as
+Layer 0 (§5.8), as a complement rather than an alternative: it covers
+permanent efun policy at zero runtime cost, and it cannot cover runtime
+attach/detach, misses, driver-initiated destructs, `call_other` traffic or
+advice on functions it does not define.
 
 **B. LDMud single-slot driver hooks.** One handler per event, set by
 privileged code. Attachments here compose (several per join point, ordered by
@@ -702,14 +748,29 @@ Settled by the game-design review: driver-side `expires` is allowed (status
 effects are the dominant use and 300 `call_out`s leak when their owner reloads) but
 refused with `HOOK_FAIL_CLOSED`, so a fence can never lapse silently.
 
-Still open:
+5. **Everything stays in this one document** (maintainer): the auto object,
+   the destruct veto and the `HOOK_AROUND` decision are resolved here, not in
+   follow-up RFCs.
 
-5. A destruct veto (LDMud `prepare_destruct`)? Not proposed.
-6. Whether the auto-object RFC (§10 A) should be written before or after
-   this one is implemented. Not a dependency.
-7. Should `HOOK_AROUND` ship at all, or stop at `HOOK_AFTER` until a
-   prototype measures its per-call cost (it allocates a `proceed` closure per
-   advised call)?
+Resolved in this document (v5), for the maintainer to confirm:
+
+6. **Auto object**: Layer 0, built from the global include file and
+   `include_file()`, no driver change (§5.8). If the end-to-end check in
+   phase 0 fails, the fallback is a one-line master apply
+   `string get_auto_object()` that the compiler injects as an implicit
+   inherit; that is the only driver change the auto object could need.
+7. **Destruct veto**: no driver mechanism. Explicit `destruct()` calls are
+   vetoed by the auto object's `destruct()` override (raise an error to
+   refuse), which covers LDMud's `prepare_destruct` use for mudlib code.
+   Driver-initiated destructs (shadow teardown, environment contents, refused
+   loads) stay unvetoable by design: refusing them would leave half-destroyed
+   state. `object_destructed` observes all of them.
+8. **`HOOK_AROUND`** ships behind a prototype gate (phase 4b): a prototype
+   measures one matching AROUND against one matching `HOOK_AFTER` on the same
+   function. If AROUND costs no more than ~1.5x AFTER per advised call (the
+   `proceed` closure is the extra), it ships; otherwise phase 4 ships
+   `BEFORE`/`AFTER`/`DECIDE` and AROUND waits for a cheaper `proceed`
+   (for example a reusable per-chain closure instead of one per call).
 
 ## 12. Review log
 
@@ -725,6 +786,7 @@ Draft v1 was reviewed from six angles; the main changes:
 | Prior art | DGD `callCritical` is unlimited, not budgeted; `valid_override` already closes `efun::`; missed LDMud `limited()`, `trace()`, `runtime_error`, `prepare_destruct` and kernellib's object-manager hooks | §4 corrected; daemon modelled on kernellib's manager |
 | Game design (3 researchers: designer, real mudlibs, emergent/player-facing) | Real libs fake aspects with shadows (Discworld 33 sites, 76 self-calls to defeat the local-call gap; Lima's 205 hand-placed hook points); gameplay needs local-call interception, per-instance targeting, after/around advice, deterministic stacking, expiry, per-object introspection and batched observers; builder-facing features must be rule data, not code | §2A, §5.7, phase 4 |
 | Maintainer (v4) | A designated hook daemon is an unnecessary second trust root and an extra hop on every advised call | Authorization through master `valid_hook()`, like `valid_shadow`/`valid_socket`; Layer 1 events became ordinary join points; ownership, re-attach and revocation rules in §5.1; security model §5.5 rewritten |
+| Maintainer (v5) | Keep everything in one document | Auto object as Layer 0 (§5.8; probes show inherited `protected` overrides replace efuns and `inherit` via `#include` works); destruct veto via the auto object, none in the driver; `HOOK_AROUND` behind a prototype gate (§11) |
 
 ## Appendix: reproducing the probes
 
