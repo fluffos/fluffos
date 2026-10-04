@@ -1,0 +1,7 @@
+// A program that is live on the main stack while a handler runs, one frame
+// below the frame that invokes the handler.
+int marker() { return 41; }
+mixed run(int flags, object relay, function handler) {
+  mixed r = relay->relay(flags, handler, this_object());
+  return ({ r, marker() + 1 });   // executes in THIS program after the handler returns
+}

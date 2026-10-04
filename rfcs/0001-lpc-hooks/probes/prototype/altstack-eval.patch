@@ -1,0 +1,373 @@
+diff --git a/src/packages/core/core.spec b/src/packages/core/core.spec
+index fd951fb9..d8774563 100644
+--- a/src/packages/core/core.spec
++++ b/src/packages/core/core.spec
+@@ -333,6 +333,7 @@ string origin();
+ int reclaim_objects();
+ 
+ int set_eval_limit(int);
++mixed hook_proto_call(int, int, function, ...);
+ int reset_eval_cost set_eval_limit(int default: 0);
+ int eval_cost set_eval_limit(int default: -1);
+ int max_eval_cost set_eval_limit(int default: 1);
+diff --git a/src/packages/core/efuns_main.cc b/src/packages/core/efuns_main.cc
+index dbde07cc..f361539d 100644
+--- a/src/packages/core/efuns_main.cc
++++ b/src/packages/core/efuns_main.cc
+@@ -3635,3 +3635,29 @@ void f_strwidth() {
+   push_number(width);
+ }
+ #endif
++
++
++#ifdef F_HOOK_PROTO_CALL
++// hook_proto_call(flags, budget_us, function, args...) -> ({ value, stale_slots }) or ({ 0, stale_slots, 1 }) on a contained error
++void f_hook_proto_call() {
++  int const num_arg = st_num_arg;
++  svalue_t* arg = sp - num_arg + 1;
++  int const flags = arg[0].u.number;
++  int const budget = arg[1].u.number;
++  funptr_t* f = arg[2].u.fp;
++  int stale = 0;
++  svalue_t* ret = hook_proto_run(f, num_arg - 3, flags, budget, &stale);
++  array_t* v = allocate_empty_array(ret ? 2 : 3);
++  if (ret) {
++    assign_svalue_no_free(&v->item[0], ret);
++  } else {
++    v->item[0] = const0;
++    v->item[2] = const1;
++  }
++  v->item[1].type = T_NUMBER;
++  v->item[1].subtype = 0;
++  v->item[1].u.number = stale;
++  pop_3_elems();
++  push_refed_array(v);
++}
++#endif
+diff --git a/src/vm/internal/base/interpret.cc b/src/vm/internal/base/interpret.cc
+index 59c23eb7..c6a38437 100644
+--- a/src/vm/internal/base/interpret.cc
++++ b/src/vm/internal/base/interpret.cc
+@@ -212,15 +212,16 @@ int st_num_arg;
+ 
+ // For safety, we leave some buffer in before and after the space.
+ static svalue_t _stack[10 + CFG_EVALUATOR_STACK_SIZE + 10];
+-static svalue_t* const start_of_stack = &_stack[10];
+-svalue_t* const end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
++static svalue_t* start_of_stack = &_stack[10];
++svalue_t* end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
+ 
+ /* Used to throw an error to a catch */
+ svalue_t catch_value = {T_NUMBER};
+ 
+ // For safety, we leave some buffer in before and after the space.
+ control_stack_t _control_stack[5 + CFG_MAX_CALL_DEPTH + 5];
+-control_stack_t* const control_stack = &_control_stack[5];
++control_stack_t* control_stack = &_control_stack[5];
++control_stack_t* control_stack_last = &_control_stack[5 + CFG_MAX_CALL_DEPTH - 1];
+ control_stack_t* csp; /* Points to last element pushed */
+ 
+ int too_deep_error = 0, max_eval_error = 0;
+@@ -1448,7 +1449,7 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
+ }
+ 
+ void push_control_stack(int frkind) {
+-  if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
++  if (csp == control_stack_last) {
+     too_deep_error = 1;
+     error("Too deep recursion.\n");
+   }
+@@ -1924,7 +1925,7 @@ unsigned char fake_program = F_RETURN;
+  * These frames are the ones that show up as <function> in error traces.
+  */
+ void setup_fake_frame(funptr_t* fun) {
+-  if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
++  if (csp == control_stack_last) {
+     too_deep_error = 1;
+     error("Too deep recursion.\n");
+   }
+@@ -2335,7 +2336,7 @@ void eval_instruction(char* p) {
+       last = (last + 1) % (sizeof previous_instruction / sizeof(int));
+     }
+ 
+-    if (outoftime) {
++    if (outoftime && !hook_proto_eval_slowpath()) {
+       debug_message("Eval interrupted: object %s cost limit reached, limit: %ld usec.\n",
+                     current_object->obname, max_eval_cost);
+       set_eval(max_eval_cost);
+@@ -5760,6 +5761,7 @@ int last_instructions() {
+  * When an object is destructed, all references to it must be removed
+  * from the stack.
+  */
++static void hook_proto_sweep_suspended(object_t* ob);
+ void remove_object_from_stack(object_t* ob) {
+   svalue_t* svp;
+ 
+@@ -5774,6 +5776,7 @@ void remove_object_from_stack(object_t* ob) {
+     svp->type = T_NUMBER;
+     svp->u.number = 0;
+   }
++  hook_proto_sweep_suspended(ob);
+ }
+ 
+ int strpref(const char* p, const char* s) {
+@@ -5850,3 +5853,191 @@ void restore_context(error_context_t* econ) {
+     }
+   }
+ }
++
++
++// ===========================================================================
++// Hook prototype (RFC 0001 validation, not for merge)
++//   flags: 1 = run the handler on an alternate VM stack
++//          2 = whole-stack walkers also visit suspended stacks
++//          4 = handler exempt from the caller's eval limit (lazy credit)
++//          8 = cap the uncharged time per evaluation at budget_us
++//         16 = eager variant: get_eval + 2x set_eval around the handler
++// ===========================================================================
++#include <chrono>
++#ifdef __linux__
++#include "vm/internal/posix_timers.h"
++#endif
++#include "vm/internal/eval_limit.h"
++
++namespace {
++constexpr int kAltStackSize = 4096;
++constexpr int kAltDepth = 64;
++svalue_t _alt_stack[10 + kAltStackSize + 10];
++control_stack_t _alt_cstack[5 + kAltDepth + 5];
++
++struct SuspendedStack {
++  svalue_t *start, *sp, *end;
++  control_stack_t *cbase, *csp, *clast;
++  SuspendedStack* next;
++};
++SuspendedStack* g_suspended = nullptr;
++int g_proto_walk_all = 0;
++bool g_in_alt = false;
++
++std::chrono::steady_clock::time_point g_hook_t0;
++int64_t g_hook_budget_us = 0;
++int64_t g_hook_caller_R = -1;
++
++int64_t us_since(std::chrono::steady_clock::time_point t0) {
++  return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0)
++      .count();
++}
++void raw_timer_set(int64_t us) {
++#ifdef __linux__
++  posix_eval_timer_set(us > 0 ? us : 1);
++#endif
++  outoftime = 0;
++}
++}  // namespace
++
++int g_hook_exempt = 0;
++extern int64_t g_eval_credit;
++extern int64_t g_hook_allow_used;
++
++static void hook_proto_sweep_suspended(object_t* ob) {
++  if (!g_proto_walk_all) return;
++  for (SuspendedStack* s = g_suspended; s; s = s->next) {
++    for (svalue_t* svp = s->start; svp <= s->sp; svp++) {
++      if (svp->type == T_OBJECT && svp->u.ob == ob) {
++        free_object(&svp->u.ob, "remove_object_from_stack (suspended)");
++        svp->type = T_NUMBER;
++        svp->u.number = 0;
++      }
++    }
++  }
++}
++
++bool vm_suspended_frame_uses_prog(program_t* prog) {
++  if (!g_proto_walk_all) return false;
++  for (SuspendedStack* s = g_suspended; s; s = s->next) {
++    for (control_stack_t* f = s->cbase; f <= s->csp; f++) {
++      if ((f->ob && f->ob->prog == prog) || f->prog == prog) return true;
++    }
++  }
++  return false;
++}
++
++// Called from the interpreter when `outoftime` is set. True = carry on.
++bool hook_proto_eval_slowpath() {
++  if (g_hook_exempt) {
++    int64_t const el = us_since(g_hook_t0);
++    if (g_hook_caller_R < 0) g_hook_caller_R = el;  // the caller's own budget ran out here
++    if (el >= g_hook_budget_us) return false;      // watchdog: abort the handler
++    raw_timer_set(g_hook_budget_us - el);
++    return true;
++  }
++  if (g_eval_credit > 0) {  // time spent in exempt handlers is given back lazily
++    int64_t const c = g_eval_credit;
++    g_eval_credit = 0;
++    raw_timer_set(c);
++    return true;
++  }
++  return false;
++}
++
++svalue_t* hook_proto_run(funptr_t* f, int n, int flags, int budget_us, int* stale_slots) {
++  bool const use_alt = (flags & 1) && !g_in_alt;
++  bool const exempt = (flags & 4) && !g_hook_exempt;
++  int const saved_walk = g_proto_walk_all;
++  g_proto_walk_all = (flags & 2) != 0;
++  int64_t eager_ev = 0;
++  if (flags & 16) {
++    eager_ev = get_eval();
++    raw_timer_set(budget_us);
++  }
++  if (exempt) {
++    g_hook_exempt++;
++    g_hook_t0 = std::chrono::steady_clock::now();
++    g_hook_budget_us = budget_us;
++    g_hook_caller_R = -1;
++  }
++  f->hdr.ref++;
++  SuspendedStack ss{};
++  if (use_alt) {
++    svalue_t* args = sp - n + 1;
++    svalue_t* alt_start = &_alt_stack[10];
++    for (int i = 0; i < n; i++) alt_start[i] = args[i];  // move, no ref change
++    ss = {start_of_stack, sp - n, end_of_stack, control_stack, csp, control_stack_last, g_suspended};
++    g_suspended = &ss;
++    start_of_stack = alt_start;
++    end_of_stack = alt_start + kAltStackSize;
++    sp = alt_start + n - 1;
++    control_stack = &_alt_cstack[5];
++    control_stack_last = control_stack + kAltDepth - 1;
++    csp = control_stack - 1;
++    g_in_alt = true;
++  }
++  error_context_t econ;
++  save_context(&econ);
++  econ.save_sp -= n;
++  svalue_t* ret;
++  try {
++    ret = call_function_pointer(f, n);
++  } catch (const char*) {
++    restore_context(&econ);
++    ret = nullptr;
++  }
++  pop_context(&econ);
++  if (use_alt) {
++    start_of_stack = ss.start;
++    end_of_stack = ss.end;
++    sp = ss.sp;
++    control_stack = ss.cbase;
++    control_stack_last = ss.clast;
++    csp = ss.csp;
++    g_suspended = ss.next;
++    g_in_alt = false;
++  }
++  // evidence: destructed objects still sitting in the (now resumed) main stack
++  if (stale_slots) {
++    int c = 0;
++    for (svalue_t* svp = start_of_stack; svp <= sp; svp++) {
++      if (svp->type == T_OBJECT && (svp->u.ob->flags & O_DESTRUCTED)) c++;
++    }
++    *stale_slots = c;
++  }
++  free_funp(f);
++  g_proto_walk_all = saved_walk;
++  if (!ret) {
++    too_deep_error = 0;
++    if (exempt || (flags & 16)) {
++      max_eval_error = 0;
++      outoftime = 0;
++    }
++  }
++  if (exempt) {
++    int64_t const h = us_since(g_hook_t0);
++    g_hook_exempt--;
++    int64_t uncharged = h;
++    if (flags & 8) {
++      int64_t const left = budget_us - g_hook_allow_used;
++      uncharged = left > 0 ? (h < left ? h : left) : 0;
++      g_hook_allow_used += uncharged;
++    }
++    if (g_hook_caller_R >= 0) {
++      int64_t const remaining = g_hook_caller_R - (h - uncharged);
++      if (remaining > 0) {
++        raw_timer_set(remaining);
++      } else {
++        outoftime = 1;
++      }
++    } else {
++      g_eval_credit += uncharged;
++      // charged part needs no action: the caller's timer kept running
++    }
++  }
++  if (flags & 16) {
++    raw_timer_set(eager_ev);
++  }
++  return ret;
++}
+diff --git a/src/vm/internal/base/interpret.h b/src/vm/internal/base/interpret.h
+index 52a06673..9dbc03cf 100644
+--- a/src/vm/internal/base/interpret.h
++++ b/src/vm/internal/base/interpret.h
+@@ -148,9 +148,17 @@ extern short caller_type;
+ extern char* pc;
+ extern svalue_t* sp;
+ extern svalue_t* fp;
+-extern svalue_t* const end_of_stack;
++extern svalue_t* end_of_stack;
+ extern svalue_t catch_value;
+-extern control_stack_t* const control_stack;
++extern control_stack_t* control_stack;
++extern control_stack_t* control_stack_last;
++// --- hook prototype (RFC 0001 validation, not for merge) ---
++struct funptr_t;
++struct program_t;
++svalue_t* hook_proto_run(funptr_t* f, int n, int flags, int budget_us, int* stale_slots);
++bool vm_suspended_frame_uses_prog(program_t* prog);
++bool hook_proto_eval_slowpath();
++extern int g_hook_exempt;
+ extern control_stack_t* csp;
+ extern int too_deep_error;
+ extern int max_eval_error;
+diff --git a/src/vm/internal/eval_limit.cc b/src/vm/internal/eval_limit.cc
+index 48b64222..60ff6cdd 100644
+--- a/src/vm/internal/eval_limit.cc
++++ b/src/vm/internal/eval_limit.cc
+@@ -14,16 +14,24 @@ void init_eval() {
+ #endif
+ }
+ 
++int64_t g_eval_credit = 0;
++int64_t g_hook_allow_used = 0;
++extern int g_hook_exempt;
++
+ void set_eval(uint64_t etime) {
+ #ifdef __linux__
+   posix_eval_timer_set(etime);
+ #endif
+   outoftime = 0;
++  if (!g_hook_exempt) {
++    g_eval_credit = 0;
++    g_hook_allow_used = 0;
++  }
+ }
+ 
+ int64_t get_eval() {
+ #ifdef __linux__
+-  return posix_eval_timer_get();
++  return posix_eval_timer_get() + g_eval_credit;
+ #else
+   return max_eval_cost;
+ #endif
+diff --git a/src/vm/internal/simulate.cc b/src/vm/internal/simulate.cc
+index 5c7d094f..c569c92a 100644
+--- a/src/vm/internal/simulate.cc
++++ b/src/vm/internal/simulate.cc
+@@ -862,6 +862,9 @@ int recompile_object(object_t* target) {
+       error("recompile_object: '/%s' is currently executing.\n", target->obname);
+     }
+   }
++  if (vm_suspended_frame_uses_prog(old_prog)) {
++    error("recompile_object: '/%s' is currently executing (suspended stack).\n", target->obname);
++  }
+   for (object_t* ob = obj_list; ob; ob = ob->next_all) {
+     if (ob->prog == old_prog && replace_program_pending(ob)) {
+       error("recompile_object: '/%s' has a pending replace_program().\n", ob->obname);

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v10. Rewritten as one design after a second review round (consistency, scope, security, implementer dry run); history in [Appendix D](#appendix-d-review-log). Open decisions in [§9](#9-decisions) |
+| Status | Draft v11. Rewritten as one design after a second review round (consistency, scope, security, implementer dry run); history in [Appendix D](#appendix-d-review-log). Open decisions in [§9](#9-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
 | Evidence | Probes on the real driver ([Appendix C](#appendix-c-reproducing-the-probes)); use cases read from real mudlibs ([Appendix A](#appendix-a-evidence-from-real-mudlibs)) |
@@ -17,8 +17,9 @@ proposes one mechanism instead of one feature per request, split the way eBPF
 is split:
 
 * **The driver is the kernel.** It defines a small, fixed set of join points,
-  makes them free when unused, runs handlers in a contained frame, and offers
-  C-side filtering, counting and batching for high-frequency events.
+  makes them free when unused, runs handlers on their own VM stack without
+  charging their time to the code they observe, and offers C-side filtering,
+  counting and batching for high-frequency events.
 * **Authorization follows the `valid_*` pattern, with tiers the driver
   computes.** Any object may call `hook_attach()`. The driver classifies the
   request (hooking yourself; observing code in a scope the master can check;
@@ -27,8 +28,7 @@ is split:
 * **Few, generic join points.** Function entry by any route (`function`, with
   an `origin` filter for `call_other`, driver applies, `call_out`, simul_efuns,
   local calls), any efun (`efun:<name>`), misses (`call_other:miss`), object
-  creation and destruction with its cause, and connection accept
-  (`net:accept`). Everything the driver can do is reachable through these
+  creation and destruction with its cause, and the network layer (`net:*`). Everything the driver can do is reachable through these
   (§4.4 has the coverage map); bespoke points that only duplicate them are
   listed in Appendix B and added on demand.
 * **Policy is LPC.** Who may hook what is the master's decision; reports,
@@ -329,7 +329,7 @@ both owners; sockets ask `valid_socket()` per operation.
 * **Secrets are redacted at every tier.** The line delivered to a no-echo
   `input_to()`/`get_char()` callback, and argument 0 of `crypt()`/`oldcrypt()`,
   reach handlers as 0.
-* `HOOK_FAIL_CLOSED` is refused on `net:accept`, `net:ws_upgrade` and
+* `HOOK_FAIL_CLOSED` is refused on every `net:*` point and on
   `call_other:miss`: a broken handler must not be able to lock everyone out.
 * A runtime config switch (`hooks enabled : 0`) makes `hook_attach()` always
   fail: the break-glass for a mud locked up by its own hooks, since owners
@@ -398,8 +398,8 @@ answered; `net:accept` refuses by closing the connection; a call the driver
 itself makes (origin `driver`) is skipped without raising anything.
 
 Anything else a decider does — returns another type or a promise (AGENTS.md
-§13.24), errors, runs out of budget, or cannot be run at all (§4.3) — is "no
-opinion" and is counted. With `HOOK_FAIL_CLOSED` it is a refusal instead, so
+§13.24), errors, is aborted as a runaway, or cannot be run at all (§4.3) — is
+"no opinion" and is counted. With `HOOK_FAIL_CLOSED` it is a refusal instead, so
 a fence cannot fail open.
 
 **Actions.** A function pointer (the handler), `"count"`, or `"time"` (count
@@ -418,9 +418,10 @@ mixed handler(int id, object actor, object caller, object target, string fn, mix
 ```
 
 * `actor` is `this_player()` at the intercepted call. Inside a handler
-  `this_player()`, `this_interactive()` and `previous_object()` are 0: a
-  handler learns identities only from its arguments, and cannot `input_to()` or
-  `command()` as the victim.
+  `this_player()`, `this_interactive()` and `previous_object()` are 0, and
+  the handler runs on its own stack (§4.3), so `call_stack()` shows only its
+  own frames: a handler learns identities only from its arguments, and cannot
+  `input_to()` or `command()` as the victim.
 * `caller` may be 0 (the backend calls `reset()`, `heart_beat()` and
   `call_out`s with no current object).
 * `args` holds the call's arguments; arrays, mappings, classes and buffers
@@ -483,70 +484,124 @@ handler does not hide it from an audit hook.
 
 ### 4.3 Contained invocation
 
-Every handler call goes through one primitive. Written against the current
-source (`safe_call_function_pointer()` cannot be used as is: it expects the
-arguments already pushed, and pushing can itself throw into the middle of,
-say, `destruct_object()`):
+Every handler call goes through one primitive. Two properties were proposed
+by the maintainer and validated with a prototype (Appendix C; patch and
+results in `probes/prototype/`): handlers run **on their own VM stack**, and
+handler time is **not charged to the code being observed**.
+
+**An alternate stack.** The driver keeps a second, small value stack and
+control stack (4,096 values, 64 frames). The primitive moves the handler's
+arguments onto it, switches `sp`/`csp` and the stack bounds, runs the
+handler, copies the result and switches back. Nested hooks reuse it.
+
+| Prototype result | Same stack | Alternate stack |
+|---|---|---|
+| Handler invoked when the caller sits at the call-depth limit | fails with "Too deep recursion" | runs |
+| Frames a handler can see with `call_stack()` (10-deep caller) | 10 | 2: its own |
+| Cost per handler call (no-op handler) | 314 ns | 330 ns |
+
+So a handler can always run (no way to dodge a fence by recursing to the
+depth limit, and no "headroom" rule), it cannot read its caller's frames,
+arguments or locals through `call_stack()`, `previous_object(n)` or the trace
+of its own error, and its own recursion or stack overflow cannot disturb the
+caller. This is DGD's `rlimits(-1; …)` for critical code, in FluffOS terms.
+
+It has one hard requirement, also shown by the prototype: **every
+whole-stack walker must visit the suspended stack too.**
+
+| Walker | If it only sees the handler's stack |
+|---|---|
+| `remove_object_from_stack()` (the destruct sweep) | objects destructed inside the handler stay as live object values in the caller's frames: the prototype found 2 stale slots, 0 with the fix. The efun type re-check (rule 6) depends on this sweep |
+| `recompile_object()`'s "is this program executing?" check | **bypassed**: the prototype recompiled a program that had a live frame on the suspended stack. With a changed layout the caller would resume in freed bytecode. With the fix it is refused as today |
+| `mark_stack()` in `checkmemory.cc` | false "bad ref count" reports on Debug builds |
+| `reset_machine()` and fatal unwinds | must restore the main stack |
+| trace builders, the debugger (#1286) | by design show the handler's frames, preceded by one marker frame naming the join point and label |
+
+The primitive therefore keeps a chain of suspended stacks, and the three
+safety-relevant walkers iterate it. Coroutine parking from inside a handler
+(`await` in a function a handler calls) copies frames relative to the current
+stack and is expected to work; it is a required test.
+
+**Eval time.** Re-arming the eval timer around each handler was measured at
+about 3.2 µs per call on the test machine (`timer_settime` ≈ 990 ns,
+`timer_gettime` ≈ 850 ns), ten times the handler call itself, so the timer is
+not touched on the normal path. Instead:
+
+* The primitive reads a monotonic clock on entry and exit (about 18 ns each)
+  and adds the elapsed time to an **eval credit**. When the eval timer later
+  fires, the interpreter's existing slow path first spends the credit
+  (re-arming the timer by that amount) before raising "Too long evaluation".
+  Measured: a 200 ms handler cost its caller 3 µs of eval instead of
+  200,005; a caller with 300 ms left ran a 600 ms handler and still had
+  300 ms afterwards. Cost: 38 ns per handler call.
+* **Unlimited is not safe**, so the credit is capped per evaluation by
+  `hook eval cost` (default: `maximum evaluation cost`). In the prototype, 40
+  handlers of 50 ms each ran for 2 s under a 1 s limit with nothing stopping
+  them when uncapped; with a 500 ms cap the caller was stopped at 1.45 s.
+  The worst-case stall is therefore the eval limit plus the allowance, for any
+  tier. Past the allowance, handler time counts against the caller like any
+  other code.
+* A runaway handler is aborted when the timer fires and it has used more
+  than `hook eval cost`; that is, no later than the caller's own limit would
+  have fired (3 s in the prototype's test).
+* On platforms without the eval timer (macOS, Windows, WASM) there is no
+  limit to exempt from.
+
+**The primitive**, in outline:
 
 ```cpp
-HookRun hook_call(Attachment* a, PushArgsFn push_args, svalue_t* out) {
+HookRun hook_call(Attachment* a, MoveArgsFn move_args, svalue_t* out) {
   funptr_t* f = a->fp;
   if (a->detached) return kSkipped;
   if (!f->hdr.owner || (f->hdr.owner->flags & O_DESTRUCTED)) return detach(a, "handler_owner_destructed");
-  if (stale_layout(f)) return detach(a, "stale_function");            // pre-check: the error text cannot be recognised afterwards
-  if (current_file || too_deep_error || max_eval_error ||
-      csp >= &control_stack[CFG_MAX_CALL_DEPTH - kHookHeadroom]) return kSkipped;
+  if (stale_layout(f)) return detach(a, "stale_function");
+  if (current_file /* compiling */ || hook_stack_exhausted()) return kSkipped;
 
-  int const num_arg = st_num_arg;                                       // AGENTS §13.16
-  auto const t0 = steady_clock::now(); int64_t const ev = get_eval();
-  int const oot = outoftime;
-  object_t *ci = current_interactive, *hb = g_current_heartbeat_obj;    // raw pointers: hold refs
+  int const num_arg = st_num_arg;                                    // AGENTS §13.16
+  auto const t0 = steady_clock::now(); bool const outermost = !g_hook_depth++;
+  object_t *ci = current_interactive, *hb = g_current_heartbeat_obj; // raw pointers: hold refs
   if (ci) add_ref(ci, "hook"); if (hb) add_ref(hb, "hook");
-  auto const sim = hook_save_simulate_state();                          // restrict_destruct, num_objects_this_thread
-  f->hdr.ref++; a->running = true; g_hook_depth++;
-  save_command_giver(nullptr);                                          // this_player() == 0
+  auto const sim = hook_save_simulate_state();                       // restrict_destruct, num_objects_this_thread
+  f->hdr.ref++; a->running = true;
+  SuspendedStack ss; if (outermost) vm_switch_to_hook_stack(&ss);    // sp, csp, bounds; chained for the walkers
+  save_command_giver(nullptr);                                       // this_player() == 0
   current_interactive = nullptr; g_current_heartbeat_obj = nullptr;
   DEFER {
     restore_command_giver();
+    if (outermost) vm_switch_back(&ss);
     current_interactive = (ci && !(ci->flags & O_DESTRUCTED)) ? ci : nullptr;
     g_current_heartbeat_obj = (hb && !(hb->flags & O_DESTRUCTED)) ? hb : nullptr;
     if (ci) free_object(&ci, "hook"); if (hb) free_object(&hb, "hook");
     hook_restore_simulate_state(sim);
     st_num_arg = num_arg;
-    set_eval(ev - elapsed_us(t0)); outoftime = oot;                     // the caller pays for the handler
-    max_eval_error = too_deep_error = 0;
+    if (outermost) hook_credit_eval(elapsed_us(t0));                 // capped by `hook eval cost`
     a->running = false; g_hook_depth--; free_funp(f);
   };
-  set_eval(std::min<int64_t>(hook_eval_cost(), ev));
   error_context_t econ; save_context(&econ);
   svalue_t* ret = nullptr;
-  try { int const n = push_args(); ret = call_function_pointer(f, n); }
+  try { int const n = move_args(); ret = call_function_pointer(f, n); }
   catch (const char*) { restore_context(&econ); }
   pop_context(&econ);
   if (!ret) { a->errors++; return kError; }
   if (ret->type == T_PROMISE || a->detached) return kDeclined;
-  assign_svalue_no_free(out, ret);                                      // copy before the next handler overwrites it
+  assign_svalue_no_free(out, ret);                                   // copy before the next handler overwrites it
   return kRan;
 }
 ```
 
 | # | Rule | Why |
 |---|---|---|
-| 1 | Budget is the smaller of `hook eval cost` and the caller's remaining eval; elapsed time is charged to the caller. An overrun aborts the handler only | Restoring the caller's full budget would make hooked calls free: `while (1)` on a self-hooked no-op never ends. Not charging at all bills the time to nobody (AGENTS.md §13.23) |
-| 2 | `outoftime`, `max_eval_error`, `too_deep_error` are reset on the way out | Otherwise a handler that ran out of eval makes the caller's next opcode die with "Too long evaluation" |
-| 3 | `restrict_destruct` and `num_objects_this_thread` are saved and restored | The driver's error handler zeroes both on *every* error, contained or not; a handler error during a destruct cascade or an inherit-chain load would silently remove the guard that protects it |
-| 4 | `current_interactive` and `g_current_heartbeat_obj` are nulled for the call (with refs) and restored only if still alive; `command_giver` is saved and restored | A handler's too-deep error would otherwise switch off the heart_beat of the innocent outer object |
-| 5 | `st_num_arg` is latched and restored; arguments are pushed inside the `try` | §13.16; a stack overflow while pushing must not throw into the join point's caller |
-| 6 | A handler that cannot run (compile active, driver already in an error state, fewer than `kHookHeadroom` = 16 control frames left) returns "skipped": counted, and a refusal under `HOOK_FAIL_CLOSED` | A silent skip would let anyone bypass a fence by recursing to the depth limit |
-| 7 | Stale or ownerless handlers are detached by a pre-check, not by recognising an error | `safe_*` paths report only "it failed" |
-| 8 | After any BEFORE or DECIDE handler, the join point re-checks that its target is not destructed, and efun points re-run the efun's argument type check | `apply_low()` checks for a destructed target only before; `call_direct()` never does; a handler that destructs an efun's object argument must produce a clean "bad argument" |
-| 9 | Handler errors are counted and reported through the normal uncaught-error path, with advised frames labelled (`[hook #12 blood_moon]`) | Debuggability; no per-attachment "last error" text is kept, because the unwind does not carry it |
+| 1 | Handlers run on the hook stack; the destruct sweep, the `recompile_object()` live-frame check and `mark_stack()` walk every suspended stack | prototype results above |
+| 2 | Handler time is credited back to the interrupted evaluation, up to `hook eval cost` per evaluation; no timer system calls on the normal path | observed code does not pay for hooks; an uncapped credit is an eval-limit escape; re-arming costs 3.2 µs |
+| 3 | `restrict_destruct` and `num_objects_this_thread` are saved and restored | the driver's error handler zeroes both on *every* error, contained or not; a handler error during a destruct cascade or an inherit-chain load would silently remove the guard |
+| 4 | `current_interactive` and `g_current_heartbeat_obj` are nulled for the call (with refs) and restored only if still alive; `command_giver` is saved and restored | a handler's error could otherwise switch off the heart_beat of the innocent outer object |
+| 5 | `st_num_arg` is latched and restored; arguments are moved inside the `try` | §13.16; an overflow while moving must not throw into the join point's caller |
+| 6 | After any BEFORE or DECIDE handler the join point re-checks that its target is not destructed, and efun points re-run the efun's argument type check | `apply_low()` checks for a destructed target only before; `call_direct()` never does; a handler that destructs an efun's object argument must produce a clean "bad argument" |
+| 7 | A handler that cannot run (a compile is active, or hooks are nested deeper than the hook stack allows) is "skipped": counted, and a refusal under `HOOK_FAIL_CLOSED` | a silent skip would be a way round a fence |
+| 8 | Stale or ownerless handlers are detached by a pre-check, not by recognising an error afterwards | `safe_*` paths report only "it failed" |
+| 9 | Handler errors are counted and reported through the normal uncaught-error path; their trace holds the handler's frames only, under a marker frame (`[hook #12 blood_moon at function /std/undead::query_damage]`) | debuggability without leaking the caller's arguments and locals |
 | 10 | The attachment table, handler function pointers, owners and object-valued filters are marked in `checkmemory.cc` (`mark_funp`, after `mark_call_outs()`); count tables are C++ containers bounded by `hook max rows` | AGENTS.md §3; attacker-chosen names must not grow memory |
-| 11 | No detach callbacks at shutdown; the table has no static-destructor side effects | The Windows exit-abort class of bug (AGENTS.md §14) |
-
-Eval limits are enforced on Linux only (`src/vm/internal/eval_limit.cc`).
-Each handler call costs three timer system calls on top of the LPC call;
-phase 1 measures this and the cost gate (§4.5) records it.
+| 11 | No detach callbacks at shutdown; the table has no static-destructor side effects | the Windows exit-abort class of bug (AGENTS.md §14) |
 
 ### 4.4 Join-point catalogue (normative; the only one)
 
@@ -562,6 +617,11 @@ AROUND are tier 3 unless the attachment is a self-hook.
 | `efun:<name>` | an efun is about to run; `efun::foo()` and `foo()` are the same event | `vm/internal/base/interpret.cc` `call_the_efun` (all efun opcodes) and `vm/internal/base/function.cc` efun function pointers | BEFORE, DECIDE, AFTER | refuse: error in the caller. No answer | `object` and `target` (first object-typed argument), `caller`, `caller_program`, `caller_object`, `args`, `exclude` | actor, caller (the simul_efun's caller when issued from simul_efun code), target, name, args | per efun call | 3 |
 | `net:accept` | a connection was accepted on a driver port, before any session or object exists | a shared helper in `comm.cc`, called by `net/transport_libevent.cc` `new_conn_handler()` and `wasm/comm_wasm.cc` before anything is allocated | BEFORE, DECIDE | refuse: the descriptor is closed | none (tier 3 only) | port, kind (`"telnet"`, `"ascii"`, `"binary"`, `"mud"`, `"websocket"`), tls flag, peer address | per connection | 3 |
 | `net:ws_upgrade` | a websocket upgrade request, before the `101` | a new `LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION` arm → one helper in `net/ws_common.cc` | BEFORE, DECIDE | refuse: the upgrade is rejected | none (tier 3 only) | port, subprotocol, peer address (honouring `X-Real-IP`), Origin, Host, User-Agent | per connection | 3 (own PR, with the browser matrix of AGENTS.md §14) |
+| `net:telnet` | a telnet protocol event: WILL/WONT/DO/DONT, a subnegotiation (GMCP, MSDP, MSSP, NAWS, TTYPE, MXP, ZMP, CHARSET, NEW-ENVIRON, unknown), an IAC command | top of `net/telnet.cc` `telnet_event_handler()`, before the per-option switch | BEFORE; DECIDE for subnegotiations | refuse: the subnegotiation is dropped before its apply or C handling. Negotiation cannot be refused (libtelnet has already replied) | `args` (tier 3 only) | user (0 before logon), event, option, payload | per protocol event | 3 |
+| `net:tls` | a TLS handshake completed or failed | `net/transport_libevent.cc` `on_user_events()` → a shared helper in `comm.cc` | after | — | none (tier 3 only) | user (0 before logon), port, version, cipher, outcome | per connection | 3 |
+| `net:read` | bytes arrived from a connection, before line assembly | the shared input funnel in `comm.cc` | `count`, or BEFORE with `HOOK_DEFERRED` (coalesced) | — | none (tier 3 only) | user, port, kind, bytes | per segment, attacker-paced | 3 |
+| `net:write` | bytes were queued to a connection | `comm.cc` `add_message()`, after transcoding | `count`, or AFTER with `HOOK_DEFERRED` (coalesced) | — | none (tier 3 only) | user, port, bytes | per message | 3 |
+| `net:resolve` | the driver's reverse lookup of a user's address completed | `packages/core/dns_libevent.cc` | after | — | none (tier 3 only) | address, name, user | per connection | 3 |
 
 Point-specific rules:
 
@@ -578,9 +638,19 @@ Point-specific rules:
   that define `function` for the matching objects (their own program and what
   they inherit) and re-resolves when a program is loaded. No double firing:
   one entry is one event, whatever the route.
-* **`net:*`** handlers never see a session: they run before any
+* **`net:*`**. `net:accept` and `net:ws_upgrade` run before any
   `interactive_t` exists, so `users()` inside a handler cannot return a
-  half-built one. For proxied websocket clients `net:accept` sees the proxy's
+  half-built session; at the other points the `user` argument is 0 until
+  logon (while the connection is still bound to the master). `net:read` and
+  `net:write` never run LPC per event: they count in C, or deliver one
+  coalesced `({ user, bytes })` per user per gametick, because the pace is set
+  by the peer and outbound formatting uses a static buffer a re-entering
+  handler would clobber. A handler that disconnects or destructs the user
+  from the read path (`net:telnet`) has the disconnect deferred until the
+  read callback returns, and the caller re-validates the connection.
+  Throttling is not a hook: it is a C token bucket fed by these counts.
+  For `net:telnet` the `args` filter positions are the handler arguments
+  (1 = event, 2 = option): `([ 1: "sb", 2: "GMCP" ])`. For proxied websocket clients `net:accept` sees the proxy's
   address; the real client is known at `net:ws_upgrade`. Address-keyed
   `count` rows obey `hook max rows`. Hook calls live in shared code
   (`comm.cc`, `net/ws_common.cc`), so the WASM transport is covered without
@@ -603,7 +673,7 @@ above:
 | clone, load, create | `efun:clone_object`, `efun:new`, `efun:load_object`; `object:create` |
 | `exec`, `snoop`, `shadow`, `recompile_object`, `replace_program`, sockets | `efun:<name>` (callbacks: `function`) |
 | commands and input | `function` on verb functions and on `process_input`; `efun:command` |
-| network | connections: `net:accept`, `net:ws_upgrade`; GMCP/MSDP/telnet subnegotiation in: `function` on `gmcp`, `msdp`, `telnet_suboption`, `window_size`, `terminal_type` (origin `driver`); out: `efun:send_gmcp` and friends |
+| network | connections: `net:accept`, `net:ws_upgrade`, `net:tls`, `net:resolve`; telnet negotiation and subnegotiation (GMCP, MSDP …): `net:telnet`, or `function` on the `gmcp`/`msdp`/`telnet_suboption` applies after logon; outbound GMCP/MSDP: `efun:send_gmcp` and friends; byte counts: `net:read`, `net:write` |
 
 Bespoke points that were surveyed and would only duplicate these, or that
 have no use case yet, are in Appendix B with their sites and hazards, so they
@@ -637,7 +707,8 @@ start, so the phase-1 table does not need rewriting for phase-2 traffic.
 |---|---|---|
 | Detached | `valgrind --tool=cachegrind` instruction counts on a hooks microbenchmark (`testsuite/command/speed_hooks.lpc`: local call, call_other hit and miss, `sizeof`, new+destruct), A/B | more than 0.5% instructions per iteration on any detached case fails |
 | Detached, wall clock (local, numbers in the PR) | interleaved A/B, ≥ 10 launches each, best-of-5 inner, medians | max(3%, 2× baseline inter-launch MAD) |
-| Attached | same harness: `count` on misses; 1 and 100 non-matching filters; an unhooked function in a hooked program; a hooked function on an unflagged object; one matching handler; a deferred observer; 100 cursed players among 300; one charmed NPC among 2,000 heart_beats | recorded; the handler-call cost (including its three timer system calls) is measured in phase 1 before any budget is promised |
+| Handler call | no-op handler through the primitive | recorded: the prototype measured 232 ns for a bare function-pointer call, 330 ns on the hook stack, 368 ns with eval credit |
+| Attached | same harness: `count` on misses; 1 and 100 non-matching filters; an unhooked function in a hooked program; a hooked function on an unflagged object; one matching handler; a deferred observer; 100 cursed players among 300; one charmed NPC among 2,000 heart_beats | recorded |
 | Memory | Debug build with attachments live: the suite passes with no `check_memory()` report | must pass |
 
 ### 4.6 API reference
@@ -673,7 +744,7 @@ BEFORE/AFTER), `HOOK_OVERRIDE_NOMASK` (with DECIDE/AROUND). Constants in
 | Key | Default | Meaning |
 |---|---|---|
 | `hooks enabled` | 1 | 0 makes `hook_attach()` always fail (break-glass) |
-| `hook eval cost` | one tenth of `maximum evaluation cost` | budget of one handler call |
+| `hook eval cost` | the value of `maximum evaluation cost` | handler time per evaluation that is not charged to the interrupted code; also the point at which a single runaway handler is aborted |
 | `hook max errors` | 10 | errors, overruns included, before an attachment is detached (never for `HOOK_FAIL_CLOSED`) |
 | `hook max attachments` | 10000 | total live attachments |
 | `hook max rows` | 10000 | rows per `count`/`time` table; overflow counted in `dropped` |
@@ -764,9 +835,9 @@ tests, its docs and the Appendix A cases it serves as testsuite scenarios.
 
 | Phase | Delivers | Scope | Main driver changes | Serves |
 |---|---|---|---|---|
-| **1. Core** | #1414, lifecycle events, the compile-time layer | `valid_hook()` with tiers; request normalization; `hook_attach`/`detach`/`query`/`list`; ownership, detach and master re-validation rules; the contained-invocation primitive (§4.3); kinds BEFORE/AFTER/DECIDE with `HOOK_FAIL_CLOSED`; `count`; `HOOK_DEFERRED`; priority ordering; `call_other:miss`, `object:create`, `object:destruct`; config keys; `mark_hooks()`; reference `valid_hook()`; docs: interposition guide and the auto-object recipe (§4.7) | new `vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`; `apply.cc`, `simulate.cc` (`destruct_object()` gains a cause), `object.cc`, `master.cc`, `applies`, `rc.cc`, `checkmemory.cc` | V1, V9 (auto object), V10 (destruct half), V11; S1, S5, S7 |
+| **1. Core** | #1414, lifecycle events, the compile-time layer | `valid_hook()` with tiers; request normalization; `hook_attach`/`detach`/`query`/`list`; ownership, detach and master re-validation rules; the contained-invocation primitive (§4.3) with the hook stack and eval credit; kinds BEFORE/AFTER/DECIDE with `HOOK_FAIL_CLOSED`; `count`; `HOOK_DEFERRED`; priority ordering; `call_other:miss`, `object:create`, `object:destruct`; config keys; `mark_hooks()`; reference `valid_hook()`; docs: interposition guide and the auto-object recipe (§4.7) | new `vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`; `apply.cc`, `simulate.cc` (`destruct_object()` gains a cause), `object.cc`, `master.cc`, `applies`, `rc.cc`, `checkmemory.cc` | V1, V9 (auto object), V10 (destruct half), V11; S1, S5, S7 |
 | **2. Function entry** | observe and decide any function, per program or per object | `function` at its five entry sites; `PROG_HOOKED` + per-function map; `O_HOOKED`; all filter keys including `origin` and `args`; `time`; `expires`; `hook_list(ob)`; the driver-origin and `nomask` rules; secret redaction for no-echo callbacks | `interpret.cc`, `function.cc`, `apply.cc`, `program.h`, `object.h`, `comm.cc` (no-echo latch) | V2–V6, V8; S2, S4, S6, S9; G1–G4, G6, G10–G12, G14, G15 (observe/decide) |
-| **3. Efuns and connections** | observe and refuse any efun; refuse connections | `efun:<name>` (dispatch sites, per-efun byte, shared type-check helper, simul_efun attribution, tier-3 delivery from simul frames, `crypt` redaction); `net:accept`; `net:ws_upgrade` as its own PR | `interpret.cc`, `function.cc`, efun table generation; `comm.cc`, `net/transport_libevent.cc`, `wasm/comm_wasm.cc`, `net/ws_common.cc` | V7, V9 (runtime form), V10; S10–S13; G7 |
+| **3. Efuns and network** | observe and refuse any efun; the network layer | `efun:<name>` (dispatch sites, per-efun byte, shared type-check helper, simul_efun attribution, tier-3 delivery from simul frames, `crypt` redaction); `net:accept`, `net:telnet`, `net:tls`, `net:read`, `net:write`, `net:resolve`; `net:ws_upgrade` as its own PR | `interpret.cc`, `function.cc`, efun table generation; `comm.cc`, `net/transport_libevent.cc`, `net/telnet.cc`, `wasm/comm_wasm.cc`, `net/ws_common.cc`, `dns_libevent.cc` | V7, V9 (runtime form), V10; S10–S13; G7 |
 | **4. Around advice** | rewriting arguments and results | `HOOK_AROUND` with `proceed` (valid once, only inside its handler call), the around chain, return-type check, `HOOK_OVERRIDE_NOMASK`; the example effects daemon | `apply.cc` (dispatch tail split), `interpret.cc`, `hooks.cc` | G5, G8, G9, G13 and the rewriting halves of G1–G3 — none validated in a real mudlib yet, so this phase is gated (§9) |
 
 Phases 2 and 3 are independent of each other; phase 4 needs phase 2.
@@ -775,7 +846,8 @@ Suggested PR split: **1a** auto-object probe and the interposition guide;
 **1b** the core with `call_other:miss` (closes #1414); **1c** the object
 events and destruct-cause plumbing; **2a** `function` observe with gating;
 **2b** decide, object filters, `expires`, redaction; **3a** `efun:<name>`;
-**3b** `net:accept`; **3c** `net:ws_upgrade`. Phase 1 is roughly 3,500–4,000
+**3b** `net:accept`, `net:tls`, `net:resolve`; **3c** `net:telnet`, `net:read`,
+`net:write`; **3d** `net:ws_upgrade`. Phase 1 is roughly 3,500–4,000
 lines including tests and docs; phase 2 and 3 about 3,000 each.
 
 ### 7.2 Tests
@@ -790,13 +862,14 @@ Each guard has a test that fails when the guard is removed (for new efuns
 | Miss by each route (`->`, explicit, array target) and reason; answer and no-opinion; promise and error are no-opinion | LPC suite (`"destructed"` via a GTest gametick bump) |
 | Every destruct cause exactly once, including nested destructs and a handler that destructs the object | LPC suite, with a `valid_object` special case for `"refused"` |
 | Owner or handler-owner destruct detaches; stale handler detaches; master recompile re-validates | LPC suite |
-| Eval charged to the caller; `command_giver`, `current_interactive`, the heart_beat object, `restrict_destruct` restored after a forced overrun or error | GTest, Linux only (a small `hook eval cost`) |
-| Skipped handler near the depth limit refuses under `HOOK_FAIL_CLOSED` | LPC suite |
+| Hook stack: a handler runs with the caller at the depth limit; `call_stack()` in a handler shows only its frames; an object destructed in a handler is swept from the caller's frames; `recompile_object()` of a program live on the suspended stack is refused; `await` in a function a handler calls; `check_memory()` with a suspended stack | LPC suite (the prototype tests in `probes/prototype/`), Debug build for `check_memory()` |
+| Eval credit: handler time not charged up to `hook eval cost`, charged beyond it; a runaway handler aborted; `command_giver`, `current_interactive`, the heart_beat object, `restrict_destruct` restored after a handler error | LPC suite and GTest, Linux only |
+| Skipped handler (hooks nested beyond the hook stack) refuses under `HOOK_FAIL_CLOSED` | LPC suite |
 | Refused while compiling | LPC suite, through the master's compile hooks |
 | `check_memory()` clean with attachments live | LPC suite on Debug (call the efun in the test, then detach unconditionally) |
 | `function`: every entry route observed once; functionals refused; driver-origin decide only on the allow-list; `nomask` skipped; target destructed by a handler; no-echo line redacted | LPC suite; `heart_beat` and `call_out` routes through GTest (`call_heart_beat()`, tick bump) |
 | `efun:*`: `efun::` observed; simul-wrapper attribution; simul-frame events reach tier 3 only; handler destructing an argument gives "bad argument"; `crypt` redacted | LPC suite |
-| `net:accept` refuses before any allocation, on the native and wasm paths; upgrade refused by real address | `tools/e2e-live.js` over real connections; browser matrix for the upgrade |
+| `net:accept` refuses before any allocation, on the native and wasm paths; upgrade refused by real address; a GMCP packet dropped by `net:telnet`; a disconnect from the read path deferred (no use-after-free under ASan); `net:read` counts bounded | `tools/e2e-live.js` over real connections; browser matrix for the upgrade |
 
 Also on every phase: Debug + sanitizer and RelWithDebInfo builds, the LPC
 suite twice (randomized order), the §4.5 gate with numbers in the PR, and
@@ -811,7 +884,8 @@ master ships the reference policy so CI exercises it.
 | Risk | Mitigation |
 |---|---|
 | Detached cost regresses a hot path | cachegrind gate on every phase; per-function and per-object gating |
-| Handler code corrupts VM state | one primitive (§4.3) used everywhere; GTests that force overruns and errors at each point |
+| Handler code corrupts VM state | one primitive (§4.3) used everywhere, on its own stack; tests that force errors and runaways at each point |
+| A stack walker that forgets the suspended stack | one iterator over all stacks used by the destruct sweep, the recompile check and `mark_stack()`; the prototype's tests are regression tests |
 | Off-graph references leak or trip `check_memory()` | `mark_hooks()` from phase 1; Debug suite with attachments live |
 | A hook locks the mud up | tiers; no fail-closed on connection points; `hooks enabled : 0` |
 | `function` is the hardest point (five sites) and now ships second | prototype the entry helper and its gate first in 2a, observe-only |
@@ -856,7 +930,8 @@ pattern (§6).
 `object:move`, `user:exec`, `call_out:fire`, `apply:<name>`, `net:telnet` …).
 Most were exact duplicates of an efun or of function entry, each a second
 site with its own re-validation rules, and the eleven validated cases used
-four of them. v10 keeps seven points plus an `origin` filter; the rest are in
+four of them. The catalogue now has five generic points with an `origin`
+filter, plus the network family; the rest are in
 Appendix B.
 
 ## 9. Decisions
@@ -872,29 +947,25 @@ Appendix B.
 6. Hooks should cover efuns, simul_efuns, applies, `call_other`, `call_out`,
    `heart_beat`, destruct, move and the network layer.
 7. Avoid duplicate and low-value work.
+8. **Generic points instead of one point per event** (confirmed). The v9
+   catalogue had 36 point families, most of them exact duplicates of an efun
+   or of function entry; §4.4's coverage map shows how each thing in decision
+   6 is hooked, and Appendix B keeps the surveyed bespoke points for later.
+9. **The whole network family is in the plan**: `net:accept`,
+   `net:ws_upgrade`, `net:telnet`, `net:tls`, `net:read`, `net:write`,
+   `net:resolve` (phase 3).
+10. **Handler time is not charged to the observed code, and handlers run on
+    an alternate stack.** Both were validated with a prototype (§4.3,
+    Appendix C). The validation changed one detail: the exemption is capped
+    per evaluation (`hook eval cost`), because an uncapped one let 40 handlers
+    run for 2 s under a 1 s limit.
 
-**Resolved in v10, for the maintainer to confirm**
+**Resolved in this document, for the maintainer to confirm**
 
-8. **Generic points instead of one point per event** (from 6 and 7). The v9
-   catalogue had 36 point families; the eleven validated cases use four of
-   them, and most of the rest were exact duplicates of an efun or of function
-   entry (`object:move` is `efun:move_object`, the only caller of the driver's
-   move; `user:exec`, `user:snoop`, `shadow:attach`, `object:clone`,
-   `call_out:schedule` likewise; `apply:*`, `heart_beat`, `call_out:fire` and
-   `simul:*` are function entry with a different origin). v10 keeps seven
-   points and the §4.4 coverage map shows how each thing in decision 6 is
-   hooked. The surveyed bespoke points are kept in Appendix B, to be added
-   when a mudlib needs what they add.
-9. **Network.** `net:accept` and `net:ws_upgrade` are planned (scenario S13:
-   bans and rate limits before a session exists; nothing else can do it).
-   `net:telnet`, `net:tls`, `net:read`, `net:write` and `net:resolve` have no
-   use case yet and are in Appendix B; inbound GMCP/MSDP is hookable today
-   through the `function` point on the telnet applies.
-10. **Tiers computed by the driver** (§4.1). `valid_hook()` returns the tier
+11. **Tiers computed by the driver** (§4.1). `valid_hook()` returns the tier
     it grants, so a naive `return 1` allows self-hooks only.
-11. **One decision protocol**: refuse (string or 1) or answer (`({ value })`),
+12. **One decision protocol**: refuse (string or 1) or answer (`({ value })`),
     with per-point meaning in §4.4.
-12. **Handler time is charged to the caller**, within a per-call budget.
 13. **Auto object** (§4.7): no driver change; if the recipe fails its
     end-to-end check in phase 1, the fallback is a one-line master apply
     `string get_auto_object()`. **Destruct veto**: by the auto object's
@@ -904,16 +975,14 @@ Appendix B.
     matching AROUND costs no more than about 1.5x a matching AFTER, and at
     least one mudlib use case from §2.2 must be confirmed as wanted. No
     validated case needs it today.
-15. **Dropped from this RFC**: `call_limited()`, `hook_reset()`, per-protocol
-    network points, driver-side throttling.
+15. **Dropped from this RFC**: `call_limited()`, `hook_reset()`, driver-side
+    throttling.
 
 **Open**
 
-16. Is charging handler time to the caller (12) acceptable, or should audit
-    hooks installed by the mudlib be free for the code they observe?
-17. Default for `hook eval cost` (proposed: one tenth of
-    `maximum evaluation cost`).
-18. Which Appendix B points, if any, should be promoted into the plan now.
+16. Default for `hook eval cost` (proposed: equal to
+    `maximum evaluation cost`, which bounds a stall at twice the eval limit).
+17. Which Appendix B points, if any, should be promoted into the plan now.
 
 ## Appendix A: evidence from real mudlibs
 
@@ -1131,15 +1200,13 @@ hazard found, so the work is not lost. Paths are under `src/`.
 | `user:disconnect` with a cause | `function` `net_dead`; `object:destruct` | a transport cause (`eof`/`error`/`tls`/`protocol`), and the case where the body is destructed (no apply fires today) | `comm.cc` `remove_interactive()`; needs `BEV_EVENT_ERROR` split from `EOF` |
 | `user:exec`, `user:snoop` | `efun:exec`, `efun:snoop` (DECIDE at tier 3) | nothing | `packages/core/interactive.cc`, `comm.cc` |
 | `socket:event` | `function` on the callback | functional callbacks | `packages/sockets/socket_efuns.cc` `call_callback()` |
-| `net:telnet` | `function` on `gmcp`/`msdp`/`telnet_suboption`/`window_size`/`terminal_type` | negotiation (WILL/DO…) and pre-logon events; dropping a subnegotiation before its apply | `net/telnet.cc` `telnet_event_handler()`; negotiation cannot be refused (libtelnet has already replied); a handler that disconnects the user on the read path must be deferred, not immediate |
-| `net:tls` | nothing | handshake outcome, version, cipher (no client-cert or SNI data exists) | `transport_libevent.cc` `on_user_events()` |
-| `net:read`, `net:write` | nothing | byte counts per user or port | counting in C or coalesced batches only: per-segment LPC is attacker-paced, and `add_vmessage()` formats into a static buffer that a re-entering handler would clobber |
-| `net:resolve` | `efun:resolve` (the request) | completion of the driver's own reverse lookup | `packages/core/dns_libevent.cc` |
 | inline output hooks | `efun:write`/`tell_object`/`message`; `receive_message`/`catch_tell` applies | — | rejected: static-buffer re-entry |
 | `call_limited(function, eval_cost, …)` | — | a sub-budget for a handler that fans out to many subscribers | must clamp to and charge the caller's budget, or it is an eval-limit escape |
 | USDT probes at each join point | — | zero-cost external tracing with `bpftrace` | Linux only |
 
 ## Appendix C: reproducing the probes
+
+### C.1 Interposition probes
 
 ```sh
 mkdir -p testsuite/clone/probe
@@ -1152,6 +1219,27 @@ cd testsuite && ../build/src/driver etc/config.test -ftest:single/tests/zz_probe
 
 These edits are for the experiment only; revert them afterwards
 (`git checkout -- testsuite/single/simul_efun.lpc` and delete the copied files).
+
+### C.2 Prototype: alternate stack and eval exemption
+
+`probes/prototype/altstack-eval.patch` (against master `de11656d`, not for
+merge) adds a scratch efun `hook_proto_call(flags, budget_us, function, …)`
+that runs a function pointer on a second VM stack and/or exempt from the
+caller's eval limit; `zz_proto.lpc` and `zz_proto_recompile.lpc` are the
+tests, `results.txt` their output, `timer_cost.cc` the timer microbenchmark.
+
+| Experiment | Result |
+|---|---|
+| Handler invoked with the caller 3 frames from the depth limit | same stack: contained "Too deep recursion", handler did not run; alternate stack: ran |
+| `call_stack()` inside a handler under a 10-frame caller | same stack: 10 frames; alternate stack: 2 |
+| Object destructed inside the handler while the caller's frames hold it | alternate stack without walking the suspended stack: 2 stale object slots; with the walk: 0 |
+| `recompile_object()` inside the handler, of a program with a live frame below the handler's caller | same stack: refused; alternate stack without the walk: **allowed**; with the walk: refused |
+| Caller's eval used by a 200 ms handler | charged: 200,005 µs; exempt (lazy credit): 3 µs |
+| 600 ms handler, caller with ~300 ms of eval left | handler completed; caller still had 299,994 µs |
+| `while (1)` handler, 300 ms budget, caller with 3 s left | aborted after 3 s (when the caller's timer fired); caller's 3 s restored |
+| 40 exempt handlers × 50 ms under a 1 s limit | uncapped: all ran, 2.0 s, no error; capped at 500 ms: caller stopped after 29 handlers, 1.45 s |
+| Cost per no-op handler call | bare function pointer 232 ns; same stack 314; alternate stack 330; + lazy eval credit 368; re-arming the timer around the call 3,240 |
+| Timer system calls (this VM) | `timer_settime` 990 ns, `timer_gettime` 850 ns, monotonic clock read 18 ns |
 
 ## Appendix D: review log
 
@@ -1174,4 +1262,4 @@ Draft v1 was reviewed from six angles; the main changes:
 | Maintainer (v9): add hooks for "net" | A read-only survey of `src/net`, `comm.cc`, `telnet.cc`, `ws_*.cc`, `dns_libevent.cc`, `wasm/comm_wasm.cc` | `net:accept` (refuse before allocation), `net:ws_upgrade`, `net:tls`, `net:telnet`, `net:read`/`net:write` (counting only), `net:resolve`; transport cause on `user:disconnect`; rules for lws callbacks, pre-logon identity, deferred read-path disconnects and bounded address tables; all in phase 3 |
 | Maintainer (v8) | Too many phases | Four phases |
 | Second review round (v10): consistency, scope and value, security of the `valid_hook()` model, implementer dry run | 31 contradictions left by nine revisions (efun timing vs `valid_*`, destruct placement, deny semantics per point, examples using deny-listed points, phase-1 examples needing phase-4 features). 36 point families of which the validated cases use four; most bespoke points duplicate an efun or function entry. Without the daemon, observation scoping had regressed to "the master should be careful": a naive `valid_hook()` exposed typed passwords, simul_efun transparency undid `valid_override()`, a handler's own extent hid foreign writes, observers could mutate arguments, hooked calls were free of eval cost, and a fail-closed hook on input or accept could lock the mud with no way back. The primitive missed state the error path clobbers (`restrict_destruct`, the heart_beat object) and phase 1 depended on phase-2/4 features | Document rewritten as one design with a single catalogue; seven points plus `origin` filter and a coverage map, the rest in Appendix B; driver-computed tiers; secret redaction; tier-3 delivery from simul frames; per-cause re-entry; one-level argument copies; one decision protocol (refuse / answer); handler time charged to the caller; skip status and kill switch; primitive rewritten against the source; phases reordered by validated value (core, function, efuns and connections, around) with a PR split and a harness mapping for tests |
-
+| Maintainer (v11): generic points yes; keep the whole `net:` family; do not charge handler time to the caller, and run handlers on an alternative stack ("you validate it") | Prototype (Appendix C.2). Alternate stack: a handler runs even at the depth limit and sees only its own frames, for +16 ns; but the destruct sweep and the `recompile_object()` live-frame check must walk the suspended stack (the check was bypassed without it). Eval: re-arming the timer per handler costs 3.2 µs; a lazy credit exempts handler time for 38 ns; an uncapped exemption is an eval-limit escape (2 s of work under a 1 s limit) | §4.3 rewritten around the hook stack and a capped eval credit; the five remaining `net:` points back in the catalogue and phase 3; decisions 8–10 |
