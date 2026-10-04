@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v7 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4), auto object, destruct veto and `HOOK_AROUND` resolved in this document (v5), 11 validated real-mudlib use cases and the plan completed (v6), comprehensive join-point catalogue across the driver (v7); see [§12](#12-review-log). Decisions in [§11](#11-decisions) |
+| Status | Draft v8 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4), auto object, destruct veto and `HOOK_AROUND` resolved in this document (v5), 11 validated real-mudlib use cases and the plan completed (v6), comprehensive join-point catalogue across the driver (v7), plan consolidated into four phases (v8); see [§12](#12-review-log). Decisions in [§11](#11-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
 | Evidence | Probes in [`probes/`](probes/), run on master `b5714e5f` (RelWithDebInfo, gcc) |
@@ -760,7 +760,7 @@ effects daemon, an event bus) shares one `hook eval cost`, so one slow
 subscriber starves the rest. An optional efun `call_limited(function f, int
 eval_cost, mixed args...)` (LDMud's `limited()`) runs `f` under its own
 budget using the §5.4 primitive's save/restore, and returns `({ result })` or
-0 on overrun or error. It is useful beyond hooks, and lands in phase 4c.
+0 on overrun or error. It is useful beyond hooks, and lands in phase 4.
 
 **Deferred or rejected here.** Environment/room-tree filters (an LPC
 `environment()` walk in the handler is ~100 ns; add only if measured hot);
@@ -789,7 +789,7 @@ whole security and resource model there (§4.2). FluffOS can do the same today:
   empty text for the master, the simul_efun object, the auto object and its
   own inherits. This is cloud-server's layered-auto trick
   (`objectd.c:627-640`) with FluffOS's existing applies. The end-to-end
-  combination is **not yet verified**; phase 0 verifies it and falls back to
+  combination is **not yet verified**; phase 1 verifies it and falls back to
   a one-line master apply if needed (§11).
 
 What it is for, and what it is not:
@@ -898,49 +898,49 @@ anything is attached: always the join point's `g_hook_mask` bit first.
 
 | Point | Fires | Site | Kinds | Handler args after `id` | Freq | Gate | Rules specific to this point | Phase |
 |---|---|---|---|---|---|---|---|---|
-| `call_other` | a resolved `call_other`/`->`, single or array target | `vm/internal/apply.cc` `apply_low()` when `local_call_origin == ORIGIN_CALL_OTHER`, after the permission check, before default-argument fill (both `f__call_other()` and `call_all_other()` converge here) | B A D R | actor, caller, target (after shadows), fn, args | per call | mask, `PROG_HOOKED`, `O_HOOKED`, pointer set | re-check `target` destructed after B/D (apply_low only checks before); `try_reset()` may run `reset()` before the hook; R needs the dispatch tail split into `apply_low_dispatch()` | 2a (R: 4b) |
-| `call_other:miss` | the same call found nothing callable | `apply_low()` not-found / permission exits, `ORIGIN_CALL_OTHER` | B D (claim) | + reason | rare | mask | arguments still on the stack at this point, unlike in `f__call_other()` | 1a |
-| `simul:<name>` | a simul_efun is called | `vm/internal/simul_efun.cc` `call_simul_efun()` — one site for `F_SIMUL_EFUN` and simul function pointers | B A D R | actor, caller, 0, name, args | per call | mask, byte bitmap indexed by simul index, recomputed by name in `rebuild_simul_efuns()` | — | 2c |
-| `efun:<name>` | an efun is about to run | `vm/internal/base/interpret.cc` `call_the_efun` (all of `F_EFUN0`–`F_EFUN3`, `F_EFUNV`) and `vm/internal/base/function.cc` `FP_EFUN` | B A D | actor, caller (a simul_efun wrapper's caller, §5.1), subject (§5.9), name, args | per opcode | mask, per-efun byte (`g_efun_hooked[MAX_INSTRS]`) | after a handler: restore `st_num_arg` and re-run the efun's argument type check through one shared helper (which also fixes the `FP_EFUN` route checking fewer arguments than `F_EFUNV` today); deny-list: `hook_*`, `call_limited`, `_call_other` (use `call_other`), `call_out`/`call_out_walltime` (use `call_out:*`); D refused on `error`, `throw`, `set_eval_limit`, `reset_eval_cost`, `eval_cost`; no R (re-running a C efun on substituted arguments is deferred); `efun::foo()` and `foo()` are the same opcode | 2d |
-| `apply:<name>` | the driver calls a function in an object | `apply_low()` when `local_call_origin == ORIGIN_DRIVER`, **and** `call_direct()` with `ORIGIN_DRIVER` (master applies through `apply_master_ob()` take this second route; `safe_apply_master_ob()` the first) | B A; D R only on applies whose result the driver ignores: `create`, `init`, `on_destruct`, `receive_message`, `net_dead`, the telnet applies | actor, caller (may be 0), target, name, args | per call | mask, `PROG_HOOKED`, `O_HOOKED` | **D/R forbidden** where a deny would take the "not found" exit and permanently disable the apply (`reset` clears `O_WILL_RESET`, `clean_up` clears `O_WILL_CLEAN_UP`, `process_input` clears `HAS_PROCESS_INPUT`, `write_prompt` falls back to the default) or where C reads the result (`id`, `catch_tell`, verb functions, every master apply); `__INIT` is not hookable; `heart_beat` is its own point; master applies are observe-only and never run while a compile is active | 2e |
-| `call_out:schedule` | `call_out()`/`call_out_walltime()` adds an entry | `packages/core/call_out.cc` `int_call_out()` | B D A | actor, caller, owner object, function (name or funptr), delay, args | per call | mask, `O_HOOKED` on owner | D makes the efun error; replaces `efun:call_out` | 2b |
-| `call_out:fire` | a call_out is about to run | `call_out()` in `call_out.cc`, after the arguments are pushed, before `set_eval` | B D A R | 0, 0, owner, function, args (+ handle) | per fire | mask, `PROG_HOOKED`, `O_HOOKED` | events are snapshotted before dispatch, so scheduling or removing call_outs inside a handler is safe; a D still settles the entry's promise (rejected, AGENTS.md §13.25) and frees it; `command_giver` saved and restored | 2b |
-| `call_out:remove` | an entry is removed (`remove_call_out`, by handle, all on reload) | `call_out.cc` | A | owner, function, handle | low | mask | destruct does not remove call_outs (they are reclaimed lazily), so it does not fire this | 2b |
-| `heart_beat` | an object's heart_beat is about to run | `packages/core/heartbeat.cc` `call_heart_beat()`, before `call_direct()` | B D A R | 0, 0, ob | per tick per object | mask, `PROG_HOOKED`, `O_HOOKED` | the **only** point for heart_beat (`apply:heart_beat` is an alias, not a second firing); re-check destructed after B/D (`call_direct()` never does); save/restore `command_giver`, `current_interactive`, `g_current_heartbeat_obj`; toggling other objects' heart_beats inside a handler is safe | 2b |
-| `heart_beat:set` | `set_heart_beat()` turns a heart_beat on or off | `heartbeat.cc` `set_heart_beat()` | A | ob, on/off | low | mask | — | 2b |
-| `function` | a function is entered by any route | one helper, after default arguments are filled and before the frame is pushed, at five sites: `apply_low()`, `F_CALL_FUNCTION_BY_ADDRESS`, `F_CALL_INHERITED`, `call_direct()`, `FP_LOCAL` | B A D R | actor, caller, target, fn, args | per call | `PROG_HOOKED` on the **defining** program, then a lazily allocated per-function bitmap on that program (there is no free bit in `function_flags`) | `FP_FUNCTIONAL` (`(: ... :)` with no named function) is not hookable; for an `async` function AFTER fires when the body parks (result = the promise); a D pops the arguments and pushes 0; bits recomputed on compile, `recompile_object()` **and** `replace_program()` | 4a |
+| `call_other` | a resolved `call_other`/`->`, single or array target | `vm/internal/apply.cc` `apply_low()` when `local_call_origin == ORIGIN_CALL_OTHER`, after the permission check, before default-argument fill (both `f__call_other()` and `call_all_other()` converge here) | B A D R | actor, caller, target (after shadows), fn, args | per call | mask, `PROG_HOOKED`, `O_HOOKED`, pointer set | re-check `target` destructed after B/D (apply_low only checks before); `try_reset()` may run `reset()` before the hook; R needs the dispatch tail split into `apply_low_dispatch()` | 2 (R: 4) |
+| `call_other:miss` | the same call found nothing callable | `apply_low()` not-found / permission exits, `ORIGIN_CALL_OTHER` | B D (claim) | + reason | rare | mask | arguments still on the stack at this point, unlike in `f__call_other()` | 1 |
+| `simul:<name>` | a simul_efun is called | `vm/internal/simul_efun.cc` `call_simul_efun()` — one site for `F_SIMUL_EFUN` and simul function pointers | B A D R | actor, caller, 0, name, args | per call | mask, byte bitmap indexed by simul index, recomputed by name in `rebuild_simul_efuns()` | — | 2 |
+| `efun:<name>` | an efun is about to run | `vm/internal/base/interpret.cc` `call_the_efun` (all of `F_EFUN0`–`F_EFUN3`, `F_EFUNV`) and `vm/internal/base/function.cc` `FP_EFUN` | B A D | actor, caller (a simul_efun wrapper's caller, §5.1), subject (§5.9), name, args | per opcode | mask, per-efun byte (`g_efun_hooked[MAX_INSTRS]`) | after a handler: restore `st_num_arg` and re-run the efun's argument type check through one shared helper (which also fixes the `FP_EFUN` route checking fewer arguments than `F_EFUNV` today); deny-list: `hook_*`, `call_limited`, `_call_other` (use `call_other`), `call_out`/`call_out_walltime` (use `call_out:*`); D refused on `error`, `throw`, `set_eval_limit`, `reset_eval_cost`, `eval_cost`; no R (re-running a C efun on substituted arguments is deferred); `efun::foo()` and `foo()` are the same opcode | 2 |
+| `apply:<name>` | the driver calls a function in an object | `apply_low()` when `local_call_origin == ORIGIN_DRIVER`, **and** `call_direct()` with `ORIGIN_DRIVER` (master applies through `apply_master_ob()` take this second route; `safe_apply_master_ob()` the first) | B A; D R only on applies whose result the driver ignores: `create`, `init`, `on_destruct`, `receive_message`, `net_dead`, the telnet applies | actor, caller (may be 0), target, name, args | per call | mask, `PROG_HOOKED`, `O_HOOKED` | **D/R forbidden** where a deny would take the "not found" exit and permanently disable the apply (`reset` clears `O_WILL_RESET`, `clean_up` clears `O_WILL_CLEAN_UP`, `process_input` clears `HAS_PROCESS_INPUT`, `write_prompt` falls back to the default) or where C reads the result (`id`, `catch_tell`, verb functions, every master apply); `__INIT` is not hookable; `heart_beat` is its own point; master applies are observe-only and never run while a compile is active | 2 |
+| `call_out:schedule` | `call_out()`/`call_out_walltime()` adds an entry | `packages/core/call_out.cc` `int_call_out()` | B D A | actor, caller, owner object, function (name or funptr), delay, args | per call | mask, `O_HOOKED` on owner | D makes the efun error; replaces `efun:call_out` | 2 |
+| `call_out:fire` | a call_out is about to run | `call_out()` in `call_out.cc`, after the arguments are pushed, before `set_eval` | B D A R | 0, 0, owner, function, args (+ handle) | per fire | mask, `PROG_HOOKED`, `O_HOOKED` | events are snapshotted before dispatch, so scheduling or removing call_outs inside a handler is safe; a D still settles the entry's promise (rejected, AGENTS.md §13.25) and frees it; `command_giver` saved and restored | 2 |
+| `call_out:remove` | an entry is removed (`remove_call_out`, by handle, all on reload) | `call_out.cc` | A | owner, function, handle | low | mask | destruct does not remove call_outs (they are reclaimed lazily), so it does not fire this | 2 |
+| `heart_beat` | an object's heart_beat is about to run | `packages/core/heartbeat.cc` `call_heart_beat()`, before `call_direct()` | B D A R | 0, 0, ob | per tick per object | mask, `PROG_HOOKED`, `O_HOOKED` | the **only** point for heart_beat (`apply:heart_beat` is an alias, not a second firing); re-check destructed after B/D (`call_direct()` never does); save/restore `command_giver`, `current_interactive`, `g_current_heartbeat_obj`; toggling other objects' heart_beats inside a handler is safe | 2 |
+| `heart_beat:set` | `set_heart_beat()` turns a heart_beat on or off | `heartbeat.cc` `set_heart_beat()` | A | ob, on/off | low | mask | — | 2 |
+| `function` | a function is entered by any route | one helper, after default arguments are filled and before the frame is pushed, at five sites: `apply_low()`, `F_CALL_FUNCTION_BY_ADDRESS`, `F_CALL_INHERITED`, `call_direct()`, `FP_LOCAL` | B A D R | actor, caller, target, fn, args | per call | `PROG_HOOKED` on the **defining** program, then a lazily allocated per-function bitmap on that program (there is no free bit in `function_flags`) | `FP_FUNCTIONAL` (`(: ... :)` with no named function) is not hookable; for an `async` function AFTER fires when the body parks (result = the promise); a D pops the arguments and pushes 0; bits recomputed on compile, `recompile_object()` **and** `replace_program()` | 4 |
 
 #### Objects
 
 | Point | Fires | Site | Kinds | Handler args after `id` | Freq | Rules | Phase |
 |---|---|---|---|---|---|---|---|
-| `object:load` | a program is loaded as an object | `vm/internal/simulate.cc` `load_object()` and its two siblings (`load_virtual_object()` → `compile_object` apply; `load_object_from_source()`) | B A | name, ob (A), cause `"file"`/`"virtual"`/`"source"`/`"failed"` | medium | no D: `valid_object()` already is the load veto | 1b |
-| `object:clone` | `clone_object()`/`new()` | `simulate.cc` `clone_object()`: B after the visibility check, A after `call_create()` | B D A | blueprint, ob (A), args | medium–high | D is new capability (`valid_object()` does not run for clones): per-domain quotas (S11) | 1b (D: 1c) |
-| `object:create` | `create()` returned | `vm/internal/base/object.cc` `call_create()` | A | ob | medium–high | skipped when `create()` destructed the object | 1b |
-| `object:reset`, `object:clean_up` | the driver ran `reset()` / `clean_up()` | `object.cc` `reset_object()` (periodic and lazy); `backend.cc` clean_up | A | ob | low | observe only (`apply:reset` D is forbidden, see above) | 1b |
-| `object:destruct` | any destruct | `simulate.cc` `destruct_object()`, **after** the existing `O_DESTRUCTED` re-check and before `remove_object_from_stack()` | B (observe) | ob, cause `"efun"`/`"shadowed"`/`"environment"`/`"refused"`/`"reload"` | medium | re-test `O_DESTRUCTED` after the handler and return if it destructed the object (the old "before the re-check" placement double-fired on nested destructs); during environment eviction `restrict_destruct` makes a handler's `destruct()` of other objects error (contained) | 1b |
-| `object:move` | `move_object()` | `simulate.cc` `move_object()`: B/D after the recursion and shadow checks, before `try_reset()`; A after `item->super = dest`, before `setup_new_commands()` | B D A | item, from, to, reason `"efun"`/`"eviction"` | high | after any LPC in `move_object()` (a hook or `try_reset()`), re-run the recursion check, the shadow check and the destructed check, not only the destructed check as today; never fire inside `setup_new_commands()` (it iterates the inventory with prefetched pointers); a denied move during eviction makes `move_or_destruct` fail, so the driver destructs the item (documented) | 1c |
-| `object:recompile` | `recompile_object()` | `simulate.cc` `recompile_object()`: D before the guards, A after the per-target loop | D A | master copy | rare | never inside the target loop (variables mid-carry, `__INIT` running) | 3b |
-| `object:replace_program` | `replace_program()` takes effect | `packages/core/replace_program.cc` `replace_programs()`, A after the loop | A | ob | rare | — | 3b |
-| `shadow:attach` | `shadow()` linked a shadow | `packages/core/efuns_main.cc` `f_shadow()` after the link | A | shadow, victim | low | no D: `valid_shadow()` exists; `shadow(ob, 0)` is a query, not a detach | 3b |
-| `shadow:detach` | a shadow is unlinked | `destruct_object()`, `reload_object()`, `replace_programs()` | A | shadow, victim, cause | low | observe only (pointers half-updated) | 3b |
+| `object:load` | a program is loaded as an object | `vm/internal/simulate.cc` `load_object()` and its two siblings (`load_virtual_object()` → `compile_object` apply; `load_object_from_source()`) | B A | name, ob (A), cause `"file"`/`"virtual"`/`"source"`/`"failed"` | medium | no D: `valid_object()` already is the load veto | 1 |
+| `object:clone` | `clone_object()`/`new()` | `simulate.cc` `clone_object()`: B after the visibility check, A after `call_create()` | B D A | blueprint, ob (A), args | medium–high | D is new capability (`valid_object()` does not run for clones): per-domain quotas (S11) | 1 (D: 2) |
+| `object:create` | `create()` returned | `vm/internal/base/object.cc` `call_create()` | A | ob | medium–high | skipped when `create()` destructed the object | 1 |
+| `object:reset`, `object:clean_up` | the driver ran `reset()` / `clean_up()` | `object.cc` `reset_object()` (periodic and lazy); `backend.cc` clean_up | A | ob | low | observe only (`apply:reset` D is forbidden, see above) | 1 |
+| `object:destruct` | any destruct | `simulate.cc` `destruct_object()`, **after** the existing `O_DESTRUCTED` re-check and before `remove_object_from_stack()` | B (observe) | ob, cause `"efun"`/`"shadowed"`/`"environment"`/`"refused"`/`"reload"` | medium | re-test `O_DESTRUCTED` after the handler and return if it destructed the object (the old "before the re-check" placement double-fired on nested destructs); during environment eviction `restrict_destruct` makes a handler's `destruct()` of other objects error (contained) | 1 |
+| `object:move` | `move_object()` | `simulate.cc` `move_object()`: B/D after the recursion and shadow checks, before `try_reset()`; A after `item->super = dest`, before `setup_new_commands()` | B D A | item, from, to, reason `"efun"`/`"eviction"` | high | after any LPC in `move_object()` (a hook or `try_reset()`), re-run the recursion check, the shadow check and the destructed check, not only the destructed check as today; never fire inside `setup_new_commands()` (it iterates the inventory with prefetched pointers); a denied move during eviction makes `move_or_destruct` fail, so the driver destructs the item (documented) | 2 |
+| `object:recompile` | `recompile_object()` | `simulate.cc` `recompile_object()`: D before the guards, A after the per-target loop | D A | master copy | rare | never inside the target loop (variables mid-carry, `__INIT` running) | 3 |
+| `object:replace_program` | `replace_program()` takes effect | `packages/core/replace_program.cc` `replace_programs()`, A after the loop | A | ob | rare | — | 3 |
+| `shadow:attach` | `shadow()` linked a shadow | `packages/core/efuns_main.cc` `f_shadow()` after the link | A | shadow, victim | low | no D: `valid_shadow()` exists; `shadow(ob, 0)` is a query, not a detach | 3 |
+| `shadow:detach` | a shadow is unlinked | `destruct_object()`, `reload_object()`, `replace_programs()` | A | shadow, victim, cause | low | observe only (pointers half-updated) | 3 |
 
 #### Users and sessions
 
 | Point | Fires | Site | Kinds | Handler args after `id` | Freq | Rules | Phase |
 |---|---|---|---|---|---|---|---|
-| `user:logon` | the body's `logon()` returned | `comm.cc` after `APPLY_LOGON` and its destructed check | A | body, port, address | rare | — | 2f |
-| `user:disconnect` | an interactive goes away (net-dead, quit, destruct, bad negotiation, `remove_interactive`) | `comm.cc` `remove_interactive()`, before `net_dead()` | B (observe) | ob, cause | rare | also fires when the body was destructed (no apply covers that today) | 2f |
-| `user:exec` | `exec()` swaps a connection to another body | `packages/core/interactive.cc` `replace_interactive()`, D at the top (pure checks) | D A | from, to | rare | new capability: there is no `valid_exec` apply | 2f |
-| `user:snoop` | `snoop()` starts or stops | `comm.cc` `new_set_snoop()`, D at the top | D A | snooper, victim (0 = stop) | rare | new capability: there is no `valid_snoop` apply | 2f |
-| `user:input` | a line of input arrives, before `process_input()` | one helper called from the four input sites: `comm.cc` `process_input()` and the three ascii/binary port paths in `net/transport_libevent.cc` | B D | user, line | low–medium | D drops the line; re-check `IP_VALID` after the handler; no transform (`process_input()` can already rewrite) | 2f |
-| `user:command` | an `add_action` verb is about to be dispatched (typed or `command()`) | `packages/core/add_action.cc` `user_parser()` | B D A | user, verb, arg, target, fn (+ result for A) | medium | **snapshot the sentence** (verb, function, object, with refs) before any handler: a handler that moves or destructs anything frees it otherwise | 2f |
+| `user:logon` | the body's `logon()` returned | `comm.cc` after `APPLY_LOGON` and its destructed check | A | body, port, address | rare | — | 3 |
+| `user:disconnect` | an interactive goes away (net-dead, quit, destruct, bad negotiation, `remove_interactive`) | `comm.cc` `remove_interactive()`, before `net_dead()` | B (observe) | ob, cause | rare | also fires when the body was destructed (no apply covers that today) | 3 |
+| `user:exec` | `exec()` swaps a connection to another body | `packages/core/interactive.cc` `replace_interactive()`, D at the top (pure checks) | D A | from, to | rare | new capability: there is no `valid_exec` apply | 3 |
+| `user:snoop` | `snoop()` starts or stops | `comm.cc` `new_set_snoop()`, D at the top | D A | snooper, victim (0 = stop) | rare | new capability: there is no `valid_snoop` apply | 3 |
+| `user:input` | a line of input arrives, before `process_input()` | one helper called from the four input sites: `comm.cc` `process_input()` and the three ascii/binary port paths in `net/transport_libevent.cc` | B D | user, line | low–medium | D drops the line; re-check `IP_VALID` after the handler; no transform (`process_input()` can already rewrite) | 3 |
+| `user:command` | an `add_action` verb is about to be dispatched (typed or `command()`) | `packages/core/add_action.cc` `user_parser()` | B D A | user, verb, arg, target, fn (+ result for A) | medium | **snapshot the sentence** (verb, function, object, with refs) before any handler: a handler that moves or destructs anything frees it otherwise | 3 |
 
 #### Other
 
 | Point | Fires | Site | Kinds | Freq | Rules | Phase |
 |---|---|---|---|---|---|---|
-| `socket:event` | an efun-socket read/write/close callback is about to run | `packages/sockets/socket_efuns.cc` `call_callback()` (single funnel) | A (observe) | low–medium | the data is already consumed; a denied close would leak LPC state, so observe only; eval state restored by §5.4 | 3b |
+| `socket:event` | an efun-socket read/write/close callback is about to run | `packages/sockets/socket_efuns.cc` `call_callback()` (single funnel) | A (observe) | low–medium | the data is already consumed; a denied close would leak LPC state, so observe only; eval state restored by §5.4 | 3 |
 
 #### Not join points (and why)
 
@@ -1006,33 +1006,18 @@ anything is attached: always the join point's `g_hook_mask` bit first.
 
 ## 8. Implementation plan
 
-Each phase is one PR, reviewed and merged before the next one starts.
-Phases 0–1 deliver #1414 and the lifecycle events; phases 2–3 the
-administrative probes; phase 4 the game-design layer.
-
 ### 8.1 Phases
 
-Each phase is one PR. Tracks B–E can proceed in parallel once phase 1a
-(the core) is merged; phase 4 depends on 2a and 2b.
+Four phases, each one or a few PRs, each shipping its own tests and docs.
+Phases 2 and 3 can run in parallel once phase 1 is merged; phase 4 needs
+phase 2.
 
-| Phase | Track | Scope (join points from §5.10) | Main driver changes | Tests (each fails on the unfixed driver) | Exit criteria |
+| Phase | Delivers | Join points (§5.10) and features | Main driver changes | Key tests (each fails on the unfixed driver) | Exit criteria |
 |---|---|---|---|---|---|
-| **0** | docs | Layer 0: interposition guide and the auto-object recipe (§5.8) | none (fallback `get_auto_object()`) | auto object injected only into ordinary files; efun override used; `efun::` refused by `valid_override()`; explicit `destruct()` vetoed | recipe verified or fallback merged |
-| **1a** | A: core | `valid_hook`, spec normalization, `hook_attach`/`detach`/`list`/`query`/`reset`, ownership, the contained-invocation primitive with all §5.4 and §5.10 rules, `call_other:miss` | new `src/vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`, `apply.cc`, `applies`, `rc.cc`, `checkmemory.cc` | authorization matrix; miss by every route and reason; claim/decline; owner destruct detaches; GTest: eval state, `command_giver`, `current_interactive` restored after a forced overrun; refused while compiling | closes #1414; detached gate |
-| **1b** | B: objects | `object:load`, `object:clone` (B/A), `object:create`, `object:reset`, `object:clean_up`, `object:destruct` | `simulate.cc`, `object.cc`, `backend.cc` | every destruct cause reported exactly once (incl. nested destruct and destruct inside the handler); load by all three routes; self-destructing `create()` not reported | Debug `check_memory()` clean with attachments live |
-| **1c** | B: objects | `object:move` (B/D/A), `object:clone` D | `simulate.cc` `move_object()`, `clone_object()` | deny a move; re-validation after a handler that moves the destination into the item (recursion) and after one that destructs it; no firing inside `init` dispatch; denied eviction move destructs the item | gate on a move-heavy loop |
-| **2a** | C: calls | `call_other` (B/A/D), filters, `PROG_HOOKED`, `O_HOOKED`, pointer set, `count`/`time`, `args` filter, `HOOK_FAIL_CLOSED`, per-attachment re-entry | `apply.cc`, `program.h`, `object.h`, `hooks.cc` | every filter key; deny with message; fail-closed; target destructed by a B handler; array targets per element | gate incl. 1 and 100 non-matching filters |
-| **2b** | C: calls | `call_out:schedule`/`fire`/`remove`, `heart_beat`, `heart_beat:set` | `call_out.cc`, `heartbeat.cc` | deny a fire settles the promise rejected and frees the entry; schedule/remove inside a handler; heart_beat target destructed in B; `this_player()` and heart_beat object restored | gate on a heart_beat-heavy suite |
-| **2c** | C: calls | `simul:<name>` | `simul_efun.cc` | simul by opcode and by function pointer; bits survive simul_efun reload | merged |
-| **2d** | C: calls | `efun:<name>` for any efun; deny-list; subject rule; simul_efun attribution; shared type-check helper | `interpret.cc` (`call_the_efun`), `function.cc` (`FP_EFUN`), `make_func` / instruction table | `efun::` observed; wrapper calls attributed to the real caller; handler destructing an argument gives a clean "bad argument"; deny-listed efuns refused at attach; `FP_EFUN` now checks all arguments | detached gate on an efun-heavy loop |
-| **2e** | C: calls | `apply:<name>` with the D/R allow-list | `apply.cc`, `interpret.cc` (`call_direct`), `master.cc` | D refused on `reset`, `clean_up`, `process_input`, `write_prompt`, `id`, `catch_tell`, verbs, master applies; master applies observe-only through both routes; `__INIT` not hookable | merged |
-| **2f** | D: users | `user:logon`, `user:disconnect`, `user:exec`, `user:snoop`, `user:input`, `user:command` | `comm.cc`, `interactive.cc`, `add_action.cc`, `net/transport_libevent.cc` | input dropped on all four input paths; `IP_VALID` re-check; command handler that destructs the verb's object (sentence snapshot); disconnect on body destruct | e2e (`tools/e2e-live.js`) covers input and command over a real connection |
-| **3** | docs | reference `valid_hook()` and examples (§7), `docs/concepts/general/hooks.md`, efun/apply pages, `include/hooks.h`, config docs, release note | testsuite | examples run in the suite | docs build clean |
-| **3b** | E: misc | `object:recompile`, `object:replace_program`, `shadow:attach`/`detach`, `socket:event` | `simulate.cc`, `replace_program.cc`, `efuns_main.cc`, `socket_efuns.cc` | each event once with the right cause; bits recomputed after `replace_program()` | merged |
-| **4a** | game design | `function` point (five sites, defining-program bitmap), `object`/`caller_object` filters, BEFORE/AFTER, `actor` | `interpret.cc`, `function.cc`, `apply.cc`, `program.h` | every entry route observed; `FP_FUNCTIONAL` refused; async function AFTER sees the promise; no double firing with `call_other`/`apply:*` | gate incl. §5.7 local-call cases |
-| **4b** | game design | AROUND prototype, then `HOOK_AROUND` for `call_other`, `simul:*`, `call_out:fire`, `heart_beat`, `function`, allowed `apply:*`; priorities; return-type check; `nomask` rule | `apply.cc` (`apply_low_dispatch`), `hooks.cc` | curse, clamp, disguise; stacking by priority; failure runs the original unmodified | prototype ≤ ~1.5x AFTER (§11) |
-| **4c** | game design | `expires`, `hook_list(ob)`, labels in traces, `HOOK_DEFERRED`, `call_limited()` | `hooks.cc`, `trace.cc`, backend | expiry callback; batches revalidate destructed objects; `call_limited` overrun leaves the caller intact | merged |
-| **4d** | examples | effects daemon; §2B V1–V11 as testsuite scenarios | testsuite only | end to end | merged |
+| **1. Core** | #1414, lifecycle events, Layer 0 | `valid_hook`, spec normalization, `hook_attach`/`detach`/`list`/`query`/`reset`, ownership, the contained-invocation primitive with every §5.4/§5.10 rule, `call_other:miss`, `object:load`/`clone`(B/A)/`create`/`reset`/`clean_up`/`destruct`; docs: interposition guide, auto-object recipe (§5.8, with the `get_auto_object()` fallback if the recipe fails), reference `valid_hook()`, `include/hooks.h`, release note on pre-existing `valid_hook` | new `src/vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`; `apply.cc`, `simulate.cc`, `object.cc`, `backend.cc`, `applies`, `rc.cc`, `checkmemory.cc` | authorization matrix (absent/0/2/promise/error/pre-master); miss by each route and reason, claim and decline; every destruct cause exactly once (incl. nested and in-handler destructs); owner destruct detaches; refused while compiling; GTest: eval state, `command_giver`, `current_interactive` restored after a forced overrun; auto object injected only into ordinary files | closes #1414; Debug `check_memory()` clean with attachments live; detached cachegrind gate |
+| **2. Calls** | observe and filter every call | `call_other` (B/A/D), `call_out:schedule`/`fire`/`remove`, `heart_beat`, `heart_beat:set`, `simul:<name>`, `efun:<name>` (any efun), `apply:<name>` (D only where allowed), `object:move` (B/D/A), `object:clone` D; filters incl. `args`, `PROG_HOOKED`, `O_HOOKED`, pointer set, `count`/`time`, `HOOK_DECIDE`, `HOOK_FAIL_CLOSED`, per-attachment re-entry | `apply.cc`, `interpret.cc` (`call_the_efun`, `call_direct`), `function.cc`, `simul_efun.cc`, `call_out.cc`, `heartbeat.cc`, `master.cc`, `simulate.cc` (`move_object`), `program.h`, `object.h`, instruction table | every filter key; deny with message; fail-closed; target destructed by a B handler; denied call_out settles its promise; `efun::` observed and simul_efun wrapper calls attributed to the real caller; handler destructing an efun argument gives a clean "bad argument"; D refused on `reset`/`clean_up`/`process_input`/`id`/verbs/master applies; move re-validation and no firing inside `init` dispatch | cachegrind gate on call-, efun-, heart_beat- and move-heavy loops, detached and with 1/100 non-matching filters |
+| **3. Sessions and the rest** | users, shadows, program swaps, sockets | `user:logon`/`disconnect`/`exec`/`snoop`/`input`/`command`, `shadow:attach`/`detach`, `object:recompile`/`replace_program`, `socket:event`; docs `docs/concepts/general/hooks.md` and the efun/apply pages | `comm.cc`, `interactive.cc`, `add_action.cc`, `net/transport_libevent.cc`, `replace_program.cc`, `efuns_main.cc`, `socket_efuns.cc` | input dropped on all four input paths with the `IP_VALID` re-check; command handler that destructs the verb's object (sentence snapshot); disconnect when the body is destructed; bits recomputed after `replace_program()`; e2e over a real connection (`tools/e2e-live.js`) | docs build clean |
+| **4. Game design** | aspects for gameplay | `function` point (five entry sites, defining-program bitmap), `object`/`caller_object` filters, `actor`; then `HOOK_AROUND` behind the §11 prototype gate, priorities, return-type check, `nomask` rule; `expires`, `hook_list(ob)`, labels in traces, `HOOK_DEFERRED`, `call_limited()`; the example effects daemon and §2B V1–V11 as testsuite scenarios | `interpret.cc`, `function.cc`, `apply.cc` (`apply_low_dispatch`), `program.h`, `hooks.cc`, `trace.cc`, backend | every entry route observed and `FP_FUNCTIONAL` refused; no double firing with `call_other`/`apply:*`; curse, clamp, disguise; stacking by priority; a failing AROUND runs the original unmodified; expiry callback; batches revalidate destructed objects | AROUND prototype ≤ ~1.5x AFTER (otherwise ship without AROUND); gate incl. the §5.7 local-call cases |
 
 ### 8.2 Required on every phase
 
@@ -1048,7 +1033,7 @@ Each phase is one PR. Tracks B–E can proceed in parallel once phase 1a
 * **Off by default.** Without a `valid_hook()` in the master nothing can
   attach, so existing mudlibs see no behaviour change; the only cost is the
   detached branches.
-* **Release notes** for phase 1a call out the `valid_hook` name collision
+* **Release notes** for phase 1 call out the `valid_hook` name collision
   (§5.5) and point to the reference policy.
 * **The testsuite master** ships the reference policy so CI exercises it.
 
@@ -1058,7 +1043,7 @@ Each phase is one PR. Tracks B–E can proceed in parallel once phase 1a
 |---|---|
 | Detached cost regresses a hot path | cachegrind gate on every phase; per-function and per-object gating |
 | Handler code corrupts VM state | one contained-invocation primitive (§5.4), reused everywhere; GTests that force overruns and errors |
-| Off-graph references leak or trip `check_memory()` | `mark_hooks()` from phase 1a; Debug suite with attachments live |
+| Off-graph references leak or trip `check_memory()` | `mark_hooks()` from phase 1; Debug suite with attachments live |
 | `HOOK_AROUND` too slow | prototype gate in 4b; BEFORE/AFTER/DECIDE ship regardless |
 | Mudlibs misuse hooks as their stat system | §2A "No" list in the docs; examples show modifier APIs where they belong |
 | Pre-existing `valid_hook` in a master | release note; apply documentation |
@@ -1157,7 +1142,7 @@ Resolved in this document (v5), for the maintainer to confirm:
 
 6. **Auto object**: Layer 0, built from the global include file and
    `include_file()`, no driver change (§5.8). If the end-to-end check in
-   phase 0 fails, the fallback is a one-line master apply
+   phase 1 fails, the fallback is a one-line master apply
    `string get_auto_object()` that the compiler injects as an implicit
    inherit; that is the only driver change the auto object could need.
 7. **Destruct veto**: no driver mechanism. Explicit `destruct()` calls are
@@ -1166,7 +1151,7 @@ Resolved in this document (v5), for the maintainer to confirm:
    Driver-initiated destructs (shadow teardown, environment contents, refused
    loads) stay unvetoable by design: refusing them would leave half-destroyed
    state. `object:destruct` observes all of them.
-8. **`HOOK_AROUND`** ships behind a prototype gate (phase 4b): a prototype
+8. **`HOOK_AROUND`** ships behind a prototype gate (phase 4): a prototype
    measures one matching AROUND against one matching `HOOK_AFTER` on the same
    function. If AROUND costs no more than ~1.5x AFTER per advised call (the
    `proceed` closure is the extra), it ships; otherwise phase 4 ships
