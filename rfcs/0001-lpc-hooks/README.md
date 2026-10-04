@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v2 — revised after a six-angle review (see [§12](#12-review-log)) |
+| Status | Draft v2 — revised after a six-angle review (see [§12](#12-review-log)); maintainer decisions recorded in [§11](#11-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
 | Evidence | Probes in [`probes/`](probes/), run on master `b5714e5f` (RelWithDebInfo, gcc) |
@@ -17,10 +17,13 @@ mechanism instead of one feature per request, split the way eBPF is split:
 * **The driver is the kernel.** It defines a fixed set of join points, makes
   them free when unused, runs handlers in a contained frame, and offers cheap
   C-side filtering and counting for high-frequency events.
-* **One privileged hook daemon is the only subscriber.** The master designates
-  it, like it designates the simul_efun object. The driver delivers events to
-  it and nothing else, so there is exactly one place where hook code runs
-  with the driver's trust.
+* **One privileged hook daemon is the only subscriber, supplied by the master**
+  (master apply `get_hook_daemon()`), the way the master names the
+  simul_efun object. The driver delivers events to it and nothing else, so
+  there is exactly one place where hook code runs with the driver's trust.
+* **The daemon can observe and filter calls.** Beyond the rare events, it
+  attaches `hook_*` probes to `call_other` and to selected efuns, with C-side
+  filters, and can deny matching calls (`HOOK_DECIDE`).
 * **Policy is LPC.** Multiple subscribers, wizard-facing attach/detach,
   scoping ("only events touching your own objects"), dedup and reports are
   written in the daemon, in LPC, where mudlibs differ. A reference daemon
@@ -33,7 +36,7 @@ cannot serve:
 |---|---|---|
 | 0 | No driver change: document the mechanisms that already cover a scenario | S2 (dev), S3, S5 (with a base object), S8 |
 | 1 | Three rare driver events, zero cost on the normal path: `call_other_miss`, `object_created`, `object_destructed` | S1, S5 (no base object, with cause), S7 |
-| 2 | Runtime probes on hot paths, available only to the daemon: `call_other` call probes and opted-in `efun` probes, with per-program gating, pointer-keyed filters, `count`/`time` actions and positional handler arguments | S2 (runtime), S4, S6, S9–S12 |
+| 2 | Call observation and filtering, available only to the daemon (`hook_attach()` etc.): `call_other` and opted-in `efun` probes that observe or deny, with per-program gating, pointer-keyed filters, `count`/`time` actions and positional handler arguments. **In scope** (maintainer decision) | S2 (runtime), S4, S6, S9–S12 |
 
 A DGD-style auto object (compile-time advice on efuns) is complementary and
 is left to a separate RFC (§10).
@@ -192,7 +195,7 @@ Sources: LDMud `github.com/ldmud/ldmud` `8afa5f50` (3.6.8); DGD
 
 ```lpc
 // master
-string get_hook_daemon();   // e.g. "/secure/hookd"; absent or 0 = hooks off
+string|object get_hook_daemon();   // e.g. "/secure/hookd"; absent or 0 = hooks off
 ```
 
 * Resolved at boot and after a master recompile, like the simul_efun object;
@@ -231,10 +234,10 @@ the 3.4x wrapper again. Layer 2 lets the daemon attach **probes** with C-side
 gating, filtering and aggregation:
 
 ```lpc
-int probe_attach(string point, mixed action, mapping filter, int flags);
-void probe_detach(int id);
-mapping probe_query(int id);   // rows, events, dropped, errors, last_error
-void probe_reset(int id);
+int hook_attach(string point, mixed action, mapping filter, int flags);
+void hook_detach(int id);
+mapping hook_query(int id);   // rows, events, dropped, errors, last_error
+void hook_reset(int id);
 ```
 
 Only the daemon may call these (an error otherwise). The daemon exposes its
@@ -242,7 +245,7 @@ own, scoped API to wizards.
 
 | Point | Fires | Site |
 |---|---|---|
-| `call_other` | a resolved `call_other`, before the function runs (so `PROBE_DECIDE` can deny) | `apply_low()`, after lookup, before `push_control_stack()`, `ORIGIN_CALL_OTHER` only |
+| `call_other` | a resolved `call_other`, before the function runs (so `HOOK_DECIDE` can deny) | `apply_low()`, after lookup, before `push_control_stack()`, `ORIGIN_CALL_OTHER` only |
 | `efun:<name>` | before the body of an efun that opts in (phase 1: `write_file`, `write_bytes`, `rm`, `rename`, `mkdir`, `rmdir`, `call_out`, `clone_object`, `new`, `load_object`, `save_object`, `restore_object`, `snoop`, `exec`, `seteuid`, `shutdown`, `socket_*`) | one `HOOK_EFUN()` line at the top of each opted-in efun; covers `F_EFUN*`, efun function pointers and `efun::` alike |
 
 **Filter keys.** Exact strings or arrays of strings; prefix match only when
@@ -259,10 +262,10 @@ the pattern ends in `/`; no globs.
 
 **Actions.** `"count"` (rows keyed by caller program, target program,
 function), `"time"` (count + summed and max eval microseconds, for S9), or an
-LPC function. **Flags.** `PROBE_DECIDE` lets a handler deny (`call_other`,
+LPC function. **Flags.** `HOOK_DECIDE` lets a handler deny (`call_other`,
 `efun:*`): it returns `1` to deny with a generic error, or a string to deny
 with that message; anything else (0, a promise, other types) allows.
-`PROBE_FAIL_CLOSED` makes a handler error or budget overrun deny instead of
+`HOOK_FAIL_CLOSED` makes a handler error or budget overrun deny instead of
 allow, for fences that must not fail open.
 
 **Handler signature (positional, not a mapping).** Building a context mapping
@@ -305,8 +308,8 @@ set_eval(CONFIG_INT(__RC_HOOK_EVAL_COST__));
 | A handler or apply that returns a promise, or is `async`, is "declined" | §13.24 |
 | Per-attachment re-entry guard, not a global "no hooks inside hooks". The daemon's own calls are exempt (§5.5), but code a handler runs on someone else's behalf — e.g. a wizard subscriber the daemon dispatches to — is still observed by every *other* probe | A global guard would let any code reached from a handler bypass audit probes |
 | Layer 1 never re-enters itself (`g_in_hook` per join point) | recursion |
-| Detach on the first "stale function pointer" or owner-destructed error; otherwise after `hook max errors` (default 10). `PROBE_FAIL_CLOSED` attachments never auto-detach; the daemon is told via `probe_detached(id, reason)` | §3 dangling funptrs; a fence that silently disappears |
-| Attachments, handler funptrs and filters marked in `checkmemory.cc` (`mark_funp`, after `mark_call_outs()`'s pattern); count tables are C++ containers bounded by `probe max rows` with a `dropped` counter | §3 off-graph references; unbounded memory from attacker-chosen names |
+| Detach on the first "stale function pointer" or owner-destructed error; otherwise after `hook max errors` (default 10). `HOOK_FAIL_CLOSED` attachments never auto-detach; the daemon is told via `hook_detached(id, reason)` | §3 dangling funptrs; a fence that silently disappears |
+| Attachments, handler funptrs and filters marked in `checkmemory.cc` (`mark_funp`, after `mark_call_outs()`'s pattern); count tables are C++ containers bounded by `hook max rows` with a `dropped` counter | §3 off-graph references; unbounded memory from attacker-chosen names |
 | `this_player()` is 0 inside handlers and Layer 1 applies, restored afterwards | a handler acting as the victim (`input_to`, `command`) |
 | Detaching inside a handler marks the attachment; it is swept after dispatch | iterator invalidation (§13.14) |
 
@@ -369,7 +372,7 @@ in LPC (multi-subscriber composition), scopes and redacts per §5.5, persists
 subscriptions across its own reload, implements S1 (`call_other_miss` + an
 exclude list for optional hooks such as `query_*`/`is_*`), S5 (created/destructed
 counts by program, with cause) and S4 (a `/secure/` fence via a
-`PROBE_DECIDE | PROBE_FAIL_CLOSED` probe).
+`HOOK_DECIDE | HOOK_FAIL_CLOSED` probe).
 
 ## 8. Implementation plan
 
@@ -380,7 +383,7 @@ Each phase is one PR, reviewed and merged before the next.
 | 0 | Docs only: `docs/concepts/general/interposition.md` covering `valid_object`+`on_destruct`, `valid_write`, the tracer, `error_handler`, `valid_override`, and the transparent-wrapper idiom with its cost | — | merged |
 | 1a | `get_hook_daemon` master apply; daemon resolution and reload; `g_hook_mask` + bit caching; the contained-invocation primitive; `call_other_miss` in `apply_low()` | LPC: miss via `->`, explicit, array, funptr; each reason; `undefined` preserved when declined; result when claimed; promise/error = declined; no event from master/simul/daemon callers; daemon reload keeps working. GTest: eval-state restore after a handler overrun. Benchmark gate §5.6 | closes #1414 |
 | 1b | `object_created`, `object_destructed` with cause | LPC: driver destructs (shadow, environment contents, refused load) each reported once with the right cause; self-destructing `create()` not reported as created; Debug `check_memory()` clean | merged |
-| 2a | `probe_*` efuns, filters, `PROG_HOOKED`, pointer-keyed set, `count`/`time`, `probe max rows`, `call_other` point | LPC: filter semantics table above; exclude; `PROBE_DECIDE` deny with message; `PROBE_FAIL_CLOSED`; re-entry guard (a handler's `write_file` seen by another probe); detach inside handler. Benchmark gate including attached cases | merged |
+| 2a | `hook_*` efuns, filters, `PROG_HOOKED`, pointer-keyed set, `count`/`time`, `hook max rows`, `call_other` point | LPC: filter semantics table above; exclude; `HOOK_DECIDE` deny with message; `HOOK_FAIL_CLOSED`; re-entry guard (a handler's `write_file` seen by another probe); detach inside handler. Benchmark gate including attached cases | merged |
 | 2b | `efun:*` opt-ins with `HOOK_EFUN()`, argument re-validation | LPC per efun group; a handler destructing an efun argument gets a clean error | merged |
 | 3 | Reference daemon and `docs/concepts/general/hooks.md`, efun and apply pages, `include/hooks.h` | the reference daemon runs in the testsuite | merged |
 
@@ -388,16 +391,16 @@ Each phase is one PR, reviewed and merged before the next.
 
 1. No event fires when the caller is the master, the simul_efun object or the
    daemon; during compile; inside `valid_*` or `error_handler`.
-2. `probe_*` called by anything but the daemon errors.
+2. `hook_*` called by anything but the daemon errors.
 3. A Layer 1 apply returning a promise, an error, or anything but 1 changes
    nothing.
 4. `efun:*` probes observe `efun::` calls, and calls made by non-daemon code
    that a probe handler invoked; a probe never observes its own handler.
-5. `PROBE_FAIL_CLOSED`: handler error or overrun denies; the attachment
-   stays; `probe_detached` is not called for it.
+5. `HOOK_FAIL_CLOSED`: handler error or overrun denies; the attachment
+   stays; `hook_detached` is not called for it.
 6. `this_player()` is 0 inside Layer 1 applies and probe handlers, and the
    caller's `this_player()` is restored afterwards.
-7. Count tables never exceed `probe max rows`; overflow is counted.
+7. Count tables never exceed `hook max rows`; overflow is counted.
 8. Filter canonicalization: `/secure/login`, `/secure/login.c` and
    `/secure/login#3` (as `target`) match the same attachments.
 
@@ -428,16 +431,27 @@ attachments. Putting one daemon in front of the mechanism removes all four.
 **E. External tracing (USDT/bpftrace).** Complementary for operators;
 `hooks.cc` can emit a USDT probe at each join point at no extra cost.
 
-## 11. Decisions for the maintainer
+## 11. Decisions
 
-1. Daemon designation: master apply `get_hook_daemon()` (proposed) or a
-   config line.
-2. Names: `probe_*` (proposed; `hook` is already common mudlib vocabulary,
-   e.g. Lima's `add_hook`/`call_hooks`) or `hook_*`.
-3. Is a destruct veto wanted (LDMud `prepare_destruct`)? Not proposed.
-4. Phase 2 scope: ship `call_other` and `efun:*` probes, or stop after
-   Layer 1 until a mudlib asks.
-5. Should the auto-object RFC come first?
+Decided by the maintainer:
+
+1. **The hook receiver is supplied by the master**: master apply
+   `string|object get_hook_daemon()`, consulted at boot and after a master
+   recompile. No config line.
+2. **Names stay `hook_*`**: `hook_attach`, `hook_detach`, `hook_query`,
+   `hook_reset`, `HOOK_DECIDE`, `HOOK_FAIL_CLOSED`, daemon callback
+   `hook_detached`. (Mudlibs that already use `hook` as vocabulary, e.g.
+   Lima's `add_hook`/`call_hooks`, are unaffected: these are efuns callable
+   only by the daemon, not names a mudlib defines.)
+3. **The daemon must be able to observe and filter calls**: Layer 2
+   (`call_other` and `efun:*` probes, observe and `HOOK_DECIDE`) is part of
+   this RFC, not a later option.
+
+Still open:
+
+4. A destruct veto (LDMud `prepare_destruct`)? Not proposed.
+5. Whether the auto-object RFC (§10 A) should be written before or after
+   this one is implemented. Not a dependency.
 
 ## 12. Review log
 
@@ -447,8 +461,8 @@ Draft v1 was reviewed from six angles; the main changes:
 |---|---|---|
 | Evidence | P1/P3 came from a careless wrapper; a `bind()`-based wrapper keeps the caller and composes with shadows. S2, S3, S5 and S8 are already served | §3 rewritten; case rests on cost and on events LPC cannot see |
 | VM safety | `call_other` miss and call cannot be at `f__call_other()` (arguments already popped, reason unknown, array/funptr routes missed); handler eval overruns leak into the caller; `efun:*` handlers can invalidate checked arguments; `error` at throw time already exists as `error_handler` | Sites moved into `apply_low()`; §5.4 primitive; argument re-validation; `error` join point dropped |
-| Security | Argument disclosure, audit bypass via a global re-entry guard, fail-open fences, decide hijacking | One privileged daemon; per-attachment re-entry; `PROBE_FAIL_CLOSED`; hard exemptions; narrow decide |
-| Mudlib API | Filter semantics undefined; mode was a filter key; count keys used arrays; `update` dropped attachments; missing scenarios | Filter table; flags; row-shaped `probe_query`; daemon resolved by path; S9–S12 |
+| Security | Argument disclosure, audit bypass via a global re-entry guard, fail-open fences, decide hijacking | One privileged daemon; per-attachment re-entry; `HOOK_FAIL_CLOSED`; hard exemptions; narrow decide |
+| Mudlib API | Filter semantics undefined; mode was a filter key; count keys used arrays; `update` dropped attachments; missing scenarios | Filter table; flags; row-shaped `hook_query`; daemon resolved by path; S9–S12 |
 | Performance | Detached cost below measurement floor; a ctx mapping costs ~200 ns per event; "< 1% in 5 runs" is unmeasurable | Positional handlers; `PROG_HOOKED` + pointer-keyed set; cachegrind gate |
 | Prior art | DGD `callCritical` is unlimited, not budgeted; `valid_override` already closes `efun::`; missed LDMud `limited()`, `trace()`, `runtime_error`, `prepare_destruct` and kernellib's object-manager hooks | §4 corrected; daemon modelled on kernellib's manager |
 
