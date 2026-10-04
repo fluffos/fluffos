@@ -3,8 +3,10 @@
 
 #include "base/internal/tracing.h"
 
+#include <cerrno>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <thread>
@@ -17,9 +19,16 @@ namespace {
 
 // Removes any leftover file from an earlier run: the writer thread is
 // asynchronous, so a stale file could otherwise be read as this run's output.
+// A leftover that cannot be removed is exactly that hazard, so it fails the
+// test; only "there was no file" is fine.
 std::string trace_path(const std::string& name) {
   auto path = std::string(testing::TempDir()) + "trace_test_" + name + ".json";
-  ::remove(path.c_str());
+  if (::remove(path.c_str()) != 0) {
+    int const err = errno;
+    if (err != ENOENT) {
+      ADD_FAILURE() << "cannot remove stale trace file " << path << ": " << strerror(err);
+    }
+  }
   return path;
 }
 
