@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v2 — revised after a six-angle review (see [§12](#12-review-log)); maintainer decisions recorded in [§11](#11-decisions) |
+| Status | Draft v3 — six-angle review (v2) plus a game-design round (v3); see [§12](#12-review-log). Maintainer decisions in [§11](#11-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
 | Evidence | Probes in [`probes/`](probes/), run on master `b5714e5f` (RelWithDebInfo, gcc) |
@@ -24,6 +24,11 @@ mechanism instead of one feature per request, split the way eBPF is split:
 * **The daemon can observe and filter calls.** Beyond the rare events, it
   attaches `hook_*` probes to `call_other` and to selected efuns, with C-side
   filters, and can deny matching calls (`HOOK_DECIDE`).
+* **It is also a gameplay tool.** The same probes, extended with a `function`
+  join point (every call route, including local calls), per-object targeting
+  and before/after/around advice with deterministic priorities, give mudlibs
+  what they have faked with `shadow()` for thirty years: curses, protections,
+  polymorph, world events and achievements over legacy content (§2A, §5.7).
 * **Policy is LPC.** Multiple subscribers, wizard-facing attach/detach,
   scoping ("only events touching your own objects"), dedup and reports are
   written in the daemon, in LPC, where mudlibs differ. A reference daemon
@@ -61,6 +66,72 @@ is left to a separate RFC (§10).
 Out of scope: hot-patching code (`recompile_object()`), per-opcode tracing
 (the tracer and the debugger in #1286), and command/message auditing (already
 served by the `process_input`, `receive_message` and `catch_tell` applies).
+
+## 2A. Game design: aspects for gameplay
+
+S1–S12 are administrative. The larger use is gameplay: LPMud games have
+always needed cross-cutting, temporary, per-instance behaviour (curses,
+protections, polymorph, world events) and have faked it with `shadow()`.
+
+### 2A.1 What real mudlibs do today
+
+Grepped from public mudlibs (shallow clones; paths relative to each lib):
+
+| Lib | Mechanism | Evidence | Pain points it shows |
+|---|---|---|---|
+| Discworld | 33 gameplay `shadow()` sites: speech curses, invulnerability, subdued/"dead" states, team XP, swimming, polymorph, room day/night and terrain, an effects framework that clones one shadow per effect | `lib/std/curses/*.c`, `lib/std/shadows/misc/{offler,surrender,harry,death,team,water}_shadow.c`, `lib/std/effect_shadow.c`, `lib/std/basic/effects.c:707-716` | Local calls bypass shadows, so `std/living/combat.c` carries **76** `this_object()->` self-calls just to stay shadow-visible (`effects.c:126-145` walks the shadow chain by hand); shadows don't survive login/restore (`effects.c:789-830` re-clones them; curses re-attach in `player_start()`); stacking order = attach order; signature drift (`offler_shadow.c` rev 1.2); reentrancy bug when adding an effect inside another (`effects.c:14-15`); display leak (`water.c` rev 1.11); a security blacklist of shadowable functions (`global/player.c:1789-1800`: `query_name`, `query_creator`, `dest_me`, `save_me`) |
+| Dead Souls | `LIB_SHADOW` objects for polymorph/disguise (`shadows/bear.lpc`, `arbiter.lpc`), damage shields, breathing gear, zombie curse, traps; `shadows/diag.lpc` is a pure observe probe | `lib/lib/shadow.lpc:8-37`, `lib/shadows/*.lpc` | Its own shadow registry because the driver can't enumerate shadows per object; manual dedup by `base_name`; parser cache refresh after polymorph; `lib/body.lpc` has 75 self-calls |
+| Lima | Gave up on shadows (`valid_shadow` defaults to deny) for a cooperative `add_hook`/`call_hooks` registry: **205** call sites hand-placed in base classes (`block_<dir>`, `prevent_combat`, `str_bonus`, `person_arrived`…) | `lib/std/object/hooks.c:30-153`, `std/modules/m_bodystats.c:259-262` | Only works where a base class anticipated the hook; removal needs the identical funptr; dead owners purged lazily |
+| nt7 (Chinese lib) | Per-instance loot effects: `shadow(new(arg->weapon_effect))` at weapon creation; a shadow that blanks `init()`; 100+ per-heartbeat condition handlers | `inherit/self/weapon/*.lpc:98-101`, `shadow/no_init.lpc:5`, `feature/condition.lpc:88-130` | Temp buffs undone by hand (`add_temp(..., -x)` in 53 skill files) |
+
+What the evidence asks for: interception of **local** calls (no shadow has
+it), **per-instance** targeting that **stacks deterministically**, removal
+handles and auto-cleanup, a documented re-attach path across login/restore,
+per-object introspection ("which effects are on this player?"), and a trust
+deny-list of advisable functions.
+
+### 2A.2 Gameplay use cases
+
+Verdict: **Hook** = cross-cutting advice is the right tool; **Retrofit** =
+right where the base class cannot be edited (legacy content), otherwise an
+explicit mudlib API is better; **No** = use the mudlib.
+
+| # | Use case | Join point & filter | Kind | Rate on a 300-player mud | Verdict |
+|---|---|---|---|---|---|
+| G1 | **Curse of Butterfingers / Silence / speech curses** on one player | `function` `wield`/`cast`/`do_say`, object = victim | deny / around (rewrite text) | low | Hook (replaces DW curse shadows; local calls covered) |
+| G2 | **Protection & states**: invulnerable at a temple, subdued, "you are dead" | `function` `adjust_hp`/`do_death`/`attack_by`, object = player | around (clamp, skip) / deny | 300–600/s mud-wide, only flagged players pay | Hook — the DW shadow family; local calls are the main win |
+| G3 | **Vulnerability / damage shield / thorns** | `function` `receive_damage`, object = victim | around / after (result, attacker = `caller`) | as G2 | Hook over legacy combat; Retrofit if the lib has a damage pipeline |
+| G4 | **Vampiric enchant on *this* heirloom sword** | `function` `hit`/`query_damage`, object = sword | after | ~1 sword | Hook — per-instance, keeps the item's identity |
+| G5 | **Polymorph / disguise** ("everyone sees a frog"; false name that logs and `/secure/` still see through) | `function` `query_short/long/race/cap_name`, object = player, exclude `caller_program` `/secure/` | around | ~100/s looks | Hook — stacking + viewer discrimination shadows can't do |
+| G6 | **Charm monster** | `function` `heart_beat` + deny `attack_ob` on the charmer, object = NPC | around / deny | heart_beat ~1000/s mud-wide | Hook; stress-tests per-object gating |
+| G7 | **Escort quest / follow the leader** | `efun:move_object`, object = escorted NPC / leader | after (state *after* the move) | moves ~100/s, flagged objects pay | Hook — `move_object` is the only chokepoint; replaces heart_beat polling |
+| G8 | **Blood Moon / seasonal overlay** (undead hit harder; frozen lake gains an exit) | `function` `query_damage` `defined_in /std/undead`; `query_exits` `target /d/lake/` | around | 50–300/s | Hook (live-ops, expires, no recompile); permanent rules move to code |
+| G9 | **Regional pricing / faction tax** (shops in orc-held towns pay 1.3×) | `function` `query_value`, `caller_program /std/shop/` + `caller /d/orclands/` | around | ~2/s | Hook — a caller × callee rule no single API expresses |
+| G10 | **Achievements & quests over legacy content** ("kill 100 orcs", "visit every room in Arnor") | `function` `die` `defined_in /std/monster`; `efun:move_object` `caller_program /std/player` | observe (deferred) | 10–100/s | Retrofit → feeds a mudlib event bus; one attachment per (program, function), fan-out in LPC |
+| G11 | **Bounty, reputation, gossip, city guards** reacting to deeds anywhere | `function` `die`/`steal`/`attack` | observe (deferred, batched) | 10–100/s | Retrofit → bus |
+| G12 | **NPC/LLM event stream**, economy simulation | as G11; `count`/`time` for trade volumes | observe (deferred, batched) | up to hundreds/s | Hook as a *source* only with batched delivery |
+| G13 | **A/B balance experiments** | around on damage/exp formulas; per-object flag = cohort | around | 100s/s | Hook (with an explain view) |
+| G14 | **Live invariants** ("gold is conserved") and **deterministic replay** on a dev server (around `efun:random` with a seeded stream) | `function` on every money-mutating function, local calls included; `efun:random` | observe / around | dev only | Hook — must see every route |
+| G15 | **Suppress an apply for one object** (nt7's blank-`init()` shadow) | `function` `init`, object = target | around (no proceed) | low | Hook, via the apply allow-list (§5.7) |
+
+**Where hooks are the wrong tool (verdict No):** double-XP weekends and
+permanent stat stacking (one chokepoint or a modifier system owns display,
+dispel and save); permadeath (identity belongs in the class); invisibility
+through `id()` (a driver-questioned apply, AGENTS.md §13.24); builder
+soft-code triggers, player housing and shop policies (owner *data* checked by
+the room/shop that already receives the event); instancing/phasing;
+accessibility rewriting and translation (`receive_message`/`catch_tell`);
+verb blocking (parser-cooperative today, and it works).
+
+**The pattern.** Hooks win when the callee is legacy or spread over many
+files, when the effect depends on *who calls*, when it is per-instance and
+temporary, or when the only chokepoint is an efun. They lose where the mudlib
+already owns a single chokepoint, or the behaviour is permanent.
+
+**Trust.** Hooks are a system / live-ops / game-designer instrument run by
+the daemon. Builder- and player-facing features are exposed by the daemon as
+**rule data** (zone prefix, program, function, verdict, expiry), never as
+builder code running in a hook frame.
 
 ## 3. What FluffOS can do today (corrected after review)
 
@@ -234,10 +305,12 @@ the 3.4x wrapper again. Layer 2 lets the daemon attach **probes** with C-side
 gating, filtering and aggregation:
 
 ```lpc
-int hook_attach(string point, mixed action, mapping filter, int flags);
+int hook_attach(string point, mixed action, mapping spec, int flags);
+                              // spec: filter keys + "label", "priority", "expires" (§5.7)
 void hook_detach(int id);
 mapping hook_query(int id);   // rows, events, dropped, errors, last_error
 void hook_reset(int id);
+mapping *hook_list(object ob); // attachments that apply to ob (§5.7)
 ```
 
 Only the daemon may call these (an error otherwise). The daemon exposes its
@@ -246,6 +319,7 @@ own, scoped API to wizards.
 | Point | Fires | Site |
 |---|---|---|
 | `call_other` | a resolved `call_other`, before the function runs (so `HOOK_DECIDE` can deny) | `apply_low()`, after lookup, before `push_control_stack()`, `ORIGIN_CALL_OTHER` only |
+| `function` | entry to a hooked function by any route (local, inherited, `call_other`, funptr, `call_out`, `heart_beat`) — added for game design, §5.7 | function entry in the interpreter, per-function gate |
 | `efun:<name>` | before the body of an efun that opts in (phase 1: `write_file`, `write_bytes`, `rm`, `rename`, `mkdir`, `rmdir`, `call_out`, `clone_object`, `new`, `load_object`, `save_object`, `restore_object`, `snoop`, `exec`, `seteuid`, `shutdown`, `socket_*`) | one `HOOK_EFUN()` line at the top of each opted-in efun; covers `F_EFUN*`, efun function pointers and `efun::` alike |
 
 **Filter keys.** Exact strings or arrays of strings; prefix match only when
@@ -258,6 +332,8 @@ the pattern ends in `/`; no globs.
 | `function` | function name |
 | `caller` | calling object's name, `#n` stripped |
 | `caller_program` | the program of the calling frame |
+| `object` | one target object instance (`O_HOOKED` bit; §5.7) |
+| `caller_object` | calls made by one object instance (§5.7) |
 | `exclude` | a mapping with the same keys, matched after the include keys |
 
 **Actions.** `"count"` (rows keyed by caller program, target program,
@@ -272,7 +348,8 @@ allow, for fences that must not fail open.
 costs ~200 ns per event; positional arguments do not:
 
 ```lpc
-int handler(int id, object caller, object target, string fn, mixed *args);
+mixed handler(int id, object actor, object caller, object target, string fn, mixed *args);
+// HOOK_AFTER adds `mixed result`; HOOK_AROUND adds `function proceed` (§5.7)
 ```
 
 **Gating.** At attach the driver resolves `target`/`defined_in` against loaded
@@ -352,6 +429,107 @@ A `testsuite/command/speed_hooks.lpc` (or a `-fspeed:hooks` section) holds the
 microbenchmark: local call, call_other hit and miss, `sizeof`, new+destruct,
 and the attached cases.
 
+### 5.7 Game-design extensions to Layer 2
+
+The §2A cases need four things the administrative design lacks. All are
+daemon-only, like the rest of Layer 2.
+
+**1. A `function` join point** — entry to a function defined in a hooked
+program, by *any* route: local call, inherited call, `call_other`, function
+pointer, `call_out`, and the driver's cached `heart_beat` dispatch. This is
+what no shadow and no `call_other` probe can do (Discworld's 76 self-calls
+exist only to work around it).
+
+* Gated **per function**, not per program: a `FUNC_HOOKED`-style bit on the
+  function's flags, set at attach and recomputed when the program is
+  compiled. A local call costs ~45 ns, so probing every local call of a hooked
+  program (5–10 ns) would cost that program 10–20%; with a per-function bit,
+  unhooked functions in a hooked program pay one predicted branch.
+* Site: function entry in the interpreter (`setup_new_frame()` / the call
+  opcodes), so it covers every route at one place.
+
+**2. Per-object targeting.** Filter keys `object` (this target instance) and
+`caller_object` (calls made *by* this instance, for tutorials and A/B cohorts),
+backed by an `O_HOOKED` bit in `object_t::flags`. A hooked function called on
+an unflagged object pays one more predicted branch; only flagged objects reach
+the attachment table. Auto-detach when the object is destructed, reported as
+`hook_detached(id, "target_destructed")`.
+
+**3. Advice kinds and their order.** `flags` selects one kind:
+
+| Kind | Handler | Can change the outcome? |
+|---|---|---|
+| `HOOK_BEFORE` (default) | `void h(int id, object actor, object caller, object target, string fn, mixed *args)` | No |
+| `HOOK_AFTER` | same, plus `mixed result` | No — observes the result (thorns, vampiric sword, escort, follow) |
+| `HOOK_DECIDE` | as `HOOK_BEFORE`, returns 1 or a message to deny | Deny only |
+| `HOOK_AROUND` | as `HOOK_BEFORE`, plus `function proceed` | Yes: call `proceed(args...)` with the same or changed arguments, change its result, or skip it |
+
+`actor` is `this_player()` at the intercepted call: handlers run with
+`this_player()` = 0 (§5.4), but "who is doing this to whom" is what most game
+effects need.
+
+Order at one join point is total and deterministic: every attachment has a
+`priority` (default 0; ties broken by attach id). The chain is
+**deciders → AROUND (lower priority = outermost) → BEFORE → original
+→ AFTER**, then the AROUND handlers unwind. A deny short-circuits everything
+after it. Each AROUND handler receives the arguments as transformed by the
+handlers outside it. The chain is snapshotted per invocation, so attaching or
+detaching inside a handler affects the next call, not this one (the Discworld
+effects reentrancy bug).
+
+AROUND contract:
+* Arguments arrive as `mixed *args`, so advice does not break when the target
+  function's signature changes (Discworld's signature-drift bug).
+* The value it returns is checked against the function's declared return type;
+  a mismatch, a promise, a handler error or an eval overrun all mean **run the
+  original unmodified** and count an error. A broken curse must never make a
+  sword unwieldable or skip `die()`'s corpse logic.
+* AROUND, AFTER and DECIDE are refused on driver-questioned applies (the
+  generated `object_applies_table` names, `id`, `catch_tell`, every `valid_*`)
+  except an allow-list (`heart_beat`, `init`), and on functions a mudlib marks
+  protected (the daemon's deny-list, after Discworld's `player.c` blacklist:
+  `query_name`, `query_creator`, `save_me`, money/exp/auth functions).
+
+**4. Lifetime, state and introspection.**
+
+* `hook_attach(string point, mixed action, mapping spec, int flags)`: `spec`
+  holds the filter keys plus `"label"` (required), `"priority"` and
+  `"expires"` (seconds; driver-side expiry so 300 status effects are not 300
+  `call_out`s that leak on daemon reload; **not allowed with
+  `HOOK_FAIL_CLOSED`**, so a fence cannot lapse silently). Per-effect state
+  rides on the handler as bound arguments: `(: fumble, ([ "tries": 0 ]) :)`.
+* `hook_list(object ob)` lists every attachment that applies to `ob` (object
+  filters and program/function filters), with label, owner, expiry, hit count
+  and handler eval time. The reference daemon renders it as a visible
+  **status-effects list** for players and builders, which replaces Dead Souls'
+  shadow registry and Discworld's `sh_adows` tool, and answers "why did that
+  rat hit me for 40?". Error traces and `call_stack()` mark advised frames
+  (`[hook #12 blood_moon]`).
+* Hooks are runtime state: nothing survives a reboot, and per-object effects
+  do not survive the target's destruct-and-reload. The daemon re-attaches them
+  from its own saved effect data at login and `restore_object()` (the
+  precedent is Discworld's `player_start()` / `init_after_save()`), using
+  `object_created` to notice new objects.
+
+**5. Deferred, batched observers** (`HOOK_DEFERRED`, with `HOOK_BEFORE` or
+`HOOK_AFTER` only). Events go into a per-attachment ring buffer and are
+delivered once per gametick as `h(int id, mixed *events)`, with object
+arguments re-validated (destructed → 0) and overflow counted in `dropped`.
+One LPC frame per batch instead of per event makes G10–G12 affordable, and it
+is the only correct way to feed an `async` consumer (an LLM NPC, an economy
+simulation), since an inline handler that returns a promise is declined.
+
+**Cost gate additions** (§5.6): local call with nothing attached; local call
+to an unhooked function in a hooked program; hooked function on an unflagged
+object; one AROUND per call on a flagged object; 100 cursed players among 300;
+one charmed orc among 2,000 `/std/monster` heart_beats.
+
+**Deferred or rejected here.** Environment/room-tree filters (an LPC
+`environment()` walk in the handler is ~100 ns; add only if measured hot);
+`call_limited(fp, eval, args...)` for a daemon fanning out to many subscribers
+under one budget (LDMud `limited()`; a small separate RFC); output/message
+transform probes and per-player phasing (rejected, see §2A.2).
+
 ## 6. Interaction with existing features
 
 * **Shadows**: Layer 1 and Layer 2 fire inside `apply_low()` after shadow
@@ -386,6 +564,10 @@ Each phase is one PR, reviewed and merged before the next.
 | 2a | `hook_*` efuns, filters, `PROG_HOOKED`, pointer-keyed set, `count`/`time`, `hook max rows`, `call_other` point | LPC: filter semantics table above; exclude; `HOOK_DECIDE` deny with message; `HOOK_FAIL_CLOSED`; re-entry guard (a handler's `write_file` seen by another probe); detach inside handler. Benchmark gate including attached cases | merged |
 | 2b | `efun:*` opt-ins with `HOOK_EFUN()`, argument re-validation | LPC per efun group; a handler destructing an efun argument gets a clean error | merged |
 | 3 | Reference daemon and `docs/concepts/general/hooks.md`, efun and apply pages, `include/hooks.h` | the reference daemon runs in the testsuite | merged |
+| 4a | Game design: `function` join point with per-function gating; `object`/`caller_object` filters with `O_HOOKED`; `HOOK_BEFORE`/`HOOK_AFTER`; `actor` argument; auto-detach on target destruct | LPC: **local, inherited, funptr, `call_out` and `heart_beat` routes all observed**; unflagged instances untouched; target destruct detaches. Benchmark: local-call cases in §5.7 | merged |
+| 4b | `HOOK_AROUND` with `proceed`, priorities and the deterministic chain; return-type check; apply allow-list and protected-function deny-list | LPC: G1 curse, G2 clamp (skip `proceed`), G5 disguise with `/secure/` excluded; stacking of two AROUNDs is order-independent of attach order given priorities; error/overrun/type mismatch runs the original unmodified; attach/detach inside a handler affects only the next call | merged |
+| 4c | `expires`, `hook_list(object)`, labels in traces, `HOOK_DEFERRED` batching | LPC: expiry fires `hook_detached(id, "expired")` and is refused with `HOOK_FAIL_CLOSED`; batched delivery revalidates destructed objects; G10 achievements fed through a deferred observer | merged |
+| 4d | Reference **effects daemon** on top of the hook daemon: status-effects view, re-attach at login/restore, rule-data API for builders | the testsuite runs G1, G2, G7 and G8 end to end through it | merged |
 
 ## 9. Security invariants (each has a test)
 
@@ -403,6 +585,13 @@ Each phase is one PR, reviewed and merged before the next.
 7. Count tables never exceed `hook max rows`; overflow is counted.
 8. Filter canonicalization: `/secure/login`, `/secure/login.c` and
    `/secure/login#3` (as `target`) match the same attachments.
+9. A `function` attachment observes every call route (local, inherited,
+   `call_other`, funptr, `call_out`, `heart_beat`), and only on the filtered
+   object instance when `object` is given.
+10. AROUND/AFTER/DECIDE on a driver-questioned apply outside the allow-list,
+    or on a deny-listed function, is refused at attach.
+11. A failing AROUND handler (error, overrun, promise, wrong return type)
+    leaves the call behaving exactly as if nothing were attached.
 
 ## 10. Alternatives considered
 
@@ -446,12 +635,22 @@ Decided by the maintainer:
 3. **The daemon must be able to observe and filter calls**: Layer 2
    (`call_other` and `efun:*` probes, observe and `HOOK_DECIDE`) is part of
    this RFC, not a later option.
+4. **Game design is in scope** (§2A, §5.7): `function` join point,
+   per-object targeting, `HOOK_BEFORE`/`AFTER`/`DECIDE`/`AROUND` with
+   priorities.
+
+Settled by the game-design review: driver-side `expires` is allowed (status
+effects are the dominant use and 300 daemon `call_out`s leak on reload) but
+refused with `HOOK_FAIL_CLOSED`, so a fence can never lapse silently.
 
 Still open:
 
-4. A destruct veto (LDMud `prepare_destruct`)? Not proposed.
-5. Whether the auto-object RFC (§10 A) should be written before or after
+5. A destruct veto (LDMud `prepare_destruct`)? Not proposed.
+6. Whether the auto-object RFC (§10 A) should be written before or after
    this one is implemented. Not a dependency.
+7. Should `HOOK_AROUND` ship at all, or stop at `HOOK_AFTER` until a
+   prototype measures its per-call cost (it allocates a `proceed` closure per
+   advised call)?
 
 ## 12. Review log
 
@@ -465,6 +664,7 @@ Draft v1 was reviewed from six angles; the main changes:
 | Mudlib API | Filter semantics undefined; mode was a filter key; count keys used arrays; `update` dropped attachments; missing scenarios | Filter table; flags; row-shaped `hook_query`; daemon resolved by path; S9–S12 |
 | Performance | Detached cost below measurement floor; a ctx mapping costs ~200 ns per event; "< 1% in 5 runs" is unmeasurable | Positional handlers; `PROG_HOOKED` + pointer-keyed set; cachegrind gate |
 | Prior art | DGD `callCritical` is unlimited, not budgeted; `valid_override` already closes `efun::`; missed LDMud `limited()`, `trace()`, `runtime_error`, `prepare_destruct` and kernellib's object-manager hooks | §4 corrected; daemon modelled on kernellib's manager |
+| Game design (3 researchers: designer, real mudlibs, emergent/player-facing) | Real libs fake aspects with shadows (Discworld 33 sites, 76 self-calls to defeat the local-call gap; Lima's 205 hand-placed hook points); gameplay needs local-call interception, per-instance targeting, after/around advice, deterministic stacking, expiry, per-object introspection and batched observers; builder-facing features must be rule data, not code | §2A, §5.7, phase 4 |
 
 ## Appendix: reproducing the probes
 
