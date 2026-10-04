@@ -2,81 +2,922 @@
 
 | | |
 |---|---|
-| Status | Draft v9 — six-angle review (v2), game-design round (v3), `valid_hook()` authorization (v4), auto object, destruct veto and `HOOK_AROUND` resolved in this document (v5), 11 validated real-mudlib use cases and the plan completed (v6), comprehensive join-point catalogue across the driver (v7), plan consolidated into four phases (v8), `net:` family (v9); see [§12](#12-review-log). Decisions in [§11](#11-decisions) |
+| Status | Draft v10. Rewritten as one design after a second review round (consistency, scope, security, implementer dry run); history in [Appendix D](#appendix-d-review-log). Open decisions in [§9](#9-decisions) |
 | Issues | #1414 (call_other miss report) is the first consumer |
 | Prior art | LDMud `set_driver_hook()`, `H_DEFAULT_METHOD`, `limited()`, `trace()`, Python hooks; DGD auto object, driver-object applies, kernellib object/error managers, `call_touch()`, `rlimits`, `atomic` |
-| Evidence | Probes in [`probes/`](probes/), run on master `b5714e5f` (RelWithDebInfo, gcc) |
+| Evidence | Probes on the real driver ([Appendix C](#appendix-c-reproducing-the-probes)); use cases read from real mudlibs ([Appendix A](#appendix-a-evidence-from-real-mudlibs)) |
 
 ## 1. Summary
 
 Mudlibs keep asking for small cross-cutting driver features: report a
 `call_other` to a missing function (#1414), fence a directory off from callers,
-count calls, account object lifetimes, and, in gameplay, curses, protections
-and world events that today are faked with `shadow()`. This RFC proposes one
-small mechanism instead of one feature per request, split the way eBPF is
-split:
+audit who changes money, account object lifetimes, and, in gameplay, curses,
+protections and world events that today are faked with `shadow()`. This RFC
+proposes one mechanism instead of one feature per request, split the way eBPF
+is split:
 
-* **The driver is the kernel.** It defines a fixed set of join points, makes
-  them free when unused, runs handlers in a contained frame, and offers cheap
-  C-side filtering and counting for high-frequency events.
-* **Authorization follows the `valid_*` pattern.** Any object may call
-  `hook_attach()`; the driver normalizes the request and asks the master's
-  `valid_hook(who, point, action, spec, flags)`, exactly as `shadow()` asks
-  `valid_shadow()` and sockets ask `valid_socket()`. Only a return of `1`
-  allows. No `valid_hook()` in the master means no hooks.
-* **Hooks cover the whole driver.** Calls (`call_other`, misses, `efun:*`,
-  `simul:*`, `apply:*`, `call_out:*`, `heart_beat`, function entry by any
-  route), objects (load, clone, create, reset, clean_up, destruct, move,
-  recompile, shadows) and sessions (logon, disconnect, exec, snoop, input,
-  commands) and the network layer (accept, websocket upgrade, TLS, telnet
-  protocol events, byte counts): §5.10 is the normative catalogue. Attachments observe or deny,
-  and for gameplay advise functions on one object instance or a whole
-  program, before, after or around them (§2A, §5.7).
-* **Policy is LPC.** Who may hook what is the master's decision; dedup,
-  reports, status-effect bookkeeping and builder-facing rule tables are mudlib
-  code. Reference policies and an example effects daemon ship with the docs.
+* **The driver is the kernel.** It defines a small, fixed set of join points,
+  makes them free when unused, runs handlers in a contained frame, and offers
+  C-side filtering, counting and batching for high-frequency events.
+* **Authorization follows the `valid_*` pattern, with tiers the driver
+  computes.** Any object may call `hook_attach()`. The driver classifies the
+  request (hooking yourself; observing code in a scope the master can check;
+  everything else) and asks the master's `valid_hook()`, which must grant at
+  least that tier. A master that naively returns 1 allows self-hooks only.
+* **Few, generic join points.** Function entry by any route (`function`, with
+  an `origin` filter for `call_other`, driver applies, `call_out`, simul_efuns,
+  local calls), any efun (`efun:<name>`), misses (`call_other:miss`), object
+  creation and destruction with its cause, and connection accept
+  (`net:accept`). Everything the driver can do is reachable through these
+  (§4.4 has the coverage map); bespoke points that only duplicate them are
+  listed in Appendix B and added on demand.
+* **Policy is LPC.** Who may hook what is the master's decision; reports,
+  status-effect bookkeeping and builder-facing rule tables are mudlib code.
 
-The driver surface is two layers, each earned by scenarios the layer below
-cannot serve:
+A compile-time complement, a DGD-style auto object, needs no driver change
+and is part of this document (§4.7).
 
-| Layer | What | Earned by |
+## 2. Motivation
+
+### 2.1 Administrative scenarios
+
+| # | Scenario | Served by |
 |---|---|---|
-| 0 | No driver change: document the mechanisms that already cover a scenario, including a DGD-style **auto object** built from the global include file and the master's `include_file()` apply (§5.8) | S2 (dev), S3, S5 (with a base object), S8; permanent efun policy and an explicit-`destruct()` veto |
-| 1 | Three rare join points, zero cost on the normal path: `call_other:miss`, `object:create`, `object:destruct` | S1, S5 (no base object, with cause), S7 |
-| 2 | Call observation and filtering: `call_other`, `efun:*` (any efun) and `function` join points that observe, deny or advise, with per-program/per-function/per-object gating, pointer-keyed filters, `count`/`time` actions and positional handler arguments | S2 (runtime), S4, S6, S9–S12, G1–G15 |
-
-Both layers use the same efuns and the same `valid_hook()` gate. Compile-time
-advice on efuns (a DGD-style auto object) is part of Layer 0 and needs no
-driver change (§5.8).
-
-## 2. Scenarios
-
-| # | Scenario | Need |
-|---|---|---|
-| S1 | **Typo finder** (#1414): list every `call_other` to a function that does not exist or is not callable, once per (caller program, target program, function), on a dev server | Observe misses, including array targets, at zero cost on hits |
-| S2 | **Hot-function profile**: which functions are called most, by whom | Dev-time: the tracer. Runtime on a live mud: counted call probes |
-| S3 | **File-write audit**, including `efun::write_file` | Per-call, unbypassable observation of file efuns |
-| S4 | **Capability fence**: objects under `/domains/` may not `call_other` into `/secure/` | Decide (deny) before the call runs; real caller identity |
-| S5 | **Lifecycle accounting**: live objects per program; leaks; every destruct, driver-initiated included, with its cause | Observe create and destruct for all objects |
-| S6 | **Deprecation**: warn with the caller when `/std/old_combat::attack()` is called, attachable at runtime | Observe one function, filtered in C |
-| S7 | **Default method / proxy** (LDMud `H_DEFAULT_METHOD`) | Supply a result for a miss |
-| S8 | **Error telemetry**, caught or not | Observe errors with their location |
-| S9 | **Eval accounting** per player or domain | Count and time calls into a set of programs, in C |
-| S10 | **`call_out` leak finder** | Observe `call_out` with caller and function |
-| S11 | **Per-domain object quotas** | Decide before `clone_object`/`new`/`load_object` |
-| S12 | **Security alarms**: `snoop`, `exec`, `seteuid`, `shutdown`, `save_object`/`restore_object` | Observe those efuns with caller |
+| S1 | **Typo finder** (#1414): every `call_other` to a function that does not exist or is not callable, once per (caller program, target program, function) | `call_other:miss` + `count` |
+| S2 | **Hot-function profile** on a live mud | `function` + `count` (dev-time: the tracer, §3.2) |
+| S3 | **File-write audit**, including `efun::write_file` | already served by `valid_write` (§3.2) |
+| S4 | **Capability fence**: `/domains/` may not `call_other` into `/secure/` | `function` DECIDE, `origin: "call_other"` |
+| S5 | **Lifecycle accounting**: live objects per program, every destruct with its cause | `object:create`, `object:destruct` |
+| S6 | **Deprecation**: who still calls `/std/old_combat::attack()`, attachable at runtime | `function` + `count` |
+| S7 | **Default method / proxy** (LDMud `H_DEFAULT_METHOD`) | `call_other:miss` DECIDE (claim) |
+| S8 | **Error telemetry** | already served by master `error_handler` (§3.2) |
+| S9 | **Eval accounting** per player or domain | `function` + `time` |
+| S10 | **`call_out` leak finder** | `efun:call_out` + `count` |
+| S11 | **Per-domain object quotas** | `efun:clone_object` / `efun:new` DECIDE |
+| S12 | **Security alarms**: `snoop`, `exec`, `seteuid`, `shutdown`, `save_object` | `efun:<name>` observe or DECIDE |
+| S13 | **Connection bans and rate limits**: refuse a connection by address before the driver allocates a session (today the only refusal is the master's `connect()`, after accept, negotiation and allocation) | `net:accept` DECIDE |
 
 Out of scope: hot-patching code (`recompile_object()`), per-opcode tracing
 (the tracer and the debugger in #1286), and command/message auditing (already
 served by the `process_input`, `receive_message` and `catch_tell` applies).
 
-## 2A. Game design: aspects for gameplay
+### 2.2 Gameplay scenarios
 
-S1–S12 are administrative. The larger use is gameplay: LPMud games have
-always needed cross-cutting, temporary, per-instance behaviour (curses,
-protections, polymorph, world events) and have faked it with `shadow()`.
+LPMud games need cross-cutting, temporary, per-instance behaviour and have
+faked it with `shadow()` (Discworld: 33 gameplay shadow sites and 76
+`this_object()->` self-calls in its combat code only to make local calls
+visible to shadows) or with cooperative registries (Lima: 205 hand-placed
+hook points). Appendix A has the evidence. What that evidence asks for:
+interception of **local** calls, **per-instance** targeting that stacks
+deterministically, removal handles and auto-cleanup, and per-object
+introspection.
 
-### 2A.1 What real mudlibs do today
+| # | Use case | Mechanism | Kind | Verdict |
+|---|---|---|---|---|
+| G1 | Curse of Butterfingers / Silence on one player | `function` `wield`/`cast`, `object` = victim | DECIDE (answer 0 and tell the player); rewriting speech needs AROUND | Hook |
+| G2 | Invulnerable at a temple, subdued, "you are dead" | `function` `adjust_hp`/`do_death`/`attack_by`, `object` = player | DECIDE; clamping needs AROUND | Hook |
+| G3 | Vulnerability / damage shield / thorns | `function` `receive_damage`, `object` = victim | AFTER (thorns); AROUND (scaling) | Hook over legacy combat |
+| G4 | Vampiric enchant on *this* heirloom sword | `function` `hit`, `object` = sword | AFTER | Hook |
+| G5 | Polymorph / disguise that `/secure/` still sees through | `function` `query_short`/`query_cap_name`, `object` = player, exclude `caller_program` `/secure/` | AROUND | Hook |
+| G6 | Charm monster | `function` `heart_beat` and `attack_ob`, `object` = NPC | DECIDE | Hook |
+| G7 | Escort quest / follow the leader | `efun:move_object`, `caller_object` = leader | AFTER | Hook |
+| G8 | Blood Moon, seasonal overlays | `function` on `/std/undead::query_damage`, `/d/lake/` exits | AROUND | Hook (expires; permanent rules move to code) |
+| G9 | Regional pricing | `function` `query_value`, `caller_program /std/shop/` | AROUND | Hook |
+| G10 | Achievements and quests over legacy content | `function` `die` in `/std/monster`; `efun:move_object` | AFTER, deferred | Hook as an event source |
+| G11 | Bounty, reputation, gossip, city guards | `function` on deed functions | AFTER, deferred | Hook as an event source |
+| G12 | NPC/LLM event stream, economy simulation | as G11, plus `count` | AFTER, deferred | Hook as a source, batched only |
+| G13 | A/B balance experiments | `function`, `caller_object` cohort | AROUND | Hook |
+| G14 | Live invariants ("gold is conserved") | `function` on every money-mutating function | AFTER, deferred | Hook |
+| G15 | Suppress an apply for one object | `function` `init`, `object` = target | DECIDE | Hook |
+
+G1–G4, G6, G7, G10–G12, G14 and G15 need only observe and decide. G5, G8, G9
+and G13, and the rewriting halves of G1–G3, need AROUND, which ships last and
+behind a gate (§7, §9).
+
+### 2.3 Cases validated in real mudlibs
+
+Eleven cases were checked against the code they cite (full write-ups, with
+file and line, in Appendix A).
+
+| # | Case | Evidence in one line | Mechanism | Phase |
+|---|---|---|---|---|
+| V1 | Find calls to functions that do not exist | pkuxkx calls `set_busy()`, `unconsious()`, `is_fight()` and es2 calls `stop_busy()`; none is defined anywhere, so cooldowns and knock-outs silently never applied | `call_other:miss` | 1 |
+| V2 | Audit every exp/money change | pkuxkx's polling audit is commented out; 613 direct `add("combat_exp", …)` calls bypass the reward daemon but all pass through one `add()` | `function` AFTER, deferred, `args` filter | 2 |
+| V3 | Money conservation and dupe hunting | Discworld has an unchecked `set_money_array()` beside `adjust_money()` | `function` AFTER + DECIDE fence | 2 |
+| V4 | Quest credit on NPC death | dtxyzjb has 281 copy-pasted `die()` overrides | `function` AFTER, deferred | 2 |
+| V5 | Conditions that block verbs | pkuxkx checks "cannot equip" in `wield` but not `wear` | `function` DECIDE, `object`, `expires` | 2 |
+| V6 | Safe zone that holds on every damage route | Dead Souls checks `"no attack"` in 9 places; spell damage skips it | `function` DECIDE | 2 |
+| V7 | Follow and escort | Lima re-registers room hooks on every move | `efun:move_object` AFTER, `caller_object` | 3 |
+| V8 | Deprecation telemetry | Discworld logs obsolete-API callers by hand at 4 sites | `function` + `count` | 2 |
+| V9 | Parser-rule fence | Dead Souls' master greps the source of every object it loads | auto object (§4.7); `efun:parse_add_rule` DECIDE as the runtime form | 1 / 3 |
+| V10 | Wizard forensics cheap enough to leave on | Dead Souls ships destruct logging switched off as too expensive | `efun:<name>` + `count`; `object:destruct` | 3 / 1 |
+| V11 | Cleanup when a room's destruct cascades | pkuxkx's destruct bookkeeping never runs for objects destructed with their room | `object:destruct` (cause) | 1 |
+
+### 2.4 Where hooks are the wrong tool
+
+Hooks win when the callee is legacy or spread over many files, when the
+effect depends on *who calls*, when it is per-instance and temporary, or when
+the only chokepoint is an efun. They lose where the mudlib already owns a
+single chokepoint, or the behaviour is permanent. Checked examples:
+
+| Case | Why not a hook |
+|---|---|
+| Timed stat buffs (`add_temp("apply/…")`, pkuxkx: 373 files with a manual undo) | The consumers are the hottest getters in combat and the lib owns the chokepoint; fix with a buff daemon |
+| PK / newbie / `no_fight` gates (pkuxkx `kill.lpc` and its copies) | `kill_ob()` is the chokepoint; move the rules there |
+| Discworld PK pair rules (`pk_check`, 47 sites) | A rule about a pair of players asked before unrelated verbs; a simul_efun question is the right shape |
+| Guard NPCs reacting to killers | `init()` fires per move × inventory; per-NPC data in an inherit |
+| Genesis guild shadows | They *add functions* to the player. **Non-goal:** hooks advise functions that exist; they do not add new ones |
+| Dead Souls damage protections | The lib already has an ordered modifier list |
+| `destruct` policy (cleanup, `remove()`) | Permanent efun policy, already in the simul_efun; the auto object's job (§4.7) |
+| Double XP, permanent stat stacking, permadeath | One chokepoint, or identity that belongs in the class |
+| Invisibility through `id()` | A driver-questioned apply (AGENTS.md §13.24); needs a first-class concept |
+| Builder triggers, player housing and shop policies | Owner *data* checked by the object that already receives the event |
+| Phasing, accessibility rewriting, translation, verb blocking | Lib architecture, or `receive_message`/`catch_tell`/the parser already do it |
+
+**Trust.** Builder- and player-facing features are exposed by a mudlib
+daemon as **rule data** (zone, program, function, verdict, expiry), so
+builders never need hook code of their own.
+
+## 3. Today and prior art
+
+### 3.1 What FluffOS can do today: probe results
+
+All rows reproduced by an independent reviewer. Timings: median of 5
+launches, N = 200k, empty-loop baseline (7 ns) subtracted; a single launch can
+spread ±25% on a shared machine, so read them as ratios.
+
+| Probe | Result |
+|---|---|
+| H1 | A simul_efun named `call_other` sees `ob->fn()`, explicit `call_other()`, `(: call_other ... :)` and array targets. |
+| H2 | A miss returns the **undefined** zero, so `undefinedp(r)` separates it from a real 0 and the wrapper only pays `function_exists()` on misses. |
+| H4 | `efun::call_other` and `efun::destruct` skip simul overrides, **but** the master's `valid_override(file, efun, main)` already gates every `efun::` use at compile time, so bypass is mudlib policy. |
+| P1/P3 | A **naive** wrapper (`efun::call_other(ob, fn, args...)`) makes the simul_efun object the caller: `previous_object()` in every callee becomes `/single/simul_efun`, and shadows that forward with `tgt->fn()` recurse until `Too deep recursion`. A **transparent** wrapper ([`simul_efun_transparent.lpc`](probes/simul_efun_transparent.lpc): `bind((: efun::call_other :), previous_object())`, cached per caller) preserves `previous_object()` and composes with shadows. The naive result is a pitfall, not a limit. |
+| H3 | Shadows see external calls and driver applies (`id()` via `present()`), not local calls, not misses; one shadow per object. |
+| P2 | A simul `destruct()` misses driver-initiated destructs: a shadow destructed with its target, environment contents that `move_or_destruct` could not move, and objects refused after load (`valid_object` denial, `creator_file` failure). `set_notify_destruct(1)` + `on_destruct` **does** see all of them. (Note: `on_destruct` on a shadowed object is routed to the shadow first, so it can fire twice.) `shutdown()` does not run `destruct_object()`. |
+| H5 | Local lfun call 45 ns; direct `call_other` 122 ns; naive simul wrapper 379 ns; **transparent wrapper 417 ns (3.4x)**; transparent wrapper into a shadowed object 562 ns; `function_exists()` 78 ns. Most of the wrapper's cost is its own LPC frame and the `args...` repacking, not the miss check. |
+| — | Simul resolution is decided at compile time, so a *new* override never reaches code compiled before it. A wrapper installed at boot can consult a runtime table, which makes attach/detach possible at the cost of the wrapper on every call. |
+| — | Caught errors reach master `error_handler(map, 1)` when `mudlib error handler` is set, at throw time with the trace live. |
+
+### 3.2 Coverage
+
+| Scenario | Existing mechanism | Verdict |
+|---|---|---|
+| S1 typo finder | Transparent `call_other` wrapper | Works, **at 3.4x on every call_other** in the mud, and blind to `call_other`s that do not go through the simul (the driver's own `apply()`s are not misses anyone wants, so this is acceptable) |
+| S2 profile | `trace_start()`/`trace_end()` (see `docs/concepts/general/tracing.md`); `PROFILE_FUNCTIONS` builds | **Yes, dev-time.** Not for always-on production counting |
+| S3 file audit | `valid_write(path, caller, efun)` runs per call inside the efun, sees `efun::` calls; `call_stack()` gives the site | **Yes** |
+| S4 fence | Transparent wrapper + `valid_override` denying `efun::call_other` under `/domains/`; or a callee-side `previous_object()` check (kernellib's way) | Works, at 3.4x on every call, or by editing every protected function |
+| S5 lifecycle | `valid_object()` before every `create()`; `on_destruct` with a mandatory base that calls `set_notify_destruct(1)` | **Yes, with a mandatory base object.** No destruct cause |
+| S6 deprecation | Edit the function, or redirect it with `inherit_program` | Yes, with a recompile; not attachable at runtime |
+| S7 default method | Transparent wrapper + `undefinedp(r) && !function_exists()` → proxy | Partial: 3.4x on every call |
+| S8 errors | master `error_handler` | **Yes** (master only) |
+| S9–S13 | `valid_*` covers some efuns per call; `call_out` and object creation have no per-call observation; a connection can only be refused by the master's `connect()`, after the session is allocated | No |
+
+**Honest residual case.** What the driver alone can add:
+(a) miss observation and default methods at **zero cost on hits** instead of
+3.4x on every call; (b) lifecycle events with a **cause** and without a
+mandatory base object; (c) call and efun observation/decision **attachable at
+runtime** at a cost proportional to what is observed, not to all traffic;
+(d) composition of several observers without each paying the wrapper cost.
+
+### 3.3 Prior art
+
+Sources: LDMud `github.com/ldmud/ldmud` `8afa5f50` (3.6.8); DGD
+`github.com/dworkin/dgd` `733ea01`; kernellib `e602afe`; cloud-server
+`7959357`; lpc-ext `0e299c8`.
+
+#### LDMud
+
+- **`set_driver_hook()`**: one handler per hook in a flat 32-slot array
+  (`src/simulate.c:238`), gated by `privilege_violation()` unless the caller is
+  the master or simul_efun object (`:5082-5091`); values are sealed (strings
+  interned, arrays copied, unbound lambdas bound to the master, `:5199-5201`).
+  Most hooks are **policy slots** — move, uids, create/reset/clean_up
+  dispatch, command parsing, include dirs, auto-include, file encoding (compiler
+  *and* `read_file`/`write_file`), prompts, telnet.
+- **`H_DEFAULT_METHOD`** runs after normal lookup and the shadow chain fail
+  (`src/interpret.c:20439-20444`): zero cost on hits, one type test on a miss.
+  Protocol `fn(&result, ob, fun, args...)`, 0 = declined. Exempt: master
+  (`:25095`, `:21016`), simul_efuns, lightweight objects (`:25089`),
+  `call_direct*`. Not documented: it also fires for driver applies through
+  `sapply()` (`interpret.h:314`; `__INIT` `object.c:498`, `catch_tell` `:1330`,
+  `id` `:4472`). History: a closure bound to a destructed object (Mantis #523,
+  `test/t-0000523.c`) and a leak when the handler errored (`test/t-errors.c`).
+- **`limited(closure, limits...)`** runs a closure under its own eval/depth
+  limits; `doc/master/runtime_error` recommends it for the error handler.
+  Hooks are not wrapped in it automatically.
+- **`trace()`/`traceprefix()`** + master `valid_trace()`: per-interactive,
+  observe-only text trace of calls, call_others, applies and returns, gated by
+  a global bit test at each site (`interpret.c:9495, 20585, 20642`) — the same
+  cost class as this RFC's detached test; no aggregation.
+- Master **`runtime_error(err, prg, curobj, line, culprit, caught)`** fires
+  for caught errors too; **`prepare_destruct()`** can veto any
+  `destruct_object()` (`simulate.c:2616-2626`).
+- **Python `register_hook`**: `ON_OBJECT_CREATED`, `ON_OBJECT_DESTRUCTED`,
+  `ON_HEARTBEAT`, signals, `BEFORE_INSTRUCTION` (3.6.8). Multiple subscribers,
+  observe-only, exceptions printed and skipped (`pkg-python.c:18048-18061`);
+  operator Python only. `BEFORE_INSTRUCTION` costs an out-of-line call per
+  opcode in a Python build even with no handler (`interpret.c:10150-10152`).
+- Error containment differs per hook by accident (`secure_*` wrappers for
+  some, propagation for others); hooks run on the caller's eval budget.
+
+#### DGD
+
+- **Auto object**: inherited by everything except the driver object; may
+  redeclare kfuns (`lpc-doc/Introduction:9-13`). `::kfun()` from an ordinary
+  program resolves to the auto object's definition when one exists
+  (`src/comp/control.cpp:1495-1512`), so advice cannot be bypassed the way
+  FluffOS's `efun::` bypasses a simul (which `valid_override` must close
+  instead). `a->f()` compiles to a call to the name `call_other`
+  (`src/comp/compile.cpp:2544`). kernellib wraps `destruct_object`,
+  `compile_object`, `clone_object`, `call_out`, file kfuns etc.: check, notify a
+  manager, `::kfun()` (`kernellib/src/kernel/lib/auto.c:224-262`). cloud-server
+  stacks a second auto layer by answering `include_file` with an inherit
+  (`objectd.c:627-640`).
+- **Driver-object applies**: `call_object` (string targets of `call_other`
+  only, `kfun/builtin.cpp:2153-2158`), `path_read`/`path_write` on every file
+  kfun (`src/path.cpp:47,70`), `touch`, `runtime_error`, `atomic_error`,
+  `remove_program`, `compile_rlimits`/`runtime_rlimits`, and the rest. The
+  driver calls `create()` lazily on the first call into an object
+  (`interpret.cpp:2534-2539`).
+- **kernellib object-manager hooks**: a fixed set of named events with **one
+  LPC subscriber** — `compiling`, `compile`, `compile_lib`, `compile_failed`,
+  `clone`, `destruct`, `destruct_lib`, `remove_program`, `include_file`,
+  `touch`, `forbid_call`, `forbid_inherit`
+  (`kernellib/src/doc/kernel/hook/driver:19-84`). Mudlibs can build the same
+  shape on top of hooks (the example effects daemon in §6 does).
+- **`call_touch()`/`touch()`**: one flag test per call
+  (`!(obj->flags & O_TOUCHED)`, `interpret.cpp:2520`); the next call into a
+  marked object fires `touch(obj, fn)` before lookup (so even for a missing
+  function); the object is re-marked touched before the hook runs, and a true
+  return re-arms it (`:2525-2531`).
+- **Containment**: `rlimits (stack; ticks) {}`; `atomic` rolls back state;
+  `callCritical` runs `runtime_error`/`atomic_error`/`remove_program`
+  **unlimited** (`rlimits(-1;-1)`, `interpret.cpp:2925`) with errors caught and
+  logged (`:2948`). `runtime_error` runs at throw time, before unwinding,
+  with the catch depth (`error.cpp:166-171`).
+- **Misses** return `nil` with no hook (`builtin.cpp:2177-2183`), and
+  kernellib relies on it (`auto.c:359`).
+
+### 3.4 What we take
+
+| From | Take | Avoid |
+|---|---|---|
+| LDMud | `H_DEFAULT_METHOD`'s placement (after normal lookup and shadows fail) and its "handled or declined" protocol, here an answer of `({ value })`; master gating; sealed values; a per-call budget like `limited()`; a global bit test at each site, like `trace()` | One handler per hook; silent widening to driver applies; per-hook accidental error policy; an always-on per-opcode call |
+| DGD / kernellib | Contained critical calls whose errors never cascade; touch's cheap per-object gate and its clear-before-call discipline; error observation at throw time (already `error_handler`); the auto object as the compile-time layer (§4.7); a small surface of events LPC cannot express itself | Unlimited budgets for code wizards write; permissive returns (nil/0 = deny, AGENTS.md §13.24) |
+
+## 4. Design
+
+### 4.1 Authorization: tiers and `valid_hook()`
+
+```lpc
+// master
+int valid_hook(object who, string point, mixed action, mapping spec, int flags, int tier);
+// returns the tier it grants: 0 (deny), 1, 2 or 3
+```
+
+Any object may call `hook_attach()`. The driver does three things before any
+attachment exists:
+
+1. **Normalizes the request.** Unknown or inapplicable spec keys, malformed
+   patterns and kinds a point does not allow are errors. Names are
+   canonicalized (`filename_to_obname()`; `#n` stripped for name keys;
+   prefixes only with a trailing `/`), so `/secure/login`, `/secure/login.c`
+   and `//secure/login` are one spelling. `who` is always the object that
+   called the efun (a mudlib simul_efun wrapping `hook_attach()` therefore owns
+   what it attaches).
+2. **Computes the tier the request needs.** This is the part a master cannot
+   get wrong by accident:
+
+   | Tier | The driver has checked that | Typical use |
+   |---|---|---|
+   | **1 Self** | the spec pins `object` or `caller_object` to `who`, the handler belongs to `who`, and neither `HOOK_FAIL_CLOSED` nor `HOOK_OVERRIDE_NOMASK` is set. Any kind | an object advising calls made on it or by it: a proxy answering its own misses, an item reacting to its own use |
+   | **2 Scoped observe** | the kind is BEFORE or AFTER (LPC handler, `count` or `time`), the handler belongs to `who`, the point is `function`, `efun:*`, `call_other:miss`, `object:create` or `object:destruct`, and at least one scoping key is present (`target`, `defined_in`, `object`, `caller`, `caller_program`, `caller_object`) | a wizard profiling or auditing code under their own directory; the master checks the paths |
+   | **3 Privileged** | nothing: everything else. `HOOK_DECIDE`/`HOOK_AROUND` on anything but yourself, `HOOK_FAIL_CLOSED`, `HOOK_OVERRIDE_NOMASK`, no scoping key, a handler owned by another object, `net:*`, the simul_efun program as a target, and delivery of events raised inside simul_efun code | the mudlib's own daemons: audit, quests, effects, security |
+
+3. **Asks the master**, passing the tier. The attachment is created only if
+   `valid_hook()` returns an integer **≥ that tier**. An absent apply, 0, a
+   lower number, any other value, a promise (AGENTS.md §13.24) or an error
+   denies, and so does attaching before the master is loaded. A master that
+   simply returns 1 therefore allows self-hooks only; passwords and other
+   people's arguments are out of reach until the master deliberately returns
+   2 or 3. The master receives a fresh copy of the normalized spec; changing
+   it has no effect.
+
+This mirrors how existing gates work: `shadow()` applies hard driver rules
+before asking `valid_shadow()`; `bind()` hands `valid_bind()` the binder and
+both owners; sockets ask `valid_socket()` per operation.
+
+**Hard rules, whatever the master returns**
+
+* The master object is never a target: no attachment matches a function in
+  the master, and no call-type event fires for calls the master makes.
+  Lifecycle events (`object:create`, `object:destruct`) fire regardless of
+  who caused them.
+* Nothing fires inside `valid_hook()`, any other `valid_*` apply,
+  `error_handler`, or while a compile is active (a depth counter around the
+  generated set of those master applies, plus the compiler's `current_file`).
+* **Simul_efun code is transparent, not exempt, and privileged to observe.**
+  Real mudlibs issue `destruct`, `call_out`, `move_object`, `exec` and `snoop`
+  from simul_efun wrappers (Dead Souls, Lima, Nightmare, Discworld; Appendix
+  A), so exempting it would blind `efun:*` hooks. An efun called from
+  simul_efun code is attributed to the object that called the simul_efun.
+  But events raised inside simul_efun code are delivered to tier-3
+  attachments only: otherwise a wizard could hook `efun:users` on their own
+  call to a simul `users()` and read what the wrapper filters out, undoing
+  `valid_override()`. Functions of the simul_efun program can be hooked at
+  tier 3, never with `HOOK_AROUND`.
+* **Secrets are redacted at every tier.** The line delivered to a no-echo
+  `input_to()`/`get_char()` callback, and argument 0 of `crypt()`/`oldcrypt()`,
+  reach handlers as 0.
+* `HOOK_FAIL_CLOSED` is refused on `net:accept`, `net:ws_upgrade` and
+  `call_other:miss`: a broken handler must not be able to lock everyone out.
+* A runtime config switch (`hooks enabled : 0`) makes `hook_attach()` always
+  fail: the break-glass for a mud locked up by its own hooks, since owners
+  re-attach in `create()` and a reboot alone would not help.
+
+**Ownership, revocation, visibility**
+
+* The attachment belongs to `who`; the handler runs as its owner (at tiers 1
+  and 2, that is `who`).
+* It is detached when its owner or its handler's owner is destructed, when
+  the handler's function pointer goes stale (its owner was recompiled), when
+  an `object`-filtered target is destructed, on expiry, after
+  `hook max errors` errors (never for `HOOK_FAIL_CLOSED`), or by the master.
+  Attachments survive recompilation of the programs they *target*. Nothing
+  persists across a reboot: owners attach in `create()`, the same idiom as
+  `call_out()` and `set_heart_beat()`.
+* Every detach is reported to the owner (`hook_detached(id, reason)`, if it is
+  alive) and to the master (`hook_detached(id, reason, owner)`), so a fence
+  never disappears silently.
+* When the master is recompiled the driver re-asks `valid_hook()` for every
+  live attachment and detaches those no longer granted.
+* `hook_query()`/`hook_detach()` work for the owner and the master.
+  `hook_list(ob)` shows other callers only the labels of attachments that
+  apply to `ob`.
+
+**Upgrade hazard.** A master that already defines a function named
+`valid_hook` would answer the new apply. Release notes and the apply's page
+must say so.
+
+### 4.2 The attachment model
+
+```lpc
+int hook_attach(string point, mixed action, mapping spec, int flags);
+```
+
+**Kinds** (`flags`, exactly one):
+
+| Kind | Runs | Can change the outcome? |
+|---|---|---|
+| `HOOK_BEFORE` (0) | before the call, for every attempt, including ones a decider then refuses | No |
+| `HOOK_DECIDE` | after the BEFORE handlers | Refuse or answer (below) |
+| `HOOK_AFTER` | after the call returned; gets its result | No |
+| `HOOK_AROUND` (phase 4, gated; `function` only) | wraps the call; gets a `proceed` function | Yes: change arguments or result, or skip the call |
+
+Event points have one kind each (`object:create` is after, `object:destruct`
+is before); for them `flags` kind 0 means "the point's kind".
+
+Order at one join point is total: **BEFORE → DECIDE → (AROUND) → the call →
+AFTER**, and within a kind by `priority` (lower first, ties by attach id).
+The list is fixed when dispatch starts: attaching or detaching inside a
+handler affects the next event, and an attachment detached mid-dispatch
+(for example because its owner was destructed) does not run.
+
+**Decisions.** A `HOOK_DECIDE` handler returns:
+
+| Return | Meaning |
+|---|---|
+| 0 or nothing | no opinion; the next decider is asked |
+| a string | **refuse**: the call does not run and the caller gets an error with that text |
+| 1 | refuse with a generic message naming the attachment's label |
+| `({ value })` | **answer**: the call does not run and `value` is its result (checked against the function's declared return type). This is how a curse makes `wield()` return 0 after telling the player why, and how a proxy claims a miss |
+
+The first refusal or answer wins. What each means at a point is in the
+catalogue's "decision" column (§4.4): an efun can be refused but not
+answered; `net:accept` refuses by closing the connection; a call the driver
+itself makes (origin `driver`) is skipped without raising anything.
+
+Anything else a decider does — returns another type or a promise (AGENTS.md
+§13.24), errors, runs out of budget, or cannot be run at all (§4.3) — is "no
+opinion" and is counted. With `HOOK_FAIL_CLOSED` it is a refusal instead, so
+a fence cannot fail open.
+
+**Actions.** A function pointer (the handler), `"count"`, or `"time"` (count
+plus summed and maximum eval microseconds; needs the call's exit, so only
+where AFTER is allowed). `count` and `time` run entirely in C and keep rows
+keyed by (caller program, target program, function); at event points the
+"function" column holds the cause or reason.
+
+**Handlers** take positional arguments (a context mapping costs about 200 ns
+per event to build):
+
+```lpc
+mixed handler(int id, object actor, object caller, object target, string fn, mixed *args);
+// HOOK_AFTER appends `mixed result`; HOOK_AROUND appends `function proceed`;
+// call_other:miss appends `string reason`. Event points pass their own arguments (§4.4).
+```
+
+* `actor` is `this_player()` at the intercepted call. Inside a handler
+  `this_player()`, `this_interactive()` and `previous_object()` are 0: a
+  handler learns identities only from its arguments, and cannot `input_to()` or
+  `command()` as the victim.
+* `caller` may be 0 (the backend calls `reset()`, `heart_beat()` and
+  `call_out`s with no current object).
+* `args` holds the call's arguments; arrays, mappings, classes and buffers
+  are one-level copies, so an observer cannot change what the callee sees.
+  Only `HOOK_AROUND` can, through `proceed`.
+
+**Batched delivery** (`HOOK_DEFERRED`, with BEFORE or AFTER). Events are
+queued per attachment and delivered once per gametick as
+`handler(int id, mixed *events)`, each event being the argument list after
+`id` (for AFTER: `({ actor, caller, target, fn, args, result })`). Objects
+destructed in the meantime are 0; overflow beyond `hook max deferred` is
+counted in `dropped`; the queue is discarded on detach. One LPC frame per
+batch is what makes event-stream consumers (quests, ledgers, NPC and LLM
+feeds) affordable, and it is the only way to feed an `async` consumer.
+
+**Filter keys** (in `spec`; a string or an array of strings unless noted;
+prefix match only when a pattern ends in `/`; no globs). Which keys a point
+accepts is in the catalogue.
+
+| Key | Matches |
+|---|---|
+| `target` | the target object's name, clone suffix stripped |
+| `object` | one target object instance (for `efun:*`: the first object-typed argument) |
+| `defined_in` | the program that defines the called function |
+| `function` | function name |
+| `origin` | how the function was entered: `"local"`, `"call_other"`, `"driver"` (applies, `heart_beat`), `"internal"` (`call_out`), `"simul"`, `"efun"` (verb functions and efun callbacks), `"function pointer"` — the names the `origin()` efun already uses |
+| `caller` | the calling object's name, clone suffix stripped |
+| `caller_program` | the program of the calling frame |
+| `caller_object` | one calling object instance |
+| `args` | a mapping from argument position to a value or array of values (strings, ints, objects), compared in C: `([ 0: ({ "combat_exp", "balance" }) ])` |
+| `exclude` | a mapping with the same keys; an event matching it is skipped |
+
+`spec` also carries `"label"` (required; shown in listings, errors and
+traces), `"priority"` (int, default 0) and `"expires"` (seconds; refused with
+`HOOK_FAIL_CLOSED`, so a fence cannot lapse silently).
+
+**Re-entry.** While an attachment's handler runs, further matching events
+are treated per cause: events caused by the handler's own owner are ignored
+(the handler's own work must not recurse); events caused by anyone else are
+queued for an observer and delivered when the handler returns, and are "no
+opinion" for a decider (a refusal under `HOOK_FAIL_CLOSED`). Other
+attachments always see everything, so doing a write from inside your own
+handler does not hide it from an audit hook.
+
+**Rules for `function` hooks**
+
+* `nomask` is respected: DECIDE and AROUND attachments skip `nomask`
+  functions unless `HOOK_OVERRIDE_NOMASK` is set (tier 3). Libraries such as
+  Genesis make their combat pipeline `nomask` precisely to stop shadows.
+* Calls the driver makes (origin `driver`) can be decided or advised only
+  when the driver ignores the result: `create`, `init`, `heart_beat`,
+  `on_destruct`, `receive_message`, `net_dead` and the telnet applies. For
+  the rest a refusal would either be read as an answer by C code (`id`,
+  `catch_tell`, verb functions) or take the "function not found" path that
+  permanently disables the apply (`reset`, `clean_up`, `process_input`,
+  `write_prompt`). Observing is always allowed. `__INIT` is not hookable.
+* `(: … :)` functionals have no named function and are not hookable.
+* For an `async` function, AFTER runs when the body first parks and its
+  result is the promise.
+
+### 4.3 Contained invocation
+
+Every handler call goes through one primitive. Written against the current
+source (`safe_call_function_pointer()` cannot be used as is: it expects the
+arguments already pushed, and pushing can itself throw into the middle of,
+say, `destruct_object()`):
+
+```cpp
+HookRun hook_call(Attachment* a, PushArgsFn push_args, svalue_t* out) {
+  funptr_t* f = a->fp;
+  if (a->detached) return kSkipped;
+  if (!f->hdr.owner || (f->hdr.owner->flags & O_DESTRUCTED)) return detach(a, "handler_owner_destructed");
+  if (stale_layout(f)) return detach(a, "stale_function");            // pre-check: the error text cannot be recognised afterwards
+  if (current_file || too_deep_error || max_eval_error ||
+      csp >= &control_stack[CFG_MAX_CALL_DEPTH - kHookHeadroom]) return kSkipped;
+
+  int const num_arg = st_num_arg;                                       // AGENTS §13.16
+  auto const t0 = steady_clock::now(); int64_t const ev = get_eval();
+  int const oot = outoftime;
+  object_t *ci = current_interactive, *hb = g_current_heartbeat_obj;    // raw pointers: hold refs
+  if (ci) add_ref(ci, "hook"); if (hb) add_ref(hb, "hook");
+  auto const sim = hook_save_simulate_state();                          // restrict_destruct, num_objects_this_thread
+  f->hdr.ref++; a->running = true; g_hook_depth++;
+  save_command_giver(nullptr);                                          // this_player() == 0
+  current_interactive = nullptr; g_current_heartbeat_obj = nullptr;
+  DEFER {
+    restore_command_giver();
+    current_interactive = (ci && !(ci->flags & O_DESTRUCTED)) ? ci : nullptr;
+    g_current_heartbeat_obj = (hb && !(hb->flags & O_DESTRUCTED)) ? hb : nullptr;
+    if (ci) free_object(&ci, "hook"); if (hb) free_object(&hb, "hook");
+    hook_restore_simulate_state(sim);
+    st_num_arg = num_arg;
+    set_eval(ev - elapsed_us(t0)); outoftime = oot;                     // the caller pays for the handler
+    max_eval_error = too_deep_error = 0;
+    a->running = false; g_hook_depth--; free_funp(f);
+  };
+  set_eval(std::min<int64_t>(hook_eval_cost(), ev));
+  error_context_t econ; save_context(&econ);
+  svalue_t* ret = nullptr;
+  try { int const n = push_args(); ret = call_function_pointer(f, n); }
+  catch (const char*) { restore_context(&econ); }
+  pop_context(&econ);
+  if (!ret) { a->errors++; return kError; }
+  if (ret->type == T_PROMISE || a->detached) return kDeclined;
+  assign_svalue_no_free(out, ret);                                      // copy before the next handler overwrites it
+  return kRan;
+}
+```
+
+| # | Rule | Why |
+|---|---|---|
+| 1 | Budget is the smaller of `hook eval cost` and the caller's remaining eval; elapsed time is charged to the caller. An overrun aborts the handler only | Restoring the caller's full budget would make hooked calls free: `while (1)` on a self-hooked no-op never ends. Not charging at all bills the time to nobody (AGENTS.md §13.23) |
+| 2 | `outoftime`, `max_eval_error`, `too_deep_error` are reset on the way out | Otherwise a handler that ran out of eval makes the caller's next opcode die with "Too long evaluation" |
+| 3 | `restrict_destruct` and `num_objects_this_thread` are saved and restored | The driver's error handler zeroes both on *every* error, contained or not; a handler error during a destruct cascade or an inherit-chain load would silently remove the guard that protects it |
+| 4 | `current_interactive` and `g_current_heartbeat_obj` are nulled for the call (with refs) and restored only if still alive; `command_giver` is saved and restored | A handler's too-deep error would otherwise switch off the heart_beat of the innocent outer object |
+| 5 | `st_num_arg` is latched and restored; arguments are pushed inside the `try` | §13.16; a stack overflow while pushing must not throw into the join point's caller |
+| 6 | A handler that cannot run (compile active, driver already in an error state, fewer than `kHookHeadroom` = 16 control frames left) returns "skipped": counted, and a refusal under `HOOK_FAIL_CLOSED` | A silent skip would let anyone bypass a fence by recursing to the depth limit |
+| 7 | Stale or ownerless handlers are detached by a pre-check, not by recognising an error | `safe_*` paths report only "it failed" |
+| 8 | After any BEFORE or DECIDE handler, the join point re-checks that its target is not destructed, and efun points re-run the efun's argument type check | `apply_low()` checks for a destructed target only before; `call_direct()` never does; a handler that destructs an efun's object argument must produce a clean "bad argument" |
+| 9 | Handler errors are counted and reported through the normal uncaught-error path, with advised frames labelled (`[hook #12 blood_moon]`) | Debuggability; no per-attachment "last error" text is kept, because the unwind does not carry it |
+| 10 | The attachment table, handler function pointers, owners and object-valued filters are marked in `checkmemory.cc` (`mark_funp`, after `mark_call_outs()`); count tables are C++ containers bounded by `hook max rows` | AGENTS.md §3; attacker-chosen names must not grow memory |
+| 11 | No detach callbacks at shutdown; the table has no static-destructor side effects | The Windows exit-abort class of bug (AGENTS.md §14) |
+
+Eval limits are enforced on Linux only (`src/vm/internal/eval_limit.cc`).
+Each handler call costs three timer system calls on top of the LPC call;
+phase 1 measures this and the cost gate (§4.5) records it.
+
+### 4.4 Join-point catalogue (normative; the only one)
+
+Sites are under `src/`. Tier is the lowest that can attach (§4.1); DECIDE and
+AROUND are tier 3 unless the attachment is a self-hook.
+
+| Point | Fires | Site | Kinds | A decision means | Filter keys | Handler arguments after `id` | Frequency | Phase |
+|---|---|---|---|---|---|---|---|---|
+| `call_other:miss` | a `call_other`/`->` (single or array target) found nothing callable, after the shadow chain | `vm/internal/apply.cc` `apply_low()`, origin `call_other`, at the not-found and no-permission exits, where the arguments are still on the stack | BEFORE, DECIDE | answer only: `({ value })` becomes the result; otherwise the caller gets `undefined` as today | `target`, `object`, `function`, `caller`, `caller_program`, `caller_object`, `exclude` | actor, caller, target (the object the caller named, before the shadow walk), fn, args, reason (`"undefined"`, `"private"`, `"protected"`, `"destructed"`; `static` reads as protected) | rare | 1 |
+| `object:create` | an object finished `create()` (also when it defines none); not if `create()` destructed it | `vm/internal/base/object.cc` `call_create()` | after | — | `target`, `exclude` | ob | medium | 1 |
+| `object:destruct` | any destruct, driver-initiated included | `vm/internal/simulate.cc` `destruct_object()`, after its `O_DESTRUCTED` re-check and before `remove_object_from_stack()`; the handler's own destruct of the object is detected afterwards | before | — | `target`, `object`, `exclude` | ob, cause (`"efun"`, `"shadowed"`, `"environment"`, `"refused"`, `"reload"`) | medium | 1 |
+| `function` | a named function is entered, by any route | one helper called after default arguments are filled and before the frame is pushed, at the five entry sites: `apply_low()`, `F_CALL_FUNCTION_BY_ADDRESS`, `F_CALL_INHERITED`, `call_direct()`, `FP_LOCAL` function pointers | BEFORE, DECIDE, AFTER; AROUND in phase 4 | refuse: error in the caller (driver-origin calls are skipped silently); answer: the value is returned | all of §4.2; at least one of `defined_in`, `target`, `object`, `function` is required | actor, caller, target, fn, args | per call | 2 |
+| `efun:<name>` | an efun is about to run; `efun::foo()` and `foo()` are the same event | `vm/internal/base/interpret.cc` `call_the_efun` (all efun opcodes) and `vm/internal/base/function.cc` efun function pointers | BEFORE, DECIDE, AFTER | refuse: error in the caller. No answer | `object` and `target` (first object-typed argument), `caller`, `caller_program`, `caller_object`, `args`, `exclude` | actor, caller (the simul_efun's caller when issued from simul_efun code), target, name, args | per efun call | 3 |
+| `net:accept` | a connection was accepted on a driver port, before any session or object exists | a shared helper in `comm.cc`, called by `net/transport_libevent.cc` `new_conn_handler()` and `wasm/comm_wasm.cc` before anything is allocated | BEFORE, DECIDE | refuse: the descriptor is closed | none (tier 3 only) | port, kind (`"telnet"`, `"ascii"`, `"binary"`, `"mud"`, `"websocket"`), tls flag, peer address | per connection | 3 |
+| `net:ws_upgrade` | a websocket upgrade request, before the `101` | a new `LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION` arm → one helper in `net/ws_common.cc` | BEFORE, DECIDE | refuse: the upgrade is rejected | none (tier 3 only) | port, subprotocol, peer address (honouring `X-Real-IP`), Origin, Host, User-Agent | per connection | 3 (own PR, with the browser matrix of AGENTS.md §14) |
+
+Point-specific rules:
+
+* **`efun:<name>`** fires at dispatch, before the efun's own `valid_*`
+  checks, so observers also see attempts the efun then refuses; a decision
+  can only refuse, so nothing a `valid_*` denies is ever granted. Not
+  hookable: the `hook_*` efuns and `call_other` (use `function` with
+  `origin: "call_other"`). DECIDE is refused on `error`, `throw`,
+  `set_eval_limit`, `reset_eval_cost` and `eval_cost`. The shared type-check
+  helper also closes an existing gap (efun function pointers check fewer
+  arguments than the opcode route does today).
+* **`function`** keys on the *defining* program. `defined_in` names it
+  directly; with only `target` or `object`, the driver resolves the programs
+  that define `function` for the matching objects (their own program and what
+  they inherit) and re-resolves when a program is loaded. No double firing:
+  one entry is one event, whatever the route.
+* **`net:*`** handlers never see a session: they run before any
+  `interactive_t` exists, so `users()` inside a handler cannot return a
+  half-built one. For proxied websocket clients `net:accept` sees the proxy's
+  address; the real client is known at `net:ws_upgrade`. Address-keyed
+  `count` rows obey `hook max rows`. Hook calls live in shared code
+  (`comm.cc`, `net/ws_common.cc`), so the WASM transport is covered without
+  `#ifdef` (AGENTS.md §5); inside libwebsockets, handlers run only in the
+  filter callback, never in `SERVER_WRITEABLE` (AGENTS.md §14).
+
+**Coverage map.** Everything the driver does is reachable through the points
+above:
+
+| To hook | Use |
+|---|---|
+| an efun call | `efun:<name>` |
+| a simul_efun call | `function`, `defined_in` = the simul_efun object, `origin: "simul"` (tier 3) |
+| an apply (the driver calling an object): `create`, `init`, `reset`, `clean_up`, `logon`, `net_dead`, `process_input`, `catch_tell`, `receive_message`, telnet applies | `function`, `origin: "driver"` (observe always; decide per §4.2) |
+| `call_other` / `->` | `function`, `origin: "call_other"`; misses: `call_other:miss` |
+| `call_out` | scheduling: `efun:call_out`; firing: `function`, `origin: "internal"` (named functions); removal: `efun:remove_call_out` |
+| `heart_beat` | `function` `heart_beat`, `origin: "driver"`; on/off: `efun:set_heart_beat` |
+| destruct | every destruct with its cause: `object:destruct`; refusing an explicit one: `efun:destruct` DECIDE |
+| move | `efun:move_object` (the driver's only move path): `caller_object` = the moved object, `object` = the destination; BEFORE sees the old environment, AFTER the new one |
+| clone, load, create | `efun:clone_object`, `efun:new`, `efun:load_object`; `object:create` |
+| `exec`, `snoop`, `shadow`, `recompile_object`, `replace_program`, sockets | `efun:<name>` (callbacks: `function`) |
+| commands and input | `function` on verb functions and on `process_input`; `efun:command` |
+| network | connections: `net:accept`, `net:ws_upgrade`; GMCP/MSDP/telnet subnegotiation in: `function` on `gmcp`, `msdp`, `telnet_suboption`, `window_size`, `terminal_type` (origin `driver`); out: `efun:send_gmcp` and friends |
+
+Bespoke points that were surveyed and would only duplicate these, or that
+have no use case yet, are in Appendix B with their sites and hazards, so they
+can be added when a mudlib asks.
+
+### 4.5 Gating and the cost gate
+
+**When nothing is attached** a join point costs one predicted branch on its
+bit in a global `g_hook_mask`. A build with that test at five sites,
+including before *every* efun dispatch, was indistinguishable from master
+(call_other 113/113 ns, local call 43/43, `sizeof` 19/19; launch-to-launch
+noise was ±6% in that A/B run).
+
+**When something is attached**, cost is confined to what is hooked:
+
+| Point | Second-level gate |
+|---|---|
+| `function` | a `PROG_HOOKED` bit in the defining program's flags, then a lazily allocated per-function byte map on that program (there is no free bit in `function_flags`); an unhooked function in a hooked program pays one more branch |
+| object filters (`object`, `caller_object`) | an `O_HOOKED` bit in `object_t::flags` (bit `0x20` is free) |
+| `efun:<name>` | a byte per efun (`g_efun_hooked[]`) |
+| matching | an open-addressed set keyed on interned `(program, function-name)` pointers, estimated 5–10 ns; never a string-keyed lookup |
+
+Bits are recomputed when a program is compiled, on `recompile_object()` and on
+`replace_program()` (which swaps `ob->prog` without a generation bump).
+`count`/`time` rows are keyed on ref-held shared-string pointers from the
+start, so the phase-1 table does not need rewriting for phase-2 traffic.
+
+**Acceptance gate** (each phase):
+
+| Gate | Method | Threshold |
+|---|---|---|
+| Detached | `valgrind --tool=cachegrind` instruction counts on a hooks microbenchmark (`testsuite/command/speed_hooks.lpc`: local call, call_other hit and miss, `sizeof`, new+destruct), A/B | more than 0.5% instructions per iteration on any detached case fails |
+| Detached, wall clock (local, numbers in the PR) | interleaved A/B, ≥ 10 launches each, best-of-5 inner, medians | max(3%, 2× baseline inter-launch MAD) |
+| Attached | same harness: `count` on misses; 1 and 100 non-matching filters; an unhooked function in a hooked program; a hooked function on an unflagged object; one matching handler; a deferred observer; 100 cursed players among 300; one charmed NPC among 2,000 heart_beats | recorded; the handler-call cost (including its three timer system calls) is measured in phase 1 before any budget is promised |
+| Memory | Debug build with attachments live: the suite passes with no `check_memory()` report | must pass |
+
+### 4.6 API reference
+
+**Master applies**
+
+```lpc
+int  valid_hook(object who, string point, mixed action, mapping spec, int flags, int tier);  // §4.1
+void hook_detached(int id, string reason, object owner);                                     // optional
+```
+
+**Optional apply on the owner:** `void hook_detached(int id, string reason)`.
+Reasons: `"expired"`, `"owner_destructed"` (master only),
+`"handler_owner_destructed"`, `"target_destructed"`, `"stale_function"`,
+`"errors"`, `"master"`.
+
+**Efuns**
+
+| Efun | Who | Returns |
+|---|---|---|
+| `int hook_attach(string point, mixed action, mapping spec, int flags)` | anyone; §4.1 | the attachment id (monotonic, never reused); errors when refused or malformed |
+| `void hook_detach(int id)` | owner or master | — |
+| `mapping hook_query(int id)` | owner or master | `([ "id", "point", "owner", "label", "flags", "priority", "expires", "spec", "events", "errors", "skipped", "dropped", "eval_us", "last_fired", "rows" ])`; `rows` (count/time only) is an array of `([ "caller_program", "target_program", "function", "count", "eval_us" ])` |
+| `mapping *hook_list(object\|void ob)` | anyone | the caller's own attachments (the master: all), as `hook_query()` mappings without `rows`; with `ob`, the attachments that apply to `ob` — other callers get only `([ "label" ])` for those they do not own |
+
+**Flags:** one kind (`HOOK_BEFORE` = 0, `HOOK_DECIDE`, `HOOK_AFTER`,
+`HOOK_AROUND`), plus `HOOK_FAIL_CLOSED` (with DECIDE), `HOOK_DEFERRED` (with
+BEFORE/AFTER), `HOOK_OVERRIDE_NOMASK` (with DECIDE/AROUND). Constants in
+`include/hooks.h`.
+
+**Runtime config**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `hooks enabled` | 1 | 0 makes `hook_attach()` always fail (break-glass) |
+| `hook eval cost` | one tenth of `maximum evaluation cost` | budget of one handler call |
+| `hook max errors` | 10 | errors, overruns included, before an attachment is detached (never for `HOOK_FAIL_CLOSED`) |
+| `hook max attachments` | 10000 | total live attachments |
+| `hook max rows` | 10000 | rows per `count`/`time` table; overflow counted in `dropped` |
+| `hook max deferred` | 1024 | queued events per attachment |
+
+### 4.7 Compile-time layer: the auto object
+
+DGD gives every program an implicit parent, the auto object, which may
+redefine kfuns and reach the originals with `::kfun()`; kernellib builds its
+whole security and resource model there (§3.3). FluffOS can do the same today:
+
+* **An inherited `protected` function overrides the efun of the same name**
+  in every inheriting program, `efun::name()` still reaches the real efun, and
+  the override is not callable from outside (probe on `b5714e5f`: an
+  inherited `protected int sizeof()` returned 4242 to the child,
+  `efun::sizeof` returned 3, `call_other` to it returned 0; an inherited
+  `protected void destruct()` saw the child's `destruct()` call and the
+  object was destructed).
+* **An `inherit` arriving through `#include` works** (probe: an included
+  header containing `inherit "/x/auto";` made the includer inherit it).
+* **The global include file is prepended to every compile**, and the master's
+  `include_file(compiled, from, path)` apply may return per-file source text
+  (an array of strings). So the global include file names a header, and
+  `include_file()` returns `inherit "/secure/auto";` for ordinary files and an
+  empty text for the master, the simul_efun object, the auto object and its
+  own inherits. This is cloud-server's layered-auto trick
+  (`objectd.c:627-640`) with FluffOS's existing applies. The end-to-end
+  combination is **not yet verified**; phase 1 verifies it and falls back to
+  a one-line master apply if needed (§9).
+
+What it is for, and what it is not:
+
+| Use | Auto object | Hooks |
+|---|---|---|
+| Permanent efun policy (`destruct` logging and guarantees, `write`→`message`, file-efun checks) | **Yes**: zero runtime cost beyond the override's frame; `previous_object()` in callees unchanged (it is a local call) | No |
+| Veto explicit `destruct()` (LDMud `prepare_destruct`) | **Yes**: the override raises an error | No |
+| Close `efun::` bypass | With `valid_override()`: refuse `efun::name` outside the auto object | `efun:*` probes see `efun::` calls anyway |
+| Change at runtime, attach and detach | No: every change means recompiling every program | **Yes** |
+| Misses, driver-initiated destructs, `call_other` traffic | No | **Yes** |
+| Advice on mudlib functions (curses, world events) | No: the auto object only redefines efuns and adds functions | **Yes** (`function` join point) |
+
+Rules for the auto object: overrides and helpers are `protected` (callable
+inside each program, not from outside) and `nomask` where children must not
+replace them; private state lives in the auto object's own variables, which
+each inheriting object gets a copy of, so keep it small; the auto object must
+not inherit from mudlib code that itself gets the auto object injected.
+
+## 5. Interaction with existing features
+
+* **Shadows.** `function` fires on the function actually entered, after
+  shadow resolution; `call_other:miss` means the shadow chain had nothing
+  either, and reports the object the caller named.
+* **`recompile_object()` and `replace_program()`.** Attachments are keyed by
+  names; gate bits are recomputed on both. An attachment survives
+  recompilation of what it targets, not of its handler's owner (§4.1).
+* **Simul_efuns and `valid_override()`.** Unchanged. `efun:*` fires inside
+  the real efun, so `efun::` calls are observed; events from simul_efun code
+  reach tier 3 only (§4.1).
+* **Async.** Handlers are synchronous; a handler that returns a promise is
+  "no opinion". Batched delivery is the way to feed an `async` consumer.
+* **Errors.** There is no error join point: master `error_handler` already
+  runs at throw time with the trace live (§3.2).
+* **The debugger (#1286) and the tracer** use their own bits in the same mask
+  word.
+
+## 6. Reference code (shipped with the docs and the testsuite)
+
+* **A reference `valid_hook()`**: returns 3 for admin objects (by directory
+  or euid); 2 for wizards when every scoping key in the spec lies under their
+  own directory; 1 otherwise; caps live attachments per owner with
+  `hook_list()`.
+* **Examples**, each also a testsuite scenario: V1 typo finder
+  (`call_other:miss` + `count`, filtering `query_*`/`is_*` when printing);
+  S5 lifecycle counts with cause; S4 `/secure/` fence
+  (`HOOK_DECIDE | HOOK_FAIL_CLOSED`); V2 exp/money audit; V5 verb-blocking
+  condition; V7 follow.
+* **An example effects daemon** (optional mudlib code, not a driver concept):
+  status effects as attachments with labels and expiry, a player-visible
+  effects list, re-attach at login and `restore_object()`, and a rule-data API
+  for builders (§2.4).
+
+## 7. Implementation plan
+
+### 7.1 Phases
+
+Ordered by validated value per unit of driver change. Each phase ships its
+tests, its docs and the Appendix A cases it serves as testsuite scenarios.
+
+| Phase | Delivers | Scope | Main driver changes | Serves |
+|---|---|---|---|---|
+| **1. Core** | #1414, lifecycle events, the compile-time layer | `valid_hook()` with tiers; request normalization; `hook_attach`/`detach`/`query`/`list`; ownership, detach and master re-validation rules; the contained-invocation primitive (§4.3); kinds BEFORE/AFTER/DECIDE with `HOOK_FAIL_CLOSED`; `count`; `HOOK_DEFERRED`; priority ordering; `call_other:miss`, `object:create`, `object:destruct`; config keys; `mark_hooks()`; reference `valid_hook()`; docs: interposition guide and the auto-object recipe (§4.7) | new `vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`; `apply.cc`, `simulate.cc` (`destruct_object()` gains a cause), `object.cc`, `master.cc`, `applies`, `rc.cc`, `checkmemory.cc` | V1, V9 (auto object), V10 (destruct half), V11; S1, S5, S7 |
+| **2. Function entry** | observe and decide any function, per program or per object | `function` at its five entry sites; `PROG_HOOKED` + per-function map; `O_HOOKED`; all filter keys including `origin` and `args`; `time`; `expires`; `hook_list(ob)`; the driver-origin and `nomask` rules; secret redaction for no-echo callbacks | `interpret.cc`, `function.cc`, `apply.cc`, `program.h`, `object.h`, `comm.cc` (no-echo latch) | V2–V6, V8; S2, S4, S6, S9; G1–G4, G6, G10–G12, G14, G15 (observe/decide) |
+| **3. Efuns and connections** | observe and refuse any efun; refuse connections | `efun:<name>` (dispatch sites, per-efun byte, shared type-check helper, simul_efun attribution, tier-3 delivery from simul frames, `crypt` redaction); `net:accept`; `net:ws_upgrade` as its own PR | `interpret.cc`, `function.cc`, efun table generation; `comm.cc`, `net/transport_libevent.cc`, `wasm/comm_wasm.cc`, `net/ws_common.cc` | V7, V9 (runtime form), V10; S10–S13; G7 |
+| **4. Around advice** | rewriting arguments and results | `HOOK_AROUND` with `proceed` (valid once, only inside its handler call), the around chain, return-type check, `HOOK_OVERRIDE_NOMASK`; the example effects daemon | `apply.cc` (dispatch tail split), `interpret.cc`, `hooks.cc` | G5, G8, G9, G13 and the rewriting halves of G1–G3 — none validated in a real mudlib yet, so this phase is gated (§9) |
+
+Phases 2 and 3 are independent of each other; phase 4 needs phase 2.
+
+Suggested PR split: **1a** auto-object probe and the interposition guide;
+**1b** the core with `call_other:miss` (closes #1414); **1c** the object
+events and destruct-cause plumbing; **2a** `function` observe with gating;
+**2b** decide, object filters, `expires`, redaction; **3a** `efun:<name>`;
+**3b** `net:accept`; **3c** `net:ws_upgrade`. Phase 1 is roughly 3,500–4,000
+lines including tests and docs; phase 2 and 3 about 3,000 each.
+
+### 7.2 Tests
+
+Each guard has a test that fails when the guard is removed (for new efuns
+"fails on the unfixed driver" would be vacuous).
+
+| What | Harness |
+|---|---|
+| Authorization matrix: tier computed correctly for each request shape; `valid_hook` returning 0/1/2/3, a promise, an error | LPC suite; the policy switch lives in `testsuite/inherit/master/valid.lpc` |
+| No `valid_hook` in the master; attach before the master is loaded | GTest (null the cached apply); a probe in the testsuite simul_efun's `create()` |
+| Miss by each route (`->`, explicit, array target) and reason; answer and no-opinion; promise and error are no-opinion | LPC suite (`"destructed"` via a GTest gametick bump) |
+| Every destruct cause exactly once, including nested destructs and a handler that destructs the object | LPC suite, with a `valid_object` special case for `"refused"` |
+| Owner or handler-owner destruct detaches; stale handler detaches; master recompile re-validates | LPC suite |
+| Eval charged to the caller; `command_giver`, `current_interactive`, the heart_beat object, `restrict_destruct` restored after a forced overrun or error | GTest, Linux only (a small `hook eval cost`) |
+| Skipped handler near the depth limit refuses under `HOOK_FAIL_CLOSED` | LPC suite |
+| Refused while compiling | LPC suite, through the master's compile hooks |
+| `check_memory()` clean with attachments live | LPC suite on Debug (call the efun in the test, then detach unconditionally) |
+| `function`: every entry route observed once; functionals refused; driver-origin decide only on the allow-list; `nomask` skipped; target destructed by a handler; no-echo line redacted | LPC suite; `heart_beat` and `call_out` routes through GTest (`call_heart_beat()`, tick bump) |
+| `efun:*`: `efun::` observed; simul-wrapper attribution; simul-frame events reach tier 3 only; handler destructing an argument gives "bad argument"; `crypt` redacted | LPC suite |
+| `net:accept` refuses before any allocation, on the native and wasm paths; upgrade refused by real address | `tools/e2e-live.js` over real connections; browser matrix for the upgrade |
+
+Also on every phase: Debug + sanitizer and RelWithDebInfo builds, the LPC
+suite twice (randomized order), the §4.5 gate with numbers in the PR, and
+docs for anything user-visible (`gen_config_docs.py`, `gen_sidebar.py`).
+
+### 7.3 Rollout and risks
+
+Hooks are off until a master defines `valid_hook()`, so existing mudlibs see
+no behaviour change; the only cost is the detached branches. The testsuite
+master ships the reference policy so CI exercises it.
+
+| Risk | Mitigation |
+|---|---|
+| Detached cost regresses a hot path | cachegrind gate on every phase; per-function and per-object gating |
+| Handler code corrupts VM state | one primitive (§4.3) used everywhere; GTests that force overruns and errors at each point |
+| Off-graph references leak or trip `check_memory()` | `mark_hooks()` from phase 1; Debug suite with attachments live |
+| A hook locks the mud up | tiers; no fail-closed on connection points; `hooks enabled : 0` |
+| `function` is the hardest point (five sites) and now ships second | prototype the entry helper and its gate first in 2a, observe-only |
+| Mudlibs misuse hooks as their stat system | §2.4 in the user docs |
+| A master already defines `valid_hook` | release note; apply documentation |
+
+## 8. Alternatives considered
+
+**A. A DGD-style auto object instead of hooks.** Now part of this design as
+the compile-time layer (§4.7), as a complement rather than an alternative: it covers
+permanent efun policy at zero runtime cost, and it cannot cover runtime
+attach/detach, misses, driver-initiated destructs, `call_other` traffic or
+advice on functions it does not define.
+
+**B. LDMud single-slot driver hooks.** One handler per event, set by
+privileged code. Attachments here compose (several per join point, ordered by
+priority) and are authorized per request, which LDMud leaves to a
+mudlib-written dispatcher.
+
+**C. More master applies, one per feature.** The status quo. Here the
+master grows exactly one apply, `valid_hook()`, and the features become
+mudlib code.
+
+**D. A single master-designated hook daemon** (draft v2/v3:
+`get_hook_daemon()`, the only object allowed to receive events and attach).
+It answered the v1 review's security findings, but it put an extra LPC hop on
+every advised call (per-instance gameplay effects would all dispatch through
+one object) and created a second trust root beside the master. v4 follows the
+`valid_*` pattern instead and answers the same findings directly: the master
+sees the normalized filter and decides (observation scope); per-attachment
+re-entry instead of a global guard (audit bypass); `HOOK_FAIL_CLOSED` and
+`hook_detached()` (fences failing open); owner-destruct detach with re-attach
+in `create()`, the `call_out()` idiom (`update` dropping attachments). v10
+adds driver-computed tiers (§4.1), so the master cannot grant observation of
+other people's data by accident. A dispatcher daemon remains a good *mudlib*
+pattern (§6).
+
+**E. External tracing (USDT/bpftrace).** Complementary for operators;
+`hooks.cc` can emit a USDT probe at each join point at no extra cost.
+
+**F. One join point per driver event** (drafts v7–v9: 36 point families,
+`object:move`, `user:exec`, `call_out:fire`, `apply:<name>`, `net:telnet` …).
+Most were exact duplicates of an efun or of function entry, each a second
+site with its own re-validation rules, and the eleven validated cases used
+four of them. v10 keeps seven points plus an `origin` filter; the rest are in
+Appendix B.
+
+## 9. Decisions
+
+**Decided by the maintainer**
+
+1. Authorization follows the `valid_*` pattern through the master; no
+   designated hook daemon.
+2. Names stay `hook_*`.
+3. Hooks must observe **and** filter (decide on) calls.
+4. Game design is in scope.
+5. Everything stays in this one document.
+6. Hooks should cover efuns, simul_efuns, applies, `call_other`, `call_out`,
+   `heart_beat`, destruct, move and the network layer.
+7. Avoid duplicate and low-value work.
+
+**Resolved in v10, for the maintainer to confirm**
+
+8. **Generic points instead of one point per event** (from 6 and 7). The v9
+   catalogue had 36 point families; the eleven validated cases use four of
+   them, and most of the rest were exact duplicates of an efun or of function
+   entry (`object:move` is `efun:move_object`, the only caller of the driver's
+   move; `user:exec`, `user:snoop`, `shadow:attach`, `object:clone`,
+   `call_out:schedule` likewise; `apply:*`, `heart_beat`, `call_out:fire` and
+   `simul:*` are function entry with a different origin). v10 keeps seven
+   points and the §4.4 coverage map shows how each thing in decision 6 is
+   hooked. The surveyed bespoke points are kept in Appendix B, to be added
+   when a mudlib needs what they add.
+9. **Network.** `net:accept` and `net:ws_upgrade` are planned (scenario S13:
+   bans and rate limits before a session exists; nothing else can do it).
+   `net:telnet`, `net:tls`, `net:read`, `net:write` and `net:resolve` have no
+   use case yet and are in Appendix B; inbound GMCP/MSDP is hookable today
+   through the `function` point on the telnet applies.
+10. **Tiers computed by the driver** (§4.1). `valid_hook()` returns the tier
+    it grants, so a naive `return 1` allows self-hooks only.
+11. **One decision protocol**: refuse (string or 1) or answer (`({ value })`),
+    with per-point meaning in §4.4.
+12. **Handler time is charged to the caller**, within a per-call budget.
+13. **Auto object** (§4.7): no driver change; if the recipe fails its
+    end-to-end check in phase 1, the fallback is a one-line master apply
+    `string get_auto_object()`. **Destruct veto**: by the auto object's
+    `destruct()` override for explicit calls (or `efun:destruct` DECIDE);
+    driver-initiated destructs are never vetoable.
+14. **`HOOK_AROUND` ships last and gated**: a prototype must show one
+    matching AROUND costs no more than about 1.5x a matching AFTER, and at
+    least one mudlib use case from §2.2 must be confirmed as wanted. No
+    validated case needs it today.
+15. **Dropped from this RFC**: `call_limited()`, `hook_reset()`, per-protocol
+    network points, driver-side throttling.
+
+**Open**
+
+16. Is charging handler time to the caller (12) acceptable, or should audit
+    hooks installed by the mudlib be free for the code they observe?
+17. Default for `hook eval cost` (proposed: one tenth of
+    `maximum evaluation cost`).
+18. Which Appendix B points, if any, should be promoted into the plan now.
+
+## Appendix A: evidence from real mudlibs
+
+### A.1 How real mudlibs do gameplay interposition today
 
 Grepped from public mudlibs (shallow clones; paths relative to each lib):
 
@@ -93,56 +934,7 @@ handles and auto-cleanup, a documented re-attach path across login/restore,
 per-object introspection ("which effects are on this player?"), and a trust
 deny-list of advisable functions.
 
-### 2A.2 Gameplay use cases
-
-Verdict: **Hook** = cross-cutting advice is the right tool; **Retrofit** =
-right where the base class cannot be edited (legacy content), otherwise an
-explicit mudlib API is better; **No** = use the mudlib.
-
-| # | Use case | Join point & filter | Kind | Rate on a 300-player mud | Verdict |
-|---|---|---|---|---|---|
-| G1 | **Curse of Butterfingers / Silence / speech curses** on one player | `function` `wield`/`cast`/`do_say`, object = victim | deny / around (rewrite text) | low | Hook (replaces DW curse shadows; local calls covered) |
-| G2 | **Protection & states**: invulnerable at a temple, subdued, "you are dead" | `function` `adjust_hp`/`do_death`/`attack_by`, object = player | around (clamp, skip) / deny | 300–600/s mud-wide, only flagged players pay | Hook — the DW shadow family; local calls are the main win |
-| G3 | **Vulnerability / damage shield / thorns** | `function` `receive_damage`, object = victim | around / after (result, attacker = `caller`) | as G2 | Hook over legacy combat; Retrofit if the lib has a damage pipeline |
-| G4 | **Vampiric enchant on *this* heirloom sword** | `function` `hit`/`query_damage`, object = sword | after | ~1 sword | Hook — per-instance, keeps the item's identity |
-| G5 | **Polymorph / disguise** ("everyone sees a frog"; false name that logs and `/secure/` still see through) | `function` `query_short/long/race/cap_name`, object = player, exclude `caller_program` `/secure/` | around | ~100/s looks | Hook — stacking + viewer discrimination shadows can't do |
-| G6 | **Charm monster** | `function` `heart_beat` + deny `attack_ob` on the charmer, object = NPC | around / deny | heart_beat ~1000/s mud-wide | Hook; stress-tests per-object gating |
-| G7 | **Escort quest / follow the leader** | `efun:move_object`, object = escorted NPC / leader | after (state *after* the move) | moves ~100/s, flagged objects pay | Hook — `move_object` is the only chokepoint; replaces heart_beat polling |
-| G8 | **Blood Moon / seasonal overlay** (undead hit harder; frozen lake gains an exit) | `function` `query_damage` `defined_in /std/undead`; `query_exits` `target /d/lake/` | around | 50–300/s | Hook (live-ops, expires, no recompile); permanent rules move to code |
-| G9 | **Regional pricing / faction tax** (shops in orc-held towns pay 1.3×) | `function` `query_value`, `caller_program /std/shop/` + `caller /d/orclands/` | around | ~2/s | Hook — a caller × callee rule no single API expresses |
-| G10 | **Achievements & quests over legacy content** ("kill 100 orcs", "visit every room in Arnor") | `function` `die` `defined_in /std/monster`; `efun:move_object` `caller_program /std/player` | observe (deferred) | 10–100/s | Retrofit → feeds a mudlib event bus; one attachment per (program, function), fan-out in LPC |
-| G11 | **Bounty, reputation, gossip, city guards** reacting to deeds anywhere | `function` `die`/`steal`/`attack` | observe (deferred, batched) | 10–100/s | Retrofit → bus |
-| G12 | **NPC/LLM event stream**, economy simulation | as G11; `count`/`time` for trade volumes | observe (deferred, batched) | up to hundreds/s | Hook as a *source* only with batched delivery |
-| G13 | **A/B balance experiments** | around on damage/exp formulas; per-object flag = cohort | around | 100s/s | Hook (with an explain view) |
-| G14 | **Live invariants** ("gold is conserved") and **deterministic replay** on a dev server (around `efun:random` with a seeded stream) | `function` on every money-mutating function, local calls included; `efun:random` | observe / around | dev only | Hook — must see every route |
-| G15 | **Suppress an apply for one object** (nt7's blank-`init()` shadow) | `function` `init`, object = target | around (no proceed) | low | Hook, via the apply allow-list (§5.7) |
-
-**Non-goal: adding functions.** Hooks advise functions that exist; they do
-not add new functions to an object. Shadows that exist to *add* an interface
-(Genesis guild shadows adding `query_guild_name_occ()` and friends,
-`std/guild/guild_base.lpc:93-133`) stay shadows or become inherits.
-
-**Where hooks are the wrong tool (verdict No):** double-XP weekends and
-permanent stat stacking (one chokepoint or a modifier system owns display,
-dispel and save); permadeath (identity belongs in the class); invisibility
-through `id()` (a driver-questioned apply, AGENTS.md §13.24); builder
-soft-code triggers, player housing and shop policies (owner *data* checked by
-the room/shop that already receives the event); instancing/phasing;
-accessibility rewriting and translation (`receive_message`/`catch_tell`);
-verb blocking (parser-cooperative today, and it works).
-
-**The pattern.** Hooks win when the callee is legacy or spread over many
-files, when the effect depends on *who calls*, when it is per-instance and
-temporary, or when the only chokepoint is an efun. They lose where the mudlib
-already owns a single chokepoint, or the behaviour is permanent.
-
-**Trust.** Hooks are a system / live-ops / game-designer instrument, and the
-master's `valid_hook()` decides who may use them on what. Builder- and
-player-facing features are best exposed by a mudlib daemon as **rule data**
-(zone prefix, program, function, verdict, expiry), so builders never need
-hook code of their own.
-
-## 2B. Validated use cases from real mudlibs
+### A.2 Validated use cases
 
 Read from the libs the FluffOS project maintains: Discworld, Dead Souls,
 Lima and Nightmare 3 (English), Genesis, and the restored Chinese libs in
@@ -156,7 +948,6 @@ master but fengyun's returns `valid_shadow() == 0`), so their case for hooks
 is not "replace shadows" but **misses, event sources and per-victim gates** in
 `dbase`-style libs where every state change funnels through `/feature/*`.
 
-### 2B.1 Valid (11)
 
 **V1. Find calls to functions that do not exist** (S1, #1414) — **Hook**, `call_other:miss`.
 *Evidence:* a call-vs-definition diff of pkuxkx found shipped gameplay bugs that
@@ -179,7 +970,7 @@ void log_misses(int id, mixed *events) {           // event: ({ actor, caller, t
 ```
 
 **V2. Audit every exp/money change, wherever it is made** — **Hook**, `function` +
-`HOOK_AFTER | HOOK_DEFERRED` + an argument filter (§5.3, added for this case).
+`HOOK_AFTER | HOOK_DEFERRED` + an argument filter (§4.2, added for this case).
 *Evidence:* pkuxkx `adm/daemons/natured.lpc:157-190` `check_all_data()` polls
 every user's money and exp and logs large deltas, but both scheduler calls are
 commented out (`:147`, `:153`): the anti-dupe/anti-robot audit was switched
@@ -229,7 +1020,11 @@ hand (`d/jiangzhou/npc/qd1.lpc:87 … qd6.lpc:93`); 123 condition daemons are
 enforced only where a verb author remembered (`query_condition` read in 11
 commands and 84 skill files).
 ```lpc
-hook_attach("function", (: "你穴道被封，无法装备！\n" :),
+mixed sealed(int id, object actor, object caller, object victim, string fn, mixed *args) {
+  tell_object(victim, "你穴道被封，无法装备！\n");
+  return ({ 0 });                       // answer: wield()/wear() return 0 without running
+}
+hook_attach("function", (: sealed :),
     ([ "label": "cannt_eq", "object": victim, "defined_in": "/feature/equip",
        "function": ({ "wield", "wear" }), "expires": duration ]),
     HOOK_DECIDE);
@@ -252,9 +1047,10 @@ their friendly refusals. `hook_list(player)` explains "why did my spell fail".
 `std/modules/m_follow.c:193-211` removes and re-adds `person_left` /
 `object_arrived` hooks on the old and new room on **every** move, and only
 works where a room's exit code reaches `call_hooks` (Lima's 205 hand-placed
-points). *Hook:* the follower attaches `efun:move_object` with `"object":
-leader` and `HOOK_AFTER` and moves itself when the leader has arrived; only
-the leader pays (§5.9: the subject of `move_object(dest)` is the moved object).
+points). *Hook:* the follower attaches `efun:move_object` with
+`"caller_object": leader` (`move_object()` moves its caller) and `HOOK_AFTER`,
+and moves itself to `args[0]` once the leader has arrived; only the leader
+pays.
 
 **V8. Deprecation telemetry** — **Hook**, `count`. *Evidence:* Discworld logs
 obsolete-API callers by hand (`obj/handlers/money_handler.c:405-410`,
@@ -284,8 +1080,8 @@ call_outs per object and log floods. *Hook:* `count`/`time` on
 `efun:destruct`, `efun:call_out`, `efun:snoop`, `efun:exec` — aggregated in C,
 no stack capture on the hot path, attachable while hunting — plus
 `object:destruct` for the destructs no wrapper sees. These libs issue the
-efuns from simul_efun wrappers, which is why §5.1 makes wrappers transparent
-rather than exempt.
+efuns from simul_efun wrappers, which is why §4.1 makes wrappers transparent
+rather than exempt (and why such hooks are tier 3).
 
 **V11. Cleanup when a room's destruct cascades** — **Hook**,
 `object:destruct`. *Evidence:* pkuxkx `adm/simul_efun/object.lpc:73-87`
@@ -295,7 +1091,7 @@ objects destructed *with* their environment never pass through it.
 "destruct-cascade" ]), 0)` acting on `cause == "environment"`; low rate,
 nothing otherwise.
 
-### 2B.2 Not a hook (7)
+### A.3 Checked and rejected (not a hook)
 
 | Case | Evidence | Why not |
 |---|---|---|
@@ -307,911 +1103,59 @@ nothing otherwise.
 | Dead Souls damage protections | `lib/body.lpc:705-745` `AddMagicProtection` list with ordering and owner cleanup | The lib already has the modifier pipeline (the single-slot `SetProtect` at `:1964` is an LPC bug) |
 | `destruct` policy (cleanup, `remove()`) | pkuxkx `adm/simul_efun/object.lpc:73-87` | Permanent efun policy already central in the simul_efun; only the cascade (V11) needs a hook |
 
-The rule from §2A held: hooks lose wherever the mudlib already owns a single
+The rule in §2.4 held: hooks lose wherever the mudlib already owns a single
 chokepoint (4 of the 7). They win for misses, event sources over legacy code,
 per-instance gates with expiry, and observation cheap enough to leave on.
 
-## 3. What FluffOS can do today (corrected after review)
+## Appendix B: surveyed points, available on demand
 
-### 3.1 Probe results
+Two source surveys mapped these candidates to their sites. They are not in
+the plan because a generic point already delivers the event, or because no
+use case exists yet. Each row records what a bespoke point would add and the
+hazard found, so the work is not lost. Paths are under `src/`.
 
-All rows reproduced by an independent reviewer. Timings: median of 5
-launches, N = 200k, empty-loop baseline (7 ns) subtracted; a single launch can
-spread ±25% on a shared machine, so read them as ratios.
-
-| Probe | Result |
-|---|---|
-| H1 | A simul_efun named `call_other` sees `ob->fn()`, explicit `call_other()`, `(: call_other ... :)` and array targets. |
-| H2 | A miss returns the **undefined** zero, so `undefinedp(r)` separates it from a real 0 and the wrapper only pays `function_exists()` on misses. |
-| H4 | `efun::call_other` and `efun::destruct` skip simul overrides, **but** the master's `valid_override(file, efun, main)` already gates every `efun::` use at compile time, so bypass is mudlib policy. |
-| P1/P3 | A **naive** wrapper (`efun::call_other(ob, fn, args...)`) makes the simul_efun object the caller: `previous_object()` in every callee becomes `/single/simul_efun`, and shadows that forward with `tgt->fn()` recurse until `Too deep recursion`. A **transparent** wrapper ([`simul_efun_transparent.lpc`](probes/simul_efun_transparent.lpc): `bind((: efun::call_other :), previous_object())`, cached per caller) preserves `previous_object()` and composes with shadows. The naive result is a pitfall, not a limit. |
-| H3 | Shadows see external calls and driver applies (`id()` via `present()`), not local calls, not misses; one shadow per object. |
-| P2 | A simul `destruct()` misses driver-initiated destructs: a shadow destructed with its target, environment contents that `move_or_destruct` could not move, and objects refused after load (`valid_object` denial, `creator_file` failure). `set_notify_destruct(1)` + `on_destruct` **does** see all of them. (Note: `on_destruct` on a shadowed object is routed to the shadow first, so it can fire twice.) `shutdown()` does not run `destruct_object()`. |
-| H5 | Local lfun call 45 ns; direct `call_other` 122 ns; naive simul wrapper 379 ns; **transparent wrapper 417 ns (3.4x)**; transparent wrapper into a shadowed object 562 ns; `function_exists()` 78 ns. Most of the wrapper's cost is its own LPC frame and the `args...` repacking, not the miss check. |
-| — | Simul resolution is decided at compile time, so a *new* override never reaches code compiled before it. A wrapper installed at boot can consult a runtime table, which makes attach/detach possible at the cost of the wrapper on every call. |
-| — | Caught errors reach master `error_handler(map, 1)` when `mudlib error handler` is set, at throw time with the trace live. |
-
-### 3.2 Coverage
-
-| Scenario | Existing mechanism | Verdict |
-|---|---|---|
-| S1 typo finder | Transparent `call_other` wrapper | Works, **at 3.4x on every call_other** in the mud, and blind to `call_other`s that do not go through the simul (the driver's own `apply()`s are not misses anyone wants, so this is acceptable) |
-| S2 profile | `trace_start()`/`trace_end()` (see `docs/concepts/general/tracing.md`); `PROFILE_FUNCTIONS` builds | **Yes, dev-time.** Not for always-on production counting |
-| S3 file audit | `valid_write(path, caller, efun)` runs per call inside the efun, sees `efun::` calls; `call_stack()` gives the site | **Yes** |
-| S4 fence | Transparent wrapper + `valid_override` denying `efun::call_other` under `/domains/`; or a callee-side `previous_object()` check (kernellib's way) | Works, at 3.4x on every call, or by editing every protected function |
-| S5 lifecycle | `valid_object()` before every `create()`; `on_destruct` with a mandatory base that calls `set_notify_destruct(1)` | **Yes, with a mandatory base object.** No destruct cause |
-| S6 deprecation | Edit the function, or redirect it with `inherit_program` | Yes, with a recompile; not attachable at runtime |
-| S7 default method | Transparent wrapper + `undefinedp(r) && !function_exists()` → proxy | Partial: 3.4x on every call |
-| S8 errors | master `error_handler` | **Yes** (master only) |
-| S9–S12 | `valid_*` covers some efuns per call; `call_out` and object creation have no per-call observation | No |
-
-**Honest residual case.** What the driver alone can add:
-(a) miss observation and default methods at **zero cost on hits** instead of
-3.4x on every call; (b) lifecycle events with a **cause** and without a
-mandatory base object; (c) call and efun observation/decision **attachable at
-runtime** at a cost proportional to what is observed, not to all traffic;
-(d) composition of several observers without each paying the wrapper cost.
-
-## 4. Prior art (corrected)
-
-Sources: LDMud `github.com/ldmud/ldmud` `8afa5f50` (3.6.8); DGD
-`github.com/dworkin/dgd` `733ea01`; kernellib `e602afe`; cloud-server
-`7959357`; lpc-ext `0e299c8`.
-
-### 4.1 LDMud
-
-- **`set_driver_hook()`**: one handler per hook in a flat 32-slot array
-  (`src/simulate.c:238`), gated by `privilege_violation()` unless the caller is
-  the master or simul_efun object (`:5082-5091`); values are sealed (strings
-  interned, arrays copied, unbound lambdas bound to the master, `:5199-5201`).
-  Most hooks are **policy slots** — move, uids, create/reset/clean_up
-  dispatch, command parsing, include dirs, auto-include, file encoding (compiler
-  *and* `read_file`/`write_file`), prompts, telnet.
-- **`H_DEFAULT_METHOD`** runs after normal lookup and the shadow chain fail
-  (`src/interpret.c:20439-20444`): zero cost on hits, one type test on a miss.
-  Protocol `fn(&result, ob, fun, args...)`, 0 = declined. Exempt: master
-  (`:25095`, `:21016`), simul_efuns, lightweight objects (`:25089`),
-  `call_direct*`. Not documented: it also fires for driver applies through
-  `sapply()` (`interpret.h:314`; `__INIT` `object.c:498`, `catch_tell` `:1330`,
-  `id` `:4472`). History: a closure bound to a destructed object (Mantis #523,
-  `test/t-0000523.c`) and a leak when the handler errored (`test/t-errors.c`).
-- **`limited(closure, limits...)`** runs a closure under its own eval/depth
-  limits; `doc/master/runtime_error` recommends it for the error handler.
-  Hooks are not wrapped in it automatically.
-- **`trace()`/`traceprefix()`** + master `valid_trace()`: per-interactive,
-  observe-only text trace of calls, call_others, applies and returns, gated by
-  a global bit test at each site (`interpret.c:9495, 20585, 20642`) — the same
-  cost class as this RFC's detached test; no aggregation.
-- Master **`runtime_error(err, prg, curobj, line, culprit, caught)`** fires
-  for caught errors too; **`prepare_destruct()`** can veto any
-  `destruct_object()` (`simulate.c:2616-2626`).
-- **Python `register_hook`**: `ON_OBJECT_CREATED`, `ON_OBJECT_DESTRUCTED`,
-  `ON_HEARTBEAT`, signals, `BEFORE_INSTRUCTION` (3.6.8). Multiple subscribers,
-  observe-only, exceptions printed and skipped (`pkg-python.c:18048-18061`);
-  operator Python only. `BEFORE_INSTRUCTION` costs an out-of-line call per
-  opcode in a Python build even with no handler (`interpret.c:10150-10152`).
-- Error containment differs per hook by accident (`secure_*` wrappers for
-  some, propagation for others); hooks run on the caller's eval budget.
-
-### 4.2 DGD
-
-- **Auto object**: inherited by everything except the driver object; may
-  redeclare kfuns (`lpc-doc/Introduction:9-13`). `::kfun()` from an ordinary
-  program resolves to the auto object's definition when one exists
-  (`src/comp/control.cpp:1495-1512`), so advice cannot be bypassed the way
-  FluffOS's `efun::` bypasses a simul (which `valid_override` must close
-  instead). `a->f()` compiles to a call to the name `call_other`
-  (`src/comp/compile.cpp:2544`). kernellib wraps `destruct_object`,
-  `compile_object`, `clone_object`, `call_out`, file kfuns etc.: check, notify a
-  manager, `::kfun()` (`kernellib/src/kernel/lib/auto.c:224-262`). cloud-server
-  stacks a second auto layer by answering `include_file` with an inherit
-  (`objectd.c:627-640`).
-- **Driver-object applies**: `call_object` (string targets of `call_other`
-  only, `kfun/builtin.cpp:2153-2158`), `path_read`/`path_write` on every file
-  kfun (`src/path.cpp:47,70`), `touch`, `runtime_error`, `atomic_error`,
-  `remove_program`, `compile_rlimits`/`runtime_rlimits`, and the rest. The
-  driver calls `create()` lazily on the first call into an object
-  (`interpret.cpp:2534-2539`).
-- **kernellib object-manager hooks**: a fixed set of named events with **one
-  LPC subscriber** — `compiling`, `compile`, `compile_lib`, `compile_failed`,
-  `clone`, `destruct`, `destruct_lib`, `remove_program`, `include_file`,
-  `touch`, `forbid_call`, `forbid_inherit`
-  (`kernellib/src/doc/kernel/hook/driver:19-84`). Mudlibs can build the same
-  shape on top of hooks (the example effects daemon in §7 does).
-- **`call_touch()`/`touch()`**: one flag test per call
-  (`!(obj->flags & O_TOUCHED)`, `interpret.cpp:2520`); the next call into a
-  marked object fires `touch(obj, fn)` before lookup (so even for a missing
-  function); the object is re-marked touched before the hook runs, and a true
-  return re-arms it (`:2525-2531`).
-- **Containment**: `rlimits (stack; ticks) {}`; `atomic` rolls back state;
-  `callCritical` runs `runtime_error`/`atomic_error`/`remove_program`
-  **unlimited** (`rlimits(-1;-1)`, `interpret.cpp:2925`) with errors caught and
-  logged (`:2948`). `runtime_error` runs at throw time, before unwinding,
-  with the catch depth (`error.cpp:166-171`).
-- **Misses** return `nil` with no hook (`builtin.cpp:2177-2183`), and
-  kernellib relies on it (`auto.c:359`).
-
-### 4.3 What we take
-
-| From | Take | Avoid |
-|---|---|---|
-| LDMud | `H_DEFAULT_METHOD`'s placement and by-ref result protocol; master gating; sealed values; `limited()`-style own budget | Silent widening to driver applies; per-hook accidental error policy; hooks on the caller's budget; an always-on per-opcode call |
-| DGD / kernellib | One privileged LPC subscriber for a fixed event set (the object manager); contained critical calls; touch's cheap per-object/per-program gate and re-arm; the auto object as a separate, complementary layer | Unlimited budgets for code that wizards write; permissive returns (nil/0 = deny, AGENTS.md §13.24) |
-
-## 5. Design
-
-### 5.1 Authorization: `valid_hook()`
-
-```lpc
-// master
-int valid_hook(object who, string point, mixed action, mapping spec, int flags);
-```
-
-* **Any object may call `hook_attach()`.** Before asking the master, the
-  driver normalizes `spec`: unknown keys and malformed patterns are rejected;
-  program and object names are canonicalized (`filename_to_obname()`, `#n`
-  stripped for program keys) so `/secure/login`, `/secure/login.c` and
-  `//secure/login` are one spelling; prefixes only with a trailing `/`. The
-  master therefore decides on exactly what the driver will match.
-* **Fail closed.** Only an exact `1` allows. An absent apply, `0`, any other
-  value, a promise (AGENTS.md §13.24) or an error denies, and `hook_attach()`
-  errors. Unlike `master_approved()`, there is no "master not loaded yet"
-  allow: attaching before the master exists is denied.
-* **The master sees everything it needs to scope.** `who` (the attaching
-  object), the join point, the action (whose function pointer owner the
-  handler will run as), the normalized filter and the flags (`HOOK_DECIDE`,
-  `HOOK_AROUND`, `HOOK_FAIL_CLOSED` ...). A reference master (§7) allows
-  wizards only filters whose target, defining program or caller lies under
-  their own directory, keeps `HOOK_DECIDE`/`HOOK_AROUND` on others' code for
-  admin objects, and refuses protected functions.
-* **Ownership.** The attachment belongs to `who`. The handler runs as its
-  function pointer's owner, like any other function pointer. The attachment is
-  detached when its owner or its handler's owner is destructed; objects that
-  need a hook re-attach in `create()`, the same idiom as `call_out()` and
-  `set_heart_beat()`. `recompile_object()` keeps identity, so attachments
-  survive it.
-* **Visibility and control.** `hook_list()` / `hook_query()` /
-  `hook_detach()` work on the caller's own attachments; the master sees and
-  may detach all of them, so a demoted wizard's hooks can be revoked.
-* **Hard exemptions, regardless of `valid_hook()`.** Nothing fires for calls
-  made by the master, during compile, or inside `valid_hook()`, any other
-  `valid_*` apply, or `error_handler`. No attachment may name the master or
-  simul_efun program as `target`, `defined_in` or `object`. Operations started
-  by the master are never denied.
-* **Simul_efun wrappers are transparent, not exempt.** Real mudlibs issue
-  `destruct`, `call_out`, `move_object`, `exec` and `snoop` from inside
-  simul_efun wrappers (Dead Souls `secure/sefun/sefun.lpc:464-493`, Lima
-  `secure/simul_efun/overrides.c`, Nightmare `secure/SimulEfun/SimulEfun.lpc:56-129`,
-  Discworld `modified_efuns.c:427-462, 762-800`). Exempting the simul_efun
-  object would blind every `efun:*` hook on those libs. Instead, a call made
-  from simul_efun code is observed and attributed to the object that called
-  the simul_efun (`caller` is that object; `caller_program` its program), and
-  may be denied like any other call.
-* **Cost when unused.** Each join point has a bit in `g_hook_mask`, set while
-  at least one attachment exists for it; otherwise the check is one predicted
-  branch.
-
-### 5.2 Layer 1: rare join points
-
-Attached like any other join point (`hook_attach()` + `valid_hook()`). §5.10 has the complete catalogue and the exact placement rules; this table is the phase-1 subset.
-
-| Point | Fires | Site | Handler and protocol |
+| Candidate | Covered today by | A bespoke point would add | Site and hazards |
 |---|---|---|---|
-| `call_other:miss` | A `call_other` (`->`, explicit, or an element of an array target) found nothing callable, after the shadow chain. (`(: ob, "fn" :)` is not a call route in FluffOS: it is a function pointer returning the string, `grammar_rules_exprs.cc:1111-1112`.) | inside `apply_low()`, only when `local_call_origin == ORIGIN_CALL_OTHER`: the one place all three dispatch routes converge, where the reason is known and the arguments are still on the stack | `h(int id, object actor, object caller, object target, string fn, mixed *args, string reason)`; `reason` is `"undefined"`, `"private"`, `"static"`, `"protected"` or `"destructed"`. With `HOOK_DECIDE` a handler may **claim** the call by returning a one-element array `({ value })`: `value` becomes the result (a plain 0 could not be told apart from "declined"). Anything else declines; the first claim in priority order wins; with no claim the caller gets `undefined` as today |
-| `object:create` | After `create()` returns (in `call_create()`), not if `create()` destructed the object | `src/vm/internal/base/object.cc` `call_create()` | `h(int id, object ob)`; observe |
-| `object:destruct` | At the start of `destruct_object()`, before the existing `O_DESTRUCTED` re-check | `src/vm/internal/simulate.cc` `destruct_object()`, beside `on_destruct` | `h(int id, object ob, string cause)`; observe; `cause` is `"efun"`, `"shadowed"`, `"environment"`, `"refused"` (`valid_object` denial / `creator_file` failure) |
+| `object:move` (before/decide/after) | `efun:move_object` (the only caller of `move_object()`; eviction goes through the `move_or_destruct` apply, which calls the efun) | `from` and a `reason`, an "after" before `init()` runs | `vm/internal/simulate.cc` `move_object()`. After any LPC inside it, the recursion, shadow and destructed checks must all be re-run (today only destructed); never fire inside `setup_new_commands()`, which iterates the inventory with prefetched pointers |
+| `object:clone`, `object:load` | `efun:clone_object`/`new`/`load_object`; `object:create`; `valid_object()` is the load veto | a load cause (`file`/`virtual`/`source`) | `load_object()` has three sibling entry points |
+| `object:reset`, `object:clean_up` | `function`, origin `driver` | nothing | `object.cc` `reset_object()`, `backend.cc` |
+| `object:recompile`, `object:replace_program`, `shadow:attach` | `efun:<name>` | the moment `replace_program()` takes effect | `simulate.cc`, `packages/core/replace_program.cc`, `efuns_main.cc` |
+| `shadow:detach` | nothing (driver-initiated) | the event itself; no use case | `destruct_object()`, `reload_object()`, `replace_programs()`, `remove_shadow()`; pointers half-updated, observe only |
+| `call_out:schedule`, `call_out:remove` | `efun:call_out`, `efun:remove_call_out` | nothing | `packages/core/call_out.cc` |
+| `call_out:fire` | `function`, origin `internal` | functional `(: … :)` call_outs and the handle; a refusal must still reject the entry's promise and free it | `call_out.cc` `call_out()`; events are snapshotted before dispatch, so scheduling inside a handler is safe |
+| `heart_beat`, `heart_beat:set` | `function` `heart_beat`, origin `driver`; `efun:set_heart_beat` | driver-initiated heart_beat off | `packages/core/heartbeat.cc` |
+| `simul:<name>`, `apply:<name>`, `call_other` as separate points | `function` with `origin` | a spelling | `simul_efun.cc` `call_simul_efun()`; `apply_low()`; master applies take two routes (`call_direct()` and `apply_low()`) |
+| `user:logon` | `function` `logon`, origin `driver` | port and address as arguments | `comm.cc` |
+| `user:input` (decide: drop a line) | `function` `process_input` (observe only: a refusal there would disable the apply) | dropping a line; bodies with no `process_input` | four input sites (`comm.cc` and three in `net/transport_libevent.cc`) need one helper; re-check `IP_VALID` after a handler; no-echo lines must be redacted |
+| `user:command` | `function` on the verb function | verb and argument before dispatch | `packages/core/add_action.cc` `user_parser()`; the sentence must be snapshotted (with refs) before any handler, or a handler that moves or destructs anything frees it |
+| `user:disconnect` with a cause | `function` `net_dead`; `object:destruct` | a transport cause (`eof`/`error`/`tls`/`protocol`), and the case where the body is destructed (no apply fires today) | `comm.cc` `remove_interactive()`; needs `BEV_EVENT_ERROR` split from `EOF` |
+| `user:exec`, `user:snoop` | `efun:exec`, `efun:snoop` (DECIDE at tier 3) | nothing | `packages/core/interactive.cc`, `comm.cc` |
+| `socket:event` | `function` on the callback | functional callbacks | `packages/sockets/socket_efuns.cc` `call_callback()` |
+| `net:telnet` | `function` on `gmcp`/`msdp`/`telnet_suboption`/`window_size`/`terminal_type` | negotiation (WILL/DO…) and pre-logon events; dropping a subnegotiation before its apply | `net/telnet.cc` `telnet_event_handler()`; negotiation cannot be refused (libtelnet has already replied); a handler that disconnects the user on the read path must be deferred, not immediate |
+| `net:tls` | nothing | handshake outcome, version, cipher (no client-cert or SNI data exists) | `transport_libevent.cc` `on_user_events()` |
+| `net:read`, `net:write` | nothing | byte counts per user or port | counting in C or coalesced batches only: per-segment LPC is attacker-paced, and `add_vmessage()` formats into a static buffer that a re-entering handler would clobber |
+| `net:resolve` | `efun:resolve` (the request) | completion of the driver's own reverse lookup | `packages/core/dns_libevent.cc` |
+| inline output hooks | `efun:write`/`tell_object`/`message`; `receive_message`/`catch_tell` applies | — | rejected: static-buffer re-entry |
+| `call_limited(function, eval_cost, …)` | — | a sub-budget for a handler that fans out to many subscribers | must clamp to and charge the caller's budget, or it is an eval-limit escape |
+| USDT probes at each join point | — | zero-cost external tracing with `bpftrace` | Linux only |
 
-S1 is `hook_attach("call_other:miss", "count", ([ "label": "typos" ]), 0)`
-from a dev tool; it prints the rows and filters out known optional hooks
-(`query_*`, `is_*`) when it reports. Misses are rare, and hits cost nothing.
+## Appendix C: reproducing the probes
 
-Errors stay with `error_handler` (S8): it already runs at throw time with the
-trace live, and a second error hook adds nothing but another way to recurse.
-
-### 5.3 Layer 2: call probes
-
-High-frequency join points cannot call LPC on every event without becoming
-the 3.4x wrapper again. Layer 2 attachments ("probes") get C-side gating,
-filtering and aggregation:
-
-```lpc
-int hook_attach(string point, mixed action, mapping spec, int flags);
-                              // spec: filter keys + "label", "priority", "expires" (§5.7)
-void hook_detach(int id);
-mapping hook_query(int id);   // rows, events, dropped, errors, last_error
-void hook_reset(int id);
-mapping *hook_list(object|void ob); // own attachments, or those applying to ob (§5.7); all for the master
+```sh
+mkdir -p testsuite/clone/probe
+cp rfcs/0001-lpc-hooks/probes/{target,plain,shadow,shadow_arrow,notify_target,notify_shadow}.lpc testsuite/clone/probe/
+cp rfcs/0001-lpc-hooks/probes/zz_probe*.lpc testsuite/single/tests/
+# naive wrapper (P1/P3 pitfall) or transparent wrapper:
+cat rfcs/0001-lpc-hooks/probes/simul_efun_transparent.lpc >> testsuite/single/simul_efun.lpc
+cd testsuite && ../build/src/driver etc/config.test -ftest:single/tests/zz_probe_hooks.lpc | grep PROBE
 ```
 
-Every `hook_attach()` goes through `valid_hook()` (§5.1); the other efuns act
-on the caller's own attachments, or on any attachment when called by the
-master.
+These edits are for the experiment only; revert them afterwards
+(`git checkout -- testsuite/single/simul_efun.lpc` and delete the copied files).
 
-| Point | Fires | Site |
-|---|---|---|
-| `call_other` | a resolved `call_other`, before the function runs (so `HOOK_DECIDE` can deny) | `apply_low()`, after lookup, before `push_control_stack()`, `ORIGIN_CALL_OTHER` only |
-| `function` | entry to a hooked function by any route (local, inherited, `call_other`, funptr, `call_out`, `heart_beat`) — added for game design, §5.7 | function entry in the interpreter, per-function gate |
-| `efun:<name>` | before **any** efun runs (a small deny-list excepted: the `hook_*` efuns, `call_limited`, and efuns the hook machinery itself calls) | the efun dispatch sites (`F_EFUN0`–`F_EFUN3`, `F_EFUNV`, efun function pointers), gated by a per-efun bit in the instruction table set while an attachment exists for that efun; a reviewer measured a bit test before *every* efun dispatch as below noise. After a handler runs, the driver latches/restores `st_num_arg` and **re-runs the efun's generic argument type check**, so a handler that destructed an object argument produces a clean "bad argument" error instead of a stale pointer. `efun:*` fires before the efun's own `valid_*` checks, so observers also see attempts the efun then refuses (useful for alarms); a decision can only deny, never grant what a `valid_*` refuses |
+## Appendix D: review log
 
-**Filter keys.** Exact strings or arrays of strings; prefix match only when
-the pattern ends in `/`; no globs.
-
-| Key | Matches |
-|---|---|
-| `target` | target object's name, `#n` clone suffix stripped |
-| `defined_in` | the program that defines the called function (S6: a function inherited by many objects) |
-| `function` | function name |
-| `caller` | calling object's name, `#n` stripped |
-| `caller_program` | the program of the calling frame |
-| `object` | one target object instance (`O_HOOKED` bit; §5.7) |
-| `caller_object` | calls made by one object instance (§5.7) |
-| `args` | a mapping from argument position to an exact value or array of values (strings, ints, objects), compared in C; e.g. `([ 0: ({ "combat_exp", "balance" }) ])` for `add(string prop, …)` (§2B V2). Honoured by `count`/`time` too |
-| `exclude` | a mapping with the same keys, matched after the include keys |
-
-**Actions.** `"count"` (rows keyed by caller program, target program,
-function), `"time"` (count + summed and max eval microseconds, for S9), or an
-LPC function. **Flags.** `HOOK_DECIDE` lets a handler deny (`call_other`,
-`efun:*`): it returns `1` to deny with a generic error, or a string to deny
-with that message; anything else (0, a promise, other types) allows.
-`HOOK_FAIL_CLOSED` makes a handler error or budget overrun deny instead of
-allow, for fences that must not fail open.
-
-**Handler signature (positional, not a mapping).** Building a context mapping
-costs ~200 ns per event; positional arguments do not:
-
-```lpc
-mixed handler(int id, object actor, object caller, object target, string fn, mixed *args);
-// HOOK_AFTER adds `mixed result`; HOOK_AROUND adds `function proceed` (§5.7)
-```
-
-**Gating.** At attach the driver resolves `target`/`defined_in` against loaded
-programs and sets a `PROG_HOOKED` bit on matching `program_t`s (re-evaluated
-when a program is compiled). A non-matching call pays one predicted branch on
-a field `apply_low()` has already loaded. A matching program pays one probe of
-an open-addressed set keyed on interned `(program*, function-name*)`
-pointers, estimated at 5–10 ns. String-keyed lookups (~50 ns) are not
-acceptable here.
-
-### 5.4 Contained invocation (the "verifier")
-
-Every handler call, at any join point, goes through one
-primitive, modelled on `call_out`'s dispatch (`src/packages/core/call_out.cc`)
-and `pop_control_stack()`'s defer loop (`src/vm/internal/base/interpret.cc`):
-
-```cpp
-int const num_arg = st_num_arg;                                  // AGENTS §13.16
-auto ev = get_eval(); int oot = outoftime, mee = max_eval_error, tde = too_deep_error;
-g_in_hook++;
-DEFER { g_in_hook--; st_num_arg = num_arg;
-        set_eval(ev); outoftime = oot; max_eval_error = mee; too_deep_error = tde; };
-if (too_deep_error || max_eval_error || csp >= &control_stack[CFG_MAX_CALL_DEPTH - kHookHeadroom]) return;
-set_eval(CONFIG_INT(__RC_HOOK_EVAL_COST__));
-// push positional args, then safe_apply() / safe_call_function_pointer()
-```
-
-| Rule | Hazard it answers |
-|---|---|
-| Own eval budget; the caller's eval timer and `outoftime`/`max_eval_error`/`too_deep_error` restored afterwards | Without the restore a handler that runs out of eval makes the caller's next opcode die with "Too long evaluation" |
-| Errors stop at the boundary (`safe_*`), are counted, and are reported through the normal uncaught-error path (debug.log + master `error_handler(map, 0)`) | LDMud's accidental per-hook propagation |
-| `st_num_arg` latched and restored; for `efun:*` probes, every object argument re-validated after the handler (destructed → error), arguments are shallow copies (arrays and mappings shared) | §13.16; a handler destructing an argument the efun then uses blind (`f_destruct`) |
-| A handler or apply that returns a promise, or is `async`, is "declined" | §13.24 |
-| Per-attachment re-entry guard, not a global "no hooks inside hooks": an attachment never observes its own handler, but everything a handler does is observed by every *other* attachment | A global guard would let anyone bypass an audit hook by doing their writes from inside their own handler |
-| Layer 1 never re-enters itself (`g_in_hook` per join point) | recursion |
-| Detach on the first "stale function pointer" or owner-destructed error; otherwise after `hook max errors` (default 10). `HOOK_FAIL_CLOSED` attachments never auto-detach. The owner is told via an optional `hook_detached(id, reason)` apply | §3 dangling funptrs; a fence that silently disappears |
-| Attachments, handler funptrs and filters marked in `checkmemory.cc` (`mark_funp`, after `mark_call_outs()`'s pattern); count tables are C++ containers bounded by `hook max rows` with a `dropped` counter | §3 off-graph references; unbounded memory from attacker-chosen names |
-| `this_player()` is 0 inside every handler, restored afterwards (the `actor` argument says who acted) | a handler acting as the victim (`input_to`, `command`) |
-| Detaching inside a handler marks the attachment; it is swept after dispatch | iterator invalidation (§13.14) |
-
-Eval limits are enforced on Linux only (`src/vm/internal/eval_limit.cc`); on
-macOS, Windows and WASM the handler shares the caller's wall clock. Document
-it.
-
-### 5.5 Security model
-
-* **The master is the trust root**, as for `shadow()`, sockets, `bind()`
-  and every other privileged capability. `valid_hook()` sees the normalized
-  filter, the kind and the handler owner, so it can enforce scope. The main
-  threat is **observation**: an attachment sees the arguments of every call it
-  matches (passwords sent to a login daemon, tells, file contents). The
-  reference master (§7) therefore lets ordinary wizards attach only to events
-  whose target, defining program or caller lies under their own directory,
-  and reserves unscoped observation, `HOOK_DECIDE` and `HOOK_AROUND` on
-  others' code, and `efun:*` decisions for admin objects.
-* **Hard exemptions** regardless of `valid_hook()` (§5.1): nothing fires for
-  calls made by the master, during compile, or inside `valid_*`/`error_handler`;
-  nothing may target the master or simul_efun program; the master's
-  operations are never denied. Simul_efun wrappers are transparent: their
-  efun calls are attributed to the object that called them.
-* **Decisions are narrow.** `call_other:miss` can only *supply* a result for a
-  call that found nothing; `HOOK_DECIDE` elsewhere can only *deny*. Nothing can
-  grant what a `valid_*` apply refused: `efun:*` probes fire after the efun's
-  own `valid_*` check.
-* **Revocation.** Authorization is checked at attach time; the master can
-  list and detach any attachment, and `hook_detached()` tells the owner.
-* **Resource abuse.** Each handler has its own eval budget, errors and
-  overruns count toward `hook max errors`, count tables are bounded by
-  `hook max rows`, and `valid_hook()` can cap attachments per owner using
-  `hook_list()`.
-* **Upgrade hazard.** A mudlib whose master already defines a function named
-  `valid_hook` for its own purposes would answer the new apply. Release notes
-  must say so, and the apply's documentation must tell mudlib maintainers to
-  check for it before upgrading.
-
-### 5.6 Cost model and acceptance gate
-
-A reviewer built master with a `g_hook_mask` test at all five candidate sites,
-including one before **every** efun body, and compared it with plain master:
-every operation stayed within the ±6% launch-to-launch noise (call_other
-113/113 ns, local call 43/43, `sizeof` 19/19). The detached cost is below what
-wall-clock timing can resolve, so the gate cannot be "< 1% in 5 runs".
-
-| Gate | Method | Threshold |
-|---|---|---|
-| Detached | `valgrind --tool=cachegrind` instruction counts on a hooks microbenchmark, A/B | > 0.5% Ir/iter on any detached case fails |
-| Detached, wall clock (local, numbers pasted in the PR) | interleaved A/B, ≥ 10 launches each, best-of-5 inner, medians | max(3%, 2× baseline inter-launch MAD) |
-| Attached | same harness: `count` on misses; 1 and 100 non-matching filters; one matching LPC handler; `time` action | recorded, no fixed threshold; matching handler expected ~250 ns over the call |
-| Memory | Debug build with a probe attached runs the suite with no `check_memory()` report | must pass |
-
-A `testsuite/command/speed_hooks.lpc` (or a `-fspeed:hooks` section) holds the
-microbenchmark: local call, call_other hit and miss, `sizeof`, new+destruct,
-and the attached cases.
-
-### 5.7 Game-design extensions to Layer 2
-
-The §2A cases need four things the administrative design lacks. All go
-through `hook_attach()` and `valid_hook()` like the rest of Layer 2.
-
-**1. A `function` join point** — entry to a function defined in a hooked
-program, by *any* route: local call, inherited call, `call_other`, function
-pointer, `call_out`, and the driver's cached `heart_beat` dispatch. This is
-what no shadow and no `call_other` probe can do (Discworld's 76 self-calls
-exist only to work around it).
-
-* Gated **per function**, not per program: a `FUNC_HOOKED`-style bit on the
-  function's flags, set at attach and recomputed when the program is
-  compiled. A local call costs ~45 ns, so probing every local call of a hooked
-  program (5–10 ns) would cost that program 10–20%; with a per-function bit,
-  unhooked functions in a hooked program pay one predicted branch.
-* Site: function entry in the interpreter (`setup_new_frame()` / the call
-  opcodes), so it covers every route at one place.
-
-**2. Per-object targeting.** Filter keys `object` (this target instance) and
-`caller_object` (calls made *by* this instance, for tutorials and A/B cohorts),
-backed by an `O_HOOKED` bit in `object_t::flags`. A hooked function called on
-an unflagged object pays one more predicted branch; only flagged objects reach
-the attachment table. Auto-detach when the object is destructed, reported as
-`hook_detached(id, "target_destructed")`.
-
-**3. Advice kinds and their order.** `flags` selects one kind:
-
-| Kind | Handler | Can change the outcome? |
-|---|---|---|
-| `HOOK_BEFORE` (default) | `void h(int id, object actor, object caller, object target, string fn, mixed *args)` | No |
-| `HOOK_AFTER` | same, plus `mixed result` | No — observes the result (thorns, vampiric sword, escort, follow) |
-| `HOOK_DECIDE` | as `HOOK_BEFORE`, returns 1 or a message to deny | Deny only |
-| `HOOK_AROUND` | as `HOOK_BEFORE`, plus `function proceed` | Yes: call `proceed(args...)` with the same or changed arguments, change its result, or skip it |
-
-`actor` is `this_player()` at the intercepted call: handlers run with
-`this_player()` = 0 (§5.4), but "who is doing this to whom" is what most game
-effects need.
-
-Order at one join point is total and deterministic: every attachment has a
-`priority` (default 0; ties broken by attach id). The chain is
-**deciders → AROUND (lower priority = outermost) → BEFORE → original
-→ AFTER**, then the AROUND handlers unwind. A deny short-circuits everything
-after it. Each AROUND handler receives the arguments as transformed by the
-handlers outside it. The chain is snapshotted per invocation, so attaching or
-detaching inside a handler affects the next call, not this one (the Discworld
-effects reentrancy bug).
-
-AROUND contract:
-* Arguments arrive as `mixed *args`, so advice does not break when the target
-  function's signature changes (Discworld's signature-drift bug).
-* The value it returns is checked against the function's declared return type;
-  a mismatch, a promise, a handler error or an eval overrun all mean **run the
-  original unmodified** and count an error. A broken curse must never make a
-  sword unwieldable or skip `die()`'s corpse logic.
-* `nomask` is respected by default: AROUND and DECIDE attachments skip
-  `nomask` functions (libraries such as Genesis make their combat pipeline
-  `nomask` precisely to stop shadows, `std/combat/cbase.lpc:44,2122`). An
-  attachment may cover them only with `HOOK_OVERRIDE_NOMASK`, which
-  `valid_hook()` sees in `flags`. BEFORE/AFTER observation is always allowed.
-* AROUND, AFTER and DECIDE are refused on driver-questioned applies (the
-  generated `object_applies_table` names, `id`, `catch_tell`, every `valid_*`)
-  except an allow-list (`heart_beat`, `init`), and on functions a mudlib marks
-  protected (refused by the master's `valid_hook()`, after Discworld's `player.c` blacklist:
-  `query_name`, `query_creator`, `save_me`, money/exp/auth functions).
-
-**4. Lifetime, state and introspection.**
-
-* `hook_attach(string point, mixed action, mapping spec, int flags)`: `spec`
-  holds the filter keys plus `"label"` (required), `"priority"` and
-  `"expires"` (seconds; driver-side expiry so 300 status effects are not 300
-  `call_out`s that leak when their owner reloads; **not allowed with
-  `HOOK_FAIL_CLOSED`**, so a fence cannot lapse silently). Per-effect state
-  rides on the handler as bound arguments: `(: fumble, ([ "tries": 0 ]) :)`.
-* `hook_list(object ob)` lists every attachment that applies to `ob` (object
-  filters and program/function filters), with label, owner, expiry, hit count
-  and handler eval time. The example effects daemon (§7) renders it as a visible
-  **status-effects list** for players and builders, which replaces Dead Souls'
-  shadow registry and Discworld's `sh_adows` tool, and answers "why did that
-  rat hit me for 40?". Error traces and `call_stack()` mark advised frames
-  (`[hook #12 blood_moon]`).
-* Hooks are runtime state: nothing survives a reboot, and per-object effects
-  do not survive the target's destruct-and-reload. Their owner re-attaches them
-  from its own saved effect data at login and `restore_object()` (the
-  precedent is Discworld's `player_start()` / `init_after_save()`), using
-  `object:create` to notice new objects.
-
-**5. Deferred, batched observers** (`HOOK_DEFERRED`, with `HOOK_BEFORE` or
-`HOOK_AFTER` only). Events go into a per-attachment ring buffer and are
-delivered once per gametick as `h(int id, mixed *events)`, with object
-arguments re-validated (destructed → 0) and overflow counted in `dropped`.
-One LPC frame per batch instead of per event makes G10–G12 affordable, and it
-is the only correct way to feed an `async` consumer (an LLM NPC, an economy
-simulation), since an inline handler that returns a promise is declined.
-
-**Cost gate additions** (§5.6): local call with nothing attached; local call
-to an unhooked function in a hooked program; hooked function on an unflagged
-object; one AROUND per call on a flagged object; 100 cursed players among 300;
-one charmed orc among 2,000 `/std/monster` heart_beats.
-
-**Sub-budget calls.** A handler that fans out to several subscribers (an
-effects daemon, an event bus) shares one `hook eval cost`, so one slow
-subscriber starves the rest. An optional efun `call_limited(function f, int
-eval_cost, mixed args...)` (LDMud's `limited()`) runs `f` under its own
-budget using the §5.4 primitive's save/restore, and returns `({ result })` or
-0 on overrun or error. It is useful beyond hooks, and lands in phase 4.
-
-**Deferred or rejected here.** Environment/room-tree filters (an LPC
-`environment()` walk in the handler is ~100 ns; add only if measured hot);
-output/message
-transform probes and per-player phasing (rejected, see §2A.2).
-
-### 5.8 Compile-time layer: the auto object (Layer 0)
-
-DGD gives every program an implicit parent, the auto object, which may
-redefine kfuns and reach the originals with `::kfun()`; kernellib builds its
-whole security and resource model there (§4.2). FluffOS can do the same today:
-
-* **An inherited `protected` function overrides the efun of the same name**
-  in every inheriting program, `efun::name()` still reaches the real efun, and
-  the override is not callable from outside (probe on `b5714e5f`: an
-  inherited `protected int sizeof()` returned 4242 to the child,
-  `efun::sizeof` returned 3, `call_other` to it returned 0; an inherited
-  `protected void destruct()` saw the child's `destruct()` call and the
-  object was destructed).
-* **An `inherit` arriving through `#include` works** (probe: an included
-  header containing `inherit "/x/auto";` made the includer inherit it).
-* **The global include file is prepended to every compile**, and the master's
-  `include_file(compiled, from, path)` apply may return per-file source text
-  (an array of strings). So the global include file names a header, and
-  `include_file()` returns `inherit "/secure/auto";` for ordinary files and an
-  empty text for the master, the simul_efun object, the auto object and its
-  own inherits. This is cloud-server's layered-auto trick
-  (`objectd.c:627-640`) with FluffOS's existing applies. The end-to-end
-  combination is **not yet verified**; phase 1 verifies it and falls back to
-  a one-line master apply if needed (§11).
-
-What it is for, and what it is not:
-
-| Use | Auto object | Hooks |
-|---|---|---|
-| Permanent efun policy (`destruct` logging and guarantees, `write`→`message`, file-efun checks) | **Yes**: zero runtime cost beyond the override's frame; `previous_object()` in callees unchanged (it is a local call) | No |
-| Veto explicit `destruct()` (LDMud `prepare_destruct`) | **Yes**: the override raises an error | No |
-| Close `efun::` bypass | With `valid_override()`: refuse `efun::name` outside the auto object | `efun:*` probes see `efun::` calls anyway |
-| Change at runtime, attach and detach | No: every change means recompiling every program | **Yes** |
-| Misses, driver-initiated destructs, `call_other` traffic | No | **Yes** |
-| Advice on mudlib functions (curses, world events) | No: the auto object only redefines efuns and adds functions | **Yes** (`function` join point) |
-
-Rules for the auto object: overrides and helpers are `protected` (callable
-inside each program, not from outside) and `nomask` where children must not
-replace them; private state lives in the auto object's own variables, which
-each inheriting object gets a copy of, so keep it small; the auto object must
-not inherit from mudlib code that itself gets the auto object injected.
-
-### 5.9 API reference (normative summary)
-
-Everything a mudlib sees, in one place. `include/hooks.h` defines the
-constants.
-
-**Master apply**
-
-```lpc
-int valid_hook(object who, string point, mixed action, mapping spec, int flags);
-// exactly 1 = allow; absent, 0, other values, promise, error = deny
-```
-
-**Optional apply on the attaching (owner) object**
-
-```lpc
-void hook_detached(int id, string reason);
-// reason: "expired", "target_destructed", "handler_owner_destructed",
-//         "errors", "stale_function", "master"
-```
-
-**Efuns**
-
-| Efun | Who may call | Returns |
-|---|---|---|
-| `int hook_attach(string point, mixed action, mapping spec, int flags)` | anyone; gated by `valid_hook()` | attachment id (> 0); errors when refused or malformed |
-| `void hook_detach(int id)` | owner or master | — |
-| `mapping hook_query(int id)` | owner or master | `([ "id", "point", "owner", "label", "flags", "priority", "expires", "spec", "events", "errors", "dropped", "last_error", "eval_us", "last_fired", "rows": ({ ([ "caller_program", "target_program", "function", "count", "eval_us" ]) }) ])` |
-| `void hook_reset(int id)` | owner or master | clears counters and rows |
-| `mapping *hook_list(object\|void ob)` | anyone (own attachments); master (all) | one `hook_query()`-shaped mapping per attachment, without `rows`; with `ob`, only attachments that apply to `ob` |
-| `mixed call_limited(function f, int eval_cost, mixed args...)` | anyone | `({ result })`, or 0 on overrun or error |
-
-**Join points** (core subset; the complete, normative list is §5.10)
-
-| Point | Kinds allowed | Handler arguments after `(int id, …)` | Site |
-|---|---|---|---|
-| `call_other:miss` | BEFORE, DECIDE (claim with `({ value })`) | `object actor, object caller, object target, string fn, mixed *args, string reason` | `apply_low()`, `ORIGIN_CALL_OTHER`, after shadows |
-| `object:create` | BEFORE | `object ob` | `call_create()` |
-| `object:destruct` | BEFORE | `object ob, string cause` | top of `destruct_object()` |
-| `call_other` | BEFORE, AFTER, DECIDE, AROUND | `object actor, object caller, object target, string fn, mixed *args` | `apply_low()`, after lookup, before the frame is pushed |
-| `efun:<name>` (any efun but the §5.3 deny-list) | BEFORE, AFTER, DECIDE | same; `target` is the efun's **subject** (its first object argument, else the calling object: for `move_object(dest)` the moved object, i.e. the caller), `args` are the efun's arguments | efun dispatch, per-efun bit; type check re-run after the handler |
-| `function` | BEFORE, AFTER, DECIDE, AROUND | same | function entry in the interpreter, per-function gate |
-
-`HOOK_AFTER` handlers get `mixed result` appended; `HOOK_AROUND` handlers get
-`function proceed` appended. `HOOK_DEFERRED` handlers get
-`(int id, mixed *events)`, in order; each event is the array of the handler
-arguments after `id`, e.g. `({ actor, caller, target, fn, args, result })` for
-`HOOK_AFTER` on `function`, `({ actor, caller, target, fn, args, reason })`
-for `call_other:miss`, `({ ob, cause })` for `object:destruct`. Objects
-destructed before delivery are 0.
-
-**Flags**: exactly one kind (`HOOK_BEFORE` = 0 default, `HOOK_AFTER`,
-`HOOK_DECIDE`, `HOOK_AROUND`), optionally `HOOK_FAIL_CLOSED` (with
-`HOOK_DECIDE`), `HOOK_DEFERRED` (with `HOOK_BEFORE`/`HOOK_AFTER`) or
-`HOOK_OVERRIDE_NOMASK` (with `HOOK_AROUND`/`HOOK_DECIDE`, §5.7).
-
-**Actions**: `"count"`, `"time"`, or a function pointer.
-
-**Spec keys**: the filter keys of §5.3 and §5.7 (`target`, `defined_in`,
-`function`, `caller`, `caller_program`, `object`, `caller_object`, `args`,
-`exclude`),
-plus `"label"` (string, required), `"priority"` (int, default 0) and
-`"expires"` (seconds; refused with `HOOK_FAIL_CLOSED`).
-
-**Runtime config**
-
-| Key | Default | Meaning |
-|---|---|---|
-| `hook eval cost` | the value of `maximum evaluation cost` | budget of one handler call |
-| `hook max errors` | 10 | errors (incl. overruns) before an attachment auto-detaches; never for `HOOK_FAIL_CLOSED` |
-| `hook max rows` | 10000 | rows per `count`/`time` table; overflow counted in `dropped` |
-| `hook max deferred` | 1024 | ring-buffer size per `HOOK_DEFERRED` attachment |
-
-### 5.10 Join-point catalogue (normative)
-
-The maintainer asked for hooks across the whole driver: efuns, simul_efuns,
-applies, `call_other`, `call_out`, `heart_beat`, destruct, move and the rest.
-This is the complete list, mapped against the source by two read-only
-surveys (call dispatch; object lifecycle and sessions). It supersedes the
-per-section tables above where they differ. Paths are under `src/`.
-
-Names follow `domain:event[:name]`. Kinds: **B** = `HOOK_BEFORE`, **A** =
-`HOOK_AFTER`, **D** = `HOOK_DECIDE`, **R** = `HOOK_AROUND`. Frequency: per
-opcode, per call, per tick, low, rare. "Gate" is what a call pays before
-anything is attached: always the join point's `g_hook_mask` bit first.
-
-#### Calls
-
-| Point | Fires | Site | Kinds | Handler args after `id` | Freq | Gate | Rules specific to this point | Phase |
-|---|---|---|---|---|---|---|---|---|
-| `call_other` | a resolved `call_other`/`->`, single or array target | `vm/internal/apply.cc` `apply_low()` when `local_call_origin == ORIGIN_CALL_OTHER`, after the permission check, before default-argument fill (both `f__call_other()` and `call_all_other()` converge here) | B A D R | actor, caller, target (after shadows), fn, args | per call | mask, `PROG_HOOKED`, `O_HOOKED`, pointer set | re-check `target` destructed after B/D (apply_low only checks before); `try_reset()` may run `reset()` before the hook; R needs the dispatch tail split into `apply_low_dispatch()` | 2 (R: 4) |
-| `call_other:miss` | the same call found nothing callable | `apply_low()` not-found / permission exits, `ORIGIN_CALL_OTHER` | B D (claim) | + reason | rare | mask | arguments still on the stack at this point, unlike in `f__call_other()` | 1 |
-| `simul:<name>` | a simul_efun is called | `vm/internal/simul_efun.cc` `call_simul_efun()` — one site for `F_SIMUL_EFUN` and simul function pointers | B A D R | actor, caller, 0, name, args | per call | mask, byte bitmap indexed by simul index, recomputed by name in `rebuild_simul_efuns()` | — | 2 |
-| `efun:<name>` | an efun is about to run | `vm/internal/base/interpret.cc` `call_the_efun` (all of `F_EFUN0`–`F_EFUN3`, `F_EFUNV`) and `vm/internal/base/function.cc` `FP_EFUN` | B A D | actor, caller (a simul_efun wrapper's caller, §5.1), subject (§5.9), name, args | per opcode | mask, per-efun byte (`g_efun_hooked[MAX_INSTRS]`) | after a handler: restore `st_num_arg` and re-run the efun's argument type check through one shared helper (which also fixes the `FP_EFUN` route checking fewer arguments than `F_EFUNV` today); deny-list: `hook_*`, `call_limited`, `_call_other` (use `call_other`), `call_out`/`call_out_walltime` (use `call_out:*`); D refused on `error`, `throw`, `set_eval_limit`, `reset_eval_cost`, `eval_cost`; no R (re-running a C efun on substituted arguments is deferred); `efun::foo()` and `foo()` are the same opcode | 2 |
-| `apply:<name>` | the driver calls a function in an object | `apply_low()` when `local_call_origin == ORIGIN_DRIVER`, **and** `call_direct()` with `ORIGIN_DRIVER` (master applies through `apply_master_ob()` take this second route; `safe_apply_master_ob()` the first) | B A; D R only on applies whose result the driver ignores: `create`, `init`, `on_destruct`, `receive_message`, `net_dead`, the telnet applies | actor, caller (may be 0), target, name, args | per call | mask, `PROG_HOOKED`, `O_HOOKED` | **D/R forbidden** where a deny would take the "not found" exit and permanently disable the apply (`reset` clears `O_WILL_RESET`, `clean_up` clears `O_WILL_CLEAN_UP`, `process_input` clears `HAS_PROCESS_INPUT`, `write_prompt` falls back to the default) or where C reads the result (`id`, `catch_tell`, verb functions, every master apply); `__INIT` is not hookable; `heart_beat` is its own point; master applies are observe-only and never run while a compile is active | 2 |
-| `call_out:schedule` | `call_out()`/`call_out_walltime()` adds an entry | `packages/core/call_out.cc` `int_call_out()` | B D A | actor, caller, owner object, function (name or funptr), delay, args | per call | mask, `O_HOOKED` on owner | D makes the efun error; replaces `efun:call_out` | 2 |
-| `call_out:fire` | a call_out is about to run | `call_out()` in `call_out.cc`, after the arguments are pushed, before `set_eval` | B D A R | 0, 0, owner, function, args (+ handle) | per fire | mask, `PROG_HOOKED`, `O_HOOKED` | events are snapshotted before dispatch, so scheduling or removing call_outs inside a handler is safe; a D still settles the entry's promise (rejected, AGENTS.md §13.25) and frees it; `command_giver` saved and restored | 2 |
-| `call_out:remove` | an entry is removed (`remove_call_out`, by handle, all on reload) | `call_out.cc` | A | owner, function, handle | low | mask | destruct does not remove call_outs (they are reclaimed lazily), so it does not fire this | 2 |
-| `heart_beat` | an object's heart_beat is about to run | `packages/core/heartbeat.cc` `call_heart_beat()`, before `call_direct()` | B D A R | 0, 0, ob | per tick per object | mask, `PROG_HOOKED`, `O_HOOKED` | the **only** point for heart_beat (`apply:heart_beat` is an alias, not a second firing); re-check destructed after B/D (`call_direct()` never does); save/restore `command_giver`, `current_interactive`, `g_current_heartbeat_obj`; toggling other objects' heart_beats inside a handler is safe | 2 |
-| `heart_beat:set` | `set_heart_beat()` turns a heart_beat on or off | `heartbeat.cc` `set_heart_beat()` | A | ob, on/off | low | mask | — | 2 |
-| `function` | a function is entered by any route | one helper, after default arguments are filled and before the frame is pushed, at five sites: `apply_low()`, `F_CALL_FUNCTION_BY_ADDRESS`, `F_CALL_INHERITED`, `call_direct()`, `FP_LOCAL` | B A D R | actor, caller, target, fn, args | per call | `PROG_HOOKED` on the **defining** program, then a lazily allocated per-function bitmap on that program (there is no free bit in `function_flags`) | `FP_FUNCTIONAL` (`(: ... :)` with no named function) is not hookable; for an `async` function AFTER fires when the body parks (result = the promise); a D pops the arguments and pushes 0; bits recomputed on compile, `recompile_object()` **and** `replace_program()` | 4 |
-
-#### Objects
-
-| Point | Fires | Site | Kinds | Handler args after `id` | Freq | Rules | Phase |
-|---|---|---|---|---|---|---|---|
-| `object:load` | a program is loaded as an object | `vm/internal/simulate.cc` `load_object()` and its two siblings (`load_virtual_object()` → `compile_object` apply; `load_object_from_source()`) | B A | name, ob (A), cause `"file"`/`"virtual"`/`"source"`/`"failed"` | medium | no D: `valid_object()` already is the load veto | 1 |
-| `object:clone` | `clone_object()`/`new()` | `simulate.cc` `clone_object()`: B after the visibility check, A after `call_create()` | B D A | blueprint, ob (A), args | medium–high | D is new capability (`valid_object()` does not run for clones): per-domain quotas (S11) | 1 (D: 2) |
-| `object:create` | `create()` returned | `vm/internal/base/object.cc` `call_create()` | A | ob | medium–high | skipped when `create()` destructed the object | 1 |
-| `object:reset`, `object:clean_up` | the driver ran `reset()` / `clean_up()` | `object.cc` `reset_object()` (periodic and lazy); `backend.cc` clean_up | A | ob | low | observe only (`apply:reset` D is forbidden, see above) | 1 |
-| `object:destruct` | any destruct | `simulate.cc` `destruct_object()`, **after** the existing `O_DESTRUCTED` re-check and before `remove_object_from_stack()` | B (observe) | ob, cause `"efun"`/`"shadowed"`/`"environment"`/`"refused"`/`"reload"` | medium | re-test `O_DESTRUCTED` after the handler and return if it destructed the object (the old "before the re-check" placement double-fired on nested destructs); during environment eviction `restrict_destruct` makes a handler's `destruct()` of other objects error (contained) | 1 |
-| `object:move` | `move_object()` | `simulate.cc` `move_object()`: B/D after the recursion and shadow checks, before `try_reset()`; A after `item->super = dest`, before `setup_new_commands()` | B D A | item, from, to, reason `"efun"`/`"eviction"` | high | after any LPC in `move_object()` (a hook or `try_reset()`), re-run the recursion check, the shadow check and the destructed check, not only the destructed check as today; never fire inside `setup_new_commands()` (it iterates the inventory with prefetched pointers); a denied move during eviction makes `move_or_destruct` fail, so the driver destructs the item (documented) | 2 |
-| `object:recompile` | `recompile_object()` | `simulate.cc` `recompile_object()`: D before the guards, A after the per-target loop | D A | master copy | rare | never inside the target loop (variables mid-carry, `__INIT` running) | 3 |
-| `object:replace_program` | `replace_program()` takes effect | `packages/core/replace_program.cc` `replace_programs()`, A after the loop | A | ob | rare | — | 3 |
-| `shadow:attach` | `shadow()` linked a shadow | `packages/core/efuns_main.cc` `f_shadow()` after the link | A | shadow, victim | low | no D: `valid_shadow()` exists; `shadow(ob, 0)` is a query, not a detach | 3 |
-| `shadow:detach` | a shadow is unlinked | `destruct_object()`, `reload_object()`, `replace_programs()` | A | shadow, victim, cause | low | observe only (pointers half-updated) | 3 |
-
-#### Users and sessions
-
-| Point | Fires | Site | Kinds | Handler args after `id` | Freq | Rules | Phase |
-|---|---|---|---|---|---|---|---|
-| `user:logon` | the body's `logon()` returned | `comm.cc` after `APPLY_LOGON` and its destructed check | A | body, port, address | rare | — | 3 |
-| `user:disconnect` | an interactive goes away (net-dead, quit, destruct, bad negotiation, `remove_interactive`) | `comm.cc` `remove_interactive()`, before `net_dead()` | B (observe) | ob, cause | rare | also fires when the body was destructed (no apply covers that today) | 3 |
-| `user:exec` | `exec()` swaps a connection to another body | `packages/core/interactive.cc` `replace_interactive()`, D at the top (pure checks) | D A | from, to | rare | new capability: there is no `valid_exec` apply | 3 |
-| `user:snoop` | `snoop()` starts or stops | `comm.cc` `new_set_snoop()`, D at the top | D A | snooper, victim (0 = stop) | rare | new capability: there is no `valid_snoop` apply | 3 |
-| `user:input` | a line of input arrives, before `process_input()` | one helper called from the four input sites: `comm.cc` `process_input()` and the three ascii/binary port paths in `net/transport_libevent.cc` | B D | user, line | low–medium | D drops the line; re-check `IP_VALID` after the handler; no transform (`process_input()` can already rewrite) | 3 |
-| `user:command` | an `add_action` verb is about to be dispatched (typed or `command()`) | `packages/core/add_action.cc` `user_parser()` | B D A | user, verb, arg, target, fn (+ result for A) | medium | **snapshot the sentence** (verb, function, object, with refs) before any handler: a handler that moves or destructs anything frees it otherwise | 3 |
-
-#### Network
-
-The transport layer, below sessions: connections before any object exists,
-protocol negotiation, and byte flow. Every hook call lives in **shared** code
-(`comm.cc` helpers and `net/telnet.cc`); the per-target transports
-(`net/transport_libevent.cc`, `net/ws_*.cc`, `wasm/comm_wasm.cc`) only call
-those helpers, as they already call `comm_telnet_received()` and
-`on_user_logon()` (AGENTS.md §5: no `#ifdef __EMSCRIPTEN__` in shared logic).
-
-| Point | Fires | Site | Kinds | Handler args after `id` | Freq | Rules | Phase |
-|---|---|---|---|---|---|---|---|
-| `net:accept` | a TCP connection is accepted on a driver port, **before** any session or object exists | new shared helper `comm_accept_connection(port, kind, addr)`, called from `transport_libevent.cc` `new_conn_handler()` before `init_user_websocket()`/`new_user()`, and from `comm_wasm.cc` before `user_add()` | B D A, `count` | port, kind (`"telnet"`/`"ascii"`/`"binary"`/`"mud"`/`"websocket"`), tls flag, peer address | low (attack-time high) | D closes the descriptor with nothing allocated: IP bans, connection-rate limits, flood defence (today the only refusal is the master's `connect()`, after accept, negotiation and allocation). For proxied websocket clients the address here is the proxy's; refuse those at `net:ws_upgrade` | 3 |
-| `net:ws_upgrade` | a websocket upgrade request, before the `101` | a new `LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION` arm in the ws protocol callbacks → one `ws_common.cc` helper; a non-zero return rejects | B D, `count` | port, subprotocol, peer address (honouring `X-Real-IP`), Origin, Host, User-Agent, h2 flag | low | the place to refuse by the *real* client address and by Origin; needs the AGENTS.md §14 browser matrix (h1/h2 × permessage-deflate) before merge | 3 (own PR) |
-| `net:tls` | a TLS handshake completed or failed | `transport_libevent.cc` `on_user_events()` (`BEV_EVENT_CONNECTED`, today ignored; error arm with the OpenSSL error) → shared `comm_tls_established()` | A | user (0 before logon), port, version, cipher, outcome | rare | observe only: the handshake is over when the driver hears of it; no client-certificate or SNI data exists today (`net/tls.cc` sets neither) | 3 |
-| `net:telnet` | a telnet protocol event: WILL/WONT/DO/DONT, subnegotiation (GMCP, MSDP, MSSP, NAWS, TTYPE, MXP, ZMP, CHARSET, NEW-ENVIRON, unknown), IAC commands | top of `net/telnet.cc` `telnet_event_handler()`, before the per-option switch | B; D only for subnegotiation | user (0 before logon), event, option, payload | low (GMCP can be medium) | D drops a subnegotiation packet before its apply or C handling (GMCP/MSDP/ZMP policy). D on negotiation is refused: libtelnet has already run its option state machine and queued the reply. Per-protocol points (`net:gmcp` …) are not needed: filter with `args` on the option | 3 |
-| `net:read` | bytes arrive from a connection, before line assembly | the shared input funnel (`comm_telnet_received()`, `comm_text_received()`) plus the three inline native paths — the same helper as `user:input` | `count`/`time` only (deferred: coalesced) | user, port, kind, bytes | per segment, attacker-paced | no LPC per segment (1-byte segments would be one LPC frame each): C-side counting, or `HOOK_DEFERRED` **coalesced** to one `({ user, bytes })` per user per tick; no D (dropping bytes mid-stream desyncs telnet). Throttling is a C token bucket + `bufferevent_disable(EV_READ)`, a separate knob fed by these counts | 3 (coalesced: 4) |
-| `net:write` | bytes are queued to a connection | `comm.cc` `add_message()` after transcoding — the only shared outbound site | `count`/`time` only (deferred: coalesced) | user, port, bytes | per message | no inline LPC (static-buffer re-entry, see "Not join points"); count the pre-transport bytes (`websocket_send_text()` counts `inet_volume` a second time today) | 3 (coalesced: 4) |
-| `net:resolve` | the driver's reverse lookup of a user's address completed | `packages/core/dns_libevent.cc`, after the cache entry is added | A | address, name, user (looked up by address) | rare | observe only; `resolve()` results already reach LPC as a callback, and `efun:resolve` sees the request | 3 (low priority) |
-
-`user:disconnect` gains a transport cause (`"eof"`, `"error"`, `"tls"`,
-`"protocol"`, `"driver"`, `"destruct"`), which needs `BEV_EVENT_ERROR` split
-from `EOF` and a close reason on `interactive_t`; there is no separate
-`net:close`.
-
-**Network rules** (added to the primitive's rules below):
-
-* **lws callbacks**: hook handlers run only inside
-  `LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION`, `ESTABLISHED`, `RECEIVE` and
-  `CLOSED` (the last two already run LPC today), **never** inside
-  `SERVER_WRITEABLE` (AGENTS.md §14).
-* **No session before logon**: the `user` argument is 0 whenever the
-  connection is still bound to the master (`ip->ob == master_ob`), and
-  `net:accept`/`net:ws_upgrade` fire before any `interactive_t` exists, so a
-  handler can never see a half-built session in `users()`.
-* **Disconnects from the read path are deferred**: a handler inside
-  `net:telnet` or `net:read` (or `user:input`) that disconnects or destructs
-  the user must not free the session under the caller still iterating it;
-  the disconnect is marked pending and serviced when the read callback
-  returns, and the caller re-validates the connection after the handler.
-* **Address-keyed tables are bounded**: `count` rows keyed by address obey
-  `hook max rows` with the `dropped` counter, so an address flood cannot grow
-  them.
-
-Not network points: separate per-protocol points (`net:gmcp` …, use
-`net:telnet` with an option filter; outbound GMCP/MSDP/ZMP are efuns);
-static-file serving, ping/pong, compression and close frames (inside lws);
-`net:flush` (inside `SERVER_WRITEABLE`); LPC sockets (every operation is an
-efun under `valid_socket`, the accept-readiness callback is `socket:event`,
-and the peer is unknown until LPC calls `socket_accept()`); `sys_reload_tls`
-(`efun:sys_reload_tls`).
-
-#### Other
-
-| Point | Fires | Site | Kinds | Freq | Rules | Phase |
-|---|---|---|---|---|---|---|
-| `socket:event` | an efun-socket read/write/close callback is about to run | `packages/sockets/socket_efuns.cc` `call_callback()` (single funnel) | A (observe) | low–medium | the data is already consumed; a denied close would leak LPC state, so observe only; eval state restored by §5.4 | 3 |
-
-#### Not join points (and why)
-
-| Candidate | Reason |
-|---|---|
-| Output (`write`, `tell_object`, `message`, `receive_message`, `catch_tell`) inline | `add_vmessage()` formats into a static buffer and then delivers; a handler that writes to anyone re-enters and clobbers it. Observe output with `efun:write`/`efun:tell_object`/`efun:message` (B/A) or `HOOK_DEFERRED` copies |
-| `init` dispatch loop | iterates the inventory with prefetched pointers; observe `apply:init` or the `function` point instead |
-| `user:connect` | the master's `connect()` already chooses or refuses the body |
-| Compile, include, inherit, `valid_override`, `error_handler`, `log_error` | run mid-compile or are master applies already; hooks are refused while a compile is active |
-| Promise drain, gametick, `free_prog()`, async/external completions | no LPC identity, or already covered by `function`/`call_out` points on the callback |
-| `catch`, `await`, `acatch` | opcodes, not efuns |
-
-#### Additional rules for the contained-invocation primitive (§5.4)
-
-1. **Re-validate the target after every B or D handler** at `call_other`,
-   `function`, `apply:*` and `heart_beat`: `apply_low()` checks for a destructed
-   target only before, and `call_direct()` never does.
-2. **`caller` may be 0**: backend-driven points (reset, clean_up, heart_beat,
-   call_out) run with no current object.
-3. **Save and restore `command_giver`, `current_interactive` and
-   `g_current_heartbeat_obj`**, not only `this_player()`.
-4. **Refuse to run while a compile is active** (nested compiles corrupt the
-   compiler's global state).
-5. **Both master routes** (`call_direct()` and `apply_low()`) enforce the
-   master exemption and `apply:` gating.
-6. **One firing per event**: `heart_beat` is not also `apply:heart_beat`;
-   `call_out` and `_call_other` efuns are deny-listed in favour of their own
-   points; the `function` point does not re-fire for the same entry that
-   `call_other` or `apply:*` already reported to the same attachment.
-7. **Bits survive program swaps**: `PROG_HOOKED` and the per-function bitmap
-   are recomputed on compile, `recompile_object()` and `replace_program()`.
-8. **Flags**: `O_HOOKED` takes the unused `0x20` in `object_t::flags`
-   (16 bits; `0x4000` is also free, being read but never set).
-
-## 6. Interaction with existing features
-
-* **Shadows**: Layer 1 and Layer 2 fire inside `apply_low()` after shadow
-  resolution, so `target` is the object actually reached and a miss means the
-  shadow chain had nothing either.
-* **`recompile_object()`**: probes are keyed by program and function *names*;
-  `PROG_HOOKED` is recomputed when a program is compiled.
-* **Simul_efuns and `valid_override`**: unchanged. `efun:*` probes fire inside
-  the efun, so `efun::` calls are observed.
-* **Async**: handlers and applies are synchronous; `async` ones are declined.
-* **The debugger (#1286) and the tracer** use their own bits in the same mask
-  word.
-
-## 7. Reference code (shipped with the docs and the testsuite)
-
-* **A reference `valid_hook()`** for the testsuite master and the docs:
-  admins (by directory or euid) may attach anything; wizards only to events
-  whose `target`, `defined_in`, `object` or `caller` lies under their own
-  directory, observe-only (`HOOK_BEFORE`/`AFTER`, `count`, `time`); protected
-  functions (`query_name`, `query_creator`, `save_me`, money/exp/auth) are
-  refused for everyone but admins; a per-owner cap on live attachments.
-* **Examples:** S1 typo finder (`call_other:miss` + `count`, filtering
-  `query_*`/`is_*` when printing); S5 lifecycle counts with cause; S4
-  `/secure/` fence (`HOOK_DECIDE | HOOK_FAIL_CLOSED`).
-* **An example effects daemon** (optional mudlib component, not a driver
-  concept): status effects as hook attachments with labels and expiry, a
-  player-visible effects list from `hook_list(ob)`, re-attach at login and
-  `restore_object()`, and a rule-data API for builders (§2A trust note).
-
-## 8. Implementation plan
-
-### 8.1 Phases
-
-Four phases, each one or a few PRs, each shipping its own tests and docs.
-Phases 2 and 3 can run in parallel once phase 1 is merged; phase 4 needs
-phase 2.
-
-| Phase | Delivers | Join points (§5.10) and features | Main driver changes | Key tests (each fails on the unfixed driver) | Exit criteria |
-|---|---|---|---|---|---|
-| **1. Core** | #1414, lifecycle events, Layer 0 | `valid_hook`, spec normalization, `hook_attach`/`detach`/`list`/`query`/`reset`, ownership, the contained-invocation primitive with every §5.4/§5.10 rule, `call_other:miss`, `object:load`/`clone`(B/A)/`create`/`reset`/`clean_up`/`destruct`; docs: interposition guide, auto-object recipe (§5.8, with the `get_auto_object()` fallback if the recipe fails), reference `valid_hook()`, `include/hooks.h`, release note on pre-existing `valid_hook` | new `src/vm/internal/hooks.{h,cc}`, `packages/core/hooks.spec`; `apply.cc`, `simulate.cc`, `object.cc`, `backend.cc`, `applies`, `rc.cc`, `checkmemory.cc` | authorization matrix (absent/0/2/promise/error/pre-master); miss by each route and reason, claim and decline; every destruct cause exactly once (incl. nested and in-handler destructs); owner destruct detaches; refused while compiling; GTest: eval state, `command_giver`, `current_interactive` restored after a forced overrun; auto object injected only into ordinary files | closes #1414; Debug `check_memory()` clean with attachments live; detached cachegrind gate |
-| **2. Calls** | observe and filter every call | `call_other` (B/A/D), `call_out:schedule`/`fire`/`remove`, `heart_beat`, `heart_beat:set`, `simul:<name>`, `efun:<name>` (any efun), `apply:<name>` (D only where allowed), `object:move` (B/D/A), `object:clone` D; filters incl. `args`, `PROG_HOOKED`, `O_HOOKED`, pointer set, `count`/`time`, `HOOK_DECIDE`, `HOOK_FAIL_CLOSED`, per-attachment re-entry | `apply.cc`, `interpret.cc` (`call_the_efun`, `call_direct`), `function.cc`, `simul_efun.cc`, `call_out.cc`, `heartbeat.cc`, `master.cc`, `simulate.cc` (`move_object`), `program.h`, `object.h`, instruction table | every filter key; deny with message; fail-closed; target destructed by a B handler; denied call_out settles its promise; `efun::` observed and simul_efun wrapper calls attributed to the real caller; handler destructing an efun argument gives a clean "bad argument"; D refused on `reset`/`clean_up`/`process_input`/`id`/verbs/master applies; move re-validation and no firing inside `init` dispatch | cachegrind gate on call-, efun-, heart_beat- and move-heavy loops, detached and with 1/100 non-matching filters |
-| **3. Sessions, network and the rest** | users, network, shadows, program swaps, sockets | `user:logon`/`disconnect` (with transport cause)/`exec`/`snoop`/`input`/`command`, `net:accept`/`tls`/`telnet`/`read`/`write`/`resolve` (`net:ws_upgrade` as its own PR with the browser matrix), `shadow:attach`/`detach`, `object:recompile`/`replace_program`, `socket:event`; docs `docs/concepts/general/hooks.md` and the efun/apply pages | `comm.cc` (shared helpers), `interactive.cc`, `add_action.cc`, `net/transport_libevent.cc`, `net/ws_common.cc`, `net/telnet.cc`, `wasm/comm_wasm.cc` (helper calls only), `dns_libevent.cc`, `replace_program.cc`, `efuns_main.cc`, `socket_efuns.cc` | `net:accept` D refuses before any allocation (and on the wasm path); a refused upgrade by real address; GMCP packet dropped by `net:telnet` D; read-path disconnect deferred, no use-after-free under ASan; `net:read` counts bounded by `hook max rows`; input dropped on all four input paths with the `IP_VALID` re-check; command handler that destructs the verb's object (sentence snapshot); disconnect when the body is destructed; bits recomputed after `replace_program()`; e2e over a real connection (`tools/e2e-live.js`) | docs build clean |
-| **4. Game design** | aspects for gameplay | `function` point (five entry sites, defining-program bitmap), `object`/`caller_object` filters, `actor`; then `HOOK_AROUND` behind the §11 prototype gate, priorities, return-type check, `nomask` rule; `expires`, `hook_list(ob)`, labels in traces, `HOOK_DEFERRED`, `call_limited()`; the example effects daemon and §2B V1–V11 as testsuite scenarios | `interpret.cc`, `function.cc`, `apply.cc` (`apply_low_dispatch`), `program.h`, `hooks.cc`, `trace.cc`, backend | every entry route observed and `FP_FUNCTIONAL` refused; no double firing with `call_other`/`apply:*`; curse, clamp, disguise; stacking by priority; a failing AROUND runs the original unmodified; expiry callback; batches revalidate destructed objects | AROUND prototype ≤ ~1.5x AFTER (otherwise ship without AROUND); gate incl. the §5.7 local-call cases |
-
-### 8.2 Required on every phase
-
-* Debug + sanitizer build: GTests and the LPC suite clean (no `check_memory()`
-  report, no ASan/UBSan finding).
-* RelWithDebInfo: LPC suite twice (randomized order), GTests.
-* The §5.6 cachegrind gate on the detached cases, numbers pasted in the PR.
-* Every regression test fails on the unfixed driver (AGENTS.md §7).
-* Docs for anything user-visible land in the same PR.
-
-### 8.3 Rollout
-
-* **Off by default.** Without a `valid_hook()` in the master nothing can
-  attach, so existing mudlibs see no behaviour change; the only cost is the
-  detached branches.
-* **Release notes** for phase 1 call out the `valid_hook` name collision
-  (§5.5) and point to the reference policy.
-* **The testsuite master** ships the reference policy so CI exercises it.
-
-### 8.4 Risks
-
-| Risk | Mitigation |
-|---|---|
-| Detached cost regresses a hot path | cachegrind gate on every phase; per-function and per-object gating |
-| Handler code corrupts VM state | one contained-invocation primitive (§5.4), reused everywhere; GTests that force overruns and errors |
-| Off-graph references leak or trip `check_memory()` | `mark_hooks()` from phase 1; Debug suite with attachments live |
-| `HOOK_AROUND` too slow | prototype gate in 4b; BEFORE/AFTER/DECIDE ship regardless |
-| Mudlibs misuse hooks as their stat system | §2A "No" list in the docs; examples show modifier APIs where they belong |
-| Pre-existing `valid_hook` in a master | release note; apply documentation |
-
-## 9. Security invariants (each has a test)
-
-1. No event fires when the caller is the master; during compile; inside
-   `valid_hook`, any other `valid_*`, or `error_handler`. An efun called from
-   a simul_efun wrapper **is** observed, with `caller` = the object that called
-   the simul_efun.
-2. `hook_attach()` errors unless `valid_hook()` returns exactly 1 (absent apply, 0, other values, promise, error, master not yet loaded all deny); `hook_detach`/`hook_query` on another owner's attachment errors unless called by the master.
-3. A `call_other:miss` handler that returns anything but a one-element
-   array (0, a promise, an error) leaves the caller with `undefined`, as if
-   nothing were attached.
-4. `efun:*` probes observe `efun::` calls and everything other attachments'
-   handlers do; an attachment never observes its own handler.
-5. `HOOK_FAIL_CLOSED`: handler error or overrun denies; the attachment
-   stays; `hook_detached` is not called for it.
-6. `this_player()` is 0 inside every handler, and the
-   caller's `this_player()` is restored afterwards.
-7. Count tables never exceed `hook max rows`; overflow is counted.
-8. Filter canonicalization: `/secure/login`, `/secure/login.c` and
-   `/secure/login#3` (as `target`) match the same attachments.
-9. A `function` attachment observes every call route (local, inherited,
-   `call_other`, funptr, `call_out`, `heart_beat`), and only on the filtered
-   object instance when `object` is given.
-10. AROUND/AFTER/DECIDE on a driver-questioned apply outside the allow-list,
-    or on a deny-listed function, is refused at attach.
-11. A failing AROUND handler (error, overrun, promise, wrong return type)
-    leaves the call behaving exactly as if nothing were attached.
-12. Destructing an attachment's owner, or its handler's owner, detaches it;
-    an attachment never outlives the code that would run.
-
-## 10. Alternatives considered
-
-**A. A DGD-style auto object instead of hooks.** Now part of this design as
-Layer 0 (§5.8), as a complement rather than an alternative: it covers
-permanent efun policy at zero runtime cost, and it cannot cover runtime
-attach/detach, misses, driver-initiated destructs, `call_other` traffic or
-advice on functions it does not define.
-
-**B. LDMud single-slot driver hooks.** One handler per event, set by
-privileged code. Attachments here compose (several per join point, ordered by
-priority) and are authorized per request, which LDMud leaves to a
-mudlib-written dispatcher.
-
-**C. More master applies, one per feature.** The status quo. Here the
-master grows exactly one apply, `valid_hook()`, and the features become
-mudlib code.
-
-**D. A single master-designated hook daemon** (draft v2/v3:
-`get_hook_daemon()`, the only object allowed to receive events and attach).
-It answered the v1 review's security findings, but it put an extra LPC hop on
-every advised call (per-instance gameplay effects would all dispatch through
-one object) and created a second trust root beside the master. v4 follows the
-`valid_*` pattern instead and answers the same findings directly: the master
-sees the normalized filter and decides (observation scope); per-attachment
-re-entry instead of a global guard (audit bypass); `HOOK_FAIL_CLOSED` and
-`hook_detached()` (fences failing open); owner-destruct detach with re-attach
-in `create()`, the `call_out()` idiom (`update` dropping attachments). A
-dispatcher daemon remains a good *mudlib* pattern (§7).
-
-**E. External tracing (USDT/bpftrace).** Complementary for operators;
-`hooks.cc` can emit a USDT probe at each join point at no extra cost.
-
-## 11. Decisions
-
-Decided by the maintainer:
-
-1. **Authorization follows the `valid_*` pattern**: any object may call
-   `hook_attach()`; the master's `valid_hook(who, point, action, spec, flags)`
-   decides, fail-closed. This supersedes the earlier "master-supplied hook
-   daemon" decision: the master still controls who hooks what, without a
-   designated receiver object.
-2. **Names stay `hook_*`**: `hook_attach`, `hook_detach`, `hook_query`,
-   `hook_reset`, `hook_list`, `HOOK_DECIDE`, `HOOK_FAIL_CLOSED`, master apply
-   `valid_hook`, owner callback `hook_detached`. Mudlib vocabulary such as
-   Lima's `add_hook`/`call_hooks` does not collide with efuns; the one real
-   collision risk is a master that already defines `valid_hook` (§5.5).
-3. **Hooks must be able to observe and filter calls**: Layer 2
-   (`call_other`, `efun:*` and `function` probes, observe and `HOOK_DECIDE`)
-   is part of this RFC, not a later option.
-4. **Game design is in scope** (§2A, §5.7): `function` join point,
-   per-object targeting, `HOOK_BEFORE`/`AFTER`/`DECIDE`/`AROUND` with
-   priorities.
-
-Settled by the game-design review: driver-side `expires` is allowed (status
-effects are the dominant use and 300 `call_out`s leak when their owner reloads) but
-refused with `HOOK_FAIL_CLOSED`, so a fence can never lapse silently.
-
-5. **Everything stays in this one document** (maintainer): the auto object,
-   the destruct veto and the `HOOK_AROUND` decision are resolved here, not in
-   follow-up RFCs.
-
-Resolved in this document (v5), for the maintainer to confirm:
-
-6. **Auto object**: Layer 0, built from the global include file and
-   `include_file()`, no driver change (§5.8). If the end-to-end check in
-   phase 1 fails, the fallback is a one-line master apply
-   `string get_auto_object()` that the compiler injects as an implicit
-   inherit; that is the only driver change the auto object could need.
-7. **Destruct veto**: no driver mechanism. Explicit `destruct()` calls are
-   vetoed by the auto object's `destruct()` override (raise an error to
-   refuse), which covers LDMud's `prepare_destruct` use for mudlib code.
-   Driver-initiated destructs (shadow teardown, environment contents, refused
-   loads) stay unvetoable by design: refusing them would leave half-destroyed
-   state. `object:destruct` observes all of them.
-8. **`HOOK_AROUND`** ships behind a prototype gate (phase 4): a prototype
-   measures one matching AROUND against one matching `HOOK_AFTER` on the same
-   function. If AROUND costs no more than ~1.5x AFTER per advised call (the
-   `proceed` closure is the extra), it ships; otherwise phase 4 ships
-   `BEFORE`/`AFTER`/`DECIDE` and AROUND waits for a cheaper `proceed`
-   (for example a reusable per-chain closure instead of one per call).
-
-## 12. Review log
-
+Section numbers in rows before v10 refer to the draft current at the time.
 Draft v1 was reviewed from six angles; the main changes:
 
 | Review | Main finding | Change |
@@ -1228,17 +1172,6 @@ Draft v1 was reviewed from six angles; the main changes:
 | Real mudlibs (v6: English libs; Chinese libs from `fluffos/mudlibs`) | 11 valid cases with file:line evidence (§2B), incl. shipped pkuxkx/es2 bugs a miss report would have caught and a disabled exp/money audit; 7 honest "no" cases. Gaps: simul_efun exemption would blind `efun:*` probes on every lib that wraps efuns; fixed efun list; no argument-value filter; `nomask` policy; efun subject; batch shape | Simul_efun wrappers transparent (§5.1); any efun hookable at dispatch with type re-check (§5.3); `args` filter; `HOOK_OVERRIDE_NOMASK`; subject rule and batch shape (§5.9); non-goal "adding functions" (§2A); API reference §5.9; full plan §8 |
 | Maintainer (v7): cover efun, simul_efun, apply, call_other, call_out, heart_beat, destruct, move, etc. | Two read-only surveys mapped every candidate to its site. Found: `(: ob, "fn" :)` is not a call route; `function` has no free flag bit (per-program bitmap instead); master applies take two routes; deny on `reset`/`clean_up`/`process_input` would permanently disable them; `object:destruct` placement double-fired; `move_object()` must re-validate recursion after LPC; `user:command` must snapshot the sentence; inline output hooks would clobber a static buffer | §5.10 normative catalogue (calls, objects, users, other, rejected) with sites, kinds, args, frequency, gates and rules; eight extra primitive rules; §8.1 phases regrouped into tracks covering every point |
 | Maintainer (v9): add hooks for "net" | A read-only survey of `src/net`, `comm.cc`, `telnet.cc`, `ws_*.cc`, `dns_libevent.cc`, `wasm/comm_wasm.cc` | `net:accept` (refuse before allocation), `net:ws_upgrade`, `net:tls`, `net:telnet`, `net:read`/`net:write` (counting only), `net:resolve`; transport cause on `user:disconnect`; rules for lws callbacks, pre-logon identity, deferred read-path disconnects and bounded address tables; all in phase 3 |
+| Maintainer (v8) | Too many phases | Four phases |
+| Second review round (v10): consistency, scope and value, security of the `valid_hook()` model, implementer dry run | 31 contradictions left by nine revisions (efun timing vs `valid_*`, destruct placement, deny semantics per point, examples using deny-listed points, phase-1 examples needing phase-4 features). 36 point families of which the validated cases use four; most bespoke points duplicate an efun or function entry. Without the daemon, observation scoping had regressed to "the master should be careful": a naive `valid_hook()` exposed typed passwords, simul_efun transparency undid `valid_override()`, a handler's own extent hid foreign writes, observers could mutate arguments, hooked calls were free of eval cost, and a fail-closed hook on input or accept could lock the mud with no way back. The primitive missed state the error path clobbers (`restrict_destruct`, the heart_beat object) and phase 1 depended on phase-2/4 features | Document rewritten as one design with a single catalogue; seven points plus `origin` filter and a coverage map, the rest in Appendix B; driver-computed tiers; secret redaction; tier-3 delivery from simul frames; per-cause re-entry; one-level argument copies; one decision protocol (refuse / answer); handler time charged to the caller; skip status and kill switch; primitive rewritten against the source; phases reordered by validated value (core, function, efuns and connections, around) with a PR split and a harness mapping for tests |
 
-## Appendix: reproducing the probes
-
-```sh
-mkdir -p testsuite/clone/probe
-cp rfcs/0001-lpc-hooks/probes/{target,plain,shadow,shadow_arrow,notify_target,notify_shadow}.lpc testsuite/clone/probe/
-cp rfcs/0001-lpc-hooks/probes/zz_probe*.lpc testsuite/single/tests/
-# naive wrapper (P1/P3 pitfall) or transparent wrapper:
-cat rfcs/0001-lpc-hooks/probes/simul_efun_transparent.lpc >> testsuite/single/simul_efun.lpc
-cd testsuite && ../build/src/driver etc/config.test -ftest:single/tests/zz_probe_hooks.lpc | grep PROBE
-```
-
-These edits are for the experiment only; revert them afterwards
-(`git checkout -- testsuite/single/simul_efun.lpc` and delete the copied files).
