@@ -1,0 +1,8 @@
+#define P(k, v) debug_message("PROBE " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+void do_tests() {
+  object p = new("/clone/probe/plain");
+  P("P3 previous_object() seen by callee via p->who_called() (caller is this test)", p->who_called());
+  P("P3 previous_object() via efun::call_other", efun::call_other(p, "who_called"));
+  P("P3 origin() via p->how_called()", p->how_called());
+  P("P3 origin() via efun::call_other", efun::call_other(p, "how_called"));
+}

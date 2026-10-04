@@ -1,0 +1,6 @@
+int local_hits;
+string query_name() { return "target"; }
+int id(string s) { return s == "target"; }
+int do_local() { local_hits++; return query_name() == "target"; }
+int noop(int x) { return x; }
+void go(object d) { move_object(d); }

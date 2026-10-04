@@ -1,0 +1,27 @@
+#define P(k, v) debug_message("PROBE " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+void do_tests() {
+  object t, s, *before;
+  mixed err;
+  int d0;
+
+  // P1: idiomatic shadow (forwards with tgt->fn()) under a simul call_other wrapper
+  t = new("/clone/probe/target");
+  s = new("/clone/probe/shadow_arrow");
+  s->attach(t);
+  err = catch(t->query_name());
+  P("P1 idiomatic shadow forward under simul call_other wrapper -> error", err);
+  destruct(s);
+
+  // P2: does a simul destruct() override see every destruction?
+  t = new("/clone/probe/target");
+  s = new("/clone/probe/shadow");
+  s->attach(t);
+  d0 = probe_destruct_count();
+  destruct(t);  // explicit: seen. The shadow dies with it: driver-initiated.
+  P("P2 shadow destructed along with target", !objectp(s));
+  P("P2 destructs seen by simul override (expected 2 objects died)", probe_destruct_count() - d0);
+  t = new("/clone/probe/target");
+  d0 = probe_destruct_count();
+  efun::destruct(t);
+  P("P2 efun::destruct seen by simul override", probe_destruct_count() - d0);
+}
