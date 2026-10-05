@@ -7,7 +7,6 @@
 #include <deque>
 #include <vector>
 #include <memory>
-#include <mutex>
 
 #include "rc.h"  // for CONFIG_*
 
@@ -21,11 +20,6 @@ const debug_t levels[] = {E(call_out), E(d_flag),        E(connections),   E(map
 const int sizeof_levels = (sizeof(levels) / sizeof(levels[0]));
 
 namespace {
-// debug_message() also runs on worker threads (the tracer's trace-dump
-// threads), so the log target and the messages buffered until it opens are
-// guarded. Recursive because the SIGUSR1/SIGUSR2 handlers log too, and can
-// interrupt a thread that is already inside debug_message().
-std::recursive_mutex debug_message_lock;
 FILE* debug_message_fp = nullptr;
 std::deque<std::unique_ptr<std::vector<char>>> pending_messages;
 }  // namespace
@@ -54,7 +48,6 @@ void reset_debug_message_fp() {
   } else {
     debug_message("New Debug log location: \"%s\".\n", deb);
 
-    std::lock_guard<std::recursive_mutex> const guard(debug_message_lock);
     debug_message_fp = new_location;
 
     if (!pending_messages.empty()) {
@@ -79,8 +72,6 @@ void debug_message(const char* fmt, ...) {
 
   vsnprintf(result->data(), result->size(), fmt, args2);
   va_end(args2);
-
-  std::lock_guard<std::recursive_mutex> const guard(debug_message_lock);
 
   // Always output to stdout first
   fputs(result->data(), stdout);

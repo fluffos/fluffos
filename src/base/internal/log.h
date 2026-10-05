@@ -25,6 +25,8 @@
 [[noreturn]] extern void fatal(const char*, ...);
 
 void reset_debug_message_fp();
+// Main thread only: the log target and the messages buffered until it opens
+// are not guarded. A worker thread hands its result to the main thread to log.
 void debug_message(const char*, ...);
 
 #define SAFE(x) \
