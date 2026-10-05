@@ -142,7 +142,8 @@ void TraceWriter::flush(const std::string& filename) {
   debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
                 Tracer::timestamp(), buffer_->size(), filename.c_str());
 
-  auto dump = [this, current_buffer = std::move(buffer_), file_ptr, filename] {
+  auto dump = [this, current_buffer = std::move(buffer_), file_ptr = std::move(file_ptr),
+               filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
     std::ofstream& file = *file_ptr;
