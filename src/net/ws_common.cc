@@ -42,6 +42,10 @@ int ws_handle_established(struct lws* wsi, ws_session* pss,
 
   auto port = (port_def_t*)lws_context_user(lws_get_context(wsi));
   auto fd = lws_get_socket_fd(lws_get_network_wsi(wsi));
+  if (fd == LWS_SOCK_INVALID) {
+    lwsl_warn("LWS_CALLBACK_ESTABLISHED: connection has no socket\n");
+    return -1;
+  }
 
   sockaddr_storage addr = {0};
   socklen_t addrlen = sizeof(addr);

@@ -5,7 +5,9 @@
 #include "base/internal/rc.h"
 #include "base/internal/stralloc.h"
 
+#include <cerrno>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <functional>
 #include <string>
@@ -93,21 +95,76 @@ std::string write_config(const std::string& name, const std::string& extra,
   return path;
 }
 
-// Redirect stdout (printf/debug_message) into a file for the duration of fn.
+// Points fd 1 -- and with it stdout, printf and debug_message -- at a file
+// until the guard goes out of scope. Restoring from the destructor means an
+// ASSERT_* early return or an exception cannot leave the rest of the test
+// binary writing into the file. It swaps the descriptor underneath stdout, as
+// gtest's own CaptureStdout() does, instead of freopen()ing the stream:
+// freopen() closes stdout before it tries the new path, so a failed open
+// would leave stdout closed for the rest of the run.
+class StdoutRedirect {
+ public:
+  explicit StdoutRedirect(const std::string& path) : path_(path) {
+    fflush(stdout);
+    saved_ = dup(1);
+    if (saved_ < 0) {
+      failed("dup");
+      return;
+    }
+    FILE* const file = fopen(path_.c_str(), "w");
+    if (file == nullptr) {
+      failed("fopen");
+      return;
+    }
+    active_ = dup2(fileno(file), 1) >= 0;
+    if (!active_) {
+      failed("dup2");
+    }
+    fclose(file);
+  }
+
+  ~StdoutRedirect() {
+    if (saved_ < 0) {
+      return;
+    }
+    if (active_) {
+      fflush(stdout);
+      if (dup2(saved_, 1) < 0) {
+        failed("restoring stdout");
+      }
+      clearerr(stdout);
+    }
+    close(saved_);
+  }
+
+  StdoutRedirect(const StdoutRedirect&) = delete;
+  StdoutRedirect& operator=(const StdoutRedirect&) = delete;
+
+  bool active() const { return active_; }
+
+ private:
+  void failed(const char* step) const {
+    int const err = errno;  // before gtest's message building can clobber it
+    ADD_FAILURE() << "redirecting stdout to " << path_ << ": " << step << ": " << strerror(err);
+  }
+
+  std::string const path_;
+  int saved_ = -1;
+  bool active_ = false;
+};
+
+// Redirect stdout (printf/debug_message) into a file for the duration of fn,
+// and return what fn printed. If stdout cannot be redirected the test fails,
+// fn runs uncaptured, and the result is empty.
 std::string capture_stdout(const std::string& name, const std::function<void()>& fn) {
   auto path = temp_path(name);
-
-  fflush(stdout);
-  int const saved = dup(1);
-  FILE* redirected = freopen(path.c_str(), "w", stdout);
-  EXPECT_NE(nullptr, redirected);
-
-  fn();
-
-  fflush(stdout);
-  dup2(saved, 1);
-  close(saved);
-  clearerr(stdout);
+  {
+    StdoutRedirect const redirect(path);
+    fn();
+    if (!redirect.active()) {
+      return "";
+    }
+  }
 
   std::ifstream in(path);
   return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -301,14 +358,10 @@ TEST_F(RcTest, PrintRcTableShowsValuesAndDefaults) {
 TEST_F(RcTest, GeneratedConfigTemplateIsParseable) {
   auto template_path = temp_path("template.cfg");
   {
-    fflush(stdout);
-    int const saved = dup(1);
-    ASSERT_NE(nullptr, freopen(template_path.c_str(), "w", stdout));
+    StdoutRedirect const redirect(template_path);
+    // read_config() below would exit() the whole test binary on a missing file
+    ASSERT_TRUE(redirect.active());
     print_config_template();
-    fflush(stdout);
-    dup2(saved, 1);
-    close(saved);
-    clearerr(stdout);
   }
 
   quiet_read_config(template_path);
