@@ -71,7 +71,11 @@ int ws_handle_established(struct lws* wsi, ws_session* pss,
       if (ret) {
         lwsl_warn("LWS_CALLBACK_ESTABLISHED: invalid X-REAL-IP : %s , error: %s.\n", buf,
                   evutil_gai_strerror(ret));
-        return false;
+        // Refuse it like the getpeername() failure above. Returning 0 would
+        // keep a connection with no user and no output buffer, and the
+        // writeable callback lws issues after answering a client PING would
+        // then dereference that missing buffer.
+        return -1;
       }
       if (res && res->ai_addrlen > 0) {
         memcpy(&addr, res->ai_addr, res->ai_addrlen);

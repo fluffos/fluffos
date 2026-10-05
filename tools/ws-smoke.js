@@ -61,6 +61,12 @@
 //     clears. Chromium speaks h1+pmd, Firefox h2+pmd; a test matrix
 //     without pmd has shipped "works in the test client, dies in the
 //     browser" bugs twice before (see src/www/AGENTS.md)
+//   * the X-Real-IP header (ws_common.cc): a parseable address becomes the
+//     user's address, and an unparseable one refuses the connection. It
+//     used to complete the handshake with no session behind it -- no user,
+//     no output buffer -- and the writeable callback lws issues after
+//     answering a client PING dereferenced that missing buffer, so one
+//     header plus one PING killed the driver before any login
 //   * a TLS (`wss`) telnet connection: banner, then the same forced
 //     backpressure through the TLS partial-write path, then a real
 //     cert swap: overwrite the on-disk cert/key with a newly generated
@@ -184,7 +190,7 @@ const CLOSE_TIMEOUT_BURST_CMD =
 // ---- tiny websocket client (RFC6455 client side, no deps) ---------------
 
 class WSClient {
-  constructor(socket, host, port, subprotocol, offerPmd) {
+  constructor(socket, host, port, subprotocol, offerPmd, extraHeaders) {
     this.sock = socket;
     this.buf = Buffer.alloc(0);
     // Frames can arrive (and be parsed) before the caller has a chance to
@@ -222,6 +228,7 @@ class WSClient {
       `Connection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\n` +
       `Sec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: ${subprotocol}\r\n` +
       (offerPmd ? 'Sec-WebSocket-Extensions: permessage-deflate\r\n' : '') +
+      (extraHeaders || '') +
       '\r\n');
     socket.on('data', (d) => this.feed(d));
     socket.on('close', () => this.onClose());
@@ -331,7 +338,7 @@ class WSClient {
   close() { try { this.sock.destroy(); } catch (_) {} }
 }
 
-function connectWS(port, subprotocol, useTls, offerPmd) {
+function connectWS(port, subprotocol, useTls, offerPmd, extraHeaders) {
   return new Promise((resolve, reject) => {
     const to = setTimeout(() => reject(new Error('ws connect timeout')), 15000);
     const sock = useTls
@@ -348,7 +355,7 @@ function connectWS(port, subprotocol, useTls, offerPmd) {
     sock.on('error', (e) => { clearTimeout(to); reject(e); });
     let ws;
     function onUp() {
-      ws = new WSClient(sock, '127.0.0.1', port, subprotocol, offerPmd);
+      ws = new WSClient(sock, '127.0.0.1', port, subprotocol, offerPmd, extraHeaders);
       if (useTls) {
         const cert = sock.getPeerCertificate();
         ws.peerFingerprint = cert && (cert.fingerprint256 || cert.fingerprint);
@@ -655,6 +662,41 @@ async function main() {
   check('pmd: driver-initiated close never truncates the extension tx drain',
         pmdNegotiated && pmdFailures.length === 0,
         pmdFailures.length ? pmdFailures.join(' | ') : `${pmdSizes.length} burst sizes clean`);
+
+  // 6c. X-Real-IP: a parseable address becomes the user's address; an
+  //     unparseable one must refuse the connection. The handler used to
+  //     `return false` there -- 0, which lws reads as "keep it" -- leaving a
+  //     completed handshake with no user and no output buffer behind it, and
+  //     the writeable callback lws issues after answering a client PING then
+  //     dereferenced that missing buffer and killed the driver.
+  const wsIp = await connectWS(plain, 'ascii', false, false, 'X-Real-IP: 203.0.113.7\r\n');
+  let ipText = '';
+  wsIp.onFrame = (payload) => { ipText += payload.toString('utf8'); };
+  await waitFor(() => ipText.length > 50, 15000);
+  wsIp.sendText('eval write("|IP:" + query_ip_number(this_player()) + "|"); return 0\n');
+  check('X-Real-IP: a valid address becomes the user\'s address',
+        await waitFor(() => ipText.includes('|IP:203.0.113.7|'), 15000));
+  wsIp.close();
+
+  const wsBadIp = await connectWS(plain, 'ascii', false, false, 'X-Real-IP: not-an-ip\r\n');
+  const badIpRefused = await waitFor(() => wsBadIp.sock.destroyed, 5000);
+  // Only a driver that kept the connection gets this PING -- the frame that
+  // used to crash it.
+  if (!badIpRefused) wsBadIp.sendFrame(0x9, Buffer.alloc(0));
+  check('X-Real-IP: an unparseable address refuses the connection', badIpRefused);
+  await sleep(500);
+  wsBadIp.close();
+  let afterBadIpText = '';
+  try {
+    const wsAfter = await connectWS(plain, 'ascii', false);
+    wsAfter.onFrame = (payload) => { afterBadIpText += payload.toString('utf8'); };
+    await waitFor(() => afterBadIpText.length > 50, 15000);
+    wsAfter.close();
+  } catch (_) {
+    // connection refused: the driver is gone
+  }
+  check('X-Real-IP: driver still serves after the refused connection',
+        afterBadIpText.length > 50);
 
   // 7. TLS websocket: banner, then forced backpressure through the TLS
   //    write path (SSL partial writes retry differently --
