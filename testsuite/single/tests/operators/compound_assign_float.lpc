@@ -1,3 +1,4 @@
+#pragma no_warnings  // deliberately truncates floats; the warning itself is pinned by test_compiler.cc (#1413)
 // Compound assignment (+= -= *= /=) with a float RHS on an int-holding
 // lvalue: whether the lvalue promotes to float or truncates and stays int
 // depends on whether its type is statically known.

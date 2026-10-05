@@ -54,6 +54,11 @@ of the file (see [pragma](preprocessor/pragma)). Notable warnings:
   different body warns (with a note pointing at the previous
   definition) and the new definition takes effect. Redefining with an
   identical body is silent. See [define](preprocessor/define).
+* **Float truncated to int** — a value the compiler knows is a float is
+  assigned, initialized, `op=`-ed or `return`ed into an `int`, silently
+  discarding the fraction (`x *= 0.85` zeroes an int `x`). Wrap the value
+  in `to_int()` to say so, or make the destination a float. See
+  [float](types/float).
 
 ## Fix-it hints
 

@@ -3264,3 +3264,70 @@ TEST(CompileArenaOwnership, DropArenaStateBeforeArenaDiesIsSafe) {
   EXPECT_TRUE(compiler_diags.empty());
   // `arena` destructs at end of scope now that nothing references it.
 }
+
+// ---------------------------------------------------------------------------
+// Issue #1413: a statically-float value truncated into an int slot used to be
+// silent. The coercion itself is deliberate (#1303); only the warning is new.
+// ---------------------------------------------------------------------------
+static int float_truncation_warnings(const char* src, const char* name) {
+  ensure_compile_env();
+  program_t* prog = compile_file(src, name);
+  EXPECT_NE(prog, nullptr) << "source must still compile: " << src;
+  int n = 0;
+  for (const auto& d : compiler_diags) {
+    if (d.is_warning && d.message.find("truncated to int") != std::string::npos) {
+      n++;
+    }
+  }
+  if (prog) {
+    deallocate_program(prog);
+  }
+  return n;
+}
+
+TEST(FloatTruncationWarning, WarnsOnInitializerAssignOpAssignAndReturn) {
+  EXPECT_EQ(1, float_truncation_warnings("int g = 2.75;\n", "/ft_global_init"));
+  EXPECT_EQ(1, float_truncation_warnings("int f() { int b = 2.75; return b; }\n", "/ft_local_init"));
+  EXPECT_EQ(1, float_truncation_warnings("int f() { int b; b = 2.75; return b; }\n", "/ft_assign"));
+  EXPECT_EQ(1, float_truncation_warnings("int f() { int x = 1000; x *= 0.85; return x; }\n",
+                                         "/ft_mul_eq"));
+  EXPECT_EQ(1, float_truncation_warnings("int f() { int c = 7; c -= 0.85; return c; }\n",
+                                         "/ft_sub_eq"));
+  EXPECT_EQ(1, float_truncation_warnings("int f() { return 2.75; }\n", "/ft_return"));
+  // A float EXPRESSION (not a literal) is just as lossy, even when its value
+  // happens to be whole at runtime.
+  EXPECT_EQ(1, float_truncation_warnings("int f(float g) { return g * 2.0; }\n", "/ft_expr"));
+}
+
+TEST(FloatTruncationWarning, SilentWhenNothingIsLostOrIntentionIsExplicit) {
+  // A literal with no fractional part loses nothing.
+  EXPECT_EQ(0, float_truncation_warnings("int i = 2.0;\n", "/ft_whole_literal"));
+  // to_int() is the explicit spelling and returns an int.
+  EXPECT_EQ(0, float_truncation_warnings("int f(float g) { int i = to_int(g); return i; }\n",
+                                         "/ft_to_int"));
+  EXPECT_EQ(0, float_truncation_warnings("int f(float g) { return to_int(g * 0.85); }\n",
+                                         "/ft_to_int_return"));
+  // Untyped / float destinations never truncate.
+  EXPECT_EQ(0, float_truncation_warnings("mixed m = 2.75;\n", "/ft_mixed"));
+  EXPECT_EQ(0, float_truncation_warnings("float f = 2;\nfloat g = 2.75;\n", "/ft_float_dest"));
+  EXPECT_EQ(0, float_truncation_warnings("float f() { return 2.75; }\n", "/ft_float_return"));
+  // An int RHS into an int slot is the ordinary case.
+  EXPECT_EQ(0, float_truncation_warnings("int f() { int x = 1000; x *= 85; return x; }\n",
+                                         "/ft_int_mul"));
+}
+
+TEST(FloatTruncationWarning, NotStaticallyFloatDoesNotWarn) {
+  // call_other / index results are statically mixed: the dynamic op= coercion
+  // (#1365, #1384) has no static type to be sure of, so it stays quiet.
+  EXPECT_EQ(0, float_truncation_warnings(
+                   "int f(object o, mapping m) { int x = 5; x += o->get(); x += m[\"k\"]; "
+                   "return x; }\n",
+                   "/ft_dynamic"));
+}
+
+TEST(FloatTruncationWarning, NoWarningsPragmaSuppresses) {
+  EXPECT_EQ(0, float_truncation_warnings("#pragma no_warnings\nint f() { return 2.75; }\n",
+                                         "/ft_pragma"));
+  // ...and the pragma does not leak into the next compile.
+  EXPECT_EQ(1, float_truncation_warnings("int f() { return 2.75; }\n", "/ft_after_pragma"));
+}
