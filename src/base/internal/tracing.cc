@@ -81,10 +81,31 @@ class TraceWriter {
   void flush(const std::string& file);
 
  private:
+  // debug_message() is main-thread only, so a dump thread never logs: it
+  // queues what happened here and the main thread reports it.
+  struct DumpDone {
+    std::string filename;
+    long long ms;
+  };
+  void report_finished_dumps();
+
   std::mutex lock_;
   std::unique_ptr<std::vector<Event>> buffer_;
   std::vector<std::thread> dump_threads_;
+  std::mutex done_lock_;
+  std::vector<DumpDone> done_;
 };
+
+void TraceWriter::report_finished_dumps() {
+  std::vector<DumpDone> done;
+  {
+    std::lock_guard<std::mutex> const guard(done_lock_);
+    done.swap(done_);
+  }
+  for (const auto& d : done) {
+    debug_message("Dumped trace to file %s, cost %lld ms.\n", d.filename.c_str(), d.ms);
+  }
+}
 
 TraceWriter::~TraceWriter() {
   std::lock_guard<std::mutex> const lock(lock_);
@@ -97,28 +118,34 @@ TraceWriter::~TraceWriter() {
     }
   }
   dump_threads_.clear();
+  report_finished_dumps();
 }
 
 void TraceWriter::flush(const std::string& filename) {
+  report_finished_dumps();
+
   std::lock_guard<std::mutex> const guard(lock_);
 
   if (!buffer_ || buffer_->empty()) {
     return;
   }
 
+  // Open on the calling thread so a failure is logged from here.
+  auto file_ptr =
+      std::make_shared<std::ofstream>(filename, std::ofstream::out | std::ofstream::binary);
+  if (!*file_ptr) {
+    debug_message("Error opening file %s: .\n", filename.c_str());
+    buffer_.reset();
+    return;
+  }
+
   debug_message("Trace duration: %lf us, dumping %ld events to %s in separate thread.\n",
                 Tracer::timestamp(), buffer_->size(), filename.c_str());
 
-  auto dump = [current_buffer = std::move(buffer_), filename] {
+  auto dump = [this, current_buffer = std::move(buffer_), file_ptr, filename] {
     auto begin = std::chrono::high_resolution_clock::now();
 
-    std::ofstream file(filename, std::ofstream::out | std::ofstream::binary);
-
-    if (!file) {
-      debug_message("Error opening file %s: .\n", filename.c_str());
-      current_buffer->clear();
-      return;
-    }
+    std::ofstream& file = *file_ptr;
 
     file << "[";
 
@@ -157,17 +184,20 @@ void TraceWriter::flush(const std::string& filename) {
     file << "\n"
          << "]";
 
-    auto dur_us = std::chrono::duration_cast<std::chrono::milliseconds>(
+    file.close();
+
+    auto dur_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                       std::chrono::high_resolution_clock::now() - begin)
                       .count();
 
-    debug_message("[thread %lud]: Dump trace successfully to file %s, cost %lld ms.\n",
-                  get_current_thread_id(), filename.c_str(), dur_us);
+    std::lock_guard<std::mutex> const guard(done_lock_);
+    done_.push_back({filename, static_cast<long long>(dur_ms)});
   };
 
 #ifdef __EMSCRIPTEN__
   // No threads on WASM: write the trace synchronously.
   dump();
+  report_finished_dumps();
 #else
   this->dump_threads_.emplace_back(std::move(dump));
 #endif
