@@ -11,6 +11,9 @@
 
 #include <sys/param.h>
 
+#include <cerrno>
+#include <cstring>
+
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
@@ -519,11 +522,16 @@ static void restore_stat_list(const char* file, mudlib_stats_t** list) {
       f = fopen(fname, "r");
     }
   } else {
-    debug_message("*Warning: call to save_stat_list with null filename\n");
+    debug_message("*Warning: call to restore_stat_list with null filename\n");
     return;
   }
   if (!f) {
-    debug_message("*Warning: unable to open stat file %s for reading.\n", file);
+    // No stat file yet is the normal state on a mud's first boot (they are
+    // written at shutdown), so only another failure is worth a warning.
+    if (errno != ENOENT) {
+      debug_message("*Warning: unable to open stat file %s for reading: %s\n", file,
+                    strerror(errno));
+    }
     return;
   }
   // The stat-file names are arbitrary-length mudlib strings; bound the scan
