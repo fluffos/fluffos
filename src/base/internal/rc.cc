@@ -29,7 +29,9 @@ char* external_cmd[g_num_external_cmds];
 
 namespace {
 
-const int K_MAX_CONFIG_LINE_LENGTH = 120;
+// Longest setting line accepted; values are sscanf'd into buffers of this
+// size, so a longer line is rejected rather than truncated.
+const int K_MAX_CONFIG_LINE_LENGTH = 1024;
 std::deque<std::string> config_lines;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -347,12 +349,13 @@ void read_config(const char* filename) {
   buffer << f.rdbuf();
 
   char tmp[K_MAX_CONFIG_LINE_LENGTH];
-  while (buffer.getline(&tmp[0], sizeof(tmp), '\n')) {
-    if (strlen(tmp) == K_MAX_CONFIG_LINE_LENGTH - 1) {
-      debug_message("*Warning: possible truncated config line: %s\n", tmp);
-    }
-
-    std::string v(tmp);
+  // Read whole lines: istream::getline() into a fixed buffer set failbit on
+  // a long line and ended the loop, silently dropping that line and every
+  // line after it (the driver then reported a later, unrelated setting such
+  // as "mudlib directory" as missing).
+  std::string line;
+  while (std::getline(buffer, line)) {
+    std::string v(line);
 
     // ignore anything after # in the line.
     auto pos = v.find_first_of('#');
@@ -362,6 +365,11 @@ void read_config(const char* filename) {
     v = trim(v);
     if (v.empty()) {
       continue;
+    }
+    if (v.size() >= K_MAX_CONFIG_LINE_LENGTH) {
+      debug_message("*Error in config file: line longer than %d characters:\n\t%s\n",
+                    K_MAX_CONFIG_LINE_LENGTH - 1, v.c_str());
+      exit(-1);
     }
     config_lines.push_back(v + "\n");
   }
@@ -548,8 +556,7 @@ void print_rc_table() {
 // default, so they get obvious placeholders the operator must edit.
 namespace {
 // Print `text` as one or more "# ..." comment lines, wrapped on whitespace.
-// The config parser drops any line >= K_MAX_CONFIG_LINE_LENGTH chars (it trips
-// failbit and stops reading the file), so comment lines must stay short.
+// Kept to a readable width; the parser accepts long comment lines.
 void print_comment(const std::string& text) {
   const size_t width = 76;
   std::istringstream words(text);
