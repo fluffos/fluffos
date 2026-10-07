@@ -153,7 +153,10 @@ void set_master(object_t* ob) {
     // 'master::author_file' should return an apropriate "author" for each
     // file (directory), as such we should get the master author by
     // asking for 'master::author_file(__MASTER_FILE__)'
-    push_malloced_string(add_slash(CONFIG_STR(__MASTER_FILE__)));
+    // The master's object name, like every per-object author_file() call
+    // (add_slash(ob->obname)); add_slash() of the configured path gave
+    // "//adm/obj/master" for the usual "/adm/obj/master" setting.
+    push_malloced_string(add_slash(master_ob->obname));
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
     if (ret == 0 || ret->type != T_STRING) {
       // we didn't got the expected value?
@@ -187,7 +190,10 @@ void set_master(object_t* ob) {
     // 'master::author_file' should return an apropriate "author" for each
     // file (directory), as such we should get the master author by
     // asking for 'master::author_file(__MASTER_FILE__)'
-    push_malloced_string(add_slash(CONFIG_STR(__MASTER_FILE__)));
+    // The master's object name, like every per-object author_file() call
+    // (add_slash(ob->obname)); add_slash() of the configured path gave
+    // "//adm/obj/master" for the usual "/adm/obj/master" setting.
+    push_malloced_string(add_slash(master_ob->obname));
     ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
     if (ret == nullptr || ret->type != T_STRING) {
       // we didn't got the expected value?
