@@ -28,6 +28,7 @@
 #include "vm/internal/base/debug.h"
 #include "vm/internal/master.h"
 #include "vm/internal/otable.h"
+#include "debugger/debug_hook.h"
 #include "vm/internal/simul_efun.h"
 #include "compiler/internal/compiler.h"  // for compiler_next_load_reason
 #include "compiler/internal/lexer.h"     // for total_lines, FIXME
@@ -118,6 +119,7 @@ void shutdownMudOS(int exit_code) {
   // any later settle frees its reaction instead of queueing it.
   promise_cleanup();
   shutdown_external_ports();
+  lpc_debugger_shutdown();
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   lpc_socks_closeall();
@@ -657,6 +659,7 @@ object_t* load_object(const char* lname, int callcreate) {
   }
   obj_list = ob;
   ObjectTable::instance().insert(ob->obname, ob); /* add name to fast object lookup table */
+  lpc_debugger_on_program_loaded(ob->prog);
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
@@ -779,6 +782,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   }
   obj_list = ob;
   ObjectTable::instance().insert(ob->obname, ob);
+  lpc_debugger_on_program_loaded(ob->prog);
 
   save_command_giver(command_giver);
   push_object(ob);
@@ -1092,6 +1096,10 @@ int recompile_object(object_t* target) {
     object_t* tmp = ob;
     free_object(&tmp, "recompile_object");
   }
+
+  // Rebind any source breakpoints against the freshly swapped-in program
+  // (the old program's addresses die with it via deallocate_program()).
+  lpc_debugger_on_program_loaded(new_prog);
 
   // Drop the compile's own reference; the updated objects hold theirs.
   free_prog(&new_prog);
@@ -2422,11 +2430,21 @@ void _error_handler(char* err) {
     fatal("error() without a context: %s", err + 1);
   }
 
-  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
-      current_error_context == g_coroutine_econ) {
-    /* user catches this error -- or it unwinds to a running async function
-     * body's boundary, where it becomes a promise rejection (or resumes an
-     * acatch() region); either way the value travels via catch_value. */
+  // The error is "caught" when it unwinds to a catch() frame -- or to a running
+  // async function body's boundary, where it becomes a promise rejection (or
+  // resumes an acatch() region); either way the value travels via catch_value.
+  const bool caught_by_lpc =
+      (((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+      current_error_context == g_coroutine_econ;
+
+  // Source-level debugger: optionally stop here, where the control stack is
+  // still fully intact (same reason mudlib_error_handler can collect a trace).
+  if (g_lpc_debug_flags) {
+    lpc_debugger_on_error(err, caught_by_lpc);
+  }
+
+  if (caught_by_lpc) {
+    /* user catches this error -- see caught_by_lpc above */
     /* This is added so that catches generate messages in the log file. */
     if (!CONFIG_INT(__RC_MUDLIB_ERROR_HANDLER__)) {
       debug_message_with_location(err);

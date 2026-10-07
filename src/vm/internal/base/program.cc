@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "vm/internal/base/machine.h"
+#include "debugger/debug_hook.h"
 
 void reference_prog(program_t* progp, const char* from) {
   progp->ref++;
@@ -12,13 +13,20 @@ void deallocate_program(program_t* progp) {
 
   debug(d_flag, "free_prog: /%s\n", progp->filename);
 
+  // The bytecode is about to be freed: drop any debugger breakpoint
+  // addresses that point into it.
+  lpc_debugger_on_program_freed(progp);
+
   total_prog_block_size -= progp->total_size;
   total_num_prog_blocks -= 1;
 
-  /* Free all function names. */
+  /* Free all function names (and any debugger local-name table). */
   for (i = 0; i < progp->num_functions_defined; i++) {
     if (progp->function_table[i].funcname) {
       free_string(progp->function_table[i].funcname);
+    }
+    if (progp->function_table[i].local_names) {
+      FREE(progp->function_table[i].local_names);
     }
   }
   /* Free all strings */

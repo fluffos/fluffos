@@ -1860,6 +1860,7 @@ int define_new_function(const char* name, int num_arg, int num_local, int flags,
     funp = reinterpret_cast<function_t*>(allocate_in_mem_block(A_FUNCTIONS, sizeof(function_t)));
     memset(funp->default_args_findex, 0, sizeof(funp->default_args_findex));
     funp->funcname = make_shared_string(name);
+    funp->local_names = nullptr;
     argument_start_index = INDEX_START_NONE;
     add_to_mem_block(A_ARGUMENT_INDEX, (char*)&argument_start_index, sizeof argument_start_index);
   }
@@ -3597,6 +3598,10 @@ static program_t* epilog(void) {
         free_string(dead->funcname);
         dead->funcname = nullptr;
       }
+      if (dead->local_names) {
+        FREE(dead->local_names);
+        dead->local_names = nullptr;
+      }
     }
   }
 
@@ -3835,6 +3840,9 @@ static void clean_parser() {
     funp = FUNC(i);
     if (funp->funcname) {
       free_string(funp->funcname);
+    }
+    if (funp->local_names) {
+      FREE(funp->local_names);
     }
   }
 

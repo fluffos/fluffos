@@ -186,7 +186,8 @@
       "tls",
       "websocket",
       "async",
-      "tracing"
+      "tracing",
+      "debugger"
     ],
     "labels": {
       "lpc": "The LPC Language",
@@ -203,7 +204,8 @@
       "tls": "TLS",
       "websocket": "WebSocket",
       "async": "Async and Promises",
-      "tracing": "Tracing"
+      "tracing": "Tracing",
+      "debugger": "WebSocket LPC Debugger"
     }
   },
   "driver": {
