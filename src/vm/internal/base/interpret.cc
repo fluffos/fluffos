@@ -227,26 +227,39 @@ int too_deep_error = 0, max_eval_error = 0;
 
 ref_t* global_ref_list = nullptr;
 
-void kill_ref(ref_t* ref) {
-  if (ref->sv.type == T_MAPPING && (ref->sv.u.map->count & MAP_LOCKED)) {
-    ref_t* r = global_ref_list;
+/* Does ref r hold (and so lock) mapping m, in sv or parent_sv? */
+static bool ref_locks_mapping(ref_t* r, mapping_t* m) {
+  /* the type checks matter: refs whose sv is not a mapping (foreach loop
+   * refs, killed refs) carry unrelated or uninitialized u data that could
+   * alias this mapping's address */
+  return (r->sv.type == T_MAPPING && r->sv.u.map == m) ||
+         (r->parent_sv.type == T_MAPPING && r->parent_sv.u.map == m);
+}
 
-    /* if some other ref references this mapping, it needs to remain
-       locked.  Skip the ref being killed: it is still linked into
-       global_ref_list at this point, so matching it would wrongly keep
-       the mapping locked and leak its deferred nodes. */
-    while (r) {
-      /* the type check matters: refs whose sv is not a mapping (foreach
-       * loop refs, killed refs) carry unrelated or uninitialized u data
-       * that could alias this mapping's address */
-      if (r != ref && r->sv.type == T_MAPPING && r->sv.u.map == ref->sv.u.map) {
-        break;
-      }
-      r = r->next;
+/* Unlock m unless some ref other than `self` still holds it. Skip the ref
+ * being killed: it is still linked into global_ref_list at this point, so
+ * matching it would wrongly keep the mapping locked and leak its deferred
+ * nodes. */
+static void unlock_mapping_unless_held(ref_t* self, mapping_t* m) {
+  if (!(m->count & MAP_LOCKED)) {
+    return;
+  }
+  for (ref_t* r = global_ref_list; r; r = r->next) {
+    if (r != self && ref_locks_mapping(r, m)) {
+      return;
     }
-    if (!r) {
-      unlock_mapping(ref->sv.u.map);
-    }
+  }
+  /* self may hold m in both slots; only unlock once */
+  unlock_mapping(m);
+}
+
+void kill_ref(ref_t* ref) {
+  if (ref->sv.type == T_MAPPING) {
+    unlock_mapping_unless_held(ref, ref->sv.u.map);
+  }
+  if (ref->parent_sv.type == T_MAPPING &&
+      !(ref->sv.type == T_MAPPING && ref->sv.u.map == ref->parent_sv.u.map)) {
+    unlock_mapping_unless_held(ref, ref->parent_sv.u.map);
   }
   /* Release the ref's own sv unconditionally: a foreach mapping ref
    * carries its counted mapping there even while lvalue is still null
@@ -257,6 +270,7 @@ void kill_ref(ref_t* ref) {
   /* F_MAKE_REF of s[i] / b[i] parks the box here so sv can still hold
    * the container. */
   free_svalue(&ref->index_sv, "kill_ref");
+  free_svalue(&ref->parent_sv, "kill_ref");
   /* Clear the stale tags: when the last T_REF svalue holding this ref_t is
    * later freed, free_svalue() re-enters kill_ref, and the MAP_LOCKED
    * check above must not re-read the (possibly already deallocated)
@@ -267,6 +281,9 @@ void kill_ref(ref_t* ref) {
   ref->index_sv.type = T_NUMBER;
   ref->index_sv.subtype = 0;
   ref->index_sv.u.number = 0;
+  ref->parent_sv.type = T_NUMBER;
+  ref->parent_sv.subtype = 0;
+  ref->parent_sv.u.number = 0;
   if (ref->next) {
     ref->next->prev = ref->prev;
   }
@@ -305,6 +322,9 @@ ref_t* make_ref(void) {
   ref->index_sv.type = T_NUMBER;
   ref->index_sv.subtype = 0;
   ref->index_sv.u.number = 0;
+  ref->parent_sv.type = T_NUMBER;
+  ref->parent_sv.subtype = 0;
+  ref->parent_sv.u.number = 0;
   return ref;
 }
 
@@ -679,6 +699,8 @@ void pop_stack() {
 int lv_owner_type;
 refed_t* lv_owner;
 const char* lv_owner_str;
+int lv_parent_type;
+refed_t* lv_parent;
 
 void free_indexed_lvalue(svalue_t* v) {
   if (v->type == T_LVALUE_CODEPOINT) {
@@ -761,6 +783,11 @@ void push_indexed_lvalue(int reverse) {
         unlink_string_svalue(lv);
         arm_codepoint_lvalue(sp, lv, ind);
 #ifdef REF_RESERVED_WORD
+        /* lv_owner still names the container whose slot holds the string
+         * (or is reset to 0 for a local/global/ref slot); F_MAKE_REF has to
+         * keep THAT alive too, since the box writes into the slot. */
+        lv_parent_type = lv_owner_type;
+        lv_parent = lv_owner;
         lv_owner_type = T_STRING;
         lv_owner_str = lv->u.string;
 #endif
@@ -2844,6 +2871,9 @@ void eval_instruction(char* p) {
         STACK_INC;
         sp->type = T_LVALUE;
         sp->u.lvalue = fp + EXTRACT_UCHAR(pc++);
+#ifdef REF_RESERVED_WORD
+        lv_owner_type = 0; /* a frame slot has no container to keep alive */
+#endif
         break;
 #ifdef REF_RESERVED_WORD
       case F_MAKE_REF: {
@@ -2870,6 +2900,22 @@ void eval_instruction(char* p) {
           sp->type = T_NUMBER;
           sp->subtype = 0;
           sp->u.number = 0;
+          /* A string-char box writes into the slot that holds the string;
+           * when that slot is inside an array / class / mapping, the ref
+           * must keep the container alive too, or a callee that drops it
+           * (`ga = 0`) leaves the box writing into freed memory -- for a
+           * mapping, into whichever mapping reuses the node. */
+          if (ref->index_sv.type == T_LVALUE_CODEPOINT &&
+              (lv_parent_type == T_ARRAY || lv_parent_type == T_CLASS ||
+               lv_parent_type == T_MAPPING)) {
+            ref->parent_sv.type = lv_parent_type;
+            ref->parent_sv.subtype = 0;
+            ref->parent_sv.u.refed = lv_parent;
+            lv_parent->ref++;
+            if (lv_parent_type == T_MAPPING) {
+              (reinterpret_cast<mapping_t*>(lv_parent))->count |= MAP_LOCKED;
+            }
+          }
         } else {
           /* Nested `ref c` on a parameter that is already a ref: lvalue
            * points at the outer ref's index_sv (the box). Do not snapshot
@@ -2967,6 +3013,9 @@ void eval_instruction(char* p) {
             STACK_INC;
             sp->type = T_LVALUE;
             sp->u.lvalue = s->u.ref->lvalue;
+            /* the outer ref keeps its own container alive for longer than
+             * any ref made through it */
+            lv_owner_type = 0;
           } else {
             error("Reference is invalid.\n");
           }
@@ -4643,6 +4692,9 @@ void eval_instruction(char* p) {
         STACK_INC;
         sp->type = T_LVALUE;
         sp->u.lvalue = find_value(idx + variable_index_offset);
+#ifdef REF_RESERVED_WORD
+        lv_owner_type = 0; /* nor does an object variable */
+#endif
         break;
       }
       case F_INDEX_LVALUE:

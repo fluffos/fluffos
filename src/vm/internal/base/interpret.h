@@ -165,6 +165,10 @@ extern ref_t* global_ref_list;
 extern int lv_owner_type;
 extern refed_t* lv_owner;
 extern const char* lv_owner_str;
+/* The container that held the string a string-char lvalue was armed on
+ * (0 when the string sat in a local, a global or behind a ref). */
+extern int lv_parent_type;
+extern refed_t* lv_parent;
 
 void kill_ref(ref_t*);
 ref_t* make_ref(void);
