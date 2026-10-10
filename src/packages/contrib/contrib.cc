@@ -2022,7 +2022,8 @@ void f_repeat_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char* str;
-  int repeat, len, newlen;
+  LPC_INT repeat; /* an int would wrap 0x100000002 to 2 */
+  int len, newlen;
   char *ret, *p;
   int i;
 
@@ -2598,7 +2599,7 @@ void f_disassemble_class() {
 #ifdef F_FETCH_CLASS_MEMBER
 
 void f_fetch_class_member() {
-  int pos = sp->u.number;
+  LPC_INT pos = sp->u.number; /* checked below as an LPC int, not wrapped */
   array_t* arr;
 
   pos = sp->u.number;
@@ -2622,7 +2623,7 @@ void f_fetch_class_member() {
 #ifdef F_STORE_CLASS_MEMBER
 
 void f_store_class_member() {
-  int const pos = (sp - 1)->u.number;
+  LPC_INT const pos = (sp - 1)->u.number; /* checked below as an LPC int */
   array_t* arr;
 
   if ((sp - 2)->type != T_CLASS) {
@@ -2868,12 +2869,19 @@ void f_abs() {
 
 void f_roll_MdN() {
   int const num_arg = st_num_arg;
-  int sides, rolls, bonus;
+  LPC_INT sides, rolls, bonus;
   LPC_INT roll = 0;
 
   rolls = (sp - 2)->u.number;
   sides = (sp - 1)->u.number;
   bonus = sp->u.number;
+
+  /* rolls used to be an int, so a count past 32 bits wrapped (0x100000001
+   * rolled once). Keep the old int ceiling on the loop -- this loop is not
+   * metered by the eval cost limit -- but refuse instead of wrapping. */
+  if (rolls > std::numeric_limits<int>::max()) {
+    error("roll_MdN: too many rolls.\n");
+  }
 
   if (rolls > 0 && sides > 0) {
     while (rolls--) {

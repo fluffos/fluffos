@@ -1,0 +1,37 @@
+// Regression: several contrib efuns (packages/contrib/contrib.cc) stored an
+// LPC int argument in an `int` before using it:
+//   fetch_class_member(c, 0x100000001) returned member 1 and
+//   store_class_member(c, 0x100000000, v) overwrote member 0 -- the
+//     "Class index out of bounds" check ran on the truncated index;
+//   repeat_string("ab", 0x100000002) returned "abab" instead of the
+//     max-string-length-clamped result every other huge count gives.
+// roll_MdN() did the same with its roll count and bonus (see below), and
+// get_config() (packages/core/rc.cc) with its key:
+//   get_config(0x100000000) returned get_config(0).
+class C {
+  int a;
+  int b;
+}
+
+void do_tests() {
+  class C c = new(class C, a: 10, b: 20);
+
+  ASSERT(catch(get_config(0x100000000)));
+
+#if efun_defined(fetch_class_member)
+  ASSERT(catch(fetch_class_member(c, 0x100000001)));
+#endif
+#if efun_defined(store_class_member)
+  ASSERT(catch(store_class_member(c, 0x100000000, 99)));
+  ASSERT_EQ(10, c->a);
+#endif
+#if efun_defined(repeat_string)
+  ASSERT_EQ(sizeof(repeat_string("ab", 0x7fffffff)), sizeof(repeat_string("ab", 0x100000002)));
+#endif
+#if efun_defined(roll_MdN)
+  // roll_MdN() kept rolls/sides/bonus in `int`: a bonus of 1 << 32 was
+  // dropped, and 0x100000001 rolls rolled once. One 1-sided die is 1.
+  ASSERT_EQ(1 + 0x100000000, roll_MdN(1, 1, 0x100000000));
+  ASSERT(catch(roll_MdN(0x100000001, 1, 0)));
+#endif
+}

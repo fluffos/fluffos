@@ -1,9 +1,8 @@
 #include "base/package_api.h"
 
 int get_config_item(svalue_t* res, svalue_t* arg) {
-  int num;
-
-  num = arg->u.number;
+  /* an LPC int: as an int, 0x100000000 would read config item 0 */
+  LPC_INT const num = arg->u.number;
 
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
     return 0;
