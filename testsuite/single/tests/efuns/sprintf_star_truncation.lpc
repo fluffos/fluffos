@@ -1,0 +1,17 @@
+// Regression: sprintf()'s `*` field width and precision were read into
+// `int fs` / `int pres` (packages/core/sprintf.cc), and the %c argument into
+// a 32-bit UChar32, so a huge LPC int wrapped:
+//   sprintf("[%*s]", 0x100000003, "x") padded to width 3 instead of failing
+//     the way any width past "maximum string length" does;
+//   sprintf("[%.*s]", 0x100000001, "xyz") truncated to precision 1;
+//   sprintf("%c", 0x100000041) printed "A" instead of rejecting the
+//     invalid codepoint.
+void do_tests() {
+  ASSERT(catch(sprintf("[%*s]", 0x100000003, "x")));
+  ASSERT(catch(sprintf("[%-*s]", 0x100000003, "x")));
+  ASSERT_EQ("[xyz]", sprintf("[%.*s]", 0x100000001, "xyz"));
+  ASSERT(catch(sprintf("%c", 0x100000041)));
+  // sanity: the 32-bit spellings
+  ASSERT(catch(sprintf("[%*s]", 300000, "x")));
+  ASSERT(catch(sprintf("%c", 0x110000)));
+}
