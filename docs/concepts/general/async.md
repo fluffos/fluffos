@@ -325,9 +325,8 @@ compile-time or runtime error, never silent misbehavior:
    is carried across as an offset. What is still refused is a `foreach` over
    a **global** loop variable (its lvalue points into the object's variable
    block, a second relocation base), a **`ref`** loop variable or `ref`
-   argument, and a string-char or buffer-byte lvalue (`s[i]`, `b[i]` —
-   those are backed by shared VM scratch state, one instance at a time by
-   construction, so they can never be per-frame). It is a runtime error
+   argument (including `ref s[i]` / `ref b[i]`, which address their string or
+   buffer without holding it). It is a runtime error
    rather than a compile error because it depends on what the awaited
    promise turns out to be; use a local loop variable, or an indexed `for`.
    Compound assignment is *not* affected — `arr[i] += await p`, `s += await
