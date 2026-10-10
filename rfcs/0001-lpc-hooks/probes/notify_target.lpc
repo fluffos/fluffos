@@ -1,0 +1,5 @@
+void create() { set_notify_destruct(1); }
+void on_destruct() { "/single/tests/zz_probe_s5"->note(file_name(this_object())); }
+string query_name() { return "target"; }
+int id(string s) { return s == "target"; }
+void go(object d) { move_object(d); }

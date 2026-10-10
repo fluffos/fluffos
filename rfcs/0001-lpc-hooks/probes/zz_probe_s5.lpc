@@ -1,0 +1,23 @@
+#define P(k, v) debug_message("PROBE " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+string *seen = ({});
+void note(string who) { seen += ({ who }); }
+void do_tests() {
+  object t, s, e, c;
+  mixed r;
+  t = new("/clone/probe/notify_target"); s = new("/clone/probe/notify_shadow"); s->attach(t);
+  seen = ({}); destruct(t);
+  P("S5 on_destruct fired for (target + driver-destructed shadow)", seen);
+  e = new("/clone/probe/notify_target"); c = new("/clone/probe/notify_target"); c->go(e);
+  seen = ({}); destruct(e);
+  P("S5 on_destruct fired for (env + driver-destructed content)", seen);
+  P("S5 content alive after env destruct", objectp(c));
+  // H2 follow-up: is a call_other miss result distinguishable from a real 0 without function_exists()?
+  t = new("/clone/probe/target");
+  r = efun::call_other(t, "no_such_fn");
+  P("H2b miss result undefinedp()", undefinedp(r));
+  r = efun::call_other(t, "noop", 0);
+  P("H2b real 0 result undefinedp()", undefinedp(r));
+  r = t->no_such_fn();
+  P("H2b arrow miss (through simul wrapper) undefinedp()", undefinedp(r));
+  destruct(t);
+}

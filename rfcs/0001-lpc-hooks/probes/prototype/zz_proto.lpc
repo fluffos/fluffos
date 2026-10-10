@@ -1,0 +1,101 @@
+#define P(k, v) debug_message("PROTO " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+#define ALT 1
+#define WALK 2
+#define EXEMPT 4
+#define CAP 8
+#define EAGER 16
+
+int n3(int x) { return x + 1; }
+int n2(int x) { return n3(x) + 1; }
+int nest3() { return n2(1) + 1; }                       // needs 3 more control frames
+mixed deep(int n, int flags) { if (n > 0) return deep(n - 1, flags); return hook_proto_call(flags, 0, (: nest3 :)); }
+int probe(int n) { if (n > 0) return probe(n - 1); return 1; }
+
+mixed see_stack() { return ({ sizeof(call_stack(0)), sizeof(filter(call_stack(1), (: $1 :))) }); }
+mixed outer_secret(string pw, int flags) { return hook_proto_call(flags, 0, (: see_stack :)); }
+mixed trace_in_handler() { error("handler boom\n"); }
+
+void kill_it(object o) { destruct(o); }
+mixed hold_and_kill(int flags) { object o = new("/clone/proto/target"); object keep = o; mixed r = hook_proto_call(flags, 0, (: kill_it :), o); return r; }
+
+int boom() { error("boom\n"); return 1; }
+void burn(int us) { int t = perf_counter_ns(); while (perf_counter_ns() - t < us * 1000) ; }
+int burner(int us) { burn(us); return 7; }
+int forever() { while (1) ; return 0; }
+int noop() { return 1; }
+
+void do_tests() {
+  int d, i, n, t0, t1;
+  mixed r;
+
+  // ---------- A1: a handler when the caller sits at the call-depth limit
+  for (d = 100; d < 200; d++) if (catch(probe(d))) break;
+  P("A1 max recursion depth reachable from here", d - 1);
+  r = catch(deep(d - 3, 0));      P("A1 same stack, caller near depth limit", r ? r : "ok");
+  r = deep(d - 3, 0);             P("A1 same stack  -> ({value, stale}) or ({0, stale, error})", r);
+  r = deep(d - 3, ALT);           P("A1 alt stack   ->", r);
+
+  // ---------- A2: what a handler can see of its caller
+  r = outer_secret("hunter2", 0);   P("A2 same stack: ({frames, objects}) visible to call_stack()", r[0]);
+  r = outer_secret("hunter2", ALT); P("A2 alt stack : ({frames, objects}) visible to call_stack()", r[0]);
+
+  // ---------- A3: destruct inside the handler vs object slots on the suspended stack
+  r = hold_and_kill(0);            P("A3 same stack           : stale destructed-object slots left on the stack", r[1]);
+  r = hold_and_kill(ALT);          P("A3 alt stack, no walk   : stale destructed-object slots left on the stack", r[1]);
+  r = hold_and_kill(ALT | WALK);   P("A3 alt stack, walk all  : stale destructed-object slots left on the stack", r[1]);
+
+  // ---------- A5: error containment
+  r = hook_proto_call(ALT, 0, (: boom :)); P("A5 alt stack, handler error contained", r);
+  P("A5 caller still fine after contained error", n2(1));
+
+  // ---------- E: eval limit
+  set_eval_limit(3000000); reset_eval_cost();
+  t0 = eval_cost(); r = hook_proto_call(0, 0, (: burner, 200000 :)); t1 = eval_cost();
+  P("E1 charged   : caller eval used by a 200ms handler (us)", t0 - t1);
+  reset_eval_cost();
+  t0 = eval_cost(); r = hook_proto_call(EXEMPT, 1000000, (: burner, 200000 :)); t1 = eval_cost();
+  P("E1 exempt    : caller eval used by a 200ms handler (us)", t0 - t1);
+
+  // caller has ~300ms left, handler needs 600ms
+  set_eval_limit(900000); reset_eval_cost(); burn(600000);
+  r = hook_proto_call(EXEMPT, 2000000, (: burner, 600000 :));
+  P("E2 exempt    : 600ms handler, caller had ~300ms left -> result", r);
+  P("E2 exempt    : caller eval left afterwards (us)", eval_cost());
+  burn(100000); P("E2 exempt    : caller still running after 100ms more", 1);
+
+  // watchdog
+  set_eval_limit(3000000); reset_eval_cost();
+  t0 = perf_counter_ns(); r = hook_proto_call(EXEMPT, 300000, (: forever :)); t1 = perf_counter_ns();
+  P("E3 watchdog  : while(1) handler with a 300ms budget -> result", r);
+  P("E3 watchdog  : wall ms", (t1 - t0) / 1000000);
+  P("E3 watchdog  : caller eval left afterwards (us)", eval_cost());
+
+  // ---------- M: cost of the mechanisms (ns per handler call, noop handler)
+  set_eval_limit(300000000); reset_eval_cost();
+  n = 300000;
+  t0 = perf_counter_ns(); for (i = 0; i < n; i++) evaluate((: noop :)); t1 = perf_counter_ns();
+  P("M baseline evaluate(funptr) ns", (t1 - t0) / n);
+  t0 = perf_counter_ns(); for (i = 0; i < n; i++) hook_proto_call(0, 0, (: noop :)); t1 = perf_counter_ns();
+  P("M same stack ns", (t1 - t0) / n);
+  t0 = perf_counter_ns(); for (i = 0; i < n; i++) hook_proto_call(ALT | WALK, 0, (: noop :)); t1 = perf_counter_ns();
+  P("M alt stack ns", (t1 - t0) / n);
+  t0 = perf_counter_ns(); for (i = 0; i < n; i++) hook_proto_call(ALT | WALK | EXEMPT | CAP, 500000, (: noop :)); t1 = perf_counter_ns();
+  P("M alt stack + exempt (lazy credit) ns", (t1 - t0) / n);
+  t0 = perf_counter_ns(); for (i = 0; i < n; i++) hook_proto_call(EAGER, 500000, (: noop :)); t1 = perf_counter_ns();
+  P("M eager timer (get_eval + 2 set_eval) ns", (t1 - t0) / n);
+
+  // amplification: 40 handlers x 50ms, caller limit 1s
+  set_eval_limit(1000000); reset_eval_cost();
+  t0 = perf_counter_ns();
+  r = catch { for (i = 0; i < 40; i++) hook_proto_call(EXEMPT, 500000, (: burner, 50000 :)); };
+  t1 = perf_counter_ns();
+  P("E4 no cap    : 40 x 50ms exempt handlers under a 1s limit -> error", r ? r : "none");
+  P("E4 no cap    : wall ms", (t1 - t0) / 1000000);
+  reset_eval_cost();
+  t0 = perf_counter_ns();
+  for (i = 0; i < 40; i++) {
+    hook_proto_call(EXEMPT | CAP, 500000, (: burner, 50000 :));
+    P("E4 cap 500ms : handlers completed / wall ms", ({ i + 1, (perf_counter_ns() - t0) / 1000000 }));
+  }
+
+}

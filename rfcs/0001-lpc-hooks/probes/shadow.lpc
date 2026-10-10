@@ -1,0 +1,7 @@
+int seen_query_name, seen_id, seen_noop;
+object tgt;
+object attach(object t) { tgt = t; return shadow(t, 1); }
+string query_name() { seen_query_name++; return efun::call_other(tgt, "query_name"); }
+int id(string s) { seen_id++; return efun::call_other(tgt, "id", s); }
+int noop(int x) { seen_noop++; return efun::call_other(tgt, "noop", x); }
+mapping counts() { return (["query_name": seen_query_name, "id": seen_id, "noop": seen_noop]); }

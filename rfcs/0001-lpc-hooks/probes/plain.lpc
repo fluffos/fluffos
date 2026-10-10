@@ -1,0 +1,2 @@
+int noop(int x) { return x; }
+object who_called() { return previous_object(); } string how_called() { return origin(); }

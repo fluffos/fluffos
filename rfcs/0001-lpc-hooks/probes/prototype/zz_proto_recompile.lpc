@@ -1,0 +1,13 @@
+#define P(k, v) debug_message("PROTO " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+// The handler recompiles the program that is live on the (suspended) caller stack.
+mixed recomp(object t) { return catch(recompile_object(t)); }
+mixed relay(int flags, function h, object t) { return hook_proto_call(flags, 0, h, t); }
+void do_tests() {
+  object t;
+  mixed r;
+  int flags = to_int(read_file("/proto_flags.txt"));
+  t = load_object("/clone/proto/target");
+  r = t->run(flags, this_object(), (: recomp :));
+  P("R flags " + flags + " recompile_object() inside the handler ->", r[0][0] ? r[0][0] : "ALLOWED");
+  P("R flags " + flags + " caller frame resumed in the old program and returned", r[1]);
+}

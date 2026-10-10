@@ -1,0 +1,5 @@
+object tgt;
+void create() { set_notify_destruct(1); }
+void on_destruct() { "/single/tests/zz_probe_s5"->note(file_name(this_object())); }
+object attach(object t) { tgt = t; return shadow(t, 1); }
+string query_name() { return efun::call_other(tgt, "query_name"); }

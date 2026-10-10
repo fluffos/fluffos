@@ -1,0 +1,70 @@
+#define P(k, v) debug_message("PROBE " + k + " = " + replace_string(sprintf("%O", v), "\n", " "))
+void do_tests() {
+  object t = new("/clone/probe/target");
+  object p = new("/clone/probe/plain");
+  int *c;
+  mixed r;
+  int i, n = 200000, t0, t1;
+
+  // H1/H2: does a simul call_other override see ->, call_other(), and misses?
+  probe_co_reset();
+  t->query_name();
+  P("H1 arrow call routed through simul (hits after 1 arrow call)", probe_co_counts());
+  probe_co_reset();
+  call_other(t, "query_name");
+  P("H1 explicit call_other routed through simul", probe_co_counts());
+  probe_co_reset();
+  r = t->no_such_fn();
+  P("H2 arrow miss result", r);
+  P("H2 arrow miss seen by simul (hits, misses)", probe_co_counts());
+  probe_co_reset();
+  r = call_other(t, "no_such_fn");
+  P("H2 explicit miss seen by simul (hits, misses)", probe_co_counts());
+  probe_co_reset();
+  r = efun::call_other(t, "no_such_fn");
+  P("H4 efun::call_other seen by simul (hits, misses)", probe_co_counts());
+  probe_co_reset();
+  r = evaluate((: call_other, t, "no_such_fn" :));
+  P("H1 call_other via efun funptr seen by simul", probe_co_counts());
+  probe_co_reset();
+  r = call_other(({ t, p }), "noop", 1);
+  P("H1 call_other on array seen by simul (one call)", probe_co_counts());
+
+  // H3: shadow coverage
+  object s = new("/clone/probe/shadow");
+  P("H3 shadow attached", s->attach(t) == t);
+  t->query_name();
+  P("H3 shadow saw external t->query_name()", s->counts()["query_name"]);
+  t->do_local();
+  P("H3 shadow saw local query_name() inside target (count after do_local, was 1)", s->counts()["query_name"]);
+  t->go(this_object());
+  r = present("target", this_object());
+  P("H3 present() found target", r == t);
+  P("H3 shadow saw driver apply id() via present()", s->counts()["id"]);
+  r = t->totally_missing();
+  P("H3 shadow saw miss (no hook exists to see it)", "n/a - shadow only sees functions it defines");
+
+  // H5: cost per call (ns) of direct vs simul-advised vs shadow-advised call_other
+  t0 = perf_counter_ns();
+  for (i = 0; i < n; i++) efun::call_other(p, "noop", i);
+  t1 = perf_counter_ns();
+  P("H5 direct efun::call_other ns/call", (t1 - t0) / n);
+  t0 = perf_counter_ns();
+  for (i = 0; i < n; i++) call_other(p, "noop", i);
+  t1 = perf_counter_ns();
+  P("H5 simul-wrapped call_other ns/call", (t1 - t0) / n);
+  t0 = perf_counter_ns();
+  for (i = 0; i < n; i++) p->noop(i);
+  t1 = perf_counter_ns();
+  P("H5 arrow p->noop ns/call", (t1 - t0) / n);
+  t0 = perf_counter_ns();
+  for (i = 0; i < n; i++) t->noop(i);
+  t1 = perf_counter_ns();
+  P("H5 arrow into shadowed object ns/call", (t1 - t0) / n);
+  t0 = perf_counter_ns();
+  for (i = 0; i < n; i++) function_exists("noop", p);
+  t1 = perf_counter_ns();
+  P("H5 function_exists ns/call (cost of an LPC-side miss check)", (t1 - t0) / n);
+
+  destruct(s); destruct(t); destruct(p);
+}

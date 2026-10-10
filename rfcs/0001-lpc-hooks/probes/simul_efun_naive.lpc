@@ -1,0 +1,13 @@
+
+// ---- RFC probe (scratch, not for commit) ----
+int probe_co_hits, probe_co_misses;
+varargs mixed call_other(mixed ob, mixed fn, mixed args...) {
+  probe_co_hits++;
+  if (objectp(ob) && stringp(fn) && !function_exists(fn, ob)) probe_co_misses++;
+  return efun::call_other(ob, fn, args...);
+}
+int *probe_co_counts() { return ({ probe_co_hits, probe_co_misses }); }
+void probe_co_reset() { probe_co_hits = 0; probe_co_misses = 0; }
+int probe_destructs;
+varargs void destruct(object ob) { probe_destructs++; efun::destruct(ob); }
+int probe_destruct_count() { return probe_destructs; }
