@@ -26,9 +26,9 @@ extern array_t the_null_array;
  */
 
 int sameval(svalue_t*, svalue_t*);
-array_t* allocate_array2(int, svalue_t*);
-array_t* allocate_array(int);
-array_t* allocate_empty_array(int);
+array_t* allocate_array2(LPC_INT, svalue_t*);
+array_t* allocate_array(LPC_INT);
+array_t* allocate_empty_array(LPC_INT);
 void free_array(array_t*);
 void free_empty_array(array_t*);
 array_t* add_array(array_t*, array_t*);

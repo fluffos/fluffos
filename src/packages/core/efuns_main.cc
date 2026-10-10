@@ -405,10 +405,11 @@ void f_clear_bit() {
     error("clear_bit() bit requested : %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", sp->u.number,
           max_bitfield_bits);
   }
-  bit = (sp--)->u.number;
-  if (bit < 0) {
+  /* check the sign on the LPC int, before narrowing it (as set_bit does) */
+  if (sp->u.number < 0) {
     error("Bad argument 2 (negative) to clear_bit().\n");
   }
+  bit = (sp--)->u.number;
   ind = bit / 6;
   bit %= 6;
   len = SVALUE_STRLEN(sp);
@@ -1035,7 +1036,7 @@ void f_match_path() {
 void f_member_array() {
   array_t* v;
   int flag = 0;
-  int i;
+  LPC_INT i;
   int size;
 
   if (st_num_arg > 2) {
@@ -1062,7 +1063,11 @@ void f_member_array() {
     if (i > SVALUE_STRLEN(sp)) {
       error("Index to start search from in member_array() is > string length.\n");
     }
-    if ((res = strchr(sp->u.string + i, (sp - 1)->u.number))) {
+    /* strchr() searches for a char: a value outside 0..255 would be
+     * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
+     * terminator), so it can never be in the string. */
+    LPC_INT const c = (sp - 1)->u.number;
+    if (c >= 0 && c <= 255 && (res = strchr(sp->u.string + i, static_cast<int>(c)))) {
       i = res - sp->u.string;
     } else {
       i = -1;
@@ -1951,7 +1956,8 @@ void f_rename() {
 void f_replace_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  int plen, rlen, dlen, slen, first, last, cur, j;
+  int plen, rlen, dlen, slen, cur, j;
+  LPC_INT first, last; /* LPC ints: an int would wrap 0x100000001 to 1 */
 
   const char* pattern;
   const char* replace;
@@ -2722,6 +2728,11 @@ void f_strsrch() {
   if (arg2->type == T_NUMBER) {
     UBool is_error = false;
     int offset = 0;
+    /* U8_APPEND takes a 32-bit UChar32: check the LPC int first, or
+     * 0x1000000E9 would be searched for as U+00E9. */
+    if (arg2->u.number < 0 || arg2->u.number > UCHAR_MAX_VALUE) {
+      error("Invalid codepoint to search.");
+    }
     U8_APPEND(buf, offset, sizeof(buf), arg2->u.number, is_error);
     if (is_error) {
       error("Invalid codepoint to search.");
@@ -2842,7 +2853,7 @@ void f_tell_room() {
 
 #ifdef F_TEST_BIT
 void f_test_bit() {
-  int const ind = (sp--)->u.number;
+  LPC_INT const ind = (sp--)->u.number;
 
   if (ind / 6 >= SVALUE_STRLEN(sp)) {
     free_string_svalue(sp);
@@ -2864,7 +2875,7 @@ void f_test_bit() {
 
 #ifdef F_NEXT_BIT
 void f_next_bit() {
-  int const start = (sp--)->u.number;
+  LPC_INT const start = (sp--)->u.number;
   int const len = SVALUE_STRLEN(sp);
   int which, bit = 0, value;
 

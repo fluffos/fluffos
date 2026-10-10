@@ -24,7 +24,9 @@ void free_buffer(buffer_t* b) {
   FREE((char*)b);
 } /* free_buffer() */
 
-buffer_t* allocate_buffer(int size) {
+/* Sizes and offsets are LPC_INT so every check below sees the caller's
+ * real 64-bit value rather than one already wrapped into int range. */
+buffer_t* allocate_buffer(LPC_INT size) {
   auto max_buffer_size = CONFIG_INT(__MAX_BUFFER_SIZE__);
 
   buffer_t* buf;

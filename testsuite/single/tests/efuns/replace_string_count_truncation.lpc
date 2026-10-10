@@ -1,0 +1,9 @@
+// Regression: replace_string()'s optional occurrence bounds (first/last,
+// packages/core/efuns_main.cc) were stored in `int`, so a count past 32 bits
+// wrapped: replace_string("aaa", "a", "b", 0x100000001) replaced only the
+// first occurrence (as if max 1), and a first..last range of
+// 0x100000002..0x100000003 replaced occurrences 2..3.
+void do_tests() {
+  ASSERT_EQ("bbb", replace_string("aaa", "a", "b", 0x100000001));
+  ASSERT_EQ("aaaa", replace_string("aaaa", "a", "b", 0x100000002, 0x100000003));
+}
