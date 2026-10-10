@@ -35,7 +35,7 @@ by accident, so the compiler warns:
     int i = 2.0;           // nothing is lost: no warning
 
 The warning is on by default and `#pragma no_warnings` silences it (see
-[diagnostics](diagnostics)). It only fires when the value is statically a
+[diagnostics](../diagnostics)). It only fires when the value is statically a
 float; a `mixed` value, a `call_other` result or a mapping/array element has no
 static type to check.
 
