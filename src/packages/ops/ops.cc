@@ -656,6 +656,20 @@ void f_parse_command() {
   fp->subtype = 0;
 }
 
+/* A [..] bound is a 64-bit LPC int; the range code below works in 32-bit
+ * ints. Every bound outside [-(len + 1), len + 1] already selects the same
+ * clamped (or empty) range as that edge does, so clamp to it first: narrowing
+ * the raw value would wrap 0x100000001 back to 1. */
+static int32_t clamp_range_bound(LPC_INT bound, LPC_INT len) {
+  if (bound > len + 1) {
+    return static_cast<int32_t>(len + 1);
+  }
+  if (bound < -(len + 1)) {
+    return static_cast<int32_t>(-(len + 1));
+  }
+  return static_cast<int32_t>(bound);
+}
+
 void f_range(int code) {
   if ((sp - 2)->type != T_NUMBER) {
     error("Start of range [ .. ] interval must be a number.\n");
@@ -674,8 +688,8 @@ void f_range(int code) {
         error("Invalid UTF-8 string: f_range");
       }
 
-      to = (sp - 1)->u.number;
-      from = (sp - 2)->u.number;
+      to = clamp_range_bound((sp - 1)->u.number, len);
+      from = clamp_range_bound((sp - 2)->u.number, len);
 
       if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (to < 0 && !(code & 0x01)) {
@@ -750,7 +764,7 @@ void f_range(int code) {
       buffer_t* rbuf = sp->u.buf;
 
       len = rbuf->size;
-      to = (--sp)->u.number;
+      to = clamp_range_bound((--sp)->u.number, len);
       if (code & 0x01) {
         to = len - to;
       }
@@ -759,7 +773,7 @@ void f_range(int code) {
           to += len;
         }
       }
-      from = (--sp)->u.number;
+      from = clamp_range_bound((--sp)->u.number, len);
       if (code & 0x10) {
         from = len - from;
       }
@@ -795,11 +809,11 @@ void f_range(int code) {
       int from, to;
 
       array_t* v = sp->u.arr;
-      to = (--sp)->u.number;
+      to = clamp_range_bound((--sp)->u.number, v->size);
       if (code & 0x01) {
         to = v->size - to;
       }
-      from = (--sp)->u.number;
+      from = clamp_range_bound((--sp)->u.number, v->size);
       if (code & 0x10) {
         from = v->size - from;
       }
@@ -825,7 +839,7 @@ void f_extract_range(int code) {
       if (!iter.ok()) {
         error("Invalid UTF-8 String: f_extract_range.");
       }
-      from = (--sp)->u.number;
+      from = clamp_range_bound((--sp)->u.number, iter.len());
       if (CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__)) {
         if (!code && from < 0) {
           code = 1;
@@ -864,7 +878,7 @@ void f_extract_range(int code) {
       buffer_t* nbuf;
 
       len = rbuf->size;
-      from = (--sp)->u.number;
+      from = clamp_range_bound((--sp)->u.number, len);
       if (code) {
         from = len - from;
       }
@@ -890,10 +904,10 @@ void f_extract_range(int code) {
     }
 
     case T_ARRAY: {
-      size_t from;
+      int from;
 
       array_t* v = sp->u.arr;
-      from = (--sp)->u.number;
+      from = clamp_range_bound((--sp)->u.number, v->size);
       if (code) {
         from = v->size - from;
       }

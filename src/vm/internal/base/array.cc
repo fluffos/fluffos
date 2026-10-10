@@ -465,22 +465,27 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
  * Slice of an array.
  * It now frees the passed array
  */
-array_t* slice_array(array_t* p, int from, int to) {
+array_t* slice_array(array_t* p, LPC_INT from64, LPC_INT to64) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int cnt;
   svalue_t *sv1, *sv2;
 
-  if (from < 0) {
-    from = 0;
+  /* Clamp in LPC_INT: narrowing first would wrap a bound past 32 bits back
+   * inside the array. */
+  if (from64 < 0) {
+    from64 = 0;
   }
-  if (to >= p->size) {
-    to = p->size - 1;
+  if (to64 >= p->size) {
+    to64 = p->size - 1;
   }
-  if (from > to) {
+  if (from64 > to64) {
     free_array(p);
     return &the_null_array;
   }
+  /* 0 <= from <= to < p->size from here on */
+  int from = static_cast<int>(from64);
+  int to = static_cast<int>(to64);
 
   if (!(--p->ref)) {
     if (from) {
