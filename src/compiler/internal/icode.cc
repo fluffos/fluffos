@@ -429,6 +429,16 @@ static void ins_fused_slot(parse_node_t* node) {
   }
 }
 
+/* The unfused sequence generated the destination nodes after the rhs, and
+ * i_generate_node() switches to each node's line on entry, so the store was
+ * attributed to the destination's line. Do the same, so a runtime error in
+ * a store split over several lines still reports the line of its target. */
+static void switch_to_node_line(parse_node_t* node) {
+  if (node->line && node->line != line_being_generated) {
+    switch_to_line(node->line);
+  }
+}
+
 /* expr is a NODE_BINARY_OP (rhs in l, dest in r) or a NODE_UNARY_OP (dest
  * in r) whose op passed is_fusable_store(). Returns false, having emitted
  * nothing, when the destination is not a shape the fused ops cover. */
@@ -447,6 +457,7 @@ static bool try_fused_store(parse_node_t* expr) {
     if (has_rhs) {
       i_generate_node(expr->l.expr);
     }
+    switch_to_node_line(dest);
     end_pushes();
     ins_byte(kind == FusedSlot::Local ? F_LOCAL_OP : F_GLOBAL_OP);
     ins_byte(op);
@@ -460,7 +471,9 @@ static bool try_fused_store(parse_node_t* expr) {
     if (has_rhs) {
       i_generate_node(expr->l.expr);
     }
+    switch_to_node_line(dest);
     i_generate_node(dest->l.expr);
+    switch_to_node_line(dest->r.expr);
     end_pushes();
     ins_byte(kind == FusedSlot::Local ? F_INDEX_LOCAL_OP : F_INDEX_GLOBAL_OP);
     ins_byte(op);
