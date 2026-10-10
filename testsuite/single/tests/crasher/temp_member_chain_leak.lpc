@@ -1,0 +1,48 @@
+// Regression: a store through a member of a TEMPORARY container -- a class
+// or mapping a function returned and nothing else holds -- in a shape the
+// fused member stores (#1358) do not cover leaked the container:
+//   mk()->arr[<1] = v        reverse index under the member
+//   mk()->arr[1][0] = v      two-level chain under the member
+//   mk()->arr[0..0] = v      range under the member
+//   f(ref mk()->arr[0])      reference to an element of the member
+//   mkm().arr[<1] = v        the same, for a mapping member
+// F_MEMBER_LVALUE and F_MAP_MEMBER_LVALUE (src/vm/internal/base/interpret.cc)
+// drop the stack's reference with a bare `ref--`, so that the container is
+// not freed while the lvalue still points into it (freeing it there was the
+// heap-use-after-free #1358 fixed for classes). The fused F_MEMBER_OP /
+// F_MEMBER_INDEX_OP / F_MAP_MEMBER_*_OP own that reference and release it
+// after the store, but the shapes above still go through *_MEMBER_LVALUE
+// followed by push_indexed_lvalue() / push_lvalue_range() / F_MAKE_REF, and
+// nothing ever releases the container afterwards: a ref-0 block nobody owns.
+// The values are checked here, but the regression signal is LeakSanitizer
+// (allocate_class() / allocate_mapping() blocks reported at exit) on a
+// sanitizer build. Before #1358 the class shapes instead read and wrote freed
+// memory (ASan heap-use-after-free in push_indexed_lvalue()/push_lvalue_range()).
+class Holder {
+  mixed arr;
+}
+
+class Holder mk() { return new(class Holder, arr: ({ 1, ({ 2, 3 }) })); }
+
+mapping mkm() { return ([ "arr": ({ 1, ({ 2, 3 }) }) ]); }
+
+void set_ref(mixed ref r) { r = 9; }
+
+// A local's LAST use is compiled to F_TRANSFER_LOCAL, which moves the class
+// onto the stack -- so ordinary code reaches the same temporary path.
+mixed last_use_store() {
+  class Holder h = mk();
+  return h->arr[<1] = 5;
+}
+
+void do_tests() {
+  ASSERT_EQ(5, mk()->arr[<1] = 5);
+  ASSERT_EQ(3, mk()->arr[<2] += 2);
+  ASSERT_EQ(7, mk()->arr[1][0] = 7);
+  ASSERT_EQ(3, ++mk()->arr[1][0]);
+  ASSERT_EQ(({ 9 }), mk()->arr[0..0] = ({ 9 }));
+  ASSERT_EQ(0, catch(set_ref(ref mk()->arr[0])));
+  ASSERT_EQ(5, mkm().arr[<1] = 5);
+  ASSERT_EQ(7, mkm().arr[1][0] = 7);
+  ASSERT_EQ(5, last_use_store());
+}

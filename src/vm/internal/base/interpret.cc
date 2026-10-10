@@ -702,6 +702,31 @@ const char* lv_owner_str;
 int lv_parent_type;
 refed_t* lv_parent;
 
+/* A class or mapping that F_MEMBER_LVALUE / F_MAP_MEMBER_LVALUE took the
+ * LAST reference to -- a container a function returned, or a local whose
+ * last use the optimizer turned into F_TRANSFER_LOCAL. The lvalue they push
+ * points into it, so it cannot be freed there (that was a heap use-after-
+ * free), and the shapes that go on to push_indexed_lvalue() /
+ * push_lvalue_range() / F_MAKE_REF have no later point that owns it (that
+ * was a leak). It is parked here instead, owning that one reference, and
+ * released when the next temporary is parked: by then the store through the
+ * previous one has finished, because a store evaluates its right-hand side
+ * and its index expressions before its own member lvalue, and a `ref`
+ * argument keeps its container alive through F_MAKE_REF's own reference. */
+static svalue_t parked_lvalue_owner = {T_NUMBER};
+
+static void park_lvalue_owner(int type, refed_t* owner) {
+  free_svalue(&parked_lvalue_owner, "park_lvalue_owner");
+  parked_lvalue_owner.type = type;
+  parked_lvalue_owner.subtype = 0;
+  parked_lvalue_owner.u.refed = owner;
+}
+
+void release_parked_lvalue_owner() {
+  free_svalue(&parked_lvalue_owner, "release_parked_lvalue_owner");
+  parked_lvalue_owner = const0;
+}
+
 void free_indexed_lvalue(svalue_t* v) {
   if (v->type == T_LVALUE_CODEPOINT) {
     delete v->u.cp_lv;
@@ -2526,7 +2551,12 @@ static void void_assign_slot(svalue_t* lval) {
         break;
       }
       case T_LVALUE_RANGE: {
-        copy_lvalue_range(lval, sp--);
+        /* Pop only after the copy: copy_lvalue_range() consumes the rhs, but
+         * every error() in it (a wrong rhs type, an oversized result) fires
+         * before that, and the unwind only frees what is still above sp --
+         * `copy_lvalue_range(lval, sp--)` leaked the rhs on those errors. */
+        copy_lvalue_range(lval, sp);
+        sp--;
         break;
       }
       case T_LVALUE_CODEPOINT: {
@@ -4277,13 +4307,18 @@ void eval_instruction(char* p) {
         lv_owner_type = T_CLASS;
         lv_owner = reinterpret_cast<refed_t*>(arr);
 #endif
-        /* Drop the stack's ref WITHOUT the possible dealloc, as
-         * F_MAP_MEMBER_LVALUE does: free_class() on a ref-1 temporary
-         * (f()->arr[0] = v) freed the class the lvalue above points into
-         * before the store wrote through it -- a heap use-after-free. The
-         * direct shapes (f()->x op= v) compile to F_MEMBER_OP, which holds
-         * the class for the whole op instead. */
-        arr->ref--;
+        /* The stack's reference must outlive the store: free_class() on a
+         * ref-1 temporary (f()->arr[0] = v) freed the class the lvalue above
+         * points into before the store wrote through it -- a heap
+         * use-after-free. Park the last reference instead (see
+         * park_lvalue_owner); any other reference is simply dropped. The
+         * direct and one-level shapes compile to F_MEMBER_OP /
+         * F_MEMBER_INDEX_OP, which hold the class for the op instead. */
+        if (arr->ref == 1) {
+          park_lvalue_owner(T_CLASS, reinterpret_cast<refed_t*>(arr));
+        } else {
+          arr->ref--;
+        }
         break;
       }
       case F_MAP_MEMBER: {
@@ -4348,11 +4383,15 @@ void eval_instruction(char* p) {
         lv_owner_type = T_MAPPING;
         lv_owner = reinterpret_cast<refed_t*>(m);
 #endif
-        /* Drop the stack's ref WITHOUT the possible dealloc (matching
-         * push_indexed_lvalue's mapping branch): free_mapping() on a ref-1
-         * temporary (e.g. f()->key = v) would free the node the lvalue
-         * above points into before the assignment writes through it. */
-        m->ref--;
+        /* As F_MEMBER_LVALUE: free_mapping() on a ref-1 temporary
+         * (f().key[<1] = v) would free the node the lvalue above points into
+         * before the assignment writes through it, and merely dropping the
+         * count leaked it. */
+        if (m->ref == 1) {
+          park_lvalue_owner(T_MAPPING, reinterpret_cast<refed_t*>(m));
+        } else {
+          m->ref--;
+        }
         break;
       }
       case F_INDEX:

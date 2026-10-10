@@ -1,0 +1,27 @@
+// Regression: a range assignment in VOID context whose rhs is the wrong type
+// (`a[0..1] = ([ ... ]);`, `s[1..2] = ({ ... });`) leaked the rhs.
+// void_assign_slot() (src/vm/internal/base/interpret.cc), case
+// T_LVALUE_RANGE, calls copy_lvalue_range(lval, sp--): the post-decrement
+// moves sp below the rhs BEFORE copy_lvalue_range() validates it, so when it
+// error()s ("Illegal rhs to array range lvalue") the unwind's stack sweep no
+// longer sees the rhs slot and its reference is never released. The value
+// context (`r = (a[0..1] = m)`, F_ASSIGN) keeps the rhs on the stack and does
+// not leak. Pre-existing: master leaks identically. The regression signal is
+// LeakSanitizer reporting the rhs blocks (allocate_mapping(), allocate_array(),
+// allocate_class()) at exit on a sanitizer build.
+class Box {
+  int x;
+}
+
+void do_tests() {
+  mixed a = ({ 1, 2, 3 });
+  mixed s = "abcd";
+  mixed b = string_encode("abcd", "utf-8");
+
+  ASSERT(catch(a[0..1] = ([ "k": 1 ])));
+  ASSERT(catch(a[0..1] = new(class Box, x: 1)));
+  ASSERT(catch(s[1..2] = ({ 1, 2 })));
+  ASSERT(catch(b[1..2] = ([ "k": 1 ])));
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+  ASSERT_EQ("abcd", s);
+}

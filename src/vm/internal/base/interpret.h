@@ -169,6 +169,9 @@ extern const char* lv_owner_str;
  * (0 when the string sat in a local, a global or behind a ref). */
 extern int lv_parent_type;
 extern refed_t* lv_parent;
+/* Drop the temporary container a member lvalue parked (see interpret.cc);
+ * only safe when no store is in flight, e.g. from check_memory(). */
+void release_parked_lvalue_owner();
 
 void kill_ref(ref_t*);
 ref_t* make_ref(void);
