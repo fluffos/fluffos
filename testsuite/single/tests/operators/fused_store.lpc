@@ -245,7 +245,9 @@ void test_index_globals() {
   gm["k"] = 1;
   gm["k"] += 1;
   gm["j"]++;
-  ASSERT_EQ(([ "k": 2, "j": 1 ]), gm);
+  ASSERT_EQ(2, sizeof(gm));
+  ASSERT_EQ(2, gm["k"]);
+  ASSERT_EQ(1, gm["j"]);
 
   gs = "abc";
   gs[0] = 'X';
@@ -318,6 +320,142 @@ void test_unfused_shapes() {
   }
 }
 
+// Globals of an inherited program sit at a non-zero variable_index_offset;
+// the fused global ops must add it, from the inheriting program's code and
+// from the inherited program's own functions.
+void test_inherited_globals() {
+  object ob;
+  mixed err;
+
+  write_file("/data/fused_pad.c", "int p1, p2, p3;\n");
+  write_file("/data/fused_base.c",
+    "int bg; int *ba; mapping bm;\n"
+    "void base_ops() { bg += 2; bg++; ba[1] += 5; bm[\"k\"]++; }\n");
+  write_file("/data/fused_child.c",
+    "inherit \"/data/fused_pad\";\n"
+    "inherit \"/data/fused_base\";\n"
+    "mixed run() {\n"
+    "  p1 = 100; p2 = 200; p3 = 300;\n"
+    "  bg = 1; ba = ({ 0, 1 }); bm = ([ ]);\n"
+    "  base_ops();\n"
+    "  bg *= 10; ba[0]--; bm[\"k\"] += 4; ++bm[\"j\"];\n"
+    "  return ({ p1, p2, p3, bg, ba, bm });\n"
+    "}\n");
+  err = catch {
+    ob = load_object("/data/fused_child");
+    mixed r = ob->run();
+    ASSERT_EQ(({ 100, 200, 300, 40, ({ -1, 6 }) }), r[0..4]);
+    ASSERT_EQ(5, r[5]["k"]);
+    ASSERT_EQ(1, r[5]["j"]);
+  };
+  if (ob) {
+    destruct(ob);
+  }
+  foreach (string f in ({ "child", "base", "pad" })) {
+    object o = find_object("/data/fused_" + f);
+    if (o) {
+      destruct(o);
+    }
+    rm("/data/fused_" + f + ".c");
+  }
+  ASSERT_EQ(0, err);
+}
+
+// $N parameters in a functional are locals at an offset; the fused index
+// ops on them go through the same slot operand.
+void test_parameter_index() {
+  int *a = ({ 1, 2 });
+  mapping m = ([]);
+  function f;
+
+  f = (: $1[0] += $2 :);
+  ASSERT_EQ(11, evaluate(f, a, 10));
+  ASSERT_EQ(({ 11, 2 }), a);
+  f = (: $1[$2]++ :);
+  ASSERT_EQ(0, evaluate(f, m, "x"));
+  ASSERT_EQ(1, m["x"]);
+  f = (: $1[1] = $2 * 2 :);
+  evaluate(f, a, 4);
+  ASSERT_EQ(({ 11, 8 }), a);
+}
+
+// The mapping fast path pops a refcounted key before the op runs; an op
+// that then errors must not leak or double-free it (Debug runs
+// check_memory() after this file).
+void test_mapping_errors() {
+  mapping m = ([]);
+  mixed *keys = ({ "str" + "ing", ({ 1 }), ([]) });
+
+  foreach (mixed k in keys) {
+    ASSERT(catch(m[k] += "s"));
+    ASSERT(catch(m[k] /= 0));
+    m[k] = "s";
+    ASSERT(catch(++m[k]));
+  }
+  // a key created by a failed op= stays, as on the unfused path
+  ASSERT_EQ(3, sizeof(m));
+}
+
+// ++/-- of an undefined slot leaves a real number (AGENTS.md 13.11).
+void test_undefined_incdec() {
+  mixed x;
+  mapping m = ([]);
+
+  ASSERT(undefinedp(x));
+  x++;
+  x--;
+  ASSERT_EQ(0, x);
+  ASSERT(!undefinedp(x));
+  m["n"]++;
+  ASSERT_EQ(1, m["n"]);
+  ASSERT(!undefinedp(m["n"]));
+}
+
+// Containers that hold themselves; break the loops before returning.
+void test_self_reference() {
+  mixed *a = ({ 0, 1 });
+  mapping m = ([]);
+
+  a[0] = a;
+  a[0] -= ({ 1 });  // a[0] = ({ a })
+  ASSERT_EQ(1, sizeof(a[0]));
+  ASSERT(a[0][0] == a);
+  a[0] = 0;
+  m["x"] = m;
+  m["x"] += ([ "y": 1, "z": 2 ]);
+  ASSERT_EQ(1, m["y"]);
+  m["x"] = 0;
+  ASSERT_EQ(3, sizeof(m));
+  ASSERT_EQ(2, m["z"]);
+}
+
+// A store split over several lines reports the line of its target, as the
+// unfused sequence did.
+void test_error_line() {
+  object ob;
+  string err;
+
+  write_file("/data/fused_line.c",
+    "int f() {\n"
+    "  mixed x = 1;\n"
+    "  x /=\n"
+    "    0;\n"
+    "  return x;\n"
+    "}\n");
+  catch {
+    ob = load_object("/data/fused_line");
+    "/single/master"->clear_last_error();
+    catch(ob->f());
+    err = "/single/master"->get_last_error();
+  };
+  if (ob) {
+    destruct(ob);
+  }
+  rm("/data/fused_line.c");
+  ASSERT(stringp(err));
+  ASSERT2(strsrch(err, "Line: 3\n") != -1, err);
+}
+
 void test_dump_prog() {
 #ifdef __PACKAGE_DEVELOP__
   object ob;
@@ -340,15 +478,18 @@ void test_dump_prog() {
     "  x += n; x++; ++x; x--; g -= n; g++; a[0] = n; a[0] += n; a[0]++;\n"
     "  m[\"k\"] = n; m[\"k\"] *= 2; ga[0] = 1; ga[0] |= 2; gm[\"k\"]--;\n"
     "  return x; }\n";
-  rm("/gen_fused_store.c");
-  write_file("/gen_fused_store.c", src);
-  ob = load_object("/gen_fused_store");
-  ASSERT(objectp(ob));
-  dump_prog(ob, 1, "/gen_fused_store_dump.txt");
-  txt = read_file("/gen_fused_store_dump.txt");
-  destruct(ob);
-  rm("/gen_fused_store.c");
-  rm("/gen_fused_store_dump.txt");
+  rm("/data/gen_fused_store.c");
+  write_file("/data/gen_fused_store.c", src);
+  catch {
+    ob = load_object("/data/gen_fused_store");
+    dump_prog(ob, 1, "/data/gen_fused_store_dump.txt");
+    txt = read_file("/data/gen_fused_store_dump.txt");
+  };
+  if (ob) {
+    destruct(ob);
+  }
+  rm("/data/gen_fused_store.c");
+  rm("/data/gen_fused_store_dump.txt");
   ASSERT(stringp(txt));
   // dump_prog pads opcode names, so a leading space keeps "local_op" from
   // matching inside "index_local_op".
@@ -375,5 +516,11 @@ void do_tests() {
   test_index_globals();
   test_index_fallback();
   test_unfused_shapes();
+  test_inherited_globals();
+  test_parameter_index();
+  test_mapping_errors();
+  test_undefined_incdec();
+  test_self_reference();
+  test_error_line();
   test_dump_prog();
 }

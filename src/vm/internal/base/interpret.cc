@@ -2284,6 +2284,8 @@ static void incdec_slot(svalue_t* lval, int op, svalue_t* out) {
     case T_NUMBER: {
       LPC_INT const old = lval->u.number;
       lval->u.number = old + delta;
+      /* the slot now holds a real number, not "undefined" (AGENTS.md 13.11) */
+      lval->subtype = 0;
       if (out) {
         out->type = T_NUMBER;
         out->subtype = 0;
@@ -2814,7 +2816,7 @@ void eval_instruction(char* p) {
         }
         break;
       case F_INC:
-        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++\n");
         {
           PoppedLvalue lv;
           incdec_slot(lv.target(), instruction, nullptr);
