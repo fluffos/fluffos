@@ -608,6 +608,24 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         pc++;
         break;
       }
+      case F_INDEX_OP:
+        snprintf(buff, sizeof(buff), "%s", query_instr_name(EXTRACT_UCHAR(pc++)));
+        break;
+      case F_MEMBER_OP:
+      case F_MEMBER_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        snprintf(buff, sizeof(buff), "%s member %d", query_instr_name(op), EXTRACT_UCHAR(pc));
+        pc++;
+        break;
+      }
+      case F_MAP_MEMBER_OP:
+      case F_MAP_MEMBER_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        COPY_SHORT(&sarg, pc);
+        pc += 2;
+        snprintf(buff, sizeof(buff), "%s key %d", query_instr_name(op), sarg);
+        break;
+      }
       case F_GLOBAL_OP:
       case F_INDEX_GLOBAL_OP: {
         int const op = EXTRACT_UCHAR(pc++);

@@ -117,3 +117,18 @@ operator acatch, end_acatch;
  * The index forms take a fast path for arrays and mappings and fall back
  * to the general lvalue path for strings, buffers and anything else. */
 operator local_op, global_op, index_local_op, index_global_op;
+
+/* Fused stores whose container is an expression, not a named slot (issue
+ * #1358):
+ *   member_op <op> <member>        op on <class expr>->member
+ *   map_member_op <op> <string:2>  op on <mapping expr>.key
+ *   index_op <op>                  op on <lvalue chain>[index]; the index and
+ *                                  the container lvalue are on the stack
+ * The member forms hold the container for the whole op, so a temporary class
+ * or mapping (f()->x += 1, f()->arr[0] = v) is neither used after free nor
+ * leaked. */
+operator member_op, map_member_op, index_op;
+/*   member_index_op <op> <member>        op on <class expr>->member[index]
+ *   map_member_index_op <op> <string:2>  op on <mapping expr>.key[index]
+ * (the index is on the stack above the container) */
+operator member_index_op, map_member_index_op;

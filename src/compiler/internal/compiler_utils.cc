@@ -123,6 +123,11 @@ void init_instrs() {
   add_instr_name("global_op", 0, F_GLOBAL_OP, T_ANY);
   add_instr_name("index_local_op", 0, F_INDEX_LOCAL_OP, T_ANY);
   add_instr_name("index_global_op", 0, F_INDEX_GLOBAL_OP, T_ANY);
+  add_instr_name("member_op", 0, F_MEMBER_OP, T_ANY);
+  add_instr_name("map_member_op", 0, F_MAP_MEMBER_OP, T_ANY);
+  add_instr_name("index_op", 0, F_INDEX_OP, T_ANY);
+  add_instr_name("member_index_op", 0, F_MEMBER_INDEX_OP, T_ANY);
+  add_instr_name("map_member_index_op", 0, F_MAP_MEMBER_INDEX_OP, T_ANY);
   add_instr_name("branch", 0, F_BRANCH, -1);
   add_instr_name("bbranch", 0, F_BBRANCH, -1);
   add_instr_name("byte", 0, F_BYTE, T_NUMBER);
