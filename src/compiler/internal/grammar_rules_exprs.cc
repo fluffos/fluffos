@@ -62,7 +62,11 @@ parse_node_t* rule_expr_or_block_block(decl_t decl_val) {
   return node;
 }
 
-parse_node_t* rule_expr_or_block_expr(parse_node_t* expr) { return insert_pop_value(expr); }
+/* The body of catch(expr), acatch(expr) and time_expression(expr) runs for
+ * its errors / its cost, so error-capable operations are kept. */
+parse_node_t* rule_expr_or_block_expr(parse_node_t* expr) {
+  return insert_pop_value_keep_errors(expr);
+}
 
 void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT saved_context) {
   CREATE_CATCH(*result, expr_or_block);

@@ -251,6 +251,23 @@ parse_node_t* make_range_node(int code, parse_node_t* expr, parse_node_t* l, par
   return newnode;
 }
 
+/* Set while popping the body of catch(expr) / acatch(expr) /
+ * time_expression(expr). Those bodies are evaluated FOR what they do at run
+ * time -- whether they error, or what they cost -- so an operation that can
+ * raise an error (an index, a range, arithmetic, a comparison, a member
+ * access) must not be pruned as "side-effect free": catch(a[i]) used to
+ * compile to an empty catch and return 0 for any i. */
+static bool g_keep_error_capable = false;
+
+parse_node_t* insert_pop_value_keep_errors(parse_node_t* expr) {
+  /* insert_pop_value() only reports soft diagnostics; it never throws */
+  bool const saved = g_keep_error_capable;
+  g_keep_error_capable = true;
+  parse_node_t* result = insert_pop_value(expr);
+  g_keep_error_capable = saved;
+  return result;
+}
+
 parse_node_t* insert_pop_value(parse_node_t* expr) {
   parse_node_t* replacement;
 
@@ -301,6 +318,9 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
       }
       return expr;
     case NODE_TERNARY_OP:
+      if (g_keep_error_capable) {
+        break; /* a range can error: evaluate it, then pop */
+      }
       switch (expr->r.expr->v.number) {
         case F_NN_RANGE:
         case F_RN_RANGE:
@@ -357,11 +377,14 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
           expr->v.number = F_DEC;
           return expr;
         case F_NOT:
-        case F_COMPL:
-        case F_NEGATE:
           expr = insert_pop_value(expr->r.expr);
           return expr;
+        case F_COMPL:
+        case F_NEGATE:
         case F_MEMBER:
+          if (g_keep_error_capable) {
+            break; /* type errors */
+          }
           expr = insert_pop_value(expr->r.expr);
           return expr;
         case F_LOCAL:
@@ -388,6 +411,9 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
         case F_NE_RANGE:
         case F_RINDEX:
         case F_INDEX:
+          if (g_keep_error_capable) {
+            break; /* bounds, division by zero, type errors */
+          }
           if ((expr->l.expr = insert_pop_value(expr->l.expr))) {
             if ((expr->r.expr = insert_pop_value(expr->r.expr))) {
               expr->kind = NODE_TWO_VALUES;

@@ -201,6 +201,9 @@ parse_node_t* make_branched_node(short, lpc_type_t, parse_node_t*, parse_node_t*
 parse_node_t* binary_int_op(parse_node_t*, parse_node_t*, char, const char*);
 parse_node_t* make_range_node(int, parse_node_t*, parse_node_t*, parse_node_t*);
 parse_node_t* insert_pop_value(parse_node_t*);
+/* insert_pop_value() for a catch/acatch/time_expression body: never prunes an
+ * operation that can raise an error. */
+parse_node_t* insert_pop_value_keep_errors(parse_node_t*);
 parse_node_t* pop_value(parse_node_t*);
 parse_node_t* optimize_loop_test(parse_node_t*);
 int is_boolean(parse_node_t*);
