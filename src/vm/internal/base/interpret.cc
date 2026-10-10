@@ -718,7 +718,9 @@ static void arm_byte_lvalue(svalue_t* slot, unsigned char* p) {
  * Compute the address of an array element.
  */
 void push_indexed_lvalue(int reverse) {
-  int ind;
+  /* LPC_INT, not int: an index past 32 bits used to truncate and land back
+   * inside the container, silently writing the wrong element. */
+  LPC_INT ind;
   svalue_t* lv;
 
   if (sp->type == T_LVALUE) {
@@ -747,6 +749,8 @@ void push_indexed_lvalue(int reverse) {
 
     switch (lv->type) {
       case T_STRING: {
+        /* arm_codepoint_lvalue takes a 32-bit EGC index */
+        if (ind > INT32_MAX) error("Index out of bounds in string index lvalue.\n");
         if (reverse) {
           if (ind <= 0) error("Index out of bounds in string index lvalue.\n");
           ind = -1 * ind;
@@ -2266,6 +2270,424 @@ static int stack_size[60];
 static char* previous_pc[60];
 static int last;
 
+/* ++ / -- on an already-resolved slot (issue #1358). `op` is one of
+ * F_INC/F_DEC (no result), F_PRE_INC/F_PRE_DEC (result is the new value) or
+ * F_POST_INC/F_POST_DEC (result is the old value); `out` receives the result
+ * and is null for the void forms. Shared by the six opcodes, which pass the
+ * lvalue they popped, and the fused stores, which pass the slot directly. */
+static void incdec_slot(svalue_t* lval, int op, svalue_t* out) {
+  bool const inc = (op == F_INC || op == F_PRE_INC || op == F_POST_INC);
+  bool const post = (op == F_POST_INC || op == F_POST_DEC);
+  int const delta = inc ? 1 : -1;
+
+  switch (lval->type) {
+    case T_NUMBER: {
+      LPC_INT const old = lval->u.number;
+      lval->u.number = old + delta;
+      if (out) {
+        out->type = T_NUMBER;
+        out->subtype = 0;
+        out->u.number = post ? old : lval->u.number;
+      }
+      return;
+    }
+    case T_REAL: {
+      LPC_FLOAT const old = lval->u.real;
+      lval->u.real = old + delta;
+      if (out) {
+        out->type = T_REAL;
+        out->u.real = post ? old : lval->u.real;
+      }
+      return;
+    }
+    case T_LVALUE_BYTE: {
+      unsigned char const old = *lval->u.lvalue_byte;
+      if (old == (inc ? 255 : 0)) {
+        error("Buffer byte value out of range: must be 0..255.\n");
+      }
+      if (!inc && lval->subtype == 0 && old == '\x1') {
+        error("Strings cannot contain 0 bytes.\n");
+      }
+      *lval->u.lvalue_byte = static_cast<unsigned char>(old + delta);
+      if (out) {
+        out->type = T_NUMBER;
+        out->subtype = 0;
+        out->u.number = post ? old : *lval->u.lvalue_byte;
+      }
+      return;
+    }
+    case T_LVALUE_CODEPOINT: {
+      LPC_INT oldval = 0;
+      LPC_INT newval = 0;
+      assign_lvalue_codepoint(lval, [&](UChar32 c) {
+        oldval = c;
+        return static_cast<UChar32>(newval = c + delta);
+      });
+      if (out) {
+        out->type = T_NUMBER;
+        out->subtype = 0;
+        out->u.number = post ? oldval : newval;
+      }
+      return;
+    }
+    default:
+      error(inc ? "++ of non-numeric argument\n" : "-- of non-numeric argument\n");
+  }
+}
+
+/* The += body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_ADD_EQ / F_VOID_ADD_EQ and the fused stores (issue #1358). */
+static void add_eq_slot(svalue_t* lval, int instruction) {
+  if (lval->type == T_LVALUE_CODEPOINT || lval->type == T_LVALUE_BYTE) {
+    LPC_INT res;
+
+    if (sp->type != T_NUMBER) {
+      error("Bad right type to += of char lvalue.\n");
+    }
+    if (lval->type == T_LVALUE_CODEPOINT) {
+      res = codepoint_lvalue_add(lval, sp->u.number);
+    } else {
+      res = *lval->u.lvalue_byte + sp->u.number;
+      if (res < 0 || res > 255) {
+        error("Buffer byte value out of range: must be 0..255.\n");
+      }
+      *lval->u.lvalue_byte = static_cast<unsigned char>(res);
+    }
+    if (instruction == F_ADD_EQ) { /* reuse the RHS slot as the rvalue */
+      sp->subtype = 0;
+      sp->u.number = res;
+    } else {
+      sp--;
+    }
+    return;
+  }
+  switch (lval->type) {
+    case T_STRING:
+      if (sp->type == T_STRING) {
+        SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
+      } else if (sp->type == T_NUMBER) {
+        char buff[100];
+        sprintf(buff, "%" LPC_INT_FMTSTR_P, sp->u.number);
+        EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
+      } else if (sp->type == T_REAL) {
+        char buff[400];
+        sprintf(buff, "%" LPC_FLOAT_FMTSTR_P, sp->u.real);
+        EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
+      } else if (sp->type == T_OBJECT) {
+        /* Extend before dropping the ref (obname dies with the object's
+           last reference), and leave sp on the consumed RHS slot like
+           the other branches: the extra sp-- here unbalanced the stack,
+           making the trailing rvalue store below clobber a live slot. */
+        EXTEND_SVALUE_STRING(lval, "/", "f_add_eq: 2");
+        EXTEND_SVALUE_STRING(lval, sp->u.ob->obname, "f_add_eq: 2");
+        free_object(&sp->u.ob, "f_add_eq: 2");
+      } else {
+        bad_argument(sp, T_OBJECT | T_STRING | T_NUMBER | T_REAL, 2, instruction);
+      }
+      break;
+    case T_NUMBER:
+      if (sp->type == T_NUMBER) {
+        lval->u.number += sp->u.number;
+        lval->subtype = 0;
+        /* both sides are numbers, no freeing required */
+      } else if (sp->type == T_REAL) {
+        /* A statically int-typed lvalue never reaches here with a
+         * float rhs -- the compiler already coerced the rhs to int
+         * (rule_expr_assign, grammar_rules_exprs.cc), including a
+         * TYPE_ANY/UNKNOWN rhs such as call_other (#1365) or a
+         * mapping/array index (#1384). This is an untyped lvalue
+         * (mixed variable, mapping value): promote it to float,
+         * since op= is the only way such a slot can ever become one. */
+        LPC_FLOAT result = lval->u.number + sp->u.real;
+        lval->type = T_REAL;
+        lval->u.real = result;
+        /* both sides are numbers, no freeing required */
+      } else {
+        error(
+            "Left hand side of += is a number (or zero); right side is "
+            "not a number.\n");
+      }
+      break;
+    case T_REAL:
+      if (sp->type == T_NUMBER) {
+        lval->u.real += sp->u.number;
+        /* both sides are numerics, no freeing required */
+      } else if (sp->type == T_REAL) {
+        lval->u.real += sp->u.real;
+        /* both sides are numerics, no freeing required */
+      } else {
+        error(
+            "Left hand side of += is a number (or zero); right side is "
+            "not a number.\n");
+      }
+      break;
+    case T_BUFFER:
+      if (sp->type == T_STRING || sp->type == T_ARRAY) {
+        /* buffer += string appends its raw UTF-8 bytes;
+         * buffer += array of ints 0..255 appends one byte each */
+        buffer_t* conv = svalue_to_buffer_bytes(sp);
+        buffer_t* b = allocate_buffer(lval->u.buf->size + conv->size);
+
+        memcpy(b->item, lval->u.buf->item, lval->u.buf->size);
+        memcpy(b->item + lval->u.buf->size, conv->item, conv->size);
+        free_buffer(conv);
+        free_svalue(sp, "f_add_eq: buffer conv");
+        free_buffer(lval->u.buf);
+        lval->u.buf = b;
+      } else if (sp->type != T_BUFFER) {
+        bad_argument(sp, T_BUFFER | T_STRING | T_ARRAY, 2, instruction);
+      } else {
+        buffer_t* b;
+
+        b = allocate_buffer(lval->u.buf->size + sp->u.buf->size);
+        memcpy(b->item, lval->u.buf->item, lval->u.buf->size);
+        memcpy(b->item + lval->u.buf->size, sp->u.buf->item, sp->u.buf->size);
+        free_buffer(sp->u.buf);
+        free_buffer(lval->u.buf);
+        lval->u.buf = b;
+      }
+      break;
+    case T_ARRAY:
+      if (sp->type != T_ARRAY) {
+        bad_argument(sp, T_ARRAY, 2, instruction);
+      } else {
+        /* add_array now frees the arrays */
+        lval->u.arr = add_array(lval->u.arr, sp->u.arr);
+      }
+      break;
+    case T_MAPPING:
+      if (sp->type != T_MAPPING) {
+        bad_argument(sp, T_MAPPING, 2, instruction);
+      } else {
+        absorb_mapping(lval->u.map, sp->u.map);
+        free_mapping(sp->u.map); /* free RHS */
+        /* LHS not freed because its being reused */
+      }
+      break;
+    default:
+      bad_arg(1, instruction);
+  }
+
+  if (instruction == F_ADD_EQ) { /* not void add_eq */
+    assign_svalue_no_free(sp, lval);
+  } else {
+    /*
+     * but if (void)add_eq then no need to produce an
+     * rvalue
+     */
+    sp--;
+  }
+}
+
+/* F_VOID_ASSIGN's store through a popped lvalue (or a plain slot); the rhs
+ * is at sp and is consumed. */
+static void void_assign_slot(svalue_t* lval) {
+  if (sp->type != T_INVALID) {
+    switch (lval->type) {
+      case T_LVALUE_BYTE: {
+        if (sp->type != T_NUMBER) {
+          error("Illegal rhs to byte lvalue\n");
+        } else {
+          LPC_INT n = (sp--)->u.number;
+          if (n < 0 || n > 255) {
+            error("Buffer byte value out of range: must be 0..255.\n");
+          }
+          *lval->u.lvalue_byte = static_cast<unsigned char>(n);
+        }
+        break;
+      }
+      case T_LVALUE_RANGE: {
+        copy_lvalue_range(lval, sp--);
+        break;
+      }
+      case T_LVALUE_CODEPOINT: {
+        if (sp->type != T_NUMBER) {
+          error("Illegal rhs to byte lvalue\n");
+        }
+        UChar32 newc = sp->u.number;
+        assign_lvalue_codepoint(lval, [=](UChar32 c) { return newc; });
+        pop_stack();
+        break;
+      }
+      default: {
+        free_svalue(lval, "F_VOID_ASSIGN : 3");
+        *lval = *sp--;
+      }
+    }
+  } else {
+    sp--;
+  }
+}
+
+/* F_ASSIGN: the lvalue is at sp, the value below it and stays as the
+ * result. Index/range dests need the kind switch; a T_LVALUE unwraps to a
+ * real slot and is a plain store (issue #1358). */
+static void assign_through_lvalue() {
+  svalue_t* dest = lvalue_target(sp);
+  if (is_indexed_lvalue(dest)) {
+    assign_value_to_lvalue(dest, sp - 1, "F_ASSIGN");
+  } else {
+    assign_svalue(dest, sp - 1);
+  }
+  free_svalue(sp--, "F_ASSIGN");
+  /* rvalue is already in the correct place */
+}
+
+/* Run store/compound op `op` through the lvalue at sp, exactly as the
+ * standalone opcode does. The fused index ops fall back to this for
+ * containers they have no fast path for. */
+static void lvalue_op(int op) {
+  switch (op) {
+    case F_ASSIGN:
+      assign_through_lvalue();
+      break;
+    case F_VOID_ASSIGN: {
+      PoppedLvalue lv;
+      void_assign_slot(lv.target());
+      break;
+    }
+    case F_ADD_EQ:
+    case F_VOID_ADD_EQ: {
+      PoppedLvalue lv;
+      add_eq_slot(lv.target(), op);
+      break;
+    }
+    case F_SUB_EQ:
+      f_sub_eq();
+      break;
+    case F_AND_EQ:
+      f_and_eq();
+      break;
+    case F_OR_EQ:
+      f_or_eq();
+      break;
+    case F_XOR_EQ:
+      f_xor_eq();
+      break;
+    case F_LSH_EQ:
+      f_lsh_eq();
+      break;
+    case F_RSH_EQ:
+      f_rsh_eq();
+      break;
+    case F_MULT_EQ:
+      f_mult_eq();
+      break;
+    case F_DIV_EQ:
+      f_div_eq();
+      break;
+    case F_MOD_EQ:
+      f_mod_eq();
+      break;
+    case F_INC:
+    case F_DEC: {
+      PoppedLvalue lv;
+      incdec_slot(lv.target(), op, nullptr);
+      break;
+    }
+    case F_PRE_INC:
+    case F_PRE_DEC:
+    case F_POST_INC:
+    case F_POST_DEC: {
+      PoppedLvalue lv(PoppedLvalue::Steal);
+      incdec_slot(lv.target(), op, sp);
+      break;
+    }
+    default:
+      error("Invalid Program: bad fused store op %d.\n", op);
+  }
+}
+
+/* Run store/compound op `op` on `dest`, a plain value slot (a local, a
+ * global, an array element or a mapping value) -- no lvalue is pushed, so
+ * nothing re-dispatches on its kind (issue #1358). The rhs, if the op has
+ * one, is at sp; the result is left where the standalone opcode leaves it. */
+static void slot_op(int op, svalue_t* dest) {
+  switch (op) {
+    case F_ASSIGN:
+      assign_svalue(dest, sp);
+      break;
+    case F_VOID_ASSIGN:
+      void_assign_slot(dest);
+      break;
+    case F_ADD_EQ:
+    case F_VOID_ADD_EQ:
+      add_eq_slot(dest, op);
+      break;
+    case F_SUB_EQ:
+      sub_eq_slot(dest);
+      break;
+    case F_AND_EQ:
+      and_eq_slot(dest);
+      break;
+    case F_OR_EQ:
+      or_eq_slot(dest);
+      break;
+    case F_XOR_EQ:
+      xor_eq_slot(dest);
+      break;
+    case F_LSH_EQ:
+      lsh_eq_slot(dest);
+      break;
+    case F_RSH_EQ:
+      rsh_eq_slot(dest);
+      break;
+    case F_MULT_EQ:
+      mult_eq_slot(dest);
+      break;
+    case F_DIV_EQ:
+      div_eq_slot(dest);
+      break;
+    case F_MOD_EQ:
+      mod_eq_slot(dest);
+      break;
+    case F_INC:
+    case F_DEC:
+      incdec_slot(dest, op, nullptr);
+      break;
+    case F_PRE_INC:
+    case F_PRE_DEC:
+    case F_POST_INC:
+    case F_POST_DEC:
+      /* make the result slot valid before anything can error() */
+      push_number(0);
+      incdec_slot(dest, op, sp);
+      break;
+    default:
+      error("Invalid Program: bad fused store op %d.\n", op);
+  }
+}
+
+/* op on container[index], the index at sp (above the rhs, if any). Arrays
+ * and mappings resolve straight to the element slot; anything else (a
+ * string char, a buffer byte, a non-integer array index, a bad container)
+ * goes through the general index lvalue so its behaviour and errors are
+ * exactly those of the unfused sequence. */
+static void index_slot_op(int op, svalue_t* container) {
+  svalue_t* dest;
+  if (container->type == T_MAPPING) {
+    if (!(dest = find_for_insert(container->u.map, sp, 0))) {
+      mapping_too_large();
+    }
+    free_svalue(sp--, "index_slot_op");
+  } else if (container->type == T_ARRAY && sp->type == T_NUMBER) {
+    LPC_INT const ind = sp->u.number;
+    if (ind < 0 || ind >= container->u.arr->size) {
+      error("Array index out of bounds\n");
+    }
+    dest = container->u.arr->item + ind;
+    sp--;
+  } else {
+    STACK_INC;
+    sp->type = T_LVALUE;
+    sp->u.lvalue = container;
+    push_indexed_lvalue(0);
+    lvalue_op(op);
+    return;
+  }
+  slot_op(op, dest);
+}
+
 void eval_instruction(char* p) {
   DEBUG_CHECK(current_error_context == nullptr, "No error context");
 
@@ -2392,32 +2814,10 @@ void eval_instruction(char* p) {
         }
         break;
       case F_INC:
-        if (!is_stack_lvalue(sp)) {
-          error("Invalid Program: non-lvalue argument to ++\n");
-        }
+        if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
         {
           PoppedLvalue lv;
-          lval = lv.target();
-          switch (lval->type) {
-            case T_NUMBER:
-              lval->u.number++;
-              break;
-            case T_REAL:
-              lval->u.real++;
-              break;
-            case T_LVALUE_BYTE:
-              if (*lval->u.lvalue_byte == 255) {
-                error("Buffer byte value out of range: must be 0..255.\n");
-              }
-              ++*lval->u.lvalue_byte;
-              break;
-            case T_LVALUE_CODEPOINT: {
-              assign_lvalue_codepoint(lval, [](UChar32 c) { return c + 1; });
-              break;
-            }
-            default:
-              error("++ of non-numeric argument\n");
-          }
+          incdec_slot(lv.target(), instruction, nullptr);
         }
         break;
       case F_WHILE_DEC: {
@@ -3024,147 +3424,8 @@ void eval_instruction(char* p) {
       case F_ADD_EQ:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to +=.");
         {
-        PoppedLvalue lv;
-        lval = lv.target();
-        if (lval->type == T_LVALUE_CODEPOINT || lval->type == T_LVALUE_BYTE) {
-          LPC_INT res;
-
-          if (sp->type != T_NUMBER) {
-            error("Bad right type to += of char lvalue.\n");
-          }
-          if (lval->type == T_LVALUE_CODEPOINT) {
-            res = codepoint_lvalue_add(lval, sp->u.number);
-          } else {
-            res = *lval->u.lvalue_byte + sp->u.number;
-            if (res < 0 || res > 255) {
-              error("Buffer byte value out of range: must be 0..255.\n");
-            }
-            *lval->u.lvalue_byte = static_cast<unsigned char>(res);
-          }
-          if (instruction == F_ADD_EQ) { /* reuse the RHS slot as the rvalue */
-            sp->subtype = 0;
-            sp->u.number = res;
-          } else {
-            sp--;
-          }
-          break;
-        }
-        switch (lval->type) {
-          case T_STRING:
-            if (sp->type == T_STRING) {
-              SVALUE_STRING_JOIN(lval, sp, "f_add_eq: 1");
-            } else if (sp->type == T_NUMBER) {
-              char buff[100];
-              sprintf(buff, "%" LPC_INT_FMTSTR_P, sp->u.number);
-              EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
-            } else if (sp->type == T_REAL) {
-              char buff[400];
-              sprintf(buff, "%" LPC_FLOAT_FMTSTR_P, sp->u.real);
-              EXTEND_SVALUE_STRING(lval, buff, "f_add_eq: 2");
-            } else if (sp->type == T_OBJECT) {
-              /* Extend before dropping the ref (obname dies with the object's
-                 last reference), and leave sp on the consumed RHS slot like
-                 the other branches: the extra sp-- here unbalanced the stack,
-                 making the trailing rvalue store below clobber a live slot. */
-              EXTEND_SVALUE_STRING(lval, "/", "f_add_eq: 2");
-              EXTEND_SVALUE_STRING(lval, sp->u.ob->obname, "f_add_eq: 2");
-              free_object(&sp->u.ob, "f_add_eq: 2");
-            } else {
-              bad_argument(sp, T_OBJECT | T_STRING | T_NUMBER | T_REAL, 2, instruction);
-            }
-            break;
-          case T_NUMBER:
-            if (sp->type == T_NUMBER) {
-              lval->u.number += sp->u.number;
-              lval->subtype = 0;
-              /* both sides are numbers, no freeing required */
-            } else if (sp->type == T_REAL) {
-              /* A statically int-typed lvalue never reaches here with a
-               * float rhs -- the compiler already coerced the rhs to int
-               * (rule_expr_assign, grammar_rules_exprs.cc), including a
-               * TYPE_ANY/UNKNOWN rhs such as call_other (#1365) or a
-               * mapping/array index (#1384). This is an untyped lvalue
-               * (mixed variable, mapping value): promote it to float,
-               * since op= is the only way such a slot can ever become one. */
-              LPC_FLOAT result = lval->u.number + sp->u.real;
-              lval->type = T_REAL;
-              lval->u.real = result;
-              /* both sides are numbers, no freeing required */
-            } else {
-              error(
-                  "Left hand side of += is a number (or zero); right side is "
-                  "not a number.\n");
-            }
-            break;
-          case T_REAL:
-            if (sp->type == T_NUMBER) {
-              lval->u.real += sp->u.number;
-              /* both sides are numerics, no freeing required */
-            } else if (sp->type == T_REAL) {
-              lval->u.real += sp->u.real;
-              /* both sides are numerics, no freeing required */
-            } else {
-              error(
-                  "Left hand side of += is a number (or zero); right side is "
-                  "not a number.\n");
-            }
-            break;
-          case T_BUFFER:
-            if (sp->type == T_STRING || sp->type == T_ARRAY) {
-              /* buffer += string appends its raw UTF-8 bytes;
-               * buffer += array of ints 0..255 appends one byte each */
-              buffer_t* conv = svalue_to_buffer_bytes(sp);
-              buffer_t* b = allocate_buffer(lval->u.buf->size + conv->size);
-
-              memcpy(b->item, lval->u.buf->item, lval->u.buf->size);
-              memcpy(b->item + lval->u.buf->size, conv->item, conv->size);
-              free_buffer(conv);
-              free_svalue(sp, "f_add_eq: buffer conv");
-              free_buffer(lval->u.buf);
-              lval->u.buf = b;
-            } else if (sp->type != T_BUFFER) {
-              bad_argument(sp, T_BUFFER | T_STRING | T_ARRAY, 2, instruction);
-            } else {
-              buffer_t* b;
-
-              b = allocate_buffer(lval->u.buf->size + sp->u.buf->size);
-              memcpy(b->item, lval->u.buf->item, lval->u.buf->size);
-              memcpy(b->item + lval->u.buf->size, sp->u.buf->item, sp->u.buf->size);
-              free_buffer(sp->u.buf);
-              free_buffer(lval->u.buf);
-              lval->u.buf = b;
-            }
-            break;
-          case T_ARRAY:
-            if (sp->type != T_ARRAY) {
-              bad_argument(sp, T_ARRAY, 2, instruction);
-            } else {
-              /* add_array now frees the arrays */
-              lval->u.arr = add_array(lval->u.arr, sp->u.arr);
-            }
-            break;
-          case T_MAPPING:
-            if (sp->type != T_MAPPING) {
-              bad_argument(sp, T_MAPPING, 2, instruction);
-            } else {
-              absorb_mapping(lval->u.map, sp->u.map);
-              free_mapping(sp->u.map); /* free RHS */
-              /* LHS not freed because its being reused */
-            }
-            break;
-          default:
-            bad_arg(1, instruction);
-        }
-
-        if (instruction == F_ADD_EQ) { /* not void add_eq */
-          assign_svalue_no_free(sp, lval);
-        } else {
-          /*
-           * but if (void)add_eq then no need to produce an
-           * rvalue
-           */
-          sp--;
-        }
+          PoppedLvalue lv;
+          add_eq_slot(lv.target(), instruction);
         }
         break;
       case F_AND:
@@ -3505,24 +3766,14 @@ void eval_instruction(char* p) {
         push_refed_mapping(m);
         break;
       }
-      case F_ASSIGN: {
+      case F_ASSIGN:
 #ifdef DEBUG
         if (!is_stack_lvalue(sp)) {
           fatal("Bad argument to F_ASSIGN\n");
         }
 #endif
-        /* Index/range dests need the kind switch; a T_LVALUE unwraps to a
-         * real slot and is a plain store (issue #1358). */
-        svalue_t* dest = lvalue_target(sp);
-        if (is_indexed_lvalue(dest)) {
-          assign_value_to_lvalue(dest, sp - 1, "F_ASSIGN");
-        } else {
-          assign_svalue(dest, sp - 1);
-        }
-        free_svalue(sp--, "F_ASSIGN");
-        /* rvalue is already in the correct place */
+        assign_through_lvalue();
         break;
-      }
       case F_ASSIGN_VALUE: {
         if (is_stack_lvalue(sp) || !is_stack_lvalue(sp - 1)) {
           error("Invalid Program: bad stack for F_ASSIGN_VALUE.");
@@ -3546,6 +3797,40 @@ void eval_instruction(char* p) {
           error("Invalid Program: op F_ASSIGN_LOCAL Tried to assign non-existent local.\n");
         }
         assign_svalue(lval, sp);
+        break;
+      }
+      /* Fused stores (issue #1358): the destination is named by operands,
+       * so no lvalue is pushed and nothing re-dispatches on its kind. */
+      case F_LOCAL_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        lval = fp + EXTRACT_UCHAR(pc++);
+        if ((lval - fp) >= csp->num_local_variables) {
+          error("Invalid Program: op F_LOCAL_OP Tried to access non-existent local.\n");
+        }
+        slot_op(op, lval);
+        break;
+      }
+      case F_GLOBAL_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        slot_op(op, find_value(idx + variable_index_offset));
+        break;
+      }
+      case F_INDEX_LOCAL_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        lval = fp + EXTRACT_UCHAR(pc++);
+        if ((lval - fp) >= csp->num_local_variables) {
+          error("Invalid Program: op F_INDEX_LOCAL_OP Tried to access non-existent local.\n");
+        }
+        index_slot_op(op, lval);
+        break;
+      }
+      case F_INDEX_GLOBAL_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        unsigned short idx = 0;
+        LOAD2(idx, pc);
+        index_slot_op(op, find_value(idx + variable_index_offset));
         break;
       }
       case F_ASSIGN_GLOBAL: {
@@ -3606,42 +3891,7 @@ void eval_instruction(char* p) {
 #endif
         {
           PoppedLvalue lv;
-          lval = lv.target();
-          if (sp->type != T_INVALID) {
-            switch (lval->type) {
-              case T_LVALUE_BYTE: {
-                if (sp->type != T_NUMBER) {
-                  error("Illegal rhs to byte lvalue\n");
-                } else {
-                  LPC_INT n = (sp--)->u.number;
-                  if (n < 0 || n > 255) {
-                    error("Buffer byte value out of range: must be 0..255.\n");
-                  }
-                  *lval->u.lvalue_byte = static_cast<unsigned char>(n);
-                }
-                break;
-              }
-              case T_LVALUE_RANGE: {
-                copy_lvalue_range(lval, sp--);
-                break;
-              }
-              case T_LVALUE_CODEPOINT: {
-                if (sp->type != T_NUMBER) {
-                  error("Illegal rhs to byte lvalue\n");
-                }
-                UChar32 newc = sp->u.number;
-                assign_lvalue_codepoint(lval, [=](UChar32 c) { return newc; });
-                pop_stack();
-                break;
-              }
-              default: {
-                free_svalue(lval, "F_VOID_ASSIGN : 3");
-                *lval = *sp--;
-              }
-            }
-          } else {
-            sp--;
-          }
+          void_assign_slot(lv.target());
         }
         break;
 #ifdef DEBUG
@@ -3776,66 +4026,16 @@ void eval_instruction(char* p) {
       case F_PRE_DEC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
         {
+          /* the result replaces the lvalue's own stack slot */
           PoppedLvalue lv(PoppedLvalue::Steal);
-          lval = lv.target();
-          switch (lval->type) {
-            case T_NUMBER:
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = --(lval->u.number);
-              break;
-            case T_REAL:
-              sp->type = T_REAL;
-              sp->u.real = --(lval->u.real);
-              break;
-            case T_LVALUE_BYTE:
-              if (*lval->u.lvalue_byte == 0) {
-                error("Buffer byte value out of range: must be 0..255.\n");
-              }
-              if (lval->subtype == 0 && *lval->u.lvalue_byte == '\x1') {
-                error("Strings cannot contain 0 bytes.\n");
-              }
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = --(*lval->u.lvalue_byte);
-              break;
-            case T_LVALUE_CODEPOINT: {
-              LPC_INT newval = 0;
-              assign_lvalue_codepoint(lval, [&newval](UChar32 c) { return newval = --c; });
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = newval;
-              break;
-            }
-            default:
-              error("-- of non-numeric argument\n");
-          }
+          incdec_slot(lv.target(), instruction, sp);
         }
         break;
       case F_DEC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
         {
           PoppedLvalue lv;
-          lval = lv.target();
-          switch (lval->type) {
-            case T_NUMBER:
-              lval->u.number--;
-              break;
-            case T_REAL:
-              lval->u.real--;
-              break;
-            case T_LVALUE_BYTE:
-              if (*lval->u.lvalue_byte == 0) {
-                error("Buffer byte value out of range: must be 0..255.\n");
-              }
-              --(*lval->u.lvalue_byte);
-              break;
-            case T_LVALUE_CODEPOINT:
-              assign_lvalue_codepoint(lval, [](UChar32 c) { return c - 1; });
-              break;
-            default:
-              error("-- of non-numeric argument\n");
-          }
+          incdec_slot(lv.target(), instruction, nullptr);
         }
         break;
       case F_DIVIDE: {
@@ -3919,37 +4119,9 @@ void eval_instruction(char* p) {
       case F_PRE_INC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
         {
+          /* the result replaces the lvalue's own stack slot */
           PoppedLvalue lv(PoppedLvalue::Steal);
-          lval = lv.target();
-          switch (lval->type) {
-            case T_NUMBER:
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = ++lval->u.number;
-              break;
-            case T_REAL:
-              sp->type = T_REAL;
-              sp->u.real = ++lval->u.real;
-              break;
-            case T_LVALUE_BYTE:
-              if (*lval->u.lvalue_byte == 255) {
-                error("Buffer byte value out of range: must be 0..255.\n");
-              }
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = ++*lval->u.lvalue_byte;
-              break;
-            case T_LVALUE_CODEPOINT: {
-              LPC_INT newval = 0;
-              assign_lvalue_codepoint(lval, [&newval](UChar32 c) { return newval = ++c; });
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = newval;
-              break;
-            }
-            default:
-              error("++ of non-numeric argument\n");
-          }
+          incdec_slot(lv.target(), instruction, sp);
         }
         break;
       case F_MEMBER: {
@@ -4378,79 +4550,17 @@ void eval_instruction(char* p) {
       case F_POST_DEC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to --.");
         {
+          /* the result replaces the lvalue's own stack slot */
           PoppedLvalue lv(PoppedLvalue::Steal);
-          lval = lv.target();
-          switch (lval->type) {
-            case T_NUMBER:
-              sp->type = T_NUMBER;
-              sp->u.number = lval->u.number--;
-              sp->subtype = 0;
-              break;
-            case T_REAL:
-              sp->type = T_REAL;
-              sp->u.real = lval->u.real--;
-              break;
-            case T_LVALUE_BYTE:
-              if (*lval->u.lvalue_byte == 0) {
-                error("Buffer byte value out of range: must be 0..255.\n");
-              }
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = (*lval->u.lvalue_byte)--;
-              break;
-            case T_LVALUE_CODEPOINT: {
-              LPC_INT oldval = 0;
-              assign_lvalue_codepoint(lval, [&oldval](UChar32 c) {
-                oldval = c;
-                return --c;
-              });
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = oldval;
-              break;
-            }
-            default:
-              error("-- of non-numeric argument\n");
-          }
+          incdec_slot(lv.target(), instruction, sp);
         }
         break;
       case F_POST_INC:
         if (!is_stack_lvalue(sp)) error("Invalid Program: non-lvalue argument to ++.");
         {
+          /* the result replaces the lvalue's own stack slot */
           PoppedLvalue lv(PoppedLvalue::Steal);
-          lval = lv.target();
-          switch (lval->type) {
-            case T_NUMBER:
-              sp->type = T_NUMBER;
-              sp->u.number = lval->u.number++;
-              sp->subtype = 0;
-              break;
-            case T_REAL:
-              sp->type = T_REAL;
-              sp->u.real = lval->u.real++;
-              break;
-            case T_LVALUE_BYTE:
-              if (*lval->u.lvalue_byte == 255) {
-                error("Buffer byte value out of range: must be 0..255.\n");
-              }
-              sp->type = T_NUMBER;
-              sp->u.number = (*lval->u.lvalue_byte)++;
-              sp->subtype = 0;
-              break;
-            case T_LVALUE_CODEPOINT: {
-              LPC_INT oldval = 0;
-              assign_lvalue_codepoint(lval, [&oldval](UChar32 c) {
-                oldval = c;
-                return c + 1;
-              });
-              sp->type = T_NUMBER;
-              sp->subtype = 0;
-              sp->u.number = oldval;
-              break;
-            }
-            default:
-              error("++ of non-numeric argument\n");
-          }
+          incdec_slot(lv.target(), instruction, sp);
         }
         break;
       case F_GLOBAL_LVALUE: {

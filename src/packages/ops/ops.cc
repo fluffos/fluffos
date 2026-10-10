@@ -5,6 +5,7 @@
 
 #include "base/package_api.h"
 
+#include "packages/ops/ops.h"
 #include "packages/ops/parse.h"
 
 void f_and() {
@@ -22,7 +23,12 @@ void f_and() {
 
 void f_and_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  and_eq_slot(lv.target());
+}
+
+/* The and= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_AND_EQ and the fused local/global/index stores (issue #1358). */
+void and_eq_slot(svalue_t* argp) {
 
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
     sp->u.arr = argp->u.arr = intersect_array(argp->u.arr, sp->u.arr);
@@ -42,7 +48,12 @@ void f_and_eq() {
 
 void f_div_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  div_eq_slot(lv.target());
+}
+
+/* The div= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_DIV_EQ and the fused local/global/index stores (issue #1358). */
+void div_eq_slot(svalue_t* argp) {
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -379,7 +390,12 @@ void f_lsh() {
 
 void f_lsh_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  lsh_eq_slot(lv.target());
+}
+
+/* The lsh= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_LSH_EQ and the fused local/global/index stores (issue #1358). */
+void lsh_eq_slot(svalue_t* argp) {
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to <<=\n");
@@ -394,7 +410,12 @@ void f_lsh_eq() {
 
 void f_mod_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  mod_eq_slot(lv.target());
+}
+
+/* The mod= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_MOD_EQ and the fused local/global/index stores (issue #1358). */
+void mod_eq_slot(svalue_t* argp) {
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to %%=\n");
@@ -417,7 +438,12 @@ void f_mod_eq() {
 
 void f_mult_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  mult_eq_slot(lv.target());
+}
+
+/* The mult= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_MULT_EQ and the fused local/global/index stores (issue #1358). */
+void mult_eq_slot(svalue_t* argp) {
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -580,7 +606,12 @@ void f_or() {
 
 void f_or_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  or_eq_slot(lv.target());
+}
+
+/* The or= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_OR_EQ and the fused local/global/index stores (issue #1358). */
+void or_eq_slot(svalue_t* argp) {
   if (argp->type == T_ARRAY && sp->type == T_ARRAY) {
     argp->u.arr = sp->u.arr = union_array(argp->u.arr, sp->u.arr);
     sp->u.arr->ref++; /* because we put it in two places */
@@ -918,7 +949,12 @@ void f_rsh() {
 
 void f_rsh_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  rsh_eq_slot(lv.target());
+}
+
+/* The rsh= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_RSH_EQ and the fused local/global/index stores (issue #1358). */
+void rsh_eq_slot(svalue_t* argp) {
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to >>=\n");
@@ -933,7 +969,12 @@ void f_rsh_eq() {
 
 void f_sub_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  sub_eq_slot(lv.target());
+}
+
+/* The sub= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_SUB_EQ and the fused local/global/index stores (issue #1358). */
+void sub_eq_slot(svalue_t* argp) {
 
   switch (argp->type | sp->type) {
     case T_NUMBER: {
@@ -1231,7 +1272,12 @@ void f_xor() {
 
 void f_xor_eq() {
   PoppedLvalue lv;
-  svalue_t* argp = lv.target();
+  xor_eq_slot(lv.target());
+}
+
+/* The xor= body on an already-resolved slot; the rhs is at sp. Shared by
+ * F_XOR_EQ and the fused local/global/index stores (issue #1358). */
+void xor_eq_slot(svalue_t* argp) {
 
   if (argp->type != T_NUMBER) {
     error("Bad left type to ^=\n");

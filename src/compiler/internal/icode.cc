@@ -372,6 +372,104 @@ int g_generate_node_depth = 0;
 constexpr int kMaxGenerateNodeDepth = 500;
 }  // namespace
 
+/* Fused stores (issue #1358). A store or compound op whose destination is
+ * a local, a parameter, a global, or one index into one of those names the
+ * slot in its own operands (F_LOCAL_OP / F_GLOBAL_OP / F_INDEX_LOCAL_OP /
+ * F_INDEX_GLOBAL_OP) instead of pushing an lvalue that the op then
+ * re-dispatches on. Plain `x = y` already has F_ASSIGN_LOCAL and friends. */
+static bool is_fusable_store(int op) {
+  switch (op) {
+    case F_ASSIGN:
+    case F_VOID_ASSIGN:
+    case F_ADD_EQ:
+    case F_VOID_ADD_EQ:
+    case F_SUB_EQ:
+    case F_AND_EQ:
+    case F_OR_EQ:
+    case F_XOR_EQ:
+    case F_LSH_EQ:
+    case F_RSH_EQ:
+    case F_MULT_EQ:
+    case F_DIV_EQ:
+    case F_MOD_EQ:
+    case F_INC:
+    case F_DEC:
+    case F_PRE_INC:
+    case F_PRE_DEC:
+    case F_POST_INC:
+    case F_POST_DEC:
+      return true;
+    default:
+      return false;
+  }
+}
+
+enum class FusedSlot { None, Local, Global };
+
+static FusedSlot fused_slot_kind(parse_node_t* node) {
+  if (IS_NODE(node, NODE_OPCODE_1, F_LOCAL_LVALUE) || node->kind == NODE_PARAMETER_LVALUE) {
+    return FusedSlot::Local;
+  }
+  if (IS_NODE(node, NODE_OPCODE_1, F_GLOBAL_LVALUE)) {
+    return FusedSlot::Global;
+  }
+  return FusedSlot::None;
+}
+
+/* Emit the slot operand. A parameter's index depends on current_num_values,
+ * so it is read at emission time, after the operands were generated, the
+ * same as the F_ASSIGN_LOCAL path does. */
+static void ins_fused_slot(parse_node_t* node) {
+  if (node->kind == NODE_PARAMETER_LVALUE) {
+    ins_byte(node->v.number + current_num_values);
+  } else if (node->v.number == F_GLOBAL_LVALUE) {
+    INS_GLOBAL_INDEX(node->l.number);
+  } else {
+    ins_byte(node->l.number);
+  }
+}
+
+/* expr is a NODE_BINARY_OP (rhs in l, dest in r) or a NODE_UNARY_OP (dest
+ * in r) whose op passed is_fusable_store(). Returns false, having emitted
+ * nothing, when the destination is not a shape the fused ops cover. */
+static bool try_fused_store(parse_node_t* expr) {
+  int const op = expr->v.number;
+  parse_node_t* dest = expr->r.expr;
+  bool const has_rhs = expr->kind == NODE_BINARY_OP;
+  if (!dest) {
+    return false;
+  }
+
+  /* x op= y, x++ ... on a plain slot. Plain assignment is handled by the
+   * F_ASSIGN_LOCAL / F_ASSIGN_GLOBAL path before this is reached. */
+  FusedSlot kind = fused_slot_kind(dest);
+  if (kind != FusedSlot::None && op != F_ASSIGN && op != F_VOID_ASSIGN) {
+    if (has_rhs) {
+      i_generate_node(expr->l.expr);
+    }
+    end_pushes();
+    ins_byte(kind == FusedSlot::Local ? F_LOCAL_OP : F_GLOBAL_OP);
+    ins_byte(op);
+    ins_fused_slot(dest);
+    return true;
+  }
+
+  /* x[i] op y with x a plain slot. */
+  if (IS_NODE(dest, NODE_BINARY_OP, F_INDEX_LVALUE) && dest->r.expr &&
+      (kind = fused_slot_kind(dest->r.expr)) != FusedSlot::None) {
+    if (has_rhs) {
+      i_generate_node(expr->l.expr);
+    }
+    i_generate_node(dest->l.expr);
+    end_pushes();
+    ins_byte(kind == FusedSlot::Local ? F_INDEX_LOCAL_OP : F_INDEX_GLOBAL_OP);
+    ins_byte(op);
+    ins_fused_slot(dest->r.expr);
+    return true;
+  }
+  return false;
+}
+
 void i_generate_node(parse_node_t* expr) {
   if (!expr) {
     return;
@@ -433,9 +531,16 @@ void i_generate_node(parse_node_t* expr) {
           break;
         }
       }
+      if (is_fusable_store(expr->v.number) && try_fused_store(expr)) {
+        break;
+      }
       i_generate_node(expr->l.expr);
     /* fall through */
     case NODE_UNARY_OP:
+      if (expr->kind == NODE_UNARY_OP && is_fusable_store(expr->v.number) &&
+          try_fused_store(expr)) {
+        break;
+      }
       i_generate_node(expr->r.expr);
     /* fall through */
     case NODE_OPCODE:
@@ -1294,6 +1399,8 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_ASSIGN_GLOBAL:
       case F_VOID_ASSIGN_GLOBAL:
       case F_STRING:
+      case F_LOCAL_OP:
+      case F_INDEX_LOCAL_OP:
 #ifdef F_JUMP_WHEN_ZERO
       case F_JUMP_WHEN_ZERO:
       case F_JUMP_WHEN_NON_ZERO:
@@ -1318,6 +1425,10 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_VOID_ASSIGN_LOCAL:
       case F_ASSIGN_LOCAL:
         pc++;
+        break;
+      case F_GLOBAL_OP:
+      case F_INDEX_GLOBAL_OP:
+        pc += 3;
         break;
       case F_FUNCTION_CONSTRUCTOR:
         switch (EXTRACT_UCHAR(pc++)) {

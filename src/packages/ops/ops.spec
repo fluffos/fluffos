@@ -104,3 +104,16 @@ operator type_check;
  * EXTRACT_UCHAR. */
 operator await;
 operator acatch, end_acatch;
+
+/* Fused stores (issue #1358). Each names its destination slot in its own
+ * operands and resolves it once, instead of a separate lvalue push that the
+ * store then re-dispatches on. The first operand byte is the store or
+ * compound op being fused: one of F_ASSIGN, F_VOID_ASSIGN, F_ADD_EQ,
+ * F_VOID_ADD_EQ, F_SUB_EQ..F_MOD_EQ, or the ++/-- family.
+ *   local_op <op> <local>          op on a local or parameter
+ *   global_op <op> <global:2>      op on a global
+ *   index_local_op <op> <local>    op on local[index]; index on the stack
+ *   index_global_op <op> <global:2> op on global[index]
+ * The index forms take a fast path for arrays and mappings and fall back
+ * to the general lvalue path for strings, buffers and anything else. */
+operator local_op, global_op, index_local_op, index_global_op;

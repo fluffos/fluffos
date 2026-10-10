@@ -1,0 +1,379 @@
+// Fused stores (issue #1358): a compound op, ++/--, or an indexed store
+// whose destination is a local, a parameter, a global, or one index into one
+// of those names the slot in its own operands (local_op / global_op /
+// index_local_op / index_global_op) instead of pushing an lvalue. These
+// check that every fused form computes what the unfused lvalue sequence did,
+// that the containers without a fast path (strings, buffers, bad values)
+// still fall back with the same results and errors, and -- via dump_prog --
+// that the fused opcodes are actually emitted.
+
+class Pair {
+  int left;
+}
+
+int g;
+int *ga;
+mapping gm;
+string gs;
+
+void test_local_compound() {
+  int x;
+  float f;
+  mixed mx;
+
+  x = 10;
+  x += 5;
+  ASSERT_EQ(15, x);
+  ASSERT_EQ(20, x += 5);
+  x -= 3;
+  ASSERT_EQ(17, x);
+  ASSERT_EQ(34, x *= 2);
+  x /= 4;
+  ASSERT_EQ(8, x);
+  x %= 5;
+  ASSERT_EQ(3, x);
+  x |= 4;
+  ASSERT_EQ(7, x);
+  x &= 6;
+  ASSERT_EQ(6, x);
+  x ^= 3;
+  ASSERT_EQ(5, x);
+  x <<= 2;
+  ASSERT_EQ(20, x);
+  x >>= 1;
+  ASSERT_EQ(10, x);
+
+  f = 1.5;
+  f += 1;
+  ASSERT_EQ(2.5, f);
+  f *= 2;
+  ASSERT_EQ(5.0, f);
+
+  // An untyped slot still promotes to float through op= (#1303).
+  mx = 1;
+  mx += 0.5;
+  ASSERT_EQ(1.5, mx);
+
+  // Division by zero is still an error, and leaves x unchanged.
+  x = 9;
+  ASSERT(catch(x /= 0));
+  ASSERT_EQ(9, x);
+}
+
+void test_local_incdec() {
+  int x;
+  float f;
+
+  x = 5;
+  x++;
+  ASSERT_EQ(6, x);
+  x--;
+  ASSERT_EQ(5, x);
+  ASSERT_EQ(5, x++);
+  ASSERT_EQ(6, x);
+  ASSERT_EQ(7, ++x);
+  ASSERT_EQ(7, x--);
+  ASSERT_EQ(5, --x);
+  ASSERT_EQ(5, x);
+
+  f = 1.5;
+  ASSERT_EQ(1.5, f++);
+  ASSERT_EQ(3.5, ++f);
+  ASSERT_EQ(3.5, f--);
+  ASSERT_EQ(1.5, --f);
+
+  {
+    mixed s = "x";
+    ASSERT_EQ("*++ of non-numeric argument\n", catch(s++));
+    ASSERT_EQ("*-- of non-numeric argument\n", catch(--s));
+    ASSERT_EQ("x", s);
+  }
+}
+
+void test_reference_types() {
+  string s;
+  int *a;
+  int *alias;
+  mapping m;
+  mapping malias;
+
+  s = "ab";
+  s += "cd";
+  s += 1;
+  ASSERT_EQ("abcd1", s);
+
+  // array += makes a new array; the alias keeps the old one.
+  a = ({ 1 });
+  alias = a;
+  a += ({ 2 });
+  ASSERT_EQ(({ 1, 2 }), a);
+  ASSERT_EQ(({ 1 }), alias);
+  a -= ({ 1 });
+  ASSERT_EQ(({ 2 }), a);
+
+  // mapping += absorbs in place; the alias sees it.
+  m = ([ "a": 1 ]);
+  malias = m;
+  m += ([ "b": 2 ]);
+  ASSERT_EQ(2, sizeof(malias));
+  ASSERT_EQ(2, malias["b"]);
+}
+
+void test_globals() {
+  g = 1;
+  g += 2;
+  ASSERT_EQ(3, g);
+  ASSERT_EQ(3, g++);
+  ASSERT_EQ(5, ++g);
+  g *= 3;
+  ASSERT_EQ(15, g);
+  ASSERT_EQ(14, --g);
+  g--;
+  ASSERT_EQ(13, g);
+
+  gs = "a";
+  gs += "b";
+  ASSERT_EQ("ab", gs);
+}
+
+void test_parameters() {
+  function f;
+
+  f = (: $1 += 2 :);
+  ASSERT_EQ(5, evaluate(f, 3));
+  f = (: $1++ :);
+  ASSERT_EQ(3, evaluate(f, 3));
+  f = (: ++$1 :);
+  ASSERT_EQ(4, evaluate(f, 3));
+}
+
+int bump(int n) {
+  n += 10;
+  n++;
+  return n;
+}
+
+void test_index_array() {
+  int *a;
+
+  a = ({ 1, 2, 3 });
+  a[0] = 10;
+  ASSERT_EQ(({ 10, 2, 3 }), a);
+  ASSERT_EQ(20, a[1] = 20);
+  a[2] += 5;
+  ASSERT_EQ(8, a[2]);
+  ASSERT_EQ(9, a[2] += 1);
+  a[0]++;
+  ASSERT_EQ(11, a[0]);
+  ASSERT_EQ(11, a[0]--);
+  ASSERT_EQ(11, ++a[0]);
+  ASSERT_EQ(10, --a[0]);
+  a[1] *= 2;
+  a[1] -= 1;
+  ASSERT_EQ(39, a[1]);
+  ASSERT_EQ(({ 10, 39, 9 }), a);
+
+  // Element stores write through to every holder of the array.
+  {
+    int *alias = a;
+    a[0] = 99;
+    ASSERT_EQ(99, alias[0]);
+  }
+
+  ASSERT_EQ("*Array index out of bounds\n", catch(a[3] = 1));
+  {
+    int neg = -1;
+    ASSERT_EQ("*Array index out of bounds\n", catch(a[neg] = 1));
+  }
+  ASSERT_EQ("*Array index out of bounds\n", catch(a[3]++));
+  ASSERT_EQ("*Array index out of bounds\n", catch(a[5] += 1));
+  // An index past 32 bits used to be truncated to an int and could land
+  // back inside the array; it is out of bounds.
+  ASSERT_EQ("*Array index out of bounds\n", catch(a[0x100000000] = 7));
+  ASSERT_EQ(({ 99, 39, 9 }), a);
+
+  // A non-integer index takes the general path and its error.
+  {
+    mixed k = "x";
+    ASSERT_EQ("*Illegal type of index\n", catch(a[k] = 1));
+  }
+
+  // A compound op that errors leaves the element alone.
+  {
+    mixed *m = ({ 1 });
+    ASSERT(catch(m[0] -= "x"));
+    ASSERT_EQ(({ 1 }), m);
+  }
+}
+
+void test_index_mapping() {
+  mapping m;
+  mapping alias;
+
+  m = ([]);
+  m["a"] = 1;
+  ASSERT_EQ(1, m["a"]);
+  ASSERT_EQ(2, m["b"] = 2);
+  m["a"] += 4;
+  ASSERT_EQ(5, m["a"]);
+  // A missing key is created by op= and ++ like the unfused path did.
+  m["n"]++;
+  ASSERT_EQ(1, m["n"]);
+  m["c"] += 3;
+  ASSERT_EQ(3, m["c"]);
+  ASSERT_EQ(0, m["z"]++);
+  ASSERT_EQ(1, m["z"]);
+  ASSERT_EQ(6, ++m["a"]);
+
+  alias = m;
+  m["shared"] = "yes";
+  ASSERT_EQ("yes", alias["shared"]);
+
+  m[({ 1 })] = 1;  // any key type
+  ASSERT_EQ(6, sizeof(m) - 1);
+}
+
+void test_index_globals() {
+  ga = ({ 1, 2 });
+  ga[0] = 5;
+  ga[1] += 1;
+  ga[1]++;
+  ASSERT_EQ(({ 5, 4 }), ga);
+  ASSERT_EQ(4, ga[1]--);
+
+  gm = ([]);
+  gm["k"] = 1;
+  gm["k"] += 1;
+  gm["j"]++;
+  ASSERT_EQ(([ "k": 2, "j": 1 ]), gm);
+
+  gs = "abc";
+  gs[0] = 'X';
+  gs[1]++;
+  ASSERT_EQ("Xcc", gs);
+}
+
+void test_index_fallback() {
+  string s;
+  buffer b;
+  mixed z;
+
+  // String chars: rebuilt in place through the general char lvalue.
+  s = "abc";
+  s[0] = 'X';
+  ASSERT_EQ("Xbc", s);
+  s[1]++;
+  ASSERT_EQ("Xcc", s);
+  ASSERT_EQ('c', s[2]--);
+  ASSERT_EQ("Xcb", s);
+  s[2] += 2;
+  ASSERT_EQ("Xcd", s);
+  ASSERT_EQ("*Index out of bounds in string index lvalue.\n", catch(s[3] = 'y'));
+
+  // Buffer bytes.
+  b = allocate_buffer(2);
+  b[0] = 255;
+  ASSERT_EQ(255, b[0]);
+  ASSERT_EQ("*Buffer byte value out of range: must be 0..255.\n", catch(b[0]++));
+  b[1] += 7;
+  ASSERT_EQ(7, b[1]);
+  ASSERT_EQ("*Buffer index out of bounds.\n", catch(b[2] = 1));
+
+  // Indexing zero / a non-container.
+  z = 0;
+  ASSERT_EQ("*Value being indexed is zero.\n", catch(z[0] = 1));
+  z = 1.5;
+  ASSERT_EQ("*Cannot index value of type 'float'.\n", catch(z[0] = 1));
+}
+
+void test_unfused_shapes() {
+  // Shapes the fused ops do not cover still work through the lvalue path.
+  mixed *nested = ({ ({ 1, 2 }), ({ 3 }) });
+  mapping mm = ([ "a": ([ "b": 1 ]) ]);
+  int *a = ({ 1, 2, 3, 4 });
+  class Pair p = new(class Pair, left: 1);
+
+  nested[0][1] += 5;
+  nested[1][0]++;
+  ASSERT_EQ(({ ({ 1, 7 }), ({ 4 }) }), nested);
+  mm["a"]["b"] += 1;
+  ASSERT_EQ(2, mm["a"]["b"]);
+  a[<1] = 9;
+  a[<2]++;
+  ASSERT_EQ(({ 1, 2, 4, 9 }), a);
+  a[0..1] = ({ 7 });
+  ASSERT_EQ(({ 7, 4, 9 }), a);
+  p->left += 2;
+  ASSERT_EQ(3, p->left);
+
+  // The general index path also rejects an index past 32 bits instead of
+  // truncating it into range.
+  {
+    int big = 0x100000000;
+    string s = "abc";
+    ASSERT_EQ("*Array index out of bounds\n", catch(nested[0][big] = 7));
+    ASSERT_EQ(({ 1, 7 }), nested[0]);
+    ASSERT_EQ("*Index out of bounds in string index lvalue.\n", catch(s[big] = 'x'));
+    ASSERT_EQ("abc", s);
+  }
+}
+
+void test_dump_prog() {
+#ifdef __PACKAGE_DEVELOP__
+  object ob;
+  string txt, src;
+  string lop, gop, ilop, igop, llv, glv, ilv;
+
+  // Needles assembled at runtime so they do not sit in this file's string
+  // table (dump_prog prints that table too).
+  lop = "local" + "_op";
+  gop = "global" + "_op";
+  ilop = "index_local" + "_op";
+  igop = "index_global" + "_op";
+  llv = "local" + "_lvalue";
+  glv = "global" + "_lvalue";
+  ilv = "index" + "_lvalue";
+
+  src = "#pragma no_optimize\n"
+    "int g; int *ga; mapping gm;\n"
+    "int f(int n) { int x; int *a = ({ 1 }); mapping m = ([]);\n"
+    "  x += n; x++; ++x; x--; g -= n; g++; a[0] = n; a[0] += n; a[0]++;\n"
+    "  m[\"k\"] = n; m[\"k\"] *= 2; ga[0] = 1; ga[0] |= 2; gm[\"k\"]--;\n"
+    "  return x; }\n";
+  rm("/gen_fused_store.c");
+  write_file("/gen_fused_store.c", src);
+  ob = load_object("/gen_fused_store");
+  ASSERT(objectp(ob));
+  dump_prog(ob, 1, "/gen_fused_store_dump.txt");
+  txt = read_file("/gen_fused_store_dump.txt");
+  destruct(ob);
+  rm("/gen_fused_store.c");
+  rm("/gen_fused_store_dump.txt");
+  ASSERT(stringp(txt));
+  // dump_prog pads opcode names, so a leading space keeps "local_op" from
+  // matching inside "index_local_op".
+  ASSERT(strsrch(txt, " " + lop) != -1);
+  ASSERT(strsrch(txt, " " + gop) != -1);
+  ASSERT(strsrch(txt, ilop) != -1);
+  ASSERT(strsrch(txt, igop) != -1);
+  // None of these stores should push an lvalue any more.
+  ASSERT(strsrch(txt, llv) == -1);
+  ASSERT(strsrch(txt, glv) == -1);
+  ASSERT(strsrch(txt, ilv) == -1);
+#endif
+}
+
+void do_tests() {
+  test_local_compound();
+  test_local_incdec();
+  test_reference_types();
+  test_globals();
+  test_parameters();
+  ASSERT_EQ(16, bump(5));
+  test_index_array();
+  test_index_mapping();
+  test_index_globals();
+  test_index_fallback();
+  test_unfused_shapes();
+  test_dump_prog();
+}
