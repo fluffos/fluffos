@@ -1698,6 +1698,17 @@ array_t* intersect_array(array_t* a1, array_t* a2) {
     return &the_null_array;
   }
 
+  /* `a &= a`: both operands are the same array. The code below releases a1
+   * and a2 separately and assumes they are distinct -- with one array held
+   * by exactly the two references it was given, the second release took it
+   * to ref 0 without freeing it (a leak of the array and its contents).
+   * Intersect against a private copy instead, dropping the duplicate
+   * reference; union_array() special-cases the same aliasing. */
+  if (a1 == a2) {
+    a2 = copy_array(a1);
+    a1->ref--; /* >= 2 here: we were handed one reference per operand */
+  }
+
   svt_1 = alist_sort(a1);
   if ((flag = (a2->ref > 1))) {
     sv_tab = reinterpret_cast<svalue_t*>(
