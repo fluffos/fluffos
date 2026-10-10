@@ -465,6 +465,28 @@ static bool try_fused_store(parse_node_t* expr) {
     return true;
   }
 
+  /* <class expr>->m op y and <mapping expr>.key op y: the container is an
+   * ordinary rvalue the op takes over. */
+  if (IS_NODE(dest, NODE_UNARY_OP_1, F_MEMBER_LVALUE) ||
+      IS_NODE(dest, NODE_UNARY_OP_1, F_MAP_MEMBER_LVALUE)) {
+    if (has_rhs) {
+      i_generate_node(expr->l.expr);
+    }
+    switch_to_node_line(dest);
+    i_generate_node(dest->r.expr);
+    end_pushes();
+    if (dest->v.number == F_MEMBER_LVALUE) {
+      ins_byte(F_MEMBER_OP);
+      ins_byte(op);
+      ins_byte(dest->l.number);
+    } else {
+      ins_byte(F_MAP_MEMBER_OP);
+      ins_byte(op);
+      ins_short(dest->l.number);
+    }
+    return true;
+  }
+
   /* x[i] op y with x a plain slot. */
   if (IS_NODE(dest, NODE_BINARY_OP, F_INDEX_LVALUE) && dest->r.expr &&
       (kind = fused_slot_kind(dest->r.expr)) != FusedSlot::None) {
@@ -478,6 +500,47 @@ static bool try_fused_store(parse_node_t* expr) {
     ins_byte(kind == FusedSlot::Local ? F_INDEX_LOCAL_OP : F_INDEX_GLOBAL_OP);
     ins_byte(op);
     ins_fused_slot(dest->r.expr);
+    return true;
+  }
+
+  /* <class expr>->m[i] op y and <mapping expr>.key[i] op y. */
+  if (IS_NODE(dest, NODE_BINARY_OP, F_INDEX_LVALUE) && dest->r.expr &&
+      (IS_NODE(dest->r.expr, NODE_UNARY_OP_1, F_MEMBER_LVALUE) ||
+       IS_NODE(dest->r.expr, NODE_UNARY_OP_1, F_MAP_MEMBER_LVALUE))) {
+    parse_node_t* member = dest->r.expr;
+    if (has_rhs) {
+      i_generate_node(expr->l.expr);
+    }
+    switch_to_node_line(dest);
+    i_generate_node(dest->l.expr);
+    switch_to_node_line(member);
+    i_generate_node(member->r.expr);
+    end_pushes();
+    if (member->v.number == F_MEMBER_LVALUE) {
+      ins_byte(F_MEMBER_INDEX_OP);
+      ins_byte(op);
+      ins_byte(member->l.number);
+    } else {
+      ins_byte(F_MAP_MEMBER_INDEX_OP);
+      ins_byte(op);
+      ins_short(member->l.number);
+    }
+    return true;
+  }
+
+  /* x[i] op y with any other container: a nested index, a ref, or
+   * (x = y)[i]. The container still pushes its lvalue; only the last step
+   * and the op are fused. */
+  if (IS_NODE(dest, NODE_BINARY_OP, F_INDEX_LVALUE)) {
+    if (has_rhs) {
+      i_generate_node(expr->l.expr);
+    }
+    switch_to_node_line(dest);
+    i_generate_node(dest->l.expr);
+    i_generate_node(dest->r.expr);
+    end_pushes();
+    ins_byte(F_INDEX_OP);
+    ins_byte(op);
     return true;
   }
   return false;
@@ -1414,6 +1477,8 @@ void optimize_icode(char* start, char* pc, char* end) {
       case F_STRING:
       case F_LOCAL_OP:
       case F_INDEX_LOCAL_OP:
+      case F_MEMBER_OP:
+      case F_MEMBER_INDEX_OP:
 #ifdef F_JUMP_WHEN_ZERO
       case F_JUMP_WHEN_ZERO:
       case F_JUMP_WHEN_NON_ZERO:
@@ -1441,7 +1506,12 @@ void optimize_icode(char* start, char* pc, char* end) {
         break;
       case F_GLOBAL_OP:
       case F_INDEX_GLOBAL_OP:
+      case F_MAP_MEMBER_OP:
+      case F_MAP_MEMBER_INDEX_OP:
         pc += 3;
+        break;
+      case F_INDEX_OP:
+        pc++;
         break;
       case F_FUNCTION_CONSTRUCTOR:
         switch (EXTRACT_UCHAR(pc++)) {

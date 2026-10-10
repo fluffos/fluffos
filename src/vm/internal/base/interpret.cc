@@ -3835,6 +3835,72 @@ void eval_instruction(char* p) {
         index_slot_op(op, find_value(idx + variable_index_offset));
         break;
       }
+      case F_MEMBER_OP:
+      case F_MEMBER_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        int const idx = EXTRACT_UCHAR(pc++);
+        /* stack: [rhs] [index] class -- the class is on top */
+        if (sp->type != T_CLASS) {
+          error("Tried to take a member of something that isn't a class.\n");
+        }
+        array_t* arr = sp->u.arr;
+        if (idx >= arr->size) {
+          error("Class has no corresponding member.\n");
+        }
+        /* Take over the stack's ref and keep the class alive until the op
+         * is done, error or not: it may be a temporary nobody else holds. */
+        sp--;
+        DEFER { free_class(arr); };
+        if (instruction == F_MEMBER_OP) {
+          slot_op(op, arr->item + idx);
+        } else {
+          index_slot_op(op, arr->item + idx);
+        }
+        break;
+      }
+      case F_MAP_MEMBER_OP:
+      case F_MAP_MEMBER_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        uint16_t offset;
+        LOAD_SHORT(offset, pc);
+        if (offset >= current_prog->num_strings) {
+          error("Invalid Program: string %d out of range in F_MAP_MEMBER_OP!", offset);
+        }
+        if (sp->type != T_MAPPING) {
+          error("Tried to take a member of something that isn't a mapping.\n");
+        }
+        mapping_t* m = sp->u.map;
+        sp--;
+        DEFER { free_mapping(m); };
+        svalue_t key;
+        key.type = T_STRING;
+        key.subtype = STRING_SHARED;
+        key.u.string = current_prog->strings[offset];
+        svalue_t* slot = find_for_insert(m, &key, 0);
+        if (!slot) {
+          mapping_too_large();
+        }
+        if (instruction == F_MAP_MEMBER_OP) {
+          slot_op(op, slot);
+        } else {
+          index_slot_op(op, slot);
+        }
+        break;
+      }
+      case F_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        if (sp->type == T_LVALUE) {
+          /* a plain lvalue owns nothing; resolve it and drop it */
+          svalue_t* container = (sp--)->u.lvalue;
+          index_slot_op(op, container);
+        } else {
+          /* an rvalue container ((x = y)[i]) or a typed lvalue: exactly the
+           * unfused index_lvalue + op */
+          push_indexed_lvalue(0);
+          lvalue_op(op);
+        }
+        break;
+      }
       case F_ASSIGN_GLOBAL: {
         unsigned short idx = 0;
         LOAD2(idx, pc);
@@ -4162,7 +4228,13 @@ void eval_instruction(char* p) {
         lv_owner_type = T_CLASS;
         lv_owner = reinterpret_cast<refed_t*>(arr);
 #endif
-        free_class(arr);
+        /* Drop the stack's ref WITHOUT the possible dealloc, as
+         * F_MAP_MEMBER_LVALUE does: free_class() on a ref-1 temporary
+         * (f()->arr[0] = v) freed the class the lvalue above points into
+         * before the store wrote through it -- a heap use-after-free. The
+         * direct shapes (f()->x op= v) compile to F_MEMBER_OP, which holds
+         * the class for the whole op instead. */
+        arr->ref--;
         break;
       }
       case F_MAP_MEMBER: {
