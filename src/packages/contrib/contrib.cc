@@ -521,6 +521,13 @@ void f_heart_beats() { push_refed_array(get_heart_beats()); }
 #define TC_FIRST_CHAR '%'
 #define TC_SECOND_CHAR '^'
 
+/* Fill-out (negative wrap) padding for a line that reached column `used`.
+ * A tab can carry a line past wrap before it breaks, so never negative:
+ * the composition pass memset()s this many bytes. */
+static inline LPC_INT tc_fill_out(LPC_INT wrap, LPC_INT used) {
+  return used < wrap ? wrap - used : 0;
+}
+
 static int at_end(int i, int imax, int z, const int* lens) {
   if (z + 1 != lens[i]) {
     return 0;
@@ -586,13 +593,25 @@ void f_terminal_colour() {
   const char* resetstr = nullptr;
   const char* resetstrname;
   int resetstrlen = 0;
-  int num, i, j, k, col, start, space, *lens, maybe_at_end;
+  int num, i, k, *lens, maybe_at_end;
+  /* j (the result length) and the column/padding arithmetic stay 64-bit:
+   * wrap and indent are LPC ints, and `int j` / `int endpad = wrap - col`
+   * used to truncate them into an undersized result (heap overflow). */
+  LPC_INT j, col, start, space;
   int space_garbage = 0;
   mapping_node_t *elt, **mtab;
   int buflen, max_buflen, space_buflen;
   LPC_INT wrap = 0;
   LPC_INT indent = 0;
   int fillout = 0;
+  /* Set once the result is cut short at max_string_length: every later
+   * fragment is then dropped, so nothing after the cut can be appended. */
+  int truncated = 0;
+  /* Indent the size pass charged for a line break that has col 0 and is
+   * (so far) the last thing kept. The composition pass does not write that
+   * indent if the result ends right there (at_end()), so a cut placed
+   * directly after such a break has to give it back. */
+  LPC_INT indent_owed = 0;
   char* rep;
   int repused;
   char** rep_allocs;
@@ -602,6 +621,19 @@ void f_terminal_colour() {
       indent = (sp--)->u.number;
     }
     wrap = (sp--)->u.number;
+    {
+      /* No line can get anywhere near this many columns (a kept byte adds
+       * at most ~11, and at most max_string_length bytes are kept), so a
+       * wider wrap never breaks a line, and fill-out padding to it can never
+       * fit: clamping changes nothing, but keeps every sum below in range
+       * (and -wrap defined). indent is bounded by wrap just below. */
+      LPC_INT const wrap_limit = 16 * static_cast<LPC_INT>(max_string_length) + 16;
+      if (wrap > wrap_limit) {
+        wrap = wrap_limit;
+      } else if (wrap < -wrap_limit) {
+        wrap = -wrap_limit;
+      }
+    }
     if (wrap < 0) {
       wrap = -wrap;
       fillout = 1;
@@ -825,6 +857,11 @@ void f_terminal_colour() {
       }
     }
 
+    if (truncated) {
+      lens[i] = 0;
+      continue;
+    }
+
     if (lens[i] <= 0) {
       if (j + -lens[i] > max_string_length) {
         lens[i] = -(-(lens[i]) - (j + -lens[i] - max_string_length));
@@ -835,16 +872,19 @@ void f_terminal_colour() {
     }
 
     if (maybe_at_end) {
-      if (j + indent > max_string_length) {
+      if (j + indent >= max_string_length) {
         /* this string no longer counts, so we are still in
            a maybe_at_end condition.  This means we will end
            up truncating the rest of the fragments too, since
-           the indent will never fit. */
+           the indent will never fit.  (>=: the indent is only
+           written in front of at least one byte of this string,
+           so it must leave room for one.) */
         lens[i] = 0;
       } else {
         j += indent;
         col += indent;
         maybe_at_end = 0;
+        indent_owed = indent;
       }
     }
 
@@ -858,15 +898,32 @@ void f_terminal_colour() {
       int z;
       const char* p = parts[i];
       tc_colwidth_state cw;
+      /* State at the start of the character (UTF-8 sequence) holding byte
+       * z, to cut the result in front of it. The cut must not split the
+       * sequence: the column advance of its leading bytes depends on where
+       * the fragment ends, so the composition pass would see different
+       * line breaks than were sized here. */
+      int seq_z = 0;
+      LPC_INT seq_j = j - lens[i]; /* j without the bytes from seq_z on */
+      LPC_INT seq_owed = indent_owed;
+      int seq_buflen = buflen;
       // This is where we figure out the size of the lines and
       // the final output string.  j is the size of the final output
       // string and max_buflen is the size of the line.
       for (z = 0; z < lens[i]; z++) {
         char const c = p[z];
+        LPC_INT const col_at_z = col;
+        if ((static_cast<unsigned char>(c) & 0xC0) != 0x80) {
+          seq_z = z;
+          seq_j = j - (lens[i] - z);
+          seq_owed = indent_owed;
+          seq_buflen = buflen;
+        }
+        indent_owed = 0;
         buflen++;
         if (c == '\n') {
           if (fillout) {
-            j += wrap - col;
+            j += tc_fill_out(wrap, col);
           }
           col = 0;
           space = space_buflen = 0;
@@ -895,7 +952,7 @@ void f_terminal_colour() {
           if (col > wrap) {
             if (space) {
               if (fillout) {
-                j += wrap - space;
+                j += tc_fill_out(wrap, space);
               }
               col -= space;
               space = 0;
@@ -905,6 +962,11 @@ void f_terminal_colour() {
               buflen -= space_buflen;
               space_buflen = 0;
             } else {
+              /* the composition pass pads this line from the column the
+               * overflowing character started at */
+              if (fillout) {
+                j += tc_fill_out(wrap, col_at_z);
+              }
               j++;
               col = cw.width;
               j += resetstrlen + curcolourlen;
@@ -920,6 +982,9 @@ void f_terminal_colour() {
 
         /* If we get here, we ended a line by wrapping */
         if (z + 1 != lens[i] || col) {
+          if (!col) {
+            indent_owed = indent;
+          }
           j += indent;
           col += indent;
         } else {
@@ -927,11 +992,25 @@ void f_terminal_colour() {
         }
 
         if (j > max_string_length) {
-          lens[i] -= (j - max_string_length);
-          j = max_string_length;
-          if (lens[i] < z) {
-            /* must have been ok or we wouldn't be here */
-            lens[i] = z;
+          LPC_INT const over = j - max_string_length;
+          truncated = 1;
+          if (lens[i] - over > z) {
+            /* dropping bytes after this line break is enough */
+            lens[i] -= over;
+            j = max_string_length;
+            if (z + 1 == lens[i]) {
+              j -= indent_owed; /* the break now ends the result */
+            }
+          } else {
+            /* The line break itself (its fill-out padding, reset/colour
+             * codes and indent) does not fit: end the result just before
+             * the character holding byte z. Charging the break and then
+             * cutting the bytes behind it, as this used to, left j
+             * disagreeing with what the composition pass writes -- "Length
+             * miscalculated", or a heap overflow when it wrote more. */
+            j = seq_j - seq_owed;
+            buflen = seq_buflen;
+            lens[i] = seq_z;
             break;
           }
         }
@@ -980,12 +1059,12 @@ void f_terminal_colour() {
       tc_colwidth_state cw;
       for (k = 0; k < lens[i]; k++) {
         int n;
-        int endpad = wrap - col;
+        LPC_INT endpad = tc_fill_out(wrap, col);
         char const c = p[k];
         *pt++ = c;
         buflen++;
         if (c == '\n') {
-          endpad = wrap - col;
+          endpad = tc_fill_out(wrap, col);
           col = 0;
           kind = 0;
           space = space_garbage = 0;
@@ -1013,7 +1092,7 @@ void f_terminal_colour() {
           }
           if (col > wrap) {
             if (space) {
-              endpad = wrap - space;
+              endpad = tc_fill_out(wrap, space);
               col -= space;
               space = 0;
               kind = 1;
@@ -1091,7 +1170,7 @@ void f_terminal_colour() {
 #ifndef DEBUG
   if (ncp - deststr != j) {
     fatal(
-        "Length miscalculated in terminal_colour()\n    Expected: %d Was: %td\n "
+        "Length miscalculated in terminal_colour()\n    Expected: %" LPC_INT_FMTSTR_P " Was: %td\n "
         "   String: %s\n    Indent: %" LPC_INT_FMTSTR_P " Wrap: %" LPC_INT_FMTSTR_P "\n",
         j, ncp - deststr, sp->u.string, indent, wrap);
   }
