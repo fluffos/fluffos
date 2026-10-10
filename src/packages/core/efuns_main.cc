@@ -1711,7 +1711,8 @@ void f_secure_random() {
 #ifdef F_READ_BYTES
 void f_read_bytes() {
   char* str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
+  LPC_INT start = 0, len = 0;
+  int rlen = 0, num_arg = st_num_arg;
   svalue_t* arg;
 
   arg = sp - num_arg + 1;
@@ -1736,7 +1737,8 @@ void f_read_bytes() {
 #ifdef F_READ_BUFFER
 void f_read_buffer() {
   char* str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
+  LPC_INT start = 0, len = 0;
+  int rlen = 0, num_arg = st_num_arg;
   int from_file = 0; /* new line */
   svalue_t* arg = sp - num_arg + 1;
 
@@ -1773,7 +1775,7 @@ void f_read_buffer() {
 #ifdef F_READ_FILE
 void f_read_file() {
   char* str;
-  int start = 0, len = 0;
+  LPC_INT start = 0, len = 0;
 
   switch (st_num_arg) {
     case 3:
