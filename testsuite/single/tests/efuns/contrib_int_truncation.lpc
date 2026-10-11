@@ -29,9 +29,18 @@ void do_tests() {
   ASSERT_EQ(sizeof(repeat_string("ab", 0x7fffffff)), sizeof(repeat_string("ab", 0x100000002)));
 #endif
 #if efun_defined(roll_MdN)
+  // Package dwlib declares roll_MdN(int, int); contrib adds an optional
+  // bonus. With dwlib's two-argument spec the implementation read `rolls`
+  // from the stack slot below its first argument, so three 1-sided dice
+  // rolled 0. Valid on either spec:
+  ASSERT_EQ(3, roll_MdN(3, 1));
+#ifndef __PACKAGE_DWLIB__
   // roll_MdN() kept rolls/sides/bonus in `int`: a bonus of 1 << 32 was
   // dropped, and 0x100000001 rolls rolled once. One 1-sided die is 1.
   ASSERT_EQ(1 + 0x100000000, roll_MdN(1, 1, 0x100000000));
   ASSERT(catch(roll_MdN(0x100000001, 1, 0)));
+#else
+  ASSERT(catch(roll_MdN(0x100000001, 1)));
+#endif
 #endif
 }

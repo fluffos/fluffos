@@ -2951,9 +2951,14 @@ void f_roll_MdN() {
   LPC_INT sides, rolls, bonus;
   LPC_INT roll = 0;
 
-  rolls = (sp - 2)->u.number;
-  sides = (sp - 1)->u.number;
-  bonus = sp->u.number;
+  /* Read the arguments relative to num_arg: package dwlib declares this efun
+   * as roll_MdN(int, int) with no bonus, and when it is enabled that spec is
+   * the one compiled in -- reading three fixed slots then took `rolls` from
+   * the caller's stack below the first argument (roll_MdN(3, 1) gave 0). */
+  svalue_t* args = sp - num_arg + 1;
+  rolls = args[0].u.number;
+  sides = args[1].u.number;
+  bonus = num_arg > 2 ? args[2].u.number : 0;
 
   /* rolls used to be an int, so a count past 32 bits wrapped (0x100000001
    * rolled once). Keep the old int ceiling on the loop -- this loop is not
