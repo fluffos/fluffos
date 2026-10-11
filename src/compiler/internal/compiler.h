@@ -151,6 +151,13 @@ extern const char* compiler_type_names[];
  * cross a catch boundary" and is cleared by a loop/switch, so an ordinary
  * `for (...) { break; }` written inside catch { } still compiles. */
 #define NO_SUSPEND_CONTEXT 0x800
+/* inside the body of a catch / time_expression / acatch, at any depth below
+ * it -- carried through loop, foreach and switch entry (which drop
+ * ACATCH_CONTEXT), cleared by function bodies and (: :) functionals, whose
+ * code runs later, outside the catch. pop_value() keeps operations that can
+ * raise an error while it is set, since raising one is what the catch is
+ * there to observe. */
+#define KEEP_ERRORS_CONTEXT 0x1000
 
 /* A block used in EXPRESSION position -- catch {}, time_expression
  * {} -- saves the parser state it is about to clobber on Bison's own value
@@ -186,6 +193,9 @@ struct function_context_t {
    * slot is the damage. */
   int entry_num_locals;
   struct function_context_t* parent;
+  /* the enclosing KEEP_ERRORS_CONTEXT bit: a (: :) body runs later, outside
+   * any catch it is written in, so the bit is cleared for its body */
+  int saved_keep_errors;
 };
 
 extern function_context_t* current_function_context;

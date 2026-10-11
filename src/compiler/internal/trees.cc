@@ -470,14 +470,14 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
 
 parse_node_t* pop_value(parse_node_t* pn) {
   if (pn) {
-    /* Inside a catch / time_expression (at any depth, loops included) or an
-     * acatch, an expression statement or the left side of a comma is
-     * evaluated for the same reason the catch(expr) body is: so its errors
-     * reach the catch. Prune it the error-preserving way there too, or
-     * `catch(a[i], 0)` and `catch { a[i]; }` would still be empty. */
-    parse_node_t* ret = (context & (NO_SUSPEND_CONTEXT | ACATCH_CONTEXT))
-                            ? insert_pop_value_keep_errors(pn)
-                            : insert_pop_value(pn);
+    /* Inside the body of a catch / time_expression / acatch (at any depth,
+     * loops and switches included; not inside a function or functional
+     * defined there), an expression statement or the left side of a comma
+     * is evaluated for the same reason the catch(expr) body is: so its
+     * errors reach the catch. Prune it the error-preserving way there too,
+     * or `catch(a[i], 0)` and `catch { a[i]; }` would still be empty. */
+    parse_node_t* ret = (context & KEEP_ERRORS_CONTEXT) ? insert_pop_value_keep_errors(pn)
+                                                        : insert_pop_value(pn);
 
     if (!ret) {
       if (pn->kind == NODE_BINARY_OP && pn->v.number >= F_EQ && pn->v.number <= F_GT) {

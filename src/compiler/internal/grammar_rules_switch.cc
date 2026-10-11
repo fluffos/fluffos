@@ -17,7 +17,7 @@ extern int num_refs;
 void rule_switch_pre(LPC_INT* saved_context, LPC_INT* saved_cases_size) {
   *saved_context = context;
   /* see rule_loop_open(): NO_SUSPEND_CONTEXT must survive switch entry */
-  context &= (LOOP_CONTEXT | NO_SUSPEND_CONTEXT);
+  context &= (LOOP_CONTEXT | NO_SUSPEND_CONTEXT | KEEP_ERRORS_CONTEXT);
   context |= SWITCH_CONTEXT;
   *saved_cases_size = mem_block[A_CASES].current_size;
 }

@@ -579,6 +579,8 @@ void push_function_context() {
   fc->bindable = 0;
   fc->entry_num_locals = max_num_locals;
   fc->parent = current_function_context;
+  fc->saved_keep_errors = context & KEEP_ERRORS_CONTEXT;
+  context &= ~KEEP_ERRORS_CONTEXT;
 
   current_function_context = fc;
 }
@@ -592,6 +594,7 @@ void pop_function_context() {
     --failed_function_context_pushes;
     return;
   }
+  context = (context & ~KEEP_ERRORS_CONTEXT) | current_function_context->saved_keep_errors;
   current_function_context = current_function_context->parent;
   last_function_context--;
 }

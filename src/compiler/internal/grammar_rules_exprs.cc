@@ -76,7 +76,7 @@ void rule_catch(parse_node_t** result, parse_node_t* expr_or_block, LPC_INT save
 
 LPC_INT rule_acatch_context_open() {
   LPC_INT saved = PACK_SAVED_CONTEXT(context, current_type);
-  context = (context & NO_SUSPEND_CONTEXT) | ACATCH_CONTEXT;
+  context = (context & NO_SUSPEND_CONTEXT) | ACATCH_CONTEXT | KEEP_ERRORS_CONTEXT;
   return saved;
 }
 
