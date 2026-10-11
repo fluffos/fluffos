@@ -137,6 +137,17 @@ static inline void replace_lvalue_with_value_on_stack(svalue_t* slot, const char
   free_svalue(&tmp, where);
 }
 
+/* The "is it false" test of ||= / &&= on the slot an lvalue names. A buffer
+ * byte lvalue is a T_LVALUE_BYTE, not a number, so the bare number check
+ * read every byte -- 0 included -- as true and `b[i] ||= v` never assigned.
+ * (A string character is never 0, so its lvalue rightly reads as true.) */
+static inline bool logical_lvalue_is_false(const svalue_t* lval) {
+  if (lval->type == T_LVALUE_BYTE) {
+    return *lval->u.lvalue_byte == 0;
+  }
+  return (lval->type == T_NUMBER && !lval->u.number) || (lval->type == T_REAL && !lval->u.real);
+}
+
 static inline void assign_value_to_lvalue(svalue_t* lval, svalue_t* value, const char* where) {
   switch (lval->type) {
     case T_LVALUE_BYTE: {
@@ -709,10 +720,14 @@ refed_t* lv_parent;
  * free), and the shapes that go on to push_indexed_lvalue() /
  * push_lvalue_range() / F_MAKE_REF have no later point that owns it (that
  * was a leak). It is parked here instead, owning that one reference, and
- * released when the next temporary is parked: by then the store through the
- * previous one has finished, because a store evaluates its right-hand side
- * and its index expressions before its own member lvalue, and a `ref`
- * argument keeps its container alive through F_MAKE_REF's own reference. */
+ * released when the next temporary is parked. By then the store through the
+ * previous one has finished: an ordinary or compound store evaluates its
+ * right-hand side and index expressions before its own member lvalue; a
+ * `ref` argument keeps its container alive through F_MAKE_REF's own
+ * reference; and ||= / &&= / ??=, which DO run LPC between pushing the
+ * lvalue and storing, take their own reference first
+ * (push_logical_assign_keepalive). A parked temporary, and whatever it
+ * holds, stays alive until the next one is parked -- one value at most. */
 static svalue_t parked_lvalue_owner = {T_NUMBER};
 
 static void park_lvalue_owner(int type, refed_t* owner) {
@@ -725,6 +740,37 @@ static void park_lvalue_owner(int type, refed_t* owner) {
 void release_parked_lvalue_owner() {
   free_svalue(&parked_lvalue_owner, "release_parked_lvalue_owner");
   parked_lvalue_owner = const0;
+}
+
+/* ||=, &&= and ??= keep their lvalue on the stack while the right-hand side
+ * -- arbitrary LPC -- runs, and only then store through it. If that LPC drops
+ * the last reference to the container the lvalue points into (`ga[0] ||=
+ * drop()` where drop() does `ga = 0`, or a temporary member container that
+ * a later member lvalue releases from parked_lvalue_owner), the store wrote
+ * freed memory. So when the right-hand side is about to run, push a counted
+ * reference to that container (or 0 for a local / global slot) above the
+ * lvalue; F_ASSIGN_VALUE releases it after the store, and an error unwind
+ * frees it like any other stack value. The container is whatever the last
+ * lvalue step recorded: lv_owner, or for a string character lv_parent (the
+ * container of the slot that holds the string). Not covered: the
+ * right-hand side deleting the very mapping key being assigned -- the
+ * mapping stays alive but that node does not. */
+static void push_logical_assign_keepalive() {
+  int type = lv_owner_type;
+  refed_t* owner = lv_owner;
+  if (type == T_STRING) {
+    type = lv_parent_type;
+    owner = lv_parent;
+  }
+  STACK_INC;
+  if (owner && (type == T_ARRAY || type == T_CLASS || type == T_MAPPING || type == T_BUFFER)) {
+    owner->ref++;
+    sp->type = type;
+    sp->subtype = 0;
+    sp->u.refed = owner;
+  } else {
+    *sp = const0;
+  }
 }
 
 void free_indexed_lvalue(svalue_t* v) {
@@ -3233,8 +3279,8 @@ void eval_instruction(char* p) {
           error("Invalid Program: non-lvalue argument to ||=.");
         }
         svalue_t* lval = lvalue_target(sp);
-        if ((lval->type == T_NUMBER && !lval->u.number) ||
-            (lval->type == T_REAL && !lval->u.real)) {
+        if (logical_lvalue_is_false(lval)) {
+          push_logical_assign_keepalive();
           pc += 2;
         } else {
           replace_lvalue_with_value_on_stack(sp, "F_LOR_EQ");
@@ -3248,12 +3294,12 @@ void eval_instruction(char* p) {
           error("Invalid Program: non-lvalue argument to &&=.");
         }
         svalue_t* lval = lvalue_target(sp);
-        if ((lval->type == T_NUMBER && !lval->u.number) ||
-            (lval->type == T_REAL && !lval->u.real)) {
+        if (logical_lvalue_is_false(lval)) {
           replace_lvalue_with_value_on_stack(sp, "F_LAND_EQ");
           COPY_SHORT(&offset, pc);
           pc += offset;
         } else {
+          push_logical_assign_keepalive();
           pc += 2;
         }
         break;
@@ -3264,6 +3310,7 @@ void eval_instruction(char* p) {
         }
         svalue_t* lval = lvalue_target(sp);
         if (lval->type == T_NUMBER && !lval->u.number && (lval->subtype == T_UNDEFINED)) {
+          push_logical_assign_keepalive();
           pc += 2;
         } else {
           replace_lvalue_with_value_on_stack(sp, "F_NULLISH_EQ");
@@ -3856,11 +3903,12 @@ void eval_instruction(char* p) {
         assign_through_lvalue();
         break;
       case F_ASSIGN_VALUE: {
-        if (is_stack_lvalue(sp) || !is_stack_lvalue(sp - 1)) {
+        /* stack: lvalue, the container keep-alive F_*_EQ pushed, value */
+        if (is_stack_lvalue(sp) || is_stack_lvalue(sp - 1) || !is_stack_lvalue(sp - 2)) {
           error("Invalid Program: bad stack for F_ASSIGN_VALUE.");
         }
         svalue_t* value = sp;
-        svalue_t* lval_slot = sp - 1;
+        svalue_t* lval_slot = sp - 2;
         svalue_t* dest = lvalue_target(lval_slot);
         if (is_indexed_lvalue(dest)) {
           assign_value_to_lvalue(dest, value, "F_ASSIGN_VALUE");
@@ -3870,6 +3918,8 @@ void eval_instruction(char* p) {
         free_svalue(lval_slot, "F_ASSIGN_VALUE");
         assign_svalue_no_free(lval_slot, value);
         free_svalue(sp--, "F_ASSIGN_VALUE");
+        /* only now may the container go */
+        free_svalue(sp--, "F_ASSIGN_VALUE keep-alive");
         break;
       }
       case F_ASSIGN_LOCAL: {
