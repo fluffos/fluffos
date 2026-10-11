@@ -10,8 +10,8 @@
 #include "base/package_api.h"
 
 #include <algorithm>
-#include <string>
-#include <unordered_set>
+#include <set>
+#include <utility>
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -1035,27 +1035,43 @@ void f_match_path() {
 #endif /* F_MATCH_PATH */
 
 #ifdef F_MEMBER_ARRAY
-/* member_array(int, string) is a BYTE search: the start offset and the
- * result are byte offsets and only one byte can match. That equals a
- * character index only while the string is ASCII, so on a non-ASCII string
- * the caller is told once (per call site) what to use instead. */
-static void warn_member_array_non_ascii() {
-  static std::unordered_set<std::string> warned;
+/* member_array(int, string) is a BYTE search (strchr): the start offset and
+ * the result are byte offsets and only one byte can match. A byte offset
+ * equals a character index only across ASCII, CR-free text (CR LF is one
+ * character), and a needle above 0x7F can only hit the inside of a UTF-8
+ * sequence. Those are the cases that get a warning -- an ASCII needle that is
+ * not found, or found after only ASCII text, is right as it is. */
+static bool has_non_ascii_or_cr(const char* s, size_t n) {
+  for (size_t k = 0; k < n; k++) {
+    auto const b = static_cast<unsigned char>(s[k]);
+    if (b >= 0x80 || b == '\r') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Once per call site. The site is keyed on (program, bytecode offset), which
+ * is cheap to test on every call; the file and line are only resolved the
+ * first time a site warns. */
+static void warn_member_array_byte_search() {
+  static std::set<std::pair<const program_t*, ptrdiff_t>> warned;
   static constexpr size_t kMaxWarnedSites = 1024; /* call sites are finite; just bound it */
+  std::pair<const program_t*, ptrdiff_t> const site(
+      current_prog, current_prog ? pc - current_prog->program : 0);
+  if (warned.size() >= kMaxWarnedSites || !warned.insert(site).second) {
+    return;
+  }
   const char* file = nullptr;
   int line = 0;
   if (current_prog) {
     get_line_number_info(&file, &line);
   }
-  std::string where = std::string("/") + (file ? file : "<unknown>") + ":" + std::to_string(line);
-  if (warned.size() >= kMaxWarnedSites || !warned.insert(where).second) {
-    return;
-  }
   debug_message(
-      "%s: Warning: member_array(int, string) on a non-ASCII string searches BYTES and returns "
-      "a byte offset, not a character index. Use strsrch(str, ch) to find a character (any "
-      "Unicode code point) by character index.\n",
-      where.c_str());
+      "/%s:%d: Warning: member_array(int, string) searches BYTES and returns a byte offset; on "
+      "this non-ASCII string that is not a character index. Use strsrch(str, ch) to find a "
+      "character (any Unicode code point) by character index.\n",
+      file ? file : "<unknown>", line);
 }
 
 void f_member_array() {
@@ -1092,13 +1108,25 @@ void f_member_array() {
      * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
      * terminator), so it can never be in the string. */
     LPC_INT const c = (sp - 1)->u.number;
-    if (!SVALUE_STR_ASCII(sp)) {
-      warn_member_array_non_ascii();
-    }
+    LPC_INT const start = i;
     if (c >= 0 && c <= 255 && (res = strchr(sp->u.string + i, static_cast<int>(c)))) {
       i = res - sp->u.string;
     } else {
       i = -1;
+    }
+    if (!SVALUE_STR_ASCII(sp)) { /* cached; ASCII and CR-free never warns */
+      const char* str = sp->u.string;
+      bool misleading;
+      if (c > 0x7f) {
+        misleading = has_non_ascii_or_cr(str, SVALUE_STRLEN(sp));
+      } else {
+        /* the text before the match (or before the start offset) */
+        LPC_INT const upto = i >= 0 ? i : start;
+        misleading = upto > 0 && has_non_ascii_or_cr(str, static_cast<size_t>(upto));
+      }
+      if (misleading) {
+        warn_member_array_byte_search();
+      }
     }
     free_string_svalue(sp--);
   } else {

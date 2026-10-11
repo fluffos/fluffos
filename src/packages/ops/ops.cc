@@ -660,16 +660,6 @@ void f_parse_command() {
  * ints. Every bound outside [-(len + 1), len + 1] already selects the same
  * clamped (or empty) range as that edge does, so clamp to it first: narrowing
  * the raw value would wrap 0x100000001 back to 1. */
-static int32_t clamp_range_bound(LPC_INT bound, LPC_INT len);
-
-/* Buffers under `old range behavior` wrap a reverse/negative bound a SECOND
- * time (`len - x`, then `+= len`), so a bound up to 2*len still selects a
- * distinct byte there; clamp them at +-(2*len + 1), past which every bound
- * already selects the same thing. */
-static int32_t clamp_buffer_range_bound(LPC_INT bound, LPC_INT len) {
-  return clamp_range_bound(bound, CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__) ? 2 * len : len);
-}
-
 static int32_t clamp_range_bound(LPC_INT bound, LPC_INT len) {
   if (bound > len + 1) {
     return static_cast<int32_t>(len + 1);
@@ -678,6 +668,14 @@ static int32_t clamp_range_bound(LPC_INT bound, LPC_INT len) {
     return static_cast<int32_t>(-(len + 1));
   }
   return static_cast<int32_t>(bound);
+}
+
+/* Buffers under `old range behavior` wrap a reverse/negative bound a SECOND
+ * time (`len - x`, then `+= len`), so a bound up to 2*len still selects a
+ * distinct byte there; clamp them at +-(2*len + 1), past which every bound
+ * already selects the same thing. */
+static int32_t clamp_buffer_range_bound(LPC_INT bound, LPC_INT len) {
+  return clamp_range_bound(bound, CONFIG_INT(__RC_OLD_RANGE_BEHAVIOR__) ? 2 * len : len);
 }
 
 void f_range(int code) {

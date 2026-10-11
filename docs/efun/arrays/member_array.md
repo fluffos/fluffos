@@ -22,10 +22,14 @@ title: arrays / member_array
     Note, if the second argument is a string, the first parameter must be an int
     representing the character you are looking for in the provided string.
     The string form is a BYTE search: 'start' and the result are byte
-    offsets, and only a single byte (0..255) can match. Those equal character
-    indexes only while the string is ASCII, so on a non-ASCII string the
-    driver logs a warning (once per call site). To find any Unicode code
-    point by character index, use strsrch(str, ch) instead.
+    offsets, and only a single byte (0..255) can match. A byte offset equals
+    a character index only across ASCII text (CR LF counts as one
+    character), and a value above 0x7F can only match part of a UTF-8
+    sequence. So when 'item' is above 0x7F and the string is not ASCII, or
+    when 'start' or the match comes after non-ASCII text, the driver logs a
+    warning (once per call site). An ASCII 'item' that is not found, or is
+    found before any non-ASCII text, is correct as it is. To find any
+    Unicode code point by character index, use strsrch(str, ch) instead.
 
     The optional 'flags' argument is a bit field:
 
