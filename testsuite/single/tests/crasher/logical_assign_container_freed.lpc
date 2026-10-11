@@ -1,0 +1,108 @@
+// Regression: ||=, &&= and ??= push their lvalue, then run the right-hand
+// side -- arbitrary LPC -- and only then store through the lvalue
+// (icode.cc NODE_LOGICAL_ASSIGN: lvalue, F_LOR_EQ/F_LAND_EQ/F_NULLISH_EQ,
+// rhs, F_ASSIGN_VALUE). If the right-hand side dropped the last reference
+// to the container the lvalue points into, the store wrote freed memory:
+//   ga[0] ||= drop()            drop() does `ga = 0` (pre-existing on master)
+//   mk()->x ||= other()         a temporary class held only by
+//   mkm().arr[<2] ||= other()   parked_lvalue_owner, which other() releases
+//                               by parking a temporary of its own
+// and the same through a string character and a buffer byte. The logical
+// assigns now take a counted reference to the lvalue's container before the
+// right-hand side runs (push_logical_assign_keepalive) and F_ASSIGN_VALUE
+// drops it after the store. The regression signal is ASan
+// heap-use-after-free on the unfixed driver; fixed, every result is right
+// and the orphaned container just goes away.
+class Holder {
+  mixed arr;
+  mixed x;
+  string s;
+}
+
+mixed *ga;
+mapping gm;
+string *gs;
+buffer *gb;
+
+class Holder mk() {
+  return new(class Holder, arr: ({ 0, ({ 0, 3 }) }), x: 0, s: "abc");
+}
+
+mapping mkm() {
+  return ([ "arr": ({ 0, 0 }), "x": 0 ]);
+}
+
+// releases whatever temporary is parked, by parking new ones
+int churn() {
+  mk()->arr[<1] = 5;
+  mkm().arr[<1] = 6;
+  mk()->arr[<1] = 7;
+  return 42;
+}
+
+int drop_array() {
+  ga = 0;
+  return 42;
+}
+
+int drop_mapping() {
+  gm = 0;
+  return 42;
+}
+
+int drop_strings() {
+  gs = 0;
+  return 'z';
+}
+
+int drop_buffers() {
+  gb = 0;
+  return 9;
+}
+
+void do_tests() {
+  mixed r;
+
+  // the container itself is dropped by the right-hand side
+  ga = ({ 0, 1 });
+  ASSERT_EQ(42, ga[0] ||= drop_array());
+  ga = ({ 1, 1 });
+  ASSERT_EQ(42, ga[0] &&= drop_array());
+  gm = ([]);  // a missing key is undefined, so ??= assigns
+  ASSERT_EQ(42, gm["k"] ??= drop_mapping());
+  gm = ([ "k": 0 ]);
+  ASSERT_EQ(42, gm["k"] ||= drop_mapping());
+  gs = ({ "abc" });
+  ASSERT_EQ('z', gs[0][1] &&= drop_strings());
+  // (a 0 byte is false: `||=` on a buffer byte used to read every byte,
+  // 0 included, as true and never assign)
+  gb = ({ allocate_buffer(2) });
+  ASSERT_EQ(9, gb[0][1] ||= drop_buffers());
+
+  // a temporary member container released by a later parked temporary
+  ASSERT_EQ(42, mk()->x ||= churn());
+  ASSERT_EQ(42, mk()->arr[<2] ||= churn());
+  ASSERT_EQ(42, mk()->arr[1][0] ||= churn());
+  ASSERT_EQ(42, mkm().arr[<2] ||= churn());
+  ASSERT_EQ(42, mkm().x ||= churn());
+  ASSERT_EQ('z', mk()->s[<1] &&= (churn(), 'z'));
+
+  // held containers: the store is visible
+  {
+    class Holder h = mk();
+    r = (h->x ||= churn());
+    ASSERT_EQ(42, h->x);
+    ga = ({ 0 });
+    ga[0] ||= 5;
+    ASSERT_EQ(({ 5 }), ga);
+    {
+      buffer b = allocate_buffer(2);
+      b[0] ||= 7;
+      b[1] = 3;
+      b[1] ||= 8;
+      b[1] &&= 4;
+      ASSERT_EQ(7, b[0]);
+      ASSERT_EQ(4, b[1]);
+    }
+  }
+}

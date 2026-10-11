@@ -7,17 +7,16 @@
 //   f(ref mk()->arr[0])      reference to an element of the member
 //   mkm().arr[<1] = v        the same, for a mapping member
 // F_MEMBER_LVALUE and F_MAP_MEMBER_LVALUE (src/vm/internal/base/interpret.cc)
-// drop the stack's reference with a bare `ref--`, so that the container is
-// not freed while the lvalue still points into it (freeing it there was the
-// heap-use-after-free #1358 fixed for classes). The fused F_MEMBER_OP /
-// F_MEMBER_INDEX_OP / F_MAP_MEMBER_*_OP own that reference and release it
-// after the store, but the shapes above still go through *_MEMBER_LVALUE
-// followed by push_indexed_lvalue() / push_lvalue_range() / F_MAKE_REF, and
-// nothing ever releases the container afterwards: a ref-0 block nobody owns.
-// The values are checked here, but the regression signal is LeakSanitizer
-// (allocate_class() / allocate_mapping() blocks reported at exit) on a
-// sanitizer build. Before #1358 the class shapes instead read and wrote freed
-// memory (ASan heap-use-after-free in push_indexed_lvalue()/push_lvalue_range()).
+// used to drop the stack's reference with a bare `ref--` (freeing it there
+// was the heap-use-after-free #1358 fixed for classes), and those shapes go
+// on to push_indexed_lvalue() / push_lvalue_range() / F_MAKE_REF, so nothing
+// ever released the container: a ref-0 block nobody owned. They now park the
+// last reference in parked_lvalue_owner, released when the next temporary is
+// parked. The values are checked here, but the regression signal is
+// LeakSanitizer (allocate_class() / allocate_mapping() blocks reported at
+// exit) on a sanitizer build. Before #1358 the class shapes instead read and
+// wrote freed memory (ASan heap-use-after-free in push_indexed_lvalue() /
+// push_lvalue_range()).
 class Holder {
   mixed arr;
 }
