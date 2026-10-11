@@ -62,7 +62,37 @@ struct codepoint_lvalue_t {
 struct range_lvalue_t {
   size_t ind1, ind2, size;
   svalue_t* owner;
+  uint32_t type; /* owner's type when the lvalue was pushed */
 };
+
+/* A range lvalue records its indices against the owner's size at push time.
+ * `x[a..b] &&= rhs` runs arbitrary LPC between the push and the store, and
+ * an rhs that shrinks or retypes the owner (`a = ({1})`) left the store
+ * copying with the stale indices -- a heap-buffer-overflow, pre-existing.
+ * Re-validate before writing; same type and size keeps the indices in
+ * bounds (and the byte offsets of a string on its old character
+ * boundaries is the most a same-length replacement can disturb). */
+static void check_range_lvalue_target(const range_lvalue_t* box) {
+  const svalue_t* owner = box->owner;
+  size_t cur;
+  switch (owner->type) {
+    case T_ARRAY:
+      cur = owner->u.arr->size;
+      break;
+    case T_STRING:
+      cur = SVALUE_STRLEN(owner);
+      break;
+    case T_BUFFER:
+      cur = owner->u.buf->size;
+      break;
+    default:
+      cur = static_cast<size_t>(-1);
+      break;
+  }
+  if (owner->type != box->type || cur != box->size) {
+    error("The value indexed by a range lvalue changed before the assignment.\n");
+  }
+}
 
 template <typename F>
 void assign_lvalue_codepoint(svalue_t* lval, F&& func);
@@ -752,9 +782,11 @@ void release_parked_lvalue_owner() {
  * lvalue; F_ASSIGN_VALUE releases it after the store, and an error unwind
  * frees it like any other stack value. The container is whatever the last
  * lvalue step recorded: lv_owner, or for a string character lv_parent (the
- * container of the slot that holds the string). Not covered: the
- * right-hand side deleting the very mapping key being assigned -- the
- * mapping stays alive but that node does not. */
+ * container of the slot that holds the string). A range lvalue's own
+ * indices are re-validated at the store (check_range_lvalue_target). Not
+ * covered: the right-hand side deleting the very mapping key being
+ * assigned -- the mapping stays alive but that node does not, and since
+ * nodes are pooled the store can land in whatever key reuses it. */
 static void push_logical_assign_keepalive() {
   int type = lv_owner_type;
   refed_t* owner = lv_owner;
@@ -1055,6 +1087,7 @@ static void push_lvalue_range(int code) {
   box->ind2 = static_cast<size_t>(ind2);
   box->size = size;
   box->owner = lv;
+  box->type = lv->type;
   sp->type = T_LVALUE_RANGE;
   sp->subtype = 0;
   sp->u.range_lv = box;
@@ -1097,6 +1130,8 @@ void copy_lvalue_range(svalue_t* lval, svalue_t* from) {
   int ind1, ind2, size, fsize;
   svalue_t* owner;
   range_lvalue_t* box = lval->u.range_lv;
+
+  check_range_lvalue_target(box);
 
   ind1 = static_cast<int>(box->ind1);
   ind2 = static_cast<int>(box->ind2);
@@ -1325,6 +1360,8 @@ void assign_lvalue_range(svalue_t* lval, svalue_t* from) {
   int ind1, ind2, size, fsize;
   svalue_t* owner;
   range_lvalue_t* box = lval->u.range_lv;
+
+  check_range_lvalue_target(box);
 
   ind1 = static_cast<int>(box->ind1);
   ind2 = static_cast<int>(box->ind2);

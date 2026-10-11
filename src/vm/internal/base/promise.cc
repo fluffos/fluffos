@@ -2086,7 +2086,7 @@ void coroutine_await_pending(promise_t* awaited) {
    *     destination (and the common ones push no lvalue at all:
    *     F_*_ASSIGN_LOCAL/GLOBAL, F_*_OP), so none is pending there; the one
    *     shape that holds an lvalue across LPC is ||= / &&= / ??=, e.g.
-   *     `s[0] ||= await p`, which this refuses.
+   *     `a[0] ||= await p`, which this refuses.
    *   - T_REF and T_ERROR_HANDLER own heap state whose unwind is tied to
    *     this C++ frame. */
   for (svalue_t* v = fp; v < sp; v++) {
