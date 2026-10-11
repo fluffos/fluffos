@@ -2,17 +2,24 @@
 // expr)) was popped with insert_pop_value() (compiler/internal/trees.cc),
 // the same void-context pruning an expression statement gets. That pruning
 // deletes "side-effect free" operations -- an index, a range, arithmetic, a
-// comparison, a member access, unary minus -- but every one of those can
-// raise an error, and raising one is exactly what catch() is asked to
-// observe. catch(s[i]) compiled to an EMPTY catch and returned 0 for any i,
-// so a test written as ASSERT(catch(a[i])) passed whether or not a[i] errors.
-// The body is now evaluated and its value popped; only genuinely inert
-// values (literals, plain variable reads) are still dropped.
+// comparison, a member access, unary minus, a ref read, a function
+// constructor's $() captures -- but every one of those can raise an error,
+// and raising one is exactly what catch() is asked to observe. catch(s[i])
+// compiled to an EMPTY catch and returned 0 for any i, so a test written as
+// ASSERT(catch(a[i])) passed whether or not a[i] errors. The same pruning hit
+// the left side of a comma and expression statements inside a catch block
+// or time_expression (`catch(a[i], 0)`, `catch { a[i]; }`). All of these are
+// now evaluated and their value popped; inside such a region only genuinely
+// inert values (literals, plain variable reads) are still dropped.
 class Pt {
   int x;
 }
 
 int calls;
+
+void read_ref(int ref r, mixed ref out) {
+  out = catch(r);
+}
 
 int bump() {
   calls++;
@@ -45,9 +52,31 @@ void do_tests() {
   ASSERT_EQ(1, calls);
   ASSERT(catch(five ? a[five] : 0));
 
+  // the left side of a comma, and statements in a catch block (also inside
+  // a loop there)
+  ASSERT(catch(a[five], 0));
+  ASSERT(catch((a[five], 0), 0));
+  ASSERT(catch { a[five]; });
+  ASSERT(catch {
+    for (int i = 0; i < 1; i++) {
+      a[five];
+    }
+  });
+  // a function constructor's $() captures run when it is built
+  ASSERT(catch((: $(a[five]) :)));
+
   // in range: still no error, and still 0
   ASSERT_EQ(0, catch(s[1]));
   ASSERT_EQ(0, catch(a[0] + a[1]));
   ASSERT_EQ(0, catch(five / 1));
   ASSERT_EQ(0, catch(s));
+  ASSERT_EQ(0, catch(a[0], s[1]));
+  ASSERT_EQ(0, catch { a[0]; });
+
+  // reading a ref whose target is gone raises an error
+  {
+    mixed out;
+    this_object()->read_ref(5, ref out);
+    ASSERT(out);
+  }
 }

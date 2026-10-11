@@ -387,9 +387,13 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
           }
           expr = insert_pop_value(expr->r.expr);
           return expr;
+        case F_REF:
+          if (g_keep_error_capable) {
+            break; /* reading a ref can raise "Reference is invalid" */
+          }
+          return nullptr;
         case F_LOCAL:
         case F_GLOBAL:
-        case F_REF:
           return nullptr;
         case F_EQ:
         case F_NE:
@@ -447,9 +451,13 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
           return expr;
       }
       break;
-    case NODE_PARAMETER:
     case NODE_ANON_FUNC: /* some dweeb threw away one? */
     case NODE_FUNCTION_CONSTRUCTOR:
+      if (g_keep_error_capable) {
+        break; /* building it evaluates its $() captures, which can error */
+      }
+      return nullptr;
+    case NODE_PARAMETER:
       return nullptr;
     case NODE_NUMBER:
     case NODE_STRING:
@@ -462,7 +470,14 @@ parse_node_t* insert_pop_value(parse_node_t* expr) {
 
 parse_node_t* pop_value(parse_node_t* pn) {
   if (pn) {
-    parse_node_t* ret = insert_pop_value(pn);
+    /* Inside a catch / time_expression (at any depth, loops included) or an
+     * acatch, an expression statement or the left side of a comma is
+     * evaluated for the same reason the catch(expr) body is: so its errors
+     * reach the catch. Prune it the error-preserving way there too, or
+     * `catch(a[i], 0)` and `catch { a[i]; }` would still be empty. */
+    parse_node_t* ret = (context & (NO_SUSPEND_CONTEXT | ACATCH_CONTEXT))
+                            ? insert_pop_value_keep_errors(pn)
+                            : insert_pop_value(pn);
 
     if (!ret) {
       if (pn->kind == NODE_BINARY_OP && pn->v.number >= F_EQ && pn->v.number <= F_GT) {
