@@ -10,6 +10,8 @@
 #include "base/package_api.h"
 
 #include <algorithm>
+#include <string>
+#include <unordered_set>
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -1033,6 +1035,29 @@ void f_match_path() {
 #endif /* F_MATCH_PATH */
 
 #ifdef F_MEMBER_ARRAY
+/* member_array(int, string) is a BYTE search: the start offset and the
+ * result are byte offsets and only one byte can match. That equals a
+ * character index only while the string is ASCII, so on a non-ASCII string
+ * the caller is told once (per call site) what to use instead. */
+static void warn_member_array_non_ascii() {
+  static std::unordered_set<std::string> warned;
+  static constexpr size_t kMaxWarnedSites = 1024; /* call sites are finite; just bound it */
+  const char* file = nullptr;
+  int line = 0;
+  if (current_prog) {
+    get_line_number_info(&file, &line);
+  }
+  std::string where = std::string("/") + (file ? file : "<unknown>") + ":" + std::to_string(line);
+  if (warned.size() >= kMaxWarnedSites || !warned.insert(where).second) {
+    return;
+  }
+  debug_message(
+      "%s: Warning: member_array(int, string) on a non-ASCII string searches BYTES and returns "
+      "a byte offset, not a character index. Use strsrch(str, ch) to find a character (any "
+      "Unicode code point) by character index.\n",
+      where.c_str());
+}
+
 void f_member_array() {
   array_t* v;
   int flag = 0;
@@ -1067,6 +1092,9 @@ void f_member_array() {
      * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
      * terminator), so it can never be in the string. */
     LPC_INT const c = (sp - 1)->u.number;
+    if (!SVALUE_STR_ASCII(sp)) {
+      warn_member_array_non_ascii();
+    }
     if (c >= 0 && c <= 255 && (res = strchr(sp->u.string + i, static_cast<int>(c)))) {
       i = res - sp->u.string;
     } else {

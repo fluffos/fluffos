@@ -1,0 +1,47 @@
+// member_array(int, string) is a BYTE search (strchr): the start offset and
+// the result are byte offsets, which equal character indexes only while the
+// string is ASCII. It keeps that behaviour, but on a non-ASCII string it now
+// logs a warning -- once per call site -- naming the call site and pointing
+// at strsrch(str, ch), which searches for any Unicode code point and returns
+// a character index. This pins the byte behaviour and the once-per-site
+// warning (read back from the debug log).
+#define LOG "/log/debug.log"
+
+// Warning lines for THIS file's call sites (the runner's own log lines also
+// name the file, so match the warning's "<file>:<line>: Warning:" prefix).
+int warnings_here() {
+  string log = read_file(LOG);
+
+  if (!stringp(log)) {
+    return -1;
+  }
+  return sizeof(regexp(explode(log, "\n"),
+    "member_array_non_ascii\\.lpc:[0-9]+: Warning: member_array"));
+}
+
+int search(int c, string s) {
+  return member_array(c, s);
+}
+
+void do_tests() {
+  int before = warnings_here();
+
+  if (before < 0) {
+    return;  // no readable debug log in this configuration
+  }
+
+  // ASCII: byte offset == character index, no warning
+  ASSERT_EQ(2, member_array('c', "abc"));
+  ASSERT_EQ(before, warnings_here());
+
+  // non-ASCII: still a byte search ('b' is character 1 but byte 2) ...
+  ASSERT_EQ(2, search('b', "éb"));
+  ASSERT_EQ(-1, search(0xe9, "éb"));
+  ASSERT_EQ(2, search('b', "éb"));
+  // ... and the call site is reported exactly once
+  ASSERT_EQ(before + 1, warnings_here());
+
+  // the recommended replacement gives the character index
+  ASSERT_EQ(1, strsrch("éb", 'b'));
+  ASSERT_EQ(0, strsrch("éb", 0xe9));
+}
