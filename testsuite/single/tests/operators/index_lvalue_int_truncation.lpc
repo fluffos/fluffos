@@ -1,0 +1,42 @@
+// Regression: an element store (x[i] = v, x[i] += v, x[i]++, ...) built its
+// index lvalue in push_indexed_lvalue() (interpret.cc), which kept the 64-bit
+// LPC int index in an `int` before bounds-checking it, so an index past 32
+// bits wrapped back inside the container and the store silently landed on a
+// real element: a[0x100000000] = 9 overwrote a[0], s[0x100000000] = 'x'
+// replaced the first character, and the same for buffers, globals, nested
+// x[0][i] stores and (x = y)[i] stores. A huge index must be rejected exactly
+// like a small out-of-range one.
+mixed *ga = ({ 1, 2, 3 });
+
+void do_tests() {
+  int big = 0x100000000;
+  mixed *a = ({ 1, 2, 3 });
+  mixed *aa = ({ ({ 1, 2 }) });
+  buffer b = allocate_buffer(3);
+  string s = "abc";
+
+  ASSERT(catch(a[big] = 9));
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+  ASSERT(catch(a[big] += 9));
+  ASSERT(catch(a[big]++));
+  ASSERT(catch(a[big] ||= 9));
+  ASSERT(catch(a[<big] = 9));
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+
+  ASSERT(catch(ga[big] = 9));
+  ASSERT_EQ(({ 1, 2, 3 }), ga);
+
+  ASSERT(catch(aa[0][big] = 9));
+  ASSERT(catch(aa[big][0] = 9));
+  ASSERT_EQ(({ ({ 1, 2 }) }), aa);
+  ASSERT(catch((a = a)[big] = 9));
+  ASSERT_EQ(({ 1, 2, 3 }), a);
+
+  ASSERT(catch(b[big] = 9));
+  ASSERT(catch(b[<big] = 9));
+  ASSERT_EQ(0, b[0]);
+
+  ASSERT(catch(s[big] = 'x'));
+  ASSERT(catch(s[<big] = 'x'));
+  ASSERT_EQ("abc", s);
+}

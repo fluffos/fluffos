@@ -1,0 +1,77 @@
+// member_array(int, string) is a BYTE search (strchr): the start offset and
+// the result are byte offsets, which equal character indexes only across
+// ASCII, CR-free text, and a needle above 0x7F can only hit the inside of a
+// UTF-8 sequence. It keeps that behaviour, but where the byte answer is not a
+// character answer it logs a warning -- once per call site -- pointing at
+// strsrch(str, ch). An ASCII needle that is not found, or is found after only
+// ASCII text, is correct as it is and must NOT warn. This pins the byte
+// results and exactly which call sites warn (read back from the debug log).
+
+// get_config(10) is `debug log file` (a name in LOG_DIR); asking the driver instead of assuming a
+// path, and scanning the whole log a window of lines at a time instead of one
+// head-anchored read_file() (capped at `maximum read file size`), are the two
+// traps unhandled_rejection_locus.lpc documents.
+#define DEBUG_LOG_FILE 10
+#define CHUNK_LINES 500
+#define MAX_CHUNKS 400
+#define WARNING "member_array_non_ascii\\.lpc:[0-9]+: Warning: member_array"
+
+int warnings_here() {
+  string configured = get_config(DEBUG_LOG_FILE);
+  string file;
+  int n = 0;
+
+  if (!stringp(configured) || configured == "") {
+    return -1;
+  }
+  file = LOG_DIR + "/" + configured;  // the log lives in the mudlib's log dir
+  if (file_size(file) < 0) {
+    return -1;
+  }
+  for (int chunk = 0; chunk < MAX_CHUNKS; chunk++) {
+    string text = read_file(file, chunk * CHUNK_LINES + 1, CHUNK_LINES);
+    if (!stringp(text) || text == "") {
+      break;
+    }
+    n += sizeof(regexp(explode(text, "\n"), WARNING));
+  }
+  return n;
+}
+
+int repeat_site(int c, string s) {
+  return member_array(c, s);
+}
+
+void do_tests() {
+  int before = warnings_here();
+
+  if (before < 0) {
+    return;  // no readable debug log in this configuration
+  }
+
+  // correct as byte searches: no warning
+  ASSERT_EQ(2, member_array('c', "abc"));
+  ASSERT_EQ(-1, member_array('x', "中文"));        // ASCII needle, absent
+  ASSERT_EQ(1, member_array('b', "ab中"));             // match before any non-ASCII
+  ASSERT_EQ(-1, member_array(0x4e2d, "abc"));              // nothing non-ASCII to search
+  ASSERT_EQ(before, warnings_here());
+
+  // byte answers that are not character answers: one warning per call site
+  ASSERT_EQ(2, member_array('b', "éb"));              // 'b' is character 1
+  ASSERT_EQ(3, member_array('b', "a\r\nb"));               // CR LF is one character
+  ASSERT_EQ(-1, member_array(0xe9, "café"));          // a code point, never found
+  ASSERT_EQ(-1, member_array(0x4e2d, "中文"));     // likewise
+  ASSERT_EQ(-1, member_array('x', "ébc", 2));         // byte start offset
+  ASSERT_EQ(before + 5, warnings_here());
+
+  // the same call site warns once, however often it runs
+  for (int k = 0; k < 3; k++) {
+    ASSERT_EQ(2, repeat_site('b', "éb"));
+  }
+  ASSERT_EQ(before + 6, warnings_here());
+
+  // the recommended replacement gives the character index
+  ASSERT_EQ(1, strsrch("éb", 'b'));
+  ASSERT_EQ(3, strsrch("café", 0xe9));
+  ASSERT_EQ(0, strsrch("中文", 0x4e2d));
+}

@@ -26,15 +26,15 @@ extern array_t the_null_array;
  */
 
 int sameval(svalue_t*, svalue_t*);
-array_t* allocate_array2(int, svalue_t*);
-array_t* allocate_array(int);
-array_t* allocate_empty_array(int);
+array_t* allocate_array2(LPC_INT, svalue_t*);
+array_t* allocate_array(LPC_INT);
+array_t* allocate_empty_array(LPC_INT);
 void free_array(array_t*);
 void free_empty_array(array_t*);
 array_t* add_array(array_t*, array_t*);
 void implode_array(funptr_t*, array_t*, svalue_t*, int);
 array_t* subtract_array(array_t*, array_t*);
-array_t* slice_array(array_t*, int, int);
+array_t* slice_array(array_t*, LPC_INT, LPC_INT);
 array_t* explode_string(const char* str, int slen, const char* del, int dellen, bool reversible);
 char* implode_string(array_t*, const char*, int);
 array_t* commands(struct object_t*);

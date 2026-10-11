@@ -10,6 +10,8 @@
 #include "base/package_api.h"
 
 #include <algorithm>
+#include <set>
+#include <utility>
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -405,10 +407,11 @@ void f_clear_bit() {
     error("clear_bit() bit requested : %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", sp->u.number,
           max_bitfield_bits);
   }
-  bit = (sp--)->u.number;
-  if (bit < 0) {
+  /* check the sign on the LPC int, before narrowing it (as set_bit does) */
+  if (sp->u.number < 0) {
     error("Bad argument 2 (negative) to clear_bit().\n");
   }
+  bit = (sp--)->u.number;
   ind = bit / 6;
   bit %= 6;
   len = SVALUE_STRLEN(sp);
@@ -1032,10 +1035,49 @@ void f_match_path() {
 #endif /* F_MATCH_PATH */
 
 #ifdef F_MEMBER_ARRAY
+/* member_array(int, string) is a BYTE search (strchr): the start offset and
+ * the result are byte offsets and only one byte can match. A byte offset
+ * equals a character index only across ASCII, CR-free text (CR LF is one
+ * character), and a needle above 0x7F can only hit the inside of a UTF-8
+ * sequence. Those are the cases that get a warning -- an ASCII needle that is
+ * not found, or found after only ASCII text, is right as it is. */
+static bool has_non_ascii_or_cr(const char* s, size_t n) {
+  for (size_t k = 0; k < n; k++) {
+    auto const b = static_cast<unsigned char>(s[k]);
+    if (b >= 0x80 || b == '\r') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Once per call site. The site is keyed on (program, bytecode offset), which
+ * is cheap to test on every call; the file and line are only resolved the
+ * first time a site warns. */
+static void warn_member_array_byte_search() {
+  static std::set<std::pair<const program_t*, ptrdiff_t>> warned;
+  static constexpr size_t kMaxWarnedSites = 1024; /* call sites are finite; just bound it */
+  std::pair<const program_t*, ptrdiff_t> const site(
+      current_prog, current_prog ? pc - current_prog->program : 0);
+  if (warned.size() >= kMaxWarnedSites || !warned.insert(site).second) {
+    return;
+  }
+  const char* file = nullptr;
+  int line = 0;
+  if (current_prog) {
+    get_line_number_info(&file, &line);
+  }
+  debug_message(
+      "/%s:%d: Warning: member_array(int, string) searches BYTES and returns a byte offset; on "
+      "this non-ASCII string that is not a character index. Use strsrch(str, ch) to find a "
+      "character (any Unicode code point) by character index.\n",
+      file ? file : "<unknown>", line);
+}
+
 void f_member_array() {
   array_t* v;
   int flag = 0;
-  int i;
+  LPC_INT i;
   int size;
 
   if (st_num_arg > 2) {
@@ -1062,10 +1104,29 @@ void f_member_array() {
     if (i > SVALUE_STRLEN(sp)) {
       error("Index to start search from in member_array() is > string length.\n");
     }
-    if ((res = strchr(sp->u.string + i, (sp - 1)->u.number))) {
+    /* strchr() searches for a char: a value outside 0..255 would be
+     * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
+     * terminator), so it can never be in the string. */
+    LPC_INT const c = (sp - 1)->u.number;
+    LPC_INT const start = i;
+    if (c >= 0 && c <= 255 && (res = strchr(sp->u.string + i, static_cast<int>(c)))) {
       i = res - sp->u.string;
     } else {
       i = -1;
+    }
+    if (!SVALUE_STR_ASCII(sp)) { /* cached; ASCII and CR-free never warns */
+      const char* str = sp->u.string;
+      bool misleading;
+      if (c > 0x7f) {
+        misleading = has_non_ascii_or_cr(str, SVALUE_STRLEN(sp));
+      } else {
+        /* the text before the match (or before the start offset) */
+        LPC_INT const upto = i >= 0 ? i : start;
+        misleading = upto > 0 && has_non_ascii_or_cr(str, static_cast<size_t>(upto));
+      }
+      if (misleading) {
+        warn_member_array_byte_search();
+      }
     }
     free_string_svalue(sp--);
   } else {
@@ -1706,7 +1767,8 @@ void f_secure_random() {
 #ifdef F_READ_BYTES
 void f_read_bytes() {
   char* str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
+  LPC_INT start = 0, len = 0;
+  int rlen = 0, num_arg = st_num_arg;
   svalue_t* arg;
 
   arg = sp - num_arg + 1;
@@ -1731,7 +1793,8 @@ void f_read_bytes() {
 #ifdef F_READ_BUFFER
 void f_read_buffer() {
   char* str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
+  LPC_INT start = 0, len = 0;
+  int rlen = 0, num_arg = st_num_arg;
   int from_file = 0; /* new line */
   svalue_t* arg = sp - num_arg + 1;
 
@@ -1768,7 +1831,7 @@ void f_read_buffer() {
 #ifdef F_READ_FILE
 void f_read_file() {
   char* str;
-  int start = 0, len = 0;
+  LPC_INT start = 0, len = 0;
 
   switch (st_num_arg) {
     case 3:
@@ -1951,7 +2014,8 @@ void f_rename() {
 void f_replace_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  int plen, rlen, dlen, slen, first, last, cur, j;
+  int plen, rlen, dlen, cur;
+  LPC_INT first, last; /* LPC ints: an int would wrap 0x100000001 to 1 */
 
   const char* pattern;
   const char* replace;
@@ -2017,13 +2081,13 @@ void f_replace_string() {
 
   if (plen > 1) {
     /* build skip table */
-    for (j = 0; j < 256; j++) {
+    for (int j = 0; j < 256; j++) {
       skip_table[j] = plen;
     }
-    for (j = 0; j < plen; j++) {
+    for (int j = 0; j < plen; j++) {
       skip_table[static_cast<unsigned char>(pattern[j])] = plen - j - 1;
     }
-    slen = SVALUE_STRLEN(arg);
+    int const slen = SVALUE_STRLEN(arg);
     slimit = src + slen;
     flimit = slimit - plen + 1;
     probe = plen - 1;
@@ -2722,6 +2786,11 @@ void f_strsrch() {
   if (arg2->type == T_NUMBER) {
     UBool is_error = false;
     int offset = 0;
+    /* U8_APPEND takes a 32-bit UChar32: check the LPC int first, or
+     * 0x1000000E9 would be searched for as U+00E9. */
+    if (arg2->u.number < 0 || arg2->u.number > UCHAR_MAX_VALUE) {
+      error("Invalid codepoint to search.");
+    }
     U8_APPEND(buf, offset, sizeof(buf), arg2->u.number, is_error);
     if (is_error) {
       error("Invalid codepoint to search.");
@@ -2842,7 +2911,7 @@ void f_tell_room() {
 
 #ifdef F_TEST_BIT
 void f_test_bit() {
-  int const ind = (sp--)->u.number;
+  LPC_INT const ind = (sp--)->u.number;
 
   if (ind / 6 >= SVALUE_STRLEN(sp)) {
     free_string_svalue(sp);
@@ -2864,7 +2933,7 @@ void f_test_bit() {
 
 #ifdef F_NEXT_BIT
 void f_next_bit() {
-  int const start = (sp--)->u.number;
+  LPC_INT const start = (sp--)->u.number;
   int const len = SVALUE_STRLEN(sp);
   int which, bit = 0, value;
 

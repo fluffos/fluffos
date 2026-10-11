@@ -1,0 +1,18 @@
+// Regression: member_array() (packages/core/efuns_main.cc) narrowed two LPC
+// ints:
+//   - the start index went into `int i`, so member_array(2, ({1,2,3}),
+//     0x100000001) searched from index 1 and found 2 at index 1 instead of
+//     returning -1, and the string form searched from byte 1;
+//   - the string form handed the searched-for int to strchr(), which takes
+//     a char, so member_array(0x161, "abc") matched 'a' (0x61) and
+//     member_array(0x100, "abc") matched the string's NUL terminator,
+//     returning 3 -- an index one past the last character.
+void do_tests() {
+  ASSERT_EQ(-1, member_array(0x100, "abc"));
+  ASSERT_EQ(-1, member_array(0x161, "abc"));
+  ASSERT_EQ(-1, member_array(2, ({ 1, 2, 3 }), 0x100000001));
+  ASSERT(catch(member_array('b', "abc", 0x100000001)));
+  // sanity
+  ASSERT_EQ(1, member_array('b', "abc"));
+  ASSERT_EQ(1, member_array(2, ({ 1, 2, 3 })));
+}

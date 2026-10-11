@@ -1411,6 +1411,13 @@ int compatible_types(int t1, int t2) {
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
   }
+  /* A class is compatible only with the same class (above) or mixed. t2's
+   * class type word (TYPE_MOD_CLASS | index, >= 0x80) must not reach the
+   * `1 << t2` below: `class Box c; c %= 2.5;` shifted by >= 128 -- undefined
+   * behaviour, and a UBSan abort on the sanitizer builds. */
+  if (t2 & TYPE_MOD_CLASS) {
+    return 0;
+  }
   if (t1 & TYPE_MOD_ARRAY) {
     if (!(t2 & TYPE_MOD_ARRAY)) {
       return 0;
@@ -1458,6 +1465,13 @@ int compatible_types2(int t1, int t2) {
   }
   if (t1 & TYPE_MOD_CLASS) {
     return t1 == t2;
+  }
+  /* A class is compatible only with the same class (above) or mixed. t2's
+   * class type word (TYPE_MOD_CLASS | index, >= 0x80) must not reach the
+   * `1 << t2` below: `class Box c; c %= 2.5;` shifted by >= 128 -- undefined
+   * behaviour, and a UBSan abort on the sanitizer builds. */
+  if (t2 & TYPE_MOD_CLASS) {
+    return 0;
   }
   if (t1 & TYPE_MOD_ARRAY) {
     if (!(t2 & TYPE_MOD_ARRAY)) {

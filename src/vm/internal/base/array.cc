@@ -88,7 +88,9 @@ static array_t* int_allocate_empty_array(unsigned int n) {
   return p;
 }
 
-array_t* allocate_empty_array(int n) {
+/* The size is an LPC_INT so the check sees the caller's real value: an
+ * int parameter would wrap allocate(0x100000001) to a 1-element array. */
+array_t* allocate_empty_array(LPC_INT n) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   if (n < 0 || n > max_array_size) {
@@ -111,7 +113,7 @@ static array_t* int_allocate_array(unsigned int n) {
   return p;
 }
 
-array_t* allocate_array(int n) {
+array_t* allocate_array(LPC_INT n) {
   array_t* p = allocate_empty_array(n);
 
   while (n--) {
@@ -121,7 +123,7 @@ array_t* allocate_array(int n) {
   return p;
 }
 
-array_t* allocate_array2(int n, svalue_t* svp) {
+array_t* allocate_array2(LPC_INT n, svalue_t* svp) {
   int i;
   array_t* ret;
 
@@ -465,22 +467,27 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
  * Slice of an array.
  * It now frees the passed array
  */
-array_t* slice_array(array_t* p, int from, int to) {
+array_t* slice_array(array_t* p, LPC_INT from64, LPC_INT to64) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int cnt;
   svalue_t *sv1, *sv2;
 
-  if (from < 0) {
-    from = 0;
+  /* Clamp in LPC_INT: narrowing first would wrap a bound past 32 bits back
+   * inside the array. */
+  if (from64 < 0) {
+    from64 = 0;
   }
-  if (to >= p->size) {
-    to = p->size - 1;
+  if (to64 >= p->size) {
+    to64 = p->size - 1;
   }
-  if (from > to) {
+  if (from64 > to64) {
     free_array(p);
     return &the_null_array;
   }
+  /* 0 <= from <= to < p->size from here on */
+  int from = static_cast<int>(from64);
+  int to = static_cast<int>(to64);
 
   if (!(--p->ref)) {
     if (from) {
@@ -1689,6 +1696,17 @@ array_t* intersect_array(array_t* a1, array_t* a2) {
     free_array(a1);
     free_array(a2);
     return &the_null_array;
+  }
+
+  /* `a &= a`: both operands are the same array. The code below releases a1
+   * and a2 separately and assumes they are distinct -- with one array held
+   * by exactly the two references it was given, the second release took it
+   * to ref 0 without freeing it (a leak of the array and its contents).
+   * Intersect against a private copy instead, dropping the duplicate
+   * reference; union_array() special-cases the same aliasing. */
+  if (a1 == a2) {
+    a2 = copy_array(a1);
+    a1->ref--; /* >= 2 here: we were handed one reference per operand */
   }
 
   svt_1 = alist_sort(a1);

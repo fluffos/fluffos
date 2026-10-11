@@ -1,0 +1,70 @@
+// Regression: terminal_colour() with wrapping sizes its result in one pass
+// and composes it in a second (packages/contrib/contrib.cc). Whenever the
+// result had to be cut at the maximum string length, or a fill-out line
+// break was sized differently from how it is written, the two passes
+// disagreed and the driver died with "FATAL ERROR: Length miscalculated in
+// terminal_colour()" -- or, when the composition wrote MORE than was sized,
+// overflowed the result buffer (heap corruption). Shapes found, all
+// reachable from ordinary mudlib calls:
+//   - cutting the result after a line break had already been sized: the
+//     break was charged and the bytes behind it dropped, so j no longer
+//     matched what was written (even plain ASCII: wrap 2 on a 30-byte
+//     string with a 31-byte limit);
+//   - cutting inside a multi-byte UTF-8 character, which changes where the
+//     composition pass sees that character's column advance land;
+//   - a pending indent charged for a fragment that is then cut to nothing;
+//   - fill-out mode (negative wrap) with a wide character crossing the wrap
+//     column: the composition padded the line, the size pass did not;
+//   - fill-out mode with tabs carrying a line past the wrap column: the
+//     padding (wrap - column) went negative and was memset() as a huge size.
+// Regression signal: every call returns a string within the limit (or
+// errors cleanly) and the driver survives.
+void do_tests() {
+#if efun_defined(terminal_colour)
+  // 256 + 14 is __MAX_STRING_LENGTH__ (include/runtime_config.h)
+  int old = get_config(256 + 14);
+  mapping m = ([ "RED": "\e[31m", "BOLD": "\e[1m", "RESET": "\e[0m" ]);
+  string *srcs = ({
+    "abcdefghijabcdefghijabcdefghij",
+    "%^RED%^abcdefghij%^RESET%^abcdefghij",
+    "ab cd ef gh ij kl mn op qr st uv",
+    "中文中文中文中文中文中文中文中文",
+    "a\nb\nc\nd\ne\nf\ng\nh",
+    "a\tb\t\tc d\te",
+    "ab中 文cd中文 %^RED%^中文\n中 文",
+    "x%^RESET%^\n%^RED%^y z\t中\n",
+  });
+  string bad = "";
+  mixed r;
+
+  // fill-out mode, no truncation involved
+  r = 0;
+  catch(r = terminal_colour("aaaa中b", m, -5));
+  ASSERT(stringp(r));
+  r = 0;
+  catch(r = terminal_colour("abc\t\tdef\t\t\tg h\n", m, -5));
+  ASSERT(stringp(r));
+
+  // every cut point of every shape against a shrunken string limit
+  catch {
+    foreach (string s in srcs) {
+      foreach (int w in ({ 2, 3, 5, 10, -3, -5, -10 })) {
+        foreach (int ind in ({ 0, 1, 4, 8 })) {
+          for (int max = strlen(s); max < strlen(s) + 90; max++) {
+            r = 0;
+            set_config(256 + 14, max);
+            catch(r = terminal_colour(s, m, w, ind));
+            set_config(256 + 14, old);
+            if (stringp(r) && strlen(r) > max) {
+              bad += sprintf("%O w=%d i=%d max=%d len=%d\n", s, w, ind, max, strlen(r));
+            }
+          }
+        }
+      }
+    }
+  };
+  set_config(256 + 14, old);
+  ASSERT_EQ("", bad);
+#endif
+  ASSERT(1);
+}

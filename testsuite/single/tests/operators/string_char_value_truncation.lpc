@@ -1,0 +1,27 @@
+// Regression: storing into a string character (s[i] = c, s[i] += d) read
+// the right-hand side into a 32-bit UChar32 (interpret.cc
+// assign_value_to_lvalue() / void_assign_slot(): `UChar32 newc =
+// value->u.number`; codepoint_lvalue_add() and the incdec lambda return
+// `c + delta` as UChar32). The codepoint validity check then ran on the
+// truncated value, so s[0] = 0x100000041 silently stored 'A' and
+// s[0] += 0x100000000 was a silent no-op. Both must be rejected exactly like
+// s[0] = 0x110000 (not a valid codepoint) is.
+void do_tests() {
+  string x;
+
+  x = "abc";
+  ASSERT(catch(x[0] = 0x100000041));
+  ASSERT_EQ("abc", x);
+
+  x = "abc";
+  ASSERT(catch(x[0] += 0x100000000));
+  ASSERT_EQ("abc", x);
+
+  x = "abc";
+  ASSERT(catch(x[0] -= 0x100000000));
+  ASSERT_EQ("abc", x);
+
+  // sanity: the 32-bit spelling of the same rejection
+  x = "abc";
+  ASSERT(catch(x[0] = 0x110000));
+}

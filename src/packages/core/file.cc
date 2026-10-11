@@ -353,12 +353,15 @@ int write_file(const char* file, const char* str, int flags) {
 
 /* Reads file, starting from line of "start", with maximum lines of "lines".
  * Returns a malloced_string.
+ *
+ * start/lines (and the offsets/lengths of read_bytes/write_bytes below) are
+ * LPC ints: narrowing them to int would wrap 0x100000002 back to line 2.
  */
-char* read_file(const char* file, int start, int lines) {
+char* read_file(const char* file, LPC_INT start, LPC_INT lines) {
   const auto read_file_max_size = CONFIG_INT(__MAX_READ_FILE_SIZE__);
 
   if (lines < 0) {
-    debug(file, "read_file: trying to read negative lines: %d", lines);
+    debug(file, "read_file: trying to read negative lines: %" LPC_INT_FMTSTR_P, lines);
     return nullptr;
   }
 
@@ -508,13 +511,13 @@ char* read_file(const char* file, int start, int lines) {
   return string_copy(ptr_start, "read_file: result");
 }
 
-char* read_bytes(const char* file, int start, int len, int* rlen) {
+char* read_bytes(const char* file, LPC_INT start, LPC_INT len, int* rlen) {
   const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
 
   struct stat st;
   FILE* fptr;
   char* str;
-  int size;
+  LPC_INT size;
 
   if (len < 0) {
     return nullptr;
@@ -543,15 +546,17 @@ char* read_bytes(const char* file, int start, int len, int* rlen) {
     error("Transfer exceeded maximum allowed number of bytes.\n");
     return nullptr;
   }
-  if (start >= size) {
+  /* a start still negative after counting back from the end used to fail
+   * in fseek(); refuse it here, before fseek()'s long can narrow it */
+  if (start >= size || start < 0) {
     fclose(fptr);
     return nullptr;
   }
-  if ((start + len) > size) {
+  if (len > size - start) {
     len = (size - start);
   }
 
-  if ((size = fseek(fptr, start, 0)) < 0) {
+  if (fseek(fptr, start, 0) < 0) {
     fclose(fptr);
     return nullptr;
   }
@@ -575,11 +580,11 @@ char* read_bytes(const char* file, int start, int len, int* rlen) {
   return str;
 }
 
-int write_bytes(const char* file, int start, const char* str, int theLength) {
+int write_bytes(const char* file, LPC_INT start, const char* str, int theLength) {
   const auto max_byte_transfer = CONFIG_INT(__MAX_BYTE_TRANSFER__);
 
   struct stat st;
-  int size;
+  LPC_INT size;
   FILE* fptr;
 
   file = check_valid_path(file, current_object, "write_bytes", 1);
@@ -615,7 +620,7 @@ int write_bytes(const char* file, int start, const char* str, int theLength) {
     fclose(fptr);
     return 0;
   }
-  if ((size = fseek(fptr, start, 0)) < 0) {
+  if (fseek(fptr, start, 0) < 0) {
     fclose(fptr);
     return 0;
   }
