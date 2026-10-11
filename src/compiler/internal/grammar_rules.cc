@@ -440,7 +440,7 @@ LPC_INT rule_loop_open() {
    * catch{}/time_expression{} still cannot park), while SPECIAL_CONTEXT
    * does NOT: break/continue targeting this loop never crosses the catch
    * boundary, and rejecting it would break ordinary mudlib code. */
-  context = (context & NO_SUSPEND_CONTEXT) | LOOP_CONTEXT;
+  context = (context & (NO_SUSPEND_CONTEXT | KEEP_ERRORS_CONTEXT)) | LOOP_CONTEXT;
   return saved;
 }
 
@@ -449,7 +449,7 @@ LPC_INT rule_special_context_open() {
   /* catch{} / time_expression{}: break/continue may not cross out of it
    * (SPECIAL_CONTEXT), and nothing inside may suspend, at any nesting
    * depth (NO_SUSPEND_CONTEXT, which loops/switches carry through) */
-  context = SPECIAL_CONTEXT | NO_SUSPEND_CONTEXT;
+  context = SPECIAL_CONTEXT | NO_SUSPEND_CONTEXT | KEEP_ERRORS_CONTEXT;
   return saved;
 }
 

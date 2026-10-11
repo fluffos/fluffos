@@ -17,6 +17,35 @@ class Pt {
 
 int calls;
 
+mixed *acatch_results;
+mixed *ga = ({ 1, 2, 3 });
+int gfive = 5;
+
+// acatch is only legal directly in an async function; with no await the body
+// runs to completion synchronously, so the results are there on return.
+async void acatch_probe(mixed *a, int five) {
+  acatch_results = ({
+    acatch { a[five]; },
+    acatch(a[five], 0),
+    acatch {
+      for (int i = 0; i < 1; i++) {
+        a[five];
+      }
+    },
+    acatch {
+      switch (five) {
+        case 5: a[five];
+      }
+    },
+    acatch {
+      foreach (int q in ({ 1 })) {
+        a[five];
+      }
+    },
+    acatch { a[0]; },
+  });
+}
+
 void read_ref(int ref r, mixed ref out) {
   out = catch(r);
 }
@@ -64,6 +93,27 @@ void do_tests() {
   });
   // a function constructor's $() captures run when it is built
   ASSERT(catch((: $(a[five]) :)));
+
+  // time_expression's block form runs what it is given
+  ASSERT(catch(time_expression { a[five]; }));
+
+  // acatch, including inside a loop, switch and foreach there
+  acatch_probe(a, five);
+  ASSERT_EQ(6, sizeof(acatch_results));
+  for (int k = 0; k < 5; k++) {
+    ASSERT2(acatch_results[k], "acatch shape " + k + " was pruned");
+  }
+  ASSERT_EQ(0, acatch_results[5]);
+
+  // a (: :) functional built inside a catch runs later, outside it: its body
+  // compiles exactly as it would anywhere else (the unused ga[gfive] is dropped)
+  {
+    function f;
+    catch(f = (: ga[gfive], 7 :));
+    ASSERT_EQ(7, evaluate(f));
+    f = (: ga[gfive], 7 :);
+    ASSERT_EQ(7, evaluate(f));
+  }
 
   // in range: still no error, and still 0
   ASSERT_EQ(0, catch(s[1]));
