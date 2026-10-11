@@ -2077,9 +2077,16 @@ void coroutine_await_pending(promise_t* awaited) {
    *     variable goes through find_value() into the object's variable
    *     block) has a second relocation base and its own lifetime questions;
    *     refused for now rather than guessed at.
-   *   - T_LVALUE_BYTE / _CODEPOINT / _RANGE are backed by SHARED VM globals
-   *     (AGENTS.md section 13.9), one instance at a time by construction, so
-   *     they can never be per-frame state -- these stay refused permanently.
+   *   - T_LVALUE_BYTE / _CODEPOINT / _RANGE are per-instance since #1358,
+   *     but each addresses its container without holding it: a byte lvalue
+   *     is a raw pointer into the buffer's bytes, and a codepoint/range box
+   *     points at the slot that owns the string or array. Neither survives
+   *     the container being replaced or freed while suspended. Ordinary and
+   *     compound stores evaluate their right-hand side before pushing their
+   *     destination (and the common ones push no lvalue at all:
+   *     F_*_ASSIGN_LOCAL/GLOBAL, F_*_OP), so none is pending there; the one
+   *     shape that holds an lvalue across LPC is ||= / &&= / ??=, e.g.
+   *     `s[0] ||= await p`, which this refuses.
    *   - T_REF and T_ERROR_HANDLER own heap state whose unwind is tied to
    *     this C++ frame. */
   for (svalue_t* v = fp; v < sp; v++) {

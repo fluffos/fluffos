@@ -66,6 +66,12 @@ struct ref_t {
    * by the box. Unused refs leave this as T_NUMBER. `ref x[a..b]` is a
    * compile error (rule_expr_ref). */
   svalue_t index_sv;
+  /* Keep-alive for the container whose SLOT a transferred string-char box
+   * writes into (`ref a[i][j]`, `ref m[k][j]`, `ref c->s[j]`): sv holds only
+   * the string, and the box's owner is a raw pointer to that array item /
+   * mapping value / class member. Mappings are also locked here so the
+   * node cannot be deleted. T_NUMBER when unused. */
+  svalue_t parent_sv;
 };
 
 struct codepoint_lvalue_t;

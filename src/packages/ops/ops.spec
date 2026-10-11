@@ -104,3 +104,31 @@ operator type_check;
  * EXTRACT_UCHAR. */
 operator await;
 operator acatch, end_acatch;
+
+/* Fused stores (issue #1358). Each names its destination slot in its own
+ * operands and resolves it once, instead of a separate lvalue push that the
+ * store then re-dispatches on. The first operand byte is the store or
+ * compound op being fused: one of F_ASSIGN, F_VOID_ASSIGN, F_ADD_EQ,
+ * F_VOID_ADD_EQ, F_SUB_EQ..F_MOD_EQ, or the ++/-- family.
+ *   local_op <op> <local>          op on a local or parameter
+ *   global_op <op> <global:2>      op on a global
+ *   index_local_op <op> <local>    op on local[index]; index on the stack
+ *   index_global_op <op> <global:2> op on global[index]
+ * The index forms take a fast path for arrays and mappings and fall back
+ * to the general lvalue path for strings, buffers and anything else. */
+operator local_op, global_op, index_local_op, index_global_op;
+
+/* Fused stores whose container is an expression, not a named slot (issue
+ * #1358):
+ *   member_op <op> <member>        op on <class expr>->member
+ *   map_member_op <op> <string:2>  op on <mapping expr>.key
+ *   index_op <op>                  op on <lvalue chain>[index]; the index and
+ *                                  the container lvalue are on the stack
+ * The member forms hold the container for the whole op, so a temporary class
+ * or mapping (f()->x += 1, f()->arr[0] = v) is neither used after free nor
+ * leaked. */
+operator member_op, map_member_op, index_op;
+/*   member_index_op <op> <member>        op on <class expr>->member[index]
+ *   map_member_index_op <op> <string:2>  op on <mapping expr>.key[index]
+ * (the index is on the stack above the container) */
+operator member_index_op, map_member_index_op;
