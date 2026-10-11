@@ -1986,7 +1986,7 @@ void f_rename() {
 void f_replace_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  int plen, rlen, dlen, cur, j;
+  int plen, rlen, dlen, cur;
   LPC_INT first, last; /* LPC ints: an int would wrap 0x100000001 to 1 */
 
   const char* pattern;
@@ -2053,10 +2053,10 @@ void f_replace_string() {
 
   if (plen > 1) {
     /* build skip table */
-    for (j = 0; j < 256; j++) {
+    for (int j = 0; j < 256; j++) {
       skip_table[j] = plen;
     }
-    for (j = 0; j < plen; j++) {
+    for (int j = 0; j < plen; j++) {
       skip_table[static_cast<unsigned char>(pattern[j])] = plen - j - 1;
     }
     int const slen = SVALUE_STRLEN(arg);
