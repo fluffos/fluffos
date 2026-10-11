@@ -1,0 +1,53 @@
+// Regression: the body of catch(expr) (and acatch(expr) / time_expression(
+// expr)) was popped with insert_pop_value() (compiler/internal/trees.cc),
+// the same void-context pruning an expression statement gets. That pruning
+// deletes "side-effect free" operations -- an index, a range, arithmetic, a
+// comparison, a member access, unary minus -- but every one of those can
+// raise an error, and raising one is exactly what catch() is asked to
+// observe. catch(s[i]) compiled to an EMPTY catch and returned 0 for any i,
+// so a test written as ASSERT(catch(a[i])) passed whether or not a[i] errors.
+// The body is now evaluated and its value popped; only genuinely inert
+// values (literals, plain variable reads) are still dropped.
+class Pt {
+  int x;
+}
+
+int calls;
+
+int bump() {
+  calls++;
+  return 1;
+}
+
+void do_tests() {
+  string s = "abc";
+  mixed *a = ({ 1, 2, 3 });
+  int five = 5, zero = 0;
+  mixed z = 1;
+  mixed ms = "abc", ma = ({ 1 });
+  class Pt p;
+
+  ASSERT(catch(s[five]));
+  ASSERT(catch(a[five]));
+  ASSERT(catch(a[<five]));
+  ASSERT(catch(five / zero));
+  ASSERT(catch(five % zero));
+  ASSERT(catch(z[0..1]));
+  ASSERT(catch(p->x));
+  // operands typed mixed so the type errors happen at run time
+  ASSERT(catch(-ms));
+  ASSERT(catch(ms < 1));
+  ASSERT(catch(ma + 1));
+
+  // nested in a comma / ternary, and after something with a side effect
+  calls = 0;
+  ASSERT(catch(bump(), a[five]));
+  ASSERT_EQ(1, calls);
+  ASSERT(catch(five ? a[five] : 0));
+
+  // in range: still no error, and still 0
+  ASSERT_EQ(0, catch(s[1]));
+  ASSERT_EQ(0, catch(a[0] + a[1]));
+  ASSERT_EQ(0, catch(five / 1));
+  ASSERT_EQ(0, catch(s));
+}
