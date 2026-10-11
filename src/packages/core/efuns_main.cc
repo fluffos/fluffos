@@ -1036,36 +1036,80 @@ void f_match_path() {
 
 #ifdef F_MEMBER_ARRAY
 /* member_array(int, string) is a BYTE search (strchr): the start offset and
- * the result are byte offsets and only one byte can match. A byte offset
- * equals a character index only across ASCII, CR-free text (CR LF is one
- * character), and a needle above 0x7F can only hit the inside of a UTF-8
- * sequence. Those are the cases that get a warning -- an ASCII needle that is
- * not found, or found after only ASCII text, is right as it is. */
-static bool has_non_ascii_or_cr(const char* s, size_t n) {
+ * the result are byte offsets and only one byte can match. The answer is a
+ * character answer exactly when:
+ *   - the needle is ASCII and not found: an ASCII byte never occurs inside a
+ *     multi-byte character, and starting at byte k never covers less text
+ *     than starting at character k, so -1 is right;
+ *   - the needle is ASCII, found at byte p, and character p is exactly that
+ *     one byte -- no non-ASCII text or CR LF (one character) before it, and
+ *     not the start of a combining sequence nor the LF of a CR LF;
+ *   - the needle is above 0x7F and the text has no byte >= 0x80 (so no such
+ *     character can be there, and -1 is right).
+ * Otherwise the caller gets one warning per call site. The decision only runs
+ * for a site that has not warned yet, so a warned site costs one set lookup. */
+static bool has_high_byte(const char* s, size_t n) {
   for (size_t k = 0; k < n; k++) {
-    auto const b = static_cast<unsigned char>(s[k]);
-    if (b >= 0x80 || b == '\r') {
+    if (static_cast<unsigned char>(s[k]) >= 0x80) {
       return true;
     }
   }
   return false;
 }
 
-/* Once per call site. The site is keyed on (program, bytecode offset), which
- * is cheap to test on every call; the file and line are only resolved the
- * first time a site warns. */
-static void warn_member_array_byte_search() {
-  static std::set<std::pair<const program_t*, ptrdiff_t>> warned;
-  static constexpr size_t kMaxWarnedSites = 1024; /* call sites are finite; just bound it */
-  std::pair<const program_t*, ptrdiff_t> const site(
-      current_prog, current_prog ? pc - current_prog->program : 0);
-  if (warned.size() >= kMaxWarnedSites || !warned.insert(site).second) {
-    return;
+static bool member_array_byte_answer_misleads(const char* str, size_t len, LPC_INT c,
+                                              LPC_INT result) {
+  if (c > 0x7f || c < 0) {
+    return has_high_byte(str, len);
   }
+  if (result < 0) {
+    return false;
+  }
+  /* The byte answer is the character answer iff character `result` is
+   * exactly the one byte at offset `result`: it starts there, and the next
+   * character starts one byte later. That catches non-ASCII text or a CR LF
+   * before the match, a combining sequence starting at it, and the LF of a
+   * CR LF. */
+  EGCSmartIterator iter(str, len);
+  if (!iter.ok()) {
+    return true;
+  }
+  int32_t const at = iter.index_to_offset(result);
+  int32_t next = iter.index_to_offset(result + 1);
+  if (next == icu::BreakIterator::DONE) {
+    next = static_cast<int32_t>(len);
+  }
+  return at != result || next != result + 1;
+}
+
+/* Once per call site. A call through an efun pointer runs in a fake frame
+ * (current_prog == &fake_prog), so the site is the caller's, saved in csp. */
+static std::set<std::pair<const program_t*, ptrdiff_t>> member_array_warned_sites;
+
+static void member_array_call_site(const program_t** prog, const char** at) {
+  *prog = current_prog;
+  *at = pc;
+  if (current_prog == &fake_prog && csp && csp->prog) {
+    *prog = csp->prog;
+    *at = csp->pc;
+  }
+}
+
+static bool member_array_site_warned(const program_t* prog, const char* at) {
+  return member_array_warned_sites.count({prog, prog ? at - prog->program : 0}) != 0;
+}
+
+static void warn_member_array_byte_search(const program_t* prog, const char* at) {
+  static constexpr size_t kMaxWarnedSites = 1024;
+  if (member_array_warned_sites.size() >= kMaxWarnedSites) {
+    /* forget rather than go silent: reloaded programs keep adding sites */
+    member_array_warned_sites.clear();
+  }
+  member_array_warned_sites.insert({prog, prog ? at - prog->program : 0});
   const char* file = nullptr;
   int line = 0;
-  if (current_prog) {
-    get_line_number_info(&file, &line);
+  if (prog && prog != &fake_prog) {
+    get_explicit_line_number_info(const_cast<char*>(at), prog, &file, &line);
   }
   debug_message(
       "/%s:%d: Warning: member_array(int, string) searches BYTES and returns a byte offset; on "
@@ -1108,24 +1152,18 @@ void f_member_array() {
      * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
      * terminator), so it can never be in the string. */
     LPC_INT const c = (sp - 1)->u.number;
-    LPC_INT const start = i;
     if (c >= 0 && c <= 255 && (res = strchr(sp->u.string + i, static_cast<int>(c)))) {
       i = res - sp->u.string;
     } else {
       i = -1;
     }
     if (!SVALUE_STR_ASCII(sp)) { /* cached; ASCII and CR-free never warns */
-      const char* str = sp->u.string;
-      bool misleading;
-      if (c > 0x7f) {
-        misleading = has_non_ascii_or_cr(str, SVALUE_STRLEN(sp));
-      } else {
-        /* the text before the match (or before the start offset) */
-        LPC_INT const upto = i >= 0 ? i : start;
-        misleading = upto > 0 && has_non_ascii_or_cr(str, static_cast<size_t>(upto));
-      }
-      if (misleading) {
-        warn_member_array_byte_search();
+      const program_t* site_prog;
+      const char* site_pc;
+      member_array_call_site(&site_prog, &site_pc);
+      if (!member_array_site_warned(site_prog, site_pc) &&
+          member_array_byte_answer_misleads(sp->u.string, SVALUE_STRLEN(sp), c, i)) {
+        warn_member_array_byte_search(site_prog, site_pc);
       }
     }
     free_string_svalue(sp--);
