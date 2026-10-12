@@ -1220,6 +1220,21 @@ static int Postgres_connect(dbconn_t* c, const char* host, const char* database,
                             const char* username, const char* password) {
   int buffsize;
 
+  // valid_database() returning 1 means "no password" and f_db_connect()
+  // passes NULL. strlen(NULL) aborted before PQconnectdb().
+  if (!host) {
+    host = "";
+  }
+  if (!database) {
+    database = "";
+  }
+  if (!username) {
+    username = "";
+  }
+  if (!password) {
+    password = "";
+  }
+
   const char* connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
   buffsize =
       strlen(connstr) + strlen(host) + strlen(database) + strlen(username) + strlen(password);

@@ -60,6 +60,16 @@ async void run() {
   ASSERT(classic_seen);
   ASSERT_EQ(3, classic_got);
 
+  // The callback is called with the error string. It is not a rejection:
+  // only the promise form rejects.
+  classic_seen = 0;
+  classic_got = 0;
+  ASSERT_EQ(0, async_db_exec(conn, "also not sql", (: classic_ok :)));
+  await call_out(1);
+  ASSERT(classic_seen);
+  ASSERT(stringp(classic_got));
+  ASSERT(strlen(classic_got) > 0);
+
   db_close(conn);
   rm("/test_async_promise.sqlite");
   RELEASE_LATCH("async_db_exec promise form");

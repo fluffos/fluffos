@@ -72,8 +72,12 @@ void do_tests() {
   ASSERT_EQ(0, rows);
   rows = db_exec(conn, "insert into tbl2 values('dup');");
   ASSERT_EQ(0, rows);
-  db_exec(conn, "insert into tbl2 values('dup');");  // fails mid-execution
-  rows = db_exec(conn, "select * from tbl2;");      // must not double-finalize
+  // A UNIQUE violation prepares, then fails in sqlite3_get_table. That used
+  // to return 0 ("no rows"). It is an error string, same as MySQL/Postgres.
+  res = db_exec(conn, "insert into tbl2 values('dup');");
+  ASSERT(stringp(res));
+  ASSERT(strlen(res) > 0);
+  rows = db_exec(conn, "select * from tbl2;");  // must not double-finalize
   ASSERT_EQ(1, rows);
   ASSERT_EQ(({ "dup" }), db_fetch(conn, 1));
   rows = db_exec(conn, "drop table tbl2;");
