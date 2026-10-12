@@ -1,0 +1,100 @@
+// async_db_exec() without a callback returns a promise (issue #1319), the
+// same split as async_read(): fulfilled with the row count the callback
+// would have received, rejected with the error string db_exec() returns.
+// The classic callback form still returns 0.
+//
+// SQLite used to report a rejected statement as 0 rows. Both forms, and
+// synchronous db_exec(), now surface the error string, matching MySQL and
+// Postgres. This file pins that on the SQLite backend CI actually runs.
+
+#ifdef __PACKAGE_DB__
+int conn;
+int classic_seen;
+mixed classic_got;
+#endif
+
+void classic_ok(mixed rows) {
+#ifdef __PACKAGE_DB__
+  classic_seen = 1;
+  classic_got = rows;
+#endif
+}
+
+#ifdef __PACKAGE_ASYNC__
+async void run() {
+#ifdef __PACKAGE_DB__
+#ifdef __USE_SQLITE3__
+  promise p;
+  int rows;
+  mixed err, res;
+
+  p = async_db_exec(conn, "select * from async_prom_tbl;");
+  ASSERT_EQ("promise", typeof(p));
+  ASSERT_EQ(0, promise_status(p));
+  rows = await p;
+  ASSERT_EQ(2, rows);
+  res = db_fetch(conn, 1);
+  ASSERT_EQ(({ "alpha" }), res);
+
+  rows = await async_db_exec(conn, "insert into async_prom_tbl values('gamma');");
+  ASSERT_EQ(0, rows);
+  rows = await async_db_exec(conn, "select * from async_prom_tbl;");
+  ASSERT_EQ(3, rows);
+
+  // A statement the backend rejects is an error string, not 0 rows.
+  // Synchronous db_exec() and the promise form agree.
+  err = db_exec(conn, "not sql at all");
+  ASSERT(stringp(err));
+  ASSERT(strlen(err) > 0);
+
+  err = acatch(await async_db_exec(conn, "still not sql"));
+  ASSERT(stringp(err));
+  ASSERT(strlen(err) > 0);
+
+  // Classic form: returns 0 immediately and delivers the row count from
+  // the worker thread. call_out(1) gives that thread a real slice; a
+  // tight yield loop can finish before the worker has run.
+  classic_seen = 0;
+  ASSERT_EQ(0, async_db_exec(conn, "select * from async_prom_tbl;", (: classic_ok :)));
+  await call_out(1);
+  ASSERT(classic_seen);
+  ASSERT_EQ(3, classic_got);
+
+  // The callback is called with the error string. It is not a rejection:
+  // only the promise form rejects.
+  classic_seen = 0;
+  classic_got = 0;
+  ASSERT_EQ(0, async_db_exec(conn, "also not sql", (: classic_ok :)));
+  await call_out(1);
+  ASSERT(classic_seen);
+  ASSERT(stringp(classic_got));
+  ASSERT(strlen(classic_got) > 0);
+
+  db_close(conn);
+  rm("/test_async_promise.sqlite");
+  RELEASE_LATCH("async_db_exec promise form");
+#endif
+#endif
+}
+#endif
+
+void do_tests() {
+#if defined(__PACKAGE_ASYNC__) && defined(__PACKAGE_DB__) && defined(__USE_SQLITE3__)
+  conn = db_connect("", "/test_async_promise.sqlite", "", __USE_SQLITE3__);
+  ASSERT_NE(0, conn);
+  db_exec(conn, "DROP TABLE IF EXISTS async_prom_tbl");
+  db_exec(conn, "create table async_prom_tbl(one varchar(10));");
+  db_exec(conn, "insert into async_prom_tbl values('alpha');");
+  db_exec(conn, "insert into async_prom_tbl values('beta');");
+
+  // A handle that was never issued is still a synchronous error in both
+  // forms -- the promise is not allocated, and nothing is queued.
+  ASSERT(catch(async_db_exec(1000000, "select 1")));
+  ASSERT(catch(async_db_exec(1000000, "select 1", (: classic_ok :))));
+
+  EXPECT_LATCH("async_db_exec promise form");
+  call_out(function() { run(); }, 1);
+#else
+  ASSERT(1);
+#endif
+}

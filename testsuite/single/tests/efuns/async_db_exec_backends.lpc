@@ -1,0 +1,97 @@
+// The promise / callback / db_exec() error-string split on MySQL and
+// Postgres. SQLite is pinned by async_db_exec_promise.lpc and db.lpc,
+// which CI always runs. This file connects to a local server when one is
+// listening and skips that backend otherwise, so a CI runner with no
+// database server still passes.
+//
+// valid_database() returns 1 ("no password"). MySQL is 127.0.0.1 as
+// fluffos. Postgres is the local socket as the OS user.
+
+#ifdef __PACKAGE_DB__
+int conn;
+int seen;
+mixed got;
+#endif
+
+void on_result(mixed v) {
+#ifdef __PACKAGE_DB__
+  seen = 1;
+  got = v;
+#endif
+}
+
+#ifdef __PACKAGE_ASYNC__
+async void check_backend(string name) {
+#ifdef __PACKAGE_DB__
+  mixed err;
+  int rows;
+
+  db_exec(conn, "DROP TABLE IF EXISTS async_backend_tbl");
+  rows = db_exec(conn, "create table async_backend_tbl(one varchar(10) unique);");
+  ASSERT_EQ(0, rows);
+  rows = db_exec(conn, "insert into async_backend_tbl values('alpha');");
+  ASSERT_EQ(0, rows);
+
+  rows = await async_db_exec(conn, "select * from async_backend_tbl;");
+  ASSERT_EQ(1, rows);
+
+  err = db_exec(conn, "not sql at all");
+  ASSERT(stringp(err));
+  ASSERT(strlen(err) > 0);
+
+  err = acatch(await async_db_exec(conn, "still not sql"));
+  ASSERT(stringp(err));
+  ASSERT(strlen(err) > 0);
+
+  // Prepares, then fails the write. Must be an error string, not 0 rows.
+  err = db_exec(conn, "insert into async_backend_tbl values('alpha');");
+  ASSERT(stringp(err));
+  ASSERT(strlen(err) > 0);
+
+  seen = 0;
+  got = 0;
+  ASSERT_EQ(0, async_db_exec(conn, "also not sql", (: on_result :)));
+  await call_out(1);
+  ASSERT(seen);
+  ASSERT(stringp(got));
+  ASSERT(strlen(got) > 0);
+
+  db_exec(conn, "DROP TABLE IF EXISTS async_backend_tbl");
+  db_close(conn);
+  write("async_db_exec: exercised " + name + "\n");
+#endif
+}
+
+async void try_backend(string name, string host, string database, string user, int type) {
+#ifdef __PACKAGE_DB__
+  mixed h;
+
+  h = db_connect(host, database, user, type);
+  if (!intp(h) || h < 1) {
+    write("async_db_exec: skipping " + name + " (" + sprintf("%O", h) + ")\n");
+    return;
+  }
+  conn = h;
+  await check_backend(name);
+#endif
+}
+
+async void run_backends() {
+#ifdef __USE_MYSQL__
+  await try_backend("MySQL", "127.0.0.1", "fluffos_test", "fluffos", __USE_MYSQL__);
+#endif
+#ifdef __USE_POSTGRES__
+  await try_backend("Postgres", "/var/run/postgresql", "fluffos_test", "ubuntu", __USE_POSTGRES__);
+#endif
+  RELEASE_LATCH("async_db_exec backend error strings");
+}
+#endif
+
+void do_tests() {
+#if !defined(__PACKAGE_ASYNC__) || !defined(__PACKAGE_DB__)
+  ASSERT(1);
+#else
+  EXPECT_LATCH("async_db_exec backend error strings");
+  call_out(function() { run_backends(); }, 1);
+#endif
+}

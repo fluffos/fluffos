@@ -1014,7 +1014,11 @@ static int SQLite3_execute(dbconn_t* c, const char* s) {
   if (sqlite3_prepare(c->SQLite3.handle, s, -1, &c->SQLite3.results, 0) != SQLITE_OK) {
     strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
     c->SQLite3.errormsg[sizeof(c->SQLite3.errormsg) - 1] = 0;
-    return 0;
+    // -1, not 0. 0 is "succeeded, no result rows" (INSERT/UPDATE/DELETE).
+    // db_exec() and async_db_exec() surface an error string only when
+    // execute() returns -1, which is what MySQL and Postgres already do.
+    // Returning 0 here made a rejected statement look like success.
+    return -1;
   }
 
   /* There has to be a better way of determining the number of rows in the
@@ -1030,6 +1034,8 @@ static int SQLite3_execute(dbconn_t* c, const char* s) {
   if (c->SQLite3.results) {
     if (sqlite3_get_table(c->SQLite3.handle, s, &result, &c->SQLite3.nrows, &c->SQLite3.ncolumns,
                           NULL) != SQLITE_OK) {
+      strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));
+      c->SQLite3.errormsg[sizeof(c->SQLite3.errormsg) - 1] = 0;
       sqlite3_free_table(result);
       sqlite3_finalize(c->SQLite3.results);
       // Clear the handle, or the next cleanup/close finalizes it a second
@@ -1038,7 +1044,7 @@ static int SQLite3_execute(dbconn_t* c, const char* s) {
       c->SQLite3.nrows = 0;
       c->SQLite3.last_row = 0;
       c->SQLite3.step_res = 0;
-      return 0;
+      return -1;
     }
 
     sqlite3_free_table(result);
@@ -1213,6 +1219,21 @@ static int Postgres_execute(dbconn_t* c, const char* s) {
 static int Postgres_connect(dbconn_t* c, const char* host, const char* database,
                             const char* username, const char* password) {
   int buffsize;
+
+  // valid_database() returning 1 means "no password" and f_db_connect()
+  // passes NULL. strlen(NULL) aborted before PQconnectdb().
+  if (!host) {
+    host = "";
+  }
+  if (!database) {
+    database = "";
+  }
+  if (!username) {
+    username = "";
+  }
+  if (!password) {
+    password = "";
+  }
 
   const char* connstr = "host = '%s' dbname = '%s' user = '%s' password = '%s'";
   buffsize =
