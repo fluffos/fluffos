@@ -417,9 +417,11 @@ int add_write(const char* fname, const char* buf, int size, char flags, function
 }
 
 #ifdef F_ASYNC_DB_EXEC
-int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* bound_args) {
+int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* bound_args,
+                promise_t* prom) {
   auto* req = new Request();
   req->fun = fun;
+  req->prom = prom;
   req->bound_args = bound_args;
   req->type = ADBEXEC;
   capture_command_giver(req);
@@ -505,6 +507,13 @@ void handle_db_exec(struct Request* req) {
     copy_and_push_string(req->path.c_str());
   } else {
     push_number(val);
+  }
+  /* Promise form: -1 is a rejection (the error string), anything else is
+     the row count the callback would have been called with. The callback
+     form is unchanged -- it still receives either value as its argument. */
+  if (req->prom) {
+    deliver_result(req, val == -1);
+    return;
   }
   set_eval(max_eval_cost);
   safe_call_efun_callback(req->fun, 1);
@@ -716,54 +725,68 @@ void f_async_getdir() {
 #endif
 #ifdef F_ASYNC_DB_EXEC
 void f_async_db_exec() {
+  // Two forms (issue #1319), same split as async_read():
+  //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
+  //   async_db_exec(handle, sql)                 -> promise for the row count
+  //
   // process_efun_callback() locates the callback via the GLOBAL
-  // st_num_arg (arg = sp - st_num_arg + 1 + narg), so it MUST run before
-  // valid_database() below -- that apply runs master LPC which leaves
-  // st_num_arg clobbered. Reversing them made ftc->f.fp read the wrong
-  // stack slot and crash at the ref++ once a real db handle existed
-  // (found by async_db_exec.lpc on the SQLite CI build). unique_ptr owns
-  // the struct and a scope guard releases the funptr ref, so an error()
-  // unwind before hand-off leaks neither (AGENTS.md section 4).
-  std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-  process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+  // st_num_arg (arg = sp - st_num_arg + 1 + narg), so when a callback was
+  // passed it MUST run before valid_database() below -- that apply runs
+  // master LPC which leaves st_num_arg clobbered. Reversing them made
+  // ftc->f.fp read the wrong stack slot and crash at the ref++ once a real
+  // db handle existed (found by async_db_exec.lpc on the SQLite CI build).
+  // Latch the arity first: the promise form has no callback, and a master
+  // apply must not be what decides which form this call is.
+  int const num_arg = st_num_arg;
 
-  // async_db_exec's callback fires long after this stack frame is gone (a
-  // DB round trip on a worker thread, then a later game tick) -- unlike
-  // the synchronous consumers of function_to_call_t (pcre, array
-  // map/filter/sort), a string-named callback (cb->ob set) has no
-  // reference-counted lifetime of its own here. Reject that form cleanly
-  // instead of type-confusing cb->f.str (a char*) as a funptr_t*.
-  if (cb->ob != nullptr) {
-    error("async_db_exec: callback must be a function pointer, not a string.\n");
-  }
-
-  cb->f.fp->hdr.ref++;
-  funptr_t* cb_fp = cb->f.fp;
+  std::unique_ptr<function_to_call_t> cb;
+  funptr_t* cb_fp = nullptr;
   bool handed_off = false;
-  DEFER {
-    if (!handed_off) free_funp(cb_fp);
-  };
-
-  // Bound args trailing the callback (the spec's `...`) are only safe to
-  // keep past this stack frame if their ownership is transferred off the
-  // VM stack -- mirroring call_out()'s cop->vs (call_out.cc): a bitwise
-  // copy, no ref bump (the copy IS the new owning reference).
   array_t* bound_args = nullptr;
-  if (cb->narg > 0) {
-    bound_args = allocate_empty_array(cb->narg);
-    memcpy(bound_args->item, cb->args, sizeof(svalue_t) * cb->narg);
-    cb->args = bound_args->item;
-  }
   bool bound_args_handed_off = false;
+  // Registered before any error() that can follow a ref we took. Both
+  // pointers stay null until that ref exists, and [&] sees the later
+  // assignments (AGENTS.md section 4).
+  DEFER {
+    if (cb_fp && !handed_off) free_funp(cb_fp);
+  };
   DEFER {
     if (bound_args && !bound_args_handed_off) free_array(bound_args);
   };
 
-  // The bound args' stack slots were bitwise-transferred into bound_args
-  // above (not ref-bumped), so skip past them without freeing -- same
-  // "args have been transfered; don't free them" idiom as int_call_out().
-  sp -= cb->narg;
-  pop_stack();  // remove the callback; now sp = sql, sp-1 = handle
+  if (num_arg >= 3) {
+    cb.reset(new function_to_call_t);
+    process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+
+    // The callback fires long after this stack frame is gone (a DB round
+    // trip on a worker thread, then a later game tick) -- unlike the
+    // synchronous consumers of function_to_call_t (pcre, array
+    // map/filter/sort), a string-named callback (cb->ob set) has no
+    // reference-counted lifetime of its own here. Reject that form cleanly
+    // instead of type-confusing cb->f.str (a char*) as a funptr_t*.
+    if (cb->ob != nullptr) {
+      error("async_db_exec: callback must be a function pointer, not a string.\n");
+    }
+
+    cb->f.fp->hdr.ref++;
+    cb_fp = cb->f.fp;
+
+    // Bound args trailing the callback (the spec's `...`) are only safe to
+    // keep past this stack frame if their ownership is transferred off the
+    // VM stack -- mirroring call_out()'s cop->vs (call_out.cc): a bitwise
+    // copy, no ref bump (the copy IS the new owning reference).
+    if (cb->narg > 0) {
+      bound_args = allocate_empty_array(cb->narg);
+      memcpy(bound_args->item, cb->args, sizeof(svalue_t) * cb->narg);
+      cb->args = bound_args->item;
+    }
+
+    // The bound args' stack slots were bitwise-transferred into bound_args
+    // above (not ref-bumped), so skip past them without freeing -- same
+    // "args have been transfered; don't free them" idiom as int_call_out().
+    sp -= cb->narg;
+    pop_stack();  // remove the callback; now sp = sql, sp-1 = handle
+  }
 
   array_t* info;
   info = allocate_empty_array(1);
@@ -782,10 +805,25 @@ void f_async_db_exec() {
     db_mut = (pthread_mutex_t*)DMALLOC(sizeof(pthread_mutex_t), TAG_PERMANENT, "async_db_exec");
     pthread_mutex_init(db_mut, nullptr);
   }
+
+  // Allocated only after the calls that error(), so a bad handle or a
+  // denied valid_database() cannot leak it. The request holds this ref;
+  // the returned svalue gets its own below.
+  promise_t* prom = nullptr;
+  if (!cb) {
+    prom = promise_alloc();
+  }
+
   handed_off = true;
   bound_args_handed_off = true;
-  add_db_exec((sp - 1)->u.number, sp->u.string, cb.release(), bound_args);
+  add_db_exec((sp - 1)->u.number, sp->u.string, cb ? cb.release() : nullptr, bound_args, prom);
   pop_2_elems();
+  if (prom) {
+    prom->ref++;
+    push_refed_promise(prom);
+  } else {
+    push_number(0);
+  }
 }
 #endif
 

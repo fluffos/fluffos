@@ -405,11 +405,13 @@ still returns the handle; note the promise form returns no handle, so a
 timer you may need to cancel individually should use the classic form.
 
 The worker-thread I/O efuns of the async *package* follow the same
-pattern: `async_read(path)`, `async_write(path, str, flag)` and
-`async_getdir(path)` with the trailing callback **omitted** return a
-promise fulfilled with the value the callback would have received, or
-rejected with the failure value (e.g. `async_read`'s negative int) —
-`string s = await async_read(path);`.
+pattern: `async_read(path)`, `async_write(path, str, flag)`,
+`async_getdir(path)` and `async_db_exec(handle, sql)` with the trailing
+callback **omitted** return a promise fulfilled with the value the callback
+would have received, or rejected with the failure value (`async_read`'s
+negative int, `async_db_exec`'s error string) —
+`string s = await async_read(path);`,
+`int rows = await async_db_exec(handle, sql);`.
 
 `external_start(index, args)` — the same efun with the socket callbacks
 **omitted** — returns a promise fulfilled with

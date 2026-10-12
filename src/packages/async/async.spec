@@ -7,5 +7,9 @@ mixed async_read(string, void | function);
 mixed async_write(string, string, int, void | function);
 mixed async_getdir(string, void | function);
 #ifdef PACKAGE_DB
-void async_db_exec(int, string, string | function, ...);
+/* Same split as async_read(): callback present -> classic form, returns 0;
+   callback omitted -> PROMISE fulfilled with the row count (the callback's
+   argument on success) or rejected with the error string db_exec() would
+   return. `int rows = await async_db_exec(handle, sql);` */
+mixed async_db_exec(int, string, void | string | function, ...);
 #endif
