@@ -724,6 +724,24 @@ void f_async_getdir() {
 }
 #endif
 #ifdef F_ASYNC_DB_EXEC
+// The funptr ref has to survive error() between the ref++ and hand-off.
+// A DEFER lambda is the wrong tool here: Cppcheck reads it as if it ran at
+// the macro, while the pointer is still null, and reports that the later
+// assignment is unused (Codacy on #1444). A destructor runs at scope exit,
+// which is the moment the flag and the pointer are actually set.
+struct AsyncCallbackRef {
+  funptr_t* fp = nullptr;
+  bool handed_off = false;
+  ~AsyncCallbackRef() {
+    if (fp != nullptr && !handed_off) {
+      free_funp(fp);
+    }
+  }
+  AsyncCallbackRef() = default;
+  AsyncCallbackRef(const AsyncCallbackRef&) = delete;
+  AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
+};
+
 void f_async_db_exec() {
   // Two forms (issue #1319), same split as async_read():
   //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
@@ -740,16 +758,12 @@ void f_async_db_exec() {
   int const num_arg = st_num_arg;
 
   std::unique_ptr<function_to_call_t> cb;
-  funptr_t* cb_fp = nullptr;
-  bool handed_off = false;
+  AsyncCallbackRef cb_ref;
   array_t* bound_args = nullptr;
   bool bound_args_handed_off = false;
-  // Registered before any error() that can follow a ref we took. Both
-  // pointers stay null until that ref exists, and [&] sees the later
-  // assignments (AGENTS.md section 4).
-  DEFER {
-    if (cb_fp && !handed_off) free_funp(cb_fp);
-  };
+  // Registered before any error() that can follow the array ref. The
+  // pointer stays null until that ref exists, and [&] sees the later
+  // assignment (AGENTS.md section 4).
   DEFER {
     if (bound_args && !bound_args_handed_off) free_array(bound_args);
   };
@@ -769,7 +783,7 @@ void f_async_db_exec() {
     }
 
     cb->f.fp->hdr.ref++;
-    cb_fp = cb->f.fp;
+    cb_ref.fp = cb->f.fp;
 
     // Bound args trailing the callback (the spec's `...`) are only safe to
     // keep past this stack frame if their ownership is transferred off the
@@ -814,7 +828,7 @@ void f_async_db_exec() {
     prom = promise_alloc();
   }
 
-  handed_off = true;
+  cb_ref.handed_off = true;
   bound_args_handed_off = true;
   add_db_exec((sp - 1)->u.number, sp->u.string, cb ? cb.release() : nullptr, bound_args, prom);
   pop_2_elems();
