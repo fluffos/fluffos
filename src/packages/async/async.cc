@@ -724,22 +724,13 @@ void f_async_getdir() {
 }
 #endif
 #ifdef F_ASYNC_DB_EXEC
-// The funptr ref has to survive error() between the ref++ and hand-off.
-// A DEFER lambda is the wrong tool here: Cppcheck reads it as if it ran at
-// the macro, while the pointer is still null, and reports that the later
-// assignment is unused (Codacy on #1444). A destructor runs at scope exit,
-// which is the moment the flag and the pointer are actually set.
-struct AsyncCallbackRef {
-  funptr_t* fp = nullptr;
-  bool handed_off = false;
-  ~AsyncCallbackRef() {
-    if (fp != nullptr && !handed_off) {
-      free_funp(fp);
-    }
-  }
-  AsyncCallbackRef() = default;
-  AsyncCallbackRef(const AsyncCallbackRef&) = delete;
-  AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
+// Frees the extra funptr ref if error() fires before the request owns it.
+// Cppcheck does not treat a DEFER lambda or a destructor read as a use of a
+// value assigned in this function, so those forms showed up as unread
+// assignments (Codacy on #1444 and #1446). unique_ptr::release() is a use it
+// counts: discarding the pointer is the hand-off, and check_reqs() frees it.
+struct FreeAsyncFunptr {
+  void operator()(funptr_t* fp) const { free_funp(fp); }
 };
 
 void f_async_db_exec() {
@@ -758,7 +749,7 @@ void f_async_db_exec() {
   int const num_arg = st_num_arg;
 
   std::unique_ptr<function_to_call_t> cb;
-  AsyncCallbackRef cb_ref;
+  std::unique_ptr<funptr_t, FreeAsyncFunptr> extra_ref;
   array_t* bound_args = nullptr;
   bool bound_args_handed_off = false;
   // Registered before any error() that can follow the array ref. The
@@ -783,7 +774,7 @@ void f_async_db_exec() {
     }
 
     cb->f.fp->hdr.ref++;
-    cb_ref.fp = cb->f.fp;
+    extra_ref.reset(cb->f.fp);
 
     // Bound args trailing the callback (the spec's `...`) are only safe to
     // keep past this stack frame if their ownership is transferred off the
@@ -828,9 +819,10 @@ void f_async_db_exec() {
     prom = promise_alloc();
   }
 
-  cb_ref.handed_off = true;
   bound_args_handed_off = true;
-  add_db_exec((sp - 1)->u.number, sp->u.string, cb ? cb.release() : nullptr, bound_args, prom);
+  function_to_call_t* fun = cb ? cb.release() : nullptr;
+  (void)extra_ref.release();
+  add_db_exec((sp - 1)->u.number, sp->u.string, fun, bound_args, prom);
   pop_2_elems();
   if (prom) {
     prom->ref++;
