@@ -20,6 +20,7 @@
 #include <io.h>
 #endif
 
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <fstream>
@@ -2422,6 +2423,43 @@ string s = "a##b";
 
 TEST(Preprocessor, PredefinedDir) {
   EXPECT_EQ(pp("string d = __DIR__;", "mydir/myfile.c"), "string d = \"/mydir/\";");
+}
+
+TEST(Preprocessor, FileAndDirInsideIncludeNameCompilingObject) {
+  // Historical MudOS/FluffOS meaning (#1449): __FILE__/__DIR__ name the
+  // object being compiled even when they appear inside an #include'd
+  // header. A shared header that builds paths with __DIR__ must resolve
+  // relative to the including object, not the header. __LINE__ stays live.
+  //
+  // The header lives in a DIFFERENT directory than the compiling object
+  // so a regression to live-scan current_file would yield a different
+  // __DIR__. Absolute #include so the no-master unit-test harness can
+  // open it (quoted relative includes from a nested virtual filename
+  // produce a leading-/ FS path that open() cannot resolve here).
+  std::string inc_dir = std::string(TESTSUITE_DIR) + "/zzprobe";
+  mkdir(inc_dir.c_str(), 0755);  // ignore EEXIST
+  std::string inc_path = inc_dir + "/zz_file_dir_inc.h";
+  {
+    std::ofstream inc(inc_path);
+    ASSERT_TRUE(inc.good()) << "failed to write " << inc_path;
+    inc << "string hdr_file = __FILE__;\n";
+    inc << "string hdr_dir = __DIR__;\n";
+    inc << "int hdr_line = __LINE__;\n";
+  }
+  NormalizedString out = pp(
+      "#include \"/zzprobe/zz_file_dir_inc.h\"\n"
+      "string top = __FILE__;\n",
+      "single/tests/zz_probe.lpc");
+  unlink(inc_path.c_str());
+  rmdir(inc_dir.c_str());
+  EXPECT_EQ(num_parse_error, 0);
+  // Both the header's and the top-level __FILE__ name the compiling object
+  // (/single/tests/...), NOT the header (/zzprobe/...).
+  EXPECT_EQ(out,
+            "string hdr_file = \"/single/tests/zz_probe.lpc\"; "
+            "string hdr_dir = \"/single/tests/\"; "
+            "int hdr_line = 3; "
+            "string top = \"/single/tests/zz_probe.lpc\";");
 }
 
 TEST(Preprocessor, IfdefDir) {

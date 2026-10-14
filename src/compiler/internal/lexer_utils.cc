@@ -821,8 +821,9 @@ int lpc_lex_resolve_identifier(union YYSTYPE* yylval_param, struct YYLTYPE* /*yy
       if (live_expansion_stack.size() >= kLpcMaxExpansionNesting) {
         lexerror("Macro expansion nested too deep");
       } else if (!m.is_function_like) {
-        // __LINE__/__FILE__/__DIR__ expand from the live scan position;
-        // any other object-like macro pushes its RAW body as a fresh Flex
+        // __LINE__ expands from the live scan position; __FILE__/__DIR__
+        // from the object being compiled (see lpc_lex_builtin_macro).
+        // Any other object-like macro pushes its RAW body as a fresh Flex
         // buffer -- nested macro references are resolved when the rescan
         // reaches them, right here, one buffer per level (no textual
         // pre-expansion pass). The frame pushed alongside doubles as the
