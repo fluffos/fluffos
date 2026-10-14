@@ -20,6 +20,7 @@
 #include <io.h>
 #endif
 
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <fstream>
