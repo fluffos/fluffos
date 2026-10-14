@@ -1,0 +1,14 @@
+// Regression for #1449: __FILE__/__DIR__ inside an #include name the
+// object being compiled, not the header. The Flex lexer migration briefly
+// made them C-like (live scan file); mudlibs rely on the historical meaning
+// (e.g. a shared header that uses __DIR__ to build paths relative to the
+// including object).
+
+#include "helper/file_dir_inc.h"
+
+void do_tests() {
+  ASSERT_EQ("/single/tests/compiler/file_dir_in_include.lpc", __FILE__);
+  ASSERT_EQ("/single/tests/compiler/", __DIR__);
+  ASSERT_EQ("/single/tests/compiler/file_dir_in_include.lpc", hdr_file());
+  ASSERT_EQ("/single/tests/compiler/", hdr_dir());
+}

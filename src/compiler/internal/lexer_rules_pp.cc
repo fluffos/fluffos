@@ -793,12 +793,18 @@ bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out) {
     *out = buf;
     return true;
   }
+  // __FILE__/__DIR__ name the object being compiled (main_file_name),
+  // not the header currently being scanned. That is the long-standing
+  // MudOS/FluffOS meaning: a shared header that uses __DIR__ builds
+  // paths relative to the including object. __LINE__ stays live so
+  // diagnostics and line-sensitive code still track the scan position.
+  // See #1449 (Flex lexer migration briefly used current_file instead).
   if (name == "__FILE__") {
-    *out = stringize(normalize_filename(current_file));
+    *out = stringize(normalize_filename(main_file_name()));
     return true;
   }
   if (name == "__DIR__") {
-    ScratchString filename = normalize_filename(current_file);
+    ScratchString filename = normalize_filename(main_file_name());
     size_t last_slash = filename.find_last_of('/');
     // normalize_filename() guarantees a leading '/', so there is always
     // at least one slash to keep.

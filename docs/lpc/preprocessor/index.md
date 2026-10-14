@@ -39,3 +39,11 @@ The driver predefines macros describing itself and its configuration:
 package and one `__FEATURE__`-style macro per enabled option, among
 others. Predefined macros are **immutable**: both `#define` and
 `#undef` of a predefined name are compile errors.
+
+`__FILE__` and `__DIR__` name the **object being compiled**, even when
+they appear inside an `#include`d header. That is the long-standing
+MudOS/FluffOS meaning: a shared header that uses `__DIR__` builds paths
+relative to the including object, not the header itself. `__LINE__` is
+the live scan position (so it does track the header's lines). `#line`
+overrides the reported line (and optionally the diagnostic file name)
+but does not change `__FILE__`/`__DIR__`.

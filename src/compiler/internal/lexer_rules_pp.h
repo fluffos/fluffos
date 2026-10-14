@@ -133,12 +133,14 @@ bool lpc_lex_handle_include(std::string_view rest, void* yyscanner);
 // nested too deep" report; deeper references stay literal).
 ScratchString lpc_lex_expand_string(std::string_view text);
 
-// __LINE__/__FILE__/__DIR__ expand from the compiler's LIVE position
-// (current_line/current_file) -- one line counter, one file name is the
-// point of the merged single-scan design. Returns false when `name` isn't
-// one of them. Filenames are normalized to the mudlib-absolute "/path"
-// form (the old preprocessor normalized at construction; the compiler's
-// current_file lacks the leading '/').
+// __LINE__ expands from the live scan position (current_line).
+// __FILE__/__DIR__ expand from the object being compiled
+// (main_file_name()), even inside an #include'd header -- the historical
+// MudOS/FluffOS meaning mudlibs rely on (a shared header's __DIR__ is
+// relative to the including object, not the header). Returns false when
+// `name` isn't one of them. Filenames are normalized to the mudlib-
+// absolute "/path" form (the old preprocessor normalized at construction;
+// the compiler's current_file lacks the leading '/').
 bool lpc_lex_builtin_macro(std::string_view name, ScratchString* out);
 
 #endif  // LEXER_RULES_PP_H
