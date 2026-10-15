@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -2437,7 +2439,9 @@ TEST(Preprocessor, FileAndDirInsideIncludeNameCompilingObject) {
   // open it (quoted relative includes from a nested virtual filename
   // produce a leading-/ FS path that open() cannot resolve here).
   std::string inc_dir = std::string(TESTSUITE_DIR) + "/zzprobe";
-  mkdir(inc_dir.c_str(), 0755);  // ignore EEXIST
+  int mkdir_rc = mkdir(inc_dir.c_str(), 0755);
+  ASSERT_TRUE(mkdir_rc == 0 || errno == EEXIST)
+      << "mkdir " << inc_dir << ": " << strerror(errno);
   std::string inc_path = inc_dir + "/zz_file_dir_inc.h";
   {
     std::ofstream inc(inc_path);
@@ -2450,8 +2454,8 @@ TEST(Preprocessor, FileAndDirInsideIncludeNameCompilingObject) {
       "#include \"/zzprobe/zz_file_dir_inc.h\"\n"
       "string top = __FILE__;\n",
       "single/tests/zz_probe.lpc");
-  unlink(inc_path.c_str());
-  rmdir(inc_dir.c_str());
+  EXPECT_EQ(unlink(inc_path.c_str()), 0) << "unlink " << inc_path << ": " << strerror(errno);
+  EXPECT_EQ(rmdir(inc_dir.c_str()), 0) << "rmdir " << inc_dir << ": " << strerror(errno);
   EXPECT_EQ(num_parse_error, 0);
   // Both the header's and the top-level __FILE__ name the compiling object
   // (/single/tests/...), NOT the header (/zzprobe/...).
