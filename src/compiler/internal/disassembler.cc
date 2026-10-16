@@ -601,6 +601,44 @@ static void disassemble(DisSink& sink, char* code, int start, int end, program_t
         sprintf(buff, "LV%d", EXTRACT_UCHAR(pc));
         pc++;
         break;
+      case F_LOCAL_OP:
+      case F_INDEX_LOCAL_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        snprintf(buff, sizeof(buff), "%s LV%d", query_instr_name(op), EXTRACT_UCHAR(pc));
+        pc++;
+        break;
+      }
+      case F_INDEX_OP:
+        snprintf(buff, sizeof(buff), "%s", query_instr_name(EXTRACT_UCHAR(pc++)));
+        break;
+      case F_MEMBER_OP:
+      case F_MEMBER_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        snprintf(buff, sizeof(buff), "%s member %d", query_instr_name(op), EXTRACT_UCHAR(pc));
+        pc++;
+        break;
+      }
+      case F_MAP_MEMBER_OP:
+      case F_MAP_MEMBER_INDEX_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        COPY_SHORT(&sarg, pc);
+        pc += 2;
+        snprintf(buff, sizeof(buff), "%s key %d", query_instr_name(op), sarg);
+        break;
+      }
+      case F_GLOBAL_OP:
+      case F_INDEX_GLOBAL_OP: {
+        int const op = EXTRACT_UCHAR(pc++);
+        short iarg;
+        LOAD2(iarg, pc);
+        if (iarg < NUM_VARS) {
+          snprintf(buff, sizeof(buff), "%s %s(%d)", query_instr_name(op), variable_name(prog, iarg),
+                   iarg);
+        } else {
+          snprintf(buff, sizeof(buff), "%s <out of range %d >", query_instr_name(op), iarg);
+        }
+        break;
+      }
       case F_WHILE_DEC:
         COPY_SHORT(&sarg, pc + 1);
         offset = (pc - code) - sarg;

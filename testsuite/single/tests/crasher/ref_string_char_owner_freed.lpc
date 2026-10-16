@@ -1,0 +1,113 @@
+// Regression: `f(ref a[i][j])`, where a[i] holds a string, parks a
+// T_LVALUE_CODEPOINT box in the ref (F_MAKE_REF, interpret.cc). The box's
+// `owner` is a raw svalue_t* to the SLOT holding the string -- here an array
+// item, a mapping node value, or a class member -- but the ref's keep-alive
+// (ref->sv, taken from lv_owner) was only the STRING: push_indexed_lvalue's
+// T_STRING branch overwrote lv_owner with the string, so nothing kept the
+// array / mapping / class that contains the slot alive. A callee that drops
+// the last reference to that container (`ga = 0`) freed the slot, and the
+// next write or read through the ref (assign_lvalue_codepoint() / F_REF)
+// dereferenced freed memory. Mapping nodes go back to a pooled free list, so
+// the mapping shape was invisible to ASan and instead wrote into whichever
+// mapping reused the node -- a silent cross-variable corruption on every
+// build. The ref now also holds (and, for a mapping, locks) that container
+// in ref_t::parent_sv. The regression signal: on the unfixed driver the
+// array, class and local-container shapes abort with ASan
+// heap-use-after-free, and the "victim" containers allocated after the free
+// come back modified (the mapping shape on every build, the array shape on
+// non-ASan builds). Fixed, the write lands in the orphaned (still alive)
+// container and no victim changes.
+
+class Holder {
+  mixed s;
+}
+
+mixed *ga;
+mapping gm;
+class Holder gc;
+mixed *victim_arr;
+mapping victim_map;
+class Holder victim_cls;
+
+void write_after_array_freed(int ref c) {
+  ga = 0;
+  victim_arr = ({ "qqqq" + "qq" });
+  c = 'Z';
+}
+
+void write_after_mapping_freed(int ref c) {
+  gm = 0;
+  victim_map = ([ "q": "qqqq" + "qq" ]);
+  c = 'Z';
+}
+
+void write_after_class_freed(int ref c) {
+  gc = 0;
+  victim_cls = new(class Holder, s: "qqqq" + "qq");
+  c = 'Z';
+}
+
+int read_after_array_freed(int ref c) {
+  ga = 0;
+  victim_arr = ({ "qqqq" + "qq" });
+  return c;
+}
+
+void write_after_local_freed(mixed ref a, int ref c) {
+  a = 0;
+  victim_arr = ({ "qqqq" + "qq" });
+  c = 'Z';
+}
+
+// The keep-alive must not change what a still-live container sees.
+void write_through(int ref c) {
+  c = 'Z';
+}
+
+void delete_then_write(int ref c) {
+  map_delete(gm, "k");
+  c = 'Y';
+}
+
+void do_tests() {
+  mixed *loc;
+  mapping alias;
+
+  ga = ({ "abc" + "def" });
+  catch(write_after_array_freed(ref ga[0][1]));
+  ASSERT_EQ(({ "qqqqqq" }), victim_arr);
+
+  gm = ([ "k": "abc" + "def" ]);
+  catch(write_after_mapping_freed(ref gm["k"][1]));
+  ASSERT_EQ("qqqqqq", victim_map["q"]);
+
+  gc = new(class Holder, s: "abc" + "def");
+  catch(write_after_class_freed(ref gc->s[1]));
+  ASSERT_EQ("qqqqqq", victim_cls->s);
+
+  // A read must see the character the ref was taken on, or fail cleanly.
+  ga = ({ "abc" + "def" });
+  ASSERT_EQ('b', read_after_array_freed(ref ga[0][1]));
+  ASSERT_EQ(({ "qqqqqq" }), victim_arr);
+
+  loc = ({ "abc" + "def" });
+  catch(write_after_local_freed(ref loc, ref loc[0][1]));
+  ASSERT_EQ(({ "qqqqqq" }), victim_arr);
+
+  // Live containers still see the write.
+  ga = ({ "abc" + "def" });
+  write_through(ref ga[0][1]);
+  ASSERT_EQ(({ "aZcdef" }), ga);
+  gc = new(class Holder, s: "abc" + "def");
+  write_through(ref gc->s[0]);
+  ASSERT_EQ("Zbcdef", gc->s);
+
+  // Deleting the key while the ref is live: the node is kept (the mapping is
+  // locked), the write does not corrupt anything, and the key stays gone.
+  gm = ([ "k": "abc" + "def" ]);
+  alias = gm;
+  catch(delete_then_write(ref gm["k"][0]));
+  ASSERT_EQ(0, sizeof(alias));
+  victim_map = ([ "q": "qqqq" + "qq" ]);
+  ASSERT_EQ("qqqqqq", victim_map["q"]);
+}

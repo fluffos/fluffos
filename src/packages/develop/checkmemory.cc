@@ -760,6 +760,8 @@ void check_all_blocks(int flag) {
 #endif
     free_svalue(&apply_ret_value, "checkmemory");
     apply_ret_value = const0u;
+    /* nothing is mid-store here, so the parked temporary is just garbage */
+    release_parked_lvalue_owner();
 
     if (master_ob) {
       master_ob->extra_ref++;
