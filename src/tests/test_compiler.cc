@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include <fcntl.h>
 #ifdef _WIN32
+#include <direct.h>
 #include <io.h>
 #endif
 
@@ -2439,7 +2440,12 @@ TEST(Preprocessor, FileAndDirInsideIncludeNameCompilingObject) {
   // open it (quoted relative includes from a nested virtual filename
   // produce a leading-/ FS path that open() cannot resolve here).
   std::string inc_dir = std::string(TESTSUITE_DIR) + "/zzprobe";
+  // MinGW's mkdir() takes only the path (direct.h); POSIX needs the mode.
+#ifdef _WIN32
+  int mkdir_rc = _mkdir(inc_dir.c_str());
+#else
   int mkdir_rc = mkdir(inc_dir.c_str(), 0755);
+#endif
   ASSERT_TRUE(mkdir_rc == 0 || errno == EEXIST)
       << "mkdir " << inc_dir << ": " << strerror(errno);
   std::string inc_path = inc_dir + "/zz_file_dir_inc.h";
