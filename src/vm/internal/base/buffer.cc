@@ -24,7 +24,9 @@ void free_buffer(buffer_t* b) {
   FREE((char*)b);
 } /* free_buffer() */
 
-buffer_t* allocate_buffer(int size) {
+/* Sizes and offsets are LPC_INT so every check below sees the caller's
+ * real 64-bit value rather than one already wrapped into int range. */
+buffer_t* allocate_buffer(LPC_INT size) {
   auto max_buffer_size = CONFIG_INT(__MAX_BUFFER_SIZE__);
 
   buffer_t* buf;
@@ -43,11 +45,11 @@ buffer_t* allocate_buffer(int size) {
   return buf;
 }
 
-int write_buffer(buffer_t* buf, int start, const char* str, int theLength) {
-  unsigned int size = buf->size;
+int write_buffer(buffer_t* buf, LPC_INT start, const char* str, int theLength) {
+  LPC_INT const size = buf->size;
 
   if (start < 0) {
-    start = (int)size + start;
+    start = size + start;
     if (start < 0) {
       return 0;
     }
@@ -58,17 +60,16 @@ int write_buffer(buffer_t* buf, int start, const char* str, int theLength) {
   /*
    * can't write past the end of the buffer since we can't reallocate the
    * buffer here (no easy way to propagate back the changes to the caller).
-   * Compute the bound in unsigned arithmetic so a huge start can't overflow
-   * signed int past the check and drive an out-of-bounds memcpy.
+   * 0 <= start and size < 2^32, so neither side of the bound can overflow.
    */
-  if ((unsigned int)start > size || (unsigned int)theLength > size - (unsigned int)start) {
+  if (start > size || theLength > size - start) {
     return 0;
   }
   memcpy(buf->item + start, str, theLength);
   return 1;
 } /* write_buffer() */
 
-char* read_buffer(buffer_t* b, int start, int len, int* rlen) {
+char* read_buffer(buffer_t* b, LPC_INT start, LPC_INT len, int* rlen) {
   char* str;
   unsigned int size;
 
@@ -89,7 +90,9 @@ char* read_buffer(buffer_t* b, int start, int len, int* rlen) {
   if (start >= size) {
     return nullptr;
   }
-  if ((start + len) > size) {
+  /* 0 <= start < size here: compare against the room left rather than
+   * computing start + len, which could overflow */
+  if (len > size - start) {
     len = (size - start);
   }
   for (str = reinterpret_cast<char*>(b->item) + start, size = 0; *str && size < len;

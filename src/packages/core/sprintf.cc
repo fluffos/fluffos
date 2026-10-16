@@ -186,6 +186,22 @@ using sprintf_state_t = struct _sprintf_state {
 static sprintf_state_t* sprintf_state = nullptr;
 
 static void add_space(outbuffer_t* /*outbuf*/, int indent);
+
+/* A `*` width/precision is a 64-bit LPC int, but fs/pres are ints:
+ * narrowing it directly turns a width of 0x100000003 into 3. Saturate
+ * instead, so a value past the int range behaves like the largest
+ * (smallest) int width/precision does -- for a width, a result too long
+ * for the maximum string length -- and every int-range value is unchanged. */
+static int clamp_star_arg(LPC_INT v) {
+  if (v > std::numeric_limits<int>::max()) {
+    return std::numeric_limits<int>::max();
+  }
+  if (v < std::numeric_limits<int>::min()) {
+    return std::numeric_limits<int>::min();
+  }
+  return static_cast<int>(v);
+}
+
 static void add_justified(const char* str, int swidth, int slen, pad_info_t* pad, int fs,
                           format_info finfo, short int trailing);
 static int add_column(cst** column, int trailing);
@@ -928,7 +944,7 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
               if (carg->type != T_NUMBER) {
                 SPRINTF_ERROR(ERR_INVALID_STAR);
               }
-              pres = carg->u.number;
+              pres = clamp_star_arg(carg->u.number);
               GET_NEXT_ARG;
               continue;
             }
@@ -951,7 +967,7 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
                 if (carg->type != T_NUMBER) {
                   SPRINTF_ERROR(ERR_INVALID_STAR);
                 }
-                fs = carg->u.number;
+                fs = clamp_star_arg(carg->u.number);
                 if (fs < 0) {
                   fs = 0;
                 }
@@ -1293,9 +1309,14 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
           }
           /* write UTF8 codepoint */
           char temp[4 + 1] = {0};
-          UChar32 const c = carg->u.number;
+          /* range-check the LPC int before narrowing it to a UChar32, or
+           * 0x100000041 would print as 'A' */
+          if (carg->u.number <= 0 || carg->u.number > UCHAR_MAX_VALUE) {
+            SPRINTF_ERROR(ERR_INVALID_ARG_C);
+          }
+          UChar32 const c = static_cast<UChar32>(carg->u.number);
 
-          if (c == 0 || !u_isdefined(c)) {
+          if (!u_isdefined(c)) {
             SPRINTF_ERROR(ERR_INVALID_ARG_C);
           }
           size_t offset = 0;

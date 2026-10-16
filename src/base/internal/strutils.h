@@ -116,7 +116,15 @@ class EGCSmartIterator : public EGCIterator {
     }
     return count_;
   }
-  int32_t index_to_offset(int32_t index) {
+  // `index` is 64-bit so a caller can pass an LPC int straight through: an
+  // index past 32 bits must be out of range, not wrap back inside the string.
+  int32_t index_to_offset(int64_t index64) {
+    // A string has at most len() clusters, so any |index| > len() + 1 is DONE
+    // for both walks below; clamping to that keeps every result unchanged
+    // while making the narrowing to int32_t exact.
+    int64_t const limit = static_cast<int64_t>(len()) + 1;
+    if (index64 > limit || index64 < -limit) return icu::BreakIterator::DONE;
+    auto const index = static_cast<int32_t>(index64);
     // ASCII: EGC index == byte offset. Boundaries are 0..len, a negative index
     // counts back from the end, and anything outside that range is DONE --
     // matching what the ICU walk below returns for the same input.
@@ -157,7 +165,7 @@ class EGCSmartIterator : public EGCIterator {
     }
     return pos;
   }
-  int32_t post_index_to_offset(int32_t index) {
+  int32_t post_index_to_offset(int64_t index) {
     auto pos = index_to_offset(index);
     if (pos < 0) return pos;
     if (is_ascii()) {
@@ -230,7 +238,7 @@ bool u8_string_is_ascii_cached(const char* str, int32_t len, bool counted);
 bool u8_validate(char**);
 bool u8_validate(const char*);
 bool u8_validate(const uint8_t*, size_t);
-UChar32 u8_egc_index_as_single_codepoint(const char*, int32_t, int32_t);
+UChar32 u8_egc_index_as_single_codepoint(const char*, int32_t, int64_t);
 void u8_copy_and_replace_codepoint_at(EGCSmartIterator& iter, char* dst, int32_t index, UChar32 c);
 int32_t u8_offset_to_egc_index(EGCIterator& iter, int32_t offset);
 int32_t u8_strncpy(uint8_t*, const uint8_t*, const int32_t);

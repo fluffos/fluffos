@@ -1,0 +1,33 @@
+// Regression: terminal_colour()'s fill-out mode (negative wrap,
+// packages/contrib/contrib.cc) corrupted the heap or aborted the driver:
+//   1. wrap is an LPC_INT and the `col > wrap` line-break test is 64-bit,
+//      but the padding is accumulated into `int j` (the result size) and
+//      `int endpad = wrap - col` -- both narrowed. With wrap = 0x100000005 a
+//      20-column line never wraps, endpad truncates to -15, the result
+//      string is undersized and the composition writes past it
+//      (ASan heap-buffer-overflow; release build SIGSEGV).
+//   2. Even without truncation, the newline path adds the fill-out padding
+//      to j without the max-string-length clamp the wrap path applies, so
+//      the size pass and the composition pass disagree and the driver dies
+//      with "FATAL ERROR: Length miscalculated in terminal_colour()".
+// Regression signal: both calls return (a string no longer than the maximum
+// string length) or error cleanly; the driver must survive.
+void do_tests() {
+#if efun_defined(terminal_colour)
+  mixed r;
+  // 256 + 14 is __MAX_STRING_LENGTH__ (include/runtime_config.h)
+  int max = get_config(256 + 14);
+
+  catch(r = terminal_colour("aaaaaaaaaaaaaaaaaaaa\nb", ([]), -0x100000005));
+  if (stringp(r)) {
+    ASSERT(sizeof(r) <= max);
+  }
+
+  r = 0;
+  catch(r = terminal_colour("\n\n\n", ([]), -100000));
+  if (stringp(r)) {
+    ASSERT(sizeof(r) <= max);
+  }
+#endif
+  ASSERT(1);
+}

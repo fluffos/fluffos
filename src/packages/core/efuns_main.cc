@@ -10,6 +10,8 @@
 #include "base/package_api.h"
 
 #include <algorithm>
+#include <set>
+#include <utility>
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -405,10 +407,11 @@ void f_clear_bit() {
     error("clear_bit() bit requested : %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", sp->u.number,
           max_bitfield_bits);
   }
-  bit = (sp--)->u.number;
-  if (bit < 0) {
+  /* check the sign on the LPC int, before narrowing it (as set_bit does) */
+  if (sp->u.number < 0) {
     error("Bad argument 2 (negative) to clear_bit().\n");
   }
+  bit = (sp--)->u.number;
   ind = bit / 6;
   bit %= 6;
   len = SVALUE_STRLEN(sp);
@@ -1032,10 +1035,93 @@ void f_match_path() {
 #endif /* F_MATCH_PATH */
 
 #ifdef F_MEMBER_ARRAY
+/* member_array(int, string) is a BYTE search (strchr): the start offset and
+ * the result are byte offsets and only one byte can match. The answer is a
+ * character answer exactly when:
+ *   - the needle is ASCII and not found: an ASCII byte never occurs inside a
+ *     multi-byte character, and starting at byte k never covers less text
+ *     than starting at character k, so -1 is right;
+ *   - the needle is ASCII, found at byte p, and character p is exactly that
+ *     one byte -- no non-ASCII text or CR LF (one character) before it, and
+ *     not the start of a combining sequence nor the LF of a CR LF;
+ *   - the needle is above 0x7F and the text has no byte >= 0x80 (so no such
+ *     character can be there, and -1 is right).
+ * Otherwise the caller gets one warning per call site. The decision only runs
+ * for a site that has not warned yet, so a warned site costs one set lookup. */
+static bool has_high_byte(const char* s, size_t n) {
+  for (size_t k = 0; k < n; k++) {
+    if (static_cast<unsigned char>(s[k]) >= 0x80) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool member_array_byte_answer_misleads(const char* str, size_t len, LPC_INT c,
+                                              LPC_INT result) {
+  if (c > 0x7f || c < 0) {
+    return has_high_byte(str, len);
+  }
+  if (result < 0) {
+    return false;
+  }
+  /* The byte answer is the character answer iff character `result` is
+   * exactly the one byte at offset `result`: it starts there, and the next
+   * character starts one byte later. That catches non-ASCII text or a CR LF
+   * before the match, a combining sequence starting at it, and the LF of a
+   * CR LF. */
+  EGCSmartIterator iter(str, len);
+  if (!iter.ok()) {
+    return true;
+  }
+  int32_t const at = iter.index_to_offset(result);
+  int32_t next = iter.index_to_offset(result + 1);
+  if (next == icu::BreakIterator::DONE) {
+    next = static_cast<int32_t>(len);
+  }
+  return at != result || next != result + 1;
+}
+
+/* Once per call site. A call through an efun pointer runs in a fake frame
+ * (current_prog == &fake_prog), so the site is the caller's, saved in csp. */
+static std::set<std::pair<const program_t*, ptrdiff_t>> member_array_warned_sites;
+
+static void member_array_call_site(const program_t** prog, const char** at) {
+  *prog = current_prog;
+  *at = pc;
+  if (current_prog == &fake_prog && csp && csp->prog) {
+    *prog = csp->prog;
+    *at = csp->pc;
+  }
+}
+
+static bool member_array_site_warned(const program_t* prog, const char* at) {
+  return member_array_warned_sites.count({prog, prog ? at - prog->program : 0}) != 0;
+}
+
+static void warn_member_array_byte_search(const program_t* prog, const char* at) {
+  static constexpr size_t kMaxWarnedSites = 1024;
+  if (member_array_warned_sites.size() >= kMaxWarnedSites) {
+    /* forget rather than go silent: reloaded programs keep adding sites */
+    member_array_warned_sites.clear();
+  }
+  member_array_warned_sites.insert({prog, prog ? at - prog->program : 0});
+  const char* file = nullptr;
+  int line = 0;
+  if (prog && prog != &fake_prog) {
+    get_explicit_line_number_info(const_cast<char*>(at), prog, &file, &line);
+  }
+  debug_message(
+      "/%s:%d: Warning: member_array(int, string) searches BYTES and returns a byte offset; on "
+      "this non-ASCII string that is not a character index. Use strsrch(str, ch) to find a "
+      "character (any Unicode code point) by character index.\n",
+      file ? file : "<unknown>", line);
+}
+
 void f_member_array() {
   array_t* v;
   int flag = 0;
-  int i;
+  LPC_INT i;
   int size;
 
   if (st_num_arg > 2) {
@@ -1062,10 +1148,23 @@ void f_member_array() {
     if (i > SVALUE_STRLEN(sp)) {
       error("Index to start search from in member_array() is > string length.\n");
     }
-    if ((res = strchr(sp->u.string + i, (sp - 1)->u.number))) {
+    /* strchr() searches for a char: a value outside 0..255 would be
+     * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
+     * terminator), so it can never be in the string. */
+    LPC_INT const c = (sp - 1)->u.number;
+    if (c >= 0 && c <= 255 && (res = strchr(sp->u.string + i, static_cast<int>(c)))) {
       i = res - sp->u.string;
     } else {
       i = -1;
+    }
+    if (!SVALUE_STR_ASCII(sp)) { /* cached; ASCII and CR-free never warns */
+      const program_t* site_prog;
+      const char* site_pc;
+      member_array_call_site(&site_prog, &site_pc);
+      if (!member_array_site_warned(site_prog, site_pc) &&
+          member_array_byte_answer_misleads(sp->u.string, SVALUE_STRLEN(sp), c, i)) {
+        warn_member_array_byte_search(site_prog, site_pc);
+      }
     }
     free_string_svalue(sp--);
   } else {
@@ -1706,7 +1805,8 @@ void f_secure_random() {
 #ifdef F_READ_BYTES
 void f_read_bytes() {
   char* str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
+  LPC_INT start = 0, len = 0;
+  int rlen = 0, num_arg = st_num_arg;
   svalue_t* arg;
 
   arg = sp - num_arg + 1;
@@ -1731,7 +1831,8 @@ void f_read_bytes() {
 #ifdef F_READ_BUFFER
 void f_read_buffer() {
   char* str;
-  int start = 0, len = 0, rlen = 0, num_arg = st_num_arg;
+  LPC_INT start = 0, len = 0;
+  int rlen = 0, num_arg = st_num_arg;
   int from_file = 0; /* new line */
   svalue_t* arg = sp - num_arg + 1;
 
@@ -1768,7 +1869,7 @@ void f_read_buffer() {
 #ifdef F_READ_FILE
 void f_read_file() {
   char* str;
-  int start = 0, len = 0;
+  LPC_INT start = 0, len = 0;
 
   switch (st_num_arg) {
     case 3:
@@ -1951,7 +2052,8 @@ void f_rename() {
 void f_replace_string() {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  int plen, rlen, dlen, slen, first, last, cur, j;
+  int plen, rlen, dlen, cur;
+  LPC_INT first, last; /* LPC ints: an int would wrap 0x100000001 to 1 */
 
   const char* pattern;
   const char* replace;
@@ -2017,13 +2119,13 @@ void f_replace_string() {
 
   if (plen > 1) {
     /* build skip table */
-    for (j = 0; j < 256; j++) {
+    for (int j = 0; j < 256; j++) {
       skip_table[j] = plen;
     }
-    for (j = 0; j < plen; j++) {
+    for (int j = 0; j < plen; j++) {
       skip_table[static_cast<unsigned char>(pattern[j])] = plen - j - 1;
     }
-    slen = SVALUE_STRLEN(arg);
+    int const slen = SVALUE_STRLEN(arg);
     slimit = src + slen;
     flimit = slimit - plen + 1;
     probe = plen - 1;
@@ -2722,6 +2824,11 @@ void f_strsrch() {
   if (arg2->type == T_NUMBER) {
     UBool is_error = false;
     int offset = 0;
+    /* U8_APPEND takes a 32-bit UChar32: check the LPC int first, or
+     * 0x1000000E9 would be searched for as U+00E9. */
+    if (arg2->u.number < 0 || arg2->u.number > UCHAR_MAX_VALUE) {
+      error("Invalid codepoint to search.");
+    }
     U8_APPEND(buf, offset, sizeof(buf), arg2->u.number, is_error);
     if (is_error) {
       error("Invalid codepoint to search.");
@@ -2842,7 +2949,7 @@ void f_tell_room() {
 
 #ifdef F_TEST_BIT
 void f_test_bit() {
-  int const ind = (sp--)->u.number;
+  LPC_INT const ind = (sp--)->u.number;
 
   if (ind / 6 >= SVALUE_STRLEN(sp)) {
     free_string_svalue(sp);
@@ -2864,7 +2971,7 @@ void f_test_bit() {
 
 #ifdef F_NEXT_BIT
 void f_next_bit() {
-  int const start = (sp--)->u.number;
+  LPC_INT const start = (sp--)->u.number;
   int const len = SVALUE_STRLEN(sp);
   int which, bit = 0, value;
 

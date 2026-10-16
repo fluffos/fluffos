@@ -1,0 +1,107 @@
+// member_array(int, string) is a BYTE search (strchr): the start offset and
+// the result are byte offsets. It keeps that behaviour, but where the byte
+// answer is not the character answer it logs a warning -- once per call site
+// -- pointing at strsrch(str, ch): an ASCII needle found after non-ASCII text
+// or a CR LF, or found as the start of a longer character (a combining
+// sequence, the LF of a CR LF), and a needle above 0x7F searched in text that
+// has non-ASCII bytes. Correct byte answers must NOT warn: an ASCII needle not
+// found (at any start offset), found before any non-ASCII text, a lone CR,
+// and a code point searched in ASCII text. Calls through an efun pointer are
+// attributed to the calling line. This pins the byte results and exactly
+// which call sites warn (read back from the debug log).
+
+// get_config(10) is `debug log file` (a name in LOG_DIR); asking the driver instead of assuming a
+// path, and scanning the whole log a window of lines at a time instead of one
+// head-anchored read_file() (capped at `maximum read file size`), are the two
+// traps unhandled_rejection_locus.lpc documents.
+#define DEBUG_LOG_FILE 10
+#define CHUNK_LINES 500
+#define MAX_CHUNKS 400
+#define WARNING "member_array_non_ascii\\.lpc:[0-9]+: Warning: member_array"
+
+int count_log_lines(string pattern) {
+  string configured = get_config(DEBUG_LOG_FILE);
+  string file;
+  int n = 0;
+
+  if (!stringp(configured) || configured == "") {
+    return -1;
+  }
+  file = LOG_DIR + "/" + configured;  // the log lives in the mudlib's log dir
+  if (file_size(file) < 0) {
+    return -1;
+  }
+  for (int chunk = 0; chunk < MAX_CHUNKS; chunk++) {
+    string text = read_file(file, chunk * CHUNK_LINES + 1, CHUNK_LINES);
+    if (!stringp(text) || text == "") {
+      break;
+    }
+    n += sizeof(regexp(explode(text, "\n"), pattern));
+  }
+  return n;
+}
+
+int repeat_site(int c, string s) {
+  return member_array(c, s);
+}
+
+int via_pointer_a(string s) {
+  return sizeof(filter(({ s }), (: member_array, 'b' :)));
+}
+
+int via_pointer_b(string s) {
+  return evaluate((: member_array :), 'b', s);
+}
+
+int warnings_here() {
+  return count_log_lines(WARNING);
+}
+
+// a member_array warning attributed to an efun pointer's fake frame
+int fake_frames_logged() {
+  return count_log_lines("\\(fake\\):[0-9]+: Warning: member_array");
+}
+
+void do_tests() {
+  int before = warnings_here();
+
+  if (before < 0) {
+    return;  // no readable debug log in this configuration
+  }
+
+  // correct as byte searches: no warning
+  ASSERT_EQ(2, member_array('c', "abc"));
+  ASSERT_EQ(-1, member_array('x', "\u4e2d\u6587"));     // ASCII needle, absent
+  ASSERT_EQ(1, member_array('b', "ab\u4e2d"));          // found before non-ASCII
+  ASSERT_EQ(-1, member_array(0x4e2d, "abc"));           // code point, ASCII text
+  ASSERT_EQ(-1, member_array(0xe9, "line\r\n"));        // ... with a CR LF in it
+  ASSERT_EQ(3, member_array('c', "ab\rc"));             // a lone CR is a character
+  ASSERT_EQ(-1, member_array('x', "\u00e9bc", 2));       // not found from a start
+  ASSERT_EQ(before, warnings_here());
+
+  // byte answers that are not character answers: one warning per call site
+  ASSERT_EQ(2, member_array('b', "\u00e9b"));            // 'b' is character 1
+  ASSERT_EQ(3, member_array('b', "a\r\nb"));             // CR LF is one character
+  ASSERT_EQ(-1, member_array(0xe9, "caf\u00e9"));        // a code point, never found
+  ASSERT_EQ(-1, member_array(0x4e2d, "\u4e2d\u6587"));   // likewise
+  ASSERT_EQ(0, member_array('e', "e\u0301x"));           // 'e' starts "e + accent"
+  ASSERT_EQ(2, member_array('\n', "a\r\n"));            // the LF of a CR LF
+  ASSERT_EQ(before + 6, warnings_here());
+
+  // the same call site warns once, however often it runs
+  for (int k = 0; k < 3; k++) {
+    ASSERT_EQ(2, repeat_site('b', "\u00e9b"));
+  }
+  ASSERT_EQ(before + 7, warnings_here());
+
+  // efun-pointer calls are reported at their calling line, one per site
+  ASSERT_EQ(1, via_pointer_a("\u00e9b"));
+  ASSERT_EQ(2, via_pointer_b("\u00e9b"));
+  ASSERT_EQ(before + 9, warnings_here());
+  ASSERT_EQ(0, fake_frames_logged());
+
+  // the recommended replacement gives the character index
+  ASSERT_EQ(1, strsrch("\u00e9b", 'b'));
+  ASSERT_EQ(3, strsrch("caf\u00e9", 0xe9));
+  ASSERT_EQ(0, strsrch("\u4e2d\u6587", 0x4e2d));
+}

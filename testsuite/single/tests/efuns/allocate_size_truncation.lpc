@@ -1,0 +1,19 @@
+// Regression: allocate() and allocate_buffer() (and ffi_alloc()) pass the
+// LPC int size straight into allocate_array(int) / allocate_array2(int, ...)
+// / allocate_buffer(int) (vm/internal/base/array.cc, buffer.cc), so the
+// "Illegal array size" / "Illegal buffer size" checks ran on the
+// TRUNCATED value: allocate(0x100000001) returned a 1-element array and
+// allocate(-0x100000000 + 2) a 2-element one instead of erroring. Every
+// size here is far past the configured maximum and must error cleanly.
+void do_tests() {
+  ASSERT(catch(allocate(0x100000001)));
+  ASSERT(catch(allocate(-0x100000000 + 2)));
+  ASSERT(catch(allocate(0x100000002, (: $1 :))));
+  ASSERT(catch(allocate(0x100000002, 0)));
+  ASSERT(catch(allocate_buffer(0x100000001)));
+  ASSERT(catch(allocate_buffer(-0x100000000 + 2)));
+#if efun_defined(ffi_alloc)
+  ASSERT(catch(ffi_alloc(0x100000001)));
+  ASSERT(catch(ffi_alloc(-0x100000000 + 2)));
+#endif
+}

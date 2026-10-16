@@ -1,0 +1,10 @@
+// Regression: strsrch(str, int) encodes the int with ICU's U8_APPEND()
+// (packages/core/efuns_main.cc), which casts it to a 32-bit codepoint, so
+// strsrch("café", 0x1000000E9) searched for U+00E9 and returned 3
+// instead of rejecting the out-of-range codepoint like 0x110000 is.
+void do_tests() {
+  ASSERT_EQ(3, strsrch("café", 0xE9));
+  ASSERT(catch(strsrch("café", 0x110000)));
+  ASSERT(catch(strsrch("café", 0x1000000E9)));
+  ASSERT(catch(strsrch("café", 0x1000000E9, -1)));
+}

@@ -1,0 +1,73 @@
+// Regression: rvalue string indexing and every [..] range form narrowed the
+// 64-bit LPC int index to a 32-bit int before range-checking it, so an
+// index past 32 bits wrapped back inside the container:
+//   - F_INDEX / F_RINDEX on a string (interpret.cc) range-checked the
+//     LPC_INT but then handed it to u8_egc_index_as_single_codepoint()'s
+//     int32_t parameter: "abc"[0x100000000] read "abc"[0].
+//   - f_range() / f_extract_range() (packages/ops/ops.cc) stored the bounds
+//     in int / int32_t / size_t-then-int (slice_array() takes int), so
+//     "abc"[0x100000001..2] was "bc" and ({1,2,3})[0x100000001..] was
+//     ({2,3}).
+//   - push_lvalue_range() (interpret.cc) stored both bounds in int32_t, so
+//     x[0..0x100000000] = ({}) deleted x[0] instead of erroring.
+// The regression signal: a huge index must behave exactly like a small
+// out-of-range one (clean error for an element, clamped/empty result for an
+// rvalue range, clean error for a range lvalue).
+#define BIG 0x100000000
+#define BIG1 0x100000001
+
+void do_tests() {
+  int big = BIG, big1 = BIG1, five = 5;
+  string s = "abc";
+  mixed *a = ({ 1, 2, 3 });
+  buffer b = allocate_buffer(3);
+  mixed got;
+
+  b[0] = 10;
+  b[1] = 11;
+  b[2] = 12;
+
+  // element reads (assigned: a bare index whose value is unused is
+  // optimized out of the catch)
+  ASSERT(catch(got = s[big]));
+  ASSERT(catch(got = s[five]));
+  ASSERT(catch(got = s[<big1]));
+  ASSERT(catch(got = s[<five]));
+
+  // rvalue ranges must clamp exactly as a small out-of-range bound does
+  ASSERT_EQ(s[0..five], s[0..big]);
+  ASSERT_EQ(s[five..2], s[big..2]);
+  ASSERT_EQ(s[five..2], s[big1..2]);
+  ASSERT_EQ(s[<five..], s[<big1..]);
+  ASSERT_EQ(s[0..<five], s[0..<big1]);
+  ASSERT_EQ(s[five..], s[big1..]);
+  ASSERT_EQ(a[five..2], a[big1..2]);
+  ASSERT_EQ(a[0..<five], a[0..<big1]);
+  ASSERT_EQ(a[<five..], a[<big1..]);
+  ASSERT_EQ(a[five..], a[big1..]);
+  ASSERT_EQ(b[five..2], b[big1..2]);
+  ASSERT_EQ(b[<five..], b[<big1..]);
+  ASSERT_EQ(b[0..<five], b[0..<big1]);
+  ASSERT_EQ(b[five..], b[big1..]);
+
+  // range lvalues must refuse an out-of-range bound, not wrap it
+  {
+    mixed *x = ({ 1, 2, 3 });
+    ASSERT(catch(x[0..big] = ({})));
+    ASSERT_EQ(({ 1, 2, 3 }), x);
+    ASSERT(catch(x[big1..2] = ({})));
+    ASSERT_EQ(({ 1, 2, 3 }), x);
+  }
+  {
+    string x = "abc";
+    ASSERT(catch(x[0..big] = ""));
+    ASSERT_EQ("abc", x);
+    ASSERT(catch(x[big1..2] = ""));
+    ASSERT_EQ("abc", x);
+  }
+  {
+    buffer x = allocate_buffer(3);
+    ASSERT(catch(x[0..big] = allocate_buffer(0)));
+    ASSERT_EQ(3, sizeof(x));
+  }
+}

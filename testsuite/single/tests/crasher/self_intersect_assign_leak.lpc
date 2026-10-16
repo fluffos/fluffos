@@ -1,0 +1,20 @@
+// Regression: `a &= a` (an array intersected with itself in place) leaked the
+// array. intersect_array() (src/vm/internal/base/array.cc) assumes its two
+// operands are distinct: it drops a1's reference with free_empty_array() and,
+// because a2->ref was > 1 on entry, drops a2's with a bare `a2->ref--` and no
+// dealloc. When a1 == a2 and the variable plus the pushed rhs are the only
+// two references (exactly the `a &= a` case), the second decrement takes the
+// array to ref 0 without freeing it, together with every element it still
+// holds. `a & a` does not leak (a third reference stays on the stack), and
+// union_array() special-cases a1 == a2. Pre-existing: master leaks
+// identically. The regression signal is LeakSanitizer reporting the
+// allocate_empty_array() block at exit on a sanitizer build.
+void do_tests() {
+  mixed a = ({ 4, 5, ({ 6 }) });
+  mixed *b = ({ "x", "y" });
+
+  a &= a;
+  ASSERT_EQ(3, sizeof(a));
+  b &= b;
+  ASSERT_EQ(sort_array(({ "x", "y" }), 1), sort_array(b, 1));
+}

@@ -606,7 +606,7 @@ void f_ffi_call() {
 
 #ifdef F_FFI_ALLOC
 void f_ffi_alloc() {
-  int nbytes = sp->u.number;
+  LPC_INT nbytes = sp->u.number;
   if (nbytes < 0) {
     error("ffi_alloc: negative size.\n");
   }
@@ -644,7 +644,7 @@ void f_ffi_peek() {
   // process-memory disclosure primitive, so the master must approve it
   // even though no foreign code runs.
   check_valid_ffi("peek", sp - 1);
-  int nbytes = sp->u.number;
+  LPC_INT nbytes = sp->u.number;
   auto addr = static_cast<intptr_t>((sp - 1)->u.number);
   if (addr == 0) {
     error("ffi_peek: NULL address.\n");

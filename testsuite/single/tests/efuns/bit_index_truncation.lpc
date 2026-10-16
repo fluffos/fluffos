@@ -1,0 +1,15 @@
+// Regression: test_bit(), next_bit() and clear_bit() (packages/core/
+// efuns_main.cc) stored the LPC int bit index in an `int` before using it,
+// so a bit index past 32 bits wrapped onto a low bit:
+//   test_bit("!", 0x100000000) returned 1 (bit 0),
+//   next_bit("!!", 0x100000000) returned 0 instead of -1,
+//   clear_bit("!", -0x100000000) cleared bit 0 instead of rejecting the
+//   negative index (its sign check ran after the truncation).
+// set_bit() already checks the untruncated value (set_bit_negative.lpc).
+void do_tests() {
+  ASSERT_EQ(0, test_bit("!", 0x100000000));
+  ASSERT_EQ(-1, next_bit("!!", 0x100000000));
+  ASSERT(catch(clear_bit("!", -0x100000000)));
+  // a positive huge bit is over max_bitfield_bits: already a clean error
+  ASSERT(catch(clear_bit("!", 0x100000000)));
+}

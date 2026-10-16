@@ -1,0 +1,19 @@
+// Regression: F_RINDEX on a buffer (interpret.cc) bounds-checked
+// `i > size` instead of `i >= size`, so b[<0] (i == size) read the byte
+// one past the end of the buffer's payload. It lands in the allocation's
+// zeroed tail padding, so ASan stays quiet and the read always yields 0;
+// the array and buffer-lvalue forms both reject b[<0]/a[<0].
+void do_tests() {
+  buffer b = allocate_buffer(3);
+  mixed *a = ({ 1, 2, 3 });
+  mixed x;
+  int zero = 0;
+
+  b[0] = 10;
+  b[1] = 11;
+  b[2] = 12;
+  ASSERT(catch(x = a[<zero]));
+  ASSERT(catch(b[<zero] = 1));
+  ASSERT(catch(x = b[<zero]));
+  ASSERT_EQ(12, b[<1]);
+}

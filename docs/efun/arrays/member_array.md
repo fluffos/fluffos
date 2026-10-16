@@ -21,6 +21,16 @@ title: arrays / member_array
 
     Note, if the second argument is a string, the first parameter must be an int
     representing the character you are looking for in the provided string.
+    The string form is a BYTE search: 'start' and the result are byte
+    offsets, and only a single byte (0..255) can match. When that byte
+    answer is not the character answer -- an ASCII 'item' found after
+    non-ASCII text or a CR LF (one character), or found as the start of a
+    longer character (a combining sequence, the LF of a CR LF), or an
+    'item' above 0x7F searched in text that has non-ASCII bytes -- the
+    driver logs a warning, once per call site. An ASCII 'item' that is not
+    found, or is found before any non-ASCII text, is correct as it is. To
+    find any Unicode code point by character index, use strsrch(str, ch)
+    instead.
 
     The optional 'flags' argument is a bit field:
 

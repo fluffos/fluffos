@@ -1,0 +1,25 @@
+// Regression: read_buffer()/write_buffer() on a buffer passed the LPC int
+// start/length into read_buffer(buffer_t*, int, int, int*) /
+// write_buffer(buffer_t*, int, ...) (vm/internal/base/buffer.cc), whose
+// bounds checks then ran on the truncated value:
+//   write_buffer(c, 0x100000000, "x") silently overwrote c[0] and returned 1;
+//   read_buffer(b, 0x100000001) read from offset 1 instead of returning 0.
+void do_tests() {
+  buffer b = allocate_buffer(3), c;
+
+  b[0] = 'a';
+  b[1] = 'b';
+  b[2] = 'c';
+
+  ASSERT_EQ(0, read_buffer(b, 0x100000001));
+  ASSERT_EQ("abc", read_buffer(b, 0, 0x100000001));
+
+  c = allocate_buffer(3);
+  c[0] = 10;
+  ASSERT_EQ(0, write_buffer(c, 0x100000000, "x"));
+  ASSERT_EQ(10, c[0]);
+
+  c = allocate_buffer(4);
+  ASSERT_EQ(0, write_buffer(c, 0x100000000, 0x41424344));
+  ASSERT_EQ(0, c[3]);
+}

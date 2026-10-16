@@ -1,0 +1,26 @@
+// Regression: read_file(), read_bytes(), read_buffer(<file>) and
+// write_bytes() narrowed their LPC int start/length arguments to `int`
+// (packages/core/efuns_main.cc callers; file.cc read_file(const char*, int,
+// int) / read_bytes(..., int, int, ...) / write_bytes(..., int, ...)):
+//   read_file(f, 0x100000002) returned line 2 instead of 0 (past EOF);
+//   read_file(f, 1, 0x100000001) returned one line instead of all;
+//   read_bytes(f, 0x100000001) read from byte 1 instead of returning 0;
+//   read_bytes(f, 0, 0x100000002) read 2 bytes instead of rejecting a
+//     length over "maximum byte transfer";
+//   write_bytes(f, 0x100000000, "X") overwrote byte 0 instead of failing.
+#define F "/data/file_offset_truncation.txt"
+
+void do_tests() {
+  rm(F);
+  write_file(F, "l1\nl2\nl3\n", 1);
+
+  ASSERT_EQ(0, read_file(F, 0x100000002));
+  ASSERT_EQ("l1\nl2\nl3\n", read_file(F, 1, 0x100000001));
+  ASSERT_EQ(0, read_bytes(F, 0x100000001));
+  ASSERT(catch(read_bytes(F, 0, 0x100000002)));
+  ASSERT_EQ(0, read_buffer(F, 0x100000001));
+  ASSERT_EQ(0, write_bytes(F, 0x100000000, "X"));
+  ASSERT_EQ("l1\nl2\nl3\n", read_file(F));
+
+  rm(F);
+}

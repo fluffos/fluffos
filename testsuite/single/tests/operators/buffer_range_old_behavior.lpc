@@ -1,0 +1,36 @@
+// Regression: with `old range behavior` on, a buffer range wraps a reverse
+// bound twice (`len - x`, then `+= len` when that is negative --
+// packages/ops/ops.cc f_range / f_extract_range), so b[<k..] for k up to
+// 2*len selects a distinct byte. The 64-bit-bound fix first clamped every
+// bound to +-(len + 1), which made b[<8..] on a 6-byte buffer return "f"
+// instead of "ef". Buffer bounds are now clamped to +-(2*len + 1) under that
+// option. The expected values below are master's: from = len - k, plus len
+// once more if that is negative.
+#define OLD_RANGE_SLOT 306  // __RC_OLD_RANGE_BEHAVIOR__ (CFG_INT(50))
+
+void do_tests() {
+  int orig = get_config(OLD_RANGE_SLOT);
+  buffer b = string_encode("abcdef", "utf-8");
+  int len = sizeof(b);
+  mixed *got = ({});
+  mixed *want = ({});
+  mixed err;
+
+  set_config(OLD_RANGE_SLOT, 1);
+  err = catch {
+    for (int k = 1; k <= 2 * len; k++) {
+      int from = len - k;
+      if (from < 0) {
+        from += len;
+      }
+      got += ({ b[<k..], b[<k..<1] });
+      want += ({ b[from..], b[from..len - 1] });
+    }
+  };
+  // restore before asserting anything, unconditionally
+  set_config(OLD_RANGE_SLOT, orig);
+  ASSERT_EQ(0, err);
+  for (int i = 0; i < sizeof(want); i++) {
+    ASSERT_EQ(want[i], got[i]);
+  }
+}

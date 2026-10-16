@@ -161,7 +161,7 @@ static inline void assign_value_to_lvalue(svalue_t* lval, svalue_t* value, const
       if (value->type != T_NUMBER) {
         error("Illegal rhs to char lvalue\n");
       }
-      UChar32 newc = value->u.number;
+      LPC_INT const newc = value->u.number;
       assign_lvalue_codepoint(lval, [=](UChar32 /*unused*/) { return newc; });
       break;
     }
@@ -692,7 +692,7 @@ void free_indexed_lvalue(svalue_t* v) {
 
 /* Per-instance string-char lvalue (issue #1358). Validate first so an
  * error cannot leak the box; then put the box on the caller's slot. */
-static void arm_codepoint_lvalue(svalue_t* slot, svalue_t* owner, int32_t ind) {
+static void arm_codepoint_lvalue(svalue_t* slot, svalue_t* owner, LPC_INT ind) {
   UChar32 c = u8_egc_index_as_single_codepoint(owner->u.string, SVALUE_STRLEN(owner), ind);
   if (c == -2 || c == 0) {
     error("Index out of bounds in string index lvalue.\n");
@@ -700,7 +700,8 @@ static void arm_codepoint_lvalue(svalue_t* slot, svalue_t* owner, int32_t ind) {
     error("Indexed character is multi-codepoint.\n");
   }
   auto* box = new codepoint_lvalue_t;
-  box->index = ind;
+  /* in range: the lookup above rejected anything past the string's end */
+  box->index = static_cast<int32_t>(ind);
   box->owner = owner;
   box->iter = std::make_unique<EGCSmartIterator>(owner->u.string, SVALUE_STRLEN(owner));
   slot->type = T_LVALUE_CODEPOINT;
@@ -718,7 +719,7 @@ static void arm_byte_lvalue(svalue_t* slot, unsigned char* p) {
  * Compute the address of an array element.
  */
 void push_indexed_lvalue(int reverse) {
-  int ind;
+  LPC_INT ind;
   svalue_t* lv;
 
   if (sp->type == T_LVALUE) {
@@ -876,7 +877,7 @@ void push_indexed_lvalue(int reverse) {
 }
 
 static void push_lvalue_range(int code) {
-  int32_t ind1, ind2;
+  LPC_INT ind1, ind2;
   size_t size = 0;
   svalue_t* lv;
   std::unique_ptr<EGCSmartIterator> iter = nullptr;
@@ -917,9 +918,9 @@ static void push_lvalue_range(int code) {
       error("push_lvalue_range: invalid ind2");
     }
   } else {
-    ind2 = (code & 0x01) ? (size - sp->u.number) : sp->u.number;
+    ind2 = (code & 0x01) ? (static_cast<LPC_INT>(size) - sp->u.number) : sp->u.number;
     ind2 = ind2 + 1;
-    if (ind2 <= 0 || (ind2 > size)) {
+    if (ind2 <= 0 || (ind2 > static_cast<LPC_INT>(size))) {
       error(
           "The 2nd index to range lvalue must be >= -1 and < sizeof(indexed "
           "value)\n");
@@ -939,8 +940,8 @@ static void push_lvalue_range(int code) {
       error("push_lvalue_range: invalid ind1");
     }
   } else {
-    ind1 = (code & 0x10) ? (size - sp->u.number) : sp->u.number;
-    if (ind1 < 0 || ind1 > size) {
+    ind1 = (code & 0x10) ? (static_cast<LPC_INT>(size) - sp->u.number) : sp->u.number;
+    if (ind1 < 0 || ind1 > static_cast<LPC_INT>(size)) {
       error(
           "The 1st index to range lvalue must be >= 0 and <= sizeof(indexed "
           "value)\n");
@@ -1185,11 +1186,16 @@ void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
     auto old_len = U8_LENGTH(c);
     DEBUG_CHECK(old_len == 0, "Invalid UTF-8 Codepoint: assign_lvalue_codepoint");
 
-    auto newc = func(c);
+    /* The new value is computed and checked as an LPC int: narrowing it to
+     * a UChar32 first would let 0x100000041 pass as 'A'. */
+    LPC_INT const newc = func(c);
     if (newc == 0) {
       error("Strings cannot contain 0 byte.\n");
     }
-    c = newc;
+    if (newc < 0 || newc > UCHAR_MAX_VALUE) {
+      error("Strings cannot contain invalid utf8 codepoint.\n");
+    }
+    c = static_cast<UChar32>(newc);
     auto new_len = U8_LENGTH(c);
     if (!new_len) {
       error("Strings cannot contain invalid utf8 codepoint.\n");
@@ -1208,7 +1214,7 @@ void assign_lvalue_codepoint(svalue_t* lval, F&& func) {
 /* Add delta to the codepoint behind a T_LVALUE_CODEPOINT slot
  * and return the resulting codepoint (for the rvalue of += / -=). */
 LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta) {
-  UChar32 out = 0;
+  LPC_INT out = 0;
   assign_lvalue_codepoint(lval, [&out, delta](UChar32 c) { return out = c + delta; });
   return out;
 }
@@ -3629,7 +3635,7 @@ void eval_instruction(char* p) {
                 if (sp->type != T_NUMBER) {
                   error("Illegal rhs to byte lvalue\n");
                 }
-                UChar32 newc = sp->u.number;
+                LPC_INT const newc = sp->u.number;
                 assign_lvalue_codepoint(lval, [=](UChar32 c) { return newc; });
                 pop_stack();
                 break;
@@ -4152,7 +4158,7 @@ void eval_instruction(char* p) {
             }
 
             i = sp->u.buf->size - (sp - 1)->u.number;
-            if ((i > sp->u.buf->size) || (i < 0)) {
+            if ((i >= sp->u.buf->size) || (i < 0)) {
               error("Buffer index out of bounds.\n");
             }
 
