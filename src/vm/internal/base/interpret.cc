@@ -2462,9 +2462,11 @@ static void incdec_slot(svalue_t* lval, int op, svalue_t* out) {
     case T_LVALUE_CODEPOINT: {
       LPC_INT oldval = 0;
       LPC_INT newval = 0;
+      /* Return LPC_INT (not UChar32): assign_lvalue_codepoint validates the
+       * full width before narrowing (#1441). */
       assign_lvalue_codepoint(lval, [&](UChar32 c) {
         oldval = c;
-        return static_cast<UChar32>(newval = c + delta);
+        return newval = c + delta;
       });
       if (out) {
         out->type = T_NUMBER;
@@ -2652,8 +2654,10 @@ static void void_assign_slot(svalue_t* lval) {
         if (sp->type != T_NUMBER) {
           error("Illegal rhs to byte lvalue\n");
         }
-        UChar32 newc = sp->u.number;
-        assign_lvalue_codepoint(lval, [=](UChar32 c) { return newc; });
+        /* LPC_INT, not UChar32: narrowing first lets 0x100000041 pass as 'A'
+         * (assign_lvalue_codepoint checks the full int; #1441). */
+        LPC_INT const newc = sp->u.number;
+        assign_lvalue_codepoint(lval, [=](UChar32 /*unused*/) { return newc; });
         pop_stack();
         break;
       }
