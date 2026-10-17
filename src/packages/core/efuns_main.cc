@@ -1627,7 +1627,9 @@ void f_printf(LPCFrame& f) {
   char* ret;
 
   if (command_giver) {
-    ret = string_print_formatted(f.string(0), num_arg - 1, f.argp(1));
+    /* argc==1 is format-only; argv pointer is unused when argc-1 == 0 */
+    ret = string_print_formatted(f.string(0), num_arg - 1,
+                                 num_arg > 1 ? f.argp(1) : nullptr);
     if (ret) {
       tell_object(command_giver, ret, COUNTED_STRLEN(ret));
       FREE_MSTR(ret);
@@ -1640,8 +1642,7 @@ void f_printf(LPCFrame& f) {
 #endif
 
 #ifdef F_PROCESS_STRING
-void f_process_string(int /*num_arg*/) {
-  LPCFrame f = LPCFrame::args(1);
+void f_process_string(LPCFrame& f) {
   char* str;
 
   str = process_string(f.string(0));
@@ -1655,8 +1656,7 @@ void f_process_string(int /*num_arg*/) {
 #endif
 
 #ifdef F_PROCESS_VALUE
-void f_process_value(int /*num_arg*/) {
-  LPCFrame f = LPCFrame::args(1);
+void f_process_value(LPCFrame& f) {
   svalue_t* ret;
 
   ret = process_value(f.string(0));
@@ -2653,7 +2653,8 @@ void f_snoop(LPCFrame& f) {
 #ifdef F_SPRINTF
 void f_sprintf(LPCFrame& f) {
   int num_arg = f.argc();
-  char* s = string_print_formatted(f.string(0), num_arg - 1, f.argp(1));
+  char* s = string_print_formatted(f.string(0), num_arg - 1,
+                                   num_arg > 1 ? f.argp(1) : nullptr);
   if (!s) {
     f.ret_str_constant("");
   } else {
