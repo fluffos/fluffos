@@ -559,6 +559,40 @@ void LPCFrame::pop_back(int n) {
   }
 }
 
+void LPCFrame::detach_back(int n, svalue_t* dest) {
+  if (n < 0 || n > size()) {
+    error("LPCFrame::detach_back(%d) with size=%d\n", n, size());
+  }
+  if (n == 0) {
+    return;
+  }
+  memcpy(dest, sp - n + 1, static_cast<size_t>(n) * sizeof(svalue_t));
+  sp -= n;
+  argc_ -= n;
+  if (argc_ < 0) {
+    argc_ = 0;
+  }
+  if (argc_ == 0) {
+    base_ = sp + 1;
+  }
+}
+
+void LPCFrame::attach_back(const svalue_t* src, int n) {
+  if (n < 0) {
+    error("LPCFrame::attach_back(%d)\n", n);
+  }
+  if (n == 0) {
+    return;
+  }
+  CHECK_STACK_OVERFLOW(n);
+  memcpy(sp + 1, src, static_cast<size_t>(n) * sizeof(svalue_t));
+  sp += n;
+  if (argc_ == 0) {
+    base_ = sp - n + 1;
+  }
+  argc_ += n;
+}
+
 void LPCFrame::discard_to() {
   if (mode_ != Mode::Mark && mode_ != Mode::Builder) {
     error("LPCFrame::discard_to requires Mark or Builder mode\n");
