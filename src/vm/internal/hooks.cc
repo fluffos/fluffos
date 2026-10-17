@@ -1059,20 +1059,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   pop_context(&econ);
 
-  /* Steal the return value off the (hook) stack before abandoning it.
-   * Outermost: switch_back restores the main stack and leaves alt-stack
-   * storage untouched — without this steal the return's refs are orphaned.
-   * Nested: the return sits at sp on the shared hook stack and must be
-   * dropped or the next nested call sees a polluted stack. */
-  svalue_t ret_sv = const0;
-  bool const have_ret = ret != nullptr;
-  if (have_ret) {
-    ret_sv = *ret;
-    if (!outermost) {
-      sp--;
-    }
-  }
-
   if (outermost) {
     switch_back(&ss);
   }
@@ -1116,7 +1102,7 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   g_hook_depth--;
   free_funp(f);
 
-  if (!have_ret) {
+  if (!ret) {
     a->errors++;
     too_deep_error = 0;
     max_eval_error = 0;
@@ -1135,17 +1121,15 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     }
     return HookRun::Error;
   }
-  if (ret_sv.type == T_PROMISE || a->detached) {
-    free_svalue(&ret_sv, "hook declined");
+  if (ret->type == T_PROMISE || a->detached) {
     if (a->detached) {
       delete a;
     }
     return HookRun::Declined;
   }
   if (out) {
-    *out = ret_sv; /* transfer ownership; caller free_svalue's */
-  } else {
-    free_svalue(&ret_sv, "hook call ret");
+    /* ret is &apply_ret_value (global); copy with bump — do not steal. */
+    assign_svalue_no_free(out, ret);
   }
   a->events++;
   a->last_fired = get_current_time();
