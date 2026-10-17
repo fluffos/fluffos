@@ -2,13 +2,24 @@
 
 #include "packages/core/outbuf.h"
 
-void outbuf_push(outbuffer_t* outbuf) {
-  LPCFrame f = LPCFrame::builder();
+/* The buffer's contents as an LPC string; "" when nothing was written. */
+static svalue_t outbuf_string(outbuffer_t* outbuf) {
+  svalue_t v;
+  v.type = T_STRING;
   if (outbuf && outbuf->buffer) {
     outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
-    f.push_str_malloced(outbuf->buffer);
+    v.subtype = STRING_MALLOC;
+    v.u.string = outbuf->buffer;
   } else {
-    f.push_str_constant("");
+    v.subtype = STRING_CONSTANT;
+    v.u.string = "";
   }
-  f.done();
+  return v;
 }
+
+void outbuf_push(outbuffer_t* outbuf) {
+  svalue_t v = outbuf_string(outbuf);
+  transfer_push_some_svalues(&v, 1);
+}
+
+void outbuf_ret(LPCFrame& f, outbuffer_t* outbuf) { f.ret_owned(outbuf_string(outbuf)); }

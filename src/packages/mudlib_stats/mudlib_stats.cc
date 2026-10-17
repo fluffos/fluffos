@@ -18,25 +18,12 @@
 
 #ifdef F_DOMAIN_STATS
 void f_domain_stats(LPCFrame& f) {
-  int num_arg = f.argc();
-  mapping_t* m;
-
-  if (num_arg) {
-    m = get_domain_stats(f.string(0));
-    f.ret_void();
-  } else {
-    m = get_domain_stats(nullptr);
-    f.done();
-  }
+  mapping_t* m = get_domain_stats(f.argc() ? f.string(0) : nullptr);
   if (!m) {
-    LPCFrame out = LPCFrame::builder();
-    out.push(static_cast<LPC_INT>(0));
-    out.done();
+    f.ret(0);
   } else {
-    /* ref count is properly decremented by get_domain_stats */
-    LPCFrame out = LPCFrame::builder();
-    out.push(m);
-    out.done();
+    /* get_domain_stats() leaves the caller no reference */
+    f.ret_addref(m);
   }
 }
 #endif
@@ -50,25 +37,12 @@ void f_set_author(LPCFrame& f) {
 
 #ifdef F_AUTHOR_STATS
 void f_author_stats(LPCFrame& f) {
-  int num_arg = f.argc();
-  mapping_t* m;
-
-  if (num_arg) {
-    m = get_author_stats(f.string(0));
-    f.ret_void();
-  } else {
-    m = get_author_stats(nullptr);
-    f.done();
-  }
+  mapping_t* m = get_author_stats(f.argc() ? f.string(0) : nullptr);
   if (!m) {
-    LPCFrame out = LPCFrame::builder();
-    out.push(static_cast<LPC_INT>(0));
-    out.done();
+    f.ret(0);
   } else {
-    /* ref count is properly decremented by get_author_stats */
-    LPCFrame out = LPCFrame::builder();
-    out.push(m);
-    out.done();
+    /* get_author_stats() leaves the caller no reference */
+    f.ret_addref(m);
   }
 }
 #endif

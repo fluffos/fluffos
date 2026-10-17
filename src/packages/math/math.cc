@@ -15,6 +15,10 @@
 #include <cmath>
 #include <climits>
 
+/* float -> float efuns that rewrite their one argument in place. */
+#define LPC_EFUN_UNARY_REAL(name, expr) \
+  void f_##name(LPCFrame& f) { f.top().u.real = (expr)(f.top().u.real); }
+
 #define SQUARE(n) ((n) * (n))
 
 #ifdef F_COS
@@ -30,7 +34,6 @@ void f_tan(LPCFrame& f) {
    * maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi))
    */
   f.top().u.real = tan(f.top().u.real);
-  f.done();
 }
 #endif
 
@@ -43,7 +46,6 @@ void f_asin(LPCFrame& f) {
     error("math: asin(x) with (x > 1.0)\n");
   }
   f.top().u.real = asin(f.top().u.real);
-  f.done();
 }
 #endif
 
@@ -56,7 +58,6 @@ void f_acos(LPCFrame& f) {
     error("math: acos(x) with (x > 1.0)\n");
   }
   f.top().u.real = acos(f.top().u.real);
-  f.done();
 }
 #endif
 
@@ -73,7 +74,6 @@ void f_sqrt(LPCFrame& f) {
   }
   f.top().type = T_REAL;
   f.top().u.real = sqrt(val);
-  f.done();
 }
 #endif
 
@@ -83,7 +83,6 @@ void f_log(LPCFrame& f) {
     error("math: log(x) with (x <= 0.0)\n");
   }
   f.top().u.real = log(f.top().u.real);
-  f.done();
 }
 #endif
 
@@ -96,7 +95,6 @@ void f_log10(LPCFrame& f) {
   }
   f.top().type = T_REAL;
   f.top().u.real = log10(val);
-  f.done();
 }
 #endif
 
@@ -109,7 +107,6 @@ void f_log2(LPCFrame& f) {
   }
   f.top().type = T_REAL;
   f.top().u.real = log2(val);
-  f.done();
 }
 #endif
 

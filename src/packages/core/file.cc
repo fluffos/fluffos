@@ -1076,11 +1076,10 @@ void f_link(LPCFrame& f) {
   int i;
 
   {
-    LPCFrame b = LPCFrame::builder();
+    LPCCall b;
     b.push(f.argp(0));
     b.push(f.argp(1));
-    ret = apply_master_ob(APPLY_VALID_LINK, 2);
-    b.done();
+    ret = b.apply_master(APPLY_VALID_LINK);
   }
   if (MASTER_APPROVED(ret, "valid_link")) {
     i = do_rename(f.string(0), f.string(1), F_LINK);

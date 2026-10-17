@@ -27,9 +27,9 @@ void f_socket_create(LPCFrame& f) {
     } else {
       fd = socket_create(static_cast<enum socket_mode>(f.number(0)), f.argp(1), f.argp(2));
     }
-    f.ret_front_number(fd);
+    f.ret(fd);
   } else {
-    f.ret_front_number(EESECURITY);
+    f.ret(EESECURITY);
   }
 }
 #endif
@@ -49,9 +49,9 @@ void f_socket_bind(LPCFrame& f) {
 
   if (VALID_SOCKET("bind")) {
     i = socket_bind(fd, f.number(1), (num_arg == 3 ? f.string(2) : nullptr));
-    f.ret_front_number(i);
+    f.ret(i);
   } else {
-    f.ret_front_number(EESECURITY);
+    f.ret(EESECURITY);
   }
 }
 #endif
@@ -66,9 +66,9 @@ void f_socket_listen(LPCFrame& f) {
 
   if (VALID_SOCKET("listen")) {
     i = socket_listen(fd, f.argp(1));
-    f.ret_front_number(i);
+    f.ret(i);
   } else {
-    f.ret_front_number(EESECURITY);
+    f.ret(EESECURITY);
   }
 }
 #endif
@@ -84,7 +84,7 @@ void f_socket_accept(LPCFrame& f) {
   fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.ret_front_number(VALID_SOCKET("accept") ? socket_accept(fd, f.argp(1), f.argp(2)) : EESECURITY);
+  f.ret(VALID_SOCKET("accept") ? socket_accept(fd, f.argp(1), f.argp(2)) : EESECURITY);
 }
 #endif
 
@@ -133,7 +133,7 @@ void f_socket_connect(LPCFrame& f) {
 #endif
   }
 
-  f.ret_front_number(VALID_SOCKET("connect")
+  f.ret(VALID_SOCKET("connect")
                          ? socket_connect(fd, f.string(1), f.argp(2), f.argp(3))
                          : EESECURITY);
 }
@@ -153,9 +153,9 @@ void f_socket_write(LPCFrame& f) {
 
   if (VALID_SOCKET("write")) {
     i = socket_write(fd, f.argp(1), (num_arg == 3) ? f.string(2) : (char*)nullptr);
-    f.ret_front_number(i);
+    f.ret(i);
   } else {
-    f.ret_front_number(EESECURITY);
+    f.ret(EESECURITY);
   }
 }
 #endif
@@ -169,7 +169,6 @@ void f_socket_close(LPCFrame& f) {
   get_socket_address(fd, addr, &port, 0);
 
   f.top().u.number = VALID_SOCKET("close") ? socket_close(fd, 0) : EESECURITY;
-  f.done();
 }
 #endif
 
@@ -184,7 +183,7 @@ void f_socket_release(LPCFrame& f) {
   fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.ret_front_number(VALID_SOCKET("release") ? socket_release(fd, f.object(1), f.argp(2))
+  f.ret(VALID_SOCKET("release") ? socket_release(fd, f.object(1), f.argp(2))
                                             : EESECURITY);
 }
 #endif
@@ -203,7 +202,7 @@ void f_socket_acquire(LPCFrame& f) {
   fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.ret_front_number(VALID_SOCKET("acquire")
+  f.ret(VALID_SOCKET("acquire")
                          ? socket_acquire(fd, f.argp(1), f.argp(2), f.argp(3))
                          : EESECURITY);
 }
@@ -231,8 +230,7 @@ void f_socket_address(LPCFrame& f) {
   if (f.type(0) & T_OBJECT) {
     /* This is so we can get the address of interactives as well. */
     if (!f.object(0)->interactive) {
-      f.set_top_undefined();
-      f.done();
+      f.ret_undefined();
       return;
     }
 
@@ -268,11 +266,9 @@ void f_socket_status(LPCFrame& f) {
     info = socket_status(f.number(0));
 
     if (!info) {
-      f.set_top_number(0);
-      f.done();
+      f.ret(0);
     } else {
-      f.set_top_array(info);
-      f.done();
+      f.ret_refed(info);
     }
   } else {
     info = allocate_empty_array(lpc_socks_num());

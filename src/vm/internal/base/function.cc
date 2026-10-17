@@ -632,10 +632,14 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             return trace_context;
           });
 
-          {
-            LPCFrame efun_frame = LPCFrame::args(num_arg);
-            (*efun_table[i - EFUN_BASE])(efun_frame);
-          }
+          LPCFrame efun_frame = LPCFrame::args(num_arg);
+#ifdef DEBUG
+          svalue_t* const expected_sp =
+              sp - num_arg + (instrs[i].ret_type == TYPE_NOVALUE ? 0 : 1);
+#endif
+          (*efun_table[i - EFUN_BASE])(efun_frame);
+          DEBUG_CHECK2(sp != expected_sp, "Bad sp after calling efun '%s' (%d args) by pointer.\n",
+                       ename, num_arg);
         }
 
         if (g_hook_mask & HOOK_MASK_EFUN) {

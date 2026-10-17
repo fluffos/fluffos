@@ -505,7 +505,6 @@ void f_pcre_replace(LPCFrame& f) {
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
     f.pop_back(f.argc() - 1);
-    f.done();
     return;
   }
 
@@ -523,7 +522,6 @@ void f_pcre_replace(LPCFrame& f) {
   if (run->rc == 1) {
     /* No captured substrings, return subject */
     f.pop_back(f.argc() - 1);
-    f.done();
     return;
   }
 
@@ -573,7 +571,6 @@ void f_pcre_replace_callback(LPCFrame& f) {
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
     f.pop_back(f.argc() - 1);
-    f.done();
     return;
   }
 
@@ -583,7 +580,7 @@ void f_pcre_replace_callback(LPCFrame& f) {
 
   arr = pcre_get_substrings(run, false);
 
-  // arr is not reachable from the VM stack until push_refed() below, so
+  // arr is not reachable from the VM stack until it is pushed below, so
   // nothing would free it if process_callback() rejects the callback first.
   std::unique_ptr<array_t, decltype(&free_array)> arr_owner(arr, &free_array);
 
@@ -595,9 +592,11 @@ void f_pcre_replace_callback(LPCFrame& f) {
 
   r = allocate_array(run->rc - 1);  // can't use the empty variant in case we error below
 
-  f.push_refed(r);
-  // Transfer ownership to the VM stack; arr still holds the same pointer for the loop below.
-  f.push_refed(arr_owner.release());
+  // Both arrays ride on the stack so an error() in a callback frees them.
+  // The stack takes over arr's reference; arr still points at it below.
+  LPCCall work;
+  work.push_refed(r);
+  work.push_refed(arr_owner.release());
   error_context_t econ;
 
   save_context(&econ);
@@ -605,11 +604,10 @@ void f_pcre_replace_callback(LPCFrame& f) {
     for (i = 0; i < run->rc - 1; i++) {
       svalue_t* v;
       {
-        LPCFrame b = LPCFrame::builder();
+        LPCCall b;
         b.push(arr->item + i);
-        b.push(static_cast<LPC_INT>(i));
-        v = call_efun_callback(&ftc, 2);
-        b.done();
+        b.push(i);
+        v = b.call(&ftc);
       }
 
       /* Mimic behaviour of map(string, function) when function pointer returns
@@ -629,7 +627,7 @@ void f_pcre_replace_callback(LPCFrame& f) {
   }
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
-
+  work.discard();
   f.ret_str_malloced(ret);
 }
 

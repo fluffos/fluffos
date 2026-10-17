@@ -729,6 +729,12 @@ void transfer_push_some_svalues(svalue_t* v, int num) {
   sp += num;
 }
 
+void transfer_pop_some_svalues(svalue_t* dest, int num) {
+  DEBUG_CHECK(sp - num + 1 < start_of_stack, "transfer_pop_some_svalues: stack underflow.\n");
+  memcpy(dest, sp - num + 1, num * sizeof(svalue_t));
+  sp -= num;
+}
+
 /*
  * Pop the top-most value of the stack.
  * Don't do this if it is a value that will be used afterwards, as the
@@ -5326,10 +5332,8 @@ void eval_instruction(char* p) {
           }
 
           ScopedTracer _efun_tracer(ename, EventCategory::LPC_EFUN, [&] { return trace_context; });
-          {
-            LPCFrame efun_frame = LPCFrame::args(num_arg);
-            (*efun_table[instruction - EFUN_BASE])(efun_frame);
-          }
+          LPCFrame efun_frame = LPCFrame::args(num_arg);
+          (*efun_table[instruction - EFUN_BASE])(efun_frame);
 
           if (g_hook_mask & HOOK_MASK_EFUN) {
             hook_dispatch_efun_after(ename, efun_filter_ob);

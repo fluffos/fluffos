@@ -50,6 +50,9 @@ std::chrono::milliseconds gametick_to_time(int ticks);
 extern struct error_context_t* current_error_context;
 
 void transfer_push_some_svalues(svalue_t*, int);
+/* Move the top num stack values into dest[0..num-1], first pushed first;
+ * dest takes over their references. The inverse of the above. */
+void transfer_pop_some_svalues(svalue_t* dest, int num);
 void push_some_svalues(svalue_t*, int);
 #ifdef DEBUG
 void int_free_svalue(svalue_t*, const char*);

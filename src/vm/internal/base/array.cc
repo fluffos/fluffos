@@ -608,7 +608,6 @@ void filter_array(svalue_t* arg, int num_arg) {
     function_to_call_t ftc;
     LPCFrame frame = LPCFrame::args(num_arg);
     frame.process_callback(1, &ftc, F_FILTER);
-    frame.done();
 
     /* allocate a full size array and push it onto the stack so that if an
      * error occurs, it'll get cleaned up.  can't use empty array because
@@ -657,7 +656,6 @@ void filter_string(svalue_t* arg, int num_arg) {
     {
       LPCFrame frame = LPCFrame::args(num_arg);
       frame.process_callback(1, &ftc, F_FILTER);
-      frame.done();
     }
 
     for (cnt = 0; cnt < size; cnt++) {
@@ -1027,7 +1025,6 @@ void map_array(svalue_t* arg, int num_arg) {
     {
       LPCFrame frame = LPCFrame::args(num_arg);
       frame.process_callback(1, &ftc, F_MAP);
-      frame.done();
     }
 
     r = int_allocate_array(size);
@@ -1242,7 +1239,6 @@ void f_sort_array(LPCFrame& f) {
       {
         LPCFrame frame = LPCFrame::args(num_arg);
         frame.process_callback(1, &ftc, F_SORT_ARRAY);
-        frame.done();
       }
 
       tmp = copy_array(tmp);
@@ -2148,9 +2144,8 @@ void f_objects(LPCFrame& f) {
       func = f.string(0);
     }
   }
-  /* Callbacks below push/pop freely; release the Args window. */
-  f.abandon();
-
+  /* From here on the body works on the raw stack: get_objects() parks the
+   * list on it, and the callbacks push and pop above that. */
   get_objects(&list, &count, nullptr, nullptr);
   if (funp || func) {
     /* NOTE: If an object's hidden status changes during a callback, that

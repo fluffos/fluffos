@@ -110,10 +110,10 @@ struct ChildExitNote {
 std::vector<ChildExitNote> g_exit_notes;
 
 void reject_with_number(promise_t* p, LPC_INT n) {
-  LPCFrame b = LPCFrame::builder();
+  LPCCall b;
   b.push(n);
-  promise_settle(p, &b.top(), 1);
-  b.discard_to();
+  promise_settle(p, &b.arg(0), 1);
+  b.discard();
 }
 
 void append_capped(std::string& dest, const char* data, size_t len) {
@@ -244,7 +244,7 @@ void free_pipe_events(ExternalHandle* h) {
   close_pipe_fd(&h->err_fd);
 }
 
-void push_external_result(LPCFrame& b, const std::string& out, const std::string& err,
+void push_external_result(LPCCall& b, const std::string& out, const std::string& err,
                           LPC_INT code) {
   array_t* arr = allocate_array(3);
   arr->item[0].type = T_STRING;
@@ -317,10 +317,10 @@ void fulfill_handle_promise(int id) {
   h->prom = nullptr;
   promise_clear_cancel_handler(p);
   {
-    LPCFrame b = LPCFrame::builder();
+    LPCCall b;
     push_external_result(b, h->out, h->err, h->exit_code);
-    promise_settle(p, &b.top(), 0);
-    b.discard_to();
+    promise_settle(p, &b.arg(0), 0);
+    b.discard();
   }
   free_promise(p);
   if (h->ephemeral) {
@@ -361,10 +361,10 @@ void abort_handle(int id, int kill_child) {
      * and free_promise a second time. */
     promise_clear_cancel_handler(p);
     if (p->state == PROMISE_PENDING) {
-      LPCFrame b = LPCFrame::builder();
+      LPCCall b;
       b.push_str_constant("*external process aborted");
-      promise_settle(p, &b.top(), 1);
-      b.discard_to();
+      promise_settle(p, &b.arg(0), 1);
+      b.discard();
     }
     free_promise(p);
   }
@@ -1316,7 +1316,7 @@ void f_external_start(LPCFrame& f) {
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    f.ret_front_number(EESECURITY);
+    f.ret(EESECURITY);
     return;
   }
   auto which = arg[0].u.number;
@@ -1325,7 +1325,7 @@ void f_external_start(LPCFrame& f) {
   }
 
   int fd = external_start(which, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : nullptr));
-  f.ret_front_number(fd);
+  f.ret(fd);
 }
 #endif
 
@@ -1346,8 +1346,7 @@ void f_external_stderr(LPCFrame& f) {
 #ifdef F_EXTERNAL_EXIT_CODE
 void f_external_exit_code(LPCFrame& f) {
   ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
-  f.set_top_number(h->exit_code);
-  f.done();
+  f.ret(h->exit_code);
 }
 #endif
 
@@ -1356,13 +1355,11 @@ void f_external_kill(LPCFrame& f) {
   int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Running || h->status_done) {
-    f.set_top_number(0);
-    f.done();
+    f.ret(0);
     return;
   }
   kill_handle_child(h);
-  f.set_top_number(1);
-  f.done();
+  f.ret(1);
 }
 #endif
 

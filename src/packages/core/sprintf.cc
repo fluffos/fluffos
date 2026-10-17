@@ -538,10 +538,9 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
       outbuf_add(outbuf, obj->u.ob->obname);
 
       if (!max_eval_error && !too_deep_error) {
-        LPCFrame apply_args = LPCFrame::builder();
+        LPCCall apply_args;
         apply_args.push(obj->u.ob);
-        apply_args.done();
-        temp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
+        temp = apply_args.safe_apply_master(APPLY_OBJECT_NAME);
         if (temp && temp != (svalue_t*)-1 && (temp->type == T_STRING)) {
           outbuf_add(outbuf, " (\"");
           outbuf_add(outbuf, temp->u.string);
@@ -858,13 +857,7 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
   int last;
 
   push_sprintf_state();
-  LPCFrame err_handler = LPCFrame::builder();
-  {
-    svalue_t eh{};
-    eh.type = T_ERROR_HANDLER;
-    eh.u.error_handler = pop_sprintf_state;
-    err_handler.push(&eh);
-  }
+  StackErrorHandler pop_state(pop_sprintf_state);
 
   last = 0;
   for (fpos = 0; true; fpos++) {
@@ -1451,8 +1444,7 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
   outbuf_fix(&sprintf_state->obuff);
   retvalue = sprintf_state->obuff.buffer;
   sprintf_state->obuff.buffer = nullptr;
-  err_handler.pop_back(1); /* pop off our error handler, will call pop_sprintf_state */
-  err_handler.done();
+  pop_state.run(); /* calls pop_sprintf_state */
   return retvalue;
 } /* end of string_print_formatted() */
 

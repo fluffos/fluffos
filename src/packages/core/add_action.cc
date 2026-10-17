@@ -759,7 +759,6 @@ void f_commands(LPCFrame& f) {
 #ifdef F_DISABLE_COMMANDS
 void f_disable_commands(LPCFrame& f) {
   enable_commands(0, 0);
-  f.done();
 }
 #endif
 
@@ -828,11 +827,12 @@ void f_query_verb(LPCFrame& f) {
     f.ret(0);
     return;
   }
+  /* last_verb need not be a shared string: share a copy */
   svalue_t v{};
   v.type = T_STRING;
   v.subtype = STRING_SHARED;
   v.u.string = make_shared_string(last_verb);
-  f.ret(v);
+  f.ret_owned(v);
 }
 #endif
 

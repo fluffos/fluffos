@@ -23,18 +23,17 @@ void f_save_object(LPCFrame& f) {
     flag = save_object(current_object, f.string(0), flag);
     f.ret(static_cast<LPC_INT>(flag));
   } else {
-    f.ret_void();
     char* saved = new_string(max_string_length, "save_object_str");
-    LPCFrame out = LPCFrame::builder();
-    out.push_str_malloced(saved);
-    int const left = max_string_length;
-    flag = save_object_str(current_object, flag, saved, left);
-    if (!flag) {
-      out.ret_undefined();
+    /* Keep the scratch buffer on the stack so an error() in the save frees it. */
+    LPCCall scratch;
+    scratch.push_str_malloced(saved);
+    flag = save_object_str(current_object, flag, saved, max_string_length);
+    char* result = flag ? string_copy(saved, "save_object_str2") : nullptr;
+    scratch.discard();
+    if (result) {
+      f.ret_str_malloced(result);
     } else {
-      saved = new_string(strlen(out.string(0)), "save_object_str2");
-      strcpy(saved, out.string(0));
-      out.ret_str_malloced(saved);
+      f.ret_undefined();
     }
   }
 }
@@ -88,6 +87,5 @@ void f_restore_variable(LPCFrame& f) {
   restore_variable(&v, const_cast<char*>(f.top().u.string));
   FREE_MSTR(f.top().u.string);
   f.top() = v;
-  f.done();
 }
 #endif

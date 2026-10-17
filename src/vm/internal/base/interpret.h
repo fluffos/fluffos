@@ -188,12 +188,9 @@ void remove_fake_frame(void);
 void push_indexed_lvalue(int);
 void setup_variables(int, int, int);
 
-/* argc is this efun's arity — never read a global; nested LPC clobbers any
- * bare arity scratch (AGENTS.md §13.16). Prefer the LPCFrame overload. */
+/* argc is the efun's arity, from its LPCFrame (efuns call
+ * LPCFrame::process_callback()). */
 void process_efun_callback(int narg, function_to_call_t* ftc, int f, int argc);
-inline void process_efun_callback(LPCFrame& frame, int narg, function_to_call_t* ftc, int f) {
-  frame.process_callback(narg, ftc, f);
-}
 svalue_t* call_efun_callback(function_to_call_t*, int);
 svalue_t* safe_call_efun_callback(function_to_call_t*, int);
 const char* type_name(int c);

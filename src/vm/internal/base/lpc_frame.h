@@ -1,30 +1,35 @@
-/* lpc_frame.h -- value-stack window protocol for driver / efun code.
+/* lpc_frame.h -- the evaluation-stack API for efuns and driver call sites.
  *
- * Owns a contiguous range of evaluation-stack slots. Does not replace
- * control_stack_t (call/control) or error_context_t (unwind marks); it
- * is the missing API for "these slots are my args / temps / call args".
+ * Two small types, one job each:
  *
- * Modes:
- *   Args    -- efun entry: window over already-pushed arguments
- *   Builder -- push args then apply / safe_apply
- *   Mark    -- record a stack watermark (assert / discard_to)
+ *   LPCFrame  The window over one efun call's arguments. The dispatchers
+ *             (eval_instruction's F_EFUN* and call_function_pointer's
+ *             FP_EFUN) build it over the slots they just type-checked and
+ *             pass it in, so an efun never reads its arity from a global
+ *             that nested LPC can overwrite (AGENTS.md section 13.16).
  *
- * Package efuns receive LPCFrame& from the dispatcher (they must not
- * construct an args window themselves). Do not use sp, bare sp, or
- * put_/pop_ macros in packages -- those stay in vm_stack.h for the
- * bytecode interpreter and packages/ops.
+ *   LPCCall   The arguments for one call from C++ into LPC: an apply, a
+ *             master apply, a function pointer or an efun callback. The
+ *             call consumes what was pushed, so the argument count is never
+ *             written a second time by hand.
  *
- * On error() unwind the destructor does NOT touch the stack (restore_context
- * owns recovery). On the normal path Args/Builder must be finalized
- * (ret_*, done, apply, discard, ...).
+ * Package code cannot see `sp` (it is declared only in vm_stack.h). These
+ * two types, plus the push_*() helpers in interpret.h for code that builds
+ * values directly on the stack, are its whole view of the stack.
  *
- * Method names intentionally avoid the push_* / put_* macros in interpret.h.
+ * Reference ownership is spelled out for every refcounted pointer:
+ * *_refed() takes over the reference the caller already holds (a freshly
+ * allocated value), *_addref() adds one (a borrowed pointer). There is
+ * deliberately no bare ret(array_t*) or push(array_t*): which one was meant
+ * is the whole question, and the short spelling used to be the wrong one
+ * for fresh results.
  */
 
 #ifndef LPC_FRAME_H
 #define LPC_FRAME_H
 
 #include <exception>
+#include <type_traits>
 
 #include "vm/internal/base/svalue.h"
 
@@ -36,176 +41,227 @@ struct buffer_t;
 struct funptr_t;
 struct promise_t;
 
+/* The window over an efun's arguments, argument 0 first.
+ *
+ * Contract: when the efun returns normally it has replaced its window with
+ * exactly one value, or with nothing if the efun is void. The usual way is a
+ * single ret*() call. An efun that edits its one remaining argument in place
+ * (pop_back() the others, then write through top() or argp()) needs no call:
+ * that argument already is its result. DEBUG builds check the stack depth
+ * after every efun in both dispatchers.
+ *
+ * Every ret*() builds its result before it releases the window, so the
+ * result may come from, or point into, an argument: f.ret_copy(f.argp(1))
+ * and f.ret_str_copy(f.string(0)) are safe. After ret*() the window is the
+ * single result slot (empty after ret_void()).
+ *
+ * On an error() unwind nothing here touches the stack; restore_context()
+ * owns it.
+ */
 class LPCFrame {
  public:
-  enum class Mode { Args, Builder, Mark };
-
-  /* Efun entry: [sp - num_arg + 1 .. sp]. */
+  /* Window over the top num_arg slots. The dispatchers build one per efun
+   * call; VM code that calls an efun body directly may build one too. */
   static LPCFrame args(int num_arg);
 
-  /* Start empty; push grows the window. */
-  static LPCFrame builder();
-
-  /* Record current top; discard_to() pops back here. */
-  static LPCFrame mark();
-
-  ~LPCFrame();
-
-  LPCFrame(LPCFrame&& other) noexcept;
-  LPCFrame& operator=(LPCFrame&& other) noexcept;
   LPCFrame(const LPCFrame&) = delete;
   LPCFrame& operator=(const LPCFrame&) = delete;
 
-  Mode mode() const { return mode_; }
   int argc() const { return argc_; }
-  /* Slots currently in the window (inclusive). */
-  int size() const;
-  svalue_t* base() const { return base_; }
-  bool finalized() const { return finalized_; }
 
-  svalue_t& operator[](int i);
-  const svalue_t& operator[](int i) const;
-  /* 0 = top (last arg), 1 = one below, ... */
-  svalue_t& from_top(int n);
-  const svalue_t& from_top(int n) const;
-  svalue_t& top();
-  const svalue_t& top() const;
-  svalue_t* argp(int i);
+  svalue_t& operator[](int i) { return base_[checked(i)]; }
+  const svalue_t& operator[](int i) const { return base_[checked(i)]; }
+  svalue_t* argp(int i) { return base_ + checked(i); }
+  svalue_t& top() { return base_[checked(argc_ - 1)]; }
 
-  int type(int i) const;
-  int subtype(int i) const;
-  LPC_INT number(int i) const;
-  LPC_FLOAT real(int i) const;
-  /* Number-or-real as float (math efuns). */
-  LPC_FLOAT as_real(int i) const;
-  const char* string(int i) const;
-  /* String length via SVALUE_STRLEN on the slot. */
-  int string_len(int i) const;
-  array_t* array(int i) const;
-  mapping_t* mapping(int i) const;
-  buffer_t* buffer(int i) const;
-  object_t* object(int i) const;
-  funptr_t* funptr(int i) const;
-  promise_t* promise(int i) const;
+  int type(int i) const { return base_[checked(i)].type; }
+  int subtype(int i) const { return base_[checked(i)].subtype; }
+  LPC_INT number(int i) const { return base_[checked(i)].u.number; }
+  LPC_FLOAT real(int i) const { return base_[checked(i)].u.real; }
+  /* An int-or-float argument as a float. */
+  LPC_FLOAT as_real(int i) const {
+    const svalue_t& v = base_[checked(i)];
+    return v.type == T_NUMBER ? static_cast<LPC_FLOAT>(v.u.number) : v.u.real;
+  }
+  const char* string(int i) const { return base_[checked(i)].u.string; }
+  int string_len(int i) const { return SVALUE_STRLEN(&base_[checked(i)]); }
+  array_t* array(int i) const { return base_[checked(i)].u.arr; }
+  mapping_t* mapping(int i) const { return base_[checked(i)].u.map; }
+  buffer_t* buffer(int i) const { return base_[checked(i)].u.buf; }
+  object_t* object(int i) const { return base_[checked(i)].u.ob; }
+  funptr_t* funptr(int i) const { return base_[checked(i)].u.fp; }
+  promise_t* promise(int i) const { return base_[checked(i)].u.prom; }
 
-  /* Move slot i out (leave const0); caller owns the returned svalue. */
-  svalue_t steal(int i);
+  /* Move argument i out, leaving 0 in its slot; the caller owns the result.
+   * For values a helper takes over (call_out arguments, stored callbacks). */
+  svalue_t steal(int i) {
+    svalue_t v = base_[checked(i)];
+    base_[i] = const0;
+    return v;
+  }
 
-  /* Builder push (also usable to grow a Mark). Updates argc_.
-   * Named push() to avoid interpret.h push_* macros. */
-  void push(LPC_INT n);
-  void push(LPC_FLOAT n);
-  void push(svalue_t* v);
+  /* Free the last n arguments; the window shrinks from the top. */
+  void pop_back(int n = 1);
+
+  /* A helper (apply(), merge_arg_lists(), clone_object(), ...) already
+   * consumed or added trailing slots: the window is now the top num_arg. */
+  void rebase(int num_arg);
+
+  /* Builds the callback descriptor for the efun's trailing
+   * "fun, [ob,] extra args..." arguments, starting at argument narg. */
+  void process_callback(int narg, function_to_call_t* ftc, int opcode);
+
+  /* ---- results: each replaces the whole window ---- */
+
+  template <typename T, std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  void ret(T n) {
+    ret_int(static_cast<LPC_INT>(n));
+  }
+  template <typename T, std::enable_if_t<std::is_floating_point<T>::value, int> = 0>
+  void ret(T n) {
+    ret_real(static_cast<LPC_FLOAT>(n));
+  }
+  void ret_int(LPC_INT n);
+  void ret_real(LPC_FLOAT n);
+  void ret_undefined();
+  void ret_void();
+
+  /* Takes over v's references. */
+  void ret_owned(svalue_t v);
+  /* Adds references to *v, which may be one of the arguments. */
+  void ret_copy(const svalue_t* v);
+  /* Adds a reference; returns 0 for a null or (being) destructed object. */
+  void ret(object_t* ob);
+
+  void ret_refed(array_t* v);
+  void ret_addref(array_t* v);
+  void ret_refed(mapping_t* m);
+  void ret_addref(mapping_t* m);
+  void ret_refed(buffer_t* b);
+  void ret_addref(buffer_t* b);
+  void ret_refed(promise_t* p);
+
+  void ret_str_malloced(const char* p); /* takes over a malloced string */
+  void ret_str_shared(const char* p);   /* adds a reference to a shared string */
+  void ret_str_constant(const char* p); /* static storage; never freed */
+  void ret_str_copy(const char* p);     /* copies p, which may be an argument */
+
+  /* A helper pushed the result just above the window (outbuf_push(),
+   * implode_array(), ...): keep that value, release the window under it. */
+  void ret_pushed();
+
+ private:
+  LPCFrame(svalue_t* base, int argc) : base_(base), argc_(argc) {}
+
+  int checked(int i) const {
+    if (i < 0 || i >= argc_) {
+      bad_index(i);
+    }
+    return i;
+  }
+  [[noreturn]] void bad_index(int i) const;
+  void finish(svalue_t v);
+
+  svalue_t* base_;
+  int argc_;
+};
+
+/* Arguments for exactly one call from C++ into LPC.
+ *
+ * Push the arguments, then make one of the calls below. The call consumes
+ * them and returns the callee's result, which lives in the driver's shared
+ * return slot: copy it out before making another call. The safe_*() forms
+ * catch an error() in the callee and return null instead.
+ *
+ * If the code returns early without calling, the destructor pops what was
+ * pushed. During an error() unwind it does nothing: restore_context() owns
+ * the stack then.
+ */
+class LPCCall {
+ public:
+  LPCCall();
+  ~LPCCall();
+  LPCCall(const LPCCall&) = delete;
+  LPCCall& operator=(const LPCCall&) = delete;
+
+  int argc() const { return argc_; }
+  /* A pushed argument, 0 first; for code that inspects or hands one over
+   * (promise_settle()) before deciding which call to make. */
+  svalue_t& arg(int i);
+
+  template <typename T, std::enable_if_t<std::is_integral<T>::value, int> = 0>
+  void push(T n) {
+    push_int(static_cast<LPC_INT>(n));
+  }
+  template <typename T, std::enable_if_t<std::is_floating_point<T>::value, int> = 0>
+  void push(T n) {
+    push_real(static_cast<LPC_FLOAT>(n));
+  }
+  void push_int(LPC_INT n);
+  void push_real(LPC_FLOAT n);
   void push_undefined();
+  /* Takes over v's references. */
+  void push_owned(svalue_t v);
+  /* Adds references to *v. */
+  void push(const svalue_t* v);
+  /* Adds a reference; pushes 0 for a null or (being) destructed object. */
+  void push(object_t* ob);
+  void push_refed(array_t* v);
+  void push_addref(array_t* v);
+  void push_refed(mapping_t* m);
+  void push_addref(mapping_t* m);
+  void push_refed(buffer_t* b);
+  void push_addref(buffer_t* b);
+  void push_refed(promise_t* p);
   void push_str_malloced(const char* p);
   void push_str_shared(const char* p);
   void push_str_constant(const char* p);
-  void push_str_copy(const char* p); /* string_copy + malloced */
-  void push(object_t* ob);
-  void push(array_t* v);
-  void push_refed(array_t* v);
-  void push(mapping_t* m);
-  void push_refed(mapping_t* m);
-  void push(buffer_t* b);
-  void push_refed(buffer_t* b);
-  void push_refed(promise_t* p);
+  void push_str_copy(const char* p);
 
-  /* Args finishers: replace the window with a single result (or nothing). */
-  void ret(LPC_INT n);
-  /* Prefer int over LPC_FLOAT when the argument is a plain int (avoids
-   * overload ambiguity between LPC_INT and LPC_FLOAT). */
-  void ret(int n) { ret(static_cast<LPC_INT>(n)); }
-  void ret(LPC_FLOAT n);
-  void ret_void();
-  void ret(svalue_t v); /* moves; frees previous window */
-  void ret_copy(svalue_t* v);
-  void ret(array_t* v);
-  void ret_refed(array_t* v);
-  void ret(mapping_t* m);
-  void ret_refed(mapping_t* m);
-  void ret_str_malloced(const char* p);
-  void ret_str_shared(const char* p);
-  void ret_str_constant(const char* p);
-  void ret_str_copy(const char* p);
-  void ret(object_t* ob);
-  void ret(buffer_t* b);
-  void ret_refed(buffer_t* b);
-  void ret_refed(promise_t* p);
-  void ret_undefined();
-
-  /* Pop argc-1 from the back; leave/set the front slot as an int result.
-   * Common sockets/db pattern: pop_n_elems(argc-1); sp->u.number = n. */
-  void ret_front_number(LPC_INT n);
-
-  /* Overwrite slot i in place (frees previous contents). */
-  void set_number(int i, LPC_INT n);
-  void set_real(int i, LPC_FLOAT n);
-  void set_undefined(int i);
-
-  /* Free and overwrite the top (put_* family when window size is unchanged). */
-  void set_top_number(LPC_INT n);
-  void set_top_real(LPC_FLOAT n);
-  void set_top_array(array_t* v);
-  void set_top_refed_array(array_t* v);
-  void set_top_str_malloced(const char* p);
-  void set_top_str_constant(const char* p);
-  void set_top_undefined();
-
-  /* Stack already holds the correct return (e.g. unary in-place mutate). */
-  void done();
-
-  /* Re-bind the Args window to the current sp after an external helper
-   * (apply, merge_arg_lists, call_all_other, ...) has already consumed
-   * some slots. Does not free anything. */
-  void rebase(int num_arg);
-
-  /* Mark finalized without touching the stack. Use when a callee already
-   * removed the window (e.g. destruct_object sweeps the object arg). */
-  void abandon();
-
-  /* Drop the first n args (free them); window shrinks from the front. */
-  void drop_front(int n);
-
-  /* Pop n slots from the back (free them); window shrinks. */
-  void pop_back(int n = 1);
-
-  /* Move the top n slots into dest without freeing; shrinks the window.
-   * Caller owns the bitwise-copied svalues. Used when stashing apply args. */
-  void detach_back(int n, svalue_t* dest);
-
-  /* Push n already-owned svalues (bitwise copy); grows the window. */
-  void attach_back(const svalue_t* src, int n);
-
-  /* Pop everything back to (and including) the mark; Mark/Builder mode. */
-  void discard_to();
-
-  /* Callback scan over trailing fun/obj/... args (Args mode). */
-  void process_callback(int narg, function_to_call_t* ftc, int opcode);
-
-  /* Consume window as apply args. Marks finalized. */
   svalue_t* apply(const char* fun, object_t* ob, int origin);
   svalue_t* safe_apply(const char* fun, object_t* ob, int origin);
+  svalue_t* apply_master(int fun);
+  svalue_t* safe_apply_master(int fun);
+  svalue_t* call(funptr_t* fp);
+  svalue_t* safe_call(funptr_t* fp);
+  svalue_t* call(function_to_call_t* ftc);
+  svalue_t* safe_call(function_to_call_t* ftc);
+
+  /* Pop the pushed values now: the call is not going to happen, or the
+   * values were only scratch space kept on the stack for error cleanup. */
+  void discard();
 
  private:
-  LPCFrame() = default;
-
-  void check_index(int i) const;
+  int take();
   void note_push();
-  void finalize_ret_slot();
 
-  Mode mode_ = Mode::Args;
-  svalue_t* base_ = nullptr;
+  svalue_t* base_;
   int argc_ = 0;
-  bool finalized_ = false;
-  bool moved_from_ = false;
+  bool consumed_ = false;
+  int uncaught_at_entry_;
 };
 
-/* ---- Tier-C glue macros (fixed scalar efuns; no raw stack in the body) ---- */
+/* An error-handler slot pushed on the stack: if an error() unwinds through
+ * it, the unwind's stack sweep calls fn (the classic T_ERROR_HANDLER
+ * cleanup for C state that LPC can interrupt). On the normal path it must
+ * be removed while it is still the stack top -- run() calls fn, dismiss()
+ * does not; the destructor runs it if neither was called. Keep its scope
+ * tight: a ret*() below an unremoved slot would release the wrong slots.
+ */
+class StackErrorHandler {
+ public:
+  explicit StackErrorHandler(void (*fn)());
+  ~StackErrorHandler();
+  StackErrorHandler(const StackErrorHandler&) = delete;
+  StackErrorHandler& operator=(const StackErrorHandler&) = delete;
 
-#define LPC_EFUN_UNARY_REAL(name, expr)      \
-  void f_##name(LPCFrame& f) {               \
-    f.top().u.real = (expr)(f.top().u.real); \
-    f.done();                                \
-  }
+  void run();
+  void dismiss();
+
+ private:
+  svalue_t* slot_;
+  bool removed_ = false;
+  int uncaught_at_entry_;
+};
 
 #endif /* LPC_FRAME_H */

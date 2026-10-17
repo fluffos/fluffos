@@ -3351,7 +3351,6 @@ void f_ed(LPCFrame& f) {
   if (!num_arg) {
     /* ed() */
     ed_start(nullptr, nullptr, nullptr, 0, nullptr, 0);
-    f.done();
   } else if (num_arg == 1) {
     /* ed(fname) */
     if (!(f.type(0) == T_STRING)) {

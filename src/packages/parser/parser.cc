@@ -572,7 +572,6 @@ void f_parse_init(LPCFrame& f) {
   parse_info_t* pi;
 
   if (current_object->pinfo) {
-    f.done();
     return;
   }
 
@@ -580,7 +579,6 @@ void f_parse_init(LPCFrame& f) {
       (parse_info_t*)DMALLOC(sizeof(parse_info_t), TAG_PARSER, "parse_init");
   pi->ob = current_object;
   pi->flags = 0;
-  f.done();
 }
 
 static void remove_ids(parse_info_t* pinfo) {
@@ -624,7 +622,6 @@ void f_parse_refresh(LPCFrame& f) {
   if (current_object == master_ob) {
     master_state &= ~MS_HAS_USERS;
     if (!master_ob->pinfo) {
-      f.done();
       return;
     }
   }
@@ -643,10 +640,9 @@ void f_parse_refresh(LPCFrame& f) {
    * object involved in the parse.
    */
   if (pi->flags & PI_VERB_HANDLER) {
-    LPCFrame apply_args = LPCFrame::builder();
+    LPCCall apply_args;
     svalue_t* ret = apply_args.safe_apply(LIVINGS_ARE_REMOTE, current_object, ORIGIN_DRIVER);
     if (current_object->flags & O_DESTRUCTED) {
-      f.done();
       return;
     }
 
@@ -654,7 +650,6 @@ void f_parse_refresh(LPCFrame& f) {
       pi->flags |= PI_REMOTE_LIVINGS;
     }
   }
-  f.done();
 }
 
 /* called from free_object() */
@@ -1015,10 +1010,9 @@ static object_t* first_inv(object_t* ob) {
 #else
   svalue_t* ret;
 
-  LPCFrame b = LPCFrame::builder();
+  LPCCall b;
   b.push(ob);
-  ret = apply_master_ob(APPLY_PARSE_FIRST_INVENTORY, b.argc());
-  b.done();
+  ret = b.apply_master(APPLY_PARSE_FIRST_INVENTORY);
   if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
@@ -1032,11 +1026,10 @@ static object_t* next_inv(object_t* sibling) {
 #else
   svalue_t* ret;
 
-  LPCFrame b = LPCFrame::builder();
+  LPCCall b;
   b.push(parent);
   b.push(sibling);
-  ret = apply_master_ob(APPLY_PARSE_NEXT_INVENTORY, b.argc());
-  b.done();
+  ret = b.apply_master(APPLY_PARSE_NEXT_INVENTORY);
   if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
@@ -1050,10 +1043,9 @@ static object_t* super(object_t* ob) {
 #else
   svalue_t* ret;
 
-  LPCFrame b = LPCFrame::builder();
+  LPCCall b;
   b.push(ob);
-  ret = apply_master_ob(APPLY_PARSE_ENVIRONMENT, b.argc());
-  b.done();
+  ret = b.apply_master(APPLY_PARSE_ENVIRONMENT);
   if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
@@ -2942,10 +2934,8 @@ static void we_are_finished(parse_state_t* state) {
       if (args) {
         best_result->res[tryy].args =
             (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result");
-        /* Args were just pushed by make_function / push_real_names. */
-        LPCFrame stash = LPCFrame::args(args);
-        stash.detach_back(args, best_result->res[tryy].args);
-        stash.abandon();
+        /* make_function() / push_real_names() just pushed them */
+        transfer_pop_some_svalues(best_result->res[tryy].args, args);
       }
     }
     DEBUG_P(
@@ -2969,19 +2959,16 @@ static void do_the_call() {
     }
     n = best_result->res[i].num;
     if (n) {
-      LPCFrame call = LPCFrame::builder();
-      call.attach_back(best_result->res[i].args, n);
-      /* Make sure we haven't dumped any dested obs onto the stack. */
+      svalue_t* args = best_result->res[i].args;
+      /* Make sure we don't dump any dested obs onto the stack. */
       for (int j = 0; j < n; j++) {
-        svalue_t& slot = call[j];
-        if (slot.type == T_OBJECT && (slot.u.ob->flags & O_DESTRUCTED)) {
-          free_object(&slot.u.ob, "do_the_call");
-          slot = const0u;
+        if (args[j].type == T_OBJECT && (args[j].u.ob->flags & O_DESTRUCTED)) {
+          free_object(&args[j].u.ob, "do_the_call");
+          args[j] = const0u;
         }
       }
-      FREE(best_result->res[i].args);
-      /* safe_apply below consumes these slots; release the window. */
-      call.abandon();
+      transfer_push_some_svalues(args, n);
+      FREE(args);
     }
     best_result->res[i].args = nullptr;
     DEBUG_P(("Calling %s ...", best_result->res[i].func));
@@ -3488,12 +3475,7 @@ void f_parse_sentence(LPCFrame& f) {
     }
   }
 
-  {
-    svalue_t eh{};
-    eh.type = T_ERROR_HANDLER;
-    eh.u.error_handler = free_parse_globals;
-    f.push(&eh);
-  }
+  StackErrorHandler parse_cleanup(free_parse_globals);
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = current_object;
@@ -3503,23 +3485,16 @@ void f_parse_sentence(LPCFrame& f) {
   parse_sentence(f.string(0));
 
   if (best_match) {
-    (void)f.steal(1); /* discard error handler without invoking it */
-    f.pop_back();
-    free_parse_globals();
-
+    parse_cleanup.run(); /* free_parse_globals() */
     do_the_call();
     f.ret(1);
   } else {
     svalue_t* ret = get_the_error(&best_error_info, -1);
-
-    (void)f.steal(1); /* discard error handler without invoking it */
-    f.pop_back();
-    free_parse_globals();
-
+    parse_cleanup.run(); /* free_parse_globals() */
     if (ret) {
       svalue_t v = *ret;
       ret->type = T_NUMBER; /* will be freed later */
-      f.ret(v);
+      f.ret_owned(v);
     } else {
       f.ret(0);
     }
@@ -3547,12 +3522,7 @@ void f_parse_my_rules(LPCFrame& f) {
     error("Illegal to call parse_sentence() recursively.\n");
   }
 
-  {
-    svalue_t eh{};
-    eh.type = T_ERROR_HANDLER;
-    eh.u.error_handler = free_parse_globals;
-    f.push(&eh);
-  }
+  StackErrorHandler parse_cleanup(free_parse_globals);
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = f.object(0);
@@ -3563,8 +3533,7 @@ void f_parse_my_rules(LPCFrame& f) {
   if (best_match) {
     if (flag) {
       do_the_call();
-      (void)f.steal(2); /* discard error handler without invoking it */
-      f.pop_back();
+      parse_cleanup.dismiss(); /* free_parse_globals() runs below */
       f.ret(1);
     } else {
       int n;
@@ -3583,19 +3552,16 @@ void f_parse_my_rules(LPCFrame& f) {
         FREE(best_result->res[3].args);
       }
       best_result->res[3].args = nullptr;
-      (void)f.steal(2); /* discard error handler without invoking it */
-      f.pop_back();
+      parse_cleanup.dismiss();
       f.ret_refed(arr);
     }
   } else {
     svalue_t* ret = get_the_error(&best_error_info, -1);
-
-    (void)f.steal(2); /* discard error handler without invoking it */
-    f.pop_back();
+    parse_cleanup.dismiss();
     if (ret) {
       svalue_t v = *ret;
       ret->type = T_NUMBER;
-      f.ret(v);
+      f.ret_owned(v);
     } else {
       f.ret(0);
     }
@@ -3710,7 +3676,7 @@ void f_parse_add_rule(LPCFrame& f) {
   verb_entry->node = verb_node;
 
   {
-    LPCFrame apply_args = LPCFrame::builder();
+    LPCCall apply_args;
     ret = apply_args.safe_apply(LIVINGS_ARE_REMOTE, handler, ORIGIN_DRIVER);
   }
   if (APPLY_SAYS_YES(ret)) {
@@ -3872,7 +3838,5 @@ void f_parse_dump(LPCFrame& f) {
       }
     }
   }
-  /* outbuf_push leaves the result string on the stack (builder + done). */
-  outbuf_push(&ob);
-  f.done();
+  outbuf_ret(f, &ob);
 }

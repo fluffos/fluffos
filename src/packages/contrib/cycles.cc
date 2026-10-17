@@ -507,7 +507,7 @@ void f_find_cycles(LPCFrame& f) {
     ret->item[i].subtype = STRING_MALLOC;
     ret->item[i].u.string = string_copy(res.paths[i].c_str(), "f_find_cycles");
   }
-  f.ret(ret);
+  f.ret_refed(ret);
 }
 #endif
 
