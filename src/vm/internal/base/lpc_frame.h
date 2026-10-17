@@ -10,7 +10,7 @@
  *   Mark    -- record a stack watermark (assert / discard_to)
  *
  * Package efuns receive LPCFrame& from the dispatcher (they must not
- * construct an args window themselves). Do not use vm_sp(), bare sp, or
+ * construct an args window themselves). Do not use sp, bare sp, or
  * put_/pop_ macros in packages -- those stay in vm_stack.h for the
  * bytecode interpreter and packages/ops.
  *

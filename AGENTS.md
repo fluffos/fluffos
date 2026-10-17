@@ -40,7 +40,7 @@ When creating or modifying packages (efuns) under `src/packages/`, you must foll
   The `make_func` parser compiler compiles these specs into C++ glue code (`efuns.autogen.cc`).
 
 ### VM Stack & Argument Unpacking
-LPC arguments and return values live on the evaluation stack. **Package efuns use `LPCFrame` only** (`vm/internal/base/lpc_frame.h`) — not bare `sp`, `vm_sp()`, or direct put_/pop_ stack macros. Raw stack access is for the bytecode interpreter and `packages/ops` via `vm_stack.h`.
+LPC arguments and return values live on the evaluation stack. **Package efuns use `LPCFrame` only** (`vm/internal/base/lpc_frame.h`) — not bare `sp`, `sp`, or direct put_/pop_ stack macros. Raw stack access is for the bytecode interpreter and `packages/ops` via `vm_stack.h`.
 
 #### LPCFrame (required for package efuns)
 * Every efun is `void f_name(LPCFrame& f)` — the **dispatcher** builds the Args window (`LPCFrame::args(num_arg)`) and passes it in. Efuns must **not** construct their own args frame.
@@ -51,7 +51,7 @@ LPC arguments and return values live on the evaluation stack. **Package efuns us
 * `LPC_EFUN_UNARY_REAL(name, expr)` — Tier-C macro for fixed unary float efuns (see `packages/math/math.cc`).
 
 #### Stack pointer privacy
-* Package-visible headers do **not** export `sp`, `lpc_eval_sp`, or `vm_sp()`. Efuns go through `LPCFrame` only. Raw stack access (`sp`, put_/STACK macros, `PoppedLvalue`) is confined to `vm_stack.h` for the interpreter and `packages/ops`.
+* Package-visible headers do **not** export `sp`, `sp`, or `sp`. Efuns go through `LPCFrame` only. Raw stack access (`sp`, put_/STACK macros, `PoppedLvalue`) is confined to `vm_stack.h` for the interpreter and `packages/ops`.
 * VM-internal code (`interpret.cc`) and the operator package (`packages/ops`) include `vm/internal/base/vm_stack.h` and use bare `sp` for the hot path.
 * Do **not** name local variables `sp` in packages.
 

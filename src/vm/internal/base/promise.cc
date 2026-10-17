@@ -811,19 +811,19 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
   while (cgsp != marker->save_cgsp) {
     restore_command_giver();
   }
-  if (vm_sp() > marker->save_sp) {
-    pop_n_elems(vm_sp() - marker->save_sp);
-  } else if (vm_sp() < marker->save_sp) {
+  if (sp > marker->save_sp) {
+    pop_n_elems(sp - marker->save_sp);
+  } else if (sp < marker->save_sp) {
     /* restore_context()'s underflow repair, for the same reason it has one:
-     * an error path with broken stack accounting can leave vm_sp() BELOW the
+     * an error path with broken stack accounting can leave sp BELOW the
      * mark, and here that additionally lands the caught value at the wrong
-     * depth, so the code after the region reads the wrong slots. Re-point vm_sp()
+     * depth, so the code after the region reads the wrong slots. Re-point sp
      * at the mark and neutralize the revived slots so later pops do not free
      * stale pointers. */
     debug_message("acatch unwind: value stack underflow by %" PRIdPTR " elements, repairing.\n",
-                  static_cast<intptr_t>(marker->save_sp - vm_sp()));
-    while (vm_sp() < marker->save_sp) {
-      *++vm_sp() = const0;
+                  static_cast<intptr_t>(marker->save_sp - sp));
+    while (sp < marker->save_sp) {
+      *++sp = const0;
     }
   }
 #ifdef DEBUG
@@ -846,7 +846,7 @@ char* unwind_to_acatch_marker(control_stack_t* marker) {
   }
 
   STACK_INC;
-  *vm_sp() = caught;
+  *sp = caught;
   return pc;
 }
 
@@ -862,7 +862,7 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
   /* The coroutine owns its whole frame (safe_apply's "callee owns the
    * args" rule, extended): if the body errors with no acatch region to
    * resume, restore_context() must reclaim the args/locals below the
-   * boundary-entry vm_sp() AND pop the async control frame itself, or the
+   * boundary-entry sp AND pop the async control frame itself, or the
    * caller continues with a desynced stack.
    *
    * `async_frame` is passed in rather than assumed to be `csp`: on the
@@ -908,8 +908,8 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
       eval_instruction(entry_pc);
       if (!g_coroutine_suspended) {
         /* normal return: the body's return value is on the stack */
-        promise_resolve_with(p, vm_sp());
-        free_svalue(vm_sp()--, "run_coroutine_body");
+        promise_resolve_with(p, sp);
+        free_svalue(sp--, "run_coroutine_body");
       }
       g_coroutine_suspended = false;
       break;
@@ -1165,7 +1165,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     return;
   }
 
-  if (vm_sp() + coro->frame_size + 2 >= end_of_stack) {
+  if (sp + coro->frame_size + 2 >= end_of_stack) {
     svalue_t err;
     err.type = T_STRING;
     err.subtype = STRING_CONSTANT;
@@ -1222,7 +1222,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   pc = coro->prog->program + coro->pc_offset;
   function_index_offset = coro->function_index_offset;
   variable_index_offset = coro->variable_index_offset;
-  fp = vm_sp() + 1;
+  fp = sp + 1;
   if (coro->frame_size > 0) {
     memcpy(fp, coro->frame, coro->frame_size * sizeof(svalue_t));
     /* re-derive the frame-relative lvalues against the NEW fp (see the
@@ -1244,7 +1244,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
     coro->temporaries = 0;
 #endif
   }
-  vm_sp() = fp + coro->frame_size - 1;
+  sp = fp + coro->frame_size - 1;
   delete[] coro->frame;
   coro->frame = nullptr;
   coro->frame_size = 0;
@@ -1312,7 +1312,7 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   if (!rejected) {
     /* the await expression's value */
     STACK_INC;
-    assign_svalue_no_free(vm_sp(), reason);
+    assign_svalue_no_free(sp, reason);
     entry = coro->prog->program + coro->pc_offset;
   } else {
     /* re-raise at the await point; the innermost acatch() catches it.
@@ -2007,7 +2007,7 @@ void run_async_function(char* entry_pc, const function_t* funp) {
     error("Can't catch eval cost too big error.\n");
   }
   push_refed_promise(p);
-  vm_sp()->subtype = value_type;
+  sp->subtype = value_type;
 }
 
 void coroutine_await_pending(promise_t* awaited) {
@@ -2100,8 +2100,8 @@ void coroutine_await_pending(promise_t* awaited) {
    *     `a[0] ||= await p`, which this refuses.
    *   - T_REF and T_ERROR_HANDLER own heap state whose unwind is tied to
    *     this C++ frame. */
-  for (svalue_t* v = fp; v < vm_sp(); v++) {
-    if (v->type == T_LVALUE && v->u.lvalue >= fp && v->u.lvalue < vm_sp()) {
+  for (svalue_t* v = fp; v < sp; v++) {
+    if (v->type == T_LVALUE && v->u.lvalue >= fp && v->u.lvalue < sp) {
       continue; /* relocatable */
     }
     if (v->type &
@@ -2157,8 +2157,8 @@ void coroutine_await_pending(promise_t* awaited) {
   }
 
   /* bitwise ownership transfer of the frame slice (the awaited promise at
-   * vm_sp() stays out of it) */
-  int const n = vm_sp() - fp;
+   * sp stays out of it) */
+  int const n = sp - fp;
   coro->frame_size = n;
   if (n > 0) {
     coro->frame = new svalue_t[n];
@@ -2198,8 +2198,8 @@ void coroutine_await_pending(promise_t* awaited) {
   /* hand the coroutine to the awaited promise, then drop the stack's ref
    * on it -- if that was the last ref the promise can never settle and the
    * coroutine is abandoned right here (its own promise rejects). */
-  svalue_t promise_slot = *vm_sp();
-  vm_sp() = fp - 1;
+  svalue_t promise_slot = *sp;
+  sp = fp - 1;
   promise_add_coroutine(awaited, coro);
   free_svalue(&promise_slot, "coroutine_await_pending");
 
@@ -2443,9 +2443,9 @@ array_t* build_async_info() {
 
 void push_refed_promise(promise_t* p) {
   STACK_INC;
-  vm_sp()->type = T_PROMISE;
-  vm_sp()->subtype = 0;
-  vm_sp()->u.prom = p;
+  sp->type = T_PROMISE;
+  sp->subtype = 0;
+  sp->u.prom = p;
 }
 
 #ifdef DEBUGMALLOC_EXTENSIONS
