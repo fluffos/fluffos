@@ -37,20 +37,20 @@ void f_compress_file(int num_arg) {
   char outname[1024];
 
   // Not a string?  Error!
-  if ((sp - num_arg + 1)->type != T_STRING) {
+  if ((vm_sp() - num_arg + 1)->type != T_STRING) {
     pop_n_elems(num_arg);
     push_number(0);
     return;
   }
 
-  input_file = (sp - num_arg + 1)->u.string;
+  input_file = (vm_sp() - num_arg + 1)->u.string;
   if (num_arg == 2) {
-    if (((sp - num_arg + 2)->type != T_STRING)) {
+    if (((vm_sp() - num_arg + 2)->type != T_STRING)) {
       pop_n_elems(num_arg);
       push_number(0);
       return;
     }
-    output_file = (sp - num_arg + 2)->u.string;
+    output_file = (vm_sp() - num_arg + 2)->u.string;
   } else {
     if (has_gz_extension(input_file)) {
       // Already compressed...
@@ -160,20 +160,20 @@ void f_uncompress_file(int num_arg) {
   char outname[1024];
 
   // Not a string?  Error!
-  if ((sp - num_arg + 1)->type != T_STRING) {
+  if ((vm_sp() - num_arg + 1)->type != T_STRING) {
     pop_n_elems(num_arg);
     push_number(0);
     return;
   }
 
-  input_file = (sp - num_arg + 1)->u.string;
+  input_file = (vm_sp() - num_arg + 1)->u.string;
   if (num_arg == 2) {
-    if (((sp - num_arg + 2)->type != T_STRING)) {
+    if (((vm_sp() - num_arg + 2)->type != T_STRING)) {
       pop_n_elems(num_arg);
       push_number(0);
       return;
     }
-    output_file = (sp - num_arg + 2)->u.string;
+    output_file = (vm_sp() - num_arg + 2)->u.string;
   } else {
     char* tmp;
     if (!has_gz_extension(input_file)) {
@@ -282,12 +282,12 @@ void f_compress(int num_arg) {
   buffer_t* real_buffer;
   uLongf new_size;
 
-  if (sp->type == T_STRING) {
-    size = SVALUE_STRLEN(sp);
-    input = (unsigned char*)sp->u.string;
-  } else if (sp->type == T_BUFFER) {
-    size = sp->u.buf->size;
-    input = sp->u.buf->item;
+  if (vm_sp()->type == T_STRING) {
+    size = SVALUE_STRLEN(vm_sp());
+    input = (unsigned char*)vm_sp()->u.string;
+  } else if (vm_sp()->type == T_BUFFER) {
+    size = vm_sp()->u.buf->size;
+    input = vm_sp()->u.buf->item;
   } else {
     pop_n_elems(num_arg);
     push_undefined();
@@ -324,8 +324,8 @@ void f_uncompress(int num_arg) {
   buffer_t* buffer;
   int ret;
 
-  if (sp->type == T_BUFFER) {
-    buffer = sp->u.buf;
+  if (vm_sp()->type == T_BUFFER) {
+    buffer = vm_sp()->u.buf;
   } else {
     pop_n_elems(num_arg);
     push_undefined();

@@ -8,22 +8,22 @@ void f_save_object(int num_arg) {
 
   int flag;
   if (num_arg == 2) {
-    flag = (sp--)->u.number;
-    if (sp->type != T_STRING) {
+    flag = (vm_sp()--)->u.number;
+    if (vm_sp()->type != T_STRING) {
       error("first argument must be a string for save_object with 2 args");
     }
   } else {
     flag = 0;
   }
 
-  if (num_arg == 1 && sp->type == T_NUMBER) {
-    flag = sp->u.number;
+  if (num_arg == 1 && vm_sp()->type == T_NUMBER) {
+    flag = vm_sp()->u.number;
   }
 
-  if (num_arg && sp->type == T_STRING) {
-    flag = save_object(current_object, sp->u.string, flag);
+  if (num_arg && vm_sp()->type == T_STRING) {
+    flag = save_object(current_object, vm_sp()->u.string, flag);
 
-    free_string_svalue(sp);
+    free_string_svalue(vm_sp());
     put_number(flag);
   } else {
     pop_n_elems(num_arg);
@@ -35,8 +35,8 @@ void f_save_object(int num_arg) {
       pop_stack();
       push_undefined();
     } else {
-      saved = new_string(strlen(sp->u.string), "save_object_str2");
-      strcpy(saved, sp->u.string);
+      saved = new_string(strlen(vm_sp()->u.string), "save_object_str2");
+      strcpy(saved, vm_sp()->u.string);
       pop_stack();
       push_malloced_string(saved);
     }
@@ -66,7 +66,7 @@ char* save_variable(svalue_t* var) {
 void f_save_variable(int num_arg) {
   char* p;
 
-  p = save_variable(sp);
+  p = save_variable(vm_sp());
   pop_stack();
   push_malloced_string(p);
 }
@@ -76,11 +76,11 @@ void f_save_variable(int num_arg) {
 void f_restore_object(int num_arg) {
   int flag;
 
-  flag = (num_arg > 1) ? (sp--)->u.number : 0;
+  flag = (num_arg > 1) ? (vm_sp()--)->u.number : 0;
 
-  flag = restore_object(current_object, sp->u.string, flag);
+  flag = restore_object(current_object, vm_sp()->u.string, flag);
 
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp());
   put_number(flag);
 }
 #endif
@@ -89,12 +89,12 @@ void f_restore_object(int num_arg) {
 void f_restore_variable(int num_arg) {
   svalue_t v;
 
-  unlink_string_svalue(sp);
+  unlink_string_svalue(vm_sp());
   v.type = T_NUMBER;
 
   // unlinked string
-  restore_variable(&v, const_cast<char*>(sp->u.string));
-  FREE_MSTR(sp->u.string);
-  *sp = v;
+  restore_variable(&v, const_cast<char*>(vm_sp()->u.string));
+  FREE_MSTR(vm_sp()->u.string);
+  *vm_sp() = v;
 }
 #endif

@@ -57,11 +57,11 @@ inline void trim_impl(trim_func_type* func, int num_arg) {
   // If use 2 arguments, we get characters to remove and positioning in previous
   // parameter.
   if (num_arg == 2) {
-    charset = sp->u.string;
+    charset = vm_sp()->u.string;
     pop_stack();
   }
 
-  std::string target(sp->u.string);
+  std::string target(vm_sp()->u.string);
   pop_stack();
 
   target = (*func)(target, charset);

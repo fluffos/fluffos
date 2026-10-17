@@ -15,27 +15,27 @@ void f_dump_prog(int num_arg) {
   int const narg = num_arg;
 
   if (num_arg == 2) {
-    if ((sp - 1)->type != T_OBJECT) {
-      bad_argument(sp - 1, T_OBJECT, 1, F_DUMP_PROG);
+    if ((vm_sp() - 1)->type != T_OBJECT) {
+      bad_argument(vm_sp() - 1, T_OBJECT, 1, F_DUMP_PROG);
     }
 
-    ob = sp[-1].u.ob;
-    d = sp->u.number;
+    ob = vm_sp()[-1].u.ob;
+    d = vm_sp()->u.number;
     where = nullptr;
   } else if (num_arg == 3) {
-    if ((sp - 2)->type != T_OBJECT) {
-      bad_argument(sp - 2, T_OBJECT, 1, F_DUMP_PROG);
+    if ((vm_sp() - 2)->type != T_OBJECT) {
+      bad_argument(vm_sp() - 2, T_OBJECT, 1, F_DUMP_PROG);
     }
 
-    ob = sp[-2].u.ob;
-    d = sp[-1].u.number;
-    where = (sp->type == T_STRING) ? sp->u.string : nullptr;
+    ob = vm_sp()[-2].u.ob;
+    d = vm_sp()[-1].u.number;
+    where = (vm_sp()->type == T_STRING) ? vm_sp()->u.string : nullptr;
   } else {
-    if (sp->type != T_OBJECT) {
-      bad_argument(sp, T_OBJECT, 1, F_DUMP_PROG);
+    if (vm_sp()->type != T_OBJECT) {
+      bad_argument(vm_sp(), T_OBJECT, 1, F_DUMP_PROG);
     }
 
-    ob = sp->u.ob;
+    ob = vm_sp()->u.ob;
     d = 0;
     where = nullptr;
   }

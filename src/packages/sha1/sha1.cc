@@ -60,12 +60,12 @@ void f_sha1(int num_arg) {
   unsigned char final[128] = {0};
   int input_length, final_length, i;
 
-  if (sp->type == T_BUFFER) {
-    str = (const unsigned char*)sp->u.buf->item;
-    input_length = sp->u.buf->size;
+  if (vm_sp()->type == T_BUFFER) {
+    str = (const unsigned char*)vm_sp()->u.buf->item;
+    input_length = vm_sp()->u.buf->size;
   } else {
-    str = reinterpret_cast<const unsigned char*>(sp->u.string);
-    input_length = SVALUE_STRLEN(sp);
+    str = reinterpret_cast<const unsigned char*>(vm_sp()->u.string);
+    input_length = SVALUE_STRLEN(vm_sp());
   }
 
   i = input_length % 64;

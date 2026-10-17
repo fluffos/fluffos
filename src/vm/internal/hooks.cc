@@ -69,7 +69,7 @@ svalue_t g_hook_stack_storage[10 + kHookStackSize + 10];
 control_stack_t g_hook_cstack_storage[5 + kHookDepth + 5];
 
 struct SuspendedStack {
-  svalue_t *start = nullptr, *sp = nullptr, *end = nullptr;
+  svalue_t *start = nullptr, *saved_sp = nullptr, *end = nullptr;
   control_stack_t *cbase = nullptr, *csp = nullptr, *clast = nullptr;
   SuspendedStack* next = nullptr;
 };
@@ -536,17 +536,17 @@ void restore_simulate(SimulateSnap s) {
 /* ---- stack switch ---- */
 
 void switch_to_hook_stack(SuspendedStack* ss, int n_args_already_on_main) {
-  svalue_t* args = sp - n_args_already_on_main + 1;
+  svalue_t* args = vm_sp() - n_args_already_on_main + 1;
   svalue_t* alt_start = &g_hook_stack_storage[10];
   for (int i = 0; i < n_args_already_on_main; i++) {
     alt_start[i] = args[i]; /* move, no ref change */
   }
-  *ss = {start_of_stack, sp - n_args_already_on_main, end_of_stack, control_stack, csp,
+  *ss = {start_of_stack, vm_sp() - n_args_already_on_main, end_of_stack, control_stack, csp,
          control_stack_last, g_suspended};
   g_suspended = ss;
   start_of_stack = alt_start;
   end_of_stack = alt_start + kHookStackSize;
-  sp = alt_start + n_args_already_on_main - 1;
+  vm_sp() = alt_start + n_args_already_on_main - 1;
   control_stack = &g_hook_cstack_storage[5];
   control_stack_last = control_stack + kHookDepth - 1;
   csp = control_stack - 1;
@@ -556,7 +556,7 @@ void switch_to_hook_stack(SuspendedStack* ss, int n_args_already_on_main) {
 void switch_back(SuspendedStack* ss) {
   start_of_stack = ss->start;
   end_of_stack = ss->end;
-  sp = ss->sp;
+  vm_sp() = ss->saved_sp;
   control_stack = ss->cbase;
   control_stack_last = ss->clast;
   csp = ss->csp;
@@ -1494,7 +1494,7 @@ void hooks_for_each_suspended_stack(
     void (*frame_fn)(control_stack_t* cbase, control_stack_t* csp_inclusive, void* ctx), void* ctx) {
   for (SuspendedStack* s = g_suspended; s; s = s->next) {
     if (value_fn) {
-      value_fn(s->start, s->sp, ctx);
+      value_fn(s->start, s->saved_sp, ctx);
     }
     if (frame_fn) {
       frame_fn(s->cbase, s->csp, ctx);
@@ -1515,7 +1515,7 @@ bool hooks_suspended_frame_uses_prog(program_t* prog) {
 
 void hooks_remove_object_from_suspended_stacks(object_t* ob) {
   for (SuspendedStack* s = g_suspended; s; s = s->next) {
-    for (svalue_t* svp = s->start; svp <= s->sp; svp++) {
+    for (svalue_t* svp = s->start; svp <= s->saved_sp; svp++) {
       if (svp->type == T_OBJECT && svp->u.ob == ob) {
         free_object(&svp->u.ob, "remove_object_from_stack (suspended)");
         svp->type = T_NUMBER;
@@ -1608,7 +1608,7 @@ HookMissResult dispatch_miss(PointId p, object_t* named_target, const char* fn, 
     return HookMissResult::NoOpinion;
   }
   auto list = snapshot_point(p);
-  svalue_t* call_args = sp - num_arg + 1;
+  svalue_t* call_args = vm_sp() - num_arg + 1;
   const char* caller_prog =
       (current_object && current_object->prog) ? current_object->prog->filename : nullptr;
   const char* target_prog =
@@ -1635,7 +1635,7 @@ HookMissResult dispatch_miss(PointId p, object_t* named_target, const char* fn, 
     for (int i = 0; i < num_arg; i++) {
       saved[i] = call_args[i];
     }
-    sp -= num_arg;
+    vm_sp() -= num_arg;
     int n = push_miss_args(a, named_target, fn, saved.data(), num_arg, reason, origin);
     svalue_t tmp{};
     (void)hook_call(a, n, &tmp);
@@ -1644,7 +1644,7 @@ HookMissResult dispatch_miss(PointId p, object_t* named_target, const char* fn, 
       push_svalue(&saved[i]);
       free_svalue(&saved[i], "hook before restore");
     }
-    call_args = sp - num_arg + 1;
+    call_args = vm_sp() - num_arg + 1;
   }
 
   for (Attachment* a : list) {
@@ -1664,7 +1664,7 @@ HookMissResult dispatch_miss(PointId p, object_t* named_target, const char* fn, 
     for (int i = 0; i < num_arg; i++) {
       saved[i] = call_args[i];
     }
-    sp -= num_arg;
+    vm_sp() -= num_arg;
     int n = push_miss_args(a, named_target, fn, saved.data(), num_arg, reason, origin);
     svalue_t result{};
     HookRun run = hook_call(a, n, &result);
@@ -1673,7 +1673,7 @@ HookMissResult dispatch_miss(PointId p, object_t* named_target, const char* fn, 
       push_svalue(&saved[i]);
       free_svalue(&saved[i], "hook decide restore");
     }
-    call_args = sp - num_arg + 1;
+    call_args = vm_sp() - num_arg + 1;
     if (run == HookRun::Skipped && (flags & HOOK_FAIL_CLOSED)) {
       /* miss point: FAIL_CLOSED refused at attach time; treat as no opinion */
       free_svalue(&result, "hook decide skip");
@@ -1770,7 +1770,7 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
     return HookGateResult::NoOpinion;
   }
   auto list = snapshot_point(PointId::Function);
-  svalue_t* call_args = num_arg > 0 ? sp - num_arg + 1 : nullptr;
+  svalue_t* call_args = num_arg > 0 ? vm_sp() - num_arg + 1 : nullptr;
   const char* caller_prog =
       (current_object && current_object->prog) ? current_object->prog->filename : nullptr;
   const char* target_prog = (target && target->prog) ? target->prog->filename : nullptr;
@@ -1790,7 +1790,7 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
     for (int i = 0; i < num_arg; i++) {
       saved[i] = call_args[i];
     }
-    sp -= num_arg;
+    vm_sp() -= num_arg;
     int n = push_call_args(a, target, fn, saved.data(), num_arg);
     svalue_t tmp{};
     (void)hook_call(a, n, &tmp);
@@ -1799,7 +1799,7 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
       push_svalue(&saved[i]);
       free_svalue(&saved[i], "hook function before restore");
     }
-    call_args = num_arg > 0 ? sp - num_arg + 1 : nullptr;
+    call_args = num_arg > 0 ? vm_sp() - num_arg + 1 : nullptr;
   }
 
   for (Attachment* a : list) {
@@ -1814,7 +1814,7 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
     for (int i = 0; i < num_arg; i++) {
       saved[i] = call_args[i];
     }
-    sp -= num_arg;
+    vm_sp() -= num_arg;
     int n = push_call_args(a, target, fn, saved.data(), num_arg);
     svalue_t result{};
     HookRun run = hook_call(a, n, &result);
@@ -1822,7 +1822,7 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
       push_svalue(&saved[i]);
       free_svalue(&saved[i], "hook function decide restore");
     }
-    call_args = num_arg > 0 ? sp - num_arg + 1 : nullptr;
+    call_args = num_arg > 0 ? vm_sp() - num_arg + 1 : nullptr;
     HookGateResult gr = decide_result(&result, run, flags, out, true);
     free_svalue(&result, "hook function decide");
     if (gr != HookGateResult::NoOpinion) {
@@ -1834,7 +1834,7 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
 
 void hook_dispatch_function_after(object_t* target, const char* fn, const char* origin,
                                   int num_arg) {
-  if (!(g_hook_mask & HOOK_MASK_LPC_FUNC) || !sp) {
+  if (!(g_hook_mask & HOOK_MASK_LPC_FUNC) || !vm_sp()) {
     return;
   }
   if (pin_index_rejects(PointId::Function, target)) {
@@ -1844,7 +1844,7 @@ void hook_dispatch_function_after(object_t* target, const char* fn, const char* 
   auto list = snapshot_point(PointId::Function);
   /* Return value is on the stack; snapshot it for handlers. */
   svalue_t ret{};
-  assign_svalue_no_free(&ret, sp);
+  assign_svalue_no_free(&ret, vm_sp());
   DEFER { free_svalue(&ret, "hook function after ret"); };
 
   const char* caller_prog =
@@ -1931,9 +1931,9 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
    * the call result on the stack. */
   std::vector<svalue_t> saved(num_arg);
   for (int i = 0; i < num_arg; i++) {
-    saved[i] = *(sp - num_arg + 1 + i);
+    saved[i] = *(vm_sp() - num_arg + 1 + i);
   }
-  sp -= num_arg;
+  vm_sp() -= num_arg;
 
   /* AROUND dispatches nest: the handler, or the body it proceeds into, may
    * call another AROUND-hooked function. Keep the enclosing one's state (its
@@ -1990,7 +1990,7 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
     return HookGateResult::NoOpinion;
   }
   auto list = snapshot_point(PointId::Efun);
-  svalue_t* call_args = num_arg > 0 ? sp - num_arg + 1 : nullptr;
+  svalue_t* call_args = num_arg > 0 ? vm_sp() - num_arg + 1 : nullptr;
   object_t* first_ob = first_object_arg(call_args, num_arg);
   if (filter_ob_out) {
     *filter_ob_out = first_ob;
@@ -2013,7 +2013,7 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
     for (int i = 0; i < num_arg; i++) {
       saved[i] = call_args[i];
     }
-    sp -= num_arg;
+    vm_sp() -= num_arg;
     int n = push_call_args(a, first_ob, efun_name, saved.data(), num_arg);
     svalue_t tmp{};
     (void)hook_call(a, n, &tmp);
@@ -2022,7 +2022,7 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
       push_svalue(&saved[i]);
       free_svalue(&saved[i], "hook efun before restore");
     }
-    call_args = num_arg > 0 ? sp - num_arg + 1 : nullptr;
+    call_args = num_arg > 0 ? vm_sp() - num_arg + 1 : nullptr;
     first_ob = first_object_arg(call_args, num_arg);
   }
   if (filter_ob_out) {
@@ -2041,7 +2041,7 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
     for (int i = 0; i < num_arg; i++) {
       saved[i] = call_args[i];
     }
-    sp -= num_arg;
+    vm_sp() -= num_arg;
     int n = push_call_args(a, first_ob, efun_name, saved.data(), num_arg);
     svalue_t result{};
     HookRun run = hook_call(a, n, &result);
@@ -2049,7 +2049,7 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
       push_svalue(&saved[i]);
       free_svalue(&saved[i], "hook efun decide restore");
     }
-    call_args = num_arg > 0 ? sp - num_arg + 1 : nullptr;
+    call_args = num_arg > 0 ? vm_sp() - num_arg + 1 : nullptr;
     first_ob = first_object_arg(call_args, num_arg);
     if (filter_ob_out) {
       *filter_ob_out = first_ob;
@@ -2461,10 +2461,10 @@ void f_hook_proceed(int num_arg) {
   /* Optional replacement args: hook_proceed(mixed *args) */
   std::vector<svalue_t> use_args;
   if (num == 1) {
-    if (sp->type != T_ARRAY) {
+    if (vm_sp()->type != T_ARRAY) {
       error("Bad argument 1 to hook_proceed()\n");
     }
-    array_t* arr = sp->u.arr;
+    array_t* arr = vm_sp()->u.arr;
     use_args.resize(arr->size);
     for (int i = 0; i < arr->size; i++) {
       assign_svalue_no_free(&use_args[i], &arr->item[i]);

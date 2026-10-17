@@ -495,7 +495,7 @@ void f_replace_program(int num_arg) {
   program_t* new_prog;
   int var_offset;
 
-  if (sp->type != T_STRING) {
+  if (vm_sp()->type != T_STRING) {
     bad_arg(1, F_REPLACE_PROGRAM);
   }
   debug(d_flag, ("replace_program called"));
@@ -512,10 +512,10 @@ void f_replace_program(int num_arg) {
                   current_object->prog->filename);
   }
 
-  name_len = SVALUE_STRLEN(sp);
+  name_len = SVALUE_STRLEN(vm_sp());
   name = reinterpret_cast<char*>(DMALLOC(name_len + 5, TAG_TEMPORARY, "replace_program"));
   xname = name;
-  strcpy(name, sp->u.string);
+  strcpy(name, vm_sp()->u.string);
   bool has_ext = (name_len >= 2 && strcmp(name + name_len - 2, ".c") == 0) ||
                  (name_len >= 4 && strcmp(name + name_len - 4, ".lpc") == 0);
   if (*name == '/') {
@@ -579,7 +579,7 @@ void f_replace_program(int num_arg) {
     debug(d_flag,
           ("replace_program: target already fully present via inherit (zero new funcs/vars); "
            "no-op, skipping pending-swap bookkeeping"));
-    free_string_svalue(sp--);
+    free_string_svalue(vm_sp()--);
     return;
   }
 
@@ -595,7 +595,7 @@ void f_replace_program(int num_arg) {
 
   debug(d_flag, ("replace_program finished"));
 
-  free_string_svalue(sp--);
+  free_string_svalue(vm_sp()--);
 }
 
 #endif

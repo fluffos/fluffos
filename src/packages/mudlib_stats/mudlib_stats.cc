@@ -21,8 +21,8 @@ void f_domain_stats(int num_arg) {
   mapping_t* m;
 
   if (num_arg) {
-    m = get_domain_stats(sp->u.string);
-    free_string_svalue(sp--);
+    m = get_domain_stats(vm_sp()->u.string);
+    free_string_svalue(vm_sp()--);
   } else {
     m = get_domain_stats(nullptr);
   }
@@ -37,8 +37,8 @@ void f_domain_stats(int num_arg) {
 
 #ifdef F_SET_AUTHOR
 void f_set_author(int num_arg) {
-  set_author(sp->u.string);
-  free_string_svalue(sp--);
+  set_author(vm_sp()->u.string);
+  free_string_svalue(vm_sp()--);
 }
 #endif
 
@@ -47,8 +47,8 @@ void f_author_stats(int num_arg) {
   mapping_t* m;
 
   if (num_arg) {
-    m = get_author_stats(sp->u.string);
-    free_string_svalue(sp--);
+    m = get_author_stats(vm_sp()->u.string);
+    free_string_svalue(vm_sp()--);
   } else {
     m = get_author_stats(nullptr);
   }

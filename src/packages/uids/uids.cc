@@ -23,14 +23,14 @@ void f_export_uid(int num_arg) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
-  ob = sp->u.ob;
+  ob = vm_sp()->u.ob;
   if (ob->euid) {
     free_object(&ob, "f_export_uid:1");
-    *sp = const0;
+    *vm_sp() = const0;
   } else {
     ob->uid = current_object->euid;
     free_object(&ob, "f_export_uid:2");
-    *sp = const1;
+    *vm_sp() = const1;
   }
 }
 
@@ -39,26 +39,26 @@ void f_export_uid(int num_arg) {
 #ifdef F_GETEUID
 
 void f_geteuid(int num_arg) {
-  if (sp->type & T_OBJECT) {
-    ob = sp->u.ob;
+  if (vm_sp()->type & T_OBJECT) {
+    ob = vm_sp()->u.ob;
     if (ob->euid) {
       put_constant_string(ob->euid->name);
       free_object(&ob, "f_geteuid:1");
       return;
     }
     free_object(&ob, "f_geteuid:2");
-    *sp = const0;
+    *vm_sp() = const0;
     return;
 
-  } else if (sp->type & T_FUNCTION) {
+  } else if (vm_sp()->type & T_FUNCTION) {
     funptr_t* fp;
-    if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
+    if ((fp = vm_sp()->u.fp)->hdr.owner && fp->hdr.owner->euid) {
       put_constant_string(fp->hdr.owner->euid->name);
       free_funp(fp);
       return;
     }
     free_funp(fp);
-    *sp = const0;
+    *vm_sp() = const0;
   }
 }
 
@@ -67,7 +67,7 @@ void f_geteuid(int num_arg) {
 #ifdef F_GETUID
 
 void f_getuid(int num_arg) {
-  ob = sp->u.ob;
+  ob = vm_sp()->u.ob;
 
   if (!ob->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
@@ -85,26 +85,26 @@ void f_seteuid(int num_arg) {
   svalue_t* arg;
   svalue_t* ret;
 
-  if (sp->type & T_NUMBER) {
-    if (sp->u.number) {
+  if (vm_sp()->type & T_NUMBER) {
+    if (vm_sp()->u.number) {
       bad_arg(1, F_SETEUID);
     }
     current_object->euid = nullptr;
-    sp->u.number = 1;
+    vm_sp()->u.number = 1;
     return;
   }
-  arg = sp;
+  arg = vm_sp();
   push_object(current_object);
   push_svalue(arg);
   ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
-    free_string_svalue(sp);
-    *sp = const0;
+    free_string_svalue(vm_sp());
+    *vm_sp() = const0;
     return;
   }
-  current_object->euid = add_uid(sp->u.string);
-  free_string_svalue(sp);
-  *sp = const1;
+  current_object->euid = add_uid(vm_sp()->u.string);
+  free_string_svalue(vm_sp());
+  *vm_sp() = const1;
 }
 
 #endif

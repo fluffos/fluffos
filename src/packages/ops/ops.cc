@@ -5,6 +5,8 @@
 
 #include "base/package_api.h"
 
+#include "vm/internal/base/vm_stack.h" /* operators are part of the VM stack machine */
+
 #include "packages/ops/ops.h"
 #include "packages/ops/parse.h"
 

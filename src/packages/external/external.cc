@@ -111,7 +111,7 @@ std::vector<ChildExitNote> g_exit_notes;
 
 void reject_with_number(promise_t* p, LPC_INT n) {
   push_number(n);
-  promise_settle(p, sp, 1);
+  promise_settle(p, vm_sp(), 1);
   pop_stack();
 }
 
@@ -315,7 +315,7 @@ void fulfill_handle_promise(int id) {
   h->prom = nullptr;
   promise_clear_cancel_handler(p);
   push_external_result(h->out, h->err, h->exit_code);
-  promise_settle(p, sp, 0);
+  promise_settle(p, vm_sp(), 0);
   pop_stack();
   free_promise(p);
   if (h->ephemeral) {
@@ -357,7 +357,7 @@ void abort_handle(int id, int kill_child) {
     promise_clear_cancel_handler(p);
     if (p->state == PROMISE_PENDING) {
       push_constant_string("*external process aborted");
-      promise_settle(p, sp, 1);
+      promise_settle(p, vm_sp(), 1);
       pop_stack();
     }
     free_promise(p);
@@ -1208,7 +1208,7 @@ void mark_external() {
 
 #ifdef F_EXTERNAL_CREATE
 void f_external_create(int num_arg) {
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
 
   /* Allocation is not privileged; valid_socket is checked at run. */
   int const cmd = validate_cmd_index(arg[0].u.number);
@@ -1232,7 +1232,7 @@ void f_external_create(int num_arg) {
 void f_external_run(int num_arg) {
   /* num_arg is the efun parameter — safe across check_valid_socket()'s
    * master apply (no global arity). */
-  int const id = static_cast<int>(sp->u.number);
+  int const id = static_cast<int>(vm_sp()->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Created) {
     error("external_run: handle has already been started.\n");
@@ -1270,7 +1270,7 @@ void f_external_run(int num_arg) {
 void f_external_start(int num_arg) {
   /* num_arg is the efun parameter — safe across check_valid_socket()'s
    * master apply (no global arity). */
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
 
   if (num_arg == 2) {
     /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
@@ -1315,7 +1315,7 @@ void f_external_start(int num_arg) {
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
     pop_n_elems(num_arg - 1);
-    sp->u.number = EESECURITY;
+    vm_sp()->u.number = EESECURITY;
     return;
   }
   auto which = arg[0].u.number;
@@ -1325,51 +1325,51 @@ void f_external_start(int num_arg) {
 
   int fd = external_start(which, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : nullptr));
   pop_n_elems(num_arg - 1);
-  sp->u.number = fd;
+  vm_sp()->u.number = fd;
 }
 #endif
 
 #ifdef F_EXTERNAL_STDOUT
 void f_external_stdout(int num_arg) {
-  ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
+  ExternalHandle* h = lookup_handle(static_cast<int>(vm_sp()->u.number), /*require_owner=*/1);
   copy_and_push_string(h->out.c_str());
-  assign_svalue(sp - 1, sp);
+  assign_svalue(vm_sp() - 1, vm_sp());
   pop_stack();
 }
 #endif
 
 #ifdef F_EXTERNAL_STDERR
 void f_external_stderr(int num_arg) {
-  ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
+  ExternalHandle* h = lookup_handle(static_cast<int>(vm_sp()->u.number), /*require_owner=*/1);
   copy_and_push_string(h->err.c_str());
-  assign_svalue(sp - 1, sp);
+  assign_svalue(vm_sp() - 1, vm_sp());
   pop_stack();
 }
 #endif
 
 #ifdef F_EXTERNAL_EXIT_CODE
 void f_external_exit_code(int num_arg) {
-  ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
-  sp->u.number = h->exit_code;
+  ExternalHandle* h = lookup_handle(static_cast<int>(vm_sp()->u.number), /*require_owner=*/1);
+  vm_sp()->u.number = h->exit_code;
 }
 #endif
 
 #ifdef F_EXTERNAL_KILL
 void f_external_kill(int num_arg) {
-  int const id = static_cast<int>(sp->u.number);
+  int const id = static_cast<int>(vm_sp()->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Running || h->status_done) {
-    sp->u.number = 0;
+    vm_sp()->u.number = 0;
     return;
   }
   kill_handle_child(h);
-  sp->u.number = 1;
+  vm_sp()->u.number = 1;
 }
 #endif
 
 #ifdef F_EXTERNAL_CLOSE
 void f_external_close(int num_arg) {
-  int const id = static_cast<int>(sp->u.number);
+  int const id = static_cast<int>(vm_sp()->u.number);
   lookup_handle(id, /*require_owner=*/1);
   destroy_handle(id, /*kill_child=*/1);
   pop_stack();
@@ -1378,7 +1378,7 @@ void f_external_close(int num_arg) {
 
 #ifdef F_EXTERNAL_WRITE
 void f_external_write(int num_arg) {
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
   int const id = static_cast<int>(arg[0].u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   int const ok = queue_stdin(h, id, arg[1].u.string, SVALUE_STRLEN(arg + 1));
@@ -1389,7 +1389,7 @@ void f_external_write(int num_arg) {
 
 #ifdef F_EXTERNAL_CLOSE_STDIN
 void f_external_close_stdin(int num_arg) {
-  int const id = static_cast<int>(sp->u.number);
+  int const id = static_cast<int>(vm_sp()->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   h->close_stdin_after_flush = true;
   if (h->state == HandleState::Running) {

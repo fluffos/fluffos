@@ -30,17 +30,17 @@ void f_crc32(int num_arg) {
   unsigned char* buf;
   uint32_t crc;
 
-  if (sp->type == T_STRING) {
-    len = SVALUE_STRLEN(sp);
-    buf = (unsigned char*)sp->u.string;
-  } else if (sp->type == T_BUFFER) {
-    len = sp->u.buf->size;
-    buf = sp->u.buf->item;
+  if (vm_sp()->type == T_STRING) {
+    len = SVALUE_STRLEN(vm_sp());
+    buf = (unsigned char*)vm_sp()->u.string;
+  } else if (vm_sp()->type == T_BUFFER) {
+    len = vm_sp()->u.buf->size;
+    buf = vm_sp()->u.buf->item;
   } else {
-    bad_argument(sp, T_STRING | T_BUFFER, 1, F_CRC32);
+    bad_argument(vm_sp(), T_STRING | T_BUFFER, 1, F_CRC32);
   }
   crc = compute_crc32(buf, len);
-  free_svalue(sp, "f_crc32");
+  free_svalue(vm_sp(), "f_crc32");
   put_number(crc);
 }
 #endif

@@ -1039,22 +1039,22 @@ int copy_file(const char* from, const char* to) {
 void f_cp(int num_arg) {
   int i;
 
-  i = copy_file(sp[-1].u.string, sp[0].u.string);
-  free_string_svalue(sp--);
-  free_string_svalue(sp);
+  i = copy_file(vm_sp()[-1].u.string, vm_sp()[0].u.string);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp());
   put_number(i);
 }
 #endif
 
 #ifdef F_FILE_SIZE
 void f_file_size(int num_arg) {
-  LPC_INT i = file_size(sp->u.string);
+  LPC_INT i = file_size(vm_sp()->u.string);
 
   // cross platform fix
 #ifdef _WIN32
-  if (i == -1 && sp->u.string[SVALUE_STRLEN(sp) - 1] == '/') {
-    auto len = SVALUE_STRLEN(sp);
-    auto tmp = string_copy(sp->u.string, "f_file_size");
+  if (i == -1 && vm_sp()->u.string[SVALUE_STRLEN(vm_sp()) - 1] == '/') {
+    auto len = SVALUE_STRLEN(vm_sp());
+    auto tmp = string_copy(vm_sp()->u.string, "f_file_size");
     tmp[len - 1] = '\0';
     if (file_size(tmp) == -2) {
       i = -2;
@@ -1063,7 +1063,7 @@ void f_file_size(int num_arg) {
   }
 #endif
 
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp());
   put_number(i);
 }
 #endif
@@ -1072,12 +1072,12 @@ void f_file_size(int num_arg) {
 void f_get_dir(int num_arg) {
   array_t* vec;
 
-  vec = get_dir((sp - 1)->u.string, sp->u.number);
-  free_string_svalue(--sp);
+  vec = get_dir((vm_sp() - 1)->u.string, vm_sp()->u.number);
+  free_string_svalue(--vm_sp());
   if (vec) {
     put_array(vec);
   } else {
-    *sp = const0;
+    *vm_sp() = const0;
   }
 }
 #endif
@@ -1087,20 +1087,20 @@ void f_link(int num_arg) {
   svalue_t *ret, *arg;
   int i;
 
-  arg = sp;
+  arg = vm_sp();
   push_svalue(arg - 1);
   push_svalue(arg);
   ret = apply_master_ob(APPLY_VALID_LINK, 2);
   if (MASTER_APPROVED(ret, "valid_link")) {
-    i = do_rename((sp - 1)->u.string, sp->u.string, F_LINK);
+    i = do_rename((vm_sp() - 1)->u.string, vm_sp()->u.string, F_LINK);
   } else {
     i = 0;
   }
   // Free both string arguments before replacing the slot with the
   // result -- the old epilogue abandoned them (two shared-string refs
   // leaked per call; caught by the testsuite's link test + leak gate).
-  free_string_svalue(sp--);
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp());
   put_number(i);
 }
 #endif /* F_LINK */
@@ -1109,13 +1109,13 @@ void f_link(int num_arg) {
 void f_mkdir(int num_arg) {
   const char* path;
 
-  path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
+  path = check_valid_path(vm_sp()->u.string, current_object, "mkdir", 1);
   if (!path || OS_mkdir(path, 0770) == -1) {
-    free_string_svalue(sp);
-    *sp = const0;
+    free_string_svalue(vm_sp());
+    *vm_sp() = const0;
   } else {
-    free_string_svalue(sp);
-    *sp = const1;
+    free_string_svalue(vm_sp());
+    *vm_sp() = const1;
   }
 }
 #endif

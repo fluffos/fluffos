@@ -337,7 +337,7 @@ static object_t* load_virtual_object(const char* name, int clone) {
   if (clone > 1) {
     args = allocate_empty_array(clone - 1);
     while (clone-- > 1) {
-      args->item[clone - 1] = *sp--;
+      args->item[clone - 1] = *vm_sp()--;
     }
     argc++;
     clone = 1;
@@ -1539,8 +1539,8 @@ void destruct_object(object_t* ob, const char* cause) {
     const char* tmp = ob->obname;
 
     STACK_INC;
-    sp->type = T_ERROR_HANDLER;
-    sp->u.error_handler = fix_object_names;
+    vm_sp()->type = T_ERROR_HANDLER;
+    vm_sp()->u.error_handler = fix_object_names;
     saved_master_name = master_ob->obname;
     saved_simul_name = simul_efun_ob->obname;
 
@@ -1552,7 +1552,7 @@ void destruct_object(object_t* ob, const char* cause) {
     new_ob = load_object(tmp, 1);
     if (!new_ob) {
       SETOBNAME(ob, tmp);
-      sp--;
+      vm_sp()--;
       error("Destruct on vital object failed: new copy failed to reload.");
     }
 
@@ -1566,7 +1566,7 @@ void destruct_object(object_t* ob, const char* cause) {
     /* Set the name back so we can remove it from the hash table.
      Also be careful not to remove the new object, which has
      the same name. */
-    sp--; /* error handler */
+    vm_sp()--; /* error handler */
     SETOBNAME(ob, tmp);
     tmp = new_ob->obname;
     SETOBNAME(new_ob, "");
@@ -2382,7 +2382,7 @@ static void mudlib_error_handler(char* err, int katch) {
   push_refed_mapping(m_owned.release());
   if (katch) {
     STACK_INC;
-    *sp = const1;
+    *vm_sp() = const1;
     mret = apply_master_ob(APPLY_ERROR_HANDLER, 2);
   } else {
     mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);

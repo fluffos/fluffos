@@ -14,7 +14,7 @@ LPCFrame LPCFrame::args(int num_arg) {
   LPCFrame f;
   f.mode_ = Mode::Args;
   f.argc_ = num_arg;
-  f.base_ = num_arg > 0 ? sp - num_arg + 1 : sp + 1;
+  f.base_ = num_arg > 0 ? vm_sp() - num_arg + 1 : vm_sp() + 1;
   f.finalized_ = false;
   return f;
 }
@@ -23,7 +23,7 @@ LPCFrame LPCFrame::builder() {
   LPCFrame f;
   f.mode_ = Mode::Builder;
   f.argc_ = 0;
-  f.base_ = sp + 1;
+  f.base_ = vm_sp() + 1;
   f.finalized_ = false;
   return f;
 }
@@ -32,7 +32,7 @@ LPCFrame LPCFrame::mark() {
   LPCFrame f;
   f.mode_ = Mode::Mark;
   f.argc_ = 0;
-  f.base_ = sp + 1;
+  f.base_ = vm_sp() + 1;
   f.finalized_ = false;
   return f;
 }
@@ -60,20 +60,20 @@ LPCFrame::~LPCFrame() {
                 argc_);
 #endif
   if (mode_ == Mode::Builder || mode_ == Mode::Mark) {
-    while (sp >= base_) {
+    while (vm_sp() >= base_) {
       pop_stack();
     }
   }
 }
 
 int LPCFrame::size() const {
-  if (argc_ == 0 && (mode_ == Mode::Builder || mode_ == Mode::Mark) && sp < base_) {
+  if (argc_ == 0 && (mode_ == Mode::Builder || mode_ == Mode::Mark) && vm_sp() < base_) {
     return 0;
   }
-  if (sp < base_) {
+  if (vm_sp() < base_) {
     return 0;
   }
-  return static_cast<int>(sp - base_) + 1;
+  return static_cast<int>(vm_sp() - base_) + 1;
 }
 
 void LPCFrame::check_index(int i) const {
@@ -84,7 +84,7 @@ void LPCFrame::check_index(int i) const {
 
 void LPCFrame::note_push() {
   if (argc_ == 0) {
-    base_ = sp;
+    base_ = vm_sp();
   }
   argc_++;
 }
@@ -161,7 +161,7 @@ void LPCFrame::push(LPC_FLOAT n) {
 
 void LPCFrame::push(svalue_t* v) {
   STACK_INC;
-  assign_svalue_no_free(sp, v);
+  assign_svalue_no_free(vm_sp(), v);
   note_push();
 }
 
@@ -209,7 +209,7 @@ void LPCFrame::ret(LPC_INT n) {
   pop_n_elems(argc_);
   push_number(n);
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
@@ -217,23 +217,23 @@ void LPCFrame::ret(LPC_FLOAT n) {
   pop_n_elems(argc_);
   push_real(n);
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
 void LPCFrame::ret_void() {
   pop_n_elems(argc_);
   argc_ = 0;
-  base_ = sp + 1;
+  base_ = vm_sp() + 1;
   finalized_ = true;
 }
 
 void LPCFrame::ret(svalue_t v) {
   pop_n_elems(argc_);
   STACK_INC;
-  *sp = v;
+  *vm_sp() = v;
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
@@ -241,7 +241,7 @@ void LPCFrame::ret(array_t* v) {
   pop_n_elems(argc_);
   push_array(v);
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
@@ -249,7 +249,7 @@ void LPCFrame::ret_refed(array_t* v) {
   pop_n_elems(argc_);
   push_refed_array(v);
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
@@ -257,7 +257,7 @@ void LPCFrame::ret(mapping_t* m) {
   pop_n_elems(argc_);
   push_mapping(m);
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
@@ -265,7 +265,7 @@ void LPCFrame::ret_str_malloced(const char* p) {
   pop_n_elems(argc_);
   push_malloced_string(p);
   argc_ = 1;
-  base_ = sp;
+  base_ = vm_sp();
   finalized_ = true;
 }
 
@@ -289,7 +289,7 @@ void LPCFrame::drop_front(int n) {
   }
   argc_ = remain;
   if (argc_ == 0) {
-    base_ = sp + 1;
+    base_ = vm_sp() + 1;
   }
 }
 
@@ -297,7 +297,7 @@ void LPCFrame::discard_to() {
   if (mode_ != Mode::Mark && mode_ != Mode::Builder) {
     error("LPCFrame::discard_to requires Mark or Builder mode\n");
   }
-  while (sp >= base_) {
+  while (vm_sp() >= base_) {
     pop_stack();
   }
   argc_ = 0;
@@ -318,7 +318,7 @@ svalue_t* LPCFrame::safe_apply(const char* fun, object_t* ob, int origin) {
   if (ob->flags & O_DESTRUCTED) {
     pop_n_elems(argc_);
     argc_ = 0;
-    base_ = sp + 1;
+    base_ = vm_sp() + 1;
     finalized_ = true;
     return nullptr;
   }

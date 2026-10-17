@@ -20,15 +20,15 @@ void f_trace_start(int num_arg) {
   // prints from inside flush(). Recovered only by a restart.
   Tracer::collect();
 
-  auto duration_secs = sp->u.number;
+  auto duration_secs = vm_sp()->u.number;
   if (duration_secs < 0 || duration_secs > 5 * 60) {
     error("Invalid duration specified.\n");
   }
 
-  const auto* realfile = check_valid_path((sp - 1)->u.string, current_object, "trace_start", 1);
+  const auto* realfile = check_valid_path((vm_sp() - 1)->u.string, current_object, "trace_start", 1);
 
   if (!realfile) {
-    error("Permission denied for trace file: %s\n", (sp - 1)->u.string);
+    error("Permission denied for trace file: %s\n", (vm_sp() - 1)->u.string);
   }
 
   // Used later in the block.

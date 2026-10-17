@@ -20,8 +20,8 @@ void f_real_time(int num_arg) { push_number(time(nullptr)); }
 void f_compressedp(int num_arg) {
   int i;
 
-  i = sp->u.ob->interactive && (sp->u.ob->interactive->iflags & USING_COMPRESS);
-  free_object(&sp->u.ob, "f_compressedp");
+  i = vm_sp()->u.ob->interactive && (vm_sp()->u.ob->interactive->iflags & USING_COMPRESS);
+  free_object(&vm_sp()->u.ob, "f_compressedp");
   put_number(i != 0);
 }
 #endif
@@ -95,7 +95,7 @@ void f_remove_shadow(int num_arg) {
 
   ob = current_object;
   if (num_arg) {
-    ob = sp->u.ob;
+    ob = vm_sp()->u.ob;
     pop_stack();
   }
   if (ob == nullptr || (ob->shadowing == nullptr && ob->shadowed == nullptr)) {
@@ -126,9 +126,9 @@ void f_query_notify_fail(int num_arg) {
     }
     if ((p = command_giver->interactive->default_err_message.s)) {
       STACK_INC;
-      sp->type = T_STRING;
-      sp->subtype = STRING_SHARED;
-      sp->u.string = p;
+      vm_sp()->type = T_STRING;
+      vm_sp()->subtype = STRING_SHARED;
+      vm_sp()->u.string = p;
       ref_string(p);
       return;
     }
@@ -148,13 +148,13 @@ void f_store_variable(int num_arg) {
   object_t* ob;
 
   if (num_arg == 3) {
-    ob = sp->u.ob;
-    sv = (sp - 1);
-    name = (sp - 2)->u.string;
+    ob = vm_sp()->u.ob;
+    sv = (vm_sp() - 1);
+    name = (vm_sp() - 2)->u.string;
   } else {
     ob = current_object;
-    sv = sp;
-    name = (sp - 1)->u.string;
+    sv = vm_sp();
+    name = (vm_sp() - 1)->u.string;
   }
 
   idx = find_global_variable(ob->prog, name, &type, 0);
@@ -175,11 +175,11 @@ void f_fetch_variable(int num_arg) {
   object_t* ob;
 
   if (num_arg == 2) {
-    ob = sp->u.ob;
-    name = (sp - 1)->u.string;
+    ob = vm_sp()->u.ob;
+    name = (vm_sp() - 1)->u.string;
   } else {
     ob = current_object;
-    name = (sp)->u.string;
+    name = (vm_sp())->u.string;
   }
 
   idx = find_global_variable(ob->prog, name, &type, 0);
@@ -197,7 +197,7 @@ void f_fetch_variable(int num_arg) {
 void f_set_prompt(int num_arg) {
   object_t* who;
   if (num_arg == 2) {
-    who = sp->u.ob;
+    who = vm_sp()->u.ob;
     pop_stack();
   } else {
     who = command_giver;
@@ -313,9 +313,9 @@ void f_copy(int num_arg) {
   svalue_t ret;
 
   depth = 0;
-  deep_copy_svalue(sp, &ret);
-  free_svalue(sp, "f_copy");
-  *sp = ret;
+  deep_copy_svalue(vm_sp(), &ret);
+  free_svalue(vm_sp(), "f_copy");
+  *vm_sp() = ret;
 }
 #endif
 
@@ -327,11 +327,11 @@ void f_functions(int num_arg) {
   array_t *vec, *subvec;
   function_t* funp;
   program_t* prog;
-  int const flag = (sp--)->u.number;
+  int const flag = (vm_sp()--)->u.number;
   lpc_type_t* types;
   char buf[256];
   char* end = EndOf(buf);
-  program_t* progp = sp->u.ob->prog;
+  program_t* progp = vm_sp()->u.ob->prog;
   int const offset = (flag & 2) ? progp->last_inherited : 0;
 
   num = (flag & 2) ? progp->num_functions_defined
@@ -349,7 +349,7 @@ void f_functions(int num_arg) {
   while (i--) {
     unsigned short low = 0, high = 0, mid = 0;
 
-    prog = sp->u.ob->prog;
+    prog = vm_sp()->u.ob->prog;
     ind = i + offset;
 
     /* Walk up the inheritance tree to the real definition */
@@ -466,8 +466,8 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
 void f_variables(int num_arg) {
   int idx = 0;
   array_t* arr;
-  int const flag = (sp--)->u.number;
-  program_t* prog = sp->u.ob->prog;
+  int const flag = (vm_sp()--)->u.number;
+  program_t* prog = vm_sp()->u.ob->prog;
 
   arr = allocate_empty_array(prog->num_variables_total);
   fv_recurse(arr, &idx, prog, 0, flag);
@@ -618,9 +618,9 @@ void f_terminal_colour(int num_arg) {
 
   if (num_arg >= 3) {
     if (num_arg == 4) {
-      indent = (sp--)->u.number;
+      indent = (vm_sp()--)->u.number;
     }
-    wrap = (sp--)->u.number;
+    wrap = (vm_sp()--)->u.number;
     {
       /* No line can get anywhere near this many columns (a kept byte adds
        * at most ~11, and at most max_string_length bytes are kept), so a
@@ -646,7 +646,7 @@ void f_terminal_colour(int num_arg) {
     }
   }
 
-  cp = instr = (sp - 1)->u.string;
+  cp = instr = (vm_sp() - 1)->u.string;
   do {
     cp = strchr(cp, TC_FIRST_CHAR);
     if (cp) {
@@ -728,10 +728,10 @@ void f_terminal_colour(int num_arg) {
       FREE_MSTR(savestr);
     }
     pop_stack();
-    free_string_svalue(sp);
-    sp->type = T_STRING;
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    free_string_svalue(vm_sp());
+    vm_sp()->type = T_STRING;
+    vm_sp()->subtype = STRING_CONSTANT;
+    vm_sp()->u.string = "";
     return;
   }
 
@@ -745,7 +745,7 @@ void f_terminal_colour(int num_arg) {
   // loop further down). DCALLOC zero-inits, so unused slots stay nullptr.
   rep_allocs = reinterpret_cast<char**>(
       DCALLOC(num, sizeof(char*), TAG_TEMPORARY, "f_terminal_colour: rep_allocs"));
-  mtab = sp->u.map->table;
+  mtab = vm_sp()->u.map->table;
 
   // First setup some little things.
   curcolour[0] = 0;
@@ -753,7 +753,7 @@ void f_terminal_colour(int num_arg) {
 
   // Find the reset colour string.
   resetstrname = findstring("RESET");
-  k = sp->u.map->table_size;
+  k = vm_sp()->u.map->table_size;
   if (resetstrname) {
     static svalue_t str = {T_STRING, STRING_SHARED};
     int tmp;
@@ -774,7 +774,7 @@ void f_terminal_colour(int num_arg) {
     // we really really need one, so just default to ansi reset
     resetstr = "\033[49;49m\033[0;10m";
     resetstrlen = 15;
-    add_mapping_string(sp->u.map, "RESET", resetstr);
+    add_mapping_string(vm_sp()->u.map, "RESET", resetstr);
   }
 
   /* Do the the pointer replacement and calculate the lengths */
@@ -783,7 +783,7 @@ void f_terminal_colour(int num_arg) {
   space = 0;
   maybe_at_end = 0;
   buflen = max_buflen = space_buflen = 0;
-  for (j = i = 0, k = sp->u.map->table_size; i < num; i++) {
+  for (j = i = 0, k = vm_sp()->u.map->table_size; i < num; i++) {
     // Look it up in the mapping.
     repused = 0;
     copy_and_push_string(parts[i]);
@@ -1172,13 +1172,13 @@ void f_terminal_colour(int num_arg) {
     fatal(
         "Length miscalculated in terminal_colour()\n    Expected: %" LPC_INT_FMTSTR_P " Was: %td\n "
         "   String: %s\n    Indent: %" LPC_INT_FMTSTR_P " Wrap: %" LPC_INT_FMTSTR_P "\n",
-        j, ncp - deststr, sp->u.string, indent, wrap);
+        j, ncp - deststr, vm_sp()->u.string, indent, wrap);
   }
 #endif
-  free_string_svalue(sp);
-  sp->type = T_STRING;
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = deststr;
+  free_string_svalue(vm_sp());
+  vm_sp()->type = T_STRING;
+  vm_sp()->subtype = STRING_MALLOC;
+  vm_sp()->u.string = deststr;
 }
 #endif
 
@@ -1684,7 +1684,7 @@ static char* pluralize(const char* str) {
 void f_pluralize(int num_arg) {
   char* s;
 
-  s = pluralize(sp->u.string);
+  s = pluralize(vm_sp()->u.string);
   pop_stack();
   if (!s) {
     push_number(0);
@@ -1746,7 +1746,7 @@ static int file_length(const char* file) {
 void f_file_length(int num_arg) {
   int l;
 
-  l = file_length(sp->u.string);
+  l = file_length(vm_sp()->u.string);
   pop_stack();
   push_number(l);
 }
@@ -1756,14 +1756,14 @@ void f_file_length(int num_arg) {
 void f_upper_case(int num_arg) {
   const char* str;
 
-  str = sp->u.string;
+  str = vm_sp()->u.string;
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uislower(*str)) {
       char* newstr;
-      int const l = str - sp->u.string;
-      unlink_string_svalue(sp);
-      newstr = const_cast<char*>(sp->u.string) + l;
+      int const l = str - vm_sp()->u.string;
+      unlink_string_svalue(vm_sp());
+      newstr = const_cast<char*>(vm_sp()->u.string) + l;
       *newstr = toupper(static_cast<unsigned char>(*newstr));
       for (newstr++; *newstr; newstr++) {
         if (uislower((unsigned char)*newstr)) {
@@ -1784,9 +1784,9 @@ void f_replaceable(int num_arg) {
   const char** ignore;
 
   if (num_arg == 2) {
-    obj = (sp - 1)->u.ob;
+    obj = (vm_sp() - 1)->u.ob;
   } else {
-    obj = sp->u.ob;
+    obj = vm_sp()->u.ob;
   }
 
   prog = obj->prog;
@@ -1794,7 +1794,7 @@ void f_replaceable(int num_arg) {
     replaceable = 0;
   } else {
     if (num_arg == 2) {
-      numignore = sp->u.arr->size;
+      numignore = vm_sp()->u.arr->size;
       // Always allocate the 2 built-in slots (create/__INIT) plus one per
       // ignore entry -- an empty ignore array must not leave ignore == NULL
       // before the unconditional ignore[0]/ignore[1] writes below.
@@ -1803,8 +1803,8 @@ void f_replaceable(int num_arg) {
       ignore[0] = findstring(APPLY_CREATE);
       ignore[1] = findstring(APPLY___INIT);
       for (i = 0; i < numignore; i++) {
-        if (sp->u.arr->item[i].type == T_STRING) {
-          ignore[i + 2] = findstring(sp->u.arr->item[i].u.string);
+        if (vm_sp()->u.arr->item[i].type == T_STRING) {
+          ignore[i + 2] = findstring(vm_sp()->u.arr->item[i].u.string);
         } else {
           ignore[i + 2] = nullptr;
         }
@@ -1839,9 +1839,9 @@ void f_replaceable(int num_arg) {
   }
 
   if (num_arg == 2) {
-    free_array((sp--)->u.arr);
+    free_array((vm_sp()--)->u.arr);
   }
-  free_svalue(sp, "f_replaceable");
+  free_svalue(vm_sp(), "f_replaceable");
   put_number(replaceable);
 }
 #endif
@@ -1903,7 +1903,7 @@ void f_program_info(int num_arg) {
   mapping_t* m;
 
   if (num_arg == 1) {
-    ob = sp->u.ob;
+    ob = vm_sp()->u.ob;
     if (!(ob->flags & O_CLONE)) {
       sum_program_info(ob->prog, info);
     }
@@ -1944,16 +1944,16 @@ void f_program_info(int num_arg) {
 
 #ifdef F_REMOVE_INTERACTIVE
 void f_remove_interactive(int num_arg) {
-  if ((sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive)) {
-    free_object(&sp->u.ob, "f_remove_interactive");
-    *sp = const0;
+  if ((vm_sp()->u.ob->flags & O_DESTRUCTED) || !(vm_sp()->u.ob->interactive)) {
+    free_object(&vm_sp()->u.ob, "f_remove_interactive");
+    *vm_sp() = const0;
   } else {
-    remove_interactive(sp->u.ob, 0);
+    remove_interactive(vm_sp()->u.ob, 0);
     /* It may have been dested */
-    if (sp->type == T_OBJECT) {
-      free_object(&sp->u.ob, "f_remove_interactive");
+    if (vm_sp()->type == T_OBJECT) {
+      free_object(&vm_sp()->u.ob, "f_remove_interactive");
     }
-    *sp = const1;
+    *vm_sp() = const1;
   }
 }
 #endif
@@ -1974,8 +1974,8 @@ void f_query_ip_port(int num_arg) {
   int tmp;
 
   if (num_arg) {
-    tmp = query_ip_port(sp->u.ob);
-    free_object(&sp->u.ob, "f_query_ip_port");
+    tmp = query_ip_port(vm_sp()->u.ob);
+    free_object(&vm_sp()->u.ob, "f_query_ip_port");
   } else {
     tmp = query_ip_port(command_giver);
     STACK_INC;
@@ -2037,9 +2037,9 @@ void f_zonetime(int num_arg) {
   time_t time_val;
   int len;
 
-  time_val = sp->u.number;
+  time_val = vm_sp()->u.number;
   pop_stack();
-  new_tz = sp->u.string;
+  new_tz = vm_sp()->u.string;
   pop_stack();
 
   old_tz = set_timezone(new_tz);
@@ -2059,8 +2059,8 @@ void f_zonetime(int num_arg) {
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time(int num_arg) {
-  time_t time_to_check = sp->u.number;
-  const char* new_tz = (sp - 1)->u.string;
+  time_t time_to_check = vm_sp()->u.number;
+  const char* new_tz = (vm_sp() - 1)->u.string;
   const char* old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {
@@ -2082,16 +2082,16 @@ void f_is_daylight_savings_time(int num_arg) {
 
 #ifdef F_DEBUG_MESSAGE
 void f_debug_message(int num_arg) {
-  debug_message("%s\n", sp->u.string);
-  free_string_svalue(sp--);
+  debug_message("%s\n", vm_sp()->u.string);
+  free_string_svalue(vm_sp()--);
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
 void f_function_owner(int num_arg) {
-  object_t* owner = sp->u.fp->hdr.owner;
+  object_t* owner = vm_sp()->u.fp->hdr.owner;
 
-  free_funp(sp->u.fp);
+  free_funp(vm_sp()->u.fp);
   put_unrefed_object(owner, "f_function_owner");
 }
 #endif
@@ -2106,10 +2106,10 @@ void f_repeat_string(int num_arg) {
   char *ret, *p;
   int i;
 
-  repeat = (sp--)->u.number;
+  repeat = (vm_sp()--)->u.number;
   if (repeat > 0) {
-    str = sp->u.string;
-    len = SVALUE_STRLEN(sp);
+    str = vm_sp()->u.string;
+    len = SVALUE_STRLEN(vm_sp());
     // Clamp repeat BEFORE multiplying: len * repeat in int can overflow and
     // wrap to a small/zero newlen, driving an undersized allocation and a
     // massive heap overflow in the copy loop. Also avoids div-by-zero on len==0.
@@ -2121,10 +2121,10 @@ void f_repeat_string(int num_arg) {
     newlen = len * repeat;
   }
   if (repeat <= 0) {
-    free_string_svalue(sp);
-    sp->type = T_STRING;
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    free_string_svalue(vm_sp());
+    vm_sp()->type = T_STRING;
+    vm_sp()->subtype = STRING_CONSTANT;
+    vm_sp()->u.string = "";
   } else if (repeat != 1) {
     p = ret = new_string(newlen, "f_repeat_string");
     for (i = 0; i < repeat; i++) {
@@ -2132,10 +2132,10 @@ void f_repeat_string(int num_arg) {
       p += len;
     }
     *p = 0;
-    free_string_svalue(sp);
-    sp->type = T_STRING;
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = ret;
+    free_string_svalue(vm_sp());
+    vm_sp()->type = T_STRING;
+    vm_sp()->subtype = STRING_MALLOC;
+    vm_sp()->u.string = ret;
   }
 }
 #endif
@@ -2300,10 +2300,10 @@ void f_query_replaced_program(int num_arg) {
   char* res = nullptr;
 
   if (num_arg) {
-    if (sp->u.ob->replaced_program) {
-      res = add_slash(sp->u.ob->replaced_program);
+    if (vm_sp()->u.ob->replaced_program) {
+      res = add_slash(vm_sp()->u.ob->replaced_program);
     }
-    free_object(&sp->u.ob, "f_query_replaced_program");
+    free_object(&vm_sp()->u.ob, "f_query_replaced_program");
   } else {
     if (current_object->replaced_program) {
       res = add_slash(current_object->replaced_program);
@@ -2440,7 +2440,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
       }
     }
     while (count--) {
-      ob = sp->u.ob;
+      ob = vm_sp()->u.ob;
       pop_stack();
       if (!ob || ob->flags & O_DESTRUCTED) {
         continue;
@@ -2454,7 +2454,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
     }
 #endif
   }
-  sp--;
+  vm_sp()--;
   FREE_MSTR(name);
 }
 
@@ -2463,7 +2463,7 @@ void f_event(int num_arg) {
 
   num = num_arg;
 
-  event((sp - num + 1), (sp - num + 2)->u.string, num - 2, (sp - num + 3));
+  event((vm_sp() - num + 1), (vm_sp() - num + 2)->u.string, num - 2, (vm_sp() - num + 3));
 
   pop_n_elems(num);
 }
@@ -2505,9 +2505,9 @@ void f_query_num(int num_arg) {
   char* res;
 
   ret[0] = 0;
-  limit = sp->u.number;
+  limit = vm_sp()->u.number;
   pop_stack();
-  n = sp->u.number;
+  n = vm_sp()->u.number;
   //  pop_stack();
 
   if ((limit && n > limit) || (n < 0) || (n > 99999)) {
@@ -2570,15 +2570,15 @@ void f_base_name(int num_arg) {
   char *name, *tmp;
   int i;
 
-  if (sp->type == T_OBJECT) {
-    if (sp->u.ob->flags & O_DESTRUCTED) {
-      free_object(&sp->u.ob, "f_base_name");
-      *sp = const0;
+  if (vm_sp()->type == T_OBJECT) {
+    if (vm_sp()->u.ob->flags & O_DESTRUCTED) {
+      free_object(&vm_sp()->u.ob, "f_base_name");
+      *vm_sp() = const0;
       return;
     }
-    name = add_slash(sp->u.ob->obname);
+    name = add_slash(vm_sp()->u.ob->obname);
   } else {
-    name = string_copy(sp->u.string, "f_base_name: name");
+    name = string_copy(vm_sp()->u.string, "f_base_name: name");
   }
 
   pop_stack();
@@ -2638,7 +2638,7 @@ void f_get_garbage(int num_arg) {
 #ifdef F_NUM_CLASSES
 
 void f_num_classes(int num_arg) {
-  int const i = sp->u.ob->prog->num_classes;
+  int const i = vm_sp()->u.ob->prog->num_classes;
   pop_stack();
   push_number(i);
 }
@@ -2651,14 +2651,14 @@ void f_assemble_class(int num_arg) {
   // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
   // is later freed as a class (caught by the testsuite's per-file
   // check_memory gate via the assemble_class test).
-  array_t* src = sp->u.arr;
+  array_t* src = vm_sp()->u.arr;
   array_t* cl = allocate_class_by_size(src->size);
   for (int i = 0; i < src->size; i++) {
     assign_svalue_no_free(&cl->item[i], &src->item[i]);
   }
   pop_stack();
   push_refed_array(cl);
-  sp->type = T_CLASS;
+  vm_sp()->type = T_CLASS;
 }
 
 #endif
@@ -2666,10 +2666,10 @@ void f_assemble_class(int num_arg) {
 #ifdef F_DISASSEMBLE_CLASS
 void f_disassemble_class(int num_arg) {
   array_t* arr;
-  if (sp->type != T_CLASS) {
+  if (vm_sp()->type != T_CLASS) {
     error("Argument to disassemble_class() not a class.\n");
   }
-  arr = copy_array(sp->u.arr);
+  arr = copy_array(vm_sp()->u.arr);
   pop_stack();
   push_refed_array(arr);
 }
@@ -2678,23 +2678,23 @@ void f_disassemble_class(int num_arg) {
 #ifdef F_FETCH_CLASS_MEMBER
 
 void f_fetch_class_member(int num_arg) {
-  LPC_INT pos = sp->u.number; /* checked below as an LPC int, not wrapped */
+  LPC_INT pos = vm_sp()->u.number; /* checked below as an LPC int, not wrapped */
   array_t* arr;
 
-  pos = sp->u.number;
+  pos = vm_sp()->u.number;
   pop_stack();
 
-  if (sp->type != T_CLASS) {
+  if (vm_sp()->type != T_CLASS) {
     error("Argument to fetch_class_member() not a class.\n");
   }
 
-  arr = sp->u.arr;
+  arr = vm_sp()->u.arr;
 
   if (pos < 0 || pos >= arr->size) {
     error("Class index out of bounds.\n");
   }
 
-  assign_svalue_no_free(sp, &arr->item[pos]);
+  assign_svalue_no_free(vm_sp(), &arr->item[pos]);
   free_array(arr);
 }
 #endif
@@ -2702,20 +2702,20 @@ void f_fetch_class_member(int num_arg) {
 #ifdef F_STORE_CLASS_MEMBER
 
 void f_store_class_member(int num_arg) {
-  LPC_INT const pos = (sp - 1)->u.number; /* checked below as an LPC int */
+  LPC_INT const pos = (vm_sp() - 1)->u.number; /* checked below as an LPC int */
   array_t* arr;
 
-  if ((sp - 2)->type != T_CLASS) {
+  if ((vm_sp() - 2)->type != T_CLASS) {
     error("Argument to store_class_member() not a class.\n");
   }
 
-  arr = (sp - 2)->u.arr;
+  arr = (vm_sp() - 2)->u.arr;
 
   if (pos < 0 || pos >= arr->size) {
     error("Class index out of bounds.\n");
   }
 
-  assign_svalue(&arr->item[pos], sp);
+  assign_svalue(&arr->item[pos], vm_sp());
 
   pop_2_elems();
 }
@@ -2723,11 +2723,11 @@ void f_store_class_member(int num_arg) {
 
 #ifdef F_ELEMENT_OF
 void f_element_of(int num_arg) {
-  array_t* arr = sp->u.arr;
+  array_t* arr = vm_sp()->u.arr;
   if (!arr->size) {
     error("Can't take element from empty array.\n");
   }
-  assign_svalue_no_free(sp, &arr->item[random_number(arr->size)]);
+  assign_svalue_no_free(vm_sp(), &arr->item[random_number(arr->size)]);
   free_array(arr);
 }
 #endif
@@ -2764,7 +2764,7 @@ void shuffle(array_t* args) {
 }
 
 void f_shuffle(int num_arg) {
-  svalue_t* sv = sp - num_arg + 1;
+  svalue_t* sv = vm_sp() - num_arg + 1;
 
   if (sv->type == T_ARRAY && sv->u.arr) {
     shuffle(sv->u.arr);
@@ -2777,7 +2777,7 @@ void f_shuffle(int num_arg) {
 #ifdef F_MAX
 
 void f_max(int num_arg) {
-  svalue_t* sarr = sp - 1;
+  svalue_t* sarr = vm_sp() - 1;
   array_t* arr = sarr->u.arr;
   int max_index = 0;
   int i;
@@ -2838,7 +2838,7 @@ void f_max(int num_arg) {
     }
   }
 
-  if (sp->u.number != 0) {
+  if (vm_sp()->u.number != 0) {
     pop_2_elems();
     push_number(max_index);
     return;
@@ -2846,7 +2846,7 @@ void f_max(int num_arg) {
 
   pop_stack();
 
-  assign_svalue_no_free(sp, &arr->item[max_index]);
+  assign_svalue_no_free(vm_sp(), &arr->item[max_index]);
   free_array(arr);
 }
 
@@ -2855,7 +2855,7 @@ void f_max(int num_arg) {
 #ifdef F_MIN
 
 void f_min(int num_arg) {
-  svalue_t* sarr = sp - 1;
+  svalue_t* sarr = vm_sp() - 1;
   array_t* arr = sarr->u.arr;
   int min_index = 0;
   int i;
@@ -2916,7 +2916,7 @@ void f_min(int num_arg) {
     }
   }
 
-  if (sp->u.number != 0) {
+  if (vm_sp()->u.number != 0) {
     pop_2_elems();
     push_number(min_index);
     return;
@@ -2924,7 +2924,7 @@ void f_min(int num_arg) {
 
   pop_stack();
 
-  assign_svalue_no_free(sp, &arr->item[min_index]);
+  assign_svalue_no_free(vm_sp(), &arr->item[min_index]);
   free_array(arr);
 }
 #endif
@@ -2932,14 +2932,14 @@ void f_min(int num_arg) {
 #ifdef F_ABS
 
 void f_abs(int num_arg) {
-  if (sp->type == T_REAL) {
-    if (sp->u.real < 0.0) {
-      sp->u.real = -sp->u.real;
-    } else if (sp->u.real == -0.0) {
-      sp->u.real = 0.0;
+  if (vm_sp()->type == T_REAL) {
+    if (vm_sp()->u.real < 0.0) {
+      vm_sp()->u.real = -vm_sp()->u.real;
+    } else if (vm_sp()->u.real == -0.0) {
+      vm_sp()->u.real = 0.0;
     }
-  } else if (sp->type == T_NUMBER && sp->u.number < 0) {
-    sp->u.number = -sp->u.number;
+  } else if (vm_sp()->type == T_NUMBER && vm_sp()->u.number < 0) {
+    vm_sp()->u.number = -vm_sp()->u.number;
   }
 }
 #endif
@@ -2954,7 +2954,7 @@ void f_roll_MdN(int num_arg) {
    * as roll_MdN(int, int) with no bonus, and when it is enabled that spec is
    * the one compiled in -- reading three fixed slots then took `rolls` from
    * the caller's stack below the first argument (roll_MdN(3, 1) gave 0). */
-  svalue_t* args = sp - num_arg + 1;
+  svalue_t* args = vm_sp() - num_arg + 1;
   rolls = args[0].u.number;
   sides = args[1].u.number;
   bonus = num_arg > 2 ? args[2].u.number : 0;
@@ -3038,8 +3038,8 @@ void f_string_difference(int num_arg) {
   int diff, as, bs;
   char *a, *b;
 
-  a = const_cast<char*>(sp->u.string);
-  b = const_cast<char*>((sp - 1)->u.string);
+  a = const_cast<char*>(vm_sp()->u.string);
+  b = const_cast<char*>((vm_sp() - 1)->u.string);
 
   if (!strcmp(a, b)) {
     diff = 0;
@@ -3055,8 +3055,8 @@ void f_string_difference(int num_arg) {
     }
   }
 
-  free_string_svalue(sp--);
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp());
   put_number(diff);
 }
 #endif
@@ -3076,8 +3076,8 @@ void f_query_charmode(int num_arg) {
   int tmp;
 
   if (num_arg) {
-    tmp = query_charmode(sp->u.ob);
-    free_object(&sp->u.ob, "f_query_charmode");
+    tmp = query_charmode(vm_sp()->u.ob);
+    free_object(&vm_sp()->u.ob, "f_query_charmode");
   } else {
     tmp = -1;
   }
@@ -3099,8 +3099,8 @@ void f_remove_charmode(int num_arg) {
   int tmp;
 
   if (num_arg) {
-    tmp = remove_charmode(sp->u.ob);
-    free_object(&sp->u.ob, "f_remove_charmode");
+    tmp = remove_charmode(vm_sp()->u.ob);
+    free_object(&vm_sp()->u.ob, "f_remove_charmode");
   } else {
     tmp = -1;
   }
@@ -3133,8 +3133,8 @@ void f_remove_get_char(int num_arg) {
   int tmp;
 
   if (num_arg) {
-    tmp = remove_get_char(sp->u.ob);
-    free_object(&sp->u.ob, "f_remove_get_char");
+    tmp = remove_get_char(vm_sp()->u.ob);
+    free_object(&vm_sp()->u.ob, "f_remove_get_char");
   } else {
     tmp = -3;
   }
@@ -3148,7 +3148,7 @@ void f_send_nullbyte(int num_arg) {
   object_t* who;
   tmp = 0;
 
-  who = sp->u.ob;
+  who = vm_sp()->u.ob;
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     tmp = -2;
@@ -3158,7 +3158,7 @@ void f_send_nullbyte(int num_arg) {
     add_message(who, "\0", 1);
     flush_message(who->interactive);
   }
-  free_object(&sp->u.ob, "f_send_nullbyte");
+  free_object(&vm_sp()->u.ob, "f_send_nullbyte");
   put_number(tmp);
 }
 
@@ -3169,15 +3169,15 @@ void f_restore_from_string(int num_arg) {
   const char* buf;
   LPC_INT noclear;
 
-  buf = (sp - 1)->u.string;
-  noclear = sp->u.number;
+  buf = (vm_sp() - 1)->u.string;
+  noclear = vm_sp()->u.number;
   if (!noclear) {
     clear_non_statics(current_object);
   }
   copy_and_push_string(buf);  // restore_object_from_buff modifies the string in
                               // place, which is ok, copied strings aren't
                               // shared
-  restore_object_from_buff(current_object, const_cast<char*>(sp->u.string), noclear);
+  restore_object_from_buff(current_object, const_cast<char*>(vm_sp()->u.string), noclear);
   pop_3_elems();
 }
 #endif
@@ -3190,10 +3190,10 @@ void f_classes(int num_arg) {
   char* end;
   program_t* prog;
 
-  flag = (sp--)->u.number;
+  flag = (vm_sp()--)->u.number;
   end = EndOf(buf);
 
-  prog = sp->u.ob->prog;
+  prog = vm_sp()->u.ob->prog;
   num = prog->num_classes;
   vec = allocate_empty_array(num);
 
@@ -3258,30 +3258,30 @@ static void fix_object_names() {
 }
 
 void f_test_load(int num_arg) {
-  const char* tmp = sp->u.string;
+  const char* tmp = vm_sp()->u.string;
   object_t* new_ob;
-  if ((testloadob = find_object2(sp->u.string))) {
+  if ((testloadob = find_object2(vm_sp()->u.string))) {
     tmp = testloadob->obname;
     ObjectTable::instance().remove(testloadob->obname);
     SETOBNAME(testloadob, "");
   }
   saved_extra_name = tmp;
   STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = fix_object_names;
+  vm_sp()->type = T_ERROR_HANDLER;
+  vm_sp()->u.error_handler = fix_object_names;
 
   new_ob = load_object(tmp, 0);
   if (!new_ob) {
     if (testloadob) {
       SETOBNAME(testloadob, tmp);
     }
-    sp--;
+    vm_sp()--;
     pop_stack();
     push_number(0);
     return;
   }
   destruct_object(new_ob);
-  sp--;
+  vm_sp()--;
   pop_stack();
   push_number(1);
   if (testloadob) {
@@ -3316,7 +3316,7 @@ static bool os_env_name_listed(const char* list, const char* name) {
 
 #ifdef F_GET_OS_ENV
 void f_get_os_env(int num_arg) {
-  const char* name = sp->u.string;
+  const char* name = vm_sp()->u.string;
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
       !os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
@@ -3325,12 +3325,12 @@ void f_get_os_env(int num_arg) {
 
   const char* val = getenv(name);
   if (!val) {
-    free_string_svalue(sp);
-    *sp = const0u;
+    free_string_svalue(vm_sp());
+    *vm_sp() = const0u;
     return;
   }
   char* copy = string_copy(val, "f_get_os_env");
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp());
   put_malloced_string(copy);
 }
 #endif
@@ -3338,7 +3338,7 @@ void f_get_os_env(int num_arg) {
 #ifdef F_SET_OS_ENV
 void f_set_os_env(int num_arg) {
   int const num = num_arg;
-  svalue_t* namearg = sp - num + 1;
+  svalue_t* namearg = vm_sp() - num + 1;
   const char* name = namearg->u.string;
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
@@ -3348,9 +3348,9 @@ void f_set_os_env(int num_arg) {
   int ok;
   if (num == 2) {
 #ifdef _WIN32
-    ok = _putenv_s(name, sp->u.string) == 0;
+    ok = _putenv_s(name, vm_sp()->u.string) == 0;
 #else
-    ok = setenv(name, sp->u.string, 1) == 0;
+    ok = setenv(name, vm_sp()->u.string, 1) == 0;
 #endif
   } else {
 #ifdef _WIN32

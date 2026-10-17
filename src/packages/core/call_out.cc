@@ -716,7 +716,7 @@ void reclaim_call_outs() {
 
 namespace {
 inline void int_call_out(bool walltime, int num_arg) {
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
   /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
    * registers a timer-only call_out and returns a promise fulfilled (with 0)
    * when the delay elapses, rejected if the call_out is removed or its
@@ -789,10 +789,10 @@ inline void int_call_out(bool walltime, int num_arg) {
       err.u.string = "*call_out was removed before it ran";
       promise_settle(p, &err, 1);
     }
-    /* sp is the delay (T_NUMBER/T_REAL): overwrite it, nothing to free */
-    sp->type = T_PROMISE;
-    sp->subtype = 0;
-    sp->u.prom = p;
+    /* vm_sp() is the delay (T_NUMBER/T_REAL): overwrite it, nothing to free */
+    vm_sp()->type = T_PROMISE;
+    vm_sp()->subtype = 0;
+    vm_sp()->u.prom = p;
     return;
   }
 
@@ -801,14 +801,14 @@ inline void int_call_out(bool walltime, int num_arg) {
                        walltime);
     /* args have been transfered; don't free them;
      also don't need to free the int */
-    sp -= num + 1;
+    vm_sp() -= num + 1;
   } else {
     ret = 0;
     pop_n_elems(num);
-    sp--;
+    vm_sp()--;
   }
   /* the function */
-  free_svalue(sp, "call_out");
+  free_svalue(vm_sp(), "call_out");
   put_number(ret);
 }
 }  // namespace

@@ -1425,7 +1425,7 @@ void restore_object_from_line(object_t* ob, char* line, int noclear) {
   }
   if (idx == -1) {
     push_number(0);
-    rc = restore_svalue(space + 1, sp);
+    rc = restore_svalue(space + 1, vm_sp());
   } else {
     v = &sv[idx];
     if (noclear) {
@@ -1668,7 +1668,7 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
   push_malloced_string(name); /* errors */
 
   file = check_valid_path(name, ob, "save_object", 1);
-  free_string_svalue(sp--);
+  free_string_svalue(vm_sp()--);
   if (!file) {
     error("Denied write permission in save_object().\n");
   }

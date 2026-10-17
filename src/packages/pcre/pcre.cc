@@ -197,16 +197,16 @@ void f_pcre_config(int num_arg) {
 void f_pcre_info(int num_arg) {
   pcre_options opts = default_pcre_options();
   if (num_arg >= 2) {
-    apply_options_svalue(&opts, sp);
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
-  if (sp->type != T_STRING) {
+  if (vm_sp()->type != T_STRING) {
     error("Bad argument 1 to pcre_info()\n");
   }
 
   pcre_t* run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_info : run");
-  run->pattern = sp->u.string;
+  run->pattern = vm_sp()->u.string;
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
@@ -290,11 +290,11 @@ void f_pcre_convert(int num_arg) {
   uint32_t cflags = PCRE2_CONVERT_UTF;
   int have_kind = 0;
 
-  if (num_arg < 2 || sp->type != T_MAPPING) {
+  if (num_arg < 2 || vm_sp()->type != T_MAPPING) {
     error("pcre_convert() requires a mapping of convert options (glob, posix_basic, or posix_extended).\n");
   }
 
-  mapping_t* map = sp->u.map;
+  mapping_t* map = vm_sp()->u.map;
   auto on = [&](const char* key) {
     svalue_t* v = find_string_in_mapping(map, key);
     return v && v->type == T_NUMBER && v->u.number != 0;
@@ -324,7 +324,7 @@ void f_pcre_convert(int num_arg) {
     error("pcre_convert() mapping must set glob, posix_basic, or posix_extended.\n");
   }
 
-  const char* pat = (sp - 1)->u.string;
+  const char* pat = (vm_sp() - 1)->u.string;
   PCRE2_UCHAR* out = nullptr;
   PCRE2_SIZE outlen = 0;
   int rc = pcre2_pattern_convert((PCRE2_SPTR)pat, PCRE2_ZERO_TERMINATED, cflags, &out, &outlen,
@@ -346,16 +346,16 @@ void f_pcre_match(int num_arg) {
   array_t* v;
   int flag = 0;
   pcre_options opts = default_pcre_options();
-  // The subject (1st arg) sits at sp - num_arg + 1 regardless of how
+  // The subject (1st arg) sits at vm_sp() - num_arg + 1 regardless of how
   // many optional trailing args (flag, pcre_flags) are present; reading
-  // (sp - 1) here only happened to be correct for the 2-arg call form --
-  // with a 3rd (or 4th) argument on the stack, sp - 1 is the pattern (or
+  // (vm_sp() - 1) here only happened to be correct for the 2-arg call form --
+  // with a 3rd (or 4th) argument on the stack, vm_sp() - 1 is the pattern (or
   // flag) instead, always misidentifying array-mode calls as string-mode.
-  bool is_string = ((sp - num_arg + 1)->type == T_STRING);
+  bool is_string = ((vm_sp() - num_arg + 1)->type == T_STRING);
 
   // optional 4th arg: pcre_flags (int or mapping)
   if (num_arg > 3) {
-    apply_options_svalue(&opts, sp);
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
@@ -363,13 +363,13 @@ void f_pcre_match(int num_arg) {
   // optional 3rd arg:
   if (num_arg == 3) {
     if (is_string) {
-      apply_options_svalue(&opts, sp);
+      apply_options_svalue(&opts, vm_sp());
       pop_stack();
-    } else if (sp->type == T_MAPPING) {
-      apply_options_svalue(&opts, sp);
+    } else if (vm_sp()->type == T_MAPPING) {
+      apply_options_svalue(&opts, vm_sp());
       pop_stack();
-    } else if (sp->type == T_NUMBER) {
-      flag = (sp--)->u.number;
+    } else if (vm_sp()->type == T_NUMBER) {
+      flag = (vm_sp()--)->u.number;
     } else {
       error("Bad argument 3 to pcre_match()\n");
     }
@@ -377,17 +377,17 @@ void f_pcre_match(int num_arg) {
   }
 
   if (is_string) {
-    flag = pcre_match_single((sp - 1), sp->u.string, opts);
+    flag = pcre_match_single((vm_sp() - 1), vm_sp()->u.string, opts);
 
-    free_string_svalue(sp--);
-    free_string_svalue(sp);
+    free_string_svalue(vm_sp()--);
+    free_string_svalue(vm_sp());
     put_number(flag);
   } else {
-    v = pcre_match((sp - 1)->u.arr, sp->u.string, flag, opts);
+    v = pcre_match((vm_sp() - 1)->u.arr, vm_sp()->u.string, flag, opts);
 
-    free_string_svalue(sp--);
-    free_array(sp->u.arr);
-    sp->u.arr = v;
+    free_string_svalue(vm_sp()--);
+    free_array(vm_sp()->u.arr);
+    vm_sp()->u.arr = v;
   }
 }
 
@@ -397,12 +397,12 @@ void f_pcre_assoc(int num_arg) {
   pcre_options opts = default_pcre_options();
 
   if (num_arg == 5) {
-    apply_options_svalue(&opts, sp);
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
 
-  arg = sp - num_arg + 1;
+  arg = vm_sp() - num_arg + 1;
 
   if ((arg + 2)->type != T_ARRAY) {
     error("Bad argument 3 to pcre_assoc()\n");
@@ -417,10 +417,10 @@ void f_pcre_assoc(int num_arg) {
     pop_2_elems();
   }
 
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp());
 
-  sp->type = T_ARRAY;
-  sp->u.arr = vec;
+  vm_sp()->type = T_ARRAY;
+  vm_sp()->u.arr = vec;
 }
 
 void f_pcre_extract(int num_arg) {
@@ -430,12 +430,12 @@ void f_pcre_extract(int num_arg) {
   pcre_options opts = default_pcre_options();
 
   if (num_arg >= 4) {
-    apply_options_svalue(&opts, sp);
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
 
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
 
   if (num_arg == 3) {
     if ((arg + 2)->type == T_MAPPING) {
@@ -485,12 +485,12 @@ void f_pcre_replace(int num_arg) {
   pcre_options opts = default_pcre_options();
 
   if (num_arg >= 4) {
-    apply_options_svalue(&opts, sp);
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
 
-  if (sp->type != T_ARRAY && sp->type != T_STRING) {
+  if (vm_sp()->type != T_ARRAY && vm_sp()->type != T_STRING) {
     error("Bad argument 3 to pcre_replace()\n");
   }
 
@@ -498,23 +498,23 @@ void f_pcre_replace(int num_arg) {
 
   run->ovector = nullptr;
   run->ovecsize = 0;
-  run->pattern = (sp - 1)->u.string;
-  run->subject = (sp - 2)->u.string;
-  run->s_length = SVALUE_STRLEN(sp - 2);
+  run->pattern = (vm_sp() - 1)->u.string;
+  run->subject = (vm_sp() - 2)->u.string;
+  run->s_length = SVALUE_STRLEN(vm_sp() - 2);
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
-  if (sp->type == T_STRING) {
+  if (vm_sp()->type == T_STRING) {
     if (pcre_ensure_compiled(run) < 0) {
       error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     }
-    ret = pcre_substitute_template(run, sp->u.string, SVALUE_STRLEN(sp));
+    ret = pcre_substitute_template(run, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()));
     pop_3_elems();
     push_malloced_string(ret);
     return;
   }
 
-  replacements = sp->u.arr;
+  replacements = vm_sp()->u.arr;
 
   if (pcre_magic(run) < 0) {
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
@@ -565,13 +565,13 @@ void f_pcre_replace_callback(int num_arg) {
   function_to_call_t ftc;
   pcre_options opts = default_pcre_options();
 
-  if (num_arg >= 4 && (sp->type == T_NUMBER || sp->type == T_MAPPING)) {
-    apply_options_svalue(&opts, sp);
+  if (num_arg >= 4 && (vm_sp()->type == T_NUMBER || vm_sp()->type == T_MAPPING)) {
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
 
-  arg = sp - num_arg + 1;
+  arg = vm_sp() - num_arg + 1;
 
   run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
   run->ovector = nullptr;
@@ -1930,14 +1930,14 @@ void f_pcre_match_all(int num_arg) {
   pcre_options opts = default_pcre_options();
 
   if (num_arg >= 3) {
-    apply_options_svalue(&opts, sp);
+    apply_options_svalue(&opts, vm_sp());
     pop_stack();
     num_arg--;
   }
 
-  const auto* pattern = (sp)->u.string;
-  const auto* subject = (sp - 1)->u.string;
-  auto subject_len = SVALUE_STRLEN(sp - 1);
+  const auto* pattern = (vm_sp())->u.string;
+  const auto* subject = (vm_sp() - 1)->u.string;
+  auto subject_len = SVALUE_STRLEN(vm_sp() - 1);
 
   auto matches = pcre_match_all(subject, subject_len, pattern, opts);
   SCOPE_FAIL { pcre_free_match_list(&matches); };

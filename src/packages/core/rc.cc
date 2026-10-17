@@ -24,7 +24,7 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 
 #ifdef F_GET_CONFIG
 void f_get_config(int num_arg) {
-  if (!get_config_item(sp, sp)) {
+  if (!get_config_item(vm_sp(), vm_sp())) {
     error("Bad argument to get_config()\n");
   }
 }
@@ -32,8 +32,8 @@ void f_get_config(int num_arg) {
 
 #ifdef F_SET_CONFIG
 void f_set_config(int num_arg) {
-  auto num = (sp - 1)->u.number;
-  auto* value = sp;
+  auto num = (vm_sp() - 1)->u.number;
+  auto* value = vm_sp();
 
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
     pop_2_elems();

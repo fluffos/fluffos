@@ -403,7 +403,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fluffos_js_result(int id, int success, cons
 
 #ifdef F_JS_EXPORT
 void f_js_export(int num_arg) {
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
 
   // Validate before any allocation: error() unwinds past C++ destructors.
   if (num_arg > 1 && arg[1].type != T_STRING && arg[1].type != T_FUNCTION) {
@@ -437,7 +437,7 @@ void f_js_export(int num_arg) {
 
 #ifdef F_JS_EVAL
 void f_js_eval(int num_arg) {
-  char* result = js_bridge_eval(sp->u.string);
+  char* result = js_bridge_eval(vm_sp()->u.string);
   std::string const text(result ? result : "");
   if (result != nullptr) {
     free(result);
@@ -450,7 +450,7 @@ void f_js_eval(int num_arg) {
 #ifdef F_JS_CALL
 void f_js_call(int num_arg) {
   static LPC_INT next_key = 0;
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
 
   const char* handler = arg[0].u.string;
   array_t* args = arg[1].u.arr;

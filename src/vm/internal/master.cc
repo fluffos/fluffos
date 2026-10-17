@@ -49,7 +49,7 @@ svalue_t* apply_master_ob(int fun, int num_arg) {
   if (master_applies[fun].func) {
     call_direct(master_ob, master_applies[fun].index, ORIGIN_DRIVER, num_arg);
     free_svalue(&apply_ret_value, "apply_master_ob");
-    apply_ret_value = *sp--;
+    apply_ret_value = *vm_sp()--;
     return &apply_ret_value;
   } else {
     pop_n_elems(num_arg);

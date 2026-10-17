@@ -33,7 +33,7 @@ class LPCFrame {
  public:
   enum class Mode { Args, Builder, Mark };
 
-  /* Efun entry: [sp - num_arg + 1 .. sp]. */
+  /* Efun entry: [vm_sp() - num_arg + 1 .. vm_sp()]. */
   static LPCFrame args(int num_arg);
 
   /* Start empty; push grows the window. */
@@ -123,7 +123,7 @@ class LPCFrame {
   bool moved_from_ = false;
 };
 
-/* ---- Tier-C glue macros (fixed scalar efuns; no raw sp in the body) ---- */
+/* ---- Tier-C glue macros (fixed scalar efuns; no raw vm_sp() in the body) ---- */
 
 #define LPC_EFUN_UNARY_REAL(name, expr)      \
   void f_##name(int num_arg) {               \

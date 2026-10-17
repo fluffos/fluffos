@@ -857,8 +857,8 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
 
   push_sprintf_state();
   STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = pop_sprintf_state;
+  vm_sp()->type = T_ERROR_HANDLER;
+  vm_sp()->u.error_handler = pop_sprintf_state;
 
   last = 0;
   for (fpos = 0; true; fpos++) {

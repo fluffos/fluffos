@@ -489,8 +489,8 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
 #ifdef F_HAS_CYCLE
 void f_has_cycle(int num_arg) {
   WalkResult res;
-  cycle_walk(sp, WALK_DETECT, &res);
-  free_svalue(sp, "f_has_cycle");
+  cycle_walk(vm_sp(), WALK_DETECT, &res);
+  free_svalue(vm_sp(), "f_has_cycle");
   put_number(res.found ? 1 : 0);
 }
 #endif
@@ -498,7 +498,7 @@ void f_has_cycle(int num_arg) {
 #ifdef F_FIND_CYCLES
 void f_find_cycles(int num_arg) {
   WalkResult res;
-  cycle_walk(sp, WALK_FIND, &res);
+  cycle_walk(vm_sp(), WALK_FIND, &res);
   // May error("Illegal array size") if there are more back-edges than
   // max_array_size; at this point nothing is held, so that unwinds cleanly
   // (the std::vectors are reclaimed by their destructors).
@@ -508,7 +508,7 @@ void f_find_cycles(int num_arg) {
     ret->item[i].subtype = STRING_MALLOC;
     ret->item[i].u.string = string_copy(res.paths[i].c_str(), "f_find_cycles");
   }
-  free_svalue(sp, "f_find_cycles");
+  free_svalue(vm_sp(), "f_find_cycles");
   put_array(ret);
 }
 #endif
@@ -516,7 +516,7 @@ void f_find_cycles(int num_arg) {
 #ifdef F_BREAK_CYCLES
 void f_break_cycles(int num_arg) {
   WalkResult res;
-  cycle_walk(sp, WALK_BREAK, &res);
+  cycle_walk(vm_sp(), WALK_BREAK, &res);
 
   // The temporary container references taken during the walk are released
   // by RAII, not a trailing loop: allocate_array() below can error() (LPC
@@ -589,7 +589,7 @@ void f_break_cycles(int num_arg) {
     }
   }
 
-  free_svalue(sp, "f_break_cycles");
+  free_svalue(vm_sp(), "f_break_cycles");
   put_number(broken);
 }
 #endif

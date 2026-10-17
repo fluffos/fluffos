@@ -32,11 +32,11 @@ void f_set_encoding(int num_arg) {
 
   // ignore if user want utf8
   UConverter* new_trans = nullptr;
-  if (ucnv_compareNames(default_encoding, sp->u.string) != 0) {
+  if (ucnv_compareNames(default_encoding, vm_sp()->u.string) != 0) {
     UErrorCode error_code = U_ZERO_ERROR;
-    new_trans = ucnv_open(sp->u.string, &error_code);
+    new_trans = ucnv_open(vm_sp()->u.string, &error_code);
     if (U_FAILURE(error_code)) {
-      error("Fail to set encoding to '%s', error: %s.", sp->u.string, u_errorName(error_code));
+      error("Fail to set encoding to '%s', error: %s.", vm_sp()->u.string, u_errorName(error_code));
     }
   }
 
@@ -93,9 +93,9 @@ void f_query_encoding(int num_arg) {
 
 #ifdef F_STRING_ENCODE
 void f_string_encode(int num_arg) {
-  const auto* encoding = sp->u.string;
-  const auto* data = (sp - 1)->u.string;
-  auto len = SVALUE_STRLEN(sp - 1);
+  const auto* encoding = vm_sp()->u.string;
+  const auto* data = (vm_sp() - 1)->u.string;
+  auto len = SVALUE_STRLEN(vm_sp() - 1);
 
   UErrorCode error_code = U_ZERO_ERROR;
   auto* trans = ucnv_open(encoding, &error_code);
@@ -133,9 +133,9 @@ void f_string_encode(int num_arg) {
 
 #ifdef F_STRING_DECODE
 void f_string_decode(int num_arg) {
-  const auto* encoding = sp->u.string;
-  auto* data = (char*)((sp - 1)->u.buf->item);
-  auto len = (sp - 1)->u.buf->size;
+  const auto* encoding = vm_sp()->u.string;
+  auto* data = (char*)((vm_sp() - 1)->u.buf->item);
+  auto len = (vm_sp() - 1)->u.buf->size;
 
   // get rid of all ending '\0's from buffer.
   while (len > 1 && data[len - 1] == '\0') len--;
@@ -175,10 +175,10 @@ void f_string_decode(int num_arg) {
 
 #ifdef F_BUFFER_TRANSCODE
 void f_buffer_transcode(int num_arg) {
-  const auto* to_encoding = sp->u.string;
-  const auto* from_encoding = (sp - 1)->u.string;
-  auto* data = (char*)((sp - 2)->u.buf->item);
-  auto len = (sp - 2)->u.buf->size;
+  const auto* to_encoding = vm_sp()->u.string;
+  const auto* from_encoding = (vm_sp() - 1)->u.string;
+  auto* data = (char*)((vm_sp() - 2)->u.buf->item);
+  auto len = (vm_sp() - 2)->u.buf->size;
 
   UErrorCode error_code = U_ZERO_ERROR;
 

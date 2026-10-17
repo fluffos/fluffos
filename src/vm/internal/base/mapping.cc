@@ -332,7 +332,7 @@ mapping_t* allocate_mapping2(array_t* arr, svalue_t* sv) {
     }
   }
 
-  sp--;
+  vm_sp()--;
   return newmap;
 }
 
@@ -608,7 +608,7 @@ struct unique_svalue_compare {
 };
 
 void f_unique_mapping(int num_arg) {
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
   array_t* v = arg->u.arr;
   if (!v || !v->size) {
     pop_n_elems(num_arg);
@@ -710,7 +710,7 @@ void f_unique_mapping(int num_arg) {
  * array of svalues. Format of data: LHS RHS LHS2 RHS2... (uses hash table)
  */
 
-mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
+mapping_t* load_mapping_from_aggregate(svalue_t* vm_sp(), int n) {
   mapping_t* m;
   int mask, i, oi, count = 0;
   mapping_node_t **a, *elt, *elt2;
@@ -723,13 +723,13 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
   mask = m->table_size;
   a = m->table;
   do {
-    i = (oi = svalue_to_int(++sp)) & mask;
+    i = (oi = svalue_to_int(++vm_sp())) & mask;
     if ((elt2 = elt = a[i])) {
       do {
-        if (msameval(sp, elt->values)) {
-          free_svalue(sp++, "load_mapping_from_aggregate: duplicate key");
+        if (msameval(vm_sp(), elt->values)) {
+          free_svalue(vm_sp()++, "load_mapping_from_aggregate: duplicate key");
           free_svalue(elt->values + 1, "load_mapping_from_aggregate");
-          *(elt->values + 1) = *sp;
+          *(elt->values + 1) = *vm_sp();
           break;
         }
       } while ((elt = elt->next));
@@ -753,10 +753,10 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
         free_mapping(m);
         // Same reasoning as the mapping_too_large() path below: these
         // remaining elements are invisible to error()'s unwind (the
-        // caller already moved the VM's real sp below this whole
+        // caller already moved the VM's real vm_sp() below this whole
         // aggregate) and would otherwise leak.
         for (int k = 0; k < n; k++) {
-          free_svalue(sp + k, "load_mapping_from_aggregate: out of memory");
+          free_svalue(vm_sp() + k, "load_mapping_from_aggregate: out of memory");
         }
         error("Out of memory\n");
       }
@@ -771,23 +771,23 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
 
       free_mapping(m);
       // The caller (F_AGGREGATE_ASSOC, interpret.cc) already moved the VM's
-      // real sp below this entire aggregate before calling in ("sp -=
+      // real vm_sp() below this entire aggregate before calling in ("vm_sp() -=
       // offset"), so error()'s unwind (pop_n_elems, walking down to the
-      // saved sp) never revisits these slots. Every remaining element from
-      // here on -- this pair (sp[0]/sp[1], already hashed/shared-string-
+      // saved vm_sp()) never revisits these slots. Every remaining element from
+      // here on -- this pair (vm_sp()[0]/vm_sp()[1], already hashed/shared-string-
       // converted by svalue_to_int above) plus any pairs still unprocessed
       // beyond it -- would otherwise leak. Already-inserted pairs don't
       // need this: their ownership was transferred into map nodes that
       // free_mapping() just freed above.
       for (int k = 0; k < n; k++) {
-        free_svalue(sp + k, "load_mapping_from_aggregate: too large");
+        free_svalue(vm_sp() + k, "load_mapping_from_aggregate: too large");
       }
       mapping_too_large();
     }
 
     elt = new_map_node();
-    *elt->values = *sp++;
-    *(elt->values + 1) = *sp;
+    *elt->values = *vm_sp()++;
+    *(elt->values + 1) = *vm_sp();
     (a[i] = elt)->next = elt2;
   } while (n -= 2);
 #ifdef PACKAGE_MUDLIB_STATS
@@ -1165,7 +1165,7 @@ void filter_mapping(svalue_t* arg, int num_arg) {
     newmap->count += count;
   }
 
-  sp--;
+  vm_sp()--;
   pop_n_elems(num_arg);
   push_refed_mapping(newmap);
 }

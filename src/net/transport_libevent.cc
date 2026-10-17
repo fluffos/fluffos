@@ -510,7 +510,7 @@ void get_user_data(interactive_t* ip) {
           ip->text[ip->text_end] = 0;
           if (restore_svalue(ip->text + 4, &value) == 0) {
             STACK_INC;
-            *sp = value;
+            *vm_sp() = value;
           } else {
             push_undefined();
           }
