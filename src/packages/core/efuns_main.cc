@@ -3573,8 +3573,11 @@ void f_defer(int num_arg) {
   newlist->func = f.steal(0);
   f.ret_void();
   if (command_giver) {
-    push_object(command_giver);
-    newlist->tp = *sp--;
+    LPCFrame b = LPCFrame::builder();
+    b.push(command_giver);
+    newlist->tp = b.steal(0);
+    b.pop_back(1);
+    b.done();
   } else {
     newlist->tp = const0;
   }

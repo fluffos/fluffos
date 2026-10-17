@@ -129,10 +129,11 @@ struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
 void f_pcre_version(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char version[96];
   int jit = 0;
   if (pcre2_config(PCRE2_CONFIG_VERSION, version) < 0) {
-    push_constant_string("unknown");
+    f.ret_str_constant("unknown");
     return;
   }
   if (pcre2_config(PCRE2_CONFIG_JIT, &jit) >= 0 && jit) {
@@ -141,10 +142,11 @@ void f_pcre_version(int num_arg) {
       memcpy(version + n, " JIT", 5);
     }
   }
-  copy_and_push_string(version);
+  f.ret_str_copy(version);
 }
 
 void f_pcre_config(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   mapping_t* m = allocate_mapping(16);
   char buf[128];
   uint32_t u = 0;
@@ -191,22 +193,23 @@ void f_pcre_config(int num_arg) {
     add_mapping_pair(m, "never_backslash_c", u);
   }
 #endif
-  push_refed_mapping(m);
+  f.ret_refed(m);
 }
 
 void f_pcre_info(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   pcre_options opts = default_pcre_options();
   if (num_arg >= 2) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
-  if (vm_sp()->type != T_STRING) {
+  if (f.type(0) != T_STRING) {
     error("Bad argument 1 to pcre_info()\n");
   }
 
   pcre_t* run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_info : run");
-  run->pattern = vm_sp()->u.string;
+  run->pattern = f.string(0);
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
@@ -282,19 +285,19 @@ void f_pcre_info(int num_arg) {
     }
   }
 
-  pop_stack();
-  push_refed_mapping(m);
+  f.ret_refed(m);
 }
 
 void f_pcre_convert(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   uint32_t cflags = PCRE2_CONVERT_UTF;
   int have_kind = 0;
 
-  if (num_arg < 2 || vm_sp()->type != T_MAPPING) {
+  if (num_arg < 2 || f.type(1) != T_MAPPING) {
     error("pcre_convert() requires a mapping of convert options (glob, posix_basic, or posix_extended).\n");
   }
 
-  mapping_t* map = vm_sp()->u.map;
+  mapping_t* map = f.mapping(1);
   auto on = [&](const char* key) {
     svalue_t* v = find_string_in_mapping(map, key);
     return v && v->type == T_NUMBER && v->u.number != 0;
@@ -324,7 +327,7 @@ void f_pcre_convert(int num_arg) {
     error("pcre_convert() mapping must set glob, posix_basic, or posix_extended.\n");
   }
 
-  const char* pat = (vm_sp() - 1)->u.string;
+  const char* pat = f.string(0);
   PCRE2_UCHAR* out = nullptr;
   PCRE2_SIZE outlen = 0;
   int rc = pcre2_pattern_convert((PCRE2_SPTR)pat, PCRE2_ZERO_TERMINATED, cflags, &out, &outlen,
@@ -338,38 +341,36 @@ void f_pcre_convert(int num_arg) {
   memcpy(ret, out, outlen);
   ret[outlen] = '\0';
   pcre2_converted_pattern_free(out);
-  pop_2_elems();
-  push_malloced_string(ret);
+  f.ret_str_malloced(ret);
 }
 
 void f_pcre_match(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* v;
   int flag = 0;
   pcre_options opts = default_pcre_options();
-  // The subject (1st arg) sits at vm_sp() - num_arg + 1 regardless of how
-  // many optional trailing args (flag, pcre_flags) are present; reading
-  // (vm_sp() - 1) here only happened to be correct for the 2-arg call form --
-  // with a 3rd (or 4th) argument on the stack, vm_sp() - 1 is the pattern (or
-  // flag) instead, always misidentifying array-mode calls as string-mode.
-  bool is_string = ((vm_sp() - num_arg + 1)->type == T_STRING);
+  // Subject is always arg 0 regardless of optional trailing args (flag /
+  // pcre_flags). Reading from_top(1) only worked for the 2-arg form.
+  bool is_string = (f.type(0) == T_STRING);
 
   // optional 4th arg: pcre_flags (int or mapping)
   if (num_arg > 3) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
 
   // optional 3rd arg:
   if (num_arg == 3) {
     if (is_string) {
-      apply_options_svalue(&opts, vm_sp());
-      pop_stack();
-    } else if (vm_sp()->type == T_MAPPING) {
-      apply_options_svalue(&opts, vm_sp());
-      pop_stack();
-    } else if (vm_sp()->type == T_NUMBER) {
-      flag = (vm_sp()--)->u.number;
+      apply_options_svalue(&opts, &f.top());
+      f.pop_back();
+    } else if (f.type(2) == T_MAPPING) {
+      apply_options_svalue(&opts, &f.top());
+      f.pop_back();
+    } else if (f.type(2) == T_NUMBER) {
+      flag = f.number(2);
+      f.pop_back();
     } else {
       error("Bad argument 3 to pcre_match()\n");
     }
@@ -377,32 +378,27 @@ void f_pcre_match(int num_arg) {
   }
 
   if (is_string) {
-    flag = pcre_match_single((vm_sp() - 1), vm_sp()->u.string, opts);
-
-    free_string_svalue(vm_sp()--);
-    free_string_svalue(vm_sp());
-    put_number(flag);
+    flag = pcre_match_single(f.argp(0), f.string(1), opts);
+    f.ret(flag);
   } else {
-    v = pcre_match((vm_sp() - 1)->u.arr, vm_sp()->u.string, flag, opts);
-
-    free_string_svalue(vm_sp()--);
-    free_array(vm_sp()->u.arr);
-    vm_sp()->u.arr = v;
+    v = pcre_match(f.array(0), f.string(1), flag, opts);
+    f.ret_refed(v);
   }
 }
 
 void f_pcre_assoc(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg;
   array_t* vec;
   pcre_options opts = default_pcre_options();
 
   if (num_arg == 5) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
 
-  arg = vm_sp() - num_arg + 1;
+  arg = f.argp(0);
 
   if ((arg + 2)->type != T_ARRAY) {
     error("Bad argument 3 to pcre_assoc()\n");
@@ -411,31 +407,23 @@ void f_pcre_assoc(int num_arg) {
   vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, num_arg > 3 ? (arg + 3) : &const0,
                    opts);
 
-  if (num_arg == 4) {
-    pop_3_elems();
-  } else {
-    pop_2_elems();
-  }
-
-  free_string_svalue(vm_sp());
-
-  vm_sp()->type = T_ARRAY;
-  vm_sp()->u.arr = vec;
+  f.ret_refed(vec);
 }
 
 void f_pcre_extract(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   pcre_t* run;
   array_t* ret;
   int include_names = 0;
   pcre_options opts = default_pcre_options();
 
   if (num_arg >= 4) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
 
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  svalue_t* arg = f.argp(0);
 
   if (num_arg == 3) {
     if ((arg + 2)->type == T_MAPPING) {
@@ -463,8 +451,7 @@ void f_pcre_extract(int num_arg) {
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_n_elems(num_arg);
-    push_refed_array(&the_null_array);
+    f.ret_refed(&the_null_array);
     return;
   }
   if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
@@ -472,12 +459,11 @@ void f_pcre_extract(int num_arg) {
   }
 
   ret = pcre_get_substrings(run, include_names);
-  pop_n_elems(num_arg);
-
-  push_refed_array(ret);
+  f.ret_refed(ret);
 }
 
 void f_pcre_replace(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   pcre_t* run;
   array_t* replacements;
 
@@ -485,12 +471,12 @@ void f_pcre_replace(int num_arg) {
   pcre_options opts = default_pcre_options();
 
   if (num_arg >= 4) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
 
-  if (vm_sp()->type != T_ARRAY && vm_sp()->type != T_STRING) {
+  if (f.type(2) != T_ARRAY && f.type(2) != T_STRING) {
     error("Bad argument 3 to pcre_replace()\n");
   }
 
@@ -498,30 +484,30 @@ void f_pcre_replace(int num_arg) {
 
   run->ovector = nullptr;
   run->ovecsize = 0;
-  run->pattern = (vm_sp() - 1)->u.string;
-  run->subject = (vm_sp() - 2)->u.string;
-  run->s_length = SVALUE_STRLEN(vm_sp() - 2);
+  run->pattern = f.string(1);
+  run->subject = f.string(0);
+  run->s_length = f.string_len(0);
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
-  if (vm_sp()->type == T_STRING) {
+  if (f.type(2) == T_STRING) {
     if (pcre_ensure_compiled(run) < 0) {
       error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     }
-    ret = pcre_substitute_template(run, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()));
-    pop_3_elems();
-    push_malloced_string(ret);
+    ret = pcre_substitute_template(run, f.string(2), f.string_len(2));
+    f.ret_str_malloced(ret);
     return;
   }
 
-  replacements = vm_sp()->u.arr;
+  replacements = f.array(2);
 
   if (pcre_magic(run) < 0) {
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_2_elems();
+    f.pop_back(f.argc() - 1);
+    f.done();
     return;
   }
 
@@ -538,9 +524,9 @@ void f_pcre_replace(int num_arg) {
 
   if (run->rc == 1) {
     /* No captured substrings, return subject */
-    pop_2_elems();
+    f.pop_back(f.argc() - 1);
+    f.done();
     return;
-    // push_malloced_string(run->subject);
   }
 
   for (int i = 0; i < replacements->size; i++) {
@@ -551,12 +537,12 @@ void f_pcre_replace(int num_arg) {
 
   ret = pcre_get_replace(run, replacements);
 
-  pop_3_elems();
-  push_malloced_string(ret);
+  f.ret_str_malloced(ret);
 }
 
 // string pcre_replace_callback(string, string, function)
 void f_pcre_replace_callback(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
   char* ret;
   pcre_t* run;
@@ -565,13 +551,13 @@ void f_pcre_replace_callback(int num_arg) {
   function_to_call_t ftc;
   pcre_options opts = default_pcre_options();
 
-  if (num_arg >= 4 && (vm_sp()->type == T_NUMBER || vm_sp()->type == T_MAPPING)) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+  if (num_arg >= 4 && (f.type(f.argc() - 1) == T_NUMBER || f.type(f.argc() - 1) == T_MAPPING)) {
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
 
-  arg = vm_sp() - num_arg + 1;
+  arg = f.argp(0);
 
   run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
   run->ovector = nullptr;
@@ -588,7 +574,8 @@ void f_pcre_replace_callback(int num_arg) {
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_n_elems(num_arg - 1);
+    f.pop_back(f.argc() - 1);
+    f.done();
     return;
   }
 
@@ -598,32 +585,34 @@ void f_pcre_replace_callback(int num_arg) {
 
   arr = pcre_get_substrings(run, false);
 
-  // arr is not reachable from the VM stack until push_refed_array() below, so
-  // nothing would free it if process_efun_callback() rejects the callback first.
+  // arr is not reachable from the VM stack until push_refed() below, so
+  // nothing would free it if process_callback() rejects the callback first.
   std::unique_ptr<array_t, decltype(&free_array)> arr_owner(arr, &free_array);
 
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
-    LPCFrame frame = LPCFrame::args(num_arg);
-    frame.process_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
-    frame.done();
+    f.process_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
   } else {  // 0
     error("Illegal third argument (0) to pcre_replace_callback");
   }
 
   r = allocate_array(run->rc - 1);  // can't use the empty variant in case we error below
 
-  push_refed_array(r);
+  f.push_refed(r);
   // Transfer ownership to the VM stack; arr still holds the same pointer for the loop below.
-  push_refed_array(arr_owner.release());
+  f.push_refed(arr_owner.release());
   error_context_t econ;
 
   save_context(&econ);
   try {
     for (i = 0; i < run->rc - 1; i++) {
       svalue_t* v;
-      push_svalue(arr->item + i);
-      push_number(i);
-      v = call_efun_callback(&ftc, 2);
+      {
+        LPCFrame b = LPCFrame::builder();
+        b.push(arr->item + i);
+        b.push(static_cast<LPC_INT>(i));
+        v = call_efun_callback(&ftc, 2);
+        b.done();
+      }
 
       /* Mimic behaviour of map(string, function) when function pointer returns
        null,
@@ -643,17 +632,16 @@ void f_pcre_replace_callback(int num_arg) {
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
 
-  pop_n_elems(num_arg + 2);  // refed arrays
-  push_malloced_string(ret);
+  f.ret_str_malloced(ret);
 }
 
 void f_pcre_cache(int num_arg) {
-  mapping_t* m = nullptr;
-  m = pcre_get_cache();
+  LPCFrame f = LPCFrame::args(num_arg);
+  mapping_t* m = pcre_get_cache();
   if (!m) {
-    push_number(0);
+    f.ret(0);
   } else {
-    push_refed_mapping(m);
+    f.ret_refed(m);
   }
 }
 
@@ -1926,18 +1914,19 @@ void mark_pcre_cache() {
 #endif
 
 void f_pcre_match_all(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* v;
   pcre_options opts = default_pcre_options();
 
   if (num_arg >= 3) {
-    apply_options_svalue(&opts, vm_sp());
-    pop_stack();
+    apply_options_svalue(&opts, &f.top());
+    f.pop_back();
     num_arg--;
   }
 
-  const auto* pattern = (vm_sp())->u.string;
-  const auto* subject = (vm_sp() - 1)->u.string;
-  auto subject_len = SVALUE_STRLEN(vm_sp() - 1);
+  const auto* pattern = f.string(1);
+  const auto* subject = f.string(0);
+  auto subject_len = f.string_len(0);
 
   auto matches = pcre_match_all(subject, subject_len, pattern, opts);
   SCOPE_FAIL { pcre_free_match_list(&matches); };
@@ -1957,8 +1946,6 @@ void f_pcre_match_all(int num_arg) {
     }
   }
 
-  pop_2_elems();
-
   v = allocate_array(matches.size());
   for (int i = 0; i < matches.size(); i++) {
     auto& match = matches[i];
@@ -1973,5 +1960,5 @@ void f_pcre_match_all(int num_arg) {
     match.clear();
   }
 
-  push_refed_array(v);
+  f.ret_refed(v);
 }
