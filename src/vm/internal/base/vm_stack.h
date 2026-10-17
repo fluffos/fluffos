@@ -1,10 +1,10 @@
 /* vm_stack.h -- evaluation-stack registers for VM-internal code only.
  *
- * Packages must NOT include this header. Use LPCFrame or vm_sp() /
- * push_*, pop_*, put_* from machine.h / interpret.h instead.
+ * Packages must NOT include this header. Package efuns use LPCFrame
+ * (lpc_frame.h) exclusively.
  *
  * Allowed consumers: interpret.cc, ops (bytecode operators), apply,
- * promise, hooks, simulate, and other vm/internal translation units.
+ * promise, hooks, simulate, lpc_frame.cc, and other vm/internal units.
  */
 
 #ifndef VM_STACK_H
@@ -14,7 +14,7 @@
 
 struct control_stack_t;
 
-/* Canonical stack-top pointer (also exposed as vm_sp() via interpret.h). */
+/* Canonical stack-top pointer. */
 extern svalue_t* lpc_eval_sp;
 #ifndef sp
 #define sp lpc_eval_sp
