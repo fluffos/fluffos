@@ -9,6 +9,7 @@
 #include "backend.h"
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/eval_limit.h"
+#include "vm/internal/hooks.h"
 #include "vm/internal/simulate.h"  // throw_error (cancellation raise)
 #include "include/promise.h"  // LPC-visible rejection reasons
 
@@ -1193,8 +1194,17 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
    * re-pushed ABOVE this frame, so the entry would stamp the innermost
    * marker instead and the body's F_RETURN would sail past this frame
    * into stale pc. */
-  push_control_stack(FRAME_FUNCTION | FRAME_ASYNC | FRAME_OB_CHANGE | FRAME_EXTERNAL);
+  /* Preserve FRAME_HOOKED across resume so function AFTER / "time" still fire
+   * when an async body completes after await. */
+  int async_frkind = FRAME_FUNCTION | FRAME_ASYNC | FRAME_OB_CHANGE | FRAME_EXTERNAL;
+  if (g_hook_mask & HOOK_MASK_LPC_FUNC_AFTER) {
+    async_frkind |= FRAME_HOOKED;
+  }
+  push_control_stack(async_frkind);
   control_stack_t* const async_frame = csp;
+  if (async_frkind & FRAME_HOOKED) {
+    csp->hook_target = coro->hook_target ? coro->hook_target : coro->ob;
+  }
   csp->fr.table_index = coro->table_index;
   csp->num_local_variables = coro->num_local_variables;
   csp->defers = coro->defers;
@@ -2110,6 +2120,7 @@ void coroutine_await_pending(promise_t* awaited) {
   g_coroutine_promise->ref++;
   coro->ob = current_object;
   add_ref(current_object, "coroutine");
+  coro->hook_target = async_frame->hook_target;
   coro->prev_ob = previous_ob;
   if (previous_ob) {
     add_ref(previous_ob, "coroutine");

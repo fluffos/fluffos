@@ -26,6 +26,7 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/base/debug.h"
+#include "vm/internal/hooks.h"
 #include "vm/internal/master.h"
 #include "vm/internal/otable.h"
 #include "vm/internal/simul_efun.h"
@@ -112,6 +113,7 @@ void shutdownMudOS(int exit_code) {
   // queue, or those reactions (and any parked coroutine they own) leak
   // into the dead queue at exit.
   clear_call_outs();
+  hooks_clear(); /* no detach callbacks at shutdown */
   // Same ordering constraint as jsbridge above: drop queued promise
   // deliveries before their drain event is discarded by
   // clear_tick_events(). promise_cleanup() also latches the queue shut, so
@@ -147,6 +149,23 @@ static int num_objects_this_thread = 0;
 #ifndef NO_ENVIRONMENT
 static object_t* restrict_destruct;
 #endif
+
+object_t* hook_get_restrict_destruct() {
+#ifdef NO_ENVIRONMENT
+  return nullptr;
+#else
+  return restrict_destruct;
+#endif
+}
+void hook_set_restrict_destruct(object_t* ob) {
+#ifndef NO_ENVIRONMENT
+  restrict_destruct = ob;
+#else
+  (void)ob;
+#endif
+}
+int hook_get_num_objects_this_thread() { return num_objects_this_thread; }
+void hook_set_num_objects_this_thread(int n) { num_objects_this_thread = n; }
 
 object_t *obj_list, *obj_list_destruct;
 #ifdef DEBUG
@@ -661,7 +680,7 @@ object_t* load_object(const char* lname, int callcreate) {
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
   if (mret && !MASTER_APPROVED(mret, "valid_object")) {
-    destruct_object(ob);
+    destruct_object(ob, "refused");
     error("master object: %s() denied permission to load '/%s'.\n",
           applies_table[APPLY_VALID_OBJECT], name);
   }
@@ -784,7 +803,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   push_object(ob);
   svalue_t* mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
   if (mret && !MASTER_APPROVED(mret, "valid_object")) {
-    destruct_object(ob);
+    destruct_object(ob, "refused");
     restore_command_giver();
     error("master object: %s() denied permission to load in-memory object '/%s'.\n",
           applies_table[APPLY_VALID_OBJECT], virtual_name);
@@ -861,6 +880,9 @@ int recompile_object(object_t* target) {
     if ((f->ob && f->ob->prog == old_prog) || f->prog == old_prog) {
       error("recompile_object: '/%s' is currently executing.\n", target->obname);
     }
+  }
+  if (hooks_suspended_frame_uses_prog(old_prog)) {
+    error("recompile_object: '/%s' is currently executing (suspended stack).\n", target->obname);
   }
   for (object_t* ob = obj_list; ob; ob = ob->next_all) {
     if (ob->prog == old_prog && replace_program_pending(ob)) {
@@ -1319,7 +1341,7 @@ static void fix_object_names() {
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-void destruct_object(object_t* ob) {
+void destruct_object(object_t* ob, const char* cause) {
   object_t** pp;
 // int removed;
 #ifndef NO_ENVIRONMENT
@@ -1330,6 +1352,9 @@ void destruct_object(object_t* ob) {
     error("Only this_object() can be destructed from move_or_destruct.\n");
   }
 #endif
+  if (!cause) {
+    cause = "efun";
+  }
 
   /*
    * Notify object that it is scheduled for destruction
@@ -1371,6 +1396,18 @@ void destruct_object(object_t* ob) {
   if (ob->flags & O_DESTRUCTED) {
     return;
   }
+  /* object:destruct fires after the O_DESTRUCTED re-check and
+   * before the stack sweep. A handler that destructs `ob` is detected by
+   * the O_DESTRUCTED flag afterwards. */
+  if (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) {
+    hook_dispatch_object_destruct(ob, cause);
+    if (ob->flags & O_DESTRUCTED) {
+      return;
+    }
+  }
+  if (g_hook_mask) {
+    hooks_owner_destructed(ob);
+  }
   remove_object_from_stack(ob);
 /*
  * If this is the first object being shadowed by another object, then
@@ -1398,7 +1435,7 @@ void destruct_object(object_t* ob) {
         ob2->shadowed = nullptr;
       }
       otmp->shadowing = nullptr;
-      destruct_object(otmp);
+      destruct_object(otmp, "shadowed");
     }
     return;
   }
@@ -1440,7 +1477,7 @@ void destruct_object(object_t* ob) {
       return;
     }
     if (otmp == ob->contains) {
-      destruct_object(otmp);
+      destruct_object(otmp, "environment");
     }
   }
 #endif

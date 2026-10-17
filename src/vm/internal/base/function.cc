@@ -3,6 +3,8 @@
 #include "base/internal/tracing.h"
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/hooks.h"
+#include "vm/internal/apply.h"
 #include "compiler/internal/lexer.h"  // for instrs, FIXME
 
 #include "packages/core/replace_program.h"
@@ -600,8 +602,29 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
           CHECK_TYPES(sp - num_arg + j + 1, instrs[i].type[j], j + 1, i);
         }
 
+        const char* ename = instrs[i].name;
+        object_t* efun_filter_ob = nullptr;
+        if (g_hook_mask & HOOK_MASK_EFUN) {
+          svalue_t answered{};
+          HookGateResult gr =
+              hook_dispatch_efun_before(ename, st_num_arg, &answered, &efun_filter_ob);
+          if (gr == HookGateResult::Refuse) {
+            pop_n_elems(st_num_arg);
+            free_svalue(&answered, "efun hook refuse");
+            free_svalue(&apply_ret_value, "call_function_pointer");
+            apply_ret_value = const0;
+            if (instrs[i].ret_type != TYPE_NOVALUE) {
+              push_number(0);
+              apply_ret_value = *sp--;
+            }
+            remove_fake_frame();
+            return &apply_ret_value;
+          }
+          free_svalue(&answered, "efun hook");
+        }
+
         {
-          ScopedTracer _efun_tracer(instrs[i].name, EventCategory::LPC_EFUN, [&] {
+          ScopedTracer _efun_tracer(ename, EventCategory::LPC_EFUN, [&] {
             json trace_context = {};
 
             json args = json::array();
@@ -613,6 +636,10 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
           });
 
           (*efun_table[i - EFUN_BASE])();
+        }
+
+        if (g_hook_mask & HOOK_MASK_EFUN) {
+          hook_dispatch_efun_after(ename, efun_filter_ob);
         }
 
         free_svalue(&apply_ret_value, "call_function_pointer");
@@ -638,6 +665,8 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
        * declared defaults. Fill BEFORE fp is set: the helpers push the
        * missing values as ordinary arguments. */
       bool local_is_async = false;
+      program_t* def_prog = nullptr;
+      function_t* def_funp = nullptr;
       {
         auto* cprog = current_object->prog;
         int roff = funp->f.local.index;
@@ -647,8 +676,49 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         local_is_async = (cprog->function_flags[roff] & FUNC_ASYNC) != 0;
         auto result = get_function_at_index(cprog, roff);
         if (result.first != nullptr) {
-          num_arg = fill_default_args(result.first, &result.first->function_table[result.second],
-                                      cprog->function_flags[roff], num_arg);
+          def_prog = result.first;
+          def_funp = &result.first->function_table[result.second];
+          num_arg = fill_default_args(def_prog, def_funp, cprog->function_flags[roff], num_arg);
+        }
+      }
+
+      object_t* target = funp->hdr.owner;
+      if (def_funp && target &&
+          (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
+        const char* fname = def_funp->funcname;
+        if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
+          svalue_t answered{};
+          HookGateResult gr =
+              hook_dispatch_function_before(target, fname, "function_pointer", num_arg, &answered);
+          if (gr == HookGateResult::Answered) {
+            pop_n_elems(num_arg);
+            push_svalue(&answered);
+            free_svalue(&answered, "function hook answer");
+            free_svalue(&apply_ret_value, "call_function_pointer");
+            apply_ret_value = *sp--;
+            remove_fake_frame();
+            return &apply_ret_value;
+          }
+          if (gr == HookGateResult::Refuse) {
+            pop_n_elems(num_arg);
+            if (answered.type == T_STRING) {
+              char buf[1024];
+              strncpy(buf, answered.u.string, sizeof(buf) - 1);
+              buf[sizeof(buf) - 1] = '\0';
+              free_svalue(&answered, "function hook refuse");
+              error("%s", buf);
+            }
+            free_svalue(&answered, "function hook refuse");
+            error("Function call refused by hook.\n");
+          }
+        }
+        if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
+            hook_dispatch_function_around(target, fname, "function_pointer", num_arg, def_prog,
+                                          def_funp->address, def_funp)) {
+          free_svalue(&apply_ret_value, "call_function_pointer");
+          apply_ret_value = *sp--;
+          remove_fake_frame();
+          return &apply_ret_value;
         }
       }
 
@@ -662,6 +732,9 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       csp->num_local_variables = num_arg;
       func = setup_new_frame(funp->f.local.index);
 
+      if (g_hook_mask & HOOK_MASK_LPC_FUNC_AFTER) {
+        hooks_mark_frame_for_after(target);
+      }
       if (local_is_async) {
         csp->framekind |= FRAME_ASYNC;
         run_async_function(current_prog->program + func->address, func);

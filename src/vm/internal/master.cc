@@ -12,6 +12,7 @@
 #include "vm/internal/base/machine.h"
 #include "applies_table.autogen.h"
 #include "vm/internal/apply.h"
+#include "vm/internal/hooks.h"
 #include "vm/internal/simulate.h"
 
 int master_approved(svalue_t* v, const char* apply_name) {
@@ -116,6 +117,7 @@ static void get_master_applies(object_t* ob) {
 void rebuild_master_applies() {
   if (master_ob) {
     get_master_applies(master_ob);
+    hooks_revalidate_all();
   }
 }
 

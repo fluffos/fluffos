@@ -38,6 +38,7 @@
 #include "net/telnet.h"
 #include "net/tls.h"
 #include "net/transport.h"
+#include "vm/internal/hooks.h"
 #include "net/websocket.h"
 #include "user.h"
 #include "vm/vm.h"
@@ -224,7 +225,35 @@ void on_user_write(bufferevent* /*bev*/, void* arg) {
   // nothing to do.
 }
 
-void on_user_events(bufferevent* /*bev*/, short events, void* arg) {
+static void fire_net_tls_hook(interactive_t* user, bufferevent* bev, const char* outcome) {
+  if (!(g_hook_mask & HOOK_MASK_NET_TLS) || !user || !user->ssl) {
+    return;
+  }
+  object_t* user_ob =
+      (user->ob && !(user->ob->flags & O_DESTRUCTED)) ? user->ob : nullptr;
+  const char* version = "";
+  const char* cipher = "";
+  SSL* ssl = user->ssl;
+  if (bev) {
+    SSL* from_bev = bufferevent_openssl_get_ssl(bev);
+    if (from_bev) {
+      ssl = from_bev;
+    }
+  }
+  if (ssl && strcmp(outcome, "ok") == 0) {
+    const char* v = SSL_get_version(ssl);
+    const char* c = SSL_get_cipher(ssl);
+    if (v) {
+      version = v;
+    }
+    if (c) {
+      cipher = c;
+    }
+  }
+  hook_dispatch_net_tls(user_ob, user->local_port, version, cipher, outcome);
+}
+
+void on_user_events(bufferevent* bev, short events, void* arg) {
   auto* user = reinterpret_cast<interactive_t*>(arg);
 
   if (user == nullptr) {
@@ -232,10 +261,21 @@ void on_user_events(bufferevent* /*bev*/, short events, void* arg) {
     return;
   }
 
+  if (events & BEV_EVENT_CONNECTED) {
+    /* TLS accept handshake completed (BUFFEREVENT_SSL_ACCEPTING). Plain
+     * accepted sockets typically do not raise CONNECTED. */
+    if (user->ssl) {
+      fire_net_tls_hook(user, bev, "ok");
+    }
+  }
+
   if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
+    if ((events & BEV_EVENT_ERROR) && user->ssl) {
+      fire_net_tls_hook(user, bev, "error");
+    }
     user->iflags |= NET_DEAD;
     remove_interactive(user->ob, 0);
-  } else {
+  } else if (!(events & BEV_EVENT_CONNECTED)) {
     debug(event, "on_user_events: ignored unknown events: %d\n", events);
   }
 }
@@ -260,11 +300,18 @@ void new_user_event_listener(event_base* base, interactive_t* user) {
  */
 void new_conn_handler(evconnlistener* listener, evutil_socket_t fd, struct sockaddr* addr,
                       int addrlen, void* arg) {
-  debug(connections, "New connection from %s.\n", sockaddr_to_string(addr, addrlen));
+  const char* peer = sockaddr_to_string(addr, addrlen);
+  debug(connections, "New connection from %s.\n", peer);
 
   // TODO: we don't really need to pass in port, we can figure out by
   // evconnlistener_get_fd and compare it
   auto* port = reinterpret_cast<port_def_t*>(arg);
+
+  if ((g_hook_mask & HOOK_MASK_NET_ACCEPT) && !hook_dispatch_net_accept(peer)) {
+    debug(connections, "new_conn_handler: refused by net:accept hook: %s\n", peer);
+    evutil_closesocket(fd);
+    return;
+  }
 
   {
     int one = 1;

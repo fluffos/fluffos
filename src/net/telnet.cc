@@ -12,7 +12,55 @@
 #include "net/transport.h"
 #include "packages/core/mssp.h"
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
+#include "vm/internal/hooks.h"
 #include "vm/vm.h"
+
+/* Human-readable TELOPT name for net:telnet hooks; nullptr → numeric. */
+static const char* hook_telopt_name(unsigned char opt) {
+  switch (opt) {
+    case TELNET_TELOPT_BINARY:
+      return "BINARY";
+    case TELNET_TELOPT_ECHO:
+      return "ECHO";
+    case TELNET_TELOPT_SGA:
+      return "SGA";
+    case TELNET_TELOPT_TM:
+      return "TM";
+    case TELNET_TELOPT_TTYPE:
+      return "TTYPE";
+    case TELNET_TELOPT_NAWS:
+      return "NAWS";
+    case TELNET_TELOPT_LINEMODE:
+      return "LINEMODE";
+    case TELNET_TELOPT_NEW_ENVIRON:
+      return "NEW_ENVIRON";
+    case TELNET_TELOPT_COMPRESS2:
+      return "COMPRESS2";
+    case TELNET_TELOPT_ZMP:
+      return "ZMP";
+    case TELNET_TELOPT_MSSP:
+      return "MSSP";
+    case TELNET_TELOPT_GMCP:
+      return "GMCP";
+    case TELNET_TELOPT_CHARSET:
+      return "CHARSET";
+    case TELNET_TELOPT_MSP:
+      return "MSP";
+    case TELNET_TELOPT_MSDP:
+      return "MSDP";
+    default:
+      return nullptr;
+  }
+}
+
+static void format_telopt_option(unsigned char opt, char* buf, size_t buflen) {
+  const char* name = hook_telopt_name(opt);
+  if (name) {
+    snprintf(buf, buflen, "%s", name);
+  } else {
+    snprintf(buf, buflen, "%u", static_cast<unsigned>(opt));
+  }
+}
 
 static const telnet_telopt_t my_telopts[] = {{TELNET_TELOPT_TM, TELNET_WILL, TELNET_DO},
                                              {TELNET_TELOPT_SGA, TELNET_WILL, TELNET_DO},
@@ -483,6 +531,57 @@ static inline void on_telnet_ttype(const char* name, interactive_t* ip) {
 // Main event handler.
 void telnet_event_handler(telnet_t* telnet, telnet_event_t* ev, void* user_data) {
   auto ip = reinterpret_cast<interactive_t*>(user_data);
+  object_t* user_ob =
+      (ip && ip->ob && !(ip->ob->flags & O_DESTRUCTED)) ? ip->ob : nullptr;
+
+  /* net:telnet BEFORE/DECIDE for protocol events (DATA/SEND stay on net:read/write). */
+  if (g_hook_mask & HOOK_MASK_NET_TELNET) {
+    const char* event = nullptr;
+    char optbuf[32];
+    optbuf[0] = '\0';
+    const char* payload = nullptr;
+    int payload_len = 0;
+    switch (ev->type) {
+      case TELNET_EV_WILL:
+        event = "will";
+        format_telopt_option(ev->neg.telopt, optbuf, sizeof(optbuf));
+        break;
+      case TELNET_EV_WONT:
+        event = "wont";
+        format_telopt_option(ev->neg.telopt, optbuf, sizeof(optbuf));
+        break;
+      case TELNET_EV_DO:
+        event = "do";
+        format_telopt_option(ev->neg.telopt, optbuf, sizeof(optbuf));
+        break;
+      case TELNET_EV_DONT:
+        event = "dont";
+        format_telopt_option(ev->neg.telopt, optbuf, sizeof(optbuf));
+        break;
+      case TELNET_EV_IAC:
+        event = "iac";
+        snprintf(optbuf, sizeof(optbuf), "%u", static_cast<unsigned>(ev->iac.cmd));
+        break;
+      case TELNET_EV_SUBNEGOTIATION:
+        event = "sb";
+        format_telopt_option(ev->sub.telopt, optbuf, sizeof(optbuf));
+        payload = ev->sub.buffer;
+        payload_len = static_cast<int>(ev->sub.size);
+        break;
+      default:
+        break;
+    }
+    if (event &&
+        !hook_dispatch_net_telnet(user_ob, event, optbuf, payload, payload_len)) {
+      /* DECIDE refuse — only SB is droppable; skip the body handler. */
+      return;
+    }
+    /* A hook may have destructed the user; re-validate before continuing. */
+    if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
+      return;
+    }
+    user_ob = (ip->ob && !(ip->ob->flags & O_DESTRUCTED)) ? ip->ob : nullptr;
+  }
 
   switch (ev->type) {
     case TELNET_EV_DATA: {

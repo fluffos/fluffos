@@ -50,6 +50,7 @@ CATEGORY_ORDER = [
     "Performance",
     "Protocol Support",
     "Security",
+    "Hooks",
 ]
 
 # Built-in integer constants the table defaults may reference.

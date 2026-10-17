@@ -10,6 +10,7 @@
 
 #include "packages/core/file.h"
 #include "packages/core/call_out.h"
+#include "vm/internal/hooks.h"
 #include "packages/core/outbuf.h"
 #include "packages/core/heartbeat.h"
 #include "packages/core/dns.h"
@@ -735,6 +736,7 @@ void check_all_blocks(int flag) {
     mark_stack();
     mark_command_giver_stack();
     mark_call_outs();
+    mark_hooks();
     mark_dns_requests();
     mark_promise_queue();
 #ifdef PACKAGE_FFI

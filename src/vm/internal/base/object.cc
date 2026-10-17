@@ -25,6 +25,7 @@ typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/eval_limit.h"
+#include "vm/internal/hooks.h"
 #include "vm/internal/otable.h"  // FIXME:
 #include "vm/internal/master.h"
 #include "vm/internal/simulate.h"
@@ -2185,6 +2186,10 @@ void call_create(object_t* ob, int num_arg) {
   }
 
   apply(APPLY_CREATE, ob, num_arg, ORIGIN_DRIVER);
+
+  if ((g_hook_mask & HOOK_MASK_OBJECT_CREATE) && !(ob->flags & O_DESTRUCTED)) {
+    hook_dispatch_object_create(ob);
+  }
 
   ob->flags |= O_RESET_STATE;
 }

@@ -50,8 +50,16 @@ object_t* object_present(svalue_t*, object_t*);
 object_t* find_object(const char*);
 object_t* find_object2(const char*);
 void move_object(object_t*, object_t*);
-void destruct_object(object_t*);
+/* cause is one of "efun", "shadowed", "environment", "refused", "reload"
+ * (object:destruct). Defaults to "efun". */
+void destruct_object(object_t*, const char* cause = "efun");
 void destruct2(object_t*);
+
+/* Hook contained-invocation save/restore (error_handler zeroes these). */
+object_t* hook_get_restrict_destruct();
+void hook_set_restrict_destruct(object_t*);
+int hook_get_num_objects_this_thread();
+void hook_set_num_objects_this_thread(int);
 
 void print_svalue(svalue_t*);
 void do_write(svalue_t*);

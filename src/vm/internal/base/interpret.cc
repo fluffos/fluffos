@@ -1,5 +1,6 @@
 #include "base/std.h"
 
+#include "vm/internal/hooks.h"
 #include "vm/internal/base/interpret.h"
 
 #include <algorithm>
@@ -252,16 +253,18 @@ int variable_index_offset; /* Needed for inheritance */
 int st_num_arg;
 
 // For safety, we leave some buffer in before and after the space.
+// Non-const: the hook stack switches these for contained handlers.
 static svalue_t _stack[10 + CFG_EVALUATOR_STACK_SIZE + 10];
-static svalue_t* const start_of_stack = &_stack[10];
-svalue_t* const end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
+svalue_t* start_of_stack = &_stack[10];
+svalue_t* end_of_stack = start_of_stack + CFG_EVALUATOR_STACK_SIZE;
 
 /* Used to throw an error to a catch */
 svalue_t catch_value = {T_NUMBER};
 
 // For safety, we leave some buffer in before and after the space.
 control_stack_t _control_stack[5 + CFG_MAX_CALL_DEPTH + 5];
-control_stack_t* const control_stack = &_control_stack[5];
+control_stack_t* control_stack = &_control_stack[5];
+control_stack_t* control_stack_last = &_control_stack[5 + CFG_MAX_CALL_DEPTH - 1];
 control_stack_t* csp; /* Points to last element pushed */
 
 int too_deep_error = 0, max_eval_error = 0;
@@ -1593,7 +1596,7 @@ static void add_svalue_type_name(outbuffer_t* buf, svalue_t* val) {
 }
 
 void push_control_stack(int frkind) {
-  if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
+  if (csp == control_stack_last) {
     too_deep_error = 1;
     error("Too deep recursion.\n");
   }
@@ -1602,6 +1605,7 @@ void push_control_stack(int frkind) {
   csp->ob = current_object;
   csp->framekind = frkind;
   csp->prev_ob = previous_ob;
+  csp->hook_target = nullptr;
   csp->fp = fp;
   csp->prog = current_prog;
   csp->pc = pc;
@@ -2069,7 +2073,7 @@ unsigned char fake_program = F_RETURN;
  * These frames are the ones that show up as <function> in error traces.
  */
 void setup_fake_frame(funptr_t* fun) {
-  if (csp == &control_stack[CFG_MAX_CALL_DEPTH - 1]) {
+  if (csp == control_stack_last) {
     too_deep_error = 1;
     error("Too deep recursion.\n");
   }
@@ -2079,6 +2083,7 @@ void setup_fake_frame(funptr_t* fun) {
   csp->fr.funp = fun;
   csp->ob = current_object;
   csp->prev_ob = previous_ob;
+  csp->hook_target = nullptr;
   csp->fp = fp;
   csp->prog = current_prog;
   csp->pc = pc;
@@ -2909,7 +2914,7 @@ void eval_instruction(char* p) {
       last = (last + 1) % (sizeof previous_instruction / sizeof(int));
     }
 
-    if (outoftime) {
+    if (outoftime && !hooks_eval_may_continue()) {
       debug_message("Eval interrupted: object %s cost limit reached, limit: %ld usec.\n",
                     current_object->obname, max_eval_cost);
       set_eval(max_eval_cost);
@@ -4175,6 +4180,38 @@ void eval_instruction(char* p) {
         DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
         pushed_args = fill_default_args(progp, funcp, funflags, pushed_args);
 
+        if (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND)) {
+          const char* fname = funcp->funcname;
+          if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
+            svalue_t answered{};
+            HookGateResult gr = hook_dispatch_function_before(current_object, fname, "local",
+                                                              pushed_args, &answered);
+            if (gr == HookGateResult::Answered) {
+              pop_n_elems(pushed_args);
+              push_svalue(&answered);
+              free_svalue(&answered, "function hook answer");
+              break;
+            }
+            if (gr == HookGateResult::Refuse) {
+              pop_n_elems(pushed_args);
+              if (answered.type == T_STRING) {
+                char buf[1024];
+                strncpy(buf, answered.u.string, sizeof(buf) - 1);
+                buf[sizeof(buf) - 1] = '\0';
+                free_svalue(&answered, "function hook refuse");
+                error("%s", buf);
+              }
+              free_svalue(&answered, "function hook refuse");
+              error("Function call refused by hook.\n");
+            }
+          }
+          if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
+              hook_dispatch_function_around(current_object, fname, "local", pushed_args, progp,
+                                            funcp->address, funcp)) {
+            break;
+          }
+        }
+
         /* Save all important global stack machine registers */
         push_control_stack(FRAME_FUNCTION);
         current_prog = current_object->prog;
@@ -4187,6 +4224,9 @@ void eval_instruction(char* p) {
         csp->num_local_variables = pushed_args;
         auto* funp = setup_new_frame(offset);
         csp->pc = pc; /* The corrected return address */
+        if (g_hook_mask & HOOK_MASK_LPC_FUNC_AFTER) {
+          hooks_mark_frame_for_after(current_object);
+        }
         if (funflags & FUNC_ASYNC) {
           /* run the coroutine body in its own nested interpreter; it
            * pushes the result promise and restores this frame's state */
@@ -4214,6 +4254,8 @@ void eval_instruction(char* p) {
          * F_CALL_FUNCTION_BY_ADDRESS -- this path used to skip them, so the
          * parent function ran with zeros instead of its declared defaults. */
         bool inherited_is_async = false;
+        program_t* inh_def_prog = nullptr;
+        function_t* inh_def_funp = nullptr;
         {
           int roff = offset;
           if (temp_prog->function_flags[roff] & FUNC_ALIAS) {
@@ -4224,9 +4266,43 @@ void eval_instruction(char* p) {
           if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
             auto result = get_function_at_index(temp_prog, roff);
             if (result.first != nullptr) {
-              pushed_args = fill_default_args(
-                  result.first, &result.first->function_table[result.second], rflags, pushed_args);
+              inh_def_prog = result.first;
+              inh_def_funp = &result.first->function_table[result.second];
+              pushed_args = fill_default_args(inh_def_prog, inh_def_funp, rflags, pushed_args);
             }
+          }
+        }
+
+        if (inh_def_funp &&
+            (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
+          const char* fname = inh_def_funp->funcname;
+          if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
+            svalue_t answered{};
+            HookGateResult gr = hook_dispatch_function_before(current_object, fname, "local",
+                                                              pushed_args, &answered);
+            if (gr == HookGateResult::Answered) {
+              pop_n_elems(pushed_args);
+              push_svalue(&answered);
+              free_svalue(&answered, "function hook answer");
+              break;
+            }
+            if (gr == HookGateResult::Refuse) {
+              pop_n_elems(pushed_args);
+              if (answered.type == T_STRING) {
+                char buf[1024];
+                strncpy(buf, answered.u.string, sizeof(buf) - 1);
+                buf[sizeof(buf) - 1] = '\0';
+                free_svalue(&answered, "function hook refuse");
+                error("%s", buf);
+              }
+              free_svalue(&answered, "function hook refuse");
+              error("Function call refused by hook.\n");
+            }
+          }
+          if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
+              hook_dispatch_function_around(current_object, fname, "local", pushed_args,
+                                            inh_def_prog, inh_def_funp->address, inh_def_funp)) {
+            break;
           }
         }
 
@@ -4242,6 +4318,9 @@ void eval_instruction(char* p) {
 
         funp = setup_inherited_frame(offset);
         csp->pc = pc;
+        if (g_hook_mask & HOOK_MASK_LPC_FUNC_AFTER) {
+          hooks_mark_frame_for_after(current_object);
+        }
         if (inherited_is_async) {
           run_async_function(current_prog->program + funp->address, funp);
           break;
@@ -4904,6 +4983,11 @@ void eval_instruction(char* p) {
 
         DEBUG_CHECK(sp != fp, "Bad stack at F_RETURN_ZERO\n");
         *sp = const0;
+        if ((csp->framekind & (FRAME_MASK | FRAME_HOOKED)) == (FRAME_FUNCTION | FRAME_HOOKED)) {
+          const char* fname = current_prog->function_table[csp->fr.table_index].funcname;
+          object_t* tob = csp->hook_target ? csp->hook_target : current_object;
+          hook_dispatch_function_after(tob, fname, origin_to_name(caller_type), 0);
+        }
         pop_control_stack();
         /* The control stack was popped just before */
         if (csp[1].framekind & (FRAME_EXTERNAL | FRAME_RETURNED_FROM_CATCH)) {
@@ -4932,6 +5016,11 @@ void eval_instruction(char* p) {
           DEBUG_CHECK(sp != fp, "Bad stack at F_RETURN\n");
           *sp = sv; /* This way, the same ref counts are
                      * maintained */
+        }
+        if ((csp->framekind & (FRAME_MASK | FRAME_HOOKED)) == (FRAME_FUNCTION | FRAME_HOOKED)) {
+          const char* fname = current_prog->function_table[csp->fr.table_index].funcname;
+          object_t* tob = csp->hook_target ? csp->hook_target : current_object;
+          hook_dispatch_function_after(tob, fname, origin_to_name(caller_type), 0);
         }
         pop_control_stack();
         /* The control stack was popped just before */
@@ -5205,13 +5294,37 @@ void eval_instruction(char* p) {
         num_arg = st_num_arg;
 #endif
         {
+          const char* ename = instrs[instruction].name;
+          int efun_nargs = st_num_arg;
+          object_t* efun_filter_ob = nullptr;
+          if (g_hook_mask & HOOK_MASK_EFUN) {
+            svalue_t answered{};
+            HookGateResult gr =
+                hook_dispatch_efun_before(ename, efun_nargs, &answered, &efun_filter_ob);
+            if (gr == HookGateResult::Refuse) {
+              pop_n_elems(efun_nargs);
+              free_svalue(&answered, "efun hook refuse");
+              if (instrs[instruction].ret_type != TYPE_NOVALUE) {
+                push_number(0);
+              }
+#ifdef DEBUG
+              expected_stack = sp; /* we shaped the stack */
+#endif
+              break;
+            }
+            free_svalue(&answered, "efun hook");
+          }
+
           if (Tracer::enabled() && CONFIG_INT(__RC_TRACE_CONTEXT__)) {
             trace_context["args"] = get_trace_args(sp, st_num_arg);
           }
 
-          ScopedTracer _efun_tracer(instrs[instruction].name, EventCategory::LPC_EFUN,
-                                    [&] { return trace_context; });
+          ScopedTracer _efun_tracer(ename, EventCategory::LPC_EFUN, [&] { return trace_context; });
           (*efun_table[instruction - EFUN_BASE])();
+
+          if (g_hook_mask & HOOK_MASK_EFUN) {
+            hook_dispatch_efun_after(ename, efun_filter_ob);
+          }
         }
 
 #ifdef DEBUG
@@ -5493,6 +5606,8 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   /* Direct calls (simul_efuns, heart_beat) must fill default arguments too;
    * simul_efuns with defaults used to run with zeros. */
   bool is_async = false;
+  program_t* def_prog = nullptr;
+  function_t* def_funp = nullptr;
   {
     int roff = offset;
     if (prog->function_flags[roff] & FUNC_ALIAS) {
@@ -5503,11 +5618,45 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
     if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
       auto result = get_function_at_index(prog, roff);
       if (result.first != nullptr) {
-        num_arg = fill_default_args(result.first, &result.first->function_table[result.second],
-                                    rflags, num_arg);
+        def_prog = result.first;
+        def_funp = &result.first->function_table[result.second];
+        num_arg = fill_default_args(def_prog, def_funp, rflags, num_arg);
       }
     }
   }
+
+  if (def_funp && (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
+    const char* fname = def_funp->funcname;
+    const char* oname = origin_to_name(origin);
+    if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
+      svalue_t answered{};
+      HookGateResult gr = hook_dispatch_function_before(ob, fname, oname, num_arg, &answered);
+      if (gr == HookGateResult::Answered) {
+        pop_n_elems(num_arg);
+        push_svalue(&answered);
+        free_svalue(&answered, "function hook answer");
+        return;
+      }
+      if (gr == HookGateResult::Refuse) {
+        pop_n_elems(num_arg);
+        if (answered.type == T_STRING) {
+          char buf[1024];
+          strncpy(buf, answered.u.string, sizeof(buf) - 1);
+          buf[sizeof(buf) - 1] = '\0';
+          free_svalue(&answered, "function hook refuse");
+          error("%s", buf);
+        }
+        free_svalue(&answered, "function hook refuse");
+        error("Function call refused by hook.\n");
+      }
+    }
+    if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
+        hook_dispatch_function_around(ob, fname, oname, num_arg, def_prog, def_funp->address,
+                                      def_funp)) {
+      return;
+    }
+  }
+
   push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
   caller_type = origin;
   csp->num_local_variables = num_arg;
@@ -5518,6 +5667,9 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   /* Same treatment as the other call paths: an async simul_efun (this is
    * also the FP_SIMUL route) must yield a promise and be able to await,
    * not run its body as an ordinary call and return a plain value. */
+  if (g_hook_mask & HOOK_MASK_LPC_FUNC_AFTER) {
+    hooks_mark_frame_for_after(ob);
+  }
   if (is_async) {
     csp->framekind |= FRAME_ASYNC;
     run_async_function(current_prog->program + funp->address, funp);
@@ -6146,6 +6298,7 @@ void remove_object_from_stack(object_t* ob) {
     svp->type = T_NUMBER;
     svp->u.number = 0;
   }
+  hooks_remove_object_from_suspended_stacks(ob);
 }
 
 int strpref(const char* p, const char* s) {
@@ -6164,6 +6317,13 @@ void mark_stack() {
   for (sv = start_of_stack; sv <= sp; sv++) {
     mark_svalue(sv);
   }
+  hooks_for_each_suspended_stack(
+      [](svalue_t* start, svalue_t* end_inclusive, void*) {
+        for (svalue_t* s = start; s <= end_inclusive; s++) {
+          mark_svalue(s);
+        }
+      },
+      nullptr, nullptr);
 }
 #endif
 

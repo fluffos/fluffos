@@ -146,3 +146,15 @@ int valid_hide() {
   // same here
   return 1;
 }
+
+// Hooks: grant the requested tier. Tests that need a stricter policy
+// can temporarily override via set_hook_policy() below.
+private int hook_policy = -1; /* -1 = grant whatever tier was requested */
+
+public void set_hook_policy(int tier) { hook_policy = tier; }
+
+int valid_hook(object who, string point, mixed action, mapping spec, int flags, int tier) {
+  inherit_called++;
+  if (hook_policy >= 0) return hook_policy;
+  return tier; /* grant exactly what was asked */
+}

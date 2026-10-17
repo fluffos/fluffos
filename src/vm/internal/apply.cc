@@ -10,6 +10,7 @@
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/base/debug.h"
+#include "vm/internal/hooks.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
 #include "compiler/internal/disassembler.h"
@@ -19,6 +20,33 @@
 svalue_t apply_ret_value;
 
 int convert_type(int /*type*/);
+
+/* Try call_other:miss / apply:miss. On Answered, pops num_arg and pushes the
+ * answer; returns 1. Otherwise leaves the stack alone and returns 0. */
+static int try_apply_miss_hooks(object_t* named_target, const char* fun, int num_arg, int origin,
+                                const char* reason) {
+  svalue_t answered{};
+  HookMissResult mr = HookMissResult::NoOpinion;
+  if (origin == ORIGIN_CALL_OTHER) {
+    if (!(g_hook_mask & HOOK_MASK_CALL_OTHER_MISS)) {
+      return 0;
+    }
+    mr = hook_dispatch_call_other_miss(named_target, fun, num_arg, reason, &answered);
+  } else {
+    if (!(g_hook_mask & HOOK_MASK_APPLY_MISS)) {
+      return 0;
+    }
+    mr = hook_dispatch_apply_miss(named_target, fun, num_arg, reason, origin_to_name(origin),
+                                  &answered);
+  }
+  if (mr != HookMissResult::Answered) {
+    return 0;
+  }
+  pop_n_elems(num_arg);
+  push_svalue(&answered);
+  free_svalue(&answered, "apply miss answer");
+  return 1;
+}
 
 int convert_type(int type) {
   /* a promise, whatever its payload; an ARRAY of promises falls through to
@@ -193,10 +221,14 @@ int apply_low(const char* fun, object_t* ob, int num_arg) {
     try_reset(ob);
   }
   if (ob->flags & O_DESTRUCTED) {
+    if (try_apply_miss_hooks(ob, fun, num_arg, local_call_origin, "destructed")) {
+      return 1;
+    }
     pop_n_elems(num_arg);
     return 0;
   }
   ob->flags &= ~O_RESET_STATE;
+  object_t* named_target = ob; /* before the shadow walk (call_other:miss target) */
 #ifndef NO_SHADOWS
   /*
    * If there is a chain of objects shadowing, start with the first of
@@ -225,6 +257,9 @@ retry_for_shadow:
 
   /* This function is not found, return failure. */
   if (!entry.progp) {
+    if (try_apply_miss_hooks(named_target, fun, num_arg, local_call_origin, "undefined")) {
+      return 1;
+    }
     pop_n_elems(num_arg);
     return 0;
   }
@@ -248,6 +283,16 @@ retry_for_shadow:
           current_object ? current_object->obname : "null", ob ? ob->obname : "null", fun,
           origin_to_name(local_call_origin), access_to_name(need),
           access_to_name(funflags & DECL_ACCESS));
+      {
+        const char* reason = "private";
+        int access = funflags & DECL_ACCESS;
+        if (access == DECL_PROTECTED) {
+          reason = "protected";
+        }
+        if (try_apply_miss_hooks(named_target, fun, num_arg, local_call_origin, reason)) {
+          return 1;
+        }
+      }
       pop_n_elems(num_arg);
       return 0;
     }
@@ -334,6 +379,42 @@ retry_for_shadow:
     if (!(funflags & FUNC_VARARGS)) {
       check_co_args(num_arg, entry.progp, funp, findex);
     }
+
+    /* function join point: filter on named_target (pre-shadow), like miss. */
+    if (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND)) {
+      const char* origin = origin_to_name(local_call_origin);
+      if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
+        svalue_t answered{};
+        HookGateResult gr =
+            hook_dispatch_function_before(named_target, fun, origin, num_arg, &answered);
+        if (gr == HookGateResult::Answered) {
+          pop_n_elems(num_arg);
+          push_svalue(&answered);
+          free_svalue(&answered, "function hook answer");
+          return 1;
+        }
+        if (gr == HookGateResult::Refuse) {
+          pop_n_elems(num_arg);
+          if (answered.type == T_STRING) {
+            char buf[1024];
+            strncpy(buf, answered.u.string, sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
+            free_svalue(&answered, "function hook refuse");
+            error("%s", buf);
+          }
+          free_svalue(&answered, "function hook refuse");
+          error("Function call refused by hook.\n");
+        }
+      }
+      function_index_offset = entry.function_index_offset;
+      variable_index_offset = entry.variable_index_offset;
+      if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
+          hook_dispatch_function_around(named_target, fun, origin, num_arg, entry.progp,
+                                        funp->address, funp)) {
+        return 1;
+      }
+    }
+
     /* Setup new call frame */
     push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
     current_prog = entry.progp;
@@ -358,6 +439,9 @@ retry_for_shadow:
 #ifdef DEBUG
     save_csp = csp;
 #endif
+    if (g_hook_mask & HOOK_MASK_LPC_FUNC_AFTER) {
+      hooks_mark_frame_for_after(named_target);
+    }
     if (funflags & FUNC_ASYNC) {
       csp->framekind |= FRAME_ASYNC;
       run_async_function(current_prog->program + funp->address, funp);
