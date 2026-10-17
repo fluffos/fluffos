@@ -436,7 +436,7 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
    (both forms consume the pushed value). */
 static void deliver_result(struct Request* req, int rejected) {
   if (req->prom) {
-    promise_settle(req->prom, sp, rejected);
+    promise_settle(req->prom, vm_sp(), rejected);
     pop_stack();
     return;
   }
@@ -611,11 +611,11 @@ void f_async_read(int num_arg) {
    * ref or a fresh promise in a raw local, that unwind would leak them
    * (AGENTS.md section 4). Nothing below this line applies, so the returned
    * string stays valid until add_read() copies it. The path is the FIRST
-   * argument -- sp itself is the optional callback when one was passed.
+   * argument -- vm_sp() itself is the optional callback when one was passed.
    * Arity is the num_arg parameter (not a global), so the master apply
    * cannot clobber form-detection or process_efun_callback. */
   const char* path =
-      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "read_file", 0);
+      check_valid_path((vm_sp() - (num_arg - 1))->u.string, current_object, "read_file", 0);
   if (num_arg >= 2) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
     LPCFrame frame = LPCFrame::args(num_arg);
@@ -656,7 +656,7 @@ void f_async_write(int num_arg) {
    * master apply -- see f_async_read(); the path is the FIRST of 3 or 4
    * arguments */
   const char* path =
-      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "write_file", 1);
+      check_valid_path((vm_sp() - (num_arg - 1))->u.string, current_object, "write_file", 1);
   if (num_arg >= 4) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
     LPCFrame frame = LPCFrame::args(num_arg);
@@ -672,7 +672,7 @@ void f_async_write(int num_arg) {
     prom = promise_alloc();
   }
 
-  add_write(path, (sp - 1)->u.string, SVALUE_STRLEN((sp - 1)), sp->u.number, fun, prom);
+  add_write(path, (vm_sp() - 1)->u.string, SVALUE_STRLEN((vm_sp() - 1)), vm_sp()->u.number, fun, prom);
   pop_3_elems();
   if (prom) {
     prom->ref++;
@@ -691,7 +691,7 @@ void f_async_getdir(int num_arg) {
   /* before any ownership is taken, with num_arg latched across the
    * master apply -- see f_async_read(); the path is the FIRST argument */
   const char* path =
-      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "get_dir", 0);
+      check_valid_path((vm_sp() - (num_arg - 1))->u.string, current_object, "get_dir", 0);
   if (num_arg >= 2) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
     LPCFrame frame = LPCFrame::args(num_arg);
@@ -742,7 +742,7 @@ void f_async_db_exec(int num_arg) {
   //   async_db_exec(handle, sql)                 -> promise for the row count
   //
   // process_efun_callback(..., num_arg) locates the callback from the
-  // parameter arity (arg = sp - num_arg + 1 + narg). Parse the callback
+  // parameter arity (arg = vm_sp() - num_arg + 1 + narg). Parse the callback
   // before valid_database() so ownership/ordering stays clear; the old
   // global-arity bug is gone, but the promise vs callback form split still
   // keys on num_arg before any apply.
@@ -789,19 +789,19 @@ void f_async_db_exec(int num_arg) {
     // The bound args' stack slots were bitwise-transferred into bound_args
     // above (not ref-bumped), so skip past them without freeing -- same
     // "args have been transfered; don't free them" idiom as int_call_out().
-    sp -= cb->narg;
-    pop_stack();  // remove the callback; now sp = sql, sp-1 = handle
+    vm_sp() -= cb->narg;
+    pop_stack();  // remove the callback; now vm_sp() = sql, vm_sp()-1 = handle
   }
 
   array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy(vm_sp()->u.string, "f_db_exec");
   valid_database("exec", info);
 
   db_t* db;
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn((vm_sp() - 1)->u.number);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
@@ -821,7 +821,7 @@ void f_async_db_exec(int num_arg) {
 
   cb_ref.handed_off = true;
   bound_args_handed_off = true;
-  add_db_exec((sp - 1)->u.number, sp->u.string, cb ? cb.release() : nullptr, bound_args, prom);
+  add_db_exec((vm_sp() - 1)->u.number, vm_sp()->u.string, cb ? cb.release() : nullptr, bound_args, prom);
   pop_2_elems();
   if (prom) {
     prom->ref++;

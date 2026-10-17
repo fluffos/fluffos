@@ -11,6 +11,8 @@
 
 #include "base/package_api.h"
 
+#include "vm/internal/base/vm_stack.h" /* parse helpers touch the eval stack directly */
+
 #include "packages/ops/parse.h"
 
 #include "packages/core/add_action.h"

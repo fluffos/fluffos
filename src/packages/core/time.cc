@@ -45,7 +45,7 @@ void f_ctime(int num_arg) {
   time_t timestamp;
 
   if (num_arg) {
-    timestamp = sp->u.number;
+    timestamp = vm_sp()->u.number;
   } else {
     push_number(0);
     timestamp = get_current_time();
@@ -75,7 +75,7 @@ void f_ctime(int num_arg) {
 void f_localtime(int num_arg) {
   struct tm res = {};
   time_t lt;
-  lt = sp->u.number;
+  lt = vm_sp()->u.number;
   auto* tm = localtime_r(&lt, &res);
 
   pop_stack();
@@ -124,8 +124,8 @@ void f_localtime(int num_arg) {
 
 #ifdef F_STRFTIME
 void f_strftime(int num_arg) {
-  auto arg_time = sp->u.number;
-  const auto* arg_fmt = (sp - 1)->u.string;
+  auto arg_time = vm_sp()->u.number;
+  const auto* arg_fmt = (vm_sp() - 1)->u.string;
 
   time_t lt = arg_time;
   if (lt <= 0) lt = get_current_time();
@@ -150,8 +150,8 @@ void f_strftime(int num_arg) {
 
 #ifdef F_STRPTIME
 void f_strptime(int num_arg) {
-  const auto* arg_timestr = (sp)->u.string;
-  const auto* arg_fmt = (sp - 1)->u.string;
+  const auto* arg_timestr = (vm_sp())->u.string;
+  const auto* arg_fmt = (vm_sp() - 1)->u.string;
 
   struct tm res = {};
   res.tm_isdst = -1;  // make sure mktime check local dst time

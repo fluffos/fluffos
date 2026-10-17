@@ -209,7 +209,7 @@ void f_db_close(int num_arg) {
 
   valid_database("close", &the_null_array);
 
-  db = find_db_conn(sp->u.number);
+  db = find_db_conn(vm_sp()->u.number);
   if (!db) {
     error("Attempt to close an invalid database handle\n");
   }
@@ -229,7 +229,7 @@ void f_db_close(int num_arg) {
   /* Remove the entry from the linked list */
   free_db_conn(db);
 
-  sp->u.number = ret;
+  vm_sp()->u.number = ret;
 }
 #endif
 
@@ -250,7 +250,7 @@ void f_db_commit(int num_arg) {
 
   valid_database("commit", &the_null_array);
 
-  db = find_db_conn(sp->u.number);
+  db = find_db_conn(vm_sp()->u.number);
   if (!db) {
     error("Attempt to commit an invalid database handle\n");
   }
@@ -261,7 +261,7 @@ void f_db_commit(int num_arg) {
     ret = db->type->commit(&(db->c));
   }
 
-  sp->u.number = ret;
+  vm_sp()->u.number = ret;
 }
 #endif
 
@@ -293,16 +293,16 @@ void f_db_connect(int num_arg) {
 
   switch (num_arg) {
     case 4:
-      type = (sp - (args++))->u.number;
+      type = (vm_sp() - (args++))->u.number;
       // fallthrough
     case 3:
-      user = (sp - (args++))->u.string;
+      user = (vm_sp() - (args++))->u.string;
       // fallthrough
     case 2:
-      database = (sp - (args++))->u.string;
+      database = (vm_sp() - (args++))->u.string;
       // fallthrough
     case 1:
-      host = (sp - (args++))->u.string;
+      host = (vm_sp() - (args++))->u.string;
       break;
     default:
       // unreachable
@@ -406,10 +406,10 @@ void f_db_exec(int num_arg) {
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy(vm_sp()->u.string, "f_db_exec");
   valid_database("exec", info);
 
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn((vm_sp() - 1)->u.number);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
@@ -422,7 +422,7 @@ void f_db_exec(int num_arg) {
   }
 
   if (db->type->execute) {
-    ret = db->type->execute(&(db->c), sp->u.string);
+    ret = db->type->execute(&(db->c), vm_sp()->u.string);
   }
 
   pop_stack();
@@ -436,7 +436,7 @@ void f_db_exec(int num_arg) {
       put_constant_string("Unknown error");
     }
   } else {
-    sp->u.number = ret;
+    vm_sp()->u.number = ret;
   }
 #ifdef PACKAGE_ASYNC
   pthread_mutex_unlock(db_mut);
@@ -475,7 +475,7 @@ void f_db_fetch(int num_arg) {
 
   valid_database("fetch", &the_null_array);
 
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn((vm_sp() - 1)->u.number);
   if (!db) {
     error("Attempt to fetch from an invalid database handle\n");
   }
@@ -483,7 +483,7 @@ void f_db_fetch(int num_arg) {
   DB_ASYNC_LOCK();  // serialize against the async DB worker thread
 
   if (db->type->fetch) {
-    ret = db->type->fetch(&(db->c), sp->u.number);
+    ret = db->type->fetch(&(db->c), vm_sp()->u.number);
   } else {
     ret = &the_null_array;
   }
@@ -496,7 +496,7 @@ void f_db_fetch(int num_arg) {
       errormsg = db->type->error(&(db->c));
       put_malloced_string(errormsg);
     } else {
-      sp->u.number = 0;
+      vm_sp()->u.number = 0;
     }
   } else {
     put_array(ret);
@@ -519,7 +519,7 @@ void f_db_rollback(int num_arg) {
 
   valid_database("rollback", &the_null_array);
 
-  db = find_db_conn(sp->u.number);
+  db = find_db_conn(vm_sp()->u.number);
   if (!db) {
     error("Attempt to rollback an invalid database handle\n");
   }
@@ -536,7 +536,7 @@ void f_db_rollback(int num_arg) {
     }
   }
 
-  sp->u.number = ret;
+  vm_sp()->u.number = ret;
 }
 #endif
 

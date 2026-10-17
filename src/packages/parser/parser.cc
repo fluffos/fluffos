@@ -2930,8 +2930,8 @@ static void we_are_finished(parse_state_t* state) {
       if (args) {
         p = (char*)(best_result->res[tryy].args =
                         (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result"));
-        memcpy(p, (char*)(sp - args + 1), args * sizeof(svalue_t));
-        sp -= args;
+        memcpy(p, (char*)(vm_sp() - args + 1), args * sizeof(svalue_t));
+        vm_sp() -= args;
       }
     }
     DEBUG_P(
@@ -2956,15 +2956,15 @@ static void do_the_call() {
     n = best_result->res[i].num;
     if (n) {
       CHECK_STACK_OVERFLOW(n);
-      memcpy((char*)(sp + 1), best_result->res[i].args, n * sizeof(svalue_t));
+      memcpy((char*)(vm_sp() + 1), best_result->res[i].args, n * sizeof(svalue_t));
       /*
        * Make sure we haven't dumped any dested obs onto the stack;
-       * this also updates sp.
+       * this also updates vm_sp().
        */
       while (n--) {
-        if ((++sp)->type == T_OBJECT && (sp->u.ob->flags & O_DESTRUCTED)) {
-          free_object(&sp->u.ob, "do_the_call");
-          *sp = const0u;
+        if ((++vm_sp())->type == T_OBJECT && (vm_sp()->u.ob->flags & O_DESTRUCTED)) {
+          free_object(&vm_sp()->u.ob, "do_the_call");
+          *vm_sp() = const0u;
         }
       }
       FREE(best_result->res[i].args);
@@ -3418,7 +3418,7 @@ static svalue_t* get_the_error(parser_error_t* err, int obj) {
       return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 5);
     default:
       pop_stack();
-      sp--;
+      vm_sp()--;
       hack.u.number = -found_level;
       return &hack;
   }
@@ -3440,17 +3440,17 @@ void f_parse_sentence(int num_arg) {
   }
 
   if (num_arg == 4) {
-    parse_nicks = (sp--)->u.map;
+    parse_nicks = (vm_sp()--)->u.map;
   }
 
   if (num_arg >= 3) {
-    parse_env = (sp--)->u.arr;
+    parse_env = (vm_sp()--)->u.arr;
   }
 
-  if (num_arg >= 2 && (sp--)->u.number) {
+  if (num_arg >= 2 && (vm_sp()--)->u.number) {
 #if defined(DEBUG) || defined(PARSE_DEBUG)
     debug_parse_depth = 1;
-    if ((sp + 1)->u.number > 1) {
+    if ((vm_sp() + 1)->u.number > 1) {
       debug_parse_verbose = 1;
     } else {
       debug_parse_verbose = 0;
@@ -3465,35 +3465,35 @@ void f_parse_sentence(int num_arg) {
   }
 
   STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = free_parse_globals;
+  vm_sp()->type = T_ERROR_HANDLER;
+  vm_sp()->u.error_handler = free_parse_globals;
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = current_object;
   pi = current_object->pinfo;
   parse_restricted = nullptr;
   found_level = 0;
-  parse_sentence((sp - 1)->u.string);
+  parse_sentence((vm_sp() - 1)->u.string);
 
   if (best_match) {
-    sp--; /* pop the error handler */
+    vm_sp()--; /* pop the error handler */
     free_parse_globals();
 
     do_the_call();
-    free_string_svalue(sp);
+    free_string_svalue(vm_sp());
     put_number(1);
   } else {
     svalue_t* ret = get_the_error(&best_error_info, -1);
 
-    sp--; /* pop the error handler */
+    vm_sp()--; /* pop the error handler */
     free_parse_globals();
 
-    free_string_svalue(sp);
+    free_string_svalue(vm_sp());
     if (ret) {
-      *sp = *ret;
+      *vm_sp() = *ret;
       ret->type = T_NUMBER; /* will be freed later */
     } else {
-      *sp = const0;
+      *vm_sp() = const0;
     }
   }
 
@@ -3504,10 +3504,10 @@ void f_parse_sentence(int num_arg) {
 }
 
 void f_parse_my_rules(int num_arg) {
-  int const flag = (num_arg == 3 ? (sp--)->u.number : 0);
+  int const flag = (num_arg == 3 ? (vm_sp()--)->u.number : 0);
 
-  if (!(sp - 1)->u.ob->pinfo)
-    error("/%s is not known by the parser.  Call parse_init() first.\n", (sp - 1)->u.ob->obname);
+  if (!(vm_sp() - 1)->u.ob->pinfo)
+    error("/%s is not known by the parser.  Call parse_init() first.\n", (vm_sp() - 1)->u.ob->obname);
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
@@ -3516,21 +3516,21 @@ void f_parse_my_rules(int num_arg) {
   }
 
   STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = free_parse_globals;
+  vm_sp()->type = T_ERROR_HANDLER;
+  vm_sp()->u.error_handler = free_parse_globals;
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
-  parse_user = (sp - 2)->u.ob;
+  parse_user = (vm_sp() - 2)->u.ob;
   pi = parse_user->pinfo;
   parse_restricted = current_object;
-  parse_sentence((sp - 1)->u.string);
+  parse_sentence((vm_sp() - 1)->u.string);
 
   if (best_match) {
     if (flag) {
       do_the_call();
-      sp--; /* pop the error handler */
-      free_string_svalue(sp--);
-      free_svalue(sp, "parse_my_rules"); /* may have been destructed */
+      vm_sp()--; /* pop the error handler */
+      free_string_svalue(vm_sp()--);
+      free_svalue(vm_sp(), "parse_my_rules"); /* may have been destructed */
       put_number(1);
     } else {
       int n;
@@ -3549,22 +3549,22 @@ void f_parse_my_rules(int num_arg) {
         FREE(best_result->res[3].args);
       }
       best_result->res[3].args = nullptr;
-      sp--; /* pop the error handler */
-      free_string_svalue(sp--);
-      free_svalue(sp, "parse_my_rules"); /* may have been destructed */
+      vm_sp()--; /* pop the error handler */
+      free_string_svalue(vm_sp()--);
+      free_svalue(vm_sp(), "parse_my_rules"); /* may have been destructed */
       put_array(arr);
     }
   } else {
     svalue_t* ret = get_the_error(&best_error_info, -1);
 
-    sp--; /* pop the error handler */
-    free_string_svalue(sp--);
-    free_svalue(sp, "parse_my_rules"); /* may have been destructed */
+    vm_sp()--; /* pop the error handler */
+    free_string_svalue(vm_sp()--);
+    free_svalue(vm_sp(), "parse_my_rules"); /* may have been destructed */
     if (ret) {
-      *sp = *ret;
+      *vm_sp() = *ret;
       ret->type = T_NUMBER;
     } else {
-      *sp = const0;
+      *vm_sp() = const0;
     }
   }
   free_parse_globals();
@@ -3574,7 +3574,7 @@ void f_parse_remove(int num_arg) {
   const char* verb;
   verb_t* verb_entry;
 
-  verb = SHARED_STRING(sp);
+  verb = SHARED_STRING(vm_sp());
   verb_entry = verbs[DO_HASH(verb, VERB_HASH_SIZE)];
   while (verb_entry) {
     if (verb_entry->match_name == verb) {
@@ -3591,7 +3591,7 @@ void f_parse_remove(int num_arg) {
     }
     verb_entry = verb_entry->next;
   }
-  free_string_svalue(sp--);
+  free_string_svalue(vm_sp()--);
 }
 
 void f_parse_add_rule(int num_arg) {
@@ -3605,8 +3605,8 @@ void f_parse_add_rule(int num_arg) {
   int h;
   int weight;
 
-  rule = sp->u.string;
-  verb = SHARED_STRING(sp - 1);
+  rule = vm_sp()->u.string;
+  verb = SHARED_STRING(vm_sp() - 1);
   verb_entry = nullptr;
   handler = current_object;
   if (!(handler->pinfo))
@@ -3632,7 +3632,7 @@ void f_parse_add_rule(int num_arg) {
 
   if (!verb_entry) {
     if (!verb) {
-      verb = make_shared_string((sp - 1)->u.string);
+      verb = make_shared_string((vm_sp() - 1)->u.string);
     } else {
       ref_string(verb);
     }
@@ -3682,8 +3682,8 @@ void f_parse_add_rule(int num_arg) {
   }
 
   /* return */
-  free_string_svalue(sp--);
-  free_string_svalue(sp--);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp()--);
 }
 
 void f_parse_add_synonym(int num_arg) {
@@ -3696,14 +3696,14 @@ void f_parse_add_synonym(int num_arg) {
   int h;
 
   if (num_arg == 3) {
-    orig_new_verb = (sp - 2)->u.string;
-    new_verb = SHARED_STRING(sp - 2);
-    old_verb = SHARED_STRING(sp - 1);
-    rule = sp->u.string;
+    orig_new_verb = (vm_sp() - 2)->u.string;
+    new_verb = SHARED_STRING(vm_sp() - 2);
+    old_verb = SHARED_STRING(vm_sp() - 1);
+    rule = vm_sp()->u.string;
   } else {
-    orig_new_verb = (sp - 1)->u.string;
-    new_verb = SHARED_STRING(sp - 1);
-    old_verb = SHARED_STRING(sp);
+    orig_new_verb = (vm_sp() - 1)->u.string;
+    new_verb = SHARED_STRING(vm_sp() - 1);
+    old_verb = SHARED_STRING(vm_sp());
     rule = nullptr;
   }
 
@@ -3810,10 +3810,10 @@ void f_parse_add_synonym(int num_arg) {
   }
 
   if (num_arg == 3) {
-    free_string_svalue(sp--);
+    free_string_svalue(vm_sp()--);
   }
-  free_string_svalue(sp--);
-  free_string_svalue(sp--);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp()--);
 }
 
 void f_parse_dump(int num_arg) {

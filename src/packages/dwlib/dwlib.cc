@@ -235,7 +235,7 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
 } /* query_multiple_short() */
 
 void f_query_multiple_short(int num_arg) {
-  svalue_t* sv = sp - num_arg + 1;
+  svalue_t* sv = vm_sp() - num_arg + 1;
   const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
@@ -444,13 +444,13 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
 }
 
 void f_reference_allowed(int num_arg) {
-  svalue_t* sv = sp - num_arg + 1;
+  svalue_t* sv = vm_sp() - num_arg + 1;
   object_t* referee = nullptr;
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
   int result = 0;
   /* Maybe I could learn how to use this :p
-   CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
+   CHECK_TYPES(vm_sp()-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
 
   if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
     referrer_obj = nullptr;
@@ -504,7 +504,7 @@ void f_reference_allowed(int num_arg) {
 
 void f_add_a(int num_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  const char* str = sp->u.string;
+  const char* str = vm_sp()->u.string;
   char* ret;
   char* p;
   char first;
@@ -563,7 +563,7 @@ void f_add_a(int num_arg) {
 
   if (an) {  // Add an.
     if (len + 3 > max_string_length) {
-      free_string_svalue(sp);
+      free_string_svalue(vm_sp());
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 3, "f_add_a");
@@ -571,7 +571,7 @@ void f_add_a(int num_arg) {
     p = ret + 3;
   } else {  // Add a.
     if (len + 2 > max_string_length) {
-      free_string_svalue(sp);
+      free_string_svalue(vm_sp());
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 2, "f_add_a");
@@ -581,26 +581,26 @@ void f_add_a(int num_arg) {
 
   // Add the rest of the string.
   memcpy(p, str, len + 1);  // + 1: get the \0.
-  free_string_svalue(sp);
-  sp->type = T_STRING;
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = ret;
+  free_string_svalue(vm_sp());
+  vm_sp()->type = T_STRING;
+  vm_sp()->subtype = STRING_MALLOC;
+  vm_sp()->u.string = ret;
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
 void f_vowel(int num_arg) {
-  char const v = (char)sp->u.number;
+  char const v = (char)vm_sp()->u.number;
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
       v == 'I' || v == 'O' || v == 'U') {
-    sp->u.number = 1;
+    vm_sp()->u.number = 1;
   } else {
-    sp->u.number = 0;
+    vm_sp()->u.number = 0;
   }
 }
 
 void f_replace(int num_arg) {
-  svalue_t* arg2 = sp - num_arg + 2;
+  svalue_t* arg2 = vm_sp() - num_arg + 2;
   if (arg2->type == T_STRING && num_arg == 3) {
     return f_replace_string(num_arg);
   }
@@ -610,7 +610,7 @@ void f_replace(int num_arg) {
     if (arr->size & 1) {
       error("Wrong array size for replace.\n");
     }
-    sp--;
+    vm_sp()--;
 
     for (i = 0; i < arr->size; i += 2) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
@@ -618,7 +618,7 @@ void f_replace(int num_arg) {
         share_and_push_string(arr->item[i + 1].u.string);
         num_arg = 3;
         f_replace_string(num_arg);
-        if (sp->type != T_STRING) {
+        if (vm_sp()->type != T_STRING) {
           break;
         }
       }
@@ -633,7 +633,7 @@ void replace_mxp_html(int html, int mxp) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
-  const char* src = sp->u.string;
+  const char* src = vm_sp()->u.string;
   char* dst2 = dst;
   while (*src && dst2 - dst < max_string_length) {
     switch (*src) {
@@ -680,7 +680,7 @@ void f_replace_mxp(int num_arg) { replace_mxp_html(0, 1); }
 
 void f_roulette_wheel(int num_arg) {
   long num;
-  mapping_t* m = sp->u.map;
+  mapping_t* m = vm_sp()->u.map;
   int j, found;
   mapping_node_t *elt, **a = m->table;
   svalue_t* val;
@@ -725,7 +725,7 @@ void f_roulette_wheel(int num_arg) {
   }
 
   // val points to the value that tipped the scale.  val - 1 is the key.
-  assign_svalue_no_free(sp, val - 1);
+  assign_svalue_no_free(vm_sp(), val - 1);
   free_mapping(m);
 }
 
@@ -767,7 +767,7 @@ svalue_t* replace_objects(svalue_t* thing) {
         append_bounded(buf, sizeof(buf), &len, "\")", 2);
       }
       copy_and_push_string(buf);
-      assign_svalue(&replace_tmp, sp);
+      assign_svalue(&replace_tmp, vm_sp());
       pop_stack();
       return &replace_tmp;
     }
@@ -779,7 +779,7 @@ svalue_t* replace_objects(svalue_t* thing) {
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
       }
-      assign_svalue(&replace_tmp, sp);
+      assign_svalue(&replace_tmp, vm_sp());
       pop_stack();
       replace_tmp.type = thing->type;
       return &replace_tmp;
@@ -788,16 +788,16 @@ svalue_t* replace_objects(svalue_t* thing) {
       push_refed_array(mapping_indices(thing->u.map));
       push_refed_mapping(allocate_mapping(thing->u.map->table_size));
       push_number(0);
-      for (i = 0; i < (sp - 2)->u.arr->size; i++) {
-        svalue_t* key = sp;
-        svalue_t* tmp = find_in_mapping(thing->u.map, (sp - 2)->u.arr->item[i]);
-        assign_svalue(key, replace_objects(&(sp - 2)->u.arr->item[i]));
-        assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1), replace_objects(tmp));
-        if ((sp - 1)->u.map->count - i != 1) {
+      for (i = 0; i < (vm_sp() - 2)->u.arr->size; i++) {
+        svalue_t* key = vm_sp();
+        svalue_t* tmp = find_in_mapping(thing->u.map, (vm_sp() - 2)->u.arr->item[i]);
+        assign_svalue(key, replace_objects(&(vm_sp() - 2)->u.arr->item[i]));
+        assign_svalue_no_free(find_for_insert((vm_sp() - 1)->u.map, key, 1), replace_objects(tmp));
+        if ((vm_sp() - 1)->u.map->count - i != 1) {
           printf("guilty party:%s\n", key->u.string);
         }
       }
-      assign_svalue(&replace_tmp, sp - 1);
+      assign_svalue(&replace_tmp, vm_sp() - 1);
       pop_3_elems();
       return &replace_tmp;
     default:
@@ -807,7 +807,7 @@ svalue_t* replace_objects(svalue_t* thing) {
 }
 
 void f_replace_objects(int num_arg) {
-  assign_svalue(sp, replace_objects(sp));
+  assign_svalue(vm_sp(), replace_objects(vm_sp()));
   // replace_tmp is a module-global scratch slot; drop its lingering ref
   // once the result is on the stack so nothing stays unaccounted between
   // calls (flagged by the Debug leak checker).
@@ -819,15 +819,15 @@ void f_replace_dollars(int num_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;
-  const char* oldstr = (sp - 1)->u.string;
+  const char* oldstr = (vm_sp() - 1)->u.string;
   char* currentnew;
   const char* currentold = oldstr;
   int i;
-  if (sp->u.arr->size & 1) {
+  if (vm_sp()->u.arr->size & 1) {
     error("wrong array length for replace_dollars()");
   }
-  for (i = 0; i < sp->u.arr->size; i++)
-    if (sp->u.arr->item[i].type != T_STRING) {
+  for (i = 0; i < vm_sp()->u.arr->size; i++)
+    if (vm_sp()->u.arr->item[i].type != T_STRING) {
       error("replace array should only contain strings");
     }
   newstr = new_string(max_string_length, "replace_dollars");
@@ -835,10 +835,10 @@ void f_replace_dollars(int num_arg) {
   for (i = 0; i < COUNTED_STRLEN(oldstr); i++) {
     if (oldstr[i] == '$') {
       int j;
-      for (j = 0; j < sp->u.arr->size; j += 2) {
-        const char* one = sp->u.arr->item[j].u.string;
+      for (j = 0; j < vm_sp()->u.arr->size; j += 2) {
+        const char* one = vm_sp()->u.arr->item[j].u.string;
         if (!strncmp(one, oldstr + i, COUNTED_STRLEN(one))) {
-          const char* two = sp->u.arr->item[j + 1].u.string;
+          const char* two = vm_sp()->u.arr->item[j + 1].u.string;
           int const len = i - (currentold - oldstr);
           if (currentnew + len - newstr > max_string_length) {
             FREE_MSTR(newstr);

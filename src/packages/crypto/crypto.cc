@@ -121,9 +121,9 @@ void f_hash(int num_arg) {
   char* result = nullptr;
   int data_len;
 
-  algo = (sp - 1)->u.string;
-  data = sp->u.string;
-  data_len = SVALUE_STRLEN(sp);
+  algo = (vm_sp() - 1)->u.string;
+  data = vm_sp()->u.string;
+  data_len = SVALUE_STRLEN(vm_sp());
 
 #define DO_HASH_IF(id, func, hash_size)       \
   SAFE(if (strcasecmp(algo, id) == 0) {       \

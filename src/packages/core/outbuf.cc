@@ -4,14 +4,14 @@
 
 void outbuf_push(outbuffer_t* outbuf) {
   STACK_INC;
-  sp->type = T_STRING;
+  vm_sp()->type = T_STRING;
   if (outbuf && outbuf->buffer) {
     outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
 
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = outbuf->buffer;
+    vm_sp()->subtype = STRING_MALLOC;
+    vm_sp()->u.string = outbuf->buffer;
   } else {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    vm_sp()->subtype = STRING_CONSTANT;
+    vm_sp()->u.string = "";
   }
 }

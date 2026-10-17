@@ -53,7 +53,7 @@ void f_sys_network_ports(int num_arg) {
 
 #ifdef F_SYS_RELOAD_TLS
 void f_sys_reload_tls(int num_arg) {
-  auto port_index_display = sp->u.number;
+  auto port_index_display = vm_sp()->u.number;
   auto port_index = port_index_display - 1;
 
   DEFER { pop_stack(); };

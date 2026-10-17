@@ -143,7 +143,7 @@ array_t* allocate_array2(LPC_INT n, svalue_t* svp) {
       ret->item[i] = *r;
       r->type = T_NUMBER;
     }
-    sp--; /* detach ret from the stack; caller owns the reference */
+    vm_sp()--; /* detach ret from the stack; caller owns the reference */
   } else {
     ret = allocate_empty_array(n);
 
@@ -428,7 +428,7 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
 
   if (first_on_stack) {
     if (!(n = arr->size)) {
-      *dest = *sp--;
+      *dest = *vm_sp()--;
       return;
     }
   } else {
@@ -624,7 +624,7 @@ void filter_array(svalue_t* arg, int num_arg) {
       }
     }
 
-    sp--; /* pull the work array off the stack without freeing it */
+    vm_sp()--; /* pull the work array off the stack without freeing it */
     if (res) {
       r = resize_array(r, res);
     } else {
@@ -634,7 +634,7 @@ void filter_array(svalue_t* arg, int num_arg) {
 
     pop_n_elems(num_arg - 1);
     free_array(vec);
-    sp->u.arr = r;
+    vm_sp()->u.arr = r;
   }
 }
 
@@ -772,28 +772,28 @@ void f_unique_array(int num_arg) {
   funptr_t* fptr = nullptr;
   const char* func;
 
-  size = (v = (sp - num_arg + 1)->u.arr)->size;
+  size = (v = (vm_sp() - num_arg + 1)->u.arr)->size;
   if (!size) {
     if (num_arg == 3) {
-      free_svalue(sp--, "f_unique_array");
+      free_svalue(vm_sp()--, "f_unique_array");
     }
-    free_svalue(sp--, "f_unique_array");
+    free_svalue(vm_sp()--, "f_unique_array");
     return;
   }
 
   if (num_arg == 3) {
-    skipval = sp;
-    if ((sp - 1)->type == T_FUNCTION) {
-      fptr = (sp - 1)->u.fp;
+    skipval = vm_sp();
+    if ((vm_sp() - 1)->type == T_FUNCTION) {
+      fptr = (vm_sp() - 1)->u.fp;
     } else {
-      func = (sp - 1)->u.string;
+      func = (vm_sp() - 1)->u.string;
     }
   } else {
     skipval = &const0;
-    if (sp->type == T_FUNCTION) {
-      fptr = sp->u.fp;
+    if (vm_sp()->type == T_FUNCTION) {
+      fptr = vm_sp()->u.fp;
     } else {
-      func = sp->u.string;
+      func = vm_sp()->u.string;
     }
   }
 
@@ -805,8 +805,8 @@ void f_unique_array(int num_arg) {
   g_u_list = unlist;
 
   STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = unique_array_error_handler;
+  vm_sp()->type = T_ERROR_HANDLER;
+  vm_sp()->u.error_handler = unique_array_error_handler;
 
   for (i = 0; i < size; i++) {
     if (fptr) {
@@ -865,10 +865,10 @@ void f_unique_array(int num_arg) {
   unlist = g_u_list->next;
   FREE((char*)g_u_list);
   g_u_list = unlist;
-  sp--;
+  vm_sp()--;
   pop_n_elems(num_arg - 1);
   free_array(v);
-  sp->u.arr = ret;
+  vm_sp()->u.arr = ret;
 }
 
 /*
@@ -1041,7 +1041,7 @@ void map_array(svalue_t* arg, int num_arg) {
         break;
       }
     }
-    sp--;
+    vm_sp()--;
   }
 
   pop_n_elems(num_arg);
@@ -1212,7 +1212,7 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
 }
 
 void f_sort_array(int num_arg) {
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = vm_sp() - num_arg + 1;
   array_t* tmp = arg->u.arr;
   check_for_destr(tmp);
 
@@ -1250,7 +1250,7 @@ void f_sort_array(int num_arg) {
         old_quickSort((char*)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
       }
       sort_array_ftc = old_ptr;
-      sp--;  // remove tmp from stack, but we don't want to free it!
+      vm_sp()--;  // remove tmp from stack, but we don't want to free it!
       break;
     }
   }
@@ -1418,7 +1418,7 @@ array_t* deep_inventory(object_t* ob, int take_top, funptr_t* fp) {
   if (fp && i < o) {
     dinv = resize_array(dinv, i);
   }
-  sp--;  // get dinv off the stack, but don't free it;
+  vm_sp()--;  // get dinv off the stack, but don't free it;
   return dinv;
 }
 
@@ -1496,7 +1496,7 @@ array_t* deep_inventory_array(array_t* arr, int take_top, funptr_t* fp) {
   if (fp && i < o) {
     dinv = resize_array(dinv, i);
   }
-  sp--;  // get dinv of the stack but don't free it
+  vm_sp()--;  // get dinv of the stack but don't free it
   return dinv;
 }
 #endif
@@ -2139,10 +2139,10 @@ void f_objects(int num_arg) {
   funptr_t* f = nullptr;
   if (!num_arg) {
     func = nullptr;
-  } else if (sp->type == T_FUNCTION) {
-    f = sp->u.fp;
+  } else if (vm_sp()->type == T_FUNCTION) {
+    f = vm_sp()->u.fp;
   } else {
-    func = sp->u.string;
+    func = vm_sp()->u.string;
   }
 
   get_objects(&list, &count, nullptr, nullptr);

@@ -456,30 +456,30 @@ void free_callback(FfiCallback* cb) {
 
 #ifdef F_FFI_LOAD
 void f_ffi_load(int num_arg) {
-  const char* path = sp->u.string;
+  const char* path = vm_sp()->u.string;
   if (!library_allowed(path)) {
     error("FFI: library '%s' is not in the configured allow-list.\n", path);
   }
-  check_valid_ffi("load", sp);
+  check_valid_ffi("load", vm_sp());
 
   void* handle = plat_dlopen(path);
   if (handle == nullptr) {
     g_last_error = plat_dlerror();
-    free_string_svalue(sp);
+    free_string_svalue(vm_sp());
     put_number(0);
     return;
   }
   auto* lib = new FfiLibrary{handle, path};
   int id = g_next_handle++;
   g_libs[id] = lib;
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp());
   put_number(id);
 }
 #endif
 
 #ifdef F_FFI_UNLOAD
 void f_ffi_unload(int num_arg) {
-  int id = sp->u.number;
+  int id = vm_sp()->u.number;
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
     // Invalidate every FfiFunc prepared from this library before closing
@@ -501,9 +501,9 @@ void f_ffi_unload(int num_arg) {
 
 #ifdef F_FFI_SYMBOL
 void f_ffi_symbol(int num_arg) {
-  const char* name = sp->u.string;
-  int id = (sp - 1)->u.number;
-  check_valid_ffi("symbol", sp);
+  const char* name = vm_sp()->u.string;
+  int id = (vm_sp() - 1)->u.number;
+  check_valid_ffi("symbol", vm_sp());
 
   auto it = g_libs.find(id);
   if (it == g_libs.end()) {
@@ -518,12 +518,12 @@ void f_ffi_symbol(int num_arg) {
 
 #ifdef F_FFI_PREPARE
 void f_ffi_prepare(int num_arg) {
-  array_t* arg_arr = sp->u.arr;
-  int ret_code = (sp - 1)->u.number;
-  const char* name = (sp - 2)->u.string;
-  int lib_id = (sp - 3)->u.number;
+  array_t* arg_arr = vm_sp()->u.arr;
+  int ret_code = (vm_sp() - 1)->u.number;
+  const char* name = (vm_sp() - 2)->u.string;
+  int lib_id = (vm_sp() - 3)->u.number;
 
-  check_valid_ffi("prepare", sp - 2);
+  check_valid_ffi("prepare", vm_sp() - 2);
 
   auto it = g_libs.find(lib_id);
   if (it == g_libs.end()) {
@@ -564,8 +564,8 @@ void f_ffi_prepare(int num_arg) {
 
 #ifdef F_FFI_CALL
 void f_ffi_call(int num_arg) {
-  array_t* args = sp->u.arr;
-  int func_id = (sp - 1)->u.number;
+  array_t* args = vm_sp()->u.arr;
+  int func_id = (vm_sp() - 1)->u.number;
 
   auto it = g_funcs.find(func_id);
   if (it == g_funcs.end()) {
@@ -606,7 +606,7 @@ void f_ffi_call(int num_arg) {
 
 #ifdef F_FFI_ALLOC
 void f_ffi_alloc(int num_arg) {
-  LPC_INT nbytes = sp->u.number;
+  LPC_INT nbytes = vm_sp()->u.number;
   if (nbytes < 0) {
     error("ffi_alloc: negative size.\n");
   }
@@ -621,7 +621,7 @@ void f_ffi_free(int num_arg) {
   // The buffer is GC-managed; "freeing" zeroes it so a dangling native
   // reader sees no stale data. The block is reclaimed when no LPC value
   // references it.
-  buffer_t* buf = sp->u.buf;
+  buffer_t* buf = vm_sp()->u.buf;
   if (buf->size) {
     memset(buf->item, 0, buf->size);
   }
@@ -631,7 +631,7 @@ void f_ffi_free(int num_arg) {
 
 #ifdef F_FFI_SIZEOF
 void f_ffi_sizeof(int num_arg) {
-  int code = sp->u.number;
+  int code = vm_sp()->u.number;
   int sz = type_size(code);
   pop_stack();
   push_number(sz);
@@ -643,9 +643,9 @@ void f_ffi_peek(int num_arg) {
   // Gated like load/prepare: reading an arbitrary native address is a
   // process-memory disclosure primitive, so the master must approve it
   // even though no foreign code runs.
-  check_valid_ffi("peek", sp - 1);
-  LPC_INT nbytes = sp->u.number;
-  auto addr = static_cast<intptr_t>((sp - 1)->u.number);
+  check_valid_ffi("peek", vm_sp() - 1);
+  LPC_INT nbytes = vm_sp()->u.number;
+  auto addr = static_cast<intptr_t>((vm_sp() - 1)->u.number);
   if (addr == 0) {
     error("ffi_peek: NULL address.\n");
   }
@@ -669,7 +669,7 @@ void f_ffi_peek(int num_arg) {
 
 #ifdef F_FFI_ADDRESS
 void f_ffi_address(int num_arg) {
-  buffer_t* buf = sp->u.buf;
+  buffer_t* buf = vm_sp()->u.buf;
   LPC_INT addr = buf->size ? reinterpret_cast<LPC_INT>(&buf->item[0]) : 0;
   pop_stack();
   push_number(addr);
@@ -678,9 +678,9 @@ void f_ffi_address(int num_arg) {
 
 #ifdef F_FFI_READ
 void f_ffi_read(int num_arg) {
-  int code = sp->u.number;
-  LPC_INT offset = (sp - 1)->u.number;
-  buffer_t* buf = (sp - 2)->u.buf;
+  int code = vm_sp()->u.number;
+  LPC_INT offset = (vm_sp() - 1)->u.number;
+  buffer_t* buf = (vm_sp() - 2)->u.buf;
   int sz = type_size(code);
   // Range-check in a non-truncating, non-overflowing form: a huge offset must
   // not truncate to int or wrap past the check into an out-of-bounds memcpy.
@@ -734,10 +734,10 @@ void f_ffi_read(int num_arg) {
 
 #ifdef F_FFI_WRITE
 void f_ffi_write(int num_arg) {
-  svalue_t* val = sp;
-  int code = (sp - 1)->u.number;
-  LPC_INT offset = (sp - 2)->u.number;
-  buffer_t* buf = (sp - 3)->u.buf;
+  svalue_t* val = vm_sp();
+  int code = (vm_sp() - 1)->u.number;
+  LPC_INT offset = (vm_sp() - 2)->u.number;
+  buffer_t* buf = (vm_sp() - 3)->u.buf;
   int sz = type_size(code);
   if (offset < 0 || static_cast<size_t>(offset) + static_cast<size_t>(sz) > buf->size) {
     error("ffi_write: offset %" LPC_INT_FMTSTR_P " (size %d) out of range for buffer of %u.\n",
@@ -752,7 +752,7 @@ void f_ffi_write(int num_arg) {
 
 #ifdef F_FFI_STRUCT_LAYOUT
 void f_ffi_struct_layout(int num_arg) {
-  array_t* fields = sp->u.arr;
+  array_t* fields = vm_sp()->u.arr;
   int n = fields->size;
 
   // Compute each field's aligned offset and the struct's total size,
@@ -799,9 +799,9 @@ void f_ffi_struct_layout(int num_arg) {
 
 #ifdef F_FFI_CALLBACK
 void f_ffi_callback(int num_arg) {
-  array_t* arg_arr = sp->u.arr;
-  int ret_code = (sp - 1)->u.number;
-  svalue_t* fun_sv = sp - 2;  // T_FUNCTION
+  array_t* arg_arr = vm_sp()->u.arr;
+  int ret_code = (vm_sp() - 1)->u.number;
+  svalue_t* fun_sv = vm_sp() - 2;  // T_FUNCTION
 
   check_valid_ffi("callback", nullptr);
 
@@ -849,7 +849,7 @@ void f_ffi_callback(int num_arg) {
 
 #ifdef F_FFI_CALLBACK_ADDR
 void f_ffi_callback_addr(int num_arg) {
-  int id = sp->u.number;
+  int id = vm_sp()->u.number;
   auto it = g_callbacks.find(id);
   if (it == g_callbacks.end()) {
     error("ffi_callback_addr: invalid callback handle %d\n", id);
@@ -862,7 +862,7 @@ void f_ffi_callback_addr(int num_arg) {
 
 #ifdef F_FFI_CALLBACK_FREE
 void f_ffi_callback_free(int num_arg) {
-  int id = sp->u.number;
+  int id = vm_sp()->u.number;
   auto it = g_callbacks.find(id);
   if (it != g_callbacks.end()) {
     if (it->second->dispatching) {

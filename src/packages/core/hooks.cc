@@ -5,10 +5,10 @@
 #ifdef F_HOOK_ATTACH
 void f_hook_attach(int /*num_arg*/) {
   /* args: string point, mixed action, mapping spec, int flags */
-  int flags = sp->u.number;
-  mapping_t* spec = (sp - 1)->u.map;
-  svalue_t* action = sp - 2;
-  const char* point = (sp - 3)->u.string;
+  int flags = vm_sp()->u.number;
+  mapping_t* spec = (vm_sp() - 1)->u.map;
+  svalue_t* action = vm_sp() - 2;
+  const char* point = (vm_sp() - 3)->u.string;
   LPC_INT id = hook_efun_attach(point, action, spec, flags);
   pop_n_elems(4);
   push_number(id);
@@ -17,7 +17,7 @@ void f_hook_attach(int /*num_arg*/) {
 
 #ifdef F_HOOK_DETACH
 void f_hook_detach(int /*num_arg*/) {
-  LPC_INT id = sp->u.number;
+  LPC_INT id = vm_sp()->u.number;
   hook_efun_detach(id);
   pop_stack();
 }
@@ -25,11 +25,11 @@ void f_hook_detach(int /*num_arg*/) {
 
 #ifdef F_HOOK_QUERY
 void f_hook_query(int /*num_arg*/) {
-  LPC_INT id = sp->u.number;
+  LPC_INT id = vm_sp()->u.number;
   mapping_t* m = hook_efun_query(id);
-  free_svalue(sp, "hook_query");
-  sp->type = T_MAPPING;
-  sp->u.map = m;
+  free_svalue(vm_sp(), "hook_query");
+  vm_sp()->type = T_MAPPING;
+  vm_sp()->u.map = m;
 }
 #endif
 
@@ -37,8 +37,8 @@ void f_hook_query(int /*num_arg*/) {
 void f_hook_list(int num_arg) {
   object_t* ob = nullptr;
   if (num_arg == 1) {
-    if (sp->type == T_OBJECT) {
-      ob = sp->u.ob;
+    if (vm_sp()->type == T_OBJECT) {
+      ob = vm_sp()->u.ob;
     }
     pop_stack();
   }

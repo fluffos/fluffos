@@ -30,14 +30,14 @@ int replace_interactive(object_t* ob, object_t* obfrom) {
 void f_exec(int num_arg) {
   int i;
 
-  i = replace_interactive((sp - 1)->u.ob, sp->u.ob);
+  i = replace_interactive((vm_sp() - 1)->u.ob, vm_sp()->u.ob);
 
   /* They might have been destructed */
-  if (sp->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:1");
+  if (vm_sp()->type == T_OBJECT) {
+    free_object(&vm_sp()->u.ob, "f_exec:1");
   }
-  if ((--sp)->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:2");
+  if ((--vm_sp())->type == T_OBJECT) {
+    free_object(&vm_sp()->u.ob, "f_exec:2");
   }
   put_number(i);
 }

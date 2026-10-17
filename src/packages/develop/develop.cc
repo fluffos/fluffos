@@ -12,7 +12,7 @@ void f_debug_info(int num_arg) {
   outbuffer_t out;
 
   outbuf_zero(&out);
-  arg = sp - 1;
+  arg = vm_sp() - 1;
   switch (arg[0].u.number) {
     case 0: {
       int i, flags;
@@ -121,29 +121,29 @@ void f_debug_info(int num_arg) {
 void f_refs(int num_arg) {
   int r;
 
-  switch (sp->type) {
+  switch (vm_sp()->type) {
     case T_MAPPING:
-      r = sp->u.map->ref;
+      r = vm_sp()->u.map->ref;
       break;
     case T_CLASS:
     case T_ARRAY:
-      r = sp->u.arr->ref;
+      r = vm_sp()->u.arr->ref;
       break;
     case T_OBJECT:
-      r = sp->u.ob->ref;
+      r = vm_sp()->u.ob->ref;
       break;
     case T_FUNCTION:
-      r = sp->u.fp->hdr.ref;
+      r = vm_sp()->u.fp->hdr.ref;
       break;
     case T_BUFFER:
-      r = sp->u.buf->ref;
+      r = vm_sp()->u.buf->ref;
       break;
     case T_PROMISE:
-      r = sp->u.prom->ref;
+      r = vm_sp()->u.prom->ref;
       break;
     case T_STRING:
-      if (sp->subtype & STRING_COUNTED) {
-        r = MSTR_REF(sp->u.string);
+      if (vm_sp()->subtype & STRING_COUNTED) {
+        r = MSTR_REF(vm_sp()->u.string);
       } else {
         r = 0;
       }
@@ -152,7 +152,7 @@ void f_refs(int num_arg) {
       r = 0;
       break;
   }
-  free_svalue(sp, "f_refs");
+  free_svalue(vm_sp(), "f_refs");
   put_number(r - 1); /* minus 1 to compensate for being arg of
                       * refs() */
 }
@@ -187,7 +187,7 @@ void f_destructed_objects(int num_arg) {
 void dump_stralloc(outbuffer_t*);
 
 void f_dump_stralloc(int num_arg) {
-  const auto* target_file = sp->u.string;
+  const auto* target_file = vm_sp()->u.string;
   const char* fn;
   FILE* fp;
   fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
@@ -235,25 +235,25 @@ void f_dump_jemalloc(int num_arg) {
 void f_debugmalloc(int num_arg) {
   char* res;
 
-  res = dump_debugmalloc((sp - 1)->u.string, sp->u.number);
-  free_string_svalue(--sp);
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = res;
+  res = dump_debugmalloc((vm_sp() - 1)->u.string, vm_sp()->u.number);
+  free_string_svalue(--vm_sp());
+  vm_sp()->subtype = STRING_MALLOC;
+  vm_sp()->u.string = res;
 }
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask(int num_arg) { set_malloc_mask((sp--)->u.number); }
+void f_set_malloc_mask(int num_arg) { set_malloc_mask((vm_sp()--)->u.number); }
 #endif
 
 #ifdef F_CHECK_MEMORY
-void f_check_memory(int num_arg) { check_all_blocks((sp--)->u.number); }
+void f_check_memory(int num_arg) { check_all_blocks((vm_sp()--)->u.number); }
 #endif
 
 #ifdef F_FIND_ORPHANED_CYCLES
 void f_find_orphaned_cycles(int num_arg) {
   // any nonzero LPC int means collect (don't truncate the 64-bit argument)
-  int const collect = (sp--)->u.number != 0;
+  int const collect = (vm_sp()--)->u.number != 0;
   push_number(md_scan_orphaned_cycles(collect, nullptr));
 }
 #endif
@@ -266,9 +266,9 @@ void f_trace(int num_arg) {
 
   if (command_giver && command_giver->interactive) {
     ot = command_giver->interactive->trace_level;
-    command_giver->interactive->trace_level = sp->u.number;
+    command_giver->interactive->trace_level = vm_sp()->u.number;
   }
-  sp->u.number = ot;
+  vm_sp()->u.number = ot;
 }
 #endif
 
@@ -278,14 +278,14 @@ void f_traceprefix(int num_arg) {
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;
-    if (sp->type & T_STRING) {
-      const char* p = sp->u.string;
+    if (vm_sp()->type & T_STRING) {
+      const char* p = vm_sp()->u.string;
       if (*p == '/') {
         p++;
       }
 
       command_giver->interactive->trace_prefix = make_shared_string(p);
-      free_string_svalue(sp);
+      free_string_svalue(vm_sp());
     } else {
       command_giver->interactive->trace_prefix = nullptr;
     }
@@ -294,7 +294,7 @@ void f_traceprefix(int num_arg) {
     put_malloced_string(add_slash(old));
     free_string(old);
   } else {
-    *sp = const0;
+    *vm_sp() = const0;
   }
 }
 #endif

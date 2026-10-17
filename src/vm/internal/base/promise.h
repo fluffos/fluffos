@@ -260,7 +260,7 @@ struct lpc_coroutine_t {
   long table_index; /* csp->fr.table_index of the async frame (traces) */
   int num_local_variables;
   struct defer_list* defers; /* the async frame's defers */
-  svalue_t* frame;           /* owned bitwise copy of [fp .. sp] */
+  svalue_t* frame;           /* owned bitwise copy of [fp .. vm_sp()] */
   int frame_size;
   /* Slots of `frame` that held a T_LVALUE pointing INTO the frame -- a
    * foreach loop variable, typically. The resume rebuilds the slice at a

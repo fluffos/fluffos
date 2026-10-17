@@ -246,7 +246,8 @@ int num_varargs;
 char* pc;     /* Program pointer. */
 svalue_t* fp; /* Pointer to first argument. */
 
-svalue_t* sp;
+svalue_t* lpc_eval_sp;
+#define sp lpc_eval_sp
 
 int function_index_offset; /* Needed for inheritance */
 int variable_index_offset; /* Needed for inheritance */

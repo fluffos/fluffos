@@ -47,7 +47,11 @@ LPC arguments and return values are passed on the VM evaluation stack using `sva
 * `LPCFrame::builder()` — push args with `f.push(...)` / `f.push_str_malloced(...)`, then `f.apply(...)` or `f.safe_apply(...)`.
 * `f.process_callback(narg, &ftc, F_FOO)` — trailing callback scan (replaces `process_efun_callback(..., num_arg)`).
 * `LPC_EFUN_UNARY_REAL(name, expr)` — Tier-C macro for fixed unary float efuns (see `packages/math/math.cc`).
-* Opcodes in `interpret.cc` / `ops.cc` keep raw `sp`; that is intentional.
+
+#### Stack pointer privacy
+* The bare global `sp` is **not** in package-visible headers. Packages use `vm_sp()` (returns `svalue_t*&`) or `LPCFrame`. Prefer `LPCFrame` for new code.
+* VM-internal code (`interpret.cc`) and the operator package (`packages/ops`) may include `vm/internal/base/vm_stack.h` and use bare `sp` for the hot path.
+* Do **not** name local variables `sp` in packages — it collides with the old global and with `vm_sp()` renames.
 
 #### Navigating the Stack (low-level / legacy):
 * The last argument is at `sp`. The first argument is at `sp - (num_args - 1)`.

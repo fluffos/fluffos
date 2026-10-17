@@ -4,12 +4,12 @@
 void f_explode(int num_arg) {
   array_t* vec;
 
-  int const len = SVALUE_STRLEN(sp - 1);
+  int const len = SVALUE_STRLEN(vm_sp() - 1);
 
-  vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp),
+  vec = explode_string((vm_sp() - 1)->u.string, len, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()),
                        CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
-  free_string_svalue(sp--);
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp());
   put_array(vec);
 }
 #endif
@@ -18,11 +18,11 @@ void f_explode(int num_arg) {
 void f_explode_reversible(int num_arg) {
   array_t* vec;
 
-  int const len = SVALUE_STRLEN(sp - 1);
+  int const len = SVALUE_STRLEN(vm_sp() - 1);
 
-  vec = explode_string((sp - 1)->u.string, len, sp->u.string, SVALUE_STRLEN(sp), true);
-  free_string_svalue(sp--);
-  free_string_svalue(sp);
+  vec = explode_string((vm_sp() - 1)->u.string, len, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()), true);
+  free_string_svalue(vm_sp()--);
+  free_string_svalue(vm_sp());
   put_array(vec);
 }
 #endif
@@ -34,7 +34,7 @@ void f_implode(int num_arg) {
   svalue_t* args;
 
   if (num_arg == 3) {
-    args = (sp - 2);
+    args = (vm_sp() - 2);
     if (args[1].type == T_STRING) {
       error(
           "Third argument to implode() is illegal with implode(array, "
@@ -42,7 +42,7 @@ void f_implode(int num_arg) {
     }
     flag = 1;
   } else {
-    args = (sp - 1);
+    args = (vm_sp() - 1);
     flag = 0;
   }
   arr = args->u.arr;
@@ -52,8 +52,8 @@ void f_implode(int num_arg) {
     /* num_arg == 2 here */
     char* str;
 
-    str = implode_string(arr, sp->u.string, SVALUE_STRLEN(sp));
-    free_string_svalue(sp--);
+    str = implode_string(arr, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()));
+    free_string_svalue(vm_sp()--);
     free_array(arr);
     put_malloced_string(str);
   } else { /* function */

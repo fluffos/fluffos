@@ -18,7 +18,7 @@ void f_socket_create(int num_arg) {
   int fd;
   svalue_t* arg;
 
-  arg = sp - num_arg + 1;
+  arg = vm_sp() - num_arg + 1;
   if ((num_arg == 3) && !(arg[2].type & (T_STRING | T_FUNCTION))) {
     bad_arg(3, F_SOCKET_CREATE);
   }
@@ -29,10 +29,10 @@ void f_socket_create(int num_arg) {
       fd = socket_create(static_cast<enum socket_mode>(arg[0].u.number), &arg[1], &arg[2]);
     }
     pop_n_elems(num_arg - 1);
-    sp->u.number = fd;
+    vm_sp()->u.number = fd;
   } else {
     pop_n_elems(num_arg - 1);
-    sp->u.number = EESECURITY;
+    vm_sp()->u.number = EESECURITY;
   }
 }
 #endif
@@ -43,7 +43,7 @@ void f_socket_bind(int num_arg) {
   svalue_t* arg;
   char addr[ADDR_BUF_SIZE];
 
-  arg = sp - num_arg + 1;
+  arg = vm_sp() - num_arg + 1;
   if ((num_arg == 3) && (arg[2].type != T_STRING)) {
     bad_arg(3, F_SOCKET_BIND);
   }
@@ -54,10 +54,10 @@ void f_socket_bind(int num_arg) {
   if (VALID_SOCKET("bind")) {
     i = socket_bind(fd, arg[1].u.number, (num_arg == 3 ? arg[2].u.string : nullptr));
     pop_n_elems(num_arg - 1);
-    sp->u.number = i;
+    vm_sp()->u.number = i;
   } else {
     pop_n_elems(num_arg - 1);
-    sp->u.number = EESECURITY;
+    vm_sp()->u.number = EESECURITY;
   }
 }
 #endif
@@ -67,16 +67,16 @@ void f_socket_listen(int num_arg) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
-  fd = (sp - 1)->u.number;
+  fd = (vm_sp() - 1)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("listen")) {
-    i = socket_listen(fd, sp);
+    i = socket_listen(fd, vm_sp());
     pop_stack();
-    sp->u.number = i;
+    vm_sp()->u.number = i;
   } else {
     pop_stack();
-    sp->u.number = EESECURITY;
+    vm_sp()->u.number = EESECURITY;
   }
 }
 #endif
@@ -86,12 +86,12 @@ void f_socket_accept(int num_arg) {
   int port, fd;
   char addr[ADDR_BUF_SIZE];
 
-  if (!(sp->type & (T_STRING | T_FUNCTION))) {
+  if (!(vm_sp()->type & (T_STRING | T_FUNCTION))) {
     bad_arg(3, F_SOCKET_ACCEPT);
   }
-  get_socket_address(fd = (sp - 2)->u.number, addr, &port, 0);
+  get_socket_address(fd = (vm_sp() - 2)->u.number, addr, &port, 0);
 
-  (sp - 2)->u.number = VALID_SOCKET("accept") ? socket_accept(fd, (sp - 1), sp) : EESECURITY;
+  (vm_sp() - 2)->u.number = VALID_SOCKET("accept") ? socket_accept(fd, (vm_sp() - 1), vm_sp()) : EESECURITY;
   pop_2_elems();
 }
 #endif
@@ -101,13 +101,13 @@ void f_socket_connect(int num_arg) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!((sp - 1)->type & (T_FUNCTION | T_STRING))) {
+  if (!((vm_sp() - 1)->type & (T_FUNCTION | T_STRING))) {
     bad_arg(3, F_SOCKET_CONNECT);
   }
-  if (!(sp->type & (T_FUNCTION | T_STRING))) {
+  if (!(vm_sp()->type & (T_FUNCTION | T_STRING))) {
     bad_arg(4, F_SOCKET_CONNECT);
   }
-  fd = (sp - 3)->u.number;
+  fd = (vm_sp() - 3)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
 #ifdef IPV6
@@ -122,27 +122,27 @@ void f_socket_connect(int num_arg) {
     int start = 0;
 
     addr[0] = '\0';
-    if ((s = strchr((sp - 2)->u.string, ' '))) {
+    if ((s = strchr((vm_sp() - 2)->u.string, ' '))) {
       /*
        * use specified address and port
        */
-      i = s - (sp - 2)->u.string;
+      i = s - (vm_sp() - 2)->u.string;
       if (i > ADDR_BUF_SIZE - 1) {
         start = i - ADDR_BUF_SIZE - 1;
         i = ADDR_BUF_SIZE - 1;
       }
-      strncat(addr, (sp - 2)->u.string + start, i);
+      strncat(addr, (vm_sp() - 2)->u.string + start, i);
       port = atoi(s + 1);
     }
 #ifdef DEBUG
   } else {
     debug_message("socket_connect: socket already bound to address/port: %s/%d\n", addr, port);
-    debug_message("socket_connect: but requested to connect to: %s\n", (sp - 2)->u.string);
+    debug_message("socket_connect: but requested to connect to: %s\n", (vm_sp() - 2)->u.string);
 #endif
   }
 
-  (sp - 3)->u.number =
-      VALID_SOCKET("connect") ? socket_connect(fd, (sp - 2)->u.string, sp - 1, sp) : EESECURITY;
+  (vm_sp() - 3)->u.number =
+      VALID_SOCKET("connect") ? socket_connect(fd, (vm_sp() - 2)->u.string, vm_sp() - 1, vm_sp()) : EESECURITY;
   pop_3_elems();
 }
 #endif
@@ -152,7 +152,7 @@ void f_socket_write(int num_arg) {
   int i, fd, port;
   svalue_t* arg;
   char addr[ADDR_BUF_SIZE];
-  arg = sp - num_arg + 1;
+  arg = vm_sp() - num_arg + 1;
   if ((num_arg == 3) && (arg[2].type != T_STRING)) {
     bad_arg(3, F_SOCKET_WRITE);
   }
@@ -162,10 +162,10 @@ void f_socket_write(int num_arg) {
   if (VALID_SOCKET("write")) {
     i = socket_write(fd, &arg[1], (num_arg == 3) ? arg[2].u.string : (char*)nullptr);
     pop_n_elems(num_arg - 1);
-    sp->u.number = i;
+    vm_sp()->u.number = i;
   } else {
     pop_n_elems(num_arg - 1);
-    sp->u.number = EESECURITY;
+    vm_sp()->u.number = EESECURITY;
   }
 }
 #endif
@@ -175,10 +175,10 @@ void f_socket_close(int num_arg) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
-  fd = sp->u.number;
+  fd = vm_sp()->u.number;
   get_socket_address(fd, addr, &port, 0);
 
-  sp->u.number = VALID_SOCKET("close") ? socket_close(fd, 0) : EESECURITY;
+  vm_sp()->u.number = VALID_SOCKET("close") ? socket_close(fd, 0) : EESECURITY;
 }
 #endif
 
@@ -187,21 +187,21 @@ void f_socket_release(int num_arg) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!(sp->type & (T_STRING | T_FUNCTION))) {
+  if (!(vm_sp()->type & (T_STRING | T_FUNCTION))) {
     bad_arg(3, F_SOCKET_RELEASE);
   }
-  fd = (sp - 2)->u.number;
+  fd = (vm_sp() - 2)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
-  (sp - 2)->u.number =
-      VALID_SOCKET("release") ? socket_release((sp - 2)->u.number, (sp - 1)->u.ob, sp) : EESECURITY;
+  (vm_sp() - 2)->u.number =
+      VALID_SOCKET("release") ? socket_release((vm_sp() - 2)->u.number, (vm_sp() - 1)->u.ob, vm_sp()) : EESECURITY;
 
   pop_stack();
   /* the object might have been dested an removed from the stack */
-  if (sp->type == T_OBJECT) {
-    free_object(&sp->u.ob, "socket_release()");
+  if (vm_sp()->type == T_OBJECT) {
+    free_object(&vm_sp()->u.ob, "socket_release()");
   }
-  sp--;
+  vm_sp()--;
 }
 #endif
 
@@ -210,17 +210,17 @@ void f_socket_acquire(int num_arg) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!((sp - 1)->type & (T_FUNCTION | T_STRING))) {
+  if (!((vm_sp() - 1)->type & (T_FUNCTION | T_STRING))) {
     bad_arg(3, F_SOCKET_ACQUIRE);
   }
-  if (!(sp->type & (T_FUNCTION | T_STRING))) {
+  if (!(vm_sp()->type & (T_FUNCTION | T_STRING))) {
     bad_arg(4, F_SOCKET_ACQUIRE);
   }
-  fd = (sp - 3)->u.number;
+  fd = (vm_sp() - 3)->u.number;
   get_socket_address(fd, addr, &port, 0);
 
-  (sp - 3)->u.number = VALID_SOCKET("acquire")
-                           ? socket_acquire((sp - 3)->u.number, (sp - 2), (sp - 1), sp)
+  (vm_sp() - 3)->u.number = VALID_SOCKET("acquire")
+                           ? socket_acquire((vm_sp() - 3)->u.number, (vm_sp() - 2), (vm_sp() - 1), vm_sp())
                            : EESECURITY;
 
   pop_3_elems();
@@ -228,7 +228,7 @@ void f_socket_acquire(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_ERROR
-void f_socket_error(int num_arg) { put_constant_string(socket_error(sp->u.number)); }
+void f_socket_error(int num_arg) { put_constant_string(socket_error(vm_sp()->u.number)); }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
@@ -242,18 +242,18 @@ void f_socket_address(int num_arg) {
    * Ok, we will add in a cute little check thing here to see if it is
    * an object or not...
    */
-  local = (sp--)->u.number;
-  if (sp->type & T_OBJECT) {
+  local = (vm_sp()--)->u.number;
+  if (vm_sp()->type & T_OBJECT) {
     /* This is so we can get the address of interactives as well. */
-    if (!sp->u.ob->interactive) {
-      free_object(&sp->u.ob, "f_socket_address:1");
-      *sp = const0u;
+    if (!vm_sp()->u.ob->interactive) {
+      free_object(&vm_sp()->u.ob, "f_socket_address:1");
+      *vm_sp() = const0u;
       return;
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int const ret = getnameinfo(reinterpret_cast<struct sockaddr*>(&sp->u.ob->interactive->addr),
-                                sp->u.ob->interactive->addrlen, host, sizeof(host), service,
+    int const ret = getnameinfo(reinterpret_cast<struct sockaddr*>(&vm_sp()->u.ob->interactive->addr),
+                                vm_sp()->u.ob->interactive->addrlen, host, sizeof(host), service,
                                 sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
       strcpy(host, "0.0.0.0");
@@ -266,7 +266,7 @@ void f_socket_address(int num_arg) {
     push_malloced_string(str);
     return;
   }
-  get_socket_address(sp->u.number, addr, &port, local);
+  get_socket_address(vm_sp()->u.number, addr, &port, local);
   sprintf(buf, "%s %d", addr, port);
   str = string_copy(buf, "f_socket_address");
   put_malloced_string(str);
@@ -279,13 +279,13 @@ void f_socket_status(int num_arg) {
   int i;
 
   if (num_arg) {
-    info = socket_status(sp->u.number);
+    info = socket_status(vm_sp()->u.number);
 
     if (!info) {
-      sp->u.number = 0;
+      vm_sp()->u.number = 0;
     } else {
-      sp->type = T_ARRAY;
-      sp->u.arr = info;
+      vm_sp()->type = T_ARRAY;
+      vm_sp()->u.arr = info;
     }
   } else {
     info = allocate_empty_array(lpc_socks_num());
@@ -316,9 +316,9 @@ void check_socket_option_access(const char* efun, int lpc_sock) {
 
 #ifdef F_SOCKET_SET_OPTION
 void f_socket_set_option(int num_arg) {
-  auto lpc_sock = (sp - 2)->u.number;
-  auto option = (sp - 1)->u.number;
-  auto* arg = sp;
+  auto lpc_sock = (vm_sp() - 2)->u.number;
+  auto option = (vm_sp() - 1)->u.number;
+  auto* arg = vm_sp();
 
   check_socket_option_access("socket_set_option", lpc_sock);
 
@@ -359,12 +359,12 @@ void f_socket_set_option(int num_arg) {
 
 #ifdef F_SOCKET_GET_OPTION
 void f_socket_get_option(int num_arg) {
-  // socket_get_option(int, int) takes TWO arguments: the socket is at sp - 1
-  // and the option at sp (the old sp - 2 / sp - 1 pair was copied from the
+  // socket_get_option(int, int) takes TWO arguments: the socket is at vm_sp() - 1
+  // and the option at vm_sp() (the old vm_sp() - 2 / vm_sp() - 1 pair was copied from the
   // three-argument setter and read the svalue below this frame as the
   // descriptor while using the descriptor as the option).
-  auto lpc_sock = (sp - 1)->u.number;
-  auto option = sp->u.number;
+  auto lpc_sock = (vm_sp() - 1)->u.number;
+  auto option = vm_sp()->u.number;
 
   check_socket_option_access("socket_get_option", lpc_sock);
 

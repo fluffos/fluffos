@@ -690,24 +690,24 @@ void f_add_action(int num_arg) {
   LPC_INT flag;
 
   if (num_arg == 3) {
-    flag = (sp--)->u.number;
+    flag = (vm_sp()--)->u.number;
   } else {
     flag = 0;
   }
 
-  if (sp->type == T_ARRAY) {
-    int i, n = sp->u.arr->size;
-    svalue_t* sv = sp->u.arr->item;
+  if (vm_sp()->type == T_ARRAY) {
+    int i, n = vm_sp()->u.arr->size;
+    svalue_t* sv = vm_sp()->u.arr->item;
 
     for (i = 0; i < n; i++) {
       if (sv[i].type == T_STRING) {
-        add_action(sp - 1, sv[i].u.string, flag & 3);
+        add_action(vm_sp() - 1, sv[i].u.string, flag & 3);
       }
     }
-    free_array((sp--)->u.arr);
+    free_array((vm_sp()--)->u.arr);
   } else {
-    add_action((sp - 1), sp->u.string, flag & 3);
-    free_string_svalue(sp--);
+    add_action((vm_sp() - 1), vm_sp()->u.string, flag & 3);
+    free_string_svalue(vm_sp()--);
   }
   pop_stack();
 }
@@ -730,11 +730,11 @@ void f_command(int num_arg) {
     char buff[1000];
     LPC_INT const save_eval_cost = get_eval();
 
-    if (SVALUE_STRLEN(sp) > sizeof(buff) - 1) {
+    if (SVALUE_STRLEN(vm_sp()) > sizeof(buff) - 1) {
       error("Too long command.\n");
     }
 
-    strncpy(buff, sp->u.string, sizeof(buff));
+    strncpy(buff, vm_sp()->u.string, sizeof(buff));
     buff[sizeof(buff) - 1] = 0;
 
     if (parse_command(buff, current_object)) {
@@ -746,7 +746,7 @@ void f_command(int num_arg) {
     }
   }
 
-  free_string_svalue(sp);
+  free_string_svalue(vm_sp());
   put_number(rc);
 }
 #endif
@@ -761,7 +761,7 @@ void f_disable_commands(int num_arg) { enable_commands(0, 0); }
 
 #ifdef F_ENABLE_COMMANDS
 void f_enable_commands(int num_arg) {
-  enable_commands(1, sp->u.number);
+  enable_commands(1, vm_sp()->u.number);
   pop_stack();
 }
 #endif
@@ -770,13 +770,13 @@ void f_enable_commands(int num_arg) {
 void f_find_living(int num_arg) {
   object_t* ob;
 
-  ob = find_living_object(sp->u.string, 0);
-  free_string_svalue(sp);
+  ob = find_living_object(vm_sp()->u.string, 0);
+  free_string_svalue(vm_sp());
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
     put_unrefed_undested_object(ob, "find_living");
   } else {
-    *sp = const0;
+    *vm_sp() = const0;
   }
 }
 #endif
@@ -785,25 +785,25 @@ void f_find_living(int num_arg) {
 void f_find_player(int num_arg) {
   object_t* ob;
 
-  ob = find_living_object(sp->u.string, 1);
-  free_string_svalue(sp);
+  ob = find_living_object(vm_sp()->u.string, 1);
+  free_string_svalue(vm_sp());
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
     put_unrefed_undested_object(ob, "find_living");
   } else {
-    *sp = const0;
+    *vm_sp() = const0;
   }
 }
 #endif
 
 #ifdef F_LIVING
 void f_living(int num_arg) {
-  if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
-    free_object(&sp->u.ob, "f_living:1");
-    *sp = const1;
+  if (vm_sp()->u.ob->flags & O_ENABLE_COMMANDS) {
+    free_object(&vm_sp()->u.ob, "f_living:1");
+    *vm_sp() = const1;
   } else {
-    free_object(&sp->u.ob, "f_living:2");
-    *sp = const0;
+    free_object(&vm_sp()->u.ob, "f_living:2");
+    *vm_sp() = const0;
   }
 }
 #endif
@@ -816,12 +816,12 @@ void f_livings(int num_arg) { push_refed_array(livings()); }
 void f_notify_fail(int num_arg) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
-    if (sp->type == T_STRING) {
-      command_giver->interactive->default_err_message.s = make_shared_string(sp->u.string);
+    if (vm_sp()->type == T_STRING) {
+      command_giver->interactive->default_err_message.s = make_shared_string(vm_sp()->u.string);
     } else {
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
-      command_giver->interactive->default_err_message.f = sp->u.fp;
-      sp->u.fp->hdr.ref++;
+      command_giver->interactive->default_err_message.f = vm_sp()->u.fp;
+      vm_sp()->u.fp->hdr.ref++;
     }
   }
   pop_stack();
@@ -842,17 +842,17 @@ void f_query_verb(int num_arg) {
 void f_remove_action(int num_arg) {
   LPC_INT success;
 
-  success = remove_action(sp - 1, sp->u.string);
-  free_string_svalue(sp--);
-  free_svalue(sp, "f_remove_action");
+  success = remove_action(vm_sp() - 1, vm_sp()->u.string);
+  free_string_svalue(vm_sp()--);
+  free_svalue(vm_sp(), "f_remove_action");
   put_number(success);
 }
 #endif
 
 #ifdef F_SET_LIVING_NAME
 void f_set_living_name(int num_arg) {
-  set_living_name(current_object, sp->u.string);
-  free_string_svalue(sp--);
+  set_living_name(current_object, vm_sp()->u.string);
+  free_string_svalue(vm_sp()--);
 }
 #endif
 

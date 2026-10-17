@@ -175,8 +175,8 @@ void dumpstat(const char* tfn) {
 #ifdef F_DUMPALLOBJ
 void f_dumpallobj(int num_arg) {
   if (num_arg) {
-    dumpstat(sp->u.string);
-    free_string_svalue(sp--);
+    dumpstat(vm_sp()->u.string);
+    free_string_svalue(vm_sp()--);
   } else {
     dumpstat("/OBJ_DUMP");
   }
