@@ -42,8 +42,7 @@ static void store_matrix(array_t* matrix, const Matrix src) {
   }
 }
 
-void f_id_matrix(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_id_matrix(LPCFrame& f) {
   array_t* matrix;
   int i;
 
@@ -55,8 +54,7 @@ void f_id_matrix(int num_arg) {
   f.ret_refed(matrix);
 }
 
-void f_translate(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_translate(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -87,8 +85,7 @@ void f_translate(int num_arg) {
   f.done();
 }
 
-void f_scale(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_scale(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -118,8 +115,7 @@ void f_scale(int num_arg) {
   f.done();
 }
 
-void f_rotate_x(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rotate_x(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -141,8 +137,7 @@ void f_rotate_x(int num_arg) {
   f.done();
 }
 
-void f_rotate_y(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rotate_y(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -164,8 +159,7 @@ void f_rotate_y(int num_arg) {
   f.done();
 }
 
-void f_rotate_z(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rotate_z(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -187,8 +181,7 @@ void f_rotate_z(int num_arg) {
   f.done();
 }
 
-void f_lookat_rotate(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_lookat_rotate(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -217,8 +210,7 @@ void f_lookat_rotate(int num_arg) {
 }
 
 #ifdef F_LOOKAT_ROTATE2
-void f_lookat_rotate2(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_lookat_rotate2(LPCFrame& f) {
   array_t* matrix;
   LPC_FLOAT ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;

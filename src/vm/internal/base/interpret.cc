@@ -5326,7 +5326,10 @@ void eval_instruction(char* p) {
           }
 
           ScopedTracer _efun_tracer(ename, EventCategory::LPC_EFUN, [&] { return trace_context; });
-          (*efun_table[instruction - EFUN_BASE])(num_arg);
+          {
+            LPCFrame efun_frame = LPCFrame::args(num_arg);
+            (*efun_table[instruction - EFUN_BASE])(efun_frame);
+          }
 
           if (g_hook_mask & HOOK_MASK_EFUN) {
             hook_dispatch_efun_after(ename, efun_filter_ob,

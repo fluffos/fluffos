@@ -7,8 +7,7 @@
 #include <vector>
 
 #ifdef F_PERF_COUNTER_NS
-void f_perf_counter_ns(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_perf_counter_ns(LPCFrame& f) {
 #ifdef _WIN32
   static LARGE_INTEGER Frequency{};
   if (Frequency.QuadPart == 0) {
@@ -28,15 +27,13 @@ void f_perf_counter_ns(int num_arg) {
 #endif
 
 #ifdef F_TIME
-void f_time(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_time(LPCFrame& f) {
   f.ret(static_cast<LPC_INT>(get_current_time()));
 }
 #endif
 
 #ifdef F_TIME_NS
-void f_time_ns(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_time_ns(LPCFrame& f) {
   auto now = std::chrono::system_clock::now();
   f.ret(static_cast<LPC_INT>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count()));
@@ -44,8 +41,8 @@ void f_time_ns(int num_arg) {
 #endif
 
 #ifdef F_CTIME
-void f_ctime(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ctime(LPCFrame& f) {
+  int num_arg = f.argc();
   char buf[255] = {};
   const char *cp = buf, *nl;
   char* p;
@@ -79,8 +76,7 @@ void f_ctime(int num_arg) {
 #ifdef F_LOCALTIME
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
-void f_localtime(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_localtime(LPCFrame& f) {
   struct tm res = {};
   time_t lt;
   lt = f.number(0);
@@ -129,8 +125,7 @@ void f_localtime(int num_arg) {
 #endif
 
 #ifdef F_STRFTIME
-void f_strftime(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_strftime(LPCFrame& f) {
   auto arg_time = f.number(1);
   const auto* arg_fmt = f.string(0);
 
@@ -155,8 +150,7 @@ void f_strftime(int num_arg) {
 #endif
 
 #ifdef F_STRPTIME
-void f_strptime(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_strptime(LPCFrame& f) {
   const auto* arg_timestr = f.string(1);
   const auto* arg_fmt = f.string(0);
 

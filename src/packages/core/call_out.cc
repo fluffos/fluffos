@@ -715,8 +715,8 @@ void reclaim_call_outs() {
 }
 
 namespace {
-inline void int_call_out(bool walltime, int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+inline void int_call_out(bool walltime, LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = f.argp(0);
   /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
    * registers a timer-only call_out and returns a promise fulfilled (with 0)
@@ -813,16 +813,15 @@ inline void int_call_out(bool walltime, int num_arg) {
 }  // namespace
 
 #ifdef F_CALL_OUT
-void f_call_out(int num_arg) { int_call_out(false, num_arg); }
+void f_call_out(LPCFrame& f) { int_call_out(false, f); }
 #endif
 
 #ifdef F_CALL_OUT_WALLTIME
-void f_call_out_walltime(int num_arg) { int_call_out(true, num_arg); }
+void f_call_out_walltime(LPCFrame& f) { int_call_out(true, f); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
-void f_call_out_info(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_call_out_info(LPCFrame& f) {
   f.ret_refed(get_all_call_outs());
 }
 #endif

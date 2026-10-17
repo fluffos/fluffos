@@ -235,8 +235,8 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
   }
 } /* query_multiple_short() */
 
-void f_query_multiple_short(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_multiple_short(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* sv = f.argp(0);
   const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
@@ -445,8 +445,8 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   return ret;
 }
 
-void f_reference_allowed(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_reference_allowed(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* referee = nullptr;
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
@@ -502,8 +502,7 @@ void f_reference_allowed(int num_arg) {
   }
 }
 
-void f_add_a(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_add_a(LPCFrame& f) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   const char* str = f.string(0);
   char* ret;
@@ -584,8 +583,7 @@ void f_add_a(int num_arg) {
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
-void f_vowel(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_vowel(LPCFrame& f) {
   char const v = (char)f.number(0);
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
@@ -597,11 +595,10 @@ void f_vowel(int num_arg) {
   f.done();
 }
 
-void f_replace(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_replace(LPCFrame& f) {
+  int num_arg = f.argc();
   if (f.type(1) == T_STRING && num_arg == 3) {
-    f.done();
-    f_replace_string(num_arg);
+    f_replace_string(f);
     return;
   }
   if (num_arg == 2 && f.type(1) != T_STRING) {
@@ -618,7 +615,7 @@ void f_replace(int num_arg) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
         share_and_push_string(arr->item[i].u.string);
         share_and_push_string(arr->item[i + 1].u.string);
-        f_replace_string(3);
+        { LPCFrame _efun_args = LPCFrame::args(3); f_replace_string(_efun_args); };
         LPCFrame r = LPCFrame::args(1);
         int ok = (r.type(0) == T_STRING);
         r.done();
@@ -678,12 +675,11 @@ void replace_mxp_html(int html, int mxp) {
   f.ret_str_malloced(extend_string(dst, dst2 - dst));
 }
 
-void f_replace_html(int num_arg) { replace_mxp_html(1, 0); }
+void f_replace_html(LPCFrame& f) { replace_mxp_html(1, 0); }
 
-void f_replace_mxp(int num_arg) { replace_mxp_html(0, 1); }
+void f_replace_mxp(LPCFrame& f) { replace_mxp_html(0, 1); }
 
-void f_roulette_wheel(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_roulette_wheel(LPCFrame& f) {
   long num;
   mapping_t* m = f.mapping(0);
   int j, found;
@@ -820,8 +816,7 @@ svalue_t* replace_objects(svalue_t* thing) {
   }
 }
 
-void f_replace_objects(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_replace_objects(LPCFrame& f) {
   assign_svalue(&f.top(), replace_objects(&f.top()));
   // replace_tmp is a module-global scratch slot; drop its lingering ref
   // once the result is on the stack so nothing stays unaccounted between
@@ -831,8 +826,7 @@ void f_replace_objects(int num_arg) {
   f.done();
 }
 
-void f_replace_dollars(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_replace_dollars(LPCFrame& f) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;

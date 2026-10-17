@@ -7,8 +7,8 @@ const char* default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
-void f_set_encoding(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_encoding(LPCFrame& f) {
+  int num_arg = f.argc();
   if (!command_giver || !command_giver->interactive) {
     f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
@@ -60,8 +60,7 @@ void f_set_encoding(int num_arg) {
 #endif
 
 #ifdef F_QUERY_ENCODING
-void f_query_encoding(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_encoding(LPCFrame& f) {
   if (!command_giver || !command_giver->interactive) {
     f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
@@ -86,8 +85,7 @@ void f_query_encoding(int num_arg) {
 #endif
 
 #ifdef F_STRING_ENCODE
-void f_string_encode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_string_encode(LPCFrame& f) {
   const auto* data = f.string(0);
   auto len = f.string_len(0);
   const auto* encoding = f.string(1);
@@ -126,8 +124,7 @@ void f_string_encode(int num_arg) {
 #endif
 
 #ifdef F_STRING_DECODE
-void f_string_decode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_string_decode(LPCFrame& f) {
   auto* data = (char*)(f.buffer(0)->item);
   auto len = f.buffer(0)->size;
   const auto* encoding = f.string(1);
@@ -168,8 +165,7 @@ void f_string_decode(int num_arg) {
 #endif
 
 #ifdef F_BUFFER_TRANSCODE
-void f_buffer_transcode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_buffer_transcode(LPCFrame& f) {
   auto* data = (char*)(f.buffer(0)->item);
   auto len = f.buffer(0)->size;
   const auto* from_encoding = f.string(1);

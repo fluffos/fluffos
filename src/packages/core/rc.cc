@@ -23,8 +23,7 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 }
 
 #ifdef F_GET_CONFIG
-void f_get_config(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_get_config(LPCFrame& f) {
   if (!get_config_item(f.argp(0), f.argp(0))) {
     error("Bad argument to get_config()\n");
   }
@@ -33,8 +32,7 @@ void f_get_config(int num_arg) {
 #endif
 
 #ifdef F_SET_CONFIG
-void f_set_config(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_config(LPCFrame& f) {
   auto num = f.number(0);
   auto* value = f.argp(1);
 

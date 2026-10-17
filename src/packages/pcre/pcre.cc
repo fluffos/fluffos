@@ -128,8 +128,7 @@ int pcrecachesize = 0;
 struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
-void f_pcre_version(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_version(LPCFrame& f) {
   char version[96];
   int jit = 0;
   if (pcre2_config(PCRE2_CONFIG_VERSION, version) < 0) {
@@ -145,8 +144,7 @@ void f_pcre_version(int num_arg) {
   f.ret_str_copy(version);
 }
 
-void f_pcre_config(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_config(LPCFrame& f) {
   mapping_t* m = allocate_mapping(16);
   char buf[128];
   uint32_t u = 0;
@@ -196,8 +194,8 @@ void f_pcre_config(int num_arg) {
   f.ret_refed(m);
 }
 
-void f_pcre_info(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_info(LPCFrame& f) {
+  int num_arg = f.argc();
   pcre_options opts = default_pcre_options();
   if (num_arg >= 2) {
     apply_options_svalue(&opts, &f.top());
@@ -288,8 +286,8 @@ void f_pcre_info(int num_arg) {
   f.ret_refed(m);
 }
 
-void f_pcre_convert(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_convert(LPCFrame& f) {
+  int num_arg = f.argc();
   uint32_t cflags = PCRE2_CONVERT_UTF;
   int have_kind = 0;
 
@@ -344,8 +342,8 @@ void f_pcre_convert(int num_arg) {
   f.ret_str_malloced(ret);
 }
 
-void f_pcre_match(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_match(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* v;
   int flag = 0;
   pcre_options opts = default_pcre_options();
@@ -386,8 +384,8 @@ void f_pcre_match(int num_arg) {
   }
 }
 
-void f_pcre_assoc(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_assoc(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg;
   array_t* vec;
   pcre_options opts = default_pcre_options();
@@ -410,8 +408,8 @@ void f_pcre_assoc(int num_arg) {
   f.ret_refed(vec);
 }
 
-void f_pcre_extract(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_extract(LPCFrame& f) {
+  int num_arg = f.argc();
   pcre_t* run;
   array_t* ret;
   int include_names = 0;
@@ -462,8 +460,8 @@ void f_pcre_extract(int num_arg) {
   f.ret_refed(ret);
 }
 
-void f_pcre_replace(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_replace(LPCFrame& f) {
+  int num_arg = f.argc();
   pcre_t* run;
   array_t* replacements;
 
@@ -541,8 +539,8 @@ void f_pcre_replace(int num_arg) {
 }
 
 // string pcre_replace_callback(string, string, function)
-void f_pcre_replace_callback(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_replace_callback(LPCFrame& f) {
+  int num_arg = f.argc();
   int i;
   char* ret;
   pcre_t* run;
@@ -635,8 +633,7 @@ void f_pcre_replace_callback(int num_arg) {
   f.ret_str_malloced(ret);
 }
 
-void f_pcre_cache(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_cache(LPCFrame& f) {
   mapping_t* m = pcre_get_cache();
   if (!m) {
     f.ret(0);
@@ -1913,8 +1910,8 @@ void mark_pcre_cache() {
 }
 #endif
 
-void f_pcre_match_all(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pcre_match_all(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* v;
   pcre_options opts = default_pcre_options();
 

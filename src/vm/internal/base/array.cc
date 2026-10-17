@@ -763,7 +763,8 @@ static void unique_array_error_handler(void) {
   FREE((char*)unlist);
 }
 
-void f_unique_array(int num_arg) {
+void f_unique_array(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t *v, *ret;
   long size, i, numkeys = 0;
   int* ind;
@@ -1212,7 +1213,8 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
   }
 }
 
-void f_sort_array(int num_arg) {
+void f_sort_array(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = vm_sp() - num_arg + 1;
   array_t* tmp = arg->u.arr;
   check_for_destr(tmp);
@@ -2135,24 +2137,27 @@ array_t* livings() {
 #endif
 
 #ifdef F_OBJECTS
-void f_objects(int num_arg) {
+void f_objects(LPCFrame& f) {
+  int num_arg = f.argc();
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
   const char* func = nullptr;
   object_t** list;
   array_t* ret;
-  funptr_t* f = nullptr;
-  if (!num_arg) {
-    func = nullptr;
-  } else if (vm_sp()->type == T_FUNCTION) {
-    f = vm_sp()->u.fp;
-  } else {
-    func = vm_sp()->u.string;
+  funptr_t* funp = nullptr;
+  if (num_arg) {
+    if (f.type(0) == T_FUNCTION) {
+      funp = f.funptr(0);
+    } else {
+      func = f.string(0);
+    }
   }
+  /* Callbacks below push/pop freely; release the Args window. */
+  f.abandon();
 
   get_objects(&list, &count, nullptr, nullptr);
-  if (f || func) {
+  if (funp || func) {
     /* NOTE: If an object's hidden status changes during a callback, that
      * change will NOT be reflected in the returned array.  If the caller
      * is destructed in a callback or the callback function does not exist,
@@ -2162,8 +2167,8 @@ void f_objects(int num_arg) {
       svalue_t* v;
 
       push_object(list[i]);
-      if (f) {
-        v = call_function_pointer(f, 1);
+      if (funp) {
+        v = call_function_pointer(funp, 1);
       } else {
         v = apply(func, current_object, 1, ORIGIN_EFUN);
       }

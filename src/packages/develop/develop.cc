@@ -7,8 +7,7 @@
 static object_t* ob;
 
 #ifdef F_DEBUG_INFO
-void f_debug_info(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_debug_info(LPCFrame& f) {
   svalue_t* arg;
   outbuffer_t out;
 
@@ -118,8 +117,7 @@ void f_debug_info(int num_arg) {
 #endif
 
 #ifdef F_REFS
-void f_refs(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_refs(LPCFrame& f) {
   int r;
 
   switch (f.type(0)) {
@@ -158,8 +156,7 @@ void f_refs(int num_arg) {
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-void f_destructed_objects(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_destructed_objects(LPCFrame& f) {
   int i;
   array_t* ret;
   object_t* ob;
@@ -186,8 +183,7 @@ void f_destructed_objects(int num_arg) {
 #ifdef F_DUMP_STRALLOC
 void dump_stralloc(outbuffer_t*);
 
-void f_dump_stralloc(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_dump_stralloc(LPCFrame& f) {
   const auto* target_file = f.string(0);
   const char* fn;
   FILE* fp;
@@ -221,8 +217,7 @@ void f_dump_stralloc(int num_arg) {
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 
-void f_dump_jemalloc(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_dump_jemalloc(LPCFrame& f) {
 #ifdef HAVE_JEMALLOC
   mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
   malloc_stats_print(nullptr, nullptr, "");
@@ -235,8 +230,7 @@ void f_dump_jemalloc(int num_arg) {
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
-void f_debugmalloc(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_debugmalloc(LPCFrame& f) {
   char* res;
 
   res = dump_debugmalloc(f.string(0), f.number(1));
@@ -245,24 +239,21 @@ void f_debugmalloc(int num_arg) {
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_malloc_mask(LPCFrame& f) {
   set_malloc_mask(f.number(0));
   f.ret_void();
 }
 #endif
 
 #ifdef F_CHECK_MEMORY
-void f_check_memory(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_check_memory(LPCFrame& f) {
   check_all_blocks(f.number(0));
   f.ret_void();
 }
 #endif
 
 #ifdef F_FIND_ORPHANED_CYCLES
-void f_find_orphaned_cycles(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_find_orphaned_cycles(LPCFrame& f) {
   // any nonzero LPC int means collect (don't truncate the 64-bit argument)
   int const collect = f.number(0) != 0;
   f.ret(md_scan_orphaned_cycles(collect, nullptr));
@@ -272,8 +263,7 @@ void f_find_orphaned_cycles(int num_arg) {
         * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
-void f_trace(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_trace(LPCFrame& f) {
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
@@ -286,8 +276,7 @@ void f_trace(int num_arg) {
 #endif
 
 #ifdef F_TRACEPREFIX
-void f_traceprefix(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_traceprefix(LPCFrame& f) {
   const char* old = nullptr;
 
   if (command_giver && command_giver->interactive) {

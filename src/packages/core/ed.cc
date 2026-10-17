@@ -3341,8 +3341,8 @@ char* object_ed_cmd(object_t* ob, const char* str) {
 #endif
 
 #ifdef F_ED
-void f_ed(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ed(LPCFrame& f) {
+  int num_arg = f.argc();
   if (!command_giver || !command_giver->interactive) {
     f.ret_void();
     return;
@@ -3443,8 +3443,7 @@ void f_ed(int num_arg) {
 #endif
 
 #ifdef F_ED_CMD
-void f_ed_cmd(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ed_cmd(LPCFrame& f) {
   char* res;
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3466,8 +3465,8 @@ void f_ed_cmd(int num_arg) {
 #endif
 
 #ifdef F_ED_START
-void f_ed_start(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ed_start(LPCFrame& f) {
+  int num_arg = f.argc();
   char* res;
   const char* fname = nullptr;
   int restr = 0;
@@ -3507,8 +3506,7 @@ void f_ed_start(int num_arg) {
 #endif
 
 #ifdef F_IN_EDIT
-void f_in_edit(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_in_edit(LPCFrame& f) {
   char* fn;
   ed_buffer_t* eb = nullptr;
 

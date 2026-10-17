@@ -686,8 +686,8 @@ void remove_sent(object_t* ob, object_t* user) {
 #endif
 
 #ifdef F_ADD_ACTION
-void f_add_action(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_add_action(LPCFrame& f) {
+  int num_arg = f.argc();
   LPC_INT flag;
 
   if (num_arg == 3) {
@@ -723,8 +723,7 @@ void f_add_action(int num_arg) {
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_command(LPCFrame& f) {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
@@ -752,31 +751,27 @@ void f_command(int num_arg) {
 #endif
 
 #ifdef F_COMMANDS
-void f_commands(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_commands(LPCFrame& f) {
   f.ret_refed(commands(current_object));
 }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_disable_commands(LPCFrame& f) {
   enable_commands(0, 0);
   f.done();
 }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_enable_commands(LPCFrame& f) {
   enable_commands(1, f.number(0));
   f.ret_void();
 }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_find_living(LPCFrame& f) {
   object_t* ob = find_living_object(f.string(0), 0);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
@@ -788,8 +783,7 @@ void f_find_living(int num_arg) {
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_find_player(LPCFrame& f) {
   object_t* ob = find_living_object(f.string(0), 1);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
@@ -801,22 +795,19 @@ void f_find_player(int num_arg) {
 #endif
 
 #ifdef F_LIVING
-void f_living(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_living(LPCFrame& f) {
   f.ret((f.object(0)->flags & O_ENABLE_COMMANDS) ? 1 : 0);
 }
 #endif
 
 #ifdef F_LIVINGS
-void f_livings(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_livings(LPCFrame& f) {
   f.ret_refed(livings());
 }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_notify_fail(LPCFrame& f) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
     if (f.type(0) == T_STRING) {
@@ -832,8 +823,7 @@ void f_notify_fail(int num_arg) {
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_verb(LPCFrame& f) {
   if (!last_verb) {
     f.ret(0);
     return;
@@ -847,16 +837,14 @@ void f_query_verb(int num_arg) {
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_remove_action(LPCFrame& f) {
   LPC_INT success = remove_action(f.argp(0), f.string(1));
   f.ret(success);
 }
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_living_name(LPCFrame& f) {
   set_living_name(current_object, f.string(0));
   f.ret_void();
 }

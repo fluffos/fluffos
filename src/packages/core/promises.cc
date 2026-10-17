@@ -20,15 +20,14 @@ static void ret_promise(LPCFrame& f, promise_t* p) {
 }
 
 #ifdef F_PROMISE_CREATE
-void f_promise_create(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_create(LPCFrame& f) {
   ret_promise(f, promise_alloc());
 }
 #endif
 
 #ifdef F_PROMISE_RESOLVE
-void f_promise_resolve(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_resolve(LPCFrame& f) {
+  int num_arg = f.argc();
   promise_t* p = f.promise(0);
 
   if (p->state != PROMISE_PENDING || p->resolving) {
@@ -55,8 +54,8 @@ void f_promise_resolve(int num_arg) {
 #endif
 
 #ifdef F_PROMISE_REJECT
-void f_promise_reject(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_reject(LPCFrame& f) {
+  int num_arg = f.argc();
   promise_t* p = f.promise(0);
 
   if (p->state != PROMISE_PENDING || p->resolving) {
@@ -138,8 +137,8 @@ static void promise_then_common(LPCFrame& f, funptr_t* on_fulfilled, funptr_t* o
 }
 
 #ifdef F_PROMISE_THEN
-void f_promise_then(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_then(LPCFrame& f) {
+  int num_arg = f.argc();
   funptr_t* on_fulfilled = (num_arg > 1) ? f.funptr(1) : nullptr;
   funptr_t* on_rejected = (num_arg > 2) ? f.funptr(2) : nullptr;
   promise_then_common(f, on_fulfilled, on_rejected);
@@ -147,23 +146,20 @@ void f_promise_then(int num_arg) {
 #endif
 
 #ifdef F_PROMISE_CATCH
-void f_promise_catch(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_catch(LPCFrame& f) {
   promise_then_common(f, nullptr, f.funptr(1));
 }
 #endif
 
 #ifdef F_PROMISE_STATUS
-void f_promise_status(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_status(LPCFrame& f) {
   int const state = f.promise(0)->state;
   f.ret(state);
 }
 #endif
 
 #ifdef F_PROMISE_RESULT
-void f_promise_result(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_result(LPCFrame& f) {
   promise_t* p = f.promise(0);
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
@@ -182,8 +178,7 @@ void f_promise_result(int num_arg) {
  * its ELEMENTS need checking (AGENTS.md section 2) -- and they need none: a
  * non-promise element is defined to count as already fulfilled with itself,
  * so map() output drops straight in. */
-static void promise_combinator_efun(int num_arg, uint8_t kind) {
-  LPCFrame f = LPCFrame::args(num_arg);
+static void promise_combinator_efun(LPCFrame& f, uint8_t kind) {
   array_t* inputs = f.array(0);
 
   if (kind == PROMISE_COMB_RACE && inputs->size == 0) {
@@ -197,26 +192,23 @@ static void promise_combinator_efun(int num_arg, uint8_t kind) {
 }
 
 #ifdef F_PROMISE_ALL
-void f_promise_all(int num_arg) { promise_combinator_efun(num_arg, PROMISE_COMB_ALL); }
+void f_promise_all(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_ALL); }
 #endif
 
 #ifdef F_PROMISE_ANY
-void f_promise_any(int num_arg) { promise_combinator_efun(num_arg, PROMISE_COMB_ANY); }
+void f_promise_any(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_ANY); }
 #endif
 
 #ifdef F_PROMISE_RACE
-void f_promise_race(int num_arg) { promise_combinator_efun(num_arg, PROMISE_COMB_RACE); }
+void f_promise_race(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_RACE); }
 #endif
 
 #ifdef F_PROMISE_ALL_SETTLED
-void f_promise_all_settled(int num_arg) {
-  promise_combinator_efun(num_arg, PROMISE_COMB_ALL_SETTLED);
-}
+void f_promise_all_settled(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_ALL_SETTLED); }
 #endif
 
 #ifdef F_PROMISE_CANCEL
-void f_promise_cancel(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promise_cancel(LPCFrame& f) {
   /* validated (and possibly error()ed) before the stack is touched */
   int const armed = promise_request_cancel(f.promise(0));
   f.ret(armed);
@@ -224,8 +216,7 @@ void f_promise_cancel(int num_arg) {
 #endif
 
 #ifdef F_PROMISEP
-void f_promisep(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_promisep(LPCFrame& f) {
   /* the argument is `mixed`, so unlike the rest of this file the tag has
    * NOT been validated for us -- that is the question being asked */
   f.ret(f.type(0) == T_PROMISE ? 1 : 0);
@@ -233,16 +224,14 @@ void f_promisep(int num_arg) {
 #endif
 
 #ifdef F_ASYNC_YIELD
-void f_async_yield(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_async_yield(LPCFrame& f) {
   /* No arguments, so nothing to pop: return the yield promise. */
   ret_promise(f, promise_async_yield());
 }
 #endif
 
 #ifdef F_ASYNC_INFO
-void f_async_info(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_async_info(LPCFrame& f) {
   /* async_info()  -> one mapping per suspended coroutine (the original form)
    * async_info(1) -> scheduler counters, including the drain's yield count,
    *                  which is the only portable way to observe that the

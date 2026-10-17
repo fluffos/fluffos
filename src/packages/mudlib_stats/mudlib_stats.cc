@@ -17,8 +17,8 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-void f_domain_stats(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_domain_stats(LPCFrame& f) {
+  int num_arg = f.argc();
   mapping_t* m;
 
   if (num_arg) {
@@ -42,16 +42,15 @@ void f_domain_stats(int num_arg) {
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_author(LPCFrame& f) {
   set_author(f.string(0));
   f.ret_void();
 }
 #endif
 
 #ifdef F_AUTHOR_STATS
-void f_author_stats(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_author_stats(LPCFrame& f) {
+  int num_arg = f.argc();
   mapping_t* m;
 
   if (num_arg) {

@@ -7,8 +7,8 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void f_dump_prog(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_dump_prog(LPCFrame& f) {
+  int num_arg = f.argc();
   program_t* prog;
   const char* where;
   int d;

@@ -1213,8 +1213,7 @@ void mark_external() {
 #endif
 
 #ifdef F_EXTERNAL_CREATE
-void f_external_create(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_create(LPCFrame& f) {
   svalue_t* arg = f.argp(0);
 
   /* Allocation is not privileged; valid_socket is checked at run. */
@@ -1235,10 +1234,10 @@ void f_external_create(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_RUN
-void f_external_run(int num_arg) {
+void f_external_run(LPCFrame& f) {
+  int num_arg = f.argc();
   /* num_arg is the efun parameter — safe across check_valid_socket()'s
    * master apply (no global arity). */
-  LPCFrame f = LPCFrame::args(num_arg);
   int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Created) {
@@ -1271,10 +1270,10 @@ void f_external_run(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_START
-void f_external_start(int num_arg) {
+void f_external_start(LPCFrame& f) {
+  int num_arg = f.argc();
   /* num_arg is the efun parameter — safe across check_valid_socket()'s
    * master apply (no global arity). */
-  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg = f.argp(0);
 
   if (num_arg == 2) {
@@ -1331,24 +1330,21 @@ void f_external_start(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_STDOUT
-void f_external_stdout(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_stdout(LPCFrame& f) {
   ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
   f.ret_str_copy(h->out.c_str());
 }
 #endif
 
 #ifdef F_EXTERNAL_STDERR
-void f_external_stderr(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_stderr(LPCFrame& f) {
   ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
   f.ret_str_copy(h->err.c_str());
 }
 #endif
 
 #ifdef F_EXTERNAL_EXIT_CODE
-void f_external_exit_code(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_exit_code(LPCFrame& f) {
   ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
   f.set_top_number(h->exit_code);
   f.done();
@@ -1356,8 +1352,7 @@ void f_external_exit_code(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_KILL
-void f_external_kill(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_kill(LPCFrame& f) {
   int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Running || h->status_done) {
@@ -1372,8 +1367,7 @@ void f_external_kill(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_CLOSE
-void f_external_close(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_close(LPCFrame& f) {
   int const id = static_cast<int>(f.number(0));
   lookup_handle(id, /*require_owner=*/1);
   destroy_handle(id, /*kill_child=*/1);
@@ -1382,8 +1376,7 @@ void f_external_close(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_WRITE
-void f_external_write(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_write(LPCFrame& f) {
   svalue_t* arg = f.argp(0);
   int const id = static_cast<int>(arg[0].u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
@@ -1393,8 +1386,7 @@ void f_external_write(int num_arg) {
 #endif
 
 #ifdef F_EXTERNAL_CLOSE_STDIN
-void f_external_close_stdin(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_external_close_stdin(LPCFrame& f) {
   int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   h->close_stdin_after_flush = true;

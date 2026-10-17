@@ -568,8 +568,7 @@ static void interrogate_master() {
   }
 }
 
-void f_parse_init(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_init(LPCFrame& f) {
   parse_info_t* pi;
 
   if (current_object->pinfo) {
@@ -615,8 +614,7 @@ static void remove_ids(parse_info_t* pinfo) {
  * information returned by applies to current_object may have changed,
  * and should be recached when necessary.
  */
-void f_parse_refresh(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_refresh(LPCFrame& f) {
   parse_info_t* pi;
 
   /* If this is the master object, prepare to go through
@@ -3442,8 +3440,8 @@ static svalue_t* get_the_error(parser_error_t* err, int obj) {
   }
 }
 
-void f_parse_sentence(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_sentence(LPCFrame& f) {
+  int num_arg = f.argc();
 
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
@@ -3533,8 +3531,8 @@ void f_parse_sentence(int num_arg) {
   }
 }
 
-void f_parse_my_rules(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_my_rules(LPCFrame& f) {
+  int num_arg = f.argc();
   int const flag = (num_arg == 3 ? f.number(2) : 0);
   if (num_arg == 3) {
     f.pop_back();
@@ -3605,8 +3603,7 @@ void f_parse_my_rules(int num_arg) {
   free_parse_globals();
 }
 
-void f_parse_remove(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_remove(LPCFrame& f) {
   const char* verb;
   verb_t* verb_entry;
 
@@ -3630,8 +3627,7 @@ void f_parse_remove(int num_arg) {
   f.ret_void();
 }
 
-void f_parse_add_rule(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_add_rule(LPCFrame& f) {
   int tokens[10];
   int lit[2], i, j;
   svalue_t* ret;
@@ -3724,8 +3720,8 @@ void f_parse_add_rule(int num_arg) {
   f.ret_void();
 }
 
-void f_parse_add_synonym(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_add_synonym(LPCFrame& f) {
+  int num_arg = f.argc();
   const char *new_verb, *old_verb, *rule, *orig_new_verb;
   verb_t* vb;
   verb_node_t *vn, *verb_node;
@@ -3851,8 +3847,7 @@ void f_parse_add_synonym(int num_arg) {
   f.ret_void();
 }
 
-void f_parse_dump(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_parse_dump(LPCFrame& f) {
   int i;
   outbuffer_t ob;
 

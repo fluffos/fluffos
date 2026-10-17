@@ -3,9 +3,8 @@
 #include "vm/internal/hooks.h"
 
 #ifdef F_HOOK_ATTACH
-void f_hook_attach(int num_arg) {
+void f_hook_attach(LPCFrame& f) {
   /* args: string point, mixed action, mapping spec, int flags */
-  LPCFrame f = LPCFrame::args(num_arg);
   const char* point = f.string(0);
   svalue_t* action = f.argp(1);
   mapping_t* spec = f.mapping(2);
@@ -16,8 +15,7 @@ void f_hook_attach(int num_arg) {
 #endif
 
 #ifdef F_HOOK_DETACH
-void f_hook_detach(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_hook_detach(LPCFrame& f) {
   LPC_INT id = f.number(0);
   hook_efun_detach(id);
   f.ret_void();
@@ -25,8 +23,7 @@ void f_hook_detach(int num_arg) {
 #endif
 
 #ifdef F_HOOK_QUERY
-void f_hook_query(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_hook_query(LPCFrame& f) {
   LPC_INT id = f.number(0);
   mapping_t* m = hook_efun_query(id);
   f.ret(m);
@@ -34,8 +31,8 @@ void f_hook_query(int num_arg) {
 #endif
 
 #ifdef F_HOOK_LIST
-void f_hook_list(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_hook_list(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* ob = nullptr;
   if (num_arg == 1) {
     if (f.type(0) == T_OBJECT) {

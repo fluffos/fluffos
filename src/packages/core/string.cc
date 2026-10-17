@@ -1,8 +1,7 @@
 #include "base/package_api.h"
 
 #ifdef F_EXPLODE
-void f_explode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_explode(LPCFrame& f) {
   array_t* vec = explode_string(f.string(0), f.string_len(0), f.string(1), f.string_len(1),
                                 CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
   f.ret(vec);
@@ -10,8 +9,7 @@ void f_explode(int num_arg) {
 #endif
 
 #ifdef F_EXPLODE_REVERSIBLE
-void f_explode_reversible(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_explode_reversible(LPCFrame& f) {
   array_t* vec =
       explode_string(f.string(0), f.string_len(0), f.string(1), f.string_len(1), true);
   f.ret(vec);
@@ -19,8 +17,8 @@ void f_explode_reversible(int num_arg) {
 #endif
 
 #ifdef F_IMPLODE
-void f_implode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_implode(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* arr = f.array(0);
   check_for_destr(arr);
 

@@ -1363,7 +1363,10 @@ void f_function_constructor() {
   push_refed_funp(fp);
 }
 
-void f__evaluate(int num_arg) {
+void f__evaluate(LPCFrame& f) {
+  int num_arg = f.argc();
+  /* Hot-path operator: reshape the stack directly after releasing the window. */
+  f.abandon();
   svalue_t* v;
   svalue_t* arg = sp - num_arg + 1;
 

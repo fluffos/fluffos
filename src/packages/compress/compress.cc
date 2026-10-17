@@ -24,8 +24,8 @@ static bool has_gz_extension(const char* name) {
 #endif
 
 #ifdef F_COMPRESS_FILE
-void f_compress_file(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_compress_file(LPCFrame& f) {
+  int num_arg = f.argc();
   int readb;
   const char* input_file;
   const char* output_file;
@@ -138,8 +138,8 @@ void f_compress_file(int num_arg) {
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-void f_uncompress_file(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_uncompress_file(LPCFrame& f) {
+  int num_arg = f.argc();
   int readb;
   int len;
   const char* input_file;
@@ -257,8 +257,7 @@ void f_uncompress_file(int num_arg) {
 #endif
 
 #ifdef F_COMPRESS
-void f_compress(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_compress(LPCFrame& f) {
   unsigned char* buffer;
   unsigned char* input;
   int size;
@@ -296,8 +295,7 @@ static void* zlib_alloc(void* /*opaque*/, unsigned int items, unsigned int size)
 
 static void zlib_free(void* /*opaque*/, void* address) { FREE(address); }
 
-void f_uncompress(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_uncompress(LPCFrame& f) {
   z_stream* compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
   unsigned char* output_data = nullptr;
