@@ -40,32 +40,24 @@ When creating or modifying packages (efuns) under `src/packages/`, you must foll
   The `make_func` parser compiler compiles these specs into C++ glue code (`efuns.autogen.cc`).
 
 ### VM Stack & Argument Unpacking
-LPC arguments and return values are passed on the VM evaluation stack using `svalue_t` structures. The stack pointer is `sp`. Prefer **`LPCFrame`** (`vm/internal/base/lpc_frame.h`) for new efun and driver call-site code so you do not do raw `sp` arithmetic.
+LPC arguments and return values live on the evaluation stack. **Package efuns use `LPCFrame` only** (`vm/internal/base/lpc_frame.h`) — not bare `sp`, `vm_sp()`, or direct put_/pop_ stack macros. Raw stack access is for the bytecode interpreter and `packages/ops` via `vm_stack.h`.
 
-#### LPCFrame (preferred for efuns / applies)
-* `LPCFrame::args(num_arg)` — efun entry window over already-pushed args; use `f[i]` / `f.number(i)` / `f.string(i)` / `f.as_real(i)`, then `f.ret(...)` / `f.ret_void()` / `f.done()` (in-place).
+#### LPCFrame (required for package efuns)
+* `LPCFrame::args(num_arg)` — efun entry window over already-pushed args; use `f[i]` / `f.from_top(n)` / `f.number(i)` / `f.string(i)` / `f.as_real(i)`, then `f.ret(...)` / `f.ret_void()` / `f.done()` (in-place) / `f.ret_front_number(n)`.
 * `LPCFrame::builder()` — push args with `f.push(...)` / `f.push_str_malloced(...)`, then `f.apply(...)` or `f.safe_apply(...)`.
 * `f.process_callback(narg, &ftc, F_FOO)` — trailing callback scan (replaces `process_efun_callback(..., num_arg)`).
 * `LPC_EFUN_UNARY_REAL(name, expr)` — Tier-C macro for fixed unary float efuns (see `packages/math/math.cc`).
 
 #### Stack pointer privacy
-* The bare global `sp` is **not** in package-visible headers. Packages use `vm_sp()` (returns `svalue_t*&`) or `LPCFrame`. Prefer `LPCFrame` for new code.
-* VM-internal code (`interpret.cc`) and the operator package (`packages/ops`) may include `vm/internal/base/vm_stack.h` and use bare `sp` for the hot path.
-* Do **not** name local variables `sp` in packages — it collides with the old global and with `vm_sp()` renames.
+* Package-visible headers do **not** export `sp` or `vm_sp()` as the efun API. Efuns go through `LPCFrame`. A transitional `vm_sp()` alias may exist only while call sites migrate.
+* VM-internal code (`interpret.cc`) and the operator package (`packages/ops`) include `vm/internal/base/vm_stack.h` and use bare `sp` for the hot path.
+* Do **not** name local variables `sp` in packages.
 
-#### Navigating the Stack (low-level / legacy):
-* The last argument is at `sp`. The first argument is at `sp - (num_args - 1)`.
+#### Arity & low-level notes (VM / ops only):
 * Every efun is `void f_name(int num_arg)` — arity is a **parameter**, not a global. There is no `st_num_arg`.
 * Helpers that locate optional trailing callbacks take arity explicitly: `process_efun_callback(narg, &ftc, F_FOO, num_arg)` or via `LPCFrame`.
 * Direct efun-to-efun calls must pass arity: `f_other(num_arg)` or `f_other(3)`.
-
-#### Accessing Arguments (low-level):
-* `sp->u.number` or `(sp - n)->u.number`: Accessing integer values.
-* `sp->u.string` or `(sp - n)->u.string`: Accessing string values.
-* `sp->u.real` or `(sp - n)->u.real`: Accessing float/real values.
-* `sp->u.arr`: Accessing arrays (`array_t *`).
-* `sp->u.map`: Accessing mappings (`mapping_t *`).
-* `sp->u.buf`: Accessing buffers (`buffer_t *`).
+* On the raw stack (ops / interpret): last arg at `sp`, first at `sp - (num_args - 1)`; typed access via `sp->u.number` / `u.string` / `u.real` / `u.arr` / `u.map` / `u.buf`.
 
 #### Modifying the Stack & Returning Values (low-level):
 * Use `pop_stack()` or `pop_n_elems(n)` to clean up input arguments.

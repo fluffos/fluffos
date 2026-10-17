@@ -124,35 +124,40 @@ struct function_lookup_info_t {
 /* macro calls */
 #define call_program(prog, offset) eval_instruction(prog->program + offset)
 
-/* Evaluation stack top. The historical name `sp` is not exported here —
- * packages use vm_sp(); VM internals may include vm_stack.h for bare `sp`. */
+/* Evaluation stack top. Package efuns must use LPCFrame (lpc_frame.h), not
+ * this pointer. VM internals / packages/ops may include vm_stack.h for bare
+ * `sp`. The transitional vm_sp() alias exists only while remaining call sites
+ * migrate; do not add new uses. */
 extern svalue_t* lpc_eval_sp;
 #define vm_sp() lpc_eval_sp
 
 #define CHECK_STACK_OVERFLOW(x) \
-  if (vm_sp() + (x) >= end_of_stack) SAFE(too_deep_error = 1; error("stack overflow");)
-#define STACK_INC SAFE(CHECK_STACK_OVERFLOW(1); vm_sp()++;)
+  if (lpc_eval_sp + (x) >= end_of_stack) SAFE(too_deep_error = 1; error("stack overflow");)
+#define STACK_INC SAFE(CHECK_STACK_OVERFLOW(1); lpc_eval_sp++;)
 
-#define push_svalue(x) SAFE(STACK_INC; assign_svalue_no_free(vm_sp(), x);)
-#define put_number(x) SAFE(vm_sp()->type = T_NUMBER; vm_sp()->subtype = 0; vm_sp()->u.number = (x);)
-#define put_buffer(x) SAFE(vm_sp()->type = T_BUFFER; vm_sp()->u.buf = (x);)
-#define put_undested_object(x) SAFE(vm_sp()->type = T_OBJECT; vm_sp()->u.ob = (x);)
-#define put_object(x)                                                             \
-  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED)* vm_sp() = const0u; else put_undested_object(x);)
+#define push_svalue(x) SAFE(STACK_INC; assign_svalue_no_free(lpc_eval_sp, x);)
+#define put_number(x) \
+  SAFE(lpc_eval_sp->type = T_NUMBER; lpc_eval_sp->subtype = 0; lpc_eval_sp->u.number = (x);)
+#define put_buffer(x) SAFE(lpc_eval_sp->type = T_BUFFER; lpc_eval_sp->u.buf = (x);)
+#define put_undested_object(x) SAFE(lpc_eval_sp->type = T_OBJECT; lpc_eval_sp->u.ob = (x);)
+#define put_object(x)                                                                   \
+  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED)* lpc_eval_sp = const0u; else put_undested_object(x);)
 #define put_unrefed_undested_object(x, y) \
-  SAFE(vm_sp()->type = T_OBJECT; vm_sp()->u.ob = (x); add_ref((x), y);)
-#define put_unrefed_object(x, y)                                        \
-  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED)* vm_sp() = const0u; \
+  SAFE(lpc_eval_sp->type = T_OBJECT; lpc_eval_sp->u.ob = (x); add_ref((x), y);)
+#define put_unrefed_object(x, y)                                              \
+  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED)* lpc_eval_sp = const0u; \
        else put_unrefed_undested_object(x, y);)
 /* see comments on push_constant_string */
-#define put_constant_string(x)          \
-  SAFE(vm_sp()->type = T_STRING; vm_sp()->subtype = STRING_SHARED; \
-       vm_sp()->u.string = make_shared_string(x);)
+#define put_constant_string(x)                                                      \
+  SAFE(lpc_eval_sp->type = T_STRING; lpc_eval_sp->subtype = STRING_SHARED; \
+       lpc_eval_sp->u.string = make_shared_string(x);)
 #define put_malloced_string(x) \
-  SAFE(vm_sp()->type = T_STRING; vm_sp()->subtype = STRING_MALLOC; vm_sp()->u.string = (x);)
-#define put_array(x) SAFE(vm_sp()->type = T_ARRAY; vm_sp()->u.arr = (x);)
+  SAFE(lpc_eval_sp->type = T_STRING; lpc_eval_sp->subtype = STRING_MALLOC; \
+       lpc_eval_sp->u.string = (x);)
+#define put_array(x) SAFE(lpc_eval_sp->type = T_ARRAY; lpc_eval_sp->u.arr = (x);)
 #define put_shared_string(x) \
-  SAFE(vm_sp()->type = T_STRING; vm_sp()->subtype = STRING_SHARED; vm_sp()->u.string = (x);)
+  SAFE(lpc_eval_sp->type = T_STRING; lpc_eval_sp->subtype = STRING_SHARED; \
+       lpc_eval_sp->u.string = (x);)
 
 extern program_t* current_prog;
 extern short caller_type;
@@ -192,9 +197,10 @@ LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
 
 /* Owns a popped (or stolen) stack lvalue. error() unwinds via a C++
  * exception (do_catch / safe_apply), so the destructor releases the box
- * on that path too -- a bare `svalue_t lvslot = *vm_sp()--` leaked every
+ * on that path too -- a bare `svalue_t lvslot = *lpc_eval_sp--` leaked every
  * T_LVALUE_CODEPOINT / T_LVALUE_RANGE that hit error() before the
- * matching free_svalue (issue #1358). */
+ * matching free_svalue (issue #1358). VM/ops only; package efuns use LPCFrame.
+ */
 /* Value-stack window API (include before PoppedLvalue; see lpc_frame.h). */
 #include "vm/internal/base/lpc_frame.h"
 
@@ -203,15 +209,15 @@ class PoppedLvalue {
   enum Mode { Pop, Steal };
 
   explicit PoppedLvalue(Mode mode = Pop) {
-    slot_ = *vm_sp();
+    slot_ = *lpc_eval_sp;
     if (mode == Pop) {
-      vm_sp()--;
+      lpc_eval_sp--;
     } else {
       /* Leave the stack slot but drop its claim on the box so unwind
        * and this destructor cannot both delete it. */
-      vm_sp()->type = T_NUMBER;
-      vm_sp()->subtype = 0;
-      vm_sp()->u.number = 0;
+      lpc_eval_sp->type = T_NUMBER;
+      lpc_eval_sp->subtype = 0;
+      lpc_eval_sp->u.number = 0;
     }
   }
   ~PoppedLvalue() { free_svalue(&slot_, "PoppedLvalue"); }
