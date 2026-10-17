@@ -974,23 +974,38 @@ array_t* copy_args_one_level(svalue_t* args, int n) {
 /* ---- contained call ---- */
 
 HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
+  /* Callers push handler args then call us; the success path moves them onto
+   * the alt stack (switch_to_hook_stack) and call_function_pointer consumes
+   * them. Every early return must pop the same way, or the args (and every
+   * ref they hold) stay on the VM stack — Debug check_memory() reports Bad
+   * ref count after the next test that leaves those slots live. */
+  auto pop_args = [&]() {
+    if (n_args_on_stack > 0) {
+      pop_n_elems(n_args_on_stack);
+    }
+  };
   if (a->detached) {
+    pop_args();
     return HookRun::Skipped;
   }
   if (a->is_count || a->is_time) {
+    pop_args();
     return HookRun::Ran; /* C-side actions handled by caller */
   }
   funptr_t* f = a->fp;
   if (!f || !f->hdr.owner || (f->hdr.owner->flags & O_DESTRUCTED)) {
     detach_attachment(a);
+    pop_args();
     return HookRun::Skipped;
   }
   if (funp_stale(f)) {
     detach_attachment(a);
+    pop_args();
     return HookRun::Skipped;
   }
   if (compiling_now() || (g_on_hook_stack && g_hook_depth >= kHookDepth - 4)) {
     a->skipped++;
+    pop_args();
     return HookRun::Skipped;
   }
 
@@ -1044,6 +1059,20 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   pop_context(&econ);
 
+  /* Steal the return value off the (hook) stack before abandoning it.
+   * Outermost: switch_back restores the main stack and leaves alt-stack
+   * storage untouched — without this steal the return's refs are orphaned.
+   * Nested: the return sits at sp on the shared hook stack and must be
+   * dropped or the next nested call sees a polluted stack. */
+  svalue_t ret_sv = const0;
+  bool const have_ret = ret != nullptr;
+  if (have_ret) {
+    ret_sv = *ret;
+    if (!outermost) {
+      sp--;
+    }
+  }
+
   if (outermost) {
     switch_back(&ss);
   }
@@ -1087,7 +1116,7 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   g_hook_depth--;
   free_funp(f);
 
-  if (!ret) {
+  if (!have_ret) {
     a->errors++;
     too_deep_error = 0;
     max_eval_error = 0;
@@ -1106,14 +1135,17 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     }
     return HookRun::Error;
   }
-  if (ret->type == T_PROMISE || a->detached) {
+  if (ret_sv.type == T_PROMISE || a->detached) {
+    free_svalue(&ret_sv, "hook declined");
     if (a->detached) {
       delete a;
     }
     return HookRun::Declined;
   }
   if (out) {
-    assign_svalue_no_free(out, ret);
+    *out = ret_sv; /* transfer ownership; caller free_svalue's */
+  } else {
+    free_svalue(&ret_sv, "hook call ret");
   }
   a->events++;
   a->last_fired = get_current_time();
