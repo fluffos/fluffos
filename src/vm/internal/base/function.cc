@@ -632,7 +632,10 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             return trace_context;
           });
 
-          (*efun_table[i - EFUN_BASE])(num_arg);
+          {
+            LPCFrame efun_frame = LPCFrame::args(num_arg);
+            (*efun_table[i - EFUN_BASE])(efun_frame);
+          }
         }
 
         if (g_hook_mask & HOOK_MASK_EFUN) {

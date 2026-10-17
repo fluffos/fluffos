@@ -6,8 +6,7 @@
 
 /* TELNET */
 #ifdef F_REQUEST_TERM_TYPE
-void f_request_term_type(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_request_term_type(LPCFrame& f) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_request_ttype(ip->telnet);
@@ -21,8 +20,7 @@ void f_request_term_type(int num_arg) {
 #endif
 
 #ifdef F_START_REQUEST_TERM_TYPE
-void f_start_request_term_type(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_start_request_term_type(LPCFrame& f) {
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
@@ -37,8 +35,8 @@ void f_start_request_term_type(int num_arg) {
 #endif
 
 #ifdef F_REQUEST_TERM_SIZE
-void f_request_term_size(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_request_term_size(LPCFrame& f) {
+  int num_arg = f.argc();
   auto* ip = current_object->interactive;
 
   if (ip && ip->telnet) {
@@ -57,8 +55,7 @@ void f_request_term_size(int num_arg) {
 #endif
 
 #ifdef F_TELNET_NOP
-void f_telnet_nop(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_telnet_nop(LPCFrame& f) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_nop(ip->telnet);
@@ -71,8 +68,7 @@ void f_telnet_nop(int num_arg) {
 #endif
 
 #ifdef F_TELNET_GA
-void f_telnet_ga(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_telnet_ga(LPCFrame& f) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_ga(ip->telnet);
@@ -86,8 +82,7 @@ void f_telnet_ga(int num_arg) {
 
 /* MXP */
 #ifdef F_HAS_MXP
-void f_has_mxp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_has_mxp(LPCFrame& f) {
   int i = 0;
 
   if (f.object(0)->interactive) {
@@ -99,8 +94,7 @@ void f_has_mxp(int num_arg) {
 #endif
 
 #ifdef F_ACT_MXP
-void f_act_mxp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_act_mxp(LPCFrame& f) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     // start MXP
@@ -115,8 +109,7 @@ void f_act_mxp(int num_arg) {
 /* GMCP */
 
 #ifdef F_HAS_GMCP
-void f_has_gmcp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_has_gmcp(LPCFrame& f) {
   int i = 0;
 
   if (f.object(0)->interactive) {
@@ -128,8 +121,7 @@ void f_has_gmcp(int num_arg) {
 #endif
 
 #ifdef F_SEND_GMCP
-void f_send_gmcp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_send_gmcp(LPCFrame& f) {
   auto* ip = current_object->interactive;
   const auto* data = f.string(0);
   auto len = f.string_len(0);
@@ -148,8 +140,7 @@ void f_send_gmcp(int num_arg) {
 /* MSP */
 
 #ifdef F_HAS_MSP
-void f_has_msp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_has_msp(LPCFrame& f) {
   int i = 0;
 
   if (f.object(0)->interactive) {
@@ -163,8 +154,7 @@ void f_has_msp(int num_arg) {
 /* MSDP */
 
 #ifdef F_HAS_MSDP
-void f_has_msdp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_has_msdp(LPCFrame& f) {
   int i = 0;
 
   if (f.object(0)->interactive) {
@@ -178,8 +168,7 @@ void f_has_msdp(int num_arg) {
 #ifdef F_SEND_MSDP_VARIABLE
 /** TODO update to support sending other value type and use proper MSDP mapping/array formats as
  * needed based on data types */
-void f_send_msdp_variable(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_send_msdp_variable(LPCFrame& f) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     switch (f.type(1)) {
@@ -223,8 +212,7 @@ void f_send_msdp_variable(int num_arg) {
 /* ZMP */
 
 #ifdef F_HAS_ZMP
-void f_has_zmp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_has_zmp(LPCFrame& f) {
   int i = 0;
 
   if (f.object(0)->interactive) {
@@ -236,8 +224,7 @@ void f_has_zmp(int num_arg) {
 #endif
 
 #ifdef F_SEND_ZMP
-void f_send_zmp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_send_zmp(LPCFrame& f) {
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_begin_zmp(ip->telnet, f.string(0));
@@ -259,8 +246,7 @@ void f_send_zmp(int num_arg) {
 #endif
 
 #ifdef F_TELNET_MSP_OOB
-void f_telnet_msp_oob(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_telnet_msp_oob(LPCFrame& f) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_msp_oob(ip, f.string(0), f.string_len(0));

@@ -3,15 +3,13 @@
 #include "file.h"
 
 #ifdef F_DUMP_TRACE
-void f_dump_trace(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_dump_trace(LPCFrame& f) {
   f.ret(get_svalue_trace());
 }
 #endif
 
 #ifdef F_TRACE_START
-void f_trace_start(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_trace_start(LPCFrame& f) {
   // Unconditional: Tracer::collect() self-guards on an empty filename, and
   // gating it on enabled() is what wedged tracing for the life of the
   // process. When a trace hits MAX_EVENTS, TraceWriter::log() calls
@@ -51,8 +49,7 @@ void f_trace_start(int num_arg) {
 #endif
 
 #ifdef F_TRACE_END
-void f_trace_end(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_trace_end(LPCFrame& f) {
   // No enabled() gate: a trace that filled its buffer is exactly the case
   // that needs ending, and collect() already no-ops when there is nothing
   // pending.

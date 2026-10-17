@@ -27,8 +27,7 @@ int replace_interactive(object_t* ob, object_t* obfrom) {
   return (1);
 } /* replace_interactive() */
 
-void f_exec(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_exec(LPCFrame& f) {
   int i = replace_interactive(f.object(0), f.object(1));
   /* Objects may have been destructed; ret() free_svalue's whatever remains. */
   f.ret(static_cast<LPC_INT>(i));

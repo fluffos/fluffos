@@ -25,8 +25,7 @@ uint32_t compute_crc32(unsigned char* buf, int len) {
 }
 
 #ifdef F_CRC32
-void f_crc32(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_crc32(LPCFrame& f) {
   int len;
   unsigned char* buf;
   uint32_t crc;

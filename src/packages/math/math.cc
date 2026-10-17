@@ -25,19 +25,17 @@ LPC_EFUN_UNARY_REAL(cos, cos)
 LPC_EFUN_UNARY_REAL(sin, sin)
 #endif
 #ifdef F_TAN
-void f_tan(int num_arg) {
+void f_tan(LPCFrame& f) {
   /*
    * maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi))
    */
-  LPCFrame f = LPCFrame::args(num_arg);
   f.top().u.real = tan(f.top().u.real);
   f.done();
 }
 #endif
 
 #ifdef F_ASIN
-void f_asin(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_asin(LPCFrame& f) {
   if (f.top().u.real < -1.0) {
     error("math: asin(x) with (x < -1.0)\n");
   }
@@ -50,8 +48,7 @@ void f_asin(int num_arg) {
 #endif
 
 #ifdef F_ACOS
-void f_acos(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_acos(LPCFrame& f) {
   if (f.top().u.real < -1.0) {
     error("math: acos(x) with (x < -1.0)\n");
   }
@@ -68,8 +65,7 @@ LPC_EFUN_UNARY_REAL(atan, atan)
 #endif
 
 #ifdef F_SQRT
-void f_sqrt(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_sqrt(LPCFrame& f) {
   LPC_FLOAT val = f.as_real(0);
 
   if (val < 0.0) {
@@ -82,8 +78,7 @@ void f_sqrt(int num_arg) {
 #endif
 
 #ifdef F_LOG
-void f_log(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_log(LPCFrame& f) {
   if (f.top().u.real <= 0.0) {
     error("math: log(x) with (x <= 0.0)\n");
   }
@@ -93,8 +88,7 @@ void f_log(int num_arg) {
 #endif
 
 #ifdef F_LOG10
-void f_log10(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_log10(LPCFrame& f) {
   LPC_FLOAT val = f.as_real(0);
 
   if (val <= 0.0) {
@@ -107,8 +101,7 @@ void f_log10(int num_arg) {
 #endif
 
 #ifdef F_LOG2
-void f_log2(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_log2(LPCFrame& f) {
   LPC_FLOAT val = f.as_real(0);
 
   if (val <= 0.0) {
@@ -121,8 +114,7 @@ void f_log2(int num_arg) {
 #endif
 
 #ifdef F_POW
-void f_pow(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pow(LPCFrame& f) {
   LPC_FLOAT val = f.as_real(0);
   LPC_FLOAT val2 = f.as_real(1);
   f.ret(pow(val, val2));
@@ -177,8 +169,7 @@ static LPC_FLOAT norm(array_t* a, bool* ok) {
   return sqrt(total);
 }
 
-void f_norm(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_norm(LPCFrame& f) {
   bool ok;
   LPC_FLOAT const val = norm(f.array(0), &ok);
 
@@ -242,8 +233,7 @@ static LPC_FLOAT dotprod(array_t* a, array_t* b, int* status) {
   return vector_op(a, b, dotprod_mult, status);
 }
 
-void f_dotprod(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_dotprod(LPCFrame& f) {
   int status;
   LPC_FLOAT const total = vector_op(f.array(0), f.array(1), dotprod_mult, &status);
 
@@ -265,8 +255,7 @@ void f_dotprod(int num_arg) {
 static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQUARE(b - a); }
 
 /* The (Euclidian) distance between two points */
-void f_distance(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_distance(LPCFrame& f) {
   int status;
   LPC_FLOAT const total = vector_op(f.array(0), f.array(1), distance_mult, &status);
 
@@ -285,8 +274,7 @@ void f_distance(int num_arg) {
 #endif
 
 #ifdef F_ANGLE
-void f_angle(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_angle(LPCFrame& f) {
   LPC_FLOAT dot, norma, normb;
   int status;
   bool ok;

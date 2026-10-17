@@ -619,8 +619,8 @@ void complete_all_asyncio() {
 
 #ifdef F_ASYNC_READ
 
-void f_async_read(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_async_read(LPCFrame& f) {
+  int num_arg = f.argc();
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -662,8 +662,8 @@ void f_async_read(int num_arg) {
 #endif
 
 #ifdef F_ASYNC_WRITE
-void f_async_write(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_async_write(LPCFrame& f) {
+  int num_arg = f.argc();
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -695,8 +695,8 @@ void f_async_write(int num_arg) {
 #endif
 
 #ifdef F_ASYNC_GETDIR
-void f_async_getdir(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_async_getdir(LPCFrame& f) {
+  int num_arg = f.argc();
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -744,7 +744,8 @@ struct AsyncCallbackRef {
   AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
 };
 
-void f_async_db_exec(int num_arg) {
+void f_async_db_exec(LPCFrame& f) {
+  int num_arg = f.argc();
   // Two forms (issue #1319), same split as async_read():
   //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
   //   async_db_exec(handle, sql)                 -> promise for the row count
@@ -765,7 +766,6 @@ void f_async_db_exec(int num_arg) {
     if (bound_args && !bound_args_handed_off) free_array(bound_args);
   };
 
-  LPCFrame f = LPCFrame::args(num_arg);
 
   if (num_arg >= 3) {
     cb.reset(new function_to_call_t);

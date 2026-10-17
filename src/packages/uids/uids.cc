@@ -19,8 +19,7 @@ static object_t* ob;
 
 #ifdef F_EXPORT_UID
 
-void f_export_uid(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_export_uid(LPCFrame& f) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
@@ -37,8 +36,7 @@ void f_export_uid(int num_arg) {
 
 #ifdef F_GETEUID
 
-void f_geteuid(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_geteuid(LPCFrame& f) {
   if (f.type(0) & T_OBJECT) {
     ob = f.object(0);
     if (ob->euid) {
@@ -62,8 +60,7 @@ void f_geteuid(int num_arg) {
 
 #ifdef F_GETUID
 
-void f_getuid(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_getuid(LPCFrame& f) {
   ob = f.object(0);
 
   if (!ob->uid) {
@@ -77,8 +74,7 @@ void f_getuid(int num_arg) {
 
 #ifdef F_SETEUID
 
-void f_seteuid(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_seteuid(LPCFrame& f) {
   svalue_t* ret;
 
   if (f.type(0) & T_NUMBER) {

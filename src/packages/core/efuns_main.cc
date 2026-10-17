@@ -39,8 +39,7 @@ int data_size(object_t* ob);
 void reload_object(object_t* obj);
 
 #ifdef F_ALL_INVENTORY
-void f_all_inventory(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_all_inventory(LPCFrame& f) {
   array_t* vec = all_inventory(f.object(0), 0);
   /* Fresh array (ref 1); transfer without ref++. */
   f.ret_refed(vec);
@@ -48,8 +47,8 @@ void f_all_inventory(int num_arg) {
 #endif
 
 #ifdef F_ALLOCATE
-void f_allocate(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_allocate(LPCFrame& f) {
+  int num_arg = f.argc();
   if (num_arg == 2) {
     array_t* arr = allocate_array2(f.number(0), f.argp(1));
     f.ret_refed(arr);
@@ -61,8 +60,7 @@ void f_allocate(int num_arg) {
 #endif
 
 #ifdef F_ALLOCATE_BUFFER
-void f_allocate_buffer(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_allocate_buffer(LPCFrame& f) {
   buffer_t* buf = allocate_buffer(f.number(0));
   if (buf) {
     f.ret_refed(buf);
@@ -73,8 +71,8 @@ void f_allocate_buffer(int num_arg) {
 #endif
 
 #ifdef F_ALLOCATE_MAPPING
-void f_allocate_mapping(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_allocate_mapping(LPCFrame& f) {
+  int num_arg = f.argc();
 
   if (num_arg == 2) {
     if (f.type(0) != T_ARRAY) {
@@ -102,8 +100,7 @@ void f_allocate_mapping(int num_arg) {
 #endif
 
 #ifdef F_BIND
-void f_bind(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_bind(LPCFrame& f) {
   object_t* ob = f.object(1);
   funptr_t* old_fp = f.funptr(0);
   funptr_t* new_fp;
@@ -186,8 +183,7 @@ static int print_cache_stats(outbuffer_t* ob, int verbose) {
 }
 
 #ifdef F_CACHE_STATS
-void f_cache_stats(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_cache_stats(LPCFrame& f) {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -200,8 +196,8 @@ void f_cache_stats(int num_arg) {
 
 #ifdef F__CALL_OTHER
 /* enhanced call_other written 930314 by Luke Mewburn <zak@rmit.edu.au> */
-void f__call_other(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f__call_other(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg;
   const char* funcname;
   object_t* ob;
@@ -269,8 +265,7 @@ static const char* origin_name(int orig) {
 #endif
 
 #ifdef F_CALL_STACK
-void f_call_stack(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_call_stack(LPCFrame& f) {
   int i, n = csp - &control_stack[0] + 1;
   array_t* ret;
 
@@ -366,8 +361,7 @@ void f_call_stack(int num_arg) {
 #endif
 
 #ifdef F_CAPITALIZE
-void f_capitalize(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_capitalize(LPCFrame& f) {
   if (uislower(f.top().u.string[0])) {
     unlink_string_svalue(&f.top());
     // unlinked, so this is ok
@@ -379,8 +373,7 @@ void f_capitalize(int num_arg) {
 #endif
 
 #ifdef F_CHILDREN
-void f_children(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_children(LPCFrame& f) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   auto v = ObjectTable::instance().children(f.string(0));
   auto len = v.size() < max_array_size ? v.size() : max_array_size;
@@ -397,16 +390,14 @@ void f_children(int num_arg) {
 #endif
 
 #ifdef F_CLASSP
-void f_classp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_classp(LPCFrame& f) {
   f.ret(f.type(0) == T_CLASS);
 }
 
 #endif
 
 #ifdef F_CLEAR_BIT
-void f_clear_bit(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_clear_bit(LPCFrame& f) {
   char* str;
   int len, ind, bit;
 
@@ -441,16 +432,15 @@ void f_clear_bit(int num_arg) {
 #endif
 
 #ifdef F_CLONEP
-void f_clonep(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_clonep(LPCFrame& f) {
   f.ret(f.type(0) == T_OBJECT && (f.object(0)->flags & O_CLONE));
 }
 
 #endif
 
 #ifdef F__NEW
-void f__new(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f__new(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* ob = clone_object(f.string(0), num_arg - 1);
   /* clone_object() / call_create() consumed the trailing create args;
    * only the filename remains. */
@@ -465,8 +455,7 @@ void f__new(int num_arg) {
 #endif
 
 #ifdef F_DEEP_INHERIT_LIST
-void f_deep_inherit_list(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_deep_inherit_list(LPCFrame& f) {
   array_t* vec = deep_inherit_list(f.object(0));
   f.ret_refed(vec);
 }
@@ -474,8 +463,7 @@ void f_deep_inherit_list(int num_arg) {
 #endif
 
 #ifdef F_SET_DEBUG_LEVEL
-void f_set_debug_level(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_debug_level(LPCFrame& f) {
   if (f.type(0) == T_STRING) {
     debug_level_set(f.string(0));
   } else {
@@ -485,15 +473,13 @@ void f_set_debug_level(int num_arg) {
 }
 
 
-void f_clear_debug_level(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_clear_debug_level(LPCFrame& f) {
   debug_level_clear(f.string(0));
   f.ret_void();
 }
 
 
-void f_debug_levels(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_debug_levels(LPCFrame& f) {
   /* not in debug.h since debug.h is included in many places that don't
    know about mapping_t */
   mapping_t* debug_levels();
@@ -504,8 +490,8 @@ void f_debug_levels(int num_arg) {
 #endif
 
 #ifdef F_DEEP_INVENTORY
-void f_deep_inventory(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_deep_inventory(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* vec;
   if (num_arg == 2 && f.type(1) == T_FUNCTION &&
       (f.type(0) == T_ARRAY || f.type(0) == T_OBJECT)) {
@@ -533,8 +519,7 @@ void f_deep_inventory(int num_arg) {
 #endif
 
 #ifdef F_DESTRUCT
-void f_destruct(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_destruct(LPCFrame& f) {
   destruct_object(f.object(0));
   /* remove_object_from_stack() already freed the object and left a number 0
    * in the arg slot; pop it (void efun). */
@@ -544,8 +529,7 @@ void f_destruct(int num_arg) {
 #endif
 
 #ifdef F_ENABLE_WIZARD
-void f_enable_wizard(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_enable_wizard(LPCFrame& f) {
   if (current_object->interactive) {
     current_object->flags |= O_IS_WIZARD;
   }
@@ -555,8 +539,7 @@ void f_enable_wizard(int num_arg) {
 #endif
 
 #ifdef F_ERROR
-void f_error(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_error(LPCFrame& f) {
   int l = f.string_len(0);
   if (l && f.string(0)[l - 1] == '\n') {
     l--;
@@ -579,8 +562,7 @@ void f_error(int num_arg) {
 #endif
 
 #ifdef F_DISABLE_WIZARD
-void f_disable_wizard(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_disable_wizard(LPCFrame& f) {
   if (current_object->interactive) {
     current_object->flags &= ~O_IS_WIZARD;
   }
@@ -590,8 +572,8 @@ void f_disable_wizard(int num_arg) {
 #endif
 
 #ifdef F_ENVIRONMENT
-void f_environment(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_environment(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* ob = nullptr;
 
   if (num_arg) {
@@ -613,8 +595,7 @@ void f_environment(int num_arg) {
 #endif
 
 #ifdef F_FILE_NAME
-void f_file_name(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_file_name(LPCFrame& f) {
   /* This function now returns a leading '/' */
   char* res = add_slash(f.object(0)->obname);
   f.ret_str_malloced(res);
@@ -623,8 +604,8 @@ void f_file_name(int num_arg) {
 #endif
 
 #ifdef F_FILTER
-void f_filter(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_filter(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = f.argp(0);
 
   if (arg->type == T_MAPPING) {
@@ -640,8 +621,7 @@ void f_filter(int num_arg) {
 #endif
 
 #ifdef F_FIND_CALL_OUT
-void f_find_call_out(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_find_call_out(LPCFrame& f) {
   int i;
   if (f.type(0) == T_NUMBER) {
     i = find_call_out_by_handle(current_object, f.number(0));
@@ -654,8 +634,7 @@ void f_find_call_out(int num_arg) {
 #endif
 
 #ifdef F_FIND_OBJECT
-void f_find_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_find_object(LPCFrame& f) {
   object_t* ob;
 
   if (f.number(1)) {
@@ -674,8 +653,7 @@ void f_find_object(int num_arg) {
 
 #ifdef F_FUNCTION_PROFILE
 /* f_function_profile: John Garnett, 1993/05/31, 0.9.17.3 */
-void f_function_profile(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_function_profile(LPCFrame& f) {
   array_t* vec;
   mapping_t* map;
   program_t* prog;
@@ -705,8 +683,8 @@ void f_function_profile(int num_arg) {
 #endif
 
 #ifdef F_FUNCTION_EXISTS
-void f_function_exists(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_function_exists(LPCFrame& f) {
+  int num_arg = f.argc();
   const char* str;
   char* res;
   int l;
@@ -749,8 +727,8 @@ void f_function_exists(int num_arg) {
 #endif
 
 #ifdef F_GET_CHAR
-void f_get_char(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_get_char(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg;
   int i, tmp;
   int flag;
@@ -772,8 +750,7 @@ void f_get_char(int num_arg) {
 #endif
 
 #ifdef F_IN_INPUT
-void f_in_input(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_in_input(LPCFrame& f) {
   int i = f.object(0)->interactive && f.object(0)->interactive->input_to;
   f.ret(i != 0);
 }
@@ -799,8 +776,7 @@ int inherits(program_t* prog, program_t* thep) {
   return 0;
 }
 
-void f_inherits(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_inherits(LPCFrame& f) {
   object_t *ob, *base;
   int i;
 
@@ -817,8 +793,7 @@ void f_inherits(int num_arg) {
 #endif
 
 #ifdef F_SHALLOW_INHERIT_LIST
-void f_shallow_inherit_list(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_shallow_inherit_list(LPCFrame& f) {
   array_t* vec = inherit_list(f.object(0));
   f.ret_refed(vec);
 }
@@ -826,8 +801,7 @@ void f_shallow_inherit_list(int num_arg) {
 #endif
 
 #ifdef F_INCLUDE_LIST
-void f_include_list(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_include_list(LPCFrame& f) {
   array_t* vec = include_list(f.object(0));
   f.ret_refed(vec);
 }
@@ -835,8 +809,8 @@ void f_include_list(int num_arg) {
 #endif
 
 #ifdef F_INPUT_TO
-void f_input_to(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_input_to(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg;
   int i, tmp;
   int flag;
@@ -857,8 +831,7 @@ void f_input_to(int num_arg) {
 #endif
 
 #ifdef F_INTERACTIVE
-void f_interactive(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_interactive(LPCFrame& f) {
   int i = (f.object(0)->interactive != nullptr);
   f.ret(i);
 }
@@ -866,16 +839,14 @@ void f_interactive(int num_arg) {
 #endif
 
 #ifdef F_INTP
-void f_intp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_intp(LPCFrame& f) {
   f.ret(f.type(0) == T_NUMBER);
 }
 
 #endif
 
 #ifdef F_FUNCTIONP
-void f_functionp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_functionp(LPCFrame& f) {
   int i;
 
   if (f.type(0) == T_FUNCTION) {
@@ -895,8 +866,7 @@ void f_functionp(int num_arg) {
 #endif
 
 #ifdef F_KEYS
-void f_keys(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_keys(LPCFrame& f) {
   array_t* vec = mapping_indices(f.mapping(0));
   f.ret_refed(vec);
 }
@@ -904,8 +874,7 @@ void f_keys(int num_arg) {
 #endif
 
 #ifdef F_VALUES
-void f_values(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_values(LPCFrame& f) {
   array_t* vec = mapping_values(f.mapping(0));
   f.ret_refed(vec);
 }
@@ -913,8 +882,7 @@ void f_values(int num_arg) {
 #endif
 
 #ifdef F_LOWER_CASE
-void f_lower_case(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_lower_case(LPCFrame& f) {
   char* str;
 
   str = const_cast<char*>(f.top().u.string);
@@ -940,8 +908,7 @@ void f_lower_case(int num_arg) {
 #endif
 
 #ifdef F_MALLOC_STATUS
-void f_malloc_status(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_malloc_status(LPCFrame& f) {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -960,8 +927,7 @@ void f_malloc_status(int num_arg) {
 #endif
 
 #ifdef F_MAP_DELETE
-void f_map_delete(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_map_delete(LPCFrame& f) {
   mapping_delete(f.mapping(0), f.argp(1));
   f.ret_void();
 }
@@ -969,16 +935,15 @@ void f_map_delete(int num_arg) {
 #endif
 
 #ifdef F_MAPP
-void f_mapp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_mapp(LPCFrame& f) {
   f.ret(f.type(0) == T_MAPPING);
 }
 
 #endif
 
 #ifdef F_MAP
-void f_map(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_map(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = f.argp(0);
 
   if (arg->type == T_MAPPING) {
@@ -994,8 +959,7 @@ void f_map(int num_arg) {
 #endif
 
 #ifdef F_MASTER
-void f_master(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_master(LPCFrame& f) {
   if (!master_ob) {
     f.ret(0);
   } else {
@@ -1018,8 +982,7 @@ void f_master(int num_arg) {
  Cygnus
  */
 #ifdef F_MATCH_PATH
-void f_match_path(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_match_path(LPCFrame& f) {
   svalue_t* value;
   const char* src;
   char* dst;
@@ -1148,8 +1111,8 @@ static void warn_member_array_byte_search(const program_t* prog, const char* at)
       file ? file : "<unknown>", line);
 }
 
-void f_member_array(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_member_array(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* v;
   int flag = 0;
   LPC_INT i;
@@ -1335,8 +1298,8 @@ void f_member_array(int num_arg) {
 #endif
 
 #ifdef F_MESSAGE
-void f_message(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_message(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t *use = nullptr, *avoid;
   svalue_t* args;
 
@@ -1385,8 +1348,7 @@ void f_message(int num_arg) {
 #endif
 
 #ifdef F_MOVE_OBJECT
-void f_move_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_move_object(LPCFrame& f) {
   object_t *o1, *o2;
 
   /* get destination */
@@ -1498,8 +1460,7 @@ int calculate_and_maybe_print_memory_info(outbuffer_t* ob, int verbose) {
 }  // namespace
 
 #ifdef F_MUD_STATUS
-void f_mud_status(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_mud_status(LPCFrame& f) {
   uint64_t tot = 0;
   int verbose = 0;
   outbuffer_t ob;
@@ -1548,32 +1509,29 @@ void f_mud_status(int num_arg) {
 #endif
 
 #ifdef F_OBJECTP
-void f_objectp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_objectp(LPCFrame& f) {
   f.ret(f.type(0) == T_OBJECT && !(f.object(0)->flags & O_DESTRUCTED));
 }
 
 #endif
 
 #ifdef F_ORIGIN
-void f_origin(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_origin(LPCFrame& f) {
   f.ret_str_constant(origin_name(caller_type));
 }
 
 #endif
 
 #ifdef F_POINTERP
-void f_pointerp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pointerp(LPCFrame& f) {
   f.ret(f.type(0) == T_ARRAY);
 }
 
 #endif
 
 #ifdef F_PRESENT
-void f_present(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_present(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = f.argp(0);
   object_t* ob;
 
@@ -1593,8 +1551,7 @@ void f_present(int num_arg) {
 #endif
 
 #ifdef F_PREVIOUS_OBJECT
-void f_previous_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_previous_object(LPCFrame& f) {
   control_stack_t* p;
   int i;
   object_t* ob = nullptr;
@@ -1665,8 +1622,8 @@ void f_previous_object(int num_arg) {
 #endif
 
 #ifdef F_PRINTF
-void f_printf(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_printf(LPCFrame& f) {
+  int num_arg = f.argc();
   char* ret;
 
   if (command_giver) {
@@ -1715,8 +1672,7 @@ void f_process_value(int /*num_arg*/) {
 #endif
 
 #ifdef F_QUERY_ED_MODE
-void f_query_ed_mode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_ed_mode(LPCFrame& f) {
   /* n = prompt for line 'n'
    0 = normal ed prompt
    -1 = not in ed
@@ -1731,8 +1687,7 @@ void f_query_ed_mode(int num_arg) {
 #endif
 
 #ifdef F_QUERY_HOST_NAME
-void f_query_host_name(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_host_name(LPCFrame& f) {
   char* tmp;
 
   if ((tmp = query_host_name())) {
@@ -1745,8 +1700,7 @@ void f_query_host_name(int num_arg) {
 #endif
 
 #ifdef F_QUERY_IDLE
-void f_query_idle(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_idle(LPCFrame& f) {
   int i = query_idle(f.object(0));
   f.ret(i);
 }
@@ -1754,8 +1708,8 @@ void f_query_idle(int num_arg) {
 #endif
 
 #ifdef F_QUERY_IP_NAME
-void f_query_ip_name(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_ip_name(LPCFrame& f) {
+  int num_arg = f.argc();
   const char* tmp;
 
   tmp = query_ip_name(num_arg ? f.object(0) : nullptr);
@@ -1770,8 +1724,8 @@ void f_query_ip_name(int num_arg) {
 #endif
 
 #ifdef F_QUERY_IP_NUMBER
-void f_query_ip_number(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_ip_number(LPCFrame& f) {
+  int num_arg = f.argc();
   const char* tmp;
 
   tmp = query_ip_number(num_arg ? f.object(0) : nullptr);
@@ -1787,16 +1741,14 @@ void f_query_ip_number(int num_arg) {
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-void f_query_load_average(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_load_average(LPCFrame& f) {
   f.ret_str_copy(query_load_av());
 }
 
 #endif
 
 #ifdef F_QUERY_PRIVS
-void f_query_privs(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_privs(LPCFrame& f) {
   object_t* ob = f.object(0);
   if (ob->privs != nullptr) {
     f.ret_str_shared(ob->privs);
@@ -1808,8 +1760,7 @@ void f_query_privs(int num_arg) {
 #endif
 
 #ifdef F_QUERY_SNOOPING
-void f_query_snooping(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_snooping(LPCFrame& f) {
   object_t* ob = query_snooping(f.object(0));
   if (ob) {
     f.ret(ob);
@@ -1821,8 +1772,7 @@ void f_query_snooping(int num_arg) {
 #endif
 
 #ifdef F_QUERY_SNOOP
-void f_query_snoop(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_snoop(LPCFrame& f) {
   object_t* ob = query_snoop(f.object(0));
   if (ob) {
     f.ret(ob);
@@ -1834,8 +1784,7 @@ void f_query_snoop(int num_arg) {
 #endif
 
 #ifdef F_RANDOM
-void f_random(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_random(LPCFrame& f) {
   if (f.number(0) <= 0) {
     f.set_top_number(0);
     f.done();
@@ -1848,8 +1797,7 @@ void f_random(int num_arg) {
 #endif
 
 #ifdef F_SECURE_RANDOM
-void f_secure_random(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_secure_random(LPCFrame& f) {
   if (f.number(0) <= 0) {
     f.set_top_number(0);
     f.done();
@@ -1862,8 +1810,8 @@ void f_secure_random(int num_arg) {
 #endif
 
 #ifdef F_READ_BYTES
-void f_read_bytes(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_read_bytes(LPCFrame& f) {
+  int num_arg = f.argc();
   char* str;
   LPC_INT start = 0, len = 0;
   int rlen = 0;
@@ -1887,8 +1835,8 @@ void f_read_bytes(int num_arg) {
 #endif
 
 #ifdef F_READ_BUFFER
-void f_read_buffer(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_read_buffer(LPCFrame& f) {
+  int num_arg = f.argc();
   char* str;
   LPC_INT start = 0, len = 0;
   int rlen = 0;
@@ -1921,8 +1869,8 @@ void f_read_buffer(int num_arg) {
 #endif
 
 #ifdef F_READ_FILE
-void f_read_file(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_read_file(LPCFrame& f) {
+  int num_arg = f.argc();
   char* str;
   LPC_INT start = 0, len = 0;
 
@@ -1953,8 +1901,7 @@ void f_read_file(int num_arg) {
 #endif
 
 #ifdef F_RECEIVE
-void f_receive(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_receive(LPCFrame& f) {
   if (f.type(0) == T_STRING) {
     if (current_object->interactive) {
       int const len = f.string_len(0);
@@ -1971,8 +1918,8 @@ void f_receive(int num_arg) {
 #endif
 
 #ifdef F_REG_ASSOC
-void f_reg_assoc(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_reg_assoc(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg;
   array_t* vec;
 
@@ -1989,8 +1936,8 @@ void f_reg_assoc(int num_arg) {
 #endif
 
 #ifdef F_REGEXP
-void f_regexp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_regexp(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* v;
   int flag;
 
@@ -2018,8 +1965,8 @@ void f_regexp(int num_arg) {
 #endif
 
 #ifdef F_REMOVE_CALL_OUT
-void f_remove_call_out(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_remove_call_out(LPCFrame& f) {
+  int num_arg = f.argc();
   int i;
   if (num_arg) {
     if (f.type(0) == T_STRING) {
@@ -2037,8 +1984,7 @@ void f_remove_call_out(int num_arg) {
 #endif
 
 #ifdef F_RENAME
-void f_rename(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rename(LPCFrame& f) {
   int i = do_rename(f.string(0), f.string(1), F_RENAME);
   f.ret(i);
 }
@@ -2093,8 +2039,8 @@ void f_rename(int num_arg) {
  )
  */
 
-void f_replace_string(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_replace_string(LPCFrame& f) {
+  int num_arg = f.argc();
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int plen, rlen, dlen, cur;
@@ -2363,8 +2309,7 @@ void f_replace_string(int num_arg) {
 #endif
 
 #ifdef F_RESOLVE
-void f_resolve(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_resolve(LPCFrame& f) {
   LPC_INT i = query_addr_by_name(f.string(0), f.argp(1));
   f.ret(i);
 }
@@ -2372,8 +2317,7 @@ void f_resolve(int num_arg) {
 #endif
 
 #ifdef F_RM
-void f_rm(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rm(LPCFrame& f) {
   int i = remove_file(f.string(0));
   f.ret(i);
 }
@@ -2381,8 +2325,7 @@ void f_rm(int num_arg) {
 #endif
 
 #ifdef F_RMDIR
-void f_rmdir(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rmdir(LPCFrame& f) {
   const char* path = check_valid_path(f.string(0), current_object, "rmdir", 1);
   if (!path || rmdir(path) == -1) {
     f.ret(0);
@@ -2394,8 +2337,8 @@ void f_rmdir(int num_arg) {
 #endif
 
 #ifdef F_SAY
-void f_say(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_say(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2428,8 +2371,7 @@ void f_say(int num_arg) {
 /* warning: do not enable this without using valid_override() in the master
  object and a set_eval_limit() simul_efun to restrict access.
  */
-void f_set_eval_limit(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_eval_limit(LPCFrame& f) {
   switch (f.number(0)) {
     case 0:
       f.set_top_number(max_eval_cost);
@@ -2453,8 +2395,7 @@ void f_set_eval_limit(int num_arg) {
 #endif
 
 #ifdef F_SET_BIT
-void f_set_bit(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_bit(LPCFrame& f) {
   char* str;
   int len, old_len, ind, bit;
 
@@ -2501,8 +2442,7 @@ void f_set_bit(int num_arg) {
 #endif
 
 #ifdef F_SET_NOTIFY_DESTRUCT
-void f_set_notify_destruct(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_notify_destruct(LPCFrame& f) {
   int const num = f.number(0);
   if (num == 1) {
     current_object->flags |= O_NOTIFY_DESTRUCT;
@@ -2517,8 +2457,7 @@ void f_set_notify_destruct(int num_arg) {
 #endif
 
 #ifdef F_QUERY_NOTIFY_DESTRUCT
-void f_query_notify_destruct(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_notify_destruct(LPCFrame& f) {
   int const num = f.object(0)->flags & O_NOTIFY_DESTRUCT;
   f.ret(num ? 1 : 0);
 }
@@ -2526,8 +2465,7 @@ void f_query_notify_destruct(int num_arg) {
 #endif
 
 #ifdef F_SET_HEART_BEAT
-void f_set_heart_beat(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_heart_beat(LPCFrame& f) {
   set_heart_beat(current_object, f.number(0));
   f.ret_void();
 }
@@ -2535,16 +2473,14 @@ void f_set_heart_beat(int num_arg) {
 #endif
 
 #ifdef F_QUERY_HEART_BEAT
-void f_query_heart_beat(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_heart_beat(LPCFrame& f) {
   f.ret(query_heart_beat(f.object(0)));
 }
 
 #endif
 
 #ifdef F_SET_HIDE
-void f_set_hide(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_hide(LPCFrame& f) {
   if (!valid_hide(current_object)) {
     f.ret_void();
     return;
@@ -2561,8 +2497,7 @@ void f_set_hide(int num_arg) {
 #endif
 
 #ifdef F_SET_LIGHT
-void f_set_light(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_light(LPCFrame& f) {
   object_t* o1;
 
   add_light(current_object, f.number(0));
@@ -2578,8 +2513,7 @@ void f_set_light(int num_arg) {
 #endif
 
 #ifdef F_SET_PRIVS
-void f_set_privs(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_privs(LPCFrame& f) {
   object_t* ob = f.object(0);
 
   if (ob->privs != nullptr) {
@@ -2595,8 +2529,7 @@ void f_set_privs(int num_arg) {
 #endif
 
 #ifdef F_SHADOW
-void f_shadow(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_shadow(LPCFrame& f) {
   object_t* ob = f.object(0);
 
   if (!f.number(1)) {
@@ -2632,8 +2565,7 @@ void f_shadow(int num_arg) {
 #endif
 
 #ifdef F_SHOUT
-void f_shout(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_shout(LPCFrame& f) {
   shout_string(f.string(0));
   f.ret_void();
 }
@@ -2641,8 +2573,8 @@ void f_shout(int num_arg) {
 #endif
 
 #ifdef F_SHUTDOWN
-void f_shutdown(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_shutdown(LPCFrame& f) {
+  int num_arg = f.argc();
   if (num_arg) {
     shutdownMudOS(f.number(0));
     f.done();
@@ -2654,8 +2586,7 @@ void f_shutdown(int num_arg) {
 #endif
 
 #ifdef F_SIZEOF
-void f_sizeof(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_sizeof(LPCFrame& f) {
   size_t i;
 
   switch (f.type(0)) {
@@ -2696,8 +2627,8 @@ void f_sizeof(int num_arg) {
 #endif
 
 #ifdef F_SNOOP
-void f_snoop(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_snoop(LPCFrame& f) {
+  int num_arg = f.argc();
   /*
    * This one takes a variable number of arguments. It returns 0 or an
    * object.
@@ -2720,8 +2651,8 @@ void f_snoop(int num_arg) {
 #endif
 
 #ifdef F_SPRINTF
-void f_sprintf(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_sprintf(LPCFrame& f) {
+  int num_arg = f.argc();
   char* s = string_print_formatted(f.string(0), num_arg - 1, f.argp(1));
   if (!s) {
     f.ret_str_constant("");
@@ -2732,8 +2663,7 @@ void f_sprintf(int num_arg) {
 #endif
 
 #ifdef F_STAT
-void f_stat(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_stat(LPCFrame& f) {
   struct stat buf;
   const char* path;
   array_t* v;
@@ -2796,8 +2726,7 @@ void f_stat(int num_arg) {
  * Written 930706 by Luke Mewburn <zak@rmit.edu.au>
  */
 
-void f_strsrch(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_strsrch(LPCFrame& f) {
   auto* arg1 = f.argp(0);
   auto* arg2 = f.argp(1);
   auto* arg3 = f.argp(2);
@@ -2878,32 +2807,28 @@ void f_strsrch(int num_arg) {
 #endif
 
 #ifdef F_STRCMP
-void f_strcmp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_strcmp(LPCFrame& f) {
   f.ret(strcmp(f.string(0), f.string(1)));
 }
 
 #endif
 
 #ifdef F_STRINGP
-void f_stringp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_stringp(LPCFrame& f) {
   f.ret(f.type(0) == T_STRING);
 }
 
 #endif
 
 #ifdef F_BUFFERP
-void f_bufferp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_bufferp(LPCFrame& f) {
   f.ret(f.type(0) == T_BUFFER);
 }
 
 #endif
 
 #ifdef F_TELL_OBJECT
-void f_tell_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_tell_object(LPCFrame& f) {
   tell_object(f.object(0), f.string(1), f.string_len(1));
   f.ret_void();
 }
@@ -2911,8 +2836,8 @@ void f_tell_object(int num_arg) {
 #endif
 
 #ifdef F_TELL_ROOM
-void f_tell_room(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_tell_room(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2953,8 +2878,7 @@ void f_tell_room(int num_arg) {
 #endif
 
 #ifdef F_TEST_BIT
-void f_test_bit(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_test_bit(LPCFrame& f) {
   LPC_INT const ind = f.number(1);
 
   if (ind / 6 >= f.string_len(0)) {
@@ -2973,8 +2897,7 @@ void f_test_bit(int num_arg) {
 #endif
 
 #ifdef F_NEXT_BIT
-void f_next_bit(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_next_bit(LPCFrame& f) {
   LPC_INT const start = f.number(1);
   int const len = f.string_len(0);
   int which, bit = 0, value;
@@ -3035,16 +2958,14 @@ void f_next_bit(int num_arg) {
 #endif
 
 #ifdef F__THIS_OBJECT
-void f__this_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f__this_object(LPCFrame& f) {
   f.ret(current_object);
 }
 
 #endif
 
 #ifdef F_THIS_PLAYER
-void f_this_player(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_this_player(LPCFrame& f) {
   if (f.number(0)) {
     if (current_interactive) {
       f.ret(current_interactive);
@@ -3065,8 +2986,7 @@ void f_this_player(int num_arg) {
 int playerchanged;
 
 #ifdef F_SET_THIS_PLAYER
-void f_set_this_player(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_this_player(LPCFrame& f) {
   if (f.type(0) == T_NUMBER) {
     set_command_giver(0);
   } else {
@@ -3078,8 +2998,7 @@ void f_set_this_player(int num_arg) {
 #endif
 
 #ifdef F_THROW
-void f_throw(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_throw(LPCFrame& f) {
   free_svalue(&catch_value, "f_throw");
   catch_value = f.steal(0);
   f.pop_back(1);
@@ -3089,8 +3008,7 @@ void f_throw(int num_arg) {
 #endif
 
 #ifdef F__TO_FLOAT
-void f__to_float(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f__to_float(LPCFrame& f) {
   LPC_FLOAT temp = 0;
 
   switch (f.type(0)) {
@@ -3107,8 +3025,7 @@ void f__to_float(int num_arg) {
 #endif
 
 #ifdef F__TO_BUFFER
-void f__to_buffer(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f__to_buffer(LPCFrame& f) {
   switch (f.type(0)) {
     case T_BUFFER:
       /* already a buffer */
@@ -3130,8 +3047,7 @@ void f__to_buffer(int num_arg) {
 #endif
 
 #ifdef F__TO_INT
-void f__to_int(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f__to_int(LPCFrame& f) {
   LPC_INT temp = 0;
   switch (f.type(0)) {
     case T_REAL:
@@ -3186,8 +3102,7 @@ void f__to_int(int num_arg) {
 #endif
 
 #ifdef F_TYPEOF
-void f_typeof(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_typeof(LPCFrame& f) {
   const char* t = type_name(f.type(0));
   f.ret_str_constant(t);
 }
@@ -3195,8 +3110,7 @@ void f_typeof(int num_arg) {
 #endif
 
 #ifdef F_UNDEFINEDP
-void f_undefinedp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_undefinedp(LPCFrame& f) {
   if (f.type(0) == T_NUMBER) {
     f.ret(!f.number(0) && (f.subtype(0) == T_UNDEFINED));
   } else {
@@ -3206,16 +3120,14 @@ void f_undefinedp(int num_arg) {
 #endif
 
 #ifdef F_UPTIME
-void f_uptime(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_uptime(LPCFrame& f) {
   f.ret(static_cast<LPC_INT>(get_current_time() - boot_time));
 }
 
 #endif
 
 #ifdef F_USERP
-void f_userp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_userp(LPCFrame& f) {
   int i = f.object(0)->flags & O_ONCE_INTERACTIVE;
   f.ret(i != 0);
 }
@@ -3223,7 +3135,8 @@ void f_userp(int num_arg) {
 #endif
 
 #ifdef F_USERS
-void f_users(int num_arg) {
+void f_users(LPCFrame& f) {
+  int num_arg = f.argc();
   bool include_hidden = true;
 #ifdef F_SET_HIDE
   include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
@@ -3253,8 +3166,7 @@ void f_users(int num_arg) {
 #endif
 
 #ifdef F_WIZARDP
-void f_wizardp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_wizardp(LPCFrame& f) {
   int i = f.object(0)->flags & O_IS_WIZARD;
   f.ret(i != 0);
 }
@@ -3262,8 +3174,7 @@ void f_wizardp(int num_arg) {
 #endif
 
 #ifdef F_VIRTUALP
-void f_virtualp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_virtualp(LPCFrame& f) {
   int i = f.object(0)->flags & O_VIRTUAL;
   f.ret(i != 0);
 }
@@ -3271,8 +3182,7 @@ void f_virtualp(int num_arg) {
 #endif
 
 #ifdef F_WRITE
-void f_write(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_write(LPCFrame& f) {
   do_write(f.argp(0));
   f.ret_void();
 }
@@ -3280,8 +3190,7 @@ void f_write(int num_arg) {
 #endif
 
 #ifdef F_WRITE_BYTES
-void f_write_bytes(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_write_bytes(LPCFrame& f) {
   int i = 0;
 
   switch (f.type(2)) {
@@ -3319,13 +3228,12 @@ void f_write_bytes(int num_arg) {
 #endif
 
 #ifdef F_WRITE_BUFFER
-void f_write_buffer(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_write_buffer(LPCFrame& f) {
+  int num_arg = f.argc();
   int i = 0;
 
   if (f.type(0) == T_STRING) {
-    f.done(); /* hand the same args window to f_write_bytes */
-    f_write_bytes(num_arg);
+    f_write_bytes(f); /* same args window; callee finalizes */
     return;
   }
 
@@ -3361,8 +3269,7 @@ void f_write_buffer(int num_arg) {
 #endif
 
 #ifdef F_WRITE_FILE
-void f_write_file(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_write_file(LPCFrame& f) {
   int flags = f.number(2);
   flags = write_file(f.string(0), f.string(1), flags);
   f.ret(flags);
@@ -3370,7 +3277,7 @@ void f_write_file(int num_arg) {
 #endif
 
 #ifdef F_DUMP_FILE_DESCRIPTORS
-void f_dump_file_descriptors(int num_arg) {
+void f_dump_file_descriptors(LPCFrame& f) {
   outbuffer_t out;
 
   outbuf_zero(&out);
@@ -3380,8 +3287,7 @@ void f_dump_file_descriptors(int num_arg) {
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-void f_reclaim_objects(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_reclaim_objects(LPCFrame& f) {
   auto res = reclaim_objects(false);
   add_gametick_event(0, TickEvent::callback_type([] { remove_destructed_objects(); }));
   f.ret(static_cast<LPC_INT>(res));
@@ -3390,8 +3296,8 @@ void f_reclaim_objects(int num_arg) {
 #endif
 
 #ifdef F_MEMORY_INFO
-void f_memory_info(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_memory_info(LPCFrame& f) {
+  int num_arg = f.argc();
   LPC_INT mem;
   object_t* ob;
 
@@ -3416,8 +3322,7 @@ void f_memory_info(int num_arg) {
 #endif
 
 #ifdef F_RELOAD_OBJECT
-void f_reload_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_reload_object(LPCFrame& f) {
   reload_object(f.object(0));
   // The target may have destructed itself during reload (call___INIT()/
   // create() can call destruct(this_object())): destruct sweeps the VM
@@ -3427,8 +3332,7 @@ void f_reload_object(int num_arg) {
 #endif
 
 #ifdef F_RECOMPILE_OBJECT
-void f_recompile_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_recompile_object(LPCFrame& f) {
   int count = recompile_object(f.object(0));
   // The target (or one of its clones) may have destructed itself in its
   // new program's __INIT: destruct sweeps the VM stack, so the arg slot may hold
@@ -3438,8 +3342,7 @@ void f_recompile_object(int num_arg) {
 #endif
 
 #ifdef F_QUERY_SHADOWING
-void f_query_shadowing(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_shadowing(LPCFrame& f) {
   object_t* ob;
 
   if ((f.type(0) == T_OBJECT) && (ob = f.object(0))->shadowing) {
@@ -3451,8 +3354,7 @@ void f_query_shadowing(int num_arg) {
 #endif
 
 #ifdef F_REQUEST_CLEAN_UP
-void f_request_clean_up(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_request_clean_up(LPCFrame& f) {
   object_t* ob = f.object(0);
   int success = 0;
   if (!(ob->flags & O_DESTRUCTED) && function_exists(APPLY_CLEAN_UP, ob, 1)) {
@@ -3465,8 +3367,8 @@ void f_request_clean_up(int num_arg) {
 #endif
 
 #ifdef F_SET_CLEAN_UP
-void f_set_clean_up(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_clean_up(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* ob;
 
   if (num_arg == 2) {
@@ -3489,8 +3391,8 @@ void f_set_clean_up(int num_arg) {
 #endif
 
 #ifdef F_SET_RESET
-void f_set_reset(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_reset(LPCFrame& f) {
+  int num_arg = f.argc();
   const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
 
   if (num_arg == 2) {
@@ -3506,16 +3408,15 @@ void f_set_reset(int num_arg) {
 #endif
 
 #ifdef F_FLOATP
-void f_floatp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_floatp(LPCFrame& f) {
   f.ret(f.type(0) == T_REAL);
 }
 
 #endif
 
 #ifdef F_FLUSH_MESSAGES
-void f_flush_messages(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_flush_messages(LPCFrame& f) {
+  int num_arg = f.argc();
   if (num_arg == 1) {
     if (f.object(0)->interactive) {
       flush_message(f.object(0)->interactive);
@@ -3529,8 +3430,7 @@ void f_flush_messages(int num_arg) {
 #endif
 
 #ifdef F_FIRST_INVENTORY
-void f_first_inventory(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_first_inventory(LPCFrame& f) {
   object_t* ob = first_inventory(f.argp(0));
   if (ob) {
     f.ret(ob);
@@ -3541,8 +3441,7 @@ void f_first_inventory(int num_arg) {
 #endif
 
 #ifdef F_NEXT_INVENTORY
-void f_next_inventory(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_next_inventory(LPCFrame& f) {
   object_t* ob = f.object(0)->next_inv;
 
 #ifdef F_SET_HIDE
@@ -3560,8 +3459,7 @@ void f_next_inventory(int num_arg) {
 #endif
 
 #ifdef F_DEFER
-void f_defer(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_defer(LPCFrame& f) {
   auto* newlist = reinterpret_cast<struct defer_list*>(
       DMALLOC(sizeof(struct defer_list), TAG_DEFERS, "defer: new item"));
 
@@ -3605,8 +3503,7 @@ void f_defer(int num_arg) {
 #endif
 
 #ifdef F_CRYPT
-void f_crypt(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_crypt(LPCFrame& f) {
   const int sh_a512_prefix_len = 3;
   const int sh_a512_salt_len = 16;
   char salt[sh_a512_prefix_len + sh_a512_salt_len + 1];
@@ -3666,8 +3563,7 @@ void f_crypt(int num_arg) {
 #endif
 
 #ifdef F_OLDCRYPT
-void f_oldcrypt(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_oldcrypt(LPCFrame& f) {
   const int salt_len = 8;
 
   const char *res, *p;
@@ -3695,8 +3591,7 @@ void f_oldcrypt(int num_arg) {
 #endif
 
 #ifdef F_RUSAGE
-void f_rusage(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_rusage(LPCFrame& f) {
   mapping_t* m;
   struct rusage rus = {};
 
@@ -3733,8 +3628,7 @@ void f_rusage(int num_arg) {
 #endif
 
 #ifdef F_STRWIDTH
-void f_strwidth(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_strwidth(LPCFrame& f) {
   auto width = u8_width(f.string(0), -1);
   f.ret(static_cast<LPC_INT>(width));
 }

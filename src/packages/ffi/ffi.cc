@@ -457,8 +457,7 @@ void free_callback(FfiCallback* cb) {
 // ===========================================================================
 
 #ifdef F_FFI_LOAD
-void f_ffi_load(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_load(LPCFrame& f) {
   const char* path = f.string(0);
   if (!library_allowed(path)) {
     error("FFI: library '%s' is not in the configured allow-list.\n", path);
@@ -479,8 +478,7 @@ void f_ffi_load(int num_arg) {
 #endif
 
 #ifdef F_FFI_UNLOAD
-void f_ffi_unload(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_unload(LPCFrame& f) {
   int id = f.number(0);
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
@@ -502,8 +500,7 @@ void f_ffi_unload(int num_arg) {
 #endif
 
 #ifdef F_FFI_SYMBOL
-void f_ffi_symbol(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_symbol(LPCFrame& f) {
   const char* name = f.string(1);
   int id = f.number(0);
   check_valid_ffi("symbol", f.argp(1));
@@ -519,8 +516,7 @@ void f_ffi_symbol(int num_arg) {
 #endif
 
 #ifdef F_FFI_PREPARE
-void f_ffi_prepare(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_prepare(LPCFrame& f) {
   array_t* arg_arr = f.array(3);
   int ret_code = f.number(2);
   const char* name = f.string(1);
@@ -565,8 +561,7 @@ void f_ffi_prepare(int num_arg) {
 #endif
 
 #ifdef F_FFI_CALL
-void f_ffi_call(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_call(LPCFrame& f) {
   array_t* args = f.array(1);
   int func_id = f.number(0);
 
@@ -608,8 +603,7 @@ void f_ffi_call(int num_arg) {
 #endif
 
 #ifdef F_FFI_ALLOC
-void f_ffi_alloc(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_alloc(LPCFrame& f) {
   LPC_INT nbytes = f.number(0);
   if (nbytes < 0) {
     error("ffi_alloc: negative size.\n");
@@ -620,8 +614,7 @@ void f_ffi_alloc(int num_arg) {
 #endif
 
 #ifdef F_FFI_FREE
-void f_ffi_free(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_free(LPCFrame& f) {
   // The buffer is GC-managed; "freeing" zeroes it so a dangling native
   // reader sees no stale data. The block is reclaimed when no LPC value
   // references it.
@@ -634,8 +627,7 @@ void f_ffi_free(int num_arg) {
 #endif
 
 #ifdef F_FFI_SIZEOF
-void f_ffi_sizeof(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_sizeof(LPCFrame& f) {
   int code = f.number(0);
   int sz = type_size(code);
   f.ret(sz);
@@ -643,8 +635,7 @@ void f_ffi_sizeof(int num_arg) {
 #endif
 
 #ifdef F_FFI_PEEK
-void f_ffi_peek(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_peek(LPCFrame& f) {
   // Gated like load/prepare: reading an arbitrary native address is a
   // process-memory disclosure primitive, so the master must approve it
   // even though no foreign code runs.
@@ -672,8 +663,7 @@ void f_ffi_peek(int num_arg) {
 #endif
 
 #ifdef F_FFI_ADDRESS
-void f_ffi_address(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_address(LPCFrame& f) {
   buffer_t* buf = f.buffer(0);
   LPC_INT addr = buf->size ? reinterpret_cast<LPC_INT>(&buf->item[0]) : 0;
   f.ret(addr);
@@ -681,8 +671,7 @@ void f_ffi_address(int num_arg) {
 #endif
 
 #ifdef F_FFI_READ
-void f_ffi_read(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_read(LPCFrame& f) {
   int code = f.number(2);
   LPC_INT offset = f.number(1);
   buffer_t* buf = f.buffer(0);
@@ -737,8 +726,7 @@ void f_ffi_read(int num_arg) {
 #endif
 
 #ifdef F_FFI_WRITE
-void f_ffi_write(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_write(LPCFrame& f) {
   svalue_t* val = f.argp(3);
   int code = f.number(2);
   LPC_INT offset = f.number(1);
@@ -756,8 +744,7 @@ void f_ffi_write(int num_arg) {
 #endif
 
 #ifdef F_FFI_STRUCT_LAYOUT
-void f_ffi_struct_layout(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_struct_layout(LPCFrame& f) {
   array_t* fields = f.array(0);
   int n = fields->size;
 
@@ -803,8 +790,7 @@ void f_ffi_struct_layout(int num_arg) {
 #endif
 
 #ifdef F_FFI_CALLBACK
-void f_ffi_callback(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_callback(LPCFrame& f) {
   array_t* arg_arr = f.array(2);
   int ret_code = f.number(1);
   svalue_t* fun_sv = f.argp(0);  // T_FUNCTION
@@ -853,8 +839,7 @@ void f_ffi_callback(int num_arg) {
 #endif
 
 #ifdef F_FFI_CALLBACK_ADDR
-void f_ffi_callback_addr(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_callback_addr(LPCFrame& f) {
   int id = f.number(0);
   auto it = g_callbacks.find(id);
   if (it == g_callbacks.end()) {
@@ -866,8 +851,7 @@ void f_ffi_callback_addr(int num_arg) {
 #endif
 
 #ifdef F_FFI_CALLBACK_FREE
-void f_ffi_callback_free(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_callback_free(LPCFrame& f) {
   int id = f.number(0);
   auto it = g_callbacks.find(id);
   if (it != g_callbacks.end()) {
@@ -887,16 +871,14 @@ void f_ffi_callback_free(int num_arg) {
 #endif
 
 #ifdef F_FFI_ERROR
-void f_ffi_error(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_error(LPCFrame& f) {
   const char* msg = g_last_error.c_str();
   f.ret_str_copy(msg);
 }
 #endif
 
 #ifdef F_FFI_STATUS
-void f_ffi_status(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_ffi_status(LPCFrame& f) {
   mapping_t* m = allocate_mapping(4);
   add_mapping_pair(m, "libraries", static_cast<long>(g_libs.size()));
   add_mapping_pair(m, "functions", static_cast<long>(g_funcs.size()));

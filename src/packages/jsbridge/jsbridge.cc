@@ -406,8 +406,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fluffos_js_result(int id, int success, cons
 }
 
 #ifdef F_JS_EXPORT
-void f_js_export(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_js_export(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = f.base();
 
   // Validate before any allocation: error() unwinds past C++ destructors.
@@ -440,8 +440,7 @@ void f_js_export(int num_arg) {
 #endif
 
 #ifdef F_JS_EVAL
-void f_js_eval(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_js_eval(LPCFrame& f) {
   char* result = js_bridge_eval(f.string(0));
   std::string const text(result ? result : "");
   if (result != nullptr) {
@@ -452,9 +451,9 @@ void f_js_eval(int num_arg) {
 #endif
 
 #ifdef F_JS_CALL
-void f_js_call(int num_arg) {
+void f_js_call(LPCFrame& f) {
+  int num_arg = f.argc();
   static LPC_INT next_key = 0;
-  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg = f.base();
 
   const char* handler = arg[0].u.string;

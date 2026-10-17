@@ -3,9 +3,9 @@
 #include "base/package_api.h"
 
 #ifdef F_SAVE_OBJECT
-void f_save_object(int num_arg) {
+void f_save_object(LPCFrame& f) {
+  int num_arg = f.argc();
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  LPCFrame f = LPCFrame::args(num_arg);
 
   int flag = 0;
   if (num_arg == 2) {
@@ -59,16 +59,15 @@ char* save_variable(svalue_t* var) {
 }
 
 #ifdef F_SAVE_VARIABLE
-void f_save_variable(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_save_variable(LPCFrame& f) {
   char* p = save_variable(&f.top());
   f.ret_str_malloced(p);
 }
 #endif
 
 #ifdef F_RESTORE_OBJECT
-void f_restore_object(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_restore_object(LPCFrame& f) {
+  int num_arg = f.argc();
   int flag = (num_arg > 1) ? static_cast<int>(f.number(1)) : 0;
   if (num_arg > 1) {
     f.pop_back(1);
@@ -79,8 +78,7 @@ void f_restore_object(int num_arg) {
 #endif
 
 #ifdef F_RESTORE_VARIABLE
-void f_restore_variable(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_restore_variable(LPCFrame& f) {
   svalue_t v;
 
   unlink_string_svalue(&f.top());

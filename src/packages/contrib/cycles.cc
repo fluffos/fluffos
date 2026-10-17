@@ -487,8 +487,7 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
 #endif  // any of the three efuns
 
 #ifdef F_HAS_CYCLE
-void f_has_cycle(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_has_cycle(LPCFrame& f) {
   WalkResult res;
   cycle_walk(f.argp(0), WALK_DETECT, &res);
   f.ret(res.found ? 1 : 0);
@@ -496,8 +495,7 @@ void f_has_cycle(int num_arg) {
 #endif
 
 #ifdef F_FIND_CYCLES
-void f_find_cycles(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_find_cycles(LPCFrame& f) {
   WalkResult res;
   cycle_walk(f.argp(0), WALK_FIND, &res);
   // May error("Illegal array size") if there are more back-edges than
@@ -514,8 +512,7 @@ void f_find_cycles(int num_arg) {
 #endif
 
 #ifdef F_BREAK_CYCLES
-void f_break_cycles(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_break_cycles(LPCFrame& f) {
   WalkResult res;
   cycle_walk(f.argp(0), WALK_BREAK, &res);
 

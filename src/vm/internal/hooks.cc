@@ -2417,7 +2417,8 @@ void hooks_mark_frame_for_after(object_t* filter_target) {
   }
 }
 
-void f_hook_proceed(int num_arg) {
+void f_hook_proceed(LPCFrame& f) {
+  int num_arg = f.argc();
   int const num = num_arg;
   if (!g_around.active) {
     error("hook_proceed: no active HOOK_AROUND handler.\n");
@@ -2435,15 +2436,15 @@ void f_hook_proceed(int num_arg) {
   /* Optional replacement args: hook_proceed(mixed *args) */
   std::vector<svalue_t> use_args;
   if (num == 1) {
-    if (vm_sp()->type != T_ARRAY) {
+    if (f.type(0) != T_ARRAY) {
       error("Bad argument 1 to hook_proceed()\n");
     }
-    array_t* arr = vm_sp()->u.arr;
+    array_t* arr = f.array(0);
     use_args.resize(arr->size);
     for (int i = 0; i < arr->size; i++) {
       assign_svalue_no_free(&use_args[i], &arr->item[i]);
     }
-    pop_stack();
+    f.pop_back();
   } else if (num == 0) {
     use_args.resize(g_around.saved_args.size());
     for (size_t i = 0; i < g_around.saved_args.size(); i++) {
@@ -2452,6 +2453,9 @@ void f_hook_proceed(int num_arg) {
   } else {
     error("Wrong number of arguments to hook_proceed()\n");
   }
+  /* Body below reshapes the stack and leaves the proceed result as the
+   * efun return; release the Args window without touching it. */
+  f.abandon();
   g_around.proceeded = true;
 
   object_t* target = g_around.target;

@@ -13,15 +13,13 @@ enum { MAX_COLOUR_STRING = 200 };
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-void f_real_time(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_real_time(LPCFrame& f) {
   f.ret(static_cast<LPC_INT>(time(nullptr)));
 }
 #endif
 
 #ifdef F_COMPRESSEDP
-void f_compressedp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_compressedp(LPCFrame& f) {
   int i;
 
   i = f.object(0)->interactive && (f.object(0)->interactive->iflags & USING_COMPRESS);
@@ -37,7 +35,7 @@ void f_compressedp(int num_arg) {
  * substantially faster.
  */
 #ifdef F_NAMED_LIVINGS
-void f_named_livings(int num_arg) {
+void f_named_livings(LPCFrame& f) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int i;
@@ -88,15 +86,14 @@ void f_named_livings(int num_arg) {
 
   FREE(obtab);
 
-  LPCFrame f = LPCFrame::args(num_arg);
   f.ret_refed(vec);
 }
 #endif
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
-void f_remove_shadow(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_remove_shadow(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* ob;
 
   ob = current_object;
@@ -122,8 +119,7 @@ void f_remove_shadow(int num_arg) {
 /* This was originally written my Malic for Demon.  I rewrote parts of it
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
-void f_query_notify_fail(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_notify_fail(LPCFrame& f) {
   const char* p;
 
   if (command_giver && command_giver->interactive) {
@@ -147,8 +143,8 @@ void f_query_notify_fail(int num_arg) {
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
-void f_store_variable(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_store_variable(LPCFrame& f) {
+  int num_arg = f.argc();
   int idx;
   svalue_t* sv;
   lpc_type_t type;
@@ -176,8 +172,8 @@ void f_store_variable(int num_arg) {
 #endif
 
 #ifdef F_FETCH_VARIABLE
-void f_fetch_variable(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_fetch_variable(LPCFrame& f) {
+  int num_arg = f.argc();
   int idx;
   lpc_type_t type;
 
@@ -203,8 +199,8 @@ void f_fetch_variable(int num_arg) {
 
 /* Beek */
 #ifdef F_SET_PROMPT
-void f_set_prompt(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_prompt(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* who;
   if (num_arg == 2) {
     who = f.object(1);
@@ -320,8 +316,7 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
   }
 }
 
-void f_copy(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_copy(LPCFrame& f) {
   svalue_t ret;
 
   depth = 0;
@@ -335,8 +330,8 @@ void f_copy(int num_arg) {
 /* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-void f_functions(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_functions(LPCFrame& f) {
+  int num_arg = f.argc();
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t* funp;
@@ -477,8 +472,7 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
   *idx += prog->num_variables_defined;
 }
 
-void f_variables(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_variables(LPCFrame& f) {
   int idx = 0;
   array_t* arr;
   int const flag = f.number(1);
@@ -494,8 +488,7 @@ void f_variables(int num_arg) {
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_heart_beats(LPCFrame& f) {
   f.ret_refed(get_heart_beats());
 }
 #endif
@@ -599,8 +592,8 @@ struct tc_colwidth_state {
   }
 };
 
-void f_terminal_colour(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_terminal_colour(LPCFrame& f) {
+  int num_arg = f.argc();
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *instr, *cp, **parts;
@@ -1702,8 +1695,7 @@ static char* pluralize(const char* str) {
   return news;
 } /* end of pluralize() */
 
-void f_pluralize(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_pluralize(LPCFrame& f) {
   char* s;
 
   s = pluralize(f.string(0));
@@ -1764,8 +1756,7 @@ static int file_length(const char* file) {
   return ret;
 } /* end of file_length() */
 
-void f_file_length(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_file_length(LPCFrame& f) {
   int l;
 
   l = file_length(f.string(0));
@@ -1774,8 +1765,7 @@ void f_file_length(int num_arg) {
 #endif
 
 #ifdef F_UPPER_CASE
-void f_upper_case(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_upper_case(LPCFrame& f) {
   const char* str;
 
   str = f.string(0);
@@ -1801,8 +1791,8 @@ void f_upper_case(int num_arg) {
 #endif
 
 #ifdef F_REPLACEABLE
-void f_replaceable(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_replaceable(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* obj;
   program_t* prog;
   int i, j, num, numignore, replaceable;
@@ -1915,8 +1905,8 @@ inline void sum_program_info(const program_t* const p, ProgramInfoS& info) {
   info.total += p->total_size;
 }
 
-void f_program_info(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_program_info(LPCFrame& f) {
+  int num_arg = f.argc();
   ProgramInfoS info{0};  // initialize all elements to 0
   object_t* ob;
   mapping_t* m;
@@ -1961,8 +1951,7 @@ void f_program_info(int num_arg) {
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-void f_remove_interactive(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_remove_interactive(LPCFrame& f) {
   if ((f.object(0)->flags & O_DESTRUCTED) || !(f.object(0)->interactive)) {
     f.set_top_number(0);
   } else {
@@ -1989,8 +1978,8 @@ static int query_ip_port(object_t* ob) {
   return ob->interactive->local_port;
 }
 
-void f_query_ip_port(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_ip_port(LPCFrame& f) {
+  int num_arg = f.argc();
   int tmp;
 
   if (num_arg) {
@@ -2049,8 +2038,7 @@ void reset_timezone(const char* old_tz) {
 #endif
 
 #ifdef F_ZONETIME
-void f_zonetime(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_zonetime(LPCFrame& f) {
   const char *new_tz, *old_tz;
   char* retv;
   time_t time_val;
@@ -2075,8 +2063,7 @@ void f_zonetime(int num_arg) {
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-void f_is_daylight_savings_time(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_is_daylight_savings_time(LPCFrame& f) {
   time_t time_to_check = f.number(1);
   const char* new_tz = f.string(0);
   const char* old_tz = set_timezone(new_tz);
@@ -2097,16 +2084,14 @@ void f_is_daylight_savings_time(int num_arg) {
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_debug_message(LPCFrame& f) {
   debug_message("%s\n", f.string(0));
   f.ret_void();
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-void f_function_owner(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_function_owner(LPCFrame& f) {
   object_t* owner = f.funptr(0)->hdr.owner;
 
   free_funp(f.funptr(0));
@@ -2122,8 +2107,7 @@ void f_function_owner(int num_arg) {
 #endif
 
 #ifdef F_REPEAT_STRING
-void f_repeat_string(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_repeat_string(LPCFrame& f) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char* str;
@@ -2290,8 +2274,7 @@ static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog)
   *idx += prog->num_variables_defined;
 }
 
-void f_memory_summary(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_memory_summary(LPCFrame& f) {
   mapping_t* result = allocate_mapping(8);
   object_t* ob;
   int idx;
@@ -2319,8 +2302,8 @@ void f_memory_summary(int num_arg) {
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-void f_query_replaced_program(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_replaced_program(LPCFrame& f) {
+  int num_arg = f.argc();
   char* res = nullptr;
 
   if (num_arg) {
@@ -2343,8 +2326,7 @@ void f_query_replaced_program(int num_arg) {
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-void f_network_stats(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_network_stats(LPCFrame& f) {
   mapping_t* m;
   int i, ports = 0;
 
@@ -2474,8 +2456,8 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
   FREE_MSTR(name);
 }
 
-void f_event(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_event(LPCFrame& f) {
+  int num_arg = f.argc();
 
   event(f.argp(0), f.string(1), num_arg - 2, num_arg > 2 ? f.argp(2) : nullptr);
 
@@ -2511,8 +2493,7 @@ void number_as_string(char* buf, LPC_INT n) {
   strcat(buf, single[n]);
 }
 
-void f_query_num(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_num(LPCFrame& f) {
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2579,8 +2560,7 @@ q_n_end:
 #endif
 
 #ifdef F_BASE_NAME
-void f_base_name(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_base_name(LPCFrame& f) {
   char *name, *tmp;
   int i;
 
@@ -2624,8 +2604,7 @@ int garbage_check(object_t* ob, void* /*data*/) {
       ;
 }
 
-void f_get_garbage(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_get_garbage(LPCFrame& f) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2649,8 +2628,7 @@ void f_get_garbage(int num_arg) {
 
 #ifdef F_NUM_CLASSES
 
-void f_num_classes(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_num_classes(LPCFrame& f) {
   int const i = f.object(0)->prog->num_classes;
   f.ret(i);
 }
@@ -2658,8 +2636,7 @@ void f_num_classes(int num_arg) {
 #endif
 
 #ifdef F_ASSEMBLE_CLASS
-void f_assemble_class(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_assemble_class(LPCFrame& f) {
   // Build through the CLASS allocator: retagging a copy_array() block as
   // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
   // is later freed as a class (caught by the testsuite's per-file
@@ -2676,8 +2653,7 @@ void f_assemble_class(int num_arg) {
 #endif
 
 #ifdef F_DISASSEMBLE_CLASS
-void f_disassemble_class(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_disassemble_class(LPCFrame& f) {
   array_t* arr;
   if (f.type(0) != T_CLASS) {
     error("Argument to disassemble_class() not a class.\n");
@@ -2689,8 +2665,7 @@ void f_disassemble_class(int num_arg) {
 
 #ifdef F_FETCH_CLASS_MEMBER
 
-void f_fetch_class_member(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_fetch_class_member(LPCFrame& f) {
   LPC_INT pos = f.number(1); /* checked below as an LPC int, not wrapped */
   array_t* arr;
 
@@ -2714,8 +2689,7 @@ void f_fetch_class_member(int num_arg) {
 
 #ifdef F_STORE_CLASS_MEMBER
 
-void f_store_class_member(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_store_class_member(LPCFrame& f) {
   LPC_INT const pos = f.number(1); /* checked below as an LPC int */
   array_t* arr;
 
@@ -2738,8 +2712,7 @@ void f_store_class_member(int num_arg) {
 #endif
 
 #ifdef F_ELEMENT_OF
-void f_element_of(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_element_of(LPCFrame& f) {
   array_t* arr = f.array(0);
   if (!arr->size) {
     error("Can't take element from empty array.\n");
@@ -2781,8 +2754,7 @@ void shuffle(array_t* args) {
   /* Well, that's it. We don't need to push or anything. */
 }
 
-void f_shuffle(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_shuffle(LPCFrame& f) {
 
   if (f.type(0) == T_ARRAY && f.array(0)) {
     shuffle(f.array(0));
@@ -2795,8 +2767,7 @@ void f_shuffle(int num_arg) {
 
 #ifdef F_MAX
 
-void f_max(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_max(LPCFrame& f) {
   array_t* arr = f.array(0);
   int max_index = 0;
   int i;
@@ -2872,8 +2843,7 @@ void f_max(int num_arg) {
 
 #ifdef F_MIN
 
-void f_min(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_min(LPCFrame& f) {
   array_t* arr = f.array(0);
   int min_index = 0;
   int i;
@@ -2948,8 +2918,7 @@ void f_min(int num_arg) {
 
 #ifdef F_ABS
 
-void f_abs(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_abs(LPCFrame& f) {
   if (f.type(0) == T_REAL) {
     if (f.top().u.real < 0.0) {
       f.top().u.real = -f.top().u.real;
@@ -2965,8 +2934,8 @@ void f_abs(int num_arg) {
 
 #ifdef F_ROLL_MDN
 
-void f_roll_MdN(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_roll_MdN(LPCFrame& f) {
+  int num_arg = f.argc();
   LPC_INT sides, rolls, bonus;
   LPC_INT roll = 0;
 
@@ -3052,8 +3021,7 @@ int levenshtein(char* a, int as, char* b, int bs) {
   return i;
 } /* levenshtein() */
 
-void f_string_difference(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_string_difference(LPCFrame& f) {
   int diff, as, bs;
   char *a, *b;
 
@@ -3089,8 +3057,8 @@ static int query_charmode(object_t* ob) {
   return ret;
 }
 
-void f_query_charmode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_query_charmode(LPCFrame& f) {
+  int num_arg = f.argc();
   int tmp;
 
   if (num_arg) {
@@ -3112,8 +3080,8 @@ static int remove_charmode(object_t* ob) {
   return ret;
 }
 
-void f_remove_charmode(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_remove_charmode(LPCFrame& f) {
+  int num_arg = f.argc();
   int tmp;
 
   if (num_arg) {
@@ -3146,8 +3114,8 @@ static int remove_get_char(object_t* ob) {
   return -1;
 }
 
-void f_remove_get_char(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_remove_get_char(LPCFrame& f) {
+  int num_arg = f.argc();
   int tmp;
 
   if (num_arg) {
@@ -3160,8 +3128,7 @@ void f_remove_get_char(int num_arg) {
 
 #endif
 #ifdef F_SEND_NULLBYTE
-void f_send_nullbyte(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_send_nullbyte(LPCFrame& f) {
   int tmp;
   object_t* who;
   tmp = 0;
@@ -3182,8 +3149,7 @@ void f_send_nullbyte(int num_arg) {
 #endif
 
 #ifdef F_RESTORE_FROM_STRING
-void f_restore_from_string(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_restore_from_string(LPCFrame& f) {
   const char* buf;
   LPC_INT noclear;
 
@@ -3205,8 +3171,7 @@ void f_restore_from_string(int num_arg) {
 #endif
 
 #ifdef F_CLASSES
-void f_classes(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_classes(LPCFrame& f) {
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
@@ -3280,8 +3245,7 @@ static void fix_object_names() {
   }
 }
 
-void f_test_load(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_test_load(LPCFrame& f) {
   const char* tmp = f.string(0);
   object_t* new_ob;
   if ((testloadob = find_object2(f.string(0)))) {
@@ -3342,8 +3306,7 @@ static bool os_env_name_listed(const char* list, const char* name) {
 #endif
 
 #ifdef F_GET_OS_ENV
-void f_get_os_env(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_get_os_env(LPCFrame& f) {
   const char* name = f.string(0);
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
@@ -3363,8 +3326,8 @@ void f_get_os_env(int num_arg) {
 #endif
 
 #ifdef F_SET_OS_ENV
-void f_set_os_env(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_set_os_env(LPCFrame& f) {
+  int num_arg = f.argc();
   const char* name = f.string(0);
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {

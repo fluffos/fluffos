@@ -1032,16 +1032,14 @@ int copy_file(const char* from, const char* to) {
 }
 
 #ifdef F_CP
-void f_cp(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_cp(LPCFrame& f) {
   int i = copy_file(f.string(0), f.string(1));
   f.ret(i);
 }
 #endif
 
 #ifdef F_FILE_SIZE
-void f_file_size(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_file_size(LPCFrame& f) {
   LPC_INT i = file_size(f.string(0));
 
   // cross platform fix
@@ -1062,8 +1060,7 @@ void f_file_size(int num_arg) {
 #endif
 
 #ifdef F_GET_DIR
-void f_get_dir(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_get_dir(LPCFrame& f) {
   array_t* vec = get_dir(f.string(0), f.number(1));
   if (vec) {
     f.ret_refed(vec);
@@ -1074,8 +1071,7 @@ void f_get_dir(int num_arg) {
 #endif
 
 #ifdef F_LINK
-void f_link(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_link(LPCFrame& f) {
   svalue_t* ret;
   int i;
 
@@ -1096,8 +1092,7 @@ void f_link(int num_arg) {
 #endif /* F_LINK */
 
 #ifdef F_MKDIR
-void f_mkdir(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_mkdir(LPCFrame& f) {
   const char* path = check_valid_path(f.string(0), current_object, "mkdir", 1);
   if (!path || OS_mkdir(path, 0770) == -1) {
     f.ret(0);

@@ -608,7 +608,8 @@ struct unique_svalue_compare {
   }
 };
 
-void f_unique_mapping(int num_arg) {
+void f_unique_mapping(LPCFrame& f) {
+  int num_arg = f.argc();
   svalue_t* arg = vm_sp() - num_arg + 1;
   array_t* v = arg->u.arr;
   if (!v || !v->size) {

@@ -54,8 +54,7 @@ static inline void sha1_hash_block(const unsigned char* block, uint32_t* h0, uin
   *h4 += e;
 }
 
-void f_sha1(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_sha1(LPCFrame& f) {
   uint32_t h0, h1, h2, h3, h4;
   const unsigned char* str;
   unsigned char final[128] = {0};

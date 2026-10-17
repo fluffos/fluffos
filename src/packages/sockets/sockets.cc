@@ -14,8 +14,8 @@
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-void f_socket_create(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_create(LPCFrame& f) {
+  int num_arg = f.argc();
   int fd;
 
   if ((num_arg == 3) && !(f.type(2) & (T_STRING | T_FUNCTION))) {
@@ -35,8 +35,8 @@ void f_socket_create(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_BIND
-void f_socket_bind(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_bind(LPCFrame& f) {
+  int num_arg = f.argc();
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -57,8 +57,7 @@ void f_socket_bind(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_LISTEN
-void f_socket_listen(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_listen(LPCFrame& f) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -75,8 +74,7 @@ void f_socket_listen(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_ACCEPT
-void f_socket_accept(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_accept(LPCFrame& f) {
   int port, fd;
   char addr[ADDR_BUF_SIZE];
 
@@ -91,8 +89,7 @@ void f_socket_accept(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_CONNECT
-void f_socket_connect(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_connect(LPCFrame& f) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -143,8 +140,8 @@ void f_socket_connect(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_WRITE
-void f_socket_write(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_write(LPCFrame& f) {
+  int num_arg = f.argc();
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -164,8 +161,7 @@ void f_socket_write(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_CLOSE
-void f_socket_close(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_close(LPCFrame& f) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -178,8 +174,7 @@ void f_socket_close(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_RELEASE
-void f_socket_release(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_release(LPCFrame& f) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -195,8 +190,7 @@ void f_socket_release(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
-void f_socket_acquire(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_acquire(LPCFrame& f) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -216,15 +210,13 @@ void f_socket_acquire(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_ERROR
-void f_socket_error(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_error(LPCFrame& f) {
   f.ret_str_constant(socket_error(f.number(0)));
 }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
-void f_socket_address(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_address(LPCFrame& f) {
   char* str;
   int local, port;
   char addr[ADDR_BUF_SIZE];
@@ -267,8 +259,8 @@ void f_socket_address(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_STATUS
-void f_socket_status(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_status(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t* info;
   int i;
 
@@ -310,8 +302,7 @@ void check_socket_option_access(const char* efun, int lpc_sock) {
 #endif
 
 #ifdef F_SOCKET_SET_OPTION
-void f_socket_set_option(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_set_option(LPCFrame& f) {
   auto lpc_sock = f.number(0);
   auto option = f.number(1);
   auto* arg = f.argp(2);
@@ -354,8 +345,7 @@ void f_socket_set_option(int num_arg) {
 #endif
 
 #ifdef F_SOCKET_GET_OPTION
-void f_socket_get_option(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_socket_get_option(LPCFrame& f) {
   // socket_get_option(int, int): socket at arg 0, option at arg 1.
   auto lpc_sock = f.number(0);
   auto option = f.number(1);

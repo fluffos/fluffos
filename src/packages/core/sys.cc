@@ -6,8 +6,7 @@
 #endif
 
 #ifdef F_SYS_NETWORK_PORTS
-void f_sys_network_ports(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_sys_network_ports(LPCFrame& f) {
   array_t* info;
   int i = 0, p = 0;
 
@@ -53,8 +52,7 @@ void f_sys_network_ports(int num_arg) {
 #endif
 
 #ifdef F_SYS_RELOAD_TLS
-void f_sys_reload_tls(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_sys_reload_tls(LPCFrame& f) {
   auto port_index_display = f.number(0);
   auto port_index = port_index_display - 1;
 

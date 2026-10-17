@@ -116,8 +116,7 @@ static char* evp_hash(const char* algo, const unsigned char* data, int data_len)
   return result;
 }
 
-void f_hash(int num_arg) {
-  LPCFrame f = LPCFrame::args(num_arg);
+void f_hash(LPCFrame& f) {
   const char *algo, *data;
   char* result = nullptr;
   int data_len;

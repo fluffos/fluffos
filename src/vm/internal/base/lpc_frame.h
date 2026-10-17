@@ -9,9 +9,10 @@
  *   Builder -- push args then apply / safe_apply
  *   Mark    -- record a stack watermark (assert / discard_to)
  *
- * Packages / efuns use LPCFrame only -- not vm_sp(), bare sp, or direct
- * put_/pop_ stack macros. Those stay in vm_stack.h for the bytecode
- * interpreter and packages/ops.
+ * Package efuns receive LPCFrame& from the dispatcher (they must not
+ * construct an args window themselves). Do not use vm_sp(), bare sp, or
+ * put_/pop_ macros in packages -- those stay in vm_stack.h for the
+ * bytecode interpreter and packages/ops.
  *
  * On error() unwind the destructor does NOT touch the stack (restore_context
  * owns recovery). On the normal path Args/Builder must be finalized
@@ -202,8 +203,7 @@ class LPCFrame {
 /* ---- Tier-C glue macros (fixed scalar efuns; no raw stack in the body) ---- */
 
 #define LPC_EFUN_UNARY_REAL(name, expr)      \
-  void f_##name(int num_arg) {               \
-    LPCFrame f = LPCFrame::args(num_arg);    \
+  void f_##name(LPCFrame& f) {               \
     f.top().u.real = (expr)(f.top().u.real); \
     f.done();                                \
   }
