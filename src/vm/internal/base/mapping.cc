@@ -618,7 +618,11 @@ void f_unique_mapping(int num_arg) {
 
   // prepare the call back.
   function_to_call_t ftc;
-  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING, num_arg);
+  {
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_UNIQUE_MAPPING);
+    frame.done();
+  }
 
   // for each item in the array, call the callback and group
   // item with same result together.
@@ -1042,7 +1046,11 @@ void map_mapping(svalue_t* arg, int num_arg) {
   svalue_t* ret;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_MAP, num_arg);
+  {
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_MAP);
+    frame.done();
+  }
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);
@@ -1082,7 +1090,11 @@ void filter_mapping(svalue_t* arg, int num_arg) {
   unsigned int tb_index;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_FILTER, num_arg);
+  {
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_FILTER);
+    frame.done();
+  }
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);

@@ -494,29 +494,8 @@ svalue_t* apply(const char* fun, object_t* ob, int num_arg, int where) {
  * after the apply. (such as the ed exit function, and the net_dead function).
  */
 svalue_t* safe_apply(const char* fun, object_t* ob, int num_arg, int where) {
-  /* Arguments are already pushed on stack */
-
-  if (ob->flags & O_DESTRUCTED) {
-    pop_n_elems(num_arg);
-    return nullptr;
-  }
-
-  error_context_t econ;
-  save_context(&econ);
-  /* The callee owns the arguments once the call starts: setup_variables()
-     pops any EXCESS arguments (more passed than declared parameters) before
-     the body runs, legally taking sp below the post-push position. The
-     unwind mark must therefore sit below the arguments, and the unwind
-     itself reclaims them -- no separate pop afterwards (issue #1014). */
-  econ.save_sp -= num_arg;
-
-  svalue_t* ret = nullptr;
-  try {
-    ret = apply(fun, ob, num_arg, where);
-  } catch (const char*) {
-    restore_context(&econ);
-    ret = nullptr;
-  }
-  pop_context(&econ);
-  return ret;
+  /* Arguments are already pushed on stack. LPCFrame owns the value-stack
+   * window and sets the unwind mark below the first arg (issue #1014). */
+  LPCFrame f = LPCFrame::args(num_arg);
+  return f.safe_apply(fun, ob, where);
 }

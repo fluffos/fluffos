@@ -603,7 +603,9 @@ void f_pcre_replace_callback(int num_arg) {
   std::unique_ptr<array_t, decltype(&free_array)> arr_owner(arr, &free_array);
 
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
-    process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK, num_arg);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
+    frame.done();
   } else {  // 0
     error("Illegal third argument (0) to pcre_replace_callback");
   }

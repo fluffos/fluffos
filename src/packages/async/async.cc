@@ -618,7 +618,9 @@ void f_async_read(int num_arg) {
       check_valid_path((sp - (num_arg - 1))->u.string, current_object, "read_file", 0);
   if (num_arg >= 2) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(1, cb.get(), F_ASYNC_READ, num_arg);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, cb.get(), F_ASYNC_READ);
+    frame.done();
     // A `mixed` argument bypasses the spec's compile-time `function` check;
     // process_efun_callback() then sets cb->ob (string-callback form) rather
     // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
@@ -657,7 +659,9 @@ void f_async_write(int num_arg) {
       check_valid_path((sp - (num_arg - 1))->u.string, current_object, "write_file", 1);
   if (num_arg >= 4) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(3, cb.get(), F_ASYNC_WRITE, num_arg);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(3, cb.get(), F_ASYNC_WRITE);
+    frame.done();
     if (cb->ob != nullptr) {
       error("async_write: callback must be a function pointer, not a string.\n");
     }
@@ -690,7 +694,9 @@ void f_async_getdir(int num_arg) {
       check_valid_path((sp - (num_arg - 1))->u.string, current_object, "get_dir", 0);
   if (num_arg >= 2) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(1, cb.get(), F_ASYNC_GETDIR, num_arg);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, cb.get(), F_ASYNC_GETDIR);
+    frame.done();
     if (cb->ob != nullptr) {
       error("async_getdir: callback must be a function pointer, not a string.\n");
     }
@@ -753,7 +759,9 @@ void f_async_db_exec(int num_arg) {
 
   if (num_arg >= 3) {
     cb.reset(new function_to_call_t);
-    process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC, num_arg);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+    frame.done();
 
     // The callback fires long after this stack frame is gone (a DB round
     // trip on a worker thread, then a later game tick) -- unlike the

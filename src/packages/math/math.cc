@@ -18,156 +18,131 @@
 #define SQUARE(n) ((n) * (n))
 
 #ifdef F_COS
-void f_cos(int num_arg) { sp->u.real = cos(sp->u.real); }
+LPC_EFUN_UNARY_REAL(cos, cos)
 #endif
 
 #ifdef F_SIN
-void f_sin(int num_arg) { sp->u.real = sin(sp->u.real); }
+LPC_EFUN_UNARY_REAL(sin, sin)
 #endif
 #ifdef F_TAN
 void f_tan(int num_arg) {
   /*
    * maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi))
    */
-  sp->u.real = tan(sp->u.real);
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.top().u.real = tan(f.top().u.real);
+  f.done();
 }
 #endif
 
 #ifdef F_ASIN
 void f_asin(int num_arg) {
-  if (sp->u.real < -1.0) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.top().u.real < -1.0) {
     error("math: asin(x) with (x < -1.0)\n");
-    return;
   }
-  if (sp->u.real > 1.0) {
+  if (f.top().u.real > 1.0) {
     error("math: asin(x) with (x > 1.0)\n");
-    return;
   }
-  sp->u.real = asin(sp->u.real);
+  f.top().u.real = asin(f.top().u.real);
+  f.done();
 }
 #endif
 
 #ifdef F_ACOS
 void f_acos(int num_arg) {
-  if (sp->u.real < -1.0) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.top().u.real < -1.0) {
     error("math: acos(x) with (x < -1.0)\n");
-    return;
   }
-  if (sp->u.real > 1.0) {
+  if (f.top().u.real > 1.0) {
     error("math: acos(x) with (x > 1.0)\n");
-    return;
   }
-  sp->u.real = acos(sp->u.real);
+  f.top().u.real = acos(f.top().u.real);
+  f.done();
 }
 #endif
 
 #ifdef F_ATAN
-void f_atan(int num_arg) { sp->u.real = atan(sp->u.real); }
+LPC_EFUN_UNARY_REAL(atan, atan)
 #endif
 
 #ifdef F_SQRT
 void f_sqrt(int num_arg) {
-  LPC_FLOAT val;
-
-  if (sp->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val = sp->u.real;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_FLOAT val = f.as_real(0);
 
   if (val < 0.0) {
     error("math: sqrt(x) with (x < 0.0)\n");
-    return;
   }
-  sp->u.real = sqrt(val);
-  sp->type = T_REAL;
+  f.top().type = T_REAL;
+  f.top().u.real = sqrt(val);
+  f.done();
 }
 #endif
 
 #ifdef F_LOG
 void f_log(int num_arg) {
-  if (sp->u.real <= 0.0) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.top().u.real <= 0.0) {
     error("math: log(x) with (x <= 0.0)\n");
-    return;
   }
-  sp->u.real = log(sp->u.real);
+  f.top().u.real = log(f.top().u.real);
+  f.done();
 }
 #endif
 
 #ifdef F_LOG10
 void f_log10(int num_arg) {
-  LPC_FLOAT val;
-
-  if (sp->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val = sp->u.real;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_FLOAT val = f.as_real(0);
 
   if (val <= 0.0) {
     error("math: log10(x) with (x <= 0.0)\n");
-    return;
   }
-  sp->u.real = log10(val);
-  sp->type = T_REAL;
+  f.top().type = T_REAL;
+  f.top().u.real = log10(val);
+  f.done();
 }
 #endif
 
 #ifdef F_LOG2
 void f_log2(int num_arg) {
-  LPC_FLOAT val;
-
-  if (sp->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val = sp->u.real;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_FLOAT val = f.as_real(0);
 
   if (val <= 0.0) {
     error("math: log2(x) with (x <= 0.0)\n");
-    return;
   }
-  sp->u.real = log2(val);
-  sp->type = T_REAL;
+  f.top().type = T_REAL;
+  f.top().u.real = log2(val);
+  f.done();
 }
 #endif
 
 #ifdef F_POW
 void f_pow(int num_arg) {
-  LPC_FLOAT val, val2;
-
-  if ((sp - 1)->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>((sp - 1)->u.number);
-  } else {
-    val = (sp - 1)->u.real;
-  }
-
-  if (sp->type == T_NUMBER) {
-    val2 = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val2 = sp->u.real;
-  }
-
-  (sp - 1)->u.real = pow(val, val2);
-  sp--;
-  sp->type = T_REAL;
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_FLOAT val = f.as_real(0);
+  LPC_FLOAT val2 = f.as_real(1);
+  f.ret(pow(val, val2));
 }
 #endif
 
 #ifdef F_EXP
-void f_exp(int num_arg) { sp->u.real = exp(sp->u.real); }
+LPC_EFUN_UNARY_REAL(exp, exp)
 #endif
 
 #ifdef F_FLOOR
-void f_floor(int num_arg) { sp->u.real = floor(sp->u.real); }
+LPC_EFUN_UNARY_REAL(floor, floor)
 #endif
 
 #ifdef F_CEIL
-void f_ceil(int num_arg) { sp->u.real = ceil(sp->u.real); }
+LPC_EFUN_UNARY_REAL(ceil, ceil)
 #endif
 
 #ifdef F_ROUND
-void f_round(int num_arg) { sp->u.real = round(sp->u.real); }
+LPC_EFUN_UNARY_REAL(round, round)
 #endif
 
 #ifdef F_NORM
@@ -184,9 +159,6 @@ void f_round(int num_arg) { sp->u.real = round(sp->u.real); }
 enum { VEC_OK = 0, VEC_ERR_SIZE_MISMATCH = -1, VEC_ERR_ARG1 = 1, VEC_ERR_ARG2 = 2 };
 
 static LPC_FLOAT norm(array_t* a, bool* ok) {
-  // Length must come from the array we actually index (a), not sp->u.arr:
-  // f_angle() calls norm((sp-1)->u.arr), a different array, so using sp's size
-  // would read past `a` if the two ever differed in length.
   LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
   *ok = true;
@@ -206,17 +178,16 @@ static LPC_FLOAT norm(array_t* a, bool* ok) {
 }
 
 void f_norm(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   bool ok;
-  LPC_FLOAT const val = norm(sp->u.arr, &ok);
+  LPC_FLOAT const val = norm(f.array(0), &ok);
 
   if (!ok) {
-    pop_stack();
+    f.ret_void();
     error("norm: invalid argument 1.\n");
-    return;
   }
 
-  pop_stack();
-  push_real(val);
+  f.ret(val);
 }
 #endif
 
@@ -272,23 +243,21 @@ static LPC_FLOAT dotprod(array_t* a, array_t* b, int* status) {
 }
 
 void f_dotprod(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int status;
-  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult, &status);
+  LPC_FLOAT const total = vector_op(f.array(0), f.array(1), dotprod_mult, &status);
 
   if (status == VEC_ERR_SIZE_MISMATCH) {
-    pop_2_elems();
+    f.ret_void();
     error("dotprod: cannot take the dotprod of vectors of different sizes.\n");
-    return;
   }
 
   if (status == VEC_ERR_ARG1 || status == VEC_ERR_ARG2) {
-    pop_2_elems();
+    f.ret_void();
     error("dotprod: invalid arg %d.\n", status);
-    return;
   }
 
-  pop_2_elems();
-  push_real(total);
+  f.ret(total);
 }
 #endif
 
@@ -297,36 +266,35 @@ static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQ
 
 /* The (Euclidian) distance between two points */
 void f_distance(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int status;
-  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, distance_mult, &status);
+  LPC_FLOAT const total = vector_op(f.array(0), f.array(1), distance_mult, &status);
 
   if (status == VEC_ERR_SIZE_MISMATCH) {
-    pop_2_elems();
+    f.ret_void();
     error("distance: cannot take the distance of vectors of different sizes.\n");
-    return;
   }
 
   if (status == VEC_ERR_ARG1 || status == VEC_ERR_ARG2) {
-    pop_2_elems();
+    f.ret_void();
     error("distance: invalid arg %d.\n", status);
-    return;
   }
 
-  pop_2_elems();
-  push_real(sqrt(total));
+  f.ret(sqrt(total));
 }
 #endif
 
 #ifdef F_ANGLE
 void f_angle(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   LPC_FLOAT dot, norma, normb;
   int status;
   bool ok;
 
-  dot = dotprod((sp - 1)->u.arr, sp->u.arr, &status);
+  dot = dotprod(f.array(0), f.array(1), &status);
 
   if (status != VEC_OK) {
-    pop_2_elems();
+    f.ret_void();
     if (status == VEC_ERR_SIZE_MISMATCH) {
       error(
           "angle: cannot calculate the angle between vectors of different "
@@ -334,26 +302,22 @@ void f_angle(int num_arg) {
     } else {
       error("angle: invalid arg %d.\n", status);
     }
-    return;
   }
 
-  norma = norm((sp - 1)->u.arr, &ok);
+  norma = norm(f.array(0), &ok);
 
   if (!ok) {
-    pop_2_elems();
+    f.ret_void();
     error("angle: invalid argument 1.\n");
-    return;
   }
 
-  normb = norm(sp->u.arr, &ok);
+  normb = norm(f.array(1), &ok);
 
   if (!ok) {
-    pop_2_elems();
+    f.ret_void();
     error("angle: invalid argument 2.\n");
-    return;
   }
 
-  pop_2_elems();
-  push_real(acos(dot / (norma * normb)));
+  f.ret(acos(dot / (norma * normb)));
 }
 #endif

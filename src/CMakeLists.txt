@@ -626,6 +626,7 @@ set(SRC
   "vm/internal/base/debug.cc"
   "vm/internal/base/function.cc"
   "vm/internal/base/interpret.cc"
+  "vm/internal/base/lpc_frame.cc"
   "vm/internal/base/mapping.cc"
   "vm/internal/base/object.cc"
   "vm/internal/base/program.cc"
