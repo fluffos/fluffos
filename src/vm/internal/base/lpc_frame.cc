@@ -504,6 +504,26 @@ void LPCFrame::set_top_undefined() {
 
 void LPCFrame::done() { finalized_ = true; }
 
+void LPCFrame::rebase(int num_arg) {
+  if (mode_ != Mode::Args) {
+    error("LPCFrame::rebase requires Args mode\n");
+  }
+  if (finalized_) {
+    error("LPCFrame::rebase on finalized frame\n");
+  }
+  if (num_arg < 0) {
+    error("LPCFrame::rebase(%d)\n", num_arg);
+  }
+  argc_ = num_arg;
+  base_ = num_arg > 0 ? sp - num_arg + 1 : sp + 1;
+}
+
+void LPCFrame::abandon() {
+  finalized_ = true;
+  argc_ = 0;
+  base_ = sp + 1;
+}
+
 void LPCFrame::drop_front(int n) {
   if (n < 0 || n > argc_) {
     error("LPCFrame::drop_front(%d) with argc=%d\n", n, argc_);
