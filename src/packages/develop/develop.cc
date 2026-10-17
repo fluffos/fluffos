@@ -8,11 +8,12 @@ static object_t* ob;
 
 #ifdef F_DEBUG_INFO
 void f_debug_info(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg;
   outbuffer_t out;
 
   outbuf_zero(&out);
-  arg = vm_sp() - 1;
+  arg = f.argp(0);
   switch (arg[0].u.number) {
     case 0: {
       int i, flags;
@@ -111,39 +112,39 @@ void f_debug_info(int num_arg) {
     default:
       bad_arg(1, F_DEBUG_INFO);
   }
-  pop_stack();
-  pop_stack();
+  f.ret_void();
   outbuf_push(&out);
 }
 #endif
 
 #ifdef F_REFS
 void f_refs(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int r;
 
-  switch (vm_sp()->type) {
+  switch (f.type(0)) {
     case T_MAPPING:
-      r = vm_sp()->u.map->ref;
+      r = f.mapping(0)->ref;
       break;
     case T_CLASS:
     case T_ARRAY:
-      r = vm_sp()->u.arr->ref;
+      r = f.array(0)->ref;
       break;
     case T_OBJECT:
-      r = vm_sp()->u.ob->ref;
+      r = f.object(0)->ref;
       break;
     case T_FUNCTION:
-      r = vm_sp()->u.fp->hdr.ref;
+      r = f.funptr(0)->hdr.ref;
       break;
     case T_BUFFER:
-      r = vm_sp()->u.buf->ref;
+      r = f.buffer(0)->ref;
       break;
     case T_PROMISE:
-      r = vm_sp()->u.prom->ref;
+      r = f.promise(0)->ref;
       break;
     case T_STRING:
-      if (vm_sp()->subtype & STRING_COUNTED) {
-        r = MSTR_REF(vm_sp()->u.string);
+      if (f.subtype(0) & STRING_COUNTED) {
+        r = MSTR_REF(f.string(0));
       } else {
         r = 0;
       }
@@ -152,14 +153,13 @@ void f_refs(int num_arg) {
       r = 0;
       break;
   }
-  free_svalue(vm_sp(), "f_refs");
-  put_number(r - 1); /* minus 1 to compensate for being arg of
-                      * refs() */
+  f.ret(r - 1); /* minus 1 to compensate for being arg of refs() */
 }
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
 void f_destructed_objects(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
   array_t* ret;
   object_t* ob;
@@ -179,7 +179,7 @@ void f_destructed_objects(int num_arg) {
     ob = ob->next_all;
   }
 
-  push_refed_array(ret);
+  f.ret_refed(ret);
 }
 #endif
 
@@ -187,7 +187,8 @@ void f_destructed_objects(int num_arg) {
 void dump_stralloc(outbuffer_t*);
 
 void f_dump_stralloc(int num_arg) {
-  const auto* target_file = vm_sp()->u.string;
+  LPCFrame f = LPCFrame::args(num_arg);
+  const auto* target_file = f.string(0);
   const char* fn;
   FILE* fp;
   fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
@@ -209,7 +210,7 @@ void f_dump_stralloc(int num_arg) {
   fputs(out.buffer, fp);
   fclose(fp);
 
-  pop_stack();
+  f.ret_void();
   outbuf_push(&out);
 }
 #endif
@@ -221,40 +222,50 @@ void f_dump_stralloc(int num_arg) {
 #endif
 
 void f_dump_jemalloc(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
 #ifdef HAVE_JEMALLOC
   mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
   malloc_stats_print(nullptr, nullptr, "");
 #else
   debug_message("Jemalloc is disabled, dump_jemalloc() has no effect.\n");
 #endif
+  f.done();
 }
 #endif
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
 void f_debugmalloc(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* res;
 
-  res = dump_debugmalloc((vm_sp() - 1)->u.string, vm_sp()->u.number);
-  free_string_svalue(--vm_sp());
-  vm_sp()->subtype = STRING_MALLOC;
-  vm_sp()->u.string = res;
+  res = dump_debugmalloc(f.string(0), f.number(1));
+  f.ret_str_malloced(res);
 }
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask(int num_arg) { set_malloc_mask((vm_sp()--)->u.number); }
+void f_set_malloc_mask(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  set_malloc_mask(f.number(0));
+  f.ret_void();
+}
 #endif
 
 #ifdef F_CHECK_MEMORY
-void f_check_memory(int num_arg) { check_all_blocks((vm_sp()--)->u.number); }
+void f_check_memory(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  check_all_blocks(f.number(0));
+  f.ret_void();
+}
 #endif
 
 #ifdef F_FIND_ORPHANED_CYCLES
 void f_find_orphaned_cycles(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   // any nonzero LPC int means collect (don't truncate the 64-bit argument)
-  int const collect = (vm_sp()--)->u.number != 0;
-  push_number(md_scan_orphaned_cycles(collect, nullptr));
+  int const collect = f.number(0) != 0;
+  f.ret(md_scan_orphaned_cycles(collect, nullptr));
 }
 #endif
 #endif /* (defined(DEBUGMALLOC) && \
@@ -262,39 +273,41 @@ void f_find_orphaned_cycles(int num_arg) {
 
 #ifdef F_TRACE
 void f_trace(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
     ot = command_giver->interactive->trace_level;
-    command_giver->interactive->trace_level = vm_sp()->u.number;
+    command_giver->interactive->trace_level = f.number(0);
   }
-  vm_sp()->u.number = ot;
+  f.set_top_number(ot);
+  f.done();
 }
 #endif
 
 #ifdef F_TRACEPREFIX
 void f_traceprefix(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* old = nullptr;
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;
-    if (vm_sp()->type & T_STRING) {
-      const char* p = vm_sp()->u.string;
+    if (f.type(0) & T_STRING) {
+      const char* p = f.string(0);
       if (*p == '/') {
         p++;
       }
 
       command_giver->interactive->trace_prefix = make_shared_string(p);
-      free_string_svalue(vm_sp());
     } else {
       command_giver->interactive->trace_prefix = nullptr;
     }
   }
   if (old) {
-    put_malloced_string(add_slash(old));
+    f.ret_str_malloced(add_slash(old));
     free_string(old);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
 #endif
