@@ -25,6 +25,7 @@
 #include "interactive.h"  // for interactive_t, FIXME
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/debug.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/master.h"

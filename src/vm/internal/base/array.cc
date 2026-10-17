@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include <stdlib.h>  // for qsort
 #include <cstring>

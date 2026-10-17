@@ -193,14 +193,16 @@ const char* plat_dlerror() {
 // ---------------------------------------------------------------------------
 
 void check_valid_ffi(const char* op, svalue_t* arg) {
-  push_constant_string(op);
+  LPCFrame b = LPCFrame::builder();
+  b.push_str_constant(op);
   if (arg == nullptr) {
-    push_number(0);
+    b.push(static_cast<LPC_INT>(0));
   } else {
-    push_svalue(arg);
+    b.push(arg);
   }
-  push_object(current_object);
+  b.push(current_object);
   svalue_t* ret = safe_apply_master_ob(APPLY_VALID_FFI, 3);
+  b.done();
   if (ret && (ret == reinterpret_cast<svalue_t*>(-1) || (ret->type == T_NUMBER && ret->u.number))) {
     return;
   }

@@ -283,23 +283,24 @@ extern svalue_t const0, const1, const0u;
     MSTR_TAG_JOIN(ess_res, ess_ascii);                                                             \
   })
 
-/* <something that needs no free> + string svalue */
+/* <something that needs no free> + string svalue on the eval stack top.
+ * Requires `sp` (include vm_stack.h); VM/ops only. */
 #define SVALUE_STRING_ADD_LEFT(y, z)                                                              \
   SAFE({                                                                                          \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                             \
     char* pss_res;                                                                                \
     int pss_r;                                                                                    \
     int pss_len;                                                                                  \
-    pss_len = SVALUE_STRLEN(vm_sp()) + (pss_r = strlen(y));                                            \
+    pss_len = SVALUE_STRLEN(sp) + (pss_r = strlen(y));                                            \
     if (pss_len > max_string_length) error("Maximum string length exceeded in concatenation.\n"); \
-    bool pss_ascii = SVALUE_STR_ASCII(vm_sp()) && u8_string_is_ascii_cached((y), pss_r, false);         \
+    bool pss_ascii = SVALUE_STR_ASCII(sp) && u8_string_is_ascii_cached((y), pss_r, false);         \
     pss_res = new_string(pss_len, z);                                                             \
     strcpy(pss_res, y);                                                                           \
-    strcpy(pss_res + pss_r, vm_sp()->u.string);                                                        \
-    free_string_svalue(vm_sp()--);                                                                     \
-    vm_sp()->type = T_STRING;                                                                          \
-    vm_sp()->u.string = pss_res;                                                                       \
-    vm_sp()->subtype = STRING_MALLOC;                                                                  \
+    strcpy(pss_res + pss_r, sp->u.string);                                                        \
+    free_string_svalue(sp--);                                                                     \
+    sp->type = T_STRING;                                                                          \
+    sp->u.string = pss_res;                                                                       \
+    sp->subtype = STRING_MALLOC;                                                                  \
     MSTR_TAG_JOIN(pss_res, pss_ascii);                                                            \
   })
 

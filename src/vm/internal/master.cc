@@ -10,6 +10,7 @@
 
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "applies_table.autogen.h"
 #include "vm/internal/apply.h"
 #include "vm/internal/hooks.h"

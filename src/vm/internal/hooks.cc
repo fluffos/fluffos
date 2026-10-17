@@ -15,6 +15,7 @@
 #include "vm/internal/base/array.h"
 #include "vm/internal/base/function.h"
 #include "vm/internal/base/interpret.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/mapping.h"
 #include "vm/internal/base/object.h"
 #include "vm/internal/base/program.h"

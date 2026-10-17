@@ -49,7 +49,7 @@ LPC arguments and return values live on the evaluation stack. **Package efuns us
 * `LPC_EFUN_UNARY_REAL(name, expr)` — Tier-C macro for fixed unary float efuns (see `packages/math/math.cc`).
 
 #### Stack pointer privacy
-* Package-visible headers do **not** export `sp` or `vm_sp()` as the efun API. Efuns go through `LPCFrame`. A transitional `vm_sp()` alias may exist only while call sites migrate.
+* Package-visible headers do **not** export `sp`, `lpc_eval_sp`, or `vm_sp()`. Efuns go through `LPCFrame` only. Raw stack access (`sp`, put_/STACK macros, `PoppedLvalue`) is confined to `vm_stack.h` for the interpreter and `packages/ops`.
 * VM-internal code (`interpret.cc`) and the operator package (`packages/ops`) include `vm/internal/base/vm_stack.h` and use bare `sp` for the hot path.
 * Do **not** name local variables `sp` in packages.
 

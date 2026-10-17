@@ -24,6 +24,7 @@ typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
 #include "comm.h"                    // add_message FIXME: reverse API
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/otable.h"  // FIXME:

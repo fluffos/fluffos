@@ -28,6 +28,7 @@
 #include "net/transport.h"
 #include "user.h"
 #include "vm/vm.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/hooks.h"
 
 #include "packages/core/add_action.h"  // FIXME?
