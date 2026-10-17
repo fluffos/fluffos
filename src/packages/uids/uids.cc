@@ -82,16 +82,14 @@ void f_seteuid(LPCFrame& f) {
       bad_arg(1, F_SETEUID);
     }
     current_object->euid = nullptr;
-    f.set_top_number(1);
-    f.done();
+    f.ret(1);
     return;
   }
   {
-    LPCFrame b = LPCFrame::builder();
+    LPCCall b;
     b.push(current_object);
     b.push(f.argp(0));
-    ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
-    b.done();
+    ret = b.apply_master(APPLY_VALID_SETEUID);
   }
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
     f.ret(0);

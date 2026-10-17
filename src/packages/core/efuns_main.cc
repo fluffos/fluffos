@@ -109,7 +109,6 @@ void f_bind(LPCFrame& f) {
   if (ob == old_fp->hdr.owner) {
     /* no change */
     f.pop_back(1);
-    f.done();
     return;
   }
 
@@ -123,12 +122,11 @@ void f_bind(LPCFrame& f) {
   }
 
   {
-    LPCFrame b = LPCFrame::builder();
+    LPCCall b;
     b.push(current_object);
     b.push(old_fp->hdr.owner);
     b.push(ob);
-    res = apply_master_ob(APPLY_VALID_BIND, 3);
-    b.done();
+    res = b.apply_master(APPLY_VALID_BIND);
   }
   if (!MASTER_APPROVED(res, "valid_bind")) {
     error("Master object denied permission to bind() function pointer.\n");
@@ -143,12 +141,13 @@ void f_bind(LPCFrame& f) {
   if (f.type(1) != T_OBJECT) {
     error("New owner was destructed during valid_bind().\n");
   }
-  ob = f.object(1);
 
   new_fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind"));
   *new_fp = *old_fp;
   new_fp->hdr.ref = 1;
-  new_fp->hdr.owner = ob; /* one ref from being on stack */
+  /* The new pointer takes over the stack's reference to its owner. */
+  ob = f.steal(1).u.ob;
+  new_fp->hdr.owner = ob;
   new_fp->hdr.owner_gen = ob->prog_generation;
   if (new_fp->hdr.args) {
     new_fp->hdr.args->ref++;
@@ -159,10 +158,11 @@ void f_bind(LPCFrame& f) {
           new_fp->f.functional.prog->func_ref);
   }
 
-  free_funp(old_fp);
-  f.pop_back(1);
-  f.top().u.fp = new_fp;
-  f.done();
+  /* Releases old_fp along with the (now empty) owner slot. */
+  svalue_t result{};
+  result.type = T_FUNCTION;
+  result.u.fp = new_fp;
+  f.ret_owned(result);
 }
 #endif
 
@@ -188,8 +188,7 @@ void f_cache_stats(LPCFrame& f) {
 
   outbuf_zero(&ob);
   print_cache_stats(&ob, 1);
-  outbuf_push(&ob);
-  f.done();
+  outbuf_ret(f, &ob);
 }
 
 #endif
@@ -230,8 +229,7 @@ void f__call_other(LPCFrame& f) {
     /* call_all_other consumed trailing args; left [obj_array, name]. */
     f.rebase(2);
     f.pop_back(1); /* name */
-    f.set_top_array(ret);
-    f.done();
+    f.ret_refed(ret);
     return;
   } else {
     ob = find_object(arg[0].u.string);
@@ -368,7 +366,6 @@ void f_capitalize(LPCFrame& f) {
     (const_cast<char*>(f.top().u.string))[0] =
         toupper(static_cast<unsigned char>(f.top().u.string[0]));
   }
-  f.done();
 }
 #endif
 
@@ -416,7 +413,7 @@ void f_clear_bit(LPCFrame& f) {
   bit %= 6;
   len = f.string_len(0);
   if (ind >= len) {
-    f.done(); /* return first arg unmodified */
+    /* return first arg unmodified */
     return;
   }
   unlink_string_svalue(&f.top());
@@ -426,7 +423,6 @@ void f_clear_bit(LPCFrame& f) {
     error("Illegal bit pattern in clear_bit character %d\n", ind);
   }
   str[ind] = ((str[ind] - ' ') & ~(1 << bit)) + ' ';
-  f.done();
 }
 
 #endif
@@ -615,7 +611,6 @@ void f_filter(LPCFrame& f) {
   } else {
     filter_array(arg, num_arg);
   }
-  f.done();
 }
 
 #endif
@@ -744,7 +739,7 @@ void f_get_char(LPCFrame& f) {
   }
   num_arg--;
   i = get_char(arg, flag, num_arg, &arg[1 + tmp]);
-  f.ret_front_number(i);
+  f.ret(i);
 }
 
 #endif
@@ -825,7 +820,7 @@ void f_input_to(LPCFrame& f) {
   }
   num_arg--; /* Don't count the name of the func either. */
   i = input_to(arg, flag, num_arg, &arg[1 + tmp]);
-  f.ret_front_number(i);
+  f.ret(i);
 }
 
 #endif
@@ -898,11 +893,9 @@ void f_lower_case(LPCFrame& f) {
           *str = tolower(static_cast<unsigned char>(*str));
         }
       }
-      f.done();
       return;
     }
   }
-  f.done();
 }
 
 #endif
@@ -920,8 +913,7 @@ void f_malloc_status(LPCFrame& f) {
 #if defined(DEBUGMALLOC)
   dump_malloc_data(&ob);
 #endif
-  outbuf_push(&ob);
-  f.done();
+  outbuf_ret(f, &ob);
 }
 
 #endif
@@ -953,7 +945,6 @@ void f_map(LPCFrame& f) {
   } else {
     map_string(arg, num_arg);
   }
-  f.done();
 }
 
 #endif
@@ -1020,9 +1011,7 @@ void f_match_path(LPCFrame& f) {
   FREE(tmpstr);
   /* Don't free mapping first, in case sometimes one uses a ref 1 mapping */
   /* Randor - 5/29/94 */
-  svalue_t result;
-  assign_svalue_no_free(&result, value);
-  f.ret(result);
+  f.ret_copy(value);
 }
 
 #endif /* F_MATCH_PATH */
@@ -1195,10 +1184,9 @@ void f_member_array(LPCFrame& f) {
         // Predicate search (issue #900): return the first index whose
         // element makes the function return truthy.
         {
-          LPCFrame b = LPCFrame::builder();
+          LPCCall b;
           b.push(sv);
-          svalue_t* ret = call_function_pointer(find->u.fp, 1);
-          b.done();
+          svalue_t* ret = b.call(find->u.fp);
           if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
             break;
           }
@@ -1502,8 +1490,7 @@ void f_mud_status(LPCFrame& f) {
     outbuf_addv(&ob, "Max RSS: %8" PRIu64 "\n", current.ru_maxrss * 1024);
   }
 
-  outbuf_push(&ob);
-  f.done();
+  outbuf_ret(f, &ob);
 }
 
 #endif
@@ -1558,8 +1545,7 @@ void f_previous_object(LPCFrame& f) {
 
   if ((i = f.number(0)) > 0) {
     if (i >= CONFIG_INT(__MAX_CALL_DEPTH__)) {
-      f.set_top_number(0);
-      f.done();
+      f.ret(0);
       return;
     }
     ob = nullptr;
@@ -1612,8 +1598,7 @@ void f_previous_object(LPCFrame& f) {
     ob = previous_ob;
   }
   if (!ob || (ob->flags & O_DESTRUCTED)) {
-    f.set_top_number(0);
-    f.done();
+    f.ret(0);
   } else {
     f.ret(ob);
   }
@@ -1649,7 +1634,6 @@ void f_process_string(LPCFrame& f) {
   if (str != f.string(0)) {
     f.ret_str_malloced(str);
   } else {
-    f.done();
   }
 }
 
@@ -1786,12 +1770,10 @@ void f_query_snoop(LPCFrame& f) {
 #ifdef F_RANDOM
 void f_random(LPCFrame& f) {
   if (f.number(0) <= 0) {
-    f.set_top_number(0);
-    f.done();
+    f.ret(0);
     return;
   }
-  f.set_top_number(random_number(f.number(0)));
-  f.done();
+  f.ret(random_number(f.number(0)));
 }
 
 #endif
@@ -1799,12 +1781,10 @@ void f_random(LPCFrame& f) {
 #ifdef F_SECURE_RANDOM
 void f_secure_random(LPCFrame& f) {
   if (f.number(0) <= 0) {
-    f.set_top_number(0);
-    f.done();
+    f.ret(0);
     return;
   }
-  f.set_top_number(secure_random_number(f.number(0)));
-  f.done();
+  f.ret(secure_random_number(f.number(0)));
 }
 
 #endif
@@ -2086,14 +2066,12 @@ void f_replace_string(LPCFrame& f) {
 
   if (first > last) { /* just return it */
     f.pop_back(num_arg - 1);
-    f.done();
     return;
   }
   pattern = (arg + 1)->u.string;
   plen = SVALUE_STRLEN(arg + 1);
   if (!plen) {
     f.pop_back(num_arg - 1); /* just return it */
-    f.done();
     return;
   }
   replace = (arg + 2)->u.string;
@@ -2206,7 +2184,6 @@ void f_replace_string(LPCFrame& f) {
       }
     }
     f.pop_back(num_arg - 1);
-    f.done();
   } else {
     dst2 = dst1 = new_string(max_string_length, "f_replace_string: 2");
 
@@ -2374,14 +2351,14 @@ void f_say(LPCFrame& f) {
 void f_set_eval_limit(LPCFrame& f) {
   switch (f.number(0)) {
     case 0:
-      f.set_top_number(max_eval_cost);
+      f.ret(max_eval_cost);
       set_eval(max_eval_cost);
       break;
     case -1:
-      f.set_top_number(get_eval());
+      f.ret(get_eval());
       break;
     case 1:
-      f.set_top_number(max_eval_cost);
+      f.ret(max_eval_cost);
       break;
     default:
       if (f.number(0) < -1) {
@@ -2390,7 +2367,6 @@ void f_set_eval_limit(LPCFrame& f) {
       max_eval_cost = f.number(0);
       break;
   }
-  f.done();
 }
 #endif
 
@@ -2430,14 +2406,13 @@ void f_set_bit(LPCFrame& f) {
     if (len > old_len) {
       memset(str + old_len, ' ', len - old_len);
     }
-    f.set_top_str_malloced(str);
+    f.ret_str_malloced(str);
   }
 
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
     error("Illegal bit pattern in set_bit character %d\n", ind);
   }
   str[ind] = ((str[ind] - ' ') | (1 << bit)) + ' ';
-  f.done();
 }
 #endif
 
@@ -2507,8 +2482,7 @@ void f_set_light(LPCFrame& f) {
     o1 = o1->super;
   }
 #endif
-  f.set_top_number(o1->total_light);
-  f.done();
+  f.ret(o1->total_light);
 }
 #endif
 
@@ -2577,7 +2551,6 @@ void f_shutdown(LPCFrame& f) {
   int num_arg = f.argc();
   if (num_arg) {
     shutdownMudOS(f.number(0));
-    f.done();
   } else {
     shutdownMudOS(0);
     f.ret(0);
@@ -2637,14 +2610,12 @@ void f_snoop(LPCFrame& f) {
     if (!new_set_snoop(f.object(0), nullptr) || (f.object(0)->flags & O_DESTRUCTED)) {
       f.ret(0);
     } else {
-      f.done();
     }
   } else {
     if (!new_set_snoop(f.object(0), f.object(1)) || (f.object(1)->flags & O_DESTRUCTED)) {
       f.ret(0);
     } else {
-      svalue_t v = f.steal(1);
-      f.ret(v);
+      f.ret_owned(f.steal(1));
     }
   }
 }
@@ -2971,14 +2942,12 @@ void f_this_player(LPCFrame& f) {
     if (current_interactive) {
       f.ret(current_interactive);
     } else {
-      f.set_top_number(0);
-      f.done();
+      f.ret(0);
     }
   } else {
     if (command_giver) {
       f.ret(command_giver);
     } else {
-      f.done();
     }
   }
 }
@@ -3003,7 +2972,6 @@ void f_throw(LPCFrame& f) {
   free_svalue(&catch_value, "f_throw");
   catch_value = f.steal(0);
   f.pop_back(1);
-  f.done();
   throw_error(); /* do the longjump, with extra checks... */
 }
 #endif
@@ -3015,13 +2983,12 @@ void f__to_float(LPCFrame& f) {
   switch (f.type(0)) {
     case T_NUMBER:
       temp = f.number(0);
-      f.set_top_real(temp);
+      f.ret(temp);
       break;
     case T_STRING:
       temp = strtod(f.string(0), nullptr);
-      f.set_top_real(temp);
+      f.ret(temp);
   }
-  f.done();
 }
 #endif
 
@@ -3030,7 +2997,6 @@ void f__to_buffer(LPCFrame& f) {
   switch (f.type(0)) {
     case T_BUFFER:
       /* already a buffer */
-      f.done();
       break;
     case T_STRING:
     case T_ARRAY: {
@@ -3053,8 +3019,7 @@ void f__to_int(LPCFrame& f) {
   switch (f.type(0)) {
     case T_REAL:
       temp = f.real(0);
-      f.set_top_number(temp);
-      f.done();
+      f.ret(temp);
       break;
     case T_STRING: {
       char* p;
@@ -3084,8 +3049,7 @@ void f__to_int(LPCFrame& f) {
           break;
         }
       }
-      f.set_top_number(temp);
-      f.done();
+      f.ret(temp);
       break;
     }
     case T_BUFFER:
@@ -3283,7 +3247,7 @@ void f_dump_file_descriptors(LPCFrame& f) {
 
   outbuf_zero(&out);
   outbuf_add(&out, "ERROR: dump_file_descriptors is no longer supported.");
-  outbuf_push(&out);
+  outbuf_ret(f, &out);
 }
 #endif
 
@@ -3425,7 +3389,6 @@ void f_flush_messages(LPCFrame& f) {
     f.ret_void();
   } else {
     flush_message_all();
-    f.done();
   }
 }
 #endif
@@ -3474,14 +3437,12 @@ void f_defer(LPCFrame& f) {
   // Configure the new item.
   newlist->func = f.steal(0);
   f.ret_void();
-  if (command_giver) {
-    LPCFrame b = LPCFrame::builder();
-    b.push(command_giver);
-    newlist->tp = b.steal(0);
-    b.pop_back(1);
-    b.done();
-  } else {
-    newlist->tp = const0;
+  /* push_object()'s rule: a destructed command_giver reads as undefined. */
+  newlist->tp = command_giver ? const0u : const0;
+  if (command_giver && !(command_giver->flags & (O_DESTRUCTED | O_BEING_DESTRUCTED))) {
+    newlist->tp.type = T_OBJECT;
+    newlist->tp.u.ob = command_giver;
+    add_ref(command_giver, "defer");
   }
 
   // In reverse mode, if list is not null, then add new item to the end.

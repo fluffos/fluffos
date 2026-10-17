@@ -794,7 +794,6 @@ inline void int_call_out(bool walltime, LPCFrame& f) {
     f.top().type = T_PROMISE;
     f.top().subtype = 0;
     f.top().u.prom = p;
-    f.done();
     return;
   }
 

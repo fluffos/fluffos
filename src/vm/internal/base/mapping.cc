@@ -623,7 +623,6 @@ void f_unique_mapping(LPCFrame& f) {
   {
     LPCFrame frame = LPCFrame::args(num_arg);
     frame.process_callback(1, &ftc, F_UNIQUE_MAPPING);
-    frame.done();
   }
 
   // for each item in the array, call the callback and group
@@ -1051,7 +1050,6 @@ void map_mapping(svalue_t* arg, int num_arg) {
   {
     LPCFrame frame = LPCFrame::args(num_arg);
     frame.process_callback(1, &ftc, F_MAP);
-    frame.done();
   }
 
   if (arg->u.map->ref > 1) {
@@ -1095,7 +1093,6 @@ void filter_mapping(svalue_t* arg, int num_arg) {
   {
     LPCFrame frame = LPCFrame::args(num_arg);
     frame.process_callback(1, &ftc, F_FILTER);
-    frame.done();
   }
 
   if (arg->u.map->ref > 1) {

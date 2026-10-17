@@ -2479,9 +2479,8 @@ void f_hook_proceed(LPCFrame& f) {
   } else {
     error("Wrong number of arguments to hook_proceed()\n");
   }
-  /* Body below reshapes the stack and leaves the proceed result as the
-   * efun return; release the Args window without touching it. */
-  f.abandon();
+  /* From here on the body works on the raw stack and leaves the proceed
+   * result as the efun's return value. */
   g_around.proceeded = true;
 
   object_t* target = g_around.target;

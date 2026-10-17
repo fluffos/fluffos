@@ -1,5 +1,7 @@
 #include "base/package_api.h"
 
+#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
+
 // from add_action.h
 extern object_t* find_living_object(const char*, int);
 
@@ -199,7 +201,7 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
         out.type = T_STRING;
         out.subtype = STRING_SHARED;
         out.u.string = make_shared_string(v->u.string);
-        f.ret(out);
+        f.ret_owned(out);
       } else {
         f.ret_undefined();
       }
@@ -219,7 +221,7 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
           out.type = T_STRING;
           out.subtype = STRING_SHARED;
           out.u.string = make_shared_string(v->u.string);
-          f.ret(out);
+          f.ret_owned(out);
         } else {
           f.ret_undefined();
         }
@@ -473,7 +475,7 @@ void f_reference_allowed(LPCFrame& f) {
       if (simul_efun_ob) {
         svalue_t* v;
         {
-          LPCFrame b = LPCFrame::builder();
+          LPCCall b;
           b.push(f.argp(1));
           v = b.apply("find_player", simul_efun_ob, ORIGIN_EFUN);
         }
@@ -524,7 +526,6 @@ void f_add_a(LPCFrame& f) {
   len = strlen(str);
   // Don't add anything if it already begins with a or an.
   if (!strncasecmp(str, "a ", 2) || !strncasecmp(str, "an ", 3)) {
-    f.done();
     return;
   }
 
@@ -588,11 +589,10 @@ void f_vowel(LPCFrame& f) {
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
       v == 'I' || v == 'O' || v == 'U') {
-    f.set_top_number(1);
+    f.ret(1);
   } else {
-    f.set_top_number(0);
+    f.ret(0);
   }
-  f.done();
 }
 
 void f_replace(LPCFrame& f) {
@@ -602,36 +602,33 @@ void f_replace(LPCFrame& f) {
     return;
   }
   if (num_arg == 2 && f.type(1) != T_STRING) {
-    svalue_t arr_sv = f.steal(1);
-    array_t* arr = arr_sv.u.arr;
-    if (arr->size & 1) {
-      free_array(arr);
+    if (f.array(1)->size & 1) {
       error("Wrong array size for replace.\n");
     }
-    f.pop_back(1);
-    f.done();
+    /* Take the pairs array off the stack, so each replace_string() below
+     * sees [string, pattern, replacement] on top and leaves its result in
+     * the string's slot. The scope guard owns the array from here on. */
+    array_t* arr = f.steal(1).u.arr;
+    DEFER { free_array(arr); };
+    f.pop_back();
 
     for (int i = 0; i < arr->size; i += 2) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
         share_and_push_string(arr->item[i].u.string);
         share_and_push_string(arr->item[i + 1].u.string);
-        { LPCFrame _efun_args = LPCFrame::args(3); f_replace_string(_efun_args); };
-        LPCFrame r = LPCFrame::args(1);
-        int ok = (r.type(0) == T_STRING);
-        r.done();
-        if (!ok) {
+        LPCFrame step = LPCFrame::args(3);
+        f_replace_string(step);
+        if (f.type(0) != T_STRING) {
           break;
         }
       }
     }
-    free_array(arr);
   } else {
     error("Bad arguments for replace.\n");
   }
 }
 
-void replace_mxp_html(int html, int mxp) {
-  LPCFrame f = LPCFrame::args(1);
+static void replace_mxp_html(LPCFrame& f, int html, int mxp) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
@@ -675,9 +672,9 @@ void replace_mxp_html(int html, int mxp) {
   f.ret_str_malloced(extend_string(dst, dst2 - dst));
 }
 
-void f_replace_html(LPCFrame& f) { replace_mxp_html(1, 0); }
+void f_replace_html(LPCFrame& f) { replace_mxp_html(f, 1, 0); }
 
-void f_replace_mxp(LPCFrame& f) { replace_mxp_html(0, 1); }
+void f_replace_mxp(LPCFrame& f) { replace_mxp_html(f, 0, 1); }
 
 void f_roulette_wheel(LPCFrame& f) {
   long num;
@@ -756,10 +753,9 @@ svalue_t* replace_objects(svalue_t* thing) {
       append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
       svalue_t* tmp = nullptr;
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
-        LPCFrame b = LPCFrame::builder();
+        LPCCall b;
         b.push(thing->u.ob);
-        tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
-        b.done();
+        tmp = b.safe_apply_master(APPLY_OBJECT_NAME);
       } else {
         append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
       }
@@ -768,37 +764,35 @@ svalue_t* replace_objects(svalue_t* thing) {
         append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp));
         append_bounded(buf, sizeof(buf), &len, "\")", 2);
       }
-      {
-        LPCFrame b = LPCFrame::builder();
-        b.push_str_copy(buf);
-        assign_svalue(&replace_tmp, &b.top());
-        b.discard_to();
-      }
+      free_svalue(&replace_tmp, "replace_objects");
+      replace_tmp.type = T_STRING;
+      replace_tmp.subtype = STRING_MALLOC;
+      replace_tmp.u.string = string_copy(buf, "replace_objects");
       return &replace_tmp;
     }
     case T_ARRAY:
     case T_CLASS: {
       array_t* ar = thing->u.arr;
       array_t* nar = allocate_array(ar->size);
-      LPCFrame b = LPCFrame::builder();
-      b.push_refed(nar);
+      LPCCall scratch; /* keeps nar on the stack until it is copied out */
+      scratch.push_refed(nar);
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
       }
-      assign_svalue(&replace_tmp, &b.top());
-      b.discard_to();
+      assign_svalue(&replace_tmp, &scratch.arg(0));
+      scratch.discard();
       replace_tmp.type = thing->type;
       return &replace_tmp;
     }
     case T_MAPPING: {
-      LPCFrame b = LPCFrame::builder();
-      b.push_refed(mapping_indices(thing->u.map));
-      b.push_refed(allocate_mapping(thing->u.map->table_size));
-      b.push(static_cast<LPC_INT>(0));
-      array_t* keys = b.array(0);
-      mapping_t* out = b.mapping(1);
+      LPCCall scratch; /* [keys, result, key] stay on the stack until copied out */
+      scratch.push_refed(mapping_indices(thing->u.map));
+      scratch.push_refed(allocate_mapping(thing->u.map->table_size));
+      scratch.push(0);
+      array_t* keys = scratch.arg(0).u.arr;
+      mapping_t* out = scratch.arg(1).u.map;
       for (i = 0; i < keys->size; i++) {
-        svalue_t* key = b.argp(2);
+        svalue_t* key = &scratch.arg(2);
         svalue_t* tmp = find_in_mapping(thing->u.map, keys->item[i]);
         assign_svalue(key, replace_objects(&keys->item[i]));
         assign_svalue_no_free(find_for_insert(out, key, 1), replace_objects(tmp));
@@ -806,8 +800,8 @@ svalue_t* replace_objects(svalue_t* thing) {
           printf("guilty party:%s\n", key->u.string);
         }
       }
-      assign_svalue(&replace_tmp, b.argp(1));
-      b.discard_to();
+      assign_svalue(&replace_tmp, &scratch.arg(1));
+      scratch.discard();
       return &replace_tmp;
     }
     default:
@@ -823,7 +817,6 @@ void f_replace_objects(LPCFrame& f) {
   // calls (flagged by the Debug leak checker).
   free_svalue(&replace_tmp, "f_replace_objects");
   replace_tmp = const0;
-  f.done();
 }
 
 void f_replace_dollars(LPCFrame& f) {
@@ -878,7 +871,6 @@ void f_replace_dollars(LPCFrame& f) {
     // nothing happened!
     FREE_MSTR(newstr);
     f.pop_back(1);
-    f.done();
     return;
   }
 

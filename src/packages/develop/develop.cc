@@ -111,8 +111,7 @@ void f_debug_info(LPCFrame& f) {
     default:
       bad_arg(1, F_DEBUG_INFO);
   }
-  f.ret_void();
-  outbuf_push(&out);
+  outbuf_ret(f, &out);
 }
 #endif
 
@@ -206,8 +205,7 @@ void f_dump_stralloc(LPCFrame& f) {
   fputs(out.buffer, fp);
   fclose(fp);
 
-  f.ret_void();
-  outbuf_push(&out);
+  outbuf_ret(f, &out);
 }
 #endif
 
@@ -224,7 +222,6 @@ void f_dump_jemalloc(LPCFrame& f) {
 #else
   debug_message("Jemalloc is disabled, dump_jemalloc() has no effect.\n");
 #endif
-  f.done();
 }
 #endif
 
@@ -247,11 +244,8 @@ void f_set_malloc_mask(LPCFrame& f) {
 
 #ifdef F_CHECK_MEMORY
 void f_check_memory(LPCFrame& f) {
-  /* Drop the int argument BEFORE scanning: check_all_blocks() walks the
-   * whole eval stack and then pushes its report string as our result. */
-  int const flag = f.number(0);
-  f.ret_void();
-  check_all_blocks(flag);
+  check_all_blocks(static_cast<int>(f.number(0))); /* pushes its report */
+  f.ret_pushed();
 }
 #endif
 
@@ -273,8 +267,7 @@ void f_trace(LPCFrame& f) {
     ot = command_giver->interactive->trace_level;
     command_giver->interactive->trace_level = f.number(0);
   }
-  f.set_top_number(ot);
-  f.done();
+  f.ret(ot);
 }
 #endif
 

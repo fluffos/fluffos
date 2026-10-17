@@ -11,17 +11,10 @@
  * already validated the top-level tag before these run (AGENTS.md section 2).
  */
 
-static void ret_promise(LPCFrame& f, promise_t* p) {
-  svalue_t v{};
-  v.type = T_PROMISE;
-  v.subtype = 0;
-  v.u.prom = p;
-  f.ret(v);
-}
 
 #ifdef F_PROMISE_CREATE
 void f_promise_create(LPCFrame& f) {
-  ret_promise(f, promise_alloc());
+  f.ret_refed(promise_alloc());
 }
 #endif
 
@@ -133,7 +126,7 @@ static void promise_then_common(LPCFrame& f, funptr_t* on_fulfilled, funptr_t* o
   }
   promise_add_reaction(p, on_fulfilled, on_rejected, chained, giver);
 
-  ret_promise(f, chained);
+  f.ret_refed(chained);
 }
 
 #ifdef F_PROMISE_THEN
@@ -168,9 +161,7 @@ void f_promise_result(LPCFrame& f) {
     /* reading a rejection or cancellation counts as observing it */
     p->handled = true;
   }
-  svalue_t result;
-  assign_svalue_no_free(&result, &p->result);
-  f.ret(result);
+  f.ret_copy(&p->result);
 }
 #endif
 
@@ -188,7 +179,7 @@ static void promise_combinator_efun(LPCFrame& f, uint8_t kind) {
     error("promise_race: needs at least one promise; an empty array would never settle.\n");
   }
   promise_t* result = promise_combinator_start(kind, inputs);
-  ret_promise(f, result);
+  f.ret_refed(result);
 }
 
 #ifdef F_PROMISE_ALL
@@ -226,7 +217,7 @@ void f_promisep(LPCFrame& f) {
 #ifdef F_ASYNC_YIELD
 void f_async_yield(LPCFrame& f) {
   /* No arguments, so nothing to pop: return the yield promise. */
-  ret_promise(f, promise_async_yield());
+  f.ret_refed(promise_async_yield());
 }
 #endif
 

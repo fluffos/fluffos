@@ -431,36 +431,33 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
 }
 #endif
 
-/* Deliver a finished request's result, already pushed on the stack: the
-   callback form calls req->fun with it, the promise form settles req->prom
-   (both forms consume the pushed value). */
-static void deliver_result(struct Request* req, int rejected) {
+/* Deliver a finished request's result, the one value pushed on `result`:
+   the callback form calls req->fun with it, the promise form settles
+   req->prom with it. The value stays on the stack while the promise
+   settles, so an error() in a cancel handler cannot leak it. */
+static void deliver_result(LPCCall& result, struct Request* req, int rejected) {
   if (req->prom) {
-    LPCFrame f = LPCFrame::args(1);
-    promise_settle(req->prom, &f.top(), rejected);
-    f.ret_void();
+    promise_settle(req->prom, &result.arg(0), rejected);
+    result.discard();
     return;
   }
   set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  result.safe_call(req->fun);
 }
 
 void handle_read(struct Request* req) {
   int const val = req->ret;
+  LPCCall result;
   if (val < 0) {
-    LPCFrame out = LPCFrame::builder();
-    out.push(static_cast<LPC_INT>(val));
-    out.done();
-    deliver_result(req, /*rejected=*/1);
+    result.push(val);
+    deliver_result(result, req, /*rejected=*/1);
     return;
   }
   char* file = new_string(val, "read_file_async: str");
   memcpy(file, (char*)(req->data.data()), val);
   file[val] = 0;
-  LPCFrame out = LPCFrame::builder();
-  out.push_str_malloced(file);
-  out.done();
-  deliver_result(req, 0);
+  result.push_str_malloced(file);
+  deliver_result(result, req, 0);
 }
 
 #ifdef F_ASYNC_GETDIR
@@ -490,50 +487,36 @@ void handle_getdir(struct Request* req) {
           });
   }
 
-  {
-    LPCFrame out = LPCFrame::builder();
-    out.push_refed(ret);
-    out.done();
-  }
-  deliver_result(req, 0);
+  LPCCall result;
+  result.push_refed(ret);
+  deliver_result(result, req, 0);
 }
 #endif
 
 void handle_write(struct Request* req) {
   int const val = req->ret;
+  LPCCall result;
   if (val < 0) {
-    LPCFrame out = LPCFrame::builder();
-    out.push(static_cast<LPC_INT>(val));
-    out.done();
-    deliver_result(req, /*rejected=*/1);
+    result.push(val);
+    deliver_result(result, req, /*rejected=*/1);
     return;
   }
-  LPCFrame out = LPCFrame::builder();
-  out.push_undefined();
-  out.done();
-  deliver_result(req, 0);
+  result.push_undefined();
+  deliver_result(result, req, 0);
 }
 
 void handle_db_exec(struct Request* req) {
   int const val = req->ret;
-  {
-    LPCFrame out = LPCFrame::builder();
-    if (val == -1) {
-      out.push_str_copy(req->path.c_str());
-    } else {
-      out.push(static_cast<LPC_INT>(val));
-    }
-    out.done();
+  LPCCall result;
+  if (val == -1) {
+    result.push_str_copy(req->path.c_str());
+  } else {
+    result.push(val);
   }
   /* Promise form: -1 is a rejection (the error string), anything else is
      the row count the callback would have been called with. The callback
      form is unchanged -- it still receives either value as its argument. */
-  if (req->prom) {
-    deliver_result(req, val == -1);
-    return;
-  }
-  set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  deliver_result(result, req, req->prom && val == -1);
 }
 
 void check_reqs() {

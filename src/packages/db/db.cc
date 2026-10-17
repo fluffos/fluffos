@@ -229,8 +229,7 @@ void f_db_close(LPCFrame& f) {
   /* Remove the entry from the linked list */
   free_db_conn(db);
 
-  f.set_top_number(ret);
-  f.done();
+  f.ret(ret);
 }
 #endif
 
@@ -262,8 +261,7 @@ void f_db_commit(LPCFrame& f) {
     ret = db->type->commit(&(db->c));
   }
 
-  f.set_top_number(ret);
-  f.done();
+  f.ret(ret);
 }
 #endif
 
@@ -497,7 +495,7 @@ void f_db_fetch(LPCFrame& f) {
       f.ret(0);
     }
   } else {
-    f.ret(ret);
+    f.ret_refed(ret);
   }
 }
 #endif
@@ -534,8 +532,7 @@ void f_db_rollback(LPCFrame& f) {
     }
   }
 
-  f.set_top_number(ret);
-  f.done();
+  f.ret(ret);
 }
 #endif
 
@@ -565,8 +562,7 @@ void f_db_status(LPCFrame& f) {
     }
   }
 
-  outbuf_push(&out);
-  f.done();
+  outbuf_ret(f, &out);
 }
 #endif
 

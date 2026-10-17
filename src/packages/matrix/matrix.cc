@@ -82,7 +82,6 @@ void f_translate(LPCFrame& f) {
   translate_matrix(x, y, z, trans_matrix);
   mult_matrix(current_matrix, trans_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
-  f.done();
 }
 
 void f_scale(LPCFrame& f) {
@@ -112,7 +111,6 @@ void f_scale(LPCFrame& f) {
   scale_matrix(x, y, z, scaling_matrix);
   mult_matrix(current_matrix, scaling_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
-  f.done();
 }
 
 void f_rotate_x(LPCFrame& f) {
@@ -134,7 +132,6 @@ void f_rotate_x(LPCFrame& f) {
   rotate_x_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
-  f.done();
 }
 
 void f_rotate_y(LPCFrame& f) {
@@ -156,7 +153,6 @@ void f_rotate_y(LPCFrame& f) {
   rotate_y_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
-  f.done();
 }
 
 void f_rotate_z(LPCFrame& f) {
@@ -178,7 +174,6 @@ void f_rotate_z(LPCFrame& f) {
   rotate_z_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
-  f.done();
 }
 
 void f_lookat_rotate(LPCFrame& f) {
@@ -206,7 +201,6 @@ void f_lookat_rotate(LPCFrame& f) {
    */
   lookat_rotate(current_matrix, x, y, z, lookat_matrix);
   store_matrix(matrix, lookat_matrix);
-  f.done();
 }
 
 #ifdef F_LOOKAT_ROTATE2
@@ -240,7 +234,6 @@ void f_lookat_rotate2(LPCFrame& f) {
    */
   lookat_rotate2(ex, ey, ez, lx, ly, lz, lookat_matrix);
   store_matrix(matrix, lookat_matrix);
-  f.done();
 }
 #endif
 

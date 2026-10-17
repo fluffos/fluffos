@@ -25,32 +25,15 @@ void f_hook_detach(LPCFrame& f) {
 #ifdef F_HOOK_QUERY
 void f_hook_query(LPCFrame& f) {
   LPC_INT id = f.number(0);
-  mapping_t* m = hook_efun_query(id);
-  f.ret(m);
+  f.ret_refed(hook_efun_query(id));
 }
 #endif
 
 #ifdef F_HOOK_LIST
 void f_hook_list(LPCFrame& f) {
-  int num_arg = f.argc();
-  object_t* ob = nullptr;
-  if (num_arg == 1) {
-    if (f.type(0) == T_OBJECT) {
-      ob = f.object(0);
-      /* Keep alive across the stack pop: stack may hold the only ref. */
-      add_ref(ob, "hook_list");
-    }
-    f.ret_void();
-  } else {
-    f.done();
-  }
-  array_t* arr = hook_efun_list(ob);
-  if (ob) {
-    free_object(&ob, "hook_list");
-  }
-  LPCFrame out = LPCFrame::builder();
-  out.push_refed(arr);
-  out.done();
+  /* The argument slot keeps ob alive while the list is built. */
+  object_t* ob = (f.argc() == 1 && f.type(0) == T_OBJECT) ? f.object(0) : nullptr;
+  f.ret_refed(hook_efun_list(ob));
 }
 #endif
 /* f_hook_proceed is defined in vm/internal/hooks.cc */

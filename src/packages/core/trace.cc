@@ -4,7 +4,7 @@
 
 #ifdef F_DUMP_TRACE
 void f_dump_trace(LPCFrame& f) {
-  f.ret(get_svalue_trace());
+  f.ret_addref(get_svalue_trace()); /* returns a zero-reference array */
 }
 #endif
 
@@ -54,6 +54,5 @@ void f_trace_end(LPCFrame& f) {
   // that needs ending, and collect() already no-ops when there is nothing
   // pending.
   Tracer::collect();
-  f.done();
 }
 #endif

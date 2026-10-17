@@ -15,7 +15,6 @@ void f_request_term_type(LPCFrame& f) {
     debug_message(
         "Warning: wrong usage. request_term_type() should only be called by a user object.\n");
   }
-  f.done();
 }
 #endif
 
@@ -30,7 +29,6 @@ void f_start_request_term_type(LPCFrame& f) {
         "Warning: wrong usage. start_request_term_type() should only be called by a user "
         "object.\n");
   }
-  f.done();
 }
 #endif
 
@@ -63,7 +61,6 @@ void f_telnet_nop(LPCFrame& f) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. telnet_nop() should only be called by a user object.\n");
   }
-  f.done();
 }
 #endif
 
@@ -76,7 +73,6 @@ void f_telnet_ga(LPCFrame& f) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. telnet_ga() should only be called by a user object.\n");
   }
-  f.done();
 }
 #endif
 
@@ -102,7 +98,6 @@ void f_act_mxp(LPCFrame& f) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. act_mxp() should only be called by a user object.\n");
   }
-  f.done();
 }
 #endif
 

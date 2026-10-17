@@ -27,7 +27,6 @@ void f_get_config(LPCFrame& f) {
   if (!get_config_item(f.argp(0), f.argp(0))) {
     error("Bad argument to get_config()\n");
   }
-  f.done();
 }
 #endif
 

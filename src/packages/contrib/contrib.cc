@@ -1,5 +1,7 @@
 #include "base/package_api.h"
 
+#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
+
 #include <sys/stat.h>  // for struct stat
 
 #include <memory>  // for std::unique_ptr (deep_copy_* error-unwind guards)
@@ -23,8 +25,7 @@ void f_compressedp(LPCFrame& f) {
   int i;
 
   i = f.object(0)->interactive && (f.object(0)->interactive->iflags & USING_COMPRESS);
-  f.set_top_number(i != 0);
-  f.done();
+  f.ret(i != 0);
 }
 #endif
 
@@ -129,7 +130,7 @@ void f_query_notify_fail(LPCFrame& f) {
       v.type = T_FUNCTION;
       v.u.fp = fp;
       fp->hdr.ref++;
-      f.ret(v);
+      f.ret_owned(v);
       return;
     }
     if ((p = command_giver->interactive->default_err_message.s)) {
@@ -216,7 +217,6 @@ void f_set_prompt(LPCFrame& f) {
   /* Future work */
   /* ed() will nuke this; also we have to make sure the string will get
    * freed */
-  f.done();
 }
 #endif
 
@@ -323,7 +323,6 @@ void f_copy(LPCFrame& f) {
   deep_copy_svalue(f.argp(0), &ret);
   free_svalue(f.argp(0), "f_copy");
   f[0] = ret;
-  f.done();
 }
 #endif
 
@@ -682,7 +681,6 @@ void f_terminal_colour(LPCFrame& f) {
       savestr = nullptr;
     } else {
       f.pop_back(); /* no delimiter in string, so return the original */
-      f.done();
       return;
     }
   } else {
@@ -743,8 +741,7 @@ void f_terminal_colour(LPCFrame& f) {
       FREE_MSTR(savestr);
     }
     f.pop_back();
-    f.set_top_str_constant("");
-    f.done();
+    f.ret_str_constant("");
     return;
   }
 
@@ -800,7 +797,7 @@ void f_terminal_colour(LPCFrame& f) {
   for (j = i = 0, k = colour_map->table_size; i < num; i++) {
     // Look it up in the mapping.
     repused = 0;
-    LPCFrame replace_args = LPCFrame::builder();
+    LPCCall replace_args;
     replace_args.push_str_copy(parts[i]);
     // safe_apply: a raw apply that error()s here would longjmp past the
     // FREE(parts)/FREE(lens)/FREE_MSTR(savestr) at the end of this efun,
@@ -1191,8 +1188,7 @@ void f_terminal_colour(LPCFrame& f) {
         j, ncp - deststr, f.string(0), indent, wrap);
   }
 #endif
-  f.set_top_str_malloced(deststr);
-  f.done();
+  f.ret_str_malloced(deststr);
 }
 #endif
 
@@ -1782,11 +1778,9 @@ void f_upper_case(LPCFrame& f) {
           *newstr = toupper(static_cast<unsigned char>(*newstr));
         }
       }
-      f.done();
       return;
     }
   }
-  f.done();
 }
 #endif
 
@@ -1953,7 +1947,7 @@ void f_program_info(LPCFrame& f) {
 #ifdef F_REMOVE_INTERACTIVE
 void f_remove_interactive(LPCFrame& f) {
   if ((f.object(0)->flags & O_DESTRUCTED) || !(f.object(0)->interactive)) {
-    f.set_top_number(0);
+    f.ret(0);
   } else {
     remove_interactive(f.object(0), 0);
     /* It may have been dested */
@@ -1962,7 +1956,6 @@ void f_remove_interactive(LPCFrame& f) {
     }
     f[0] = const1;
   }
-  f.done();
 }
 #endif
 
@@ -2102,7 +2095,6 @@ void f_function_owner(LPCFrame& f) {
   } else {
     f[0] = const0u;
   }
-  f.done();
 }
 #endif
 
@@ -2132,7 +2124,7 @@ void f_repeat_string(LPCFrame& f) {
     newlen = len * repeat;
   }
   if (repeat <= 0) {
-    f.set_top_str_constant("");
+    f.ret_str_constant("");
   } else if (repeat != 1) {
     p = ret = new_string(newlen, "f_repeat_string");
     for (i = 0; i < repeat; i++) {
@@ -2140,9 +2132,8 @@ void f_repeat_string(LPCFrame& f) {
       p += len;
     }
     *p = 0;
-    f.set_top_str_malloced(ret);
+    f.ret_str_malloced(ret);
   }
-  f.done();
 }
 #endif
 
@@ -2397,6 +2388,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
   origin = current_object;
 
   name = new_string(strlen(event_fun) + strlen(EVENT_PREFIX) + 1, "newmoon.c: au_event");
+  DEFER { FREE_MSTR(name); }; /* an event handler may error() */
 
   strcpy(name, EVENT_PREFIX);
   strcat(name, event_fun);
@@ -2410,7 +2402,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
         continue;
       }
 
-      LPCFrame b = LPCFrame::builder();
+      LPCCall b;
       b.push(origin);
       for (i = 0; i < numparam; i++) {
         b.push(event_param + i);
@@ -2422,7 +2414,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
     /* First we call the event on the object itself */
 
     {
-      LPCFrame b = LPCFrame::builder();
+      LPCCall b;
       b.push(origin);
       for (i = 0; i < numparam; i++) {
         b.push(event_param + i);
@@ -2442,7 +2434,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
         if (ob->flags & O_DESTRUCTED) {
           continue;
         }
-        LPCFrame b = LPCFrame::builder();
+        LPCCall b;
         b.push(origin);
         for (i = 0; i < numparam; i++) {
           b.push(event_param + i);
@@ -2453,7 +2445,6 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
     }
 #endif
   }
-  FREE_MSTR(name);
 }
 
 void f_event(LPCFrame& f) {
@@ -2566,8 +2557,7 @@ void f_base_name(LPCFrame& f) {
 
   if (f.type(0) == T_OBJECT) {
     if (f.object(0)->flags & O_DESTRUCTED) {
-      f.set_top_number(0);
-      f.done();
+      f.ret(0);
       return;
     }
     name = add_slash(f.object(0)->obname);
@@ -2683,7 +2673,6 @@ void f_fetch_class_member(LPCFrame& f) {
 
   assign_svalue_no_free(f.argp(0), &arr->item[pos]);
   free_array(arr);
-  f.done();
 }
 #endif
 
@@ -2707,7 +2696,6 @@ void f_store_class_member(LPCFrame& f) {
 
   /* Leave the class on the stack (mixed return); drop index + value. */
   f.pop_back(2);
-  f.done();
 }
 #endif
 
@@ -2719,7 +2707,6 @@ void f_element_of(LPCFrame& f) {
   }
   assign_svalue_no_free(f.argp(0), &arr->item[random_number(arr->size)]);
   free_array(arr);
-  f.done();
 }
 #endif
 #ifdef F_SHUFFLE
@@ -2758,7 +2745,6 @@ void f_shuffle(LPCFrame& f) {
 
   if (f.type(0) == T_ARRAY && f.array(0)) {
     shuffle(f.array(0));
-    f.done();
   } else {
     f.ret_refed(&the_null_array);
   }
@@ -2836,7 +2822,6 @@ void f_max(LPCFrame& f) {
   f.pop_back();
   assign_svalue_no_free(f.argp(0), &arr->item[max_index]);
   free_array(arr);
-  f.done();
 }
 
 #endif
@@ -2912,7 +2897,6 @@ void f_min(LPCFrame& f) {
   f.pop_back();
   assign_svalue_no_free(f.argp(0), &arr->item[min_index]);
   free_array(arr);
-  f.done();
 }
 #endif
 
@@ -2928,7 +2912,6 @@ void f_abs(LPCFrame& f) {
   } else if (f.type(0) == T_NUMBER && f.number(0) < 0) {
     f.top().u.number = -f.top().u.number;
   }
-  f.done();
 }
 #endif
 
@@ -3159,12 +3142,12 @@ void f_restore_from_string(LPCFrame& f) {
     clear_non_statics(current_object);
   }
   {
-    LPCFrame tmp = LPCFrame::builder();
+    LPCCall tmp;
     tmp.push_str_copy(buf);  // restore_object_from_buff modifies the string in
                              // place, which is ok, copied strings aren't
                              // shared
-    restore_object_from_buff(current_object, const_cast<char*>(tmp.string(0)), noclear);
-    tmp.discard_to();
+    restore_object_from_buff(current_object, const_cast<char*>(tmp.arg(0).u.string), noclear);
+    tmp.discard();
   }
   f.ret_void();
 }
@@ -3255,25 +3238,18 @@ void f_test_load(LPCFrame& f) {
   }
   saved_extra_name = tmp;
   {
-    svalue_t eh{};
-    eh.type = T_ERROR_HANDLER;
-    eh.u.error_handler = fix_object_names;
-    f.push(&eh);
+    StackErrorHandler restore_names(fix_object_names);
+    new_ob = load_object(tmp, 0);
+    restore_names.dismiss();
   }
-
-  new_ob = load_object(tmp, 0);
   if (!new_ob) {
     if (testloadob) {
       SETOBNAME(testloadob, tmp);
     }
-    (void)f.steal(1); /* discard error handler without invoking */
-    f.pop_back();
     f.ret(0);
     return;
   }
   destruct_object(new_ob);
-  (void)f.steal(1);
-  f.pop_back();
   f.ret(1);
   if (testloadob) {
     SETOBNAME(testloadob, saved_extra_name);
@@ -3316,8 +3292,7 @@ void f_get_os_env(LPCFrame& f) {
 
   const char* val = getenv(name);
   if (!val) {
-    f.set_top_undefined();
-    f.done();
+    f.ret_undefined();
     return;
   }
   char* copy = string_copy(val, "f_get_os_env");
