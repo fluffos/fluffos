@@ -1037,24 +1037,22 @@ int copy_file(const char* from, const char* to) {
 
 #ifdef F_CP
 void f_cp(int num_arg) {
-  int i;
-
-  i = copy_file(vm_sp()[-1].u.string, vm_sp()[0].u.string);
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp());
-  put_number(i);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int i = copy_file(f.string(0), f.string(1));
+  f.ret(i);
 }
 #endif
 
 #ifdef F_FILE_SIZE
 void f_file_size(int num_arg) {
-  LPC_INT i = file_size(vm_sp()->u.string);
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_INT i = file_size(f.string(0));
 
   // cross platform fix
 #ifdef _WIN32
-  if (i == -1 && vm_sp()->u.string[SVALUE_STRLEN(vm_sp()) - 1] == '/') {
-    auto len = SVALUE_STRLEN(vm_sp());
-    auto tmp = string_copy(vm_sp()->u.string, "f_file_size");
+  if (i == -1 && f.string(0)[f.string_len(0) - 1] == '/') {
+    auto len = f.string_len(0);
+    auto tmp = string_copy(f.string(0), "f_file_size");
     tmp[len - 1] = '\0';
     if (file_size(tmp) == -2) {
       i = -2;
@@ -1063,59 +1061,52 @@ void f_file_size(int num_arg) {
   }
 #endif
 
-  free_string_svalue(vm_sp());
-  put_number(i);
+  f.ret(i);
 }
 #endif
 
 #ifdef F_GET_DIR
 void f_get_dir(int num_arg) {
-  array_t* vec;
-
-  vec = get_dir((vm_sp() - 1)->u.string, vm_sp()->u.number);
-  free_string_svalue(--vm_sp());
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = get_dir(f.string(0), f.number(1));
   if (vec) {
-    put_array(vec);
+    f.ret_refed(vec);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
 #endif
 
 #ifdef F_LINK
 void f_link(int num_arg) {
-  svalue_t *ret, *arg;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* ret;
   int i;
 
-  arg = vm_sp();
-  push_svalue(arg - 1);
-  push_svalue(arg);
-  ret = apply_master_ob(APPLY_VALID_LINK, 2);
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push(f.argp(0));
+    b.push(f.argp(1));
+    ret = apply_master_ob(APPLY_VALID_LINK, 2);
+    b.done();
+  }
   if (MASTER_APPROVED(ret, "valid_link")) {
-    i = do_rename((vm_sp() - 1)->u.string, vm_sp()->u.string, F_LINK);
+    i = do_rename(f.string(0), f.string(1), F_LINK);
   } else {
     i = 0;
   }
-  // Free both string arguments before replacing the slot with the
-  // result -- the old epilogue abandoned them (two shared-string refs
-  // leaked per call; caught by the testsuite's link test + leak gate).
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp());
-  put_number(i);
+  f.ret(i);
 }
 #endif /* F_LINK */
 
 #ifdef F_MKDIR
 void f_mkdir(int num_arg) {
-  const char* path;
-
-  path = check_valid_path(vm_sp()->u.string, current_object, "mkdir", 1);
+  LPCFrame f = LPCFrame::args(num_arg);
+  const char* path = check_valid_path(f.string(0), current_object, "mkdir", 1);
   if (!path || OS_mkdir(path, 0770) == -1) {
-    free_string_svalue(vm_sp());
-    *vm_sp() = const0;
+    f.ret(0);
   } else {
-    free_string_svalue(vm_sp());
-    *vm_sp() = const1;
+    f.ret(1);
   }
 }
 #endif

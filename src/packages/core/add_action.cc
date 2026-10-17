@@ -687,29 +687,29 @@ void remove_sent(object_t* ob, object_t* user) {
 
 #ifdef F_ADD_ACTION
 void f_add_action(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   LPC_INT flag;
 
   if (num_arg == 3) {
-    flag = (vm_sp()--)->u.number;
+    flag = f.number(2);
+    f.pop_back(1);
   } else {
     flag = 0;
   }
 
-  if (vm_sp()->type == T_ARRAY) {
-    int i, n = vm_sp()->u.arr->size;
-    svalue_t* sv = vm_sp()->u.arr->item;
+  if (f.type(1) == T_ARRAY) {
+    int i, n = f.array(1)->size;
+    svalue_t* sv = f.array(1)->item;
 
     for (i = 0; i < n; i++) {
       if (sv[i].type == T_STRING) {
-        add_action(vm_sp() - 1, sv[i].u.string, flag & 3);
+        add_action(f.argp(0), sv[i].u.string, flag & 3);
       }
     }
-    free_array((vm_sp()--)->u.arr);
   } else {
-    add_action((vm_sp() - 1), vm_sp()->u.string, flag & 3);
-    free_string_svalue(vm_sp()--);
+    add_action(f.argp(0), f.string(1), flag & 3);
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
@@ -724,17 +724,18 @@ void f_add_action(int num_arg) {
  * When failure, return 0.
  */
 void f_command(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
     char buff[1000];
     LPC_INT const save_eval_cost = get_eval();
 
-    if (SVALUE_STRLEN(vm_sp()) > sizeof(buff) - 1) {
+    if (f.string_len(0) > static_cast<int>(sizeof(buff) - 1)) {
       error("Too long command.\n");
     }
 
-    strncpy(buff, vm_sp()->u.string, sizeof(buff));
+    strncpy(buff, f.string(0), sizeof(buff));
     buff[sizeof(buff) - 1] = 0;
 
     if (parse_command(buff, current_object)) {
@@ -746,113 +747,118 @@ void f_command(int num_arg) {
     }
   }
 
-  free_string_svalue(vm_sp());
-  put_number(rc);
+  f.ret(rc);
 }
 #endif
 
 #ifdef F_COMMANDS
-void f_commands(int num_arg) { push_refed_array(commands(current_object)); }
+void f_commands(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_refed(commands(current_object));
+}
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands(int num_arg) { enable_commands(0, 0); }
+void f_disable_commands(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  enable_commands(0, 0);
+  f.done();
+}
 #endif
 
 #ifdef F_ENABLE_COMMANDS
 void f_enable_commands(int num_arg) {
-  enable_commands(1, vm_sp()->u.number);
-  pop_stack();
+  LPCFrame f = LPCFrame::args(num_arg);
+  enable_commands(1, f.number(0));
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FIND_LIVING
 void f_find_living(int num_arg) {
-  object_t* ob;
-
-  ob = find_living_object(vm_sp()->u.string, 0);
-  free_string_svalue(vm_sp());
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = find_living_object(f.string(0), 0);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
-    put_unrefed_undested_object(ob, "find_living");
+    f.ret(ob);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
 #endif
 
 #ifdef F_FIND_PLAYER
 void f_find_player(int num_arg) {
-  object_t* ob;
-
-  ob = find_living_object(vm_sp()->u.string, 1);
-  free_string_svalue(vm_sp());
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = find_living_object(f.string(0), 1);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
-    put_unrefed_undested_object(ob, "find_living");
+    f.ret(ob);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
 #endif
 
 #ifdef F_LIVING
 void f_living(int num_arg) {
-  if (vm_sp()->u.ob->flags & O_ENABLE_COMMANDS) {
-    free_object(&vm_sp()->u.ob, "f_living:1");
-    *vm_sp() = const1;
-  } else {
-    free_object(&vm_sp()->u.ob, "f_living:2");
-    *vm_sp() = const0;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret((f.object(0)->flags & O_ENABLE_COMMANDS) ? 1 : 0);
 }
 #endif
 
 #ifdef F_LIVINGS
-void f_livings(int num_arg) { push_refed_array(livings()); }
+void f_livings(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_refed(livings());
+}
 #endif
 
 #ifdef F_NOTIFY_FAIL
 void f_notify_fail(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
-    if (vm_sp()->type == T_STRING) {
-      command_giver->interactive->default_err_message.s = make_shared_string(vm_sp()->u.string);
+    if (f.type(0) == T_STRING) {
+      command_giver->interactive->default_err_message.s = make_shared_string(f.string(0));
     } else {
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
-      command_giver->interactive->default_err_message.f = vm_sp()->u.fp;
-      vm_sp()->u.fp->hdr.ref++;
+      command_giver->interactive->default_err_message.f = f.funptr(0);
+      f.funptr(0)->hdr.ref++;
     }
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_QUERY_VERB
 void f_query_verb(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (!last_verb) {
-    push_number(0);
+    f.ret(0);
     return;
   }
-  share_and_push_string(last_verb);
+  svalue_t v{};
+  v.type = T_STRING;
+  v.subtype = STRING_SHARED;
+  v.u.string = make_shared_string(last_verb);
+  f.ret(v);
 }
 #endif
 
 #ifdef F_REMOVE_ACTION
 void f_remove_action(int num_arg) {
-  LPC_INT success;
-
-  success = remove_action(vm_sp() - 1, vm_sp()->u.string);
-  free_string_svalue(vm_sp()--);
-  free_svalue(vm_sp(), "f_remove_action");
-  put_number(success);
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_INT success = remove_action(f.argp(0), f.string(1));
+  f.ret(success);
 }
 #endif
 
 #ifdef F_SET_LIVING_NAME
 void f_set_living_name(int num_arg) {
-  set_living_name(current_object, vm_sp()->u.string);
-  free_string_svalue(vm_sp()--);
+  LPCFrame f = LPCFrame::args(num_arg);
+  set_living_name(current_object, f.string(0));
+  f.ret_void();
 }
 #endif
 

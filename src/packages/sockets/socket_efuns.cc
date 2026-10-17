@@ -1489,7 +1489,7 @@ void socket_read_select_handler(int fd) {
           push_number(fd);
           if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
             STACK_INC;
-            *vm_sp() = value;
+            *lpc_eval_sp = value;
           } else {
             push_undefined();
           }

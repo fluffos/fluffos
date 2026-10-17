@@ -107,9 +107,13 @@ class LPCFrame {
   void push_refed(mapping_t* m);
   void push(buffer_t* b);
   void push_refed(buffer_t* b);
+  void push_refed(promise_t* p);
 
   /* Args finishers: replace the window with a single result (or nothing). */
   void ret(LPC_INT n);
+  /* Prefer int over LPC_FLOAT when the argument is a plain int (avoids
+   * overload ambiguity between LPC_INT and LPC_FLOAT). */
+  void ret(int n) { ret(static_cast<LPC_INT>(n)); }
   void ret(LPC_FLOAT n);
   void ret_void();
   void ret(svalue_t v); /* moves; frees previous window */
@@ -125,6 +129,7 @@ class LPCFrame {
   void ret(object_t* ob);
   void ret(buffer_t* b);
   void ret_refed(buffer_t* b);
+  void ret_refed(promise_t* p);
   void ret_undefined();
 
   /* Pop argc-1 from the back; leave/set the front slot as an int result.

@@ -18,45 +18,58 @@
 
 #ifdef F_DOMAIN_STATS
 void f_domain_stats(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   mapping_t* m;
 
   if (num_arg) {
-    m = get_domain_stats(vm_sp()->u.string);
-    free_string_svalue(vm_sp()--);
+    m = get_domain_stats(f.string(0));
+    f.ret_void();
   } else {
     m = get_domain_stats(nullptr);
+    f.done();
   }
   if (!m) {
-    push_number(0);
+    LPCFrame out = LPCFrame::builder();
+    out.push(static_cast<LPC_INT>(0));
+    out.done();
   } else {
     /* ref count is properly decremented by get_domain_stats */
-    push_mapping(m);
+    LPCFrame out = LPCFrame::builder();
+    out.push(m);
+    out.done();
   }
 }
 #endif
 
 #ifdef F_SET_AUTHOR
 void f_set_author(int num_arg) {
-  set_author(vm_sp()->u.string);
-  free_string_svalue(vm_sp()--);
+  LPCFrame f = LPCFrame::args(num_arg);
+  set_author(f.string(0));
+  f.ret_void();
 }
 #endif
 
 #ifdef F_AUTHOR_STATS
 void f_author_stats(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   mapping_t* m;
 
   if (num_arg) {
-    m = get_author_stats(vm_sp()->u.string);
-    free_string_svalue(vm_sp()--);
+    m = get_author_stats(f.string(0));
+    f.ret_void();
   } else {
     m = get_author_stats(nullptr);
+    f.done();
   }
   if (!m) {
-    push_number(0);
+    LPCFrame out = LPCFrame::builder();
+    out.push(static_cast<LPC_INT>(0));
+    out.done();
   } else {
     /* ref count is properly decremented by get_author_stats */
-    push_mapping(m);
+    LPCFrame out = LPCFrame::builder();
+    out.push(m);
+    out.done();
   }
 }
 #endif

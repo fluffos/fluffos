@@ -43,6 +43,7 @@ static void store_matrix(array_t* matrix, const Matrix src) {
 }
 
 void f_id_matrix(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   int i;
 
@@ -51,30 +52,31 @@ void f_id_matrix(int num_arg) {
     matrix->item[i].type = T_REAL;
     matrix->item[i].u.real = identity[i];
   }
-  push_refed_array(matrix);
+  f.ret_refed(matrix);
 }
 
 void f_translate(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix trans_matrix;
   Matrix final_matrix;
 
-  if ((vm_sp() - 1)->type != T_REAL) {
+  if (f.type(2) != T_REAL) {
     bad_arg(3, F_TRANSLATE);
   }
-  if (vm_sp()->type != T_REAL) {
+  if (f.type(3) != T_REAL) {
     bad_arg(4, F_TRANSLATE);
   }
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 3, current_matrix);
-  x = (vm_sp() - 2)->u.real;
-  y = (vm_sp() - 1)->u.real;
-  z = vm_sp()->u.real;
-  vm_sp() -= 3;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  x = f.real(1);
+  y = f.real(2);
+  z = f.real(3);
+  f.pop_back(3);
 
   /*
    * create translation matrix, then compute and store the transformed matrix.
@@ -82,38 +84,42 @@ void f_translate(int num_arg) {
   translate_matrix(x, y, z, trans_matrix);
   mult_matrix(current_matrix, trans_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  f.done();
 }
 
 void f_scale(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix scaling_matrix;
   Matrix final_matrix;
 
-  if ((vm_sp() - 1)->type != T_REAL) {
+  if (f.type(2) != T_REAL) {
     bad_arg(3, F_SCALE);
   }
-  if (vm_sp()->type != T_REAL) {
+  if (f.type(3) != T_REAL) {
     bad_arg(4, F_SCALE);
   }
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 3, current_matrix);
-  x = (vm_sp() - 2)->u.real;
-  y = (vm_sp() - 1)->u.real;
-  z = vm_sp()->u.real;
-  vm_sp() -= 3;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  x = f.real(1);
+  y = f.real(2);
+  z = f.real(3);
+  f.pop_back(3);
   /*
    * create scaling matrix, then compute and store the transformed matrix.
    */
   scale_matrix(x, y, z, scaling_matrix);
   mult_matrix(current_matrix, scaling_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  f.done();
 }
 
 void f_rotate_x(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -123,17 +129,20 @@ void f_rotate_x(int num_arg) {
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 1, current_matrix);
-  angle = (vm_sp()--)->u.real;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  angle = f.real(1);
+  f.pop_back(1);
   /*
    * create x rotation matrix, then compute and store the transformed matrix.
    */
   rotate_x_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  f.done();
 }
 
 void f_rotate_y(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -143,17 +152,20 @@ void f_rotate_y(int num_arg) {
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 1, current_matrix);
-  angle = (vm_sp()--)->u.real;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  angle = f.real(1);
+  f.pop_back(1);
   /*
    * create y rotation matrix, then compute and store the transformed matrix.
    */
   rotate_y_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  f.done();
 }
 
 void f_rotate_z(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -163,45 +175,50 @@ void f_rotate_z(int num_arg) {
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 1, current_matrix);
-  angle = (vm_sp()--)->u.real;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  angle = f.real(1);
+  f.pop_back(1);
   /*
    * create z rotation matrix, then compute and store the transformed matrix.
    */
   rotate_z_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  f.done();
 }
 
 void f_lookat_rotate(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
   Matrix lookat_matrix;
 
-  if ((vm_sp() - 1)->type != T_REAL) {
+  if (f.type(2) != T_REAL) {
     bad_arg(3, F_LOOKAT_ROTATE);
   }
-  if (vm_sp()->type != T_REAL) {
+  if (f.type(3) != T_REAL) {
     bad_arg(4, F_LOOKAT_ROTATE);
   }
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 3, current_matrix);
-  x = (vm_sp() - 2)->u.real;
-  y = (vm_sp() - 1)->u.real;
-  z = vm_sp()->u.real;
-  vm_sp() -= 3;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  x = f.real(1);
+  y = f.real(2);
+  z = f.real(3);
+  f.pop_back(3);
   /*
    * create new viewing transformation matrix and store it.
    */
   lookat_rotate(current_matrix, x, y, z, lookat_matrix);
   store_matrix(matrix, lookat_matrix);
+  f.done();
 }
 
 #ifdef F_LOOKAT_ROTATE2
 void f_lookat_rotate2(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* matrix;
   LPC_FLOAT ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;
@@ -209,28 +226,29 @@ void f_lookat_rotate2(int num_arg) {
   int j;
 
   for (j = 4; j >= 0; j--) {
-    if ((vm_sp() - j)->type != T_REAL) {
+    if (f.type(6 - j) != T_REAL) {
       bad_arg(7 - j, F_LOOKAT_ROTATE2);
     }
   }
   /*
    * get arguments from stack.
    */
-  matrix = matrix_arg_to_floats(vm_sp() - 6, current_matrix);
-  ex = (vm_sp() - 5)->u.real;
-  ey = (vm_sp() - 4)->u.real;
-  ez = (vm_sp() - 3)->u.real;
-  lx = (vm_sp() - 2)->u.real;
-  ly = (vm_sp() - 1)->u.real;
-  lz = vm_sp()->u.real;
+  matrix = matrix_arg_to_floats(f.argp(0), current_matrix);
+  ex = f.real(1);
+  ey = f.real(2);
+  ez = f.real(3);
+  lx = f.real(4);
+  ly = f.real(5);
+  lz = f.real(6);
 
-  pop_n_elems(6);
+  f.pop_back(6);
 
   /*
    * create new viewing transformation matrix and store it.
    */
   lookat_rotate2(ex, ey, ez, lx, ly, lz, lookat_matrix);
   store_matrix(matrix, lookat_matrix);
+  f.done();
 }
 #endif
 

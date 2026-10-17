@@ -40,79 +40,78 @@ void reload_object(object_t* obj);
 
 #ifdef F_ALL_INVENTORY
 void f_all_inventory(int num_arg) {
-  array_t* vec = all_inventory(vm_sp()->u.ob, 0);
-  free_object(&vm_sp()->u.ob, "f_all_inventory");
-  vm_sp()->type = T_ARRAY;
-  vm_sp()->u.arr = vec;
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = all_inventory(f.object(0), 0);
+  f.ret_refed(vec);
 }
 #endif
 
 #ifdef F_ALLOCATE
 void f_allocate(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (num_arg == 2) {
-    (vm_sp() - 1)->u.arr = allocate_array2((vm_sp() - 1)->u.number, vm_sp());
-    pop_stack();
+    array_t* arr = allocate_array2(f.number(0), f.argp(1));
+    f.ret_refed(arr);
   } else {
-    vm_sp()->u.arr = allocate_array(vm_sp()->u.number);
+    array_t* arr = allocate_array(f.number(0));
+    f.ret_refed(arr);
   }
-  vm_sp()->type = T_ARRAY;
 }
 #endif
 
 #ifdef F_ALLOCATE_BUFFER
 void f_allocate_buffer(int num_arg) {
-  buffer_t* buf;
-
-  buf = allocate_buffer(vm_sp()->u.number);
+  LPCFrame f = LPCFrame::args(num_arg);
+  buffer_t* buf = allocate_buffer(f.number(0));
   if (buf) {
-    pop_stack();
-    push_refed_buffer(buf);
+    f.ret_refed(buf);
   } else {
-    assign_svalue(vm_sp(), &const0);
+    f.ret(0);
   }
 }
 #endif
 
 #ifdef F_ALLOCATE_MAPPING
 void f_allocate_mapping(int num_arg) {
-  array_t* arr;
+  LPCFrame f = LPCFrame::args(num_arg);
 
   if (num_arg == 2) {
-    if ((vm_sp() - 1)->type != T_ARRAY) {
+    if (f.type(0) != T_ARRAY) {
       error("Bad argument 1 to allocate_mapping()\n");
     }
-    if (vm_sp()->type == T_ARRAY) {
-      arr = (vm_sp() - 1)->u.arr;
-      if (vm_sp()->u.arr->size != arr->size) {
+    if (f.type(1) == T_ARRAY) {
+      array_t* arr = f.array(0);
+      if (f.array(1)->size != arr->size) {
         error("Arrays passed to allocate_mapping() must be the same size\n");
       }
-      (vm_sp() - 1)->u.map = mkmapping(arr, vm_sp()->u.arr);
+      mapping_t* m = mkmapping(arr, f.array(1));
+      f.ret_refed(m);
     } else {
-      arr = (vm_sp() - 1)->u.arr;
-      (vm_sp() - 1)->u.map = allocate_mapping2(arr, vm_sp());
+      array_t* arr = f.array(0);
+      mapping_t* m = allocate_mapping2(arr, f.argp(1));
+      f.ret_refed(m);
     }
-    pop_stack();
-    free_array(arr);
-  } else if (vm_sp()->type == T_NUMBER) {
-    vm_sp()->u.map = allocate_mapping(vm_sp()->u.number);
+  } else if (f.type(0) == T_NUMBER) {
+    mapping_t* m = allocate_mapping(f.number(0));
+    f.ret_refed(m);
   } else {
     error("Bad argument 1 to allocate_mapping()\n");
   }
-  vm_sp()->type = T_MAPPING;
 }
 #endif
 
 #ifdef F_BIND
 void f_bind(int num_arg) {
-  object_t* ob = vm_sp()->u.ob;
-  funptr_t* old_fp = (vm_sp() - 1)->u.fp;
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = f.object(1);
+  funptr_t* old_fp = f.funptr(0);
   funptr_t* new_fp;
   svalue_t* res;
 
   if (ob == old_fp->hdr.owner) {
     /* no change */
-    free_object(&ob, "bind nop");
-    vm_sp()--;
+    f.pop_back(1);
+    f.done();
     return;
   }
 
@@ -125,16 +124,14 @@ void f_bind(int num_arg) {
         "functions.\n");
   }
 
-  /* the object doing the binding */
-  push_object(current_object);
-
-  /* the old owner */
-  push_object(old_fp->hdr.owner);
-
-  /* the new owner */
-  push_object(ob);
-
-  res = apply_master_ob(APPLY_VALID_BIND, 3);
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push(current_object);
+    b.push(old_fp->hdr.owner);
+    b.push(ob);
+    res = apply_master_ob(APPLY_VALID_BIND, 3);
+    b.done();
+  }
   if (!MASTER_APPROVED(res, "valid_bind")) {
     error("Master object denied permission to bind() function pointer.\n");
   }
@@ -145,9 +142,10 @@ void f_bind(int num_arg) {
    * would create an uncounted reference whose eventual free_object() in
    * dealloc_funp() over-decrements a ref we no longer hold. Check the slot,
    * not ob->flags: ob may already be deallocated memory. */
-  if (vm_sp()->type != T_OBJECT) {
+  if (f.type(1) != T_OBJECT) {
     error("New owner was destructed during valid_bind().\n");
   }
+  ob = f.object(1);
 
   new_fp = reinterpret_cast<funptr_t*>(DMALLOC(sizeof(funptr_t), TAG_FUNP, "f_bind"));
   *new_fp = *old_fp;
@@ -164,8 +162,9 @@ void f_bind(int num_arg) {
   }
 
   free_funp(old_fp);
-  vm_sp()--;
-  vm_sp()->u.fp = new_fp;
+  f.pop_back(1);
+  f.top().u.fp = new_fp;
+  f.done();
 }
 #endif
 

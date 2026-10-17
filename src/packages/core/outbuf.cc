@@ -3,15 +3,12 @@
 #include "packages/core/outbuf.h"
 
 void outbuf_push(outbuffer_t* outbuf) {
-  STACK_INC;
-  vm_sp()->type = T_STRING;
+  LPCFrame f = LPCFrame::builder();
   if (outbuf && outbuf->buffer) {
     outbuf->buffer = extend_string(outbuf->buffer, outbuf->real_size);
-
-    vm_sp()->subtype = STRING_MALLOC;
-    vm_sp()->u.string = outbuf->buffer;
+    f.push_str_malloced(outbuf->buffer);
   } else {
-    vm_sp()->subtype = STRING_CONSTANT;
-    vm_sp()->u.string = "";
+    f.push_str_constant("");
   }
+  f.done();
 }

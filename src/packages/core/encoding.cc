@@ -8,11 +8,9 @@ const char* default_encoding = "utf-8";
 
 #ifdef F_SET_ENCODING
 void f_set_encoding(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (!command_giver || !command_giver->interactive) {
-    if (num_arg) {
-      pop_stack();
-    }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
@@ -24,7 +22,7 @@ void f_set_encoding(int num_arg) {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
     }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
@@ -32,11 +30,11 @@ void f_set_encoding(int num_arg) {
 
   // ignore if user want utf8
   UConverter* new_trans = nullptr;
-  if (ucnv_compareNames(default_encoding, vm_sp()->u.string) != 0) {
+  if (ucnv_compareNames(default_encoding, f.string(0)) != 0) {
     UErrorCode error_code = U_ZERO_ERROR;
-    new_trans = ucnv_open(vm_sp()->u.string, &error_code);
+    new_trans = ucnv_open(f.string(0), &error_code);
     if (U_FAILURE(error_code)) {
-      error("Fail to set encoding to '%s', error: %s.", vm_sp()->u.string, u_errorName(error_code));
+      error("Fail to set encoding to '%s', error: %s.", f.string(0), u_errorName(error_code));
     }
   }
 
@@ -46,11 +44,9 @@ void f_set_encoding(int num_arg) {
   }
   ip->trans = new_trans;
 
-  pop_stack();
-
   // Now let's return an canonical name
   if (!ip->trans) {
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 2"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
     return;
   }
 
@@ -59,17 +55,15 @@ void f_set_encoding(int num_arg) {
   if (U_FAILURE(error_code)) {
     error("Fail to set encoding, ucnv_getName error: %s.", u_errorName(error_code));
   }
-  push_malloced_string(string_copy(name, "f_set_encoding: 3"));
+  f.ret_str_malloced(string_copy(name, "f_set_encoding: 3"));
 }
 #endif
 
 #ifdef F_QUERY_ENCODING
 void f_query_encoding(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (!command_giver || !command_giver->interactive) {
-    if (num_arg) {
-      pop_stack();
-    }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
@@ -87,15 +81,16 @@ void f_query_encoding(int num_arg) {
     }
   }
 
-  push_malloced_string(string_copy(res, "f_query_encoding"));
+  f.ret_str_malloced(string_copy(res, "f_query_encoding"));
 }
 #endif
 
 #ifdef F_STRING_ENCODE
 void f_string_encode(int num_arg) {
-  const auto* encoding = vm_sp()->u.string;
-  const auto* data = (vm_sp() - 1)->u.string;
-  auto len = SVALUE_STRLEN(vm_sp() - 1);
+  LPCFrame f = LPCFrame::args(num_arg);
+  const auto* data = f.string(0);
+  auto len = f.string_len(0);
+  const auto* encoding = f.string(1);
 
   UErrorCode error_code = U_ZERO_ERROR;
   auto* trans = ucnv_open(encoding, &error_code);
@@ -124,8 +119,7 @@ void f_string_encode(int num_arg) {
     free_buffer(buffer);
     error("string_encode: error: %s.", u_errorName(error_code));
   }
-  pop_2_elems();
-  push_refed_buffer(buffer);
+  f.ret_refed(buffer);
 
   ucnv_close(trans);
 }
@@ -133,9 +127,10 @@ void f_string_encode(int num_arg) {
 
 #ifdef F_STRING_DECODE
 void f_string_decode(int num_arg) {
-  const auto* encoding = vm_sp()->u.string;
-  auto* data = (char*)((vm_sp() - 1)->u.buf->item);
-  auto len = (vm_sp() - 1)->u.buf->size;
+  LPCFrame f = LPCFrame::args(num_arg);
+  auto* data = (char*)(f.buffer(0)->item);
+  auto len = f.buffer(0)->size;
+  const auto* encoding = f.string(1);
 
   // get rid of all ending '\0's from buffer.
   while (len > 1 && data[len - 1] == '\0') len--;
@@ -166,8 +161,7 @@ void f_string_decode(int num_arg) {
     error("string_decode: error: %s.", u_errorName(error_code));
   }
   DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
-  pop_2_elems();
-  push_malloced_string(res);
+  f.ret_str_malloced(res);
 
   ucnv_close(trans);
 }
@@ -175,10 +169,11 @@ void f_string_decode(int num_arg) {
 
 #ifdef F_BUFFER_TRANSCODE
 void f_buffer_transcode(int num_arg) {
-  const auto* to_encoding = vm_sp()->u.string;
-  const auto* from_encoding = (vm_sp() - 1)->u.string;
-  auto* data = (char*)((vm_sp() - 2)->u.buf->item);
-  auto len = (vm_sp() - 2)->u.buf->size;
+  LPCFrame f = LPCFrame::args(num_arg);
+  auto* data = (char*)(f.buffer(0)->item);
+  auto len = f.buffer(0)->size;
+  const auto* from_encoding = f.string(1);
+  const auto* to_encoding = f.string(2);
 
   UErrorCode error_code = U_ZERO_ERROR;
 
@@ -198,7 +193,6 @@ void f_buffer_transcode(int num_arg) {
     free_buffer(res);
     error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
-  pop_3_elems();
-  push_refed_buffer(res);
+  f.ret_refed(res);
 }
 #endif

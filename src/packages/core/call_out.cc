@@ -716,7 +716,8 @@ void reclaim_call_outs() {
 
 namespace {
 inline void int_call_out(bool walltime, int num_arg) {
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* arg = f.argp(0);
   /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
    * registers a timer-only call_out and returns a promise fulfilled (with 0)
    * when the delay elapses, rejected if the call_out is removed or its
@@ -789,27 +790,25 @@ inline void int_call_out(bool walltime, int num_arg) {
       err.u.string = "*call_out was removed before it ran";
       promise_settle(p, &err, 1);
     }
-    /* vm_sp() is the delay (T_NUMBER/T_REAL): overwrite it, nothing to free */
-    vm_sp()->type = T_PROMISE;
-    vm_sp()->subtype = 0;
-    vm_sp()->u.prom = p;
+    /* delay slot is T_NUMBER/T_REAL: overwrite in place, nothing to free */
+    f.top().type = T_PROMISE;
+    f.top().subtype = 0;
+    f.top().u.prom = p;
+    f.done();
     return;
   }
 
   if (!(current_object->flags & O_DESTRUCTED)) {
     ret = new_call_out(current_object, arg, std::chrono::milliseconds(delay_msecs), num, arg + 2,
                        walltime);
-    /* args have been transfered; don't free them;
-     also don't need to free the int */
-    vm_sp() -= num + 1;
+    /* args have been transfered; steal so ret() does not free them */
+    for (int i = 2; i < num_arg; i++) {
+      (void)f.steal(i);
+    }
   } else {
     ret = 0;
-    pop_n_elems(num);
-    vm_sp()--;
   }
-  /* the function */
-  free_svalue(vm_sp(), "call_out");
-  put_number(ret);
+  f.ret(ret);
 }
 }  // namespace
 
@@ -822,5 +821,8 @@ void f_call_out_walltime(int num_arg) { int_call_out(true, num_arg); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
-void f_call_out_info(int /*num_arg*/) { push_refed_array(get_all_call_outs()); }
+void f_call_out_info(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_refed(get_all_call_outs());
+}
 #endif

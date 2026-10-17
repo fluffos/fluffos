@@ -174,11 +174,12 @@ void dumpstat(const char* tfn) {
 
 #ifdef F_DUMPALLOBJ
 void f_dumpallobj(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (num_arg) {
-    dumpstat(vm_sp()->u.string);
-    free_string_svalue(vm_sp()--);
+    dumpstat(f.string(0));
   } else {
     dumpstat("/OBJ_DUMP");
   }
+  f.ret_void();
 }
 #endif

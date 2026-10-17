@@ -293,6 +293,11 @@ void LPCFrame::push_refed(buffer_t* b) {
   note_push();
 }
 
+void LPCFrame::push_refed(promise_t* p) {
+  push_refed_promise(p);
+  note_push();
+}
+
 void LPCFrame::ret(LPC_INT n) {
   pop_n_elems(argc_);
   push_number(n);
@@ -388,6 +393,12 @@ void LPCFrame::ret(buffer_t* b) {
 void LPCFrame::ret_refed(buffer_t* b) {
   pop_n_elems(argc_);
   push_refed_buffer(b);
+  finalize_ret_slot();
+}
+
+void LPCFrame::ret_refed(promise_t* p) {
+  pop_n_elems(argc_);
+  push_refed_promise(p);
   finalize_ret_slot();
 }
 
