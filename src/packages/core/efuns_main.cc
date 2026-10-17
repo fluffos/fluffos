@@ -3221,6 +3221,7 @@ void f_userp(int num_arg) {
 
 #ifdef F_USERS
 void f_users(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   bool include_hidden = true;
 #ifdef F_SET_HIDE
   include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
@@ -3245,7 +3246,7 @@ void f_users(int num_arg) {
     i++;
   }
 
-  push_refed_array(ret);
+  f.ret_refed(ret);
 }
 #endif
 
@@ -3368,11 +3369,13 @@ void f_write_file(int num_arg) {
 
 #ifdef F_DUMP_FILE_DESCRIPTORS
 void f_dump_file_descriptors(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   outbuffer_t out;
 
   outbuf_zero(&out);
   outbuf_add(&out, "ERROR: dump_file_descriptors is no longer supported.");
   outbuf_push(&out);
+  f.done();
 }
 #endif
 
@@ -3572,11 +3575,13 @@ void f_defer(int num_arg) {
   // Configure the new item.
   newlist->func = f.steal(0);
   f.ret_void();
-  if (command_giver) {
-    push_object(command_giver);
-    newlist->tp = *sp--;
+  if (command_giver && !(command_giver->flags & O_DESTRUCTED) &&
+      !(command_giver->flags & O_BEING_DESTRUCTED)) {
+    newlist->tp.type = T_OBJECT;
+    newlist->tp.u.ob = command_giver;
+    add_ref(command_giver, "defer");
   } else {
-    newlist->tp = const0;
+    newlist->tp = command_giver ? const0u : const0;
   }
 
   // In reverse mode, if list is not null, then add new item to the end.
