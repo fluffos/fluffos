@@ -1329,19 +1329,15 @@ const char* canonicalize_name(const char* in) {
       *hash = '\0';
     }
   }
-  size_t blen = strnlen(buf, sizeof(buf));
-  if (star_suffix) {
-    if (blen >= sizeof(buf) - 1) {
+  /* Cap at sizeof-1 so blen+1 is always a valid index when we append. */
+  size_t blen = strnlen(buf, sizeof(buf) - 1);
+  if (star_suffix || slash_suffix) {
+    if (blen < sizeof(buf) - 1) {
+      buf[blen] = star_suffix ? '*' : '/';
+      buf[blen + 1] = '\0';
+    } else {
       error("hook_attach: name pattern too long.\n");
     }
-    buf[blen] = '*';
-    buf[blen + 1] = '\0';
-  } else if (slash_suffix) {
-    if (blen >= sizeof(buf) - 1) {
-      error("hook_attach: name pattern too long.\n");
-    }
-    buf[blen] = '/';
-    buf[blen + 1] = '\0';
   }
   return make_shared_string(buf);
 }
