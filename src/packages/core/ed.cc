@@ -3342,109 +3342,109 @@ char* object_ed_cmd(object_t* ob, const char* str) {
 
 #ifdef F_ED
 void f_ed(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (!command_giver || !command_giver->interactive) {
-    pop_n_elems(num_arg);
+    f.ret_void();
     return;
   }
 
   if (!num_arg) {
     /* ed() */
     ed_start(nullptr, nullptr, nullptr, 0, nullptr, 0);
+    f.done();
   } else if (num_arg == 1) {
     /* ed(fname) */
-    if (!(vm_sp()->type == T_STRING)) {
-      bad_argument(vm_sp(), T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
-    ed_start(vm_sp()->u.string, nullptr, nullptr, 0, nullptr, 0);
-    pop_stack();
+    ed_start(f.string(0), nullptr, nullptr, 0, nullptr, 0);
+    f.ret_void();
   } else if (num_arg == 2) {
     /* ed(fname,exitfn) / ed(fname, scroll_lines) */
-    if (!((vm_sp() - 1)->type == T_STRING)) {
-      bad_argument(vm_sp() - 1, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    if (vm_sp()->type == T_STRING) {
-      ed_start((vm_sp() - 1)->u.string, nullptr, vm_sp()->u.string, 0, current_object, 0);
-    } else if (vm_sp()->type == T_NUMBER) {
-      ed_start((vm_sp() - 1)->u.string, nullptr, nullptr, 0, nullptr, vm_sp()->u.number);
+    if (f.type(1) == T_STRING) {
+      ed_start(f.string(0), nullptr, f.string(1), 0, current_object, 0);
+    } else if (f.type(1) == T_NUMBER) {
+      ed_start(f.string(0), nullptr, nullptr, 0, nullptr, f.number(1));
     } else {
-      bad_argument(vm_sp(), T_NUMBER | T_STRING, 2, F_ED);
+      bad_argument(f.argp(1), T_NUMBER | T_STRING, 2, F_ED);
     }
-    pop_2_elems();
+    f.ret_void();
   } else if (num_arg == 3) {
     /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) /
      ed(fname,exitfn,scroll_lines) */
-    if (!((vm_sp() - 1)->type == T_STRING)) {
-      bad_argument(vm_sp() - 1, T_STRING, 2, F_ED);
+    if (!(f.type(1) == T_STRING)) {
+      bad_argument(f.argp(1), T_STRING, 2, F_ED);
     }
-    if (!((vm_sp() - 2)->type == T_STRING)) {
-      bad_argument(vm_sp() - 2, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    if (vm_sp()->type == T_NUMBER) {
-      if (vm_sp()->u.number == 1) {
-        ed_start((vm_sp() - 2)->u.string, nullptr, (vm_sp() - 1)->u.string, vm_sp()->u.number, current_object, 0);
+    if (f.type(2) == T_NUMBER) {
+      if (f.number(2) == 1) {
+        ed_start(f.string(0), nullptr, f.string(1), f.number(2), current_object, 0);
       } else {
-        ed_start((vm_sp() - 2)->u.string, nullptr, (vm_sp() - 1)->u.string, 0, current_object, vm_sp()->u.number);
+        ed_start(f.string(0), nullptr, f.string(1), 0, current_object, f.number(2));
       }
-    } else if (vm_sp()->type == T_STRING) {
-      ed_start((vm_sp() - 2)->u.string, (vm_sp() - 1)->u.string, vm_sp()->u.string, 0, current_object, 0);
+    } else if (f.type(2) == T_STRING) {
+      ed_start(f.string(0), f.string(1), f.string(2), 0, current_object, 0);
     } else {
-      bad_argument(vm_sp(), T_NUMBER | T_STRING, 3, F_ED);
+      bad_argument(f.argp(2), T_NUMBER | T_STRING, 3, F_ED);
     }
-    pop_3_elems();
+    f.ret_void();
   } else if (num_arg == 4) {
     /* ed(fname,writefn,exitfn,restricted) /
      ed(fname,writefn,exitfn,scroll_lines) */
-    if (!(vm_sp()->type == T_NUMBER)) {
-      bad_argument(vm_sp(), T_NUMBER, 4, F_ED);
+    if (!(f.type(3) == T_NUMBER)) {
+      bad_argument(f.argp(3), T_NUMBER, 4, F_ED);
     }
-    if (!((vm_sp() - 1)->type == T_STRING)) {
-      bad_argument(vm_sp() - 1, T_STRING, 3, F_ED);
+    if (!(f.type(2) == T_STRING)) {
+      bad_argument(f.argp(2), T_STRING, 3, F_ED);
     }
-    if (!((vm_sp() - 2)->type == T_STRING)) {
-      bad_argument(vm_sp() - 2, T_STRING, 2, F_ED);
+    if (!(f.type(1) == T_STRING)) {
+      bad_argument(f.argp(1), T_STRING, 2, F_ED);
     }
-    if (!((vm_sp() - 3)->type == T_STRING)) {
-      bad_argument(vm_sp() - 3, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    if (vm_sp()->u.number == 1) {
-      ed_start((vm_sp() - 3)->u.string, (vm_sp() - 2)->u.string, (vm_sp() - 1)->u.string, vm_sp()->u.number,
-               current_object, 0);
+    if (f.number(3) == 1) {
+      ed_start(f.string(0), f.string(1), f.string(2), f.number(3), current_object, 0);
     } else {
-      ed_start((vm_sp() - 3)->u.string, (vm_sp() - 2)->u.string, (vm_sp() - 1)->u.string, 0, current_object,
-               vm_sp()->u.number);
+      ed_start(f.string(0), f.string(1), f.string(2), 0, current_object, f.number(3));
     }
-    pop_n_elems(4);
+    f.ret_void();
   } else { /* num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
-    if (!(vm_sp()->type == T_NUMBER)) {
-      bad_argument(vm_sp(), T_NUMBER, 5, F_ED);
+    if (!(f.type(4) == T_NUMBER)) {
+      bad_argument(f.argp(4), T_NUMBER, 5, F_ED);
     }
-    if (!((vm_sp() - 1)->type == T_NUMBER)) {
-      bad_argument(vm_sp() - 1, T_NUMBER, 4, F_ED);
+    if (!(f.type(3) == T_NUMBER)) {
+      bad_argument(f.argp(3), T_NUMBER, 4, F_ED);
     }
-    if (!((vm_sp() - 2)->type == T_STRING)) {
-      bad_argument(vm_sp() - 2, T_STRING, 3, F_ED);
+    if (!(f.type(2) == T_STRING)) {
+      bad_argument(f.argp(2), T_STRING, 3, F_ED);
     }
-    if (!((vm_sp() - 3)->type == T_STRING)) {
-      bad_argument(vm_sp() - 3, T_STRING, 2, F_ED);
+    if (!(f.type(1) == T_STRING)) {
+      bad_argument(f.argp(1), T_STRING, 2, F_ED);
     }
-    if (!((vm_sp() - 4)->type == T_STRING)) {
-      bad_argument(vm_sp() - 4, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    ed_start((vm_sp() - 4)->u.string, (vm_sp() - 3)->u.string, (vm_sp() - 2)->u.string, (vm_sp() - 1)->u.number,
-             current_object, vm_sp()->u.number);
+    ed_start(f.string(0), f.string(1), f.string(2), f.number(3), current_object, f.number(4));
 
-    pop_n_elems(5);
+    f.ret_void();
   }
 }
 #endif
 
 #ifdef F_ED_CMD
 void f_ed_cmd(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* res;
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3455,43 +3455,37 @@ void f_ed_cmd(int num_arg) {
     error("ed_cmd() called with no ed session active.\n");
   }
 
-  res = object_ed_cmd(current_object, vm_sp()->u.string);
+  res = object_ed_cmd(current_object, f.string(0));
 
-  free_string_svalue(vm_sp());
   if (res) {
-    vm_sp()->subtype = STRING_MALLOC;
-    vm_sp()->u.string = res;
+    f.ret_str_malloced(res);
   } else {
-    vm_sp()->subtype = STRING_CONSTANT;
-    vm_sp()->u.string = "";
+    f.ret_str_constant("");
   }
 }
 #endif
 
 #ifdef F_ED_START
 void f_ed_start(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* res;
-  const char* fname;
+  const char* fname = nullptr;
   int restr = 0;
   int scroll_lines = 20;
 
   if (num_arg == 3) {
-    scroll_lines = (vm_sp()--)->u.number;
-    restr = (vm_sp()--)->u.number;
-  }
-
-  if (num_arg == 2) {
-    if (vm_sp()->u.number == 1) {
-      restr = (vm_sp()--)->u.number;
+    scroll_lines = f.number(2);
+    restr = f.number(1);
+  } else if (num_arg == 2) {
+    if (f.number(1) == 1) {
+      restr = f.number(1);
     } else {
-      scroll_lines = (vm_sp()--)->u.number;
+      scroll_lines = f.number(1);
     }
   }
 
   if (num_arg) {
-    fname = vm_sp()->u.string;
-  } else {
-    fname = 0;
+    fname = f.string(0);
   }
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3504,43 +3498,33 @@ void f_ed_start(int num_arg) {
 
   res = object_ed_start(current_object, fname, restr, scroll_lines);
 
-  if (fname) {
-    free_string_svalue(vm_sp());
-  } else {
-    STACK_INC;
-    vm_sp()->type = T_STRING;
-  }
-
   if (res) {
-    vm_sp()->subtype = STRING_MALLOC;
-    vm_sp()->u.string = res;
+    f.ret_str_malloced(res);
   } else {
-    vm_sp()->subtype = STRING_CONSTANT;
-    vm_sp()->u.string = "";
+    f.ret_str_constant("");
   }
 }
 #endif
 
 #ifdef F_IN_EDIT
 void f_in_edit(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* fn;
   ed_buffer_t* eb = nullptr;
 
 #ifdef OLD_ED
-  if (vm_sp()->u.ob->interactive) {
-    eb = vm_sp()->u.ob->interactive->ed_buffer;
+  if (f.object(0)->interactive) {
+    eb = f.object(0)->interactive->ed_buffer;
   }
 #else
-  if (vm_sp()->u.ob->flags & O_IN_EDIT) {
-    eb = find_ed_buffer(vm_sp()->u.ob);
+  if (f.object(0)->flags & O_IN_EDIT) {
+    eb = find_ed_buffer(f.object(0));
   }
 #endif
   if (eb && (fn = eb->fname)) {
-    free_object(&vm_sp()->u.ob, "f_in_edit:1");
-    put_malloced_string(add_slash(fn));
+    f.ret_str_malloced(add_slash(fn));
     return;
   }
-  free_object(&vm_sp()->u.ob, "f_in_edit:1");
-  *vm_sp() = const0;
+  f.ret(0);
 }
 #endif

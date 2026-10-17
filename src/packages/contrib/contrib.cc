@@ -13,16 +13,20 @@ enum { MAX_COLOUR_STRING = 200 };
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-void f_real_time(int num_arg) { push_number(time(nullptr)); }
+void f_real_time(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret(static_cast<LPC_INT>(time(nullptr)));
+}
 #endif
 
 #ifdef F_COMPRESSEDP
 void f_compressedp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
 
-  i = vm_sp()->u.ob->interactive && (vm_sp()->u.ob->interactive->iflags & USING_COMPRESS);
-  free_object(&vm_sp()->u.ob, "f_compressedp");
-  put_number(i != 0);
+  i = f.object(0)->interactive && (f.object(0)->interactive->iflags & USING_COMPRESS);
+  f.set_top_number(i != 0);
+  f.done();
 }
 #endif
 
@@ -84,22 +88,24 @@ void f_named_livings(int num_arg) {
 
   FREE(obtab);
 
-  push_refed_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_refed(vec);
 }
 #endif
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
 void f_remove_shadow(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* ob;
 
   ob = current_object;
   if (num_arg) {
-    ob = vm_sp()->u.ob;
-    pop_stack();
+    ob = f.object(0);
+    f.pop_back();
   }
   if (ob == nullptr || (ob->shadowing == nullptr && ob->shadowed == nullptr)) {
-    push_number(0);
+    f.ret(0);
   } else {
     if (ob->shadowed) {
       ob->shadowed->shadowing = ob->shadowing;
@@ -108,7 +114,7 @@ void f_remove_shadow(int num_arg) {
       ob->shadowing->shadowed = ob->shadowed;
     }
     ob->shadowing = ob->shadowed = nullptr;
-    push_number(1);
+    f.ret(1);
   }
 }
 #endif
@@ -117,29 +123,32 @@ void f_remove_shadow(int num_arg) {
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
 void f_query_notify_fail(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* p;
 
   if (command_giver && command_giver->interactive) {
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
-      push_funp(command_giver->interactive->default_err_message.f);
+      funptr_t* fp = command_giver->interactive->default_err_message.f;
+      svalue_t v{};
+      v.type = T_FUNCTION;
+      v.u.fp = fp;
+      fp->hdr.ref++;
+      f.ret(v);
       return;
     }
     if ((p = command_giver->interactive->default_err_message.s)) {
-      STACK_INC;
-      vm_sp()->type = T_STRING;
-      vm_sp()->subtype = STRING_SHARED;
-      vm_sp()->u.string = p;
-      ref_string(p);
+      f.ret_str_shared(p);
       return;
     }
   }
-  push_number(0);
+  f.ret(0);
 }
 #endif
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
 void f_store_variable(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int idx;
   svalue_t* sv;
   lpc_type_t type;
@@ -148,13 +157,13 @@ void f_store_variable(int num_arg) {
   object_t* ob;
 
   if (num_arg == 3) {
-    ob = vm_sp()->u.ob;
-    sv = (vm_sp() - 1);
-    name = (vm_sp() - 2)->u.string;
+    ob = f.object(2);
+    sv = f.argp(1);
+    name = f.string(0);
   } else {
     ob = current_object;
-    sv = vm_sp();
-    name = (vm_sp() - 1)->u.string;
+    sv = f.argp(1);
+    name = f.string(0);
   }
 
   idx = find_global_variable(ob->prog, name, &type, 0);
@@ -162,12 +171,13 @@ void f_store_variable(int num_arg) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
   assign_svalue(&ob->variables[idx], sv);
-  pop_n_elems(num_arg);
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FETCH_VARIABLE
 void f_fetch_variable(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int idx;
   lpc_type_t type;
 
@@ -175,11 +185,11 @@ void f_fetch_variable(int num_arg) {
   object_t* ob;
 
   if (num_arg == 2) {
-    ob = vm_sp()->u.ob;
-    name = (vm_sp() - 1)->u.string;
+    ob = f.object(1);
+    name = f.string(0);
   } else {
     ob = current_object;
-    name = (vm_sp())->u.string;
+    name = f.string(0);
   }
 
   idx = find_global_variable(ob->prog, name, &type, 0);
@@ -187,18 +197,18 @@ void f_fetch_variable(int num_arg) {
   if (idx == -1 || (ob != current_object && (type & DECL_PRIVATE))) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
-  pop_n_elems(num_arg);
-  push_svalue(&ob->variables[idx]);
+  f.ret_copy(&ob->variables[idx]);
 }
 #endif
 
 /* Beek */
 #ifdef F_SET_PROMPT
 void f_set_prompt(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* who;
   if (num_arg == 2) {
-    who = vm_sp()->u.ob;
-    pop_stack();
+    who = f.object(1);
+    f.pop_back();
   } else {
     who = command_giver;
   }
@@ -210,6 +220,7 @@ void f_set_prompt(int num_arg) {
   /* Future work */
   /* ed() will nuke this; also we have to make sure the string will get
    * freed */
+  f.done();
 }
 #endif
 
@@ -310,12 +321,14 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
 }
 
 void f_copy(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t ret;
 
   depth = 0;
-  deep_copy_svalue(vm_sp(), &ret);
-  free_svalue(vm_sp(), "f_copy");
-  *vm_sp() = ret;
+  deep_copy_svalue(f.argp(0), &ret);
+  free_svalue(f.argp(0), "f_copy");
+  f[0] = ret;
+  f.done();
 }
 #endif
 
@@ -323,15 +336,17 @@ void f_copy(int num_arg) {
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
 void f_functions(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t* funp;
   program_t* prog;
-  int const flag = (vm_sp()--)->u.number;
+  int const flag = f.number(1);
+  f.pop_back();
   lpc_type_t* types;
   char buf[256];
   char* end = EndOf(buf);
-  program_t* progp = vm_sp()->u.ob->prog;
+  program_t* progp = f.object(0)->prog;
   int const offset = (flag & 2) ? progp->last_inherited : 0;
 
   num = (flag & 2) ? progp->num_functions_defined
@@ -349,7 +364,7 @@ void f_functions(int num_arg) {
   while (i--) {
     unsigned short low = 0, high = 0, mid = 0;
 
-    prog = vm_sp()->u.ob->prog;
+    prog = f.object(0)->prog;
     ind = i + offset;
 
     /* Walk up the inheritance tree to the real definition */
@@ -424,8 +439,7 @@ void f_functions(int num_arg) {
     }
   }
 
-  pop_stack();
-  push_refed_array(vec);
+  f.ret_refed(vec);
 }
 #endif
 
@@ -464,22 +478,26 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
 }
 
 void f_variables(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int idx = 0;
   array_t* arr;
-  int const flag = (vm_sp()--)->u.number;
-  program_t* prog = vm_sp()->u.ob->prog;
+  int const flag = f.number(1);
+  f.pop_back();
+  program_t* prog = f.object(0)->prog;
 
   arr = allocate_empty_array(prog->num_variables_total);
   fv_recurse(arr, &idx, prog, 0, flag);
 
-  pop_stack();
-  push_refed_array(arr);
+  f.ret_refed(arr);
 }
 #endif
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats(int num_arg) { push_refed_array(get_heart_beats()); }
+void f_heart_beats(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_refed(get_heart_beats());
+}
 #endif
 
 /*Aleas@Nightmare */
@@ -582,6 +600,7 @@ struct tc_colwidth_state {
 };
 
 void f_terminal_colour(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *instr, *cp, **parts;
@@ -618,9 +637,11 @@ void f_terminal_colour(int num_arg) {
 
   if (num_arg >= 3) {
     if (num_arg == 4) {
-      indent = (vm_sp()--)->u.number;
+      indent = f.number(f.argc() - 1);
+      f.pop_back();
     }
-    wrap = (vm_sp()--)->u.number;
+    wrap = f.number(f.argc() - 1);
+    f.pop_back();
     {
       /* No line can get anywhere near this many columns (a kept byte adds
        * at most ~11, and at most max_string_length bytes are kept), so a
@@ -646,7 +667,7 @@ void f_terminal_colour(int num_arg) {
     }
   }
 
-  cp = instr = (vm_sp() - 1)->u.string;
+  cp = instr = f.string(0);
   do {
     cp = strchr(cp, TC_FIRST_CHAR);
     if (cp) {
@@ -667,7 +688,8 @@ void f_terminal_colour(int num_arg) {
       parts[0] = instr;
       savestr = nullptr;
     } else {
-      pop_stack(); /* no delimiter in string, so return the original */
+      f.pop_back(); /* no delimiter in string, so return the original */
+      f.done();
       return;
     }
   } else {
@@ -727,11 +749,9 @@ void f_terminal_colour(int num_arg) {
     if (savestr) {
       FREE_MSTR(savestr);
     }
-    pop_stack();
-    free_string_svalue(vm_sp());
-    vm_sp()->type = T_STRING;
-    vm_sp()->subtype = STRING_CONSTANT;
-    vm_sp()->u.string = "";
+    f.pop_back();
+    f.set_top_str_constant("");
+    f.done();
     return;
   }
 
@@ -745,7 +765,8 @@ void f_terminal_colour(int num_arg) {
   // loop further down). DCALLOC zero-inits, so unused slots stay nullptr.
   rep_allocs = reinterpret_cast<char**>(
       DCALLOC(num, sizeof(char*), TAG_TEMPORARY, "f_terminal_colour: rep_allocs"));
-  mtab = vm_sp()->u.map->table;
+  mapping_t* colour_map = f.mapping(1);
+  mtab = colour_map->table;
 
   // First setup some little things.
   curcolour[0] = 0;
@@ -753,7 +774,7 @@ void f_terminal_colour(int num_arg) {
 
   // Find the reset colour string.
   resetstrname = findstring("RESET");
-  k = vm_sp()->u.map->table_size;
+  k = colour_map->table_size;
   if (resetstrname) {
     static svalue_t str = {T_STRING, STRING_SHARED};
     int tmp;
@@ -774,7 +795,7 @@ void f_terminal_colour(int num_arg) {
     // we really really need one, so just default to ansi reset
     resetstr = "\033[49;49m\033[0;10m";
     resetstrlen = 15;
-    add_mapping_string(vm_sp()->u.map, "RESET", resetstr);
+    add_mapping_string(colour_map, "RESET", resetstr);
   }
 
   /* Do the the pointer replacement and calculate the lengths */
@@ -783,15 +804,17 @@ void f_terminal_colour(int num_arg) {
   space = 0;
   maybe_at_end = 0;
   buflen = max_buflen = space_buflen = 0;
-  for (j = i = 0, k = vm_sp()->u.map->table_size; i < num; i++) {
+  for (j = i = 0, k = colour_map->table_size; i < num; i++) {
     // Look it up in the mapping.
     repused = 0;
-    copy_and_push_string(parts[i]);
+    LPCFrame replace_args = LPCFrame::builder();
+    replace_args.push_str_copy(parts[i]);
     // safe_apply: a raw apply that error()s here would longjmp past the
     // FREE(parts)/FREE(lens)/FREE_MSTR(savestr) at the end of this efun,
     // leaking them. On error safe_apply returns null -> treated as no
     // replacement, which is the desired robust behavior anyway.
-    svalue_t* reptmp = safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, 1, ORIGIN_EFUN);
+    svalue_t* reptmp =
+        replace_args.safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
       // Was alloca() -- called once per loop iteration, that memory isn't
       // reclaimed until the whole function returns (alloca doesn't free on
@@ -1166,19 +1189,17 @@ void f_terminal_colour(int num_arg) {
     FREE_MSTR(savestr);
   }
   /* now we have what we want */
-  pop_stack();
+  f.pop_back();
 #ifndef DEBUG
   if (ncp - deststr != j) {
     fatal(
         "Length miscalculated in terminal_colour()\n    Expected: %" LPC_INT_FMTSTR_P " Was: %td\n "
         "   String: %s\n    Indent: %" LPC_INT_FMTSTR_P " Wrap: %" LPC_INT_FMTSTR_P "\n",
-        j, ncp - deststr, vm_sp()->u.string, indent, wrap);
+        j, ncp - deststr, f.string(0), indent, wrap);
   }
 #endif
-  free_string_svalue(vm_sp());
-  vm_sp()->type = T_STRING;
-  vm_sp()->subtype = STRING_MALLOC;
-  vm_sp()->u.string = deststr;
+  f.set_top_str_malloced(deststr);
+  f.done();
 }
 #endif
 
@@ -1682,14 +1703,14 @@ static char* pluralize(const char* str) {
 } /* end of pluralize() */
 
 void f_pluralize(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* s;
 
-  s = pluralize(vm_sp()->u.string);
-  pop_stack();
+  s = pluralize(f.string(0));
   if (!s) {
-    push_number(0);
+    f.ret(0);
   } else {
-    push_malloced_string(s);
+    f.ret_str_malloced(s);
   }
 }
 #endif
@@ -1744,35 +1765,38 @@ static int file_length(const char* file) {
 } /* end of file_length() */
 
 void f_file_length(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int l;
 
-  l = file_length(vm_sp()->u.string);
-  pop_stack();
-  push_number(l);
+  l = file_length(f.string(0));
+  f.ret(l);
 }
 #endif
 
 #ifdef F_UPPER_CASE
 void f_upper_case(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* str;
 
-  str = vm_sp()->u.string;
+  str = f.string(0);
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uislower(*str)) {
       char* newstr;
-      int const l = str - vm_sp()->u.string;
-      unlink_string_svalue(vm_sp());
-      newstr = const_cast<char*>(vm_sp()->u.string) + l;
+      int const l = str - f.string(0);
+      unlink_string_svalue(f.argp(0));
+      newstr = const_cast<char*>(f.string(0)) + l;
       *newstr = toupper(static_cast<unsigned char>(*newstr));
       for (newstr++; *newstr; newstr++) {
         if (uislower((unsigned char)*newstr)) {
           *newstr = toupper(static_cast<unsigned char>(*newstr));
         }
       }
+      f.done();
       return;
     }
   }
+  f.done();
 }
 #endif
 
@@ -2082,17 +2106,26 @@ void f_is_daylight_savings_time(int num_arg) {
 
 #ifdef F_DEBUG_MESSAGE
 void f_debug_message(int num_arg) {
-  debug_message("%s\n", vm_sp()->u.string);
-  free_string_svalue(vm_sp()--);
+  LPCFrame f = LPCFrame::args(num_arg);
+  debug_message("%s\n", f.string(0));
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
 void f_function_owner(int num_arg) {
-  object_t* owner = vm_sp()->u.fp->hdr.owner;
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* owner = f.funptr(0)->hdr.owner;
 
-  free_funp(vm_sp()->u.fp);
-  put_unrefed_object(owner, "f_function_owner");
+  free_funp(f.funptr(0));
+  f[0].type = T_OBJECT;
+  f[0].u.ob = owner;
+  if (owner) {
+    add_ref(owner, "f_function_owner");
+  } else {
+    f[0] = const0u;
+  }
+  f.done();
 }
 #endif
 

@@ -138,13 +138,15 @@ void free_js_call(JsCall* call) {
 // Deliver a settled result to the LPC callback: cb(result, success, id).
 void deliver_js_result(JsCall* call, bool success, const std::string& result) {
   if (call->want_callback) {
-    copy_and_push_string(result.c_str());
-    push_number(success ? 1 : 0);
-    push_number(call->key);
+    LPCFrame b = LPCFrame::builder();
+    b.push_str_copy(result.c_str());
+    b.push(success ? 1 : 0);
+    b.push(call->key);
     set_eval(max_eval_cost);
     if (call->call_back.type == T_STRING) {
-      safe_apply(call->call_back.u.string, call->ob_to_call, 3, ORIGIN_INTERNAL);
+      b.safe_apply(call->call_back.u.string, call->ob_to_call, ORIGIN_INTERNAL);
     } else {
+      b.done();
       safe_call_function_pointer(call->call_back.u.fp, 3);
     }
   }
@@ -302,14 +304,16 @@ void deliver_lpc_call(const std::string& name, const std::vector<std::string>& a
     arr->item[i].subtype = STRING_MALLOC;
     arr->item[i].u.string = string_copy(args[i].c_str(), "deliver_lpc_call");
   }
-  push_refed_array(arr);
-  push_number(id);
+  LPCFrame b = LPCFrame::builder();
+  b.push_refed(arr);
+  b.push(static_cast<LPC_INT>(id));
 
   set_eval(max_eval_cost);
   svalue_t* ret;
   if (exp->call_back.type == T_STRING) {
-    ret = safe_apply(exp->call_back.u.string, exp->ob_to_call, 2, ORIGIN_INTERNAL);
+    ret = b.safe_apply(exp->call_back.u.string, exp->ob_to_call, ORIGIN_INTERNAL);
   } else {
+    b.done();
     ret = safe_call_function_pointer(exp->call_back.u.fp, 2);
   }
 
