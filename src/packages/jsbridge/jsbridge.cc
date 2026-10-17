@@ -403,7 +403,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fluffos_js_result(int id, int success, cons
 
 #ifdef F_JS_EXPORT
 void f_js_export(int num_arg) {
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* arg = f.base();
 
   // Validate before any allocation: error() unwinds past C++ destructors.
   if (num_arg > 1 && arg[1].type != T_STRING && arg[1].type != T_FUNCTION) {
@@ -430,27 +431,27 @@ void f_js_export(int num_arg) {
     registered = 1;
   }
 
-  pop_n_elems(num_arg);
-  push_number(registered);
+  f.ret(registered);
 }
 #endif
 
 #ifdef F_JS_EVAL
 void f_js_eval(int num_arg) {
-  char* result = js_bridge_eval(vm_sp()->u.string);
+  LPCFrame f = LPCFrame::args(num_arg);
+  char* result = js_bridge_eval(f.string(0));
   std::string const text(result ? result : "");
   if (result != nullptr) {
     free(result);
   }
-  pop_stack();
-  copy_and_push_string(text.c_str());
+  f.ret_str_copy(text.c_str());
 }
 #endif
 
 #ifdef F_JS_CALL
 void f_js_call(int num_arg) {
   static LPC_INT next_key = 0;
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* arg = f.base();
 
   const char* handler = arg[0].u.string;
   array_t* args = arg[1].u.arr;
@@ -488,7 +489,6 @@ void f_js_call(int num_arg) {
       jargs.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
   js_bridge_invoke(call->key, handler, jargs_text.c_str());
 
-  pop_n_elems(num_arg);
-  push_number(call->key);
+  f.ret(call->key);
 }
 #endif

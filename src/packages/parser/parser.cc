@@ -2944,8 +2944,8 @@ static void we_are_finished(parse_state_t* state) {
       if (args) {
         p = (char*)(best_result->res[tryy].args =
                         (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result"));
-        memcpy(p, (char*)(vm_sp() - args + 1), args * sizeof(svalue_t));
-        vm_sp() -= args;
+        memcpy(p, (char*)(lpc_eval_sp - args + 1), args * sizeof(svalue_t));
+        lpc_eval_sp -= args;
       }
     }
     DEBUG_P(
@@ -2970,15 +2970,15 @@ static void do_the_call() {
     n = best_result->res[i].num;
     if (n) {
       CHECK_STACK_OVERFLOW(n);
-      memcpy((char*)(vm_sp() + 1), best_result->res[i].args, n * sizeof(svalue_t));
+      memcpy((char*)(lpc_eval_sp + 1), best_result->res[i].args, n * sizeof(svalue_t));
       /*
        * Make sure we haven't dumped any dested obs onto the stack;
-       * this also updates vm_sp().
+       * this also updates lpc_eval_sp.
        */
       while (n--) {
-        if ((++vm_sp())->type == T_OBJECT && (vm_sp()->u.ob->flags & O_DESTRUCTED)) {
-          free_object(&vm_sp()->u.ob, "do_the_call");
-          *vm_sp() = const0u;
+        if ((++lpc_eval_sp)->type == T_OBJECT && (lpc_eval_sp->u.ob->flags & O_DESTRUCTED)) {
+          free_object(&lpc_eval_sp->u.ob, "do_the_call");
+          *lpc_eval_sp = const0u;
         }
       }
       FREE(best_result->res[i].args);
@@ -3432,7 +3432,7 @@ static svalue_t* get_the_error(parser_error_t* err, int obj) {
       return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 5);
     default:
       pop_stack();
-      vm_sp()--;
+      lpc_eval_sp--;
       hack.u.number = -found_level;
       return &hack;
   }
