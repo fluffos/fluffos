@@ -9,9 +9,9 @@
  *   Builder -- push args then apply / safe_apply
  *   Mark    -- record a stack watermark (assert / discard_to)
  *
- * Packages / efuns should use LPCFrame only -- not vm_sp(), bare sp, or
- * direct put_/pop_ stack macros. Opcodes and VM internals may still use
- * vm_stack.h.
+ * Packages / efuns use LPCFrame only -- not vm_sp(), bare sp, or direct
+ * put_/pop_ stack macros. Those stay in vm_stack.h for the bytecode
+ * interpreter and packages/ops.
  *
  * On error() unwind the destructor does NOT touch the stack (restore_context
  * owns recovery). On the normal path Args/Builder must be finalized

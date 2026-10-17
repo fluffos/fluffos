@@ -3,6 +3,7 @@
 #include "base/internal/tracing.h"
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/apply.h"
 #include "compiler/internal/lexer.h"  // for instrs, FIXME

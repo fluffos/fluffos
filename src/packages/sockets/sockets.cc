@@ -356,10 +356,7 @@ void f_socket_set_option(int num_arg) {
 #ifdef F_SOCKET_GET_OPTION
 void f_socket_get_option(int num_arg) {
   LPCFrame f = LPCFrame::args(num_arg);
-  // socket_get_option(int, int) takes TWO arguments: the socket is at arg 0
-  // and the option at arg 1 (the old vm_sp() - 2 / vm_sp() - 1 pair was copied
-  // from the three-argument setter and read the svalue below this frame as the
-  // descriptor while using the descriptor as the option).
+  // socket_get_option(int, int): socket at arg 0, option at arg 1.
   auto lpc_sock = f.number(0);
   auto option = f.number(1);
 

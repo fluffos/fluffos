@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 void dealloc_class(array_t* p) {
   int i;

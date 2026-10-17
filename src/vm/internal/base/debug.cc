@@ -3,6 +3,7 @@
 #include "vm/internal/base/svalue.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/base/interpret.h"
+#include "vm/internal/base/vm_stack.h"
 #include "compiler/internal/disassembler.h"
 #include "vm/internal/trace.h"
 

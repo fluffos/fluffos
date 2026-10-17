@@ -2,6 +2,7 @@
 
 #include "vm/internal/hooks.h"
 #include "vm/internal/base/interpret.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include <algorithm>
 #include <functional>
@@ -247,7 +248,6 @@ char* pc;     /* Program pointer. */
 svalue_t* fp; /* Pointer to first argument. */
 
 svalue_t* lpc_eval_sp;
-#define sp lpc_eval_sp
 
 int function_index_offset; /* Needed for inheritance */
 int variable_index_offset; /* Needed for inheritance */
