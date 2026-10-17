@@ -2731,7 +2731,9 @@ void f_store_class_member(int num_arg) {
 
   assign_svalue(&arr->item[pos], f.argp(2));
 
-  f.ret_void();
+  /* Leave the class on the stack (mixed return); drop index + value. */
+  f.pop_back(2);
+  f.done();
 }
 #endif
 
