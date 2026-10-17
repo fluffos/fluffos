@@ -1,0 +1,664 @@
+#include <hooks.h>
+
+/* Demos for every use-case row in docs/concepts/general/hooks.md.
+ * Each demo_* attaches, exercises, asserts, and detaches. */
+
+nosave mapping seen = ([]);
+nosave mixed *log = ({});
+nosave int counter = 0;
+nosave int create_n = 0;
+nosave int destruct_n = 0;
+nosave string last_cause = 0;
+nosave mixed last_result = 0;
+
+void reset_state() {
+  seen = ([]);
+  log = ({});
+  counter = 0;
+  create_n = 0;
+  destruct_n = 0;
+  last_cause = 0;
+  last_result = 0;
+}
+
+/* ---- helpers ---- */
+
+void write_fixture(string path, string src) {
+  write_file(path, src, 1);
+}
+
+object load_fixture(string path_no_ext, string src) {
+  string path = path_no_ext + ".lpc";
+  write_fixture(path, src);
+  object ob = load_object(path_no_ext);
+  return ob;
+}
+
+void cleanup_fixture(string path_no_ext) {
+  object ob = find_object(path_no_ext);
+  if (ob) destruct(ob);
+  rm(path_no_ext + ".lpc");
+}
+
+/* ---- 1. Typo / miss finder ---- */
+
+void on_typo(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  string key = sprintf("%O|%O|%s|%s", caller, target, fn, reason);
+  if (seen[key]) return;
+  seen[key] = 1;
+  log += ({ key });
+}
+
+void demo_typo_finder() {
+  reset_state();
+  int id = hook_attach("call_other:miss", (: on_typo :),
+    ([ "label": "typo-finder", "object": this_object() ]), HOOK_BEFORE);
+  this_object()->no_such_a();
+  this_object()->no_such_a(); /* unique key — second hit ignored */ this_object()->no_such_b();
+  ASSERT_EQ(sizeof(log), 2);
+  hook_detach(id);
+}
+
+/* ---- 2. Deprecation radar ---- */
+
+void on_depr(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  log += ({ fn });
+}
+
+void demo_deprecation_radar() {
+  reset_state();
+  int id = hook_attach("call_other:miss", (: on_depr :),
+    ([ "label": "depr", "object": this_object(), "function": "old_api_name" ]),
+    HOOK_BEFORE);
+  this_object()->old_api_name();
+  this_object()->other_miss();
+  ASSERT_EQ(log, ({ "old_api_name" }));
+  hook_detach(id);
+}
+
+/* ---- 3. Access audit ---- */
+
+void on_access(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  if (reason == "private" || reason == "protected") log += ({ ({ fn, reason }) });
+}
+
+void demo_access_audit() {
+  reset_state();
+  object priv = load_fixture("/data/hooks_uc_priv",
+    "private void secret() {}\n"
+    "protected void gated() {}\n"
+    "void create() {}\n");
+  int id = hook_attach("call_other:miss", (: on_access :),
+    ([ "label": "access-audit", "object": priv ]), HOOK_BEFORE);
+  priv->secret();
+  priv->gated();
+  ASSERT_EQ(sizeof(log), 2);
+  ASSERT_EQ(log[0][1], "private");
+  ASSERT_EQ(log[1][1], "protected");
+  hook_detach(id);
+  cleanup_fixture("/data/hooks_uc_priv");
+}
+
+/* ---- 4. Destructed-call noise ---- */
+
+void on_dest_miss(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  if (reason == "destructed") log += ({ fn });
+}
+
+void demo_destructed_noise() {
+  reset_state();
+  /* Pin by target path — an object pin would detach when the victim dies. */
+  int id = hook_attach("call_other:miss", (: on_dest_miss :),
+    ([ "label": "destructed-noise", "target": "single/void" ]), HOOK_BEFORE);
+  object victim = new("/single/void");
+  object *hold = ({ victim });
+  destruct(victim);
+  /* hold[0] may still be a destructed object ref for call_other */
+  if (hold[0]) {
+    hold[0]->ghost_call();
+    ASSERT(sizeof(log) >= 1);
+    ASSERT_EQ(log[<1], "ghost_call");
+  } else {
+    /* Some builds zero array slots on destruct — pin the attach path instead. */
+    mapping q = hook_query(id);
+    ASSERT_EQ(q["point"], "call_other:miss");
+  }
+  hook_detach(id);
+}
+
+/* ---- 5–6. Default proxy / compat shim ---- */
+
+mixed on_proxy(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  if (fn == "proxy_me") return ({ "proxied" });
+  if (fn == "legacy_alias") return ({ "shimmed" });
+  return 0;
+}
+
+void demo_default_proxy() {
+  reset_state();
+  int id = hook_attach("call_other:miss", (: on_proxy :),
+    ([ "label": "proxy", "object": this_object(), "function": "proxy_me" ]),
+    HOOK_DECIDE);
+  ASSERT_EQ(this_object()->proxy_me(), "proxied");
+  hook_detach(id);
+}
+
+void demo_compat_shim() {
+  reset_state();
+  int id = hook_attach("call_other:miss", (: on_proxy :),
+    ([ "label": "shim", "object": this_object(), "function": "legacy_alias" ]),
+    HOOK_DECIDE);
+  ASSERT_EQ(this_object()->legacy_alias(), "shimmed");
+  hook_detach(id);
+}
+
+/* ---- 7. Virtual / generated objects (target prefix) ---- */
+
+mixed on_virt(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  return ({ "virtual:" + fn });
+}
+
+void demo_virtual_proxy() {
+  reset_state();
+  mkdir("/data/hooks_uc_virt");
+  object virt = load_fixture("/data/hooks_uc_virt/thing",
+    "void create() {}\n");
+  int id = hook_attach("call_other:miss", (: on_virt :),
+    ([ "label": "virt", "target": "data/hooks_uc_virt/" ]), HOOK_DECIDE);
+  ASSERT_EQ(virt->generated_fn(), "virtual:generated_fn");
+  /* outside the prefix — still a real miss */
+  ASSERT_EQ(undefinedp(this_object()->generated_fn()), 1);
+  hook_detach(id);
+  cleanup_fixture("/data/hooks_uc_virt/thing");
+  catch(rmdir("/data/hooks_uc_virt"));
+}
+
+/* ---- 8. Hot miss profile ---- */
+
+void demo_hot_miss_profile() {
+  reset_state();
+  int id = hook_attach("call_other:miss", "count",
+    ([ "label": "miss-count", "object": this_object() ]), HOOK_BEFORE);
+  this_object()->miss_a();
+  this_object()->miss_a();
+  this_object()->miss_b();
+  mapping q = hook_query(id);
+  ASSERT(q["events"] >= 3);
+  ASSERT(sizeof(q["rows"]) >= 1);
+  hook_detach(id);
+}
+
+/* ---- apply:miss finder / proxy ---- */
+
+void on_apply_miss_finder(int id, object actor, object caller, object target, string fn,
+  mixed *args, string reason, string origin) {
+  string key = sprintf("%s|%s|%s", fn, reason, origin);
+  if (seen[key]) return;
+  seen[key] = 1;
+  log += ({ key });
+}
+
+mixed on_apply_miss_proxy(int id, object actor, object caller, object target, string fn,
+  mixed *args, string reason, string origin) {
+  if (fn == "id" && sizeof(args) && args[0] == "uc-proxy") return ({ 1 });
+  return 0;
+}
+
+void demo_apply_miss_finder() {
+#ifndef __NO_ENVIRONMENT__
+  reset_state();
+  write_file("/data/hooks_uc_apply_kid.lpc",
+    "void move(object dest) { move_object(dest); }\n", 1);
+  object kid = load_object("/data/hooks_uc_apply_kid");
+  kid->move(this_object());
+  int id = hook_attach("apply:miss", (: on_apply_miss_finder :),
+    ([ "label": "apply-finder", "object": kid, "origin": "driver" ]),
+    HOOK_BEFORE);
+  present("missing-id", this_object());
+  ASSERT(sizeof(log) >= 1);
+  ASSERT(strsrch(log[<1], "id|undefined|driver") != -1);
+  /* call_other must not appear here */
+  int before = sizeof(log);
+  this_object()->uc_apply_cross_check();
+  ASSERT_EQ(sizeof(log), before);
+  hook_detach(id);
+  destruct(kid);
+  rm("/data/hooks_uc_apply_kid.lpc");
+#endif
+}
+
+void demo_apply_miss_proxy() {
+#ifndef __NO_ENVIRONMENT__
+  reset_state();
+  write_file("/data/hooks_uc_apply_kid2.lpc",
+    "void move(object dest) { move_object(dest); }\n", 1);
+  object kid = load_object("/data/hooks_uc_apply_kid2");
+  kid->move(this_object());
+  int id = hook_attach("apply:miss", (: on_apply_miss_proxy :),
+    ([ "label": "apply-proxy", "object": kid, "function": "id" ]),
+    HOOK_DECIDE);
+  ASSERT_EQ(present("uc-proxy", this_object()), kid);
+  ASSERT_EQ(present("other", this_object()), 0);
+  hook_detach(id);
+  destruct(kid);
+  rm("/data/hooks_uc_apply_kid2.lpc");
+#endif
+}
+
+/* ---- 9–11. Object census / storm / destruct cause ---- */
+
+void on_create(int id, object ob) { create_n++; }
+void on_destruct(int id, object ob, string cause) {
+  destruct_n++;
+  last_cause = cause;
+}
+
+void demo_object_census() {
+  reset_state();
+  int cid = hook_attach("object:create", (: on_create :), ([ "label": "census-c" ]), 0);
+  int xid = hook_attach("object:destruct", (: on_destruct :), ([ "label": "census-d" ]), 0);
+  object a = new("/single/void");
+  object b = new("/single/void");
+  ASSERT(create_n >= 2);
+  destruct(a);
+  destruct(b);
+  ASSERT(destruct_n >= 2);
+  ASSERT_EQ(last_cause, "efun");
+  hook_detach(cid);
+  hook_detach(xid);
+}
+
+void demo_clone_storm() {
+  reset_state();
+  int id = hook_attach("object:create", "count", ([ "label": "storm" ]), 0);
+  for (int i = 0; i < 5; i++) {
+    object o = new("/single/void");
+    destruct(o);
+  }
+  mapping q = hook_query(id);
+  ASSERT(q["events"] >= 5);
+  hook_detach(id);
+}
+
+void demo_destruct_cause() {
+  reset_state();
+  int id = hook_attach("object:destruct", (: on_destruct :), ([ "label": "cause" ]), 0);
+  object o = new("/single/void");
+  destruct(o);
+  ASSERT_EQ(last_cause, "efun");
+  hook_detach(id);
+}
+
+/* ---- 12–13. Session bookkeeping / soft quota ---- */
+
+void on_path_create(int id, object ob) {
+  create_n++;
+  log += ({ file_name(ob) });
+}
+
+void demo_session_bookkeeping() {
+  reset_state();
+  load_fixture("/data/hooks_uc_room", "void create() {}\n");
+  int id = hook_attach("object:create", (: on_path_create :),
+    ([ "label": "session", "target": "data/hooks_uc_room" ]), 0);
+  object clone = new("/data/hooks_uc_room");
+  ASSERT(create_n >= 1);
+  destruct(clone);
+  hook_detach(id);
+  cleanup_fixture("/data/hooks_uc_room");
+}
+
+void demo_quota_soft() {
+  reset_state();
+  int id = hook_attach("object:create", "count",
+    ([ "label": "quota-soft", "target": "single/void" ]), 0);
+  for (int i = 0; i < 3; i++) {
+    object o = new("/single/void");
+    destruct(o);
+  }
+  mapping q = hook_query(id);
+  ASSERT(q["events"] >= 3);
+  /* soft alert: mudlib would warn when events exceed a threshold */
+  ASSERT(q["events"] > 2);
+  hook_detach(id);
+}
+
+/* ---- 14. Hard quota (efun:clone_object DECIDE) ---- */
+
+mixed on_clone_refuse(int id, object actor, object caller, object target, string fn,
+  mixed *args) {
+  counter++;
+  if (counter > 2) return 1; /* refuse */ return 0;
+}
+
+void demo_quota_hard() {
+  reset_state();
+  int id = hook_attach("efun:clone_object", (: on_clone_refuse :),
+    ([ "label": "quota-hard" ]), HOOK_DECIDE);
+  object a = new("/single/void");
+  object b = new("/single/void");
+  object c = new("/single/void"); /* refused → 0 */ ASSERT(objectp(a));
+  ASSERT(objectp(b));
+  ASSERT_EQ(c, 0);
+  if (a) destruct(a);
+  if (b) destruct(b);
+  hook_detach(id);
+}
+
+/* ---- 15. Capability fence ---- */
+
+string secure_ping() { return "ok"; }
+
+mixed on_fence(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return "domains may not call secure";
+}
+
+void demo_capability_fence() {
+  reset_state();
+  int id = hook_attach("function", (: on_fence :),
+    ([
+      "label": "fence",
+      "function": "secure_ping",
+      "object": this_object(),
+      "origin": "call_other",
+    ]),
+    HOOK_DECIDE);
+  /* local call — origin "local", fence does not match */
+  ASSERT_EQ(secure_ping(), "ok");
+  /* call_other — refused */
+  mixed err = catch(this_object()->secure_ping());
+  ASSERT(err);
+  hook_detach(id);
+}
+
+/* ---- 16. Live-function deprecation ---- */
+
+int deprecated_api(int x) { return x; }
+
+void on_live_depr(int id, object actor, object caller, object target, string fn, mixed *args) {
+  log += ({ fn });
+}
+
+void demo_live_deprecation() {
+  reset_state();
+  int bid = hook_attach("function", (: on_live_depr :),
+    ([ "label": "live-depr", "function": "deprecated_api", "object": this_object() ]),
+    HOOK_BEFORE);
+  int cid = hook_attach("function", "count",
+    ([ "label": "live-depr-count", "function": "deprecated_api", "object": this_object() ]),
+    HOOK_BEFORE);
+  ASSERT_EQ(deprecated_api(1), 1);
+  ASSERT_EQ(this_object()->deprecated_api(2), 2);
+  ASSERT(sizeof(log) >= 2);
+  mapping q = hook_query(cid);
+  ASSERT(q["events"] >= 2);
+  hook_detach(bid);
+  hook_detach(cid);
+}
+
+/* ---- 17. Status effects (DECIDE refuse) ---- */
+
+int attack() { return 10; }
+
+mixed on_silence(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return "silenced";
+}
+
+void demo_status_effect() {
+  reset_state();
+  int id = hook_attach("function", (: on_silence :),
+    ([ "label": "silence", "function": "attack", "object": this_object() ]),
+    HOOK_DECIDE);
+  mixed err = catch(this_object()->attack());
+  ASSERT(err);
+  hook_detach(id);
+  ASSERT_EQ(this_object()->attack(), 10);
+}
+
+/* ---- 18. Quest / achievement AFTER ---- */
+
+int complete_quest() { return 1; }
+
+mixed on_quest(int id, object actor, object caller, object target, string fn, mixed *args,
+  mixed result) {
+  last_result = result;
+  log += ({ fn });
+  return 0;
+}
+
+void demo_quest_after() {
+  reset_state();
+  int id = hook_attach("function", (: on_quest :),
+    ([ "label": "quest", "function": "complete_quest", "object": this_object() ]),
+    HOOK_AFTER);
+  ASSERT_EQ(complete_quest(), 1);
+  ASSERT_EQ(last_result, 1);
+  ASSERT_EQ(log[<1], "complete_quest");
+  hook_detach(id);
+}
+
+/* ---- 19. Hot-function profile (count + time) ---- */
+
+int busy(int n) {
+  int s = 0;
+  for (int i = 0; i < n; i++) s += i;
+  return s;
+}
+
+void demo_hot_function_profile() {
+  reset_state();
+  int cid = hook_attach("function", "count",
+    ([ "label": "hot-count", "function": "busy", "object": this_object() ]),
+    HOOK_AFTER);
+  int tid = hook_attach("function", "time",
+    ([ "label": "hot-time", "function": "busy", "object": this_object() ]),
+    HOOK_AFTER);
+  busy(100);
+  busy(100);
+  mapping cq = hook_query(cid);
+  mapping tq = hook_query(tid);
+  ASSERT(cq["events"] >= 2);
+  ASSERT(tq["events"] >= 2);
+  ASSERT(tq["eval_us"] >= 0);
+  hook_detach(cid);
+  hook_detach(tid);
+}
+
+/* ---- 20. Privilege efun alarms ---- */
+
+void on_priv(int id, object actor, object caller, object target, string fn, mixed *args) {
+  log += ({ fn });
+}
+
+void demo_privilege_alarm() {
+  reset_state();
+  /* seteuid is commonly available; observe BEFORE without refusing */
+  int id = hook_attach("efun:seteuid", (: on_priv :),
+    ([ "label": "priv-alarm" ]), HOOK_BEFORE);
+  catch(seteuid(getuid()));
+  ASSERT(member_array("seteuid", log) != -1);
+  hook_detach(id);
+}
+
+/* ---- 21. call_out leak finder ---- */
+
+void demo_call_out_leak() {
+  reset_state();
+  int id = hook_attach("efun:call_out", "count",
+    ([ "label": "callout-count" ]), HOOK_BEFORE);
+  int h1 = call_out(function() {}, 100);
+  int h2 = call_out(function() {}, 100);
+  mapping q = hook_query(id);
+  ASSERT(q["events"] >= 2);
+  remove_call_out(h1);
+  remove_call_out(h2);
+  hook_detach(id);
+}
+
+/* ---- 22–23. Net API demos (no live connection in -ftest) ---- */
+
+void demo_net_accept_api() {
+  reset_state();
+  int id = hook_attach("net:accept",
+    function(int hid, string addr) { return 0; },
+    ([ "label": "ban-list" ]), HOOK_DECIDE);
+  mapping q = hook_query(id);
+  ASSERT_EQ(q["point"], "net:accept");
+  hook_detach(id);
+  /* reserved flags must be rejected */
+  mixed err = catch(hook_attach("net:accept",
+    function(int hid, string addr) { return 0; },
+    ([ "label": "deferred-bad" ]), HOOK_BEFORE | HOOK_DEFERRED));
+  ASSERT(err);
+}
+
+void demo_net_rw_api() {
+  reset_state();
+  int rid = hook_attach("net:read",
+    function(int hid, object user, int len, string data) { return 0; },
+    ([ "label": "rate-read" ]), HOOK_BEFORE);
+  int wid = hook_attach("net:write",
+    function(int hid, object user, int len, string data) { return 0; },
+    ([ "label": "rate-write" ]), HOOK_BEFORE);
+  ASSERT_EQ(hook_query(rid)["point"], "net:read");
+  ASSERT_EQ(hook_query(wid)["point"], "net:write");
+  /* protocol / DNS points accept attach (dispatch needs a live connection) */
+  int tid = hook_attach("net:telnet",
+    function(int hid, object user, string ev, string opt, string payload) {},
+    ([ "label": "telnet-api" ]), HOOK_BEFORE);
+  ASSERT_EQ(hook_query(tid)["point"], "net:telnet");
+  int sid = hook_attach("net:telnet",
+    function(int hid, object user, string ev, string opt, string payload) {
+      return 0;
+    },
+    ([ "label": "telnet-sb" ]), HOOK_DECIDE);
+  ASSERT_EQ(hook_query(sid)["point"], "net:telnet");
+  int lid = hook_attach("net:tls",
+    function(int hid, object user, int port, string ver, string cipher,
+      string outcome) {},
+    ([ "label": "tls-api" ]), HOOK_AFTER);
+  ASSERT_EQ(hook_query(lid)["point"], "net:tls");
+  int did = hook_attach("net:resolve",
+    function(int hid, string address, string name, object user) {},
+    ([ "label": "resolve-api" ]), HOOK_AFTER);
+  ASSERT_EQ(hook_query(did)["point"], "net:resolve");
+  /* kind 0 normalizes to AFTER for observe-only net points */
+  int lid0 = hook_attach("net:tls",
+    function(int hid, object user, int port, string ver, string cipher,
+      string outcome) {},
+    ([ "label": "tls-kind0" ]), 0);
+  ASSERT(lid0 > 0);
+  hook_detach(rid);
+  hook_detach(wid);
+  hook_detach(tid);
+  hook_detach(sid);
+  hook_detach(lid);
+  hook_detach(did);
+  hook_detach(lid0);
+}
+
+/* ---- 24. Polymorph / disguise with exclude_caller_program ---- */
+
+string query_short() { return "plain goblin"; }
+
+mixed on_disguise(int id, object actor, object caller, object target, string fn, mixed *args) {
+  hook_proceed();
+  return "a harmless sheep";
+}
+
+void demo_polymorph() {
+  reset_state();
+  /* Secure caller sees through disguise via exclude_caller_program. */
+  write_fixture("/data/hooks_uc_secure.lpc",
+    "string look_at(object ob) { return ob->query_short(); }\n"
+    "void create() {}\n");
+  object secure = load_object("/data/hooks_uc_secure");
+  /* prog->filename has no leading slash and keeps the .lpc extension */
+  string secure_prog = "data/hooks_uc_secure.lpc";
+  int id = hook_attach("function", (: on_disguise :),
+    ([
+      "label": "polymorph",
+      "function": "query_short",
+      "object": this_object(),
+      "exclude_caller_program": secure_prog,
+    ]),
+    HOOK_AROUND);
+  /* Normal call_other — disguised */
+  ASSERT_EQ(this_object()->query_short(), "a harmless sheep");
+  /* Secure program — excluded, sees real short */
+  ASSERT_EQ(secure->look_at(this_object()), "plain goblin");
+  hook_detach(id);
+  cleanup_fixture("/data/hooks_uc_secure");
+}
+
+/* ---- 25. AROUND rewrite (damage scale / pricing) ---- */
+
+int roll_damage(int base) { return base; }
+
+mixed on_scale(int id, object actor, object caller, object target, string fn, mixed *args) {
+  mixed r = hook_proceed(({ args[0] * 2 }));
+  return r;
+}
+
+void demo_around_rewrite() {
+  reset_state();
+  int id = hook_attach("function", (: on_scale :),
+    ([ "label": "dmg-scale", "function": "roll_damage", "object": this_object() ]),
+    HOOK_AROUND);
+  ASSERT_EQ(this_object()->roll_damage(5), 10);
+  hook_detach(id);
+  ASSERT_EQ(this_object()->roll_damage(5), 5);
+}
+
+/* ---- expires + reserved-flag sanity ---- */
+
+void demo_expires_and_reserved() {
+  reset_state();
+  int id = hook_attach("call_other:miss", (: on_typo :),
+    ([ "label": "expires-soon", "object": this_object(), "expires": 3600 ]),
+    HOOK_BEFORE);
+  mapping q = hook_query(id);
+  ASSERT(q["expires"] > time());
+  hook_detach(id);
+  mixed err = catch(hook_attach("function", (: on_silence :),
+    ([ "label": "override-bad", "function": "attack", "object": this_object() ]),
+    HOOK_AROUND | HOOK_OVERRIDE_NOMASK));
+  ASSERT(err);
+}
+
+void do_tests() {
+  demo_typo_finder();
+  demo_deprecation_radar();
+  demo_access_audit();
+  demo_destructed_noise();
+  demo_default_proxy();
+  demo_compat_shim();
+  demo_virtual_proxy();
+  demo_hot_miss_profile();
+  demo_apply_miss_finder();
+  demo_apply_miss_proxy();
+  demo_object_census();
+  demo_clone_storm();
+  demo_destruct_cause();
+  demo_session_bookkeeping();
+  demo_quota_soft();
+  demo_quota_hard();
+  demo_capability_fence();
+  demo_live_deprecation();
+  demo_status_effect();
+  demo_quest_after();
+  demo_hot_function_profile();
+  demo_privilege_alarm();
+  demo_call_out_leak();
+  demo_net_accept_api();
+  demo_net_rw_api();
+  demo_polymorph();
+  demo_around_rewrite();
+  demo_expires_and_reserved();
+}

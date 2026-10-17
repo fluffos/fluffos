@@ -201,6 +201,22 @@ const FlagEntry INT_FLAGS[] = {
      "Advertise and enable the MSP telnet protocol."},
     {"enable msdp", __RC_ENABLE_MSDP__, 0, 0, INT_MAX, "Protocol Support",
      "Advertise and enable the MSDP telnet protocol."},
+    {"hooks enabled", __RC_HOOKS_ENABLED__, 1, 0, INT_MAX, "Hooks",
+     "Master switch for the hook_* efuns. 0 makes hook_attach() always fail — the "
+     "break-glass for a mud locked up by its own hooks."},
+    {"hook eval cost", __RC_HOOK_EVAL_COST__, 0, 0, INT_MAX, "Hooks",
+     "Microseconds of handler time per evaluation that are not charged to the interrupted code. "
+     "Also the point at which a single runaway handler is aborted. 0 (the default) "
+     "uses the value of maximum evaluation cost."},
+    {"hook max errors", __RC_HOOK_MAX_ERRORS__, 10, 0, INT_MAX, "Hooks",
+     "Errors (overruns included) before an attachment is detached. Never applied to "
+     "HOOK_FAIL_CLOSED attachments."},
+    {"hook max attachments", __RC_HOOK_MAX_ATTACHMENTS__, 10000, 0, INT_MAX, "Hooks",
+     "Ceiling on live hook attachments."},
+    {"hook max rows", __RC_HOOK_MAX_ROWS__, 10000, 0, INT_MAX, "Hooks",
+     "Rows per count/time table; overflow is counted in dropped."},
+    {"hook max deferred", __RC_HOOK_MAX_DEFERRED__, 1024, 0, INT_MAX, "Hooks",
+     "Reserved for HOOK_DEFERRED (not yet implemented). Queued events per attachment."},
 };
 
 /*

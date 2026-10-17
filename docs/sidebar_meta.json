@@ -55,6 +55,10 @@
     "label": "Function Pointers",
     "description": "Create, bind, defer and evaluate function pointers."
   },
+  "efun/hooks": {
+    "label": "Hooks",
+    "description": "Join-point attachments: intercept call_other misses and object lifecycle events."
+  },
   "efun/general": {
     "label": "General",
     "description": "Miscellaneous efuns: vector and matrix math, compression, type predicates, save/restore and generic collection helpers."
@@ -186,6 +190,7 @@
       "tls",
       "websocket",
       "async",
+      "hooks",
       "tracing"
     ],
     "labels": {
@@ -203,6 +208,7 @@
       "tls": "TLS",
       "websocket": "WebSocket",
       "async": "Async and Promises",
+      "hooks": "Hooks",
       "tracing": "Tracing"
     }
   },

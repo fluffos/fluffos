@@ -21,10 +21,24 @@ for P in $PACKAGES; do
 	# get the directory and file name
 	DIR=$(echo $P | tr '[:upper:]' '[:lower:]')
 
+	# Include every *.spec in the package directory. Historically each
+	# package had only $DIR.spec; PACKAGE_CORE now also ships hooks.spec.
+	# Order: $DIR.spec first, then the rest alphabetically.
+	SPECS=()
 	if [[ -e "${TOP_SRCDIR}/src/packages/$DIR/$DIR.spec" ]]; then
-		echo "#include \"${TOP_SRCDIR}/src/packages/$DIR/$DIR.spec\"" >> $PACKAGES_SPEC
-	else
+		SPECS+=("${TOP_SRCDIR}/src/packages/$DIR/$DIR.spec")
+	fi
+	for SPEC in "${TOP_SRCDIR}/src/packages/$DIR"/*.spec; do
+		[[ -e "$SPEC" ]] || continue
+		[[ "$(basename "$SPEC")" == "$DIR.spec" ]] && continue
+		SPECS+=("$SPEC")
+	done
+	if [[ ${#SPECS[@]} -eq 0 ]]; then
 		echo "Warning: ${TOP_SRCDIR}/src/packages/$DIR/$DIR.spec is missing."
+	else
+		for SPEC in "${SPECS[@]}"; do
+			echo "#include \"$SPEC\"" >> $PACKAGES_SPEC
+		done
 	fi
 done
 
@@ -60,9 +74,10 @@ spec_efun_names() {
 PRESENT_EFUNS=$(
 	for P in $PACKAGES; do
 		D=$(echo "${P#PACKAGE_}" | tr '[:upper:]' '[:lower:]')
-		if [[ -e "${TOP_SRCDIR}/src/packages/$D/$D.spec" ]]; then
-			spec_efun_names "${TOP_SRCDIR}/src/packages/$D/$D.spec"
-		fi
+		for SPEC in "${TOP_SRCDIR}/src/packages/$D"/*.spec; do
+			[[ -e "$SPEC" ]] || continue
+			spec_efun_names "$SPEC"
+		done
 	done | sort -u
 )
 

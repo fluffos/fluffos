@@ -12,6 +12,7 @@
 #include "applies_table.autogen.h"
 #include "vm/internal/base/machine.h"  // for reset_machine
 #include "vm/internal/eval_limit.h"
+#include "vm/internal/hooks.h"
 #include "vm/internal/master.h"
 #include "vm/internal/simul_efun.h"
 #include "vm/internal/simulate.h"
@@ -79,6 +80,7 @@ void vm_init() {
   boot_time = get_current_time();
 
   init_eval(); /* in eval.cc */
+  hooks_init();
 
   init_strings();     /* in stralloc.c */
   init_instrs();      /* in compiler_utils.cc */

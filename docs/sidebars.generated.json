@@ -1376,6 +1376,49 @@
       },
       {
         "type": "category",
+        "key": "efun/hooks",
+        "label": "Hooks",
+        "link": {
+          "type": "generated-index",
+          "title": "Hooks",
+          "slug": "/efun/hooks/",
+          "description": "Join-point attachments: intercept call_other misses and object lifecycle events."
+        },
+        "items": [
+          {
+            "type": "doc",
+            "id": "efun/hooks/hook_attach",
+            "key": "efun/hooks/hook_attach",
+            "label": "hook_attach"
+          },
+          {
+            "type": "doc",
+            "id": "efun/hooks/hook_detach",
+            "key": "efun/hooks/hook_detach",
+            "label": "hook_detach"
+          },
+          {
+            "type": "doc",
+            "id": "efun/hooks/hook_list",
+            "key": "efun/hooks/hook_list",
+            "label": "hook_list"
+          },
+          {
+            "type": "doc",
+            "id": "efun/hooks/hook_proceed",
+            "key": "efun/hooks/hook_proceed",
+            "label": "hook_proceed"
+          },
+          {
+            "type": "doc",
+            "id": "efun/hooks/hook_query",
+            "key": "efun/hooks/hook_query",
+            "label": "hook_query"
+          }
+        ]
+      },
+      {
+        "type": "category",
         "key": "efun/interactive",
         "label": "Interactive & Networking",
         "link": {
@@ -3352,6 +3395,12 @@
           },
           {
             "type": "doc",
+            "id": "apply/master/valid_hook",
+            "key": "apply/master/valid_hook",
+            "label": "valid_hook"
+          },
+          {
+            "type": "doc",
             "id": "apply/master/valid_link",
             "key": "apply/master/valid_link",
             "label": "valid_link"
@@ -3833,6 +3882,12 @@
             "id": "concepts/general/async",
             "key": "concepts/general/async",
             "label": "Async and Promises"
+          },
+          {
+            "type": "doc",
+            "id": "concepts/general/hooks",
+            "key": "concepts/general/hooks",
+            "label": "Hooks"
           },
           {
             "type": "doc",

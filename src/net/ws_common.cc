@@ -11,6 +11,7 @@
 #include "comm.h"
 #include "net/transport_native.h"
 #include "interactive.h"
+#include "vm/internal/hooks.h"
 
 namespace {
 
@@ -84,6 +85,12 @@ int ws_handle_established(struct lws* wsi, ws_session* pss,
         evutil_freeaddrinfo(res);
       }
     }
+  }
+
+  const char* peer = sockaddr_to_string(reinterpret_cast<sockaddr*>(&addr), addrlen);
+  if ((g_hook_mask & HOOK_MASK_NET_WS_UPGRADE) && !hook_dispatch_net_ws_upgrade(peer)) {
+    lwsl_warn("LWS_CALLBACK_ESTABLISHED: refused by net:ws_upgrade hook: %s\n", peer);
+    return -1;
   }
 
   auto ip = new_user(port, fd, reinterpret_cast<sockaddr*>(&addr), addrlen);

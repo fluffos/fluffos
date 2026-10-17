@@ -30,6 +30,8 @@
  * FRAME_CATCH frame, marks an acatch() region marker (no C++ recursion,
  * unlike do_catch()). */
 #define FRAME_ASYNC 32
+/* Set when function AFTER hooks should fire at F_RETURN. */
+#define FRAME_HOOKED 64
 struct defer_list {
   struct defer_list* next;
   svalue_t func;
@@ -45,6 +47,9 @@ struct control_stack_t {
   } fr;
   object_t* ob;      /* Current object */
   object_t* prev_ob; /* Save previous object */
+  /* Named target for function AFTER filters (pre-shadow). nullptr => use
+   * current_object at F_RETURN. Not ref-counted; the call keeps it alive. */
+  object_t* hook_target;
   program_t* prog;   /* Current program */
   char* pc;          /* TODO: change this to unsigned char* */
 
@@ -148,9 +153,11 @@ extern short caller_type;
 extern char* pc;
 extern svalue_t* sp;
 extern svalue_t* fp;
-extern svalue_t* const end_of_stack;
+extern svalue_t* start_of_stack;
+extern svalue_t* end_of_stack;
 extern svalue_t catch_value;
-extern control_stack_t* const control_stack;
+extern control_stack_t* control_stack;
+extern control_stack_t* control_stack_last;
 extern control_stack_t* csp;
 extern int too_deep_error;
 extern int max_eval_error;

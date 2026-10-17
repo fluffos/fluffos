@@ -20,6 +20,7 @@
 #endif
 
 #include "backend.h"
+#include "vm/internal/hooks.h"
 
 static struct evdns_base* g_dns_base = nullptr;
 
@@ -34,10 +35,14 @@ void init_dns_event_base(struct event_base* base) {
 }
 
 using addr_name_query_t = struct addr_name_query_s {
-  sockaddr_storage addr;
-  ev_socklen_t addrlen;
-  struct evdns_request* req;
+  sockaddr_storage addr{};
+  ev_socklen_t addrlen = 0;
+  struct evdns_request* req = nullptr;
+  object_t* ob = nullptr;         /* ref held until callback; may be destructed */
+  const char* addr_str = nullptr; /* shared string of numeric address */
 };
+
+static std::set<addr_name_query_t*> pending_reverse_queries;
 
 // Reverse DNS lookup.
 void on_addr_name_result(int err, char type, int count, int /*ttl*/, void* addresses, void* arg) {
@@ -51,6 +56,18 @@ void on_addr_name_result(int err, char type, int count, int /*ttl*/, void* addre
     auto* result = *(reinterpret_cast<char**>(addresses));
     debug(dns, "DNS reverse lookup result: %d: %s\n", type, result);
     dns_add_ip_entry(reinterpret_cast<sockaddr*>(&query->addr), query->addrlen, result);
+    if (g_hook_mask & HOOK_MASK_NET_RESOLVE) {
+      object_t* user =
+          (query->ob && !(query->ob->flags & O_DESTRUCTED)) ? query->ob : nullptr;
+      hook_dispatch_net_resolve(query->addr_str, result, user);
+    }
+  }
+  pending_reverse_queries.erase(query);
+  if (query->ob) {
+    free_object(&query->ob, "on_addr_name_result");
+  }
+  if (query->addr_str) {
+    free_string(query->addr_str);
   }
   delete query;
 }
@@ -67,12 +84,18 @@ void query_name_by_addr(object_t* ob) {
 
   const char* addr = query_ip_number(ob);
   debug(dns, "query_name_by_addr: starting lookup for %s.\n", addr);
+  /* Keep a shared copy for the net:resolve hook; query_ip_number's return
+   * is already shared and would be freed below — intern again for the query. */
+  query->addr_str = make_shared_string(addr ? addr : "");
   free_string(addr);
 
   // By the time resolve finish, ob may be already gone, we have to
-  // copy the address.
+  // copy the address — and hold a ref so the hook can name the user.
   memcpy(&query->addr, &ob->interactive->addr, ob->interactive->addrlen);
   query->addrlen = ob->interactive->addrlen;
+  query->ob = ob;
+  add_ref(ob, "query_name_by_addr");
+  pending_reverse_queries.insert(query);
 
   // Check for mapped v4 address, if we are querying for v6 address.
   if (query->addr.ss_family == AF_INET6) {
@@ -88,6 +111,13 @@ void query_name_by_addr(object_t* ob) {
   } else {
     in_addr* addr4 = &(reinterpret_cast<sockaddr_in*>(&query->addr))->sin_addr;
     query->req = evdns_base_resolve_reverse(g_dns_base, addr4, 0, on_addr_name_result, query);
+  }
+  if (!query->req) {
+    debug(dns, "query_name_by_addr: failed to start reverse lookup.\n");
+    pending_reverse_queries.erase(query);
+    free_object(&query->ob, "query_name_by_addr: no req");
+    free_string(query->addr_str);
+    delete query;
   }
 }
 
@@ -126,6 +156,14 @@ void mark_dns_requests() {
     }
     if (query->command_giver) {
       query->command_giver->extra_ref++;
+    }
+  }
+  for (auto* query : pending_reverse_queries) {
+    if (query->addr_str) {
+      EXTRA_REF(BLOCK(query->addr_str))++;
+    }
+    if (query->ob) {
+      query->ob->extra_ref++;
     }
   }
 }

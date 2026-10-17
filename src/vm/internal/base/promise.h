@@ -238,6 +238,9 @@ struct lpc_coroutine_t {
   struct object_t* ob;       /* ref held */
   struct object_t* prev_ob;  /* ref held; may be null */
   struct object_t* command_giver; /* ref held; may be null */
+  /* Named target for function AFTER filters (pre-shadow). Not ref-held —
+   * same lifetime rule as control_stack_t::hook_target. */
+  struct object_t* hook_target;
   struct program_t* prog;    /* reference_prog() held; the DEFINING program
                               * (setup_new_frame() points current_prog at the
                               * base for an inherited function), which is what

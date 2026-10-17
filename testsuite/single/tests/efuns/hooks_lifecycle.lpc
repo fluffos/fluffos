@@ -1,0 +1,209 @@
+#include <hooks.h>
+
+/* Hooks (shipped points): call_other:miss, apply:miss, object:create,
+ * object:destruct. */
+
+nosave mixed *miss_log = ({});
+nosave mixed *create_log = ({});
+nosave mixed *destruct_log = ({});
+nosave int attached_ids = 0;
+
+mixed on_miss(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  miss_log += ({ ({ id, target, fn, reason, args }) });
+  if (fn == "proxy_me") return ({ "proxied" });
+  if (fn == "proxy_args") return ({ args });
+  return 0;
+}
+
+/* DECIDE handler that detaches itself mid-call (UAF canary). */
+mixed on_miss_detach(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  hook_detach(id);
+  return 0;
+}
+
+void on_create(int id, object ob) {
+  create_log += ({ ob });
+}
+
+void on_destruct(int id, object ob, string cause) {
+  destruct_log += ({ ({ ob, cause }) });
+}
+
+nosave int clone_fn_hits = 0;
+
+mixed on_clone_fn(int id, object actor, object caller, object target, string fn, mixed *args) {
+  clone_fn_hits++;
+  return 0;
+}
+
+void do_tests() {
+  miss_log = ({});
+  create_log = ({});
+  destruct_log = ({});
+
+  int mid = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "miss-test", "priority": 0, "object": this_object() ]), HOOK_BEFORE);
+  int did = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "miss-decide", "object": this_object(), "function": "proxy_me" ]),
+    HOOK_DECIDE);
+  int cid = hook_attach("object:create", (: on_create :), ([ "label": "create-test" ]), 0);
+  int xid = hook_attach("object:destruct", (: on_destruct :), ([ "label": "destruct-test" ]), 0);
+  attached_ids = mid;
+
+  /* undefined miss */
+  mixed r = this_object()->no_such_function(1, 2);
+  ASSERT_EQ(undefinedp(r), 1);
+  ASSERT(sizeof(miss_log) >= 1);
+  ASSERT_EQ(miss_log[<1][2], "no_such_function");
+  ASSERT_EQ(miss_log[<1][3], "undefined");
+
+  /* private / protected miss (call_other from a different object) */
+  write_file("/data/hooks_priv.lpc",
+    "private void secret() {}\n"
+    "protected void gated() {}\n"
+    "void create() {}\n",
+    1);
+  object priv = load_object("/data/hooks_priv");
+  int pmid = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "miss-priv", "object": priv ]), HOOK_BEFORE);
+  r = priv->secret();
+  ASSERT_EQ(undefinedp(r), 1);
+  ASSERT_EQ(miss_log[<1][3], "private");
+  r = priv->gated();
+  ASSERT_EQ(undefinedp(r), 1);
+  ASSERT_EQ(miss_log[<1][3], "protected");
+  hook_detach(pmid);
+  destruct(priv);
+  rm("/data/hooks_priv.lpc");
+
+  /* DECIDE answer (0 args) */
+  r = this_object()->proxy_me();
+  ASSERT_EQ(r, "proxied");
+
+  /* DECIDE answer with args — apply_low pops them after dispatch */
+  int did_args = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "miss-decide-args", "object": this_object(), "function": "proxy_args" ]),
+    HOOK_DECIDE);
+  r = this_object()->proxy_args(7, "x");
+  ASSERT_EQ(r, ({ 7, "x" }));
+  /* no-answer DECIDE with args must not desync the stack either */
+  r = this_object()->still_missing(1, 2, 3);
+  ASSERT_EQ(undefinedp(r), 1);
+  hook_detach(did_args);
+
+  /* detach mid-DECIDE must not UAF / crash */
+  int did_die = hook_attach("call_other:miss", (: on_miss_detach :),
+    ([ "label": "miss-self-detach", "object": this_object() ]), HOOK_DECIDE);
+  r = this_object()->vanish_please(9);
+  ASSERT_EQ(undefinedp(r), 1);
+  ASSERT_EQ(sizeof(hook_query(did_die)), 0);
+
+  /* create / destruct */
+  object ob = new("/single/void");
+  ASSERT(sizeof(create_log) >= 1);
+  destruct(ob);
+  ASSERT(sizeof(destruct_log) >= 1);
+  ASSERT_EQ(destruct_log[<1][1], "efun");
+
+  /* master object pin matches clones; clone pin stays instance-exact */
+  write_file("/data/hooks_clone_pin.lpc",
+    "void create() {}\n"
+    "int ping() { return 1; }\n",
+    1);
+  object master = load_object("/data/hooks_clone_pin");
+  object c1 = new("/data/hooks_clone_pin");
+  object c2 = new("/data/hooks_clone_pin");
+  miss_log = ({});
+  int mpin = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "master-pin", "object": master ]), HOOK_BEFORE);
+  mixed mr = c1->no_such_on_clone();
+  ASSERT_EQ(undefinedp(mr), 1);
+  ASSERT(sizeof(miss_log) >= 1);
+  ASSERT_EQ(miss_log[<1][1], c1);
+  ASSERT_EQ(miss_log[<1][2], "no_such_on_clone");
+  /* function pin on master also covers clones */
+  clone_fn_hits = 0;
+  int fpin = hook_attach("function", (: on_clone_fn :),
+    ([ "label": "master-fn", "object": master, "function": "ping" ]),
+    HOOK_BEFORE);
+  ASSERT_EQ(c2->ping(), 1);
+  ASSERT_EQ(clone_fn_hits, 1);
+  hook_detach(fpin);
+  /* pinning one clone must not match a sibling */
+  miss_log = ({});
+  hook_detach(mpin);
+  int cpin = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "clone-pin", "object": c1 ]), HOOK_BEFORE);
+  c2->sibling_miss();
+  ASSERT_EQ(sizeof(miss_log), 0);
+  c1->only_me_miss();
+  ASSERT_EQ(sizeof(miss_log), 1);
+  ASSERT_EQ(miss_log[<1][1], c1);
+  hook_detach(cpin);
+  destruct(c1);
+  destruct(c2);
+  destruct(master);
+  rm("/data/hooks_clone_pin.lpc");
+
+  /* object/target name patterns: "*", "foo*", "foo/" — same matcher as efun */
+  write_file("/data/hooks_pat_a.lpc", "void create() {}\n", 1);
+  write_file("/data/hooks_pat_b.lpc", "void create() {}\n", 1);
+  object pa = load_object("/data/hooks_pat_a");
+  object pb = load_object("/data/hooks_pat_b");
+  miss_log = ({});
+  int pid_star = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "obj-star", "object": "data/hooks_pat*" ]), HOOK_BEFORE);
+  pa->miss_a();
+  pb->miss_b();
+  ASSERT_EQ(sizeof(miss_log), 2);
+  hook_detach(pid_star);
+  miss_log = ({});
+  int pid_exact = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "obj-exact", "object": "data/hooks_pat_a" ]), HOOK_BEFORE);
+  pa->miss_exact();
+  pb->miss_other();
+  ASSERT_EQ(sizeof(miss_log), 1);
+  ASSERT_EQ(miss_log[0][1], pa);
+  hook_detach(pid_exact);
+  miss_log = ({});
+  int pid_dir = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "obj-dir", "object": "data/" ]), HOOK_BEFORE);
+  pa->miss_dir();
+  ASSERT_EQ(sizeof(miss_log), 1);
+  hook_detach(pid_dir);
+  miss_log = ({});
+  int pid_any = hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "obj-any", "object": "*" ]), HOOK_BEFORE);
+  this_object()->pattern_any_miss();
+  ASSERT(sizeof(miss_log) >= 1);
+  hook_detach(pid_any);
+  mixed bad_star = catch(hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "bad", "object": "a*b" ]), HOOK_BEFORE));
+  ASSERT(bad_star);
+  mixed both = catch(hook_attach("call_other:miss", (: on_miss :),
+    ([ "label": "both", "object": "data/", "target": "data/" ]), HOOK_BEFORE));
+  ASSERT(both);
+  destruct(pa);
+  destruct(pb);
+  rm("/data/hooks_pat_a.lpc");
+  rm("/data/hooks_pat_b.lpc");
+
+  /* query / list / detach */
+  mapping q = hook_query(mid);
+  ASSERT_EQ(q["point"], "call_other:miss");
+  ASSERT_EQ(q["label"], "miss-test");
+  mapping *list = hook_list();
+  ASSERT(sizeof(list) >= 4);
+
+  hook_detach(mid);
+  hook_detach(did);
+  hook_detach(cid);
+  hook_detach(xid);
+
+  /* after detach, a miss is silent again */
+  int before = sizeof(miss_log);
+  this_object()->no_such_function();
+  ASSERT_EQ(sizeof(miss_log), before);
+}

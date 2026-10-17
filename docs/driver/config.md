@@ -197,6 +197,21 @@ they always match the options it actually recognizes.
 | `writable os environment variables` | string | — | Colon-separated allow-list of environment variable names that set_os_env() may modify "
      "(package_contrib); these are implicitly readable. Empty (the default) denies all writes. |
 
+### Hooks
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `hooks enabled` | int | 1 | Master switch for the hook_* efuns. 0 makes hook_attach() always fail — the "
+     "break-glass for a mud locked up by its own hooks. |
+| `hook eval cost` | int | 0 | Microseconds of handler time per evaluation that are not charged to the interrupted code. "
+     "Also the point at which a single runaway handler is aborted. 0 (the default) "
+     "uses the value of maximum evaluation cost. |
+| `hook max errors` | int | 10 | Errors (overruns included) before an attachment is detached. Never applied to "
+     "HOOK_FAIL_CLOSED attachments. |
+| `hook max attachments` | int | 10000 | Ceiling on live hook attachments. |
+| `hook max rows` | int | 10000 | Rows per count/time table; overflow is counted in dropped. |
+| `hook max deferred` | int | 1024 | Reserved for HOOK_DEFERRED (not yet implemented). Queued events per attachment. |
+
 ## Ports and Connections
 
 The listening ports are configured with numbered `external_port_N` entries

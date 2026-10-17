@@ -1,0 +1,239 @@
+#include <hooks.h>
+
+/* function / efun:* / HOOK_AROUND / apply:miss join points. */
+
+nosave mixed *fn_before_log = ({});
+nosave mixed *fn_after_log = ({});
+nosave mixed *efun_before_log = ({});
+nosave int around_hits = 0;
+
+int probe(int x) { return x + 1; }
+int answered() { return -1; } /* DECIDE should replace this */
+int blocked() { return -1; }
+
+mixed on_fn_before(int id, object actor, object caller, object target, string fn, mixed *args) {
+  fn_before_log += ({ ({ fn, args }) });
+  return 0;
+}
+
+mixed on_fn_decide(int id, object actor, object caller, object target, string fn, mixed *args) {
+  if (fn == "blocked") return "nope";
+  if (fn == "answered") return ({ 42 });
+  return 0;
+}
+
+mixed on_fn_after(int id, object actor, object caller, object target, string fn, mixed *args,
+  mixed result) {
+  fn_after_log += ({ ({ fn, result }) });
+  return 0;
+}
+
+mixed on_around(int id, object actor, object caller, object target, string fn, mixed *args) {
+  around_hits++;
+  mixed r = hook_proceed();
+  return r * 10;
+}
+
+mixed on_efun_before(int id, object actor, object caller, object target, string fn, mixed *args) {
+  efun_before_log += ({ fn });
+  return 0;
+}
+
+mixed on_efun_refuse(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return 1; /* refuse */
+}
+
+nosave int efun_after_hits = 0;
+
+mixed on_efun_after(int id, object actor, object caller, object target, string fn, mixed *args,
+  mixed result) {
+  efun_after_hits++;
+  return 0;
+}
+
+nosave mixed *apply_miss_log = ({});
+
+mixed on_apply_miss(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason, string origin) {
+  apply_miss_log += ({ ({ fn, reason, origin, args }) });
+  if (fn == "id" && sizeof(args) && args[0] == "hook-proxy") return ({ 1 });
+  return 0;
+}
+
+mixed on_call_other_cross(int id, object actor, object caller, object target, string fn,
+  mixed *args, string reason) {
+  apply_miss_log += ({ ({ "call_other", fn, reason }) });
+  return 0;
+}
+
+void do_tests() {
+  fn_before_log = ({});
+  fn_after_log = ({});
+  efun_before_log = ({});
+  around_hits = 0;
+
+  int bid = hook_attach("function", (: on_fn_before :),
+    ([ "label": "fn-before", "object": this_object(), "function": "probe" ]),
+    HOOK_BEFORE);
+  int did = hook_attach("function", (: on_fn_decide :),
+    ([ "label": "fn-decide", "object": this_object() ]), HOOK_DECIDE);
+  int aid = hook_attach("function", (: on_fn_after :),
+    ([ "label": "fn-after", "object": this_object(), "function": "probe" ]),
+    HOOK_AFTER);
+
+  ASSERT_EQ(probe(3), 4);
+  ASSERT(sizeof(fn_before_log) >= 1);
+  ASSERT_EQ(fn_before_log[<1][0], "probe");
+  ASSERT(sizeof(fn_after_log) >= 1);
+  ASSERT_EQ(fn_after_log[<1][1], 4);
+
+  /* DECIDE answer */
+  ASSERT_EQ(this_object()->answered(), 42);
+
+  /* DECIDE refuse */
+  mixed err = catch(this_object()->blocked());
+  ASSERT(err);
+
+  hook_detach(bid);
+  hook_detach(did);
+  hook_detach(aid);
+
+  /* AROUND + proceed */
+  int arid = hook_attach("function", (: on_around :),
+    ([ "label": "fn-around", "object": this_object(), "function": "probe" ]),
+    HOOK_AROUND);
+  ASSERT_EQ(probe(2), 30); /* (2+1)*10 */ ASSERT_EQ(around_hits, 1);
+  hook_detach(arid);
+
+  /* efun:sizeof BEFORE — use a runtime value so sizeof is not folded */
+  mixed arr = ({ 1, 2 });
+  int eid = hook_attach("efun:sizeof", (: on_efun_before :),
+    ([ "label": "efun-sz" ]), HOOK_BEFORE);
+  ASSERT_EQ(sizeof(arr), 2);
+  ASSERT(member_array("sizeof", efun_before_log) != -1);
+  hook_detach(eid);
+
+  /* efun name prefix pattern — same matcher as object/target strings */
+  efun_before_log = ({});
+  int eid_pat = hook_attach("efun:size*", (: on_efun_before :),
+    ([ "label": "efun-sz-pat" ]), HOOK_BEFORE);
+  ASSERT_EQ(sizeof(arr), 2);
+  ASSERT(member_array("sizeof", efun_before_log) != -1);
+  hook_detach(eid_pat);
+  /* alias prefix: clone* must match dispatch name _new */
+  efun_before_log = ({});
+  int eid_clone = hook_attach("efun:clone*", (: on_efun_before :),
+    ([ "label": "efun-clone-pat" ]), HOOK_BEFORE);
+  object cloned = new("/single/void");
+  ASSERT(objectp(cloned));
+  ASSERT(member_array("_new", efun_before_log) != -1);
+  hook_detach(eid_clone);
+  destruct(cloned);
+  mixed bad_efun = catch(hook_attach("efun:si*ze", (: on_efun_before :),
+    ([ "label": "efun-bad" ]), HOOK_BEFORE));
+  ASSERT(bad_efun);
+
+  /* efun AFTER must honor object filters (args are gone after the efun).
+   * Use a name pattern: a live object pin would auto-detach when destructed. */
+  efun_after_hits = 0;
+  object room = load_object("/single/void");
+  int eid_after = hook_attach("efun:all_inventory", (: on_efun_after :),
+    ([ "label": "efun-after-obj", "object": room ]), HOOK_AFTER);
+  all_inventory(room);
+  ASSERT_EQ(efun_after_hits, 1);
+  hook_detach(eid_after);
+
+  /* function name trailing '*' */
+  fn_before_log = ({});
+  int fid_pat = hook_attach("function", (: on_fn_before :),
+    ([ "label": "fn-pat", "object": this_object(), "function": "pro*" ]),
+    HOOK_BEFORE);
+  ASSERT_EQ(probe(1), 2);
+  ASSERT(sizeof(fn_before_log) >= 1);
+  ASSERT_EQ(fn_before_log[<1][0], "probe");
+  hook_detach(fid_pat);
+
+  /* efun DECIDE refuse → 0 */
+  arr = ({ 1, 2, 3 });
+  int rid = hook_attach("efun:sizeof", (: on_efun_refuse :),
+    ([ "label": "efun-refuse" ]), HOOK_DECIDE);
+  ASSERT_EQ(sizeof(arr), 0);
+  hook_detach(rid);
+
+  /* net:* attach/detach (dispatch needs a real connection; pin the API) */
+  int nid = hook_attach("net:accept",
+    function(int id, string addr) { return 0; },
+    ([ "label": "net-accept" ]), HOOK_BEFORE);
+  mapping nq = hook_query(nid);
+  ASSERT_EQ(nq["point"], "net:accept");
+  hook_detach(nid);
+
+  /* miss/function: require object|target; no AROUND/FAIL_CLOSED on miss */
+  mixed around_miss = catch(hook_attach("call_other:miss", (: on_call_other_cross :),
+    ([ "label": "around-no", "object": this_object() ]), HOOK_AROUND));
+  ASSERT(around_miss);
+  mixed failc = catch(hook_attach("call_other:miss", (: on_call_other_cross :),
+    ([ "label": "failc-no", "object": this_object() ]),
+    HOOK_DECIDE | HOOK_FAIL_CLOSED));
+  ASSERT(failc);
+  mixed count_decide = catch(hook_attach("call_other:miss", "count",
+    ([ "label": "count-decide", "object": this_object() ]), HOOK_DECIDE));
+  ASSERT(count_decide);
+  mixed bare_co = catch(hook_attach("call_other:miss", (: on_call_other_cross :),
+    ([ "label": "co-bare", "function": "x" ]), HOOK_BEFORE));
+  ASSERT(bare_co);
+  mixed bare_fn = catch(hook_attach("function", (: on_fn_before :),
+    ([ "label": "fn-bare", "function": "probe" ]), HOOK_BEFORE));
+  ASSERT(bare_fn);
+
+#ifndef __NO_ENVIRONMENT__
+  /* apply:miss — requires object/target; driver present()/id(); vs call_other */
+  apply_miss_log = ({});
+  mixed bare = catch(hook_attach("apply:miss", (: on_apply_miss :),
+    ([ "label": "apply-bare", "function": "id" ]), HOOK_BEFORE));
+  ASSERT(bare);
+  mixed failc_apply = catch(hook_attach("apply:miss", (: on_apply_miss :),
+    ([ "label": "failc-apply", "object": this_object() ]),
+    HOOK_DECIDE | HOOK_FAIL_CLOSED));
+  ASSERT(failc_apply);
+
+  write_file("/data/hooks_apply_kid.lpc",
+    "void move(object dest) { move_object(dest); }\n", 1);
+  object kid = load_object("/data/hooks_apply_kid");
+  kid->move(this_object());
+
+  int amid = hook_attach("apply:miss", (: on_apply_miss :),
+    ([ "label": "apply-miss", "object": kid, "function": "id" ]), HOOK_BEFORE);
+  int amid_d = hook_attach("apply:miss", (: on_apply_miss :),
+    ([ "label": "apply-miss-decide", "object": kid, "function": "id",
+      "origin": "driver" ]),
+    HOOK_DECIDE);
+  int coid = hook_attach("call_other:miss", (: on_call_other_cross :),
+    ([ "label": "cross-check", "object": this_object() ]), HOOK_BEFORE);
+
+  /* silent driver apply of missing id() */
+  ASSERT_EQ(present("nope", this_object()), 0);
+  ASSERT(sizeof(apply_miss_log) >= 1);
+  ASSERT_EQ(apply_miss_log[<1][0], "id");
+  ASSERT_EQ(apply_miss_log[<1][1], "undefined");
+  ASSERT_EQ(apply_miss_log[<1][2], "driver");
+
+  /* DECIDE answers the apply — present finds the object */
+  apply_miss_log = ({});
+  ASSERT_EQ(present("hook-proxy", this_object()), kid);
+
+  /* call_other miss must not raise apply:miss */
+  int before = sizeof(apply_miss_log);
+  this_object()->definitely_missing_xyz();
+  ASSERT(sizeof(apply_miss_log) > before);
+  ASSERT_EQ(apply_miss_log[<1][0], "call_other");
+
+  mapping aq = hook_query(amid);
+  ASSERT_EQ(aq["point"], "apply:miss");
+  hook_detach(amid);
+  hook_detach(amid_d);
+  hook_detach(coid);
+  destruct(kid);
+  rm("/data/hooks_apply_kid.lpc");
+#endif
+}

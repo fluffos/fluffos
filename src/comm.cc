@@ -28,6 +28,7 @@
 #include "net/transport.h"
 #include "user.h"
 #include "vm/vm.h"
+#include "vm/internal/hooks.h"
 
 #include "packages/core/add_action.h"  // FIXME?
 #include "packages/core/dns.h"         // FIXME?
@@ -215,6 +216,10 @@ void add_message(object_t* who, const char* data, int len) {
     return;
   }
 
+  if ((g_hook_mask & HOOK_MASK_NET_WRITE) && !hook_dispatch_net_write(who, data, len)) {
+    return; /* DECIDE refuse drops the payload */
+  }
+
   inet_packets++;
 
   auto* ip = who->interactive;
@@ -242,6 +247,13 @@ void add_message(object_t* who, const char* data, int len) {
       ip->transport->write(data, len);
       break;
     }
+  }
+
+  /* AFTER observes the payload once it has been handed to telnet/transport.
+   * This is not a socket-completion callback — buffered/async transports may
+   * still be draining — but it is past the driver's write handoff. */
+  if (g_hook_mask & HOOK_MASK_NET_WRITE) {
+    hook_dispatch_net_write_after(who, data, len);
   }
 
 #ifdef SHADOW_CATCH_MESSAGE
@@ -405,6 +417,12 @@ static const int ANSI_SUBSTITUTE = 0x20;
 // client will actually send entire line. In ascii mode, we will get an single char input
 // each time.
 void on_user_input(interactive_t* ip, const char* data, size_t len) {
+  if (g_hook_mask & HOOK_MASK_NET_READ) {
+    object_t* user_ob = ip && ip->ob && !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
+    if (!hook_dispatch_net_read(user_ob, data, static_cast<int>(len))) {
+      return; /* DECIDE refuse drops the input */
+    }
+  }
   for (int i = 0; i < len; i++) {
     if (ip->text_end == sizeof(ip->text) - 1) {
       // No more space

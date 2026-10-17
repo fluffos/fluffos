@@ -3,8 +3,13 @@
 #define ARRAY_TESTS
 #define MAPPING_TESTS
 #define ASYNC_TESTS
+#define HOOK_TESTS
 
 inherit "/single/inh";
+
+#ifdef HOOK_TESTS
+#include <hooks.h>
+#endif
 
 int time;
 int save;
@@ -21,6 +26,22 @@ create() {
 }
 
 void lfun0() {}
+
+#ifdef HOOK_TESTS
+/* Empty handlers — measure dispatch + alt-stack call overhead only. */
+mixed hook_bench_fn(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return 0;
+}
+mixed hook_bench_miss(int id, object actor, object caller, object target, string fn, mixed *args,
+  string reason) {
+  return 0;
+}
+mixed hook_bench_apply_miss(int id, object actor, object caller, object target, string fn,
+  mixed *args, string reason, string origin) {
+  return 0;
+}
+
+#endif
 
 #ifdef ASYNC_TESTS
 // Async/promise cost model (issue #1319). Per await: one promise_t, its
@@ -305,6 +326,9 @@ private void a_phase(int phase) {
 #endif
 
 private int sync_main();
+#ifdef HOOK_TESTS
+private int hooks_main();
+#endif
 
 int main(string arg) {
 #ifdef ASYNC_TESTS
@@ -318,8 +342,104 @@ int main(string arg) {
     return 1;
   }
 #endif
+#ifdef HOOK_TESTS
+  if (arg == "hooks") {
+    return hooks_main();
+  }
+#endif
   return sync_main();
 }
+
+#ifdef HOOK_TESTS
+// -fspeed:hooks — join-point cost vs the idle (mask-zero) baseline.
+//
+// Measured (RelWithDebInfo, x86-64, three runs):
+//
+//   call_other hit, idle              ~67 ns
+//   call_other miss, idle             ~52 ns   (mask clear)
+//   call_other hit + function BEFORE ~300 ns   (empty LPC handler)
+//   call_other miss + count           ~73 ns   (+~20 ns C bump)
+//   call_other miss + LPC BEFORE     ~270 ns
+//   present/id miss, idle             ~65 ns
+//   apply:miss pin + count           ~100 ns
+//   apply:miss index skip             ~67 ns   (≈ idle; exact-object reject)
+//   apply:miss pin + LPC             ~340 ns
+//
+// Takeaways: idle paths stay at baseline; count is cheap; LPC BEFORE is the
+// real cost; exact-object pin index (call_other:miss / apply:miss / function)
+// keeps unrelated targets near idle. Miss points answer via DECIDE — no
+// hook_proceed. All three points require object|target at attach.
+//
+private int hooks_main() {
+  int before, after, i, time;
+  int id;
+  object kid, other;
+
+  write(__VERSION__ + "\n");
+  out("\n--- hooks microbenchmark ---\n");
+
+  /* Baselines with nothing attached (g_hook_mask == 0). */
+  TIME("call_other hit, idle", 100000, this_object()->lfun0());
+  TIME("call_other miss, idle", 100000, this_object()->doesnt_exist());
+
+  id = hook_attach("function", (: hook_bench_fn :),
+    ([ "label": "bench-fn", "function": "lfun0", "object": this_object() ]),
+    HOOK_BEFORE);
+  TIME("call_other hit + fn BEFORE", 100000, this_object()->lfun0());
+  hook_detach(id);
+
+  id = hook_attach("call_other:miss", "count",
+    ([ "label": "bench-miss-count", "object": this_object() ]), HOOK_BEFORE);
+  TIME("call_other miss + count", 100000, this_object()->doesnt_exist());
+  hook_detach(id);
+
+  id = hook_attach("call_other:miss", (: hook_bench_miss :),
+    ([ "label": "bench-miss-lpc", "object": this_object() ]), HOOK_BEFORE);
+  TIME("call_other miss + LPC BEFORE", 100000, this_object()->doesnt_exist());
+  hook_detach(id);
+
+#ifndef __NO_ENVIRONMENT__
+  write_file("/data/hooks_bench_kid.lpc",
+    "void move(object dest) { move_object(dest); }\n", 1);
+  write_file("/data/hooks_bench_other.lpc",
+    "void move(object dest) { move_object(dest); }\n", 1);
+  kid = load_object("/data/hooks_bench_kid");
+  other = load_object("/data/hooks_bench_other");
+  kid->move(this_object());
+  /* `other` stays out of inventory so present() only applies id on kid. */
+
+  TIME("present/id miss, idle", 20000, present("no-id", this_object()));
+
+  id = hook_attach("apply:miss", "count",
+    ([ "label": "bench-apply-count", "object": kid, "function": "id" ]),
+    HOOK_BEFORE);
+  TIME("apply:miss pin + count", 20000, present("no-id", this_object()));
+  hook_detach(id);
+
+  /* Exact-object index: pin on a different object → dispatch returns before
+   * walking handlers. Should be near the idle present/id cost. */
+  id = hook_attach("apply:miss", "count",
+    ([ "label": "bench-apply-skip", "object": other, "function": "id" ]),
+    HOOK_BEFORE);
+  TIME("apply:miss index skip", 20000, present("no-id", this_object()));
+  hook_detach(id);
+
+  id = hook_attach("apply:miss", (: hook_bench_apply_miss :),
+    ([ "label": "bench-apply-lpc", "object": kid, "function": "id" ]),
+    HOOK_BEFORE);
+  TIME("apply:miss pin + LPC", 20000, present("no-id", this_object()));
+  hook_detach(id);
+
+  destruct(kid);
+  destruct(other);
+  rm("/data/hooks_bench_kid.lpc");
+  rm("/data/hooks_bench_other.lpc");
+#endif
+
+  out("\n");
+  return 1;
+}
+#endif
 
 private int sync_main() {
   int before, after;

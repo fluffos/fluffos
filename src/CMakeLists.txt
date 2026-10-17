@@ -632,6 +632,7 @@ set(SRC
   "vm/internal/base/promise.cc"
   "vm/internal/base/svalue.cc"
   "vm/internal/apply.cc"
+  "vm/internal/hooks.cc"
   "vm/internal/eval_limit.cc"
   "vm/internal/posix_timers.cc"
   "vm/internal/master.cc"
