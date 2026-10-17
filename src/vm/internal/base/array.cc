@@ -605,8 +605,9 @@ void filter_array(svalue_t* arg, int num_arg) {
     svalue_t* v;
     int res = 0, cnt;
     function_to_call_t ftc;
-
-    process_efun_callback(1, &ftc, F_FILTER, num_arg);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_FILTER);
+    frame.done();
 
     /* allocate a full size array and push it onto the stack so that if an
      * error occurs, it'll get cleaned up.  can't use empty array because
@@ -652,7 +653,11 @@ void filter_string(svalue_t* arg, int num_arg) {
     size = SVALUE_STRLEN(arg);
     str = const_cast<char*>(arg->u.string);
 
-    process_efun_callback(1, &ftc, F_FILTER, num_arg);
+    {
+      LPCFrame frame = LPCFrame::args(num_arg);
+      frame.process_callback(1, &ftc, F_FILTER);
+      frame.done();
+    }
 
     for (cnt = 0; cnt < size; cnt++) {
       push_number(str[cnt]);
@@ -1017,7 +1022,11 @@ void map_array(svalue_t* arg, int num_arg) {
     int cnt;
     svalue_t* v;
 
-    process_efun_callback(1, &ftc, F_MAP, num_arg);
+    {
+      LPCFrame frame = LPCFrame::args(num_arg);
+      frame.process_callback(1, &ftc, F_MAP);
+      frame.done();
+    }
 
     r = int_allocate_array(size);
 
@@ -1227,7 +1236,11 @@ void f_sort_array(int num_arg) {
 
       old_ptr = sort_array_ftc;
       sort_array_ftc = &ftc;
-      process_efun_callback(1, &ftc, F_SORT_ARRAY, num_arg);
+      {
+        LPCFrame frame = LPCFrame::args(num_arg);
+        frame.process_callback(1, &ftc, F_SORT_ARRAY);
+        frame.done();
+      }
 
       tmp = copy_array(tmp);
       push_refed_array(tmp);

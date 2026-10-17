@@ -190,6 +190,9 @@ LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
  * on that path too -- a bare `svalue_t lvslot = *sp--` leaked every
  * T_LVALUE_CODEPOINT / T_LVALUE_RANGE that hit error() before the
  * matching free_svalue (issue #1358). */
+/* Value-stack window API (include before PoppedLvalue; see lpc_frame.h). */
+#include "vm/internal/base/lpc_frame.h"
+
 class PoppedLvalue {
  public:
   enum Mode { Pop, Steal };
@@ -236,8 +239,11 @@ void push_indexed_lvalue(int);
 void setup_variables(int, int, int);
 
 /* argc is this efun's arity — never read a global; nested LPC clobbers any
- * bare arity scratch (AGENTS.md §13.16). */
+ * bare arity scratch (AGENTS.md §13.16). Prefer the LPCFrame overload. */
 void process_efun_callback(int narg, function_to_call_t* ftc, int f, int argc);
+inline void process_efun_callback(LPCFrame& frame, int narg, function_to_call_t* ftc, int f) {
+  frame.process_callback(narg, ftc, f);
+}
 svalue_t* call_efun_callback(function_to_call_t*, int);
 svalue_t* safe_call_efun_callback(function_to_call_t*, int);
 const char* type_name(int c);

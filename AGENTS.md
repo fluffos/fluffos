@@ -40,15 +40,22 @@ When creating or modifying packages (efuns) under `src/packages/`, you must foll
   The `make_func` parser compiler compiles these specs into C++ glue code (`efuns.autogen.cc`).
 
 ### VM Stack & Argument Unpacking
-LPC arguments and return values are passed on the VM evaluation stack using `svalue_t` structures. The stack pointer is `sp`.
+LPC arguments and return values are passed on the VM evaluation stack using `svalue_t` structures. The stack pointer is `sp`. Prefer **`LPCFrame`** (`vm/internal/base/lpc_frame.h`) for new efun and driver call-site code so you do not do raw `sp` arithmetic.
 
-#### Navigating the Stack:
+#### LPCFrame (preferred for efuns / applies)
+* `LPCFrame::args(num_arg)` — efun entry window over already-pushed args; use `f[i]` / `f.number(i)` / `f.string(i)` / `f.as_real(i)`, then `f.ret(...)` / `f.ret_void()` / `f.done()` (in-place).
+* `LPCFrame::builder()` — push args with `f.push(...)` / `f.push_str_malloced(...)`, then `f.apply(...)` or `f.safe_apply(...)`.
+* `f.process_callback(narg, &ftc, F_FOO)` — trailing callback scan (replaces `process_efun_callback(..., num_arg)`).
+* `LPC_EFUN_UNARY_REAL(name, expr)` — Tier-C macro for fixed unary float efuns (see `packages/math/math.cc`).
+* Opcodes in `interpret.cc` / `ops.cc` keep raw `sp`; that is intentional.
+
+#### Navigating the Stack (low-level / legacy):
 * The last argument is at `sp`. The first argument is at `sp - (num_args - 1)`.
-* Every efun is `void f_name(int num_arg)` — arity is a **parameter**, not a global. Use `num_arg` and `svalue_t* arg = sp - num_arg + 1`. There is no `st_num_arg` (it was removed so nested LPC cannot clobber arity).
-* Helpers that locate optional trailing callbacks take arity explicitly: `process_efun_callback(narg, &ftc, F_FOO, num_arg)`.
+* Every efun is `void f_name(int num_arg)` — arity is a **parameter**, not a global. There is no `st_num_arg`.
+* Helpers that locate optional trailing callbacks take arity explicitly: `process_efun_callback(narg, &ftc, F_FOO, num_arg)` or via `LPCFrame`.
 * Direct efun-to-efun calls must pass arity: `f_other(num_arg)` or `f_other(3)`.
 
-#### Accessing Arguments:
+#### Accessing Arguments (low-level):
 * `sp->u.number` or `(sp - n)->u.number`: Accessing integer values.
 * `sp->u.string` or `(sp - n)->u.string`: Accessing string values.
 * `sp->u.real` or `(sp - n)->u.real`: Accessing float/real values.
@@ -56,7 +63,7 @@ LPC arguments and return values are passed on the VM evaluation stack using `sva
 * `sp->u.map`: Accessing mappings (`mapping_t *`).
 * `sp->u.buf`: Accessing buffers (`buffer_t *`).
 
-#### Modifying the Stack & Returning Values:
+#### Modifying the Stack & Returning Values (low-level):
 * Use `pop_stack()` or `pop_n_elems(n)` to clean up input arguments.
 * Push return values to the stack:
   - `push_number(val)` / `push_real(val)`

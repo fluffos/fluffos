@@ -1262,8 +1262,9 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     return nullptr;
   }
   if (ob->super) {
-    push_svalue(v);
-    ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
+    LPCFrame call = LPCFrame::builder();
+    call.push(v);
+    ret = call.apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
     /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
        sets ob->super to nullptr (destruct_object), or destruct the
        environment. */
@@ -1311,9 +1312,10 @@ static object_t* object_present2(const char* str, object_t* ob) {
     char* str_to_push = new_string(namelen, "object_present2");
     memcpy(str_to_push, name, namelen);
     str_to_push[namelen] = 0;
-    push_malloced_string(str_to_push);
+    LPCFrame call = LPCFrame::builder();
+    call.push_str_malloced(str_to_push);
 
-    ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
+    ret = call.apply(APPLY_ID, ob, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }

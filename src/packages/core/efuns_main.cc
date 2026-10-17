@@ -359,18 +359,22 @@ void f_call_stack(int num_arg) {
 
 #ifdef F_CAPITALIZE
 void f_capitalize(int num_arg) {
-  if (uislower(sp->u.string[0])) {
-    unlink_string_svalue(sp);
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (uislower(f.top().u.string[0])) {
+    unlink_string_svalue(&f.top());
     // unlinked, so this is ok
-    (const_cast<char*>(sp->u.string))[0] = toupper(static_cast<unsigned char>(sp->u.string[0]));
+    (const_cast<char*>(f.top().u.string))[0] =
+        toupper(static_cast<unsigned char>(f.top().u.string[0]));
   }
+  f.done();
 }
 #endif
 
 #ifdef F_CHILDREN
 void f_children(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
-  auto v = ObjectTable::instance().children(sp->u.string);
+  auto v = ObjectTable::instance().children(f.string(0));
   auto len = v.size() < max_array_size ? v.size() : max_array_size;
   auto* res = allocate_empty_array(len);
 
@@ -379,20 +383,23 @@ void f_children(int num_arg) {
     res->item[i].type = T_OBJECT;
     add_ref(v[i], "children");
   }
-  free_string_svalue(sp);
+  free_string_svalue(&f.top());
   put_array(res);
+  f.done();
 }
 #endif
 
 #ifdef F_CLASSP
 void f_classp(int num_arg) {
-  if (sp->type == T_CLASS) {
-    free_class(sp->u.arr);
-    *sp = const1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.top().type == T_CLASS) {
+    free_class(f.top().u.arr);
+    f.top() = const1;
   } else {
-    free_svalue(sp, "f_classp");
-    *sp = const0;
+    free_svalue(&f.top(), "f_classp");
+    f.top() = const0;
   }
+  f.done();
 }
 #endif
 
