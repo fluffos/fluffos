@@ -4,8 +4,8 @@
 extern object_t* find_living_object(const char*, int);
 
 /* Hideous mangling of C code by Taffyd. */
-void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int quiet, int dark,
-                          int num_arg) {
+void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_dollars, int quiet,
+                          int dark) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char m[] = "$M$";
   char s[] = "_short";
@@ -31,8 +31,7 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
   if (!size) {
     str = new_string(0, "f_query_multiple_short");
     str[0] = '\0';
-    pop_n_elems(num_arg);
-    push_malloced_string(str);
+    f.ret_str_malloced(str);
     return;
   }
 
@@ -53,8 +52,7 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
     v = apply("check_dark", command_giver, 1, ORIGIN_EFUN);
 
     if (v && v->type == T_NUMBER && v->u.number) {
-      pop_n_elems(num_arg);
-      copy_and_push_string("some objects you cannot make out");
+      f.ret_str_copy("some objects you cannot make out");
       return;
     }
   }
@@ -116,8 +114,7 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
     FREE_MSTR(str);
     FREE_MSTR(fun);
 
-    pop_n_elems(num_arg);
-    push_malloced_string(res);
+    f.ret_str_malloced(res);
     return;
   }
 
@@ -198,11 +195,13 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
       v = apply("convert_message", command_giver, 1, ORIGIN_EFUN);
 
       if (v && v->type == T_STRING) {
-        pop_n_elems(num_arg);
-        share_and_push_string(v->u.string);
+        svalue_t out;
+        out.type = T_STRING;
+        out.subtype = STRING_SHARED;
+        out.u.string = make_shared_string(v->u.string);
+        f.ret(out);
       } else {
-        pop_n_elems(num_arg);
-        push_undefined();
+        f.ret_undefined();
       }
 
     } else {
@@ -216,54 +215,57 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
 
         /* Return the result! */
         if (v && v->type == T_STRING) {
-          pop_n_elems(num_arg);
-          share_and_push_string(v->u.string);
+          svalue_t out;
+          out.type = T_STRING;
+          out.subtype = STRING_SHARED;
+          out.u.string = make_shared_string(v->u.string);
+          f.ret(out);
         } else {
-          pop_n_elems(num_arg);
-          push_undefined();
+          f.ret_undefined();
         }
       } else {
-        pop_n_elems(num_arg);
-        push_undefined();
+        /* res was never pushed / handed off -- free it. */
+        FREE_MSTR(res);
+        f.ret_undefined();
       }
     }
 
   } else {
-    pop_n_elems(num_arg);
-    push_malloced_string(res);
+    f.ret_str_malloced(res);
   }
 } /* query_multiple_short() */
 
 void f_query_multiple_short(int num_arg) {
-  svalue_t* sv = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* sv = f.argp(0);
   const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
   if (num_arg > 4) {
-    if (sv[4].type == T_NUMBER) {
-      dark = sv[4].u.number;
+    if (f.type(4) == T_NUMBER) {
+      dark = f.number(4);
     }
   }
 
   if (num_arg > 3) {
-    if (sv[3].type == T_NUMBER) {
-      quiet = sv[3].u.number;
+    if (f.type(3) == T_NUMBER) {
+      quiet = f.number(3);
     }
   }
 
   if (num_arg > 2) {
-    if (sv[2].type == T_NUMBER) {
-      no_dollars = sv[2].u.number;
+    if (f.type(2) == T_NUMBER) {
+      no_dollars = f.number(2);
     }
   }
 
   if (num_arg >= 2) {
-    if (sv[1].type == T_STRING) {
-      type = sv[1].u.string;
+    if (f.type(1) == T_STRING) {
+      type = f.string(1);
     }
   }
 
-  query_multiple_short(sv, type, no_dollars, quiet, dark, num_arg);
+  query_multiple_short(f, sv, type, no_dollars, quiet, dark);
 }
 
 /* Hideous mangling of C code by Taffyd. */
@@ -444,67 +446,66 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
 }
 
 void f_reference_allowed(int num_arg) {
-  svalue_t* sv = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* referee = nullptr;
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
   int result = 0;
-  /* Maybe I could learn how to use this :p
-   CHECK_TYPES(vm_sp()-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
 
   if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
     referrer_obj = nullptr;
   }
 
-  if (sv->type == T_OBJECT && sv->u.ob) {
-    referee = sv->u.ob;
+  if (f.type(0) == T_OBJECT && f.object(0)) {
+    referee = f.object(0);
   }
 
   if (num_arg > 1) {
-    if (sv[1].type == T_STRING && sv[1].u.string) {
+    if (f.type(1) == T_STRING && f.string(1)) {
 /* We've been passed in a string, now we need to call
  * find_player() */
 #ifdef F_FIND_PLAYER
       /* If we have a find_player() efun, then we need to sue
        * the following method.  This hasn't been tested!
        */
-      referrer_obj = find_living_object(sv[1].u.string, 1);
+      referrer_obj = find_living_object(f.string(1), 1);
 #else
       if (simul_efun_ob) {
         svalue_t* v;
-        push_svalue(&sv[1]);
-        v = apply("find_player", simul_efun_ob, 1, ORIGIN_EFUN);
+        {
+          LPCFrame b = LPCFrame::builder();
+          b.push(f.argp(1));
+          v = b.apply("find_player", simul_efun_ob, ORIGIN_EFUN);
+        }
 
         if (v && v->type == T_OBJECT) {
           referrer_obj = v->u.ob;
-          referrer_name = sv[1].u.string;
+          referrer_name = f.string(1);
         } else {
           referrer_obj = NULL;
-          referrer_name = sv[1].u.string;
+          referrer_name = f.string(1);
         }
       }
 #endif
     }
-    if (sv[1].type == T_OBJECT && sv[1].u.ob) {
-      referrer_obj = sv[1].u.ob;
+    if (f.type(1) == T_OBJECT && f.object(1)) {
+      referrer_obj = f.object(1);
       referrer_name = nullptr;
     }
   }
 
   if (referee && (referrer_obj || referrer_name)) {
     result = reference_allowed(referee, referrer_obj, referrer_name);
-
-    pop_n_elems(num_arg);
-    push_number(result);
+    f.ret(result);
   } else {
-    pop_n_elems(num_arg);
-    push_undefined();
+    f.ret_undefined();
   }
 }
 
 void f_add_a(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  const char* str = vm_sp()->u.string;
+  const char* str = f.string(0);
   char* ret;
   char* p;
   char first;
@@ -517,14 +518,14 @@ void f_add_a(int num_arg) {
 
   // If *str is 0, it was only spaces.  Return "a ".
   if (*str == 0) {
-    pop_stack();
-    copy_and_push_string("a ");
+    f.ret_str_copy("a ");
     return;
   }
 
   len = strlen(str);
   // Don't add anything if it already begins with a or an.
   if (!strncasecmp(str, "a ", 2) || !strncasecmp(str, "an ", 3)) {
+    f.done();
     return;
   }
 
@@ -563,7 +564,6 @@ void f_add_a(int num_arg) {
 
   if (an) {  // Add an.
     if (len + 3 > max_string_length) {
-      free_string_svalue(vm_sp());
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 3, "f_add_a");
@@ -571,7 +571,6 @@ void f_add_a(int num_arg) {
     p = ret + 3;
   } else {  // Add a.
     if (len + 2 > max_string_length) {
-      free_string_svalue(vm_sp());
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 2, "f_add_a");
@@ -581,44 +580,49 @@ void f_add_a(int num_arg) {
 
   // Add the rest of the string.
   memcpy(p, str, len + 1);  // + 1: get the \0.
-  free_string_svalue(vm_sp());
-  vm_sp()->type = T_STRING;
-  vm_sp()->subtype = STRING_MALLOC;
-  vm_sp()->u.string = ret;
+  f.ret_str_malloced(ret);
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
 void f_vowel(int num_arg) {
-  char const v = (char)vm_sp()->u.number;
+  LPCFrame f = LPCFrame::args(num_arg);
+  char const v = (char)f.number(0);
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
       v == 'I' || v == 'O' || v == 'U') {
-    vm_sp()->u.number = 1;
+    f.set_top_number(1);
   } else {
-    vm_sp()->u.number = 0;
+    f.set_top_number(0);
   }
+  f.done();
 }
 
 void f_replace(int num_arg) {
-  svalue_t* arg2 = vm_sp() - num_arg + 2;
-  if (arg2->type == T_STRING && num_arg == 3) {
-    return f_replace_string(num_arg);
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.type(1) == T_STRING && num_arg == 3) {
+    f.done();
+    f_replace_string(num_arg);
+    return;
   }
-  if (num_arg == 2 && arg2->type != T_STRING) {
-    array_t* arr = arg2->u.arr;
-    int i = 0;
+  if (num_arg == 2 && f.type(1) != T_STRING) {
+    svalue_t arr_sv = f.steal(1);
+    array_t* arr = arr_sv.u.arr;
     if (arr->size & 1) {
+      free_array(arr);
       error("Wrong array size for replace.\n");
     }
-    vm_sp()--;
+    f.pop_back(1);
+    f.done();
 
-    for (i = 0; i < arr->size; i += 2) {
+    for (int i = 0; i < arr->size; i += 2) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
         share_and_push_string(arr->item[i].u.string);
         share_and_push_string(arr->item[i + 1].u.string);
-        num_arg = 3;
-        f_replace_string(num_arg);
-        if (vm_sp()->type != T_STRING) {
+        f_replace_string(3);
+        LPCFrame r = LPCFrame::args(1);
+        int ok = (r.type(0) == T_STRING);
+        r.done();
+        if (!ok) {
           break;
         }
       }
@@ -630,10 +634,11 @@ void f_replace(int num_arg) {
 }
 
 void replace_mxp_html(int html, int mxp) {
+  LPCFrame f = LPCFrame::args(1);
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
-  const char* src = vm_sp()->u.string;
+  const char* src = f.string(0);
   char* dst2 = dst;
   while (*src && dst2 - dst < max_string_length) {
     switch (*src) {
@@ -669,9 +674,8 @@ void replace_mxp_html(int html, int mxp) {
     }
     src++;
   }
-  pop_stack();
   *dst2 = 0;
-  push_malloced_string(extend_string(dst, dst2 - dst));
+  f.ret_str_malloced(extend_string(dst, dst2 - dst));
 }
 
 void f_replace_html(int num_arg) { replace_mxp_html(1, 0); }
@@ -679,8 +683,9 @@ void f_replace_html(int num_arg) { replace_mxp_html(1, 0); }
 void f_replace_mxp(int num_arg) { replace_mxp_html(0, 1); }
 
 void f_roulette_wheel(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   long num;
-  mapping_t* m = vm_sp()->u.map;
+  mapping_t* m = f.mapping(0);
   int j, found;
   mapping_node_t *elt, **a = m->table;
   svalue_t* val;
@@ -725,8 +730,7 @@ void f_roulette_wheel(int num_arg) {
   }
 
   // val points to the value that tipped the scale.  val - 1 is the key.
-  assign_svalue_no_free(vm_sp(), val - 1);
-  free_mapping(m);
+  f.ret_copy(val - 1);
 }
 
 // Appends up to (bufsize - 1 - *len) bytes of `text` to buf[*len..], always
@@ -756,8 +760,10 @@ svalue_t* replace_objects(svalue_t* thing) {
       append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
       svalue_t* tmp = nullptr;
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
-        push_object(thing->u.ob);
+        LPCFrame b = LPCFrame::builder();
+        b.push(thing->u.ob);
         tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
+        b.done();
       } else {
         append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
       }
@@ -766,40 +772,48 @@ svalue_t* replace_objects(svalue_t* thing) {
         append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp));
         append_bounded(buf, sizeof(buf), &len, "\")", 2);
       }
-      copy_and_push_string(buf);
-      assign_svalue(&replace_tmp, vm_sp());
-      pop_stack();
+      {
+        LPCFrame b = LPCFrame::builder();
+        b.push_str_copy(buf);
+        assign_svalue(&replace_tmp, &b.top());
+        b.discard_to();
+      }
       return &replace_tmp;
     }
     case T_ARRAY:
     case T_CLASS: {
       array_t* ar = thing->u.arr;
       array_t* nar = allocate_array(ar->size);
-      push_refed_array(nar);
+      LPCFrame b = LPCFrame::builder();
+      b.push_refed(nar);
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
       }
-      assign_svalue(&replace_tmp, vm_sp());
-      pop_stack();
+      assign_svalue(&replace_tmp, &b.top());
+      b.discard_to();
       replace_tmp.type = thing->type;
       return &replace_tmp;
     }
-    case T_MAPPING:
-      push_refed_array(mapping_indices(thing->u.map));
-      push_refed_mapping(allocate_mapping(thing->u.map->table_size));
-      push_number(0);
-      for (i = 0; i < (vm_sp() - 2)->u.arr->size; i++) {
-        svalue_t* key = vm_sp();
-        svalue_t* tmp = find_in_mapping(thing->u.map, (vm_sp() - 2)->u.arr->item[i]);
-        assign_svalue(key, replace_objects(&(vm_sp() - 2)->u.arr->item[i]));
-        assign_svalue_no_free(find_for_insert((vm_sp() - 1)->u.map, key, 1), replace_objects(tmp));
-        if ((vm_sp() - 1)->u.map->count - i != 1) {
+    case T_MAPPING: {
+      LPCFrame b = LPCFrame::builder();
+      b.push_refed(mapping_indices(thing->u.map));
+      b.push_refed(allocate_mapping(thing->u.map->table_size));
+      b.push(static_cast<LPC_INT>(0));
+      array_t* keys = b.array(0);
+      mapping_t* out = b.mapping(1);
+      for (i = 0; i < keys->size; i++) {
+        svalue_t* key = b.argp(2);
+        svalue_t* tmp = find_in_mapping(thing->u.map, keys->item[i]);
+        assign_svalue(key, replace_objects(&keys->item[i]));
+        assign_svalue_no_free(find_for_insert(out, key, 1), replace_objects(tmp));
+        if (out->count - i != 1) {
           printf("guilty party:%s\n", key->u.string);
         }
       }
-      assign_svalue(&replace_tmp, vm_sp() - 1);
-      pop_3_elems();
+      assign_svalue(&replace_tmp, b.argp(1));
+      b.discard_to();
       return &replace_tmp;
+    }
     default:
       assign_svalue(&replace_tmp, thing);
       return &replace_tmp;
@@ -807,27 +821,31 @@ svalue_t* replace_objects(svalue_t* thing) {
 }
 
 void f_replace_objects(int num_arg) {
-  assign_svalue(vm_sp(), replace_objects(vm_sp()));
+  LPCFrame f = LPCFrame::args(num_arg);
+  assign_svalue(&f.top(), replace_objects(&f.top()));
   // replace_tmp is a module-global scratch slot; drop its lingering ref
   // once the result is on the stack so nothing stays unaccounted between
   // calls (flagged by the Debug leak checker).
   free_svalue(&replace_tmp, "f_replace_objects");
   replace_tmp = const0;
+  f.done();
 }
 
 void f_replace_dollars(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;
-  const char* oldstr = (vm_sp() - 1)->u.string;
+  const char* oldstr = f.string(0);
   char* currentnew;
   const char* currentold = oldstr;
+  array_t* arr = f.array(1);
   int i;
-  if (vm_sp()->u.arr->size & 1) {
+  if (arr->size & 1) {
     error("wrong array length for replace_dollars()");
   }
-  for (i = 0; i < vm_sp()->u.arr->size; i++)
-    if (vm_sp()->u.arr->item[i].type != T_STRING) {
+  for (i = 0; i < arr->size; i++)
+    if (arr->item[i].type != T_STRING) {
       error("replace array should only contain strings");
     }
   newstr = new_string(max_string_length, "replace_dollars");
@@ -835,10 +853,10 @@ void f_replace_dollars(int num_arg) {
   for (i = 0; i < COUNTED_STRLEN(oldstr); i++) {
     if (oldstr[i] == '$') {
       int j;
-      for (j = 0; j < vm_sp()->u.arr->size; j += 2) {
-        const char* one = vm_sp()->u.arr->item[j].u.string;
+      for (j = 0; j < arr->size; j += 2) {
+        const char* one = arr->item[j].u.string;
         if (!strncmp(one, oldstr + i, COUNTED_STRLEN(one))) {
-          const char* two = vm_sp()->u.arr->item[j + 1].u.string;
+          const char* two = arr->item[j + 1].u.string;
           int const len = i - (currentold - oldstr);
           if (currentnew + len - newstr > max_string_length) {
             FREE_MSTR(newstr);
@@ -865,7 +883,8 @@ void f_replace_dollars(int num_arg) {
   if (newstr == currentnew) {
     // nothing happened!
     FREE_MSTR(newstr);
-    pop_stack();
+    f.pop_back(1);
+    f.done();
     return;
   }
 
@@ -875,7 +894,6 @@ void f_replace_dollars(int num_arg) {
   }
 
   strcpy(currentnew, currentold);
-  pop_2_elems();
-  push_malloced_string(
+  f.ret_str_malloced(
       extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
 }
