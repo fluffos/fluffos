@@ -122,6 +122,9 @@ void LPCFrame::rebase(int num_arg) {
 }
 
 void LPCFrame::process_callback(int narg, function_to_call_t* ftc, int opcode) {
+  /* process_efun_callback() locates the arguments from the stack top */
+  DEBUG_CHECK(sp != base_ + argc_ - 1,
+              "LPCFrame::process_callback: window is not the stack top.\n");
   process_efun_callback(narg, ftc, opcode, argc_);
 }
 
@@ -217,8 +220,11 @@ void LPCCall::discard() {
   if (consumed_) {
     return;
   }
-  DEBUG_CHECK(sp != base_ + argc_ - 1, "LPCCall: arguments are not the stack top at discard.\n");
   consumed_ = true;
+  if (argc_ == 0) {
+    return; /* nothing pushed: the stack may legitimately have moved */
+  }
+  DEBUG_CHECK(sp != base_ + argc_ - 1, "LPCCall: arguments are not the stack top at discard.\n");
   pop_n_elems(argc_);
 }
 

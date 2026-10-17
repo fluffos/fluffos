@@ -2085,16 +2085,9 @@ void f_debug_message(LPCFrame& f) {
 
 #ifdef F_FUNCTION_OWNER
 void f_function_owner(LPCFrame& f) {
-  object_t* owner = f.funptr(0)->hdr.owner;
-
-  free_funp(f.funptr(0));
-  f[0].type = T_OBJECT;
-  f[0].u.ob = owner;
-  if (owner) {
-    add_ref(owner, "f_function_owner");
-  } else {
-    f[0] = const0u;
-  }
+  /* The owner reference is taken before the function pointer (which may
+   * hold the last reference to a destructed owner) is released. */
+  f.ret(f.funptr(0)->hdr.owner);
 }
 #endif
 
@@ -2424,25 +2417,32 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
     }
 
 #ifndef NO_ENVIRONMENT
-    /* And then call it on it's inventory..., if it's still around! */
-    if (event_ob && event_ob->u.ob && !(event_ob->u.ob->flags & O_DESTRUCTED)) {
+    /* And then call it on its inventory, if it's still around. Snapshot the
+     * inventory first, with references on the stack: a handler can move or
+     * destruct objects (which would derail a walk of the live list), and
+     * destruct's stack sweep turns a destructed object's slot into 0. */
+    LPCCall snapshot;
+    if (event_ob->type == T_OBJECT && !(event_ob->u.ob->flags & O_DESTRUCTED)) {
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
-        if (ob == origin) {
-          continue;
+        if (ob != origin && !(ob->flags & O_DESTRUCTED)) {
+          snapshot.push(ob);
         }
-
-        if (ob->flags & O_DESTRUCTED) {
-          continue;
-        }
-        LPCCall b;
-        b.push(origin);
-        for (i = 0; i < numparam; i++) {
-          b.push(event_param + i);
-        }
-
-        b.apply(name, ob, ORIGIN_EFUN);
       }
     }
+    /* Last to first, as before the LPCFrame migration. */
+    for (int k = snapshot.argc() - 1; k >= 0; k--) {
+      svalue_t* slot = &snapshot.arg(k);
+      if (slot->type != T_OBJECT || (slot->u.ob->flags & O_DESTRUCTED)) {
+        continue;
+      }
+      LPCCall b;
+      b.push(origin);
+      for (i = 0; i < numparam; i++) {
+        b.push(event_param + i);
+      }
+      b.apply(name, slot->u.ob, ORIGIN_EFUN);
+    }
+    snapshot.discard();
 #endif
   }
 }
@@ -3237,12 +3237,11 @@ void f_test_load(LPCFrame& f) {
     SETOBNAME(testloadob, "");
   }
   saved_extra_name = tmp;
-  {
-    StackErrorHandler restore_names(fix_object_names);
-    new_ob = load_object(tmp, 0);
-    restore_names.dismiss();
-  }
+  /* Restores testloadob's name if loading or destructing the probe errors. */
+  StackErrorHandler restore_names(fix_object_names);
+  new_ob = load_object(tmp, 0);
   if (!new_ob) {
+    restore_names.dismiss();
     if (testloadob) {
       SETOBNAME(testloadob, tmp);
     }
@@ -3250,6 +3249,7 @@ void f_test_load(LPCFrame& f) {
     return;
   }
   destruct_object(new_ob);
+  restore_names.dismiss();
   f.ret(1);
   if (testloadob) {
     SETOBNAME(testloadob, saved_extra_name);

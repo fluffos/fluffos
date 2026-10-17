@@ -3454,25 +3454,28 @@ void f_parse_sentence(LPCFrame& f) {
     f.pop_back();
   }
 
+  LPC_INT dbg = 0;
   if (num_arg >= 2) {
-    LPC_INT const dbg = f.number(f.argc() - 1);
+    dbg = f.number(f.argc() - 1);
     f.pop_back();
-    if (dbg) {
+  }
+  if (dbg) {
 #if defined(DEBUG) || defined(PARSE_DEBUG)
-      debug_parse_depth = 1;
-      if (dbg > 1) {
-        debug_parse_verbose = 1;
-      } else {
-        debug_parse_verbose = 0;
-      }
+    debug_parse_depth = 1;
+    if (dbg > 1) {
+      debug_parse_verbose = 1;
     } else {
-      debug_parse_depth = 0;
-#else
-      error(
-          "Parser debugging not enabled. (compile with -DDEBUG or "
-          "-DPARSE_DEBUG).\n");
-#endif
+      debug_parse_verbose = 0;
     }
+  } else {
+    /* also when no debug argument was passed: a previous call's setting
+     * must not stick */
+    debug_parse_depth = 0;
+#else
+    error(
+        "Parser debugging not enabled. (compile with -DDEBUG or "
+        "-DPARSE_DEBUG).\n");
+#endif
   }
 
   StackErrorHandler parse_cleanup(free_parse_globals);
