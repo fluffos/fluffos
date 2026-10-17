@@ -452,9 +452,11 @@ void f_clonep(int num_arg) {
 void f__new(int num_arg) {
   LPCFrame f = LPCFrame::args(num_arg);
   object_t* ob = clone_object(f.string(0), num_arg - 1);
-
+  /* clone_object() / call_create() consumed the trailing create args;
+   * only the filename remains. */
+  f.rebase(1);
   if (ob) {
-    f.ret(ob);
+    f.ret(ob); /* push_object add_refs; clone starts at ref 1 */
   } else {
     f.ret(0);
   }
@@ -534,8 +536,9 @@ void f_deep_inventory(int num_arg) {
 void f_destruct(int num_arg) {
   LPCFrame f = LPCFrame::args(num_arg);
   destruct_object(f.object(0));
-  /* Object was already removed from the stack by destruct_object(). */
-  f.abandon();
+  /* remove_object_from_stack() already freed the object and left a number 0
+   * in the arg slot; pop it (void efun). */
+  f.ret_void();
 }
 
 #endif
