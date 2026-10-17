@@ -43,7 +43,7 @@ void f_all_inventory(int num_arg) {
   LPCFrame f = LPCFrame::args(num_arg);
   array_t* vec = all_inventory(f.object(0), 0);
   /* Fresh array (ref 1); transfer without ref++. */
-  f.ret(vec);
+  f.ret_refed(vec);
 }
 #endif
 

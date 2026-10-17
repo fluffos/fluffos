@@ -153,6 +153,15 @@ class LPCFrame {
   /* Stack already holds the correct return (e.g. unary in-place mutate). */
   void done();
 
+  /* Re-bind the Args window to the current sp after an external helper
+   * (apply, merge_arg_lists, call_all_other, ...) has already consumed
+   * some slots. Does not free anything. */
+  void rebase(int num_arg);
+
+  /* Mark finalized without touching the stack. Use when a callee already
+   * removed the window (e.g. destruct_object sweeps the object arg). */
+  void abandon();
+
   /* Drop the first n args (free them); window shrinks from the front. */
   void drop_front(int n);
 

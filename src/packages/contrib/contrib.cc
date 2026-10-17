@@ -1802,23 +1802,21 @@ void f_upper_case(int num_arg) {
 
 #ifdef F_REPLACEABLE
 void f_replaceable(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* obj;
   program_t* prog;
   int i, j, num, numignore, replaceable;
   const char** ignore;
 
-  if (num_arg == 2) {
-    obj = (vm_sp() - 1)->u.ob;
-  } else {
-    obj = vm_sp()->u.ob;
-  }
+  obj = f.object(0);
 
   prog = obj->prog;
   if (obj == simul_efun_ob || prog->func_ref) {
     replaceable = 0;
   } else {
     if (num_arg == 2) {
-      numignore = vm_sp()->u.arr->size;
+      array_t* ign = f.array(1);
+      numignore = ign->size;
       // Always allocate the 2 built-in slots (create/__INIT) plus one per
       // ignore entry -- an empty ignore array must not leave ignore == NULL
       // before the unconditional ignore[0]/ignore[1] writes below.
@@ -1827,8 +1825,8 @@ void f_replaceable(int num_arg) {
       ignore[0] = findstring(APPLY_CREATE);
       ignore[1] = findstring(APPLY___INIT);
       for (i = 0; i < numignore; i++) {
-        if (vm_sp()->u.arr->item[i].type == T_STRING) {
-          ignore[i + 2] = findstring(vm_sp()->u.arr->item[i].u.string);
+        if (ign->item[i].type == T_STRING) {
+          ignore[i + 2] = findstring(ign->item[i].u.string);
         } else {
           ignore[i + 2] = nullptr;
         }
@@ -1862,11 +1860,7 @@ void f_replaceable(int num_arg) {
     FREE(ignore);
   }
 
-  if (num_arg == 2) {
-    free_array((vm_sp()--)->u.arr);
-  }
-  free_svalue(vm_sp(), "f_replaceable");
-  put_number(replaceable);
+  f.ret(replaceable);
 }
 #endif
 
@@ -1922,16 +1916,16 @@ inline void sum_program_info(const program_t* const p, ProgramInfoS& info) {
 }
 
 void f_program_info(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   ProgramInfoS info{0};  // initialize all elements to 0
   object_t* ob;
   mapping_t* m;
 
   if (num_arg == 1) {
-    ob = vm_sp()->u.ob;
+    ob = f.object(0);
     if (!(ob->flags & O_CLONE)) {
       sum_program_info(ob->prog, info);
     }
-    pop_stack();
   } else {
     for (ob = obj_list; ob; ob = ob->next_all) {
       if (ob->flags & O_CLONE) {
@@ -1955,7 +1949,7 @@ void f_program_info(int num_arg) {
 
   add_mapping_pair(m, "total size", info.total);
 
-  push_refed_mapping(m);
+  f.ret_refed(m);
 }
 #endif
 
@@ -1968,17 +1962,18 @@ void f_program_info(int num_arg) {
 
 #ifdef F_REMOVE_INTERACTIVE
 void f_remove_interactive(int num_arg) {
-  if ((vm_sp()->u.ob->flags & O_DESTRUCTED) || !(vm_sp()->u.ob->interactive)) {
-    free_object(&vm_sp()->u.ob, "f_remove_interactive");
-    *vm_sp() = const0;
+  LPCFrame f = LPCFrame::args(num_arg);
+  if ((f.object(0)->flags & O_DESTRUCTED) || !(f.object(0)->interactive)) {
+    f.set_top_number(0);
   } else {
-    remove_interactive(vm_sp()->u.ob, 0);
+    remove_interactive(f.object(0), 0);
     /* It may have been dested */
-    if (vm_sp()->type == T_OBJECT) {
-      free_object(&vm_sp()->u.ob, "f_remove_interactive");
+    if (f.type(0) == T_OBJECT) {
+      free_object(&f[0].u.ob, "f_remove_interactive");
     }
-    *vm_sp() = const1;
+    f[0] = const1;
   }
+  f.done();
 }
 #endif
 
@@ -1995,16 +1990,15 @@ static int query_ip_port(object_t* ob) {
 }
 
 void f_query_ip_port(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int tmp;
 
   if (num_arg) {
-    tmp = query_ip_port(vm_sp()->u.ob);
-    free_object(&vm_sp()->u.ob, "f_query_ip_port");
+    tmp = query_ip_port(f.object(0));
   } else {
     tmp = query_ip_port(command_giver);
-    STACK_INC;
   }
-  put_number(tmp);
+  f.ret(tmp);
 }
 #endif
 
@@ -2056,15 +2050,14 @@ void reset_timezone(const char* old_tz) {
 
 #ifdef F_ZONETIME
 void f_zonetime(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char *new_tz, *old_tz;
   char* retv;
   time_t time_val;
   int len;
 
-  time_val = vm_sp()->u.number;
-  pop_stack();
-  new_tz = vm_sp()->u.string;
-  pop_stack();
+  new_tz = f.string(0);
+  time_val = f.number(1);
 
   old_tz = set_timezone(new_tz);
   char buf[256] = {};
@@ -2077,14 +2070,15 @@ void f_zonetime(int num_arg) {
   len = strlen(retv);
   retv[len - 1] = '\0';
   reset_timezone(old_tz);
-  push_malloced_string(string_copy(retv, "zonetime"));
+  f.ret_str_malloced(string_copy(retv, "zonetime"));
 }
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
 void f_is_daylight_savings_time(int num_arg) {
-  time_t time_to_check = vm_sp()->u.number;
-  const char* new_tz = (vm_sp() - 1)->u.string;
+  LPCFrame f = LPCFrame::args(num_arg);
+  time_t time_to_check = f.number(1);
+  const char* new_tz = f.string(0);
   const char* old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {
@@ -2093,12 +2087,10 @@ void f_is_daylight_savings_time(int num_arg) {
   struct tm res = {};
   struct tm* t = localtime_r(&time_to_check, &res);
 
-  pop_stack();
-  pop_stack();
   if (t) {
-    push_number((t->tm_isdst) > 0);
+    f.ret((t->tm_isdst) > 0);
   } else {
-    push_number(-1);
+    f.ret(-1);
   }
   reset_timezone(old_tz);
 }
@@ -2131,6 +2123,7 @@ void f_function_owner(int num_arg) {
 
 #ifdef F_REPEAT_STRING
 void f_repeat_string(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char* str;
@@ -2139,10 +2132,11 @@ void f_repeat_string(int num_arg) {
   char *ret, *p;
   int i;
 
-  repeat = (vm_sp()--)->u.number;
+  repeat = f.number(1);
+  f.pop_back();
   if (repeat > 0) {
-    str = vm_sp()->u.string;
-    len = SVALUE_STRLEN(vm_sp());
+    str = f.string(0);
+    len = f.string_len(0);
     // Clamp repeat BEFORE multiplying: len * repeat in int can overflow and
     // wrap to a small/zero newlen, driving an undersized allocation and a
     // massive heap overflow in the copy loop. Also avoids div-by-zero on len==0.
@@ -2154,10 +2148,7 @@ void f_repeat_string(int num_arg) {
     newlen = len * repeat;
   }
   if (repeat <= 0) {
-    free_string_svalue(vm_sp());
-    vm_sp()->type = T_STRING;
-    vm_sp()->subtype = STRING_CONSTANT;
-    vm_sp()->u.string = "";
+    f.set_top_str_constant("");
   } else if (repeat != 1) {
     p = ret = new_string(newlen, "f_repeat_string");
     for (i = 0; i < repeat; i++) {
@@ -2165,11 +2156,9 @@ void f_repeat_string(int num_arg) {
       p += len;
     }
     *p = 0;
-    free_string_svalue(vm_sp());
-    vm_sp()->type = T_STRING;
-    vm_sp()->subtype = STRING_MALLOC;
-    vm_sp()->u.string = ret;
+    f.set_top_str_malloced(ret);
   }
+  f.done();
 }
 #endif
 
@@ -2302,6 +2291,7 @@ static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog)
 }
 
 void f_memory_summary(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   mapping_t* result = allocate_mapping(8);
   object_t* ob;
   int idx;
@@ -2322,7 +2312,7 @@ void f_memory_summary(int num_arg) {
     idx = 0;
     fms_recurse(entry->u.map, ob, &idx, ob->prog);
   }
-  push_refed_mapping(result);
+  f.ret_refed(result);
 }
 
 #endif
@@ -2330,24 +2320,23 @@ void f_memory_summary(int num_arg) {
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
 void f_query_replaced_program(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* res = nullptr;
 
   if (num_arg) {
-    if (vm_sp()->u.ob->replaced_program) {
-      res = add_slash(vm_sp()->u.ob->replaced_program);
+    if (f.object(0)->replaced_program) {
+      res = add_slash(f.object(0)->replaced_program);
     }
-    free_object(&vm_sp()->u.ob, "f_query_replaced_program");
   } else {
     if (current_object->replaced_program) {
       res = add_slash(current_object->replaced_program);
     }
-    STACK_INC;
   }
 
   if (res) {
-    put_malloced_string(res);
+    f.ret_str_malloced(res);
   } else {
-    put_number(0);
+    f.ret(0);
   }
 }
 #endif
@@ -2355,6 +2344,7 @@ void f_query_replaced_program(int num_arg) {
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
 void f_network_stats(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   mapping_t* m;
   int i, ports = 0;
 
@@ -2399,7 +2389,7 @@ void f_network_stats(int num_arg) {
     }
   }
 
-  push_refed_mapping(m);
+  f.ret_refed(m);
 }
 #endif
 
@@ -2425,7 +2415,6 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
   origin = current_object;
 
   name = new_string(strlen(event_fun) + strlen(EVENT_PREFIX) + 1, "newmoon.c: au_event");
-  push_malloced_string(name);
 
   strcpy(name, EVENT_PREFIX);
   strcat(name, event_fun);
@@ -2439,23 +2428,26 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
         continue;
       }
 
-      push_object(origin);
+      LPCFrame b = LPCFrame::builder();
+      b.push(origin);
       for (i = 0; i < numparam; i++) {
-        push_svalue(event_param + i);
+        b.push(event_param + i);
       }
 
-      apply(name, event_ob->u.arr->item[ind].u.ob, numparam + 1, ORIGIN_EFUN);
+      b.apply(name, event_ob->u.arr->item[ind].u.ob, ORIGIN_EFUN);
     }
   } else if (event_ob->type == T_OBJECT) {
-    int count = 0;
     /* First we call the event on the object itself */
 
-    push_object(origin);
-    for (i = 0; i < numparam; i++) {
-      push_svalue(event_param + i);
-    }
+    {
+      LPCFrame b = LPCFrame::builder();
+      b.push(origin);
+      for (i = 0; i < numparam; i++) {
+        b.push(event_param + i);
+      }
 
-    apply(name, event_ob->u.ob, numparam + 1, ORIGIN_EFUN);
+      b.apply(name, event_ob->u.ob, ORIGIN_EFUN);
+    }
 
 #ifndef NO_ENVIRONMENT
     /* And then call it on it's inventory..., if it's still around! */
@@ -2468,37 +2460,26 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
         if (ob->flags & O_DESTRUCTED) {
           continue;
         }
-        push_object(ob);
-        count++;
-      }
-    }
-    while (count--) {
-      ob = vm_sp()->u.ob;
-      pop_stack();
-      if (!ob || ob->flags & O_DESTRUCTED) {
-        continue;
-      }
-      push_object(origin);
-      for (i = 0; i < numparam; i++) {
-        push_svalue(event_param + i);
-      }
+        LPCFrame b = LPCFrame::builder();
+        b.push(origin);
+        for (i = 0; i < numparam; i++) {
+          b.push(event_param + i);
+        }
 
-      apply(name, ob, numparam + 1, ORIGIN_EFUN);
+        b.apply(name, ob, ORIGIN_EFUN);
+      }
     }
 #endif
   }
-  vm_sp()--;
   FREE_MSTR(name);
 }
 
 void f_event(int num_arg) {
-  int num;
+  LPCFrame f = LPCFrame::args(num_arg);
 
-  num = num_arg;
+  event(f.argp(0), f.string(1), num_arg - 2, num_arg > 2 ? f.argp(2) : nullptr);
 
-  event((vm_sp() - num + 1), (vm_sp() - num + 2)->u.string, num - 2, (vm_sp() - num + 3));
-
-  pop_n_elems(num);
+  f.ret_void();
 }
 #endif
 
@@ -2531,6 +2512,7 @@ void number_as_string(char* buf, LPC_INT n) {
 }
 
 void f_query_num(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2538,10 +2520,8 @@ void f_query_num(int num_arg) {
   char* res;
 
   ret[0] = 0;
-  limit = vm_sp()->u.number;
-  pop_stack();
-  n = vm_sp()->u.number;
-  //  pop_stack();
+  limit = f.number(1);
+  n = f.number(0);
 
   if ((limit && n > limit) || (n < 0) || (n > 99999)) {
     strcpy(ret, "many"); /* this is a little pointless ... */
@@ -2593,28 +2573,27 @@ q_n_end:
   n = strlen(ret);
   res = new_string(n, "query_num");
   strcpy(res, ret);
-  put_malloced_string(res);
+  f.ret_str_malloced(res);
 }
 
 #endif
 
 #ifdef F_BASE_NAME
 void f_base_name(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char *name, *tmp;
   int i;
 
-  if (vm_sp()->type == T_OBJECT) {
-    if (vm_sp()->u.ob->flags & O_DESTRUCTED) {
-      free_object(&vm_sp()->u.ob, "f_base_name");
-      *vm_sp() = const0;
+  if (f.type(0) == T_OBJECT) {
+    if (f.object(0)->flags & O_DESTRUCTED) {
+      f.set_top_number(0);
+      f.done();
       return;
     }
-    name = add_slash(vm_sp()->u.ob->obname);
+    name = add_slash(f.object(0)->obname);
   } else {
-    name = string_copy(vm_sp()->u.string, "f_base_name: name");
+    name = string_copy(f.string(0), "f_base_name: name");
   }
-
-  pop_stack();
 
   if ((tmp = strchr(name, '#')) != nullptr) {
     char* ret;
@@ -2624,12 +2603,12 @@ void f_base_name(int num_arg) {
     ret[i] = 0;
     FREE_MSTR(name);
 
-    push_malloced_string(ret);
+    f.ret_str_malloced(ret);
   } else {
-    push_malloced_string(name);
+    f.ret_str_malloced(name);
   }
 
-} /* f_base_name() */
+} /* f_base_name() */ /* f_base_name() */
 #endif
 
 #ifdef F_GET_GARBAGE
@@ -2646,6 +2625,7 @@ int garbage_check(object_t* ob, void* /*data*/) {
 }
 
 void f_get_garbage(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2663,105 +2643,108 @@ void f_get_garbage(int num_arg) {
     add_ref(obs[i], "f_get_garbage");
   }
 
-  pop_n_elems(1);
-  push_refed_array(ret);
+  f.ret_refed(ret);
 }
 #endif
 
 #ifdef F_NUM_CLASSES
 
 void f_num_classes(int num_arg) {
-  int const i = vm_sp()->u.ob->prog->num_classes;
-  pop_stack();
-  push_number(i);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int const i = f.object(0)->prog->num_classes;
+  f.ret(i);
 }
 
 #endif
 
 #ifdef F_ASSEMBLE_CLASS
 void f_assemble_class(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   // Build through the CLASS allocator: retagging a copy_array() block as
   // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
   // is later freed as a class (caught by the testsuite's per-file
   // check_memory gate via the assemble_class test).
-  array_t* src = vm_sp()->u.arr;
+  array_t* src = f.array(0);
   array_t* cl = allocate_class_by_size(src->size);
   for (int i = 0; i < src->size; i++) {
     assign_svalue_no_free(&cl->item[i], &src->item[i]);
   }
-  pop_stack();
-  push_refed_array(cl);
-  vm_sp()->type = T_CLASS;
+  f.ret_refed(cl);
+  f.top().type = T_CLASS;
 }
 
 #endif
 
 #ifdef F_DISASSEMBLE_CLASS
 void f_disassemble_class(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* arr;
-  if (vm_sp()->type != T_CLASS) {
+  if (f.type(0) != T_CLASS) {
     error("Argument to disassemble_class() not a class.\n");
   }
-  arr = copy_array(vm_sp()->u.arr);
-  pop_stack();
-  push_refed_array(arr);
+  arr = copy_array(f.array(0));
+  f.ret_refed(arr);
 }
 #endif
 
 #ifdef F_FETCH_CLASS_MEMBER
 
 void f_fetch_class_member(int num_arg) {
-  LPC_INT pos = vm_sp()->u.number; /* checked below as an LPC int, not wrapped */
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_INT pos = f.number(1); /* checked below as an LPC int, not wrapped */
   array_t* arr;
 
-  pos = vm_sp()->u.number;
-  pop_stack();
+  f.pop_back();
 
-  if (vm_sp()->type != T_CLASS) {
+  if (f.type(0) != T_CLASS) {
     error("Argument to fetch_class_member() not a class.\n");
   }
 
-  arr = vm_sp()->u.arr;
+  arr = f.array(0);
 
   if (pos < 0 || pos >= arr->size) {
     error("Class index out of bounds.\n");
   }
 
-  assign_svalue_no_free(vm_sp(), &arr->item[pos]);
+  assign_svalue_no_free(f.argp(0), &arr->item[pos]);
   free_array(arr);
+  f.done();
 }
 #endif
 
 #ifdef F_STORE_CLASS_MEMBER
 
 void f_store_class_member(int num_arg) {
-  LPC_INT const pos = (vm_sp() - 1)->u.number; /* checked below as an LPC int */
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_INT const pos = f.number(1); /* checked below as an LPC int */
   array_t* arr;
 
-  if ((vm_sp() - 2)->type != T_CLASS) {
+  if (f.type(0) != T_CLASS) {
     error("Argument to store_class_member() not a class.\n");
   }
 
-  arr = (vm_sp() - 2)->u.arr;
+  arr = f.array(0);
 
   if (pos < 0 || pos >= arr->size) {
     error("Class index out of bounds.\n");
   }
 
-  assign_svalue(&arr->item[pos], vm_sp());
+  assign_svalue(&arr->item[pos], f.argp(2));
 
-  pop_2_elems();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_ELEMENT_OF
 void f_element_of(int num_arg) {
-  array_t* arr = vm_sp()->u.arr;
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* arr = f.array(0);
   if (!arr->size) {
     error("Can't take element from empty array.\n");
   }
-  assign_svalue_no_free(vm_sp(), &arr->item[random_number(arr->size)]);
+  assign_svalue_no_free(f.argp(0), &arr->item[random_number(arr->size)]);
   free_array(arr);
+  f.done();
 }
 #endif
 #ifdef F_SHUFFLE
@@ -2797,12 +2780,13 @@ void shuffle(array_t* args) {
 }
 
 void f_shuffle(int num_arg) {
-  svalue_t* sv = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
 
-  if (sv->type == T_ARRAY && sv->u.arr) {
-    shuffle(sv->u.arr);
+  if (f.type(0) == T_ARRAY && f.array(0)) {
+    shuffle(f.array(0));
+    f.done();
   } else {
-    push_refed_array(&the_null_array);
+    f.ret_refed(&the_null_array);
   }
 }
 #endif
@@ -2810,8 +2794,8 @@ void f_shuffle(int num_arg) {
 #ifdef F_MAX
 
 void f_max(int num_arg) {
-  svalue_t* sarr = vm_sp() - 1;
-  array_t* arr = sarr->u.arr;
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* arr = f.array(0);
   int max_index = 0;
   int i;
 
@@ -2871,16 +2855,15 @@ void f_max(int num_arg) {
     }
   }
 
-  if (vm_sp()->u.number != 0) {
-    pop_2_elems();
-    push_number(max_index);
+  if (f.number(1) != 0) {
+    f.ret(max_index);
     return;
   }
 
-  pop_stack();
-
-  assign_svalue_no_free(vm_sp(), &arr->item[max_index]);
+  f.pop_back();
+  assign_svalue_no_free(f.argp(0), &arr->item[max_index]);
   free_array(arr);
+  f.done();
 }
 
 #endif
@@ -2888,8 +2871,8 @@ void f_max(int num_arg) {
 #ifdef F_MIN
 
 void f_min(int num_arg) {
-  svalue_t* sarr = vm_sp() - 1;
-  array_t* arr = sarr->u.arr;
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* arr = f.array(0);
   int min_index = 0;
   int i;
 
@@ -2949,37 +2932,39 @@ void f_min(int num_arg) {
     }
   }
 
-  if (vm_sp()->u.number != 0) {
-    pop_2_elems();
-    push_number(min_index);
+  if (f.number(1) != 0) {
+    f.ret(min_index);
     return;
   }
 
-  pop_stack();
-
-  assign_svalue_no_free(vm_sp(), &arr->item[min_index]);
+  f.pop_back();
+  assign_svalue_no_free(f.argp(0), &arr->item[min_index]);
   free_array(arr);
+  f.done();
 }
 #endif
 
 #ifdef F_ABS
 
 void f_abs(int num_arg) {
-  if (vm_sp()->type == T_REAL) {
-    if (vm_sp()->u.real < 0.0) {
-      vm_sp()->u.real = -vm_sp()->u.real;
-    } else if (vm_sp()->u.real == -0.0) {
-      vm_sp()->u.real = 0.0;
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.type(0) == T_REAL) {
+    if (f.top().u.real < 0.0) {
+      f.top().u.real = -f.top().u.real;
+    } else if (f.top().u.real == -0.0) {
+      f.top().u.real = 0.0;
     }
-  } else if (vm_sp()->type == T_NUMBER && vm_sp()->u.number < 0) {
-    vm_sp()->u.number = -vm_sp()->u.number;
+  } else if (f.type(0) == T_NUMBER && f.number(0) < 0) {
+    f.top().u.number = -f.top().u.number;
   }
+  f.done();
 }
 #endif
 
 #ifdef F_ROLL_MDN
 
 void f_roll_MdN(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   LPC_INT sides, rolls, bonus;
   LPC_INT roll = 0;
 
@@ -2987,10 +2972,9 @@ void f_roll_MdN(int num_arg) {
    * as roll_MdN(int, int) with no bonus, and when it is enabled that spec is
    * the one compiled in -- reading three fixed slots then took `rolls` from
    * the caller's stack below the first argument (roll_MdN(3, 1) gave 0). */
-  svalue_t* args = vm_sp() - num_arg + 1;
-  rolls = args[0].u.number;
-  sides = args[1].u.number;
-  bonus = num_arg > 2 ? args[2].u.number : 0;
+  rolls = f.number(0);
+  sides = f.number(1);
+  bonus = num_arg > 2 ? f.number(2) : 0;
 
   /* rolls used to be an int, so a count past 32 bits wrapped (0x100000001
    * rolled once). Keep the old int ceiling on the loop -- this loop is not
@@ -3006,8 +2990,7 @@ void f_roll_MdN(int num_arg) {
     roll += bonus;
   }
 
-  pop_n_elems(num_arg);
-  push_number(roll);
+  f.ret(roll);
 }
 
 #endif
@@ -3068,11 +3051,12 @@ int levenshtein(char* a, int as, char* b, int bs) {
 } /* levenshtein() */
 
 void f_string_difference(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int diff, as, bs;
   char *a, *b;
 
-  a = const_cast<char*>(vm_sp()->u.string);
-  b = const_cast<char*>((vm_sp() - 1)->u.string);
+  b = const_cast<char*>(f.string(0));
+  a = const_cast<char*>(f.string(1));
 
   if (!strcmp(a, b)) {
     diff = 0;
@@ -3088,9 +3072,7 @@ void f_string_difference(int num_arg) {
     }
   }
 
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp());
-  put_number(diff);
+  f.ret(diff);
 }
 #endif
 
@@ -3106,15 +3088,15 @@ static int query_charmode(object_t* ob) {
 }
 
 void f_query_charmode(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int tmp;
 
   if (num_arg) {
-    tmp = query_charmode(vm_sp()->u.ob);
-    free_object(&vm_sp()->u.ob, "f_query_charmode");
+    tmp = query_charmode(f.object(0));
   } else {
     tmp = -1;
   }
-  put_number(tmp);
+  f.ret(tmp);
 }
 
 #ifdef F_REMOVE_CHARMODE
@@ -3129,17 +3111,17 @@ static int remove_charmode(object_t* ob) {
 }
 
 void f_remove_charmode(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int tmp;
 
   if (num_arg) {
-    tmp = remove_charmode(vm_sp()->u.ob);
-    free_object(&vm_sp()->u.ob, "f_remove_charmode");
+    tmp = remove_charmode(f.object(0));
   } else {
     tmp = -1;
   }
   // if(tmp > 0 && !(tmp & I_SINGLE_CHAR)) tmp = 1;
   // else tmp = 0;
-  put_number(tmp);
+  f.ret(tmp);
 }
 #endif
 #endif
@@ -3163,25 +3145,26 @@ static int remove_get_char(object_t* ob) {
 }
 
 void f_remove_get_char(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int tmp;
 
   if (num_arg) {
-    tmp = remove_get_char(vm_sp()->u.ob);
-    free_object(&vm_sp()->u.ob, "f_remove_get_char");
+    tmp = remove_get_char(f.object(0));
   } else {
     tmp = -3;
   }
-  put_number(tmp);
+  f.ret(tmp);
 }
 
 #endif
 #ifdef F_SEND_NULLBYTE
 void f_send_nullbyte(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int tmp;
   object_t* who;
   tmp = 0;
 
-  who = vm_sp()->u.ob;
+  who = f.object(0);
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     tmp = -2;
@@ -3191,42 +3174,48 @@ void f_send_nullbyte(int num_arg) {
     add_message(who, "\0", 1);
     flush_message(who->interactive);
   }
-  free_object(&vm_sp()->u.ob, "f_send_nullbyte");
-  put_number(tmp);
+  f.ret(tmp);
 }
 
 #endif
 
 #ifdef F_RESTORE_FROM_STRING
 void f_restore_from_string(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* buf;
   LPC_INT noclear;
 
-  buf = (vm_sp() - 1)->u.string;
-  noclear = vm_sp()->u.number;
+  buf = f.string(0);
+  noclear = f.number(1);
   if (!noclear) {
     clear_non_statics(current_object);
   }
-  copy_and_push_string(buf);  // restore_object_from_buff modifies the string in
-                              // place, which is ok, copied strings aren't
-                              // shared
-  restore_object_from_buff(current_object, const_cast<char*>(vm_sp()->u.string), noclear);
-  pop_3_elems();
+  {
+    LPCFrame tmp = LPCFrame::builder();
+    tmp.push_str_copy(buf);  // restore_object_from_buff modifies the string in
+                             // place, which is ok, copied strings aren't
+                             // shared
+    restore_object_from_buff(current_object, const_cast<char*>(tmp.string(0)), noclear);
+    tmp.discard_to();
+  }
+  f.ret_void();
 }
 #endif
 
 #ifdef F_CLASSES
 void f_classes(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
   char* end;
   program_t* prog;
 
-  flag = (vm_sp()--)->u.number;
+  flag = f.number(1);
+  f.pop_back();
   end = EndOf(buf);
 
-  prog = vm_sp()->u.ob->prog;
+  prog = f.object(0)->prog;
   num = prog->num_classes;
   vec = allocate_empty_array(num);
 
@@ -3274,8 +3263,7 @@ void f_classes(int num_arg) {
     }
   }
 
-  pop_stack();
-  push_refed_array(vec);
+  f.ret_refed(vec);
 }
 
 #endif
@@ -3291,32 +3279,36 @@ static void fix_object_names() {
 }
 
 void f_test_load(int num_arg) {
-  const char* tmp = vm_sp()->u.string;
+  LPCFrame f = LPCFrame::args(num_arg);
+  const char* tmp = f.string(0);
   object_t* new_ob;
-  if ((testloadob = find_object2(vm_sp()->u.string))) {
+  if ((testloadob = find_object2(f.string(0)))) {
     tmp = testloadob->obname;
     ObjectTable::instance().remove(testloadob->obname);
     SETOBNAME(testloadob, "");
   }
   saved_extra_name = tmp;
-  STACK_INC;
-  vm_sp()->type = T_ERROR_HANDLER;
-  vm_sp()->u.error_handler = fix_object_names;
+  {
+    svalue_t eh{};
+    eh.type = T_ERROR_HANDLER;
+    eh.u.error_handler = fix_object_names;
+    f.push(&eh);
+  }
 
   new_ob = load_object(tmp, 0);
   if (!new_ob) {
     if (testloadob) {
       SETOBNAME(testloadob, tmp);
     }
-    vm_sp()--;
-    pop_stack();
-    push_number(0);
+    (void)f.steal(1); /* discard error handler without invoking */
+    f.pop_back();
+    f.ret(0);
     return;
   }
   destruct_object(new_ob);
-  vm_sp()--;
-  pop_stack();
-  push_number(1);
+  (void)f.steal(1);
+  f.pop_back();
+  f.ret(1);
   if (testloadob) {
     SETOBNAME(testloadob, saved_extra_name);
     ObjectTable::instance().insert(testloadob->obname, testloadob);
@@ -3349,7 +3341,8 @@ static bool os_env_name_listed(const char* list, const char* name) {
 
 #ifdef F_GET_OS_ENV
 void f_get_os_env(int num_arg) {
-  const char* name = vm_sp()->u.string;
+  LPCFrame f = LPCFrame::args(num_arg);
+  const char* name = f.string(0);
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
       !os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
@@ -3358,32 +3351,30 @@ void f_get_os_env(int num_arg) {
 
   const char* val = getenv(name);
   if (!val) {
-    free_string_svalue(vm_sp());
-    *vm_sp() = const0u;
+    f.set_top_undefined();
+    f.done();
     return;
   }
   char* copy = string_copy(val, "f_get_os_env");
-  free_string_svalue(vm_sp());
-  put_malloced_string(copy);
+  f.ret_str_malloced(copy);
 }
 #endif
 
 #ifdef F_SET_OS_ENV
 void f_set_os_env(int num_arg) {
-  int const num = num_arg;
-  svalue_t* namearg = vm_sp() - num + 1;
-  const char* name = namearg->u.string;
+  LPCFrame f = LPCFrame::args(num_arg);
+  const char* name = f.string(0);
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
     error("set_os_env: '%s' is not in the 'writable os environment variables' list.\n", name);
   }
 
   int ok;
-  if (num == 2) {
+  if (num_arg == 2) {
 #ifdef _WIN32
-    ok = _putenv_s(name, vm_sp()->u.string) == 0;
+    ok = _putenv_s(name, f.string(1)) == 0;
 #else
-    ok = setenv(name, vm_sp()->u.string, 1) == 0;
+    ok = setenv(name, f.string(1), 1) == 0;
 #endif
   } else {
 #ifdef _WIN32
@@ -3392,7 +3383,6 @@ void f_set_os_env(int num_arg) {
     ok = unsetenv(name) == 0;
 #endif
   }
-  pop_n_elems(num);
-  push_number(ok);
+  f.ret(ok);
 }
 #endif
