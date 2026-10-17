@@ -333,7 +333,7 @@ mapping_t* allocate_mapping2(array_t* arr, svalue_t* sv) {
     }
   }
 
-  vm_sp()--;
+  sp--;
   return newmap;
 }
 
@@ -610,7 +610,7 @@ struct unique_svalue_compare {
 
 void f_unique_mapping(LPCFrame& f) {
   int num_arg = f.argc();
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  svalue_t* arg = sp - num_arg + 1;
   array_t* v = arg->u.arr;
   if (!v || !v->size) {
     pop_n_elems(num_arg);
@@ -1167,7 +1167,7 @@ void filter_mapping(svalue_t* arg, int num_arg) {
     newmap->count += count;
   }
 
-  vm_sp()--;
+  sp--;
   pop_n_elems(num_arg);
   push_refed_mapping(newmap);
 }

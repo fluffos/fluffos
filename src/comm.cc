@@ -943,14 +943,14 @@ static int call_function_interactive(interactive_t* i, char* str) {
     STACK_INC;
     if (sent->flags & V_FUNCTION) {
       function = nullptr;
-      vm_sp()->type = T_FUNCTION;
-      vm_sp()->u.fp = funp = sent->function.f;
+      sp->type = T_FUNCTION;
+      sp->u.fp = funp = sent->function.f;
       funp->hdr.ref++;
     } else {
       function = sent->function.s;
-      vm_sp()->type = T_STRING;
-      vm_sp()->subtype = STRING_SHARED;
-      vm_sp()->u.string = function;
+      sp->type = T_STRING;
+      sp->subtype = STRING_SHARED;
+      sp->u.string = function;
       ref_string(function);
     }
 

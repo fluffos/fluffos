@@ -79,12 +79,12 @@ bool dump_vm_state() {
   std::cout << prefix << "current_prog = " << print_program_ptr(current_prog) << "\n";
   std::cout << prefix << "caller_type = " << caller_type << "\n";
   std::cout << prefix << "pc = " << print_pc(current_prog, pc) << "\n";
-  std::cout << prefix << "fp = " << (void*)fp << " (vm_sp() - " << (vm_sp() - fp) << ")" << "\n";
-  std::cout << prefix << "vm_sp() = " << (void*)vm_sp() << "\n";
+  std::cout << prefix << "fp = " << (void*)fp << " (sp - " << (sp - fp) << ")" << "\n";
+  std::cout << prefix << "sp = " << (void*)sp << "\n";
 
   // Dump current stack
   std::cout << "current stack:\n";
-  for (auto* sv = csp->fp; sv < vm_sp(); sv++) {
+  for (auto* sv = csp->fp; sv < sp; sv++) {
     if (sv == nullptr) break;
     std::cout << "sv " << (sv - csp->fp) << ":\n";
     std::cout << prefix << "type = " << type_name(sv->type) << "\n";

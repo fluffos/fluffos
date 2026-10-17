@@ -124,10 +124,10 @@ struct function_lookup_info_t {
 /* macro calls */
 #define call_program(prog, offset) eval_instruction(prog->program + offset)
 
-/* Evaluation stack *top* (`sp` / `lpc_eval_sp`), put_/STACK macros, and
+/* Evaluation stack *top* (`sp` / `sp`), put_/STACK macros, and
  * PoppedLvalue live in vm_stack.h -- VM internals and packages/ops only.
  * Package efuns use LPCFrame (included below); they must not see sp or
- * vm_sp(). Other registers remain visible for control-frame bookkeeping. */
+ * sp. Other registers remain visible for control-frame bookkeeping. */
 extern program_t* current_prog;
 extern short caller_type;
 extern char* pc;

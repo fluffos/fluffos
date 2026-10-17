@@ -40,7 +40,7 @@ array_t* allocate_class(class_def_t* cld, int has_values) {
   p->size = n;
   if (has_values) {
     while (n--) {
-      p->item[n] = *vm_sp()--;
+      p->item[n] = *sp--;
     }
   } else {
     while (n--) {
