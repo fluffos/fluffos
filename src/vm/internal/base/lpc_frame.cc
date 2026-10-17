@@ -51,6 +51,22 @@ LPCFrame::LPCFrame(LPCFrame&& other) noexcept
   other.finalized_ = true;
 }
 
+LPCFrame& LPCFrame::operator=(LPCFrame&& other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+  /* Abandon this window without touching the stack (caller must have
+   * finalized, or is replacing a still-open window on an error path). */
+  mode_ = other.mode_;
+  base_ = other.base_;
+  argc_ = other.argc_;
+  finalized_ = other.finalized_;
+  moved_from_ = false;
+  other.moved_from_ = true;
+  other.finalized_ = true;
+  return *this;
+}
+
 LPCFrame::~LPCFrame() {
   if (moved_from_ || finalized_) {
     return;

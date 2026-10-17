@@ -51,7 +51,7 @@ class LPCFrame {
   ~LPCFrame();
 
   LPCFrame(LPCFrame&& other) noexcept;
-  LPCFrame& operator=(LPCFrame&&) = delete;
+  LPCFrame& operator=(LPCFrame&& other) noexcept;
   LPCFrame(const LPCFrame&) = delete;
   LPCFrame& operator=(const LPCFrame&) = delete;
 

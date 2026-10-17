@@ -186,27 +186,30 @@ static int print_cache_stats(outbuffer_t* ob, int verbose) {
 
 #ifdef F_CACHE_STATS
 void f_cache_stats(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   outbuffer_t ob;
 
   outbuf_zero(&ob);
   print_cache_stats(&ob, 1);
   outbuf_push(&ob);
+  f.done();
 }
+
 #endif
 
 #ifdef F__CALL_OTHER
 /* enhanced call_other written 930314 by Luke Mewburn <zak@rmit.edu.au> */
 void f__call_other(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg;
   const char* funcname;
   object_t* ob;
 
   if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
-    pop_n_elems(num_arg);
-    push_undefined();
+    f.ret_undefined();
     return;
   }
-  arg = vm_sp() - num_arg + 1;
+  arg = f.argp(0);
   if (arg[1].type == T_STRING) {
     funcname = arg[1].u.string;
   } else { /* must be T_ARRAY then */
@@ -219,17 +222,20 @@ void f__call_other(int num_arg) {
     check_for_destr(v);
     funcname = sv->u.string;
     num_arg = 2 + merge_arg_lists(num_arg - 2, v, 1);
+    f.done();
+    f = LPCFrame::args(num_arg);
+    arg = f.argp(0);
   }
 
   if (arg[0].type == T_OBJECT) {
     ob = arg[0].u.ob;
   } else if (arg[0].type == T_ARRAY) {
-    array_t* ret;
-
-    ret = call_all_other(arg[0].u.arr, funcname, num_arg - 2);
-    pop_stack();
-    free_array(arg->u.arr);
-    vm_sp()->u.arr = ret;
+    array_t* ret = call_all_other(arg[0].u.arr, funcname, num_arg - 2);
+    f.done();
+    f = LPCFrame::args(2); /* obj array + name */
+    f.pop_back(1);         /* name */
+    f.set_top_array(ret);
+    f.done();
     return;
   } else {
     ob = find_object(arg[0].u.string);
@@ -237,15 +243,17 @@ void f__call_other(int num_arg) {
       error("call_other() couldn't find object '%s'.\n", arg[0].u.string);
     }
   }
-  /* Send the remaining arguments to the function. */
-  if (apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER) == nullptr) { /* Function not found */
-    pop_2_elems();
-    push_undefined();
+  /* apply() consumes num_arg-2 trailing args from the stack. */
+  svalue_t* applied = ::apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER);
+  f.done();
+  f = LPCFrame::args(2); /* obj + name */
+  if (applied == nullptr) {
+    f.ret_undefined();
     return;
   }
-  pop_n_elems(2);
-  push_some_svalues(&apply_ret_value, 1);
+  f.ret_copy(&apply_ret_value);
 }
+
 #endif
 
 #if defined(F_CALL_STACK) || defined(F_ORIGIN)
@@ -263,10 +271,11 @@ static const char* origin_name(int orig) {
 
 #ifdef F_CALL_STACK
 void f_call_stack(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i, n = csp - &control_stack[0] + 1;
   array_t* ret;
 
-  if (vm_sp()->u.number < 0 || vm_sp()->u.number > 4) {
+  if (f.number(0) < 0 || f.number(0) > 4) {
     error("First argument of call_stack() must be 0, 1, 2, 3, or 4.\n");
   }
 
@@ -280,7 +289,7 @@ void f_call_stack(int num_arg) {
    * one at index >= 1 too. Report those honestly instead of crashing:
    * "<driver>" for a file, 0 for an object -- the array is zero-initialized,
    * so a skipped slot is already 0. */
-  switch (vm_sp()->u.number) {
+  switch (f.number(0)) {
     case 0:
       ret->item[0].type = T_STRING;
       ret->item[0].subtype = STRING_MALLOC;
@@ -352,8 +361,9 @@ void f_call_stack(int num_arg) {
       break;
   }
 
-  put_array(ret);
+  f.ret_refed(ret);
 }
+
 #endif
 
 #ifdef F_CAPITALIZE
@@ -382,167 +392,171 @@ void f_children(int num_arg) {
     res->item[i].type = T_OBJECT;
     add_ref(v[i], "children");
   }
-  free_string_svalue(&f.top());
-  put_array(res);
-  f.done();
+  f.ret_refed(res);
 }
+
 #endif
 
 #ifdef F_CLASSP
 void f_classp(int num_arg) {
   LPCFrame f = LPCFrame::args(num_arg);
-  if (f.top().type == T_CLASS) {
-    free_class(f.top().u.arr);
-    f.top() = const1;
-  } else {
-    free_svalue(&f.top(), "f_classp");
-    f.top() = const0;
-  }
-  f.done();
+  f.ret(f.type(0) == T_CLASS);
 }
+
 #endif
 
 #ifdef F_CLEAR_BIT
 void f_clear_bit(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* str;
   int len, ind, bit;
 
   auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
-  if (vm_sp()->u.number > max_bitfield_bits) {
-    error("clear_bit() bit requested : %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", vm_sp()->u.number,
+  if (f.number(1) > max_bitfield_bits) {
+    error("clear_bit() bit requested : %" LPC_INT_FMTSTR_P " > maximum bits: %d\n", f.number(1),
           max_bitfield_bits);
   }
   /* check the sign on the LPC int, before narrowing it (as set_bit does) */
-  if (vm_sp()->u.number < 0) {
+  if (f.number(1) < 0) {
     error("Bad argument 2 (negative) to clear_bit().\n");
   }
-  bit = (vm_sp()--)->u.number;
+  bit = f.number(1);
+  f.pop_back(1);
   ind = bit / 6;
   bit %= 6;
-  len = SVALUE_STRLEN(vm_sp());
+  len = f.string_len(0);
   if (ind >= len) {
-    return; /* return first arg unmodified */
+    f.done(); /* return first arg unmodified */
+    return;
   }
-  unlink_string_svalue(vm_sp());
-  str = const_cast<char*>(vm_sp()->u.string);
+  unlink_string_svalue(&f.top());
+  str = const_cast<char*>(f.top().u.string);
 
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
     error("Illegal bit pattern in clear_bit character %d\n", ind);
   }
   str[ind] = ((str[ind] - ' ') & ~(1 << bit)) + ' ';
+  f.done();
 }
+
 #endif
 
 #ifdef F_CLONEP
 void f_clonep(int num_arg) {
-  if ((vm_sp()->type == T_OBJECT) && (vm_sp()->u.ob->flags & O_CLONE)) {
-    free_object(&vm_sp()->u.ob, "f_clonep");
-    *vm_sp() = const1;
-  } else {
-    free_svalue(vm_sp(), "f_clonep");
-    *vm_sp() = const0;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret(f.type(0) == T_OBJECT && (f.object(0)->flags & O_CLONE));
 }
+
 #endif
 
 #ifdef F__NEW
 void f__new(int num_arg) {
-  svalue_t* arg = vm_sp() - num_arg + 1;
-  object_t* ob;
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = clone_object(f.string(0), num_arg - 1);
 
-  ob = clone_object(arg->u.string, num_arg - 1);
-
-  free_string_svalue(vm_sp());
   if (ob) {
-    put_unrefed_undested_object(ob, "f_clone_object");
+    f.ret(ob);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_DEEP_INHERIT_LIST
 void f_deep_inherit_list(int num_arg) {
-  array_t* vec;
-
-  vec = deep_inherit_list(vm_sp()->u.ob);
-  free_object(&vm_sp()->u.ob, "f_deep_inherit_list");
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = deep_inherit_list(f.object(0));
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_SET_DEBUG_LEVEL
 void f_set_debug_level(int num_arg) {
-  if (vm_sp()->type == T_STRING) {
-    debug_level_set(vm_sp()->u.string);
-    free_string_svalue(vm_sp()--);
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.type(0) == T_STRING) {
+    debug_level_set(f.string(0));
   } else {
-    debug_level = (vm_sp()--)->u.number;
+    debug_level = f.number(0);
   }
+  f.ret_void();
 }
+
 
 void f_clear_debug_level(int num_arg) {
-  debug_level_clear(vm_sp()->u.string);
-  pop_stack();
+  LPCFrame f = LPCFrame::args(num_arg);
+  debug_level_clear(f.string(0));
+  f.ret_void();
 }
 
+
 void f_debug_levels(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   /* not in debug.h since debug.h is included in many places that don't
    know about mapping_t */
   mapping_t* debug_levels();
 
-  push_refed_mapping(debug_levels());
+  f.ret_refed(debug_levels());
 }
+
 #endif
 
 #ifdef F_DEEP_INVENTORY
 void f_deep_inventory(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* vec;
-  int const args = num_arg;
-  if (num_arg == 2 && vm_sp()->type == T_FUNCTION &&
-      ((vm_sp() - 1)->type == T_ARRAY || (vm_sp() - 1)->type == T_OBJECT)) {
-    if ((vm_sp() - 1)->type == T_ARRAY) {
-      vec = deep_inventory_array((vm_sp() - 1)->u.arr, 1, vm_sp()->u.fp);
-    } else { /*(vm_sp()-1)->type==T_OBJECT*/
-      vec = deep_inventory((vm_sp() - 1)->u.ob, 0, vm_sp()->u.fp);
+  if (num_arg == 2 && f.type(1) == T_FUNCTION &&
+      (f.type(0) == T_ARRAY || f.type(0) == T_OBJECT)) {
+    if (f.type(0) == T_ARRAY) {
+      vec = deep_inventory_array(f.array(0), 1, f.funptr(1));
+    } else {
+      vec = deep_inventory(f.object(0), 0, f.funptr(1));
     }
   } else if (num_arg == 1 &&
-             (vm_sp()->type == T_FUNCTION || vm_sp()->type == T_ARRAY || vm_sp()->type == T_OBJECT)) {
-    if (vm_sp()->type == T_FUNCTION) {
-      vec = deep_inventory(current_object, 0, vm_sp()->u.fp);
-    } else if (vm_sp()->type == T_ARRAY) {
-      vec = deep_inventory_array(vm_sp()->u.arr, 1, nullptr);
-    } else { /*vm_sp()->type==T_OBJECT*/
-      vec = deep_inventory(vm_sp()->u.ob, 0, nullptr);
+             (f.type(0) == T_FUNCTION || f.type(0) == T_ARRAY || f.type(0) == T_OBJECT)) {
+    if (f.type(0) == T_FUNCTION) {
+      vec = deep_inventory(current_object, 0, f.funptr(0));
+    } else if (f.type(0) == T_ARRAY) {
+      vec = deep_inventory_array(f.array(0), 1, nullptr);
+    } else {
+      vec = deep_inventory(f.object(0), 0, nullptr);
     }
   } else {
     vec = &the_null_array;
   }
 
-  pop_n_elems(args);
-  push_refed_array(vec);
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_DESTRUCT
 void f_destruct(int num_arg) {
-  destruct_object(vm_sp()->u.ob);
-  vm_sp()--; /* Ok since the object was removed from the stack */
+  LPCFrame f = LPCFrame::args(num_arg);
+  destruct_object(f.object(0));
+  /* Ok since the object was removed from the stack */
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_ENABLE_WIZARD
 void f_enable_wizard(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (current_object->interactive) {
     current_object->flags |= O_IS_WIZARD;
   }
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_ERROR
 void f_error(int num_arg) {
-  int l = SVALUE_STRLEN(vm_sp());
-  if (l && vm_sp()->u.string[l - 1] == '\n') {
+  LPCFrame f = LPCFrame::args(num_arg);
+  int l = f.string_len(0);
+  if (l && f.string(0)[l - 1] == '\n') {
     l--;
   }
   const auto max_string_length = LARGEST_PRINTABLE_STRING;
@@ -553,58 +567,63 @@ void f_error(int num_arg) {
 
   err_buf[0] = '*';
   u8_strncpy(reinterpret_cast<uint8_t*>(err_buf + 1),
-             reinterpret_cast<const uint8_t*>(vm_sp()->u.string), l);
+             reinterpret_cast<const uint8_t*>(f.string(0)), l);
   err_buf[l + 1] = '\n';
   err_buf[l + 2] = 0;
 
   error_handler(err_buf);
 }
+
 #endif
 
 #ifdef F_DISABLE_WIZARD
 void f_disable_wizard(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (current_object->interactive) {
     current_object->flags &= ~O_IS_WIZARD;
   }
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_ENVIRONMENT
 void f_environment(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* ob = nullptr;
 
   if (num_arg) {
-    if ((ob = vm_sp()->u.ob)->flags & O_DESTRUCTED) {
+    if ((ob = f.object(0))->flags & O_DESTRUCTED) {
       error("environment() of destructed object.\n");
     }
     ob = ob->super;
-    free_object(&(vm_sp()--)->u.ob, "f_environment");
   } else {
     ob = current_object->super;
   }
 
   if (ob && object_visible(ob)) {
-    push_object(ob);
+    f.ret(ob);
   } else {
-    push_number(0);
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_FILE_NAME
 void f_file_name(int num_arg) {
-  char* res;
-
+  LPCFrame f = LPCFrame::args(num_arg);
   /* This function now returns a leading '/' */
-  res = add_slash(vm_sp()->u.ob->obname);
-  free_object(&vm_sp()->u.ob, "f_file_name");
-  put_malloced_string(res);
+  char* res = add_slash(f.object(0)->obname);
+  f.ret_str_malloced(res);
 }
+
 #endif
 
 #ifdef F_FILTER
 void f_filter(int num_arg) {
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* arg = f.argp(0);
 
   if (arg->type == T_MAPPING) {
     filter_mapping(arg, num_arg);
@@ -613,51 +632,55 @@ void f_filter(int num_arg) {
   } else {
     filter_array(arg, num_arg);
   }
+  f.done();
 }
+
 #endif
 
 #ifdef F_FIND_CALL_OUT
 void f_find_call_out(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
-  if (vm_sp()->type == T_NUMBER) {
-    i = find_call_out_by_handle(current_object, vm_sp()->u.number);
+  if (f.type(0) == T_NUMBER) {
+    i = find_call_out_by_handle(current_object, f.number(0));
   } else { /* T_STRING */
-    i = find_call_out(current_object, vm_sp()->u.string);
-    free_string_svalue(vm_sp());
+    i = find_call_out(current_object, f.string(0));
   }
-  put_number(i);
+  f.ret(i);
 }
+
 #endif
 
 #ifdef F_FIND_OBJECT
 void f_find_object(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* ob;
 
-  if ((vm_sp()--)->u.number) {
-    ob = find_object(vm_sp()->u.string);
+  if (f.number(1)) {
+    ob = find_object(f.string(0));
   } else {
-    ob = find_object2(vm_sp()->u.string);
+    ob = find_object2(f.string(0));
   }
-  free_string_svalue(vm_sp());
   if (ob && object_visible(ob)) {
-    /* find_object only returns undested objects */
-    put_unrefed_undested_object(ob, "find_object");
+    f.ret(ob);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_FUNCTION_PROFILE
 /* f_function_profile: John Garnett, 1993/05/31, 0.9.17.3 */
 void f_function_profile(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* vec;
   mapping_t* map;
   program_t* prog;
   int nf, j;
   object_t* ob;
 
-  ob = vm_sp()->u.ob;
+  ob = f.object(0);
 
   prog = ob->prog;
   nf = prog->num_functions_defined;
@@ -674,13 +697,14 @@ void f_function_profile(int num_arg) {
     prog->function_table[j].self = 0;
     prog->function_table[j].children = 0;
   }
-  free_object(&ob, "f_function_profile");
-  put_array(vec);
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_FUNCTION_EXISTS
 void f_function_exists(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* str;
   char* res;
   int l;
@@ -689,21 +713,20 @@ void f_function_exists(int num_arg) {
 
   if (num_arg > 1) {
     if (num_arg > 2) {
-      flag = (vm_sp()--)->u.number;
+      flag = f.number(2);
+      f.pop_back(1);
     }
-    ob = vm_sp()->u.ob;
-    free_object(&(vm_sp()--)->u.ob, "f_function_exists");
+    ob = f.object(1);
+    f.pop_back(1);
   } else {
     if (current_object->flags & O_DESTRUCTED) {
-      free_string_svalue(vm_sp());
-      *vm_sp() = const0;
+      f.ret(0);
       return;
     }
     ob = current_object;
   }
 
-  str = function_exists(vm_sp()->u.string, ob, flag);
-  free_string_svalue(vm_sp());
+  str = function_exists(f.string(0), ob, flag);
   if (str) {
     l = SHARED_STRLEN(str); /* strip the source extension (.lpc or .c) */
     if (l > 4 && strcmp(str + l - 4, ".lpc") == 0) {
@@ -715,22 +738,22 @@ void f_function_exists(int num_arg) {
     res[0] = '/';
     strncpy(res + 1, str, l);
     res[l + 1] = 0;
-
-    vm_sp()->subtype = STRING_MALLOC;
-    vm_sp()->u.string = res;
+    f.ret_str_malloced(res);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_GET_CHAR
 void f_get_char(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg;
   int i, tmp;
   int flag;
 
-  arg = vm_sp() - num_arg + 1; /* Points arg at first argument. */
+  arg = f.argp(0); /* Points arg at first argument. */
   if (num_arg == 1 || !(arg[1].type == T_NUMBER)) {
     tmp = 0;
     flag = 0;
@@ -741,20 +764,18 @@ void f_get_char(int num_arg) {
   }
   num_arg--;
   i = get_char(arg, flag, num_arg, &arg[1 + tmp]);
-  free_svalue(arg, "f_get_char");
-  (vm_sp() = arg)->type = T_NUMBER;
-  vm_sp()->u.number = i;
+  f.ret_front_number(i);
 }
+
 #endif
 
 #ifdef F_IN_INPUT
 void f_in_input(int num_arg) {
-  int i;
-
-  i = vm_sp()->u.ob->interactive && vm_sp()->u.ob->interactive->input_to;
-  free_object(&vm_sp()->u.ob, "f_in_input");
-  put_number(i != 0);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int i = f.object(0)->interactive && f.object(0)->interactive->input_to;
+  f.ret(i != 0);
 }
+
 #endif
 
 #ifdef F_INHERITS
@@ -777,50 +798,48 @@ int inherits(program_t* prog, program_t* thep) {
 }
 
 void f_inherits(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t *ob, *base;
   int i;
 
-  base = (vm_sp()--)->u.ob;
-  ob = find_object2(vm_sp()->u.string);
+  base = f.object(1);
+  ob = find_object2(f.string(0));
   if (!ob) {
-    free_object(&base, "f_inherits");
-    assign_svalue(vm_sp(), &const0);
+    f.ret(0);
     return;
   }
   i = inherits(base->prog, ob->prog);
-  free_object(&base, "f_inherits");
-  free_string_svalue(vm_sp());
-  put_number(i);
+  f.ret(i);
 }
+
 #endif
 
 #ifdef F_SHALLOW_INHERIT_LIST
 void f_shallow_inherit_list(int num_arg) {
-  array_t* vec;
-
-  vec = inherit_list(vm_sp()->u.ob);
-  free_object(&vm_sp()->u.ob, "f_inherit_list");
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = inherit_list(f.object(0));
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_INCLUDE_LIST
 void f_include_list(int num_arg) {
-  array_t* vec;
-
-  vec = include_list(vm_sp()->u.ob);
-  free_object(&vm_sp()->u.ob, "f_include_list");
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = include_list(f.object(0));
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_INPUT_TO
 void f_input_to(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg;
   int i, tmp;
   int flag;
 
-  arg = vm_sp() - num_arg + 1; /* Points arg at first argument. */
+  arg = f.argp(0); /* Points arg at first argument. */
   if ((num_arg == 1) || !(arg[1].type == T_NUMBER)) {
     tmp = flag = 0;
   } else {
@@ -828,100 +847,99 @@ void f_input_to(int num_arg) {
     num_arg--; /* Don't count the flag as an arg */
     flag = arg[1].u.number;
   }
-  num_arg--; /* Don't count the name of the func eicther. */
+  num_arg--; /* Don't count the name of the func either. */
   i = input_to(arg, flag, num_arg, &arg[1 + tmp]);
-  free_svalue(arg, "f_input_to");
-  (vm_sp() = arg)->type = T_NUMBER;
-  vm_sp()->u.number = i;
+  f.ret_front_number(i);
 }
+
 #endif
 
 #ifdef F_INTERACTIVE
 void f_interactive(int num_arg) {
-  int i;
-
-  i = (vm_sp()->u.ob->interactive != nullptr);
-  free_object(&vm_sp()->u.ob, "f_interactive");
-  put_number(i);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int i = (f.object(0)->interactive != nullptr);
+  f.ret(i);
 }
+
 #endif
 
 #ifdef F_INTP
 void f_intp(int num_arg) {
-  if (vm_sp()->type == T_NUMBER) {
-    vm_sp()->u.number = 1;
-  } else {
-    free_svalue(vm_sp(), "f_intp");
-    put_number(0);
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret(f.type(0) == T_NUMBER);
 }
+
 #endif
 
 #ifdef F_FUNCTIONP
 void f_functionp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
 
-  if (vm_sp()->type == T_FUNCTION) {
-    i = vm_sp()->u.fp->hdr.type;
-    if (vm_sp()->u.fp->hdr.args) {
+  if (f.type(0) == T_FUNCTION) {
+    i = f.funptr(0)->hdr.type;
+    if (f.funptr(0)->hdr.args) {
       i |= FP_HAS_ARGUMENTS;
     }
-    if (!vm_sp()->u.fp->hdr.owner || (vm_sp()->u.fp->hdr.owner->flags & O_DESTRUCTED)) {
+    if (!f.funptr(0)->hdr.owner || (f.funptr(0)->hdr.owner->flags & O_DESTRUCTED)) {
       i |= FP_OWNER_DESTED;
     }
-    free_funp(vm_sp()->u.fp);
-    put_number(i);
+    f.ret(i);
     return;
   }
-  assign_svalue(vm_sp(), &const0);
+  f.ret(0);
 }
+
 #endif
 
 #ifdef F_KEYS
 void f_keys(int num_arg) {
-  array_t* vec;
-
-  vec = mapping_indices(vm_sp()->u.map);
-  free_mapping(vm_sp()->u.map);
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = mapping_indices(f.mapping(0));
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_VALUES
 void f_values(int num_arg) {
-  array_t* vec;
-
-  vec = mapping_values(vm_sp()->u.map);
-  free_mapping(vm_sp()->u.map);
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = mapping_values(f.mapping(0));
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_LOWER_CASE
 void f_lower_case(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* str;
 
-  str = const_cast<char*>(vm_sp()->u.string);
+  str = const_cast<char*>(f.top().u.string);
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uisupper(*str)) {
-      int const l = str - vm_sp()->u.string;
-      unlink_string_svalue(vm_sp());
-      str = const_cast<char*>(vm_sp()->u.string) + l;
+      int const l = str - f.top().u.string;
+      unlink_string_svalue(&f.top());
+      str = const_cast<char*>(f.top().u.string) + l;
       *str = tolower(static_cast<unsigned char>(*str));
       for (str++; *str; str++) {
         if (uisupper(*str)) {
           *str = tolower(static_cast<unsigned char>(*str));
         }
       }
+      f.done();
       return;
     }
   }
+  f.done();
 }
+
 #endif
 
 #ifdef F_MALLOC_STATUS
 void f_malloc_status(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -934,32 +952,32 @@ void f_malloc_status(int num_arg) {
   dump_malloc_data(&ob);
 #endif
   outbuf_push(&ob);
+  f.done();
 }
+
 #endif
 
 #ifdef F_MAP_DELETE
 void f_map_delete(int num_arg) {
-  mapping_delete((vm_sp() - 1)->u.map, vm_sp());
-  pop_stack();
-  free_mapping((vm_sp()--)->u.map);
+  LPCFrame f = LPCFrame::args(num_arg);
+  mapping_delete(f.mapping(0), f.argp(1));
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_MAPP
 void f_mapp(int num_arg) {
-  if (vm_sp()->type == T_MAPPING) {
-    free_mapping(vm_sp()->u.map);
-    *vm_sp() = const1;
-  } else {
-    free_svalue(vm_sp(), "f_mapp");
-    *vm_sp() = const0;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret(f.type(0) == T_MAPPING);
 }
+
 #endif
 
 #ifdef F_MAP
 void f_map(int num_arg) {
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* arg = f.argp(0);
 
   if (arg->type == T_MAPPING) {
     map_mapping(arg, num_arg);
@@ -968,17 +986,21 @@ void f_map(int num_arg) {
   } else {
     map_string(arg, num_arg);
   }
+  f.done();
 }
+
 #endif
 
 #ifdef F_MASTER
 void f_master(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (!master_ob) {
-    push_number(0);
+    f.ret(0);
   } else {
-    push_object(master_ob);
+    f.ret(master_ob);
   }
 }
+
 #endif
 
 /*
@@ -995,6 +1017,7 @@ void f_master(int num_arg) {
  */
 #ifdef F_MATCH_PATH
 void f_match_path(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* value;
   const char* src;
   char* dst;
@@ -1004,9 +1027,9 @@ void f_match_path(int num_arg) {
 
   value = &const0u;
 
-  tmpstr = reinterpret_cast<char*>(DMALLOC(SVALUE_STRLEN(vm_sp()) + 1, TAG_STRING, "match_path"));
+  tmpstr = reinterpret_cast<char*>(DMALLOC(f.string_len(1) + 1, TAG_STRING, "match_path"));
 
-  src = vm_sp()->u.string;
+  src = f.string(1);
   dst = tmpstr;
 
   while (*src != '\0') {
@@ -1022,7 +1045,7 @@ void f_match_path(int num_arg) {
       }
     }
     *dst = '\0';
-    nvalue = find_string_in_mapping((vm_sp() - 1)->u.map, tmpstr);
+    nvalue = find_string_in_mapping(f.mapping(0), tmpstr);
 
     if (nvalue != &const0u) {
       value = nvalue;
@@ -1032,11 +1055,11 @@ void f_match_path(int num_arg) {
   FREE(tmpstr);
   /* Don't free mapping first, in case sometimes one uses a ref 1 mapping */
   /* Randor - 5/29/94 */
-  free_string_svalue(vm_sp()--);
-  map = vm_sp()->u.map;
-  assign_svalue_no_free(vm_sp(), value);
-  free_mapping(map);
+  svalue_t result;
+  assign_svalue_no_free(&result, value);
+  f.ret(result);
 }
+
 #endif /* F_MATCH_PATH */
 
 #ifdef F_MEMBER_ARRAY
@@ -1124,6 +1147,7 @@ static void warn_member_array_byte_search(const program_t* prog, const char* at)
 }
 
 void f_member_array(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t* v;
   int flag = 0;
   LPC_INT i;
@@ -1131,12 +1155,16 @@ void f_member_array(int num_arg) {
 
   if (num_arg > 2) {
     if (num_arg > 3) {
-      CHECK_TYPES(vm_sp(), T_NUMBER, 4, F_MEMBER_ARRAY);
-      flag = (vm_sp()--)->u.number;
+      CHECK_TYPES(f.argp(3), T_NUMBER, 4, F_MEMBER_ARRAY);
+      flag = f.number(3);
+      f.pop_back(1);
+      num_arg--;
     }
-    CHECK_TYPES(vm_sp(), T_NUMBER, 3, F_MEMBER_ARRAY);
+    CHECK_TYPES(f.argp(2), T_NUMBER, 3, F_MEMBER_ARRAY);
 
-    i = (vm_sp()--)->u.number;
+    i = f.number(2);
+    f.pop_back(1);
+    num_arg--;
     if (i < 0) {
       bad_arg(3, F_MEMBER_ARRAY);
     }
@@ -1144,41 +1172,42 @@ void f_member_array(int num_arg) {
     i = 0;
   }
 
-  if (vm_sp()->type == T_STRING) {
+  if (f.type(1) == T_STRING) {
     const char* res;
     if (flag & 2) {
       error("member_array: can not search backwards in strings");
     }
-    CHECK_TYPES(vm_sp() - 1, T_NUMBER, 1, F_MEMBER_ARRAY);
-    if (i > SVALUE_STRLEN(vm_sp())) {
+    CHECK_TYPES(f.argp(0), T_NUMBER, 1, F_MEMBER_ARRAY);
+    if (i > f.string_len(1)) {
       error("Index to start search from in member_array() is > string length.\n");
     }
     /* strchr() searches for a char: a value outside 0..255 would be
      * truncated onto some other byte (0x161 -> 'a', 0x100 -> the NUL
      * terminator), so it can never be in the string. */
-    LPC_INT const c = (vm_sp() - 1)->u.number;
-    if (c >= 0 && c <= 255 && (res = strchr(vm_sp()->u.string + i, static_cast<int>(c)))) {
-      i = res - vm_sp()->u.string;
+    LPC_INT const c = f.number(0);
+    if (c >= 0 && c <= 255 && (res = strchr(f.string(1) + i, static_cast<int>(c)))) {
+      i = res - f.string(1);
     } else {
       i = -1;
     }
-    if (!SVALUE_STR_ASCII(vm_sp())) { /* cached; ASCII and CR-free never warns */
+    if (!SVALUE_STR_ASCII(f.argp(1))) { /* cached; ASCII and CR-free never warns */
       const program_t* site_prog;
       const char* site_pc;
       member_array_call_site(&site_prog, &site_pc);
       if (!member_array_site_warned(site_prog, site_pc) &&
-          member_array_byte_answer_misleads(vm_sp()->u.string, SVALUE_STRLEN(vm_sp()), c, i)) {
+          member_array_byte_answer_misleads(f.string(1), f.string_len(1), c, i)) {
         warn_member_array_byte_search(site_prog, site_pc);
       }
     }
-    free_string_svalue(vm_sp()--);
+    f.ret(i);
+    return;
   } else {
     svalue_t* sv;
     svalue_t* find;
     int flen = 0;
 
-    size = (v = vm_sp()->u.arr)->size;
-    find = (vm_sp() - 1);
+    size = (v = f.array(1))->size;
+    find = f.argp(0);
     /* optimize a bit */
     if (find->type == T_STRING) {
       /* *not* COUNTED_STRLEN() which can do a (costly) strlen() call */
@@ -1200,10 +1229,14 @@ void f_member_array(int num_arg) {
       if ((flag & 4) && find->type == T_FUNCTION) {
         // Predicate search (issue #900): return the first index whose
         // element makes the function return truthy.
-        push_svalue(sv);
-        svalue_t* ret = call_function_pointer(find->u.fp, 1);
-        if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
-          break;
+        {
+          LPCFrame b = LPCFrame::builder();
+          b.push(sv);
+          svalue_t* ret = call_function_pointer(find->u.fp, 1);
+          b.done();
+          if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
+            break;
+          }
         }
         continue;
       }
@@ -1289,24 +1322,23 @@ void f_member_array(int num_arg) {
     if (i >= size) {
       i = -1; /* Return -1 for failure */
     }
-    free_array(v);
-    free_svalue(find, "f_member_array");
-    vm_sp()--;
   }
   if (i != -1 && (flag & 2)) {
     /* not-found used to be "reversed" too, returning size instead of -1 */
     i = size - i - 1;
   }
-  put_number(i);
+  f.ret(i);
 }
+
 #endif
 
 #ifdef F_MESSAGE
 void f_message(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   array_t *use = nullptr, *avoid;
   svalue_t* args;
 
-  args = vm_sp() - num_arg + 1;
+  args = f.argp(0);
   switch (args[2].type) {
     case T_OBJECT:
     case T_STRING:
@@ -1321,7 +1353,7 @@ void f_message(int num_arg) {
     case T_NUMBER: {
       int const len = SVALUE_STRLEN(args + 1);
       add_message(command_giver, args[1].u.string, len);
-      pop_n_elems(num_arg);
+      f.ret_void();
       return;
     }
     default:
@@ -1345,19 +1377,21 @@ void f_message(int num_arg) {
     avoid = &the_null_array;
   }
   do_message(&args[0], &args[1], use, avoid, 1);
-  pop_n_elems(num_arg);
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_MOVE_OBJECT
 void f_move_object(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t *o1, *o2;
 
   /* get destination */
-  if (vm_sp()->type == T_OBJECT) {
-    o2 = vm_sp()->u.ob;
+  if (f.type(0) == T_OBJECT) {
+    o2 = f.object(0);
   } else {
-    if (!(o2 = find_object(vm_sp()->u.string)) || !object_visible(o2)) {
+    if (!(o2 = find_object(f.string(0))) || !object_visible(o2)) {
       error("move_object failed: could not find destination\n");
     }
   }
@@ -1367,8 +1401,9 @@ void f_move_object(int num_arg) {
   }
 
   move_object(o1, o2);
-  pop_stack();
+  f.ret_void();
 }
+
 #endif
 
 namespace {
@@ -1462,12 +1497,14 @@ int calculate_and_maybe_print_memory_info(outbuffer_t* ob, int verbose) {
 
 #ifdef F_MUD_STATUS
 void f_mud_status(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   uint64_t tot = 0;
   int verbose = 0;
   outbuffer_t ob;
 
   outbuf_zero(&ob);
-  verbose = (vm_sp()--)->u.number;
+  verbose = f.number(0);
+  f.pop_back(1);
 
   if (verbose) {
     char dir_buf[1024];
@@ -1503,40 +1540,39 @@ void f_mud_status(int num_arg) {
   }
 
   outbuf_push(&ob);
+  f.done();
 }
+
 #endif
 
 #ifdef F_OBJECTP
 void f_objectp(int num_arg) {
-  if (vm_sp()->type == T_OBJECT && !(vm_sp()->u.ob->flags & O_DESTRUCTED)) {
-    free_object(&vm_sp()->u.ob, "f_objectp");
-    *vm_sp() = const1;
-  } else {
-    free_svalue(vm_sp(), "f_objectp");
-    *vm_sp() = const0;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret(f.type(0) == T_OBJECT && !(f.object(0)->flags & O_DESTRUCTED));
 }
+
 #endif
 
 #ifdef F_ORIGIN
-void f_origin(int num_arg) { push_constant_string(origin_name(caller_type)); }
+void f_origin(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_str_constant(origin_name(caller_type));
+}
+
 #endif
 
 #ifdef F_POINTERP
 void f_pointerp(int num_arg) {
-  if (vm_sp()->type == T_ARRAY) {
-    free_array(vm_sp()->u.arr);
-    *vm_sp() = const1;
-  } else {
-    free_svalue(vm_sp(), "f_pointerp");
-    *vm_sp() = const0;
-  }
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret(f.type(0) == T_ARRAY);
 }
+
 #endif
 
 #ifdef F_PRESENT
 void f_present(int num_arg) {
-  svalue_t* arg = vm_sp() - num_arg + 1;
+  LPCFrame f = LPCFrame::args(num_arg);
+  svalue_t* arg = f.argp(0);
   object_t* ob;
 
   if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
@@ -1545,24 +1581,26 @@ void f_present(int num_arg) {
     }
   }
   ob = object_present(arg, num_arg == 1 ? nullptr : arg[1].u.ob);
-  pop_n_elems(num_arg);
   if (ob && object_visible(ob)) {
-    push_object(ob);
+    f.ret(ob);
   } else {
-    push_number(0);
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_PREVIOUS_OBJECT
 void f_previous_object(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   control_stack_t* p;
   int i;
   object_t* ob = nullptr;
 
-  if ((i = vm_sp()->u.number) > 0) {
+  if ((i = f.number(0)) > 0) {
     if (i >= CONFIG_INT(__MAX_CALL_DEPTH__)) {
-      vm_sp()->u.number = 0;
+      f.set_top_number(0);
+      f.done();
       return;
     }
     ob = nullptr;
@@ -1609,336 +1647,343 @@ void f_previous_object(int num_arg) {
         i++;
       }
     } while (--p >= control_stack);
-    put_array(v);
+    f.ret_refed(v);
     return;
   } else {
     ob = previous_ob;
   }
   if (!ob || (ob->flags & O_DESTRUCTED)) {
-    vm_sp()->u.number = 0;
+    f.set_top_number(0);
+    f.done();
   } else {
-    put_unrefed_undested_object(ob, "previous_object()");
+    f.ret(ob);
   }
 }
+
 #endif
 
 #ifdef F_PRINTF
 void f_printf(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* ret;
 
   if (command_giver) {
-    ret = string_print_formatted((vm_sp() - num_arg + 1)->u.string, num_arg - 1, vm_sp() - num_arg + 2);
+    ret = string_print_formatted(f.string(0), num_arg - 1, f.argp(1));
     if (ret) {
       tell_object(command_giver, ret, COUNTED_STRLEN(ret));
       FREE_MSTR(ret);
     }
   }
 
-  pop_n_elems(num_arg);
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_PROCESS_STRING
 void f_process_string(int /*num_arg*/) {
+  LPCFrame f = LPCFrame::args(1);
   char* str;
 
-  str = process_string(vm_sp()->u.string);
-  if (str != vm_sp()->u.string) {
-    free_string_svalue(vm_sp());
-    put_malloced_string(str);
+  str = process_string(f.string(0));
+  if (str != f.string(0)) {
+    f.ret_str_malloced(str);
+  } else {
+    f.done();
   }
 }
+
 #endif
 
 #ifdef F_PROCESS_VALUE
 void f_process_value(int /*num_arg*/) {
+  LPCFrame f = LPCFrame::args(1);
   svalue_t* ret;
 
-  ret = process_value(vm_sp()->u.string);
-  free_string_svalue(vm_sp());
+  ret = process_value(f.string(0));
   if (ret) {
-    assign_svalue_no_free(vm_sp(), ret);
+    svalue_t v;
+    assign_svalue_no_free(&v, ret);
+    f.ret(v);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_QUERY_ED_MODE
 void f_query_ed_mode(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   /* n = prompt for line 'n'
    0 = normal ed prompt
    -1 = not in ed
    -2 = more prompt */
   if (current_object->flags & O_IN_EDIT) {
-    push_number(object_ed_mode(current_object));
+    f.ret(static_cast<LPC_INT>(object_ed_mode(current_object)));
   } else {
-    push_number(-1);
+    f.ret(static_cast<LPC_INT>(-1));
   }
 }
+
 #endif
 
 #ifdef F_QUERY_HOST_NAME
 void f_query_host_name(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* tmp;
 
   if ((tmp = query_host_name())) {
-    push_constant_string(tmp);
+    f.ret_str_constant(tmp);
   } else {
-    push_number(0);
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_QUERY_IDLE
 void f_query_idle(int num_arg) {
-  int i;
-
-  i = query_idle(vm_sp()->u.ob);
-  free_object(&vm_sp()->u.ob, "f_query_idle");
-  put_number(i);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int i = query_idle(f.object(0));
+  f.ret(i);
 }
+
 #endif
 
 #ifdef F_QUERY_IP_NAME
 void f_query_ip_name(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* tmp;
 
-  tmp = query_ip_name(num_arg ? vm_sp()->u.ob : nullptr);
-  if (num_arg) {
-    free_object(&(vm_sp()--)->u.ob, "f_query_ip_name");
-  }
+  tmp = query_ip_name(num_arg ? f.object(0) : nullptr);
   if (!tmp) {
-    push_number(0);
+    f.ret(0);
   } else {
-    push_shared_string(tmp);
+    f.ret_str_shared(tmp);
   }
   // no need to free
 }
+
 #endif
 
 #ifdef F_QUERY_IP_NUMBER
 void f_query_ip_number(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* tmp;
 
-  tmp = query_ip_number(num_arg ? vm_sp()->u.ob : nullptr);
-  if (num_arg) {
-    free_object(&(vm_sp()--)->u.ob, "f_query_ip_number");
-  }
+  tmp = query_ip_number(num_arg ? f.object(0) : nullptr);
   if (!tmp) {
-    push_number(0);
+    f.ret(0);
   } else {
-    copy_and_push_string(tmp);
+    f.ret_str_copy(tmp);
   }
 
   if (tmp) free_string(tmp);
 }
+
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-void f_query_load_average(int num_arg) { copy_and_push_string(query_load_av()); }
+void f_query_load_average(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  f.ret_str_copy(query_load_av());
+}
+
 #endif
 
 #ifdef F_QUERY_PRIVS
 void f_query_privs(int num_arg) {
-  object_t* ob;
-
-  ob = vm_sp()->u.ob;
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = f.object(0);
   if (ob->privs != nullptr) {
-    vm_sp()->type = T_STRING;
-    vm_sp()->u.string = make_shared_string(ob->privs);
-    vm_sp()->subtype = STRING_SHARED;
-    free_object(&ob, "f_query_privs");
+    f.ret_str_shared(ob->privs);
   } else {
-    free_object(&ob, "f_query_privs");
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_QUERY_SNOOPING
 void f_query_snooping(int num_arg) {
-  object_t* ob;
-
-  ob = query_snooping(vm_sp()->u.ob);
-  free_object(&vm_sp()->u.ob, "f_query_snooping");
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = query_snooping(f.object(0));
   if (ob) {
-    put_unrefed_undested_object(ob, "query_snooping");
+    f.ret(ob);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_QUERY_SNOOP
 void f_query_snoop(int num_arg) {
-  object_t* ob;
-
-  ob = query_snoop(vm_sp()->u.ob);
-  free_object(&vm_sp()->u.ob, "f_query_snoop");
+  LPCFrame f = LPCFrame::args(num_arg);
+  object_t* ob = query_snoop(f.object(0));
   if (ob) {
-    put_unrefed_undested_object(ob, "query_snoop");
+    f.ret(ob);
   } else {
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
+
 #endif
 
 #ifdef F_RANDOM
 void f_random(int num_arg) {
-  if (vm_sp()->u.number <= 0) {
-    vm_sp()->u.number = 0;
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.number(0) <= 0) {
+    f.set_top_number(0);
+    f.done();
     return;
   }
-  vm_sp()->u.number = random_number(vm_sp()->u.number);
+  f.set_top_number(random_number(f.number(0)));
+  f.done();
 }
+
 #endif
 
 #ifdef F_SECURE_RANDOM
 void f_secure_random(int num_arg) {
-  if (vm_sp()->u.number <= 0) {
-    vm_sp()->u.number = 0;
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.number(0) <= 0) {
+    f.set_top_number(0);
+    f.done();
     return;
   }
-  vm_sp()->u.number = secure_random_number(vm_sp()->u.number);
+  f.set_top_number(secure_random_number(f.number(0)));
+  f.done();
 }
+
 #endif
 
 #ifdef F_READ_BYTES
 void f_read_bytes(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* str;
   LPC_INT start = 0, len = 0;
   int rlen = 0;
-  svalue_t* arg;
 
-  arg = vm_sp() - num_arg + 1;
   if (num_arg > 1) {
-    start = arg[1].u.number;
+    start = f.number(1);
   }
   if (num_arg == 3) {
-    len = arg[2].u.number;
+    len = f.number(2);
   }
-  str = read_bytes(arg[0].u.string, start, len, &rlen);
-  pop_n_elems(num_arg);
+  str = read_bytes(f.string(0), start, len, &rlen);
   if (str == nullptr) {
-    push_number(0);
+    f.ret(0);
   } else {
     auto res = u8_sanitize(str);
-    copy_and_push_string(res.c_str());
     FREE_MSTR(str);
+    f.ret_str_copy(res.c_str());
   }
 }
+
 #endif
 
 #ifdef F_READ_BUFFER
 void f_read_buffer(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* str;
   LPC_INT start = 0, len = 0;
   int rlen = 0;
   int from_file = 0; /* new line */
-  svalue_t* arg = vm_sp() - num_arg + 1;
 
   if (num_arg > 1) {
-    start = arg[1].u.number;
+    start = f.number(1);
     if (num_arg == 3) {
-      len = arg[2].u.number;
+      len = f.number(2);
     }
   }
-  if (arg[0].type == T_STRING) {
+  if (f.type(0) == T_STRING) {
     from_file = 1; /* new line */
-    str = read_bytes(arg[0].u.string, start, len, &rlen);
+    str = read_bytes(f.string(0), start, len, &rlen);
   } else { /* T_BUFFER */
-    str = read_buffer(arg[0].u.buf, start, len, &rlen);
+    str = read_buffer(f.buffer(0), start, len, &rlen);
   }
-  pop_n_elems(num_arg);
   if (str == nullptr) {
-    push_number(0);
+    f.ret(0);
   } else if (from_file) { /* changed */
-    buffer_t* buf;
-
-    buf = allocate_buffer(rlen);
+    buffer_t* buf = allocate_buffer(rlen);
     memcpy(buf->item, str, rlen);
-    STACK_INC;
-    vm_sp()->type = T_BUFFER;
-    vm_sp()->u.buf = buf;
     FREE_MSTR(str);
+    f.ret_refed(buf);
   } else { /* T_BUFFER */
-    push_malloced_string(str);
+    f.ret_str_malloced(str);
   }
 }
+
 #endif
 
 #ifdef F_READ_FILE
 void f_read_file(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* str;
   LPC_INT start = 0, len = 0;
 
   switch (num_arg) {
     case 3:
-      len = vm_sp()->u.number;
-      pop_stack();
+      len = f.number(2);
+      f.pop_back(1);
     /* fall through */
     case 2:
-      start = vm_sp()->u.number;
-      pop_stack();
+      start = f.number(1);
+      f.pop_back(1);
     /* fall through */
     case 1:
       break;
     default:
       error("Wrong number of arguments!");
   }
-  str = read_file(vm_sp()->u.string, start, len);
-  pop_stack();
+  str = read_file(f.string(0), start, len);
   if (!str) {
-    push_svalue(&const0);
+    f.ret(0);
   } else {
     auto res = u8_sanitize(str);
-    copy_and_push_string(res.c_str());
     FREE_MSTR(str);
+    f.ret_str_copy(res.c_str());
   }
 }
+
 #endif
 
 #ifdef F_RECEIVE
 void f_receive(int num_arg) {
-  if (vm_sp()->type == T_STRING) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.type(0) == T_STRING) {
     if (current_object->interactive) {
-      int const len = SVALUE_STRLEN(vm_sp());
-      add_message(current_object, vm_sp()->u.string, len);
+      int const len = f.string_len(0);
+      add_message(current_object, f.string(0), len);
     }
-    free_string_svalue(vm_sp()--);
   } else {
     if (current_object->interactive) {
-      add_message(current_object, reinterpret_cast<char*>(vm_sp()->u.buf->item), vm_sp()->u.buf->size);
+      add_message(current_object, reinterpret_cast<char*>(f.buffer(0)->item), f.buffer(0)->size);
     }
-
-    free_buffer((vm_sp()--)->u.buf);
   }
+  f.ret_void();
 }
+
 #endif
 
 #ifdef F_REG_ASSOC
 void f_reg_assoc(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* arg;
   array_t* vec;
 
-  arg = vm_sp() - num_arg + 1;
+  arg = f.argp(0);
 
   if (!(arg[2].type == T_ARRAY)) {
     error("Bad argument 3 to reg_assoc()\n");
   }
 
   vec = reg_assoc(arg, arg[1].u.arr, arg[2].u.arr, num_arg > 3 ? &arg[3] : &const0);
-
-  if (num_arg == 4) {
-    pop_3_elems();
-  } else {
-    pop_2_elems();
-  }
-  free_string_svalue(vm_sp());
-  vm_sp()->type = T_ARRAY;
-  vm_sp()->u.arr = vec;
+  f.ret_refed(vec);
 }
+
 #endif
 
 #ifdef F_REGEXP
