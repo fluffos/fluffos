@@ -2942,10 +2942,12 @@ static void we_are_finished(parse_state_t* state) {
       best_result->res[tryy].func = string_copy(func, "best_result");
       best_result->res[tryy].num = args;
       if (args) {
-        p = (char*)(best_result->res[tryy].args =
-                        (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result"));
-        memcpy(p, (char*)(vm_sp() - args + 1), args * sizeof(svalue_t));
-        vm_sp() -= args;
+        best_result->res[tryy].args =
+            (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result");
+        /* Args were just pushed by make_function / push_real_names. */
+        LPCFrame stash = LPCFrame::args(args);
+        stash.detach_back(args, best_result->res[tryy].args);
+        stash.abandon();
       }
     }
     DEBUG_P(
@@ -2969,19 +2971,19 @@ static void do_the_call() {
     }
     n = best_result->res[i].num;
     if (n) {
-      CHECK_STACK_OVERFLOW(n);
-      memcpy((char*)(vm_sp() + 1), best_result->res[i].args, n * sizeof(svalue_t));
-      /*
-       * Make sure we haven't dumped any dested obs onto the stack;
-       * this also updates vm_sp().
-       */
-      while (n--) {
-        if ((++vm_sp())->type == T_OBJECT && (vm_sp()->u.ob->flags & O_DESTRUCTED)) {
-          free_object(&vm_sp()->u.ob, "do_the_call");
-          *vm_sp() = const0u;
+      LPCFrame call = LPCFrame::builder();
+      call.attach_back(best_result->res[i].args, n);
+      /* Make sure we haven't dumped any dested obs onto the stack. */
+      for (int j = 0; j < n; j++) {
+        svalue_t& slot = call[j];
+        if (slot.type == T_OBJECT && (slot.u.ob->flags & O_DESTRUCTED)) {
+          free_object(&slot.u.ob, "do_the_call");
+          slot = const0u;
         }
       }
       FREE(best_result->res[i].args);
+      /* safe_apply below consumes these slots; release the window. */
+      call.abandon();
     }
     best_result->res[i].args = nullptr;
     DEBUG_P(("Calling %s ...", best_result->res[i].func));
@@ -3430,11 +3432,13 @@ static svalue_t* get_the_error(parser_error_t* err, int obj) {
       return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 2);
     case ERR_MANY_PATHS:
       return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 5);
-    default:
-      pop_stack();
-      vm_sp()--;
+    default: {
+      /* Drop the two slots pushed above (number + object/undefined). */
+      LPCFrame drop = LPCFrame::args(2);
+      drop.ret_void();
       hack.u.number = -found_level;
       return &hack;
+    }
   }
 }
 

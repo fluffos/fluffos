@@ -168,6 +168,13 @@ class LPCFrame {
   /* Pop n slots from the back (free them); window shrinks. */
   void pop_back(int n = 1);
 
+  /* Move the top n slots into dest without freeing; shrinks the window.
+   * Caller owns the bitwise-copied svalues. Used when stashing apply args. */
+  void detach_back(int n, svalue_t* dest);
+
+  /* Push n already-owned svalues (bitwise copy); grows the window. */
+  void attach_back(const svalue_t* src, int n);
+
   /* Pop everything back to (and including) the mark; Mark/Builder mode. */
   void discard_to();
 

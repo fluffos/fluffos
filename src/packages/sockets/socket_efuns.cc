@@ -1486,12 +1486,16 @@ void socket_read_select_handler(int fd) {
           }
           lpc_socks[fd].r_buf[lpc_socks[fd].r_len] = '\0';
           value = const0;
-          push_number(fd);
-          if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
-            STACK_INC;
-            *lpc_eval_sp = value;
-          } else {
-            push_undefined();
+          {
+            LPCFrame cb = LPCFrame::builder();
+            cb.push(static_cast<LPC_INT>(fd));
+            if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
+              cb.push(&value);
+            } else {
+              cb.push_undefined();
+            }
+            /* call_callback / safe_apply consume the two slots. */
+            cb.abandon();
           }
           FREE(lpc_socks[fd].r_buf);
           lpc_socks[fd].flags |= S_HEADER;
