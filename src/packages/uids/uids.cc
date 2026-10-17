@@ -20,17 +20,16 @@ static object_t* ob;
 #ifdef F_EXPORT_UID
 
 void f_export_uid(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
-  ob = vm_sp()->u.ob;
+  ob = f.object(0);
   if (ob->euid) {
-    free_object(&ob, "f_export_uid:1");
-    *vm_sp() = const0;
+    f.ret(0);
   } else {
     ob->uid = current_object->euid;
-    free_object(&ob, "f_export_uid:2");
-    *vm_sp() = const1;
+    f.ret(1);
   }
 }
 
@@ -39,26 +38,23 @@ void f_export_uid(int num_arg) {
 #ifdef F_GETEUID
 
 void f_geteuid(int num_arg) {
-  if (vm_sp()->type & T_OBJECT) {
-    ob = vm_sp()->u.ob;
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (f.type(0) & T_OBJECT) {
+    ob = f.object(0);
     if (ob->euid) {
-      put_constant_string(ob->euid->name);
-      free_object(&ob, "f_geteuid:1");
+      f.ret_str_shared(ob->euid->name);
       return;
     }
-    free_object(&ob, "f_geteuid:2");
-    *vm_sp() = const0;
+    f.ret(0);
     return;
 
-  } else if (vm_sp()->type & T_FUNCTION) {
+  } else if (f.type(0) & T_FUNCTION) {
     funptr_t* fp;
-    if ((fp = vm_sp()->u.fp)->hdr.owner && fp->hdr.owner->euid) {
-      put_constant_string(fp->hdr.owner->euid->name);
-      free_funp(fp);
+    if ((fp = f.funptr(0))->hdr.owner && fp->hdr.owner->euid) {
+      f.ret_str_shared(fp->hdr.owner->euid->name);
       return;
     }
-    free_funp(fp);
-    *vm_sp() = const0;
+    f.ret(0);
   }
 }
 
@@ -67,14 +63,14 @@ void f_geteuid(int num_arg) {
 #ifdef F_GETUID
 
 void f_getuid(int num_arg) {
-  ob = vm_sp()->u.ob;
+  LPCFrame f = LPCFrame::args(num_arg);
+  ob = f.object(0);
 
   if (!ob->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
   }
 
-  put_constant_string(ob->uid->name);
-  free_object(&ob, "f_getuid");
+  f.ret_str_shared(ob->uid->name);
 }
 
 #endif
@@ -82,29 +78,31 @@ void f_getuid(int num_arg) {
 #ifdef F_SETEUID
 
 void f_seteuid(int num_arg) {
-  svalue_t* arg;
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t* ret;
 
-  if (vm_sp()->type & T_NUMBER) {
-    if (vm_sp()->u.number) {
+  if (f.type(0) & T_NUMBER) {
+    if (f.number(0)) {
       bad_arg(1, F_SETEUID);
     }
     current_object->euid = nullptr;
-    vm_sp()->u.number = 1;
+    f.set_top_number(1);
+    f.done();
     return;
   }
-  arg = vm_sp();
-  push_object(current_object);
-  push_svalue(arg);
-  ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push(current_object);
+    b.push(f.argp(0));
+    ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
+    b.done();
+  }
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
-    free_string_svalue(vm_sp());
-    *vm_sp() = const0;
+    f.ret(0);
     return;
   }
-  current_object->euid = add_uid(vm_sp()->u.string);
-  free_string_svalue(vm_sp());
-  *vm_sp() = const1;
+  current_object->euid = add_uid(f.string(0));
+  f.ret(1);
 }
 
 #endif

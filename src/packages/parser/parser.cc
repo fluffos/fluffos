@@ -569,9 +569,11 @@ static void interrogate_master() {
 }
 
 void f_parse_init(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   parse_info_t* pi;
 
   if (current_object->pinfo) {
+    f.done();
     return;
   }
 
@@ -579,6 +581,7 @@ void f_parse_init(int num_arg) {
       (parse_info_t*)DMALLOC(sizeof(parse_info_t), TAG_PARSER, "parse_init");
   pi->ob = current_object;
   pi->flags = 0;
+  f.done();
 }
 
 static void remove_ids(parse_info_t* pinfo) {
@@ -613,6 +616,7 @@ static void remove_ids(parse_info_t* pinfo) {
  * and should be recached when necessary.
  */
 void f_parse_refresh(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   parse_info_t* pi;
 
   /* If this is the master object, prepare to go through
@@ -622,6 +626,7 @@ void f_parse_refresh(int num_arg) {
   if (current_object == master_ob) {
     master_state &= ~MS_HAS_USERS;
     if (!master_ob->pinfo) {
+      f.done();
       return;
     }
   }
@@ -640,8 +645,10 @@ void f_parse_refresh(int num_arg) {
    * object involved in the parse.
    */
   if (pi->flags & PI_VERB_HANDLER) {
-    svalue_t* ret = safe_apply(LIVINGS_ARE_REMOTE, current_object, 0, ORIGIN_DRIVER);
+    LPCFrame apply_args = LPCFrame::builder();
+    svalue_t* ret = apply_args.safe_apply(LIVINGS_ARE_REMOTE, current_object, ORIGIN_DRIVER);
     if (current_object->flags & O_DESTRUCTED) {
+      f.done();
       return;
     }
 
@@ -649,6 +656,7 @@ void f_parse_refresh(int num_arg) {
       pi->flags |= PI_REMOTE_LIVINGS;
     }
   }
+  f.done();
 }
 
 /* called from free_object() */
@@ -1009,8 +1017,10 @@ static object_t* first_inv(object_t* ob) {
 #else
   svalue_t* ret;
 
-  push_object(ob);
-  ret = apply_master_ob(APPLY_PARSE_FIRST_INVENTORY, 1);
+  LPCFrame b = LPCFrame::builder();
+  b.push(ob);
+  ret = apply_master_ob(APPLY_PARSE_FIRST_INVENTORY, b.argc());
+  b.done();
   if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
@@ -1024,9 +1034,11 @@ static object_t* next_inv(object_t* sibling) {
 #else
   svalue_t* ret;
 
-  push_object(parent);
-  push_object(sibling);
-  ret = apply_master_ob(APPLY_PARSE_NEXT_INVENTORY, 2);
+  LPCFrame b = LPCFrame::builder();
+  b.push(parent);
+  b.push(sibling);
+  ret = apply_master_ob(APPLY_PARSE_NEXT_INVENTORY, b.argc());
+  b.done();
   if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
@@ -1040,8 +1052,10 @@ static object_t* super(object_t* ob) {
 #else
   svalue_t* ret;
 
-  push_object(ob);
-  ret = apply_master_ob(APPLY_PARSE_ENVIRONMENT, 1);
+  LPCFrame b = LPCFrame::builder();
+  b.push(ob);
+  ret = apply_master_ob(APPLY_PARSE_ENVIRONMENT, b.argc());
+  b.done();
   if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
@@ -3425,6 +3439,8 @@ static svalue_t* get_the_error(parser_error_t* err, int obj) {
 }
 
 void f_parse_sentence(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
@@ -3440,60 +3456,70 @@ void f_parse_sentence(int num_arg) {
   }
 
   if (num_arg == 4) {
-    parse_nicks = (vm_sp()--)->u.map;
+    parse_nicks = f.steal(f.argc() - 1).u.map;
+    f.pop_back();
   }
 
   if (num_arg >= 3) {
-    parse_env = (vm_sp()--)->u.arr;
+    parse_env = f.steal(f.argc() - 1).u.arr;
+    f.pop_back();
   }
 
-  if (num_arg >= 2 && (vm_sp()--)->u.number) {
+  if (num_arg >= 2) {
+    LPC_INT const dbg = f.number(f.argc() - 1);
+    f.pop_back();
+    if (dbg) {
 #if defined(DEBUG) || defined(PARSE_DEBUG)
-    debug_parse_depth = 1;
-    if ((vm_sp() + 1)->u.number > 1) {
-      debug_parse_verbose = 1;
+      debug_parse_depth = 1;
+      if (dbg > 1) {
+        debug_parse_verbose = 1;
+      } else {
+        debug_parse_verbose = 0;
+      }
     } else {
-      debug_parse_verbose = 0;
-    }
-  } else {
-    debug_parse_depth = 0;
+      debug_parse_depth = 0;
 #else
-    error(
-        "Parser debugging not enabled. (compile with -DDEBUG or "
-        "-DPARSE_DEBUG).\n");
+      error(
+          "Parser debugging not enabled. (compile with -DDEBUG or "
+          "-DPARSE_DEBUG).\n");
 #endif
+    }
   }
 
-  STACK_INC;
-  vm_sp()->type = T_ERROR_HANDLER;
-  vm_sp()->u.error_handler = free_parse_globals;
+  {
+    svalue_t eh{};
+    eh.type = T_ERROR_HANDLER;
+    eh.u.error_handler = free_parse_globals;
+    f.push(&eh);
+  }
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = current_object;
   pi = current_object->pinfo;
   parse_restricted = nullptr;
   found_level = 0;
-  parse_sentence((vm_sp() - 1)->u.string);
+  parse_sentence(f.string(0));
 
   if (best_match) {
-    vm_sp()--; /* pop the error handler */
+    (void)f.steal(1); /* discard error handler without invoking it */
+    f.pop_back();
     free_parse_globals();
 
     do_the_call();
-    free_string_svalue(vm_sp());
-    put_number(1);
+    f.ret(1);
   } else {
     svalue_t* ret = get_the_error(&best_error_info, -1);
 
-    vm_sp()--; /* pop the error handler */
+    (void)f.steal(1); /* discard error handler without invoking it */
+    f.pop_back();
     free_parse_globals();
 
-    free_string_svalue(vm_sp());
     if (ret) {
-      *vm_sp() = *ret;
+      svalue_t v = *ret;
       ret->type = T_NUMBER; /* will be freed later */
+      f.ret(v);
     } else {
-      *vm_sp() = const0;
+      f.ret(0);
     }
   }
 
@@ -3504,10 +3530,14 @@ void f_parse_sentence(int num_arg) {
 }
 
 void f_parse_my_rules(int num_arg) {
-  int const flag = (num_arg == 3 ? (vm_sp()--)->u.number : 0);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int const flag = (num_arg == 3 ? f.number(2) : 0);
+  if (num_arg == 3) {
+    f.pop_back();
+  }
 
-  if (!(vm_sp() - 1)->u.ob->pinfo)
-    error("/%s is not known by the parser.  Call parse_init() first.\n", (vm_sp() - 1)->u.ob->obname);
+  if (!f.object(0)->pinfo)
+    error("/%s is not known by the parser.  Call parse_init() first.\n", f.object(0)->obname);
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
@@ -3515,23 +3545,25 @@ void f_parse_my_rules(int num_arg) {
     error("Illegal to call parse_sentence() recursively.\n");
   }
 
-  STACK_INC;
-  vm_sp()->type = T_ERROR_HANDLER;
-  vm_sp()->u.error_handler = free_parse_globals;
+  {
+    svalue_t eh{};
+    eh.type = T_ERROR_HANDLER;
+    eh.u.error_handler = free_parse_globals;
+    f.push(&eh);
+  }
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
-  parse_user = (vm_sp() - 2)->u.ob;
+  parse_user = f.object(0);
   pi = parse_user->pinfo;
   parse_restricted = current_object;
-  parse_sentence((vm_sp() - 1)->u.string);
+  parse_sentence(f.string(1));
 
   if (best_match) {
     if (flag) {
       do_the_call();
-      vm_sp()--; /* pop the error handler */
-      free_string_svalue(vm_sp()--);
-      free_svalue(vm_sp(), "parse_my_rules"); /* may have been destructed */
-      put_number(1);
+      (void)f.steal(2); /* discard error handler without invoking it */
+      f.pop_back();
+      f.ret(1);
     } else {
       int n;
       array_t* arr;
@@ -3549,32 +3581,32 @@ void f_parse_my_rules(int num_arg) {
         FREE(best_result->res[3].args);
       }
       best_result->res[3].args = nullptr;
-      vm_sp()--; /* pop the error handler */
-      free_string_svalue(vm_sp()--);
-      free_svalue(vm_sp(), "parse_my_rules"); /* may have been destructed */
-      put_array(arr);
+      (void)f.steal(2); /* discard error handler without invoking it */
+      f.pop_back();
+      f.ret_refed(arr);
     }
   } else {
     svalue_t* ret = get_the_error(&best_error_info, -1);
 
-    vm_sp()--; /* pop the error handler */
-    free_string_svalue(vm_sp()--);
-    free_svalue(vm_sp(), "parse_my_rules"); /* may have been destructed */
+    (void)f.steal(2); /* discard error handler without invoking it */
+    f.pop_back();
     if (ret) {
-      *vm_sp() = *ret;
+      svalue_t v = *ret;
       ret->type = T_NUMBER;
+      f.ret(v);
     } else {
-      *vm_sp() = const0;
+      f.ret(0);
     }
   }
   free_parse_globals();
 }
 
 void f_parse_remove(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char* verb;
   verb_t* verb_entry;
 
-  verb = SHARED_STRING(vm_sp());
+  verb = SHARED_STRING(f.argp(0));
   verb_entry = verbs[DO_HASH(verb, VERB_HASH_SIZE)];
   while (verb_entry) {
     if (verb_entry->match_name == verb) {
@@ -3591,10 +3623,11 @@ void f_parse_remove(int num_arg) {
     }
     verb_entry = verb_entry->next;
   }
-  free_string_svalue(vm_sp()--);
+  f.ret_void();
 }
 
 void f_parse_add_rule(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int tokens[10];
   int lit[2], i, j;
   svalue_t* ret;
@@ -3605,8 +3638,8 @@ void f_parse_add_rule(int num_arg) {
   int h;
   int weight;
 
-  rule = vm_sp()->u.string;
-  verb = SHARED_STRING(vm_sp() - 1);
+  rule = f.string(1);
+  verb = SHARED_STRING(f.argp(0));
   verb_entry = nullptr;
   handler = current_object;
   if (!(handler->pinfo))
@@ -3632,7 +3665,7 @@ void f_parse_add_rule(int num_arg) {
 
   if (!verb_entry) {
     if (!verb) {
-      verb = make_shared_string((vm_sp() - 1)->u.string);
+      verb = make_shared_string(f.string(0));
     } else {
       ref_string(verb);
     }
@@ -3676,17 +3709,19 @@ void f_parse_add_rule(int num_arg) {
   verb_node->next = verb_entry->node;
   verb_entry->node = verb_node;
 
-  ret = safe_apply(LIVINGS_ARE_REMOTE, handler, 0, ORIGIN_DRIVER);
+  {
+    LPCFrame apply_args = LPCFrame::builder();
+    ret = apply_args.safe_apply(LIVINGS_ARE_REMOTE, handler, ORIGIN_DRIVER);
+  }
   if (APPLY_SAYS_YES(ret)) {
     handler->pinfo->flags |= PI_REMOTE_LIVINGS;
   }
 
-  /* return */
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp()--);
+  f.ret_void();
 }
 
 void f_parse_add_synonym(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char *new_verb, *old_verb, *rule, *orig_new_verb;
   verb_t* vb;
   verb_node_t *vn, *verb_node;
@@ -3696,14 +3731,14 @@ void f_parse_add_synonym(int num_arg) {
   int h;
 
   if (num_arg == 3) {
-    orig_new_verb = (vm_sp() - 2)->u.string;
-    new_verb = SHARED_STRING(vm_sp() - 2);
-    old_verb = SHARED_STRING(vm_sp() - 1);
-    rule = vm_sp()->u.string;
+    orig_new_verb = f.string(0);
+    new_verb = SHARED_STRING(f.argp(0));
+    old_verb = SHARED_STRING(f.argp(1));
+    rule = f.string(2);
   } else {
-    orig_new_verb = (vm_sp() - 1)->u.string;
-    new_verb = SHARED_STRING(vm_sp() - 1);
-    old_verb = SHARED_STRING(vm_sp());
+    orig_new_verb = f.string(0);
+    new_verb = SHARED_STRING(f.argp(0));
+    old_verb = SHARED_STRING(f.argp(1));
     rule = nullptr;
   }
 
@@ -3809,14 +3844,11 @@ void f_parse_add_synonym(int num_arg) {
     syn->real = vb;
   }
 
-  if (num_arg == 3) {
-    free_string_svalue(vm_sp()--);
-  }
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp()--);
+  f.ret_void();
 }
 
 void f_parse_dump(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
   outbuffer_t ob;
 
@@ -3841,5 +3873,7 @@ void f_parse_dump(int num_arg) {
       }
     }
   }
+  /* outbuf_push leaves the result string on the stack (builder + done). */
   outbuf_push(&ob);
+  f.done();
 }

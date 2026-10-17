@@ -5,40 +5,36 @@
 #ifdef F_SAVE_OBJECT
 void f_save_object(int num_arg) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
+  LPCFrame f = LPCFrame::args(num_arg);
 
-  int flag;
+  int flag = 0;
   if (num_arg == 2) {
-    flag = (vm_sp()--)->u.number;
-    if (vm_sp()->type != T_STRING) {
+    flag = static_cast<int>(f.number(1));
+    if (f.type(0) != T_STRING) {
       error("first argument must be a string for save_object with 2 args");
     }
-  } else {
-    flag = 0;
   }
 
-  if (num_arg == 1 && vm_sp()->type == T_NUMBER) {
-    flag = vm_sp()->u.number;
+  if (num_arg == 1 && f.type(0) == T_NUMBER) {
+    flag = static_cast<int>(f.number(0));
   }
 
-  if (num_arg && vm_sp()->type == T_STRING) {
-    flag = save_object(current_object, vm_sp()->u.string, flag);
-
-    free_string_svalue(vm_sp());
-    put_number(flag);
+  if (num_arg && f.type(0) == T_STRING) {
+    flag = save_object(current_object, f.string(0), flag);
+    f.ret(static_cast<LPC_INT>(flag));
   } else {
-    pop_n_elems(num_arg);
+    f.ret_void();
     char* saved = new_string(max_string_length, "save_object_str");
-    push_malloced_string(saved);
+    LPCFrame out = LPCFrame::builder();
+    out.push_str_malloced(saved);
     int const left = max_string_length;
     flag = save_object_str(current_object, flag, saved, left);
     if (!flag) {
-      pop_stack();
-      push_undefined();
+      out.ret_undefined();
     } else {
-      saved = new_string(strlen(vm_sp()->u.string), "save_object_str2");
-      strcpy(saved, vm_sp()->u.string);
-      pop_stack();
-      push_malloced_string(saved);
+      saved = new_string(strlen(out.string(0)), "save_object_str2");
+      strcpy(saved, out.string(0));
+      out.ret_str_malloced(saved);
     }
   }
 }
@@ -64,37 +60,36 @@ char* save_variable(svalue_t* var) {
 
 #ifdef F_SAVE_VARIABLE
 void f_save_variable(int num_arg) {
-  char* p;
-
-  p = save_variable(vm_sp());
-  pop_stack();
-  push_malloced_string(p);
+  LPCFrame f = LPCFrame::args(num_arg);
+  char* p = save_variable(&f.top());
+  f.ret_str_malloced(p);
 }
 #endif
 
 #ifdef F_RESTORE_OBJECT
 void f_restore_object(int num_arg) {
-  int flag;
-
-  flag = (num_arg > 1) ? (vm_sp()--)->u.number : 0;
-
-  flag = restore_object(current_object, vm_sp()->u.string, flag);
-
-  free_string_svalue(vm_sp());
-  put_number(flag);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int flag = (num_arg > 1) ? static_cast<int>(f.number(1)) : 0;
+  if (num_arg > 1) {
+    f.pop_back(1);
+  }
+  flag = restore_object(current_object, f.string(0), flag);
+  f.ret(static_cast<LPC_INT>(flag));
 }
 #endif
 
 #ifdef F_RESTORE_VARIABLE
 void f_restore_variable(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   svalue_t v;
 
-  unlink_string_svalue(vm_sp());
+  unlink_string_svalue(&f.top());
   v.type = T_NUMBER;
 
   // unlinked string
-  restore_variable(&v, const_cast<char*>(vm_sp()->u.string));
-  FREE_MSTR(vm_sp()->u.string);
-  *vm_sp() = v;
+  restore_variable(&v, const_cast<char*>(f.top().u.string));
+  FREE_MSTR(f.top().u.string);
+  f.top() = v;
+  f.done();
 }
 #endif

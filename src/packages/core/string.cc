@@ -2,66 +2,43 @@
 
 #ifdef F_EXPLODE
 void f_explode(int num_arg) {
-  array_t* vec;
-
-  int const len = SVALUE_STRLEN(vm_sp() - 1);
-
-  vec = explode_string((vm_sp() - 1)->u.string, len, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()),
-                       CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp());
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec = explode_string(f.string(0), f.string_len(0), f.string(1), f.string_len(1),
+                                CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0);
+  f.ret(vec);
 }
 #endif
 
 #ifdef F_EXPLODE_REVERSIBLE
 void f_explode_reversible(int num_arg) {
-  array_t* vec;
-
-  int const len = SVALUE_STRLEN(vm_sp() - 1);
-
-  vec = explode_string((vm_sp() - 1)->u.string, len, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()), true);
-  free_string_svalue(vm_sp()--);
-  free_string_svalue(vm_sp());
-  put_array(vec);
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* vec =
+      explode_string(f.string(0), f.string_len(0), f.string(1), f.string_len(1), true);
+  f.ret(vec);
 }
 #endif
 
 #ifdef F_IMPLODE
 void f_implode(int num_arg) {
-  array_t* arr;
-  int flag;
-  svalue_t* args;
-
-  if (num_arg == 3) {
-    args = (vm_sp() - 2);
-    if (args[1].type == T_STRING) {
-      error(
-          "Third argument to implode() is illegal with implode(array, "
-          "string)\n");
-    }
-    flag = 1;
-  } else {
-    args = (vm_sp() - 1);
-    flag = 0;
-  }
-  arr = args->u.arr;
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* arr = f.array(0);
   check_for_destr(arr);
 
-  if (args[1].type == T_STRING) {
+  if (f.type(1) == T_STRING) {
     /* num_arg == 2 here */
-    char* str;
-
-    str = implode_string(arr, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()));
-    free_string_svalue(vm_sp()--);
-    free_array(arr);
-    put_malloced_string(str);
+    char* str = implode_string(arr, f.string(1), f.string_len(1));
+    f.ret_str_malloced(str);
   } else { /* function */
-    funptr_t* funp = args[1].u.fp;
+    funptr_t* funp = f.funptr(1);
+    int const flag = (num_arg == 3) ? 1 : 0;
 
     /* this pulls the extra arg off the stack if it exists */
-    implode_array(funp, arr, args, flag);
-    pop_stack();
+    implode_array(funp, arr, f.argp(0), flag);
+    /* implode_array may have consumed the optional 3rd arg; leave the
+     * result in slot 0 and drop the function pointer still on top. */
+    f.done();
+    LPCFrame drop_fun = LPCFrame::args(1);
+    drop_fun.ret_void();
   }
 }
 #endif

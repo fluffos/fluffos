@@ -7,6 +7,7 @@
 /* TELNET */
 #ifdef F_REQUEST_TERM_TYPE
 void f_request_term_type(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_request_ttype(ip->telnet);
@@ -15,11 +16,13 @@ void f_request_term_type(int num_arg) {
     debug_message(
         "Warning: wrong usage. request_term_type() should only be called by a user object.\n");
   }
+  f.done();
 }
 #endif
 
 #ifdef F_START_REQUEST_TERM_TYPE
 void f_start_request_term_type(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
@@ -29,15 +32,17 @@ void f_start_request_term_type(int num_arg) {
         "Warning: wrong usage. start_request_term_type() should only be called by a user "
         "object.\n");
   }
+  f.done();
 }
 #endif
 
 #ifdef F_REQUEST_TERM_SIZE
 void f_request_term_size(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
 
   if (ip && ip->telnet) {
-    if ((num_arg == 1) && (vm_sp()->u.number == 0)) {
+    if ((num_arg == 1) && (f.number(0) == 0)) {
       telnet_dont_naws(ip->telnet);
     } else {
       telnet_do_naws(ip->telnet);
@@ -47,14 +52,13 @@ void f_request_term_size(int num_arg) {
     debug_message(
         "Warning: wrong usage. request_term_size() should only be called by a user object.\n");
   }
-  if (num_arg == 1) {
-    vm_sp()--;
-  }
+  f.ret_void();
 }
 #endif
 
 #ifdef F_TELNET_NOP
 void f_telnet_nop(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_nop(ip->telnet);
@@ -62,11 +66,13 @@ void f_telnet_nop(int num_arg) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. telnet_nop() should only be called by a user object.\n");
   }
+  f.done();
 }
 #endif
 
 #ifdef F_TELNET_GA
 void f_telnet_ga(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_ga(ip->telnet);
@@ -74,25 +80,27 @@ void f_telnet_ga(int num_arg) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. telnet_ga() should only be called by a user object.\n");
   }
+  f.done();
 }
 #endif
 
 /* MXP */
 #ifdef F_HAS_MXP
 void f_has_mxp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i = 0;
 
-  if (vm_sp()->u.ob->interactive) {
-    i = vm_sp()->u.ob->interactive->iflags & USING_MXP;
+  if (f.object(0)->interactive) {
+    i = f.object(0)->interactive->iflags & USING_MXP;
     i = !!i;  // force 1 or 0
   }
-  free_object(&vm_sp()->u.ob, "f_has_mxp");
-  put_number(i);
+  f.ret(i);
 }
 #endif
 
 #ifdef F_ACT_MXP
 void f_act_mxp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     // start MXP
@@ -100,6 +108,7 @@ void f_act_mxp(int num_arg) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. act_mxp() should only be called by a user object.\n");
   }
+  f.done();
 }
 #endif
 
@@ -107,22 +116,23 @@ void f_act_mxp(int num_arg) {
 
 #ifdef F_HAS_GMCP
 void f_has_gmcp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i = 0;
 
-  if (vm_sp()->u.ob->interactive) {
-    i = vm_sp()->u.ob->interactive->iflags & USING_GMCP;
+  if (f.object(0)->interactive) {
+    i = f.object(0)->interactive->iflags & USING_GMCP;
     i = !!i;  // force 1 or 0
   }
-  free_object(&vm_sp()->u.ob, "f_has_gmcp");
-  put_number(i);
+  f.ret(i);
 }
 #endif
 
 #ifdef F_SEND_GMCP
 void f_send_gmcp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
-  const auto* data = vm_sp()->u.string;
-  auto len = SVALUE_STRLEN(vm_sp());
+  const auto* data = f.string(0);
+  auto len = f.string_len(0);
   if (ip && ip->telnet) {
     std::string const transdata = u8_convert_encoding(ip->trans, data, len);
     std::string_view const result = transdata.empty() ? std::string_view(data, len) : transdata;
@@ -131,7 +141,7 @@ void f_send_gmcp(int num_arg) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. send_gmcp() should only be called by a user object.\n");
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
@@ -139,14 +149,14 @@ void f_send_gmcp(int num_arg) {
 
 #ifdef F_HAS_MSP
 void f_has_msp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i = 0;
 
-  if (vm_sp()->u.ob->interactive) {
-    i = vm_sp()->u.ob->interactive->iflags & USING_MSP;
+  if (f.object(0)->interactive) {
+    i = f.object(0)->interactive->iflags & USING_MSP;
     i = !!i;  // force 1 or 0
   }
-  free_object(&vm_sp()->u.ob, "f_has_msp");
-  put_number(i);
+  f.ret(i);
 }
 #endif
 
@@ -154,14 +164,14 @@ void f_has_msp(int num_arg) {
 
 #ifdef F_HAS_MSDP
 void f_has_msdp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i = 0;
 
-  if (vm_sp()->u.ob->interactive) {
-    i = vm_sp()->u.ob->interactive->iflags & USING_MSDP;
+  if (f.object(0)->interactive) {
+    i = f.object(0)->interactive->iflags & USING_MSDP;
     i = !!i;  // force 1 or 0
   }
-  free_object(&vm_sp()->u.ob, "f_has_msdp");
-  put_number(i);
+  f.ret(i);
 }
 #endif
 
@@ -169,29 +179,30 @@ void f_has_msdp(int num_arg) {
 /** TODO update to support sending other value type and use proper MSDP mapping/array formats as
  * needed based on data types */
 void f_send_msdp_variable(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
-    switch (vm_sp()->type) {
+    switch (f.type(1)) {
       case T_STRING:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02", (vm_sp() - 1)->u.string);
-        telnet_send(ip->telnet, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()));
+        telnet_printf(ip->telnet, "\x01%s\x02", f.string(0));
+        telnet_send(ip->telnet, f.string(1), f.string_len(1));
         telnet_finish_sb((ip->telnet));
         break;
       case T_NUMBER:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02%lu", (vm_sp() - 1)->u.string, vm_sp()->u.number);
+        telnet_printf(ip->telnet, "\x01%s\x02%lu", f.string(0), f.number(1));
         telnet_finish_sb((ip->telnet));
         break;
       case T_REAL:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02%f", (vm_sp() - 1)->u.string, vm_sp()->u.real);
+        telnet_printf(ip->telnet, "\x01%s\x02%f", f.string(0), f.real(1));
         telnet_finish_sb((ip->telnet));
         break;
       case T_BUFFER:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02", (vm_sp() - 1)->u.string);
-        telnet_send(ip->telnet, reinterpret_cast<char*>(vm_sp()->u.buf->item), vm_sp()->u.buf->size);
+        telnet_printf(ip->telnet, "\x01%s\x02", f.string(0));
+        telnet_send(ip->telnet, reinterpret_cast<char*>(f.buffer(1)->item), f.buffer(1)->size);
         telnet_finish_sb((ip->telnet));
         break;
       case T_ARRAY:
@@ -205,7 +216,7 @@ void f_send_msdp_variable(int num_arg) {
     debug_message(
         "Warning: wrong usage. send_msdp_variable() should only be called by a user object.\n");
   }
-  pop_2_elems();
+  f.ret_void();
 }
 #endif
 
@@ -213,26 +224,27 @@ void f_send_msdp_variable(int num_arg) {
 
 #ifdef F_HAS_ZMP
 void f_has_zmp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i = 0;
 
-  if (vm_sp()->u.ob->interactive) {
-    i = vm_sp()->u.ob->interactive->iflags & USING_ZMP;
+  if (f.object(0)->interactive) {
+    i = f.object(0)->interactive->iflags & USING_ZMP;
     i = !!i;  // force 1 or 0
   }
-  free_object(&vm_sp()->u.ob, "f_has_zmp");
-  put_number(i);
+  f.ret(i);
 }
 #endif
 
 #ifdef F_SEND_ZMP
 void f_send_zmp(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
-    telnet_begin_zmp(ip->telnet, (vm_sp() - 1)->u.string);
+    telnet_begin_zmp(ip->telnet, f.string(0));
 
-    for (int i = 0; i < vm_sp()->u.arr->size; i++) {
-      if (vm_sp()->u.arr->item[i].type == T_STRING) {
-        telnet_zmp_arg(ip->telnet, vm_sp()->u.arr->item[i].u.string);
+    for (int i = 0; i < f.array(1)->size; i++) {
+      if (f.array(1)->item[i].type == T_STRING) {
+        telnet_zmp_arg(ip->telnet, f.array(1)->item[i].u.string);
       }
     }
 
@@ -242,20 +254,21 @@ void f_send_zmp(int num_arg) {
   } else if (!ip) {
     debug_message("Warning: wrong usage. send_zmp() should only be called by a user object.\n");
   }
-  pop_2_elems();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_TELNET_MSP_OOB
 void f_telnet_msp_oob(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
-    telnet_send_msp_oob(ip, vm_sp()->u.string, SVALUE_STRLEN(vm_sp()));
+    telnet_send_msp_oob(ip, f.string(0), f.string_len(0));
     flush_message(ip);
   } else if (!ip) {
     debug_message(
         "Warning: wrong usage. telnet_msp_oob() should only be called by a user object.\n");
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif

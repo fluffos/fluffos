@@ -11,14 +11,25 @@
  * already validated the top-level tag before these run (AGENTS.md section 2).
  */
 
+static void ret_promise(LPCFrame& f, promise_t* p) {
+  svalue_t v{};
+  v.type = T_PROMISE;
+  v.subtype = 0;
+  v.u.prom = p;
+  f.ret(v);
+}
+
 #ifdef F_PROMISE_CREATE
-void f_promise_create(int num_arg) { push_refed_promise(promise_alloc()); }
+void f_promise_create(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  ret_promise(f, promise_alloc());
+}
 #endif
 
 #ifdef F_PROMISE_RESOLVE
 void f_promise_resolve(int num_arg) {
-  svalue_t* parg = vm_sp() - num_arg + 1;
-  promise_t* p = parg->u.prom;
+  LPCFrame f = LPCFrame::args(num_arg);
+  promise_t* p = f.promise(0);
 
   if (p->state != PROMISE_PENDING || p->resolving) {
     /* `resolving`: a prior resolve with a still-pending promise committed
@@ -34,19 +45,19 @@ void f_promise_resolve(int num_arg) {
         "promise_resolve: promise belongs to an async function; only its body "
         "can settle it.\n");
   }
-  svalue_t* value = (num_arg > 1) ? vm_sp() : &const0;
+  svalue_t* value = (num_arg > 1) ? f.argp(1) : &const0;
   if (value->type == T_PROMISE && value->u.prom == p) {
     error("promise_resolve: cannot resolve a promise with itself.\n");
   }
   promise_resolve_with(p, value);
-  pop_n_elems(num_arg);
+  f.ret_void();
 }
 #endif
 
 #ifdef F_PROMISE_REJECT
 void f_promise_reject(int num_arg) {
-  svalue_t* parg = vm_sp() - num_arg + 1;
-  promise_t* p = parg->u.prom;
+  LPCFrame f = LPCFrame::args(num_arg);
+  promise_t* p = f.promise(0);
 
   if (p->state != PROMISE_PENDING || p->resolving) {
     /* see promise_resolve: an in-flight adoption already commits the fate */
@@ -62,7 +73,7 @@ void f_promise_reject(int num_arg) {
   /* mirror promise_resolve's guard: a promise holding itself is a cycle no
    * collector here can break (%O itself is depth-bounded, so it prints
    * fine -- the problem is the leak, not the printing) */
-  if (num_arg > 1 && vm_sp()->type == T_PROMISE && vm_sp()->u.prom == p) {
+  if (num_arg > 1 && f.type(1) == T_PROMISE && f.promise(1) == p) {
     error("promise_reject: cannot reject a promise with itself.\n");
   }
   /* A rejection reason must be TRUTHY by default. acatch(), like catch(),
@@ -78,15 +89,14 @@ void f_promise_reject(int num_arg) {
   default_reason.type = T_STRING;
   default_reason.subtype = STRING_CONSTANT;
   default_reason.u.string = PROMISE_REASON_NO_REASON;
-  promise_settle(p, (num_arg > 1) ? vm_sp() : &default_reason, 1);
-  pop_n_elems(num_arg);
+  promise_settle(p, (num_arg > 1) ? f.argp(1) : &default_reason, 1);
+  f.ret_void();
 }
 #endif
 
 /* shared body of promise_then() / promise_catch() */
-static void promise_then_common(int num_arg, funptr_t* on_fulfilled, funptr_t* on_rejected) {
-  svalue_t* parg = vm_sp() - num_arg + 1;
-  promise_t* p = parg->u.prom;
+static void promise_then_common(LPCFrame& f, funptr_t* on_fulfilled, funptr_t* on_rejected) {
+  promise_t* p = f.promise(0);
 
   /* Refuse to register more work when the delivery queue is already
    * saturated. Without this a handler that attaches more reactions than the
@@ -124,37 +134,37 @@ static void promise_then_common(int num_arg, funptr_t* on_fulfilled, funptr_t* o
   }
   promise_add_reaction(p, on_fulfilled, on_rejected, chained, giver);
 
-  pop_n_elems(num_arg);
-  push_refed_promise(chained);
+  ret_promise(f, chained);
 }
 
 #ifdef F_PROMISE_THEN
 void f_promise_then(int num_arg) {
-  svalue_t* parg = vm_sp() - num_arg + 1;
-  funptr_t* on_fulfilled = (num_arg > 1) ? (parg + 1)->u.fp : nullptr;
-  funptr_t* on_rejected = (num_arg > 2) ? (parg + 2)->u.fp : nullptr;
-  promise_then_common(num_arg, on_fulfilled, on_rejected);
+  LPCFrame f = LPCFrame::args(num_arg);
+  funptr_t* on_fulfilled = (num_arg > 1) ? f.funptr(1) : nullptr;
+  funptr_t* on_rejected = (num_arg > 2) ? f.funptr(2) : nullptr;
+  promise_then_common(f, on_fulfilled, on_rejected);
 }
 #endif
 
 #ifdef F_PROMISE_CATCH
 void f_promise_catch(int num_arg) {
-  promise_then_common(2, nullptr, vm_sp()->u.fp);
+  LPCFrame f = LPCFrame::args(num_arg);
+  promise_then_common(f, nullptr, f.funptr(1));
 }
 #endif
 
 #ifdef F_PROMISE_STATUS
 void f_promise_status(int num_arg) {
-  promise_t* p = vm_sp()->u.prom;
-  int const state = p->state;
-  free_svalue(vm_sp(), "f_promise_status");
-  put_number(state);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int const state = f.promise(0)->state;
+  f.ret(state);
 }
 #endif
 
 #ifdef F_PROMISE_RESULT
 void f_promise_result(int num_arg) {
-  promise_t* p = vm_sp()->u.prom;
+  LPCFrame f = LPCFrame::args(num_arg);
+  promise_t* p = f.promise(0);
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
   }
@@ -164,8 +174,7 @@ void f_promise_result(int num_arg) {
   }
   svalue_t result;
   assign_svalue_no_free(&result, &p->result);
-  free_svalue(vm_sp(), "f_promise_result");
-  *vm_sp() = result;
+  f.ret(result);
 }
 #endif
 
@@ -173,8 +182,9 @@ void f_promise_result(int num_arg) {
  * its ELEMENTS need checking (AGENTS.md section 2) -- and they need none: a
  * non-promise element is defined to count as already fulfilled with itself,
  * so map() output drops straight in. */
-static void promise_combinator_efun(uint8_t kind) {
-  array_t* inputs = vm_sp()->u.arr;
+static void promise_combinator_efun(int num_arg, uint8_t kind) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  array_t* inputs = f.array(0);
 
   if (kind == PROMISE_COMB_RACE && inputs->size == 0) {
     /* JS lets this hang forever. Here a hung await is a parked frame holding
@@ -183,72 +193,65 @@ static void promise_combinator_efun(uint8_t kind) {
     error("promise_race: needs at least one promise; an empty array would never settle.\n");
   }
   promise_t* result = promise_combinator_start(kind, inputs);
-  free_svalue(vm_sp(), "promise_combinator_efun");
-  vm_sp()->type = T_PROMISE;
-  vm_sp()->subtype = 0;
-  vm_sp()->u.prom = result;
+  ret_promise(f, result);
 }
 
 #ifdef F_PROMISE_ALL
-void f_promise_all(int num_arg) { promise_combinator_efun(PROMISE_COMB_ALL); }
+void f_promise_all(int num_arg) { promise_combinator_efun(num_arg, PROMISE_COMB_ALL); }
 #endif
 
 #ifdef F_PROMISE_ANY
-void f_promise_any(int num_arg) { promise_combinator_efun(PROMISE_COMB_ANY); }
+void f_promise_any(int num_arg) { promise_combinator_efun(num_arg, PROMISE_COMB_ANY); }
 #endif
 
 #ifdef F_PROMISE_RACE
-void f_promise_race(int num_arg) { promise_combinator_efun(PROMISE_COMB_RACE); }
+void f_promise_race(int num_arg) { promise_combinator_efun(num_arg, PROMISE_COMB_RACE); }
 #endif
 
 #ifdef F_PROMISE_ALL_SETTLED
-void f_promise_all_settled(int num_arg) { promise_combinator_efun(PROMISE_COMB_ALL_SETTLED); }
+void f_promise_all_settled(int num_arg) {
+  promise_combinator_efun(num_arg, PROMISE_COMB_ALL_SETTLED);
+}
 #endif
 
 #ifdef F_PROMISE_CANCEL
 void f_promise_cancel(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   /* validated (and possibly error()ed) before the stack is touched */
-  int const armed = promise_request_cancel(vm_sp()->u.prom);
-
-  free_svalue(vm_sp(), "f_promise_cancel");
-  put_number(armed);
+  int const armed = promise_request_cancel(f.promise(0));
+  f.ret(armed);
 }
 #endif
 
 #ifdef F_PROMISEP
 void f_promisep(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   /* the argument is `mixed`, so unlike the rest of this file the tag has
    * NOT been validated for us -- that is the question being asked */
-  if (vm_sp()->type == T_PROMISE) {
-    free_promise(vm_sp()->u.prom);
-    *vm_sp() = const1;
-  } else {
-    free_svalue(vm_sp(), "f_promisep");
-    *vm_sp() = const0;
-  }
+  f.ret(f.type(0) == T_PROMISE ? 1 : 0);
 }
 #endif
 
 #ifdef F_ASYNC_YIELD
 void f_async_yield(int num_arg) {
-  /* No arguments, so nothing to pop: STACK_INC and write the result. */
-  push_refed_promise(promise_async_yield());
+  LPCFrame f = LPCFrame::args(num_arg);
+  /* No arguments, so nothing to pop: return the yield promise. */
+  ret_promise(f, promise_async_yield());
 }
 #endif
 
 #ifdef F_ASYNC_INFO
 void f_async_info(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   /* async_info()  -> one mapping per suspended coroutine (the original form)
    * async_info(1) -> scheduler counters, including the drain's yield count,
    *                  which is the only portable way to observe that the
    *                  drain re-posted itself rather than running on. */
-  int const want_stats = vm_sp()->u.number != 0;
-  pop_stack();
+  int const want_stats = f.number(0) != 0;
   if (want_stats) {
-    push_refed_mapping(build_async_scheduler_info());
+    f.ret_refed(build_async_scheduler_info());
   } else {
-    push_refed_array(build_async_info());
+    f.ret_refed(build_async_info());
   }
 }
 #endif
-

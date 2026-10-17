@@ -3,47 +3,57 @@
 #include "vm/internal/hooks.h"
 
 #ifdef F_HOOK_ATTACH
-void f_hook_attach(int /*num_arg*/) {
+void f_hook_attach(int num_arg) {
   /* args: string point, mixed action, mapping spec, int flags */
-  int flags = vm_sp()->u.number;
-  mapping_t* spec = (vm_sp() - 1)->u.map;
-  svalue_t* action = vm_sp() - 2;
-  const char* point = (vm_sp() - 3)->u.string;
+  LPCFrame f = LPCFrame::args(num_arg);
+  const char* point = f.string(0);
+  svalue_t* action = f.argp(1);
+  mapping_t* spec = f.mapping(2);
+  int flags = static_cast<int>(f.number(3));
   LPC_INT id = hook_efun_attach(point, action, spec, flags);
-  pop_n_elems(4);
-  push_number(id);
+  f.ret(id);
 }
 #endif
 
 #ifdef F_HOOK_DETACH
-void f_hook_detach(int /*num_arg*/) {
-  LPC_INT id = vm_sp()->u.number;
+void f_hook_detach(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_INT id = f.number(0);
   hook_efun_detach(id);
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_HOOK_QUERY
-void f_hook_query(int /*num_arg*/) {
-  LPC_INT id = vm_sp()->u.number;
+void f_hook_query(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  LPC_INT id = f.number(0);
   mapping_t* m = hook_efun_query(id);
-  free_svalue(vm_sp(), "hook_query");
-  vm_sp()->type = T_MAPPING;
-  vm_sp()->u.map = m;
+  f.ret(m);
 }
 #endif
 
 #ifdef F_HOOK_LIST
 void f_hook_list(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   object_t* ob = nullptr;
   if (num_arg == 1) {
-    if (vm_sp()->type == T_OBJECT) {
-      ob = vm_sp()->u.ob;
+    if (f.type(0) == T_OBJECT) {
+      ob = f.object(0);
+      /* Keep alive across the stack pop: stack may hold the only ref. */
+      add_ref(ob, "hook_list");
     }
-    pop_stack();
+    f.ret_void();
+  } else {
+    f.done();
   }
   array_t* arr = hook_efun_list(ob);
-  push_refed_array(arr);
+  if (ob) {
+    free_object(&ob, "hook_list");
+  }
+  LPCFrame out = LPCFrame::builder();
+  out.push_refed(arr);
+  out.done();
 }
 #endif
 /* f_hook_proceed is defined in vm/internal/hooks.cc */

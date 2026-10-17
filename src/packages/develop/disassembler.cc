@@ -8,34 +8,34 @@
 
 #ifdef F_DUMP_PROG
 void f_dump_prog(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   program_t* prog;
   const char* where;
   int d;
   object_t* ob;
-  int const narg = num_arg;
 
   if (num_arg == 2) {
-    if ((vm_sp() - 1)->type != T_OBJECT) {
-      bad_argument(vm_sp() - 1, T_OBJECT, 1, F_DUMP_PROG);
+    if (f.type(0) != T_OBJECT) {
+      bad_argument(f.argp(0), T_OBJECT, 1, F_DUMP_PROG);
     }
 
-    ob = vm_sp()[-1].u.ob;
-    d = vm_sp()->u.number;
+    ob = f.object(0);
+    d = static_cast<int>(f.number(1));
     where = nullptr;
   } else if (num_arg == 3) {
-    if ((vm_sp() - 2)->type != T_OBJECT) {
-      bad_argument(vm_sp() - 2, T_OBJECT, 1, F_DUMP_PROG);
+    if (f.type(0) != T_OBJECT) {
+      bad_argument(f.argp(0), T_OBJECT, 1, F_DUMP_PROG);
     }
 
-    ob = vm_sp()[-2].u.ob;
-    d = vm_sp()[-1].u.number;
-    where = (vm_sp()->type == T_STRING) ? vm_sp()->u.string : nullptr;
+    ob = f.object(0);
+    d = static_cast<int>(f.number(1));
+    where = (f.type(2) == T_STRING) ? f.string(2) : nullptr;
   } else {
-    if (vm_sp()->type != T_OBJECT) {
-      bad_argument(vm_sp(), T_OBJECT, 1, F_DUMP_PROG);
+    if (f.type(0) != T_OBJECT) {
+      bad_argument(f.argp(0), T_OBJECT, 1, F_DUMP_PROG);
     }
 
-    ob = vm_sp()->u.ob;
+    ob = f.object(0);
     d = 0;
     where = nullptr;
   }
@@ -48,7 +48,7 @@ void f_dump_prog(int num_arg) {
     }
 
     const char* fname;
-    FILE* f;
+    FILE* file;
 
     fname = check_valid_path(where, current_object, "dumpallobj", 1);
 
@@ -56,15 +56,15 @@ void f_dump_prog(int num_arg) {
       error("Invalid path '%s' for writing.\n", where);
       return;
     }
-    f = fopen(fname, "w");
-    if (!f) {
+    file = fopen(fname, "w");
+    if (!file) {
       error("Unable to open '/%s' for writing.\n", fname);
       return;
     }
-    dump_prog(prog, f, d);
-    fclose(f);
+    dump_prog(prog, file, d);
+    fclose(file);
   }
-  pop_n_elems(narg);
+  f.ret_void();
 }
 
 #endif

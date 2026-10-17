@@ -28,17 +28,9 @@ int replace_interactive(object_t* ob, object_t* obfrom) {
 } /* replace_interactive() */
 
 void f_exec(int num_arg) {
-  int i;
-
-  i = replace_interactive((vm_sp() - 1)->u.ob, vm_sp()->u.ob);
-
-  /* They might have been destructed */
-  if (vm_sp()->type == T_OBJECT) {
-    free_object(&vm_sp()->u.ob, "f_exec:1");
-  }
-  if ((--vm_sp())->type == T_OBJECT) {
-    free_object(&vm_sp()->u.ob, "f_exec:2");
-  }
-  put_number(i);
+  LPCFrame f = LPCFrame::args(num_arg);
+  int i = replace_interactive(f.object(0), f.object(1));
+  /* Objects may have been destructed; ret() free_svalue's whatever remains. */
+  f.ret(static_cast<LPC_INT>(i));
 }
 #endif
