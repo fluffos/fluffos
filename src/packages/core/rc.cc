@@ -24,32 +24,32 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 
 #ifdef F_GET_CONFIG
 void f_get_config(int num_arg) {
-  if (!get_config_item(vm_sp(), vm_sp())) {
+  LPCFrame f = LPCFrame::args(num_arg);
+  if (!get_config_item(f.argp(0), f.argp(0))) {
     error("Bad argument to get_config()\n");
   }
+  f.done();
 }
 #endif
 
 #ifdef F_SET_CONFIG
 void f_set_config(int num_arg) {
-  auto num = (vm_sp() - 1)->u.number;
-  auto* value = vm_sp();
+  LPCFrame f = LPCFrame::args(num_arg);
+  auto num = f.number(0);
+  auto* value = f.argp(1);
 
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
-    pop_2_elems();
     error("Bad 1st argument to set_config()\n");
   }
   if (num < RC_BASE_CONFIG_INT) {
-    pop_2_elems();
     error("Can not set string config through set_config() yet.\n");
   }
 
   if (value->type != T_NUMBER) {
-    pop_2_elems();
     error("Bad 2nd argument to set_config()\n");
   }
 
   CONFIG_INT(num) = value->u.number;
-  pop_2_elems();
+  f.ret_void();
 }
 #endif

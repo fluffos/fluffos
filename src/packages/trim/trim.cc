@@ -52,23 +52,21 @@ inline std::string& trim_func(std::string& s, const std::string& charset) {
 using trim_func_type = std::string&(std::string&, const std::string&);
 
 inline void trim_impl(trim_func_type* func, int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   std::string charset;
 
   // If use 2 arguments, we get characters to remove and positioning in previous
   // parameter.
   if (num_arg == 2) {
-    charset = vm_sp()->u.string;
-    pop_stack();
+    charset = f.string(1);
   }
 
-  std::string target(vm_sp()->u.string);
-  pop_stack();
-
+  std::string target(f.string(0));
   target = (*func)(target, charset);
   if (target.empty()) {
-    share_and_push_string("");
+    f.ret_str_copy("");
   } else {
-    copy_and_push_string(target.c_str());
+    f.ret_str_copy(target.c_str());
   }
 }
 

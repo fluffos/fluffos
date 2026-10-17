@@ -117,13 +117,14 @@ static char* evp_hash(const char* algo, const unsigned char* data, int data_len)
 }
 
 void f_hash(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   const char *algo, *data;
   char* result = nullptr;
   int data_len;
 
-  algo = (vm_sp() - 1)->u.string;
-  data = vm_sp()->u.string;
-  data_len = SVALUE_STRLEN(vm_sp());
+  algo = f.string(0);
+  data = f.string(1);
+  data_len = f.string_len(1);
 
 #define DO_HASH_IF(id, func, hash_size)       \
   SAFE(if (strcasecmp(algo, id) == 0) {       \
@@ -195,8 +196,6 @@ result:
     error("hash() unknown hash type: %s\n", algo);
   }
 
-  /* Pop the arguments off the stack and push the result */
-  pop_n_elems(num_arg);
-  push_malloced_string(result);
+  f.ret_str_malloced(result);
 }
 #endif

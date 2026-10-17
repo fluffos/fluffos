@@ -55,17 +55,18 @@ static inline void sha1_hash_block(const unsigned char* block, uint32_t* h0, uin
 }
 
 void f_sha1(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   uint32_t h0, h1, h2, h3, h4;
   const unsigned char* str;
   unsigned char final[128] = {0};
   int input_length, final_length, i;
 
-  if (vm_sp()->type == T_BUFFER) {
-    str = (const unsigned char*)vm_sp()->u.buf->item;
-    input_length = vm_sp()->u.buf->size;
+  if (f.type(0) == T_BUFFER) {
+    str = (const unsigned char*)f.buffer(0)->item;
+    input_length = f.buffer(0)->size;
   } else {
-    str = reinterpret_cast<const unsigned char*>(vm_sp()->u.string);
-    input_length = SVALUE_STRLEN(vm_sp());
+    str = reinterpret_cast<const unsigned char*>(f.string(0));
+    input_length = f.string_len(0);
   }
 
   i = input_length % 64;
@@ -110,7 +111,6 @@ void f_sha1(int num_arg) {
   }
 
   sprintf(reinterpret_cast<char*>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
-  pop_stack();
-  push_malloced_string(string_copy((char*) final, "f_sha1"));
+  f.ret_str_malloced(string_copy((char*) final, "f_sha1"));
 }
 #endif
