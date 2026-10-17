@@ -23,7 +23,7 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 }
 
 #ifdef F_GET_CONFIG
-void f_get_config() {
+void f_get_config(int num_arg) {
   if (!get_config_item(sp, sp)) {
     error("Bad argument to get_config()\n");
   }
@@ -31,7 +31,7 @@ void f_get_config() {
 #endif
 
 #ifdef F_SET_CONFIG
-void f_set_config() {
+void f_set_config(int num_arg) {
   auto num = (sp - 1)->u.number;
   auto* value = sp;
 

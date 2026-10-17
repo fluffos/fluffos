@@ -116,7 +116,7 @@ static char* evp_hash(const char* algo, const unsigned char* data, int data_len)
   return result;
 }
 
-void f_hash() {
+void f_hash(int num_arg) {
   const char *algo, *data;
   char* result = nullptr;
   int data_len;
@@ -196,7 +196,7 @@ result:
   }
 
   /* Pop the arguments off the stack and push the result */
-  pop_n_elems(st_num_arg);
+  pop_n_elems(num_arg);
   push_malloced_string(result);
 }
 #endif

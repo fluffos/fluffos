@@ -7,7 +7,7 @@
 static object_t* ob;
 
 #ifdef F_DEBUG_INFO
-void f_debug_info() {
+void f_debug_info(int num_arg) {
   svalue_t* arg;
   outbuffer_t out;
 
@@ -118,7 +118,7 @@ void f_debug_info() {
 #endif
 
 #ifdef F_REFS
-void f_refs() {
+void f_refs(int num_arg) {
   int r;
 
   switch (sp->type) {
@@ -159,7 +159,7 @@ void f_refs() {
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-void f_destructed_objects() {
+void f_destructed_objects(int num_arg) {
   int i;
   array_t* ret;
   object_t* ob;
@@ -186,7 +186,7 @@ void f_destructed_objects() {
 #ifdef F_DUMP_STRALLOC
 void dump_stralloc(outbuffer_t*);
 
-void f_dump_stralloc() {
+void f_dump_stralloc(int num_arg) {
   const auto* target_file = sp->u.string;
   const char* fn;
   FILE* fp;
@@ -220,7 +220,7 @@ void f_dump_stralloc() {
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 
-void f_dump_jemalloc() {
+void f_dump_jemalloc(int num_arg) {
 #ifdef HAVE_JEMALLOC
   mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
   malloc_stats_print(nullptr, nullptr, "");
@@ -232,7 +232,7 @@ void f_dump_jemalloc() {
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
-void f_debugmalloc() {
+void f_debugmalloc(int num_arg) {
   char* res;
 
   res = dump_debugmalloc((sp - 1)->u.string, sp->u.number);
@@ -243,15 +243,15 @@ void f_debugmalloc() {
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask() { set_malloc_mask((sp--)->u.number); }
+void f_set_malloc_mask(int num_arg) { set_malloc_mask((sp--)->u.number); }
 #endif
 
 #ifdef F_CHECK_MEMORY
-void f_check_memory() { check_all_blocks((sp--)->u.number); }
+void f_check_memory(int num_arg) { check_all_blocks((sp--)->u.number); }
 #endif
 
 #ifdef F_FIND_ORPHANED_CYCLES
-void f_find_orphaned_cycles() {
+void f_find_orphaned_cycles(int num_arg) {
   // any nonzero LPC int means collect (don't truncate the 64-bit argument)
   int const collect = (sp--)->u.number != 0;
   push_number(md_scan_orphaned_cycles(collect, nullptr));
@@ -261,7 +261,7 @@ void f_find_orphaned_cycles() {
         * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
-void f_trace() {
+void f_trace(int num_arg) {
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
@@ -273,7 +273,7 @@ void f_trace() {
 #endif
 
 #ifdef F_TRACEPREFIX
-void f_traceprefix() {
+void f_traceprefix(int num_arg) {
   const char* old = nullptr;
 
   if (command_giver && command_giver->interactive) {

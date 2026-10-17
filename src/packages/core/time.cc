@@ -7,7 +7,7 @@
 #include <vector>
 
 #ifdef F_PERF_COUNTER_NS
-void f_perf_counter_ns() {
+void f_perf_counter_ns(int num_arg) {
 #ifdef _WIN32
   static LARGE_INTEGER Frequency{};
   if (Frequency.QuadPart == 0) {
@@ -26,25 +26,25 @@ void f_perf_counter_ns() {
 #endif
 
 #ifdef F_TIME
-void f_time() { push_number(get_current_time()); }
+void f_time(int num_arg) { push_number(get_current_time()); }
 #endif
 
 #ifdef F_TIME_NS
-void f_time_ns() {
+void f_time_ns(int num_arg) {
   auto now = std::chrono::system_clock::now();
   push_number(std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
 }
 #endif
 
 #ifdef F_CTIME
-void f_ctime() {
+void f_ctime(int num_arg) {
   char buf[255] = {};
   const char *cp = buf, *nl;
   char* p;
   int l;
   time_t timestamp;
 
-  if (st_num_arg) {
+  if (num_arg) {
     timestamp = sp->u.number;
   } else {
     push_number(0);
@@ -72,7 +72,7 @@ void f_ctime() {
 #ifdef F_LOCALTIME
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
-void f_localtime() {
+void f_localtime(int num_arg) {
   struct tm res = {};
   time_t lt;
   lt = sp->u.number;
@@ -123,7 +123,7 @@ void f_localtime() {
 #endif
 
 #ifdef F_STRFTIME
-void f_strftime() {
+void f_strftime(int num_arg) {
   auto arg_time = sp->u.number;
   const auto* arg_fmt = (sp - 1)->u.string;
 
@@ -149,7 +149,7 @@ void f_strftime() {
 #endif
 
 #ifdef F_STRPTIME
-void f_strptime() {
+void f_strptime(int num_arg) {
   const auto* arg_timestr = (sp)->u.string;
   const auto* arg_fmt = (sp - 1)->u.string;
 

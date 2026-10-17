@@ -564,11 +564,14 @@ void make_efun_tables() {
 
   fprintf(f, "\n#define NUM_OPCODES %d\n", total_code + 1);
 
-  fprintf(f, "\n/* EFUN prototypes */\n\n");
+  fprintf(f, "\n/* EFUN prototypes.\n"
+             " * Arity is a parameter (not the old st_num_arg global): nested LPC\n"
+             " * overwrites any bare global, so efuns must use this num_arg.\n"
+             " */\n\n");
   for (int i = 0; i < efun_code; i++) {
-    fprintf(f, "void f_%s (void);\n", efun_names[i]);
+    fprintf(f, "void f_%s (int num_arg);\n", efun_names[i]);
   }
-  fprintf(f, "typedef void (*func_t) (void);\n\n");
+  fprintf(f, "typedef void (*func_t) (int num_arg);\n\n");
   fprintf(f, "extern func_t efun_table[];\n");
   fprintf(f, "extern const char* operator_names[];\n");
 

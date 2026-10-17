@@ -1032,7 +1032,7 @@ int copy_file(const char* from, const char* to) {
 }
 
 #ifdef F_CP
-void f_cp() {
+void f_cp(int num_arg) {
   int i;
 
   i = copy_file(sp[-1].u.string, sp[0].u.string);
@@ -1043,7 +1043,7 @@ void f_cp() {
 #endif
 
 #ifdef F_FILE_SIZE
-void f_file_size() {
+void f_file_size(int num_arg) {
   LPC_INT i = file_size(sp->u.string);
 
   // cross platform fix
@@ -1065,7 +1065,7 @@ void f_file_size() {
 #endif
 
 #ifdef F_GET_DIR
-void f_get_dir() {
+void f_get_dir(int num_arg) {
   array_t* vec;
 
   vec = get_dir((sp - 1)->u.string, sp->u.number);
@@ -1079,7 +1079,7 @@ void f_get_dir() {
 #endif
 
 #ifdef F_LINK
-void f_link() {
+void f_link(int num_arg) {
   svalue_t *ret, *arg;
   int i;
 
@@ -1102,7 +1102,7 @@ void f_link() {
 #endif /* F_LINK */
 
 #ifdef F_MKDIR
-void f_mkdir() {
+void f_mkdir(int num_arg) {
   const char* path;
 
   path = check_valid_path(sp->u.string, current_object, "mkdir", 1);

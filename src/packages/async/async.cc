@@ -602,7 +602,7 @@ void complete_all_asyncio() {
 
 #ifdef F_ASYNC_READ
 
-void f_async_read() {
+void f_async_read(int num_arg) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -612,25 +612,19 @@ void f_async_read() {
    * (AGENTS.md section 4). Nothing below this line applies, so the returned
    * string stays valid until add_read() copies it. The path is the FIRST
    * argument -- sp itself is the optional callback when one was passed.
-   *
-   * st_num_arg is a bare global: ANY efun the master's valid_read calls
-   * overwrites it (the f_async_db_exec ordering comment below documents the
-   * crash). Latch it first and restore it after, so the form-detection
-   * branch and process_efun_callback() see this call's real arity. */
-  int const num_arg = st_num_arg;
+   * Arity is the num_arg parameter (not a global), so the master apply
+   * cannot clobber form-detection or process_efun_callback. */
   const char* path =
       check_valid_path((sp - (num_arg - 1))->u.string, current_object, "read_file", 0);
-  st_num_arg = num_arg;
-
   if (num_arg >= 2) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(1, cb.get(), F_ASYNC_READ);
+    process_efun_callback(1, cb.get(), F_ASYNC_READ, num_arg);
     // A `mixed` argument bypasses the spec's compile-time `function` check;
     // process_efun_callback() then sets cb->ob (string-callback form) rather
     // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
     // char*) as a funptr_t*.
     if (cb->ob != nullptr) {
-      error("async_read: callback must be a function pointer, not a string.\n");
+      error("async_read: callback must be a function pointer, not a string.\n", num_arg);
     }
     cb->f.fp->hdr.ref++;
     pop_stack();
@@ -652,21 +646,18 @@ void f_async_read() {
 #endif
 
 #ifdef F_ASYNC_WRITE
-void f_async_write() {
+void f_async_write(int num_arg) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
-  /* before any ownership is taken, with st_num_arg latched across the
+  /* before any ownership is taken, with num_arg latched across the
    * master apply -- see f_async_read(); the path is the FIRST of 3 or 4
    * arguments */
-  int const num_arg = st_num_arg;
   const char* path =
       check_valid_path((sp - (num_arg - 1))->u.string, current_object, "write_file", 1);
-  st_num_arg = num_arg;
-
   if (num_arg >= 4) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(3, cb.get(), F_ASYNC_WRITE);
+    process_efun_callback(3, cb.get(), F_ASYNC_WRITE, num_arg);
     if (cb->ob != nullptr) {
       error("async_write: callback must be a function pointer, not a string.\n");
     }
@@ -689,20 +680,17 @@ void f_async_write() {
 #endif
 
 #ifdef F_ASYNC_GETDIR
-void f_async_getdir() {
+void f_async_getdir(int num_arg) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
-  /* before any ownership is taken, with st_num_arg latched across the
+  /* before any ownership is taken, with num_arg latched across the
    * master apply -- see f_async_read(); the path is the FIRST argument */
-  int const num_arg = st_num_arg;
   const char* path =
       check_valid_path((sp - (num_arg - 1))->u.string, current_object, "get_dir", 0);
-  st_num_arg = num_arg;
-
   if (num_arg >= 2) {
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(1, cb.get(), F_ASYNC_GETDIR);
+    process_efun_callback(1, cb.get(), F_ASYNC_GETDIR, num_arg);
     if (cb->ob != nullptr) {
       error("async_getdir: callback must be a function pointer, not a string.\n");
     }
@@ -742,21 +730,16 @@ struct AsyncCallbackRef {
   AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
 };
 
-void f_async_db_exec() {
+void f_async_db_exec(int num_arg) {
   // Two forms (issue #1319), same split as async_read():
   //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
   //   async_db_exec(handle, sql)                 -> promise for the row count
   //
-  // process_efun_callback() locates the callback via the GLOBAL
-  // st_num_arg (arg = sp - st_num_arg + 1 + narg), so when a callback was
-  // passed it MUST run before valid_database() below -- that apply runs
-  // master LPC which leaves st_num_arg clobbered. Reversing them made
-  // ftc->f.fp read the wrong stack slot and crash at the ref++ once a real
-  // db handle existed (found by async_db_exec.lpc on the SQLite CI build).
-  // Latch the arity first: the promise form has no callback, and a master
-  // apply must not be what decides which form this call is.
-  int const num_arg = st_num_arg;
-
+  // process_efun_callback(..., num_arg) locates the callback from the
+  // parameter arity (arg = sp - num_arg + 1 + narg). Parse the callback
+  // before valid_database() so ownership/ordering stays clear; the old
+  // global-arity bug is gone, but the promise vs callback form split still
+  // keys on num_arg before any apply.
   std::unique_ptr<function_to_call_t> cb;
   AsyncCallbackRef cb_ref;
   array_t* bound_args = nullptr;
@@ -770,7 +753,7 @@ void f_async_db_exec() {
 
   if (num_arg >= 3) {
     cb.reset(new function_to_call_t);
-    process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+    process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC, num_arg);
 
     // The callback fires long after this stack frame is gone (a DB round
     // trip on a worker thread, then a later game tick) -- unlike the

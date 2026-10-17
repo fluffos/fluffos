@@ -14,10 +14,9 @@
 enum { COMPRESS_BUF_SIZE = 8096 };
 
 #ifdef F_COMPRESS_FILE
-void f_compress_file() {
+void f_compress_file(int num_arg) {
   int readb;
   int len;
-  int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
   const char* real_input_file;
@@ -140,10 +139,9 @@ void f_compress_file() {
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-void f_uncompress_file() {
+void f_uncompress_file(int num_arg) {
   int readb;
   int len;
-  int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
   const char* real_input_file;
@@ -269,7 +267,7 @@ void f_uncompress_file() {
 #endif
 
 #ifdef F_COMPRESS
-void f_compress() {
+void f_compress(int num_arg) {
   unsigned char* buffer;
   unsigned char* input;
   int size;
@@ -283,7 +281,7 @@ void f_compress() {
     size = sp->u.buf->size;
     input = sp->u.buf->item;
   } else {
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     push_undefined();
     return;
   }
@@ -294,7 +292,7 @@ void f_compress() {
   compress(buffer, &new_size, input, size);
 
   // Shrink it down.
-  pop_n_elems(st_num_arg);
+  pop_n_elems(num_arg);
   real_buffer = allocate_buffer(new_size);
   write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer), new_size);
   FREE(buffer);
@@ -309,7 +307,7 @@ static void* zlib_alloc(void* /*opaque*/, unsigned int items, unsigned int size)
 
 static void zlib_free(void* /*opaque*/, void* address) { FREE(address); }
 
-void f_uncompress() {
+void f_uncompress(int num_arg) {
   z_stream* compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
   unsigned char* output_data = nullptr;
@@ -321,7 +319,7 @@ void f_uncompress() {
   if (sp->type == T_BUFFER) {
     buffer = sp->u.buf;
   } else {
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     push_undefined();
     return;
   }
@@ -338,7 +336,7 @@ void f_uncompress() {
 
   if (inflateInit(compressed) != Z_OK) {
     FREE(compressed);
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     error("inflateInit failed");
   }
 
@@ -371,7 +369,7 @@ void f_uncompress() {
 
   inflateEnd(compressed);
 
-  pop_n_elems(st_num_arg);
+  pop_n_elems(num_arg);
 
   if (too_large) {
     if (output_data) {

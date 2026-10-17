@@ -203,7 +203,7 @@ svalue_t* valid_database(const char* action, array_t* info) {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_CLOSE
-void f_db_close() {
+void f_db_close(int num_arg) {
   int ret = 0;
   db_t* db;
 
@@ -244,7 +244,7 @@ void f_db_close() {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_COMMIT
-void f_db_commit() {
+void f_db_commit(int num_arg) {
   int ret = 0;
   db_t* db;
 
@@ -277,7 +277,7 @@ void f_db_commit() {
  * Returns a new database handle.
  */
 #ifdef F_DB_CONNECT
-void f_db_connect() {
+void f_db_connect(int num_arg) {
   char* errormsg = nullptr;
   const char *user = "", *database, *host = nullptr;
   db_t* db;
@@ -291,7 +291,7 @@ void f_db_connect() {
   type = 0;
 #endif
 
-  switch (st_num_arg) {
+  switch (num_arg) {
     case 4:
       type = (sp - (args++))->u.number;
       // fallthrough
@@ -399,7 +399,7 @@ void f_db_connect() {
 extern pthread_mutex_t* db_mut;
 #endif
 #ifdef F_DB_EXEC
-void f_db_exec() {
+void f_db_exec(int num_arg) {
   int ret = 0;
   db_t* db;
   array_t* info;
@@ -469,7 +469,7 @@ void f_db_exec() {
  * Returns an array of columns from the named row on success.
  */
 #ifdef F_DB_FETCH
-void f_db_fetch() {
+void f_db_fetch(int num_arg) {
   db_t* db;
   array_t* ret;
 
@@ -513,7 +513,7 @@ void f_db_fetch() {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_ROLLBACK
-void f_db_rollback() {
+void f_db_rollback(int num_arg) {
   int ret = 0;
   db_t* db;
 
@@ -545,7 +545,7 @@ void f_db_rollback() {
  * Returns a string describing the database package's current status
  */
 #ifdef F_DB_STATUS
-void f_db_status() {
+void f_db_status(int num_arg) {
   int i;
   outbuffer_t out;
 

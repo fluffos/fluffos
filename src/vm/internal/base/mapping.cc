@@ -607,11 +607,9 @@ struct unique_svalue_compare {
   }
 };
 
-void f_unique_mapping(void) {
-  svalue_t* arg = sp - st_num_arg + 1;
+void f_unique_mapping(int num_arg) {
+  svalue_t* arg = sp - num_arg + 1;
   array_t* v = arg->u.arr;
-  unsigned short num_arg = st_num_arg;
-
   if (!v || !v->size) {
     pop_n_elems(num_arg);
     push_refed_mapping(allocate_mapping(0));
@@ -620,7 +618,7 @@ void f_unique_mapping(void) {
 
   // prepare the call back.
   function_to_call_t ftc;
-  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING);
+  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING, num_arg);
 
   // for each item in the array, call the callback and group
   // item with same result together.
@@ -1044,7 +1042,7 @@ void map_mapping(svalue_t* arg, int num_arg) {
   svalue_t* ret;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_MAP);
+  process_efun_callback(1, &ftc, F_MAP, num_arg);
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);
@@ -1084,7 +1082,7 @@ void filter_mapping(svalue_t* arg, int num_arg) {
   unsigned int tb_index;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_FILTER);
+  process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);

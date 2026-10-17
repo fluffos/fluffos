@@ -42,7 +42,7 @@ static void store_matrix(array_t* matrix, const Matrix src) {
   }
 }
 
-void f_id_matrix() {
+void f_id_matrix(int num_arg) {
   array_t* matrix;
   int i;
 
@@ -54,7 +54,7 @@ void f_id_matrix() {
   push_refed_array(matrix);
 }
 
-void f_translate() {
+void f_translate(int num_arg) {
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -84,7 +84,7 @@ void f_translate() {
   store_matrix(matrix, final_matrix);
 }
 
-void f_scale() {
+void f_scale(int num_arg) {
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -113,7 +113,7 @@ void f_scale() {
   store_matrix(matrix, final_matrix);
 }
 
-void f_rotate_x() {
+void f_rotate_x(int num_arg) {
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -133,7 +133,7 @@ void f_rotate_x() {
   store_matrix(matrix, final_matrix);
 }
 
-void f_rotate_y() {
+void f_rotate_y(int num_arg) {
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -153,7 +153,7 @@ void f_rotate_y() {
   store_matrix(matrix, final_matrix);
 }
 
-void f_rotate_z() {
+void f_rotate_z(int num_arg) {
   array_t* matrix;
   LPC_FLOAT angle;
   Matrix current_matrix;
@@ -173,7 +173,7 @@ void f_rotate_z() {
   store_matrix(matrix, final_matrix);
 }
 
-void f_lookat_rotate() {
+void f_lookat_rotate(int num_arg) {
   array_t* matrix;
   LPC_FLOAT x, y, z;
   Matrix current_matrix;
@@ -201,7 +201,7 @@ void f_lookat_rotate() {
 }
 
 #ifdef F_LOOKAT_ROTATE2
-void f_lookat_rotate2(void) {
+void f_lookat_rotate2(int num_arg) {
   array_t* matrix;
   LPC_FLOAT ex, ey, ez, lx, ly, lz;
   Matrix current_matrix;

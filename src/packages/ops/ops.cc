@@ -1361,20 +1361,20 @@ void f_function_constructor() {
   push_refed_funp(fp);
 }
 
-void f__evaluate() {
+void f__evaluate(int num_arg) {
   svalue_t* v;
-  svalue_t* arg = sp - st_num_arg + 1;
+  svalue_t* arg = sp - num_arg + 1;
 
   if (arg->type != T_FUNCTION) {
-    pop_n_elems(st_num_arg - 1);
+    pop_n_elems(num_arg - 1);
     return;
   }
   if (current_object->flags & O_DESTRUCTED) {
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     push_undefined();
     return;
   }
-  v = call_function_pointer(arg->u.fp, st_num_arg - 1);
+  v = call_function_pointer(arg->u.fp, num_arg - 1);
   assign_svalue(sp, v);
 }
 

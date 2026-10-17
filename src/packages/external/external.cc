@@ -1207,8 +1207,7 @@ void mark_external() {
 #endif
 
 #ifdef F_EXTERNAL_CREATE
-void f_external_create() {
-  int const num_arg = st_num_arg;
+void f_external_create(int num_arg) {
   svalue_t* arg = sp - num_arg + 1;
 
   /* Allocation is not privileged; valid_socket is checked at run. */
@@ -1230,24 +1229,21 @@ void f_external_create() {
 #endif
 
 #ifdef F_EXTERNAL_RUN
-void f_external_run() {
-  /* Latch arity first: check_valid_socket() runs a master apply that
-   * overwrites st_num_arg (same trap as f_async_read). */
-  int const num_arg = st_num_arg;
+void f_external_run(int num_arg) {
+  /* num_arg is the efun parameter — safe across check_valid_socket()'s
+   * master apply (no global arity). */
   int const id = static_cast<int>(sp->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Created) {
     error("external_run: handle has already been started.\n");
   }
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    st_num_arg = num_arg;
     promise_t* p = promise_alloc();
     reject_with_number(p, EESECURITY);
     pop_n_elems(num_arg);
     push_refed_promise(p);
     return;
   }
-  st_num_arg = num_arg;
   /* check_valid_socket() is a master apply: the owner may have been
    * destructed and this slot reused. Re-lookup before spawn. */
   h = lookup_handle(id, /*require_owner=*/1);
@@ -1271,10 +1267,9 @@ void f_external_run() {
 #endif
 
 #ifdef F_EXTERNAL_START
-void f_external_start() {
-  /* Latch arity first: check_valid_socket() runs a master apply that
-   * overwrites st_num_arg (same trap as f_async_read). */
-  int const num_arg = st_num_arg;
+void f_external_start(int num_arg) {
+  /* num_arg is the efun parameter — safe across check_valid_socket()'s
+   * master apply (no global arity). */
   svalue_t* arg = sp - num_arg + 1;
 
   if (num_arg == 2) {
@@ -1282,15 +1277,12 @@ void f_external_start() {
      * ({ stdout, stderr, exit_code }). Classic 4/5-arg path below is
      * unchanged. Drive stdin on a handle with external_write(). */
     if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-      st_num_arg = num_arg;
       promise_t* p = promise_alloc();
       reject_with_number(p, EESECURITY);
       pop_n_elems(num_arg);
       push_refed_promise(p);
       return;
     }
-    st_num_arg = num_arg;
-
     auto which = arg[0].u.number;
     if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
       error("Bad argument 1 to external_start()\n");
@@ -1322,13 +1314,10 @@ void f_external_start() {
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    st_num_arg = num_arg;
     pop_n_elems(num_arg - 1);
     sp->u.number = EESECURITY;
     return;
   }
-  st_num_arg = num_arg;
-
   auto which = arg[0].u.number;
   if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
     error("Bad argument 1 to external_start()\n");
@@ -1341,7 +1330,7 @@ void f_external_start() {
 #endif
 
 #ifdef F_EXTERNAL_STDOUT
-void f_external_stdout() {
+void f_external_stdout(int num_arg) {
   ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
   copy_and_push_string(h->out.c_str());
   assign_svalue(sp - 1, sp);
@@ -1350,7 +1339,7 @@ void f_external_stdout() {
 #endif
 
 #ifdef F_EXTERNAL_STDERR
-void f_external_stderr() {
+void f_external_stderr(int num_arg) {
   ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
   copy_and_push_string(h->err.c_str());
   assign_svalue(sp - 1, sp);
@@ -1359,14 +1348,14 @@ void f_external_stderr() {
 #endif
 
 #ifdef F_EXTERNAL_EXIT_CODE
-void f_external_exit_code() {
+void f_external_exit_code(int num_arg) {
   ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
   sp->u.number = h->exit_code;
 }
 #endif
 
 #ifdef F_EXTERNAL_KILL
-void f_external_kill() {
+void f_external_kill(int num_arg) {
   int const id = static_cast<int>(sp->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Running || h->status_done) {
@@ -1379,7 +1368,7 @@ void f_external_kill() {
 #endif
 
 #ifdef F_EXTERNAL_CLOSE
-void f_external_close() {
+void f_external_close(int num_arg) {
   int const id = static_cast<int>(sp->u.number);
   lookup_handle(id, /*require_owner=*/1);
   destroy_handle(id, /*kill_child=*/1);
@@ -1388,8 +1377,7 @@ void f_external_close() {
 #endif
 
 #ifdef F_EXTERNAL_WRITE
-void f_external_write() {
-  int const num_arg = st_num_arg;
+void f_external_write(int num_arg) {
   svalue_t* arg = sp - num_arg + 1;
   int const id = static_cast<int>(arg[0].u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
@@ -1400,7 +1388,7 @@ void f_external_write() {
 #endif
 
 #ifdef F_EXTERNAL_CLOSE_STDIN
-void f_external_close_stdin() {
+void f_external_close_stdin(int num_arg) {
   int const id = static_cast<int>(sp->u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   h->close_stdin_after_flush = true;

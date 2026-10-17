@@ -568,7 +568,7 @@ static void interrogate_master() {
   }
 }
 
-void f_parse_init() {
+void f_parse_init(int num_arg) {
   parse_info_t* pi;
 
   if (current_object->pinfo) {
@@ -612,7 +612,7 @@ static void remove_ids(parse_info_t* pinfo) {
  * information returned by applies to current_object may have changed,
  * and should be recached when necessary.
  */
-void f_parse_refresh() {
+void f_parse_refresh(int num_arg) {
   parse_info_t* pi;
 
   /* If this is the master object, prepare to go through
@@ -3424,7 +3424,7 @@ static svalue_t* get_the_error(parser_error_t* err, int obj) {
   }
 }
 
-void f_parse_sentence() {
+void f_parse_sentence(int num_arg) {
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
@@ -3439,15 +3439,15 @@ void f_parse_sentence() {
     best_result = nullptr;
   }
 
-  if (st_num_arg == 4) {
+  if (num_arg == 4) {
     parse_nicks = (sp--)->u.map;
   }
 
-  if (st_num_arg >= 3) {
+  if (num_arg >= 3) {
     parse_env = (sp--)->u.arr;
   }
 
-  if (st_num_arg >= 2 && (sp--)->u.number) {
+  if (num_arg >= 2 && (sp--)->u.number) {
 #if defined(DEBUG) || defined(PARSE_DEBUG)
     debug_parse_depth = 1;
     if ((sp + 1)->u.number > 1) {
@@ -3503,8 +3503,8 @@ void f_parse_sentence() {
   }
 }
 
-void f_parse_my_rules() {
-  int const flag = (st_num_arg == 3 ? (sp--)->u.number : 0);
+void f_parse_my_rules(int num_arg) {
+  int const flag = (num_arg == 3 ? (sp--)->u.number : 0);
 
   if (!(sp - 1)->u.ob->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", (sp - 1)->u.ob->obname);
@@ -3570,7 +3570,7 @@ void f_parse_my_rules() {
   free_parse_globals();
 }
 
-void f_parse_remove() {
+void f_parse_remove(int num_arg) {
   const char* verb;
   verb_t* verb_entry;
 
@@ -3594,7 +3594,7 @@ void f_parse_remove() {
   free_string_svalue(sp--);
 }
 
-void f_parse_add_rule() {
+void f_parse_add_rule(int num_arg) {
   int tokens[10];
   int lit[2], i, j;
   svalue_t* ret;
@@ -3686,7 +3686,7 @@ void f_parse_add_rule() {
   free_string_svalue(sp--);
 }
 
-void f_parse_add_synonym() {
+void f_parse_add_synonym(int num_arg) {
   const char *new_verb, *old_verb, *rule, *orig_new_verb;
   verb_t* vb;
   verb_node_t *vn, *verb_node;
@@ -3695,7 +3695,7 @@ void f_parse_add_synonym() {
   int weight;
   int h;
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     orig_new_verb = (sp - 2)->u.string;
     new_verb = SHARED_STRING(sp - 2);
     old_verb = SHARED_STRING(sp - 1);
@@ -3809,14 +3809,14 @@ void f_parse_add_synonym() {
     syn->real = vb;
   }
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     free_string_svalue(sp--);
   }
   free_string_svalue(sp--);
   free_string_svalue(sp--);
 }
 
-void f_parse_dump() {
+void f_parse_dump(int num_arg) {
   int i;
   outbuffer_t ob;
 

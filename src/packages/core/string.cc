@@ -1,7 +1,7 @@
 #include "base/package_api.h"
 
 #ifdef F_EXPLODE
-void f_explode() {
+void f_explode(int num_arg) {
   array_t* vec;
 
   int const len = SVALUE_STRLEN(sp - 1);
@@ -15,7 +15,7 @@ void f_explode() {
 #endif
 
 #ifdef F_EXPLODE_REVERSIBLE
-void f_explode_reversible() {
+void f_explode_reversible(int num_arg) {
   array_t* vec;
 
   int const len = SVALUE_STRLEN(sp - 1);
@@ -28,12 +28,12 @@ void f_explode_reversible() {
 #endif
 
 #ifdef F_IMPLODE
-void f_implode() {
+void f_implode(int num_arg) {
   array_t* arr;
   int flag;
   svalue_t* args;
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     args = (sp - 2);
     if (args[1].type == T_STRING) {
       error(
@@ -49,7 +49,7 @@ void f_implode() {
   check_for_destr(arr);
 
   if (args[1].type == T_STRING) {
-    /* st_num_arg == 2 here */
+    /* num_arg == 2 here */
     char* str;
 
     str = implode_string(arr, sp->u.string, SVALUE_STRLEN(sp));

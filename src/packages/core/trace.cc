@@ -3,11 +3,11 @@
 #include "file.h"
 
 #ifdef F_DUMP_TRACE
-void f_dump_trace() { push_array(get_svalue_trace()); }
+void f_dump_trace(int num_arg) { push_array(get_svalue_trace()); }
 #endif
 
 #ifdef F_TRACE_START
-void f_trace_start() {
+void f_trace_start(int num_arg) {
   // Unconditional: Tracer::collect() self-guards on an empty filename, and
   // gating it on enabled() is what wedged tracing for the life of the
   // process. When a trace hits MAX_EVENTS, TraceWriter::log() calls
@@ -47,7 +47,7 @@ void f_trace_start() {
 #endif
 
 #ifdef F_TRACE_END
-void f_trace_end() {
+void f_trace_end(int num_arg) {
   // No enabled() gate: a trace that filled its buffer is exactly the case
   // that needs ending, and collect() already no-ops when there is nothing
   // pending.

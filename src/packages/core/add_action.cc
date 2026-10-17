@@ -686,10 +686,10 @@ void remove_sent(object_t* ob, object_t* user) {
 #endif
 
 #ifdef F_ADD_ACTION
-void f_add_action() {
+void f_add_action(int num_arg) {
   LPC_INT flag;
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     flag = (sp--)->u.number;
   } else {
     flag = 0;
@@ -723,7 +723,7 @@ void f_add_action() {
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command() {
+void f_command(int num_arg) {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
@@ -752,22 +752,22 @@ void f_command() {
 #endif
 
 #ifdef F_COMMANDS
-void f_commands() { push_refed_array(commands(current_object)); }
+void f_commands(int num_arg) { push_refed_array(commands(current_object)); }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands() { enable_commands(0, 0); }
+void f_disable_commands(int num_arg) { enable_commands(0, 0); }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands() {
+void f_enable_commands(int num_arg) {
   enable_commands(1, sp->u.number);
   pop_stack();
 }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living() {
+void f_find_living(int num_arg) {
   object_t* ob;
 
   ob = find_living_object(sp->u.string, 0);
@@ -782,7 +782,7 @@ void f_find_living() {
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player() {
+void f_find_player(int num_arg) {
   object_t* ob;
 
   ob = find_living_object(sp->u.string, 1);
@@ -797,7 +797,7 @@ void f_find_player() {
 #endif
 
 #ifdef F_LIVING
-void f_living() {
+void f_living(int num_arg) {
   if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
     free_object(&sp->u.ob, "f_living:1");
     *sp = const1;
@@ -809,11 +809,11 @@ void f_living() {
 #endif
 
 #ifdef F_LIVINGS
-void f_livings() { push_refed_array(livings()); }
+void f_livings(int num_arg) { push_refed_array(livings()); }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail() {
+void f_notify_fail(int num_arg) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
     if (sp->type == T_STRING) {
@@ -829,7 +829,7 @@ void f_notify_fail() {
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb() {
+void f_query_verb(int num_arg) {
   if (!last_verb) {
     push_number(0);
     return;
@@ -839,7 +839,7 @@ void f_query_verb() {
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action() {
+void f_remove_action(int num_arg) {
   LPC_INT success;
 
   success = remove_action(sp - 1, sp->u.string);
@@ -850,7 +850,7 @@ void f_remove_action() {
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name() {
+void f_set_living_name(int num_arg) {
   set_living_name(current_object, sp->u.string);
   free_string_svalue(sp--);
 }

@@ -13,11 +13,11 @@ enum { MAX_COLOUR_STRING = 200 };
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-void f_real_time() { push_number(time(nullptr)); }
+void f_real_time(int num_arg) { push_number(time(nullptr)); }
 #endif
 
 #ifdef F_COMPRESSEDP
-void f_compressedp() {
+void f_compressedp(int num_arg) {
   int i;
 
   i = sp->u.ob->interactive && (sp->u.ob->interactive->iflags & USING_COMPRESS);
@@ -33,7 +33,7 @@ void f_compressedp() {
  * substantially faster.
  */
 #ifdef F_NAMED_LIVINGS
-void f_named_livings() {
+void f_named_livings(int num_arg) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int i;
@@ -90,11 +90,11 @@ void f_named_livings() {
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
-void f_remove_shadow() {
+void f_remove_shadow(int num_arg) {
   object_t* ob;
 
   ob = current_object;
-  if (st_num_arg) {
+  if (num_arg) {
     ob = sp->u.ob;
     pop_stack();
   }
@@ -116,7 +116,7 @@ void f_remove_shadow() {
 /* This was originally written my Malic for Demon.  I rewrote parts of it
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
-void f_query_notify_fail() {
+void f_query_notify_fail(int num_arg) {
   const char* p;
 
   if (command_giver && command_giver->interactive) {
@@ -139,7 +139,7 @@ void f_query_notify_fail() {
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
-void f_store_variable() {
+void f_store_variable(int num_arg) {
   int idx;
   svalue_t* sv;
   lpc_type_t type;
@@ -147,7 +147,7 @@ void f_store_variable() {
   const char* name = nullptr;
   object_t* ob;
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     ob = sp->u.ob;
     sv = (sp - 1);
     name = (sp - 2)->u.string;
@@ -162,19 +162,19 @@ void f_store_variable() {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
   assign_svalue(&ob->variables[idx], sv);
-  pop_n_elems(st_num_arg);
+  pop_n_elems(num_arg);
 }
 #endif
 
 #ifdef F_FETCH_VARIABLE
-void f_fetch_variable() {
+void f_fetch_variable(int num_arg) {
   int idx;
   lpc_type_t type;
 
   const char* name = nullptr;
   object_t* ob;
 
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     ob = sp->u.ob;
     name = (sp - 1)->u.string;
   } else {
@@ -187,16 +187,16 @@ void f_fetch_variable() {
   if (idx == -1 || (ob != current_object && (type & DECL_PRIVATE))) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
-  pop_n_elems(st_num_arg);
+  pop_n_elems(num_arg);
   push_svalue(&ob->variables[idx]);
 }
 #endif
 
 /* Beek */
 #ifdef F_SET_PROMPT
-void f_set_prompt(void) {
+void f_set_prompt(int num_arg) {
   object_t* who;
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     who = sp->u.ob;
     pop_stack();
   } else {
@@ -309,7 +309,7 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
   }
 }
 
-void f_copy() {
+void f_copy(int num_arg) {
   svalue_t ret;
 
   depth = 0;
@@ -322,7 +322,7 @@ void f_copy() {
 /* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-void f_functions() {
+void f_functions(int num_arg) {
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t* funp;
@@ -463,7 +463,7 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
   *idx += prog->num_variables_defined;
 }
 
-void f_variables() {
+void f_variables(int num_arg) {
   int idx = 0;
   array_t* arr;
   int const flag = (sp--)->u.number;
@@ -479,7 +479,7 @@ void f_variables() {
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats() { push_refed_array(get_heart_beats()); }
+void f_heart_beats(int num_arg) { push_refed_array(get_heart_beats()); }
 #endif
 
 /*Aleas@Nightmare */
@@ -581,7 +581,7 @@ struct tc_colwidth_state {
   }
 };
 
-void f_terminal_colour() {
+void f_terminal_colour(int num_arg) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *instr, *cp, **parts;
@@ -616,8 +616,8 @@ void f_terminal_colour() {
   int repused;
   char** rep_allocs;
 
-  if (st_num_arg >= 3) {
-    if (st_num_arg == 4) {
+  if (num_arg >= 3) {
+    if (num_arg == 4) {
       indent = (sp--)->u.number;
     }
     wrap = (sp--)->u.number;
@@ -1681,7 +1681,7 @@ static char* pluralize(const char* str) {
   return news;
 } /* end of pluralize() */
 
-void f_pluralize() {
+void f_pluralize(int num_arg) {
   char* s;
 
   s = pluralize(sp->u.string);
@@ -1743,7 +1743,7 @@ static int file_length(const char* file) {
   return ret;
 } /* end of file_length() */
 
-void f_file_length() {
+void f_file_length(int num_arg) {
   int l;
 
   l = file_length(sp->u.string);
@@ -1753,7 +1753,7 @@ void f_file_length() {
 #endif
 
 #ifdef F_UPPER_CASE
-void f_upper_case() {
+void f_upper_case(int num_arg) {
   const char* str;
 
   str = sp->u.string;
@@ -1777,13 +1777,13 @@ void f_upper_case() {
 #endif
 
 #ifdef F_REPLACEABLE
-void f_replaceable() {
+void f_replaceable(int num_arg) {
   object_t* obj;
   program_t* prog;
   int i, j, num, numignore, replaceable;
   const char** ignore;
 
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     obj = (sp - 1)->u.ob;
   } else {
     obj = sp->u.ob;
@@ -1793,7 +1793,7 @@ void f_replaceable() {
   if (obj == simul_efun_ob || prog->func_ref) {
     replaceable = 0;
   } else {
-    if (st_num_arg == 2) {
+    if (num_arg == 2) {
       numignore = sp->u.arr->size;
       // Always allocate the 2 built-in slots (create/__INIT) plus one per
       // ignore entry -- an empty ignore array must not leave ignore == NULL
@@ -1838,7 +1838,7 @@ void f_replaceable() {
     FREE(ignore);
   }
 
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     free_array((sp--)->u.arr);
   }
   free_svalue(sp, "f_replaceable");
@@ -1897,12 +1897,12 @@ inline void sum_program_info(const program_t* const p, ProgramInfoS& info) {
   info.total += p->total_size;
 }
 
-void f_program_info() {
+void f_program_info(int num_arg) {
   ProgramInfoS info{0};  // initialize all elements to 0
   object_t* ob;
   mapping_t* m;
 
-  if (st_num_arg == 1) {
+  if (num_arg == 1) {
     ob = sp->u.ob;
     if (!(ob->flags & O_CLONE)) {
       sum_program_info(ob->prog, info);
@@ -1943,7 +1943,7 @@ void f_program_info() {
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-void f_remove_interactive() {
+void f_remove_interactive(int num_arg) {
   if ((sp->u.ob->flags & O_DESTRUCTED) || !(sp->u.ob->interactive)) {
     free_object(&sp->u.ob, "f_remove_interactive");
     *sp = const0;
@@ -1970,10 +1970,10 @@ static int query_ip_port(object_t* ob) {
   return ob->interactive->local_port;
 }
 
-void f_query_ip_port() {
+void f_query_ip_port(int num_arg) {
   int tmp;
 
-  if (st_num_arg) {
+  if (num_arg) {
     tmp = query_ip_port(sp->u.ob);
     free_object(&sp->u.ob, "f_query_ip_port");
   } else {
@@ -2031,7 +2031,7 @@ void reset_timezone(const char* old_tz) {
 #endif
 
 #ifdef F_ZONETIME
-void f_zonetime() {
+void f_zonetime(int num_arg) {
   const char *new_tz, *old_tz;
   char* retv;
   time_t time_val;
@@ -2058,7 +2058,7 @@ void f_zonetime() {
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-void f_is_daylight_savings_time() {
+void f_is_daylight_savings_time(int num_arg) {
   time_t time_to_check = sp->u.number;
   const char* new_tz = (sp - 1)->u.string;
   const char* old_tz = set_timezone(new_tz);
@@ -2081,14 +2081,14 @@ void f_is_daylight_savings_time() {
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message() {
+void f_debug_message(int num_arg) {
   debug_message("%s\n", sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-void f_function_owner() {
+void f_function_owner(int num_arg) {
   object_t* owner = sp->u.fp->hdr.owner;
 
   free_funp(sp->u.fp);
@@ -2097,7 +2097,7 @@ void f_function_owner() {
 #endif
 
 #ifdef F_REPEAT_STRING
-void f_repeat_string() {
+void f_repeat_string(int num_arg) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char* str;
@@ -2268,7 +2268,7 @@ static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog)
   *idx += prog->num_variables_defined;
 }
 
-void f_memory_summary() {
+void f_memory_summary(int num_arg) {
   mapping_t* result = allocate_mapping(8);
   object_t* ob;
   int idx;
@@ -2296,10 +2296,10 @@ void f_memory_summary() {
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-void f_query_replaced_program() {
+void f_query_replaced_program(int num_arg) {
   char* res = nullptr;
 
-  if (st_num_arg) {
+  if (num_arg) {
     if (sp->u.ob->replaced_program) {
       res = add_slash(sp->u.ob->replaced_program);
     }
@@ -2321,7 +2321,7 @@ void f_query_replaced_program() {
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-void f_network_stats() {
+void f_network_stats(int num_arg) {
   mapping_t* m;
   int i, ports = 0;
 
@@ -2458,10 +2458,10 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
   FREE_MSTR(name);
 }
 
-void f_event() {
+void f_event(int num_arg) {
   int num;
 
-  num = st_num_arg;
+  num = num_arg;
 
   event((sp - num + 1), (sp - num + 2)->u.string, num - 2, (sp - num + 3));
 
@@ -2497,7 +2497,7 @@ void number_as_string(char* buf, LPC_INT n) {
   strcat(buf, single[n]);
 }
 
-void f_query_num() {
+void f_query_num(int num_arg) {
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2566,7 +2566,7 @@ q_n_end:
 #endif
 
 #ifdef F_BASE_NAME
-void f_base_name() {
+void f_base_name(int num_arg) {
   char *name, *tmp;
   int i;
 
@@ -2612,7 +2612,7 @@ int garbage_check(object_t* ob, void* /*data*/) {
       ;
 }
 
-void f_get_garbage() {
+void f_get_garbage(int num_arg) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2637,7 +2637,7 @@ void f_get_garbage() {
 
 #ifdef F_NUM_CLASSES
 
-void f_num_classes() {
+void f_num_classes(int num_arg) {
   int const i = sp->u.ob->prog->num_classes;
   pop_stack();
   push_number(i);
@@ -2646,7 +2646,7 @@ void f_num_classes() {
 #endif
 
 #ifdef F_ASSEMBLE_CLASS
-void f_assemble_class() {
+void f_assemble_class(int num_arg) {
   // Build through the CLASS allocator: retagging a copy_array() block as
   // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
   // is later freed as a class (caught by the testsuite's per-file
@@ -2664,7 +2664,7 @@ void f_assemble_class() {
 #endif
 
 #ifdef F_DISASSEMBLE_CLASS
-void f_disassemble_class() {
+void f_disassemble_class(int num_arg) {
   array_t* arr;
   if (sp->type != T_CLASS) {
     error("Argument to disassemble_class() not a class.\n");
@@ -2677,7 +2677,7 @@ void f_disassemble_class() {
 
 #ifdef F_FETCH_CLASS_MEMBER
 
-void f_fetch_class_member() {
+void f_fetch_class_member(int num_arg) {
   LPC_INT pos = sp->u.number; /* checked below as an LPC int, not wrapped */
   array_t* arr;
 
@@ -2701,7 +2701,7 @@ void f_fetch_class_member() {
 
 #ifdef F_STORE_CLASS_MEMBER
 
-void f_store_class_member() {
+void f_store_class_member(int num_arg) {
   LPC_INT const pos = (sp - 1)->u.number; /* checked below as an LPC int */
   array_t* arr;
 
@@ -2722,7 +2722,7 @@ void f_store_class_member() {
 #endif
 
 #ifdef F_ELEMENT_OF
-void f_element_of() {
+void f_element_of(int num_arg) {
   array_t* arr = sp->u.arr;
   if (!arr->size) {
     error("Can't take element from empty array.\n");
@@ -2763,8 +2763,8 @@ void shuffle(array_t* args) {
   /* Well, that's it. We don't need to push or anything. */
 }
 
-void f_shuffle() {
-  svalue_t* sv = sp - st_num_arg + 1;
+void f_shuffle(int num_arg) {
+  svalue_t* sv = sp - num_arg + 1;
 
   if (sv->type == T_ARRAY && sv->u.arr) {
     shuffle(sv->u.arr);
@@ -2776,7 +2776,7 @@ void f_shuffle() {
 
 #ifdef F_MAX
 
-void f_max() {
+void f_max(int num_arg) {
   svalue_t* sarr = sp - 1;
   array_t* arr = sarr->u.arr;
   int max_index = 0;
@@ -2854,7 +2854,7 @@ void f_max() {
 
 #ifdef F_MIN
 
-void f_min() {
+void f_min(int num_arg) {
   svalue_t* sarr = sp - 1;
   array_t* arr = sarr->u.arr;
   int min_index = 0;
@@ -2931,7 +2931,7 @@ void f_min() {
 
 #ifdef F_ABS
 
-void f_abs() {
+void f_abs(int num_arg) {
   if (sp->type == T_REAL) {
     if (sp->u.real < 0.0) {
       sp->u.real = -sp->u.real;
@@ -2946,8 +2946,7 @@ void f_abs() {
 
 #ifdef F_ROLL_MDN
 
-void f_roll_MdN() {
-  int const num_arg = st_num_arg;
+void f_roll_MdN(int num_arg) {
   LPC_INT sides, rolls, bonus;
   LPC_INT roll = 0;
 
@@ -3035,7 +3034,7 @@ int levenshtein(char* a, int as, char* b, int bs) {
   return i;
 } /* levenshtein() */
 
-void f_string_difference() {
+void f_string_difference(int num_arg) {
   int diff, as, bs;
   char *a, *b;
 
@@ -3073,10 +3072,10 @@ static int query_charmode(object_t* ob) {
   return ret;
 }
 
-void f_query_charmode() {
+void f_query_charmode(int num_arg) {
   int tmp;
 
-  if (st_num_arg) {
+  if (num_arg) {
     tmp = query_charmode(sp->u.ob);
     free_object(&sp->u.ob, "f_query_charmode");
   } else {
@@ -3096,10 +3095,10 @@ static int remove_charmode(object_t* ob) {
   return ret;
 }
 
-void f_remove_charmode() {
+void f_remove_charmode(int num_arg) {
   int tmp;
 
-  if (st_num_arg) {
+  if (num_arg) {
     tmp = remove_charmode(sp->u.ob);
     free_object(&sp->u.ob, "f_remove_charmode");
   } else {
@@ -3130,10 +3129,10 @@ static int remove_get_char(object_t* ob) {
   return -1;
 }
 
-void f_remove_get_char() {
+void f_remove_get_char(int num_arg) {
   int tmp;
 
-  if (st_num_arg) {
+  if (num_arg) {
     tmp = remove_get_char(sp->u.ob);
     free_object(&sp->u.ob, "f_remove_get_char");
   } else {
@@ -3144,7 +3143,7 @@ void f_remove_get_char() {
 
 #endif
 #ifdef F_SEND_NULLBYTE
-void f_send_nullbyte() {
+void f_send_nullbyte(int num_arg) {
   int tmp;
   object_t* who;
   tmp = 0;
@@ -3166,7 +3165,7 @@ void f_send_nullbyte() {
 #endif
 
 #ifdef F_RESTORE_FROM_STRING
-void f_restore_from_string() {
+void f_restore_from_string(int num_arg) {
   const char* buf;
   LPC_INT noclear;
 
@@ -3184,7 +3183,7 @@ void f_restore_from_string() {
 #endif
 
 #ifdef F_CLASSES
-void f_classes() {
+void f_classes(int num_arg) {
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
@@ -3258,7 +3257,7 @@ static void fix_object_names() {
   }
 }
 
-void f_test_load() {
+void f_test_load(int num_arg) {
   const char* tmp = sp->u.string;
   object_t* new_ob;
   if ((testloadob = find_object2(sp->u.string))) {
@@ -3316,7 +3315,7 @@ static bool os_env_name_listed(const char* list, const char* name) {
 #endif
 
 #ifdef F_GET_OS_ENV
-void f_get_os_env() {
+void f_get_os_env(int num_arg) {
   const char* name = sp->u.string;
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
@@ -3337,8 +3336,8 @@ void f_get_os_env() {
 #endif
 
 #ifdef F_SET_OS_ENV
-void f_set_os_env() {
-  int const num = st_num_arg;
+void f_set_os_env(int num_arg) {
+  int const num = num_arg;
   svalue_t* namearg = sp - num + 1;
   const char* name = namearg->u.string;
 
