@@ -308,7 +308,11 @@ void mark_mudlib_stats() {
 static void init_author_for_ob(object_t* ob) {
   svalue_t* ret;
 
-  push_malloced_string(add_slash(ob->obname));
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push_str_malloced(add_slash(ob->obname));
+    b.done();
+  }
   ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
   if (ret == (svalue_t*)-1) {
     ob->stats.author = master_author;
@@ -353,7 +357,11 @@ static const char* author_for_file(const char* file) {
   svalue_t* ret;
   static char buff[50];
 
-  copy_and_push_string(file);
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push_str_copy(file);
+    b.done();
+  }
   ret = safe_apply_master_ob(APPLY_AUTHOR_FILE, 1);
   if (ret == nullptr || ret == (svalue_t*)-1 || ret->type != T_STRING) {
     return nullptr;
@@ -392,7 +400,11 @@ static void init_domain_for_ob(object_t* ob) {
   /*
    * Ask master object who the creator of this object is.
    */
-  push_malloced_string(add_slash(ob->obname));
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push_str_malloced(add_slash(ob->obname));
+    b.done();
+  }
 
   if (master_ob) {
     ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
@@ -453,7 +465,11 @@ static const char* domain_for_file(const char* file) {
   svalue_t* ret;
   static char buff[512];
 
-  share_and_push_string(file);
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push_str_copy(file);
+    b.done();
+  }
   ret = safe_apply_master_ob(APPLY_DOMAIN_FILE, 1);
   if (ret == nullptr || ret == (svalue_t*)-1 || ret->type != T_STRING) {
     return nullptr;
