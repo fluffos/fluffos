@@ -110,9 +110,10 @@ struct ChildExitNote {
 std::vector<ChildExitNote> g_exit_notes;
 
 void reject_with_number(promise_t* p, LPC_INT n) {
-  push_number(n);
-  promise_settle(p, sp, 1);
-  pop_stack();
+  LPCFrame b = LPCFrame::builder();
+  b.push(n);
+  promise_settle(p, &b.top(), 1);
+  b.discard_to();
 }
 
 void append_capped(std::string& dest, const char* data, size_t len) {
@@ -243,7 +244,8 @@ void free_pipe_events(ExternalHandle* h) {
   close_pipe_fd(&h->err_fd);
 }
 
-void push_external_result(const std::string& out, const std::string& err, LPC_INT code) {
+void push_external_result(LPCFrame& b, const std::string& out, const std::string& err,
+                          LPC_INT code) {
   array_t* arr = allocate_array(3);
   arr->item[0].type = T_STRING;
   arr->item[0].subtype = STRING_MALLOC;
@@ -252,7 +254,7 @@ void push_external_result(const std::string& out, const std::string& err, LPC_IN
   arr->item[1].subtype = STRING_MALLOC;
   arr->item[1].u.string = string_copy(err.c_str(), "external_stderr");
   arr->item[2].u.number = code;
-  push_refed_array(arr);
+  b.push_refed(arr);
 }
 
 void kill_handle_child(ExternalHandle* h) {
@@ -314,9 +316,12 @@ void fulfill_handle_promise(int id) {
   promise_t* p = h->prom;
   h->prom = nullptr;
   promise_clear_cancel_handler(p);
-  push_external_result(h->out, h->err, h->exit_code);
-  promise_settle(p, sp, 0);
-  pop_stack();
+  {
+    LPCFrame b = LPCFrame::builder();
+    push_external_result(b, h->out, h->err, h->exit_code);
+    promise_settle(p, &b.top(), 0);
+    b.discard_to();
+  }
   free_promise(p);
   if (h->ephemeral) {
     delete h;
@@ -356,9 +361,10 @@ void abort_handle(int id, int kill_child) {
      * and free_promise a second time. */
     promise_clear_cancel_handler(p);
     if (p->state == PROMISE_PENDING) {
-      push_constant_string("*external process aborted");
-      promise_settle(p, sp, 1);
-      pop_stack();
+      LPCFrame b = LPCFrame::builder();
+      b.push_str_constant("*external process aborted");
+      promise_settle(p, &b.top(), 1);
+      b.discard_to();
     }
     free_promise(p);
   }
@@ -1207,9 +1213,8 @@ void mark_external() {
 #endif
 
 #ifdef F_EXTERNAL_CREATE
-void f_external_create() {
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
+void f_external_create(LPCFrame& f) {
+  svalue_t* arg = f.argp(0);
 
   /* Allocation is not privileged; valid_socket is checked at run. */
   int const cmd = validate_cmd_index(arg[0].u.number);
@@ -1224,30 +1229,26 @@ void f_external_create() {
   h->args = std::move(extra);
   g_handles[id - 1] = h;
 
-  pop_n_elems(num_arg);
-  push_number(id);
+  f.ret(id);
 }
 #endif
 
 #ifdef F_EXTERNAL_RUN
-void f_external_run() {
-  /* Latch arity first: check_valid_socket() runs a master apply that
-   * overwrites st_num_arg (same trap as f_async_read). */
-  int const num_arg = st_num_arg;
-  int const id = static_cast<int>(sp->u.number);
+void f_external_run(LPCFrame& f) {
+  int num_arg = f.argc();
+  /* num_arg is the efun parameter — safe across check_valid_socket()'s
+   * master apply (no global arity). */
+  int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Created) {
     error("external_run: handle has already been started.\n");
   }
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    st_num_arg = num_arg;
     promise_t* p = promise_alloc();
     reject_with_number(p, EESECURITY);
-    pop_n_elems(num_arg);
-    push_refed_promise(p);
+    f.ret_refed(p);
     return;
   }
-  st_num_arg = num_arg;
   /* check_valid_socket() is a master apply: the owner may have been
    * destructed and this slot reused. Re-lookup before spawn. */
   h = lookup_handle(id, /*require_owner=*/1);
@@ -1259,38 +1260,32 @@ void f_external_run() {
   promise_t* p = promise_alloc();
   if (rc < 0) {
     reject_with_number(p, rc);
-    pop_n_elems(num_arg);
-    push_refed_promise(p);
+    f.ret_refed(p);
     return;
   }
   h->state = HandleState::Running;
   attach_start_promise(h, id, p);
-  pop_n_elems(num_arg);
-  push_refed_promise(p);
+  f.ret_refed(p);
 }
 #endif
 
 #ifdef F_EXTERNAL_START
-void f_external_start() {
-  /* Latch arity first: check_valid_socket() runs a master apply that
-   * overwrites st_num_arg (same trap as f_async_read). */
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
+void f_external_start(LPCFrame& f) {
+  int num_arg = f.argc();
+  /* num_arg is the efun parameter — safe across check_valid_socket()'s
+   * master apply (no global arity). */
+  svalue_t* arg = f.argp(0);
 
   if (num_arg == 2) {
     /* Issue #1319 omit-callback form: same efun, no callbacks, promise of
      * ({ stdout, stderr, exit_code }). Classic 4/5-arg path below is
      * unchanged. Drive stdin on a handle with external_write(). */
     if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-      st_num_arg = num_arg;
       promise_t* p = promise_alloc();
       reject_with_number(p, EESECURITY);
-      pop_n_elems(num_arg);
-      push_refed_promise(p);
+      f.ret_refed(p);
       return;
     }
-    st_num_arg = num_arg;
-
     auto which = arg[0].u.number;
     if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
       error("Bad argument 1 to external_start()\n");
@@ -1309,8 +1304,7 @@ void f_external_start() {
     g_handles[id - 1] = h;
 
     promise_t* p = start_created_handle(h, id);
-    pop_n_elems(num_arg);
-    push_refed_promise(p);
+    f.ret_refed(p);
     return;
   }
 
@@ -1322,91 +1316,83 @@ void f_external_start() {
   }
 
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
-    st_num_arg = num_arg;
-    pop_n_elems(num_arg - 1);
-    sp->u.number = EESECURITY;
+    f.ret_front_number(EESECURITY);
     return;
   }
-  st_num_arg = num_arg;
-
   auto which = arg[0].u.number;
   if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
     error("Bad argument 1 to external_start()\n");
   }
 
   int fd = external_start(which, arg + 1, arg + 2, arg + 3, (num_arg == 5 ? arg + 4 : nullptr));
-  pop_n_elems(num_arg - 1);
-  sp->u.number = fd;
+  f.ret_front_number(fd);
 }
 #endif
 
 #ifdef F_EXTERNAL_STDOUT
-void f_external_stdout() {
-  ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
-  copy_and_push_string(h->out.c_str());
-  assign_svalue(sp - 1, sp);
-  pop_stack();
+void f_external_stdout(LPCFrame& f) {
+  ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
+  f.ret_str_copy(h->out.c_str());
 }
 #endif
 
 #ifdef F_EXTERNAL_STDERR
-void f_external_stderr() {
-  ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
-  copy_and_push_string(h->err.c_str());
-  assign_svalue(sp - 1, sp);
-  pop_stack();
+void f_external_stderr(LPCFrame& f) {
+  ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
+  f.ret_str_copy(h->err.c_str());
 }
 #endif
 
 #ifdef F_EXTERNAL_EXIT_CODE
-void f_external_exit_code() {
-  ExternalHandle* h = lookup_handle(static_cast<int>(sp->u.number), /*require_owner=*/1);
-  sp->u.number = h->exit_code;
+void f_external_exit_code(LPCFrame& f) {
+  ExternalHandle* h = lookup_handle(static_cast<int>(f.number(0)), /*require_owner=*/1);
+  f.set_top_number(h->exit_code);
+  f.done();
 }
 #endif
 
 #ifdef F_EXTERNAL_KILL
-void f_external_kill() {
-  int const id = static_cast<int>(sp->u.number);
+void f_external_kill(LPCFrame& f) {
+  int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Running || h->status_done) {
-    sp->u.number = 0;
+    f.set_top_number(0);
+    f.done();
     return;
   }
   kill_handle_child(h);
-  sp->u.number = 1;
+  f.set_top_number(1);
+  f.done();
 }
 #endif
 
 #ifdef F_EXTERNAL_CLOSE
-void f_external_close() {
-  int const id = static_cast<int>(sp->u.number);
+void f_external_close(LPCFrame& f) {
+  int const id = static_cast<int>(f.number(0));
   lookup_handle(id, /*require_owner=*/1);
   destroy_handle(id, /*kill_child=*/1);
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_EXTERNAL_WRITE
-void f_external_write() {
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
+void f_external_write(LPCFrame& f) {
+  svalue_t* arg = f.argp(0);
   int const id = static_cast<int>(arg[0].u.number);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   int const ok = queue_stdin(h, id, arg[1].u.string, SVALUE_STRLEN(arg + 1));
-  pop_n_elems(num_arg);
-  push_number(ok);
+  f.ret(ok);
 }
 #endif
 
 #ifdef F_EXTERNAL_CLOSE_STDIN
-void f_external_close_stdin() {
-  int const id = static_cast<int>(sp->u.number);
+void f_external_close_stdin(LPCFrame& f) {
+  int const id = static_cast<int>(f.number(0));
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   h->close_stdin_after_flush = true;
   if (h->state == HandleState::Running) {
     flush_stdin(h, id);
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif

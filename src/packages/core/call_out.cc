@@ -715,8 +715,9 @@ void reclaim_call_outs() {
 }
 
 namespace {
-inline void int_call_out(bool walltime) {
-  svalue_t* arg = sp - st_num_arg + 1;
+inline void int_call_out(bool walltime, LPCFrame& f) {
+  int num_arg = f.argc();
+  svalue_t* arg = f.argp(0);
   /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
    * registers a timer-only call_out and returns a promise fulfilled (with 0)
    * when the delay elapses, rejected if the call_out is removed or its
@@ -727,18 +728,18 @@ inline void int_call_out(bool walltime) {
    * loosening the spec to min_arg 1 moved these from compile time (where the
    * spec named them correctly) to here */
   const char* const efun_name = walltime ? "call_out_walltime" : "call_out";
-  if (timer_form && st_num_arg > 1) {
+  if (timer_form && num_arg > 1) {
     error("%s: a delay-only %s takes no arguments (nothing will be called).\n", efun_name,
           efun_name);
   }
   /* The spec can no longer pin argument 2's type (the delay is argument 1 in
    * the promise form), so the classic form checks it here. */
   if (!timer_form &&
-      (st_num_arg < 2 || (arg[1].type != T_NUMBER && arg[1].type != T_REAL))) {
+      (num_arg < 2 || (arg[1].type != T_NUMBER && arg[1].type != T_REAL))) {
     error("%s: argument 2 (the delay) must be int or float.\n", efun_name);
   }
   svalue_t* delay_arg = timer_form ? &arg[0] : &arg[1];
-  int const num = timer_form ? 0 : st_num_arg - 2;
+  int const num = timer_form ? 0 : num_arg - 2;
   LPC_INT ret;
 
   LPC_INT delay_msecs = 0;
@@ -789,38 +790,38 @@ inline void int_call_out(bool walltime) {
       err.u.string = "*call_out was removed before it ran";
       promise_settle(p, &err, 1);
     }
-    /* sp is the delay (T_NUMBER/T_REAL): overwrite it, nothing to free */
-    sp->type = T_PROMISE;
-    sp->subtype = 0;
-    sp->u.prom = p;
+    /* delay slot is T_NUMBER/T_REAL: overwrite in place, nothing to free */
+    f.top().type = T_PROMISE;
+    f.top().subtype = 0;
+    f.top().u.prom = p;
+    f.done();
     return;
   }
 
   if (!(current_object->flags & O_DESTRUCTED)) {
     ret = new_call_out(current_object, arg, std::chrono::milliseconds(delay_msecs), num, arg + 2,
                        walltime);
-    /* args have been transfered; don't free them;
-     also don't need to free the int */
-    sp -= num + 1;
+    /* args have been transfered; steal so ret() does not free them */
+    for (int i = 2; i < num_arg; i++) {
+      (void)f.steal(i);
+    }
   } else {
     ret = 0;
-    pop_n_elems(num);
-    sp--;
   }
-  /* the function */
-  free_svalue(sp, "call_out");
-  put_number(ret);
+  f.ret(ret);
 }
 }  // namespace
 
 #ifdef F_CALL_OUT
-void f_call_out() { int_call_out(false); }
+void f_call_out(LPCFrame& f) { int_call_out(false, f); }
 #endif
 
 #ifdef F_CALL_OUT_WALLTIME
-void f_call_out_walltime() { int_call_out(true); }
+void f_call_out_walltime(LPCFrame& f) { int_call_out(true, f); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
-void f_call_out_info() { push_refed_array(get_all_call_outs()); }
+void f_call_out_info(LPCFrame& f) {
+  f.ret_refed(get_all_call_outs());
+}
 #endif

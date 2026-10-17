@@ -3,48 +3,54 @@
 #include "vm/internal/hooks.h"
 
 #ifdef F_HOOK_ATTACH
-void f_hook_attach() {
+void f_hook_attach(LPCFrame& f) {
   /* args: string point, mixed action, mapping spec, int flags */
-  int flags = sp->u.number;
-  mapping_t* spec = (sp - 1)->u.map;
-  svalue_t* action = sp - 2;
-  const char* point = (sp - 3)->u.string;
+  const char* point = f.string(0);
+  svalue_t* action = f.argp(1);
+  mapping_t* spec = f.mapping(2);
+  int flags = static_cast<int>(f.number(3));
   LPC_INT id = hook_efun_attach(point, action, spec, flags);
-  pop_n_elems(4);
-  push_number(id);
+  f.ret(id);
 }
 #endif
 
 #ifdef F_HOOK_DETACH
-void f_hook_detach() {
-  LPC_INT id = sp->u.number;
+void f_hook_detach(LPCFrame& f) {
+  LPC_INT id = f.number(0);
   hook_efun_detach(id);
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_HOOK_QUERY
-void f_hook_query() {
-  LPC_INT id = sp->u.number;
+void f_hook_query(LPCFrame& f) {
+  LPC_INT id = f.number(0);
   mapping_t* m = hook_efun_query(id);
-  free_svalue(sp, "hook_query");
-  sp->type = T_MAPPING;
-  sp->u.map = m;
+  f.ret(m);
 }
 #endif
 
 #ifdef F_HOOK_LIST
-void f_hook_list() {
-  int num = st_num_arg;
+void f_hook_list(LPCFrame& f) {
+  int num_arg = f.argc();
   object_t* ob = nullptr;
-  if (num == 1) {
-    if (sp->type == T_OBJECT) {
-      ob = sp->u.ob;
+  if (num_arg == 1) {
+    if (f.type(0) == T_OBJECT) {
+      ob = f.object(0);
+      /* Keep alive across the stack pop: stack may hold the only ref. */
+      add_ref(ob, "hook_list");
     }
-    pop_stack();
+    f.ret_void();
+  } else {
+    f.done();
   }
   array_t* arr = hook_efun_list(ob);
-  push_refed_array(arr);
+  if (ob) {
+    free_object(&ob, "hook_list");
+  }
+  LPCFrame out = LPCFrame::builder();
+  out.push_refed(arr);
+  out.done();
 }
 #endif
 /* f_hook_proceed is defined in vm/internal/hooks.cc */

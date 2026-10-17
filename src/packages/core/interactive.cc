@@ -27,18 +27,9 @@ int replace_interactive(object_t* ob, object_t* obfrom) {
   return (1);
 } /* replace_interactive() */
 
-void f_exec() {
-  int i;
-
-  i = replace_interactive((sp - 1)->u.ob, sp->u.ob);
-
-  /* They might have been destructed */
-  if (sp->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:1");
-  }
-  if ((--sp)->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:2");
-  }
-  put_number(i);
+void f_exec(LPCFrame& f) {
+  int i = replace_interactive(f.object(0), f.object(1));
+  /* Objects may have been destructed; ret() free_svalue's whatever remains. */
+  f.ret(static_cast<LPC_INT>(i));
 }
 #endif

@@ -7,24 +7,22 @@ const char* default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
-void f_set_encoding() {
+void f_set_encoding(LPCFrame& f) {
+  int num_arg = f.argc();
   if (!command_giver || !command_giver->interactive) {
-    if (st_num_arg) {
-      pop_stack();
-    }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
   auto* ip = command_giver->interactive;
 
   // Reset to no-transcoding
-  if (!st_num_arg) {
+  if (!num_arg) {
     if (ip && ip->trans) {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
     }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
@@ -32,11 +30,11 @@ void f_set_encoding() {
 
   // ignore if user want utf8
   UConverter* new_trans = nullptr;
-  if (ucnv_compareNames(default_encoding, sp->u.string) != 0) {
+  if (ucnv_compareNames(default_encoding, f.string(0)) != 0) {
     UErrorCode error_code = U_ZERO_ERROR;
-    new_trans = ucnv_open(sp->u.string, &error_code);
+    new_trans = ucnv_open(f.string(0), &error_code);
     if (U_FAILURE(error_code)) {
-      error("Fail to set encoding to '%s', error: %s.", sp->u.string, u_errorName(error_code));
+      error("Fail to set encoding to '%s', error: %s.", f.string(0), u_errorName(error_code));
     }
   }
 
@@ -46,11 +44,9 @@ void f_set_encoding() {
   }
   ip->trans = new_trans;
 
-  pop_stack();
-
   // Now let's return an canonical name
   if (!ip->trans) {
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 2"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
     return;
   }
 
@@ -59,17 +55,14 @@ void f_set_encoding() {
   if (U_FAILURE(error_code)) {
     error("Fail to set encoding, ucnv_getName error: %s.", u_errorName(error_code));
   }
-  push_malloced_string(string_copy(name, "f_set_encoding: 3"));
+  f.ret_str_malloced(string_copy(name, "f_set_encoding: 3"));
 }
 #endif
 
 #ifdef F_QUERY_ENCODING
-void f_query_encoding() {
+void f_query_encoding(LPCFrame& f) {
   if (!command_giver || !command_giver->interactive) {
-    if (st_num_arg) {
-      pop_stack();
-    }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
+    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
     return;
   }
 
@@ -87,15 +80,15 @@ void f_query_encoding() {
     }
   }
 
-  push_malloced_string(string_copy(res, "f_query_encoding"));
+  f.ret_str_malloced(string_copy(res, "f_query_encoding"));
 }
 #endif
 
 #ifdef F_STRING_ENCODE
-void f_string_encode() {
-  const auto* encoding = sp->u.string;
-  const auto* data = (sp - 1)->u.string;
-  auto len = SVALUE_STRLEN(sp - 1);
+void f_string_encode(LPCFrame& f) {
+  const auto* data = f.string(0);
+  auto len = f.string_len(0);
+  const auto* encoding = f.string(1);
 
   UErrorCode error_code = U_ZERO_ERROR;
   auto* trans = ucnv_open(encoding, &error_code);
@@ -124,18 +117,17 @@ void f_string_encode() {
     free_buffer(buffer);
     error("string_encode: error: %s.", u_errorName(error_code));
   }
-  pop_2_elems();
-  push_refed_buffer(buffer);
+  f.ret_refed(buffer);
 
   ucnv_close(trans);
 }
 #endif
 
 #ifdef F_STRING_DECODE
-void f_string_decode() {
-  const auto* encoding = sp->u.string;
-  auto* data = (char*)((sp - 1)->u.buf->item);
-  auto len = (sp - 1)->u.buf->size;
+void f_string_decode(LPCFrame& f) {
+  auto* data = (char*)(f.buffer(0)->item);
+  auto len = f.buffer(0)->size;
+  const auto* encoding = f.string(1);
 
   // get rid of all ending '\0's from buffer.
   while (len > 1 && data[len - 1] == '\0') len--;
@@ -166,19 +158,18 @@ void f_string_decode() {
     error("string_decode: error: %s.", u_errorName(error_code));
   }
   DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
-  pop_2_elems();
-  push_malloced_string(res);
+  f.ret_str_malloced(res);
 
   ucnv_close(trans);
 }
 #endif
 
 #ifdef F_BUFFER_TRANSCODE
-void f_buffer_transcode() {
-  const auto* to_encoding = sp->u.string;
-  const auto* from_encoding = (sp - 1)->u.string;
-  auto* data = (char*)((sp - 2)->u.buf->item);
-  auto len = (sp - 2)->u.buf->size;
+void f_buffer_transcode(LPCFrame& f) {
+  auto* data = (char*)(f.buffer(0)->item);
+  auto len = f.buffer(0)->size;
+  const auto* from_encoding = f.string(1);
+  const auto* to_encoding = f.string(2);
 
   UErrorCode error_code = U_ZERO_ERROR;
 
@@ -198,7 +189,6 @@ void f_buffer_transcode() {
     free_buffer(res);
     error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
-  pop_3_elems();
-  push_refed_buffer(res);
+  f.ret_refed(res);
 }
 #endif

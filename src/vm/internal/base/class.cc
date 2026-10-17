@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 void dealloc_class(array_t* p) {
   int i;
@@ -39,7 +40,7 @@ array_t* allocate_class(class_def_t* cld, int has_values) {
   p->size = n;
   if (has_values) {
     while (n--) {
-      p->item[n] = *sp--;
+      p->item[n] = *vm_sp()--;
     }
   } else {
     while (n--) {

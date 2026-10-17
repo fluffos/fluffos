@@ -564,11 +564,16 @@ void make_efun_tables() {
 
   fprintf(f, "\n#define NUM_OPCODES %d\n", total_code + 1);
 
-  fprintf(f, "\n/* EFUN prototypes */\n\n");
+  fprintf(f, "#include \"vm/internal/base/lpc_frame.h\"\n\n");
+  fprintf(f, "\n/* EFUN prototypes.\n"
+             " * The dispatcher builds an LPCFrame over the pushed args and\n"
+             " * passes it in. Efuns must not construct their own args window\n"
+             " * (use f.argc() for arity — there is no st_num_arg global).\n"
+             " */\n\n");
   for (int i = 0; i < efun_code; i++) {
-    fprintf(f, "void f_%s (void);\n", efun_names[i]);
+    fprintf(f, "void f_%s (LPCFrame& f);\n", efun_names[i]);
   }
-  fprintf(f, "typedef void (*func_t) (void);\n\n");
+  fprintf(f, "typedef void (*func_t) (LPCFrame& f);\n\n");
   fprintf(f, "extern func_t efun_table[];\n");
   fprintf(f, "extern const char* operator_names[];\n");
 

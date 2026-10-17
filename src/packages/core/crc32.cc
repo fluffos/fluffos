@@ -25,22 +25,21 @@ uint32_t compute_crc32(unsigned char* buf, int len) {
 }
 
 #ifdef F_CRC32
-void f_crc32() {
+void f_crc32(LPCFrame& f) {
   int len;
   unsigned char* buf;
   uint32_t crc;
 
-  if (sp->type == T_STRING) {
-    len = SVALUE_STRLEN(sp);
-    buf = (unsigned char*)sp->u.string;
-  } else if (sp->type == T_BUFFER) {
-    len = sp->u.buf->size;
-    buf = sp->u.buf->item;
+  if (f.type(0) == T_STRING) {
+    len = f.string_len(0);
+    buf = (unsigned char*)f.string(0);
+  } else if (f.type(0) == T_BUFFER) {
+    len = f.buffer(0)->size;
+    buf = f.buffer(0)->item;
   } else {
-    bad_argument(sp, T_STRING | T_BUFFER, 1, F_CRC32);
+    bad_argument(f.argp(0), T_STRING | T_BUFFER, 1, F_CRC32);
   }
   crc = compute_crc32(buf, len);
-  free_svalue(sp, "f_crc32");
-  put_number(crc);
+  f.ret(static_cast<LPC_INT>(crc));
 }
 #endif

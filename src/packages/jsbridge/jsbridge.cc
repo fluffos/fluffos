@@ -138,13 +138,15 @@ void free_js_call(JsCall* call) {
 // Deliver a settled result to the LPC callback: cb(result, success, id).
 void deliver_js_result(JsCall* call, bool success, const std::string& result) {
   if (call->want_callback) {
-    copy_and_push_string(result.c_str());
-    push_number(success ? 1 : 0);
-    push_number(call->key);
+    LPCFrame b = LPCFrame::builder();
+    b.push_str_copy(result.c_str());
+    b.push(success ? 1 : 0);
+    b.push(call->key);
     set_eval(max_eval_cost);
     if (call->call_back.type == T_STRING) {
-      safe_apply(call->call_back.u.string, call->ob_to_call, 3, ORIGIN_INTERNAL);
+      b.safe_apply(call->call_back.u.string, call->ob_to_call, ORIGIN_INTERNAL);
     } else {
+      b.done();
       safe_call_function_pointer(call->call_back.u.fp, 3);
     }
   }
@@ -302,14 +304,16 @@ void deliver_lpc_call(const std::string& name, const std::vector<std::string>& a
     arr->item[i].subtype = STRING_MALLOC;
     arr->item[i].u.string = string_copy(args[i].c_str(), "deliver_lpc_call");
   }
-  push_refed_array(arr);
-  push_number(id);
+  LPCFrame b = LPCFrame::builder();
+  b.push_refed(arr);
+  b.push(static_cast<LPC_INT>(id));
 
   set_eval(max_eval_cost);
   svalue_t* ret;
   if (exp->call_back.type == T_STRING) {
-    ret = safe_apply(exp->call_back.u.string, exp->ob_to_call, 2, ORIGIN_INTERNAL);
+    ret = b.safe_apply(exp->call_back.u.string, exp->ob_to_call, ORIGIN_INTERNAL);
   } else {
+    b.done();
     ret = safe_call_function_pointer(exp->call_back.u.fp, 2);
   }
 
@@ -402,9 +406,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fluffos_js_result(int id, int success, cons
 }
 
 #ifdef F_JS_EXPORT
-void f_js_export() {
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
+void f_js_export(LPCFrame& f) {
+  int num_arg = f.argc();
+  svalue_t* arg = f.base();
 
   // Validate before any allocation: error() unwinds past C++ destructors.
   if (num_arg > 1 && arg[1].type != T_STRING && arg[1].type != T_FUNCTION) {
@@ -431,29 +435,26 @@ void f_js_export() {
     registered = 1;
   }
 
-  pop_n_elems(num_arg);
-  push_number(registered);
+  f.ret(registered);
 }
 #endif
 
 #ifdef F_JS_EVAL
-void f_js_eval() {
-  char* result = js_bridge_eval(sp->u.string);
+void f_js_eval(LPCFrame& f) {
+  char* result = js_bridge_eval(f.string(0));
   std::string const text(result ? result : "");
   if (result != nullptr) {
     free(result);
   }
-  pop_stack();
-  copy_and_push_string(text.c_str());
+  f.ret_str_copy(text.c_str());
 }
 #endif
 
 #ifdef F_JS_CALL
-void f_js_call() {
+void f_js_call(LPCFrame& f) {
+  int num_arg = f.argc();
   static LPC_INT next_key = 0;
-
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
+  svalue_t* arg = f.base();
 
   const char* handler = arg[0].u.string;
   array_t* args = arg[1].u.arr;
@@ -491,7 +492,6 @@ void f_js_call() {
       jargs.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
   js_bridge_invoke(call->key, handler, jargs_text.c_str());
 
-  pop_n_elems(num_arg);
-  push_number(call->key);
+  f.ret(call->key);
 }
 #endif

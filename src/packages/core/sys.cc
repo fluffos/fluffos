@@ -6,7 +6,7 @@
 #endif
 
 #ifdef F_SYS_NETWORK_PORTS
-void f_sys_network_ports() {
+void f_sys_network_ports(LPCFrame& f) {
   array_t* info;
   int i = 0, p = 0;
 
@@ -47,16 +47,16 @@ void f_sys_network_ports() {
     p++;
   }
 
-  push_refed_array(info);
+  f.ret_refed(info);
 }
 #endif
 
 #ifdef F_SYS_RELOAD_TLS
-void f_sys_reload_tls() {
-  auto port_index_display = sp->u.number;
+void f_sys_reload_tls(LPCFrame& f) {
+  auto port_index_display = f.number(0);
   auto port_index = port_index_display - 1;
 
-  DEFER { pop_stack(); };
+  DEFER { f.ret_void(); };
   // external_port is a fixed array; bound by ELEMENT COUNT, not sizeof (which
   // is the size in bytes and let indices up to ~sizeof(port_def_t)*N through,
   // for an out-of-bounds read and a wild tls_server_close()/port->ssl write).

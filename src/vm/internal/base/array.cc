@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include <stdlib.h>  // for qsort
 #include <cstring>
@@ -143,7 +144,7 @@ array_t* allocate_array2(LPC_INT n, svalue_t* svp) {
       ret->item[i] = *r;
       r->type = T_NUMBER;
     }
-    sp--; /* detach ret from the stack; caller owns the reference */
+    vm_sp()--; /* detach ret from the stack; caller owns the reference */
   } else {
     ret = allocate_empty_array(n);
 
@@ -428,7 +429,7 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
 
   if (first_on_stack) {
     if (!(n = arr->size)) {
-      *dest = *sp--;
+      *dest = *vm_sp()--;
       return;
     }
   } else {
@@ -605,8 +606,9 @@ void filter_array(svalue_t* arg, int num_arg) {
     svalue_t* v;
     int res = 0, cnt;
     function_to_call_t ftc;
-
-    process_efun_callback(1, &ftc, F_FILTER);
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_FILTER);
+    frame.done();
 
     /* allocate a full size array and push it onto the stack so that if an
      * error occurs, it'll get cleaned up.  can't use empty array because
@@ -623,7 +625,7 @@ void filter_array(svalue_t* arg, int num_arg) {
       }
     }
 
-    sp--; /* pull the work array off the stack without freeing it */
+    vm_sp()--; /* pull the work array off the stack without freeing it */
     if (res) {
       r = resize_array(r, res);
     } else {
@@ -633,7 +635,7 @@ void filter_array(svalue_t* arg, int num_arg) {
 
     pop_n_elems(num_arg - 1);
     free_array(vec);
-    sp->u.arr = r;
+    vm_sp()->u.arr = r;
   }
 }
 
@@ -652,7 +654,11 @@ void filter_string(svalue_t* arg, int num_arg) {
     size = SVALUE_STRLEN(arg);
     str = const_cast<char*>(arg->u.string);
 
-    process_efun_callback(1, &ftc, F_FILTER);
+    {
+      LPCFrame frame = LPCFrame::args(num_arg);
+      frame.process_callback(1, &ftc, F_FILTER);
+      frame.done();
+    }
 
     for (cnt = 0; cnt < size; cnt++) {
       push_number(str[cnt]);
@@ -757,9 +763,10 @@ static void unique_array_error_handler(void) {
   FREE((char*)unlist);
 }
 
-void f_unique_array(void) {
+void f_unique_array(LPCFrame& f) {
+  int num_arg = f.argc();
   array_t *v, *ret;
-  long size, i, numkeys = 0, num_arg = st_num_arg;
+  long size, i, numkeys = 0;
   int* ind;
   svalue_t *skipval, *sv, *svp;
   unique_list_t* unlist;
@@ -767,28 +774,28 @@ void f_unique_array(void) {
   funptr_t* fptr = nullptr;
   const char* func;
 
-  size = (v = (sp - num_arg + 1)->u.arr)->size;
+  size = (v = (vm_sp() - num_arg + 1)->u.arr)->size;
   if (!size) {
     if (num_arg == 3) {
-      free_svalue(sp--, "f_unique_array");
+      free_svalue(vm_sp()--, "f_unique_array");
     }
-    free_svalue(sp--, "f_unique_array");
+    free_svalue(vm_sp()--, "f_unique_array");
     return;
   }
 
   if (num_arg == 3) {
-    skipval = sp;
-    if ((sp - 1)->type == T_FUNCTION) {
-      fptr = (sp - 1)->u.fp;
+    skipval = vm_sp();
+    if ((vm_sp() - 1)->type == T_FUNCTION) {
+      fptr = (vm_sp() - 1)->u.fp;
     } else {
-      func = (sp - 1)->u.string;
+      func = (vm_sp() - 1)->u.string;
     }
   } else {
     skipval = &const0;
-    if (sp->type == T_FUNCTION) {
-      fptr = sp->u.fp;
+    if (vm_sp()->type == T_FUNCTION) {
+      fptr = vm_sp()->u.fp;
     } else {
-      func = sp->u.string;
+      func = vm_sp()->u.string;
     }
   }
 
@@ -800,8 +807,8 @@ void f_unique_array(void) {
   g_u_list = unlist;
 
   STACK_INC;
-  sp->type = T_ERROR_HANDLER;
-  sp->u.error_handler = unique_array_error_handler;
+  vm_sp()->type = T_ERROR_HANDLER;
+  vm_sp()->u.error_handler = unique_array_error_handler;
 
   for (i = 0; i < size; i++) {
     if (fptr) {
@@ -860,10 +867,10 @@ void f_unique_array(void) {
   unlist = g_u_list->next;
   FREE((char*)g_u_list);
   g_u_list = unlist;
-  sp--;
+  vm_sp()--;
   pop_n_elems(num_arg - 1);
   free_array(v);
-  sp->u.arr = ret;
+  vm_sp()->u.arr = ret;
 }
 
 /*
@@ -1017,7 +1024,11 @@ void map_array(svalue_t* arg, int num_arg) {
     int cnt;
     svalue_t* v;
 
-    process_efun_callback(1, &ftc, F_MAP);
+    {
+      LPCFrame frame = LPCFrame::args(num_arg);
+      frame.process_callback(1, &ftc, F_MAP);
+      frame.done();
+    }
 
     r = int_allocate_array(size);
 
@@ -1032,7 +1043,7 @@ void map_array(svalue_t* arg, int num_arg) {
         break;
       }
     }
-    sp--;
+    vm_sp()--;
   }
 
   pop_n_elems(num_arg);
@@ -1202,11 +1213,10 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
   }
 }
 
-void f_sort_array(void) {
-  svalue_t* arg = sp - st_num_arg + 1;
+void f_sort_array(LPCFrame& f) {
+  int num_arg = f.argc();
+  svalue_t* arg = vm_sp() - num_arg + 1;
   array_t* tmp = arg->u.arr;
-  int num_arg = st_num_arg;
-
   check_for_destr(tmp);
 
   switch (arg[1].type) {
@@ -1229,7 +1239,11 @@ void f_sort_array(void) {
 
       old_ptr = sort_array_ftc;
       sort_array_ftc = &ftc;
-      process_efun_callback(1, &ftc, F_SORT_ARRAY);
+      {
+        LPCFrame frame = LPCFrame::args(num_arg);
+        frame.process_callback(1, &ftc, F_SORT_ARRAY);
+        frame.done();
+      }
 
       tmp = copy_array(tmp);
       push_refed_array(tmp);
@@ -1239,7 +1253,7 @@ void f_sort_array(void) {
         old_quickSort((char*)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
       }
       sort_array_ftc = old_ptr;
-      sp--;  // remove tmp from stack, but we don't want to free it!
+      vm_sp()--;  // remove tmp from stack, but we don't want to free it!
       break;
     }
   }
@@ -1407,7 +1421,7 @@ array_t* deep_inventory(object_t* ob, int take_top, funptr_t* fp) {
   if (fp && i < o) {
     dinv = resize_array(dinv, i);
   }
-  sp--;  // get dinv off the stack, but don't free it;
+  vm_sp()--;  // get dinv off the stack, but don't free it;
   return dinv;
 }
 
@@ -1485,7 +1499,7 @@ array_t* deep_inventory_array(array_t* arr, int take_top, funptr_t* fp) {
   if (fp && i < o) {
     dinv = resize_array(dinv, i);
   }
-  sp--;  // get dinv of the stack but don't free it
+  vm_sp()--;  // get dinv of the stack but don't free it
   return dinv;
 }
 #endif
@@ -2118,27 +2132,27 @@ array_t* livings() {
 #endif
 
 #ifdef F_OBJECTS
-void f_objects(void) {
+void f_objects(LPCFrame& f) {
+  int num_arg = f.argc();
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
   const char* func = nullptr;
   object_t** list;
   array_t* ret;
-  funptr_t* f = nullptr;
-
-  int num_arg = st_num_arg;
-
-  if (!num_arg) {
-    func = nullptr;
-  } else if (sp->type == T_FUNCTION) {
-    f = sp->u.fp;
-  } else {
-    func = sp->u.string;
+  funptr_t* funp = nullptr;
+  if (num_arg) {
+    if (f.type(0) == T_FUNCTION) {
+      funp = f.funptr(0);
+    } else {
+      func = f.string(0);
+    }
   }
+  /* Callbacks below push/pop freely; release the Args window. */
+  f.abandon();
 
   get_objects(&list, &count, nullptr, nullptr);
-  if (f || func) {
+  if (funp || func) {
     /* NOTE: If an object's hidden status changes during a callback, that
      * change will NOT be reflected in the returned array.  If the caller
      * is destructed in a callback or the callback function does not exist,
@@ -2148,8 +2162,8 @@ void f_objects(void) {
       svalue_t* v;
 
       push_object(list[i]);
-      if (f) {
-        v = call_function_pointer(f, 1);
+      if (funp) {
+        v = call_function_pointer(funp, 1);
       } else {
         v = apply(func, current_object, 1, ORIGIN_EFUN);
       }

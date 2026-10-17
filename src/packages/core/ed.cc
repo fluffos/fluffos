@@ -1554,7 +1554,7 @@ static void indent(char* buf) {
       2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0,
   };
   char text[ED_MAXLINE], ident[ED_MAXLINE];
-  char *p, *sp;
+  char *p, *tsp;
   int* ip;
   long indent_index;
   int top, token;
@@ -1815,10 +1815,10 @@ static void indent(char* buf) {
     }
 
     /* parse */
-    sp = stack;
+    tsp = stack;
     ip = ind;
     for (;;) {
-      top = *sp;
+      top = *tsp;
       if (top == LOPERATOR && token == RHOOK) {
         /* ) after LOPERATOR is ROPERATOR */
         token = ROPERATOR;
@@ -1826,15 +1826,15 @@ static void indent(char* buf) {
       if (f[top] <= g[token]) { /* shift the token on the stack */
         int i;
 
-        if (sp == stackbot) {
+        if (tsp == stackbot) {
           /* out of stack */
           error("Nesting too deep in line %d\n");
         }
         /* handle indentation */
         i = *ip;
         /* if needed, reduce indentation prior to shift */
-        if ((token == LBRACKET && (*sp == ROPERATOR || *sp == ELSE || *sp == XDO)) ||
-            token == RBRACKET || (token == IF && *sp == ELSE)) {
+        if ((token == LBRACKET && (*tsp == ROPERATOR || *tsp == ELSE || *tsp == XDO)) ||
+            token == RBRACKET || (token == IF && *tsp == ELSE)) {
           /* back up */
           i -= P_SHIFTWIDTH;
         } else if (token == RHOOK || token == ROPERATOR) {
@@ -1843,7 +1843,7 @@ static void indent(char* buf) {
         /* shift the current line, if appropriate */
         if (do_indent) {
           shi = i - indent_index;
-          if (token == TOKEN && *sp == LBRACKET &&
+          if (token == TOKEN && *tsp == LBRACKET &&
               (strcmp(ident, "case") == 0 || strcmp(ident, "default") == 0)) {
 /* back up if this is a switch label */
 #ifndef ED_INDENT_CASE
@@ -1872,24 +1872,24 @@ static void indent(char* buf) {
           }
           case SEMICOLON: {
             /* in case it is followed by a comment */
-            if (*sp == ROPERATOR || *sp == ELSE) {
+            if (*tsp == ROPERATOR || *tsp == ELSE) {
               i -= P_SHIFTWIDTH;
             }
             break;
           }
         }
 
-        *--sp = token;
+        *--tsp = token;
         *--ip = i;
         break;
       }
       /* reduce handle */
       do {
-        top = *sp++;
+        top = *tsp++;
         ip++;
-      } while (f[static_cast<int>(*sp)] >= g[top]);
+      } while (f[static_cast<int>(*tsp)] >= g[top]);
     }
-    stack = sp;
+    stack = tsp;
     ind = ip;
     after_keyword_t = (token >= IF); /* but not after ELSE */
   }
@@ -3341,110 +3341,109 @@ char* object_ed_cmd(object_t* ob, const char* str) {
 #endif
 
 #ifdef F_ED
-void f_ed() {
+void f_ed(LPCFrame& f) {
+  int num_arg = f.argc();
   if (!command_giver || !command_giver->interactive) {
-    pop_n_elems(st_num_arg);
+    f.ret_void();
     return;
   }
 
-  if (!st_num_arg) {
+  if (!num_arg) {
     /* ed() */
     ed_start(nullptr, nullptr, nullptr, 0, nullptr, 0);
-  } else if (st_num_arg == 1) {
+    f.done();
+  } else if (num_arg == 1) {
     /* ed(fname) */
-    if (!(sp->type == T_STRING)) {
-      bad_argument(sp, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
-    ed_start(sp->u.string, nullptr, nullptr, 0, nullptr, 0);
-    pop_stack();
-  } else if (st_num_arg == 2) {
+    ed_start(f.string(0), nullptr, nullptr, 0, nullptr, 0);
+    f.ret_void();
+  } else if (num_arg == 2) {
     /* ed(fname,exitfn) / ed(fname, scroll_lines) */
-    if (!((sp - 1)->type == T_STRING)) {
-      bad_argument(sp - 1, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    if (sp->type == T_STRING) {
-      ed_start((sp - 1)->u.string, nullptr, sp->u.string, 0, current_object, 0);
-    } else if (sp->type == T_NUMBER) {
-      ed_start((sp - 1)->u.string, nullptr, nullptr, 0, nullptr, sp->u.number);
+    if (f.type(1) == T_STRING) {
+      ed_start(f.string(0), nullptr, f.string(1), 0, current_object, 0);
+    } else if (f.type(1) == T_NUMBER) {
+      ed_start(f.string(0), nullptr, nullptr, 0, nullptr, f.number(1));
     } else {
-      bad_argument(sp, T_NUMBER | T_STRING, 2, F_ED);
+      bad_argument(f.argp(1), T_NUMBER | T_STRING, 2, F_ED);
     }
-    pop_2_elems();
-  } else if (st_num_arg == 3) {
+    f.ret_void();
+  } else if (num_arg == 3) {
     /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) /
      ed(fname,exitfn,scroll_lines) */
-    if (!((sp - 1)->type == T_STRING)) {
-      bad_argument(sp - 1, T_STRING, 2, F_ED);
+    if (!(f.type(1) == T_STRING)) {
+      bad_argument(f.argp(1), T_STRING, 2, F_ED);
     }
-    if (!((sp - 2)->type == T_STRING)) {
-      bad_argument(sp - 2, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    if (sp->type == T_NUMBER) {
-      if (sp->u.number == 1) {
-        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, sp->u.number, current_object, 0);
+    if (f.type(2) == T_NUMBER) {
+      if (f.number(2) == 1) {
+        ed_start(f.string(0), nullptr, f.string(1), f.number(2), current_object, 0);
       } else {
-        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, 0, current_object, sp->u.number);
+        ed_start(f.string(0), nullptr, f.string(1), 0, current_object, f.number(2));
       }
-    } else if (sp->type == T_STRING) {
-      ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0, current_object, 0);
+    } else if (f.type(2) == T_STRING) {
+      ed_start(f.string(0), f.string(1), f.string(2), 0, current_object, 0);
     } else {
-      bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
+      bad_argument(f.argp(2), T_NUMBER | T_STRING, 3, F_ED);
     }
-    pop_3_elems();
-  } else if (st_num_arg == 4) {
+    f.ret_void();
+  } else if (num_arg == 4) {
     /* ed(fname,writefn,exitfn,restricted) /
      ed(fname,writefn,exitfn,scroll_lines) */
-    if (!(sp->type == T_NUMBER)) {
-      bad_argument(sp, T_NUMBER, 4, F_ED);
+    if (!(f.type(3) == T_NUMBER)) {
+      bad_argument(f.argp(3), T_NUMBER, 4, F_ED);
     }
-    if (!((sp - 1)->type == T_STRING)) {
-      bad_argument(sp - 1, T_STRING, 3, F_ED);
+    if (!(f.type(2) == T_STRING)) {
+      bad_argument(f.argp(2), T_STRING, 3, F_ED);
     }
-    if (!((sp - 2)->type == T_STRING)) {
-      bad_argument(sp - 2, T_STRING, 2, F_ED);
+    if (!(f.type(1) == T_STRING)) {
+      bad_argument(f.argp(1), T_STRING, 2, F_ED);
     }
-    if (!((sp - 3)->type == T_STRING)) {
-      bad_argument(sp - 3, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    if (sp->u.number == 1) {
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, sp->u.number,
-               current_object, 0);
+    if (f.number(3) == 1) {
+      ed_start(f.string(0), f.string(1), f.string(2), f.number(3), current_object, 0);
     } else {
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0, current_object,
-               sp->u.number);
+      ed_start(f.string(0), f.string(1), f.string(2), 0, current_object, f.number(3));
     }
-    pop_n_elems(4);
-  } else { /* st_num_arg == 5 */
+    f.ret_void();
+  } else { /* num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
-    if (!(sp->type == T_NUMBER)) {
-      bad_argument(sp, T_NUMBER, 5, F_ED);
+    if (!(f.type(4) == T_NUMBER)) {
+      bad_argument(f.argp(4), T_NUMBER, 5, F_ED);
     }
-    if (!((sp - 1)->type == T_NUMBER)) {
-      bad_argument(sp - 1, T_NUMBER, 4, F_ED);
+    if (!(f.type(3) == T_NUMBER)) {
+      bad_argument(f.argp(3), T_NUMBER, 4, F_ED);
     }
-    if (!((sp - 2)->type == T_STRING)) {
-      bad_argument(sp - 2, T_STRING, 3, F_ED);
+    if (!(f.type(2) == T_STRING)) {
+      bad_argument(f.argp(2), T_STRING, 3, F_ED);
     }
-    if (!((sp - 3)->type == T_STRING)) {
-      bad_argument(sp - 3, T_STRING, 2, F_ED);
+    if (!(f.type(1) == T_STRING)) {
+      bad_argument(f.argp(1), T_STRING, 2, F_ED);
     }
-    if (!((sp - 4)->type == T_STRING)) {
-      bad_argument(sp - 4, T_STRING, 1, F_ED);
+    if (!(f.type(0) == T_STRING)) {
+      bad_argument(f.argp(0), T_STRING, 1, F_ED);
     }
 
-    ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.number,
-             current_object, sp->u.number);
+    ed_start(f.string(0), f.string(1), f.string(2), f.number(3), current_object, f.number(4));
 
-    pop_n_elems(5);
+    f.ret_void();
   }
 }
 #endif
 
 #ifdef F_ED_CMD
-void f_ed_cmd(void) {
+void f_ed_cmd(LPCFrame& f) {
   char* res;
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3455,43 +3454,37 @@ void f_ed_cmd(void) {
     error("ed_cmd() called with no ed session active.\n");
   }
 
-  res = object_ed_cmd(current_object, sp->u.string);
+  res = object_ed_cmd(current_object, f.string(0));
 
-  free_string_svalue(sp);
   if (res) {
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = res;
+    f.ret_str_malloced(res);
   } else {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    f.ret_str_constant("");
   }
 }
 #endif
 
 #ifdef F_ED_START
-void f_ed_start(void) {
+void f_ed_start(LPCFrame& f) {
+  int num_arg = f.argc();
   char* res;
-  const char* fname;
+  const char* fname = nullptr;
   int restr = 0;
   int scroll_lines = 20;
 
-  if (st_num_arg == 3) {
-    scroll_lines = (sp--)->u.number;
-    restr = (sp--)->u.number;
-  }
-
-  if (st_num_arg == 2) {
-    if (sp->u.number == 1) {
-      restr = (sp--)->u.number;
+  if (num_arg == 3) {
+    scroll_lines = f.number(2);
+    restr = f.number(1);
+  } else if (num_arg == 2) {
+    if (f.number(1) == 1) {
+      restr = f.number(1);
     } else {
-      scroll_lines = (sp--)->u.number;
+      scroll_lines = f.number(1);
     }
   }
 
-  if (st_num_arg) {
-    fname = sp->u.string;
-  } else {
-    fname = 0;
+  if (num_arg) {
+    fname = f.string(0);
   }
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3504,43 +3497,32 @@ void f_ed_start(void) {
 
   res = object_ed_start(current_object, fname, restr, scroll_lines);
 
-  if (fname) {
-    free_string_svalue(sp);
-  } else {
-    STACK_INC;
-    sp->type = T_STRING;
-  }
-
   if (res) {
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = res;
+    f.ret_str_malloced(res);
   } else {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    f.ret_str_constant("");
   }
 }
 #endif
 
 #ifdef F_IN_EDIT
-void f_in_edit() {
+void f_in_edit(LPCFrame& f) {
   char* fn;
   ed_buffer_t* eb = nullptr;
 
 #ifdef OLD_ED
-  if (sp->u.ob->interactive) {
-    eb = sp->u.ob->interactive->ed_buffer;
+  if (f.object(0)->interactive) {
+    eb = f.object(0)->interactive->ed_buffer;
   }
 #else
-  if (sp->u.ob->flags & O_IN_EDIT) {
-    eb = find_ed_buffer(sp->u.ob);
+  if (f.object(0)->flags & O_IN_EDIT) {
+    eb = find_ed_buffer(f.object(0));
   }
 #endif
   if (eb && (fn = eb->fname)) {
-    free_object(&sp->u.ob, "f_in_edit:1");
-    put_malloced_string(add_slash(fn));
+    f.ret_str_malloced(add_slash(fn));
     return;
   }
-  free_object(&sp->u.ob, "f_in_edit:1");
-  *sp = const0;
+  f.ret(0);
 }
 #endif

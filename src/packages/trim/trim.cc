@@ -51,37 +51,35 @@ inline std::string& trim_func(std::string& s, const std::string& charset) {
 
 using trim_func_type = std::string&(std::string&, const std::string&);
 
-inline void trim_impl(trim_func_type* func) {
+inline void trim_impl(trim_func_type* func, LPCFrame& f) {
+  int num_arg = f.argc();
   std::string charset;
 
   // If use 2 arguments, we get characters to remove and positioning in previous
   // parameter.
-  if (st_num_arg == 2) {
-    charset = sp->u.string;
-    pop_stack();
+  if (num_arg == 2) {
+    charset = f.string(1);
   }
 
-  std::string target(sp->u.string);
-  pop_stack();
-
+  std::string target(f.string(0));
   target = (*func)(target, charset);
   if (target.empty()) {
-    share_and_push_string("");
+    f.ret_str_copy("");
   } else {
-    copy_and_push_string(target.c_str());
+    f.ret_str_copy(target.c_str());
   }
 }
 
 }  // namespace
 
 #ifdef F_TRIM
-void f_trim() { trim_impl(&trim_func); }
+void f_trim(LPCFrame& f) { trim_impl(&trim_func, f); }
 #endif
 
 #ifdef F_LTRIM
-void f_ltrim() { trim_impl(&ltrim_func); }
+void f_ltrim(LPCFrame& f) { trim_impl(&ltrim_func, f); }
 #endif
 
 #ifdef F_RTRIM
-void f_rtrim() { trim_impl(&rtrim_func); }
+void f_rtrim(LPCFrame& f) { trim_impl(&rtrim_func, f); }
 #endif

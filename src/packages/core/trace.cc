@@ -3,11 +3,13 @@
 #include "file.h"
 
 #ifdef F_DUMP_TRACE
-void f_dump_trace() { push_array(get_svalue_trace()); }
+void f_dump_trace(LPCFrame& f) {
+  f.ret(get_svalue_trace());
+}
 #endif
 
 #ifdef F_TRACE_START
-void f_trace_start() {
+void f_trace_start(LPCFrame& f) {
   // Unconditional: Tracer::collect() self-guards on an empty filename, and
   // gating it on enabled() is what wedged tracing for the life of the
   // process. When a trace hits MAX_EVENTS, TraceWriter::log() calls
@@ -20,15 +22,15 @@ void f_trace_start() {
   // prints from inside flush(). Recovered only by a restart.
   Tracer::collect();
 
-  auto duration_secs = sp->u.number;
+  auto duration_secs = f.number(1);
   if (duration_secs < 0 || duration_secs > 5 * 60) {
     error("Invalid duration specified.\n");
   }
 
-  const auto* realfile = check_valid_path((sp - 1)->u.string, current_object, "trace_start", 1);
+  const auto* realfile = check_valid_path(f.string(0), current_object, "trace_start", 1);
 
   if (!realfile) {
-    error("Permission denied for trace file: %s\n", (sp - 1)->u.string);
+    error("Permission denied for trace file: %s\n", f.string(0));
   }
 
   // Used later in the block.
@@ -42,15 +44,16 @@ void f_trace_start() {
   // mid-window has to be able to drain here.
   add_walltime_event(std::chrono::seconds(duration_secs),
                      TickEvent::callback_type([] { Tracer::collect(); }));
-  pop_2_elems();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_TRACE_END
-void f_trace_end() {
+void f_trace_end(LPCFrame& f) {
   // No enabled() gate: a trace that filled its buffer is exactly the case
   // that needs ending, and collect() already no-ops when there is nothing
   // pending.
   Tracer::collect();
+  f.done();
 }
 #endif

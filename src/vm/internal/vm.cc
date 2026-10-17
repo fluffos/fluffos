@@ -6,6 +6,7 @@
  */
 
 #include "base/std.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include <cstdlib>
 

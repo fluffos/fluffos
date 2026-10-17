@@ -9,6 +9,7 @@
 
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 mapping_node_t* locked_map_nodes = nullptr;
 
@@ -332,7 +333,7 @@ mapping_t* allocate_mapping2(array_t* arr, svalue_t* sv) {
     }
   }
 
-  sp--;
+  vm_sp()--;
   return newmap;
 }
 
@@ -607,11 +608,10 @@ struct unique_svalue_compare {
   }
 };
 
-void f_unique_mapping(void) {
-  svalue_t* arg = sp - st_num_arg + 1;
+void f_unique_mapping(LPCFrame& f) {
+  int num_arg = f.argc();
+  svalue_t* arg = vm_sp() - num_arg + 1;
   array_t* v = arg->u.arr;
-  unsigned short num_arg = st_num_arg;
-
   if (!v || !v->size) {
     pop_n_elems(num_arg);
     push_refed_mapping(allocate_mapping(0));
@@ -620,7 +620,11 @@ void f_unique_mapping(void) {
 
   // prepare the call back.
   function_to_call_t ftc;
-  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING);
+  {
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_UNIQUE_MAPPING);
+    frame.done();
+  }
 
   // for each item in the array, call the callback and group
   // item with same result together.
@@ -708,7 +712,7 @@ void f_unique_mapping(void) {
  * array of svalues. Format of data: LHS RHS LHS2 RHS2... (uses hash table)
  */
 
-mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
+mapping_t* load_mapping_from_aggregate(svalue_t* svp, int n) {
   mapping_t* m;
   int mask, i, oi, count = 0;
   mapping_node_t **a, *elt, *elt2;
@@ -721,13 +725,13 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
   mask = m->table_size;
   a = m->table;
   do {
-    i = (oi = svalue_to_int(++sp)) & mask;
+    i = (oi = svalue_to_int(++svp)) & mask;
     if ((elt2 = elt = a[i])) {
       do {
-        if (msameval(sp, elt->values)) {
-          free_svalue(sp++, "load_mapping_from_aggregate: duplicate key");
+        if (msameval(svp, elt->values)) {
+          free_svalue(svp++, "load_mapping_from_aggregate: duplicate key");
           free_svalue(elt->values + 1, "load_mapping_from_aggregate");
-          *(elt->values + 1) = *sp;
+          *(elt->values + 1) = *svp;
           break;
         }
       } while ((elt = elt->next));
@@ -754,7 +758,7 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
         // caller already moved the VM's real sp below this whole
         // aggregate) and would otherwise leak.
         for (int k = 0; k < n; k++) {
-          free_svalue(sp + k, "load_mapping_from_aggregate: out of memory");
+          free_svalue(svp + k, "load_mapping_from_aggregate: out of memory");
         }
         error("Out of memory\n");
       }
@@ -772,20 +776,20 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
       // real sp below this entire aggregate before calling in ("sp -=
       // offset"), so error()'s unwind (pop_n_elems, walking down to the
       // saved sp) never revisits these slots. Every remaining element from
-      // here on -- this pair (sp[0]/sp[1], already hashed/shared-string-
+      // here on -- this pair (svp[0]/svp[1], already hashed/shared-string-
       // converted by svalue_to_int above) plus any pairs still unprocessed
       // beyond it -- would otherwise leak. Already-inserted pairs don't
       // need this: their ownership was transferred into map nodes that
       // free_mapping() just freed above.
       for (int k = 0; k < n; k++) {
-        free_svalue(sp + k, "load_mapping_from_aggregate: too large");
+        free_svalue(svp + k, "load_mapping_from_aggregate: too large");
       }
       mapping_too_large();
     }
 
     elt = new_map_node();
-    *elt->values = *sp++;
-    *(elt->values + 1) = *sp;
+    *elt->values = *svp++;
+    *(elt->values + 1) = *svp;
     (a[i] = elt)->next = elt2;
   } while (n -= 2);
 #ifdef PACKAGE_MUDLIB_STATS
@@ -1044,7 +1048,11 @@ void map_mapping(svalue_t* arg, int num_arg) {
   svalue_t* ret;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_MAP);
+  {
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_MAP);
+    frame.done();
+  }
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);
@@ -1084,7 +1092,11 @@ void filter_mapping(svalue_t* arg, int num_arg) {
   unsigned int tb_index;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_FILTER);
+  {
+    LPCFrame frame = LPCFrame::args(num_arg);
+    frame.process_callback(1, &ftc, F_FILTER);
+    frame.done();
+  }
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);
@@ -1155,7 +1167,7 @@ void filter_mapping(svalue_t* arg, int num_arg) {
     newmap->count += count;
   }
 
-  sp--;
+  vm_sp()--;
   pop_n_elems(num_arg);
   push_refed_mapping(newmap);
 }

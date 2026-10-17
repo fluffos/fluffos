@@ -25,6 +25,7 @@
 #include "interactive.h"  // for interactive_t, FIXME
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/debug.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/master.h"
@@ -337,7 +338,7 @@ static object_t* load_virtual_object(const char* name, int clone) {
   if (clone > 1) {
     args = allocate_empty_array(clone - 1);
     while (clone-- > 1) {
-      args->item[clone - 1] = *sp--;
+      args->item[clone - 1] = *vm_sp()--;
     }
     argc++;
     clone = 1;
@@ -1262,8 +1263,9 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     return nullptr;
   }
   if (ob->super) {
-    push_svalue(v);
-    ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
+    LPCFrame call = LPCFrame::builder();
+    call.push(v);
+    ret = call.apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
     /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
        sets ob->super to nullptr (destruct_object), or destruct the
        environment. */
@@ -1311,9 +1313,10 @@ static object_t* object_present2(const char* str, object_t* ob) {
     char* str_to_push = new_string(namelen, "object_present2");
     memcpy(str_to_push, name, namelen);
     str_to_push[namelen] = 0;
-    push_malloced_string(str_to_push);
+    LPCFrame call = LPCFrame::builder();
+    call.push_str_malloced(str_to_push);
 
-    ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
+    ret = call.apply(APPLY_ID, ob, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }
@@ -1537,8 +1540,8 @@ void destruct_object(object_t* ob, const char* cause) {
     const char* tmp = ob->obname;
 
     STACK_INC;
-    sp->type = T_ERROR_HANDLER;
-    sp->u.error_handler = fix_object_names;
+    vm_sp()->type = T_ERROR_HANDLER;
+    vm_sp()->u.error_handler = fix_object_names;
     saved_master_name = master_ob->obname;
     saved_simul_name = simul_efun_ob->obname;
 
@@ -1550,7 +1553,7 @@ void destruct_object(object_t* ob, const char* cause) {
     new_ob = load_object(tmp, 1);
     if (!new_ob) {
       SETOBNAME(ob, tmp);
-      sp--;
+      vm_sp()--;
       error("Destruct on vital object failed: new copy failed to reload.");
     }
 
@@ -1564,7 +1567,7 @@ void destruct_object(object_t* ob, const char* cause) {
     /* Set the name back so we can remove it from the hash table.
      Also be careful not to remove the new object, which has
      the same name. */
-    sp--; /* error handler */
+    vm_sp()--; /* error handler */
     SETOBNAME(ob, tmp);
     tmp = new_ob->obname;
     SETOBNAME(new_ob, "");
@@ -2380,7 +2383,7 @@ static void mudlib_error_handler(char* err, int katch) {
   push_refed_mapping(m_owned.release());
   if (katch) {
     STACK_INC;
-    *sp = const1;
+    *vm_sp() = const1;
     mret = apply_master_ob(APPLY_ERROR_HANDLER, 2);
   } else {
     mret = apply_master_ob(APPLY_ERROR_HANDLER, 1);

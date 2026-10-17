@@ -193,14 +193,16 @@ const char* plat_dlerror() {
 // ---------------------------------------------------------------------------
 
 void check_valid_ffi(const char* op, svalue_t* arg) {
-  push_constant_string(op);
+  LPCFrame b = LPCFrame::builder();
+  b.push_str_constant(op);
   if (arg == nullptr) {
-    push_number(0);
+    b.push(static_cast<LPC_INT>(0));
   } else {
-    push_svalue(arg);
+    b.push(arg);
   }
-  push_object(current_object);
+  b.push(current_object);
   svalue_t* ret = safe_apply_master_ob(APPLY_VALID_FFI, 3);
+  b.done();
   if (ret && (ret == reinterpret_cast<svalue_t*>(-1) || (ret->type == T_NUMBER && ret->u.number))) {
     return;
   }
@@ -455,31 +457,29 @@ void free_callback(FfiCallback* cb) {
 // ===========================================================================
 
 #ifdef F_FFI_LOAD
-void f_ffi_load() {
-  const char* path = sp->u.string;
+void f_ffi_load(LPCFrame& f) {
+  const char* path = f.string(0);
   if (!library_allowed(path)) {
     error("FFI: library '%s' is not in the configured allow-list.\n", path);
   }
-  check_valid_ffi("load", sp);
+  check_valid_ffi("load", f.argp(0));
 
   void* handle = plat_dlopen(path);
   if (handle == nullptr) {
     g_last_error = plat_dlerror();
-    free_string_svalue(sp);
-    put_number(0);
+    f.ret(0);
     return;
   }
   auto* lib = new FfiLibrary{handle, path};
   int id = g_next_handle++;
   g_libs[id] = lib;
-  free_string_svalue(sp);
-  put_number(id);
+  f.ret(id);
 }
 #endif
 
 #ifdef F_FFI_UNLOAD
-void f_ffi_unload() {
-  int id = sp->u.number;
+void f_ffi_unload(LPCFrame& f) {
+  int id = f.number(0);
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
     // Invalidate every FfiFunc prepared from this library before closing
@@ -495,15 +495,15 @@ void f_ffi_unload() {
     delete it->second;
     g_libs.erase(it);
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FFI_SYMBOL
-void f_ffi_symbol() {
-  const char* name = sp->u.string;
-  int id = (sp - 1)->u.number;
-  check_valid_ffi("symbol", sp);
+void f_ffi_symbol(LPCFrame& f) {
+  const char* name = f.string(1);
+  int id = f.number(0);
+  check_valid_ffi("symbol", f.argp(1));
 
   auto it = g_libs.find(id);
   if (it == g_libs.end()) {
@@ -511,19 +511,18 @@ void f_ffi_symbol() {
   }
   void* addr = plat_dlsym(it->second->handle, name);
   LPC_INT result = reinterpret_cast<LPC_INT>(addr);
-  pop_2_elems();
-  push_number(result);
+  f.ret(result);
 }
 #endif
 
 #ifdef F_FFI_PREPARE
-void f_ffi_prepare() {
-  array_t* arg_arr = sp->u.arr;
-  int ret_code = (sp - 1)->u.number;
-  const char* name = (sp - 2)->u.string;
-  int lib_id = (sp - 3)->u.number;
+void f_ffi_prepare(LPCFrame& f) {
+  array_t* arg_arr = f.array(3);
+  int ret_code = f.number(2);
+  const char* name = f.string(1);
+  int lib_id = f.number(0);
 
-  check_valid_ffi("prepare", sp - 2);
+  check_valid_ffi("prepare", f.argp(1));
 
   auto it = g_libs.find(lib_id);
   if (it == g_libs.end()) {
@@ -557,15 +556,14 @@ void f_ffi_prepare() {
   // Record that this FfiFunc's ->addr came from this library, so
   // ffi_unload() can invalidate it later (see FfiLibrary::prepared_func_ids).
   it->second->prepared_func_ids.push_back(id);
-  pop_n_elems(4);
-  push_number(id);
+  f.ret(id);
 }
 #endif
 
 #ifdef F_FFI_CALL
-void f_ffi_call() {
-  array_t* args = sp->u.arr;
-  int func_id = (sp - 1)->u.number;
+void f_ffi_call(LPCFrame& f) {
+  array_t* args = f.array(1);
+  int func_id = f.number(0);
 
   auto it = g_funcs.find(func_id);
   if (it == g_funcs.end()) {
@@ -599,53 +597,51 @@ void f_ffi_call() {
   } rvalue;
   ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues.data());
 
-  pop_2_elems();
+  f.ret_void();
   return_to_lpc(fn->ret_code, &rvalue);
 }
 #endif
 
 #ifdef F_FFI_ALLOC
-void f_ffi_alloc() {
-  LPC_INT nbytes = sp->u.number;
+void f_ffi_alloc(LPCFrame& f) {
+  LPC_INT nbytes = f.number(0);
   if (nbytes < 0) {
     error("ffi_alloc: negative size.\n");
   }
   buffer_t* buf = allocate_buffer(nbytes);  // zeroed
-  pop_stack();
-  push_refed_buffer(buf);
+  f.ret_refed(buf);
 }
 #endif
 
 #ifdef F_FFI_FREE
-void f_ffi_free() {
+void f_ffi_free(LPCFrame& f) {
   // The buffer is GC-managed; "freeing" zeroes it so a dangling native
   // reader sees no stale data. The block is reclaimed when no LPC value
   // references it.
-  buffer_t* buf = sp->u.buf;
+  buffer_t* buf = f.buffer(0);
   if (buf->size) {
     memset(buf->item, 0, buf->size);
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FFI_SIZEOF
-void f_ffi_sizeof() {
-  int code = sp->u.number;
+void f_ffi_sizeof(LPCFrame& f) {
+  int code = f.number(0);
   int sz = type_size(code);
-  pop_stack();
-  push_number(sz);
+  f.ret(sz);
 }
 #endif
 
 #ifdef F_FFI_PEEK
-void f_ffi_peek() {
+void f_ffi_peek(LPCFrame& f) {
   // Gated like load/prepare: reading an arbitrary native address is a
   // process-memory disclosure primitive, so the master must approve it
   // even though no foreign code runs.
-  check_valid_ffi("peek", sp - 1);
-  LPC_INT nbytes = sp->u.number;
-  auto addr = static_cast<intptr_t>((sp - 1)->u.number);
+  check_valid_ffi("peek", f.argp(0));
+  LPC_INT nbytes = f.number(1);
+  auto addr = static_cast<intptr_t>(f.number(0));
   if (addr == 0) {
     error("ffi_peek: NULL address.\n");
   }
@@ -662,25 +658,23 @@ void f_ffi_peek() {
   if (nbytes) {
     memcpy(buf->item, src, nbytes);
   }
-  pop_2_elems();
-  push_refed_buffer(buf);
+  f.ret_refed(buf);
 }
 #endif
 
 #ifdef F_FFI_ADDRESS
-void f_ffi_address() {
-  buffer_t* buf = sp->u.buf;
+void f_ffi_address(LPCFrame& f) {
+  buffer_t* buf = f.buffer(0);
   LPC_INT addr = buf->size ? reinterpret_cast<LPC_INT>(&buf->item[0]) : 0;
-  pop_stack();
-  push_number(addr);
+  f.ret(addr);
 }
 #endif
 
 #ifdef F_FFI_READ
-void f_ffi_read() {
-  int code = sp->u.number;
-  LPC_INT offset = (sp - 1)->u.number;
-  buffer_t* buf = (sp - 2)->u.buf;
+void f_ffi_read(LPCFrame& f) {
+  int code = f.number(2);
+  LPC_INT offset = f.number(1);
+  buffer_t* buf = f.buffer(0);
   int sz = type_size(code);
   // Range-check in a non-truncating, non-overflowing form: a huge offset must
   // not truncate to int or wrap past the check into an out-of-bounds memcpy.
@@ -691,40 +685,39 @@ void f_ffi_read() {
   void* at = &buf->item[offset];
   FfiArgSlot tmp;
   memcpy(&tmp, at, sz);
-  pop_n_elems(3);
   switch (code) {
     case FFI_INT8:
-      push_number(tmp.i8);
+      f.ret(static_cast<LPC_INT>(tmp.i8));
       break;
     case FFI_UINT8:
-      push_number(tmp.u8);
+      f.ret(static_cast<LPC_INT>(tmp.u8));
       break;
     case FFI_INT16:
-      push_number(tmp.i16);
+      f.ret(static_cast<LPC_INT>(tmp.i16));
       break;
     case FFI_UINT16:
-      push_number(tmp.u16);
+      f.ret(static_cast<LPC_INT>(tmp.u16));
       break;
     case FFI_INT32:
-      push_number(tmp.i32);
+      f.ret(static_cast<LPC_INT>(tmp.i32));
       break;
     case FFI_UINT32:
-      push_number(tmp.u32);
+      f.ret(static_cast<LPC_INT>(tmp.u32));
       break;
     case FFI_INT64:
-      push_number(tmp.i64);
+      f.ret(static_cast<LPC_INT>(tmp.i64));
       break;
     case FFI_UINT64:
-      push_number(static_cast<LPC_INT>(tmp.u64));
+      f.ret(static_cast<LPC_INT>(tmp.u64));
       break;
     case FFI_FLOAT:
-      push_real(tmp.f32);
+      f.ret(static_cast<LPC_FLOAT>(tmp.f32));
       break;
     case FFI_DOUBLE:
-      push_real(tmp.f64);
+      f.ret(static_cast<LPC_FLOAT>(tmp.f64));
       break;
     case FFI_POINTER:
-      push_number(reinterpret_cast<LPC_INT>(tmp.ptr));
+      f.ret(reinterpret_cast<LPC_INT>(tmp.ptr));
       break;
     default:
       error("ffi_read: bad type code %d\n", code);
@@ -733,11 +726,11 @@ void f_ffi_read() {
 #endif
 
 #ifdef F_FFI_WRITE
-void f_ffi_write() {
-  svalue_t* val = sp;
-  int code = (sp - 1)->u.number;
-  LPC_INT offset = (sp - 2)->u.number;
-  buffer_t* buf = (sp - 3)->u.buf;
+void f_ffi_write(LPCFrame& f) {
+  svalue_t* val = f.argp(3);
+  int code = f.number(2);
+  LPC_INT offset = f.number(1);
+  buffer_t* buf = f.buffer(0);
   int sz = type_size(code);
   if (offset < 0 || static_cast<size_t>(offset) + static_cast<size_t>(sz) > buf->size) {
     error("ffi_write: offset %" LPC_INT_FMTSTR_P " (size %d) out of range for buffer of %u.\n",
@@ -746,13 +739,13 @@ void f_ffi_write() {
   FfiArgSlot tmp;
   lpc_to_slot(code, val, &tmp);
   memcpy(&buf->item[offset], &tmp, sz);
-  pop_n_elems(4);
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FFI_STRUCT_LAYOUT
-void f_ffi_struct_layout() {
-  array_t* fields = sp->u.arr;
+void f_ffi_struct_layout(LPCFrame& f) {
+  array_t* fields = f.array(0);
   int n = fields->size;
 
   // Compute each field's aligned offset and the struct's total size,
@@ -792,16 +785,15 @@ void f_ffi_struct_layout() {
   result->item[0].u.number = cur;
   result->item[1].type = T_ARRAY;
   result->item[1].u.arr = offs.release();  // ref transferred
-  pop_stack();
-  push_refed_array(result);
+  f.ret_refed(result);
 }
 #endif
 
 #ifdef F_FFI_CALLBACK
-void f_ffi_callback() {
-  array_t* arg_arr = sp->u.arr;
-  int ret_code = (sp - 1)->u.number;
-  svalue_t* fun_sv = sp - 2;  // T_FUNCTION
+void f_ffi_callback(LPCFrame& f) {
+  array_t* arg_arr = f.array(2);
+  int ret_code = f.number(1);
+  svalue_t* fun_sv = f.argp(0);  // T_FUNCTION
 
   check_valid_ffi("callback", nullptr);
 
@@ -842,27 +834,25 @@ void f_ffi_callback() {
 
   int id = g_next_handle++;
   g_callbacks[id] = cb.release();
-  pop_n_elems(3);
-  push_number(id);
+  f.ret(id);
 }
 #endif
 
 #ifdef F_FFI_CALLBACK_ADDR
-void f_ffi_callback_addr() {
-  int id = sp->u.number;
+void f_ffi_callback_addr(LPCFrame& f) {
+  int id = f.number(0);
   auto it = g_callbacks.find(id);
   if (it == g_callbacks.end()) {
     error("ffi_callback_addr: invalid callback handle %d\n", id);
   }
   LPC_INT addr = reinterpret_cast<LPC_INT>(it->second->code);
-  pop_stack();
-  push_number(addr);
+  f.ret(addr);
 }
 #endif
 
 #ifdef F_FFI_CALLBACK_FREE
-void f_ffi_callback_free() {
-  int id = sp->u.number;
+void f_ffi_callback_free(LPCFrame& f) {
+  int id = f.number(0);
   auto it = g_callbacks.find(id);
   if (it != g_callbacks.end()) {
     if (it->second->dispatching) {
@@ -876,24 +866,24 @@ void f_ffi_callback_free() {
     free_callback(it->second);
     g_callbacks.erase(it);
   }
-  pop_stack();
+  f.ret_void();
 }
 #endif
 
 #ifdef F_FFI_ERROR
-void f_ffi_error() {
+void f_ffi_error(LPCFrame& f) {
   const char* msg = g_last_error.c_str();
-  push_malloced_string(string_copy(msg, "f_ffi_error"));
+  f.ret_str_copy(msg);
 }
 #endif
 
 #ifdef F_FFI_STATUS
-void f_ffi_status() {
+void f_ffi_status(LPCFrame& f) {
   mapping_t* m = allocate_mapping(4);
   add_mapping_pair(m, "libraries", static_cast<long>(g_libs.size()));
   add_mapping_pair(m, "functions", static_cast<long>(g_funcs.size()));
   add_mapping_pair(m, "callbacks", static_cast<long>(g_callbacks.size()));
-  push_refed_mapping(m);
+  f.ret_refed(m);
 }
 #endif
 

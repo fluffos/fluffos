@@ -38,5 +38,4 @@ void f_xor(void);
 void f_xor_eq(void);
 void xor_eq_slot(svalue_t*);
 void f_function_constructor(void);
-void f_evaluate(void);
 void f_sscanf(void);

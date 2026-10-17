@@ -19,18 +19,16 @@ static object_t* ob;
 
 #ifdef F_EXPORT_UID
 
-void f_export_uid() {
+void f_export_uid(LPCFrame& f) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
-  ob = sp->u.ob;
+  ob = f.object(0);
   if (ob->euid) {
-    free_object(&ob, "f_export_uid:1");
-    *sp = const0;
+    f.ret(0);
   } else {
     ob->uid = current_object->euid;
-    free_object(&ob, "f_export_uid:2");
-    *sp = const1;
+    f.ret(1);
   }
 }
 
@@ -38,27 +36,23 @@ void f_export_uid() {
 
 #ifdef F_GETEUID
 
-void f_geteuid() {
-  if (sp->type & T_OBJECT) {
-    ob = sp->u.ob;
+void f_geteuid(LPCFrame& f) {
+  if (f.type(0) & T_OBJECT) {
+    ob = f.object(0);
     if (ob->euid) {
-      put_constant_string(ob->euid->name);
-      free_object(&ob, "f_geteuid:1");
+      f.ret_str_shared(ob->euid->name);
       return;
     }
-    free_object(&ob, "f_geteuid:2");
-    *sp = const0;
+    f.ret(0);
     return;
 
-  } else if (sp->type & T_FUNCTION) {
+  } else if (f.type(0) & T_FUNCTION) {
     funptr_t* fp;
-    if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
-      put_constant_string(fp->hdr.owner->euid->name);
-      free_funp(fp);
+    if ((fp = f.funptr(0))->hdr.owner && fp->hdr.owner->euid) {
+      f.ret_str_shared(fp->hdr.owner->euid->name);
       return;
     }
-    free_funp(fp);
-    *sp = const0;
+    f.ret(0);
   }
 }
 
@@ -66,45 +60,45 @@ void f_geteuid() {
 
 #ifdef F_GETUID
 
-void f_getuid() {
-  ob = sp->u.ob;
+void f_getuid(LPCFrame& f) {
+  ob = f.object(0);
 
   if (!ob->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
   }
 
-  put_constant_string(ob->uid->name);
-  free_object(&ob, "f_getuid");
+  f.ret_str_shared(ob->uid->name);
 }
 
 #endif
 
 #ifdef F_SETEUID
 
-void f_seteuid() {
-  svalue_t* arg;
+void f_seteuid(LPCFrame& f) {
   svalue_t* ret;
 
-  if (sp->type & T_NUMBER) {
-    if (sp->u.number) {
+  if (f.type(0) & T_NUMBER) {
+    if (f.number(0)) {
       bad_arg(1, F_SETEUID);
     }
     current_object->euid = nullptr;
-    sp->u.number = 1;
+    f.set_top_number(1);
+    f.done();
     return;
   }
-  arg = sp;
-  push_object(current_object);
-  push_svalue(arg);
-  ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
+  {
+    LPCFrame b = LPCFrame::builder();
+    b.push(current_object);
+    b.push(f.argp(0));
+    ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
+    b.done();
+  }
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
-    free_string_svalue(sp);
-    *sp = const0;
+    f.ret(0);
     return;
   }
-  current_object->euid = add_uid(sp->u.string);
-  free_string_svalue(sp);
-  *sp = const1;
+  current_object->euid = add_uid(f.string(0));
+  f.ret(1);
 }
 
 #endif

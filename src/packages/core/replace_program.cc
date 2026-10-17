@@ -488,14 +488,14 @@ static bool replace_program_is_noop(program_t* cur_prog, program_t* new_prog) {
 // "immediately" or "next periodic sweep, up to 5 minutes" -- which is
 // out of scope for this fix.
 
-void f_replace_program() {
+void f_replace_program(LPCFrame& f) {
   replace_ob_t* tmp;
   int name_len;
   char *name, *xname;
   program_t* new_prog;
   int var_offset;
 
-  if (sp->type != T_STRING) {
+  if (f.type(0) != T_STRING) {
     bad_arg(1, F_REPLACE_PROGRAM);
   }
   debug(d_flag, ("replace_program called"));
@@ -512,10 +512,10 @@ void f_replace_program() {
                   current_object->prog->filename);
   }
 
-  name_len = SVALUE_STRLEN(sp);
+  name_len = f.string_len(0);
   name = reinterpret_cast<char*>(DMALLOC(name_len + 5, TAG_TEMPORARY, "replace_program"));
   xname = name;
-  strcpy(name, sp->u.string);
+  strcpy(name, f.string(0));
   bool has_ext = (name_len >= 2 && strcmp(name + name_len - 2, ".c") == 0) ||
                  (name_len >= 4 && strcmp(name + name_len - 4, ".lpc") == 0);
   if (*name == '/') {
@@ -579,7 +579,7 @@ void f_replace_program() {
     debug(d_flag,
           ("replace_program: target already fully present via inherit (zero new funcs/vars); "
            "no-op, skipping pending-swap bookkeeping"));
-    free_string_svalue(sp--);
+    f.ret_void();
     return;
   }
 
@@ -595,7 +595,7 @@ void f_replace_program() {
 
   debug(d_flag, ("replace_program finished"));
 
-  free_string_svalue(sp--);
+  f.ret_void();
 }
 
 #endif

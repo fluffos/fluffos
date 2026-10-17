@@ -173,12 +173,13 @@ void dumpstat(const char* tfn) {
 }
 
 #ifdef F_DUMPALLOBJ
-void f_dumpallobj() {
-  if (st_num_arg) {
-    dumpstat(sp->u.string);
-    free_string_svalue(sp--);
+void f_dumpallobj(LPCFrame& f) {
+  int num_arg = f.argc();
+  if (num_arg) {
+    dumpstat(f.string(0));
   } else {
     dumpstat("/OBJ_DUMP");
   }
+  f.ret_void();
 }
 #endif

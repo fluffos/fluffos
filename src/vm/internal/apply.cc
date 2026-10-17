@@ -9,6 +9,7 @@
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/debug.h"
 #include "vm/internal/hooks.h"
 #include "compiler/internal/compiler.h"
@@ -103,13 +104,13 @@ void check_co_args2(lpc_type_t* types, int num_arg, const char* name, const char
       continue;
     }
 
-    if ((sp - argc)->type != exptype) {
+    if ((vm_sp() - argc)->type != exptype) {
       char buf[1024];
-      if ((sp - argc)->type == T_NUMBER && !(sp - argc)->u.number) {
+      if ((vm_sp() - argc)->type == T_NUMBER && !(vm_sp() - argc)->u.number) {
         continue;
       }
       sprintf(buf, "Bad argument %d in call to %s() in %s\nExpected: %s Got %s.\n", i, name,
-              ob_name, type_name(exptype), type_name((sp - argc)->type));
+              ob_name, type_name(exptype), type_name((vm_sp() - argc)->type));
       if (CONFIG_INT(__RC_CALL_OTHER_WARN__)) {
         if (current_prog) {
           const char* file;
@@ -159,7 +160,7 @@ void check_co_args(int num_arg, const program_t* prog, function_t* fun, int find
     // Pass num_arg_check as the loop bound: argument_types holds only
     // fun->num_arg slots, so bounding the walk by the (possibly larger)
     // passed num_arg would over-read the array. num_arg stays as sparg so
-    // stack indexing (sp - argc) still lines up with the pushed arguments.
+    // stack indexing (vm_sp() - argc) still lines up with the pushed arguments.
     if (num_arg_check && prog->type_start && prog->type_start[findex] != INDEX_START_NONE)
       check_co_args2(&prog->argument_types[prog->type_start[findex]], num_arg_check, fun->funcname,
                      prog->filename, num_arg);
@@ -312,7 +313,7 @@ retry_for_shadow:
         // fill in the arguments
         if (num_arg != funcp->num_arg) {
           auto* saved_fp = fp;
-          fp = sp;  // leave the already pushed args on the stack
+          fp = vm_sp();  // leave the already pushed args on the stack
           // fp is manually repointed per iteration below; restore it
           // unconditionally, including if a default-argument closure error()s
           // and unwinds out of here (AGENTS.md section 4).
@@ -321,7 +322,7 @@ retry_for_shadow:
           // NOTE: this assumes default arguments closure are always generated right after the
           // function in order
           for (int i = num_arg; i < funcp->num_arg; i++) {
-            auto current_sp = sp;
+            auto current_sp = vm_sp();
             auto* default_funcp = progp->function_table + funcp->default_args_findex[i];
             if (default_funcp->funcname[0] != APPLY___INIT_SPECIAL_CHAR) {
 #ifdef DEBUG
@@ -333,7 +334,7 @@ retry_for_shadow:
             }
             // notice we don't change current_object here, so the default arguments closure
             // will be called in the context of the caller
-            fp = sp + 1;  // zero args
+            fp = vm_sp() + 1;  // zero args
             push_control_stack(FRAME_FUNCTION);
             caller_type = ORIGIN_LOCAL;
             csp->pc = pc;
@@ -341,13 +342,13 @@ retry_for_shadow:
             current_prog = progp;
             call_program(progp, default_funcp->address);
 
-            if (sp - current_sp != 1 || sp->type != T_FUNCTION) {
+            if (vm_sp() - current_sp != 1 || vm_sp()->type != T_FUNCTION) {
               error("Driver Bug: Bad stack after default arguments call.");
             }
 
             // get the returned closure then evaluate for the real value
             svalue_t sv_funcp;
-            assign_svalue_no_free(&sv_funcp, sp);
+            assign_svalue_no_free(&sv_funcp, vm_sp());
             pop_stack();
             // Drop sv_funcp's ref on every path, including if the closure
             // below error()s (AGENTS.md section 4).
@@ -358,16 +359,16 @@ retry_for_shadow:
                 "apply_low: default args closure returned null.");
 
             // Evaluate the closure into a local BEFORE pushing: push_svalue(x)
-            // is `STACK_INC; assign_svalue_no_free(sp, x);`, so pushing
+            // is `STACK_INC; assign_svalue_no_free(vm_sp(), x);`, so pushing
             // call_function_pointer(...) directly runs STACK_INC before the
             // call -- if it throws (an ordinary default expression calling
-            // error()), sp is left one slot high pointing at garbage and the
+            // error()), vm_sp() is left one slot high pointing at garbage and the
             // unwind's pop_n_elems() frees it and crashes. (Sibling of the
             // same fix in interpret.cc's fill_default_args().)
             svalue_t* result = call_function_pointer(sv_funcp.u.fp, 0);
             push_svalue(result);
 
-            DEBUG_CHECK(sp - current_sp != 1 && dump_vm_state(),
+            DEBUG_CHECK(vm_sp() - current_sp != 1 && dump_vm_state(),
                         "Bad stack after default arguments call.");
           }
 
@@ -475,14 +476,14 @@ svalue_t* apply(const char* fun, object_t* ob, int num_arg, int where) {
   call_origin = where;
 
 #ifdef DEBUG
-  expected_sp = sp - num_arg;
+  expected_sp = vm_sp() - num_arg;
 #endif
   if (apply_low(fun, ob, num_arg) == 0) {
     return nullptr;
   }
   free_svalue(&apply_ret_value, "sapply");
-  apply_ret_value = *sp--;
-  DEBUG_CHECK(expected_sp != sp, "Corrupt stack pointer.\n");
+  apply_ret_value = *vm_sp()--;
+  DEBUG_CHECK(expected_sp != vm_sp(), "Corrupt stack pointer.\n");
   return &apply_ret_value;
 }
 
@@ -494,29 +495,8 @@ svalue_t* apply(const char* fun, object_t* ob, int num_arg, int where) {
  * after the apply. (such as the ed exit function, and the net_dead function).
  */
 svalue_t* safe_apply(const char* fun, object_t* ob, int num_arg, int where) {
-  /* Arguments are already pushed on stack */
-
-  if (ob->flags & O_DESTRUCTED) {
-    pop_n_elems(num_arg);
-    return nullptr;
-  }
-
-  error_context_t econ;
-  save_context(&econ);
-  /* The callee owns the arguments once the call starts: setup_variables()
-     pops any EXCESS arguments (more passed than declared parameters) before
-     the body runs, legally taking sp below the post-push position. The
-     unwind mark must therefore sit below the arguments, and the unwind
-     itself reclaims them -- no separate pop afterwards (issue #1014). */
-  econ.save_sp -= num_arg;
-
-  svalue_t* ret = nullptr;
-  try {
-    ret = apply(fun, ob, num_arg, where);
-  } catch (const char*) {
-    restore_context(&econ);
-    ret = nullptr;
-  }
-  pop_context(&econ);
-  return ret;
+  /* Arguments are already pushed on stack. LPCFrame owns the value-stack
+   * window and sets the unwind mark below the first arg (issue #1014). */
+  LPCFrame f = LPCFrame::args(num_arg);
+  return f.safe_apply(fun, ob, where);
 }

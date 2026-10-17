@@ -3,6 +3,7 @@
 #include "base/internal/tracing.h"
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/apply.h"
 #include "compiler/internal/lexer.h"  // for instrs, FIXME
@@ -321,14 +322,14 @@ void free_funp(funptr_t* fp) {
 
 void push_refed_funp(funptr_t* fp) {
   STACK_INC;
-  sp->type = T_FUNCTION;
-  sp->u.fp = fp;
+  vm_sp()->type = T_FUNCTION;
+  vm_sp()->u.fp = fp;
 }
 
 void push_funp(funptr_t* fp) {
   STACK_INC;
-  sp->type = T_FUNCTION;
-  sp->u.fp = fp;
+  vm_sp()->type = T_FUNCTION;
+  vm_sp()->u.fp = fp;
   fp->hdr.ref++;
 }
 
@@ -345,7 +346,7 @@ int merge_arg_lists(int num_arg, array_t* arr, int start) {
 
   if (num_arr_arg) {
     CHECK_STACK_OVERFLOW(num_arr_arg);
-    sptr = (sp += num_arr_arg);
+    sptr = (vm_sp() += num_arr_arg);
     if (num_arg) {
       /* We need to do some stack movement so that the order
          of arguments is logical */
@@ -359,7 +360,7 @@ int merge_arg_lists(int num_arg, array_t* arr, int start) {
       assign_svalue_no_free(sptr--, &arr->item[num_arg]);
     }
     /* could just return num_arr_arg if num_arg is 0 but .... -Sym */
-    return (sp - sptr);
+    return (vm_sp() - sptr);
   }
   return num_arg;
 }
@@ -527,9 +528,6 @@ funptr_t* make_functional_funp(short num_arg, short num_local, short len, svalue
   return fp;
 }
 
-typedef void (*func_t)(void);
-extern func_t efun_table[];
-
 svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
   array_t* v;
 
@@ -573,7 +571,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       break;
     case FP_EFUN: {
       int i, def;
-      fp = sp - num_arg + 1;
+      fp = vm_sp() - num_arg + 1;
 
       i = funp->f.efun.index;
       if (num_arg == instrs[i].min_arg - 1 && ((def = instrs[i].Default) != DEFAULT_NONE)) {
@@ -592,14 +590,13 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
          also on eval_cost here, which is ok for just 1 efun */
       {
         int j, n = num_arg;
-        st_num_arg = num_arg;
 
         if (n >= 4 || instrs[i].max_arg == -1) {
           n = instrs[i].min_arg;
         }
 
         for (j = 0; j < n; j++) {
-          CHECK_TYPES(sp - num_arg + j + 1, instrs[i].type[j], j + 1, i);
+          CHECK_TYPES(vm_sp() - num_arg + j + 1, instrs[i].type[j], j + 1, i);
         }
 
         const char* ename = instrs[i].name;
@@ -607,15 +604,15 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         if (g_hook_mask & HOOK_MASK_EFUN) {
           svalue_t answered{};
           HookGateResult gr =
-              hook_dispatch_efun_before(ename, st_num_arg, &answered, &efun_filter_ob);
+              hook_dispatch_efun_before(ename, num_arg, &answered, &efun_filter_ob);
           if (gr == HookGateResult::Refuse) {
-            pop_n_elems(st_num_arg);
+            pop_n_elems(num_arg);
             free_svalue(&answered, "efun hook refuse");
             free_svalue(&apply_ret_value, "call_function_pointer");
             apply_ret_value = const0;
             if (instrs[i].ret_type != TYPE_NOVALUE) {
               push_number(0);
-              apply_ret_value = *sp--;
+              apply_ret_value = *vm_sp()--;
             }
             remove_fake_frame();
             return &apply_ret_value;
@@ -628,14 +625,17 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             json trace_context = {};
 
             json args = json::array();
-            for (int i = st_num_arg; i > 0; i--) {
-              args.push_back(svalue_to_json_summary(sp - i + 1));
+            for (int k = num_arg; k > 0; k--) {
+              args.push_back(svalue_to_json_summary(vm_sp() - k + 1));
             }
             trace_context["args"] = args;
             return trace_context;
           });
 
-          (*efun_table[i - EFUN_BASE])();
+          {
+            LPCFrame efun_frame = LPCFrame::args(num_arg);
+            (*efun_table[i - EFUN_BASE])(efun_frame);
+          }
         }
 
         if (g_hook_mask & HOOK_MASK_EFUN) {
@@ -646,7 +646,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         if (instrs[i].ret_type == TYPE_NOVALUE) {
           apply_ret_value = const0;
         } else {
-          apply_ret_value = *sp--;
+          apply_ret_value = *vm_sp()--;
         }
         remove_fake_frame();
         return &apply_ret_value;
@@ -695,7 +695,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             push_svalue(&answered);
             free_svalue(&answered, "function hook answer");
             free_svalue(&apply_ret_value, "call_function_pointer");
-            apply_ret_value = *sp--;
+            apply_ret_value = *vm_sp()--;
             remove_fake_frame();
             return &apply_ret_value;
           }
@@ -720,13 +720,13 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             hook_dispatch_function_around(target, fname, "function_pointer", num_arg, def_prog,
                                           def_funp->address, def_funp)) {
           free_svalue(&apply_ret_value, "call_function_pointer");
-          apply_ret_value = *sp--;
+          apply_ret_value = *vm_sp()--;
           remove_fake_frame();
           return &apply_ret_value;
         }
       }
 
-      fp = sp - num_arg + 1;
+      fp = vm_sp() - num_arg + 1;
 
       push_control_stack(FRAME_FUNCTION);
       current_prog = funp->hdr.owner->prog;
@@ -749,7 +749,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
     }
     case FP_FUNCTIONAL:
     case FP_FUNCTIONAL | FP_NOT_BINDABLE: {
-      fp = sp - num_arg + 1;
+      fp = vm_sp() - num_arg + 1;
       push_control_stack(FRAME_FUNP);
       current_prog = funp->f.functional.prog;
       csp->fr.funp = funp;
@@ -767,7 +767,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       error("Unsupported function pointer type.\n");
   }
   free_svalue(&apply_ret_value, "call_function_pointer");
-  apply_ret_value = *sp--;
+  apply_ret_value = *vm_sp()--;
   remove_fake_frame();
   return &apply_ret_value;
 }

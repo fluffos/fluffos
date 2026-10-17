@@ -17,46 +17,58 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-void f_domain_stats() {
+void f_domain_stats(LPCFrame& f) {
+  int num_arg = f.argc();
   mapping_t* m;
 
-  if (st_num_arg) {
-    m = get_domain_stats(sp->u.string);
-    free_string_svalue(sp--);
+  if (num_arg) {
+    m = get_domain_stats(f.string(0));
+    f.ret_void();
   } else {
     m = get_domain_stats(nullptr);
+    f.done();
   }
   if (!m) {
-    push_number(0);
+    LPCFrame out = LPCFrame::builder();
+    out.push(static_cast<LPC_INT>(0));
+    out.done();
   } else {
     /* ref count is properly decremented by get_domain_stats */
-    push_mapping(m);
+    LPCFrame out = LPCFrame::builder();
+    out.push(m);
+    out.done();
   }
 }
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author() {
-  set_author(sp->u.string);
-  free_string_svalue(sp--);
+void f_set_author(LPCFrame& f) {
+  set_author(f.string(0));
+  f.ret_void();
 }
 #endif
 
 #ifdef F_AUTHOR_STATS
-void f_author_stats() {
+void f_author_stats(LPCFrame& f) {
+  int num_arg = f.argc();
   mapping_t* m;
 
-  if (st_num_arg) {
-    m = get_author_stats(sp->u.string);
-    free_string_svalue(sp--);
+  if (num_arg) {
+    m = get_author_stats(f.string(0));
+    f.ret_void();
   } else {
     m = get_author_stats(nullptr);
+    f.done();
   }
   if (!m) {
-    push_number(0);
+    LPCFrame out = LPCFrame::builder();
+    out.push(static_cast<LPC_INT>(0));
+    out.done();
   } else {
     /* ref count is properly decremented by get_author_stats */
-    push_mapping(m);
+    LPCFrame out = LPCFrame::builder();
+    out.push(m);
+    out.done();
   }
 }
 #endif

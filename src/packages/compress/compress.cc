@@ -14,10 +14,10 @@
 enum { COMPRESS_BUF_SIZE = 8096 };
 
 #ifdef F_COMPRESS_FILE
-void f_compress_file() {
+void f_compress_file(LPCFrame& f) {
+  int num_arg = f.argc();
   int readb;
   int len;
-  int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
   const char* real_input_file;
@@ -29,26 +29,23 @@ void f_compress_file() {
   char outname[1024];
 
   // Not a string?  Error!
-  if ((sp - num_arg + 1)->type != T_STRING) {
-    pop_n_elems(num_arg);
-    push_number(0);
+  if (f.type(0) != T_STRING) {
+    f.ret(0);
     return;
   }
 
-  input_file = (sp - num_arg + 1)->u.string;
+  input_file = f.string(0);
   if (num_arg == 2) {
-    if (((sp - num_arg + 2)->type != T_STRING)) {
-      pop_n_elems(num_arg);
-      push_number(0);
+    if (f.type(1) != T_STRING) {
+      f.ret(0);
       return;
     }
-    output_file = (sp - num_arg + 2)->u.string;
+    output_file = f.string(1);
   } else {
     len = strlen(input_file);
     if (!strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION)) {
       // Already compressed...
-      pop_n_elems(num_arg);
-      push_number(0);
+      f.ret(0);
       return;
     }
     tmpout = new_string(strlen(input_file) + strlen(GZ_EXTENSION), "compress_file");
@@ -62,16 +59,14 @@ void f_compress_file() {
     if (num_arg != 2) {
       FREE_MSTR(output_file);
     }
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
   if (strlen(real_output_file) >= sizeof(outname)) {
     if (num_arg != 2) {
       FREE_MSTR(output_file);
     }
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
   // Copy it into our little buffer.
@@ -84,23 +79,20 @@ void f_compress_file() {
 
   real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
   if (!real_input_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
   in_file = fopen(real_input_file, "rb");
   if (!in_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
   out_file = gzopen(output_file, "wb");
   if (!out_file) {
     fclose(in_file);
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
@@ -127,23 +119,21 @@ void f_compress_file() {
     debug_message("compress_file: failed to compress /%s into /%s.\n", real_input_file,
                   output_file);
     unlink(output_file);
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
   unlink(real_input_file);
 
-  pop_n_elems(num_arg);
-  push_number(1);
+  f.ret(1);
 }
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-void f_uncompress_file() {
+void f_uncompress_file(LPCFrame& f) {
+  int num_arg = f.argc();
   int readb;
   int len;
-  int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
   const char* real_input_file;
@@ -154,27 +144,24 @@ void f_uncompress_file() {
   char outname[1024];
 
   // Not a string?  Error!
-  if ((sp - num_arg + 1)->type != T_STRING) {
-    pop_n_elems(num_arg);
-    push_number(0);
+  if (f.type(0) != T_STRING) {
+    f.ret(0);
     return;
   }
 
-  input_file = (sp - num_arg + 1)->u.string;
+  input_file = f.string(0);
   if (num_arg == 2) {
-    if (((sp - num_arg + 2)->type != T_STRING)) {
-      pop_n_elems(num_arg);
-      push_number(0);
+    if (f.type(1) != T_STRING) {
+      f.ret(0);
       return;
     }
-    output_file = (sp - num_arg + 2)->u.string;
+    output_file = f.string(1);
   } else {
     char* tmp;
     len = strlen(input_file);
     if (strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION) != 0) {
       // Not compressed...
-      pop_n_elems(num_arg);
-      push_number(0);
+      f.ret(0);
       return;
     }
     tmp = new_string(len, "compress_file");
@@ -189,16 +176,14 @@ void f_uncompress_file() {
       FREE_MSTR(output_file);
     }
 
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
   if (strlen(real_output_file) >= sizeof(outname)) {
     if (num_arg != 2) {
       FREE_MSTR(output_file);
     }
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
   // Copy it into our little buffer.
@@ -210,23 +195,20 @@ void f_uncompress_file() {
 
   real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
   if (!real_input_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
   in_file = gzopen(real_input_file, "rb");
   if (!in_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
   out_file = fopen(output_file, "wb");
   if (!out_file) {
     gzclose(in_file);
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
@@ -256,35 +238,32 @@ void f_uncompress_file() {
     debug_message("uncompress_file: failed to decompress /%s into /%s.\n", real_input_file,
                   output_file);
     unlink(output_file);
-    pop_n_elems(num_arg);
-    push_number(0);
+    f.ret(0);
     return;
   }
 
   unlink(real_input_file);
 
-  pop_n_elems(num_arg);
-  push_number(1);
+  f.ret(1);
 }
 #endif
 
 #ifdef F_COMPRESS
-void f_compress() {
+void f_compress(LPCFrame& f) {
   unsigned char* buffer;
   unsigned char* input;
   int size;
   buffer_t* real_buffer;
   uLongf new_size;
 
-  if (sp->type == T_STRING) {
-    size = SVALUE_STRLEN(sp);
-    input = (unsigned char*)sp->u.string;
-  } else if (sp->type == T_BUFFER) {
-    size = sp->u.buf->size;
-    input = sp->u.buf->item;
+  if (f.type(0) == T_STRING) {
+    size = f.string_len(0);
+    input = (unsigned char*)f.string(0);
+  } else if (f.type(0) == T_BUFFER) {
+    size = f.buffer(0)->size;
+    input = f.buffer(0)->item;
   } else {
-    pop_n_elems(st_num_arg);
-    push_undefined();
+    f.ret_undefined();
     return;
   }
 
@@ -294,11 +273,10 @@ void f_compress() {
   compress(buffer, &new_size, input, size);
 
   // Shrink it down.
-  pop_n_elems(st_num_arg);
   real_buffer = allocate_buffer(new_size);
   write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer), new_size);
   FREE(buffer);
-  push_refed_buffer(real_buffer);
+  f.ret_refed(real_buffer);
 }
 #endif
 
@@ -309,7 +287,7 @@ static void* zlib_alloc(void* /*opaque*/, unsigned int items, unsigned int size)
 
 static void zlib_free(void* /*opaque*/, void* address) { FREE(address); }
 
-void f_uncompress() {
+void f_uncompress(LPCFrame& f) {
   z_stream* compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
   unsigned char* output_data = nullptr;
@@ -318,11 +296,10 @@ void f_uncompress() {
   buffer_t* buffer;
   int ret;
 
-  if (sp->type == T_BUFFER) {
-    buffer = sp->u.buf;
+  if (f.type(0) == T_BUFFER) {
+    buffer = f.buffer(0);
   } else {
-    pop_n_elems(st_num_arg);
-    push_undefined();
+    f.ret_undefined();
     return;
   }
 
@@ -338,7 +315,7 @@ void f_uncompress() {
 
   if (inflateInit(compressed) != Z_OK) {
     FREE(compressed);
-    pop_n_elems(st_num_arg);
+    f.ret_void();
     error("inflateInit failed");
   }
 
@@ -371,13 +348,12 @@ void f_uncompress() {
 
   inflateEnd(compressed);
 
-  pop_n_elems(st_num_arg);
-
   if (too_large) {
     if (output_data) {
       FREE(output_data);
     }
     FREE(compressed);
+    f.ret_void();
     error("uncompress: decompressed data exceeds maximum buffer size\n");
   }
 
@@ -385,13 +361,14 @@ void f_uncompress() {
     buffer = allocate_buffer(len);
     write_buffer(buffer, 0, reinterpret_cast<char*>(output_data), len);
     FREE(output_data);
-    push_refed_buffer(buffer);
     FREE(compressed);
+    f.ret_refed(buffer);
   } else {
     if (output_data) {
       FREE(output_data);
     }
     FREE(compressed);
+    f.ret_void();
     error("inflate: no ZSTREAM_END\n");
   }
 }
