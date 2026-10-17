@@ -624,7 +624,7 @@ void f_async_read(LPCFrame& f) {
     // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
     // char*) as a funptr_t*.
     if (cb->ob != nullptr) {
-      error("async_read: callback must be a function pointer, not a string.\n", num_arg);
+      error("async_read: callback must be a function pointer, not a string.\n");
     }
     cb->f.fp->hdr.ref++;
     f.pop_back(1);

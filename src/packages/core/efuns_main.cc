@@ -739,6 +739,12 @@ void f_get_char(LPCFrame& f) {
   }
   num_arg--;
   i = get_char(arg, flag, num_arg, &arg[1 + tmp]);
+  if (i) {
+    /* get_char() moved the extra arguments into the pending input */
+    for (int k = 1 + tmp; k < f.argc(); k++) {
+      (void)f.steal(k);
+    }
+  }
   f.ret(i);
 }
 
@@ -820,6 +826,12 @@ void f_input_to(LPCFrame& f) {
   }
   num_arg--; /* Don't count the name of the func either. */
   i = input_to(arg, flag, num_arg, &arg[1 + tmp]);
+  if (i) {
+    /* input_to() moved the extra arguments into the pending input */
+    for (int k = 1 + tmp; k < f.argc(); k++) {
+      (void)f.steal(k);
+    }
+  }
   f.ret(i);
 }
 
@@ -1645,9 +1657,7 @@ void f_process_value(LPCFrame& f) {
 
   ret = process_value(f.string(0));
   if (ret) {
-    svalue_t v;
-    assign_svalue_no_free(&v, ret);
-    f.ret(v);
+    f.ret_copy(ret);
   } else {
     f.ret(0);
   }

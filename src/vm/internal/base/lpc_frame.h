@@ -247,6 +247,7 @@ class LPCCall {
  * be removed while it is still the stack top -- run() calls fn, dismiss()
  * does not; the destructor runs it if neither was called. Keep its scope
  * tight: a ret*() below an unremoved slot would release the wrong slots.
+ * fn runs from an unwind and possibly a destructor, so it must not error().
  */
 class StackErrorHandler {
  public:
