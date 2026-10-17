@@ -7,14 +7,14 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void f_dump_prog() {
+void f_dump_prog(int num_arg) {
   program_t* prog;
   const char* where;
   int d;
   object_t* ob;
-  int const narg = st_num_arg;
+  int const narg = num_arg;
 
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     if ((sp - 1)->type != T_OBJECT) {
       bad_argument(sp - 1, T_OBJECT, 1, F_DUMP_PROG);
     }
@@ -22,7 +22,7 @@ void f_dump_prog() {
     ob = sp[-1].u.ob;
     d = sp->u.number;
     where = nullptr;
-  } else if (st_num_arg == 3) {
+  } else if (num_arg == 3) {
     if ((sp - 2)->type != T_OBJECT) {
       bad_argument(sp - 2, T_OBJECT, 1, F_DUMP_PROG);
     }

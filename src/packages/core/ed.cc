@@ -3341,23 +3341,23 @@ char* object_ed_cmd(object_t* ob, const char* str) {
 #endif
 
 #ifdef F_ED
-void f_ed() {
+void f_ed(int num_arg) {
   if (!command_giver || !command_giver->interactive) {
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     return;
   }
 
-  if (!st_num_arg) {
+  if (!num_arg) {
     /* ed() */
     ed_start(nullptr, nullptr, nullptr, 0, nullptr, 0);
-  } else if (st_num_arg == 1) {
+  } else if (num_arg == 1) {
     /* ed(fname) */
     if (!(sp->type == T_STRING)) {
       bad_argument(sp, T_STRING, 1, F_ED);
     }
     ed_start(sp->u.string, nullptr, nullptr, 0, nullptr, 0);
     pop_stack();
-  } else if (st_num_arg == 2) {
+  } else if (num_arg == 2) {
     /* ed(fname,exitfn) / ed(fname, scroll_lines) */
     if (!((sp - 1)->type == T_STRING)) {
       bad_argument(sp - 1, T_STRING, 1, F_ED);
@@ -3371,7 +3371,7 @@ void f_ed() {
       bad_argument(sp, T_NUMBER | T_STRING, 2, F_ED);
     }
     pop_2_elems();
-  } else if (st_num_arg == 3) {
+  } else if (num_arg == 3) {
     /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) /
      ed(fname,exitfn,scroll_lines) */
     if (!((sp - 1)->type == T_STRING)) {
@@ -3393,7 +3393,7 @@ void f_ed() {
       bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
     }
     pop_3_elems();
-  } else if (st_num_arg == 4) {
+  } else if (num_arg == 4) {
     /* ed(fname,writefn,exitfn,restricted) /
      ed(fname,writefn,exitfn,scroll_lines) */
     if (!(sp->type == T_NUMBER)) {
@@ -3417,7 +3417,7 @@ void f_ed() {
                sp->u.number);
     }
     pop_n_elems(4);
-  } else { /* st_num_arg == 5 */
+  } else { /* num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
     if (!(sp->type == T_NUMBER)) {
       bad_argument(sp, T_NUMBER, 5, F_ED);
@@ -3444,7 +3444,7 @@ void f_ed() {
 #endif
 
 #ifdef F_ED_CMD
-void f_ed_cmd(void) {
+void f_ed_cmd(int num_arg) {
   char* res;
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3469,18 +3469,18 @@ void f_ed_cmd(void) {
 #endif
 
 #ifdef F_ED_START
-void f_ed_start(void) {
+void f_ed_start(int num_arg) {
   char* res;
   const char* fname;
   int restr = 0;
   int scroll_lines = 20;
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     scroll_lines = (sp--)->u.number;
     restr = (sp--)->u.number;
   }
 
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     if (sp->u.number == 1) {
       restr = (sp--)->u.number;
     } else {
@@ -3488,7 +3488,7 @@ void f_ed_start(void) {
     }
   }
 
-  if (st_num_arg) {
+  if (num_arg) {
     fname = sp->u.string;
   } else {
     fname = 0;
@@ -3522,7 +3522,7 @@ void f_ed_start(void) {
 #endif
 
 #ifdef F_IN_EDIT
-void f_in_edit() {
+void f_in_edit(int num_arg) {
   char* fn;
   ed_buffer_t* eb = nullptr;
 

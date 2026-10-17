@@ -128,7 +128,7 @@ int pcrecachesize = 0;
 struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
-void f_pcre_version() {
+void f_pcre_version(int num_arg) {
   char version[96];
   int jit = 0;
   if (pcre2_config(PCRE2_CONFIG_VERSION, version) < 0) {
@@ -144,7 +144,7 @@ void f_pcre_version() {
   copy_and_push_string(version);
 }
 
-void f_pcre_config() {
+void f_pcre_config(int num_arg) {
   mapping_t* m = allocate_mapping(16);
   char buf[128];
   uint32_t u = 0;
@@ -194,12 +194,12 @@ void f_pcre_config() {
   push_refed_mapping(m);
 }
 
-void f_pcre_info() {
+void f_pcre_info(int num_arg) {
   pcre_options opts = default_pcre_options();
-  if (st_num_arg >= 2) {
+  if (num_arg >= 2) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
+    num_arg--;
   }
   if (sp->type != T_STRING) {
     error("Bad argument 1 to pcre_info()\n");
@@ -286,11 +286,11 @@ void f_pcre_info() {
   push_refed_mapping(m);
 }
 
-void f_pcre_convert() {
+void f_pcre_convert(int num_arg) {
   uint32_t cflags = PCRE2_CONVERT_UTF;
   int have_kind = 0;
 
-  if (st_num_arg < 2 || sp->type != T_MAPPING) {
+  if (num_arg < 2 || sp->type != T_MAPPING) {
     error("pcre_convert() requires a mapping of convert options (glob, posix_basic, or posix_extended).\n");
   }
 
@@ -342,26 +342,26 @@ void f_pcre_convert() {
   push_malloced_string(ret);
 }
 
-void f_pcre_match() {
+void f_pcre_match(int num_arg) {
   array_t* v;
   int flag = 0;
   pcre_options opts = default_pcre_options();
-  // The subject (1st arg) sits at sp - st_num_arg + 1 regardless of how
+  // The subject (1st arg) sits at sp - num_arg + 1 regardless of how
   // many optional trailing args (flag, pcre_flags) are present; reading
   // (sp - 1) here only happened to be correct for the 2-arg call form --
   // with a 3rd (or 4th) argument on the stack, sp - 1 is the pattern (or
   // flag) instead, always misidentifying array-mode calls as string-mode.
-  bool is_string = ((sp - st_num_arg + 1)->type == T_STRING);
+  bool is_string = ((sp - num_arg + 1)->type == T_STRING);
 
   // optional 4th arg: pcre_flags (int or mapping)
-  if (st_num_arg > 3) {
+  if (num_arg > 3) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
+    num_arg--;
   }
 
   // optional 3rd arg:
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     if (is_string) {
       apply_options_svalue(&opts, sp);
       pop_stack();
@@ -373,7 +373,7 @@ void f_pcre_match() {
     } else {
       error("Bad argument 3 to pcre_match()\n");
     }
-    st_num_arg--;
+    num_arg--;
   }
 
   if (is_string) {
@@ -391,27 +391,27 @@ void f_pcre_match() {
   }
 }
 
-void f_pcre_assoc() {
+void f_pcre_assoc(int num_arg) {
   svalue_t* arg;
   array_t* vec;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg == 5) {
+  if (num_arg == 5) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
+    num_arg--;
   }
 
-  arg = sp - st_num_arg + 1;
+  arg = sp - num_arg + 1;
 
   if ((arg + 2)->type != T_ARRAY) {
     error("Bad argument 3 to pcre_assoc()\n");
   }
 
-  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, st_num_arg > 3 ? (arg + 3) : &const0,
+  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, num_arg > 3 ? (arg + 3) : &const0,
                    opts);
 
-  if (st_num_arg == 4) {
+  if (num_arg == 4) {
     pop_3_elems();
   } else {
     pop_2_elems();
@@ -423,21 +423,21 @@ void f_pcre_assoc() {
   sp->u.arr = vec;
 }
 
-void f_pcre_extract() {
+void f_pcre_extract(int num_arg) {
   pcre_t* run;
   array_t* ret;
   int include_names = 0;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg >= 4) {
+  if (num_arg >= 4) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
+    num_arg--;
   }
 
-  svalue_t* arg = sp - st_num_arg + 1;
+  svalue_t* arg = sp - num_arg + 1;
 
-  if (st_num_arg == 3) {
+  if (num_arg == 3) {
     if ((arg + 2)->type == T_MAPPING) {
       apply_options_svalue(&opts, arg + 2);
     } else if ((arg + 2)->type == T_NUMBER) {
@@ -445,7 +445,7 @@ void f_pcre_extract() {
     } else {
       error("Bad argument 3 to pcre_extract()\n");
     }
-  } else if (st_num_arg != 2) {
+  } else if (num_arg != 2) {
     error("pcre_extract() requires 2 or 3 arguments\n");
   }
 
@@ -463,7 +463,7 @@ void f_pcre_extract() {
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     push_refed_array(&the_null_array);
     return;
   }
@@ -472,22 +472,22 @@ void f_pcre_extract() {
   }
 
   ret = pcre_get_substrings(run, include_names);
-  pop_n_elems(st_num_arg);
+  pop_n_elems(num_arg);
 
   push_refed_array(ret);
 }
 
-void f_pcre_replace() {
+void f_pcre_replace(int num_arg) {
   pcre_t* run;
   array_t* replacements;
 
   char* ret;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg >= 4) {
+  if (num_arg >= 4) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
+    num_arg--;
   }
 
   if (sp->type != T_ARRAY && sp->type != T_STRING) {
@@ -556,8 +556,8 @@ void f_pcre_replace() {
 }
 
 // string pcre_replace_callback(string, string, function)
-void f_pcre_replace_callback() {
-  int num_arg = st_num_arg, i;
+void f_pcre_replace_callback(int num_arg) {
+  int i;
   char* ret;
   pcre_t* run;
   svalue_t* arg;
@@ -568,7 +568,6 @@ void f_pcre_replace_callback() {
   if (num_arg >= 4 && (sp->type == T_NUMBER || sp->type == T_MAPPING)) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
     num_arg--;
   }
 
@@ -604,7 +603,7 @@ void f_pcre_replace_callback() {
   std::unique_ptr<array_t, decltype(&free_array)> arr_owner(arr, &free_array);
 
   if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
-    process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
+    process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK, num_arg);
   } else {  // 0
     error("Illegal third argument (0) to pcre_replace_callback");
   }
@@ -646,7 +645,7 @@ void f_pcre_replace_callback() {
   push_malloced_string(ret);
 }
 
-void f_pcre_cache() {
+void f_pcre_cache(int num_arg) {
   mapping_t* m = nullptr;
   m = pcre_get_cache();
   if (!m) {
@@ -1924,14 +1923,14 @@ void mark_pcre_cache() {
 }
 #endif
 
-void f_pcre_match_all() {
+void f_pcre_match_all(int num_arg) {
   array_t* v;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg >= 3) {
+  if (num_arg >= 3) {
     apply_options_svalue(&opts, sp);
     pop_stack();
-    st_num_arg--;
+    num_arg--;
   }
 
   const auto* pattern = (sp)->u.string;

@@ -12,12 +12,11 @@
  */
 
 #ifdef F_PROMISE_CREATE
-void f_promise_create() { push_refed_promise(promise_alloc()); }
+void f_promise_create(int num_arg) { push_refed_promise(promise_alloc()); }
 #endif
 
 #ifdef F_PROMISE_RESOLVE
-void f_promise_resolve() {
-  int const num_arg = st_num_arg;
+void f_promise_resolve(int num_arg) {
   svalue_t* parg = sp - num_arg + 1;
   promise_t* p = parg->u.prom;
 
@@ -45,8 +44,7 @@ void f_promise_resolve() {
 #endif
 
 #ifdef F_PROMISE_REJECT
-void f_promise_reject() {
-  int const num_arg = st_num_arg;
+void f_promise_reject(int num_arg) {
   svalue_t* parg = sp - num_arg + 1;
   promise_t* p = parg->u.prom;
 
@@ -131,8 +129,7 @@ static void promise_then_common(int num_arg, funptr_t* on_fulfilled, funptr_t* o
 }
 
 #ifdef F_PROMISE_THEN
-void f_promise_then() {
-  int const num_arg = st_num_arg;
+void f_promise_then(int num_arg) {
   svalue_t* parg = sp - num_arg + 1;
   funptr_t* on_fulfilled = (num_arg > 1) ? (parg + 1)->u.fp : nullptr;
   funptr_t* on_rejected = (num_arg > 2) ? (parg + 2)->u.fp : nullptr;
@@ -141,13 +138,13 @@ void f_promise_then() {
 #endif
 
 #ifdef F_PROMISE_CATCH
-void f_promise_catch() {
+void f_promise_catch(int num_arg) {
   promise_then_common(2, nullptr, sp->u.fp);
 }
 #endif
 
 #ifdef F_PROMISE_STATUS
-void f_promise_status() {
+void f_promise_status(int num_arg) {
   promise_t* p = sp->u.prom;
   int const state = p->state;
   free_svalue(sp, "f_promise_status");
@@ -156,7 +153,7 @@ void f_promise_status() {
 #endif
 
 #ifdef F_PROMISE_RESULT
-void f_promise_result() {
+void f_promise_result(int num_arg) {
   promise_t* p = sp->u.prom;
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
@@ -193,23 +190,23 @@ static void promise_combinator_efun(uint8_t kind) {
 }
 
 #ifdef F_PROMISE_ALL
-void f_promise_all() { promise_combinator_efun(PROMISE_COMB_ALL); }
+void f_promise_all(int num_arg) { promise_combinator_efun(PROMISE_COMB_ALL); }
 #endif
 
 #ifdef F_PROMISE_ANY
-void f_promise_any() { promise_combinator_efun(PROMISE_COMB_ANY); }
+void f_promise_any(int num_arg) { promise_combinator_efun(PROMISE_COMB_ANY); }
 #endif
 
 #ifdef F_PROMISE_RACE
-void f_promise_race() { promise_combinator_efun(PROMISE_COMB_RACE); }
+void f_promise_race(int num_arg) { promise_combinator_efun(PROMISE_COMB_RACE); }
 #endif
 
 #ifdef F_PROMISE_ALL_SETTLED
-void f_promise_all_settled() { promise_combinator_efun(PROMISE_COMB_ALL_SETTLED); }
+void f_promise_all_settled(int num_arg) { promise_combinator_efun(PROMISE_COMB_ALL_SETTLED); }
 #endif
 
 #ifdef F_PROMISE_CANCEL
-void f_promise_cancel() {
+void f_promise_cancel(int num_arg) {
   /* validated (and possibly error()ed) before the stack is touched */
   int const armed = promise_request_cancel(sp->u.prom);
 
@@ -219,7 +216,7 @@ void f_promise_cancel() {
 #endif
 
 #ifdef F_PROMISEP
-void f_promisep() {
+void f_promisep(int num_arg) {
   /* the argument is `mixed`, so unlike the rest of this file the tag has
    * NOT been validated for us -- that is the question being asked */
   if (sp->type == T_PROMISE) {
@@ -233,14 +230,14 @@ void f_promisep() {
 #endif
 
 #ifdef F_ASYNC_YIELD
-void f_async_yield() {
+void f_async_yield(int num_arg) {
   /* No arguments, so nothing to pop: STACK_INC and write the result. */
   push_refed_promise(promise_async_yield());
 }
 #endif
 
 #ifdef F_ASYNC_INFO
-void f_async_info() {
+void f_async_info(int num_arg) {
   /* async_info()  -> one mapping per suspended coroutine (the original form)
    * async_info(1) -> scheduler counters, including the drain's yield count,
    *                  which is the only portable way to observe that the

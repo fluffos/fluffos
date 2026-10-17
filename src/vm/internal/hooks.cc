@@ -1035,7 +1035,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     return HookRun::Skipped;
   }
 
-  int const num_arg_saved = st_num_arg;
   auto const t0 = std::chrono::steady_clock::now();
   bool const outermost = !g_hook_depth++;
   object_t* ci = current_interactive;
@@ -1098,7 +1097,7 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     free_object(&hb, "hook");
   }
   restore_simulate(sim);
-  st_num_arg = num_arg_saved;
+  /* Arity is a call_function_pointer parameter — no st_num_arg to restore. */
 
   if (exempt) {
     int64_t const h = us_since(t0);
@@ -2444,8 +2443,8 @@ void hooks_mark_frame_for_after(object_t* filter_target) {
   }
 }
 
-void f_hook_proceed() {
-  int const num = st_num_arg;
+void f_hook_proceed(int num_arg) {
+  int const num = num_arg;
   if (!g_around.active) {
     error("hook_proceed: no active HOOK_AROUND handler.\n");
   }

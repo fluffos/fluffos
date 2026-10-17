@@ -166,7 +166,6 @@ extern int variable_index_offset;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
 extern int num_varargs;
-extern int st_num_arg;
 
 extern ref_t* global_ref_list;
 extern int lv_owner_type;
@@ -236,7 +235,9 @@ void remove_fake_frame(void);
 void push_indexed_lvalue(int);
 void setup_variables(int, int, int);
 
-void process_efun_callback(int, function_to_call_t*, int);
+/* argc is this efun's arity — never read a global; nested LPC clobbers any
+ * bare arity scratch (AGENTS.md §13.16). */
+void process_efun_callback(int narg, function_to_call_t* ftc, int f, int argc);
 svalue_t* call_efun_callback(function_to_call_t*, int);
 svalue_t* safe_call_efun_callback(function_to_call_t*, int);
 const char* type_name(int c);

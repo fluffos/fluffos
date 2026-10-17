@@ -6,7 +6,7 @@
 #endif
 
 #ifdef F_SYS_NETWORK_PORTS
-void f_sys_network_ports() {
+void f_sys_network_ports(int num_arg) {
   array_t* info;
   int i = 0, p = 0;
 
@@ -52,7 +52,7 @@ void f_sys_network_ports() {
 #endif
 
 #ifdef F_SYS_RELOAD_TLS
-void f_sys_reload_tls() {
+void f_sys_reload_tls(int num_arg) {
   auto port_index_display = sp->u.number;
   auto port_index = port_index_display - 1;
 

@@ -3,11 +3,11 @@
 #include "base/package_api.h"
 
 #ifdef F_SAVE_OBJECT
-void f_save_object() {
+void f_save_object(int num_arg) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int flag;
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     flag = (sp--)->u.number;
     if (sp->type != T_STRING) {
       error("first argument must be a string for save_object with 2 args");
@@ -16,17 +16,17 @@ void f_save_object() {
     flag = 0;
   }
 
-  if (st_num_arg == 1 && sp->type == T_NUMBER) {
+  if (num_arg == 1 && sp->type == T_NUMBER) {
     flag = sp->u.number;
   }
 
-  if (st_num_arg && sp->type == T_STRING) {
+  if (num_arg && sp->type == T_STRING) {
     flag = save_object(current_object, sp->u.string, flag);
 
     free_string_svalue(sp);
     put_number(flag);
   } else {
-    pop_n_elems(st_num_arg);
+    pop_n_elems(num_arg);
     char* saved = new_string(max_string_length, "save_object_str");
     push_malloced_string(saved);
     int const left = max_string_length;
@@ -63,7 +63,7 @@ char* save_variable(svalue_t* var) {
 }
 
 #ifdef F_SAVE_VARIABLE
-void f_save_variable() {
+void f_save_variable(int num_arg) {
   char* p;
 
   p = save_variable(sp);
@@ -73,10 +73,10 @@ void f_save_variable() {
 #endif
 
 #ifdef F_RESTORE_OBJECT
-void f_restore_object() {
+void f_restore_object(int num_arg) {
   int flag;
 
-  flag = (st_num_arg > 1) ? (sp--)->u.number : 0;
+  flag = (num_arg > 1) ? (sp--)->u.number : 0;
 
   flag = restore_object(current_object, sp->u.string, flag);
 
@@ -86,7 +86,7 @@ void f_restore_object() {
 #endif
 
 #ifdef F_RESTORE_VARIABLE
-void f_restore_variable() {
+void f_restore_variable(int num_arg) {
   svalue_t v;
 
   unlink_string_svalue(sp);

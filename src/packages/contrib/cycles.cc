@@ -487,7 +487,7 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
 #endif  // any of the three efuns
 
 #ifdef F_HAS_CYCLE
-void f_has_cycle() {
+void f_has_cycle(int num_arg) {
   WalkResult res;
   cycle_walk(sp, WALK_DETECT, &res);
   free_svalue(sp, "f_has_cycle");
@@ -496,7 +496,7 @@ void f_has_cycle() {
 #endif
 
 #ifdef F_FIND_CYCLES
-void f_find_cycles() {
+void f_find_cycles(int num_arg) {
   WalkResult res;
   cycle_walk(sp, WALK_FIND, &res);
   // May error("Illegal array size") if there are more back-edges than
@@ -514,7 +514,7 @@ void f_find_cycles() {
 #endif
 
 #ifdef F_BREAK_CYCLES
-void f_break_cycles() {
+void f_break_cycles(int num_arg) {
   WalkResult res;
   cycle_walk(sp, WALK_BREAK, &res);
 

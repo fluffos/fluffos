@@ -80,7 +80,6 @@ bool dump_vm_state() {
   std::cout << prefix << "pc = " << print_pc(current_prog, pc) << "\n";
   std::cout << prefix << "fp = " << (void*)fp << " (sp - " << (sp - fp) << ")" << "\n";
   std::cout << prefix << "sp = " << (void*)sp << "\n";
-  std::cout << prefix << "st_num_arg = " << st_num_arg << "\n";
 
   // Dump current stack
   std::cout << "current stack:\n";

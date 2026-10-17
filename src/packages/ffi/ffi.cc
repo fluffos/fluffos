@@ -455,7 +455,7 @@ void free_callback(FfiCallback* cb) {
 // ===========================================================================
 
 #ifdef F_FFI_LOAD
-void f_ffi_load() {
+void f_ffi_load(int num_arg) {
   const char* path = sp->u.string;
   if (!library_allowed(path)) {
     error("FFI: library '%s' is not in the configured allow-list.\n", path);
@@ -478,7 +478,7 @@ void f_ffi_load() {
 #endif
 
 #ifdef F_FFI_UNLOAD
-void f_ffi_unload() {
+void f_ffi_unload(int num_arg) {
   int id = sp->u.number;
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
@@ -500,7 +500,7 @@ void f_ffi_unload() {
 #endif
 
 #ifdef F_FFI_SYMBOL
-void f_ffi_symbol() {
+void f_ffi_symbol(int num_arg) {
   const char* name = sp->u.string;
   int id = (sp - 1)->u.number;
   check_valid_ffi("symbol", sp);
@@ -517,7 +517,7 @@ void f_ffi_symbol() {
 #endif
 
 #ifdef F_FFI_PREPARE
-void f_ffi_prepare() {
+void f_ffi_prepare(int num_arg) {
   array_t* arg_arr = sp->u.arr;
   int ret_code = (sp - 1)->u.number;
   const char* name = (sp - 2)->u.string;
@@ -563,7 +563,7 @@ void f_ffi_prepare() {
 #endif
 
 #ifdef F_FFI_CALL
-void f_ffi_call() {
+void f_ffi_call(int num_arg) {
   array_t* args = sp->u.arr;
   int func_id = (sp - 1)->u.number;
 
@@ -605,7 +605,7 @@ void f_ffi_call() {
 #endif
 
 #ifdef F_FFI_ALLOC
-void f_ffi_alloc() {
+void f_ffi_alloc(int num_arg) {
   LPC_INT nbytes = sp->u.number;
   if (nbytes < 0) {
     error("ffi_alloc: negative size.\n");
@@ -617,7 +617,7 @@ void f_ffi_alloc() {
 #endif
 
 #ifdef F_FFI_FREE
-void f_ffi_free() {
+void f_ffi_free(int num_arg) {
   // The buffer is GC-managed; "freeing" zeroes it so a dangling native
   // reader sees no stale data. The block is reclaimed when no LPC value
   // references it.
@@ -630,7 +630,7 @@ void f_ffi_free() {
 #endif
 
 #ifdef F_FFI_SIZEOF
-void f_ffi_sizeof() {
+void f_ffi_sizeof(int num_arg) {
   int code = sp->u.number;
   int sz = type_size(code);
   pop_stack();
@@ -639,7 +639,7 @@ void f_ffi_sizeof() {
 #endif
 
 #ifdef F_FFI_PEEK
-void f_ffi_peek() {
+void f_ffi_peek(int num_arg) {
   // Gated like load/prepare: reading an arbitrary native address is a
   // process-memory disclosure primitive, so the master must approve it
   // even though no foreign code runs.
@@ -668,7 +668,7 @@ void f_ffi_peek() {
 #endif
 
 #ifdef F_FFI_ADDRESS
-void f_ffi_address() {
+void f_ffi_address(int num_arg) {
   buffer_t* buf = sp->u.buf;
   LPC_INT addr = buf->size ? reinterpret_cast<LPC_INT>(&buf->item[0]) : 0;
   pop_stack();
@@ -677,7 +677,7 @@ void f_ffi_address() {
 #endif
 
 #ifdef F_FFI_READ
-void f_ffi_read() {
+void f_ffi_read(int num_arg) {
   int code = sp->u.number;
   LPC_INT offset = (sp - 1)->u.number;
   buffer_t* buf = (sp - 2)->u.buf;
@@ -733,7 +733,7 @@ void f_ffi_read() {
 #endif
 
 #ifdef F_FFI_WRITE
-void f_ffi_write() {
+void f_ffi_write(int num_arg) {
   svalue_t* val = sp;
   int code = (sp - 1)->u.number;
   LPC_INT offset = (sp - 2)->u.number;
@@ -751,7 +751,7 @@ void f_ffi_write() {
 #endif
 
 #ifdef F_FFI_STRUCT_LAYOUT
-void f_ffi_struct_layout() {
+void f_ffi_struct_layout(int num_arg) {
   array_t* fields = sp->u.arr;
   int n = fields->size;
 
@@ -798,7 +798,7 @@ void f_ffi_struct_layout() {
 #endif
 
 #ifdef F_FFI_CALLBACK
-void f_ffi_callback() {
+void f_ffi_callback(int num_arg) {
   array_t* arg_arr = sp->u.arr;
   int ret_code = (sp - 1)->u.number;
   svalue_t* fun_sv = sp - 2;  // T_FUNCTION
@@ -848,7 +848,7 @@ void f_ffi_callback() {
 #endif
 
 #ifdef F_FFI_CALLBACK_ADDR
-void f_ffi_callback_addr() {
+void f_ffi_callback_addr(int num_arg) {
   int id = sp->u.number;
   auto it = g_callbacks.find(id);
   if (it == g_callbacks.end()) {
@@ -861,7 +861,7 @@ void f_ffi_callback_addr() {
 #endif
 
 #ifdef F_FFI_CALLBACK_FREE
-void f_ffi_callback_free() {
+void f_ffi_callback_free(int num_arg) {
   int id = sp->u.number;
   auto it = g_callbacks.find(id);
   if (it != g_callbacks.end()) {
@@ -881,14 +881,14 @@ void f_ffi_callback_free() {
 #endif
 
 #ifdef F_FFI_ERROR
-void f_ffi_error() {
+void f_ffi_error(int num_arg) {
   const char* msg = g_last_error.c_str();
   push_malloced_string(string_copy(msg, "f_ffi_error"));
 }
 #endif
 
 #ifdef F_FFI_STATUS
-void f_ffi_status() {
+void f_ffi_status(int num_arg) {
   mapping_t* m = allocate_mapping(4);
   add_mapping_pair(m, "libraries", static_cast<long>(g_libs.size()));
   add_mapping_pair(m, "functions", static_cast<long>(g_funcs.size()));

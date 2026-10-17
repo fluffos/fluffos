@@ -51,12 +51,12 @@ inline std::string& trim_func(std::string& s, const std::string& charset) {
 
 using trim_func_type = std::string&(std::string&, const std::string&);
 
-inline void trim_impl(trim_func_type* func) {
+inline void trim_impl(trim_func_type* func, int num_arg) {
   std::string charset;
 
   // If use 2 arguments, we get characters to remove and positioning in previous
   // parameter.
-  if (st_num_arg == 2) {
+  if (num_arg == 2) {
     charset = sp->u.string;
     pop_stack();
   }
@@ -75,13 +75,13 @@ inline void trim_impl(trim_func_type* func) {
 }  // namespace
 
 #ifdef F_TRIM
-void f_trim() { trim_impl(&trim_func); }
+void f_trim(int num_arg) { trim_impl(&trim_func, num_arg); }
 #endif
 
 #ifdef F_LTRIM
-void f_ltrim() { trim_impl(&ltrim_func); }
+void f_ltrim(int num_arg) { trim_impl(&ltrim_func, num_arg); }
 #endif
 
 #ifdef F_RTRIM
-void f_rtrim() { trim_impl(&rtrim_func); }
+void f_rtrim(int num_arg) { trim_impl(&rtrim_func, num_arg); }
 #endif

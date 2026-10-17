@@ -14,8 +14,8 @@
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-void f_socket_create() {
-  int fd, num_arg = st_num_arg;
+void f_socket_create(int num_arg) {
+  int fd;
   svalue_t* arg;
 
   arg = sp - num_arg + 1;
@@ -38,8 +38,8 @@ void f_socket_create() {
 #endif
 
 #ifdef F_SOCKET_BIND
-void f_socket_bind() {
-  int i, fd, port, num_arg = st_num_arg;
+void f_socket_bind(int num_arg) {
+  int i, fd, port;
   svalue_t* arg;
   char addr[ADDR_BUF_SIZE];
 
@@ -63,7 +63,7 @@ void f_socket_bind() {
 #endif
 
 #ifdef F_SOCKET_LISTEN
-void f_socket_listen() {
+void f_socket_listen(int num_arg) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -82,7 +82,7 @@ void f_socket_listen() {
 #endif
 
 #ifdef F_SOCKET_ACCEPT
-void f_socket_accept() {
+void f_socket_accept(int num_arg) {
   int port, fd;
   char addr[ADDR_BUF_SIZE];
 
@@ -97,7 +97,7 @@ void f_socket_accept() {
 #endif
 
 #ifdef F_SOCKET_CONNECT
-void f_socket_connect() {
+void f_socket_connect(int num_arg) {
   int i, fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -148,12 +148,10 @@ void f_socket_connect() {
 #endif
 
 #ifdef F_SOCKET_WRITE
-void f_socket_write() {
+void f_socket_write(int num_arg) {
   int i, fd, port;
   svalue_t* arg;
   char addr[ADDR_BUF_SIZE];
-  int const num_arg = st_num_arg;
-
   arg = sp - num_arg + 1;
   if ((num_arg == 3) && (arg[2].type != T_STRING)) {
     bad_arg(3, F_SOCKET_WRITE);
@@ -173,7 +171,7 @@ void f_socket_write() {
 #endif
 
 #ifdef F_SOCKET_CLOSE
-void f_socket_close() {
+void f_socket_close(int num_arg) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -185,7 +183,7 @@ void f_socket_close() {
 #endif
 
 #ifdef F_SOCKET_RELEASE
-void f_socket_release() {
+void f_socket_release(int num_arg) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -208,7 +206,7 @@ void f_socket_release() {
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
-void f_socket_acquire() {
+void f_socket_acquire(int num_arg) {
   int fd, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -230,11 +228,11 @@ void f_socket_acquire() {
 #endif
 
 #ifdef F_SOCKET_ERROR
-void f_socket_error() { put_constant_string(socket_error(sp->u.number)); }
+void f_socket_error(int num_arg) { put_constant_string(socket_error(sp->u.number)); }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
-void f_socket_address() {
+void f_socket_address(int num_arg) {
   char* str;
   int local, port;
   char addr[ADDR_BUF_SIZE];
@@ -276,11 +274,11 @@ void f_socket_address() {
 #endif
 
 #ifdef F_SOCKET_STATUS
-void f_socket_status() {
+void f_socket_status(int num_arg) {
   array_t* info;
   int i;
 
-  if (st_num_arg) {
+  if (num_arg) {
     info = socket_status(sp->u.number);
 
     if (!info) {
@@ -317,7 +315,7 @@ void check_socket_option_access(const char* efun, int lpc_sock) {
 #endif
 
 #ifdef F_SOCKET_SET_OPTION
-void f_socket_set_option() {
+void f_socket_set_option(int num_arg) {
   auto lpc_sock = (sp - 2)->u.number;
   auto option = (sp - 1)->u.number;
   auto* arg = sp;
@@ -360,7 +358,7 @@ void f_socket_set_option() {
 #endif
 
 #ifdef F_SOCKET_GET_OPTION
-void f_socket_get_option() {
+void f_socket_get_option(int num_arg) {
   // socket_get_option(int, int) takes TWO arguments: the socket is at sp - 1
   // and the option at sp (the old sp - 2 / sp - 1 pair was copied from the
   // three-argument setter and read the svalue below this frame as the

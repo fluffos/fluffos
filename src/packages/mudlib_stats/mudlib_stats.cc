@@ -17,10 +17,10 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-void f_domain_stats() {
+void f_domain_stats(int num_arg) {
   mapping_t* m;
 
-  if (st_num_arg) {
+  if (num_arg) {
     m = get_domain_stats(sp->u.string);
     free_string_svalue(sp--);
   } else {
@@ -36,17 +36,17 @@ void f_domain_stats() {
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author() {
+void f_set_author(int num_arg) {
   set_author(sp->u.string);
   free_string_svalue(sp--);
 }
 #endif
 
 #ifdef F_AUTHOR_STATS
-void f_author_stats() {
+void f_author_stats(int num_arg) {
   mapping_t* m;
 
-  if (st_num_arg) {
+  if (num_arg) {
     m = get_author_stats(sp->u.string);
     free_string_svalue(sp--);
   } else {

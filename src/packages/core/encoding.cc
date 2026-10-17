@@ -7,9 +7,9 @@ const char* default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
-void f_set_encoding() {
+void f_set_encoding(int num_arg) {
   if (!command_giver || !command_giver->interactive) {
-    if (st_num_arg) {
+    if (num_arg) {
       pop_stack();
     }
     push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
@@ -19,7 +19,7 @@ void f_set_encoding() {
   auto* ip = command_giver->interactive;
 
   // Reset to no-transcoding
-  if (!st_num_arg) {
+  if (!num_arg) {
     if (ip && ip->trans) {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
@@ -64,9 +64,9 @@ void f_set_encoding() {
 #endif
 
 #ifdef F_QUERY_ENCODING
-void f_query_encoding() {
+void f_query_encoding(int num_arg) {
   if (!command_giver || !command_giver->interactive) {
-    if (st_num_arg) {
+    if (num_arg) {
       pop_stack();
     }
     push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
@@ -92,7 +92,7 @@ void f_query_encoding() {
 #endif
 
 #ifdef F_STRING_ENCODE
-void f_string_encode() {
+void f_string_encode(int num_arg) {
   const auto* encoding = sp->u.string;
   const auto* data = (sp - 1)->u.string;
   auto len = SVALUE_STRLEN(sp - 1);
@@ -132,7 +132,7 @@ void f_string_encode() {
 #endif
 
 #ifdef F_STRING_DECODE
-void f_string_decode() {
+void f_string_decode(int num_arg) {
   const auto* encoding = sp->u.string;
   auto* data = (char*)((sp - 1)->u.buf->item);
   auto len = (sp - 1)->u.buf->size;
@@ -174,7 +174,7 @@ void f_string_decode() {
 #endif
 
 #ifdef F_BUFFER_TRANSCODE
-void f_buffer_transcode() {
+void f_buffer_transcode(int num_arg) {
   const auto* to_encoding = sp->u.string;
   const auto* from_encoding = (sp - 1)->u.string;
   auto* data = (char*)((sp - 2)->u.buf->item);

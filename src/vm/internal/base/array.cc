@@ -606,7 +606,7 @@ void filter_array(svalue_t* arg, int num_arg) {
     int res = 0, cnt;
     function_to_call_t ftc;
 
-    process_efun_callback(1, &ftc, F_FILTER);
+    process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
     /* allocate a full size array and push it onto the stack so that if an
      * error occurs, it'll get cleaned up.  can't use empty array because
@@ -652,7 +652,7 @@ void filter_string(svalue_t* arg, int num_arg) {
     size = SVALUE_STRLEN(arg);
     str = const_cast<char*>(arg->u.string);
 
-    process_efun_callback(1, &ftc, F_FILTER);
+    process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
     for (cnt = 0; cnt < size; cnt++) {
       push_number(str[cnt]);
@@ -757,9 +757,9 @@ static void unique_array_error_handler(void) {
   FREE((char*)unlist);
 }
 
-void f_unique_array(void) {
+void f_unique_array(int num_arg) {
   array_t *v, *ret;
-  long size, i, numkeys = 0, num_arg = st_num_arg;
+  long size, i, numkeys = 0;
   int* ind;
   svalue_t *skipval, *sv, *svp;
   unique_list_t* unlist;
@@ -1017,7 +1017,7 @@ void map_array(svalue_t* arg, int num_arg) {
     int cnt;
     svalue_t* v;
 
-    process_efun_callback(1, &ftc, F_MAP);
+    process_efun_callback(1, &ftc, F_MAP, num_arg);
 
     r = int_allocate_array(size);
 
@@ -1202,11 +1202,9 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
   }
 }
 
-void f_sort_array(void) {
-  svalue_t* arg = sp - st_num_arg + 1;
+void f_sort_array(int num_arg) {
+  svalue_t* arg = sp - num_arg + 1;
   array_t* tmp = arg->u.arr;
-  int num_arg = st_num_arg;
-
   check_for_destr(tmp);
 
   switch (arg[1].type) {
@@ -1229,7 +1227,7 @@ void f_sort_array(void) {
 
       old_ptr = sort_array_ftc;
       sort_array_ftc = &ftc;
-      process_efun_callback(1, &ftc, F_SORT_ARRAY);
+      process_efun_callback(1, &ftc, F_SORT_ARRAY, num_arg);
 
       tmp = copy_array(tmp);
       push_refed_array(tmp);
@@ -2123,7 +2121,7 @@ array_t* livings() {
 #endif
 
 #ifdef F_OBJECTS
-void f_objects(void) {
+void f_objects(int num_arg) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2131,9 +2129,6 @@ void f_objects(void) {
   object_t** list;
   array_t* ret;
   funptr_t* f = nullptr;
-
-  int num_arg = st_num_arg;
-
   if (!num_arg) {
     func = nullptr;
   } else if (sp->type == T_FUNCTION) {

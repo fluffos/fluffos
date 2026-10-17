@@ -6,7 +6,7 @@
 
 /* TELNET */
 #ifdef F_REQUEST_TERM_TYPE
-void f_request_term_type() {
+void f_request_term_type(int num_arg) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_request_ttype(ip->telnet);
@@ -19,7 +19,7 @@ void f_request_term_type() {
 #endif
 
 #ifdef F_START_REQUEST_TERM_TYPE
-void f_start_request_term_type() {
+void f_start_request_term_type(int num_arg) {
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
@@ -33,11 +33,11 @@ void f_start_request_term_type() {
 #endif
 
 #ifdef F_REQUEST_TERM_SIZE
-void f_request_term_size() {
+void f_request_term_size(int num_arg) {
   auto* ip = current_object->interactive;
 
   if (ip && ip->telnet) {
-    if ((st_num_arg == 1) && (sp->u.number == 0)) {
+    if ((num_arg == 1) && (sp->u.number == 0)) {
       telnet_dont_naws(ip->telnet);
     } else {
       telnet_do_naws(ip->telnet);
@@ -47,14 +47,14 @@ void f_request_term_size() {
     debug_message(
         "Warning: wrong usage. request_term_size() should only be called by a user object.\n");
   }
-  if (st_num_arg == 1) {
+  if (num_arg == 1) {
     sp--;
   }
 }
 #endif
 
 #ifdef F_TELNET_NOP
-void f_telnet_nop() {
+void f_telnet_nop(int num_arg) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_nop(ip->telnet);
@@ -66,7 +66,7 @@ void f_telnet_nop() {
 #endif
 
 #ifdef F_TELNET_GA
-void f_telnet_ga() {
+void f_telnet_ga(int num_arg) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_ga(ip->telnet);
@@ -79,7 +79,7 @@ void f_telnet_ga() {
 
 /* MXP */
 #ifdef F_HAS_MXP
-void f_has_mxp() {
+void f_has_mxp(int num_arg) {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -92,7 +92,7 @@ void f_has_mxp() {
 #endif
 
 #ifdef F_ACT_MXP
-void f_act_mxp() {
+void f_act_mxp(int num_arg) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     // start MXP
@@ -106,7 +106,7 @@ void f_act_mxp() {
 /* GMCP */
 
 #ifdef F_HAS_GMCP
-void f_has_gmcp() {
+void f_has_gmcp(int num_arg) {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -119,7 +119,7 @@ void f_has_gmcp() {
 #endif
 
 #ifdef F_SEND_GMCP
-void f_send_gmcp() {
+void f_send_gmcp(int num_arg) {
   auto* ip = current_object->interactive;
   const auto* data = sp->u.string;
   auto len = SVALUE_STRLEN(sp);
@@ -138,7 +138,7 @@ void f_send_gmcp() {
 /* MSP */
 
 #ifdef F_HAS_MSP
-void f_has_msp() {
+void f_has_msp(int num_arg) {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -153,7 +153,7 @@ void f_has_msp() {
 /* MSDP */
 
 #ifdef F_HAS_MSDP
-void f_has_msdp() {
+void f_has_msdp(int num_arg) {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -168,7 +168,7 @@ void f_has_msdp() {
 #ifdef F_SEND_MSDP_VARIABLE
 /** TODO update to support sending other value type and use proper MSDP mapping/array formats as
  * needed based on data types */
-void f_send_msdp_variable() {
+void f_send_msdp_variable(int num_arg) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     switch (sp->type) {
@@ -212,7 +212,7 @@ void f_send_msdp_variable() {
 /* ZMP */
 
 #ifdef F_HAS_ZMP
-void f_has_zmp() {
+void f_has_zmp(int num_arg) {
   int i = 0;
 
   if (sp->u.ob->interactive) {
@@ -225,7 +225,7 @@ void f_has_zmp() {
 #endif
 
 #ifdef F_SEND_ZMP
-void f_send_zmp() {
+void f_send_zmp(int num_arg) {
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_begin_zmp(ip->telnet, (sp - 1)->u.string);
@@ -247,7 +247,7 @@ void f_send_zmp() {
 #endif
 
 #ifdef F_TELNET_MSP_OOB
-void f_telnet_msp_oob() {
+void f_telnet_msp_oob(int num_arg) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_msp_oob(ip, sp->u.string, SVALUE_STRLEN(sp));

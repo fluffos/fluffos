@@ -19,7 +19,7 @@ static object_t* ob;
 
 #ifdef F_EXPORT_UID
 
-void f_export_uid() {
+void f_export_uid(int num_arg) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
@@ -38,7 +38,7 @@ void f_export_uid() {
 
 #ifdef F_GETEUID
 
-void f_geteuid() {
+void f_geteuid(int num_arg) {
   if (sp->type & T_OBJECT) {
     ob = sp->u.ob;
     if (ob->euid) {
@@ -66,7 +66,7 @@ void f_geteuid() {
 
 #ifdef F_GETUID
 
-void f_getuid() {
+void f_getuid(int num_arg) {
   ob = sp->u.ob;
 
   if (!ob->uid) {
@@ -81,7 +81,7 @@ void f_getuid() {
 
 #ifdef F_SETEUID
 
-void f_seteuid() {
+void f_seteuid(int num_arg) {
   svalue_t* arg;
   svalue_t* ret;
 

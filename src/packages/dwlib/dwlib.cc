@@ -234,36 +234,36 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
   }
 } /* query_multiple_short() */
 
-void f_query_multiple_short() {
-  svalue_t* sv = sp - st_num_arg + 1;
+void f_query_multiple_short(int num_arg) {
+  svalue_t* sv = sp - num_arg + 1;
   const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
-  if (st_num_arg > 4) {
+  if (num_arg > 4) {
     if (sv[4].type == T_NUMBER) {
       dark = sv[4].u.number;
     }
   }
 
-  if (st_num_arg > 3) {
+  if (num_arg > 3) {
     if (sv[3].type == T_NUMBER) {
       quiet = sv[3].u.number;
     }
   }
 
-  if (st_num_arg > 2) {
+  if (num_arg > 2) {
     if (sv[2].type == T_NUMBER) {
       no_dollars = sv[2].u.number;
     }
   }
 
-  if (st_num_arg >= 2) {
+  if (num_arg >= 2) {
     if (sv[1].type == T_STRING) {
       type = sv[1].u.string;
     }
   }
 
-  query_multiple_short(sv, type, no_dollars, quiet, dark, st_num_arg);
+  query_multiple_short(sv, type, no_dollars, quiet, dark, num_arg);
 }
 
 /* Hideous mangling of C code by Taffyd. */
@@ -443,14 +443,12 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   return ret;
 }
 
-void f_reference_allowed() {
-  svalue_t* sv = sp - st_num_arg + 1;
+void f_reference_allowed(int num_arg) {
+  svalue_t* sv = sp - num_arg + 1;
   object_t* referee = nullptr;
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
   int result = 0;
-  int const num_arg = st_num_arg;
-
   /* Maybe I could learn how to use this :p
    CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
 
@@ -462,7 +460,7 @@ void f_reference_allowed() {
     referee = sv->u.ob;
   }
 
-  if (st_num_arg > 1) {
+  if (num_arg > 1) {
     if (sv[1].type == T_STRING && sv[1].u.string) {
 /* We've been passed in a string, now we need to call
  * find_player() */
@@ -504,7 +502,7 @@ void f_reference_allowed() {
   }
 }
 
-void f_add_a() {
+void f_add_a(int num_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   const char* str = sp->u.string;
   char* ret;
@@ -590,7 +588,7 @@ void f_add_a() {
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
-void f_vowel() {
+void f_vowel(int num_arg) {
   char const v = (char)sp->u.number;
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
@@ -601,12 +599,12 @@ void f_vowel() {
   }
 }
 
-void f_replace() {
-  svalue_t* arg2 = sp - st_num_arg + 2;
-  if (arg2->type == T_STRING && st_num_arg == 3) {
-    return f_replace_string();
+void f_replace(int num_arg) {
+  svalue_t* arg2 = sp - num_arg + 2;
+  if (arg2->type == T_STRING && num_arg == 3) {
+    return f_replace_string(num_arg);
   }
-  if (st_num_arg == 2 && arg2->type != T_STRING) {
+  if (num_arg == 2 && arg2->type != T_STRING) {
     array_t* arr = arg2->u.arr;
     int i = 0;
     if (arr->size & 1) {
@@ -618,8 +616,8 @@ void f_replace() {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
         share_and_push_string(arr->item[i].u.string);
         share_and_push_string(arr->item[i + 1].u.string);
-        st_num_arg = 3;
-        f_replace_string();
+        num_arg = 3;
+        f_replace_string(num_arg);
         if (sp->type != T_STRING) {
           break;
         }
@@ -676,11 +674,11 @@ void replace_mxp_html(int html, int mxp) {
   push_malloced_string(extend_string(dst, dst2 - dst));
 }
 
-void f_replace_html() { replace_mxp_html(1, 0); }
+void f_replace_html(int num_arg) { replace_mxp_html(1, 0); }
 
-void f_replace_mxp() { replace_mxp_html(0, 1); }
+void f_replace_mxp(int num_arg) { replace_mxp_html(0, 1); }
 
-void f_roulette_wheel() {
+void f_roulette_wheel(int num_arg) {
   long num;
   mapping_t* m = sp->u.map;
   int j, found;
@@ -808,7 +806,7 @@ svalue_t* replace_objects(svalue_t* thing) {
   }
 }
 
-void f_replace_objects() {
+void f_replace_objects(int num_arg) {
   assign_svalue(sp, replace_objects(sp));
   // replace_tmp is a module-global scratch slot; drop its lingering ref
   // once the result is on the stack so nothing stays unaccounted between
@@ -817,7 +815,7 @@ void f_replace_objects() {
   replace_tmp = const0;
 }
 
-void f_replace_dollars() {
+void f_replace_dollars(int num_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;
