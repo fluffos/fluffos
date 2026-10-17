@@ -541,7 +541,7 @@ void demo_net_rw_api() {
   ASSERT_EQ(hook_query(sid)["point"], "net:telnet");
   int lid = hook_attach("net:tls",
     function(int hid, object user, int port, string ver, string cipher,
-             string outcome) {},
+      string outcome) {},
     ([ "label": "tls-api" ]), HOOK_AFTER);
   ASSERT_EQ(hook_query(lid)["point"], "net:tls");
   int did = hook_attach("net:resolve",
@@ -551,7 +551,7 @@ void demo_net_rw_api() {
   /* kind 0 normalizes to AFTER for observe-only net points */
   int lid0 = hook_attach("net:tls",
     function(int hid, object user, int port, string ver, string cipher,
-             string outcome) {},
+      string outcome) {},
     ([ "label": "tls-kind0" ]), 0);
   ASSERT(lid0 > 0);
   hook_detach(rid);

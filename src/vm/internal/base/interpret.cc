@@ -4196,8 +4196,12 @@ void eval_instruction(char* p) {
               pop_n_elems(pushed_args);
               if (answered.type == T_STRING) {
                 char buf[1024];
-                strncpy(buf, answered.u.string, sizeof(buf) - 1);
-                buf[sizeof(buf) - 1] = '\0';
+                size_t n = SVALUE_STRLEN(&answered);
+                if (n >= sizeof(buf)) {
+                  n = sizeof(buf) - 1;
+                }
+                memcpy(buf, answered.u.string, n);
+                buf[n] = '\0';
                 free_svalue(&answered, "function hook refuse");
                 error("%s", buf);
               }
@@ -4290,8 +4294,12 @@ void eval_instruction(char* p) {
               pop_n_elems(pushed_args);
               if (answered.type == T_STRING) {
                 char buf[1024];
-                strncpy(buf, answered.u.string, sizeof(buf) - 1);
-                buf[sizeof(buf) - 1] = '\0';
+                size_t n = SVALUE_STRLEN(&answered);
+                if (n >= sizeof(buf)) {
+                  n = sizeof(buf) - 1;
+                }
+                memcpy(buf, answered.u.string, n);
+                buf[n] = '\0';
                 free_svalue(&answered, "function hook refuse");
                 error("%s", buf);
               }
@@ -5641,8 +5649,12 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
         pop_n_elems(num_arg);
         if (answered.type == T_STRING) {
           char buf[1024];
-          strncpy(buf, answered.u.string, sizeof(buf) - 1);
-          buf[sizeof(buf) - 1] = '\0';
+          size_t n = SVALUE_STRLEN(&answered);
+          if (n >= sizeof(buf)) {
+            n = sizeof(buf) - 1;
+          }
+          memcpy(buf, answered.u.string, n);
+          buf[n] = '\0';
           free_svalue(&answered, "function hook refuse");
           error("%s", buf);
         }

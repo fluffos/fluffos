@@ -169,8 +169,8 @@ PointId parse_point(const char* name, const char** efun_name_out) {
     return PointId::Function;
   }
   if (strncmp(name, "efun:", 5) == 0) {
-    const char* rest = name + 5;
     if (efun_name_out) {
+      const char* rest = name + 5;
       *efun_name_out = make_shared_string(rest[0] ? rest : "*");
     }
     return PointId::Efun;
@@ -241,7 +241,7 @@ bool kind_allowed(PointId p, int kind) {
     case PointId::ObjectCreate:
       return kind == HOOK_BEFORE /* 0 = after */ || kind == HOOK_AFTER;
     case PointId::ObjectDestruct:
-      return kind == HOOK_BEFORE || kind == 0;
+      return kind == HOOK_BEFORE; /* HOOK_BEFORE is 0 = the point's kind */
     case PointId::Function:
       return kind == HOOK_BEFORE || kind == HOOK_DECIDE || kind == HOOK_AFTER ||
              kind == HOOK_AROUND;
@@ -406,8 +406,9 @@ void obname_without_clone(const char* obname, char* buf, size_t buflen) {
     }
     return;
   }
-  strncpy(buf, obname, buflen - 1);
-  buf[buflen - 1] = '\0';
+  size_t n = strnlen(obname, buflen - 1);
+  memcpy(buf, obname, n);
+  buf[n] = '\0';
   char* hash = strchr(buf, '#');
   if (hash) {
     *hash = '\0';
@@ -631,7 +632,10 @@ void detach_attachment(Attachment* a) {
  *   "foo/"    — prefix match (path convention; '/' included in the prefix)
  *   "foo"     — exact match
  * A '*' anywhere other than alone or as the final character is rejected at
- * attach time (see validate_name_pattern). */
+ * attach time (see validate_name_pattern). Bound for filter/name scans —
+ * attach rejects longer patterns. */
+constexpr size_t kMaxHookNamePattern = 1023;
+
 bool name_matches(const char* filter, const char* name) {
   if (!filter) {
     return true;
@@ -642,7 +646,10 @@ bool name_matches(const char* filter, const char* name) {
   if (filter[0] == '*' && filter[1] == '\0') {
     return true;
   }
-  size_t flen = strlen(filter);
+  size_t flen = strnlen(filter, kMaxHookNamePattern + 1);
+  if (flen > kMaxHookNamePattern) {
+    return false;
+  }
   if (flen && filter[flen - 1] == '*') {
     return strncmp(filter, name, flen - 1) == 0;
   }
@@ -656,6 +663,9 @@ bool name_matches(const char* filter, const char* name) {
 void validate_name_pattern(const char* filter, const char* what) {
   if (!filter) {
     return;
+  }
+  if (strnlen(filter, kMaxHookNamePattern + 1) > kMaxHookNamePattern) {
+    error("hook_attach: %s pattern too long.\n", what);
   }
   const char* star = strchr(filter, '*');
   if (!star) {
@@ -1288,16 +1298,16 @@ const char* canonicalize_name(const char* in) {
   if (in[0] == '*' && in[1] == '\0') {
     return make_shared_string("*");
   }
-  size_t len = strlen(in);
+  size_t len = strnlen(in, kMaxHookNamePattern + 1);
+  if (len > kMaxHookNamePattern) {
+    error("hook_attach: name pattern too long.\n");
+  }
   bool star_suffix = len > 0 && in[len - 1] == '*';
   bool slash_suffix = len > 0 && in[len - 1] == '/';
   char body[1024];
   size_t body_len = len;
   if (star_suffix || slash_suffix) {
     body_len = len - 1;
-  }
-  if (body_len >= sizeof(body)) {
-    body_len = sizeof(body) - 1;
   }
   memcpy(body, in, body_len);
   body[body_len] = '\0';
@@ -1307,23 +1317,27 @@ const char* canonicalize_name(const char* in) {
     /* "*" already handled; bare "*"/" → keep as pattern suffix only. */
     buf[0] = '\0';
   } else if (!filename_to_obname(body, buf, sizeof(buf))) {
-    strncpy(buf, body, sizeof(buf) - 1);
-    buf[sizeof(buf) - 1] = '\0';
+    size_t n = body_len;
+    if (n >= sizeof(buf)) {
+      n = sizeof(buf) - 1;
+    }
+    memcpy(buf, body, n);
+    buf[n] = '\0';
   } else {
     char* hash = strchr(buf, '#');
     if (hash) {
       *hash = '\0';
     }
   }
-  size_t blen = strlen(buf);
+  size_t blen = strnlen(buf, sizeof(buf));
   if (star_suffix) {
-    if (blen + 1 >= sizeof(buf)) {
+    if (blen >= sizeof(buf) - 1) {
       error("hook_attach: name pattern too long.\n");
     }
     buf[blen] = '*';
     buf[blen + 1] = '\0';
   } else if (slash_suffix) {
-    if (blen + 1 >= sizeof(buf)) {
+    if (blen >= sizeof(buf) - 1) {
       error("hook_attach: name pattern too long.\n");
     }
     buf[blen] = '/';

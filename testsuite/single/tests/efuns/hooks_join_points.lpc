@@ -206,7 +206,7 @@ void do_tests() {
     ([ "label": "apply-miss", "object": kid, "function": "id" ]), HOOK_BEFORE);
   int amid_d = hook_attach("apply:miss", (: on_apply_miss :),
     ([ "label": "apply-miss-decide", "object": kid, "function": "id",
-       "origin": "driver" ]),
+      "origin": "driver" ]),
     HOOK_DECIDE);
   int coid = hook_attach("call_other:miss", (: on_call_other_cross :),
     ([ "label": "cross-check", "object": this_object() ]), HOOK_BEFORE);
