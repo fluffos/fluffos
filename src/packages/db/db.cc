@@ -204,12 +204,13 @@ svalue_t* valid_database(const char* action, array_t* info) {
  */
 #ifdef F_DB_CLOSE
 void f_db_close(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int ret = 0;
   db_t* db;
 
   valid_database("close", &the_null_array);
 
-  db = find_db_conn(vm_sp()->u.number);
+  db = find_db_conn(f.number(0));
   if (!db) {
     error("Attempt to close an invalid database handle\n");
   }
@@ -229,7 +230,8 @@ void f_db_close(int num_arg) {
   /* Remove the entry from the linked list */
   free_db_conn(db);
 
-  vm_sp()->u.number = ret;
+  f.set_top_number(ret);
+  f.done();
 }
 #endif
 
@@ -245,12 +247,13 @@ void f_db_close(int num_arg) {
  */
 #ifdef F_DB_COMMIT
 void f_db_commit(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int ret = 0;
   db_t* db;
 
   valid_database("commit", &the_null_array);
 
-  db = find_db_conn(vm_sp()->u.number);
+  db = find_db_conn(f.number(0));
   if (!db) {
     error("Attempt to commit an invalid database handle\n");
   }
@@ -261,7 +264,8 @@ void f_db_commit(int num_arg) {
     ret = db->type->commit(&(db->c));
   }
 
-  vm_sp()->u.number = ret;
+  f.set_top_number(ret);
+  f.done();
 }
 #endif
 
@@ -278,12 +282,13 @@ void f_db_commit(int num_arg) {
  */
 #ifdef F_DB_CONNECT
 void f_db_connect(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   char* errormsg = nullptr;
   const char *user = "", *database, *host = nullptr;
   db_t* db;
   array_t* info;
   svalue_t* mret;
-  int handle, ret = 0, args = 0, type;
+  int handle, ret = 0, type;
 
 #ifdef DEFAULT_DB
   type = DEFAULT_DB;
@@ -293,16 +298,16 @@ void f_db_connect(int num_arg) {
 
   switch (num_arg) {
     case 4:
-      type = (vm_sp() - (args++))->u.number;
+      type = f.number(3);
       // fallthrough
     case 3:
-      user = (vm_sp() - (args++))->u.string;
+      user = f.string(2);
       // fallthrough
     case 2:
-      database = (vm_sp() - (args++))->u.string;
+      database = f.string(1);
       // fallthrough
     case 1:
-      host = (vm_sp() - (args++))->u.string;
+      host = f.string(0);
       break;
     default:
       // unreachable
@@ -324,8 +329,7 @@ void f_db_connect(int num_arg) {
 
   handle = create_db_conn();
   if (!handle) {
-    pop_n_elems(args);
-    push_number(0);
+    f.ret(0);
     return;
   }
   db = find_db_conn(handle);
@@ -369,18 +373,16 @@ void f_db_connect(int num_arg) {
         (mret != (svalue_t*)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
   }
 
-  pop_n_elems(args);
-
   if (!ret) {
     if (db->type->error) {
       errormsg = db->type->error(&(db->c));
-      push_malloced_string(errormsg);
+      f.ret_str_malloced(errormsg);
     } else {
-      push_number(0);
+      f.ret(0);
     }
     free_db_conn(db);
   } else {
-    push_number(handle);
+    f.ret(handle);
   }
 }
 #endif
@@ -400,16 +402,17 @@ extern pthread_mutex_t* db_mut;
 #endif
 #ifdef F_DB_EXEC
 void f_db_exec(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int ret = 0;
   db_t* db;
   array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(vm_sp()->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy(f.string(1), "f_db_exec");
   valid_database("exec", info);
 
-  db = find_db_conn((vm_sp() - 1)->u.number);
+  db = find_db_conn(f.number(0));
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
@@ -422,21 +425,20 @@ void f_db_exec(int num_arg) {
   }
 
   if (db->type->execute) {
-    ret = db->type->execute(&(db->c), vm_sp()->u.string);
+    ret = db->type->execute(&(db->c), f.string(1));
   }
 
-  pop_stack();
   if (ret == -1) {
     if (db->type->error) {
       char* errormsg;
 
       errormsg = db->type->error(&(db->c));
-      put_malloced_string(errormsg);
+      f.ret_str_malloced(errormsg);
     } else {
-      put_constant_string("Unknown error");
+      f.ret_str_constant("Unknown error");
     }
   } else {
-    vm_sp()->u.number = ret;
+    f.ret(ret);
   }
 #ifdef PACKAGE_ASYNC
   pthread_mutex_unlock(db_mut);
@@ -470,12 +472,13 @@ void f_db_exec(int num_arg) {
  */
 #ifdef F_DB_FETCH
 void f_db_fetch(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   db_t* db;
   array_t* ret;
 
   valid_database("fetch", &the_null_array);
 
-  db = find_db_conn((vm_sp() - 1)->u.number);
+  db = find_db_conn(f.number(0));
   if (!db) {
     error("Attempt to fetch from an invalid database handle\n");
   }
@@ -483,23 +486,22 @@ void f_db_fetch(int num_arg) {
   DB_ASYNC_LOCK();  // serialize against the async DB worker thread
 
   if (db->type->fetch) {
-    ret = db->type->fetch(&(db->c), vm_sp()->u.number);
+    ret = db->type->fetch(&(db->c), f.number(1));
   } else {
     ret = &the_null_array;
   }
 
-  pop_stack();
   if (!ret) {
     if (db->type->error) {
       char* errormsg;
 
       errormsg = db->type->error(&(db->c));
-      put_malloced_string(errormsg);
+      f.ret_str_malloced(errormsg);
     } else {
-      vm_sp()->u.number = 0;
+      f.ret(0);
     }
   } else {
-    put_array(ret);
+    f.ret(ret);
   }
 }
 #endif
@@ -514,12 +516,13 @@ void f_db_fetch(int num_arg) {
  */
 #ifdef F_DB_ROLLBACK
 void f_db_rollback(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int ret = 0;
   db_t* db;
 
   valid_database("rollback", &the_null_array);
 
-  db = find_db_conn(vm_sp()->u.number);
+  db = find_db_conn(f.number(0));
   if (!db) {
     error("Attempt to rollback an invalid database handle\n");
   }
@@ -536,7 +539,8 @@ void f_db_rollback(int num_arg) {
     }
   }
 
-  vm_sp()->u.number = ret;
+  f.set_top_number(ret);
+  f.done();
 }
 #endif
 
@@ -546,6 +550,7 @@ void f_db_rollback(int num_arg) {
  */
 #ifdef F_DB_STATUS
 void f_db_status(int num_arg) {
+  LPCFrame f = LPCFrame::args(num_arg);
   int i;
   outbuffer_t out;
 
@@ -567,6 +572,7 @@ void f_db_status(int num_arg) {
   }
 
   outbuf_push(&out);
+  f.done();
 }
 #endif
 

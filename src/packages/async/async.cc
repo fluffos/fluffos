@@ -750,7 +750,7 @@ void f_async_db_exec(int num_arg) {
   //   async_db_exec(handle, sql)                 -> promise for the row count
   //
   // process_efun_callback(..., num_arg) locates the callback from the
-  // parameter arity (arg = vm_sp() - num_arg + 1 + narg). Parse the callback
+  // parameter arity (arg = frame base + narg). Parse the callback
   // before valid_database() so ownership/ordering stays clear; the old
   // global-arity bug is gone, but the promise vs callback form split still
   // keys on num_arg before any apply.
