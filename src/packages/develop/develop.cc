@@ -247,8 +247,11 @@ void f_set_malloc_mask(LPCFrame& f) {
 
 #ifdef F_CHECK_MEMORY
 void f_check_memory(LPCFrame& f) {
-  check_all_blocks(f.number(0));
+  /* Drop the int argument BEFORE scanning: check_all_blocks() walks the
+   * whole eval stack and then pushes its report string as our result. */
+  int const flag = f.number(0);
   f.ret_void();
+  check_all_blocks(flag);
 }
 #endif
 
