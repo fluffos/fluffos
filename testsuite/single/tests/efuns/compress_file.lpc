@@ -1,6 +1,8 @@
 #ifdef __PACKAGE_COMPRESS__
 void do_tests() {
   string text = "compress_file efun test payload payload payload\n";
+  string empty;
+
   write_file("/cf_src.txt", text, 1);
   ASSERT_EQ(1, compress_file("/cf_src.txt"));
   ASSERT_EQ(-1, file_size("/cf_src.txt"));       // source consumed
@@ -8,5 +10,27 @@ void do_tests() {
   ASSERT_EQ(1, uncompress_file("/cf_src.txt.gz"));
   ASSERT_EQ(text, read_file("/cf_src.txt"));
   rm("/cf_src.txt");
+
+  // A name shorter than ".gz" cannot end in it: it is compressed, and is
+  // not something uncompress_file() can strip the extension from.
+  write_file("/z", text, 1);
+  ASSERT_EQ(0, uncompress_file("/z"));
+  ASSERT_EQ(1, compress_file("/z"));
+  ASSERT_EQ(1, uncompress_file("/z.gz"));
+  ASSERT_EQ(text, read_file("/z"));
+  rm("/z");
+
+  // The extension test used to compare from len - 3, i.e. from before the
+  // start of such a name: a heap-buffer-overflow under ASan. get_config()'s
+  // empty "default error message" is a heap string with nothing in front of
+  // it, so the stray read leaves the allocation. (11 is
+  // __DEFAULT_ERROR_MESSAGE__, include/runtime_config.h.)
+  empty = get_config(11);
+  ASSERT_EQ("", empty);
+  ASSERT_EQ(0, uncompress_file(empty));
+  // "" names the mudlib root: compressing a directory fails (logging it) and
+  // must not leave its partial /.gz behind.
+  ASSERT_EQ(0, compress_file(empty));
+  ASSERT_EQ(-1, file_size("/.gz"));
 }
 #endif
