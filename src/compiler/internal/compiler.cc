@@ -2238,7 +2238,7 @@ short store_prog_string(const char* str) {
   //
   // Cheap and idempotent -- a string already interned by an earlier compile
   // just reads its cached tag straight back.
-  u8_string_is_ascii_cached(str, static_cast<int32_t>(strlen(str)), /*counted=*/true);
+  (void)u8_string_is_ascii_cached(str, static_cast<int32_t>(strlen(str)), /*counted=*/true);
 
   STRING_HASH(hash, str);
   idxp = &string_idx[hash];

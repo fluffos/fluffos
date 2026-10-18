@@ -261,17 +261,26 @@ void on_user_events(bufferevent* bev, short events, void* arg) {
     return;
   }
 
+  // The net:tls hook is LPC and may remove the user.
+  InteractiveScope const scope;
+
   if (events & BEV_EVENT_CONNECTED) {
     /* TLS accept handshake completed (BUFFEREVENT_SSL_ACCEPTING). Plain
      * accepted sockets typically do not raise CONNECTED. */
     if (user->ssl) {
       fire_net_tls_hook(user, bev, "ok");
+      if (user->iflags & CLOSING) {
+        return;
+      }
     }
   }
 
   if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
     if ((events & BEV_EVENT_ERROR) && user->ssl) {
       fire_net_tls_hook(user, bev, "error");
+      if (user->iflags & CLOSING) {
+        return;
+      }
     }
     user->iflags |= NET_DEAD;
     remove_interactive(user->ob, 0);
@@ -470,6 +479,8 @@ void get_user_data(interactive_t* ip) {
 
   /* process the data that we've just read */
 
+  // process_input() may destruct the user mid-buffer (PORT_TYPE_ASCII).
+  InteractiveScope const scope;
   switch (ip->connection_type) {
     case PORT_TYPE_WEBSOCKET:
       // Impossible, we don't handle it here
@@ -535,6 +546,9 @@ void get_user_data(interactive_t* ip) {
           push_malloced_string(str);
           set_eval(max_eval_cost);
           safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+          if (ip->iflags & CLOSING) {
+            return;
+          }
         }
 
         if (ip->text_start == ip->text_end) {

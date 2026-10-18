@@ -12,6 +12,7 @@
 #include <cstring>   // for NULL, memcpy, strlen, etc
 #include <unistd.h>  // for gethostname
 #include <memory>    // for unique_ptr
+#include <vector>
 // Network stuff
 #ifndef _WIN32
 #include <netdb.h>       // for getnameinfo, gai_strerror
@@ -54,7 +55,14 @@ static void receive_snoop(const char* /*buf*/, int /*len*/, object_t* ob);
 
 #endif
 
+static void free_interactive(interactive_t* ip);
+
 namespace {
+// Open InteractiveScopes, and the interactives remove_interactive() tore
+// down while one was open (see comm.h).
+int g_interactive_scopes = 0;
+std::vector<interactive_t*> g_closed_interactives;
+
 // If a complete command is buffered, ask the connection's transport to
 // arrange a process_user_command() run on the driver's scheduler.
 void maybe_schedule_user_command(interactive_t* user) {
@@ -79,6 +87,10 @@ void comm_run_scheduled_command(interactive_t* ip) {
 
 // Called upon user, when he's finished negotiations , and ready to logon
 void on_user_logon(interactive_t* user) {
+  // connect() runs with the connection on the master, which may destruct
+  // itself (see below); `user` is still read afterwards.
+  InteractiveScope const scope;
+
   set_command_giver(master_ob);
   master_ob->flags |= O_ONCE_INTERACTIVE;
   master_ob->interactive = user;
@@ -216,8 +228,15 @@ void add_message(object_t* who, const char* data, int len) {
     return;
   }
 
-  if ((g_hook_mask & HOOK_MASK_NET_WRITE) && !hook_dispatch_net_write(who, data, len)) {
-    return; /* DECIDE refuse drops the payload */
+  if (g_hook_mask & HOOK_MASK_NET_WRITE) {
+    if (!hook_dispatch_net_write(who, data, len)) {
+      return; /* DECIDE refuse drops the payload */
+    }
+    /* A handler may have destructed or disconnected `who`. */
+    if ((who->flags & O_DESTRUCTED) || !who->interactive ||
+        (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+      return;
+    }
   }
 
   inet_packets++;
@@ -256,18 +275,22 @@ void add_message(object_t* who, const char* data, int len) {
     hook_dispatch_net_write_after(who, data, len);
   }
 
+  /* From here on LPC may have run (the AFTER hook, a shadow's catch_tell)
+   * and removed the user, freeing ip: re-check before each use. */
 #ifdef SHADOW_CATCH_MESSAGE
   /*
    * shadow handling.
    */
   if (shadow_catch_message(who, data)) {
-    if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
+    if (CONFIG_INT(__RC_SNOOP_SHADOWED__) && IP_VALID(ip, who)) {
       handle_snoop(data, len, ip);
     }
     return;
   }
 #endif /* NO_SHADOWS */
-  handle_snoop(data, len, ip);
+  if (IP_VALID(ip, who)) {
+    handle_snoop(data, len, ip);
+  }
 
   add_message_calls++;
 } /* add_message() */
@@ -371,10 +394,14 @@ void comm_text_received(interactive_t* ip, const char* data, size_t len) {
   if (!len) {
     return;
   }
+  InteractiveScope const scope;
 
   comm_reserve_input_space(ip, len);
 
   on_user_input(ip, data, len);
+  if (ip->iflags & CLOSING) {
+    return;
+  }
 
   if (cmd_in_buf(ip)) {
     ip->iflags |= CMD_IN_BUF;
@@ -387,18 +414,28 @@ void comm_telnet_received(interactive_t* ip, const char* data, size_t len) {
   if (!len) {
     return;
   }
+  // Telnet events run applies and hooks, any of which may destruct the user
+  // while libtelnet is still parsing this buffer.
+  InteractiveScope const scope;
+
   comm_reserve_input_space(ip, len);
 
   int const start = ip->text_end;
 
   // this will read data into ip->text
   telnet_recv(ip->telnet, data, len);
+  if (ip->iflags & CLOSING) {
+    return;
+  }
   // If we read something
   if (ip->text_end > start) {
     /* handle snooping - snooper does not see type-ahead due to
       telnet being in linemode */
     if (!(ip->iflags & NOECHO)) {
       handle_snoop(ip->text + start, ip->text_end - start, ip);
+      if (ip->iflags & CLOSING) {
+        return; /* receive_snoop() is LPC */
+      }
     }
 
     // search for command.
@@ -418,9 +455,12 @@ static const int ANSI_SUBSTITUTE = 0x20;
 // each time.
 void on_user_input(interactive_t* ip, const char* data, size_t len) {
   if (g_hook_mask & HOOK_MASK_NET_READ) {
-    object_t* user_ob = ip && ip->ob && !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
+    object_t* user_ob = !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
     if (!hook_dispatch_net_read(user_ob, data, static_cast<int>(len))) {
       return; /* DECIDE refuse drops the input */
+    }
+    if (ip->iflags & CLOSING) {
+      return; /* the hook removed the user; the caller's scope keeps ip */
     }
   }
   for (int i = 0; i < len; i++) {
@@ -701,7 +741,7 @@ int process_user_command(interactive_t* ip) {
 
   if (ip->iflags & USING_MXP) {
     if (user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z') {
-      if (!on_receive_mxp_tag(ip, user_command)) {
+      if (!on_receive_mxp_tag(ip, user_command) || !IP_VALID(ip, command_giver)) {
         goto exit;
       }
     }
@@ -749,10 +789,11 @@ exit:
   /*
    * Print a prompt if user is still here.
    */
+  if (IP_VALID(ip, command_giver) && ip->input_to == nullptr) {
+    print_prompt(ip);
+  }
+  /* write_prompt() is LPC: check again. */
   if (IP_VALID(ip, command_giver)) {
-    if (ip->input_to == nullptr) {
-      print_prompt(ip);
-    }
     if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
       telnet_send_ga(ip->telnet);
     }
@@ -835,12 +876,6 @@ void remove_interactive(object_t* ob, int dested) {
     ip->transport = nullptr;
   }
 
-  // Free telnet handle
-  if (ip->telnet != nullptr) {
-    telnet_free(ip->telnet);
-    ip->telnet = nullptr;
-  }
-
   // Free translator
   if (ip->trans != nullptr) {
     ucnv_close(ip->trans);
@@ -863,10 +898,43 @@ void remove_interactive(object_t* ob, int dested) {
 #endif
 
   user_del(ip);
-  FREE(ip);
   ob->interactive = nullptr;
-  free_object(&ob, "remove_interactive");
+  if (g_interactive_scopes > 0) {
+    // Driver code up the C stack may have run the LPC that brought us here
+    // and still hold ip -- libtelnet may be in the middle of telnet_recv() on
+    // ip->telnet. The outermost InteractiveScope frees what is left; CLOSING
+    // tells that code to stop.
+    g_closed_interactives.push_back(ip);
+    return;
+  }
+  free_interactive(ip);
 } /* remove_interactive() */
+
+/*
+ * The part of remove_interactive() that input processing may still be
+ * running on: the telnet handle, the struct, and the connection's reference
+ * to its object (ip->ob, kept valid for as long as ip is).
+ */
+static void free_interactive(interactive_t* ip) {
+  if (ip->telnet != nullptr) {
+    telnet_free(ip->telnet);
+    ip->telnet = nullptr;
+  }
+  object_t* ob = ip->ob;
+  FREE(ip);
+  free_object(&ob, "remove_interactive");
+}
+
+InteractiveScope::InteractiveScope() { g_interactive_scopes++; }
+
+InteractiveScope::~InteractiveScope() {
+  if (--g_interactive_scopes == 0) {
+    for (interactive_t* ip : g_closed_interactives) {
+      free_interactive(ip);
+    }
+    g_closed_interactives.clear();
+  }
+}
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
 static int call_function_interactive(interactive_t* i, char* str) {
@@ -1059,7 +1127,9 @@ static void print_prompt(interactive_t* ip) {
       tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
     }
 #endif
-    else if (!safe_apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
+    /* write_prompt() is LPC and may remove the user before failing. */
+    else if (object_t* ob = ip->ob;
+             !safe_apply(APPLY_WRITE_PROMPT, ob, 0, ORIGIN_DRIVER) && IP_VALID(ip, ob)) {
       ip->iflags &= ~HAS_WRITE_PROMPT;
       tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
     }

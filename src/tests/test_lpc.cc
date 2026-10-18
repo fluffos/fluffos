@@ -5,6 +5,9 @@
 #include "mainlib.h"
 
 #include "comm.h"
+#include "interactive.h"
+#include "net/telnet.h"
+#include "net/transport.h"
 #include "user.h"
 #include "compiler/internal/compiler.h"
 
@@ -1017,4 +1020,232 @@ TEST_F(DriverTest, RemoveInteractiveDestructedStress) {
     }
   }
   RunGuarded([&] { remove_destructed_objects(); });
+}
+
+// ---------------------------------------------------------------------------
+// LPC run while the driver is using a connection removes the user.
+//
+// Input processing keeps using the interactive after it runs LPC: libtelnet
+// is still parsing the rest of the buffer when an apply or hook returns into
+// telnet_recv(), and the text path goes on to fill ip->text. Any of that LPC
+// may destruct the user, and remove_interactive() used to free the
+// interactive and its telnet handle on the spot -- every later byte of the
+// buffer was then a heap use-after-free. These drive real telnet / text
+// bytes (and output, for the net:write hook) through a fabricated
+// connection whose LPC destructs the user partway through.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr char kIAC = static_cast<char>(255);
+constexpr char kSB = static_cast<char>(250);
+constexpr char kSE = static_cast<char>(240);
+constexpr char kWILL = static_cast<char>(251);
+constexpr char kNAWS = 31;
+constexpr char kNEW_ENVIRON = 39;
+
+// Records what the connection did; outlives the transport, which
+// remove_interactive() deletes.
+struct TransportLog {
+  bool closed = false;
+  int scheduled = 0;
+};
+
+class LoggingTransport final : public Transport {
+ public:
+  explicit LoggingTransport(TransportLog* log) : log_(log) {}
+  void write(const char* /*data*/, size_t /*len*/) override {}
+  int flush() override { return 0; }
+  void schedule_command() override { log_->scheduled++; }
+  void close() override { log_->closed = true; }
+
+ private:
+  TransportLog* log_;
+};
+
+interactive_t* fabricate_telnet_interactive(object_t* ob, TransportLog* log) {
+  interactive_t* ip = fabricate_interactive(ob);
+  ip->connection_type = PORT_TYPE_TELNET;
+  ip->transport = new LoggingTransport(log);
+  ip->telnet = net_telnet_init(ip);
+  return ip;
+}
+
+// Loads `src`, gives it a telnet connection, feeds `input` through `feed`
+// and checks the connection was torn down cleanly by the user's own
+// destruct.
+template <typename Feed>
+void ExpectUserDestructedMidway(const char* src, const char* name, const std::string& input,
+                                const char* arm, Feed&& feed) {
+  object_t* body = nullptr;
+  RunGuarded([&] { body = load_object_from_source(src, name, 0); });
+  ASSERT_NE(body, nullptr);
+
+  uint32_t const ref_before = body->ref;
+  TransportLog log;
+  interactive_t* ip = fabricate_telnet_interactive(body, &log);
+  if (arm) {
+    RunGuarded([&] { safe_apply(arm, body, 0, ORIGIN_DRIVER); });
+  }
+
+  RunGuarded([&] { feed(ip, input); });
+
+  EXPECT_TRUE(body->flags & O_DESTRUCTED);
+  EXPECT_EQ(body->interactive, nullptr);
+  EXPECT_TRUE(log.closed);
+  // Nothing after the destruct may reach the gone connection.
+  EXPECT_EQ(log.scheduled, 0);
+  EXPECT_TRUE(users().empty());
+  // The connection's reference was released once input processing let go.
+  EXPECT_EQ(body->ref, ref_before);
+
+  RunGuarded([&] {
+    if (!(body->flags & O_DESTRUCTED)) {
+      destruct_object(body);  // failed above: don't leak its hook / user
+    }
+    free_object(&body, name);
+  });
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
+void FeedTelnet(interactive_t* ip, const std::string& in) {
+  comm_telnet_received(ip, in.data(), in.size());
+}
+
+void FeedText(interactive_t* ip, const std::string& in) {
+  comm_text_received(ip, in.data(), in.size());
+}
+
+// A NAWS report, then more negotiation and a command line: everything after
+// the SB is parsed by libtelnet after window_size() has run.
+std::string NawsThenMore() {
+  std::string s = {kIAC, kSB, kNAWS, 0, 80, 0, 24, kIAC, kSE};
+  s += {kIAC, kWILL, kNAWS};
+  s += {kIAC, kSB, kNAWS, 0, 100, 0, 40, kIAC, kSE};
+  s += "look\r\n";
+  return s;
+}
+
+}  // namespace
+
+// An apply run for a telnet event (window_size) destructs the user.
+TEST_F(DriverTest, TelnetApplyDestructsUserMidBuffer) {
+  ExpectUserDestructedMidway("void window_size(int w, int h) { destruct(this_object()); }\n",
+                             "telnet_destruct_naws", NawsThenMore(), nullptr, FeedTelnet);
+}
+
+// receive_environ() runs once per variable of ONE event: the first call
+// destructs the user, the second must not run on the gone connection.
+TEST_F(DriverTest, TelnetEnvironApplyDestructsUser) {
+  std::string in = {kIAC, kSB, kNEW_ENVIRON, 0 /* IS */};
+  in += {0 /* VAR */, 'A', 1 /* VALUE */, '1'};
+  in += {0 /* VAR */, 'B', 1 /* VALUE */, '2'};
+  in += {kIAC, kSE};
+  in += "look\r\n";
+  ExpectUserDestructedMidway(
+      "int calls;\n"
+      "void receive_environ(string var, string val) { calls++; destruct(this_object()); }\n",
+      "telnet_destruct_environ", in, nullptr, FeedTelnet);
+}
+
+// A net:telnet hook destructs the user before the driver's own handler runs.
+TEST_F(DriverTest, TelnetHookDestructsUser) {
+  ExpectUserDestructedMidway(
+      "#include <hooks.h>\n"
+      "void on_telnet(int id, object user, string event, string option, string payload) {\n"
+      "  destruct(this_object());\n"
+      "}\n"
+      "void arm() {\n"
+      "  hook_attach(\"net:telnet\", (: on_telnet :), ([ \"label\": \"destruct-telnet\" ]),\n"
+      "              HOOK_BEFORE);\n"
+      "}\n",
+      "telnet_destruct_hook", NawsThenMore(), "arm", FeedTelnet);
+}
+
+// A net:read hook destructs the user before its bytes are buffered, on both
+// the telnet data path and the plain-text (websocket ascii) path.
+TEST_F(DriverTest, NetReadHookDestructsUser) {
+  const char* src =
+      "#include <hooks.h>\n"
+      "void on_read(int id, object user, int len, string data) {\n"
+      "  destruct(this_object());\n"
+      "}\n"
+      "void arm() {\n"
+      "  hook_attach(\"net:read\", (: on_read :), ([ \"label\": \"destruct-read\" ]), "
+      "HOOK_BEFORE);\n"
+      "}\n";
+  ExpectUserDestructedMidway(src, "net_read_destruct_telnet", "look\r\nsay hi\r\n", "arm",
+                             FeedTelnet);
+  ExpectUserDestructedMidway(src, "net_read_destruct_text", "look\r\nsay hi\r\n", "arm", FeedText);
+}
+
+// A net:write hook destructs the user it is writing to: add_message() must
+// not go on to the gone connection, before (BEFORE) or after (AFTER) the
+// payload is handed to it.
+TEST_F(DriverTest, NetWriteHookDestructsUser) {
+  for (const char* kind : {"HOOK_BEFORE", "HOOK_AFTER"}) {
+    std::string const src = std::string(
+                                "#include <hooks.h>\n"
+                                "void on_write(int id, object user, int len, string data) {\n"
+                                "  destruct(this_object());\n"
+                                "}\n"
+                                "void arm() {\n"
+                                "  hook_attach(\"net:write\", (: on_write :), ([ \"label\": "
+                                "\"destruct-write\" ]), ") +
+                            kind + ");\n}\n";
+    std::string const name = std::string("net_write_destruct_") + kind;
+    ExpectUserDestructedMidway(src.c_str(), name.c_str(), "hello\n", "arm",
+                               [](interactive_t* ip, const std::string& out) {
+                                 add_message(ip->ob, out.data(), static_cast<int>(out.size()));
+                               });
+  }
+}
+
+// The mxp_tag apply, run for a buffered command, destructs the user; the
+// command must not then be dispatched on the freed connection.
+TEST_F(DriverTest, MxpTagApplyDestructsUser) {
+  object_t* body = nullptr;
+  RunGuarded([&] {
+    body = load_object_from_source("int mxp_tag(string tag) { destruct(this_object()); }\n",
+                                   "mxp_tag_destruct", 0);
+  });
+  ASSERT_NE(body, nullptr);
+
+  uint32_t const ref_before = body->ref;
+  interactive_t* ip = fabricate_interactive(body);
+  ip->iflags |= USING_MXP | CMD_IN_BUF;
+  std::string const cmd = " [1z\n";
+  ip->text_end = static_cast<int>(cmd.copy(ip->text, cmd.size()));
+
+  RunGuarded([&] { process_user_command(ip); });
+
+  EXPECT_TRUE(body->flags & O_DESTRUCTED);
+  EXPECT_EQ(body->interactive, nullptr);
+  EXPECT_TRUE(users().empty());
+  EXPECT_EQ(body->ref, ref_before);
+
+  RunGuarded([&] {
+    if (!(body->flags & O_DESTRUCTED)) {
+      destruct_object(body);
+    }
+    free_object(&body, "MxpTagApplyDestructsUser");
+  });
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
+// write_prompt(), run after a command, destructs the user -- returning
+// normally (process_user_command() then sent a GA and rescheduled on the
+// gone connection) or erroring (print_prompt() fell back to the default
+// prompt on it).
+TEST_F(DriverTest, WritePromptDestructsUser) {
+  for (const char* body_src :
+       {"void write_prompt() { destruct(this_object()); }\n",
+        "void write_prompt() { destruct(this_object()); error(\"x\"); }\n"}) {
+    ExpectUserDestructedMidway(body_src, "write_prompt_destruct", "look\n", nullptr,
+                               [](interactive_t* ip, const std::string& cmd) {
+                                 ip->iflags |= HAS_WRITE_PROMPT | USING_TELNET | CMD_IN_BUF;
+                                 ip->text_end = static_cast<int>(cmd.copy(ip->text, cmd.size()));
+                                 process_user_command(ip);
+                               });
+  }
 }

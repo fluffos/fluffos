@@ -326,7 +326,6 @@ struct Attachment {
   const char* exclude_caller_program = nullptr; /* shared; reject if matches */
   const char* efun_name = nullptr;              /* shared; PointId::Efun ("*" = all) */
   bool detached = false;
-  bool running = false; /* while true, detach_attachment defers delete */
   int errors = 0;
   int64_t events = 0;
   int64_t skipped = 0;
@@ -360,6 +359,30 @@ std::chrono::steady_clock::time_point g_hook_frame_t0[CFG_MAX_CALL_DEPTH + 8];
 std::unordered_map<LPC_INT, Attachment*> g_attachments;
 std::vector<Attachment*> g_by_point[static_cast<int>(PointId::Count)];
 LPC_INT g_next_id = 1;
+
+/* Code that keeps Attachment pointers across a handler call -- a dispatcher
+ * walking its snapshot (BEFORE, then DECIDE), hook_call() itself -- runs in a
+ * HookDispatchScope. A handler can detach any attachment: itself, another at
+ * the same point, any whose owner it destructs. While a scope is open,
+ * detach_attachment() unlinks and releases it as usual but parks the struct
+ * here (still readable, `detached` set) for the outermost scope to delete. */
+int g_hook_dispatches = 0;
+std::vector<Attachment*> g_detached_attachments;
+
+class HookDispatchScope {
+ public:
+  HookDispatchScope() { g_hook_dispatches++; }
+  ~HookDispatchScope() {
+    if (--g_hook_dispatches == 0) {
+      for (Attachment* a : g_detached_attachments) {
+        delete a;
+      }
+      g_detached_attachments.clear();
+    }
+  }
+  HookDispatchScope(const HookDispatchScope&) = delete;
+  HookDispatchScope& operator=(const HookDispatchScope&) = delete;
+};
 
 int64_t us_since(std::chrono::steady_clock::time_point t0) {
   return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0)
@@ -617,8 +640,8 @@ void detach_attachment(Attachment* a) {
     free_object(&a->owner, "hook owner");
   }
   free_attachment_filters(a);
-  /* Dispatch still holds `a` across hook_call(); delete after running clears. */
-  if (a->running) {
+  if (g_hook_dispatches > 0) {
+    g_detached_attachments.push_back(a); /* see HookDispatchScope */
     return;
   }
   delete a;
@@ -984,6 +1007,9 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
       pop_n_elems(n_args_on_stack);
     }
   };
+  /* The handler may detach `a` (and so may the stale-owner paths below);
+   * it is still read on the way out. */
+  HookDispatchScope const scope;
   if (a->detached) {
     pop_args();
     return HookRun::Skipped;
@@ -1022,7 +1048,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   auto sim = save_simulate();
   f->hdr.ref++;
-  a->running = true;
 
   SuspendedStack ss{};
   if (outermost) {
@@ -1097,8 +1122,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     }
   }
 
-  bool const deferred_delete = a->detached;
-  a->running = false;
   g_hook_depth--;
   free_funp(f);
 
@@ -1112,19 +1135,11 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
       max_err = 10;
     }
     if (!(a->flags & HOOK_FAIL_CLOSED) && a->errors >= max_err) {
-      /* running is clear — detach_attachment deletes immediately. */
       detach_attachment(a);
-      return HookRun::Error;
-    }
-    if (deferred_delete) {
-      delete a;
     }
     return HookRun::Error;
   }
   if (ret->type == T_PROMISE || a->detached) {
-    if (a->detached) {
-      delete a;
-    }
     return HookRun::Declined;
   }
   if (out) {
@@ -1133,9 +1148,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   a->events++;
   a->last_fired = get_current_time();
-  if (deferred_delete) {
-    delete a;
-  }
   return HookRun::Ran;
 }
 
@@ -1207,10 +1219,21 @@ void bump_count(Attachment* a, const char* caller_prog, const char* target_prog,
 }
 
 /* Snapshot the live list so attach/detach inside a handler only affects the
- * next event. */
-std::vector<Attachment*> snapshot_point(PointId p) {
-  return g_by_point[static_cast<int>(p)];
-}
+ * next event. Its dispatch scope keeps every entry readable for as long as
+ * the dispatcher walks it: one a handler detached reads as `detached`. */
+class HookSnapshot {
+ public:
+  explicit HookSnapshot(const std::vector<Attachment*>& live) : list_(live) {}
+
+  std::vector<Attachment*>::const_iterator begin() const { return list_.begin(); }
+  std::vector<Attachment*>::const_iterator end() const { return list_.end(); }
+
+ private:
+  HookDispatchScope scope_;
+  std::vector<Attachment*> list_;
+};
+
+HookSnapshot snapshot_point(PointId p) { return HookSnapshot(g_by_point[static_cast<int>(p)]); }
 
 /* ---- authorization ---- */
 
@@ -1913,6 +1936,10 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
   }
   sp -= num_arg;
 
+  /* AROUND dispatches nest: the handler, or the body it proceeds into, may
+   * call another AROUND-hooked function. Keep the enclosing one's state (its
+   * parked args, whether it proceeded) and put it back when this one ends. */
+  AroundState enclosing = std::move(g_around);
   g_around = AroundState{};
   g_around.active = true;
   g_around.proceeded = false;
@@ -1930,7 +1957,7 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
     for (auto& sv : g_around.saved_args) {
       free_svalue(&sv, "hook around saved");
     }
-    g_around = AroundState{};
+    g_around = std::move(enclosing);
   };
 
   int n = push_call_args(around, target, fn, g_around.saved_args.data(), num_arg);
@@ -2038,14 +2065,14 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
   return HookGateResult::NoOpinion;
 }
 
-void hook_dispatch_efun_after(const char* efun_name, object_t* filter_ob) {
+void hook_dispatch_efun_after(const char* efun_name, object_t* filter_ob, svalue_t* result) {
   if (!(g_hook_mask & HOOK_MASK_EFUN)) {
     return;
   }
   auto list = snapshot_point(PointId::Efun);
   svalue_t ret{};
-  if (sp) {
-    assign_svalue_no_free(&ret, sp);
+  if (result) {
+    assign_svalue_no_free(&ret, result);
   } else {
     ret = const0;
   }
@@ -2506,9 +2533,19 @@ void hooks_owner_destructed(object_t* ob) {
 }
 
 void hooks_revalidate_all() {
-  std::vector<Attachment*> doomed;
+  /* valid_hook() is LPC and may detach any attachment, erasing it from
+   * g_attachments: walk a copy, inside a dispatch scope. */
+  HookDispatchScope const scope;
+  std::vector<Attachment*> all;
+  all.reserve(g_attachments.size());
   for (auto& kv : g_attachments) {
-    Attachment* a = kv.second;
+    all.push_back(kv.second);
+  }
+  std::vector<Attachment*> doomed;
+  for (Attachment* a : all) {
+    if (a->detached) {
+      continue;
+    }
     /* Rebuild a minimal spec and re-ask. For simplicity, re-attach check:
      * if valid_hook is absent or returns < needed tier, detach. */
     mapping_t* spec = allocate_mapping(4);
