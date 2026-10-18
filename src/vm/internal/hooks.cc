@@ -1936,6 +1936,10 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
   }
   sp -= num_arg;
 
+  /* AROUND dispatches nest: the handler, or the body it proceeds into, may
+   * call another AROUND-hooked function. Keep the enclosing one's state (its
+   * parked args, whether it proceeded) and put it back when this one ends. */
+  AroundState enclosing = std::move(g_around);
   g_around = AroundState{};
   g_around.active = true;
   g_around.proceeded = false;
@@ -1953,7 +1957,7 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
     for (auto& sv : g_around.saved_args) {
       free_svalue(&sv, "hook around saved");
     }
-    g_around = AroundState{};
+    g_around = std::move(enclosing);
   };
 
   int n = push_call_args(around, target, fn, g_around.saved_args.data(), num_arg);

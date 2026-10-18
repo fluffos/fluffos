@@ -1232,3 +1232,20 @@ TEST_F(DriverTest, MxpTagApplyDestructsUser) {
   });
   RunGuarded([&] { remove_destructed_objects(); });
 }
+
+// write_prompt(), run after a command, destructs the user -- returning
+// normally (process_user_command() then sent a GA and rescheduled on the
+// gone connection) or erroring (print_prompt() fell back to the default
+// prompt on it).
+TEST_F(DriverTest, WritePromptDestructsUser) {
+  for (const char* body_src :
+       {"void write_prompt() { destruct(this_object()); }\n",
+        "void write_prompt() { destruct(this_object()); error(\"x\"); }\n"}) {
+    ExpectUserDestructedMidway(body_src, "write_prompt_destruct", "look\n", nullptr,
+                               [](interactive_t* ip, const std::string& cmd) {
+                                 ip->iflags |= HAS_WRITE_PROMPT | USING_TELNET | CMD_IN_BUF;
+                                 ip->text_end = static_cast<int>(cmd.copy(ip->text, cmd.size()));
+                                 process_user_command(ip);
+                               });
+  }
+}

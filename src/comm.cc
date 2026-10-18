@@ -87,6 +87,10 @@ void comm_run_scheduled_command(interactive_t* ip) {
 
 // Called upon user, when he's finished negotiations , and ready to logon
 void on_user_logon(interactive_t* user) {
+  // connect() runs with the connection on the master, which may destruct
+  // itself (see below); `user` is still read afterwards.
+  InteractiveScope const scope;
+
   set_command_giver(master_ob);
   master_ob->flags |= O_ONCE_INTERACTIVE;
   master_ob->interactive = user;
@@ -785,10 +789,11 @@ exit:
   /*
    * Print a prompt if user is still here.
    */
+  if (IP_VALID(ip, command_giver) && ip->input_to == nullptr) {
+    print_prompt(ip);
+  }
+  /* write_prompt() is LPC: check again. */
   if (IP_VALID(ip, command_giver)) {
-    if (ip->input_to == nullptr) {
-      print_prompt(ip);
-    }
     if (ip->telnet && (ip->iflags & USING_TELNET) && !(ip->iflags & SUPPRESS_GA)) {
       telnet_send_ga(ip->telnet);
     }
@@ -1122,9 +1127,13 @@ static void print_prompt(interactive_t* ip) {
       tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
     }
 #endif
-    else if (!safe_apply(APPLY_WRITE_PROMPT, ip->ob, 0, ORIGIN_DRIVER)) {
-      ip->iflags &= ~HAS_WRITE_PROMPT;
-      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
+    else {
+      object_t* ob = ip->ob;
+      /* write_prompt() is LPC and may remove the user before failing. */
+      if (!safe_apply(APPLY_WRITE_PROMPT, ob, 0, ORIGIN_DRIVER) && IP_VALID(ip, ob)) {
+        ip->iflags &= ~HAS_WRITE_PROMPT;
+        tell_object(ob, ip->prompt, strlen(ip->prompt));
+      }
     }
   } catch (const char*) {
     restore_context(&econ);

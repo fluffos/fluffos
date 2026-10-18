@@ -1,0 +1,26 @@
+#include <hooks.h>
+
+/* AROUND dispatches nest: the outer handler calls another AROUND-hooked
+ * function before proceeding, and must still find its own call to proceed
+ * into. */
+
+int outer(int x) { return x + 1; }
+int inner(int y) { return y * 2; }
+
+mixed on_around(int id, object actor, object caller, object target, string fn, mixed *args) {
+  if (fn == "outer") {
+    int seen = this_object()->inner(5);
+    return hook_proceed() * 100 + seen;
+  }
+  return hook_proceed();
+}
+
+void do_tests() {
+  int a = hook_attach("function", (: on_around :),
+    ([ "label": "around-outer", "object": this_object(), "function": "outer" ]), HOOK_AROUND);
+  int b = hook_attach("function", (: on_around :),
+    ([ "label": "around-inner", "object": this_object(), "function": "inner" ]), HOOK_AROUND);
+  ASSERT_EQ(this_object()->outer(1), 2 * 100 + 10);
+  hook_detach(a);
+  hook_detach(b);
+}
