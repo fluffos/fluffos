@@ -2,6 +2,8 @@
 
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 
+#include <vector>
+
 #include <sys/stat.h>  // for struct stat
 
 #include <memory>  // for std::unique_ptr (deep_copy_* error-unwind guards)
@@ -38,55 +40,52 @@ void f_compressedp(LPCFrame& f) {
 #ifdef F_NAMED_LIVINGS
 void f_named_livings(LPCFrame& f) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
+  int const table_size = CONFIG_INT(__LIVING_HASH_TABLE_SIZE__);
+  object_t* ob;
 
-  int i;
-  int nob;
 #ifdef F_SET_HIDE
-  int apply_valid_hide, display_hidden = 0;
+  /* valid_hide() is a master apply -- arbitrary LPC that can destruct
+   * objects or rename livings -- so ask it before the walk (only when a
+   * hidden living exists, as before), never in the middle of one. */
+  bool display_hidden = false;
+  bool any_hidden = false;
+  for (int i = 0; i < table_size && !any_hidden; i++) {
+    for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
+      if ((ob->flags & O_ENABLE_COMMANDS) && (ob->flags & O_HIDDEN)) {
+        any_hidden = true;
+        break;
+      }
+    }
+  }
+  if (any_hidden) {
+    display_hidden = valid_hide(current_object) != 0;
+  }
 #endif
-  object_t *ob, **obtab;
-  array_t* vec;
 
-  nob = 0;
-#ifdef F_SET_HIDE
-  apply_valid_hide = 1;
-#endif
-
-  obtab = reinterpret_cast<object_t**>(
-      DCALLOC(max_array_size, sizeof(object_t*), TAG_TEMPORARY, "named_livings"));
-
-  for (i = 0; i < CONFIG_INT(__LIVING_HASH_TABLE_SIZE__); i++) {
+  std::vector<object_t*> found;
+  for (int i = 0; i < table_size; i++) {
     for (ob = hashed_living[i]; ob; ob = ob->next_hashed_living) {
       if (!(ob->flags & O_ENABLE_COMMANDS)) {
         continue;
       }
 #ifdef F_SET_HIDE
-      if (ob->flags & O_HIDDEN) {
-        if (apply_valid_hide) {
-          apply_valid_hide = 0;
-          display_hidden = valid_hide(current_object);
-        }
-        if (!display_hidden) {
-          continue;
-        }
+      if ((ob->flags & O_HIDDEN) && !display_hidden) {
+        continue;
       }
 #endif
-      if (nob == max_array_size) {
+      if (found.size() == static_cast<size_t>(max_array_size)) {
         break;
       }
-      obtab[nob++] = ob;
+      found.push_back(ob);
     }
   }
 
-  vec = allocate_empty_array(nob);
-  while (--nob >= 0) {
-    vec->item[nob].type = T_OBJECT;
-    vec->item[nob].u.ob = obtab[nob];
-    add_ref(obtab[nob], "livings");
+  array_t* vec = allocate_empty_array(found.size());
+  for (size_t k = 0; k < found.size(); k++) {
+    vec->item[k].type = T_OBJECT;
+    vec->item[k].u.ob = found[k];
+    add_ref(found[k], "livings");
   }
-
-  FREE(obtab);
-
   f.ret_refed(vec);
 }
 #endif
@@ -3241,10 +3240,9 @@ void f_test_load(LPCFrame& f) {
   StackErrorHandler restore_names(fix_object_names);
   new_ob = load_object(tmp, 0);
   if (!new_ob) {
-    restore_names.dismiss();
-    if (testloadob) {
-      SETOBNAME(testloadob, tmp);
-    }
+    /* fix_object_names(): restore the name AND the object-table entry
+     * (restoring only the name left the object unfindable) */
+    restore_names.run();
     f.ret(0);
     return;
   }

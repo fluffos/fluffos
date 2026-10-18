@@ -175,7 +175,7 @@ void f_send_msdp_variable(LPCFrame& f) {
         break;
       case T_NUMBER:
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
-        telnet_printf(ip->telnet, "\x01%s\x02%lu", f.string(0), f.number(1));
+        telnet_printf(ip->telnet, "\x01%s\x02%" LPC_INT_FMTSTR_P, f.string(0), f.number(1));
         telnet_finish_sb((ip->telnet));
         break;
       case T_REAL:

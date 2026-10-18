@@ -3,6 +3,14 @@ void do_tests() {
   parse_init();
   parse_add_rule("smile", "");
   ASSERT_EQ(0, catch(parse_add_synonym("grin", "smile")));
+
+  {
+    // An old verb that is not even a shared string (built at runtime, so no
+    // literal interned it) used to be formatted from a null pointer.
+    string verb = sprintf("zz_unshared_verb_%d", 7);
+    string err = catch(parse_add_synonym("smirk", verb));
+    ASSERT(err && strsrch(err, verb) != -1);
+  }
 #endif
   ASSERT(1);
 }

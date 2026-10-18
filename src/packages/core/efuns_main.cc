@@ -1710,9 +1710,13 @@ void f_query_ip_name(LPCFrame& f) {
   if (!tmp) {
     f.ret(0);
   } else {
-    f.ret_str_shared(tmp);
+    /* query_ip_name() hands us a reference: the result takes it over */
+    svalue_t v{};
+    v.type = T_STRING;
+    v.subtype = STRING_SHARED;
+    v.u.string = tmp;
+    f.ret_owned(v);
   }
-  // no need to free
 }
 
 #endif
@@ -2663,6 +2667,14 @@ void f_stat(LPCFrame& f) {
   }
   if (stat(path, &buf) != -1) {
     if (buf.st_mode & S_IFREG) { /* if a regular file */
+      /* object_visible() can run valid_hide() (LPC): ask before the result
+       * array exists, so an error() there has nothing to leak. */
+      LPC_INT load_time = 0;
+      ob = find_object2(path);
+      if (ob && object_visible(ob)) {
+        load_time = ob->load_time;
+      }
+
       v = allocate_empty_array(4);
       v->item[0].type = T_NUMBER;
       v->item[0].subtype = 0;
@@ -2672,15 +2684,7 @@ void f_stat(LPCFrame& f) {
       v->item[1].u.number = buf.st_mtime;
       v->item[2].type = T_NUMBER;
       v->item[2].subtype = 0;
-      ob = find_object2(path);
-      if (ob && !object_visible(ob)) {
-        ob = nullptr;
-      }
-      if (ob) {
-        v->item[2].u.number = ob->load_time;
-      } else {
-        v->item[2].u.number = 0;
-      }
+      v->item[2].u.number = load_time;
 
       v->item[3].type = T_NUMBER;
       v->item[3].subtype = 0;

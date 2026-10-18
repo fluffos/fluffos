@@ -1020,8 +1020,9 @@ static object_t* first_inv(object_t* ob) {
 #endif
 }
 
-static object_t* next_inv(object_t* sibling) {
+static object_t* next_inv(object_t* parent, object_t* sibling) {
 #ifndef NO_ENVIRONMENT
+  (void)parent;
   return sibling->next_inv;
 #else
   svalue_t* ret;
@@ -1085,7 +1086,7 @@ static void rec_add_object(object_t* ob, int flags) {
       flags &= ~RAO_INREACH;
     }
   }
-  for (o = first_inv(ob); o; o = next_inv(o)) {
+  for (o = first_inv(ob); o; o = next_inv(ob, o)) {
     rec_add_object(o, flags);
   }
 }
@@ -1180,7 +1181,7 @@ static void find_uninited_objects(object_t* ob) {
     loaded_objects[num_objects++] = ob;
     add_ref(ob, "find_uninited_objects");
   }
-  for (o = first_inv(ob); o; o = next_inv(o)) {
+  for (o = first_inv(ob); o; o = next_inv(ob, o)) {
     find_uninited_objects(o);
   }
 }
@@ -3444,39 +3445,33 @@ void f_parse_sentence(LPCFrame& f) {
     best_result = nullptr;
   }
 
-  if (num_arg == 4) {
-    parse_nicks = f.steal(f.argc() - 1).u.map;
-    f.pop_back();
-  }
-
-  if (num_arg >= 3) {
-    parse_env = f.steal(f.argc() - 1).u.arr;
-    f.pop_back();
-  }
-
-  LPC_INT dbg = 0;
-  if (num_arg >= 2) {
-    dbg = f.number(f.argc() - 1);
-    f.pop_back();
-  }
-  if (dbg) {
+  LPC_INT const dbg = num_arg >= 2 ? f.number(1) : 0;
 #if defined(DEBUG) || defined(PARSE_DEBUG)
+  if (dbg) {
     debug_parse_depth = 1;
-    if (dbg > 1) {
-      debug_parse_verbose = 1;
-    } else {
-      debug_parse_verbose = 0;
-    }
+    debug_parse_verbose = dbg > 1 ? 1 : 0;
   } else {
     /* also when no debug argument was passed: a previous call's setting
      * must not stick */
     debug_parse_depth = 0;
+  }
 #else
+  /* Before anything is moved off the stack, so this error leaks nothing. */
+  if (dbg) {
     error(
         "Parser debugging not enabled. (compile with -DDEBUG or "
         "-DPARSE_DEBUG).\n");
-#endif
   }
+#endif
+
+  /* free_parse_globals() releases these */
+  if (num_arg == 4) {
+    parse_nicks = f.steal(3).u.map;
+  }
+  if (num_arg >= 3) {
+    parse_env = f.steal(2).u.arr;
+  }
+  f.pop_back(num_arg - 1);
 
   StackErrorHandler parse_cleanup(free_parse_globals);
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
@@ -3717,8 +3712,8 @@ void f_parse_add_synonym(LPCFrame& f) {
 
   verb_entry = nullptr;
 
-  if (!old_verb) {
-    error("%s is not a verb!\n", old_verb);
+  if (!old_verb) { /* not even a shared string, so certainly not a verb */
+    error("%s is not a verb!\n", f.string(1));
   }
 
   vb = verbs[DO_HASH(old_verb, VERB_HASH_SIZE)];

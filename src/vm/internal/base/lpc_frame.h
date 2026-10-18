@@ -146,8 +146,8 @@ class LPCFrame {
   void ret_str_constant(const char* p); /* static storage; never freed */
   void ret_str_copy(const char* p);     /* copies p, which may be an argument */
 
-  /* A helper pushed the result just above the window (outbuf_push(),
-   * implode_array(), ...): keep that value, release the window under it. */
+  /* A helper pushed the result just above the window (e.g.
+   * check_all_blocks()): keep that value, release the window under it. */
   void ret_pushed();
 
  private:

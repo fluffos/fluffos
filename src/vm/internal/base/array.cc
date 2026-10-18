@@ -427,14 +427,18 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
   int i = 0, n;
   svalue_t* v;
 
+  /* dest is the array's own slot: every path that overwrites it releases
+   * the reference that slot held. */
   if (first_on_stack) {
     if (!(n = arr->size)) {
       *dest = *sp--;
+      free_array(arr);
       return;
     }
   } else {
     if (!(n = arr->size)) {
       *dest = const0;
+      free_array(arr);
       return;
     } else if (n == 1) {
       assign_svalue_no_free(dest, &arr->item[0]);
@@ -452,6 +456,7 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
     v = call_function_pointer(fptr, 2);
     if (!v) {
       *dest = const0;
+      free_array(arr);
       return;
     }
     if (i < n) {

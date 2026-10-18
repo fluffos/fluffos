@@ -9,6 +9,9 @@
 
 #include <zlib.h>
 
+#include <memory>
+#include <string>
+
 #define GZ_EXTENSION ".gz"
 
 enum { COMPRESS_BUF_SIZE = 8096 };
@@ -31,7 +34,7 @@ void f_compress_file(LPCFrame& f) {
   const char* output_file;
   const char* real_input_file;
   const char* real_output_file;
-  char* tmpout;
+  std::string tmpout; /* owns a generated output name; error()-safe */
   gzFile out_file;
   FILE* in_file;
   char buf[4096];
@@ -56,33 +59,21 @@ void f_compress_file(LPCFrame& f) {
       f.ret(0);
       return;
     }
-    tmpout = new_string(strlen(input_file) + strlen(GZ_EXTENSION), "compress_file");
-    strcpy(tmpout, input_file);
-    strcat(tmpout, GZ_EXTENSION);
-    output_file = tmpout;
+    tmpout = std::string(input_file) + GZ_EXTENSION;
+    output_file = tmpout.c_str();
   }
 
   real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
   if (!real_output_file) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
     f.ret(0);
     return;
   }
   if (strlen(real_output_file) >= sizeof(outname)) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
     f.ret(0);
     return;
   }
   // Copy it into our little buffer.
   strcpy(outname, real_output_file);
-  // Free the old file.
-  if (num_arg != 2) {
-    FREE_MSTR(output_file);
-  }
   output_file = outname;
 
   real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
@@ -144,6 +135,7 @@ void f_uncompress_file(LPCFrame& f) {
   int len;
   const char* input_file;
   const char* output_file;
+  std::string tmpout; /* owns a generated output name; error()-safe */
   const char* real_input_file;
   const char* real_output_file;
   FILE* out_file;
@@ -165,40 +157,28 @@ void f_uncompress_file(LPCFrame& f) {
     }
     output_file = f.string(1);
   } else {
-    char* tmp;
     if (!has_gz_extension(input_file)) {
       // Not compressed...
       f.ret(0);
       return;
     }
     len = strlen(input_file);
-    tmp = new_string(len, "compress_file");
-    strcpy(tmp, input_file);
-    tmp[len - strlen(GZ_EXTENSION)] = 0;
-    output_file = tmp;
+    tmpout.assign(input_file, len - strlen(GZ_EXTENSION));
+    output_file = tmpout.c_str();
   }
 
   real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
   if (!real_output_file) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
 
     f.ret(0);
     return;
   }
   if (strlen(real_output_file) >= sizeof(outname)) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
     f.ret(0);
     return;
   }
   // Copy it into our little buffer.
   strcpy(outname, real_output_file);
-  if (num_arg != 2) {
-    FREE_MSTR(output_file);
-  }
   output_file = outname;
 
   real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
@@ -258,7 +238,6 @@ void f_uncompress_file(LPCFrame& f) {
 
 #ifdef F_COMPRESS
 void f_compress(LPCFrame& f) {
-  unsigned char* buffer;
   unsigned char* input;
   int size;
   buffer_t* real_buffer;
@@ -276,14 +255,18 @@ void f_compress(LPCFrame& f) {
   }
 
   new_size = compressBound(size);
-  // Make it a little larger as specified in the docs.
-  buffer = reinterpret_cast<unsigned char*>(DMALLOC(new_size, TAG_TEMPORARY, "compress"));
-  compress(buffer, &new_size, input, size);
+  // Make it a little larger as specified in the docs. Owned, so an
+  // allocate_buffer() error() on an oversized result still frees it.
+  struct FreeScratch {
+    void operator()(unsigned char* p) const { FREE(p); }
+  };
+  std::unique_ptr<unsigned char, FreeScratch> buffer(
+      reinterpret_cast<unsigned char*>(DMALLOC(new_size, TAG_TEMPORARY, "compress")));
+  compress(buffer.get(), &new_size, input, size);
 
   // Shrink it down.
   real_buffer = allocate_buffer(new_size);
-  write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer), new_size);
-  FREE(buffer);
+  write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer.get()), new_size);
   f.ret_refed(real_buffer);
 }
 #endif

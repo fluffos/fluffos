@@ -2,6 +2,8 @@
 
 #include <unicode/ucnv.h>
 
+#include <memory>
+
 namespace {
 const char* default_encoding = "utf-8";
 }  // namespace
@@ -85,45 +87,48 @@ void f_query_encoding(LPCFrame& f) {
 #endif
 
 #ifdef F_STRING_ENCODE
+namespace {
+/* error() is a C++ throw, so these owners also release on an error path:
+ * an oversized result makes allocate_buffer()/new_string() error(). */
+using ConverterOwner = std::unique_ptr<UConverter, decltype(&ucnv_close)>;
+struct FreeMstr {
+  void operator()(char* p) const { FREE_MSTR(p); }
+};
+}  // namespace
+
 void f_string_encode(LPCFrame& f) {
   const auto* data = f.string(0);
   auto len = f.string_len(0);
   const auto* encoding = f.string(1);
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto* trans = ucnv_open(encoding, &error_code);
+  ConverterOwner trans(ucnv_open(encoding, &error_code), &ucnv_close);
   if (U_FAILURE(error_code)) {
     error("string_encode: Invalid encoding '%s', error: %s.", encoding, u_errorName(error_code));
   }
 
   error_code = U_ZERO_ERROR;
-  auto required =
-      ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, nullptr, 0, data, len, &error_code);
+  auto required = ucnv_fromAlgorithmic(trans.get(), UConverterType::UCNV_UTF8, nullptr, 0, data,
+                                       len, &error_code);
   if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
-    ucnv_close(trans);
     error("string_encode: error: %s.", u_errorName(error_code));
   }
 
   size_t const translen = required;
   error_code = U_ZERO_ERROR;
-  auto* buffer = allocate_buffer(translen);
+  std::unique_ptr<buffer_t, decltype(&free_buffer)> buffer(allocate_buffer(translen),
+                                                           &free_buffer);
   auto* transdata = (char*)buffer->item;
 
-  auto written = ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, transdata, translen, data,
-                                      len, &error_code);
+  auto written = ucnv_fromAlgorithmic(trans.get(), UConverterType::UCNV_UTF8, transdata, translen,
+                                      data, len, &error_code);
   DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error.");
   if (U_FAILURE(error_code)) {
-    ucnv_close(trans);
-    free_buffer(buffer);
     error("string_encode: error: %s.", u_errorName(error_code));
   }
-  f.ret_refed(buffer);
-
-  ucnv_close(trans);
+  f.ret_refed(buffer.release());
 }
-#endif
 
-#ifdef F_STRING_DECODE
 void f_string_decode(LPCFrame& f) {
   auto* data = (char*)(f.buffer(0)->item);
   auto len = f.buffer(0)->size;
@@ -133,34 +138,29 @@ void f_string_decode(LPCFrame& f) {
   while (len > 1 && data[len - 1] == '\0') len--;
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto* trans = ucnv_open(encoding, &error_code);
+  ConverterOwner trans(ucnv_open(encoding, &error_code), &ucnv_close);
   if (U_FAILURE(error_code)) {
     error("string_decode: Invalid encoding '%s', error: %s.", encoding, u_errorName(error_code));
   }
 
   error_code = U_ZERO_ERROR;
-  auto required =
-      ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, nullptr, 0, data, len, &error_code);
+  auto required = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans.get(), nullptr, 0, data,
+                                     len, &error_code);
   if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
-    ucnv_close(trans);
     error("string_decode: error: %s.", u_errorName(error_code));
   }
 
-  auto* res = new_string(required, "f_string_decode");
+  std::unique_ptr<char, FreeMstr> res(new_string(required, "f_string_decode"));
 
   error_code = U_ZERO_ERROR;
-  auto written =
-      ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, res, required, data, len, &error_code);
-  res[required] = '\0';
+  auto written = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans.get(), res.get(), required,
+                                    data, len, &error_code);
+  res.get()[required] = '\0';
   if (U_FAILURE(error_code)) {
-    ucnv_close(trans);
-    FREE_MSTR(res);
     error("string_decode: error: %s.", u_errorName(error_code));
   }
   DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
-  f.ret_str_malloced(res);
-
-  ucnv_close(trans);
+  f.ret_str_malloced(res.release());
 }
 #endif
 

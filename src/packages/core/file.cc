@@ -8,6 +8,7 @@
 #include "packages/core/file.h"
 
 #include <iostream>
+#include <string>
 #include <cerrno>
 #if HAVE_DIRENT_H
 #include <dirent.h>
@@ -1048,14 +1049,12 @@ void f_file_size(LPCFrame& f) {
 
   // cross platform fix
 #ifdef _WIN32
-  if (i == -1 && f.string(0)[f.string_len(0) - 1] == '/') {
-    auto len = f.string_len(0);
-    auto tmp = string_copy(f.string(0), "f_file_size");
-    tmp[len - 1] = '\0';
-    if (file_size(tmp) == -2) {
+  auto const len = f.string_len(0);
+  if (i == -1 && len > 0 && f.string(0)[len - 1] == '/') {
+    std::string const trimmed(f.string(0), len - 1);
+    if (file_size(trimmed.c_str()) == -2) {
       i = -2;
     }
-    FREE_MSTR(tmp);
   }
 #endif
 
