@@ -1127,13 +1127,11 @@ static void print_prompt(interactive_t* ip) {
       tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
     }
 #endif
-    else {
-      object_t* ob = ip->ob;
-      /* write_prompt() is LPC and may remove the user before failing. */
-      if (!safe_apply(APPLY_WRITE_PROMPT, ob, 0, ORIGIN_DRIVER) && IP_VALID(ip, ob)) {
-        ip->iflags &= ~HAS_WRITE_PROMPT;
-        tell_object(ob, ip->prompt, strlen(ip->prompt));
-      }
+    /* write_prompt() is LPC and may remove the user before failing. */
+    else if (object_t* ob = ip->ob;
+             !safe_apply(APPLY_WRITE_PROMPT, ob, 0, ORIGIN_DRIVER) && IP_VALID(ip, ob)) {
+      ip->iflags &= ~HAS_WRITE_PROMPT;
+      tell_object(ip->ob, ip->prompt, strlen(ip->prompt));
     }
   } catch (const char*) {
     restore_context(&econ);
