@@ -91,13 +91,6 @@ struct interactive_t {
   char u8_carry[4];
   int u8_carry_len;
 
-  // Driver frames up the C stack that keep using this struct after running
-  // LPC (see InteractivePin, comm.h), and whether remove_interactive() has
-  // already torn the connection down underneath them -- the last pin then
-  // frees what remove_interactive() left behind.
-  int pins;
-  bool torn_down;
-
   // Last NAWS report (0 = none yet).  The window_size apply is replayed
   // from this on logon, because fast clients answer the initial DO NAWS
   // while ip->ob is still the master object.

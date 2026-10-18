@@ -542,10 +542,10 @@ void telnet_event_handler(telnet_t* telnet, telnet_event_t* ev, void* user_data)
   auto ip = reinterpret_cast<interactive_t*>(user_data);
 
   // LPC run for an earlier event in this telnet_recv() removed the user:
-  // comm_telnet_received()'s pin keeps ip and the telnet handle alive until
-  // libtelnet finishes the buffer, but the transport, translator and object
-  // are gone. Ignore the rest of the buffer.
-  if (ip->torn_down) {
+  // comm_telnet_received()'s InteractiveScope keeps ip and the telnet handle
+  // allocated until libtelnet finishes the buffer, but the connection is
+  // gone. Ignore the rest of it.
+  if (ip->transport == nullptr) {
     return;
   }
 

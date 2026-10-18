@@ -12,6 +12,7 @@
 #include <cstring>   // for NULL, memcpy, strlen, etc
 #include <unistd.h>  // for gethostname
 #include <memory>    // for unique_ptr
+#include <vector>
 // Network stuff
 #ifndef _WIN32
 #include <netdb.h>       // for getnameinfo, gai_strerror
@@ -57,6 +58,11 @@ static void receive_snoop(const char* /*buf*/, int /*len*/, object_t* ob);
 static void free_interactive(interactive_t* ip);
 
 namespace {
+// Open InteractiveScopes, and the interactives remove_interactive() tore
+// down while one was open (see comm.h).
+int g_interactive_scopes = 0;
+std::vector<interactive_t*> g_closed_interactives;
+
 // If a complete command is buffered, ask the connection's transport to
 // arrange a process_user_command() run on the driver's scheduler.
 void maybe_schedule_user_command(interactive_t* user) {
@@ -218,8 +224,15 @@ void add_message(object_t* who, const char* data, int len) {
     return;
   }
 
-  if ((g_hook_mask & HOOK_MASK_NET_WRITE) && !hook_dispatch_net_write(who, data, len)) {
-    return; /* DECIDE refuse drops the payload */
+  if (g_hook_mask & HOOK_MASK_NET_WRITE) {
+    if (!hook_dispatch_net_write(who, data, len)) {
+      return; /* DECIDE refuse drops the payload */
+    }
+    /* A handler may have destructed or disconnected `who`. */
+    if ((who->flags & O_DESTRUCTED) || !who->interactive ||
+        (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+      return;
+    }
   }
 
   inet_packets++;
@@ -258,18 +271,22 @@ void add_message(object_t* who, const char* data, int len) {
     hook_dispatch_net_write_after(who, data, len);
   }
 
+  /* From here on LPC may have run (the AFTER hook, a shadow's catch_tell)
+   * and removed the user, freeing ip: re-check before each use. */
 #ifdef SHADOW_CATCH_MESSAGE
   /*
    * shadow handling.
    */
   if (shadow_catch_message(who, data)) {
-    if (CONFIG_INT(__RC_SNOOP_SHADOWED__)) {
+    if (CONFIG_INT(__RC_SNOOP_SHADOWED__) && IP_VALID(ip, who)) {
       handle_snoop(data, len, ip);
     }
     return;
   }
 #endif /* NO_SHADOWS */
-  handle_snoop(data, len, ip);
+  if (IP_VALID(ip, who)) {
+    handle_snoop(data, len, ip);
+  }
 
   add_message_calls++;
 } /* add_message() */
@@ -373,7 +390,7 @@ void comm_text_received(interactive_t* ip, const char* data, size_t len) {
   if (!len) {
     return;
   }
-  InteractivePin const pin(ip);
+  InteractiveScope const scope;
 
   comm_reserve_input_space(ip, len);
 
@@ -395,7 +412,7 @@ void comm_telnet_received(interactive_t* ip, const char* data, size_t len) {
   }
   // Telnet events run applies and hooks, any of which may destruct the user
   // while libtelnet is still parsing this buffer.
-  InteractivePin const pin(ip);
+  InteractiveScope const scope;
 
   comm_reserve_input_space(ip, len);
 
@@ -439,7 +456,7 @@ void on_user_input(interactive_t* ip, const char* data, size_t len) {
       return; /* DECIDE refuse drops the input */
     }
     if (ip->iflags & CLOSING) {
-      return; /* the hook removed the user; the caller's pin keeps ip */
+      return; /* the hook removed the user; the caller's scope keeps ip */
     }
   }
   for (int i = 0; i < len; i++) {
@@ -877,12 +894,12 @@ void remove_interactive(object_t* ob, int dested) {
 
   user_del(ip);
   ob->interactive = nullptr;
-  if (ip->pins > 0) {
-    // Input processing up the C stack ran the LPC that brought us here and
-    // still holds ip -- libtelnet may be in the middle of telnet_recv() on
-    // ip->telnet. The last InteractivePin frees what is left; CLOSING tells
-    // that code to stop.
-    ip->torn_down = true;
+  if (g_interactive_scopes > 0) {
+    // Driver code up the C stack may have run the LPC that brought us here
+    // and still hold ip -- libtelnet may be in the middle of telnet_recv() on
+    // ip->telnet. The outermost InteractiveScope frees what is left; CLOSING
+    // tells that code to stop.
+    g_closed_interactives.push_back(ip);
     return;
   }
   free_interactive(ip);
@@ -903,11 +920,14 @@ static void free_interactive(interactive_t* ip) {
   free_object(&ob, "remove_interactive");
 }
 
-InteractivePin::InteractivePin(interactive_t* ip) : ip_(ip) { ip_->pins++; }
+InteractiveScope::InteractiveScope() { g_interactive_scopes++; }
 
-InteractivePin::~InteractivePin() {
-  if (--ip_->pins == 0 && ip_->torn_down) {
-    free_interactive(ip_);
+InteractiveScope::~InteractiveScope() {
+  if (--g_interactive_scopes == 0) {
+    for (interactive_t* ip : g_closed_interactives) {
+      free_interactive(ip);
+    }
+    g_closed_interactives.clear();
   }
 }
 

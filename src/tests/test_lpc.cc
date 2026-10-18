@@ -1023,7 +1023,7 @@ TEST_F(DriverTest, RemoveInteractiveDestructedStress) {
 }
 
 // ---------------------------------------------------------------------------
-// LPC run during input processing removes the user.
+// LPC run while the driver is using a connection removes the user.
 //
 // Input processing keeps using the interactive after it runs LPC: libtelnet
 // is still parsing the rest of the buffer when an apply or hook returns into
@@ -1031,8 +1031,8 @@ TEST_F(DriverTest, RemoveInteractiveDestructedStress) {
 // may destruct the user, and remove_interactive() used to free the
 // interactive and its telnet handle on the spot -- every later byte of the
 // buffer was then a heap use-after-free. These drive real telnet / text
-// bytes through comm_telnet_received() / comm_text_received() on a
-// fabricated connection whose LPC destructs the user partway through.
+// bytes (and output, for the net:write hook) through a fabricated
+// connection whose LPC destructs the user partway through.
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -1075,8 +1075,8 @@ interactive_t* fabricate_telnet_interactive(object_t* ob, TransportLog* log) {
 // and checks the connection was torn down cleanly by the user's own
 // destruct.
 template <typename Feed>
-void ExpectInputDestructsUser(const char* src, const char* name, const std::string& input,
-                              const char* arm, Feed&& feed) {
+void ExpectUserDestructedMidway(const char* src, const char* name, const std::string& input,
+                                const char* arm, Feed&& feed) {
   object_t* body = nullptr;
   RunGuarded([&] { body = load_object_from_source(src, name, 0); });
   ASSERT_NE(body, nullptr);
@@ -1130,8 +1130,8 @@ std::string NawsThenMore() {
 
 // An apply run for a telnet event (window_size) destructs the user.
 TEST_F(DriverTest, TelnetApplyDestructsUserMidBuffer) {
-  ExpectInputDestructsUser("void window_size(int w, int h) { destruct(this_object()); }\n",
-                           "telnet_destruct_naws", NawsThenMore(), nullptr, FeedTelnet);
+  ExpectUserDestructedMidway("void window_size(int w, int h) { destruct(this_object()); }\n",
+                             "telnet_destruct_naws", NawsThenMore(), nullptr, FeedTelnet);
 }
 
 // receive_environ() runs once per variable of ONE event: the first call
@@ -1142,7 +1142,7 @@ TEST_F(DriverTest, TelnetEnvironApplyDestructsUser) {
   in += {0 /* VAR */, 'B', 1 /* VALUE */, '2'};
   in += {kIAC, kSE};
   in += "look\r\n";
-  ExpectInputDestructsUser(
+  ExpectUserDestructedMidway(
       "int calls;\n"
       "void receive_environ(string var, string val) { calls++; destruct(this_object()); }\n",
       "telnet_destruct_environ", in, nullptr, FeedTelnet);
@@ -1150,13 +1150,13 @@ TEST_F(DriverTest, TelnetEnvironApplyDestructsUser) {
 
 // A net:telnet hook destructs the user before the driver's own handler runs.
 TEST_F(DriverTest, TelnetHookDestructsUser) {
-  ExpectInputDestructsUser(
+  ExpectUserDestructedMidway(
       "#include <hooks.h>\n"
       "void on_telnet(int id, object user, string event, string option, string payload) {\n"
       "  destruct(this_object());\n"
       "}\n"
       "void arm() {\n"
-      "  hook_attach(\"net:telnet\", (: on_telnet :), ([ \"label\": \"pin-telnet\" ]),\n"
+      "  hook_attach(\"net:telnet\", (: on_telnet :), ([ \"label\": \"destruct-telnet\" ]),\n"
       "              HOOK_BEFORE);\n"
       "}\n",
       "telnet_destruct_hook", NawsThenMore(), "arm", FeedTelnet);
@@ -1171,11 +1171,34 @@ TEST_F(DriverTest, NetReadHookDestructsUser) {
       "  destruct(this_object());\n"
       "}\n"
       "void arm() {\n"
-      "  hook_attach(\"net:read\", (: on_read :), ([ \"label\": \"pin-read\" ]), HOOK_BEFORE);\n"
+      "  hook_attach(\"net:read\", (: on_read :), ([ \"label\": \"destruct-read\" ]), "
+      "HOOK_BEFORE);\n"
       "}\n";
-  ExpectInputDestructsUser(src, "net_read_destruct_telnet", "look\r\nsay hi\r\n", "arm",
-                           FeedTelnet);
-  ExpectInputDestructsUser(src, "net_read_destruct_text", "look\r\nsay hi\r\n", "arm", FeedText);
+  ExpectUserDestructedMidway(src, "net_read_destruct_telnet", "look\r\nsay hi\r\n", "arm",
+                             FeedTelnet);
+  ExpectUserDestructedMidway(src, "net_read_destruct_text", "look\r\nsay hi\r\n", "arm", FeedText);
+}
+
+// A net:write hook destructs the user it is writing to: add_message() must
+// not go on to the gone connection, before (BEFORE) or after (AFTER) the
+// payload is handed to it.
+TEST_F(DriverTest, NetWriteHookDestructsUser) {
+  for (const char* kind : {"HOOK_BEFORE", "HOOK_AFTER"}) {
+    std::string const src = std::string(
+                                "#include <hooks.h>\n"
+                                "void on_write(int id, object user, int len, string data) {\n"
+                                "  destruct(this_object());\n"
+                                "}\n"
+                                "void arm() {\n"
+                                "  hook_attach(\"net:write\", (: on_write :), ([ \"label\": "
+                                "\"destruct-write\" ]), ") +
+                            kind + ");\n}\n";
+    std::string const name = std::string("net_write_destruct_") + kind;
+    ExpectUserDestructedMidway(src.c_str(), name.c_str(), "hello\n", "arm",
+                               [](interactive_t* ip, const std::string& out) {
+                                 add_message(ip->ob, out.data(), static_cast<int>(out.size()));
+                               });
+  }
 }
 
 // The mxp_tag apply, run for a buffered command, destructs the user; the
@@ -1191,9 +1214,8 @@ TEST_F(DriverTest, MxpTagApplyDestructsUser) {
   uint32_t const ref_before = body->ref;
   interactive_t* ip = fabricate_interactive(body);
   ip->iflags |= USING_MXP | CMD_IN_BUF;
-  const char cmd[] = " [1z\n";
-  memcpy(ip->text, cmd, sizeof(cmd) - 1);
-  ip->text_end = sizeof(cmd) - 1;
+  std::string const cmd = " [1z\n";
+  ip->text_end = static_cast<int>(cmd.copy(ip->text, cmd.size()));
 
   RunGuarded([&] { process_user_command(ip); });
 

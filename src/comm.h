@@ -38,24 +38,22 @@
   if (!IP_VALID(ip, ob)) goto failure
 
 /*
- * Input processing can't use IP_VALID: it holds the ip itself, not an
- * object, and libtelnet is still walking ip->telnet when an apply or hook
- * returns into it. Hold an InteractivePin across such code instead. If LPC
- * destructs the user (or otherwise remove_interactive()s it) while a pin is
- * held, the connection is still closed and the object detached, but the
- * struct, its telnet handle and its object reference are left for the last
- * pin to free. After any call that can run LPC, stop if
+ * Input processing and connection events can't use IP_VALID: they hold the
+ * ip itself, not an object, and libtelnet is still walking ip->telnet when
+ * an apply or hook returns into it. Run such code inside an
+ * InteractiveScope instead. While any scope is open, remove_interactive()
+ * still closes the connection and detaches the object, but leaves the
+ * struct, its telnet handle and its object reference for the outermost
+ * scope to free on exit -- the way a destructed object outlives destruct()
+ * until the next sweep. After any call that can run LPC, stop if
  * (ip->iflags & CLOSING).
  */
-class InteractivePin {
+class InteractiveScope {
  public:
-  explicit InteractivePin(struct interactive_t* ip);
-  ~InteractivePin();
-  InteractivePin(const InteractivePin&) = delete;
-  InteractivePin& operator=(const InteractivePin&) = delete;
-
- private:
-  struct interactive_t* ip_;
+  InteractiveScope();
+  ~InteractiveScope();
+  InteractiveScope(const InteractiveScope&) = delete;
+  InteractiveScope& operator=(const InteractiveScope&) = delete;
 };
 
 /*
