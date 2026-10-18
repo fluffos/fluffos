@@ -4,4 +4,16 @@ void do_tests() {
   ASSERT_EQ(1, write_bytes("/wb_test.bin", 2, "xy"));
   ASSERT_EQ("AAxyAAAA", read_file("/wb_test.bin"));
   rm("/wb_test.bin");
+
+  /* a missing file is created */
+  ASSERT_EQ(-1, file_size("/wb_test.bin"));
+  ASSERT_EQ(1, write_bytes("/wb_test.bin", 0, "new"));
+  ASSERT_EQ("new", read_file("/wb_test.bin"));
+  /* writing at the end extends without truncating what's there */
+  ASSERT_EQ(1, write_bytes("/wb_test.bin", 3, "er"));
+  ASSERT_EQ("newer", read_file("/wb_test.bin"));
+  rm("/wb_test.bin");
+
+  /* a directory can't be written */
+  ASSERT_EQ(0, write_bytes("/single", 0, "x"));
 }

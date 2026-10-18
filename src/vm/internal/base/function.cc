@@ -639,7 +639,8 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         }
 
         if (g_hook_mask & HOOK_MASK_EFUN) {
-          hook_dispatch_efun_after(ename, efun_filter_ob);
+          hook_dispatch_efun_after(ename, efun_filter_ob,
+                                   instrs[i].ret_type != TYPE_NOVALUE ? sp : nullptr);
         }
 
         free_svalue(&apply_ret_value, "call_function_pointer");

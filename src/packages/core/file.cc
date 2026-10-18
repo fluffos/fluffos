@@ -69,6 +69,11 @@ namespace fs = ghc::filesystem;
 #define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
 #endif
 
+/* Windows open() translates CRLF unless asked not to; POSIX has no such flag. */
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 #ifdef _WIN32
 #define lstat(x, y) stat(x, y)
 #define link(x, y) ((-1))
@@ -595,18 +600,17 @@ int write_bytes(const char* file, LPC_INT start, const char* str, int theLength)
   if (theLength > max_byte_transfer) {
     return 0;
   }
-  /* Under system V, it isn't possible change existing data in a file
-   * opened for append, so it can't be opened for append.
-   * opening for r+ won't create the file if it doesn't exist.
-   * opening for w or w+ will truncate it if it does exist.  So we
-   * have to check if it exists first.
-   */
-  if (stat(file, &st) == -1) {
-    fptr = fopen(file, "wb");
-  } else {
-    fptr = fopen(file, "r+b");
+  /* Append mode can't change existing data, fopen()'s "r+" won't create a
+   * missing file and "w"/"w+" truncate an existing one. Picking between the
+   * last two with a stat() first races with the file appearing or vanishing
+   * in between, so create-without-truncate in one open() instead. */
+  int const fd = open(file, O_RDWR | O_CREAT | O_BINARY, 0666);
+  if (fd == -1) {
+    return 0;
   }
+  fptr = fdopen(fd, "r+b");
   if (fptr == nullptr) {
+    close(fd);
     return 0;
   }
   if (fstat(fileno(fptr), &st) == -1) {

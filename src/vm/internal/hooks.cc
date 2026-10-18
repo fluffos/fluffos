@@ -2038,14 +2038,14 @@ HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, sva
   return HookGateResult::NoOpinion;
 }
 
-void hook_dispatch_efun_after(const char* efun_name, object_t* filter_ob) {
+void hook_dispatch_efun_after(const char* efun_name, object_t* filter_ob, svalue_t* result) {
   if (!(g_hook_mask & HOOK_MASK_EFUN)) {
     return;
   }
   auto list = snapshot_point(PointId::Efun);
   svalue_t ret{};
-  if (sp) {
-    assign_svalue_no_free(&ret, sp);
+  if (result) {
+    assign_svalue_no_free(&ret, result);
   } else {
     ret = const0;
   }

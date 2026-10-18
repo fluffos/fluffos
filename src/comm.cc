@@ -418,7 +418,7 @@ static const int ANSI_SUBSTITUTE = 0x20;
 // each time.
 void on_user_input(interactive_t* ip, const char* data, size_t len) {
   if (g_hook_mask & HOOK_MASK_NET_READ) {
-    object_t* user_ob = ip && ip->ob && !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
+    object_t* user_ob = !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
     if (!hook_dispatch_net_read(user_ob, data, static_cast<int>(len))) {
       return; /* DECIDE refuse drops the input */
     }

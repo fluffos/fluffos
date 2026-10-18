@@ -51,6 +51,27 @@ mixed on_efun_after(int id, object actor, object caller, object target, string f
   return 0;
 }
 
+nosave mixed *efun_after_results = ({});
+
+mixed on_efun_after_result(int id, object actor, object caller, object target, string fn,
+  mixed *args, mixed result) {
+  efun_after_results += ({ result });
+  return 0;
+}
+
+/* A void efun leaves nothing on the stack: the slot AFTER used to read is the
+ * caller's (here the last local, `marker`), not a result. */
+mixed *void_efun_after_results() {
+  mapping m = ([ "k": 1 ]);
+  int id = hook_attach("efun:map_delete", (: on_efun_after_result :),
+    ([ "label": "efun-after-void" ]), HOOK_AFTER);
+  string marker = "caller slot";
+  efun_after_results = ({});
+  map_delete(m, "k");
+  hook_detach(id);
+  return efun_after_results;
+}
+
 nosave mixed *apply_miss_log = ({});
 
 mixed on_apply_miss(int id, object actor, object caller, object target, string fn, mixed *args,
@@ -142,6 +163,15 @@ void do_tests() {
   all_inventory(room);
   ASSERT_EQ(efun_after_hits, 1);
   hook_detach(eid_after);
+
+  /* efun AFTER result: the return value, or 0 for a void efun */
+  efun_after_results = ({});
+  int eid_res = hook_attach("efun:sizeof", (: on_efun_after_result :),
+    ([ "label": "efun-after-result" ]), HOOK_AFTER);
+  ASSERT_EQ(sizeof(arr), 2);
+  hook_detach(eid_res);
+  ASSERT_EQ(efun_after_results, ({ 2 }));
+  ASSERT_EQ(void_efun_after_results(), ({ 0 }));
 
   /* function name trailing '*' */
   fn_before_log = ({});

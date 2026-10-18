@@ -5331,7 +5331,8 @@ void eval_instruction(char* p) {
           (*efun_table[instruction - EFUN_BASE])();
 
           if (g_hook_mask & HOOK_MASK_EFUN) {
-            hook_dispatch_efun_after(ename, efun_filter_ob);
+            hook_dispatch_efun_after(ename, efun_filter_ob,
+                                     instrs[instruction].ret_type != TYPE_NOVALUE ? sp : nullptr);
           }
         }
 

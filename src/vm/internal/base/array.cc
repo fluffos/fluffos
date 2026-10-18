@@ -1704,13 +1704,18 @@ array_t* intersect_array(array_t* a1, array_t* a2) {
    * to ref 0 without freeing it (a leak of the array and its contents).
    * Intersect against a private copy instead, dropping the duplicate
    * reference; union_array() special-cases the same aliasing. */
+  bool a2_private = false;
   if (a1 == a2) {
     a2 = copy_array(a1);
     a1->ref--; /* >= 2 here: we were handed one reference per operand */
+    a2_private = true;
   }
 
   svt_1 = alist_sort(a1);
-  if ((flag = (a2->ref > 1))) {
+  /* A shared a2 is sorted into a scratch table; one we hold the only
+   * reference to (including the private copy above) is sorted in place and
+   * its husk deallocated at the end. */
+  if ((flag = (!a2_private && a2->ref > 1))) {
     sv_tab = reinterpret_cast<svalue_t*>(
         DCALLOC(a2s, sizeof(svalue_t), TAG_TEMPORARY, "intersect_array: sv2_tab"));
     sv_ptr = a2->item;

@@ -128,10 +128,11 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
 /* efun:<name> — before the C efun runs. name is instrs[].name (no "efun:" prefix).
  * On return, *filter_ob_out (when non-null) is the first live object argument
  * used for object/target matching — pass it to hook_dispatch_efun_after, since
- * the efun consumes its args before AFTER runs. */
+ * the efun consumes its args before AFTER runs. AFTER's `result` is the efun's
+ * return value on the stack, or nullptr for a void efun (handlers then see 0). */
 HookGateResult hook_dispatch_efun_before(const char* efun_name, int num_arg, svalue_t* out,
                                          object_t** filter_ob_out);
-void hook_dispatch_efun_after(const char* efun_name, object_t* filter_ob);
+void hook_dispatch_efun_after(const char* efun_name, object_t* filter_ob, svalue_t* result);
 
 /* net:accept — peer address string; false means refuse (caller closes fd). */
 bool hook_dispatch_net_accept(const char* addr);

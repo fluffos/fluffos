@@ -222,8 +222,8 @@ mixed handler(int id, object actor, object caller, object target,
 - `HOOK_DECIDE`: return `({ value })` to answer (skip the body); a string or
   `1` to refuse; `0` for no opinion. `efun:*` DECIDE is refuse-only (no
   answer); a refuse skips the efun and yields `0`.
-- `HOOK_AFTER`: sees the return value (call args are not preserved — the
-  `args` slot is an empty array).
+- `HOOK_AFTER`: sees the return value (`0` for an efun that returns
+  nothing; call args are not preserved — the `args` slot is an empty array).
 - `HOOK_AROUND` (`function` only): highest-priority match replaces the body.
   Call `hook_proceed()` or `hook_proceed(mixed *args)` once to run the real
   call; the handler's return value becomes the call result. Returning

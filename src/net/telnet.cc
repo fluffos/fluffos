@@ -530,12 +530,13 @@ static inline void on_telnet_ttype(const char* name, interactive_t* ip) {
 
 // Main event handler.
 void telnet_event_handler(telnet_t* telnet, telnet_event_t* ev, void* user_data) {
+  // Never null: net_telnet_init() hands libtelnet the interactive, and an
+  // interactive always has an object (master_ob until logon) while it exists.
   auto ip = reinterpret_cast<interactive_t*>(user_data);
-  object_t* user_ob =
-      (ip && ip->ob && !(ip->ob->flags & O_DESTRUCTED)) ? ip->ob : nullptr;
 
   /* net:telnet BEFORE/DECIDE for protocol events (DATA/SEND stay on net:read/write). */
   if (g_hook_mask & HOOK_MASK_NET_TELNET) {
+    object_t* user_ob = !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
     const char* event = nullptr;
     char optbuf[32];
     optbuf[0] = '\0';
@@ -576,11 +577,10 @@ void telnet_event_handler(telnet_t* telnet, telnet_event_t* ev, void* user_data)
       /* DECIDE refuse — only SB is droppable; skip the body handler. */
       return;
     }
-    /* A hook may have destructed the user; re-validate before continuing. */
-    if (!ip || (ip->iflags & (NET_DEAD | CLOSING))) {
+    /* A hook may have marked the connection dead or closing; stop here. */
+    if (ip->iflags & (NET_DEAD | CLOSING)) {
       return;
     }
-    user_ob = (ip->ob && !(ip->ob->flags & O_DESTRUCTED)) ? ip->ob : nullptr;
   }
 
   switch (ev->type) {
