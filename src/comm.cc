@@ -720,7 +720,7 @@ int process_user_command(interactive_t* ip) {
 
   if (ip->iflags & USING_MXP) {
     if (user_command[0] == ' ' && user_command[1] == '[' && user_command[3] == 'z') {
-      if (!on_receive_mxp_tag(ip, user_command)) {
+      if (!on_receive_mxp_tag(ip, user_command) || !IP_VALID(ip, command_giver)) {
         goto exit;
       }
     }

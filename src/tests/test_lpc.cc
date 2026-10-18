@@ -1099,7 +1099,12 @@ void ExpectInputDestructsUser(const char* src, const char* name, const std::stri
   // The connection's reference was released once input processing let go.
   EXPECT_EQ(body->ref, ref_before);
 
-  RunGuarded([&] { free_object(&body, name); });
+  RunGuarded([&] {
+    if (!(body->flags & O_DESTRUCTED)) {
+      destruct_object(body);  // failed above: don't leak its hook / user
+    }
+    free_object(&body, name);
+  });
   RunGuarded([&] { remove_destructed_objects(); });
 }
 
@@ -1171,4 +1176,37 @@ TEST_F(DriverTest, NetReadHookDestructsUser) {
   ExpectInputDestructsUser(src, "net_read_destruct_telnet", "look\r\nsay hi\r\n", "arm",
                            FeedTelnet);
   ExpectInputDestructsUser(src, "net_read_destruct_text", "look\r\nsay hi\r\n", "arm", FeedText);
+}
+
+// The mxp_tag apply, run for a buffered command, destructs the user; the
+// command must not then be dispatched on the freed connection.
+TEST_F(DriverTest, MxpTagApplyDestructsUser) {
+  object_t* body = nullptr;
+  RunGuarded([&] {
+    body = load_object_from_source("int mxp_tag(string tag) { destruct(this_object()); }\n",
+                                   "mxp_tag_destruct", 0);
+  });
+  ASSERT_NE(body, nullptr);
+
+  uint32_t const ref_before = body->ref;
+  interactive_t* ip = fabricate_interactive(body);
+  ip->iflags |= USING_MXP | CMD_IN_BUF;
+  const char cmd[] = " [1z\n";
+  memcpy(ip->text, cmd, sizeof(cmd) - 1);
+  ip->text_end = sizeof(cmd) - 1;
+
+  RunGuarded([&] { process_user_command(ip); });
+
+  EXPECT_TRUE(body->flags & O_DESTRUCTED);
+  EXPECT_EQ(body->interactive, nullptr);
+  EXPECT_TRUE(users().empty());
+  EXPECT_EQ(body->ref, ref_before);
+
+  RunGuarded([&] {
+    if (!(body->flags & O_DESTRUCTED)) {
+      destruct_object(body);
+    }
+    free_object(&body, "MxpTagApplyDestructsUser");
+  });
+  RunGuarded([&] { remove_destructed_objects(); });
 }
