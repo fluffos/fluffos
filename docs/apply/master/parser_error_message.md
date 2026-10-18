@@ -43,8 +43,9 @@ title: master / parser_error_message
     - `ERR_BAD_MULTIPLE` (2 arguments):
       - (no additional arguments)
 
-    - `ERR_MANY_PATHS` (5 arguments):
-      - (additional path-related data)
+    - `ERR_MANY_PATHS` (2 arguments):
+      - (no additional arguments: the sentence matched too many object
+        combinations to try)
 
     **Return Value:**
     - Return a string containing the error message to show to the user

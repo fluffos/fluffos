@@ -96,18 +96,8 @@ void call_heart_beat() {
 
     g_current_heartbeat_obj = ob;
 
-    error_context_t econ;
-
-    save_context(&econ);
-    try {
-      set_eval(max_eval_cost);
-      // TODO: provide a safe_call_direct()
-      call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER, 0);
-      pop_stack(); /* pop the return value */
-    } catch (const char*) {
-      restore_context(&econ);
-    }
-    pop_context(&econ);
+    set_eval(max_eval_cost);
+    LPCCall().safe_call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER);
 
     restore_command_giver();
     current_interactive = nullptr;

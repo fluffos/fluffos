@@ -9,34 +9,31 @@ const char* default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
-void f_set_encoding(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_set_encoding(EfunArgs&, std::optional<StringArg> encoding) {
   if (!command_giver || !command_giver->interactive) {
-    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
-    return;
+    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   auto* ip = command_giver->interactive;
 
   // Reset to no-transcoding
-  if (!num_arg) {
+  if (!encoding) {
     if (ip && ip->trans) {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
     }
-    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
-    return;
+    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   // Set to specific encoding
 
   // ignore if user want utf8
   UConverter* new_trans = nullptr;
-  if (ucnv_compareNames(default_encoding, f.string(0)) != 0) {
+  if (ucnv_compareNames(default_encoding, encoding->c_str()) != 0) {
     UErrorCode error_code = U_ZERO_ERROR;
-    new_trans = ucnv_open(f.string(0), &error_code);
+    new_trans = ucnv_open(encoding->c_str(), &error_code);
     if (U_FAILURE(error_code)) {
-      error("Fail to set encoding to '%s', error: %s.", f.string(0), u_errorName(error_code));
+      error("Fail to set encoding to '%s', error: %s.", encoding->c_str(), u_errorName(error_code));
     }
   }
 
@@ -48,8 +45,7 @@ void f_set_encoding(LPCFrame& f) {
 
   // Now let's return an canonical name
   if (!ip->trans) {
-    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
-    return;
+    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
   }
 
   UErrorCode error_code = U_ZERO_ERROR;
@@ -57,15 +53,14 @@ void f_set_encoding(LPCFrame& f) {
   if (U_FAILURE(error_code)) {
     error("Fail to set encoding, ucnv_getName error: %s.", u_errorName(error_code));
   }
-  f.ret_str_malloced(string_copy(name, "f_set_encoding: 3"));
+  return Value::str_malloced(string_copy(name, "f_set_encoding: 3"));
 }
 #endif
 
 #ifdef F_QUERY_ENCODING
-void f_query_encoding(LPCFrame& f) {
+Value f_query_encoding(EfunArgs&) {
   if (!command_giver || !command_giver->interactive) {
-    f.ret_str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
-    return;
+    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   const auto* res = default_encoding;
@@ -82,11 +77,11 @@ void f_query_encoding(LPCFrame& f) {
     }
   }
 
-  f.ret_str_malloced(string_copy(res, "f_query_encoding"));
+  return Value::str_malloced(string_copy(res, "f_query_encoding"));
 }
 #endif
 
-#ifdef F_STRING_ENCODE
+#if defined(F_STRING_ENCODE) || defined(F_STRING_DECODE)
 namespace {
 /* error() is a C++ throw, so these owners also release on an error path:
  * an oversized result makes allocate_buffer()/new_string() error(). */
@@ -95,11 +90,13 @@ struct FreeMstr {
   void operator()(char* p) const { FREE_MSTR(p); }
 };
 }  // namespace
+#endif
 
-void f_string_encode(LPCFrame& f) {
-  const auto* data = f.string(0);
-  auto len = f.string_len(0);
-  const auto* encoding = f.string(1);
+#ifdef F_STRING_ENCODE
+Value f_string_encode(EfunArgs&, StringArg str, StringArg encoding_arg) {
+  const auto* data = str.c_str();
+  auto len = str.size();
+  const auto* encoding = encoding_arg.c_str();
 
   UErrorCode error_code = U_ZERO_ERROR;
   ConverterOwner trans(ucnv_open(encoding, &error_code), &ucnv_close);
@@ -126,13 +123,15 @@ void f_string_encode(LPCFrame& f) {
   if (U_FAILURE(error_code)) {
     error("string_encode: error: %s.", u_errorName(error_code));
   }
-  f.ret_refed(buffer.release());
+  return Value::refed(buffer.release());
 }
+#endif
 
-void f_string_decode(LPCFrame& f) {
-  auto* data = (char*)(f.buffer(0)->item);
-  auto len = f.buffer(0)->size;
-  const auto* encoding = f.string(1);
+#ifdef F_STRING_DECODE
+Value f_string_decode(EfunArgs&, buffer_t* buf, StringArg encoding_arg) {
+  auto* data = (char*)(buf->item);
+  auto len = buf->size;
+  const auto* encoding = encoding_arg.c_str();
 
   // get rid of all ending '\0's from buffer.
   while (len > 1 && data[len - 1] == '\0') len--;
@@ -160,16 +159,17 @@ void f_string_decode(LPCFrame& f) {
     error("string_decode: error: %s.", u_errorName(error_code));
   }
   DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
-  f.ret_str_malloced(res.release());
+  return Value::str_malloced(res.release());
 }
 #endif
 
 #ifdef F_BUFFER_TRANSCODE
-void f_buffer_transcode(LPCFrame& f) {
-  auto* data = (char*)(f.buffer(0)->item);
-  auto len = f.buffer(0)->size;
-  const auto* from_encoding = f.string(1);
-  const auto* to_encoding = f.string(2);
+Value f_buffer_transcode(EfunArgs&, buffer_t* buf, StringArg from_encoding_arg,
+                         StringArg to_encoding_arg) {
+  auto* data = (char*)(buf->item);
+  auto len = buf->size;
+  const auto* from_encoding = from_encoding_arg.c_str();
+  const auto* to_encoding = to_encoding_arg.c_str();
 
   UErrorCode error_code = U_ZERO_ERROR;
 
@@ -189,6 +189,6 @@ void f_buffer_transcode(LPCFrame& f) {
     free_buffer(res);
     error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
-  f.ret_refed(res);
+  return Value::refed(res);
 }
 #endif

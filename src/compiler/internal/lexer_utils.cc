@@ -38,6 +38,7 @@
 #include "efuns.autogen.h"
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
+#include "vm/internal/base/vm_stack.h"
 #include "compiler.h"
 #include "keyword.h"
 #include "options.autogen.h"

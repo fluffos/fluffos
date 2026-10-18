@@ -269,22 +269,23 @@ void call_out(pending_call_t* cop) {
       DBG_CALLOUT("  command_giver: /%s\n", new_command_giver->obname);
     }
   }
-  int num_callout_args = 0;
-
+  /* The callback's arguments: moved out of cop->vs (which owns them until
+   * then; `held` releases whatever is left if a push fails). */
+  LPCCall call;
   if (cop->vs) {
     array_t* vec = cop->vs;
-    svalue_t* svp = vec->item + vec->size;
-    num_callout_args = vec->size;
-
-    while (svp-- > vec->item) {
+    Value held = Value::refed(vec);
+    cop->vs = nullptr;
+    for (int i = 0; i < vec->size; i++) {
+      svalue_t* svp = &vec->item[i];
       if (svp->type == T_OBJECT && (svp->u.ob->flags & O_DESTRUCTED)) {
         free_object(&svp->u.ob, "call_out");
         *svp = const0u;
       }
+      svalue_t arg = *svp;
+      *svp = const0;
+      call.push(Value::owned(arg));
     }
-    /* cop->vs is ref one */
-    transfer_push_some_svalues(cop->vs->item, vec->size);
-    free_empty_array(cop->vs);
   }
 
   // Executing LPC callback
@@ -292,27 +293,25 @@ void call_out(pending_call_t* cop) {
 
   save_command_giver(new_command_giver);
   /* current object no longer set */
-  svalue_t* ret = nullptr;
-  svalue_t timer_result = const0;
+  /* timer-only: nothing to call; the delay elapsing IS the result */
+  CallResult ret{Value(0)};
   if (cop->ob && !cop->function.s) {
-    /* timer-only: nothing to call; the delay elapsing IS the result */
     DBG_CALLOUT("  func: <timer>\n");
-    ret = &timer_result;
   } else if (cop->ob) {
     DBG_CALLOUT("  func: %s\n", cop->function.s);
-    ret = safe_apply(cop->function.s, cop->ob, num_callout_args, ORIGIN_INTERNAL);
+    ret = call.safe_apply(cop->function.s, cop->ob, ORIGIN_INTERNAL);
   } else {
     DBG_CALLOUT("  func: <function>\n");
-    ret = safe_call_function_pointer(cop->function.f, num_callout_args);
+    ret = call.safe_call(cop->function.f);
   }
   restore_command_giver();
 
   /* Promise delivery: fulfil with the callback's value, or reject if it
-   * errored (safe_* returns null then). Must run before free_called_call,
-   * whose own settle call is the "never ran" rejection path. */
+   * errored or was not found. Must run before free_called_call, whose own
+   * settle call is the "never ran" rejection path. */
   if (cop->promise) {
     if (ret) {
-      settle_call_out_promise(cop, ret, 0);
+      settle_call_out_promise(cop, ret.get(), 0);
     } else {
       svalue_t err;
       err.type = T_STRING;
@@ -715,15 +714,14 @@ void reclaim_call_outs() {
 }
 
 namespace {
-inline void int_call_out(bool walltime, LPCFrame& f) {
+Value int_call_out(bool walltime, EfunArgs& f, Arg fun) {
   int num_arg = f.argc();
-  svalue_t* arg = f.argp(0);
   /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
    * registers a timer-only call_out and returns a promise fulfilled (with 0)
    * when the delay elapses, rejected if the call_out is removed or its
    * object destructed first -- `await call_out(2)` is the pause idiom. The
    * classic function-first form is untouched and still returns the handle. */
-  bool const timer_form = (arg[0].type == T_NUMBER || arg[0].type == T_REAL);
+  bool const timer_form = fun.is(T_NUMBER) || fun.is(T_REAL);
   /* name the efun the author actually called: this helper serves both, and
    * loosening the spec to min_arg 1 moved these from compile time (where the
    * spec named them correctly) to here */
@@ -734,19 +732,18 @@ inline void int_call_out(bool walltime, LPCFrame& f) {
   }
   /* The spec can no longer pin argument 2's type (the delay is argument 1 in
    * the promise form), so the classic form checks it here. */
-  if (!timer_form &&
-      (num_arg < 2 || (arg[1].type != T_NUMBER && arg[1].type != T_REAL))) {
+  if (!timer_form && (num_arg < 2 || (!f[1].is(T_NUMBER) && !f[1].is(T_REAL)))) {
     error("%s: argument 2 (the delay) must be int or float.\n", efun_name);
   }
-  svalue_t* delay_arg = timer_form ? &arg[0] : &arg[1];
+  Arg delay_arg = timer_form ? fun : f[1];
   int const num = timer_form ? 0 : num_arg - 2;
   LPC_INT ret;
 
   LPC_INT delay_msecs = 0;
-  switch (delay_arg->type) {
+  switch (delay_arg.type()) {
     case T_NUMBER: {
       // seconds * 1000 can overflow int64 (UB / UBSan abort); saturate.
-      LPC_INT secs = delay_arg->u.number;
+      LPC_INT secs = delay_arg.number();
       if (secs > INT64_MAX / 1000) {
         delay_msecs = INT64_MAX;
       } else {
@@ -755,7 +752,7 @@ inline void int_call_out(bool walltime, LPCFrame& f) {
       break;
     }
     case T_REAL: {
-      double ms = floor(delay_arg->u.real * 1000.0);
+      double ms = floor(delay_arg.real() * 1000.0);
       if (ms >= (double)INT64_MAX) {
         delay_msecs = INT64_MAX;
       } else if (ms <= 0.0) {
@@ -774,9 +771,9 @@ inline void int_call_out(bool walltime, LPCFrame& f) {
     promise_t* p;
 
     if (!(current_object->flags & O_DESTRUCTED)) {
-      /* arg[0] doubles as the "function" svalue: new_call_out reads only its
-       * type, and T_NUMBER/T_REAL select the timer-only entry */
-      ret = new_call_out(current_object, &arg[0], std::chrono::milliseconds(delay_msecs), 0,
+      /* the delay doubles as the "function" svalue: new_call_out reads only
+       * its type, and T_NUMBER/T_REAL select the timer-only entry */
+      ret = new_call_out(current_object, fun.sv(), std::chrono::milliseconds(delay_msecs), 0,
                          nullptr, walltime);
       p = promise_for_call_out(ret);
       DEBUG_CHECK(!p, "BUG: no promise for a call_out registered this instant.\n");
@@ -790,37 +787,31 @@ inline void int_call_out(bool walltime, LPCFrame& f) {
       err.u.string = "*call_out was removed before it ran";
       promise_settle(p, &err, 1);
     }
-    /* delay slot is T_NUMBER/T_REAL: overwrite in place, nothing to free */
-    f.top().type = T_PROMISE;
-    f.top().subtype = 0;
-    f.top().u.prom = p;
-    return;
+    return Value::refed(p);
   }
 
   if (!(current_object->flags & O_DESTRUCTED)) {
-    ret = new_call_out(current_object, arg, std::chrono::milliseconds(delay_msecs), num, arg + 2,
-                       walltime);
-    /* args have been transfered; steal so ret() does not free them */
+    ret = new_call_out(current_object, fun.sv(), std::chrono::milliseconds(delay_msecs), num,
+                       num ? f[2].sv() : nullptr, walltime);
+    /* new_call_out() moved the callback's arguments into the call_out */
     for (int i = 2; i < num_arg; i++) {
-      (void)f.steal(i);
+      f.forget(i);
     }
   } else {
     ret = 0;
   }
-  f.ret(ret);
+  return ret;
 }
 }  // namespace
 
 #ifdef F_CALL_OUT
-void f_call_out(LPCFrame& f) { int_call_out(false, f); }
+Value f_call_out(EfunArgs& f, Arg fun) { return int_call_out(false, f, fun); }
 #endif
 
 #ifdef F_CALL_OUT_WALLTIME
-void f_call_out_walltime(LPCFrame& f) { int_call_out(true, f); }
+Value f_call_out_walltime(EfunArgs& f, Arg fun) { return int_call_out(true, f, fun); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
-void f_call_out_info(LPCFrame& f) {
-  f.ret_refed(get_all_call_outs());
-}
+Value f_call_out_info(EfunArgs&) { return Value::refed(get_all_call_outs()); }
 #endif

@@ -116,14 +116,14 @@ static char* evp_hash(const char* algo, const unsigned char* data, int data_len)
   return result;
 }
 
-void f_hash(LPCFrame& f) {
+Value f_hash(EfunArgs&, StringArg algorithm, StringArg input) {
   const char *algo, *data;
   char* result = nullptr;
   int data_len;
 
-  algo = f.string(0);
-  data = f.string(1);
-  data_len = f.string_len(1);
+  algo = algorithm.c_str();
+  data = input.c_str();
+  data_len = input.size();
 
 #define DO_HASH_IF(id, func, hash_size)       \
   SAFE(if (strcasecmp(algo, id) == 0) {       \
@@ -195,6 +195,6 @@ result:
     error("hash() unknown hash type: %s\n", algo);
   }
 
-  f.ret_str_malloced(result);
+  return Value::str_malloced(result);
 }
 #endif

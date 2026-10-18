@@ -1,13 +1,12 @@
 #include "base/package_api.h"
 
-#include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
+#include "packages/core/replace_string.h"
 
 // from add_action.h
 extern object_t* find_living_object(const char*, int);
 
 /* Hideous mangling of C code by Taffyd. */
-void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_dollars, int quiet,
-                          int dark) {
+Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int quiet, int dark) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char m[] = "$M$";
   char s[] = "_short";
@@ -19,9 +18,7 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
   int const seplen = strlen(separator);
   int const andlen = strlen(andsep);
 
-  array_t* arr = arg->u.arr;
   svalue_t* sv;
-  svalue_t* v;
   int const size = arr->size;
   int i;
   int len;
@@ -33,8 +30,7 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
   if (!size) {
     str = new_string(0, "f_query_multiple_short");
     str[0] = '\0';
-    f.ret_str_malloced(str);
-    return;
+    return Value::str_malloced(str);
   }
 
   /*
@@ -47,15 +43,14 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
    } */
 
   if (no_dollars && arr->item->type == T_OBJECT && !dark && command_giver && command_giver->super) {
-    call_origin = ORIGIN_EFUN;
-    if (!apply_low("query_light", command_giver->super, 0)) {
-      push_number(0);
-    }
-    v = apply("check_dark", command_giver, 1, ORIGIN_EFUN);
+    /* check_dark(query_light()), passing 0 when there is no query_light() */
+    CallResult light = LPCCall().apply("query_light", command_giver->super, ORIGIN_EFUN);
+    LPCCall check;
+    check.push(light.take());
+    CallResult v = check.apply("check_dark", command_giver, ORIGIN_EFUN);
 
     if (v && v->type == T_NUMBER && v->u.number) {
-      f.ret_str_copy("some objects you cannot make out");
-      return;
+      return Value::str_copy("some objects you cannot make out");
     }
   }
 
@@ -91,16 +86,17 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
 
     for (i = 0; i < size; i++) {
       sv = (arr->item + i);
-      push_number(quiet);
-      v = apply(fun, sv->u.ob, 1, ORIGIN_EFUN);
+      LPCCall call;
+      call.push(quiet);
+      CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
 
       if (!v || v->type != T_STRING) {
         continue;
       }
-      if (total_len + SVALUE_STRLEN(v) > max_string_length - mlen) {
+      if (total_len + SVALUE_STRLEN(v.get()) > max_string_length - mlen) {
         continue;
       }
-      strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v)));
+      strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v.get())));
       total_len += len;
     }
 
@@ -116,8 +112,7 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
     FREE_MSTR(str);
     FREE_MSTR(fun);
 
-    f.ret_str_malloced(res);
-    return;
+    return Value::str_malloced(res);
   }
 
   /* This is a mixed array, so we don't use $M$ format.  Instead, we
@@ -138,20 +133,22 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
           total_len += len;
         }
         break;
-      case T_OBJECT:
-        push_number(quiet);
-        v = apply(fun, sv->u.ob, 1, ORIGIN_EFUN);
+      case T_OBJECT: {
+        LPCCall call;
+        call.push(quiet);
+        CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
 
         if (!v || v->type != T_STRING) {
           continue;
         }
 
-        if (total_len + SVALUE_STRLEN(v) < max_string_length) {
-          strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v)));
+        if (total_len + SVALUE_STRLEN(v.get()) < max_string_length) {
+          strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v.get())));
           total_len += len;
         }
 
         break;
+      }
       case T_ARRAY:
       /* Does anyone use this? */
       /* args[ i ] = "$"+ type +"_short:"+ file_name( args[ i ][ 1 ] ) +"$"; */
@@ -193,81 +190,60 @@ void query_multiple_short(LPCFrame& f, svalue_t* arg, const char* type, int no_d
   if (no_dollars) {
     if (command_giver) {
       /* We need to call on this_player(). */
-      push_malloced_string(res);
-      v = apply("convert_message", command_giver, 1, ORIGIN_EFUN);
+      LPCCall call;
+      call.push(Value::str_malloced(res));
+      CallResult v = call.apply("convert_message", command_giver, ORIGIN_EFUN);
 
       if (v && v->type == T_STRING) {
-        svalue_t out;
-        out.type = T_STRING;
-        out.subtype = STRING_SHARED;
-        out.u.string = make_shared_string(v->u.string);
-        f.ret_owned(out);
-      } else {
-        f.ret_undefined();
+        return Value::str_make_shared(v->u.string);
       }
-
-    } else {
-      /* We need to find /global/player. */
-      /* Does this work? Seems not to. */
-      ob = find_object("/global/player");
-
-      if (ob) {
-        push_malloced_string(res);
-        v = apply("convert_message", ob, 1, ORIGIN_EFUN);
-
-        /* Return the result! */
-        if (v && v->type == T_STRING) {
-          svalue_t out;
-          out.type = T_STRING;
-          out.subtype = STRING_SHARED;
-          out.u.string = make_shared_string(v->u.string);
-          f.ret_owned(out);
-        } else {
-          f.ret_undefined();
-        }
-      } else {
-        /* res was never pushed / handed off -- free it. */
-        FREE_MSTR(res);
-        f.ret_undefined();
-      }
+      return Value::undefined();
     }
+    /* We need to find /global/player. */
+    /* Does this work? Seems not to. */
+    ob = find_object("/global/player");
 
-  } else {
-    f.ret_str_malloced(res);
+    if (ob) {
+      LPCCall call;
+      call.push(Value::str_malloced(res));
+      CallResult v = call.apply("convert_message", ob, ORIGIN_EFUN);
+
+      /* Return the result! */
+      if (v && v->type == T_STRING) {
+        return Value::str_make_shared(v->u.string);
+      }
+      return Value::undefined();
+    }
+    /* res was never handed off -- free it. */
+    FREE_MSTR(res);
+    return Value::undefined();
   }
+  return Value::str_malloced(res);
 } /* query_multiple_short() */
 
-void f_query_multiple_short(LPCFrame& f) {
-  int num_arg = f.argc();
-  svalue_t* sv = f.argp(0);
+Value f_query_multiple_short(EfunArgs&, array_t* arr, std::optional<Arg> type_arg,
+                             std::optional<LPC_INT> no_dollars_arg, std::optional<LPC_INT> quiet_arg,
+                             std::optional<LPC_INT> dark_arg) {
   const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
-  if (num_arg > 4) {
-    if (f.type(4) == T_NUMBER) {
-      dark = f.number(4);
-    }
+  if (dark_arg) {
+    dark = *dark_arg;
   }
 
-  if (num_arg > 3) {
-    if (f.type(3) == T_NUMBER) {
-      quiet = f.number(3);
-    }
+  if (quiet_arg) {
+    quiet = *quiet_arg;
   }
 
-  if (num_arg > 2) {
-    if (f.type(2) == T_NUMBER) {
-      no_dollars = f.number(2);
-    }
+  if (no_dollars_arg) {
+    no_dollars = *no_dollars_arg;
   }
 
-  if (num_arg >= 2) {
-    if (f.type(1) == T_STRING) {
-      type = f.string(1);
-    }
+  if (type_arg && type_arg->is(T_STRING)) {
+    type = type_arg->string().c_str();
   }
 
-  query_multiple_short(f, sv, type, no_dollars, quiet, dark);
+  return query_multiple_short(arr, type, no_dollars, quiet, dark);
 }
 
 /* Hideous mangling of C code by Taffyd. */
@@ -282,7 +258,6 @@ int _in_reference_allowed = 0;
 int reference_allowed(object_t* referee, object_t* referrer_obj, const char* referrer_name) {
   int invis = 0;
   int referee_creator = 0;
-  svalue_t* v;
   svalue_t* item;
   array_t* vec;
   const char* referee_name = nullptr;
@@ -296,13 +271,13 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   int ret = 0;
 
   /* Check to see whether we're invisible */
-  v = apply("query_invis", referee, 0, ORIGIN_EFUN);
+  CallResult v = LPCCall().apply("query_invis", referee, ORIGIN_EFUN);
 
   if (v && v->type == T_NUMBER) {
     invis = v->u.number;
   }
   /* And if we're a creator. */
-  v = apply("query_creator", referee, 0, ORIGIN_EFUN);
+  v = LPCCall().apply("query_creator", referee, ORIGIN_EFUN);
 
   if (v && v->type == T_NUMBER) {
     referee_creator = v->u.number;
@@ -322,21 +297,22 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   }
 
   /* Determine the names of these guys.
-   * We might need to make copies of these strings? apply()
-   * has a few oddities.
+   * Each name's CallResult owns the string, so the names stay valid
+   * across the applies below.
    */
 
-  v = apply("query_name", referee, 0, ORIGIN_EFUN);
+  CallResult referee_name_v = LPCCall().apply("query_name", referee, ORIGIN_EFUN);
 
-  if (v && v->type == T_STRING) {
-    referee_name = v->u.string;
+  if (referee_name_v && referee_name_v->type == T_STRING) {
+    referee_name = referee_name_v->u.string;
   }
 
+  CallResult referrer_name_v(CallResult::kNotFound);
   if (referrer_obj && !referrer_name) {
-    v = apply("query_name", referrer_obj, 0, ORIGIN_EFUN);
+    referrer_name_v = LPCCall().apply("query_name", referrer_obj, ORIGIN_EFUN);
 
-    if (v && v->type == T_STRING) {
-      referrer_name = v->u.string;
+    if (referrer_name_v && referrer_name_v->type == T_STRING) {
+      referrer_name = referrer_name_v->u.string;
     }
   }
 
@@ -348,15 +324,16 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   playtester_handler = find_object(PLAYTESTER_HANDLER);
 
   if (playtester_handler) {
-    copy_and_push_string(referrer_name);
-    v = apply("query_playtester", playtester_handler, 1, ORIGIN_EFUN);
+    LPCCall call;
+    call.push(Value::str_copy(referrer_name));
+    v = call.apply("query_playtester", playtester_handler, ORIGIN_EFUN);
 
     if (v && v->type == T_NUMBER) {
       referrer_playtester = v->u.number;
     }
   }
 
-  v = apply("query_allowed", referee, 0, ORIGIN_EFUN);
+  v = LPCCall().apply("query_allowed", referee, ORIGIN_EFUN);
   // printf("allow refs:%d\n", v->u.arr->ref);
   if (v && v->type == T_ARRAY) {
     vec = v->u.arr;
@@ -394,40 +371,43 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   }
 
   switch (invis) {
-    case 3:
+    case 3: {
       /* Check for High Lord Invis. */
 
-      copy_and_push_string(referrer_name);
-      v = apply("high_programmer", master_ob, 1, ORIGIN_EFUN);
+      LPCCall call;
+      call.push(Value::str_copy(referrer_name));
+      v = call.apply("high_programmer", master_ob, ORIGIN_EFUN);
 
       if (v && v->type == T_NUMBER) {
         ret = v->u.number;
       }
-      break;
+    } break;
 
-    case 2:
+    case 2: {
       /* Check for Lord Invis */
 
-      copy_and_push_string(referrer_name);
-      v = apply("query_lord", master_ob, 1, ORIGIN_EFUN);
+      LPCCall call;
+      call.push(Value::str_copy(referrer_name));
+      v = call.apply("query_lord", master_ob, ORIGIN_EFUN);
 
       if (v && v->type == T_NUMBER) {
         ret = v->u.number;
       }
-      break;
+    } break;
 
     case 1: {
       /* Creator Invis */
       if (referrer_obj) {
-        v = apply("query_creator", referrer_obj, 0, ORIGIN_EFUN);
+        v = LPCCall().apply("query_creator", referrer_obj, ORIGIN_EFUN);
 
         if (v && v->type == T_NUMBER) {
           ret = v->u.number;
         }
       } else {
         player_handler = find_object(PLAYER_HANDLER);
-        copy_and_push_string(referrer_name);
-        v = apply("test_creator", player_handler, 1, ORIGIN_EFUN);
+        LPCCall call;
+        call.push(Value::str_copy(referrer_name));
+        v = call.apply("test_creator", player_handler, ORIGIN_EFUN);
 
         if (v && v->type == T_NUMBER) {
           ret = v->u.number;
@@ -447,66 +427,60 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   return ret;
 }
 
-void f_reference_allowed(LPCFrame& f) {
-  int num_arg = f.argc();
-  object_t* referee = nullptr;
+Value f_reference_allowed(EfunArgs&, object_t* referee, std::optional<Arg> referrer) {
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
   int result = 0;
+#ifndef F_FIND_PLAYER
+  /* find_player()'s result; holds the object it returned for the call */
+  CallResult player(CallResult::kNotFound);
+#endif
 
   if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
     referrer_obj = nullptr;
   }
 
-  if (f.type(0) == T_OBJECT && f.object(0)) {
-    referee = f.object(0);
-  }
-
-  if (num_arg > 1) {
-    if (f.type(1) == T_STRING && f.string(1)) {
+  if (referrer) {
+    if (referrer->is(T_STRING)) {
 /* We've been passed in a string, now we need to call
  * find_player() */
 #ifdef F_FIND_PLAYER
       /* If we have a find_player() efun, then we need to sue
        * the following method.  This hasn't been tested!
        */
-      referrer_obj = find_living_object(f.string(1), 1);
+      referrer_obj = find_living_object(referrer->string().c_str(), 1);
 #else
       if (simul_efun_ob) {
-        svalue_t* v;
-        {
-          LPCCall b;
-          b.push(f.argp(1));
-          v = b.apply("find_player", simul_efun_ob, ORIGIN_EFUN);
-        }
+        LPCCall b;
+        b.push(referrer->copy());
+        player = b.apply("find_player", simul_efun_ob, ORIGIN_EFUN);
 
-        if (v && v->type == T_OBJECT) {
-          referrer_obj = v->u.ob;
-          referrer_name = f.string(1);
+        if (player && player->type == T_OBJECT) {
+          referrer_obj = player->u.ob;
+          referrer_name = referrer->string().c_str();
         } else {
           referrer_obj = NULL;
-          referrer_name = f.string(1);
+          referrer_name = referrer->string().c_str();
         }
       }
 #endif
     }
-    if (f.type(1) == T_OBJECT && f.object(1)) {
-      referrer_obj = f.object(1);
+    if (referrer->is(T_OBJECT)) {
+      referrer_obj = referrer->object();
       referrer_name = nullptr;
     }
   }
 
   if (referee && (referrer_obj || referrer_name)) {
     result = reference_allowed(referee, referrer_obj, referrer_name);
-    f.ret(result);
-  } else {
-    f.ret_undefined();
+    return result;
   }
+  return Value::undefined();
 }
 
-void f_add_a(LPCFrame& f) {
+Value f_add_a(EfunArgs& f, StringArg str_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  const char* str = f.string(0);
+  const char* str = str_arg.c_str();
   char* ret;
   char* p;
   char first;
@@ -519,14 +493,13 @@ void f_add_a(LPCFrame& f) {
 
   // If *str is 0, it was only spaces.  Return "a ".
   if (*str == 0) {
-    f.ret_str_copy("a ");
-    return;
+    return Value::str_copy("a ");
   }
 
   len = strlen(str);
   // Don't add anything if it already begins with a or an.
   if (!strncasecmp(str, "a ", 2) || !strncasecmp(str, "an ", 3)) {
-    return;
+    return f.take(0);
   }
 
   first = *str;
@@ -580,59 +553,55 @@ void f_add_a(LPCFrame& f) {
 
   // Add the rest of the string.
   memcpy(p, str, len + 1);  // + 1: get the \0.
-  f.ret_str_malloced(ret);
+  return Value::str_malloced(ret);
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
-void f_vowel(LPCFrame& f) {
-  char const v = (char)f.number(0);
+Value f_vowel(EfunArgs&, LPC_INT c) {
+  char const v = (char)c;
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
       v == 'I' || v == 'O' || v == 'U') {
-    f.ret(1);
-  } else {
-    f.ret(0);
+    return 1;
   }
+  return 0;
 }
 
-void f_replace(LPCFrame& f) {
+/* Both forms run replace_string()'s body directly. It reads only the
+ * window's arity (2 or 3 here, so no range) and its typed strings. */
+Value f_replace(EfunArgs& f, StringArg /* moved out with f.take(0) */, Arg pattern,
+                std::optional<StringArg> replacement) {
   int num_arg = f.argc();
-  if (f.type(1) == T_STRING && num_arg == 3) {
-    f_replace_string(f);
-    return;
+  if (pattern.is(T_STRING) && num_arg == 3) {
+    return replace_string_value(f.take(0), pattern.string(), *replacement);
   }
-  if (num_arg == 2 && f.type(1) != T_STRING) {
-    if (f.array(1)->size & 1) {
+  if (num_arg == 2 && !pattern.is(T_STRING)) {
+    array_t* arr = pattern.array();
+    if (arr->size & 1) {
       error("Wrong array size for replace.\n");
     }
-    /* Take the pairs array off the stack, so each replace_string() below
-     * sees [string, pattern, replacement] on top and leaves its result in
-     * the string's slot. The scope guard owns the array from here on. */
-    array_t* arr = f.steal(1).u.arr;
-    DEFER { free_array(arr); };
-    f.pop_back();
-
+    /* Apply each [pattern, replacement] pair in turn to the result so far
+     * (owned, so a string nothing else references is edited in place). */
+    Value cur = f.take(0);
     for (int i = 0; i < arr->size; i += 2) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
-        share_and_push_string(arr->item[i].u.string);
-        share_and_push_string(arr->item[i + 1].u.string);
-        LPCFrame step = LPCFrame::args(3);
-        f_replace_string(step);
-        if (f.type(0) != T_STRING) {
+        cur = replace_string_value(std::move(cur), StringArg(&arr->item[i]),
+                                   StringArg(&arr->item[i + 1]));
+        if (cur.type() != T_STRING) {
           break;
         }
       }
     }
-  } else {
-    error("Bad arguments for replace.\n");
+    return cur;
   }
+  error("Bad arguments for replace.\n");
 }
 
-static void replace_mxp_html(LPCFrame& f, int html, int mxp) {
+static Value replace_mxp_html(StringArg str, int html, int mxp) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
-  const char* src = f.string(0);
+  const char* src = str.c_str();
   char* dst2 = dst;
   while (*src && dst2 - dst < max_string_length) {
     switch (*src) {
@@ -662,6 +631,7 @@ static void replace_mxp_html(LPCFrame& f, int html, int mxp) {
           dst2 += 6;
           break;
         }
+        [[fallthrough]];
       default:
       def:
         *dst2++ = *src;
@@ -669,16 +639,15 @@ static void replace_mxp_html(LPCFrame& f, int html, int mxp) {
     src++;
   }
   *dst2 = 0;
-  f.ret_str_malloced(extend_string(dst, dst2 - dst));
+  return Value::str_malloced(extend_string(dst, dst2 - dst));
 }
 
-void f_replace_html(LPCFrame& f) { replace_mxp_html(f, 1, 0); }
+Value f_replace_html(EfunArgs&, StringArg str) { return replace_mxp_html(str, 1, 0); }
 
-void f_replace_mxp(LPCFrame& f) { replace_mxp_html(f, 0, 1); }
+Value f_replace_mxp(EfunArgs&, StringArg str) { return replace_mxp_html(str, 0, 1); }
 
-void f_roulette_wheel(LPCFrame& f) {
+Value f_roulette_wheel(EfunArgs&, mapping_t* m) {
   long num;
-  mapping_t* m = f.mapping(0);
   int j, found;
   mapping_node_t *elt, **a = m->table;
   svalue_t* val;
@@ -723,7 +692,7 @@ void f_roulette_wheel(LPCFrame& f) {
   }
 
   // val points to the value that tipped the scale.  val - 1 is the key.
-  f.ret_copy(val - 1);
+  return Value::copy(val - 1);
 }
 
 // Appends up to (bufsize - 1 - *len) bytes of `text` to buf[*len..], always
@@ -751,17 +720,17 @@ svalue_t* replace_objects(svalue_t* thing) {
       char buf[2000];
       size_t len = 0;
       append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
-      svalue_t* tmp = nullptr;
+      CallResult tmp(CallResult::kNotFound);
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
         LPCCall b;
-        b.push(thing->u.ob);
+        b.push(Value::object(thing->u.ob));
         tmp = b.safe_apply_master(APPLY_OBJECT_NAME);
       } else {
         append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
       }
       if (tmp && tmp->type == T_STRING) {
         append_bounded(buf, sizeof(buf), &len, " (\"", 3);
-        append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp));
+        append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp.get()));
         append_bounded(buf, sizeof(buf), &len, "\")", 2);
       }
       free_svalue(&replace_tmp, "replace_objects");
@@ -773,26 +742,24 @@ svalue_t* replace_objects(svalue_t* thing) {
     case T_ARRAY:
     case T_CLASS: {
       array_t* ar = thing->u.arr;
-      array_t* nar = allocate_array(ar->size);
-      LPCCall scratch; /* keeps nar on the stack until it is copied out */
-      scratch.push_refed(nar);
+      Value nar_owner = Value::refed(allocate_array(ar->size)); /* freed if we error */
+      array_t* nar = nar_owner->u.arr;
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
       }
-      assign_svalue(&replace_tmp, &scratch.arg(0));
-      scratch.discard();
+      assign_svalue(&replace_tmp, nar_owner.get());
       replace_tmp.type = thing->type;
       return &replace_tmp;
     }
     case T_MAPPING: {
-      LPCCall scratch; /* [keys, result, key] stay on the stack until copied out */
-      scratch.push_refed(mapping_indices(thing->u.map));
-      scratch.push_refed(allocate_mapping(thing->u.map->table_size));
-      scratch.push(0);
-      array_t* keys = scratch.arg(0).u.arr;
-      mapping_t* out = scratch.arg(1).u.map;
+      /* keys, result and key are owned here, so an error frees them */
+      Value keys_owner = Value::refed(mapping_indices(thing->u.map));
+      Value out_owner = Value::refed(allocate_mapping(thing->u.map->table_size));
+      Value key_owner;
+      array_t* keys = keys_owner->u.arr;
+      mapping_t* out = out_owner->u.map;
       for (i = 0; i < keys->size; i++) {
-        svalue_t* key = &scratch.arg(2);
+        svalue_t* key = key_owner.get();
         svalue_t* tmp = find_in_mapping(thing->u.map, keys->item[i]);
         assign_svalue(key, replace_objects(&keys->item[i]));
         assign_svalue_no_free(find_for_insert(out, key, 1), replace_objects(tmp));
@@ -800,8 +767,7 @@ svalue_t* replace_objects(svalue_t* thing) {
           printf("guilty party:%s\n", key->u.string);
         }
       }
-      assign_svalue(&replace_tmp, &scratch.arg(1));
-      scratch.discard();
+      assign_svalue(&replace_tmp, out_owner.get());
       return &replace_tmp;
     }
     default:
@@ -810,23 +776,20 @@ svalue_t* replace_objects(svalue_t* thing) {
   }
 }
 
-void f_replace_objects(LPCFrame& f) {
-  assign_svalue(&f.top(), replace_objects(&f.top()));
-  // replace_tmp is a module-global scratch slot; drop its lingering ref
-  // once the result is on the stack so nothing stays unaccounted between
-  // calls (flagged by the Debug leak checker).
-  free_svalue(&replace_tmp, "f_replace_objects");
-  replace_tmp = const0;
+Value f_replace_objects(EfunArgs&, Arg thing) {
+  // replace_tmp is a module-global scratch slot: move the result out of it
+  // (leaving 0) so no reference lingers there between calls (flagged by the
+  // Debug leak checker).
+  return Value::take(replace_objects(thing.sv()));
 }
 
-void f_replace_dollars(LPCFrame& f) {
+Value f_replace_dollars(EfunArgs& f, StringArg str, array_t* arr) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;
-  const char* oldstr = f.string(0);
+  const char* oldstr = str.c_str();
   char* currentnew;
   const char* currentold = oldstr;
-  array_t* arr = f.array(1);
   int i;
   if (arr->size & 1) {
     error("wrong array length for replace_dollars()");
@@ -870,8 +833,7 @@ void f_replace_dollars(LPCFrame& f) {
   if (newstr == currentnew) {
     // nothing happened!
     FREE_MSTR(newstr);
-    f.pop_back(1);
-    return;
+    return f.take(0);
   }
 
   if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr > max_string_length) {
@@ -880,6 +842,6 @@ void f_replace_dollars(LPCFrame& f) {
   }
 
   strcpy(currentnew, currentold);
-  f.ret_str_malloced(
+  return Value::str_malloced(
       extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
 }

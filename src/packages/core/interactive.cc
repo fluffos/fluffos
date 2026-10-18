@@ -27,9 +27,9 @@ int replace_interactive(object_t* ob, object_t* obfrom) {
   return (1);
 } /* replace_interactive() */
 
-void f_exec(LPCFrame& f) {
-  int i = replace_interactive(f.object(0), f.object(1));
-  /* Objects may have been destructed; ret() free_svalue's whatever remains. */
-  f.ret(static_cast<LPC_INT>(i));
+Value f_exec(EfunArgs&, object_t* to, object_t* from) {
+  /* The objects may have been destructed meanwhile: their slots are released
+   * with free_svalue, which copes with whatever remains. */
+  return replace_interactive(to, from);
 }
 #endif

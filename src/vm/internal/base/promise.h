@@ -164,7 +164,6 @@ size_t pending_promise_deliveries();
 void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected,
                           promise_t* next, object_t* giver);
 
-void push_refed_promise(promise_t* p);
 
 /* Build a combinator over `inputs` and return its result promise with one
  * reference for the caller. An element that is not a promise counts as

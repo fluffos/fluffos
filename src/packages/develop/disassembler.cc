@@ -7,35 +7,20 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void f_dump_prog(LPCFrame& f) {
+void f_dump_prog(EfunArgs& f, object_t* ob) {
   int num_arg = f.argc();
   program_t* prog;
   const char* where;
   int d;
-  object_t* ob;
 
+  /* the flags are an untyped `...` argument, read unchecked as before */
   if (num_arg == 2) {
-    if (f.type(0) != T_OBJECT) {
-      bad_argument(f.argp(0), T_OBJECT, 1, F_DUMP_PROG);
-    }
-
-    ob = f.object(0);
-    d = static_cast<int>(f.number(1));
+    d = static_cast<int>(f[1].sv()->u.number);
     where = nullptr;
   } else if (num_arg == 3) {
-    if (f.type(0) != T_OBJECT) {
-      bad_argument(f.argp(0), T_OBJECT, 1, F_DUMP_PROG);
-    }
-
-    ob = f.object(0);
-    d = static_cast<int>(f.number(1));
-    where = (f.type(2) == T_STRING) ? f.string(2) : nullptr;
+    d = static_cast<int>(f[1].sv()->u.number);
+    where = f[2].is(T_STRING) ? f[2].string().c_str() : nullptr;
   } else {
-    if (f.type(0) != T_OBJECT) {
-      bad_argument(f.argp(0), T_OBJECT, 1, F_DUMP_PROG);
-    }
-
-    ob = f.object(0);
     d = 0;
     where = nullptr;
   }
@@ -64,7 +49,6 @@ void f_dump_prog(LPCFrame& f) {
     dump_prog(prog, file, d);
     fclose(file);
   }
-  f.ret_void();
 }
 
 #endif

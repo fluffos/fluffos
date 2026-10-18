@@ -46,7 +46,7 @@ struct lpc_socket_event_data {
 };
 
 // forward declaration for callback helper used later
-static void call_callback(int fd, int what, int num_arg);
+static void call_callback(int fd, int what, LPCCall& call);
 
 namespace {
 
@@ -233,7 +233,6 @@ static bool lpcaddr_to_sockaddr(const char* name, struct sockaddr* addr, ev_sock
 int check_valid_socket(const char* const what, int fd, object_t* owner, const char* const addr,
                        int port) {
   array_t* info;
-  svalue_t* mret;
 
   info = allocate_empty_array(4);
   info->item[0].type = T_NUMBER;
@@ -245,12 +244,13 @@ int check_valid_socket(const char* const what, int fd, object_t* owner, const ch
   info->item[3].type = T_NUMBER;
   info->item[3].u.number = port;
 
-  push_object(current_object);
-  push_constant_string(what);
-  push_refed_array(info);
+  LPCCall call;
+  call.push(Value::object(current_object));
+  call.push(Value::str_constant(what));
+  call.push(Value::refed(info));
 
-  mret = apply_master_ob(APPLY_VALID_SOCKET, 3);
-  return MASTER_APPROVED(mret, "valid_socket");
+  CallResult mret = call.apply_master(APPLY_VALID_SOCKET);
+  return master_approved(mret, "valid_socket");
 }
 
 static void clear_socket(int which, int dofree) {
@@ -1245,7 +1245,10 @@ int socket_write(int fd, svalue_t* message, const char* name) {
 
 #endif /* PACKAGE_SOCKETS */
 
-static void call_callback(int fd, int what, int num_arg) {
+/* Runs the socket's `what` callback with the arguments pushed on `call`. With
+ * no callback set the call is never made, and `call` pops its arguments when
+ * the caller's scope ends. */
+static void call_callback(int fd, int what, LPCCall& call) {
   union string_or_func callback;
 
   switch (what) {
@@ -1263,12 +1266,12 @@ static void call_callback(int fd, int what, int num_arg) {
   set_eval(max_eval_cost);
 
   if (lpc_socks[fd].flags & what) {
-    safe_call_function_pointer(callback.f, num_arg);
+    call.safe_call(callback.f);
   } else if (callback.s) {
     if (callback.s[0] == APPLY___INIT_SPECIAL_CHAR) {
       error("Illegal function name.\n");
     }
-    safe_apply(callback.s, lpc_socks[fd].owner_ob, num_arg, ORIGIN_INTERNAL);
+    call.safe_apply(callback.s, lpc_socks[fd].owner_ob, ORIGIN_INTERNAL);
   }
 }
 
@@ -1279,9 +1282,10 @@ static void call_callback(int fd, int what, int num_arg) {
  * byte count, which breaks Content-Length framing in HTTP clients built on
  * this efun).  Prepend the bytes carried from the previous read, hold back a
  * new incomplete trailing sequence for the next one, then sanitize and push
- * the rest as the read callback's data argument.  The caller has already
- * pushed the socket fd.  Returns false when the whole chunk was an incomplete
- * lead (nothing to deliver yet -- caller should pop the fd and wait).
+ * the rest on `call` as the read callback's data argument.  The caller has
+ * already pushed the socket fd.  Returns false when the whole chunk was an
+ * incomplete lead (nothing to deliver yet -- the caller drops `call`, which
+ * pops the fd, and waits).
  *
  * If the peer closes while carry bytes are held, those <=3 bytes are dropped
  * rather than delivered as U+FFFD: they are an incomplete sequence that can
@@ -1289,7 +1293,7 @@ static void call_callback(int fd, int what, int num_arg) {
  * char, and a well-formed text/JSON body ends on an ASCII byte with the carry
  * already empty.
  */
-static bool push_sanitized_stream_chunk(int fd, const char *buf, int cc) {
+static bool push_sanitized_stream_chunk(LPCCall &call, int fd, const char *buf, int cc) {
   std::string data;
   data.reserve(lpc_socks[fd].u8_carry_len + cc);
   data.append(lpc_socks[fd].u8_carry, lpc_socks[fd].u8_carry_len);
@@ -1306,7 +1310,7 @@ static bool push_sanitized_stream_chunk(int fd, const char *buf, int cc) {
   }
 
   auto res = u8_sanitize(data);
-  copy_and_push_string(res.c_str());
+  call.push(Value::str_copy(res.c_str()));
   return true;
 }
 
@@ -1369,24 +1373,25 @@ void socket_read_select_handler(int fd) {
               sprintf(addr, "%s %s", host, service);
             }
           }
-          push_number(fd);
+          LPCCall call;
+          call.push(fd);
           if (lpc_socks[fd].flags & S_BINARY || !u8_validate(buf)) {
             buffer_t* b;
 
             b = allocate_buffer(cc);
             if (b) {
               memcpy(b->item, buf, cc);
-              push_refed_buffer(b);
+              call.push(Value::refed(b));
             } else {
-              push_number(0);
+              call.push(0);
             }
           } else {
             auto res = u8_sanitize(buf);
-            copy_and_push_string(res.c_str());
+            call.push(Value::str_copy(res.c_str()));
           }
-          copy_and_push_string(addr);
+          call.push(Value::str_copy(addr));
           debug(sockets, ("read_socket_handler: apply\n"));
-          call_callback(fd, S_READ_FP, 3);
+          call_callback(fd, S_READ_FP, call);
           return;
         }
         case MUD:
@@ -1398,12 +1403,14 @@ void socket_read_select_handler(int fd) {
       }
       break;
 
-    case STATE_LISTEN:
+    case STATE_LISTEN: {
       debug(sockets, ("read_socket_handler: apply read callback\n"));
       lpc_socks[fd].flags |= S_WACCEPT;
-      push_number(fd);
-      call_callback(fd, S_READ_FP, 1);
+      LPCCall call;
+      call.push(fd);
+      call_callback(fd, S_READ_FP, call);
       return;
+    }
 
     case STATE_HANDSHAKE: {
       switch (lpc_socks[fd].mode) {
@@ -1486,19 +1493,22 @@ void socket_read_select_handler(int fd) {
           }
           lpc_socks[fd].r_buf[lpc_socks[fd].r_len] = '\0';
           value = const0;
-          push_number(fd);
-          if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
-            transfer_push_some_svalues(&value, 1); /* the stack takes it over */
-          } else {
-            push_undefined();
+          {
+            LPCCall call;
+            call.push(fd);
+            if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
+              call.push(Value::owned(value)); /* the call takes it over */
+            } else {
+              call.push(Value::undefined());
+            }
+            FREE(lpc_socks[fd].r_buf);
+            lpc_socks[fd].flags |= S_HEADER;
+            lpc_socks[fd].r_buf = nullptr;
+            lpc_socks[fd].r_off = 0;
+            lpc_socks[fd].r_len = 0;
+            debug(sockets, ("read_socket_handler: apply read callback\n"));
+            call_callback(fd, S_READ_FP, call);
           }
-          FREE(lpc_socks[fd].r_buf);
-          lpc_socks[fd].flags |= S_HEADER;
-          lpc_socks[fd].r_buf = nullptr;
-          lpc_socks[fd].r_off = 0;
-          lpc_socks[fd].r_len = 0;
-          debug(sockets, ("read_socket_handler: apply read callback\n"));
-          call_callback(fd, S_READ_FP, 2);
           return;
 
         case STREAM:
@@ -1517,24 +1527,25 @@ void socket_read_select_handler(int fd) {
 #endif
           debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
-          push_number(fd);
-          if (lpc_socks[fd].flags & S_BINARY) {
-            buffer_t* b;
+          {
+            LPCCall call;
+            call.push(fd);
+            if (lpc_socks[fd].flags & S_BINARY) {
+              buffer_t* b;
 
-            b = allocate_buffer(cc);
-            if (b) {
-              b->ref--;
-              memcpy(b->item, buf, cc);
-              push_buffer(b);
-            } else {
-              push_number(0);
+              b = allocate_buffer(cc);
+              if (b) {
+                memcpy(b->item, buf, cc);
+                call.push(Value::refed(b));
+              } else {
+                call.push(0);
+              }
+            } else if (!push_sanitized_stream_chunk(call, fd, buf, cc)) {
+              return; /* `call` drops the fd we pushed; wait for the rest of the char */
             }
-          } else if (!push_sanitized_stream_chunk(fd, buf, cc)) {
-            pop_stack(); /* drop the fd we pushed; wait for the rest of the char */
-            return;
+            debug(sockets, ("read_socket_handler: apply read callback\n"));
+            call_callback(fd, S_READ_FP, call);
           }
-          debug(sockets, ("read_socket_handler: apply read callback\n"));
-          call_callback(fd, S_READ_FP, 2);
           return;
         case STREAM_BINARY:
         case DATAGRAM_BINARY:
@@ -1568,24 +1579,25 @@ void socket_read_select_handler(int fd) {
 #endif
           debug(sockets, "read_socket_handler: SSL_read %d bytes\n", cc);
           buf[cc] = '\0';
-          push_number(fd);
-          if (lpc_socks[fd].flags & S_BINARY) {
-            buffer_t* b;
+          {
+            LPCCall call;
+            call.push(fd);
+            if (lpc_socks[fd].flags & S_BINARY) {
+              buffer_t* b;
 
-            b = allocate_buffer(cc);
-            if (b) {
-              b->ref--;
-              memcpy(b->item, buf, cc);
-              push_buffer(b);
-            } else {
-              push_number(0);
+              b = allocate_buffer(cc);
+              if (b) {
+                memcpy(b->item, buf, cc);
+                call.push(Value::refed(b));
+              } else {
+                call.push(0);
+              }
+            } else if (!push_sanitized_stream_chunk(call, fd, buf, cc)) {
+              return; /* `call` drops the fd we pushed; wait for the rest of the char */
             }
-          } else if (!push_sanitized_stream_chunk(fd, buf, cc)) {
-            pop_stack(); /* drop the fd we pushed; wait for the rest of the char */
-            return;
+            debug(sockets, ("read_socket_handler: apply read callback\n"));
+            call_callback(fd, S_READ_FP, call);
           }
-          debug(sockets, ("read_socket_handler: apply read callback\n"));
-          call_callback(fd, S_READ_FP, 2);
           return;
       }
       break;
@@ -1766,8 +1778,11 @@ void socket_write_select_handler(int fd) {
 
   debug(sockets, ("write_socket_handler: apply write_callback\n"));
 
-  push_number(fd);
-  call_callback(fd, S_WRITE_FP, 1);
+  {
+    LPCCall call;
+    call.push(fd);
+    call_callback(fd, S_WRITE_FP, call);
+  }
 
   // trigger send again
   if (lpc_socks[fd].w_len != 0) {
@@ -1795,8 +1810,9 @@ int socket_close(int fd, int flags) {
 
   if (flags & SC_DO_CALLBACK) {
     debug(sockets, ("socket_close: apply close callback\n"));
-    push_number(fd);
-    call_callback(fd, S_CLOSE_FP, 1);
+    LPCCall call;
+    call.push(fd);
+    call_callback(fd, S_CLOSE_FP, call);
   }
 
   if (lpc_socks[fd].ssl != nullptr) {
@@ -1872,14 +1888,15 @@ int socket_release(int fd, object_t* ob, svalue_t* callback) {
   lpc_socks[fd].flags |= S_RELEASE;
   lpc_socks[fd].release_ob = ob;
 
-  push_number(fd);
-  push_object(ob);
+  LPCCall call;
+  call.push(fd);
+  call.push(Value::object(ob));
   set_eval(max_eval_cost);
 
   if (callback->type == T_FUNCTION) {
-    safe_call_function_pointer(callback->u.fp, 2);
+    call.safe_call(callback->u.fp);
   } else {
-    safe_apply(callback->u.string, ob, 2, ORIGIN_INTERNAL);
+    call.safe_apply(callback->u.string, ob, ORIGIN_INTERNAL);
   }
 
   if ((lpc_socks[fd].flags & S_RELEASE) == 0) {

@@ -669,13 +669,13 @@ int file_size(const char* file) {
  * The path is always treated as an absolute path, and is returned without
  * a leading '/'.
  * If the path was '/', then '.' is returned.
- * Otherwise, the returned path is temporarily allocated by apply(), which
- * means it will be deallocated at next apply().
+ * Otherwise, the returned path lives in apply_ret_value (the master's answer
+ * is moved there, or the path is copied there), which means it will be
+ * deallocated at the next apply(); callers that need it longer take a
+ * reference to apply_ret_value (do_rename(), copy_file()).
  */
 const char* check_valid_path(const char* path, object_t* call_object, const char* const call_fun,
                              int writeflg) {
-  svalue_t* v;
-
   if (!master_ob && !call_object) {
     // early startup, ignore security
     free_svalue(&apply_ret_value, "check_valid_path");
@@ -689,18 +689,14 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
     return nullptr;
   }
 
-  copy_and_push_string(path);
-  push_object(call_object);
-  push_constant_string(call_fun);
-  if (writeflg) {
-    v = safe_apply_master_ob(APPLY_VALID_WRITE, 3);
-  } else {
-    v = safe_apply_master_ob(APPLY_VALID_READ, 3);
-  }
-
-  if (v == (svalue_t*)-1) {
-    v = nullptr;
-  }
+  LPCCall call;
+  call.push(Value::str_copy(path));
+  call.push(Value::object(call_object));
+  call.push(Value::str_constant(call_fun));
+  /* No master, no such apply, or an error in it: v is not ok() and reads as
+   * null below, which allows the path unchanged (as it always has). */
+  CallResult r = call.safe_apply_master(writeflg ? APPLY_VALID_WRITE : APPLY_VALID_READ);
+  svalue_t* v = r.get();
 
   if (v && v->type == T_NUMBER && v->u.number == 0) {
     return nullptr;
@@ -723,10 +719,12 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
     return nullptr;
   }
   if (v && v->type == T_STRING) {
-    path = v->u.string;
+    /* r dies with this function: move the master's answer into
+     * apply_ret_value, where callers expect the returned path to live. */
+    free_svalue(&apply_ret_value, "check_valid_path");
+    apply_ret_value = r.take().release();
+    path = apply_ret_value.u.string;
   } else {
-    extern svalue_t apply_ret_value;
-
     free_svalue(&apply_ret_value, "check_valid_path");
     apply_ret_value.type = T_STRING;
     apply_ret_value.subtype = STRING_MALLOC;
@@ -1037,69 +1035,64 @@ int copy_file(const char* from, const char* to) {
 }
 
 #ifdef F_CP
-void f_cp(LPCFrame& f) {
-  int i = copy_file(f.string(0), f.string(1));
-  f.ret(i);
+Value f_cp(EfunArgs&, StringArg from, StringArg to) {
+  int i = copy_file(from.c_str(), to.c_str());
+  return i;
 }
 #endif
 
 #ifdef F_FILE_SIZE
-void f_file_size(LPCFrame& f) {
-  LPC_INT i = file_size(f.string(0));
+Value f_file_size(EfunArgs&, StringArg file) {
+  LPC_INT i = file_size(file.c_str());
 
   // cross platform fix
 #ifdef _WIN32
-  auto const len = f.string_len(0);
-  if (i == -1 && len > 0 && f.string(0)[len - 1] == '/') {
-    std::string const trimmed(f.string(0), len - 1);
+  auto const len = file.size();
+  if (i == -1 && len > 0 && file.c_str()[len - 1] == '/') {
+    std::string const trimmed(file.c_str(), len - 1);
     if (file_size(trimmed.c_str()) == -2) {
       i = -2;
     }
   }
 #endif
 
-  f.ret(i);
+  return i;
 }
 #endif
 
 #ifdef F_GET_DIR
-void f_get_dir(LPCFrame& f) {
-  array_t* vec = get_dir(f.string(0), f.number(1));
+Value f_get_dir(EfunArgs&, StringArg path, LPC_INT flags) {
+  array_t* vec = get_dir(path.c_str(), flags);
   if (vec) {
-    f.ret_refed(vec);
-  } else {
-    f.ret(0);
+    return Value::refed(vec);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_LINK
-void f_link(LPCFrame& f) {
-  svalue_t* ret;
+Value f_link(EfunArgs&, StringArg from, StringArg to) {
   int i;
 
-  {
-    LPCCall b;
-    b.push(f.argp(0));
-    b.push(f.argp(1));
-    ret = b.apply_master(APPLY_VALID_LINK);
-  }
+  LPCCall call;
+  call.push(from.copy());
+  call.push(to.copy());
+  CallResult ret = call.apply_master(APPLY_VALID_LINK);
   if (MASTER_APPROVED(ret, "valid_link")) {
-    i = do_rename(f.string(0), f.string(1), F_LINK);
+    i = do_rename(from.c_str(), to.c_str(), F_LINK);
   } else {
     i = 0;
   }
-  f.ret(i);
+  return i;
 }
 #endif /* F_LINK */
 
 #ifdef F_MKDIR
-void f_mkdir(LPCFrame& f) {
-  const char* path = check_valid_path(f.string(0), current_object, "mkdir", 1);
+Value f_mkdir(EfunArgs&, StringArg dir) {
+  const char* path = check_valid_path(dir.c_str(), current_object, "mkdir", 1);
   if (!path || OS_mkdir(path, 0770) == -1) {
-    f.ret(0);
-  } else {
-    f.ret(1);
+    return 0;
   }
+  return 1;
 }
 #endif

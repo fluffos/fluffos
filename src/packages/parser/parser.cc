@@ -144,7 +144,7 @@ static int debug_parse_verbose = 0;
 
 static void parse_rule(parse_state_t*);
 static void clear_parallel_errors(saved_error_t**);
-static svalue_t* get_the_error(parser_error_t*, int);
+static CallResult get_the_error(parser_error_t*, int);
 
 /* UTF-8 lead/continuation bytes are word bytes (issue #660): the C locale
  * classifies them as non-printable and non-alphanumeric, which used to
@@ -497,8 +497,6 @@ static int check_special_word(const char* wrd, long* arg) {
 }
 
 static void interrogate_master() {
-  svalue_t* ret;
-
   if ((master_state & MS_HAS_USERS) == 0) {
     DEBUG_PP(("[master::parse_command_users]"));
     if (master_user_list) {
@@ -507,7 +505,7 @@ static void interrogate_master() {
     }
 
     DEBUG_PP(("[%s]", applies_table[APPLY_USERS]));
-    ret = apply_master_ob(APPLY_USERS, 0);
+    CallResult ret = LPCCall().apply_master(APPLY_USERS);
     if (ret && ret->type == T_ARRAY) {
       master_user_list = ret->u.arr;
       ret->u.arr->ref++;
@@ -529,7 +527,7 @@ static void interrogate_master() {
     }
 
     DEBUG_PP(("[%s]", applies_table[APPLY_LITERALS]));
-    ret = apply_master_ob(APPLY_LITERALS, 0);
+    CallResult ret = LPCCall().apply_master(APPLY_LITERALS);
 
     if (ret && ret->type == T_ARRAY) {
       num_literals = parse_copy_array(ret->u.arr, &literals, __CURRENT_FILE_LINE__);
@@ -568,7 +566,7 @@ static void interrogate_master() {
   }
 }
 
-void f_parse_init(LPCFrame& f) {
+void f_parse_init(EfunArgs&) {
   parse_info_t* pi;
 
   if (current_object->pinfo) {
@@ -612,7 +610,7 @@ static void remove_ids(parse_info_t* pinfo) {
  * information returned by applies to current_object may have changed,
  * and should be recached when necessary.
  */
-void f_parse_refresh(LPCFrame& f) {
+void f_parse_refresh(EfunArgs&) {
   parse_info_t* pi;
 
   /* If this is the master object, prepare to go through
@@ -640,8 +638,7 @@ void f_parse_refresh(LPCFrame& f) {
    * object involved in the parse.
    */
   if (pi->flags & PI_VERB_HANDLER) {
-    LPCCall apply_args;
-    svalue_t* ret = apply_args.safe_apply(LIVINGS_ARE_REMOTE, current_object, ORIGIN_DRIVER);
+    CallResult ret = LPCCall().safe_apply(LIVINGS_ARE_REMOTE, current_object, ORIGIN_DRIVER);
     if (current_object->flags & O_DESTRUCTED) {
       return;
     }
@@ -924,8 +921,6 @@ static void free_words() {
 }
 
 static void interrogate_object(object_t* ob) {
-  svalue_t* ret;
-
   if (ob->pinfo->flags & PI_REFRESH) {
     remove_ids(ob->pinfo);
   }
@@ -938,7 +933,7 @@ static void interrogate_object(object_t* ob) {
   DEBUG_P(("Interogating /%s.", ob->obname));
 
   DEBUG_PP(("[%s]", APPLY_NOUN));
-  ret = safe_apply(APPLY_NOUN, ob, 0, ORIGIN_DRIVER);
+  CallResult ret = LPCCall().safe_apply(APPLY_NOUN, ob, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
     ob->pinfo->num_ids = parse_copy_array(ret->u.arr, &ob->pinfo->ids, __CURRENT_FILE_LINE__);
   } else {
@@ -954,7 +949,7 @@ static void interrogate_object(object_t* ob) {
   ob->pinfo->num_plurals = 0;
 
   DEBUG_PP(("[%s]", APPLY_PLURAL));
-  ret = safe_apply(APPLY_PLURAL, ob, 0, ORIGIN_DRIVER);
+  ret = LPCCall().safe_apply(APPLY_PLURAL, ob, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
     ob->pinfo->num_plurals =
         parse_copy_array(ret->u.arr, &ob->pinfo->plurals, __CURRENT_FILE_LINE__);
@@ -966,7 +961,7 @@ static void interrogate_object(object_t* ob) {
   }
 
   DEBUG_PP(("[%s]", APPLY_ADJECTIVE));
-  ret = safe_apply(APPLY_ADJECTIVE, ob, 0, ORIGIN_DRIVER);
+  ret = LPCCall().safe_apply(APPLY_ADJECTIVE, ob, ORIGIN_DRIVER);
   if (ret && ret->type == T_ARRAY) {
     ob->pinfo->num_adjs = parse_copy_array(ret->u.arr, &ob->pinfo->adjs, __CURRENT_FILE_LINE__);
   } else {
@@ -977,7 +972,7 @@ static void interrogate_object(object_t* ob) {
   }
 
   DEBUG_PP(("[%s]", IS_LIVING));
-  ret = safe_apply(IS_LIVING, ob, 0, ORIGIN_DRIVER);
+  ret = LPCCall().safe_apply(IS_LIVING, ob, ORIGIN_DRIVER);
   if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_LIVING;
     DEBUG_PP(("(yes)"));
@@ -987,7 +982,7 @@ static void interrogate_object(object_t* ob) {
   }
 
   DEBUG_PP(("[%s]", INVENTORY_ACCESSIBLE));
-  ret = safe_apply(INVENTORY_ACCESSIBLE, ob, 0, ORIGIN_DRIVER);
+  ret = LPCCall().safe_apply(INVENTORY_ACCESSIBLE, ob, ORIGIN_DRIVER);
   if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_INV_ACCESSIBLE;
     DEBUG_PP(("(yes)"));
@@ -997,7 +992,7 @@ static void interrogate_object(object_t* ob) {
   }
 
   DEBUG_PP(("[%s]", INVENTORY_VISIBLE));
-  ret = safe_apply(INVENTORY_VISIBLE, ob, 0, ORIGIN_DRIVER);
+  ret = LPCCall().safe_apply(INVENTORY_VISIBLE, ob, ORIGIN_DRIVER);
   if (APPLY_SAYS_YES(ret)) {
     ob->pinfo->flags |= PI_INV_VISIBLE;
     DEBUG_PP(("(yes)"));
@@ -1008,12 +1003,10 @@ static object_t* first_inv(object_t* ob) {
 #ifndef NO_ENVIRONMENT
   return ob->contains;
 #else
-  svalue_t* ret;
-
   LPCCall b;
-  b.push(ob);
-  ret = b.apply_master(APPLY_PARSE_FIRST_INVENTORY);
-  if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
+  b.push(Value::object(ob));
+  CallResult ret = b.apply_master(APPLY_PARSE_FIRST_INVENTORY);
+  if (ret && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
   return (object_t*)NULL;
@@ -1025,13 +1018,11 @@ static object_t* next_inv(object_t* parent, object_t* sibling) {
   (void)parent;
   return sibling->next_inv;
 #else
-  svalue_t* ret;
-
   LPCCall b;
-  b.push(parent);
-  b.push(sibling);
-  ret = b.apply_master(APPLY_PARSE_NEXT_INVENTORY);
-  if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
+  b.push(Value::object(parent));
+  b.push(Value::object(sibling));
+  CallResult ret = b.apply_master(APPLY_PARSE_NEXT_INVENTORY);
+  if (ret && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
   return (object_t*)NULL;
@@ -1042,12 +1033,10 @@ static object_t* super(object_t* ob) {
 #ifndef NO_ENVIRONMENT
   return ob->super;
 #else
-  svalue_t* ret;
-
   LPCCall b;
-  b.push(ob);
-  ret = b.apply_master(APPLY_PARSE_ENVIRONMENT);
-  if (ret && ret != (svalue_t*)-1 && ret->type == T_OBJECT) {
+  b.push(Value::object(ob));
+  CallResult ret = b.apply_master(APPLY_PARSE_ENVIRONMENT);
+  if (ret && ret->type == T_OBJECT) {
     return ret->u.ob;
   }
   return (object_t*)NULL;
@@ -1470,13 +1459,11 @@ static int get_single(bitvec_t* bv) {
 
 /* FIXME: obsolete */
 static char* query_the_short(char* start, char* end, object_t* ob) {
-  svalue_t* ret;
-
-  if (ob == nullptr) {
+  if (ob == nullptr || (ob->flags & O_DESTRUCTED)) {
     return strput(start, end, "the thing");
   }
-  if ((ob->flags & O_DESTRUCTED) || (!(ret = safe_apply("the_short", ob, 0, ORIGIN_DRIVER))) ||
-      (ret->type != T_STRING)) {
+  CallResult ret = LPCCall().safe_apply("the_short", ob, ORIGIN_DRIVER);
+  if (!ret || ret->type != T_STRING) {
     return strput(start, end, "the thing");
   }
   return strput(start, end, ret->u.string);
@@ -1506,7 +1493,7 @@ static char* strput_words(char* str, const char* limit, int first, int last) {
   return str + num;
 }
 
-static void push_words(int first, int last) {
+static Value words_to_string(int first, int last) {
   char* p = words[first].start;
   char* end = words[last].end;
   char* str;
@@ -1517,12 +1504,13 @@ static void push_words(int first, int last) {
   while (uisspace(end[0])) {
     end--;
   }
-  push_malloced_string(str = new_string(end - p + 1, "push_words"));
+  Value result = Value::str_malloced(str = new_string(end - p + 1, "push_words"));
 
   while (p <= end) {
     *str++ = *p++;
   }
   *str = 0;
+  return result;
 }
 
 static void free_parser_error(parser_error_t* p) {
@@ -1940,7 +1928,7 @@ static int parallel_process_answer(parse_state_t* state, svalue_t* sv, int which
   return 1;
 }
 
-static int push_real_names(int tryy) {
+static void push_real_names(LPCCall& call, int tryy) {
   int index = 0, match = 0;
   int tok;
   char tmp[1024];
@@ -1948,17 +1936,16 @@ static int push_real_names(int tryy) {
   if (tryy >= 2) {
     char tmpbuf[1024];
     strput_words(tmpbuf, EndOf(tmpbuf), 0, 0);
-    copy_and_push_string(tmpbuf);
+    call.push(Value::str_copy(tmpbuf));
   }
 
   while ((tok = parse_vn->token[index++])) {
     if (tok > 0) {
       strput_words(tmp, EndOf(tmp), matches[match].first, matches[match].last);
-      push_malloced_string(string_copy(tmp, "push_real_names"));
+      call.push(Value::str_malloced(string_copy(tmp, "push_real_names")));
       match++;
     }
   }
-  return match + (tryy >= 2);
 }
 
 static char* rule_string(verb_node_t* vn) {
@@ -2010,7 +1997,7 @@ static char* rule_string(verb_node_t* vn) {
   }
 }
 
-static void push_bitvec_as_array(bitvec_t* bv, int errors_too) {
+static Value bitvec_to_array(bitvec_t* bv, int errors_too) {
   int i, k, n = 0;
   unsigned int j;
   array_t* arr;
@@ -2036,17 +2023,17 @@ static void push_bitvec_as_array(bitvec_t* bv, int errors_too) {
     }
   }
   arr = allocate_array(n);
-  /* error safety; right spot for return value too */
-  push_refed_array(arr);
+  /* error safety; the return value too */
+  Value result = Value::refed(arr);
 
   if (errors_too) {
     i = 0;
     se = best_result->parallel;
     while (se) {
-      svalue_t* ret = get_the_error(&se->err, se->obj);
+      CallResult ret = get_the_error(&se->err, se->obj);
 
       if (ret) {
-        assign_svalue_no_free(&arr->item[i], ret);
+        arr->item[i] = ret.take().release();
       }
 
       se = se->next;
@@ -2075,8 +2062,10 @@ static void push_bitvec_as_array(bitvec_t* bv, int errors_too) {
       }
     }
   }
+  return result;
 }
 
+/* A shared string holding a copy of p (what share_and_push_string() pushed). */
 /* Belgarat: this function has been extended to handle
  *  two more parser apply calls. direct_ and indirect_ applies are
  *  called sometimes more than once
@@ -2086,9 +2075,10 @@ static const char* prefixes[] = {
     /* Belgarat: names for the second pass with filled object arguments */
     "direct_", "indirect_"};
 
-static int make_function(char* buf, char* end, int which, int tryy, object_t* target) {
+/* Writes the function name into buf and pushes its arguments onto call. */
+static void make_function(LPCCall& call, char* buf, char* end, int which, int tryy,
+                          object_t* target) {
   int index = 0, match = 0, omatch = 0;
-  int on_stack = 0;
   int tok;
 
   /* try = 0: "read_about_str_from_obj"
@@ -2102,16 +2092,14 @@ static int make_function(char* buf, char* end, int which, int tryy, object_t* ta
     buf = strput(buf, end, parse_verb_entry->match_name);
   } else {
     buf = strput(buf, end, "verb");
-    push_shared_string(parse_verb_entry->match_name);
-    on_stack++;
+    call.push(Value::str_shared(parse_verb_entry->match_name));
   }
 
   if (tryy == 3) {
     buf = strput(buf, end, "_rule");
     /* leave the 0; this effectively truncates the string. */
     buf++;
-    share_and_push_string(rule_string(parse_vn));
-    on_stack++;
+    call.push(Value::str_make_shared(rule_string(parse_vn)));
   }
   while ((tok = parse_vn->token[index++])) {
     *buf++ = '_';
@@ -2151,56 +2139,51 @@ static int make_function(char* buf, char* end, int which, int tryy, object_t* ta
          */
         if (which >= 4) {
           if (omatch == 1) {
-            push_object(loaded_objects[direct_object >= 0 ? direct_object : 0]);
+            call.push(Value::object(loaded_objects[direct_object >= 0 ? direct_object : 0]));
           } else {
-            push_object(loaded_objects[indirect_object >= 0 ? indirect_object : 0]);
+            call.push(Value::object(loaded_objects[indirect_object >= 0 ? indirect_object : 0]));
           }
         } else if (omatch == which) {
-          push_object(target);
+          call.push(Value::object(target));
         } else if (omatch > which) {
-          push_number(0);
+          call.push(0);
         } else if (matches[match].token == ERROR_TOKEN) {
-          push_number(0);
+          call.push(0);
         } else if (matches[match].token & PLURAL_MODIFIER) {
-          push_bitvec_as_array(&matches[match].val.obs, which == 3);
+          call.push(bitvec_to_array(&matches[match].val.obs, which == 3));
         } else if (matches[match].val.number < 0) {
-          push_number(0);
+          call.push(0);
         } else if (loaded_objects[matches[match].val.number] == nullptr ||
                    loaded_objects[matches[match].val.number]->flags & O_DESTRUCTED) {
-          push_number(0);
+          call.push(0);
         } else {
-          push_object(loaded_objects[matches[match].val.number]);
+          call.push(Value::object(loaded_objects[matches[match].val.number]));
         }
         match++;
-        on_stack++;
         break;
       case STR_TOKEN: {
         char tmp[1024];
         buf = strput(buf, end, "str");
         strput_words(tmp, EndOf(tmp), matches[match].first, matches[match].last);
-        push_malloced_string(string_copy(tmp, "push_real_names"));
+        call.push(Value::str_malloced(string_copy(tmp, "push_real_names")));
         match++;
-        on_stack++;
       } break;
       case WRD_TOKEN: {
         char tmp[1024];
         buf = strput(buf, end, "wrd");
         strput_words(tmp, EndOf(tmp), matches[match].first, matches[match].last);
-        push_malloced_string(string_copy(tmp, "push_real_names"));
+        call.push(Value::str_malloced(string_copy(tmp, "push_real_names")));
         match++;
-        on_stack++;
       } break;
       default:
         if (!tryy) {
           buf = strput(buf, end, literals[-(tok + 1)]);
         } else if (tryy < 3) {
           buf = strput(buf, end, "word");
-          push_shared_string(literals[-(tok + 1)]);
-          on_stack++;
+          call.push(Value::str_shared(literals[-(tok + 1)]));
         }
     }
   }
-  return on_stack;
 }
 
 #define SET_OB(x) \
@@ -2209,17 +2192,19 @@ static int make_function(char* buf, char* end, int which, int tryy, object_t* ta
 static int check_functions(object_t* obj, parse_state_t* state) {
   object_t* ob;
   char func[CHAR_FUNC];
-  int tryy, ret, args;
+  int tryy, ret;
 
   SET_OB(obj);
   for (tryy = 0, ret = 0; !ret && tryy < 8; tryy++) {
     if (tryy == 4) {
       SET_OB(parse_vn->handler);
     }
-    args = make_function(func, EndOf(func), 0, tryy % 4, obj);
-    args += push_real_names(tryy % 4);
+    LPCCall call;
+    make_function(call, func, EndOf(func), 0, tryy % 4, obj);
+    push_real_names(call, tryy % 4);
     DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
-    ret = process_answer(state, safe_apply(func, ob, args, ORIGIN_DRIVER), 0);
+    CallResult answer = call.safe_apply(func, ob, ORIGIN_DRIVER);
+    ret = process_answer(state, answer.get(), 0);
     if (ob->flags & O_DESTRUCTED) {
       return 0;
     }
@@ -2281,7 +2266,7 @@ static int save_last_parallel_error(int ob) {
 static int parallel_check_functions(object_t* obj, parse_state_t* state, int which) {
   object_t* ob;
   char func[CHAR_FUNC];
-  int tryy, ret = 0, args;
+  int tryy, ret = 0;
 
   free_parser_error(&parallel_error_info);
   if (obj) {
@@ -2290,10 +2275,12 @@ static int parallel_check_functions(object_t* obj, parse_state_t* state, int whi
       if (tryy == 4) {
         SET_OB(parse_vn->handler);
       }
-      args = make_function(func, EndOf(func), which, tryy % 4, obj);
-      args += push_real_names(tryy % 4);
+      LPCCall call;
+      make_function(call, func, EndOf(func), which, tryy % 4, obj);
+      push_real_names(call, tryy % 4);
       DEBUG_P(("Trying %s ... (/%s)", func, ob->obname));
-      ret = parallel_process_answer(state, safe_apply(func, ob, args, ORIGIN_DRIVER), which);
+      CallResult answer = call.safe_apply(func, ob, ORIGIN_DRIVER);
+      ret = parallel_process_answer(state, answer.get(), which);
       if (ob->flags & O_DESTRUCTED) {
         return 0;
       }
@@ -2820,7 +2807,6 @@ static void check_object_relations(parse_state_t* state) {
 
 static void we_are_finished(parse_state_t* state) {
   char func[CHAR_FUNC];
-  char* p;
   int which, mtch;
   int tryy, args;
 
@@ -2928,16 +2914,21 @@ static void we_are_finished(parse_state_t* state) {
     parallel_errors = nullptr;
     add_ref(parse_vn->handler, "best_result");
     for (tryy = 0; tryy < 4; tryy++) {
-      args = make_function(func, EndOf(func), 3, tryy, nullptr);
-      args += push_real_names(tryy);
+      /* Only collects the arguments; do_the_call() makes the call later. */
+      LPCCall call;
+      make_function(call, func, EndOf(func), 3, tryy, nullptr);
+      push_real_names(call, tryy);
+      args = call.argc();
       best_result->res[tryy].func = string_copy(func, "best_result");
       best_result->res[tryy].num = args;
       if (args) {
         best_result->res[tryy].args =
             (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result");
-        /* make_function() / push_real_names() just pushed them */
-        transfer_pop_some_svalues(best_result->res[tryy].args, args);
+        for (int j = 0; j < args; j++) {
+          assign_svalue_no_free(&best_result->res[tryy].args[j], call.arg(j).sv());
+        }
       }
+      call.discard();
     }
     DEBUG_P(
         ("Saving successful match: %s (%s)", best_result->res[0].func, best_result->ob->obname));
@@ -2959,6 +2950,7 @@ static void do_the_call() {
       return;
     }
     n = best_result->res[i].num;
+    LPCCall call;
     if (n) {
       svalue_t* args = best_result->res[i].args;
       /* Make sure we don't dump any dested obs onto the stack. */
@@ -2968,12 +2960,18 @@ static void do_the_call() {
           args[j] = const0u;
         }
       }
-      transfer_push_some_svalues(args, n);
+      for (int j = 0; j < n; j++) {
+        /* best_result gives up each value as it is handed over, so a stack
+         * overflow error part-way leaves free_parse_result() only the rest */
+        svalue_t v = args[j];
+        args[j] = const0;
+        call.push(Value::owned(v));
+      }
       FREE(args);
     }
     best_result->res[i].args = nullptr;
     DEBUG_P(("Calling %s ...", best_result->res[i].func));
-    if (safe_apply(best_result->res[i].func, ob, best_result->res[i].num, ORIGIN_DRIVER)) {
+    if (call.safe_apply(best_result->res[i].func, ob, ORIGIN_DRIVER)) {
       return;
     }
   }
@@ -3383,54 +3381,54 @@ static void parse_sentence(const char* input) {
   }
 }
 
-static svalue_t* get_the_error(parser_error_t* err, int obj) {
+/* The master's parser_error_message() for err; for an error type it has no
+ * message for, the number -found_level instead. */
+static CallResult get_the_error(parser_error_t* err, int obj) {
   int const tmp = err->error_type;
-  static svalue_t hack = {T_NUMBER};
 
   err->error_type = 0;
-  push_number(tmp);
+  LPCCall call;
+  call.push(tmp);
   if (obj == -1 || (loaded_objects[obj]->flags & O_DESTRUCTED)) {
-    push_undefined();
+    call.push(Value::undefined());
   } else {
-    push_object(loaded_objects[obj]);
+    call.push(Value::object(loaded_objects[obj]));
   }
 
   switch (tmp) {
     case ERR_IS_NOT:
     case ERR_NOT_LIVING:
     case ERR_NOT_ACCESSIBLE:
-      push_shared_string(err->err.noun->name);
-      push_number(get_single(&err->err.noun->pv.noun) == -1);
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 4);
+      call.push(Value::str_shared(err->err.noun->name));
+      call.push(get_single(&err->err.noun->pv.noun) == -1);
+      break;
     case ERR_AMBIG:
-      push_bitvec_as_array(&err->err.obs, 0);
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 3);
+      call.push(bitvec_to_array(&err->err.obs, 0));
+      break;
     case ERR_ORDINAL:
-      push_number(err->err.ord_error);
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 3);
+      call.push(err->err.ord_error);
+      break;
     case ERR_THERE_IS_NO:
-      push_words(err->err.str_problem.start, err->err.str_problem.end);
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 3);
+      call.push(words_to_string(err->err.str_problem.start, err->err.str_problem.end));
+      break;
     case ERR_ALLOCATED:
-      push_malloced_string(err->err.str);
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 3);
+      call.push(Value::str_malloced(err->err.str));
+      break;
     case ERR_BAD_MULTIPLE:
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 2);
+      break;
     case ERR_MANY_PATHS:
-      return apply_master_ob(APPLY_PARSER_ERROR_MESSAGE, 5);
-    default: {
-      /* Drop the two slots pushed above (number + object/undefined). */
-      LPCFrame drop = LPCFrame::args(2);
-      drop.ret_void();
-      hack.u.number = -found_level;
-      return &hack;
-    }
+      /* Was apply_master_ob(..., 5) over these two pushes, which handed the
+       * apply three slots that belonged to the caller. */
+      break;
+    default:
+      call.discard();
+      return CallResult(Value(-found_level));
   }
+  return call.apply_master(APPLY_PARSER_ERROR_MESSAGE);
 }
 
-void f_parse_sentence(LPCFrame& f) {
-  int num_arg = f.argc();
-
+Value f_parse_sentence(EfunArgs& f, StringArg sentence, std::optional<LPC_INT> debug,
+                       std::optional<array_t*> env, std::optional<mapping_t*> nicks) {
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
@@ -3445,7 +3443,7 @@ void f_parse_sentence(LPCFrame& f) {
     best_result = nullptr;
   }
 
-  LPC_INT const dbg = num_arg >= 2 ? f.number(1) : 0;
+  LPC_INT const dbg = debug.value_or(0);
 #if defined(DEBUG) || defined(PARSE_DEBUG)
   if (dbg) {
     debug_parse_depth = 1;
@@ -3456,7 +3454,7 @@ void f_parse_sentence(LPCFrame& f) {
     debug_parse_depth = 0;
   }
 #else
-  /* Before anything is moved off the stack, so this error leaks nothing. */
+  /* Before anything is moved out of the arguments, so this error leaks nothing. */
   if (dbg) {
     error(
         "Parser debugging not enabled. (compile with -DDEBUG or "
@@ -3465,36 +3463,41 @@ void f_parse_sentence(LPCFrame& f) {
 #endif
 
   /* free_parse_globals() releases these */
-  if (num_arg == 4) {
-    parse_nicks = f.steal(3).u.map;
+  if (nicks) {
+    parse_nicks = f.take(3).release().u.map;
   }
-  if (num_arg >= 3) {
-    parse_env = f.steal(2).u.arr;
+  if (env) {
+    parse_env = f.take(2).release().u.arr;
   }
-  f.pop_back(num_arg - 1);
 
-  StackErrorHandler parse_cleanup(free_parse_globals);
+  /* free_parse_globals() runs exactly once: below on the normal path, or
+   * here on an error() unwind before that point */
+  bool globals_freed = false;
+  DEFER {
+    if (!globals_freed) {
+      free_parse_globals();
+    }
+  };
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = current_object;
   pi = current_object->pinfo;
   parse_restricted = nullptr;
   found_level = 0;
-  parse_sentence(f.string(0));
+  parse_sentence(sentence.c_str());
 
+  Value result;
   if (best_match) {
-    parse_cleanup.run(); /* free_parse_globals() */
+    globals_freed = true;
+    free_parse_globals();
     do_the_call();
-    f.ret(1);
+    result = 1;
   } else {
-    svalue_t* ret = get_the_error(&best_error_info, -1);
-    parse_cleanup.run(); /* free_parse_globals() */
+    CallResult ret = get_the_error(&best_error_info, -1);
+    globals_freed = true;
+    free_parse_globals();
     if (ret) {
-      svalue_t v = *ret;
-      ret->type = T_NUMBER; /* will be freed later */
-      f.ret_owned(v);
-    } else {
-      f.ret(0);
+      result = ret.take();
     }
   }
 
@@ -3502,17 +3505,15 @@ void f_parse_sentence(LPCFrame& f) {
     free_parse_result(best_result);
     best_result = nullptr;
   }
+  return result;
 }
 
-void f_parse_my_rules(LPCFrame& f) {
-  int num_arg = f.argc();
-  int const flag = (num_arg == 3 ? f.number(2) : 0);
-  if (num_arg == 3) {
-    f.pop_back();
-  }
+Value f_parse_my_rules(EfunArgs&, object_t* user, StringArg sentence,
+                       std::optional<LPC_INT> do_call) {
+  int const flag = do_call.value_or(0);
 
-  if (!f.object(0)->pinfo)
-    error("/%s is not known by the parser.  Call parse_init() first.\n", f.object(0)->obname);
+  if (!user->pinfo)
+    error("/%s is not known by the parser.  Call parse_init() first.\n", user->obname);
   if (!current_object->pinfo)
     error("/%s is not known by the parser.  Call parse_init() first.\n", current_object->obname);
 
@@ -3520,19 +3521,20 @@ void f_parse_my_rules(LPCFrame& f) {
     error("Illegal to call parse_sentence() recursively.\n");
   }
 
-  StackErrorHandler parse_cleanup(free_parse_globals);
+  /* on every exit from here, an error() unwind included; on the normal path
+   * after the result is built */
+  DEFER { free_parse_globals(); };
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
-  parse_user = f.object(0);
+  parse_user = user;
   pi = parse_user->pinfo;
   parse_restricted = current_object;
-  parse_sentence(f.string(1));
+  parse_sentence(sentence.c_str());
 
   if (best_match) {
     if (flag) {
       do_the_call();
-      parse_cleanup.dismiss(); /* free_parse_globals() runs below */
-      f.ret(1);
+      return 1;
     } else {
       int n;
       array_t* arr;
@@ -3550,28 +3552,21 @@ void f_parse_my_rules(LPCFrame& f) {
         FREE(best_result->res[3].args);
       }
       best_result->res[3].args = nullptr;
-      parse_cleanup.dismiss();
-      f.ret_refed(arr);
-    }
-  } else {
-    svalue_t* ret = get_the_error(&best_error_info, -1);
-    parse_cleanup.dismiss();
-    if (ret) {
-      svalue_t v = *ret;
-      ret->type = T_NUMBER;
-      f.ret_owned(v);
-    } else {
-      f.ret(0);
+      return Value::refed(arr);
     }
   }
-  free_parse_globals();
+  CallResult ret = get_the_error(&best_error_info, -1);
+  if (ret) {
+    return ret.take();
+  }
+  return 0;
 }
 
-void f_parse_remove(LPCFrame& f) {
+void f_parse_remove(EfunArgs&, StringArg verb_name) {
   const char* verb;
   verb_t* verb_entry;
 
-  verb = SHARED_STRING(f.argp(0));
+  verb = SHARED_STRING(verb_name.sv());
   verb_entry = verbs[DO_HASH(verb, VERB_HASH_SIZE)];
   while (verb_entry) {
     if (verb_entry->match_name == verb) {
@@ -3588,13 +3583,11 @@ void f_parse_remove(LPCFrame& f) {
     }
     verb_entry = verb_entry->next;
   }
-  f.ret_void();
 }
 
-void f_parse_add_rule(LPCFrame& f) {
+void f_parse_add_rule(EfunArgs&, StringArg verb_name, StringArg rule_arg) {
   int tokens[10];
   int lit[2], i, j;
-  svalue_t* ret;
   const char *verb, *rule;
   object_t* handler;
   verb_t* verb_entry;
@@ -3602,8 +3595,8 @@ void f_parse_add_rule(LPCFrame& f) {
   int h;
   int weight;
 
-  rule = f.string(1);
-  verb = SHARED_STRING(f.argp(0));
+  rule = rule_arg.c_str();
+  verb = SHARED_STRING(verb_name.sv());
   verb_entry = nullptr;
   handler = current_object;
   if (!(handler->pinfo))
@@ -3629,7 +3622,7 @@ void f_parse_add_rule(LPCFrame& f) {
 
   if (!verb_entry) {
     if (!verb) {
-      verb = make_shared_string(f.string(0));
+      verb = make_shared_string(verb_name.c_str());
     } else {
       ref_string(verb);
     }
@@ -3673,19 +3666,14 @@ void f_parse_add_rule(LPCFrame& f) {
   verb_node->next = verb_entry->node;
   verb_entry->node = verb_node;
 
-  {
-    LPCCall apply_args;
-    ret = apply_args.safe_apply(LIVINGS_ARE_REMOTE, handler, ORIGIN_DRIVER);
-  }
+  CallResult ret = LPCCall().safe_apply(LIVINGS_ARE_REMOTE, handler, ORIGIN_DRIVER);
   if (APPLY_SAYS_YES(ret)) {
     handler->pinfo->flags |= PI_REMOTE_LIVINGS;
   }
-
-  f.ret_void();
 }
 
-void f_parse_add_synonym(LPCFrame& f) {
-  int num_arg = f.argc();
+void f_parse_add_synonym(EfunArgs&, StringArg new_verb_arg, StringArg old_verb_arg,
+                         std::optional<StringArg> rule_arg) {
   const char *new_verb, *old_verb, *rule, *orig_new_verb;
   verb_t* vb;
   verb_node_t *vn, *verb_node;
@@ -3694,17 +3682,10 @@ void f_parse_add_synonym(LPCFrame& f) {
   int weight;
   int h;
 
-  if (num_arg == 3) {
-    orig_new_verb = f.string(0);
-    new_verb = SHARED_STRING(f.argp(0));
-    old_verb = SHARED_STRING(f.argp(1));
-    rule = f.string(2);
-  } else {
-    orig_new_verb = f.string(0);
-    new_verb = SHARED_STRING(f.argp(0));
-    old_verb = SHARED_STRING(f.argp(1));
-    rule = nullptr;
-  }
+  orig_new_verb = new_verb_arg.c_str();
+  new_verb = SHARED_STRING(new_verb_arg.sv());
+  old_verb = SHARED_STRING(old_verb_arg.sv());
+  rule = rule_arg ? rule_arg->c_str() : nullptr;
 
   if (old_verb == new_verb) {
     error("Verb cannot be a synonym for itself.\n");
@@ -3713,7 +3694,7 @@ void f_parse_add_synonym(LPCFrame& f) {
   verb_entry = nullptr;
 
   if (!old_verb) { /* not even a shared string, so certainly not a verb */
-    error("%s is not a verb!\n", f.string(1));
+    error("%s is not a verb!\n", old_verb_arg.c_str());
   }
 
   vb = verbs[DO_HASH(old_verb, VERB_HASH_SIZE)];
@@ -3807,11 +3788,9 @@ void f_parse_add_synonym(LPCFrame& f) {
     syn->flags = VB_IS_SYN | (vb->flags & VB_HAS_OBJ);
     syn->real = vb;
   }
-
-  f.ret_void();
 }
 
-void f_parse_dump(LPCFrame& f) {
+Value f_parse_dump(EfunArgs&) {
   int i;
   outbuffer_t ob;
 
@@ -3836,5 +3815,5 @@ void f_parse_dump(LPCFrame& f) {
       }
     }
   }
-  outbuf_ret(f, &ob);
+  return outbuf_value(&ob);
 }

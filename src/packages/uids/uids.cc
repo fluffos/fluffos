@@ -19,84 +19,72 @@ static object_t* ob;
 
 #ifdef F_EXPORT_UID
 
-void f_export_uid(LPCFrame& f) {
+Value f_export_uid(EfunArgs&, object_t* target) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
-  ob = f.object(0);
+  ob = target;
   if (ob->euid) {
-    f.ret(0);
-  } else {
-    ob->uid = current_object->euid;
-    f.ret(1);
+    return 0;
   }
+  ob->uid = current_object->euid;
+  return 1;
 }
 
 #endif
 
 #ifdef F_GETEUID
 
-void f_geteuid(LPCFrame& f) {
-  if (f.type(0) & T_OBJECT) {
-    ob = f.object(0);
+Value f_geteuid(EfunArgs&, Arg who) {
+  if (who.is(T_OBJECT)) {
+    ob = who.object();
     if (ob->euid) {
-      f.ret_str_shared(ob->euid->name);
-      return;
+      return Value::str_shared(ob->euid->name);
     }
-    f.ret(0);
-    return;
-
-  } else if (f.type(0) & T_FUNCTION) {
-    funptr_t* fp;
-    if ((fp = f.funptr(0))->hdr.owner && fp->hdr.owner->euid) {
-      f.ret_str_shared(fp->hdr.owner->euid->name);
-      return;
-    }
-    f.ret(0);
+    return 0;
   }
+  funptr_t* fp = who.funptr();
+  if (fp->hdr.owner && fp->hdr.owner->euid) {
+    return Value::str_shared(fp->hdr.owner->euid->name);
+  }
+  return 0;
 }
 
 #endif
 
 #ifdef F_GETUID
 
-void f_getuid(LPCFrame& f) {
-  ob = f.object(0);
+Value f_getuid(EfunArgs&, object_t* target) {
+  ob = target;
 
   if (!ob->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
   }
 
-  f.ret_str_shared(ob->uid->name);
+  return Value::str_shared(ob->uid->name);
 }
 
 #endif
 
 #ifdef F_SETEUID
 
-void f_seteuid(LPCFrame& f) {
-  svalue_t* ret;
-
-  if (f.type(0) & T_NUMBER) {
-    if (f.number(0)) {
+Value f_seteuid(EfunArgs&, Arg euid) {
+  if (euid.is(T_NUMBER)) {
+    if (euid.number()) {
       bad_arg(1, F_SETEUID);
     }
     current_object->euid = nullptr;
-    f.ret(1);
-    return;
+    return 1;
   }
-  {
-    LPCCall b;
-    b.push(current_object);
-    b.push(f.argp(0));
-    ret = b.apply_master(APPLY_VALID_SETEUID);
-  }
+  LPCCall call;
+  call.push(Value::object(current_object));
+  call.push(euid.copy());
+  CallResult ret = call.apply_master(APPLY_VALID_SETEUID);
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
-    f.ret(0);
-    return;
+    return 0;
   }
-  current_object->euid = add_uid(f.string(0));
-  f.ret(1);
+  current_object->euid = add_uid(euid.string().c_str());
+  return 1;
 }
 
 #endif

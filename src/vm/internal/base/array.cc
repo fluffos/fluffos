@@ -611,8 +611,7 @@ void filter_array(svalue_t* arg, int num_arg) {
     svalue_t* v;
     int res = 0, cnt;
     function_to_call_t ftc;
-    LPCFrame frame = LPCFrame::args(num_arg);
-    frame.process_callback(1, &ftc, F_FILTER);
+    process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
     /* allocate a full size array and push it onto the stack so that if an
      * error occurs, it'll get cleaned up.  can't use empty array because
@@ -658,10 +657,7 @@ void filter_string(svalue_t* arg, int num_arg) {
     size = SVALUE_STRLEN(arg);
     str = const_cast<char*>(arg->u.string);
 
-    {
-      LPCFrame frame = LPCFrame::args(num_arg);
-      frame.process_callback(1, &ftc, F_FILTER);
-    }
+    process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
     for (cnt = 0; cnt < size; cnt++) {
       push_number(str[cnt]);
@@ -766,40 +762,26 @@ static void unique_array_error_handler(void) {
   FREE((char*)unlist);
 }
 
-void f_unique_array(LPCFrame& f) {
-  int num_arg = f.argc();
-  array_t *v, *ret;
+Value f_unique_array(EfunArgs&, array_t* v, Arg separator, std::optional<Arg> skip) {
+  array_t* ret;
   long size, i, numkeys = 0;
   int* ind;
   svalue_t *skipval, *sv, *svp;
   unique_list_t* unlist;
   unique_t **head, *uptr, *nptr;
   funptr_t* fptr = nullptr;
-  const char* func;
+  const char* func = nullptr;
 
-  size = (v = (sp - num_arg + 1)->u.arr)->size;
+  size = v->size;
   if (!size) {
-    if (num_arg == 3) {
-      free_svalue(sp--, "f_unique_array");
-    }
-    free_svalue(sp--, "f_unique_array");
-    return;
+    return Value::addref(v);
   }
 
-  if (num_arg == 3) {
-    skipval = sp;
-    if ((sp - 1)->type == T_FUNCTION) {
-      fptr = (sp - 1)->u.fp;
-    } else {
-      func = (sp - 1)->u.string;
-    }
+  skipval = skip ? skip->sv() : &const0;
+  if (separator.is(T_FUNCTION)) {
+    fptr = separator.funptr();
   } else {
-    skipval = &const0;
-    if (sp->type == T_FUNCTION) {
-      fptr = sp->u.fp;
-    } else {
-      func = sp->u.string;
-    }
+    func = separator.string().c_str();
   }
 
   unlist = reinterpret_cast<unique_list_t*>(
@@ -870,10 +852,8 @@ void f_unique_array(LPCFrame& f) {
   unlist = g_u_list->next;
   FREE((char*)g_u_list);
   g_u_list = unlist;
-  sp--;
-  pop_n_elems(num_arg - 1);
-  free_array(v);
-  sp->u.arr = ret;
+  sp--; /* the error handler slot, without running it */
+  return Value::refed(ret);
 }
 
 /*
@@ -1027,10 +1007,7 @@ void map_array(svalue_t* arg, int num_arg) {
     int cnt;
     svalue_t* v;
 
-    {
-      LPCFrame frame = LPCFrame::args(num_arg);
-      frame.process_callback(1, &ftc, F_MAP);
-    }
+    process_efun_callback(1, &ftc, F_MAP, num_arg);
 
     r = int_allocate_array(size);
 
@@ -1215,16 +1192,15 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
   }
 }
 
-void f_sort_array(LPCFrame& f) {
-  int num_arg = f.argc();
-  svalue_t* arg = sp - num_arg + 1;
-  array_t* tmp = arg->u.arr;
-  check_for_destr(tmp);
+Value f_sort_array(EfunArgs& f, array_t* arr, Arg how) {
+  check_for_destr(arr);
 
-  switch (arg[1].type) {
+  switch (how.type()) {
     case T_NUMBER: {
-      tmp = builtin_sort_array(copy_array(tmp), arg[1].u.number);
-      break;
+      /* held while the builtin comparator runs: it error()s on a mixed array */
+      Value sorted = Value::refed(copy_array(arr));
+      builtin_sort_array(sorted->u.arr, how.number());
+      return sorted;
     }
 
     case T_FUNCTION:
@@ -1237,29 +1213,26 @@ void f_sort_array(LPCFrame& f) {
        * to it in a global, being careful to save and restore the old
        * value.
        */
-      function_to_call_t ftc, *old_ptr;
-
-      old_ptr = sort_array_ftc;
+      function_to_call_t ftc;
+      function_to_call_t* old_ptr = sort_array_ftc;
+      /* Restored on an error() unwind too: a comparator that catches an
+       * error escaping a nested sort_array() must not leave the outer sort
+       * pointing at the inner one's dead ftc. */
+      DEFER { sort_array_ftc = old_ptr; };
       sort_array_ftc = &ftc;
-      {
-        LPCFrame frame = LPCFrame::args(num_arg);
-        frame.process_callback(1, &ftc, F_SORT_ARRAY);
-      }
+      f.process_callback(1, &ftc);
 
-      tmp = copy_array(tmp);
-      push_refed_array(tmp);
+      Value sorted = Value::refed(copy_array(arr));
+      array_t* tmp = sorted->u.arr;
       if (CONFIG_INT(__RC_SANE_SORTING__)) {
         qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
       } else {
         old_quickSort((char*)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
       }
-      sort_array_ftc = old_ptr;
-      sp--;  // remove tmp from stack, but we don't want to free it!
-      break;
+      return sorted;
     }
   }
-  pop_n_elems(num_arg);
-  push_refed_array(tmp);  // put it back
+  return Value::addref(arr); /* unreachable: the spec admits only the cases above */
 }
 #endif
 
@@ -2138,8 +2111,7 @@ array_t* livings() {
 #endif
 
 #ifdef F_OBJECTS
-void f_objects(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_objects(EfunArgs&, std::optional<Arg> filter) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2147,15 +2119,15 @@ void f_objects(LPCFrame& f) {
   object_t** list;
   array_t* ret;
   funptr_t* funp = nullptr;
-  if (num_arg) {
-    if (f.type(0) == T_FUNCTION) {
-      funp = f.funptr(0);
+  if (filter) {
+    if (filter->is(T_FUNCTION)) {
+      funp = filter->funptr();
     } else {
-      func = f.string(0);
+      func = filter->string().c_str();
     }
   }
-  /* From here on the body works on the raw stack: get_objects() parks the
-   * list on it, and the callbacks push and pop above that. */
+  /* get_objects() parks the list on the stack above the arguments (so an
+   * error() frees it), and the callbacks push and pop above that. */
   get_objects(&list, &count, nullptr, nullptr);
   if (funp || func) {
     /* NOTE: If an object's hidden status changes during a callback, that
@@ -2173,9 +2145,8 @@ void f_objects(LPCFrame& f) {
         v = apply(func, current_object, 1, ORIGIN_EFUN);
       }
       if (!v || (current_object->flags & O_DESTRUCTED)) {
-        pop_n_elems(num_arg + 1);
-        push_refed_array(&the_null_array);
-        return;
+        pop_stack(); /* the list */
+        return Value::refed(&the_null_array);
       }
       if (v->type == T_NUMBER && !v->u.number) {
         list[i] = nullptr;
@@ -2198,7 +2169,7 @@ void f_objects(LPCFrame& f) {
     add_ref(list[i], "f_objects");
   }
 
-  pop_n_elems(num_arg + 1); /* include our temporary 'string' */
-  push_refed_array(ret);
+  pop_stack(); /* the list */
+  return Value::refed(ret);
 }
 #endif

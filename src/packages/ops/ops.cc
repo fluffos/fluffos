@@ -1363,22 +1363,18 @@ void f_function_constructor() {
   push_refed_funp(fp);
 }
 
-void f__evaluate(LPCFrame& f) {
-  int num_arg = f.argc(); /* the body below works on the raw stack */
-  svalue_t* v;
-  svalue_t* arg = sp - num_arg + 1;
-
-  if (arg->type != T_FUNCTION) {
-    pop_n_elems(num_arg - 1);
-    return;
+Value f__evaluate(EfunArgs& f, Arg fun) {
+  if (!fun.is(T_FUNCTION)) {
+    return f.take(0); /* anything else evaluates to itself */
   }
   if (current_object->flags & O_DESTRUCTED) {
-    pop_n_elems(num_arg);
-    push_undefined();
-    return;
+    return Value::undefined();
   }
-  v = call_function_pointer(arg->u.fp, num_arg - 1);
-  assign_svalue(sp, v);
+  /* the call consumes the trailing arguments; its result is moved out of
+   * the shared return slot */
+  svalue_t* v = call_function_pointer(fun.funptr(), f.argc() - 1);
+  f.resync();
+  return Value::take(v);
 }
 
 void f_sscanf() {

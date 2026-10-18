@@ -16,6 +16,11 @@
  * valid_link, valid_hide, valid_override. Same rule, and the same reason, as
  * check_valid_path() and the command parser (AGENTS.md section 13.24). */
 int master_approved(struct svalue_t* v, const char* apply_name);
+/* The same question for an LPCCall::apply_master()/safe_apply_master()
+ * result: CallResult::kNoMaster is the bootstrap allow, any other failure
+ * denies. */
+class CallResult;
+int master_approved(const CallResult& r, const char* apply_name);
 
 /* for apply_master_ob */
 #define MASTER_APPROVED(x, name) master_approved((x), (name))

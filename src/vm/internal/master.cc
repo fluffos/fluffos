@@ -33,6 +33,13 @@ int master_approved(svalue_t* v, const char* apply_name) {
   return v->type != T_NUMBER || v->u.number != 0;
 }
 
+int master_approved(const CallResult& r, const char* apply_name) {
+  if (r.status() == CallResult::kNoMaster) {
+    return 1; /* no master yet: the bootstrap allow */
+  }
+  return master_approved(const_cast<svalue_t*>(r.get()), apply_name);
+}
+
 struct object_t* master_ob = nullptr;
 struct function_lookup_info_t* master_applies = nullptr;
 

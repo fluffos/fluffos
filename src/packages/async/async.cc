@@ -437,7 +437,7 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
    settles, so an error() in a cancel handler cannot leak it. */
 static void deliver_result(LPCCall& result, struct Request* req, int rejected) {
   if (req->prom) {
-    promise_settle(req->prom, &result.arg(0), rejected);
+    promise_settle(req->prom, result.arg(0).sv(), rejected);
     result.discard();
     return;
   }
@@ -456,7 +456,7 @@ void handle_read(struct Request* req) {
   char* file = new_string(val, "read_file_async: str");
   memcpy(file, (char*)(req->data.data()), val);
   file[val] = 0;
-  result.push_str_malloced(file);
+  result.push(Value::str_malloced(file));
   deliver_result(result, req, 0);
 }
 
@@ -488,7 +488,7 @@ void handle_getdir(struct Request* req) {
   }
 
   LPCCall result;
-  result.push_refed(ret);
+  result.push(Value::refed(ret));
   deliver_result(result, req, 0);
 }
 #endif
@@ -501,7 +501,7 @@ void handle_write(struct Request* req) {
     deliver_result(result, req, /*rejected=*/1);
     return;
   }
-  result.push_undefined();
+  result.push(Value::undefined());
   deliver_result(result, req, 0);
 }
 
@@ -509,7 +509,7 @@ void handle_db_exec(struct Request* req) {
   int const val = req->ret;
   LPCCall result;
   if (val == -1) {
-    result.push_str_copy(req->path.c_str());
+    result.push(Value::str_copy(req->path.c_str()));
   } else {
     result.push(val);
   }
@@ -602,8 +602,7 @@ void complete_all_asyncio() {
 
 #ifdef F_ASYNC_READ
 
-void f_async_read(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_async_read(EfunArgs& f, StringArg file, std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -613,19 +612,15 @@ void f_async_read(LPCFrame& f) {
    * (AGENTS.md section 4). Nothing below this line applies, so the returned
    * string stays valid until add_read() copies it. The path is the FIRST
    * argument -- the optional callback is the last when one was passed.
-   * Arity is the num_arg parameter (not a global), so the master apply
-   * cannot clobber form-detection or process_efun_callback. */
-  const char* path = check_valid_path(f.string(0), current_object, "read_file", 0);
-  if (num_arg >= 2) {
+   * The form is decided by the callback parameter (not a global), so the
+   * master apply cannot clobber form-detection or process_callback. */
+  const char* path = check_valid_path(file.c_str(), current_object, "read_file", 0);
+  if (callback) {
+    /* The callback parameter is typed funptr_t*: the efun thunk has already
+     * rejected a string (or anything else) there, so process_callback()
+     * always fills cb->f.fp, never the string-callback form. */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    f.process_callback(1, cb.get(), F_ASYNC_READ);
-    // A `mixed` argument bypasses the spec's compile-time `function` check;
-    // process_efun_callback() then sets cb->ob (string-callback form) rather
-    // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
-    // char*) as a funptr_t*.
-    if (cb->ob != nullptr) {
-      error("async_read: callback must be a function pointer, not a string.\n");
-    }
+    f.process_callback(1, cb.get());
     cb->f.fp->hdr.ref++;
     f.pop_back(1);
     fun = cb.release();
@@ -637,29 +632,25 @@ void f_async_read(LPCFrame& f) {
   add_read(path, fun, prom);
   if (prom) {
     prom->ref++; /* the request's ref stays; this one is the return value */
-    f.ret_refed(prom);
-  } else {
-    f.ret(0);
+    return Value::refed(prom);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_ASYNC_WRITE
-void f_async_write(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_async_write(EfunArgs& f, StringArg file, StringArg buf, LPC_INT flags,
+                    std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
-  /* before any ownership is taken, with num_arg latched across the
-   * master apply -- see f_async_read(); the path is the FIRST of 3 or 4
-   * arguments */
-  const char* path = check_valid_path(f.string(0), current_object, "write_file", 1);
-  if (num_arg >= 4) {
+  /* before any ownership is taken -- see f_async_read(); the path is the
+   * FIRST of 3 or 4 arguments */
+  const char* path = check_valid_path(file.c_str(), current_object, "write_file", 1);
+  if (callback) {
+    /* typed funptr_t*: see f_async_read() */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    f.process_callback(3, cb.get(), F_ASYNC_WRITE);
-    if (cb->ob != nullptr) {
-      error("async_write: callback must be a function pointer, not a string.\n");
-    }
+    f.process_callback(3, cb.get());
     cb->f.fp->hdr.ref++;
     f.pop_back(1);
     fun = cb.release();
@@ -667,31 +658,27 @@ void f_async_write(LPCFrame& f) {
     prom = promise_alloc();
   }
 
-  add_write(path, f.string(1), f.string_len(1), f.number(2), fun, prom);
+  add_write(path, buf.c_str(), buf.size(), flags, fun, prom);
   if (prom) {
     prom->ref++;
-    f.ret_refed(prom);
-  } else {
-    f.ret(0);
+    return Value::refed(prom);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_ASYNC_GETDIR
-void f_async_getdir(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_async_getdir(EfunArgs& f, StringArg dir, std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
-  /* before any ownership is taken, with num_arg latched across the
-   * master apply -- see f_async_read(); the path is the FIRST argument */
-  const char* path = check_valid_path(f.string(0), current_object, "get_dir", 0);
-  if (num_arg >= 2) {
+  /* before any ownership is taken -- see f_async_read(); the path is the
+   * FIRST argument */
+  const char* path = check_valid_path(dir.c_str(), current_object, "get_dir", 0);
+  if (callback) {
+    /* typed funptr_t*: see f_async_read() */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    f.process_callback(1, cb.get(), F_ASYNC_GETDIR);
-    if (cb->ob != nullptr) {
-      error("async_getdir: callback must be a function pointer, not a string.\n");
-    }
+    f.process_callback(1, cb.get());
     cb->f.fp->hdr.ref++;
     f.pop_back(1);
     fun = cb.release();
@@ -702,10 +689,9 @@ void f_async_getdir(LPCFrame& f) {
   add_getdir(path, fun, prom);
   if (prom) {
     prom->ref++;
-    f.ret_refed(prom);
-  } else {
-    f.ret(0);
+    return Value::refed(prom);
   }
+  return 0;
 }
 #endif
 #ifdef F_ASYNC_DB_EXEC
@@ -727,17 +713,16 @@ struct AsyncCallbackRef {
   AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
 };
 
-void f_async_db_exec(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_async_db_exec(EfunArgs& f, LPC_INT handle, StringArg sql, std::optional<Arg> callback) {
   // Two forms (issue #1319), same split as async_read():
   //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
   //   async_db_exec(handle, sql)                 -> promise for the row count
   //
-  // process_efun_callback(..., num_arg) locates the callback from the
-  // parameter arity (arg = frame base + narg). Parse the callback
-  // before valid_database() so ownership/ordering stays clear; the old
+  // process_callback() locates the callback from the window's arity
+  // (arg = window base + narg). Parse the callback before
+  // valid_database() so ownership/ordering stays clear; the old
   // global-arity bug is gone, but the promise vs callback form split still
-  // keys on num_arg before any apply.
+  // keys on the callback's presence before any apply.
   std::unique_ptr<function_to_call_t> cb;
   AsyncCallbackRef cb_ref;
   array_t* bound_args = nullptr;
@@ -749,10 +734,9 @@ void f_async_db_exec(LPCFrame& f) {
     if (bound_args && !bound_args_handed_off) free_array(bound_args);
   };
 
-
-  if (num_arg >= 3) {
+  if (callback) {
     cb.reset(new function_to_call_t);
-    f.process_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+    f.process_callback(2, cb.get());
 
     // The callback fires long after this stack frame is gone (a DB round
     // trip on a worker thread, then a later game tick) -- unlike the
@@ -778,26 +762,25 @@ void f_async_db_exec(LPCFrame& f) {
     }
 
     // The bound args' stack slots were bitwise-transferred into bound_args
-    // above (not ref-bumped), so steal them before pop so ret/pop does not
+    // above (not ref-bumped), so forget them before the pop so it does not
     // free them -- same idiom as int_call_out().
-    for (int i = 3; i < num_arg; i++) {
-      (void)f.steal(i);
+    for (int i = 3; i < f.argc(); i++) {
+      f.forget(i);
     }
-    if (num_arg > 3) {
-      f.pop_back(num_arg - 3);
-    }
-    f.pop_back(1);  // remove the callback; window is handle, sql
+    // remove the (forgotten) bound args and the callback; the window is
+    // handle, sql (`callback` pointed into a released slot from here on)
+    f.pop_back(f.argc() - 2);
   }
 
   array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(f.string(1), "f_db_exec");
+  info->item[0].u.string = string_copy(sql.c_str(), "f_db_exec");
   valid_database("exec", info);
 
   db_t* db;
-  db = find_db_conn(f.number(0));
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
@@ -817,13 +800,12 @@ void f_async_db_exec(LPCFrame& f) {
 
   cb_ref.handed_off = true;
   bound_args_handed_off = true;
-  add_db_exec(f.number(0), f.string(1), cb ? cb.release() : nullptr, bound_args, prom);
+  add_db_exec(handle, sql.c_str(), cb ? cb.release() : nullptr, bound_args, prom);
   if (prom) {
     prom->ref++;
-    f.ret_refed(prom);
-  } else {
-    f.ret(0);
+    return Value::refed(prom);
   }
+  return 0;
 }
 #endif
 

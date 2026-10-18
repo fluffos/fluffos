@@ -152,6 +152,8 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
     "-Wextra"
     "-Wformat"
     "-Werror=format-security"
+    # An efun returning Value must return one on every path.
+    "-Werror=return-type"
     $<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
     # Turn off some warnings from GCC.
     "-Wno-unknown-warning-option"
@@ -626,7 +628,7 @@ set(SRC
   "vm/internal/base/debug.cc"
   "vm/internal/base/function.cc"
   "vm/internal/base/interpret.cc"
-  "vm/internal/base/lpc_frame.cc"
+  "vm/internal/base/efun_args.cc"
   "vm/internal/base/mapping.cc"
   "vm/internal/base/object.cc"
   "vm/internal/base/program.cc"

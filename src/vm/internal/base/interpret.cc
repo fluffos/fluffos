@@ -5299,11 +5299,12 @@ void eval_instruction(char* p) {
         if (instruction < EFUN_BASE || instruction > NUM_OPCODES) {
           fatal("wrong!");
         }
-        if (instrs[instruction].ret_type == TYPE_NOVALUE) {
-          expected_stack = sp - num_arg;
-        } else {
-          expected_stack = sp - num_arg + 1;
-        }
+#endif
+#ifdef DEBUG
+        /* The efun replaces its arguments with its result (none if void).
+         * Every build checks the window as the efun returns
+         * (EfunArgs::finish()); this re-check guards the generated thunks. */
+        expected_stack = sp - num_arg + (instrs[instruction].ret_type == TYPE_NOVALUE ? 0 : 1);
 #endif
         {
           const char* ename = instrs[instruction].name;
@@ -5332,8 +5333,7 @@ void eval_instruction(char* p) {
           }
 
           ScopedTracer _efun_tracer(ename, EventCategory::LPC_EFUN, [&] { return trace_context; });
-          LPCFrame efun_frame = LPCFrame::args(num_arg);
-          (*efun_table[instruction - EFUN_BASE])(efun_frame);
+          (*efun_table[instruction - EFUN_BASE])(num_arg);
 
           if (g_hook_mask & HOOK_MASK_EFUN) {
             hook_dispatch_efun_after(ename, efun_filter_ob,
@@ -5343,8 +5343,7 @@ void eval_instruction(char* p) {
 
 #ifdef DEBUG
         if (expected_stack != sp) {
-          fatal("Bad sp %p (should be %p) after calling efun '%s', num arg %d.\n", sp,
-                expected_stack, instrs[instruction].name, num_arg);
+          efun_stack_mismatch(instrs[instruction].name, num_arg, sp - expected_stack);
         }
 #endif
     } /* switch (instruction) */

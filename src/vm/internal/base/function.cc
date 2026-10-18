@@ -594,6 +594,11 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         if (n >= 4 || instrs[i].max_arg == -1) {
           n = instrs[i].min_arg;
         }
+        /* instrs[].type holds the first 4 argument types only; the generated
+         * efun binding checks every typed argument again anyway. */
+        if (n > 4) {
+          n = 4;
+        }
 
         for (j = 0; j < n; j++) {
           CHECK_TYPES(sp - num_arg + j + 1, instrs[i].type[j], j + 1, i);
@@ -632,14 +637,18 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             return trace_context;
           });
 
-          LPCFrame efun_frame = LPCFrame::args(num_arg);
 #ifdef DEBUG
+          /* as in eval_instruction: every build checks the window as the efun
+           * returns; this re-check guards the generated thunks */
           svalue_t* const expected_sp =
               sp - num_arg + (instrs[i].ret_type == TYPE_NOVALUE ? 0 : 1);
 #endif
-          (*efun_table[i - EFUN_BASE])(efun_frame);
-          DEBUG_CHECK2(sp != expected_sp, "Bad sp after calling efun '%s' (%d args) by pointer.\n",
-                       ename, num_arg);
+          (*efun_table[i - EFUN_BASE])(num_arg);
+#ifdef DEBUG
+          if (sp != expected_sp) {
+            efun_stack_mismatch(ename, num_arg, sp - expected_sp);
+          }
+#endif
         }
 
         if (g_hook_mask & HOOK_MASK_EFUN) {

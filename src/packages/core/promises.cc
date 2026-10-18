@@ -11,18 +11,12 @@
  * already validated the top-level tag before these run (AGENTS.md section 2).
  */
 
-
 #ifdef F_PROMISE_CREATE
-void f_promise_create(LPCFrame& f) {
-  f.ret_refed(promise_alloc());
-}
+Value f_promise_create(EfunArgs&) { return Value::refed(promise_alloc()); }
 #endif
 
 #ifdef F_PROMISE_RESOLVE
-void f_promise_resolve(LPCFrame& f) {
-  int num_arg = f.argc();
-  promise_t* p = f.promise(0);
-
+void f_promise_resolve(EfunArgs&, promise_t* p, std::optional<Arg> value_arg) {
   if (p->state != PROMISE_PENDING || p->resolving) {
     /* `resolving`: a prior resolve with a still-pending promise committed
      * this promise's fate to the adoption; without the check, a second
@@ -37,20 +31,16 @@ void f_promise_resolve(LPCFrame& f) {
         "promise_resolve: promise belongs to an async function; only its body "
         "can settle it.\n");
   }
-  svalue_t* value = (num_arg > 1) ? f.argp(1) : &const0;
+  svalue_t* value = value_arg ? value_arg->sv() : &const0;
   if (value->type == T_PROMISE && value->u.prom == p) {
     error("promise_resolve: cannot resolve a promise with itself.\n");
   }
   promise_resolve_with(p, value);
-  f.ret_void();
 }
 #endif
 
 #ifdef F_PROMISE_REJECT
-void f_promise_reject(LPCFrame& f) {
-  int num_arg = f.argc();
-  promise_t* p = f.promise(0);
-
+void f_promise_reject(EfunArgs&, promise_t* p, std::optional<Arg> reason) {
   if (p->state != PROMISE_PENDING || p->resolving) {
     /* see promise_resolve: an in-flight adoption already commits the fate */
     error("promise_reject: promise is already settled.\n");
@@ -65,7 +55,7 @@ void f_promise_reject(LPCFrame& f) {
   /* mirror promise_resolve's guard: a promise holding itself is a cycle no
    * collector here can break (%O itself is depth-bounded, so it prints
    * fine -- the problem is the leak, not the printing) */
-  if (num_arg > 1 && f.type(1) == T_PROMISE && f.promise(1) == p) {
+  if (reason && reason->is(T_PROMISE) && reason->promise() == p) {
     error("promise_reject: cannot reject a promise with itself.\n");
   }
   /* A rejection reason must be TRUTHY by default. acatch(), like catch(),
@@ -81,15 +71,12 @@ void f_promise_reject(LPCFrame& f) {
   default_reason.type = T_STRING;
   default_reason.subtype = STRING_CONSTANT;
   default_reason.u.string = PROMISE_REASON_NO_REASON;
-  promise_settle(p, (num_arg > 1) ? f.argp(1) : &default_reason, 1);
-  f.ret_void();
+  promise_settle(p, reason ? reason->sv() : &default_reason, 1);
 }
 #endif
 
 /* shared body of promise_then() / promise_catch() */
-static void promise_then_common(LPCFrame& f, funptr_t* on_fulfilled, funptr_t* on_rejected) {
-  promise_t* p = f.promise(0);
-
+static Value promise_then_common(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected) {
   /* Refuse to register more work when the delivery queue is already
    * saturated. Without this a handler that attaches more reactions than the
    * drain retires grows g_promise_microtasks without bound -- one call to a
@@ -126,34 +113,31 @@ static void promise_then_common(LPCFrame& f, funptr_t* on_fulfilled, funptr_t* o
   }
   promise_add_reaction(p, on_fulfilled, on_rejected, chained, giver);
 
-  f.ret_refed(chained);
+  return Value::refed(chained);
 }
 
 #ifdef F_PROMISE_THEN
-void f_promise_then(LPCFrame& f) {
-  int num_arg = f.argc();
-  funptr_t* on_fulfilled = (num_arg > 1) ? f.funptr(1) : nullptr;
-  funptr_t* on_rejected = (num_arg > 2) ? f.funptr(2) : nullptr;
-  promise_then_common(f, on_fulfilled, on_rejected);
+Value f_promise_then(EfunArgs&, promise_t* p, std::optional<funptr_t*> on_fulfilled,
+                     std::optional<funptr_t*> on_rejected) {
+  return promise_then_common(p, on_fulfilled.value_or(nullptr), on_rejected.value_or(nullptr));
 }
 #endif
 
 #ifdef F_PROMISE_CATCH
-void f_promise_catch(LPCFrame& f) {
-  promise_then_common(f, nullptr, f.funptr(1));
+Value f_promise_catch(EfunArgs&, promise_t* p, funptr_t* on_rejected) {
+  return promise_then_common(p, nullptr, on_rejected);
 }
 #endif
 
 #ifdef F_PROMISE_STATUS
-void f_promise_status(LPCFrame& f) {
-  int const state = f.promise(0)->state;
-  f.ret(state);
+Value f_promise_status(EfunArgs&, promise_t* p) {
+  int const state = p->state;
+  return state;
 }
 #endif
 
 #ifdef F_PROMISE_RESULT
-void f_promise_result(LPCFrame& f) {
-  promise_t* p = f.promise(0);
+Value f_promise_result(EfunArgs&, promise_t* p) {
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
   }
@@ -161,7 +145,7 @@ void f_promise_result(LPCFrame& f) {
     /* reading a rejection or cancellation counts as observing it */
     p->handled = true;
   }
-  f.ret_copy(&p->result);
+  return Value::copy(&p->result);
 }
 #endif
 
@@ -169,9 +153,7 @@ void f_promise_result(LPCFrame& f) {
  * its ELEMENTS need checking (AGENTS.md section 2) -- and they need none: a
  * non-promise element is defined to count as already fulfilled with itself,
  * so map() output drops straight in. */
-static void promise_combinator_efun(LPCFrame& f, uint8_t kind) {
-  array_t* inputs = f.array(0);
-
+static Value promise_combinator_efun(array_t* inputs, uint8_t kind) {
   if (kind == PROMISE_COMB_RACE && inputs->size == 0) {
     /* JS lets this hang forever. Here a hung await is a parked frame holding
      * its object, its program and one `max suspended async functions` slot
@@ -179,59 +161,66 @@ static void promise_combinator_efun(LPCFrame& f, uint8_t kind) {
     error("promise_race: needs at least one promise; an empty array would never settle.\n");
   }
   promise_t* result = promise_combinator_start(kind, inputs);
-  f.ret_refed(result);
+  return Value::refed(result);
 }
 
 #ifdef F_PROMISE_ALL
-void f_promise_all(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_ALL); }
+Value f_promise_all(EfunArgs&, array_t* inputs) {
+  return promise_combinator_efun(inputs, PROMISE_COMB_ALL);
+}
 #endif
 
 #ifdef F_PROMISE_ANY
-void f_promise_any(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_ANY); }
+Value f_promise_any(EfunArgs&, array_t* inputs) {
+  return promise_combinator_efun(inputs, PROMISE_COMB_ANY);
+}
 #endif
 
 #ifdef F_PROMISE_RACE
-void f_promise_race(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_RACE); }
+Value f_promise_race(EfunArgs&, array_t* inputs) {
+  return promise_combinator_efun(inputs, PROMISE_COMB_RACE);
+}
 #endif
 
 #ifdef F_PROMISE_ALL_SETTLED
-void f_promise_all_settled(LPCFrame& f) { promise_combinator_efun(f, PROMISE_COMB_ALL_SETTLED); }
+Value f_promise_all_settled(EfunArgs&, array_t* inputs) {
+  return promise_combinator_efun(inputs, PROMISE_COMB_ALL_SETTLED);
+}
 #endif
 
 #ifdef F_PROMISE_CANCEL
-void f_promise_cancel(LPCFrame& f) {
-  /* validated (and possibly error()ed) before the stack is touched */
-  int const armed = promise_request_cancel(f.promise(0));
-  f.ret(armed);
+Value f_promise_cancel(EfunArgs&, promise_t* p) {
+  /* validated (and possibly error()ed) before anything is returned */
+  int const armed = promise_request_cancel(p);
+  return armed;
 }
 #endif
 
 #ifdef F_PROMISEP
-void f_promisep(LPCFrame& f) {
+Value f_promisep(EfunArgs&, Arg value) {
   /* the argument is `mixed`, so unlike the rest of this file the tag has
    * NOT been validated for us -- that is the question being asked */
-  f.ret(f.type(0) == T_PROMISE ? 1 : 0);
+  return value.is(T_PROMISE) ? 1 : 0;
 }
 #endif
 
 #ifdef F_ASYNC_YIELD
-void f_async_yield(LPCFrame& f) {
-  /* No arguments, so nothing to pop: return the yield promise. */
-  f.ret_refed(promise_async_yield());
+Value f_async_yield(EfunArgs&) {
+  /* No arguments: return the yield promise. */
+  return Value::refed(promise_async_yield());
 }
 #endif
 
 #ifdef F_ASYNC_INFO
-void f_async_info(LPCFrame& f) {
+Value f_async_info(EfunArgs&, LPC_INT stats) {
   /* async_info()  -> one mapping per suspended coroutine (the original form)
    * async_info(1) -> scheduler counters, including the drain's yield count,
    *                  which is the only portable way to observe that the
    *                  drain re-posted itself rather than running on. */
-  int const want_stats = f.number(0) != 0;
+  int const want_stats = stats != 0;
   if (want_stats) {
-    f.ret_refed(build_async_scheduler_info());
-  } else {
-    f.ret_refed(build_async_info());
+    return Value::refed(build_async_scheduler_info());
   }
+  return Value::refed(build_async_info());
 }
 #endif

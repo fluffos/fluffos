@@ -31,7 +31,6 @@ void init_living() {
 
 static void notify_no_command() {
   union string_or_func p;
-  svalue_t* v;
 
   if (!command_giver || !command_giver->interactive) {
     return;
@@ -39,12 +38,12 @@ static void notify_no_command() {
   p = command_giver->interactive->default_err_message;
   if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
     save_command_giver(command_giver);
-    v = call_function_pointer(p.f, 0);
+    CallResult v = LPCCall().call(p.f);
     restore_command_giver();
     free_funp(p.f);
     if (command_giver && command_giver->interactive) {
       if (v && v->type == T_STRING) {
-        tell_object(command_giver, v->u.string, SVALUE_STRLEN(v));
+        tell_object(command_giver, v->u.string, SVALUE_STRLEN(v.get()));
       }
       command_giver->interactive->iflags &= ~NOTIFY_FAIL_FUNC;
       command_giver->interactive->default_err_message.s = nullptr;
@@ -183,7 +182,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
    */
   if (item->flags & O_ENABLE_COMMANDS) {
     save_command_giver(item);
-    (void)apply(APPLY_INIT, dest, 0, ORIGIN_DRIVER);
+    (void)LPCCall().apply(APPLY_INIT, dest, ORIGIN_DRIVER);
     restore_command_giver();
     if (item->super != dest) {
       return;
@@ -206,7 +205,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
     }
     if (ob->flags & O_ENABLE_COMMANDS) {
       save_command_giver(ob);
-      (void)apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+      (void)LPCCall().apply(APPLY_INIT, item, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
@@ -220,7 +219,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
     }
     if (item->flags & O_ENABLE_COMMANDS) {
       save_command_giver(item);
-      (void)apply(APPLY_INIT, ob, 0, ORIGIN_DRIVER);
+      (void)LPCCall().apply(APPLY_INIT, ob, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
@@ -235,7 +234,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
   }
   if (dest->flags & O_ENABLE_COMMANDS) {
     save_command_giver(dest);
-    (void)apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+    (void)LPCCall().apply(APPLY_INIT, item, ORIGIN_DRIVER);
     restore_command_giver();
   }
 }
@@ -362,8 +361,6 @@ static int user_parser(char* buff) {
   save_illegal_sentence_action = illegal_sentence_action;
   illegal_sentence_action = 0;
   for (s = command_giver->sent; s; s = s->next) {
-    svalue_t* ret;
-
     if (s->flags & (V_NOSPACE | V_SHORT)) {
       if (strncmp(buff, s->verb, strlen(s->verb)) != 0) {
         continue;
@@ -408,20 +405,22 @@ static int user_parser(char* buff) {
      * Remember the object, to update moves.
      */
     save_command_giver(command_giver);
+    LPCCall call;
     if (s->flags & V_NOSPACE) {
-      copy_and_push_string(&buff[strlen(s->verb)]);
+      call.push(Value::str_copy(&buff[strlen(s->verb)]));
     } else if (buff[length] == ' ') {
-      copy_and_push_string(&buff[length + 1]);
+      call.push(Value::str_copy(&buff[length + 1]));
     } else {
-      push_undefined();
+      call.push(Value::undefined());
     }
+    CallResult ret(CallResult::kNotFound);
     if (s->flags & V_FUNCTION) {
-      ret = call_function_pointer(s->function.f, 1);
+      ret = call.call(s->function.f);
     } else {
       if (s->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
         error("Illegal function name.\n");
       }
-      ret = apply(s->function.s, s->ob, 1, where);
+      ret = call.apply(s->function.s, s->ob, where);
     }
     /* s may be dangling at this point */
 
@@ -430,7 +429,7 @@ static int user_parser(char* buff) {
     last_verb = nullptr;
 
     /* was this the right verb? */
-    if (ret == nullptr) {
+    if (!ret) {
       /* is it still around?  Otherwise, ignore this ...
          it moved somewhere or dested itself */
       if (s == command_giver->sent) {
@@ -467,7 +466,7 @@ static int user_parser(char* buff) {
           "Verb '%s' returned a promise: a verb function cannot be async -- the driver needs "
           "its answer now. Treating the command as unhandled.\n",
           verb_buff);
-      ret = nullptr;
+      ret = CallResult(CallResult::kNotFound);
     }
     if (ret && (ret->type != T_NUMBER || ret->u.number != 0)) {
 #ifdef PACKAGE_MUDLIB_STATS
@@ -686,30 +685,22 @@ void remove_sent(object_t* ob, object_t* user) {
 #endif
 
 #ifdef F_ADD_ACTION
-void f_add_action(LPCFrame& f) {
-  int num_arg = f.argc();
-  LPC_INT flag;
+void f_add_action(EfunArgs&, Arg fun, Arg verb, std::optional<LPC_INT> flag_arg) {
+  LPC_INT const flag = flag_arg.value_or(0);
 
-  if (num_arg == 3) {
-    flag = f.number(2);
-    f.pop_back(1);
-  } else {
-    flag = 0;
-  }
-
-  if (f.type(1) == T_ARRAY) {
-    int i, n = f.array(1)->size;
-    svalue_t* sv = f.array(1)->item;
+  if (verb.is(T_ARRAY)) {
+    array_t* verbs = verb.array();
+    int i, n = verbs->size;
+    svalue_t* sv = verbs->item;
 
     for (i = 0; i < n; i++) {
       if (sv[i].type == T_STRING) {
-        add_action(f.argp(0), sv[i].u.string, flag & 3);
+        add_action(fun.sv(), sv[i].u.string, flag & 3);
       }
     }
   } else {
-    add_action(f.argp(0), f.string(1), flag & 3);
+    add_action(fun.sv(), verb.string().c_str(), flag & 3);
   }
-  f.ret_void();
 }
 #endif
 
@@ -723,18 +714,18 @@ void f_add_action(LPCFrame& f) {
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command(LPCFrame& f) {
+Value f_command(EfunArgs&, StringArg cmd) {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
     char buff[1000];
     LPC_INT const save_eval_cost = get_eval();
 
-    if (f.string_len(0) > static_cast<int>(sizeof(buff) - 1)) {
+    if (cmd.size() > sizeof(buff) - 1) {
       error("Too long command.\n");
     }
 
-    strncpy(buff, f.string(0), sizeof(buff));
+    strncpy(buff, cmd.c_str(), sizeof(buff));
     buff[sizeof(buff) - 1] = 0;
 
     if (parse_command(buff, current_object)) {
@@ -746,108 +737,87 @@ void f_command(LPCFrame& f) {
     }
   }
 
-  f.ret(rc);
+  return rc;
 }
 #endif
 
 #ifdef F_COMMANDS
-void f_commands(LPCFrame& f) {
-  f.ret_refed(commands(current_object));
-}
+Value f_commands(EfunArgs&) { return Value::refed(commands(current_object)); }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands(LPCFrame& f) {
-  enable_commands(0, 0);
-}
+void f_disable_commands(EfunArgs&) { enable_commands(0, 0); }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands(LPCFrame& f) {
-  enable_commands(1, f.number(0));
-  f.ret_void();
-}
+void f_enable_commands(EfunArgs&, LPC_INT setup_actions) { enable_commands(1, setup_actions); }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living(LPCFrame& f) {
-  object_t* ob = find_living_object(f.string(0), 0);
+Value f_find_living(EfunArgs&, StringArg name) {
+  object_t* ob = find_living_object(name.c_str(), 0);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
-    f.ret(ob);
-  } else {
-    f.ret(0);
+    return Value::object(ob);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player(LPCFrame& f) {
-  object_t* ob = find_living_object(f.string(0), 1);
+Value f_find_player(EfunArgs&, StringArg name) {
+  object_t* ob = find_living_object(name.c_str(), 1);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
-    f.ret(ob);
-  } else {
-    f.ret(0);
+    return Value::object(ob);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_LIVING
-void f_living(LPCFrame& f) {
-  f.ret((f.object(0)->flags & O_ENABLE_COMMANDS) ? 1 : 0);
-}
+Value f_living(EfunArgs&, object_t* ob) { return (ob->flags & O_ENABLE_COMMANDS) ? 1 : 0; }
 #endif
 
 #ifdef F_LIVINGS
-void f_livings(LPCFrame& f) {
-  f.ret_refed(livings());
-}
+Value f_livings(EfunArgs&) { return Value::refed(livings()); }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail(LPCFrame& f) {
+void f_notify_fail(EfunArgs&, Arg message) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
-    if (f.type(0) == T_STRING) {
-      command_giver->interactive->default_err_message.s = make_shared_string(f.string(0));
+    if (message.is(T_STRING)) {
+      command_giver->interactive->default_err_message.s =
+          make_shared_string(message.string().c_str());
     } else {
+      funptr_t* fp = message.funptr();
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
-      command_giver->interactive->default_err_message.f = f.funptr(0);
-      f.funptr(0)->hdr.ref++;
+      command_giver->interactive->default_err_message.f = fp;
+      fp->hdr.ref++;
     }
   }
-  f.ret_void();
 }
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb(LPCFrame& f) {
+Value f_query_verb(EfunArgs&) {
   if (!last_verb) {
-    f.ret(0);
-    return;
+    return 0;
   }
   /* last_verb need not be a shared string: share a copy */
-  svalue_t v{};
-  v.type = T_STRING;
-  v.subtype = STRING_SHARED;
-  v.u.string = make_shared_string(last_verb);
-  f.ret_owned(v);
+  return Value::str_make_shared(last_verb);
 }
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action(LPCFrame& f) {
-  LPC_INT success = remove_action(f.argp(0), f.string(1));
-  f.ret(success);
+Value f_remove_action(EfunArgs&, Arg action, StringArg verb) {
+  return remove_action(action.sv(), verb.c_str());
 }
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name(LPCFrame& f) {
-  set_living_name(current_object, f.string(0));
-  f.ret_void();
-}
+void f_set_living_name(EfunArgs&, StringArg name) { set_living_name(current_object, name.c_str()); }
 #endif
 
 #endif /* ! NO_ADD_ACTION */

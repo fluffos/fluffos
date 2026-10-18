@@ -7,18 +7,16 @@
 static object_t* ob;
 
 #ifdef F_DEBUG_INFO
-void f_debug_info(LPCFrame& f) {
-  svalue_t* arg;
+Value f_debug_info(EfunArgs&, LPC_INT flag, object_t* target) {
   outbuffer_t out;
 
   outbuf_zero(&out);
-  arg = f.argp(0);
-  switch (arg[0].u.number) {
+  switch (flag) {
     case 0: {
       int i, flags;
       object_t* obj2;
 
-      ob = arg[1].u.ob;
+      ob = target;
       flags = ob->flags;
       outbuf_addv(&out, "O_HEART_BEAT      : %s\n", flags & O_HEART_BEAT ? "TRUE" : "FALSE");
 #ifndef NO_WIZARDS
@@ -78,7 +76,7 @@ void f_debug_info(LPCFrame& f) {
       break;
     }
     case 1:
-      ob = arg[1].u.ob;
+      ob = target;
 
       outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
       outbuf_addv(&out, "Name /%s\n", ob->prog->filename);
@@ -99,7 +97,7 @@ void f_debug_info(LPCFrame& f) {
       break;
     case 2: {
       int i;
-      ob = arg[1].u.ob;
+      ob = target;
       for (i = 0; i < ob->prog->num_variables_total; i++) {
         /* inefficient, but: */
         outbuf_addv(&out, "%s: ", variable_name(ob->prog, i));
@@ -111,37 +109,37 @@ void f_debug_info(LPCFrame& f) {
     default:
       bad_arg(1, F_DEBUG_INFO);
   }
-  outbuf_ret(f, &out);
+  return outbuf_value(&out);
 }
 #endif
 
 #ifdef F_REFS
-void f_refs(LPCFrame& f) {
+Value f_refs(EfunArgs&, Arg value) {
   int r;
 
-  switch (f.type(0)) {
+  switch (value.type()) {
     case T_MAPPING:
-      r = f.mapping(0)->ref;
+      r = value.mapping()->ref;
       break;
-    case T_CLASS:
+    case T_CLASS: /* a class is an array_t too; array() would expect T_ARRAY */
     case T_ARRAY:
-      r = f.array(0)->ref;
+      r = value.sv()->u.arr->ref;
       break;
     case T_OBJECT:
-      r = f.object(0)->ref;
+      r = value.object()->ref;
       break;
     case T_FUNCTION:
-      r = f.funptr(0)->hdr.ref;
+      r = value.funptr()->hdr.ref;
       break;
     case T_BUFFER:
-      r = f.buffer(0)->ref;
+      r = value.buffer()->ref;
       break;
     case T_PROMISE:
-      r = f.promise(0)->ref;
+      r = value.promise()->ref;
       break;
     case T_STRING:
-      if (f.subtype(0) & STRING_COUNTED) {
-        r = MSTR_REF(f.string(0));
+      if (value.subtype() & STRING_COUNTED) {
+        r = MSTR_REF(value.string().c_str());
       } else {
         r = 0;
       }
@@ -150,12 +148,12 @@ void f_refs(LPCFrame& f) {
       r = 0;
       break;
   }
-  f.ret(r - 1); /* minus 1 to compensate for being arg of refs() */
+  return r - 1; /* minus 1 to compensate for being arg of refs() */
 }
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-void f_destructed_objects(LPCFrame& f) {
+Value f_destructed_objects(EfunArgs&) {
   int i;
   array_t* ret;
   object_t* ob;
@@ -175,15 +173,15 @@ void f_destructed_objects(LPCFrame& f) {
     ob = ob->next_all;
   }
 
-  f.ret_refed(ret);
+  return Value::refed(ret);
 }
 #endif
 
 #ifdef F_DUMP_STRALLOC
 void dump_stralloc(outbuffer_t*);
 
-void f_dump_stralloc(LPCFrame& f) {
-  const auto* target_file = f.string(0);
+Value f_dump_stralloc(EfunArgs&, StringArg file) {
+  const auto* target_file = file.c_str();
   const char* fn;
   FILE* fp;
   fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
@@ -205,7 +203,7 @@ void f_dump_stralloc(LPCFrame& f) {
   fputs(out.buffer, fp);
   fclose(fp);
 
-  outbuf_ret(f, &out);
+  return outbuf_value(&out);
 }
 #endif
 
@@ -215,7 +213,7 @@ void f_dump_stralloc(LPCFrame& f) {
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 
-void f_dump_jemalloc(LPCFrame& f) {
+void f_dump_jemalloc(EfunArgs&) {
 #ifdef HAVE_JEMALLOC
   mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
   malloc_stats_print(nullptr, nullptr, "");
@@ -227,58 +225,56 @@ void f_dump_jemalloc(LPCFrame& f) {
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
-void f_debugmalloc(LPCFrame& f) {
+Value f_debugmalloc(EfunArgs&, StringArg file, LPC_INT mask) {
   char* res;
 
-  res = dump_debugmalloc(f.string(0), f.number(1));
-  f.ret_str_malloced(res);
+  res = dump_debugmalloc(file.c_str(), mask);
+  return Value::str_malloced(res);
 }
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask(LPCFrame& f) {
-  set_malloc_mask(f.number(0));
-  f.ret_void();
-}
+void f_set_malloc_mask(EfunArgs&, LPC_INT mask) { set_malloc_mask(mask); }
 #endif
 
 #ifdef F_CHECK_MEMORY
-void f_check_memory(LPCFrame& f) {
-  check_all_blocks(static_cast<int>(f.number(0))); /* pushes its report */
-  f.ret_pushed();
+Value check_all_blocks(int); /* checkmemory.cc */
+
+Value f_check_memory(EfunArgs&, LPC_INT flag) {
+  return check_all_blocks(static_cast<int>(flag));
 }
 #endif
 
 #ifdef F_FIND_ORPHANED_CYCLES
-void f_find_orphaned_cycles(LPCFrame& f) {
+Value f_find_orphaned_cycles(EfunArgs&, LPC_INT collect_arg) {
   // any nonzero LPC int means collect (don't truncate the 64-bit argument)
-  int const collect = f.number(0) != 0;
-  f.ret(md_scan_orphaned_cycles(collect, nullptr));
+  int const collect = collect_arg != 0;
+  return md_scan_orphaned_cycles(collect, nullptr);
 }
 #endif
 #endif /* (defined(DEBUGMALLOC) && \
         * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
-void f_trace(LPCFrame& f) {
+Value f_trace(EfunArgs&, LPC_INT level) {
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
     ot = command_giver->interactive->trace_level;
-    command_giver->interactive->trace_level = f.number(0);
+    command_giver->interactive->trace_level = level;
   }
-  f.ret(ot);
+  return ot;
 }
 #endif
 
 #ifdef F_TRACEPREFIX
-void f_traceprefix(LPCFrame& f) {
+Value f_traceprefix(EfunArgs&, Arg prefix) {
   const char* old = nullptr;
 
   if (command_giver && command_giver->interactive) {
     old = command_giver->interactive->trace_prefix;
-    if (f.type(0) & T_STRING) {
-      const char* p = f.string(0);
+    if (prefix.is(T_STRING)) {
+      const char* p = prefix.string().c_str();
       if (*p == '/') {
         p++;
       }
@@ -289,10 +285,10 @@ void f_traceprefix(LPCFrame& f) {
     }
   }
   if (old) {
-    f.ret_str_malloced(add_slash(old));
+    Value result = Value::str_malloced(add_slash(old));
     free_string(old);
-  } else {
-    f.ret(0);
+    return result;
   }
+  return 0;
 }
 #endif

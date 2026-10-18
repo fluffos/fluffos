@@ -8,6 +8,7 @@
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
 #include "vm/internal/simulate.h"
+#include "vm/internal/base/vm_stack.h"
 #include "compiler/internal/lexer.h"  // for ident_hash_elem_t etc, fix me!
 
 /*

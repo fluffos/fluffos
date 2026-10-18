@@ -2,6 +2,7 @@
 
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "compiler/internal/compiler.h"
 #include "compiler/internal/lexer.h"
 #include "base/internal/scratchpad.h"

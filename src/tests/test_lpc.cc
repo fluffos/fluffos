@@ -10,6 +10,8 @@
 #include "net/transport.h"
 #include "user.h"
 #include "compiler/internal/compiler.h"
+#include "vm/internal/base/vm_stack.h"
+#include "vm/internal/base/efun_args_inline.h"
 
 namespace {
 // Runs `fn` (arbitrary LPC-triggering driver code -- load_object_from_source,
@@ -70,6 +72,129 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
   dump_prog(obj->prog, stdout, 1 | 2);
 
   free_object(&obj, "DriverTest::TestCompileDumpProgWorks");
+}
+
+// ---- The C++ value and call API (value.h, efun_args.h) ----
+
+TEST_F(DriverTest, ValueOwnsItsReference) {
+  array_t* arr = allocate_array(1);
+  {
+    Value held = Value::addref(arr);
+    EXPECT_EQ(arr->ref, 2u);
+    Value moved = std::move(held);
+    EXPECT_EQ(held.type(), T_NUMBER);
+    EXPECT_EQ(moved.type(), T_ARRAY);
+    EXPECT_EQ(arr->ref, 2u);
+    svalue_t raw = moved.release();
+    EXPECT_EQ(moved.type(), T_NUMBER);
+    Value back = Value::owned(raw);
+    EXPECT_EQ(arr->ref, 2u);
+  }
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, ValueIsReleasedByAnErrorUnwind) {
+  array_t* arr = allocate_array(1);
+  bool errored = false;
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    Value held = Value::addref(arr);
+    error("ValueIsReleasedByAnErrorUnwind\n");
+  } catch (...) {
+    errored = true;
+    restore_context(&econ);
+  }
+  if (!errored) {
+    pop_context(&econ);
+  }
+  EXPECT_TRUE(errored);
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, LPCCallPopsPushesItNeverHandsToACall) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  {
+    LPCCall call;
+    call.push(Value::addref(arr));
+    call.push(1);
+    EXPECT_EQ(sp, before + 2);
+    EXPECT_EQ(call.arg(1).number(), 1);
+    EXPECT_EQ(arr->ref, 2u);
+  }
+  EXPECT_EQ(sp, before);
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, CallResultStatuses) {
+  svalue_t* const before = sp;
+  RunGuarded([] {
+    current_object = master_ob;
+    object_t* ob = find_object("/clone/efun_api_probe");
+    ASSERT_NE(ob, nullptr);
+
+    {
+      LPCCall call;
+      call.push(Value::str_copy("x"));
+      call.push(7);
+      CallResult r = call.apply("echo", ob, ORIGIN_DRIVER);
+      ASSERT_TRUE(r.ok());
+      ASSERT_EQ(r->type, T_STRING);
+      EXPECT_STREQ(r->u.string, "x7");
+      /* an owned copy: another call does not disturb it */
+      CallResult other = LPCCall().apply("no_such_function", ob, ORIGIN_DRIVER);
+      EXPECT_EQ(other.status(), CallResult::kNotFound);
+      EXPECT_EQ(other.get(), nullptr);
+      EXPECT_FALSE(other);
+      EXPECT_STREQ(r->u.string, "x7");
+      Value taken = r.take();
+      EXPECT_EQ(taken.type(), T_STRING);
+    }
+    {
+      CallResult r = LPCCall().safe_apply("boom", ob, ORIGIN_DRIVER);
+      EXPECT_EQ(r.status(), CallResult::kError);
+    }
+    {
+      object_t* saved = master_ob;
+      master_ob = nullptr;
+      LPCCall call;
+      call.push(1);
+      CallResult r = call.safe_apply_master(APPLY_VALID_READ);
+      CallResult r2 = LPCCall().apply_master(APPLY_VALID_READ);
+      master_ob = saved;
+      EXPECT_EQ(r.status(), CallResult::kNoMaster);
+      EXPECT_EQ(r2.status(), CallResult::kNoMaster);
+      EXPECT_TRUE(master_approved(r, "CallResultStatuses"));
+    }
+    EXPECT_FALSE(master_approved(CallResult(CallResult::kError), "CallResultStatuses"));
+  });
+  EXPECT_EQ(sp, before);
+}
+
+TEST_F(DriverTest, EfunArgsReplacesItsWindowWithTheResult) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  push_array(arr); /* the window's reference; arr keeps ours */
+  push_number(5);
+  {
+    EfunArgs f = EfunArgs::over_top(2, F_SIZEOF);
+    EXPECT_EQ(f.argc(), 2);
+    EXPECT_EQ(f[1].number(), 5);
+    Value moved = f.take(0);
+    EXPECT_EQ(f[0].type(), T_NUMBER);
+    EXPECT_EQ(arr->ref, 2u);
+    f.finish(moved.release());
+  }
+  ASSERT_EQ(sp, before + 1);
+  EXPECT_EQ(sp->type, T_ARRAY);
+  EXPECT_EQ(sp->u.arr, arr);
+  pop_stack();
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
 }
 
 TEST_F(DriverTest, TestInMemoryCompileFile) {

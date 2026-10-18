@@ -19,4 +19,20 @@ void do_tests() {
   ASSERT_EQ("hello room", l2->last_message());
   destruct(l1); destruct(l2); destruct(room);
   RESTORETP;
+
+  // A room given by name is loaded (running its create()) after the
+  // exclusion argument is read: here the load destructs the excluded
+  // object, which zeroes its argument slot. Master then dereferenced a
+  // null exclusion list.
+  {
+    object victim = load_object("/clone/tell_room_victim");
+    object loaded = find_object("/clone/tell_room_loads_victim");
+
+    if (loaded) {
+      destruct(loaded);
+    }
+    ASSERT(!catch(tell_room("/clone/tell_room_loads_victim", "x", victim)));
+    ASSERT(!victim);
+    destruct(find_object("/clone/tell_room_loads_victim"));
+  }
 }

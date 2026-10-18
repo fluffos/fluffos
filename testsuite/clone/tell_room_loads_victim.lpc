@@ -1,0 +1,9 @@
+// A room whose loading destructs /clone/tell_room_victim: tell_room() by
+// name must read its exclusion before it loads the room.
+void create() {
+  object victim = find_object("/clone/tell_room_victim");
+
+  if (victim) {
+    destruct(victim);
+  }
+}

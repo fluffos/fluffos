@@ -67,7 +67,7 @@ struct db_t {
 };
 
 void db_cleanup(void);
-svalue_t* valid_database(const char* action, array_t* info);
+CallResult valid_database(const char* action, array_t* info);
 db_t* find_db_conn(int handle);
 
 void mark_db_conn();

@@ -171,8 +171,7 @@ void hooks_mark_frame_for_after(object_t* filter_target = nullptr);
 
 /* AROUND support: mudlib efun hook_proceed(). */
 bool hooks_around_active();
-class LPCFrame;
-void f_hook_proceed(LPCFrame& f);
+/* f_hook_proceed() itself is declared with the other efuns (efuns.autogen.h). */
 
 int64_t hook_efun_attach(const char* point, svalue_t* action, mapping_t* spec, int flags);
 void hook_efun_detach(int64_t id);

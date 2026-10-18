@@ -23,18 +23,18 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 }
 
 #ifdef F_GET_CONFIG
-void f_get_config(LPCFrame& f) {
-  if (!get_config_item(f.argp(0), f.argp(0))) {
+Value f_get_config(EfunArgs& f, LPC_INT item) {
+  /* get_config_item() reads the item number from its slot and overwrites
+   * the slot with the result */
+  if (!get_config_item(f[0].sv(), f[0].sv())) {
     error("Bad argument to get_config()\n");
   }
+  return f.take(0);
 }
 #endif
 
 #ifdef F_SET_CONFIG
-void f_set_config(LPCFrame& f) {
-  auto num = f.number(0);
-  auto* value = f.argp(1);
-
+void f_set_config(EfunArgs&, LPC_INT num, Arg value) {
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
     error("Bad 1st argument to set_config()\n");
   }
@@ -42,11 +42,10 @@ void f_set_config(LPCFrame& f) {
     error("Can not set string config through set_config() yet.\n");
   }
 
-  if (value->type != T_NUMBER) {
+  if (!value.is(T_NUMBER)) {
     error("Bad 2nd argument to set_config()\n");
   }
 
-  CONFIG_INT(num) = value->u.number;
-  f.ret_void();
+  CONFIG_INT(num) = value.number();
 }
 #endif

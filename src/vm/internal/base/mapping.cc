@@ -608,22 +608,14 @@ struct unique_svalue_compare {
   }
 };
 
-void f_unique_mapping(LPCFrame& f) {
-  int num_arg = f.argc();
-  svalue_t* arg = sp - num_arg + 1;
-  array_t* v = arg->u.arr;
+Value f_unique_mapping(EfunArgs& f, array_t* v, Arg /* the callback */) {
   if (!v || !v->size) {
-    pop_n_elems(num_arg);
-    push_refed_mapping(allocate_mapping(0));
-    return;
+    return Value::refed(allocate_mapping(0));
   }
 
   // prepare the call back.
   function_to_call_t ftc;
-  {
-    LPCFrame frame = LPCFrame::args(num_arg);
-    frame.process_callback(1, &ftc, F_UNIQUE_MAPPING);
-  }
+  f.process_callback(1, &ftc);
 
   // for each item in the array, call the callback and group
   // item with same result together.
@@ -632,17 +624,12 @@ void f_unique_mapping(LPCFrame& f) {
 
   // The callback in the loop below and the size limits in the mapping
   // build afterwards can all error() and unwind (issue #126): release the
-  // copied keys exactly once, and drop the partially built mapping unless
-  // it was handed off to the stack.
-  mapping_t* m = nullptr;
-  bool completed = false;
+  // copied keys exactly once (the partially built mapping below is a Value,
+  // released by its own destructor on that path).
   DEFER {
     for (auto& item : result) {
       svalue_t key = item.first;
       free_svalue(&key, "unique_mapping key");
-    }
-    if (!completed && m) {
-      free_mapping(m);
     }
   };
 
@@ -684,15 +671,15 @@ void f_unique_mapping(LPCFrame& f) {
   }
 
   // Translate result into LPC mapping
-  m = allocate_mapping(0);
+  Value m = Value::refed(allocate_mapping(0));
   for (auto& item : result) {
     auto key = item.first;
     auto values = item.second;
 
     // find_for_insert/allocate_empty_array may error() on the size
-    // limits; the scope guard above reclaims the partial mapping and the
-    // copied keys (it also releases the keys on the success path).
-    svalue_t* l = find_for_insert(m, &key, 0);
+    // limits; `m` releases the partial mapping and the scope guard above
+    // the copied keys (it also releases the keys on the success path).
+    svalue_t* l = find_for_insert(m->u.map, &key, 0);
     l->type = T_ARRAY;
     l->u.arr = allocate_empty_array(values.size());
     for (unsigned int i = 0; i < values.size(); i++) {
@@ -700,9 +687,7 @@ void f_unique_mapping(LPCFrame& f) {
       assign_svalue_no_free(&l->u.arr->item[i], values[i]);
     }
   }
-  completed = true;
-  pop_n_elems(num_arg);
-  push_refed_mapping(m);
+  return m;
 }
 #endif /* End of unique_mapping */
 
@@ -1047,10 +1032,7 @@ void map_mapping(svalue_t* arg, int num_arg) {
   svalue_t* ret;
   function_to_call_t ftc;
 
-  {
-    LPCFrame frame = LPCFrame::args(num_arg);
-    frame.process_callback(1, &ftc, F_MAP);
-  }
+  process_efun_callback(1, &ftc, F_MAP, num_arg);
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);
@@ -1090,10 +1072,7 @@ void filter_mapping(svalue_t* arg, int num_arg) {
   unsigned int tb_index;
   function_to_call_t ftc;
 
-  {
-    LPCFrame frame = LPCFrame::args(num_arg);
-    frame.process_callback(1, &ftc, F_FILTER);
-  }
+  process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);

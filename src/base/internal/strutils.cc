@@ -653,7 +653,7 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
 
 namespace {
 
-std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
+std::unordered_set<UChar32> u8_charset_set(std::string_view chars) {
   std::unordered_set<UChar32> set;
   const auto* s = reinterpret_cast<const uint8_t*>(chars.data());
   int32_t i = 0;
@@ -701,6 +701,19 @@ int32_t u8_rtrim_off(const uint8_t* s, int32_t start, int32_t end,
 // Trim by Unicode scalar value. The charset is a set of code points, so a
 // multi-byte character cannot donate individual UTF-8 bytes to the match
 // (U+3000 / 《 share E3 80 under find_first_not_of -- issue #1401).
+std::pair<size_t, size_t> u8_trim_range(std::string_view str, std::string_view chars, bool left,
+                                        bool right) {
+  const auto len = static_cast<int32_t>(str.size());
+  if (len == 0) {
+    return {0, 0};
+  }
+  const auto set = u8_charset_set(chars);
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  const int32_t start = left ? u8_ltrim_off(s, len, set) : 0;
+  const int32_t end = right ? u8_rtrim_off(s, start, len, set) : len;
+  return {static_cast<size_t>(start), static_cast<size_t>(end)};
+}
+
 std::string ltrim(const std::string& str, const std::string& chars) {
   if (str.empty()) {
     return str;

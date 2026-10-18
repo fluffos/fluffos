@@ -8,78 +8,44 @@
 
 #include "base/package_api.h"
 
-#include <algorithm>  // std::find_if
-#include <cctype>
-#include <functional>
-#include <locale>
-#include <string>
+#include <string_view>
 
 namespace {
 
-// trim from start
-inline std::string& ltrim_func(std::string& s, const std::string& charset) {
-  std::string trimset{charset};
+/* trim()/ltrim()/rtrim(): `chars` is a set of Unicode scalar values (issue
+ * #1401), whitespace when absent or empty. A string with nothing to trim is
+ * returned as is; otherwise the kept range is copied once. */
+Value trim_impl(EfunArgs& f, bool left, bool right, StringArg str,
+                std::optional<StringArg> chars) {
+  std::string_view const set =
+      chars && !chars->empty() ? chars->view() : std::string_view("\t\n\v\f\r ");
+  auto const [first, last] = u8_trim_range(str.view(), set, left, right);
 
-  if (trimset.empty()) {
-    trimset = "\t\n\v\f\r ";
+  if (first == 0 && last == str.size()) {
+    return f.take(0);
   }
-  s = ltrim(s, trimset);
-  return s;
-}
-
-// trim from end
-inline std::string& rtrim_func(std::string& s, const std::string& charset) {
-  std::string trimset{charset};
-
-  if (trimset.empty()) {
-    trimset = "\t\n\v\f\r ";
+  if (first == last) {
+    return Value::str_make_shared("");
   }
-  s = rtrim(s, trimset);
-  return s;
-}
-
-// trim from both ends
-inline std::string& trim_func(std::string& s, const std::string& charset) {
-  std::string trimset{charset};
-
-  if (trimset.empty()) {
-    trimset = "\t\n\v\f\r ";
-  }
-  s = trim(s, trimset);
-  return s;
-}
-
-using trim_func_type = std::string&(std::string&, const std::string&);
-
-inline void trim_impl(trim_func_type* func, LPCFrame& f) {
-  int num_arg = f.argc();
-  std::string charset;
-
-  // If use 2 arguments, we get characters to remove and positioning in previous
-  // parameter.
-  if (num_arg == 2) {
-    charset = f.string(1);
-  }
-
-  std::string target(f.string(0));
-  target = (*func)(target, charset);
-  if (target.empty()) {
-    f.ret_str_copy("");
-  } else {
-    f.ret_str_copy(target.c_str());
-  }
+  return Value::str_copy(str.view().substr(first, last - first));
 }
 
 }  // namespace
 
 #ifdef F_TRIM
-void f_trim(LPCFrame& f) { trim_impl(&trim_func, f); }
+Value f_trim(EfunArgs& f, StringArg str, std::optional<StringArg> chars) {
+  return trim_impl(f, true, true, str, chars);
+}
 #endif
 
 #ifdef F_LTRIM
-void f_ltrim(LPCFrame& f) { trim_impl(&ltrim_func, f); }
+Value f_ltrim(EfunArgs& f, StringArg str, std::optional<StringArg> chars) {
+  return trim_impl(f, true, false, str, chars);
+}
 #endif
 
 #ifdef F_RTRIM
-void f_rtrim(LPCFrame& f) { trim_impl(&rtrim_func, f); }
+Value f_rtrim(EfunArgs& f, StringArg str, std::optional<StringArg> chars) {
+  return trim_impl(f, false, true, str, chars);
+}
 #endif

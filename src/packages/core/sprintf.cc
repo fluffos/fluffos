@@ -527,8 +527,6 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
       }
       break;
     case T_OBJECT: {
-      svalue_t* temp;
-
       if (obj->u.ob->flags & O_DESTRUCTED) {
         outbuf_addv(outbuf, "%d", 0);
         break;
@@ -539,9 +537,9 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
 
       if (!max_eval_error && !too_deep_error) {
         LPCCall apply_args;
-        apply_args.push(obj->u.ob);
-        temp = apply_args.safe_apply_master(APPLY_OBJECT_NAME);
-        if (temp && temp != (svalue_t*)-1 && (temp->type == T_STRING)) {
+        apply_args.push(Value::object(obj->u.ob));
+        CallResult temp = apply_args.safe_apply_master(APPLY_OBJECT_NAME);
+        if (temp && (temp->type == T_STRING)) {
           outbuf_add(outbuf, " (\"");
           outbuf_add(outbuf, temp->u.string);
           outbuf_add(outbuf, "\")");
@@ -761,7 +759,8 @@ static int add_table(cst** table) {
     int done;
     int const end = tab_d[i + 1].start - tab_di - 1;
     // Look for next '\n'
-    for (done = 0; done != end && tab_di[done] != '\n'; done++);
+    for (done = 0; done != end && tab_di[done] != '\n'; done++) {
+    }
     // Check if this is over width
     {
       size_t slen = done;
@@ -857,7 +856,11 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
   int last;
 
   push_sprintf_state();
-  StackErrorHandler pop_state(pop_sprintf_state);
+  /* Runs on return and on an error() unwind (a C++ throw). The state stack
+   * is LIFO: a nested (s)printf (e.g. from the master's error handler, or
+   * from its object_name() apply in svalue_to_string()) pushes and pops its
+   * own state before this one is popped. */
+  DEFER { pop_sprintf_state(); };
 
   last = 0;
   for (fpos = 0; true; fpos++) {
@@ -1444,8 +1447,7 @@ char* string_print_formatted(const char* format_str, int argc, svalue_t* argv) {
   outbuf_fix(&sprintf_state->obuff);
   retvalue = sprintf_state->obuff.buffer;
   sprintf_state->obuff.buffer = nullptr;
-  pop_state.run(); /* calls pop_sprintf_state */
-  return retvalue;
+  return retvalue; /* the DEFER above calls pop_sprintf_state */
 } /* end of string_print_formatted() */
 
 #endif /* defined(F_SPRINTF) || defined(F_PRINTF) */

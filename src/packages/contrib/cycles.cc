@@ -487,17 +487,17 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
 #endif  // any of the three efuns
 
 #ifdef F_HAS_CYCLE
-void f_has_cycle(LPCFrame& f) {
+Value f_has_cycle(EfunArgs&, Arg value) {
   WalkResult res;
-  cycle_walk(f.argp(0), WALK_DETECT, &res);
-  f.ret(res.found ? 1 : 0);
+  cycle_walk(value.sv(), WALK_DETECT, &res);
+  return res.found ? 1 : 0;
 }
 #endif
 
 #ifdef F_FIND_CYCLES
-void f_find_cycles(LPCFrame& f) {
+Value f_find_cycles(EfunArgs&, Arg value) {
   WalkResult res;
-  cycle_walk(f.argp(0), WALK_FIND, &res);
+  cycle_walk(value.sv(), WALK_FIND, &res);
   // May error("Illegal array size") if there are more back-edges than
   // max_array_size; at this point nothing is held, so that unwinds cleanly
   // (the std::vectors are reclaimed by their destructors).
@@ -507,14 +507,14 @@ void f_find_cycles(LPCFrame& f) {
     ret->item[i].subtype = STRING_MALLOC;
     ret->item[i].u.string = string_copy(res.paths[i].c_str(), "f_find_cycles");
   }
-  f.ret_refed(ret);
+  return Value::refed(ret);
 }
 #endif
 
 #ifdef F_BREAK_CYCLES
-void f_break_cycles(LPCFrame& f) {
+Value f_break_cycles(EfunArgs&, Arg value) {
   WalkResult res;
-  cycle_walk(f.argp(0), WALK_BREAK, &res);
+  cycle_walk(value.sv(), WALK_BREAK, &res);
 
   // The temporary container references taken during the walk are released
   // by RAII, not a trailing loop: allocate_array() below can error() (LPC
@@ -587,6 +587,6 @@ void f_break_cycles(LPCFrame& f) {
     }
   }
 
-  f.ret(static_cast<LPC_INT>(broken));
+  return broken;
 }
 #endif

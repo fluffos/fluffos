@@ -2443,9 +2443,7 @@ void hooks_mark_frame_for_after(object_t* filter_target) {
   }
 }
 
-void f_hook_proceed(LPCFrame& f) {
-  int num_arg = f.argc();
-  int const num = num_arg;
+Value f_hook_proceed(EfunArgs& f, std::optional<array_t*> replacement_args) {
   if (!g_around.active) {
     error("hook_proceed: no active HOOK_AROUND handler.\n");
   }
@@ -2460,27 +2458,22 @@ void f_hook_proceed(LPCFrame& f) {
   }
 
   /* Optional replacement args: hook_proceed(mixed *args) */
-  std::vector<svalue_t> use_args;
-  if (num == 1) {
-    if (f.type(0) != T_ARRAY) {
-      error("Bad argument 1 to hook_proceed()\n");
-    }
-    array_t* arr = f.array(0);
-    use_args.resize(arr->size);
+  std::vector<Value> use_args;
+  if (replacement_args) {
+    array_t* arr = *replacement_args;
+    use_args.reserve(arr->size);
     for (int i = 0; i < arr->size; i++) {
-      assign_svalue_no_free(&use_args[i], &arr->item[i]);
+      use_args.push_back(Value::copy(&arr->item[i]));
     }
     f.pop_back();
-  } else if (num == 0) {
-    use_args.resize(g_around.saved_args.size());
-    for (size_t i = 0; i < g_around.saved_args.size(); i++) {
-      assign_svalue_no_free(&use_args[i], &g_around.saved_args[i]);
-    }
   } else {
-    error("Wrong number of arguments to hook_proceed()\n");
+    use_args.reserve(g_around.saved_args.size());
+    for (auto& sv : g_around.saved_args) {
+      use_args.push_back(Value::copy(&sv));
+    }
   }
-  /* From here on the body works on the raw stack and leaves the proceed
-   * result as the efun's return value. */
+  /* The real body runs on the raw stack above the (now empty) argument
+   * window; the result it leaves there is the efun's. */
   g_around.proceeded = true;
 
   object_t* target = g_around.target;
@@ -2491,9 +2484,9 @@ void f_hook_proceed(LPCFrame& f) {
   int fio = g_around.function_index_offset;
   int vio = g_around.variable_index_offset;
 
-  for (auto& sv : use_args) {
-    push_svalue(&sv);
-    free_svalue(&sv, "hook_proceed arg");
+  for (auto& v : use_args) {
+    push_svalue(v.get());
+    v = Value();
   }
 
   /* Run the real body; eval_instruction marks this frame FRAME_EXTERNAL so
@@ -2513,8 +2506,7 @@ void f_hook_proceed(LPCFrame& f) {
     setup_variables(narg, 0, narg);
   }
   call_program(prog, address);
-  /* Result left on the stack as hook_proceed's return value. */
-  (void)address;
+  return f.take_pushed();
 }
 
 void hooks_owner_destructed(object_t* ob) {

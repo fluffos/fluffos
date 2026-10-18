@@ -2,6 +2,7 @@
 
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "compiler/internal/compiler.h"
 #include "packages_missing_efuns.autogen.h"
 #include "compiler/internal/lexer.h"

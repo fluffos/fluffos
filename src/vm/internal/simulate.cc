@@ -1230,7 +1230,6 @@ object_t* environment(svalue_t* arg) {
 static object_t* object_present2(const char* /*str*/, object_t* /*ob*/);
 
 object_t* object_present(svalue_t* v, object_t* ob) {
-  svalue_t* ret;
   object_t* ret_ob;
   int specific = 0;
 
@@ -1264,8 +1263,8 @@ object_t* object_present(svalue_t* v, object_t* ob) {
   }
   if (ob->super) {
     LPCCall call;
-    call.push(v);
-    ret = call.apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
+    call.push(Value::copy(v));
+    CallResult ret = call.apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
     /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
        sets ob->super to nullptr (destruct_object), or destruct the
        environment. */
@@ -1284,8 +1283,6 @@ object_t* object_present(svalue_t* v, object_t* ob) {
 // If string is in format of "xxx 1", then look for the <digits>-th
 // object that id("xx") returns true.
 static object_t* object_present2(const char* str, object_t* ob) {
-  svalue_t* ret;
-
   const char* name = nullptr;
   int namelen = 0, count = 0;
 
@@ -1310,13 +1307,10 @@ static object_t* object_present2(const char* str, object_t* ob) {
   }
 
   for (; ob; ob = ob->next_inv) {
-    char* str_to_push = new_string(namelen, "object_present2");
-    memcpy(str_to_push, name, namelen);
-    str_to_push[namelen] = 0;
     LPCCall call;
-    call.push_str_malloced(str_to_push);
+    call.push(Value::str_copy(std::string_view(name, namelen)));
 
-    ret = call.apply(APPLY_ID, ob, ORIGIN_DRIVER);
+    CallResult ret = call.apply(APPLY_ID, ob, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }

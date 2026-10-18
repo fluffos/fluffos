@@ -17,33 +17,28 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-void f_domain_stats(LPCFrame& f) {
-  mapping_t* m = get_domain_stats(f.argc() ? f.string(0) : nullptr);
+Value f_domain_stats(EfunArgs&, std::optional<StringArg> domain) {
+  mapping_t* m = get_domain_stats(domain ? domain->c_str() : nullptr);
   if (!m) {
-    f.ret(0);
-  } else {
-    /* get_domain_stats() leaves the caller no reference */
-    f.ret_addref(m);
+    return 0;
   }
+  /* get_domain_stats() leaves the caller no reference */
+  return Value::addref(m);
 }
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author(LPCFrame& f) {
-  set_author(f.string(0));
-  f.ret_void();
-}
+void f_set_author(EfunArgs&, StringArg name) { set_author(name.c_str()); }
 #endif
 
 #ifdef F_AUTHOR_STATS
-void f_author_stats(LPCFrame& f) {
-  mapping_t* m = get_author_stats(f.argc() ? f.string(0) : nullptr);
+Value f_author_stats(EfunArgs&, std::optional<StringArg> author) {
+  mapping_t* m = get_author_stats(author ? author->c_str() : nullptr);
   if (!m) {
-    f.ret(0);
-  } else {
-    /* get_author_stats() leaves the caller no reference */
-    f.ret_addref(m);
+    return 0;
   }
+  /* get_author_stats() leaves the caller no reference */
+  return Value::addref(m);
 }
 #endif
 
@@ -279,11 +274,10 @@ void mark_mudlib_stats() {
  *************************/
 
 static void init_author_for_ob(object_t* ob) {
-  svalue_t* ret;
-
-  push_malloced_string(add_slash(ob->obname));
-  ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-  if (ret == (svalue_t*)-1) {
+  LPCCall call;
+  call.push(Value::str_malloced(add_slash(ob->obname)));
+  CallResult ret = call.apply_master(APPLY_AUTHOR_FILE);
+  if (ret.status() == CallResult::kNoMaster) {
     ob->stats.author = master_author;
   } else if (!ret || ret->type != T_STRING) {
     ob->stats.author = nullptr;
@@ -323,16 +317,16 @@ mudlib_stats_t* set_master_author(const char* str) {
 }
 
 static const char* author_for_file(const char* file) {
-  svalue_t* ret;
   static char buff[50];
 
-  copy_and_push_string(file);
-  ret = safe_apply_master_ob(APPLY_AUTHOR_FILE, 1);
-  if (ret == nullptr || ret == (svalue_t*)-1 || ret->type != T_STRING) {
+  LPCCall call;
+  call.push(Value::str_copy(file));
+  CallResult ret = call.safe_apply_master(APPLY_AUTHOR_FILE);
+  if (!ret || ret->type != T_STRING) {
     return nullptr;
   }
   // The master apply may return an arbitrary-length string; bound the copy.
-  size_t n = SVALUE_STRLEN(ret);
+  size_t n = SVALUE_STRLEN(ret.get());
   if (n >= sizeof(buff)) {
     n = sizeof(buff) - 1;
   }
@@ -346,7 +340,6 @@ static const char* author_for_file(const char* file) {
  *************************/
 
 static void init_domain_for_ob(object_t* ob) {
-  svalue_t* ret;
   const char* domain_name;
 
   if (!current_object
@@ -365,13 +358,11 @@ static void init_domain_for_ob(object_t* ob) {
   /*
    * Ask master object who the creator of this object is.
    */
-  push_malloced_string(add_slash(ob->obname));
+  LPCCall call;
+  call.push(Value::str_malloced(add_slash(ob->obname)));
 
-  if (master_ob) {
-    ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
-  } else {
-    ret = apply(applies_table[APPLY_DOMAIN_FILE], ob, 1, ORIGIN_DRIVER);
-  }
+  CallResult ret = master_ob ? call.apply_master(APPLY_DOMAIN_FILE)
+                             : call.apply(applies_table[APPLY_DOMAIN_FILE], ob, ORIGIN_DRIVER);
 
   if (IS_ZERO(ret)) {
     ob->stats.domain = current_object->stats.domain;
@@ -423,16 +414,16 @@ mudlib_stats_t* set_backbone_domain(const char* str) {
  * Ask the master object.
  */
 static const char* domain_for_file(const char* file) {
-  svalue_t* ret;
   static char buff[512];
 
-  share_and_push_string(file);
-  ret = safe_apply_master_ob(APPLY_DOMAIN_FILE, 1);
-  if (ret == nullptr || ret == (svalue_t*)-1 || ret->type != T_STRING) {
+  LPCCall call;
+  call.push(Value::str_make_shared(file));
+  CallResult ret = call.safe_apply_master(APPLY_DOMAIN_FILE);
+  if (!ret || ret->type != T_STRING) {
     return nullptr;
   }
   // The master apply may return an arbitrary-length string; bound the copy.
-  size_t n = SVALUE_STRLEN(ret);
+  size_t n = SVALUE_STRLEN(ret.get());
   if (n >= sizeof(buff)) {
     n = sizeof(buff) - 1;
   }

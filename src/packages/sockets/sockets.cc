@@ -14,92 +14,62 @@
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-void f_socket_create(LPCFrame& f) {
-  int num_arg = f.argc();
-  int fd;
-
-  if ((num_arg == 3) && !(f.type(2) & (T_STRING | T_FUNCTION))) {
-    bad_arg(3, F_SOCKET_CREATE);
-  }
+Value f_socket_create(EfunArgs&, LPC_INT mode, Arg read_callback,
+                      std::optional<Arg> close_callback) {
   if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
-    if (num_arg == 2) {
-      fd = socket_create(static_cast<enum socket_mode>(f.number(0)), f.argp(1), nullptr);
-    } else {
-      fd = socket_create(static_cast<enum socket_mode>(f.number(0)), f.argp(1), f.argp(2));
-    }
-    f.ret(fd);
-  } else {
-    f.ret(EESECURITY);
+    return socket_create(static_cast<enum socket_mode>(mode), read_callback.sv(),
+                         close_callback ? close_callback->sv() : nullptr);
   }
+  return EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_BIND
-void f_socket_bind(LPCFrame& f) {
-  int num_arg = f.argc();
-  int i, fd, port;
+Value f_socket_bind(EfunArgs&, LPC_INT fd, LPC_INT bind_port, std::optional<StringArg> bind_addr) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  if ((num_arg == 3) && (f.type(2) != T_STRING)) {
-    bad_arg(3, F_SOCKET_BIND);
-  }
-
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("bind")) {
-    i = socket_bind(fd, f.number(1), (num_arg == 3 ? f.string(2) : nullptr));
-    f.ret(i);
-  } else {
-    f.ret(EESECURITY);
+    return socket_bind(fd, bind_port, bind_addr ? bind_addr->c_str() : nullptr);
   }
+  return EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_LISTEN
-void f_socket_listen(LPCFrame& f) {
-  int i, fd, port;
+Value f_socket_listen(EfunArgs&, LPC_INT fd, Arg listen_callback) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("listen")) {
-    i = socket_listen(fd, f.argp(1));
-    f.ret(i);
-  } else {
-    f.ret(EESECURITY);
+    return socket_listen(fd, listen_callback.sv());
   }
+  return EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_ACCEPT
-void f_socket_accept(LPCFrame& f) {
-  int port, fd;
+Value f_socket_accept(EfunArgs&, LPC_INT fd, Arg read_callback, Arg write_callback) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!(f.type(2) & (T_STRING | T_FUNCTION))) {
-    bad_arg(3, F_SOCKET_ACCEPT);
-  }
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.ret(VALID_SOCKET("accept") ? socket_accept(fd, f.argp(1), f.argp(2)) : EESECURITY);
+  return VALID_SOCKET("accept") ? socket_accept(fd, read_callback.sv(), write_callback.sv())
+                                : EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_CONNECT
-void f_socket_connect(LPCFrame& f) {
-  int i, fd, port;
+Value f_socket_connect(EfunArgs&, LPC_INT fd, StringArg address, Arg read_callback,
+                       Arg write_callback) {
+  int i, port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!(f.type(2) & (T_FUNCTION | T_STRING))) {
-    bad_arg(3, F_SOCKET_CONNECT);
-  }
-  if (!(f.type(3) & (T_FUNCTION | T_STRING))) {
-    bad_arg(4, F_SOCKET_CONNECT);
-  }
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
 #ifdef IPV6
@@ -114,110 +84,93 @@ void f_socket_connect(LPCFrame& f) {
     int start = 0;
 
     addr[0] = '\0';
-    if ((s = strchr(f.string(1), ' '))) {
+    if ((s = strchr(address.c_str(), ' '))) {
       /*
        * use specified address and port
        */
-      i = s - f.string(1);
+      i = s - address.c_str();
       if (i > ADDR_BUF_SIZE - 1) {
         start = i - ADDR_BUF_SIZE - 1;
         i = ADDR_BUF_SIZE - 1;
       }
-      strncat(addr, f.string(1) + start, i);
+      strncat(addr, address.c_str() + start, i);
       port = atoi(s + 1);
     }
 #ifdef DEBUG
   } else {
     debug_message("socket_connect: socket already bound to address/port: %s/%d\n", addr, port);
-    debug_message("socket_connect: but requested to connect to: %s\n", f.string(1));
+    debug_message("socket_connect: but requested to connect to: %s\n", address.c_str());
 #endif
   }
 
-  f.ret(VALID_SOCKET("connect")
-                         ? socket_connect(fd, f.string(1), f.argp(2), f.argp(3))
-                         : EESECURITY);
+  return VALID_SOCKET("connect")
+             ? socket_connect(fd, address.c_str(), read_callback.sv(), write_callback.sv())
+             : EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_WRITE
-void f_socket_write(LPCFrame& f) {
-  int num_arg = f.argc();
-  int i, fd, port;
+Value f_socket_write(EfunArgs&, LPC_INT fd, Arg message, std::optional<StringArg> address) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  if ((num_arg == 3) && (f.type(2) != T_STRING)) {
-    bad_arg(3, F_SOCKET_WRITE);
-  }
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
   if (VALID_SOCKET("write")) {
-    i = socket_write(fd, f.argp(1), (num_arg == 3) ? f.string(2) : (char*)nullptr);
-    f.ret(i);
-  } else {
-    f.ret(EESECURITY);
+    return socket_write(fd, message.sv(), address ? address->c_str() : nullptr);
   }
+  return EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_CLOSE
-void f_socket_close(LPCFrame& f) {
-  int fd, port;
+Value f_socket_close(EfunArgs&, LPC_INT fd) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.top().u.number = VALID_SOCKET("close") ? socket_close(fd, 0) : EESECURITY;
+  return VALID_SOCKET("close") ? socket_close(fd, 0) : EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_RELEASE
-void f_socket_release(LPCFrame& f) {
-  int fd, port;
+Value f_socket_release(EfunArgs&, LPC_INT fd, object_t* ob, Arg release_callback) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!(f.type(2) & (T_STRING | T_FUNCTION))) {
-    bad_arg(3, F_SOCKET_RELEASE);
-  }
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.ret(VALID_SOCKET("release") ? socket_release(fd, f.object(1), f.argp(2))
-                                            : EESECURITY);
+  /* the release callback runs LPC, which may destruct `ob`: its argument
+   * slot may be 0 by the time the window is released */
+  return VALID_SOCKET("release") ? socket_release(fd, ob, release_callback.sv()) : EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
-void f_socket_acquire(LPCFrame& f) {
-  int fd, port;
+Value f_socket_acquire(EfunArgs&, LPC_INT fd, Arg read_callback, Arg write_callback,
+                       Arg close_callback) {
+  int port;
   char addr[ADDR_BUF_SIZE];
 
-  if (!(f.type(2) & (T_FUNCTION | T_STRING))) {
-    bad_arg(3, F_SOCKET_ACQUIRE);
-  }
-  if (!(f.type(3) & (T_FUNCTION | T_STRING))) {
-    bad_arg(4, F_SOCKET_ACQUIRE);
-  }
-  fd = f.number(0);
   get_socket_address(fd, addr, &port, 0);
 
-  f.ret(VALID_SOCKET("acquire")
-                         ? socket_acquire(fd, f.argp(1), f.argp(2), f.argp(3))
-                         : EESECURITY);
+  return VALID_SOCKET("acquire") ? socket_acquire(fd, read_callback.sv(), write_callback.sv(),
+                                                  close_callback.sv())
+                                 : EESECURITY;
 }
 #endif
 
 #ifdef F_SOCKET_ERROR
-void f_socket_error(LPCFrame& f) {
-  f.ret_str_constant(socket_error(f.number(0)));
+Value f_socket_error(EfunArgs&, LPC_INT error_code) {
+  return Value::str_constant(socket_error(error_code));
 }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
-void f_socket_address(LPCFrame& f) {
+Value f_socket_address(EfunArgs&, Arg target, LPC_INT local) {
   char* str;
-  int local, port;
+  int port;
   char addr[ADDR_BUF_SIZE];
   char buf[2 * ADDR_BUF_SIZE]; /* a bit of overkill to be safe */
 
@@ -225,20 +178,17 @@ void f_socket_address(LPCFrame& f) {
    * Ok, we will add in a cute little check thing here to see if it is
    * an object or not...
    */
-  local = f.number(1);
-  f.pop_back();
-  if (f.type(0) & T_OBJECT) {
+  if (target.is(T_OBJECT)) {
+    object_t* ob = target.object();
     /* This is so we can get the address of interactives as well. */
-    if (!f.object(0)->interactive) {
-      f.ret_undefined();
-      return;
+    if (!ob->interactive) {
+      return Value::undefined();
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
-    int const ret =
-        getnameinfo(reinterpret_cast<struct sockaddr*>(&f.object(0)->interactive->addr),
-                    f.object(0)->interactive->addrlen, host, sizeof(host), service, sizeof(service),
-                    NI_NUMERICHOST | NI_NUMERICSERV);
+    int const ret = getnameinfo(reinterpret_cast<struct sockaddr*>(&ob->interactive->addr),
+                                ob->interactive->addrlen, host, sizeof(host), service,
+                                sizeof(service), NI_NUMERICHOST | NI_NUMERICSERV);
     if (ret) {
       strcpy(host, "0.0.0.0");
       strcpy(service, "0");
@@ -246,38 +196,34 @@ void f_socket_address(LPCFrame& f) {
     sprintf(buf, "%s %s", host, service);
 
     str = string_copy(buf, "f_socket_address");
-    f.ret_str_malloced(str);
-    return;
+    return Value::str_malloced(str);
   }
-  get_socket_address(f.number(0), addr, &port, local);
+  get_socket_address(target.number(), addr, &port, local);
   sprintf(buf, "%s %d", addr, port);
   str = string_copy(buf, "f_socket_address");
-  f.ret_str_malloced(str);
+  return Value::str_malloced(str);
 } /* f_socket_address() */
 #endif
 
 #ifdef F_SOCKET_STATUS
-void f_socket_status(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_socket_status(EfunArgs&, std::optional<LPC_INT> fd) {
   array_t* info;
   int i;
 
-  if (num_arg) {
-    info = socket_status(f.number(0));
+  if (fd) {
+    info = socket_status(*fd);
 
     if (!info) {
-      f.ret(0);
-    } else {
-      f.ret_refed(info);
+      return 0;
     }
-  } else {
-    info = allocate_empty_array(lpc_socks_num());
-    for (i = 0; i < lpc_socks_num(); i++) {
-      info->item[i].type = T_ARRAY;
-      info->item[i].u.arr = socket_status(i);
-    }
-    f.ret_refed(info);
+    return Value::refed(info);
   }
+  info = allocate_empty_array(lpc_socks_num());
+  for (i = 0; i < lpc_socks_num(); i++) {
+    info->item[i].type = T_ARRAY;
+    info->item[i].u.arr = socket_status(i);
+  }
+  return Value::refed(info);
 }
 
 #if defined(F_SOCKET_SET_OPTION) || defined(F_SOCKET_GET_OPTION)
@@ -298,10 +244,8 @@ void check_socket_option_access(const char* efun, int lpc_sock) {
 #endif
 
 #ifdef F_SOCKET_SET_OPTION
-void f_socket_set_option(LPCFrame& f) {
-  auto lpc_sock = f.number(0);
-  auto option = f.number(1);
-  auto* arg = f.argp(2);
+void f_socket_set_option(EfunArgs&, LPC_INT lpc_sock, LPC_INT option, Arg value) {
+  auto* arg = value.sv();
 
   check_socket_option_access("socket_set_option", lpc_sock);
 
@@ -311,7 +255,8 @@ void f_socket_set_option(LPCFrame& f) {
         bad_arg(3, F_SOCKET_SET_OPTION);
       }
       if (arg->u.number != 0 && arg->u.number != 1) {
-        error("Bad socket option value: %d, onl 0 or 1 is accepted.\n", arg->u.number);
+        error("Bad socket option value: %" LPC_INT_FMTSTR_P ", onl 0 or 1 is accepted.\n",
+              arg->u.number);
       }
       assign_svalue_no_free(&lpc_socks_get(lpc_sock)->options[SO_TLS_VERIFY_PEER], arg);
       break;
@@ -334,17 +279,14 @@ void f_socket_set_option(LPCFrame& f) {
       assign_svalue(&lpc_socks_get(lpc_sock)->options[SO_TLS_KEY], arg);
       break;
     default:
-      error("Unknown socket option: %d\n", option);
+      error("Unknown socket option: %" LPC_INT_FMTSTR_P "\n", option);
   }
-  f.ret_void();
 }
 #endif
 
 #ifdef F_SOCKET_GET_OPTION
-void f_socket_get_option(LPCFrame& f) {
+Value f_socket_get_option(EfunArgs&, LPC_INT lpc_sock, LPC_INT option) {
   // socket_get_option(int, int): socket at arg 0, option at arg 1.
-  auto lpc_sock = f.number(0);
-  auto option = f.number(1);
 
   check_socket_option_access("socket_get_option", lpc_sock);
 
@@ -355,17 +297,17 @@ void f_socket_get_option(LPCFrame& f) {
     case SO_TLS_KEY:
       break;
     default:
-      error("Unknown socket option: %d\n", option);
+      error("Unknown socket option: %" LPC_INT_FMTSTR_P "\n", option);
   }
 
   svalue_t const value = lpc_socks_get(lpc_sock)->options[option];
   if (value.type == T_STRING) {
-    f.ret_str_copy(value.u.string);
-  } else if (value.type == T_NUMBER) {
-    f.ret(value.u.number);
-  } else {
-    f.ret(0);
+    return Value::str_copy(value.u.string);
   }
+  if (value.type == T_NUMBER) {
+    return value.u.number;
+  }
+  return 0;
 }
 #endif
 

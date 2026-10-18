@@ -17,17 +17,15 @@ enum { MAX_COLOUR_STRING = 200 };
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-void f_real_time(LPCFrame& f) {
-  f.ret(static_cast<LPC_INT>(time(nullptr)));
-}
+Value f_real_time(EfunArgs&) { return static_cast<LPC_INT>(time(nullptr)); }
 #endif
 
 #ifdef F_COMPRESSEDP
-void f_compressedp(LPCFrame& f) {
+Value f_compressedp(EfunArgs&, object_t* ob) {
   int i;
 
-  i = f.object(0)->interactive && (f.object(0)->interactive->iflags & USING_COMPRESS);
-  f.ret(i != 0);
+  i = ob->interactive && (ob->interactive->iflags & USING_COMPRESS);
+  return i != 0;
 }
 #endif
 
@@ -38,7 +36,7 @@ void f_compressedp(LPCFrame& f) {
  * substantially faster.
  */
 #ifdef F_NAMED_LIVINGS
-void f_named_livings(LPCFrame& f) {
+Value f_named_livings(EfunArgs&) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   int const table_size = CONFIG_INT(__LIVING_HASH_TABLE_SIZE__);
   object_t* ob;
@@ -86,23 +84,15 @@ void f_named_livings(LPCFrame& f) {
     vec->item[k].u.ob = found[k];
     add_ref(found[k], "livings");
   }
-  f.ret_refed(vec);
+  return Value::refed(vec);
 }
 #endif
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
-void f_remove_shadow(LPCFrame& f) {
-  int num_arg = f.argc();
-  object_t* ob;
-
-  ob = current_object;
-  if (num_arg) {
-    ob = f.object(0);
-    f.pop_back();
-  }
+Value f_remove_shadow(EfunArgs&, object_t* ob) {
   if (ob == nullptr || (ob->shadowing == nullptr && ob->shadowed == nullptr)) {
-    f.ret(0);
+    return 0;
   } else {
     if (ob->shadowed) {
       ob->shadowed->shadowing = ob->shadowing;
@@ -111,7 +101,7 @@ void f_remove_shadow(LPCFrame& f) {
       ob->shadowing->shadowed = ob->shadowed;
     }
     ob->shadowing = ob->shadowed = nullptr;
-    f.ret(1);
+    return 1;
   }
 }
 #endif
@@ -119,103 +109,52 @@ void f_remove_shadow(LPCFrame& f) {
 /* This was originally written my Malic for Demon.  I rewrote parts of it
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
-void f_query_notify_fail(LPCFrame& f) {
+Value f_query_notify_fail(EfunArgs&) {
   const char* p;
 
   if (command_giver && command_giver->interactive) {
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
-      funptr_t* fp = command_giver->interactive->default_err_message.f;
-      svalue_t v{};
-      v.type = T_FUNCTION;
-      v.u.fp = fp;
-      fp->hdr.ref++;
-      f.ret_owned(v);
-      return;
+      return Value::addref(command_giver->interactive->default_err_message.f);
     }
     if ((p = command_giver->interactive->default_err_message.s)) {
-      f.ret_str_shared(p);
-      return;
+      return Value::str_shared(p);
     }
   }
-  f.ret(0);
+  return 0;
 }
 #endif
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
-void f_store_variable(LPCFrame& f) {
-  int num_arg = f.argc();
+void f_store_variable(EfunArgs&, StringArg var_name, Arg value, std::optional<object_t*> target) {
   int idx;
-  svalue_t* sv;
   lpc_type_t type;
 
-  const char* name = nullptr;
-  object_t* ob;
-
-  if (num_arg == 3) {
-    ob = f.object(2);
-    sv = f.argp(1);
-    name = f.string(0);
-  } else {
-    ob = current_object;
-    sv = f.argp(1);
-    name = f.string(0);
-  }
+  const char* name = var_name.c_str();
+  object_t* ob = target.value_or(current_object);
 
   idx = find_global_variable(ob->prog, name, &type, 0);
   if (idx == -1 || (ob != current_object && (type & DECL_PRIVATE))) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
-  assign_svalue(&ob->variables[idx], sv);
-  f.ret_void();
+  assign_svalue(&ob->variables[idx], value.sv());
 }
 #endif
 
 #ifdef F_FETCH_VARIABLE
-void f_fetch_variable(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_fetch_variable(EfunArgs&, StringArg var_name, std::optional<object_t*> target) {
   int idx;
   lpc_type_t type;
 
-  const char* name = nullptr;
-  object_t* ob;
-
-  if (num_arg == 2) {
-    ob = f.object(1);
-    name = f.string(0);
-  } else {
-    ob = current_object;
-    name = f.string(0);
-  }
+  const char* name = var_name.c_str();
+  object_t* ob = target.value_or(current_object);
 
   idx = find_global_variable(ob->prog, name, &type, 0);
 
   if (idx == -1 || (ob != current_object && (type & DECL_PRIVATE))) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
-  f.ret_copy(&ob->variables[idx]);
-}
-#endif
-
-/* Beek */
-#ifdef F_SET_PROMPT
-void f_set_prompt(LPCFrame& f) {
-  int num_arg = f.argc();
-  object_t* who;
-  if (num_arg == 2) {
-    who = f.object(1);
-    f.pop_back();
-  } else {
-    who = command_giver;
-  }
-
-  if (!who || who->flags & O_DESTRUCTED || !who->interactive) {
-    error("Prompts can only be set for interactives.\n");
-  }
-
-  /* Future work */
-  /* ed() will nuke this; also we have to make sure the string will get
-   * freed */
+  return Value::copy(&ob->variables[idx]);
 }
 #endif
 
@@ -315,31 +254,28 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
   }
 }
 
-void f_copy(LPCFrame& f) {
+Value f_copy(EfunArgs&, Arg value) {
   svalue_t ret;
 
   depth = 0;
-  deep_copy_svalue(f.argp(0), &ret);
-  free_svalue(f.argp(0), "f_copy");
-  f[0] = ret;
+  deep_copy_svalue(value.sv(), &ret);
+  return Value::owned(ret);
 }
 #endif
 
 /* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-void f_functions(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_functions(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t* funp;
   program_t* prog;
-  int const flag = f.number(1);
-  f.pop_back();
+  int const flag = flag_arg;
   lpc_type_t* types;
   char buf[256];
   char* end = EndOf(buf);
-  program_t* progp = f.object(0)->prog;
+  program_t* progp = ob->prog;
   int const offset = (flag & 2) ? progp->last_inherited : 0;
 
   num = (flag & 2) ? progp->num_functions_defined
@@ -357,7 +293,7 @@ void f_functions(LPCFrame& f) {
   while (i--) {
     unsigned short low = 0, high = 0, mid = 0;
 
-    prog = f.object(0)->prog;
+    prog = ob->prog;
     ind = i + offset;
 
     /* Walk up the inheritance tree to the real definition */
@@ -432,7 +368,7 @@ void f_functions(LPCFrame& f) {
     }
   }
 
-  f.ret_refed(vec);
+  return Value::refed(vec);
 }
 #endif
 
@@ -470,25 +406,22 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
   *idx += prog->num_variables_defined;
 }
 
-void f_variables(LPCFrame& f) {
+Value f_variables(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   int idx = 0;
   array_t* arr;
-  int const flag = f.number(1);
-  f.pop_back();
-  program_t* prog = f.object(0)->prog;
+  int const flag = flag_arg;
+  program_t* prog = ob->prog;
 
   arr = allocate_empty_array(prog->num_variables_total);
   fv_recurse(arr, &idx, prog, 0, flag);
 
-  f.ret_refed(arr);
+  return Value::refed(arr);
 }
 #endif
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-void f_heart_beats(LPCFrame& f) {
-  f.ret_refed(get_heart_beats());
-}
+Value f_heart_beats(EfunArgs&) { return Value::refed(get_heart_beats()); }
 #endif
 
 /*Aleas@Nightmare */
@@ -590,8 +523,8 @@ struct tc_colwidth_state {
   }
 };
 
-void f_terminal_colour(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_terminal_colour(EfunArgs& f, StringArg input, mapping_t* colour_map,
+                        std::optional<LPC_INT> wrap_arg, std::optional<LPC_INT> indent_arg) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *instr, *cp, **parts;
@@ -626,13 +559,11 @@ void f_terminal_colour(LPCFrame& f) {
   int repused;
   char** rep_allocs;
 
-  if (num_arg >= 3) {
-    if (num_arg == 4) {
-      indent = f.number(f.argc() - 1);
-      f.pop_back();
+  if (wrap_arg) {
+    if (indent_arg) {
+      indent = *indent_arg;
     }
-    wrap = f.number(f.argc() - 1);
-    f.pop_back();
+    wrap = *wrap_arg;
     {
       /* No line can get anywhere near this many columns (a kept byte adds
        * at most ~11, and at most max_string_length bytes are kept), so a
@@ -658,7 +589,7 @@ void f_terminal_colour(LPCFrame& f) {
     }
   }
 
-  cp = instr = f.string(0);
+  cp = instr = input.c_str();
   do {
     cp = strchr(cp, TC_FIRST_CHAR);
     if (cp) {
@@ -679,8 +610,7 @@ void f_terminal_colour(LPCFrame& f) {
       parts[0] = instr;
       savestr = nullptr;
     } else {
-      f.pop_back(); /* no delimiter in string, so return the original */
-      return;
+      return f.take(0); /* no delimiter in string, so return the original */
     }
   } else {
     /* here we have something to parse */
@@ -739,9 +669,7 @@ void f_terminal_colour(LPCFrame& f) {
     if (savestr) {
       FREE_MSTR(savestr);
     }
-    f.pop_back();
-    f.ret_str_constant("");
-    return;
+    return Value::str_constant("");
   }
 
   /* Could keep track of the lens as we create parts, removing the need
@@ -754,7 +682,6 @@ void f_terminal_colour(LPCFrame& f) {
   // loop further down). DCALLOC zero-inits, so unused slots stay nullptr.
   rep_allocs = reinterpret_cast<char**>(
       DCALLOC(num, sizeof(char*), TAG_TEMPORARY, "f_terminal_colour: rep_allocs"));
-  mapping_t* colour_map = f.mapping(1);
   mtab = colour_map->table;
 
   // First setup some little things.
@@ -797,12 +724,12 @@ void f_terminal_colour(LPCFrame& f) {
     // Look it up in the mapping.
     repused = 0;
     LPCCall replace_args;
-    replace_args.push_str_copy(parts[i]);
-    // safe_apply: a raw apply that error()s here would longjmp past the
+    replace_args.push(Value::str_copy(parts[i]));
+    // safe_apply: a raw apply that error()s here would unwind past the
     // FREE(parts)/FREE(lens)/FREE_MSTR(savestr) at the end of this efun,
-    // leaking them. On error safe_apply returns null -> treated as no
+    // leaking them. On error safe_apply returns no result -> treated as no
     // replacement, which is the desired robust behavior anyway.
-    svalue_t* reptmp =
+    CallResult reptmp =
         replace_args.safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
       // Was alloca() -- called once per loop iteration, that memory isn't
@@ -1178,16 +1105,15 @@ void f_terminal_colour(LPCFrame& f) {
     FREE_MSTR(savestr);
   }
   /* now we have what we want */
-  f.pop_back();
 #ifndef DEBUG
   if (ncp - deststr != j) {
     fatal(
         "Length miscalculated in terminal_colour()\n    Expected: %" LPC_INT_FMTSTR_P " Was: %td\n "
         "   String: %s\n    Indent: %" LPC_INT_FMTSTR_P " Wrap: %" LPC_INT_FMTSTR_P "\n",
-        j, ncp - deststr, f.string(0), indent, wrap);
+        j, ncp - deststr, input.c_str(), indent, wrap);
   }
 #endif
-  f.ret_str_malloced(deststr);
+  return Value::str_malloced(deststr);
 }
 #endif
 
@@ -1690,15 +1616,14 @@ static char* pluralize(const char* str) {
   return news;
 } /* end of pluralize() */
 
-void f_pluralize(LPCFrame& f) {
+Value f_pluralize(EfunArgs&, StringArg str) {
   char* s;
 
-  s = pluralize(f.string(0));
+  s = pluralize(str.c_str());
   if (!s) {
-    f.ret(0);
-  } else {
-    f.ret_str_malloced(s);
+    return 0;
   }
+  return Value::str_malloced(s);
 }
 #endif
 
@@ -1751,54 +1676,54 @@ static int file_length(const char* file) {
   return ret;
 } /* end of file_length() */
 
-void f_file_length(LPCFrame& f) {
+Value f_file_length(EfunArgs&, StringArg file) {
   int l;
 
-  l = file_length(f.string(0));
-  f.ret(l);
+  l = file_length(file.c_str());
+  return l;
 }
 #endif
 
 #ifdef F_UPPER_CASE
-void f_upper_case(LPCFrame& f) {
+Value f_upper_case(EfunArgs& f, StringArg) {
+  /* The result is the argument itself, upper-cased in place in its slot
+   * (unlinked first, so the edit never reaches a string anyone else holds). */
+  svalue_t* sv = f[0].sv();
   const char* str;
 
-  str = f.string(0);
+  str = sv->u.string;
   /* find first upper case letter, if any */
   for (; *str; str++) {
     if (uislower(*str)) {
       char* newstr;
-      int const l = str - f.string(0);
-      unlink_string_svalue(f.argp(0));
-      newstr = const_cast<char*>(f.string(0)) + l;
+      int const l = str - sv->u.string;
+      unlink_string_svalue(sv);
+      newstr = const_cast<char*>(sv->u.string) + l;
       *newstr = toupper(static_cast<unsigned char>(*newstr));
       for (newstr++; *newstr; newstr++) {
         if (uislower((unsigned char)*newstr)) {
           *newstr = toupper(static_cast<unsigned char>(*newstr));
         }
       }
-      return;
+      break;
     }
   }
+  return f.take(0);
 }
 #endif
 
 #ifdef F_REPLACEABLE
-void f_replaceable(LPCFrame& f) {
-  int num_arg = f.argc();
-  object_t* obj;
+Value f_replaceable(EfunArgs&, object_t* obj, std::optional<array_t*> ignore_list) {
   program_t* prog;
   int i, j, num, numignore, replaceable;
   const char** ignore;
-
-  obj = f.object(0);
 
   prog = obj->prog;
   if (obj == simul_efun_ob || prog->func_ref) {
     replaceable = 0;
   } else {
-    if (num_arg == 2) {
-      array_t* ign = f.array(1);
+    if (ignore_list) {
+      array_t* ign = *ignore_list;
       numignore = ign->size;
       // Always allocate the 2 built-in slots (create/__INIT) plus one per
       // ignore entry -- an empty ignore array must not leave ignore == NULL
@@ -1843,7 +1768,7 @@ void f_replaceable(LPCFrame& f) {
     FREE(ignore);
   }
 
-  f.ret(replaceable);
+  return replaceable;
 }
 #endif
 
@@ -1898,14 +1823,13 @@ inline void sum_program_info(const program_t* const p, ProgramInfoS& info) {
   info.total += p->total_size;
 }
 
-void f_program_info(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_program_info(EfunArgs&, std::optional<object_t*> target) {
   ProgramInfoS info{0};  // initialize all elements to 0
   object_t* ob;
   mapping_t* m;
 
-  if (num_arg == 1) {
-    ob = f.object(0);
+  if (target) {
+    ob = *target;
     if (!(ob->flags & O_CLONE)) {
       sum_program_info(ob->prog, info);
     }
@@ -1932,7 +1856,7 @@ void f_program_info(LPCFrame& f) {
 
   add_mapping_pair(m, "total size", info.total);
 
-  f.ret_refed(m);
+  return Value::refed(m);
 }
 #endif
 
@@ -1944,17 +1868,14 @@ void f_program_info(LPCFrame& f) {
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-void f_remove_interactive(LPCFrame& f) {
-  if ((f.object(0)->flags & O_DESTRUCTED) || !(f.object(0)->interactive)) {
-    f.ret(0);
-  } else {
-    remove_interactive(f.object(0), 0);
-    /* It may have been dested */
-    if (f.type(0) == T_OBJECT) {
-      free_object(&f[0].u.ob, "f_remove_interactive");
-    }
-    f[0] = const1;
+Value f_remove_interactive(EfunArgs&, object_t* ob) {
+  if ((ob->flags & O_DESTRUCTED) || !(ob->interactive)) {
+    return 0;
   }
+  /* It may have been dested: ob is not used afterwards, and releasing the
+   * argument slot copes with destruct's stack sweep having zeroed it. */
+  remove_interactive(ob, 0);
+  return 1;
 }
 #endif
 
@@ -1970,16 +1891,15 @@ static int query_ip_port(object_t* ob) {
   return ob->interactive->local_port;
 }
 
-void f_query_ip_port(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_query_ip_port(EfunArgs&, std::optional<object_t*> ob) {
   int tmp;
 
-  if (num_arg) {
-    tmp = query_ip_port(f.object(0));
+  if (ob) {
+    tmp = query_ip_port(*ob);
   } else {
     tmp = query_ip_port(command_giver);
   }
-  f.ret(tmp);
+  return tmp;
 }
 #endif
 
@@ -2030,14 +1950,14 @@ void reset_timezone(const char* old_tz) {
 #endif
 
 #ifdef F_ZONETIME
-void f_zonetime(LPCFrame& f) {
+Value f_zonetime(EfunArgs&, StringArg tz, LPC_INT when) {
   const char *new_tz, *old_tz;
   char* retv;
   time_t time_val;
   int len;
 
-  new_tz = f.string(0);
-  time_val = f.number(1);
+  new_tz = tz.c_str();
+  time_val = when;
 
   old_tz = set_timezone(new_tz);
   char buf[256] = {};
@@ -2045,19 +1965,18 @@ void f_zonetime(LPCFrame& f) {
   if (!retv) {
     reset_timezone(old_tz);
     error("bad argument to zonetime.");
-    return;
   }
   len = strlen(retv);
   retv[len - 1] = '\0';
   reset_timezone(old_tz);
-  f.ret_str_malloced(string_copy(retv, "zonetime"));
+  return Value::str_malloced(string_copy(retv, "zonetime"));
 }
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-void f_is_daylight_savings_time(LPCFrame& f) {
-  time_t time_to_check = f.number(1);
-  const char* new_tz = f.string(0);
+Value f_is_daylight_savings_time(EfunArgs&, StringArg tz, LPC_INT when) {
+  time_t time_to_check = when;
+  const char* new_tz = tz.c_str();
   const char* old_tz = set_timezone(new_tz);
 
   if (time_to_check < 0) {
@@ -2066,32 +1985,31 @@ void f_is_daylight_savings_time(LPCFrame& f) {
   struct tm res = {};
   struct tm* t = localtime_r(&time_to_check, &res);
 
+  int result;
   if (t) {
-    f.ret((t->tm_isdst) > 0);
+    result = (t->tm_isdst) > 0;
   } else {
-    f.ret(-1);
+    result = -1;
   }
   reset_timezone(old_tz);
+  return result;
 }
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message(LPCFrame& f) {
-  debug_message("%s\n", f.string(0));
-  f.ret_void();
-}
+void f_debug_message(EfunArgs&, StringArg msg) { debug_message("%s\n", msg.c_str()); }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-void f_function_owner(LPCFrame& f) {
+Value f_function_owner(EfunArgs&, funptr_t* fp) {
   /* The owner reference is taken before the function pointer (which may
    * hold the last reference to a destructed owner) is released. */
-  f.ret(f.funptr(0)->hdr.owner);
+  return Value::object(fp->hdr.owner);
 }
 #endif
 
 #ifdef F_REPEAT_STRING
-void f_repeat_string(LPCFrame& f) {
+Value f_repeat_string(EfunArgs& f, StringArg s, LPC_INT times) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char* str;
@@ -2100,11 +2018,10 @@ void f_repeat_string(LPCFrame& f) {
   char *ret, *p;
   int i;
 
-  repeat = f.number(1);
-  f.pop_back();
+  repeat = times;
   if (repeat > 0) {
-    str = f.string(0);
-    len = f.string_len(0);
+    str = s.c_str();
+    len = s.size();
     // Clamp repeat BEFORE multiplying: len * repeat in int can overflow and
     // wrap to a small/zero newlen, driving an undersized allocation and a
     // massive heap overflow in the copy loop. Also avoids div-by-zero on len==0.
@@ -2116,7 +2033,7 @@ void f_repeat_string(LPCFrame& f) {
     newlen = len * repeat;
   }
   if (repeat <= 0) {
-    f.ret_str_constant("");
+    return Value::str_constant("");
   } else if (repeat != 1) {
     p = ret = new_string(newlen, "f_repeat_string");
     for (i = 0; i < repeat; i++) {
@@ -2124,8 +2041,9 @@ void f_repeat_string(LPCFrame& f) {
       p += len;
     }
     *p = 0;
-    f.ret_str_malloced(ret);
+    return Value::str_malloced(ret);
   }
+  return f.take(0); /* once: the argument itself */
 }
 #endif
 
@@ -2257,7 +2175,7 @@ static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog)
   *idx += prog->num_variables_defined;
 }
 
-void f_memory_summary(LPCFrame& f) {
+Value f_memory_summary(EfunArgs&) {
   mapping_t* result = allocate_mapping(8);
   object_t* ob;
   int idx;
@@ -2278,20 +2196,19 @@ void f_memory_summary(LPCFrame& f) {
     idx = 0;
     fms_recurse(entry->u.map, ob, &idx, ob->prog);
   }
-  f.ret_refed(result);
+  return Value::refed(result);
 }
 
 #endif
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-void f_query_replaced_program(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_query_replaced_program(EfunArgs&, std::optional<object_t*> ob) {
   char* res = nullptr;
 
-  if (num_arg) {
-    if (f.object(0)->replaced_program) {
-      res = add_slash(f.object(0)->replaced_program);
+  if (ob) {
+    if ((*ob)->replaced_program) {
+      res = add_slash((*ob)->replaced_program);
     }
   } else {
     if (current_object->replaced_program) {
@@ -2300,16 +2217,15 @@ void f_query_replaced_program(LPCFrame& f) {
   }
 
   if (res) {
-    f.ret_str_malloced(res);
-  } else {
-    f.ret(0);
+    return Value::str_malloced(res);
   }
+  return 0;
 }
 #endif
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-void f_network_stats(LPCFrame& f) {
+Value f_network_stats(EfunArgs&) {
   mapping_t* m;
   int i, ports = 0;
 
@@ -2354,7 +2270,7 @@ void f_network_stats(LPCFrame& f) {
     }
   }
 
-  f.ret_refed(m);
+  return Value::refed(m);
 }
 #endif
 
@@ -2395,9 +2311,9 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
       }
 
       LPCCall b;
-      b.push(origin);
+      b.push(Value::object(origin));
       for (i = 0; i < numparam; i++) {
-        b.push(event_param + i);
+        b.push(Value::copy(event_param + i));
       }
 
       b.apply(name, event_ob->u.arr->item[ind].u.ob, ORIGIN_EFUN);
@@ -2407,9 +2323,9 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
 
     {
       LPCCall b;
-      b.push(origin);
+      b.push(Value::object(origin));
       for (i = 0; i < numparam; i++) {
-        b.push(event_param + i);
+        b.push(Value::copy(event_param + i));
       }
 
       b.apply(name, event_ob->u.ob, ORIGIN_EFUN);
@@ -2424,20 +2340,20 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
     if (event_ob->type == T_OBJECT && !(event_ob->u.ob->flags & O_DESTRUCTED)) {
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
         if (ob != origin && !(ob->flags & O_DESTRUCTED)) {
-          snapshot.push(ob);
+          snapshot.push(Value::object(ob));
         }
       }
     }
-    /* Last to first, as before the LPCFrame migration. */
+    /* Last to first, as the original raw-stack version did. */
     for (int k = snapshot.argc() - 1; k >= 0; k--) {
-      svalue_t* slot = &snapshot.arg(k);
+      svalue_t* slot = snapshot.arg(k).sv();
       if (slot->type != T_OBJECT || (slot->u.ob->flags & O_DESTRUCTED)) {
         continue;
       }
       LPCCall b;
-      b.push(origin);
+      b.push(Value::object(origin));
       for (i = 0; i < numparam; i++) {
-        b.push(event_param + i);
+        b.push(Value::copy(event_param + i));
       }
       b.apply(name, slot->u.ob, ORIGIN_EFUN);
     }
@@ -2446,12 +2362,10 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
   }
 }
 
-void f_event(LPCFrame& f) {
+void f_event(EfunArgs& f, Arg target, StringArg event_name) {
   int num_arg = f.argc();
 
-  event(f.argp(0), f.string(1), num_arg - 2, num_arg > 2 ? f.argp(2) : nullptr);
-
-  f.ret_void();
+  event(target.sv(), event_name.c_str(), num_arg - 2, num_arg > 2 ? f[2].sv() : nullptr);
 }
 #endif
 
@@ -2483,7 +2397,7 @@ void number_as_string(char* buf, LPC_INT n) {
   strcat(buf, single[n]);
 }
 
-void f_query_num(LPCFrame& f) {
+Value f_query_num(EfunArgs&, LPC_INT num, LPC_INT max) {
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2491,8 +2405,8 @@ void f_query_num(LPCFrame& f) {
   char* res;
 
   ret[0] = 0;
-  limit = f.number(1);
-  n = f.number(0);
+  limit = max;
+  n = num;
 
   if ((limit && n > limit) || (n < 0) || (n > 99999)) {
     strcpy(ret, "many"); /* this is a little pointless ... */
@@ -2544,24 +2458,23 @@ q_n_end:
   n = strlen(ret);
   res = new_string(n, "query_num");
   strcpy(res, ret);
-  f.ret_str_malloced(res);
+  return Value::str_malloced(res);
 }
 
 #endif
 
 #ifdef F_BASE_NAME
-void f_base_name(LPCFrame& f) {
+Value f_base_name(EfunArgs&, Arg target) {
   char *name, *tmp;
   int i;
 
-  if (f.type(0) == T_OBJECT) {
-    if (f.object(0)->flags & O_DESTRUCTED) {
-      f.ret(0);
-      return;
+  if (target.is(T_OBJECT)) {
+    if (target.object()->flags & O_DESTRUCTED) {
+      return 0;
     }
-    name = add_slash(f.object(0)->obname);
+    name = add_slash(target.object()->obname);
   } else {
-    name = string_copy(f.string(0), "f_base_name: name");
+    name = string_copy(target.string().c_str(), "f_base_name: name");
   }
 
   if ((tmp = strchr(name, '#')) != nullptr) {
@@ -2572,12 +2485,11 @@ void f_base_name(LPCFrame& f) {
     ret[i] = 0;
     FREE_MSTR(name);
 
-    f.ret_str_malloced(ret);
-  } else {
-    f.ret_str_malloced(name);
+    return Value::str_malloced(ret);
   }
+  return Value::str_malloced(name);
 
-} /* f_base_name() */ /* f_base_name() */
+} /* f_base_name() */
 #endif
 
 #ifdef F_GET_GARBAGE
@@ -2593,13 +2505,16 @@ int garbage_check(object_t* ob, void* /*data*/) {
       ;
 }
 
-void f_get_garbage(LPCFrame& f) {
+Value f_get_garbage(EfunArgs& f) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
   object_t** obs;
   array_t* ret;
   get_objects(&obs, &count, garbage_check, nullptr);
+  /* get_objects() pushed the list's storage (a malloced string) above the
+   * window; hold it here so it is freed on return or an error() unwind. */
+  Value obs_storage = f.take_pushed();
 
   if (count > max_array_size) {
     count = max_array_size;
@@ -2611,101 +2526,94 @@ void f_get_garbage(LPCFrame& f) {
     add_ref(obs[i], "f_get_garbage");
   }
 
-  f.ret_refed(ret);
+  return Value::refed(ret);
 }
 #endif
 
 #ifdef F_NUM_CLASSES
 
-void f_num_classes(LPCFrame& f) {
-  int const i = f.object(0)->prog->num_classes;
-  f.ret(i);
+Value f_num_classes(EfunArgs&, object_t* ob) {
+  int const i = ob->prog->num_classes;
+  return i;
 }
 
 #endif
 
 #ifdef F_ASSEMBLE_CLASS
-void f_assemble_class(LPCFrame& f) {
+Value f_assemble_class(EfunArgs&, array_t* src) {
   // Build through the CLASS allocator: retagging a copy_array() block as
   // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
   // is later freed as a class (caught by the testsuite's per-file
   // check_memory gate via the assemble_class test).
-  array_t* src = f.array(0);
   array_t* cl = allocate_class_by_size(src->size);
   for (int i = 0; i < src->size; i++) {
     assign_svalue_no_free(&cl->item[i], &src->item[i]);
   }
-  f.ret_refed(cl);
-  f.top().type = T_CLASS;
+  return Value::refed_class(cl);
 }
 
 #endif
 
 #ifdef F_DISASSEMBLE_CLASS
-void f_disassemble_class(LPCFrame& f) {
+Value f_disassemble_class(EfunArgs&, Arg cls) {
   array_t* arr;
-  if (f.type(0) != T_CLASS) {
+  if (!cls.is(T_CLASS)) {
     error("Argument to disassemble_class() not a class.\n");
   }
-  arr = copy_array(f.array(0));
-  f.ret_refed(arr);
+  arr = copy_array(cls.sv()->u.arr);
+  return Value::refed(arr);
 }
 #endif
 
 #ifdef F_FETCH_CLASS_MEMBER
 
-void f_fetch_class_member(LPCFrame& f) {
-  LPC_INT pos = f.number(1); /* checked below as an LPC int, not wrapped */
+Value f_fetch_class_member(EfunArgs&, Arg cls, LPC_INT pos) {
+  /* pos is checked below as an LPC int, not wrapped */
   array_t* arr;
 
-  f.pop_back();
-
-  if (f.type(0) != T_CLASS) {
+  if (!cls.is(T_CLASS)) {
     error("Argument to fetch_class_member() not a class.\n");
   }
 
-  arr = f.array(0);
+  arr = cls.sv()->u.arr;
 
   if (pos < 0 || pos >= arr->size) {
     error("Class index out of bounds.\n");
   }
 
-  assign_svalue_no_free(f.argp(0), &arr->item[pos]);
-  free_array(arr);
+  return Value::copy(&arr->item[pos]);
 }
 #endif
 
 #ifdef F_STORE_CLASS_MEMBER
 
-void f_store_class_member(LPCFrame& f) {
-  LPC_INT const pos = f.number(1); /* checked below as an LPC int */
+Value f_store_class_member(EfunArgs& f, Arg cls, LPC_INT pos, Arg value) {
+  /* pos is checked below as an LPC int */
   array_t* arr;
 
-  if (f.type(0) != T_CLASS) {
+  if (!cls.is(T_CLASS)) {
     error("Argument to store_class_member() not a class.\n");
   }
 
-  arr = f.array(0);
+  arr = cls.sv()->u.arr;
 
   if (pos < 0 || pos >= arr->size) {
     error("Class index out of bounds.\n");
   }
 
-  assign_svalue(&arr->item[pos], f.argp(2));
+  assign_svalue(&arr->item[pos], value.sv());
 
-  /* Leave the class on the stack (mixed return); drop index + value. */
-  f.pop_back(2);
+  /* The result is the class itself (mixed return). */
+  return f.take(0);
 }
 #endif
 
 #ifdef F_ELEMENT_OF
-void f_element_of(LPCFrame& f) {
-  array_t* arr = f.array(0);
+Value f_element_of(EfunArgs&, array_t* arr) {
   if (!arr->size) {
     error("Can't take element from empty array.\n");
   }
-  assign_svalue_no_free(f.argp(0), &arr->item[random_number(arr->size)]);
-  free_array(arr);
+  return Value::copy(&arr->item[random_number(arr->size)]);
 }
 #endif
 #ifdef F_SHUFFLE
@@ -2719,7 +2627,7 @@ void shuffle(array_t* args) {
   svalue_t temp;
 
   /* Hrm, if we have less than two elements, then the order isn't
-   * going to change! Let's just leave the old array on the stack.
+   * going to change! Let's just leave the old array as it is.
    */
   if (args->size < 2) {
     return;
@@ -2737,23 +2645,18 @@ void shuffle(array_t* args) {
     args->item[j] = temp;
   }
 
-  /* Well, that's it. We don't need to push or anything. */
+  /* Well, that's it. The array was shuffled in place. */
 }
 
-void f_shuffle(LPCFrame& f) {
-
-  if (f.type(0) == T_ARRAY && f.array(0)) {
-    shuffle(f.array(0));
-  } else {
-    f.ret_refed(&the_null_array);
-  }
+Value f_shuffle(EfunArgs& f, array_t* arr) {
+  shuffle(arr); /* in place: the result is the argument array */
+  return f.take(0);
 }
 #endif
 
 #ifdef F_MAX
 
-void f_max(LPCFrame& f) {
-  array_t* arr = f.array(0);
+Value f_max(EfunArgs&, array_t* arr, LPC_INT want_index) {
   int max_index = 0;
   int i;
 
@@ -2813,22 +2716,18 @@ void f_max(LPCFrame& f) {
     }
   }
 
-  if (f.number(1) != 0) {
-    f.ret(max_index);
-    return;
+  if (want_index != 0) {
+    return max_index;
   }
 
-  f.pop_back();
-  assign_svalue_no_free(f.argp(0), &arr->item[max_index]);
-  free_array(arr);
+  return Value::copy(&arr->item[max_index]);
 }
 
 #endif
 
 #ifdef F_MIN
 
-void f_min(LPCFrame& f) {
-  array_t* arr = f.array(0);
+Value f_min(EfunArgs&, array_t* arr, LPC_INT want_index) {
   int min_index = 0;
   int i;
 
@@ -2888,46 +2787,41 @@ void f_min(LPCFrame& f) {
     }
   }
 
-  if (f.number(1) != 0) {
-    f.ret(min_index);
-    return;
+  if (want_index != 0) {
+    return min_index;
   }
 
-  f.pop_back();
-  assign_svalue_no_free(f.argp(0), &arr->item[min_index]);
-  free_array(arr);
+  return Value::copy(&arr->item[min_index]);
 }
 #endif
 
 #ifdef F_ABS
 
-void f_abs(LPCFrame& f) {
-  if (f.type(0) == T_REAL) {
-    if (f.top().u.real < 0.0) {
-      f.top().u.real = -f.top().u.real;
-    } else if (f.top().u.real == -0.0) {
-      f.top().u.real = 0.0;
+Value f_abs(EfunArgs& f, Arg n) {
+  /* Edited in place, so anything else about the value (an int's subtype)
+   * is kept as it was. */
+  svalue_t* v = n.sv();
+  if (v->type == T_REAL) {
+    if (v->u.real < 0.0) {
+      v->u.real = -v->u.real;
+    } else if (v->u.real == -0.0) {
+      v->u.real = 0.0;
     }
-  } else if (f.type(0) == T_NUMBER && f.number(0) < 0) {
-    f.top().u.number = -f.top().u.number;
+  } else if (v->type == T_NUMBER && v->u.number < 0) {
+    v->u.number = -v->u.number;
   }
+  return f.take(0);
 }
 #endif
 
 #ifdef F_ROLL_MDN
 
-void f_roll_MdN(LPCFrame& f) {
-  int num_arg = f.argc();
-  LPC_INT sides, rolls, bonus;
+Value f_roll_MdN(EfunArgs&, LPC_INT rolls, LPC_INT sides, LPC_INT bonus) {
   LPC_INT roll = 0;
 
-  /* Read the arguments relative to num_arg: package dwlib declares this efun
-   * as roll_MdN(int, int) with no bonus, and when it is enabled that spec is
-   * the one compiled in -- reading three fixed slots then took `rolls` from
-   * the caller's stack below the first argument (roll_MdN(3, 1) gave 0). */
-  rolls = f.number(0);
-  sides = f.number(1);
-  bonus = num_arg > 2 ? f.number(2) : 0;
+  /* bonus defaults to 0 (spec `int default:0`). This is the only roll_MdN
+   * spec: package dwlib used to declare a two-argument roll_MdN(int, int)
+   * too, which took precedence when dwlib was enabled. */
 
   /* rolls used to be an int, so a count past 32 bits wrapped (0x100000001
    * rolled once). Keep the old int ceiling on the loop -- this loop is not
@@ -2943,7 +2837,7 @@ void f_roll_MdN(LPCFrame& f) {
     roll += bonus;
   }
 
-  f.ret(roll);
+  return roll;
 }
 
 #endif
@@ -3003,12 +2897,12 @@ int levenshtein(char* a, int as, char* b, int bs) {
   return i;
 } /* levenshtein() */
 
-void f_string_difference(LPCFrame& f) {
+Value f_string_difference(EfunArgs&, StringArg first, StringArg second) {
   int diff, as, bs;
   char *a, *b;
 
-  b = const_cast<char*>(f.string(0));
-  a = const_cast<char*>(f.string(1));
+  b = const_cast<char*>(first.c_str());
+  a = const_cast<char*>(second.c_str());
 
   if (!strcmp(a, b)) {
     diff = 0;
@@ -3024,7 +2918,7 @@ void f_string_difference(LPCFrame& f) {
     }
   }
 
-  f.ret(diff);
+  return diff;
 }
 #endif
 
@@ -3039,17 +2933,7 @@ static int query_charmode(object_t* ob) {
   return ret;
 }
 
-void f_query_charmode(LPCFrame& f) {
-  int num_arg = f.argc();
-  int tmp;
-
-  if (num_arg) {
-    tmp = query_charmode(f.object(0));
-  } else {
-    tmp = -1;
-  }
-  f.ret(tmp);
-}
+Value f_query_charmode(EfunArgs&, object_t* ob) { return query_charmode(ob); }
 
 #ifdef F_REMOVE_CHARMODE
 static int remove_charmode(object_t* ob) {
@@ -3062,18 +2946,13 @@ static int remove_charmode(object_t* ob) {
   return ret;
 }
 
-void f_remove_charmode(LPCFrame& f) {
-  int num_arg = f.argc();
+Value f_remove_charmode(EfunArgs&, object_t* ob) {
   int tmp;
 
-  if (num_arg) {
-    tmp = remove_charmode(f.object(0));
-  } else {
-    tmp = -1;
-  }
+  tmp = remove_charmode(ob);
   // if(tmp > 0 && !(tmp & I_SINGLE_CHAR)) tmp = 1;
   // else tmp = 0;
-  f.ret(tmp);
+  return tmp;
 }
 #endif
 #endif
@@ -3096,26 +2975,14 @@ static int remove_get_char(object_t* ob) {
   return -1;
 }
 
-void f_remove_get_char(LPCFrame& f) {
-  int num_arg = f.argc();
-  int tmp;
-
-  if (num_arg) {
-    tmp = remove_get_char(f.object(0));
-  } else {
-    tmp = -3;
-  }
-  f.ret(tmp);
-}
+Value f_remove_get_char(EfunArgs&, object_t* ob) { return remove_get_char(ob); }
 
 #endif
 #ifdef F_SEND_NULLBYTE
-void f_send_nullbyte(LPCFrame& f) {
+Value f_send_nullbyte(EfunArgs&, object_t* who) {
   int tmp;
-  object_t* who;
   tmp = 0;
 
-  who = f.object(0);
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
       (who->interactive->iflags & (NET_DEAD | CLOSING))) {
     tmp = -2;
@@ -3125,46 +2992,38 @@ void f_send_nullbyte(LPCFrame& f) {
     add_message(who, "\0", 1);
     flush_message(who->interactive);
   }
-  f.ret(tmp);
+  return tmp;
 }
 
 #endif
 
 #ifdef F_RESTORE_FROM_STRING
-void f_restore_from_string(LPCFrame& f) {
-  const char* buf;
-  LPC_INT noclear;
-
-  buf = f.string(0);
-  noclear = f.number(1);
+void f_restore_from_string(EfunArgs& f, StringArg, LPC_INT noclear) {
   if (!noclear) {
     clear_non_statics(current_object);
   }
-  {
-    LPCCall tmp;
-    tmp.push_str_copy(buf);  // restore_object_from_buff modifies the string in
-                             // place, which is ok, copied strings aren't
-                             // shared
-    restore_object_from_buff(current_object, const_cast<char*>(tmp.arg(0).u.string), noclear);
-    tmp.discard();
-  }
-  f.ret_void();
+  // restore_object_from_buff modifies the string in place: take the
+  // argument and unlink it, which copies only if something else still
+  // references it (a temporary such as read_file()'s result is used as is).
+  // The Value frees it on an error() too.
+  Value text = f.take(0);
+  unlink_string_svalue(text.get());
+  restore_object_from_buff(current_object, const_cast<char*>(text->u.string), noclear);
 }
 #endif
 
 #ifdef F_CLASSES
-void f_classes(LPCFrame& f) {
+Value f_classes(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
   char* end;
   program_t* prog;
 
-  flag = f.number(1);
-  f.pop_back();
+  flag = flag_arg;
   end = EndOf(buf);
 
-  prog = f.object(0)->prog;
+  prog = ob->prog;
   num = prog->num_classes;
   vec = allocate_empty_array(num);
 
@@ -3212,7 +3071,7 @@ void f_classes(LPCFrame& f) {
     }
   }
 
-  f.ret_refed(vec);
+  return Value::refed(vec);
 }
 
 #endif
@@ -3227,32 +3086,25 @@ static void fix_object_names() {
   }
 }
 
-void f_test_load(LPCFrame& f) {
-  const char* tmp = f.string(0);
+Value f_test_load(EfunArgs&, StringArg path) {
+  const char* tmp = path.c_str();
   object_t* new_ob;
-  if ((testloadob = find_object2(f.string(0)))) {
+  if ((testloadob = find_object2(path.c_str()))) {
     tmp = testloadob->obname;
     ObjectTable::instance().remove(testloadob->obname);
     SETOBNAME(testloadob, "");
   }
   saved_extra_name = tmp;
-  /* Restores testloadob's name if loading or destructing the probe errors. */
-  StackErrorHandler restore_names(fix_object_names);
+  /* Restores testloadob's name AND its object-table entry on every exit:
+   * success, a failed load (restoring only the name left the object
+   * unfindable), and an error() while loading or destructing the probe. */
+  DEFER { fix_object_names(); };
   new_ob = load_object(tmp, 0);
   if (!new_ob) {
-    /* fix_object_names(): restore the name AND the object-table entry
-     * (restoring only the name left the object unfindable) */
-    restore_names.run();
-    f.ret(0);
-    return;
+    return 0;
   }
   destruct_object(new_ob);
-  restore_names.dismiss();
-  f.ret(1);
-  if (testloadob) {
-    SETOBNAME(testloadob, saved_extra_name);
-    ObjectTable::instance().insert(testloadob->obname, testloadob);
-  }
+  return 1;
 }
 #endif
 
@@ -3280,8 +3132,8 @@ static bool os_env_name_listed(const char* list, const char* name) {
 #endif
 
 #ifdef F_GET_OS_ENV
-void f_get_os_env(LPCFrame& f) {
-  const char* name = f.string(0);
+Value f_get_os_env(EfunArgs&, StringArg var_name) {
+  const char* name = var_name.c_str();
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
       !os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
@@ -3290,29 +3142,27 @@ void f_get_os_env(LPCFrame& f) {
 
   const char* val = getenv(name);
   if (!val) {
-    f.ret_undefined();
-    return;
+    return Value::undefined();
   }
   char* copy = string_copy(val, "f_get_os_env");
-  f.ret_str_malloced(copy);
+  return Value::str_malloced(copy);
 }
 #endif
 
 #ifdef F_SET_OS_ENV
-void f_set_os_env(LPCFrame& f) {
-  int num_arg = f.argc();
-  const char* name = f.string(0);
+Value f_set_os_env(EfunArgs&, StringArg var_name, std::optional<StringArg> value) {
+  const char* name = var_name.c_str();
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {
     error("set_os_env: '%s' is not in the 'writable os environment variables' list.\n", name);
   }
 
   int ok;
-  if (num_arg == 2) {
+  if (value) {
 #ifdef _WIN32
-    ok = _putenv_s(name, f.string(1)) == 0;
+    ok = _putenv_s(name, value->c_str()) == 0;
 #else
-    ok = setenv(name, f.string(1), 1) == 0;
+    ok = setenv(name, value->c_str(), 1) == 0;
 #endif
   } else {
 #ifdef _WIN32
@@ -3321,6 +3171,6 @@ void f_set_os_env(LPCFrame& f) {
     ok = unsetenv(name) == 0;
 #endif
   }
-  f.ret(ok);
+  return ok;
 }
 #endif
