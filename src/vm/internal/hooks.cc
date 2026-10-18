@@ -326,7 +326,10 @@ struct Attachment {
   const char* exclude_caller_program = nullptr; /* shared; reject if matches */
   const char* efun_name = nullptr;              /* shared; PointId::Efun ("*" = all) */
   bool detached = false;
-  bool running = false; /* while true, detach_attachment defers delete */
+  /* Dispatch snapshots and in-flight hook_call()s still using this
+   * attachment; while nonzero, detach_attachment() defers the delete to the
+   * last holder (release_attachment()). */
+  int holds = 0;
   int errors = 0;
   int64_t events = 0;
   int64_t skipped = 0;
@@ -617,12 +620,31 @@ void detach_attachment(Attachment* a) {
     free_object(&a->owner, "hook owner");
   }
   free_attachment_filters(a);
-  /* Dispatch still holds `a` across hook_call(); delete after running clears. */
-  if (a->running) {
-    return;
+  if (a->holds > 0) {
+    return; /* release_attachment() deletes it */
   }
   delete a;
 }
+
+void release_attachment(Attachment* a) {
+  if (--a->holds == 0 && a->detached) {
+    delete a;
+  }
+}
+
+/* Keeps `a` allocated (though possibly detached) for a scope that runs LPC:
+ * a handler can detach any attachment, its own included -- hook_detach(), or
+ * destructing an owner or a pinned filter object. */
+class AttachmentHold {
+ public:
+  explicit AttachmentHold(Attachment* a) : a_(a) { a_->holds++; }
+  ~AttachmentHold() { release_attachment(a_); }
+  AttachmentHold(const AttachmentHold&) = delete;
+  AttachmentHold& operator=(const AttachmentHold&) = delete;
+
+ private:
+  Attachment* a_;
+};
 
 /* ---- matching ---- */
 
@@ -984,6 +1006,9 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
       pop_n_elems(n_args_on_stack);
     }
   };
+  /* The handler may detach `a` (and so may the stale-owner paths below);
+   * it is still read on the way out. */
+  AttachmentHold const hold(a);
   if (a->detached) {
     pop_args();
     return HookRun::Skipped;
@@ -1022,7 +1047,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   auto sim = save_simulate();
   f->hdr.ref++;
-  a->running = true;
 
   SuspendedStack ss{};
   if (outermost) {
@@ -1097,8 +1121,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     }
   }
 
-  bool const deferred_delete = a->detached;
-  a->running = false;
   g_hook_depth--;
   free_funp(f);
 
@@ -1112,19 +1134,11 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
       max_err = 10;
     }
     if (!(a->flags & HOOK_FAIL_CLOSED) && a->errors >= max_err) {
-      /* running is clear — detach_attachment deletes immediately. */
       detach_attachment(a);
-      return HookRun::Error;
-    }
-    if (deferred_delete) {
-      delete a;
     }
     return HookRun::Error;
   }
   if (ret->type == T_PROMISE || a->detached) {
-    if (a->detached) {
-      delete a;
-    }
     return HookRun::Declined;
   }
   if (out) {
@@ -1133,9 +1147,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   a->events++;
   a->last_fired = get_current_time();
-  if (deferred_delete) {
-    delete a;
-  }
   return HookRun::Ran;
 }
 
@@ -1207,10 +1218,33 @@ void bump_count(Attachment* a, const char* caller_prog, const char* target_prog,
 }
 
 /* Snapshot the live list so attach/detach inside a handler only affects the
- * next event. */
-std::vector<Attachment*> snapshot_point(PointId p) {
-  return g_by_point[static_cast<int>(p)];
-}
+ * next event. The snapshot holds every attachment in it: dispatchers walk it
+ * again after handlers have run (BEFORE then DECIDE), and a handler can
+ * detach any of them -- one that comes up later reads as `detached` instead
+ * of freed memory. */
+class HookSnapshot {
+ public:
+  explicit HookSnapshot(const std::vector<Attachment*>& live) : list_(live) {
+    for (Attachment* a : list_) {
+      a->holds++;
+    }
+  }
+  ~HookSnapshot() {
+    for (Attachment* a : list_) {
+      release_attachment(a);
+    }
+  }
+  HookSnapshot(const HookSnapshot&) = delete;
+  HookSnapshot& operator=(const HookSnapshot&) = delete;
+
+  std::vector<Attachment*>::const_iterator begin() const { return list_.begin(); }
+  std::vector<Attachment*>::const_iterator end() const { return list_.end(); }
+
+ private:
+  std::vector<Attachment*> list_;
+};
+
+HookSnapshot snapshot_point(PointId p) { return HookSnapshot(g_by_point[static_cast<int>(p)]); }
 
 /* ---- authorization ---- */
 
@@ -1441,7 +1475,10 @@ void hooks_clear() {
       free_object(&a->owner, "hooks_clear");
     }
     free_attachment_filters(a);
-    delete a;
+    a->detached = true;
+    if (a->holds == 0) {
+      delete a;
+    }
   }
 }
 

@@ -400,6 +400,8 @@ namespace {
 void get_user_data(interactive_t* ip) {
   int num_bytes, text_space;
   unsigned char buf[MAX_TEXT];
+  // process_input() may destruct the user mid-buffer (PORT_TYPE_ASCII).
+  InteractivePin const pin(ip);
 
   text_space = sizeof(buf);
 
@@ -535,6 +537,9 @@ void get_user_data(interactive_t* ip) {
           push_malloced_string(str);
           set_eval(max_eval_cost);
           safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
+          if (ip->iflags & CLOSING) {
+            return;
+          }
         }
 
         if (ip->text_start == ip->text_end) {

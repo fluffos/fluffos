@@ -54,6 +54,8 @@ static void receive_snoop(const char* /*buf*/, int /*len*/, object_t* ob);
 
 #endif
 
+static void free_interactive(interactive_t* ip);
+
 namespace {
 // If a complete command is buffered, ask the connection's transport to
 // arrange a process_user_command() run on the driver's scheduler.
@@ -371,10 +373,14 @@ void comm_text_received(interactive_t* ip, const char* data, size_t len) {
   if (!len) {
     return;
   }
+  InteractivePin const pin(ip);
 
   comm_reserve_input_space(ip, len);
 
   on_user_input(ip, data, len);
+  if (ip->iflags & CLOSING) {
+    return;
+  }
 
   if (cmd_in_buf(ip)) {
     ip->iflags |= CMD_IN_BUF;
@@ -387,18 +393,28 @@ void comm_telnet_received(interactive_t* ip, const char* data, size_t len) {
   if (!len) {
     return;
   }
+  // Telnet events run applies and hooks, any of which may destruct the user
+  // while libtelnet is still parsing this buffer.
+  InteractivePin const pin(ip);
+
   comm_reserve_input_space(ip, len);
 
   int const start = ip->text_end;
 
   // this will read data into ip->text
   telnet_recv(ip->telnet, data, len);
+  if (ip->iflags & CLOSING) {
+    return;
+  }
   // If we read something
   if (ip->text_end > start) {
     /* handle snooping - snooper does not see type-ahead due to
       telnet being in linemode */
     if (!(ip->iflags & NOECHO)) {
       handle_snoop(ip->text + start, ip->text_end - start, ip);
+      if (ip->iflags & CLOSING) {
+        return; /* receive_snoop() is LPC */
+      }
     }
 
     // search for command.
@@ -421,6 +437,9 @@ void on_user_input(interactive_t* ip, const char* data, size_t len) {
     object_t* user_ob = !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
     if (!hook_dispatch_net_read(user_ob, data, static_cast<int>(len))) {
       return; /* DECIDE refuse drops the input */
+    }
+    if (ip->iflags & CLOSING) {
+      return; /* the hook removed the user; the caller's pin keeps ip */
     }
   }
   for (int i = 0; i < len; i++) {
@@ -835,12 +854,6 @@ void remove_interactive(object_t* ob, int dested) {
     ip->transport = nullptr;
   }
 
-  // Free telnet handle
-  if (ip->telnet != nullptr) {
-    telnet_free(ip->telnet);
-    ip->telnet = nullptr;
-  }
-
   // Free translator
   if (ip->trans != nullptr) {
     ucnv_close(ip->trans);
@@ -863,10 +876,40 @@ void remove_interactive(object_t* ob, int dested) {
 #endif
 
   user_del(ip);
-  FREE(ip);
   ob->interactive = nullptr;
-  free_object(&ob, "remove_interactive");
+  if (ip->pins > 0) {
+    // Input processing up the C stack ran the LPC that brought us here and
+    // still holds ip -- libtelnet may be in the middle of telnet_recv() on
+    // ip->telnet. The last InteractivePin frees what is left; CLOSING tells
+    // that code to stop.
+    ip->torn_down = true;
+    return;
+  }
+  free_interactive(ip);
 } /* remove_interactive() */
+
+/*
+ * The part of remove_interactive() that input processing may still be
+ * running on: the telnet handle, the struct, and the connection's reference
+ * to its object (ip->ob, kept valid for as long as ip is).
+ */
+static void free_interactive(interactive_t* ip) {
+  if (ip->telnet != nullptr) {
+    telnet_free(ip->telnet);
+    ip->telnet = nullptr;
+  }
+  object_t* ob = ip->ob;
+  FREE(ip);
+  free_object(&ob, "remove_interactive");
+}
+
+InteractivePin::InteractivePin(interactive_t* ip) : ip_(ip) { ip_->pins++; }
+
+InteractivePin::~InteractivePin() {
+  if (--ip_->pins == 0 && ip_->torn_down) {
+    free_interactive(ip_);
+  }
+}
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
 static int call_function_interactive(interactive_t* i, char* str) {

@@ -72,6 +72,30 @@ mixed *void_efun_after_results() {
   return efun_after_results;
 }
 
+/* Handlers that detach attachments mid-dispatch: the dispatcher still walks
+ * its snapshot (BEFORE, then DECIDE) afterwards. */
+nosave int self_detach_hits = 0;
+nosave int victim_id = 0;
+nosave int victim_hits = 0;
+
+mixed on_self_detach(int id, object actor, object caller, object target, string fn,
+  mixed *args) {
+  self_detach_hits++;
+  hook_detach(id);
+  return 0;
+}
+
+mixed on_detach_victim(int id, object actor, object caller, object target, string fn,
+  mixed *args) {
+  hook_detach(victim_id);
+  return 0;
+}
+
+mixed on_victim(int id, object actor, object caller, object target, string fn, mixed *args) {
+  victim_hits++;
+  return 0;
+}
+
 nosave mixed *apply_miss_log = ({});
 
 mixed on_apply_miss(int id, object actor, object caller, object target, string fn, mixed *args,
@@ -172,6 +196,22 @@ void do_tests() {
   hook_detach(eid_res);
   ASSERT_EQ(efun_after_results, ({ 2 }));
   ASSERT_EQ(void_efun_after_results(), ({ 0 }));
+
+  /* a handler detaching itself, then one detaching an attachment the
+   * dispatch has not reached yet */
+  self_detach_hits = 0;
+  hook_attach("efun:sizeof", (: on_self_detach :), ([ "label": "self-detach" ]), HOOK_BEFORE);
+  ASSERT_EQ(sizeof(arr), 2);
+  ASSERT_EQ(sizeof(arr), 2);
+  ASSERT_EQ(self_detach_hits, 1);
+  victim_hits = 0;
+  victim_id = hook_attach("efun:sizeof", (: on_victim :), ([ "label": "victim" ]),
+    HOOK_DECIDE);
+  int killer = hook_attach("efun:sizeof", (: on_detach_victim :), ([ "label": "killer" ]),
+    HOOK_BEFORE);
+  ASSERT_EQ(sizeof(arr), 2);
+  ASSERT_EQ(victim_hits, 0);
+  hook_detach(killer);
 
   /* function name trailing '*' */
   fn_before_log = ({});

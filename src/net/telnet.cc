@@ -283,6 +283,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
             "Bad client: bogus IAC DO GMCP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
+        return;
 #else
         // do nothing
 #endif
@@ -296,6 +297,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
             "Bad client: bogus IAC DO MSDP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
+        return;
 #else
         // do nothing
 #endif
@@ -309,6 +311,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
             "Bad client: bogus IAC DO MSSP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
+        return;
 #else
         // do nothing
 #endif
@@ -322,6 +325,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
             "Bad client: bogus IAC DO ZMP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
         remove_interactive(ip->ob, false);
+        return;
 #else
         // do nothing
 #endif
@@ -508,6 +512,9 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char* buf, 
 static inline void on_telnet_environ(const struct telnet_environ_t* values, unsigned long size,
                                      interactive_t* ip) {
   for (int i = 0; i < size; i++) {
+    if (ip->iflags & CLOSING) {
+      return; /* an earlier receive_environ() removed the user */
+    }
     if (values[i].var == nullptr || values[i].value == nullptr) {
       continue;
     }
@@ -533,6 +540,14 @@ void telnet_event_handler(telnet_t* telnet, telnet_event_t* ev, void* user_data)
   // Never null: net_telnet_init() hands libtelnet the interactive, and an
   // interactive always has an object (master_ob until logon) while it exists.
   auto ip = reinterpret_cast<interactive_t*>(user_data);
+
+  // LPC run for an earlier event in this telnet_recv() removed the user:
+  // comm_telnet_received()'s pin keeps ip and the telnet handle alive until
+  // libtelnet finishes the buffer, but the transport, translator and object
+  // are gone. Ignore the rest of the buffer.
+  if (ip->torn_down) {
+    return;
+  }
 
   /* net:telnet BEFORE/DECIDE for protocol events (DATA/SEND stay on net:read/write). */
   if (g_hook_mask & HOOK_MASK_NET_TELNET) {
