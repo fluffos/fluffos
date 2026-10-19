@@ -13,10 +13,19 @@
 
 enum { COMPRESS_BUF_SIZE = 8096 };
 
+#if defined(F_COMPRESS_FILE) || defined(F_UNCOMPRESS_FILE)
+/* Does name end in GZ_EXTENSION? A name shorter than the extension cannot,
+ * and comparing from len - 3 would start before it. */
+static bool has_gz_extension(const char* name) {
+  size_t const len = strlen(name);
+  size_t const ext_len = strlen(GZ_EXTENSION);
+  return len >= ext_len && strcmp(name + len - ext_len, GZ_EXTENSION) == 0;
+}
+#endif
+
 #ifdef F_COMPRESS_FILE
 void f_compress_file() {
   int readb;
-  int len;
   int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
@@ -44,8 +53,7 @@ void f_compress_file() {
     }
     output_file = (sp - num_arg + 2)->u.string;
   } else {
-    len = strlen(input_file);
-    if (!strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION)) {
+    if (has_gz_extension(input_file)) {
       // Already compressed...
       pop_n_elems(num_arg);
       push_number(0);
@@ -170,13 +178,13 @@ void f_uncompress_file() {
     output_file = (sp - num_arg + 2)->u.string;
   } else {
     char* tmp;
-    len = strlen(input_file);
-    if (strcmp(input_file + len - strlen(GZ_EXTENSION), GZ_EXTENSION) != 0) {
+    if (!has_gz_extension(input_file)) {
       // Not compressed...
       pop_n_elems(num_arg);
       push_number(0);
       return;
     }
+    len = strlen(input_file);
     tmp = new_string(len, "compress_file");
     strcpy(tmp, input_file);
     tmp[len - strlen(GZ_EXTENSION)] = 0;
