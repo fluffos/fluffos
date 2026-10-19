@@ -1,29 +1,30 @@
 #include "base/package_api.h"
 
 #ifdef F_EXPLODE
-Value f_explode(EfunArgs&, StringArg str, StringArg delimiter) {
-  return Value::refed(explode_string(str.c_str(), str.size(), delimiter.c_str(), delimiter.size(),
-                                     CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0));
+vm::Value f_explode(vm::EfunArgs&, vm::StringArg str, vm::StringArg delimiter) {
+  return vm::Value::refed(explode_string(str.c_str(), str.size(), delimiter.c_str(),
+                                         delimiter.size(),
+                                         CONFIG_INT(__RC_REVERSIBLE_EXPLODE_STRING__) != 0));
 }
 #endif
 
 #ifdef F_EXPLODE_REVERSIBLE
-Value f_explode_reversible(EfunArgs&, StringArg str, StringArg delimiter) {
-  return Value::refed(
+vm::Value f_explode_reversible(vm::EfunArgs&, vm::StringArg str, vm::StringArg delimiter) {
+  return vm::Value::refed(
       explode_string(str.c_str(), str.size(), delimiter.c_str(), delimiter.size(), true));
 }
 #endif
 
 #ifdef F_IMPLODE
-Value f_implode(EfunArgs& f, array_t* arr, Arg glue, std::optional<Arg> start) {
+vm::Value f_implode(vm::EfunArgs& f, array_t* arr, vm::Arg glue, std::optional<vm::Arg> start) {
   if (start && glue.is(T_STRING)) {
     error("Third argument to implode() is illegal with implode(array, string)\n");
   }
   check_for_destr(arr);
 
   if (glue.is(T_STRING)) {
-    StringArg str = glue.string();
-    return Value::str_malloced(implode_string(arr, str.c_str(), str.size()));
+    vm::StringArg str = glue.string();
+    return vm::Value::str_malloced(implode_string(arr, str.c_str(), str.size()));
   }
   /* implode_array() writes the result into slot 0, taking over the array's
    * reference, and consumes the starting value itself: what is left is

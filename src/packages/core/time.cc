@@ -7,7 +7,7 @@
 #include <vector>
 
 #ifdef F_PERF_COUNTER_NS
-Value f_perf_counter_ns(EfunArgs&) {
+vm::Value f_perf_counter_ns(vm::EfunArgs&) {
 #ifdef _WIN32
   static LARGE_INTEGER Frequency{};
   if (Frequency.QuadPart == 0) {
@@ -27,11 +27,11 @@ Value f_perf_counter_ns(EfunArgs&) {
 #endif
 
 #ifdef F_TIME
-Value f_time(EfunArgs&) { return static_cast<LPC_INT>(get_current_time()); }
+vm::Value f_time(vm::EfunArgs&) { return static_cast<LPC_INT>(get_current_time()); }
 #endif
 
 #ifdef F_TIME_NS
-Value f_time_ns(EfunArgs&) {
+vm::Value f_time_ns(vm::EfunArgs&) {
   auto now = std::chrono::system_clock::now();
   return static_cast<LPC_INT>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
@@ -39,7 +39,7 @@ Value f_time_ns(EfunArgs&) {
 #endif
 
 #ifdef F_CTIME
-Value f_ctime(EfunArgs&, std::optional<LPC_INT> clock) {
+vm::Value f_ctime(vm::EfunArgs&, std::optional<LPC_INT> clock) {
   char buf[255] = {};
   const char *cp = buf, *nl;
   char* p;
@@ -66,21 +66,21 @@ Value f_ctime(EfunArgs&, std::optional<LPC_INT> clock) {
   p = new_string(l, "f_ctime");
   strncpy(p, cp, l);
   p[l] = '\0';
-  return Value::str_malloced(p);
+  return vm::Value::str_malloced(p);
 }
 #endif
 
 #ifdef F_LOCALTIME
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
-Value f_localtime(EfunArgs&, LPC_INT clock) {
+vm::Value f_localtime(vm::EfunArgs&, LPC_INT clock) {
   struct tm res = {};
   time_t lt;
   lt = clock;
   auto* tm = localtime_r(&lt, &res);
 
   if (!tm) {
-    return Value::undefined();
+    return vm::Value::undefined();
   }
 
   auto* vec = allocate_empty_array(11);
@@ -116,12 +116,12 @@ Value f_localtime(EfunArgs&, LPC_INT clock) {
   } else {
     vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
   }
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 #endif
 
 #ifdef F_STRFTIME
-Value f_strftime(EfunArgs&, StringArg fmt, LPC_INT clock) {
+vm::Value f_strftime(vm::EfunArgs&, vm::StringArg fmt, LPC_INT clock) {
   auto arg_time = clock;
   const auto* arg_fmt = fmt.c_str();
 
@@ -141,12 +141,12 @@ Value f_strftime(EfunArgs&, StringArg fmt, LPC_INT clock) {
   size_t const size = strftime(buf.data(), buf.size(), arg_fmt, res_tm);
   buf[size] = '\0';
 
-  return Value::str_copy(buf.data());
+  return vm::Value::str_copy(buf.data());
 }
 #endif
 
 #ifdef F_STRPTIME
-Value f_strptime(EfunArgs&, StringArg fmt, StringArg timestr) {
+vm::Value f_strptime(vm::EfunArgs&, vm::StringArg fmt, vm::StringArg timestr) {
   const auto* arg_timestr = timestr.c_str();
   const auto* arg_fmt = fmt.c_str();
 

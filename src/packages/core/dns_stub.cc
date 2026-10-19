@@ -60,16 +60,16 @@ std::set<StubAddrQuery*> pending_addr_queries;
 void on_stub_resolve_finish(StubAddrQuery* query) {
   // Same argument shape as on_query_addr_by_name_finish():
   // (name, dotted-quad, key).
-  LPCCall call;
-  call.push(Value::str_copy(query->name));
+  vm::Call call;
+  call.push(vm::Value::str_copy(query->name));
 
   in_addr a4;
   in6_addr a6;
   if (inet_pton(AF_INET, query->name, &a4) == 1 || inet_pton(AF_INET6, query->name, &a6) == 1) {
     // Already numeric: echo it, as a native getaddrinfo() would.
-    call.push(Value::str_copy(query->name));
+    call.push(vm::Value::str_copy(query->name));
   } else {
-    call.push(Value::str_copy("127.0.0.1"));
+    call.push(vm::Value::str_copy("127.0.0.1"));
   }
 
   call.push(query->key);

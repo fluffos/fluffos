@@ -6,7 +6,7 @@
 #endif
 
 #ifdef F_SYS_NETWORK_PORTS
-Value f_sys_network_ports(EfunArgs&) {
+vm::Value f_sys_network_ports(vm::EfunArgs&) {
   array_t* info;
   int i = 0, p = 0;
 
@@ -47,12 +47,12 @@ Value f_sys_network_ports(EfunArgs&) {
     p++;
   }
 
-  return Value::refed(info);
+  return vm::Value::refed(info);
 }
 #endif
 
 #ifdef F_SYS_RELOAD_TLS
-void f_sys_reload_tls(EfunArgs&, LPC_INT port_index_display) {
+void f_sys_reload_tls(vm::EfunArgs&, LPC_INT port_index_display) {
   auto port_index = port_index_display - 1;
 
   // external_port is a fixed array; bound by ELEMENT COUNT, not sizeof (which

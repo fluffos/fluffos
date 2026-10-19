@@ -762,7 +762,8 @@ static void unique_array_error_handler(void) {
   FREE((char*)unlist);
 }
 
-Value f_unique_array(EfunArgs&, array_t* v, Arg separator, std::optional<Arg> skip) {
+vm::Value f_unique_array(vm::EfunArgs&, array_t* v, vm::Arg separator,
+                         std::optional<vm::Arg> skip) {
   array_t* ret;
   long size, i, numkeys = 0;
   int* ind;
@@ -774,7 +775,7 @@ Value f_unique_array(EfunArgs&, array_t* v, Arg separator, std::optional<Arg> sk
 
   size = v->size;
   if (!size) {
-    return Value::addref(v);
+    return vm::Value::addref(v);
   }
 
   skipval = skip ? skip->sv() : &const0;
@@ -853,7 +854,7 @@ Value f_unique_array(EfunArgs&, array_t* v, Arg separator, std::optional<Arg> sk
   FREE((char*)g_u_list);
   g_u_list = unlist;
   sp--; /* the error handler slot, without running it */
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 
 /*
@@ -1192,13 +1193,13 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
   }
 }
 
-Value f_sort_array(EfunArgs& f, array_t* arr, Arg how) {
+vm::Value f_sort_array(vm::EfunArgs& f, array_t* arr, vm::Arg how) {
   check_for_destr(arr);
 
   switch (how.type()) {
     case T_NUMBER: {
       /* held while the builtin comparator runs: it error()s on a mixed array */
-      Value sorted = Value::refed(copy_array(arr));
+      vm::Value sorted = vm::Value::refed(copy_array(arr));
       builtin_sort_array(sorted->u.arr, how.number());
       return sorted;
     }
@@ -1222,7 +1223,7 @@ Value f_sort_array(EfunArgs& f, array_t* arr, Arg how) {
       sort_array_ftc = &ftc;
       f.process_callback(1, &ftc);
 
-      Value sorted = Value::refed(copy_array(arr));
+      vm::Value sorted = vm::Value::refed(copy_array(arr));
       array_t* tmp = sorted->u.arr;
       if (CONFIG_INT(__RC_SANE_SORTING__)) {
         qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
@@ -1232,7 +1233,7 @@ Value f_sort_array(EfunArgs& f, array_t* arr, Arg how) {
       return sorted;
     }
   }
-  return Value::addref(arr); /* unreachable: the spec admits only the cases above */
+  return vm::Value::addref(arr); /* unreachable: the spec admits only the cases above */
 }
 #endif
 
@@ -2111,7 +2112,7 @@ array_t* livings() {
 #endif
 
 #ifdef F_OBJECTS
-Value f_objects(EfunArgs&, std::optional<Arg> filter) {
+vm::Value f_objects(vm::EfunArgs&, std::optional<vm::Arg> filter) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2146,7 +2147,7 @@ Value f_objects(EfunArgs&, std::optional<Arg> filter) {
       }
       if (!v || (current_object->flags & O_DESTRUCTED)) {
         pop_stack(); /* the list */
-        return Value::refed(&the_null_array);
+        return vm::Value::refed(&the_null_array);
       }
       if (v->type == T_NUMBER && !v->u.number) {
         list[i] = nullptr;
@@ -2170,6 +2171,6 @@ Value f_objects(EfunArgs&, std::optional<Arg> filter) {
   }
 
   pop_stack(); /* the list */
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 #endif

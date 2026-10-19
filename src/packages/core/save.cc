@@ -3,7 +3,8 @@
 #include "base/package_api.h"
 
 #ifdef F_SAVE_OBJECT
-Value f_save_object(EfunArgs&, std::optional<Arg> target, std::optional<LPC_INT> flag_arg) {
+vm::Value f_save_object(vm::EfunArgs&, std::optional<vm::Arg> target,
+                        std::optional<LPC_INT> flag_arg) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int flag = 0;
@@ -24,12 +25,12 @@ Value f_save_object(EfunArgs&, std::optional<Arg> target, std::optional<LPC_INT>
   }
   char* saved = new_string(max_string_length, "save_object_str");
   /* Hold the scratch buffer in a Value so an error() in the save frees it. */
-  Value scratch = Value::str_malloced(saved);
+  vm::Value scratch = vm::Value::str_malloced(saved);
   flag = save_object_str(current_object, flag, saved, max_string_length);
   if (flag) {
-    return Value::str_malloced(string_copy(saved, "save_object_str2"));
+    return vm::Value::str_malloced(string_copy(saved, "save_object_str2"));
   }
-  return Value::undefined();
+  return vm::Value::undefined();
 }
 #endif
 
@@ -52,14 +53,14 @@ char* save_variable(svalue_t* var) {
 }
 
 #ifdef F_SAVE_VARIABLE
-Value f_save_variable(EfunArgs&, Arg value) {
+vm::Value f_save_variable(vm::EfunArgs&, vm::Arg value) {
   char* p = save_variable(value.sv());
-  return Value::str_malloced(p);
+  return vm::Value::str_malloced(p);
 }
 #endif
 
 #ifdef F_RESTORE_OBJECT
-Value f_restore_object(EfunArgs&, StringArg file, std::optional<LPC_INT> flag_arg) {
+vm::Value f_restore_object(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT> flag_arg) {
   int flag = flag_arg ? static_cast<int>(*flag_arg) : 0;
   flag = restore_object(current_object, file.c_str(), flag);
   return flag;
@@ -67,7 +68,7 @@ Value f_restore_object(EfunArgs&, StringArg file, std::optional<LPC_INT> flag_ar
 #endif
 
 #ifdef F_RESTORE_VARIABLE
-Value f_restore_variable(EfunArgs& f, StringArg saved) {
+vm::Value f_restore_variable(vm::EfunArgs& f, vm::StringArg saved) {
   svalue_t v;
 
   /* restore_variable() edits the text in place: give the argument's slot a
@@ -78,6 +79,6 @@ Value f_restore_variable(EfunArgs& f, StringArg saved) {
 
   // unlinked string
   restore_variable(&v, const_cast<char*>(saved.c_str()));
-  return Value::owned(v);
+  return vm::Value::owned(v);
 }
 #endif

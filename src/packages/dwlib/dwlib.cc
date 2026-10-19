@@ -6,7 +6,8 @@
 extern object_t* find_living_object(const char*, int);
 
 /* Hideous mangling of C code by Taffyd. */
-Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int quiet, int dark) {
+vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int quiet,
+                               int dark) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char m[] = "$M$";
   char s[] = "_short";
@@ -30,7 +31,7 @@ Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int q
   if (!size) {
     str = new_string(0, "f_query_multiple_short");
     str[0] = '\0';
-    return Value::str_malloced(str);
+    return vm::Value::str_malloced(str);
   }
 
   /*
@@ -44,13 +45,13 @@ Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int q
 
   if (no_dollars && arr->item->type == T_OBJECT && !dark && command_giver && command_giver->super) {
     /* check_dark(query_light()), passing 0 when there is no query_light() */
-    CallResult light = LPCCall().apply("query_light", command_giver->super, ORIGIN_EFUN);
-    LPCCall check;
+    vm::CallResult light = vm::Call().apply("query_light", command_giver->super, ORIGIN_EFUN);
+    vm::Call check;
     check.push(light.take());
-    CallResult v = check.apply("check_dark", command_giver, ORIGIN_EFUN);
+    vm::CallResult v = check.apply("check_dark", command_giver, ORIGIN_EFUN);
 
     if (v && v->type == T_NUMBER && v->u.number) {
-      return Value::str_copy("some objects you cannot make out");
+      return vm::Value::str_copy("some objects you cannot make out");
     }
   }
 
@@ -86,9 +87,9 @@ Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int q
 
     for (i = 0; i < size; i++) {
       sv = (arr->item + i);
-      LPCCall call;
+      vm::Call call;
       call.push(quiet);
-      CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
+      vm::CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
 
       if (!v || v->type != T_STRING) {
         continue;
@@ -112,7 +113,7 @@ Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int q
     FREE_MSTR(str);
     FREE_MSTR(fun);
 
-    return Value::str_malloced(res);
+    return vm::Value::str_malloced(res);
   }
 
   /* This is a mixed array, so we don't use $M$ format.  Instead, we
@@ -134,9 +135,9 @@ Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int q
         }
         break;
       case T_OBJECT: {
-        LPCCall call;
+        vm::Call call;
         call.push(quiet);
-        CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
+        vm::CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
 
         if (!v || v->type != T_STRING) {
           continue;
@@ -190,40 +191,41 @@ Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int q
   if (no_dollars) {
     if (command_giver) {
       /* We need to call on this_player(). */
-      LPCCall call;
-      call.push(Value::str_malloced(res));
-      CallResult v = call.apply("convert_message", command_giver, ORIGIN_EFUN);
+      vm::Call call;
+      call.push(vm::Value::str_malloced(res));
+      vm::CallResult v = call.apply("convert_message", command_giver, ORIGIN_EFUN);
 
       if (v && v->type == T_STRING) {
-        return Value::str_make_shared(v->u.string);
+        return vm::Value::str_make_shared(v->u.string);
       }
-      return Value::undefined();
+      return vm::Value::undefined();
     }
     /* We need to find /global/player. */
     /* Does this work? Seems not to. */
     ob = find_object("/global/player");
 
     if (ob) {
-      LPCCall call;
-      call.push(Value::str_malloced(res));
-      CallResult v = call.apply("convert_message", ob, ORIGIN_EFUN);
+      vm::Call call;
+      call.push(vm::Value::str_malloced(res));
+      vm::CallResult v = call.apply("convert_message", ob, ORIGIN_EFUN);
 
       /* Return the result! */
       if (v && v->type == T_STRING) {
-        return Value::str_make_shared(v->u.string);
+        return vm::Value::str_make_shared(v->u.string);
       }
-      return Value::undefined();
+      return vm::Value::undefined();
     }
     /* res was never handed off -- free it. */
     FREE_MSTR(res);
-    return Value::undefined();
+    return vm::Value::undefined();
   }
-  return Value::str_malloced(res);
+  return vm::Value::str_malloced(res);
 } /* query_multiple_short() */
 
-Value f_query_multiple_short(EfunArgs&, array_t* arr, std::optional<Arg> type_arg,
-                             std::optional<LPC_INT> no_dollars_arg, std::optional<LPC_INT> quiet_arg,
-                             std::optional<LPC_INT> dark_arg) {
+vm::Value f_query_multiple_short(vm::EfunArgs&, array_t* arr, std::optional<vm::Arg> type_arg,
+                                 std::optional<LPC_INT> no_dollars_arg,
+                                 std::optional<LPC_INT> quiet_arg,
+                                 std::optional<LPC_INT> dark_arg) {
   const char* type = nullptr;
   int no_dollars = 0, quiet = 0, dark = 0;
 
@@ -271,13 +273,13 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   int ret = 0;
 
   /* Check to see whether we're invisible */
-  CallResult v = LPCCall().apply("query_invis", referee, ORIGIN_EFUN);
+  vm::CallResult v = vm::Call().apply("query_invis", referee, ORIGIN_EFUN);
 
   if (v && v->type == T_NUMBER) {
     invis = v->u.number;
   }
   /* And if we're a creator. */
-  v = LPCCall().apply("query_creator", referee, ORIGIN_EFUN);
+  v = vm::Call().apply("query_creator", referee, ORIGIN_EFUN);
 
   if (v && v->type == T_NUMBER) {
     referee_creator = v->u.number;
@@ -301,15 +303,15 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
    * across the applies below.
    */
 
-  CallResult referee_name_v = LPCCall().apply("query_name", referee, ORIGIN_EFUN);
+  vm::CallResult referee_name_v = vm::Call().apply("query_name", referee, ORIGIN_EFUN);
 
   if (referee_name_v && referee_name_v->type == T_STRING) {
     referee_name = referee_name_v->u.string;
   }
 
-  CallResult referrer_name_v(CallResult::kNotFound);
+  vm::CallResult referrer_name_v(vm::CallResult::kNotFound);
   if (referrer_obj && !referrer_name) {
-    referrer_name_v = LPCCall().apply("query_name", referrer_obj, ORIGIN_EFUN);
+    referrer_name_v = vm::Call().apply("query_name", referrer_obj, ORIGIN_EFUN);
 
     if (referrer_name_v && referrer_name_v->type == T_STRING) {
       referrer_name = referrer_name_v->u.string;
@@ -324,8 +326,8 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   playtester_handler = find_object(PLAYTESTER_HANDLER);
 
   if (playtester_handler) {
-    LPCCall call;
-    call.push(Value::str_copy(referrer_name));
+    vm::Call call;
+    call.push(vm::Value::str_copy(referrer_name));
     v = call.apply("query_playtester", playtester_handler, ORIGIN_EFUN);
 
     if (v && v->type == T_NUMBER) {
@@ -333,7 +335,7 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
     }
   }
 
-  v = LPCCall().apply("query_allowed", referee, ORIGIN_EFUN);
+  v = vm::Call().apply("query_allowed", referee, ORIGIN_EFUN);
   // printf("allow refs:%d\n", v->u.arr->ref);
   if (v && v->type == T_ARRAY) {
     vec = v->u.arr;
@@ -374,8 +376,8 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
     case 3: {
       /* Check for High Lord Invis. */
 
-      LPCCall call;
-      call.push(Value::str_copy(referrer_name));
+      vm::Call call;
+      call.push(vm::Value::str_copy(referrer_name));
       v = call.apply("high_programmer", master_ob, ORIGIN_EFUN);
 
       if (v && v->type == T_NUMBER) {
@@ -386,8 +388,8 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
     case 2: {
       /* Check for Lord Invis */
 
-      LPCCall call;
-      call.push(Value::str_copy(referrer_name));
+      vm::Call call;
+      call.push(vm::Value::str_copy(referrer_name));
       v = call.apply("query_lord", master_ob, ORIGIN_EFUN);
 
       if (v && v->type == T_NUMBER) {
@@ -398,15 +400,15 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
     case 1: {
       /* Creator Invis */
       if (referrer_obj) {
-        v = LPCCall().apply("query_creator", referrer_obj, ORIGIN_EFUN);
+        v = vm::Call().apply("query_creator", referrer_obj, ORIGIN_EFUN);
 
         if (v && v->type == T_NUMBER) {
           ret = v->u.number;
         }
       } else {
         player_handler = find_object(PLAYER_HANDLER);
-        LPCCall call;
-        call.push(Value::str_copy(referrer_name));
+        vm::Call call;
+        call.push(vm::Value::str_copy(referrer_name));
         v = call.apply("test_creator", player_handler, ORIGIN_EFUN);
 
         if (v && v->type == T_NUMBER) {
@@ -427,13 +429,13 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   return ret;
 }
 
-Value f_reference_allowed(EfunArgs&, object_t* referee, std::optional<Arg> referrer) {
+vm::Value f_reference_allowed(vm::EfunArgs&, object_t* referee, std::optional<vm::Arg> referrer) {
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
   int result = 0;
 #ifndef F_FIND_PLAYER
   /* find_player()'s result; holds the object it returned for the call */
-  CallResult player(CallResult::kNotFound);
+  vm::CallResult player(vm::CallResult::kNotFound);
 #endif
 
   if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
@@ -451,7 +453,7 @@ Value f_reference_allowed(EfunArgs&, object_t* referee, std::optional<Arg> refer
       referrer_obj = find_living_object(referrer->string().c_str(), 1);
 #else
       if (simul_efun_ob) {
-        LPCCall b;
+        vm::Call b;
         b.push(referrer->copy());
         player = b.apply("find_player", simul_efun_ob, ORIGIN_EFUN);
 
@@ -475,10 +477,10 @@ Value f_reference_allowed(EfunArgs&, object_t* referee, std::optional<Arg> refer
     result = reference_allowed(referee, referrer_obj, referrer_name);
     return result;
   }
-  return Value::undefined();
+  return vm::Value::undefined();
 }
 
-Value f_add_a(EfunArgs& f, StringArg str_arg) {
+vm::Value f_add_a(vm::EfunArgs& f, vm::StringArg str_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   const char* str = str_arg.c_str();
   char* ret;
@@ -493,7 +495,7 @@ Value f_add_a(EfunArgs& f, StringArg str_arg) {
 
   // If *str is 0, it was only spaces.  Return "a ".
   if (*str == 0) {
-    return Value::str_copy("a ");
+    return vm::Value::str_copy("a ");
   }
 
   len = strlen(str);
@@ -553,11 +555,11 @@ Value f_add_a(EfunArgs& f, StringArg str_arg) {
 
   // Add the rest of the string.
   memcpy(p, str, len + 1);  // + 1: get the \0.
-  return Value::str_malloced(ret);
+  return vm::Value::str_malloced(ret);
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
-Value f_vowel(EfunArgs&, LPC_INT c) {
+vm::Value f_vowel(vm::EfunArgs&, LPC_INT c) {
   char const v = (char)c;
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
@@ -569,8 +571,8 @@ Value f_vowel(EfunArgs&, LPC_INT c) {
 
 /* Both forms run replace_string()'s body directly. It reads only the
  * window's arity (2 or 3 here, so no range) and its typed strings. */
-Value f_replace(EfunArgs& f, StringArg /* moved out with f.take(0) */, Arg pattern,
-                std::optional<StringArg> replacement) {
+vm::Value f_replace(vm::EfunArgs& f, vm::StringArg /* moved out with f.take(0) */, vm::Arg pattern,
+                    std::optional<vm::StringArg> replacement) {
   int num_arg = f.argc();
   if (pattern.is(T_STRING) && num_arg == 3) {
     return replace_string_value(f.take(0), pattern.string(), *replacement);
@@ -582,11 +584,11 @@ Value f_replace(EfunArgs& f, StringArg /* moved out with f.take(0) */, Arg patte
     }
     /* Apply each [pattern, replacement] pair in turn to the result so far
      * (owned, so a string nothing else references is edited in place). */
-    Value cur = f.take(0);
+    vm::Value cur = f.take(0);
     for (int i = 0; i < arr->size; i += 2) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
-        cur = replace_string_value(std::move(cur), StringArg(&arr->item[i]),
-                                   StringArg(&arr->item[i + 1]));
+        cur = replace_string_value(std::move(cur), vm::StringArg(&arr->item[i]),
+                                   vm::StringArg(&arr->item[i + 1]));
         if (cur.type() != T_STRING) {
           break;
         }
@@ -597,7 +599,7 @@ Value f_replace(EfunArgs& f, StringArg /* moved out with f.take(0) */, Arg patte
   error("Bad arguments for replace.\n");
 }
 
-static Value replace_mxp_html(StringArg str, int html, int mxp) {
+static vm::Value replace_mxp_html(vm::StringArg str, int html, int mxp) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
@@ -639,14 +641,14 @@ static Value replace_mxp_html(StringArg str, int html, int mxp) {
     src++;
   }
   *dst2 = 0;
-  return Value::str_malloced(extend_string(dst, dst2 - dst));
+  return vm::Value::str_malloced(extend_string(dst, dst2 - dst));
 }
 
-Value f_replace_html(EfunArgs&, StringArg str) { return replace_mxp_html(str, 1, 0); }
+vm::Value f_replace_html(vm::EfunArgs&, vm::StringArg str) { return replace_mxp_html(str, 1, 0); }
 
-Value f_replace_mxp(EfunArgs&, StringArg str) { return replace_mxp_html(str, 0, 1); }
+vm::Value f_replace_mxp(vm::EfunArgs&, vm::StringArg str) { return replace_mxp_html(str, 0, 1); }
 
-Value f_roulette_wheel(EfunArgs&, mapping_t* m) {
+vm::Value f_roulette_wheel(vm::EfunArgs&, mapping_t* m) {
   long num;
   int j, found;
   mapping_node_t *elt, **a = m->table;
@@ -692,7 +694,7 @@ Value f_roulette_wheel(EfunArgs&, mapping_t* m) {
   }
 
   // val points to the value that tipped the scale.  val - 1 is the key.
-  return Value::copy(val - 1);
+  return vm::Value::copy(val - 1);
 }
 
 // Appends up to (bufsize - 1 - *len) bytes of `text` to buf[*len..], always
@@ -720,10 +722,10 @@ svalue_t* replace_objects(svalue_t* thing) {
       char buf[2000];
       size_t len = 0;
       append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
-      CallResult tmp(CallResult::kNotFound);
+      vm::CallResult tmp(vm::CallResult::kNotFound);
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
-        LPCCall b;
-        b.push(Value::object(thing->u.ob));
+        vm::Call b;
+        b.push(vm::Value::object(thing->u.ob));
         tmp = b.safe_apply_master(APPLY_OBJECT_NAME);
       } else {
         append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
@@ -742,7 +744,7 @@ svalue_t* replace_objects(svalue_t* thing) {
     case T_ARRAY:
     case T_CLASS: {
       array_t* ar = thing->u.arr;
-      Value nar_owner = Value::refed(allocate_array(ar->size)); /* freed if we error */
+      vm::Value nar_owner = vm::Value::refed(allocate_array(ar->size)); /* freed if we error */
       array_t* nar = nar_owner->u.arr;
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
@@ -753,9 +755,9 @@ svalue_t* replace_objects(svalue_t* thing) {
     }
     case T_MAPPING: {
       /* keys, result and key are owned here, so an error frees them */
-      Value keys_owner = Value::refed(mapping_indices(thing->u.map));
-      Value out_owner = Value::refed(allocate_mapping(thing->u.map->table_size));
-      Value key_owner;
+      vm::Value keys_owner = vm::Value::refed(mapping_indices(thing->u.map));
+      vm::Value out_owner = vm::Value::refed(allocate_mapping(thing->u.map->table_size));
+      vm::Value key_owner;
       array_t* keys = keys_owner->u.arr;
       mapping_t* out = out_owner->u.map;
       for (i = 0; i < keys->size; i++) {
@@ -776,14 +778,14 @@ svalue_t* replace_objects(svalue_t* thing) {
   }
 }
 
-Value f_replace_objects(EfunArgs&, Arg thing) {
+vm::Value f_replace_objects(vm::EfunArgs&, vm::Arg thing) {
   // replace_tmp is a module-global scratch slot: move the result out of it
   // (leaving 0) so no reference lingers there between calls (flagged by the
   // Debug leak checker).
-  return Value::take(replace_objects(thing.sv()));
+  return vm::Value::take(replace_objects(thing.sv()));
 }
 
-Value f_replace_dollars(EfunArgs& f, StringArg str, array_t* arr) {
+vm::Value f_replace_dollars(vm::EfunArgs& f, vm::StringArg str, array_t* arr) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;
@@ -842,6 +844,6 @@ Value f_replace_dollars(EfunArgs& f, StringArg str, array_t* arr) {
   }
 
   strcpy(currentnew, currentold);
-  return Value::str_malloced(
+  return vm::Value::str_malloced(
       extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
 }

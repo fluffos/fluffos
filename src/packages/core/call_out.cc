@@ -271,10 +271,10 @@ void call_out(pending_call_t* cop) {
   }
   /* The callback's arguments: moved out of cop->vs (which owns them until
    * then; `held` releases whatever is left if a push fails). */
-  LPCCall call;
+  vm::Call call;
   if (cop->vs) {
     array_t* vec = cop->vs;
-    Value held = Value::refed(vec);
+    vm::Value held = vm::Value::refed(vec);
     cop->vs = nullptr;
     for (int i = 0; i < vec->size; i++) {
       svalue_t* svp = &vec->item[i];
@@ -284,7 +284,7 @@ void call_out(pending_call_t* cop) {
       }
       svalue_t arg = *svp;
       *svp = const0;
-      call.push(Value::owned(arg));
+      call.push(vm::Value::owned(arg));
     }
   }
 
@@ -294,7 +294,7 @@ void call_out(pending_call_t* cop) {
   save_command_giver(new_command_giver);
   /* current object no longer set */
   /* timer-only: nothing to call; the delay elapsing IS the result */
-  CallResult ret{Value(0)};
+  vm::CallResult ret{vm::Value(0)};
   if (cop->ob && !cop->function.s) {
     DBG_CALLOUT("  func: <timer>\n");
   } else if (cop->ob) {
@@ -714,7 +714,7 @@ void reclaim_call_outs() {
 }
 
 namespace {
-Value int_call_out(bool walltime, EfunArgs& f, Arg fun) {
+vm::Value int_call_out(bool walltime, vm::EfunArgs& f, vm::Arg fun) {
   int num_arg = f.argc();
   /* call_out(delay) with no callback is the PROMISE form (issue #1319): it
    * registers a timer-only call_out and returns a promise fulfilled (with 0)
@@ -735,7 +735,7 @@ Value int_call_out(bool walltime, EfunArgs& f, Arg fun) {
   if (!timer_form && (num_arg < 2 || (!f[1].is(T_NUMBER) && !f[1].is(T_REAL)))) {
     error("%s: argument 2 (the delay) must be int or float.\n", efun_name);
   }
-  Arg delay_arg = timer_form ? fun : f[1];
+  vm::Arg delay_arg = timer_form ? fun : f[1];
   int const num = timer_form ? 0 : num_arg - 2;
   LPC_INT ret;
 
@@ -787,7 +787,7 @@ Value int_call_out(bool walltime, EfunArgs& f, Arg fun) {
       err.u.string = "*call_out was removed before it ran";
       promise_settle(p, &err, 1);
     }
-    return Value::refed(p);
+    return vm::Value::refed(p);
   }
 
   if (!(current_object->flags & O_DESTRUCTED)) {
@@ -805,13 +805,13 @@ Value int_call_out(bool walltime, EfunArgs& f, Arg fun) {
 }  // namespace
 
 #ifdef F_CALL_OUT
-Value f_call_out(EfunArgs& f, Arg fun) { return int_call_out(false, f, fun); }
+vm::Value f_call_out(vm::EfunArgs& f, vm::Arg fun) { return int_call_out(false, f, fun); }
 #endif
 
 #ifdef F_CALL_OUT_WALLTIME
-Value f_call_out_walltime(EfunArgs& f, Arg fun) { return int_call_out(true, f, fun); }
+vm::Value f_call_out_walltime(vm::EfunArgs& f, vm::Arg fun) { return int_call_out(true, f, fun); }
 #endif
 
 #ifdef F_CALL_OUT_INFO
-Value f_call_out_info(EfunArgs&) { return Value::refed(get_all_call_outs()); }
+vm::Value f_call_out_info(vm::EfunArgs&) { return vm::Value::refed(get_all_call_outs()); }
 #endif

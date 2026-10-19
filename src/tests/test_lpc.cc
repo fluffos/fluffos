@@ -79,15 +79,15 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
 TEST_F(DriverTest, ValueOwnsItsReference) {
   array_t* arr = allocate_array(1);
   {
-    Value held = Value::addref(arr);
+    vm::Value held = vm::Value::addref(arr);
     EXPECT_EQ(arr->ref, 2u);
-    Value moved = std::move(held);
+    vm::Value moved = std::move(held);
     EXPECT_EQ(held.type(), T_NUMBER);
     EXPECT_EQ(moved.type(), T_ARRAY);
     EXPECT_EQ(arr->ref, 2u);
     svalue_t raw = moved.release();
     EXPECT_EQ(moved.type(), T_NUMBER);
-    Value back = Value::owned(raw);
+    vm::Value back = vm::Value::owned(raw);
     EXPECT_EQ(arr->ref, 2u);
   }
   EXPECT_EQ(arr->ref, 1u);
@@ -100,7 +100,7 @@ TEST_F(DriverTest, ValueIsReleasedByAnErrorUnwind) {
   error_context_t econ{};
   save_context(&econ);
   try {
-    Value held = Value::addref(arr);
+    vm::Value held = vm::Value::addref(arr);
     error("ValueIsReleasedByAnErrorUnwind\n");
   } catch (...) {
     errored = true;
@@ -114,12 +114,12 @@ TEST_F(DriverTest, ValueIsReleasedByAnErrorUnwind) {
   free_array(arr);
 }
 
-TEST_F(DriverTest, LPCCallPopsPushesItNeverHandsToACall) {
+TEST_F(DriverTest, CallPopsPushesItNeverHandsToACall) {
   svalue_t* const before = sp;
   array_t* arr = allocate_array(1);
   {
-    LPCCall call;
-    call.push(Value::addref(arr));
+    vm::Call call;
+    call.push(vm::Value::addref(arr));
     call.push(1);
     EXPECT_EQ(sp, before + 2);
     EXPECT_EQ(call.arg(1).number(), 1);
@@ -130,7 +130,7 @@ TEST_F(DriverTest, LPCCallPopsPushesItNeverHandsToACall) {
   free_array(arr);
 }
 
-TEST_F(DriverTest, LPCCallReleasesPushesOnAnErrorUnwind) {
+TEST_F(DriverTest, CallReleasesPushesOnAnErrorUnwind) {
   svalue_t* const before = sp;
   array_t* arr = allocate_array(1);
   /* buried: something was left pushed over the pending arguments when the
@@ -141,13 +141,13 @@ TEST_F(DriverTest, LPCCallReleasesPushesOnAnErrorUnwind) {
     error_context_t econ{};
     save_context(&econ);
     try {
-      LPCCall call;
-      call.push(Value::addref(arr));
+      vm::Call call;
+      call.push(vm::Value::addref(arr));
       call.push(1);
       if (buried) {
         push_number(2);
       }
-      error("LPCCallReleasesPushesOnAnErrorUnwind\n");
+      error("CallReleasesPushesOnAnErrorUnwind\n");
     } catch (...) {
       errored = true;
       restore_context(&econ);
@@ -170,39 +170,39 @@ TEST_F(DriverTest, CallResultStatuses) {
     ASSERT_NE(ob, nullptr);
 
     {
-      LPCCall call;
-      call.push(Value::str_copy("x"));
+      vm::Call call;
+      call.push(vm::Value::str_copy("x"));
       call.push(7);
-      CallResult r = call.apply("echo", ob, ORIGIN_DRIVER);
+      vm::CallResult r = call.apply("echo", ob, ORIGIN_DRIVER);
       ASSERT_TRUE(r.ok());
       ASSERT_EQ(r->type, T_STRING);
       EXPECT_STREQ(r->u.string, "x7");
       /* an owned copy: another call does not disturb it */
-      CallResult other = LPCCall().apply("no_such_function", ob, ORIGIN_DRIVER);
-      EXPECT_EQ(other.status(), CallResult::kNotFound);
+      vm::CallResult other = vm::Call().apply("no_such_function", ob, ORIGIN_DRIVER);
+      EXPECT_EQ(other.status(), vm::CallResult::kNotFound);
       EXPECT_EQ(other.get(), nullptr);
       EXPECT_FALSE(other);
       EXPECT_STREQ(r->u.string, "x7");
-      Value taken = r.take();
+      vm::Value taken = r.take();
       EXPECT_EQ(taken.type(), T_STRING);
     }
     {
-      CallResult r = LPCCall().safe_apply("boom", ob, ORIGIN_DRIVER);
-      EXPECT_EQ(r.status(), CallResult::kError);
+      vm::CallResult r = vm::Call().safe_apply("boom", ob, ORIGIN_DRIVER);
+      EXPECT_EQ(r.status(), vm::CallResult::kError);
     }
     {
       object_t* saved = master_ob;
       master_ob = nullptr;
-      LPCCall call;
+      vm::Call call;
       call.push(1);
-      CallResult r = call.safe_apply_master(APPLY_VALID_READ);
-      CallResult r2 = LPCCall().apply_master(APPLY_VALID_READ);
+      vm::CallResult r = call.safe_apply_master(APPLY_VALID_READ);
+      vm::CallResult r2 = vm::Call().apply_master(APPLY_VALID_READ);
       master_ob = saved;
-      EXPECT_EQ(r.status(), CallResult::kNoMaster);
-      EXPECT_EQ(r2.status(), CallResult::kNoMaster);
+      EXPECT_EQ(r.status(), vm::CallResult::kNoMaster);
+      EXPECT_EQ(r2.status(), vm::CallResult::kNoMaster);
       EXPECT_TRUE(master_approved(r, "CallResultStatuses"));
     }
-    EXPECT_FALSE(master_approved(CallResult(CallResult::kError), "CallResultStatuses"));
+    EXPECT_FALSE(master_approved(vm::CallResult(vm::CallResult::kError), "CallResultStatuses"));
   });
   EXPECT_EQ(sp, before);
 }
@@ -213,10 +213,10 @@ TEST_F(DriverTest, EfunArgsReplacesItsWindowWithTheResult) {
   push_array(arr); /* the window's reference; arr keeps ours */
   push_number(5);
   {
-    EfunArgs f = EfunArgs::over_top(2, F_SIZEOF);
+    vm::EfunArgs f = vm::EfunArgs::over_top(2, F_SIZEOF);
     EXPECT_EQ(f.argc(), 2);
     EXPECT_EQ(f[1].number(), 5);
-    Value moved = f.take(0);
+    vm::Value moved = f.take(0);
     EXPECT_EQ(f[0].type(), T_NUMBER);
     EXPECT_EQ(arr->ref, 2u);
     f.finish(moved.release());

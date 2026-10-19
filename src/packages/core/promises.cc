@@ -12,11 +12,11 @@
  */
 
 #ifdef F_PROMISE_CREATE
-Value f_promise_create(EfunArgs&) { return Value::refed(promise_alloc()); }
+vm::Value f_promise_create(vm::EfunArgs&) { return vm::Value::refed(promise_alloc()); }
 #endif
 
 #ifdef F_PROMISE_RESOLVE
-void f_promise_resolve(EfunArgs&, promise_t* p, std::optional<Arg> value_arg) {
+void f_promise_resolve(vm::EfunArgs&, promise_t* p, std::optional<vm::Arg> value_arg) {
   if (p->state != PROMISE_PENDING || p->resolving) {
     /* `resolving`: a prior resolve with a still-pending promise committed
      * this promise's fate to the adoption; without the check, a second
@@ -40,7 +40,7 @@ void f_promise_resolve(EfunArgs&, promise_t* p, std::optional<Arg> value_arg) {
 #endif
 
 #ifdef F_PROMISE_REJECT
-void f_promise_reject(EfunArgs&, promise_t* p, std::optional<Arg> reason) {
+void f_promise_reject(vm::EfunArgs&, promise_t* p, std::optional<vm::Arg> reason) {
   if (p->state != PROMISE_PENDING || p->resolving) {
     /* see promise_resolve: an in-flight adoption already commits the fate */
     error("promise_reject: promise is already settled.\n");
@@ -76,7 +76,7 @@ void f_promise_reject(EfunArgs&, promise_t* p, std::optional<Arg> reason) {
 #endif
 
 /* shared body of promise_then() / promise_catch() */
-static Value promise_then_common(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected) {
+static vm::Value promise_then_common(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected) {
   /* Refuse to register more work when the delivery queue is already
    * saturated. Without this a handler that attaches more reactions than the
    * drain retires grows g_promise_microtasks without bound -- one call to a
@@ -113,31 +113,31 @@ static Value promise_then_common(promise_t* p, funptr_t* on_fulfilled, funptr_t*
   }
   promise_add_reaction(p, on_fulfilled, on_rejected, chained, giver);
 
-  return Value::refed(chained);
+  return vm::Value::refed(chained);
 }
 
 #ifdef F_PROMISE_THEN
-Value f_promise_then(EfunArgs&, promise_t* p, std::optional<funptr_t*> on_fulfilled,
-                     std::optional<funptr_t*> on_rejected) {
+vm::Value f_promise_then(vm::EfunArgs&, promise_t* p, std::optional<funptr_t*> on_fulfilled,
+                         std::optional<funptr_t*> on_rejected) {
   return promise_then_common(p, on_fulfilled.value_or(nullptr), on_rejected.value_or(nullptr));
 }
 #endif
 
 #ifdef F_PROMISE_CATCH
-Value f_promise_catch(EfunArgs&, promise_t* p, funptr_t* on_rejected) {
+vm::Value f_promise_catch(vm::EfunArgs&, promise_t* p, funptr_t* on_rejected) {
   return promise_then_common(p, nullptr, on_rejected);
 }
 #endif
 
 #ifdef F_PROMISE_STATUS
-Value f_promise_status(EfunArgs&, promise_t* p) {
+vm::Value f_promise_status(vm::EfunArgs&, promise_t* p) {
   int const state = p->state;
   return state;
 }
 #endif
 
 #ifdef F_PROMISE_RESULT
-Value f_promise_result(EfunArgs&, promise_t* p) {
+vm::Value f_promise_result(vm::EfunArgs&, promise_t* p) {
   if (p->state == PROMISE_PENDING) {
     error("promise_result: promise is still pending.\n");
   }
@@ -145,7 +145,7 @@ Value f_promise_result(EfunArgs&, promise_t* p) {
     /* reading a rejection or cancellation counts as observing it */
     p->handled = true;
   }
-  return Value::copy(&p->result);
+  return vm::Value::copy(&p->result);
 }
 #endif
 
@@ -153,7 +153,7 @@ Value f_promise_result(EfunArgs&, promise_t* p) {
  * its ELEMENTS need checking (AGENTS.md section 2) -- and they need none: a
  * non-promise element is defined to count as already fulfilled with itself,
  * so map() output drops straight in. */
-static Value promise_combinator_efun(array_t* inputs, uint8_t kind) {
+static vm::Value promise_combinator_efun(array_t* inputs, uint8_t kind) {
   if (kind == PROMISE_COMB_RACE && inputs->size == 0) {
     /* JS lets this hang forever. Here a hung await is a parked frame holding
      * its object, its program and one `max suspended async functions` slot
@@ -161,35 +161,35 @@ static Value promise_combinator_efun(array_t* inputs, uint8_t kind) {
     error("promise_race: needs at least one promise; an empty array would never settle.\n");
   }
   promise_t* result = promise_combinator_start(kind, inputs);
-  return Value::refed(result);
+  return vm::Value::refed(result);
 }
 
 #ifdef F_PROMISE_ALL
-Value f_promise_all(EfunArgs&, array_t* inputs) {
+vm::Value f_promise_all(vm::EfunArgs&, array_t* inputs) {
   return promise_combinator_efun(inputs, PROMISE_COMB_ALL);
 }
 #endif
 
 #ifdef F_PROMISE_ANY
-Value f_promise_any(EfunArgs&, array_t* inputs) {
+vm::Value f_promise_any(vm::EfunArgs&, array_t* inputs) {
   return promise_combinator_efun(inputs, PROMISE_COMB_ANY);
 }
 #endif
 
 #ifdef F_PROMISE_RACE
-Value f_promise_race(EfunArgs&, array_t* inputs) {
+vm::Value f_promise_race(vm::EfunArgs&, array_t* inputs) {
   return promise_combinator_efun(inputs, PROMISE_COMB_RACE);
 }
 #endif
 
 #ifdef F_PROMISE_ALL_SETTLED
-Value f_promise_all_settled(EfunArgs&, array_t* inputs) {
+vm::Value f_promise_all_settled(vm::EfunArgs&, array_t* inputs) {
   return promise_combinator_efun(inputs, PROMISE_COMB_ALL_SETTLED);
 }
 #endif
 
 #ifdef F_PROMISE_CANCEL
-Value f_promise_cancel(EfunArgs&, promise_t* p) {
+vm::Value f_promise_cancel(vm::EfunArgs&, promise_t* p) {
   /* validated (and possibly error()ed) before anything is returned */
   int const armed = promise_request_cancel(p);
   return armed;
@@ -197,7 +197,7 @@ Value f_promise_cancel(EfunArgs&, promise_t* p) {
 #endif
 
 #ifdef F_PROMISEP
-Value f_promisep(EfunArgs&, Arg value) {
+vm::Value f_promisep(vm::EfunArgs&, vm::Arg value) {
   /* the argument is `mixed`, so unlike the rest of this file the tag has
    * NOT been validated for us -- that is the question being asked */
   return value.is(T_PROMISE) ? 1 : 0;
@@ -205,22 +205,22 @@ Value f_promisep(EfunArgs&, Arg value) {
 #endif
 
 #ifdef F_ASYNC_YIELD
-Value f_async_yield(EfunArgs&) {
+vm::Value f_async_yield(vm::EfunArgs&) {
   /* No arguments: return the yield promise. */
-  return Value::refed(promise_async_yield());
+  return vm::Value::refed(promise_async_yield());
 }
 #endif
 
 #ifdef F_ASYNC_INFO
-Value f_async_info(EfunArgs&, LPC_INT stats) {
+vm::Value f_async_info(vm::EfunArgs&, LPC_INT stats) {
   /* async_info()  -> one mapping per suspended coroutine (the original form)
    * async_info(1) -> scheduler counters, including the drain's yield count,
    *                  which is the only portable way to observe that the
    *                  drain re-posted itself rather than running on. */
   int const want_stats = stats != 0;
   if (want_stats) {
-    return Value::refed(build_async_scheduler_info());
+    return vm::Value::refed(build_async_scheduler_info());
   }
-  return Value::refed(build_async_info());
+  return vm::Value::refed(build_async_info());
 }
 #endif

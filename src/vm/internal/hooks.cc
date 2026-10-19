@@ -2443,7 +2443,7 @@ void hooks_mark_frame_for_after(object_t* filter_target) {
   }
 }
 
-Value f_hook_proceed(EfunArgs& f, std::optional<array_t*> replacement_args) {
+vm::Value f_hook_proceed(vm::EfunArgs& f, std::optional<array_t*> replacement_args) {
   if (!g_around.active) {
     error("hook_proceed: no active HOOK_AROUND handler.\n");
   }
@@ -2458,18 +2458,18 @@ Value f_hook_proceed(EfunArgs& f, std::optional<array_t*> replacement_args) {
   }
 
   /* Optional replacement args: hook_proceed(mixed *args) */
-  std::vector<Value> use_args;
+  std::vector<vm::Value> use_args;
   if (replacement_args) {
     array_t* arr = *replacement_args;
     use_args.reserve(arr->size);
     for (int i = 0; i < arr->size; i++) {
-      use_args.push_back(Value::copy(&arr->item[i]));
+      use_args.push_back(vm::Value::copy(&arr->item[i]));
     }
     f.pop_back();
   } else {
     use_args.reserve(g_around.saved_args.size());
     for (auto& sv : g_around.saved_args) {
-      use_args.push_back(Value::copy(&sv));
+      use_args.push_back(vm::Value::copy(&sv));
     }
   }
   /* The real body runs on the raw stack above the (now empty) argument
@@ -2486,7 +2486,7 @@ Value f_hook_proceed(EfunArgs& f, std::optional<array_t*> replacement_args) {
 
   for (auto& v : use_args) {
     push_svalue(v.get());
-    v = Value();
+    v = vm::Value();
   }
 
   /* Run the real body; eval_instruction marks this frame FRAME_EXTERNAL so

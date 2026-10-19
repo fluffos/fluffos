@@ -41,7 +41,7 @@ static void store_matrix(array_t* matrix, const Matrix src) {
   }
 }
 
-Value f_id_matrix(EfunArgs&) {
+vm::Value f_id_matrix(vm::EfunArgs&) {
   array_t* matrix;
   int i;
 
@@ -50,10 +50,10 @@ Value f_id_matrix(EfunArgs&) {
     matrix->item[i].type = T_REAL;
     matrix->item[i].u.real = identity[i];
   }
-  return Value::refed(matrix);
+  return vm::Value::refed(matrix);
 }
 
-Value f_translate(EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
+vm::Value f_translate(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
   Matrix current_matrix;
   Matrix trans_matrix;
   Matrix final_matrix;
@@ -69,7 +69,7 @@ Value f_translate(EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FL
   return f.take(0); /* updated in place: the result is the argument */
 }
 
-Value f_scale(EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
+vm::Value f_scale(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
   Matrix current_matrix;
   Matrix scaling_matrix;
   Matrix final_matrix;
@@ -84,7 +84,7 @@ Value f_scale(EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT 
   return f.take(0); /* updated in place: the result is the argument */
 }
 
-Value f_rotate_x(EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
+vm::Value f_rotate_x(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
@@ -99,7 +99,7 @@ Value f_rotate_x(EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   return f.take(0); /* updated in place: the result is the argument */
 }
 
-Value f_rotate_y(EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
+vm::Value f_rotate_y(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
@@ -114,7 +114,7 @@ Value f_rotate_y(EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   return f.take(0); /* updated in place: the result is the argument */
 }
 
-Value f_rotate_z(EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
+vm::Value f_rotate_z(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
@@ -129,7 +129,7 @@ Value f_rotate_z(EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   return f.take(0); /* updated in place: the result is the argument */
 }
 
-Value f_lookat_rotate(EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
+vm::Value f_lookat_rotate(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
   Matrix current_matrix;
   Matrix lookat_matrix;
 
@@ -143,8 +143,8 @@ Value f_lookat_rotate(EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LP
 }
 
 #ifdef F_LOOKAT_ROTATE2
-Value f_lookat_rotate2(EfunArgs& f, array_t* matrix, LPC_FLOAT ex, LPC_FLOAT ey, LPC_FLOAT ez,
-                       LPC_FLOAT lx, LPC_FLOAT ly, LPC_FLOAT lz) {
+vm::Value f_lookat_rotate2(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT ex, LPC_FLOAT ey,
+                           LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly, LPC_FLOAT lz) {
   Matrix current_matrix;
   Matrix lookat_matrix;
 

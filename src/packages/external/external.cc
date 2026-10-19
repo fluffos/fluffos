@@ -110,7 +110,7 @@ struct ChildExitNote {
 std::vector<ChildExitNote> g_exit_notes;
 
 void reject_with_number(promise_t* p, LPC_INT n) {
-  Value reason(n);
+  vm::Value reason(n);
   promise_settle(p, reason.get(), 1);
 }
 
@@ -242,7 +242,7 @@ void free_pipe_events(ExternalHandle* h) {
   close_pipe_fd(&h->err_fd);
 }
 
-Value external_result(const std::string& out, const std::string& err, LPC_INT code) {
+vm::Value external_result(const std::string& out, const std::string& err, LPC_INT code) {
   array_t* arr = allocate_array(3);
   arr->item[0].type = T_STRING;
   arr->item[0].subtype = STRING_MALLOC;
@@ -251,7 +251,7 @@ Value external_result(const std::string& out, const std::string& err, LPC_INT co
   arr->item[1].subtype = STRING_MALLOC;
   arr->item[1].u.string = string_copy(err.c_str(), "external_stderr");
   arr->item[2].u.number = code;
-  return Value::refed(arr);
+  return vm::Value::refed(arr);
 }
 
 void kill_handle_child(ExternalHandle* h) {
@@ -314,7 +314,7 @@ void fulfill_handle_promise(int id) {
   h->prom = nullptr;
   promise_clear_cancel_handler(p);
   {
-    Value result = external_result(h->out, h->err, h->exit_code);
+    vm::Value result = external_result(h->out, h->err, h->exit_code);
     promise_settle(p, result.get(), 0);
   }
   free_promise(p);
@@ -356,7 +356,7 @@ void abort_handle(int id, int kill_child) {
      * and free_promise a second time. */
     promise_clear_cancel_handler(p);
     if (p->state == PROMISE_PENDING) {
-      Value reason = Value::str_constant("*external process aborted");
+      vm::Value reason = vm::Value::str_constant("*external process aborted");
       promise_settle(p, reason.get(), 1);
     }
     free_promise(p);
@@ -1206,7 +1206,7 @@ void mark_external() {
 #endif
 
 #ifdef F_EXTERNAL_CREATE
-Value f_external_create(EfunArgs&, LPC_INT command, Arg args) {
+vm::Value f_external_create(vm::EfunArgs&, LPC_INT command, vm::Arg args) {
   /* Allocation is not privileged; valid_socket is checked at run. */
   int const cmd = validate_cmd_index(command);
   std::vector<std::string> extra;
@@ -1225,7 +1225,7 @@ Value f_external_create(EfunArgs&, LPC_INT command, Arg args) {
 #endif
 
 #ifdef F_EXTERNAL_RUN
-Value f_external_run(EfunArgs&, LPC_INT handle) {
+vm::Value f_external_run(vm::EfunArgs&, LPC_INT handle) {
   int const id = static_cast<int>(handle);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Created) {
@@ -1234,7 +1234,7 @@ Value f_external_run(EfunArgs&, LPC_INT handle) {
   if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
     promise_t* p = promise_alloc();
     reject_with_number(p, EESECURITY);
-    return Value::refed(p);
+    return vm::Value::refed(p);
   }
   /* check_valid_socket() is a master apply: the owner may have been
    * destructed and this slot reused. Re-lookup before spawn. */
@@ -1247,17 +1247,19 @@ Value f_external_run(EfunArgs&, LPC_INT handle) {
   promise_t* p = promise_alloc();
   if (rc < 0) {
     reject_with_number(p, rc);
-    return Value::refed(p);
+    return vm::Value::refed(p);
   }
   h->state = HandleState::Running;
   attach_start_promise(h, id, p);
-  return Value::refed(p);
+  return vm::Value::refed(p);
 }
 #endif
 
 #ifdef F_EXTERNAL_START
-Value f_external_start(EfunArgs& f, LPC_INT command, Arg args, std::optional<Arg> read_callback,
-                       std::optional<Arg> write_callback, std::optional<Arg> close_callback) {
+vm::Value f_external_start(vm::EfunArgs& f, LPC_INT command, vm::Arg args,
+                           std::optional<vm::Arg> read_callback,
+                           std::optional<vm::Arg> write_callback,
+                           std::optional<vm::Arg> close_callback) {
   int const num_arg = f.argc();
 
   if (num_arg == 2) {
@@ -1267,7 +1269,7 @@ Value f_external_start(EfunArgs& f, LPC_INT command, Arg args, std::optional<Arg
     if (!check_valid_socket("external", -1, current_object, "N/A", -1)) {
       promise_t* p = promise_alloc();
       reject_with_number(p, EESECURITY);
-      return Value::refed(p);
+      return vm::Value::refed(p);
     }
     auto which = command;
     if (--which < 0 || which > (g_num_external_cmds - 1) || !external_cmd[which]) {
@@ -1287,7 +1289,7 @@ Value f_external_start(EfunArgs& f, LPC_INT command, Arg args, std::optional<Arg
     g_handles[id - 1] = h;
 
     promise_t* p = start_created_handle(h, id);
-    return Value::refed(p);
+    return vm::Value::refed(p);
   }
 
   if (num_arg != 4 && num_arg != 5) {
@@ -1312,28 +1314,28 @@ Value f_external_start(EfunArgs& f, LPC_INT command, Arg args, std::optional<Arg
 #endif
 
 #ifdef F_EXTERNAL_STDOUT
-Value f_external_stdout(EfunArgs&, LPC_INT handle) {
+vm::Value f_external_stdout(vm::EfunArgs&, LPC_INT handle) {
   ExternalHandle* h = lookup_handle(static_cast<int>(handle), /*require_owner=*/1);
-  return Value::str_copy(h->out.c_str());
+  return vm::Value::str_copy(h->out.c_str());
 }
 #endif
 
 #ifdef F_EXTERNAL_STDERR
-Value f_external_stderr(EfunArgs&, LPC_INT handle) {
+vm::Value f_external_stderr(vm::EfunArgs&, LPC_INT handle) {
   ExternalHandle* h = lookup_handle(static_cast<int>(handle), /*require_owner=*/1);
-  return Value::str_copy(h->err.c_str());
+  return vm::Value::str_copy(h->err.c_str());
 }
 #endif
 
 #ifdef F_EXTERNAL_EXIT_CODE
-Value f_external_exit_code(EfunArgs&, LPC_INT handle) {
+vm::Value f_external_exit_code(vm::EfunArgs&, LPC_INT handle) {
   ExternalHandle* h = lookup_handle(static_cast<int>(handle), /*require_owner=*/1);
   return h->exit_code;
 }
 #endif
 
 #ifdef F_EXTERNAL_KILL
-Value f_external_kill(EfunArgs&, LPC_INT handle) {
+vm::Value f_external_kill(vm::EfunArgs&, LPC_INT handle) {
   int const id = static_cast<int>(handle);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   if (h->state != HandleState::Running || h->status_done) {
@@ -1345,7 +1347,7 @@ Value f_external_kill(EfunArgs&, LPC_INT handle) {
 #endif
 
 #ifdef F_EXTERNAL_CLOSE
-void f_external_close(EfunArgs&, LPC_INT handle) {
+void f_external_close(vm::EfunArgs&, LPC_INT handle) {
   int const id = static_cast<int>(handle);
   lookup_handle(id, /*require_owner=*/1);
   destroy_handle(id, /*kill_child=*/1);
@@ -1353,7 +1355,7 @@ void f_external_close(EfunArgs&, LPC_INT handle) {
 #endif
 
 #ifdef F_EXTERNAL_WRITE
-Value f_external_write(EfunArgs&, LPC_INT handle, StringArg data) {
+vm::Value f_external_write(vm::EfunArgs&, LPC_INT handle, vm::StringArg data) {
   int const id = static_cast<int>(handle);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   int const ok = queue_stdin(h, id, data.c_str(), data.size());
@@ -1362,7 +1364,7 @@ Value f_external_write(EfunArgs&, LPC_INT handle, StringArg data) {
 #endif
 
 #ifdef F_EXTERNAL_CLOSE_STDIN
-void f_external_close_stdin(EfunArgs&, LPC_INT handle) {
+void f_external_close_stdin(vm::EfunArgs&, LPC_INT handle) {
   int const id = static_cast<int>(handle);
   ExternalHandle* h = lookup_handle(id, /*require_owner=*/1);
   h->close_stdin_after_flush = true;

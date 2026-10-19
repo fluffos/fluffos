@@ -548,13 +548,13 @@ static int doprnt(int from, int to) {
 
 static void do_output(char* str) {
 #ifdef RECEIVE_ED
-  LPCCall call;
-  call.push(Value::str_copy(str));
-  call.push(Value::str_copy(P_FNAME));
+  vm::Call call;
+  call.push(vm::Value::str_copy(str));
+  call.push(vm::Value::str_copy(P_FNAME));
   // One could argue that this should be safe_apply()
   // Pro: ed continues to work with a runtiming receive_ed()
   // Con: "I wrote a receive_ed()!  Why does the driver ignore it??"
-  CallResult ret = call.apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
+  vm::CallResult ret = call.apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
   if (!ret) {
     ED_OUTPUTV(ED_DEST, "%s\n", str);
   } else if (ret->type == T_NUMBER) {
@@ -591,7 +591,7 @@ static void free_ed_buffer(object_t* who) {
 
     /* make this "safe" */
     set_eval(max_eval_cost);
-    LPCCall().safe_apply(exit_fn, exit_ob, ORIGIN_INTERNAL);
+    vm::Call().safe_apply(exit_fn, exit_ob, ORIGIN_INTERNAL);
     FREE(exit_fn);
     free_object(&exit_ob, "ed EOF");
     return;
@@ -772,11 +772,11 @@ static int dowrite(int from, int to, const char* fname, int apflg) {
 
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {
-    LPCCall call;
-    call.push(Value::str_malloced(add_slash(fname)));
+    vm::Call call;
+    call.push(vm::Value::str_malloced(add_slash(fname)));
     call.push(0);
     set_eval(max_eval_cost);
-    CallResult res = call.safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, ORIGIN_INTERNAL);
+    vm::CallResult res = call.safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, ORIGIN_INTERNAL);
     if (IS_ZERO(res)) {
       return (EDERR);
     }
@@ -822,8 +822,8 @@ static int dowrite(int from, int to, const char* fname, int apflg) {
 
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {
-    LPCCall call;
-    call.push(Value::str_malloced(add_slash(fname)));
+    vm::Call call;
+    call.push(vm::Value::str_malloced(add_slash(fname)));
     call.push(1);
     set_eval(max_eval_cost);
     call.safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, ORIGIN_INTERNAL);
@@ -897,10 +897,10 @@ static char* getfn(int writeflg) {
   }
 
   if (file[0] != '/') {
-    LPCCall call;
-    call.push(Value::str_copy(file));
+    vm::Call call;
+    call.push(vm::Value::str_copy(file));
     /* no master, no such apply, or not a string: give up */
-    CallResult ret = call.apply_master(APPLY_MAKE_PATH_ABSOLUTE);
+    vm::CallResult ret = call.apply_master(APPLY_MAKE_PATH_ABSOLUTE);
     if (!ret || ret->type != T_STRING) {
       return nullptr;
     }
@@ -1340,10 +1340,10 @@ static int set() {
     if (P_RESTRICT) {
       return (SET_FAIL);
     }
-    LPCCall call;
-    call.push(Value::object(current_editor));
+    vm::Call call;
+    call.push(vm::Value::object(current_editor));
     call.push(P_SHIFTWIDTH | P_FLAGS);
-    CallResult ret = call.apply_master(APPLY_SAVE_ED_SETUP);
+    vm::CallResult ret = call.apply_master(APPLY_SAVE_ED_SETUP);
     if (MASTER_APPROVED(ret, "save_ed_setup")) {
       return 0;
     }
@@ -2493,9 +2493,9 @@ void ed_start(const char* file_arg, const char* write_fn, const char* exit_fn, i
 
   ED_BUFFER->flags |= EIGHTBIT_MASK;
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
-  LPCCall setup_call;
-  setup_call.push(Value::object(current_editor));
-  CallResult setup = setup_call.apply_master(APPLY_RETRIEVE_ED_SETUP);
+  vm::Call setup_call;
+  setup_call.push(vm::Value::object(current_editor));
+  vm::CallResult setup = setup_call.apply_master(APPLY_RETRIEVE_ED_SETUP);
   if (setup && setup->type == T_NUMBER && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
@@ -2665,11 +2665,11 @@ void save_ed_buffer(object_t* who) {
   current_ed_buffer = who->interactive->ed_buffer;
   current_editor = who;
 
-  LPCCall call;
-  call.push(Value::str_malloced(add_slash(P_FNAME)));
-  call.push(Value::object(who));
+  vm::Call call;
+  call.push(vm::Value::str_malloced(add_slash(P_FNAME)));
+  call.push(vm::Value::object(who));
   /* must be safe; we get called by remove_interactive() */
-  CallResult stmp = call.safe_apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
+  vm::CallResult stmp = call.safe_apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
   if (stmp) {
     if (stmp->type == T_STRING) {
       fname = stmp->u.string;
@@ -3027,13 +3027,13 @@ that help is desired for. \n",
               ED_BUFFER->scroll_lines - 1, ED_BUFFER->scroll_lines + 4);
 
 #ifdef RECEIVE_ED
-      LPCCall call;
-      call.push(Value::str_copy(edout));
-      call.push(Value::undefined());
+      vm::Call call;
+      call.push(vm::Value::str_copy(edout));
+      call.push(vm::Value::undefined());
 
       /* outstr may point into ret's string below: ret lives to the end of
        * the switch */
-      CallResult ret = call.apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
+      vm::CallResult ret = call.apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
       if (!ret) {
         outstr = edout;
       } else if (ret->type == T_NUMBER) {
@@ -3220,9 +3220,9 @@ char* object_ed_start(object_t* ob, const char* fname, int restricted, int scrol
   ED_BUFFER->flags |= EIGHTBIT_MASK;
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
 
-  LPCCall setup_call;
-  setup_call.push(Value::object(current_editor));
-  CallResult setup = setup_call.apply_master(APPLY_RETRIEVE_ED_SETUP);
+  vm::Call setup_call;
+  setup_call.push(vm::Value::object(current_editor));
+  vm::CallResult setup = setup_call.apply_master(APPLY_RETRIEVE_ED_SETUP);
   if (setup && setup->type == T_NUMBER && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
@@ -3265,9 +3265,9 @@ void object_save_ed_buffer(object_t* ob) {
   current_ed_buffer = find_ed_buffer(ob);
   current_editor = ob;
 
-  LPCCall call;
-  call.push(Value::str_copy(P_FNAME));
-  CallResult stmp = call.apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
+  vm::Call call;
+  call.push(vm::Value::str_copy(P_FNAME));
+  vm::CallResult stmp = call.apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
   if (stmp) {
     if (stmp->type == T_STRING) {
       fname = stmp->u.string;
@@ -3345,8 +3345,8 @@ char* object_ed_cmd(object_t* ob, const char* str) {
 /* The spec types each position (string, then string|int twice, then int
  * twice), so only the checks it cannot express remain: which of the
  * string|int positions must be a string in each calling form. */
-void f_ed(EfunArgs& f, std::optional<StringArg> fname, std::optional<Arg> arg2,
-          std::optional<Arg> arg3, std::optional<LPC_INT> arg4, std::optional<LPC_INT> arg5) {
+void f_ed(vm::EfunArgs& f, std::optional<vm::StringArg> fname, std::optional<vm::Arg> arg2,
+          std::optional<vm::Arg> arg3, std::optional<LPC_INT> arg4, std::optional<LPC_INT> arg5) {
   int num_arg = f.argc();
   if (!command_giver || !command_giver->interactive) {
     return;
@@ -3417,7 +3417,7 @@ void f_ed(EfunArgs& f, std::optional<StringArg> fname, std::optional<Arg> arg2,
 #endif
 
 #ifdef F_ED_CMD
-Value f_ed_cmd(EfunArgs&, StringArg cmd) {
+vm::Value f_ed_cmd(vm::EfunArgs&, vm::StringArg cmd) {
   char* res;
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3431,15 +3431,15 @@ Value f_ed_cmd(EfunArgs&, StringArg cmd) {
   res = object_ed_cmd(current_object, cmd.c_str());
 
   if (res) {
-    return Value::str_malloced(res);
+    return vm::Value::str_malloced(res);
   }
-  return Value::str_constant("");
+  return vm::Value::str_constant("");
 }
 #endif
 
 #ifdef F_ED_START
-Value f_ed_start(EfunArgs&, std::optional<StringArg> file, std::optional<LPC_INT> arg2,
-                 std::optional<LPC_INT> arg3) {
+vm::Value f_ed_start(vm::EfunArgs&, std::optional<vm::StringArg> file, std::optional<LPC_INT> arg2,
+                     std::optional<LPC_INT> arg3) {
   char* res;
   const char* fname = nullptr;
   int restr = 0;
@@ -3471,14 +3471,14 @@ Value f_ed_start(EfunArgs&, std::optional<StringArg> file, std::optional<LPC_INT
   res = object_ed_start(current_object, fname, restr, scroll_lines);
 
   if (res) {
-    return Value::str_malloced(res);
+    return vm::Value::str_malloced(res);
   }
-  return Value::str_constant("");
+  return vm::Value::str_constant("");
 }
 #endif
 
 #ifdef F_IN_EDIT
-Value f_in_edit(EfunArgs&, object_t* ob) {
+vm::Value f_in_edit(vm::EfunArgs&, object_t* ob) {
   char* fn;
   ed_buffer_t* eb = nullptr;
 
@@ -3492,7 +3492,7 @@ Value f_in_edit(EfunArgs&, object_t* ob) {
   }
 #endif
   if (eb && (fn = eb->fname)) {
-    return Value::str_malloced(add_slash(fn));
+    return vm::Value::str_malloced(add_slash(fn));
   }
   return 0;
 }

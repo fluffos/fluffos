@@ -4,7 +4,7 @@
  *              destructor releases what it still holds, including during an
  *              error() unwind (error() is a C++ throw), so a Value cannot
  *              leak the way a raw svalue_t local does. An efun returns one,
- *              LPCCall::push() takes one, a CallResult holds one.
+ *              Call::push() takes one, a CallResult holds one.
  *
  *   StringArg  A borrowed LPC string. c_str() is NUL-terminated; size() is
  *              the byte length, read from the string's header rather than
@@ -31,6 +31,9 @@
  * The borrowing views point into the stack slot of a live argument. They
  * are valid until that slot is released: the efun returns, or calls
  * EfunArgs::pop_back()/take() on it.
+ *
+ * All of it lives in namespace vm, with efun_args.h's EfunArgs, Call and
+ * CallResult; code outside the namespace spells the names out (vm::Value).
  */
 
 #ifndef VM_VALUE_H
@@ -48,6 +51,8 @@ struct mapping_t;
 struct buffer_t;
 struct funptr_t;
 struct promise_t;
+
+namespace vm {
 
 class Value {
  public:
@@ -264,5 +269,7 @@ class Arg {
 
   svalue_t* sv_;
 };
+
+}  // namespace vm
 
 #endif /* VM_VALUE_H */

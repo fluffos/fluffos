@@ -54,7 +54,7 @@ static inline void sha1_hash_block(const unsigned char* block, uint32_t* h0, uin
   *h4 += e;
 }
 
-Value f_sha1(EfunArgs&, Arg input) {
+vm::Value f_sha1(vm::EfunArgs&, vm::Arg input) {
   uint32_t h0, h1, h2, h3, h4;
   const unsigned char* str;
   unsigned char final[128] = {0};
@@ -110,6 +110,6 @@ Value f_sha1(EfunArgs&, Arg input) {
   }
 
   sprintf(reinterpret_cast<char*>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
-  return Value::str_malloced(string_copy((char*) final, "f_sha1"));
+  return vm::Value::str_malloced(string_copy((char*) final, "f_sha1"));
 }
 #endif

@@ -1363,18 +1363,18 @@ void f_function_constructor() {
   push_refed_funp(fp);
 }
 
-Value f__evaluate(EfunArgs& f, Arg fun) {
+vm::Value f__evaluate(vm::EfunArgs& f, vm::Arg fun) {
   if (!fun.is(T_FUNCTION)) {
     return f.take(0); /* anything else evaluates to itself */
   }
   if (current_object->flags & O_DESTRUCTED) {
-    return Value::undefined();
+    return vm::Value::undefined();
   }
   /* the call consumes the trailing arguments; its result is moved out of
    * the shared return slot */
   svalue_t* v = call_function_pointer(fun.funptr(), f.argc() - 1);
   f.resync();
-  return Value::take(v);
+  return vm::Value::take(v);
 }
 
 void f_sscanf() {

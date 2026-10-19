@@ -17,11 +17,11 @@ enum { MAX_COLOUR_STRING = 200 };
 /* should be done in configure */
 
 #ifdef F_REAL_TIME
-Value f_real_time(EfunArgs&) { return static_cast<LPC_INT>(time(nullptr)); }
+vm::Value f_real_time(vm::EfunArgs&) { return static_cast<LPC_INT>(time(nullptr)); }
 #endif
 
 #ifdef F_COMPRESSEDP
-Value f_compressedp(EfunArgs&, object_t* ob) {
+vm::Value f_compressedp(vm::EfunArgs&, object_t* ob) {
   int i;
 
   i = ob->interactive && (ob->interactive->iflags & USING_COMPRESS);
@@ -36,7 +36,7 @@ Value f_compressedp(EfunArgs&, object_t* ob) {
  * substantially faster.
  */
 #ifdef F_NAMED_LIVINGS
-Value f_named_livings(EfunArgs&) {
+vm::Value f_named_livings(vm::EfunArgs&) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   int const table_size = CONFIG_INT(__LIVING_HASH_TABLE_SIZE__);
   object_t* ob;
@@ -84,13 +84,13 @@ Value f_named_livings(EfunArgs&) {
     vec->item[k].u.ob = found[k];
     add_ref(found[k], "livings");
   }
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 #endif
 
 /* I forgot who wrote this, please claim it :) */
 #ifdef F_REMOVE_SHADOW
-Value f_remove_shadow(EfunArgs&, object_t* ob) {
+vm::Value f_remove_shadow(vm::EfunArgs&, object_t* ob) {
   if (ob == nullptr || (ob->shadowing == nullptr && ob->shadowed == nullptr)) {
     return 0;
   } else {
@@ -109,15 +109,15 @@ Value f_remove_shadow(EfunArgs&, object_t* ob) {
 /* This was originally written my Malic for Demon.  I rewrote parts of it
    when I added it (added function support, etc) -Beek */
 #ifdef F_QUERY_NOTIFY_FAIL
-Value f_query_notify_fail(EfunArgs&) {
+vm::Value f_query_notify_fail(vm::EfunArgs&) {
   const char* p;
 
   if (command_giver && command_giver->interactive) {
     if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
-      return Value::addref(command_giver->interactive->default_err_message.f);
+      return vm::Value::addref(command_giver->interactive->default_err_message.f);
     }
     if ((p = command_giver->interactive->default_err_message.s)) {
-      return Value::str_shared(p);
+      return vm::Value::str_shared(p);
     }
   }
   return 0;
@@ -126,7 +126,8 @@ Value f_query_notify_fail(EfunArgs&) {
 
 /* Beek again */
 #ifdef F_STORE_VARIABLE
-void f_store_variable(EfunArgs&, StringArg var_name, Arg value, std::optional<object_t*> target) {
+void f_store_variable(vm::EfunArgs&, vm::StringArg var_name, vm::Arg value,
+                      std::optional<object_t*> target) {
   int idx;
   lpc_type_t type;
 
@@ -142,7 +143,7 @@ void f_store_variable(EfunArgs&, StringArg var_name, Arg value, std::optional<ob
 #endif
 
 #ifdef F_FETCH_VARIABLE
-Value f_fetch_variable(EfunArgs&, StringArg var_name, std::optional<object_t*> target) {
+vm::Value f_fetch_variable(vm::EfunArgs&, vm::StringArg var_name, std::optional<object_t*> target) {
   int idx;
   lpc_type_t type;
 
@@ -154,7 +155,7 @@ Value f_fetch_variable(EfunArgs&, StringArg var_name, std::optional<object_t*> t
   if (idx == -1 || (ob != current_object && (type & DECL_PRIVATE))) {
     error("Variable named '%s' does not exist or is not visible!\n", name);
   }
-  return Value::copy(&ob->variables[idx]);
+  return vm::Value::copy(&ob->variables[idx]);
 }
 #endif
 
@@ -254,19 +255,19 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
   }
 }
 
-Value f_copy(EfunArgs&, Arg value) {
+vm::Value f_copy(vm::EfunArgs&, vm::Arg value) {
   svalue_t ret;
 
   depth = 0;
   deep_copy_svalue(value.sv(), &ret);
-  return Value::owned(ret);
+  return vm::Value::owned(ret);
 }
 #endif
 
 /* Gudu@VR */
 /* flag and extra info by Beek */
 #ifdef F_FUNCTIONS
-Value f_functions(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
+vm::Value f_functions(vm::EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   int i, j, num, ind;
   array_t *vec, *subvec;
   function_t* funp;
@@ -368,7 +369,7 @@ Value f_functions(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
     }
   }
 
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 #endif
 
@@ -406,7 +407,7 @@ static void fv_recurse(array_t* arr, int* idx, program_t* prog, int type, int fl
   *idx += prog->num_variables_defined;
 }
 
-Value f_variables(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
+vm::Value f_variables(vm::EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   int idx = 0;
   array_t* arr;
   int const flag = flag_arg;
@@ -415,13 +416,13 @@ Value f_variables(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   arr = allocate_empty_array(prog->num_variables_total);
   fv_recurse(arr, &idx, prog, 0, flag);
 
-  return Value::refed(arr);
+  return vm::Value::refed(arr);
 }
 #endif
 
 /* also Beek */
 #ifdef F_HEART_BEATS
-Value f_heart_beats(EfunArgs&) { return Value::refed(get_heart_beats()); }
+vm::Value f_heart_beats(vm::EfunArgs&) { return vm::Value::refed(get_heart_beats()); }
 #endif
 
 /*Aleas@Nightmare */
@@ -523,8 +524,8 @@ struct tc_colwidth_state {
   }
 };
 
-Value f_terminal_colour(EfunArgs& f, StringArg input, mapping_t* colour_map,
-                        std::optional<LPC_INT> wrap_arg, std::optional<LPC_INT> indent_arg) {
+vm::Value f_terminal_colour(vm::EfunArgs& f, vm::StringArg input, mapping_t* colour_map,
+                            std::optional<LPC_INT> wrap_arg, std::optional<LPC_INT> indent_arg) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char *instr, *cp, **parts;
@@ -669,7 +670,7 @@ Value f_terminal_colour(EfunArgs& f, StringArg input, mapping_t* colour_map,
     if (savestr) {
       FREE_MSTR(savestr);
     }
-    return Value::str_constant("");
+    return vm::Value::str_constant("");
   }
 
   /* Could keep track of the lens as we create parts, removing the need
@@ -723,13 +724,13 @@ Value f_terminal_colour(EfunArgs& f, StringArg input, mapping_t* colour_map,
   for (j = i = 0, k = colour_map->table_size; i < num; i++) {
     // Look it up in the mapping.
     repused = 0;
-    LPCCall replace_args;
-    replace_args.push(Value::str_copy(parts[i]));
+    vm::Call replace_args;
+    replace_args.push(vm::Value::str_copy(parts[i]));
     // safe_apply: a raw apply that error()s here would unwind past the
     // FREE(parts)/FREE(lens)/FREE_MSTR(savestr) at the end of this efun,
     // leaking them. On error safe_apply returns no result -> treated as no
     // replacement, which is the desired robust behavior anyway.
-    CallResult reptmp =
+    vm::CallResult reptmp =
         replace_args.safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, ORIGIN_EFUN);
     if (reptmp && reptmp->type == T_STRING) {
       // Was alloca() -- called once per loop iteration, that memory isn't
@@ -1113,7 +1114,7 @@ Value f_terminal_colour(EfunArgs& f, StringArg input, mapping_t* colour_map,
         j, ncp - deststr, input.c_str(), indent, wrap);
   }
 #endif
-  return Value::str_malloced(deststr);
+  return vm::Value::str_malloced(deststr);
 }
 #endif
 
@@ -1616,14 +1617,14 @@ static char* pluralize(const char* str) {
   return news;
 } /* end of pluralize() */
 
-Value f_pluralize(EfunArgs&, StringArg str) {
+vm::Value f_pluralize(vm::EfunArgs&, vm::StringArg str) {
   char* s;
 
   s = pluralize(str.c_str());
   if (!s) {
     return 0;
   }
-  return Value::str_malloced(s);
+  return vm::Value::str_malloced(s);
 }
 #endif
 
@@ -1676,7 +1677,7 @@ static int file_length(const char* file) {
   return ret;
 } /* end of file_length() */
 
-Value f_file_length(EfunArgs&, StringArg file) {
+vm::Value f_file_length(vm::EfunArgs&, vm::StringArg file) {
   int l;
 
   l = file_length(file.c_str());
@@ -1685,7 +1686,7 @@ Value f_file_length(EfunArgs&, StringArg file) {
 #endif
 
 #ifdef F_UPPER_CASE
-Value f_upper_case(EfunArgs& f, StringArg) {
+vm::Value f_upper_case(vm::EfunArgs& f, vm::StringArg) {
   /* The result is the argument itself, upper-cased in place in its slot
    * (unlinked first, so the edit never reaches a string anyone else holds). */
   svalue_t* sv = f[0].sv();
@@ -1713,7 +1714,7 @@ Value f_upper_case(EfunArgs& f, StringArg) {
 #endif
 
 #ifdef F_REPLACEABLE
-Value f_replaceable(EfunArgs&, object_t* obj, std::optional<array_t*> ignore_list) {
+vm::Value f_replaceable(vm::EfunArgs&, object_t* obj, std::optional<array_t*> ignore_list) {
   program_t* prog;
   int i, j, num, numignore, replaceable;
   const char** ignore;
@@ -1823,7 +1824,7 @@ inline void sum_program_info(const program_t* const p, ProgramInfoS& info) {
   info.total += p->total_size;
 }
 
-Value f_program_info(EfunArgs&, std::optional<object_t*> target) {
+vm::Value f_program_info(vm::EfunArgs&, std::optional<object_t*> target) {
   ProgramInfoS info{0};  // initialize all elements to 0
   object_t* ob;
   mapping_t* m;
@@ -1856,7 +1857,7 @@ Value f_program_info(EfunArgs&, std::optional<object_t*> target) {
 
   add_mapping_pair(m, "total size", info.total);
 
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 #endif
 
@@ -1868,7 +1869,7 @@ Value f_program_info(EfunArgs&, std::optional<object_t*> target) {
  */
 
 #ifdef F_REMOVE_INTERACTIVE
-Value f_remove_interactive(EfunArgs&, object_t* ob) {
+vm::Value f_remove_interactive(vm::EfunArgs&, object_t* ob) {
   if ((ob->flags & O_DESTRUCTED) || !(ob->interactive)) {
     return 0;
   }
@@ -1891,7 +1892,7 @@ static int query_ip_port(object_t* ob) {
   return ob->interactive->local_port;
 }
 
-Value f_query_ip_port(EfunArgs&, std::optional<object_t*> ob) {
+vm::Value f_query_ip_port(vm::EfunArgs&, std::optional<object_t*> ob) {
   int tmp;
 
   if (ob) {
@@ -1950,7 +1951,7 @@ void reset_timezone(const char* old_tz) {
 #endif
 
 #ifdef F_ZONETIME
-Value f_zonetime(EfunArgs&, StringArg tz, LPC_INT when) {
+vm::Value f_zonetime(vm::EfunArgs&, vm::StringArg tz, LPC_INT when) {
   const char *new_tz, *old_tz;
   char* retv;
   time_t time_val;
@@ -1969,12 +1970,12 @@ Value f_zonetime(EfunArgs&, StringArg tz, LPC_INT when) {
   len = strlen(retv);
   retv[len - 1] = '\0';
   reset_timezone(old_tz);
-  return Value::str_malloced(string_copy(retv, "zonetime"));
+  return vm::Value::str_malloced(string_copy(retv, "zonetime"));
 }
 #endif
 
 #ifdef F_IS_DAYLIGHT_SAVINGS_TIME
-Value f_is_daylight_savings_time(EfunArgs&, StringArg tz, LPC_INT when) {
+vm::Value f_is_daylight_savings_time(vm::EfunArgs&, vm::StringArg tz, LPC_INT when) {
   time_t time_to_check = when;
   const char* new_tz = tz.c_str();
   const char* old_tz = set_timezone(new_tz);
@@ -1997,19 +1998,19 @@ Value f_is_daylight_savings_time(EfunArgs&, StringArg tz, LPC_INT when) {
 #endif
 
 #ifdef F_DEBUG_MESSAGE
-void f_debug_message(EfunArgs&, StringArg msg) { debug_message("%s\n", msg.c_str()); }
+void f_debug_message(vm::EfunArgs&, vm::StringArg msg) { debug_message("%s\n", msg.c_str()); }
 #endif
 
 #ifdef F_FUNCTION_OWNER
-Value f_function_owner(EfunArgs&, funptr_t* fp) {
+vm::Value f_function_owner(vm::EfunArgs&, funptr_t* fp) {
   /* The owner reference is taken before the function pointer (which may
    * hold the last reference to a destructed owner) is released. */
-  return Value::object(fp->hdr.owner);
+  return vm::Value::object(fp->hdr.owner);
 }
 #endif
 
 #ifdef F_REPEAT_STRING
-Value f_repeat_string(EfunArgs& f, StringArg s, LPC_INT times) {
+vm::Value f_repeat_string(vm::EfunArgs& f, vm::StringArg s, LPC_INT times) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   const char* str;
@@ -2033,7 +2034,7 @@ Value f_repeat_string(EfunArgs& f, StringArg s, LPC_INT times) {
     newlen = len * repeat;
   }
   if (repeat <= 0) {
-    return Value::str_constant("");
+    return vm::Value::str_constant("");
   } else if (repeat != 1) {
     p = ret = new_string(newlen, "f_repeat_string");
     for (i = 0; i < repeat; i++) {
@@ -2041,7 +2042,7 @@ Value f_repeat_string(EfunArgs& f, StringArg s, LPC_INT times) {
       p += len;
     }
     *p = 0;
-    return Value::str_malloced(ret);
+    return vm::Value::str_malloced(ret);
   }
   return f.take(0); /* once: the argument itself */
 }
@@ -2175,7 +2176,7 @@ static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog)
   *idx += prog->num_variables_defined;
 }
 
-Value f_memory_summary(EfunArgs&) {
+vm::Value f_memory_summary(vm::EfunArgs&) {
   mapping_t* result = allocate_mapping(8);
   object_t* ob;
   int idx;
@@ -2196,14 +2197,14 @@ Value f_memory_summary(EfunArgs&) {
     idx = 0;
     fms_recurse(entry->u.map, ob, &idx, ob->prog);
   }
-  return Value::refed(result);
+  return vm::Value::refed(result);
 }
 
 #endif
 
 /* Marius */
 #ifdef F_QUERY_REPLACED_PROGRAM
-Value f_query_replaced_program(EfunArgs&, std::optional<object_t*> ob) {
+vm::Value f_query_replaced_program(vm::EfunArgs&, std::optional<object_t*> ob) {
   char* res = nullptr;
 
   if (ob) {
@@ -2217,7 +2218,7 @@ Value f_query_replaced_program(EfunArgs&, std::optional<object_t*> ob) {
   }
 
   if (res) {
-    return Value::str_malloced(res);
+    return vm::Value::str_malloced(res);
   }
   return 0;
 }
@@ -2225,7 +2226,7 @@ Value f_query_replaced_program(EfunArgs&, std::optional<object_t*> ob) {
 
 /* Skullslayer@Realms of the Dragon */
 #ifdef F_NETWORK_STATS
-Value f_network_stats(EfunArgs&) {
+vm::Value f_network_stats(vm::EfunArgs&) {
   mapping_t* m;
   int i, ports = 0;
 
@@ -2270,7 +2271,7 @@ Value f_network_stats(EfunArgs&) {
     }
   }
 
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 #endif
 
@@ -2310,10 +2311,10 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
         continue;
       }
 
-      LPCCall b;
-      b.push(Value::object(origin));
+      vm::Call b;
+      b.push(vm::Value::object(origin));
       for (i = 0; i < numparam; i++) {
-        b.push(Value::copy(event_param + i));
+        b.push(vm::Value::copy(event_param + i));
       }
 
       b.apply(name, event_ob->u.arr->item[ind].u.ob, ORIGIN_EFUN);
@@ -2322,10 +2323,10 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
     /* First we call the event on the object itself */
 
     {
-      LPCCall b;
-      b.push(Value::object(origin));
+      vm::Call b;
+      b.push(vm::Value::object(origin));
       for (i = 0; i < numparam; i++) {
-        b.push(Value::copy(event_param + i));
+        b.push(vm::Value::copy(event_param + i));
       }
 
       b.apply(name, event_ob->u.ob, ORIGIN_EFUN);
@@ -2336,11 +2337,11 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
      * inventory first, with references on the stack: a handler can move or
      * destruct objects (which would derail a walk of the live list), and
      * destruct's stack sweep turns a destructed object's slot into 0. */
-    LPCCall snapshot;
+    vm::Call snapshot;
     if (event_ob->type == T_OBJECT && !(event_ob->u.ob->flags & O_DESTRUCTED)) {
       for (ob = event_ob->u.ob->contains; ob; ob = ob->next_inv) {
         if (ob != origin && !(ob->flags & O_DESTRUCTED)) {
-          snapshot.push(Value::object(ob));
+          snapshot.push(vm::Value::object(ob));
         }
       }
     }
@@ -2350,10 +2351,10 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
       if (slot->type != T_OBJECT || (slot->u.ob->flags & O_DESTRUCTED)) {
         continue;
       }
-      LPCCall b;
-      b.push(Value::object(origin));
+      vm::Call b;
+      b.push(vm::Value::object(origin));
       for (i = 0; i < numparam; i++) {
-        b.push(Value::copy(event_param + i));
+        b.push(vm::Value::copy(event_param + i));
       }
       b.apply(name, slot->u.ob, ORIGIN_EFUN);
     }
@@ -2362,7 +2363,7 @@ void event(svalue_t* event_ob, const char* event_fun, int numparam, svalue_t* ev
   }
 }
 
-void f_event(EfunArgs& f, Arg target, StringArg event_name) {
+void f_event(vm::EfunArgs& f, vm::Arg target, vm::StringArg event_name) {
   int num_arg = f.argc();
 
   event(target.sv(), event_name.c_str(), num_arg - 2, num_arg > 2 ? f[2].sv() : nullptr);
@@ -2397,7 +2398,7 @@ void number_as_string(char* buf, LPC_INT n) {
   strcat(buf, single[n]);
 }
 
-Value f_query_num(EfunArgs&, LPC_INT num, LPC_INT max) {
+vm::Value f_query_num(vm::EfunArgs&, LPC_INT num, LPC_INT max) {
   char ret[100];
   int i;
   LPC_INT n, limit;
@@ -2458,13 +2459,13 @@ q_n_end:
   n = strlen(ret);
   res = new_string(n, "query_num");
   strcpy(res, ret);
-  return Value::str_malloced(res);
+  return vm::Value::str_malloced(res);
 }
 
 #endif
 
 #ifdef F_BASE_NAME
-Value f_base_name(EfunArgs&, Arg target) {
+vm::Value f_base_name(vm::EfunArgs&, vm::Arg target) {
   char *name, *tmp;
   int i;
 
@@ -2485,9 +2486,9 @@ Value f_base_name(EfunArgs&, Arg target) {
     ret[i] = 0;
     FREE_MSTR(name);
 
-    return Value::str_malloced(ret);
+    return vm::Value::str_malloced(ret);
   }
-  return Value::str_malloced(name);
+  return vm::Value::str_malloced(name);
 
 } /* f_base_name() */
 #endif
@@ -2505,7 +2506,7 @@ int garbage_check(object_t* ob, void* /*data*/) {
       ;
 }
 
-Value f_get_garbage(EfunArgs& f) {
+vm::Value f_get_garbage(vm::EfunArgs& f) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
@@ -2514,7 +2515,7 @@ Value f_get_garbage(EfunArgs& f) {
   get_objects(&obs, &count, garbage_check, nullptr);
   /* get_objects() pushed the list's storage (a malloced string) above the
    * window; hold it here so it is freed on return or an error() unwind. */
-  Value obs_storage = f.take_pushed();
+  vm::Value obs_storage = f.take_pushed();
 
   if (count > max_array_size) {
     count = max_array_size;
@@ -2526,13 +2527,13 @@ Value f_get_garbage(EfunArgs& f) {
     add_ref(obs[i], "f_get_garbage");
   }
 
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 #endif
 
 #ifdef F_NUM_CLASSES
 
-Value f_num_classes(EfunArgs&, object_t* ob) {
+vm::Value f_num_classes(vm::EfunArgs&, object_t* ob) {
   int const i = ob->prog->num_classes;
   return i;
 }
@@ -2540,7 +2541,7 @@ Value f_num_classes(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_ASSEMBLE_CLASS
-Value f_assemble_class(EfunArgs&, array_t* src) {
+vm::Value f_assemble_class(vm::EfunArgs&, array_t* src) {
   // Build through the CLASS allocator: retagging a copy_array() block as
   // T_CLASS skews num_arrays/num_classes and the DEBUGMALLOC tag when it
   // is later freed as a class (caught by the testsuite's per-file
@@ -2549,25 +2550,25 @@ Value f_assemble_class(EfunArgs&, array_t* src) {
   for (int i = 0; i < src->size; i++) {
     assign_svalue_no_free(&cl->item[i], &src->item[i]);
   }
-  return Value::refed_class(cl);
+  return vm::Value::refed_class(cl);
 }
 
 #endif
 
 #ifdef F_DISASSEMBLE_CLASS
-Value f_disassemble_class(EfunArgs&, Arg cls) {
+vm::Value f_disassemble_class(vm::EfunArgs&, vm::Arg cls) {
   array_t* arr;
   if (!cls.is(T_CLASS)) {
     error("Argument to disassemble_class() not a class.\n");
   }
   arr = copy_array(cls.sv()->u.arr);
-  return Value::refed(arr);
+  return vm::Value::refed(arr);
 }
 #endif
 
 #ifdef F_FETCH_CLASS_MEMBER
 
-Value f_fetch_class_member(EfunArgs&, Arg cls, LPC_INT pos) {
+vm::Value f_fetch_class_member(vm::EfunArgs&, vm::Arg cls, LPC_INT pos) {
   /* pos is checked below as an LPC int, not wrapped */
   array_t* arr;
 
@@ -2581,13 +2582,13 @@ Value f_fetch_class_member(EfunArgs&, Arg cls, LPC_INT pos) {
     error("Class index out of bounds.\n");
   }
 
-  return Value::copy(&arr->item[pos]);
+  return vm::Value::copy(&arr->item[pos]);
 }
 #endif
 
 #ifdef F_STORE_CLASS_MEMBER
 
-Value f_store_class_member(EfunArgs& f, Arg cls, LPC_INT pos, Arg value) {
+vm::Value f_store_class_member(vm::EfunArgs& f, vm::Arg cls, LPC_INT pos, vm::Arg value) {
   /* pos is checked below as an LPC int */
   array_t* arr;
 
@@ -2609,11 +2610,11 @@ Value f_store_class_member(EfunArgs& f, Arg cls, LPC_INT pos, Arg value) {
 #endif
 
 #ifdef F_ELEMENT_OF
-Value f_element_of(EfunArgs&, array_t* arr) {
+vm::Value f_element_of(vm::EfunArgs&, array_t* arr) {
   if (!arr->size) {
     error("Can't take element from empty array.\n");
   }
-  return Value::copy(&arr->item[random_number(arr->size)]);
+  return vm::Value::copy(&arr->item[random_number(arr->size)]);
 }
 #endif
 #ifdef F_SHUFFLE
@@ -2648,7 +2649,7 @@ void shuffle(array_t* args) {
   /* Well, that's it. The array was shuffled in place. */
 }
 
-Value f_shuffle(EfunArgs& f, array_t* arr) {
+vm::Value f_shuffle(vm::EfunArgs& f, array_t* arr) {
   shuffle(arr); /* in place: the result is the argument array */
   return f.take(0);
 }
@@ -2656,7 +2657,7 @@ Value f_shuffle(EfunArgs& f, array_t* arr) {
 
 #ifdef F_MAX
 
-Value f_max(EfunArgs&, array_t* arr, LPC_INT want_index) {
+vm::Value f_max(vm::EfunArgs&, array_t* arr, LPC_INT want_index) {
   int max_index = 0;
   int i;
 
@@ -2720,14 +2721,14 @@ Value f_max(EfunArgs&, array_t* arr, LPC_INT want_index) {
     return max_index;
   }
 
-  return Value::copy(&arr->item[max_index]);
+  return vm::Value::copy(&arr->item[max_index]);
 }
 
 #endif
 
 #ifdef F_MIN
 
-Value f_min(EfunArgs&, array_t* arr, LPC_INT want_index) {
+vm::Value f_min(vm::EfunArgs&, array_t* arr, LPC_INT want_index) {
   int min_index = 0;
   int i;
 
@@ -2791,13 +2792,13 @@ Value f_min(EfunArgs&, array_t* arr, LPC_INT want_index) {
     return min_index;
   }
 
-  return Value::copy(&arr->item[min_index]);
+  return vm::Value::copy(&arr->item[min_index]);
 }
 #endif
 
 #ifdef F_ABS
 
-Value f_abs(EfunArgs& f, Arg n) {
+vm::Value f_abs(vm::EfunArgs& f, vm::Arg n) {
   /* Edited in place, so anything else about the value (an int's subtype)
    * is kept as it was. */
   svalue_t* v = n.sv();
@@ -2816,7 +2817,7 @@ Value f_abs(EfunArgs& f, Arg n) {
 
 #ifdef F_ROLL_MDN
 
-Value f_roll_MdN(EfunArgs&, LPC_INT rolls, LPC_INT sides, LPC_INT bonus) {
+vm::Value f_roll_MdN(vm::EfunArgs&, LPC_INT rolls, LPC_INT sides, LPC_INT bonus) {
   LPC_INT roll = 0;
 
   /* bonus defaults to 0 (spec `int default:0`). This is the only roll_MdN
@@ -2897,7 +2898,7 @@ int levenshtein(char* a, int as, char* b, int bs) {
   return i;
 } /* levenshtein() */
 
-Value f_string_difference(EfunArgs&, StringArg first, StringArg second) {
+vm::Value f_string_difference(vm::EfunArgs&, vm::StringArg first, vm::StringArg second) {
   int diff, as, bs;
   char *a, *b;
 
@@ -2933,7 +2934,7 @@ static int query_charmode(object_t* ob) {
   return ret;
 }
 
-Value f_query_charmode(EfunArgs&, object_t* ob) { return query_charmode(ob); }
+vm::Value f_query_charmode(vm::EfunArgs&, object_t* ob) { return query_charmode(ob); }
 
 #ifdef F_REMOVE_CHARMODE
 static int remove_charmode(object_t* ob) {
@@ -2946,7 +2947,7 @@ static int remove_charmode(object_t* ob) {
   return ret;
 }
 
-Value f_remove_charmode(EfunArgs&, object_t* ob) {
+vm::Value f_remove_charmode(vm::EfunArgs&, object_t* ob) {
   int tmp;
 
   tmp = remove_charmode(ob);
@@ -2975,11 +2976,11 @@ static int remove_get_char(object_t* ob) {
   return -1;
 }
 
-Value f_remove_get_char(EfunArgs&, object_t* ob) { return remove_get_char(ob); }
+vm::Value f_remove_get_char(vm::EfunArgs&, object_t* ob) { return remove_get_char(ob); }
 
 #endif
 #ifdef F_SEND_NULLBYTE
-Value f_send_nullbyte(EfunArgs&, object_t* who) {
+vm::Value f_send_nullbyte(vm::EfunArgs&, object_t* who) {
   int tmp;
   tmp = 0;
 
@@ -2998,7 +2999,7 @@ Value f_send_nullbyte(EfunArgs&, object_t* who) {
 #endif
 
 #ifdef F_RESTORE_FROM_STRING
-void f_restore_from_string(EfunArgs& f, StringArg, LPC_INT noclear) {
+void f_restore_from_string(vm::EfunArgs& f, vm::StringArg, LPC_INT noclear) {
   if (!noclear) {
     clear_non_statics(current_object);
   }
@@ -3006,14 +3007,14 @@ void f_restore_from_string(EfunArgs& f, StringArg, LPC_INT noclear) {
   // argument and unlink it, which copies only if something else still
   // references it (a temporary such as read_file()'s result is used as is).
   // The Value frees it on an error() too.
-  Value text = f.take(0);
+  vm::Value text = f.take(0);
   unlink_string_svalue(text.get());
   restore_object_from_buff(current_object, const_cast<char*>(text->u.string), noclear);
 }
 #endif
 
 #ifdef F_CLASSES
-Value f_classes(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
+vm::Value f_classes(vm::EfunArgs&, object_t* ob, LPC_INT flag_arg) {
   int i, j, num, size, offset, flag;
   array_t *vec, *subvec, *subsubvec;
   char buf[256];
@@ -3071,7 +3072,7 @@ Value f_classes(EfunArgs&, object_t* ob, LPC_INT flag_arg) {
     }
   }
 
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 
 #endif
@@ -3086,7 +3087,7 @@ static void fix_object_names() {
   }
 }
 
-Value f_test_load(EfunArgs&, StringArg path) {
+vm::Value f_test_load(vm::EfunArgs&, vm::StringArg path) {
   const char* tmp = path.c_str();
   object_t* new_ob;
   if ((testloadob = find_object2(path.c_str()))) {
@@ -3132,7 +3133,7 @@ static bool os_env_name_listed(const char* list, const char* name) {
 #endif
 
 #ifdef F_GET_OS_ENV
-Value f_get_os_env(EfunArgs&, StringArg var_name) {
+vm::Value f_get_os_env(vm::EfunArgs&, vm::StringArg var_name) {
   const char* name = var_name.c_str();
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_READABLE__), name) &&
@@ -3142,15 +3143,15 @@ Value f_get_os_env(EfunArgs&, StringArg var_name) {
 
   const char* val = getenv(name);
   if (!val) {
-    return Value::undefined();
+    return vm::Value::undefined();
   }
   char* copy = string_copy(val, "f_get_os_env");
-  return Value::str_malloced(copy);
+  return vm::Value::str_malloced(copy);
 }
 #endif
 
 #ifdef F_SET_OS_ENV
-Value f_set_os_env(EfunArgs&, StringArg var_name, std::optional<StringArg> value) {
+vm::Value f_set_os_env(vm::EfunArgs&, vm::StringArg var_name, std::optional<vm::StringArg> value) {
   const char* name = var_name.c_str();
 
   if (!os_env_name_listed(CONFIG_STR(__OS_ENV_WRITABLE__), name)) {

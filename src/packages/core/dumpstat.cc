@@ -173,7 +173,7 @@ void dumpstat(const char* tfn) {
 }
 
 #ifdef F_DUMPALLOBJ
-void f_dumpallobj(EfunArgs&, std::optional<StringArg> file) {
+void f_dumpallobj(vm::EfunArgs&, std::optional<vm::StringArg> file) {
   if (file) {
     dumpstat(file->c_str());
   } else {

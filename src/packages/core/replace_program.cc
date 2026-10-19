@@ -488,7 +488,7 @@ static bool replace_program_is_noop(program_t* cur_prog, program_t* new_prog) {
 // "immediately" or "next periodic sweep, up to 5 minutes" -- which is
 // out of scope for this fix.
 
-void f_replace_program(EfunArgs&, StringArg program) {
+void f_replace_program(vm::EfunArgs&, vm::StringArg program) {
   replace_ob_t* tmp;
   int name_len;
   char *name, *xname;

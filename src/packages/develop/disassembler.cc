@@ -7,7 +7,7 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void f_dump_prog(EfunArgs& f, object_t* ob) {
+void f_dump_prog(vm::EfunArgs& f, object_t* ob) {
   int num_arg = f.argc();
   program_t* prog;
   const char* where;

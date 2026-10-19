@@ -1,7 +1,7 @@
 /* vm_stack.h -- the raw evaluation stack, for VM-internal code only.
  *
  * Packages must NOT include this header. Package efuns use efun_args.h
- * (EfunArgs, LPCCall, Value) -- not `sp`, which they cannot see, nor the
+ * (vm::EfunArgs, vm::Call, vm::Value) -- not `sp`, which they cannot see, nor the
  * push_*()/pop_*() primitives or the put_/STACK macros declared here.
  *
  * Allowed consumers: interpret.cc, ops (bytecode operators), apply,
@@ -23,7 +23,7 @@ struct funptr_t;
 struct promise_t;
 
 /* Evaluation-stack top. Deliberately declared only here: package code
- * cannot name it, so it reaches the stack only through EfunArgs/LPCCall
+ * cannot name it, so it reaches the stack only through vm::EfunArgs/vm::Call
  * (efun_args.h). */
 extern svalue_t* sp;
 extern svalue_t* fp;

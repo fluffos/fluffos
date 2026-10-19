@@ -17,7 +17,7 @@
 
 /* float -> float efuns. */
 #define LPC_EFUN_UNARY_REAL(name, expr) \
-  Value f_##name(EfunArgs&, LPC_FLOAT x) { return (expr)(x); }
+  vm::Value f_##name(vm::EfunArgs&, LPC_FLOAT x) { return (expr)(x); }
 
 #define SQUARE(n) ((n) * (n))
 
@@ -34,7 +34,7 @@ LPC_EFUN_UNARY_REAL(tan, tan)
 #endif
 
 #ifdef F_ASIN
-Value f_asin(EfunArgs&, LPC_FLOAT x) {
+vm::Value f_asin(vm::EfunArgs&, LPC_FLOAT x) {
   if (x < -1.0) {
     error("math: asin(x) with (x < -1.0)\n");
   }
@@ -46,7 +46,7 @@ Value f_asin(EfunArgs&, LPC_FLOAT x) {
 #endif
 
 #ifdef F_ACOS
-Value f_acos(EfunArgs&, LPC_FLOAT x) {
+vm::Value f_acos(vm::EfunArgs&, LPC_FLOAT x) {
   if (x < -1.0) {
     error("math: acos(x) with (x < -1.0)\n");
   }
@@ -62,7 +62,7 @@ LPC_EFUN_UNARY_REAL(atan, atan)
 #endif
 
 #ifdef F_SQRT
-Value f_sqrt(EfunArgs&, Arg x) {
+vm::Value f_sqrt(vm::EfunArgs&, vm::Arg x) {
   LPC_FLOAT val = x.as_real();
 
   if (val < 0.0) {
@@ -73,7 +73,7 @@ Value f_sqrt(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F_LOG
-Value f_log(EfunArgs&, LPC_FLOAT x) {
+vm::Value f_log(vm::EfunArgs&, LPC_FLOAT x) {
   if (x <= 0.0) {
     error("math: log(x) with (x <= 0.0)\n");
   }
@@ -82,7 +82,7 @@ Value f_log(EfunArgs&, LPC_FLOAT x) {
 #endif
 
 #ifdef F_LOG10
-Value f_log10(EfunArgs&, Arg x) {
+vm::Value f_log10(vm::EfunArgs&, vm::Arg x) {
   LPC_FLOAT val = x.as_real();
 
   if (val <= 0.0) {
@@ -93,7 +93,7 @@ Value f_log10(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F_LOG2
-Value f_log2(EfunArgs&, Arg x) {
+vm::Value f_log2(vm::EfunArgs&, vm::Arg x) {
   LPC_FLOAT val = x.as_real();
 
   if (val <= 0.0) {
@@ -104,7 +104,9 @@ Value f_log2(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F_POW
-Value f_pow(EfunArgs&, Arg base, Arg exponent) { return pow(base.as_real(), exponent.as_real()); }
+vm::Value f_pow(vm::EfunArgs&, vm::Arg base, vm::Arg exponent) {
+  return pow(base.as_real(), exponent.as_real());
+}
 #endif
 
 #ifdef F_EXP
@@ -155,7 +157,7 @@ static LPC_FLOAT norm(array_t* a, bool* ok) {
   return sqrt(total);
 }
 
-Value f_norm(EfunArgs&, array_t* vec) {
+vm::Value f_norm(vm::EfunArgs&, array_t* vec) {
   bool ok;
   LPC_FLOAT const val = norm(vec, &ok);
 
@@ -218,7 +220,7 @@ static LPC_FLOAT dotprod(array_t* a, array_t* b, int* status) {
   return vector_op(a, b, dotprod_mult, status);
 }
 
-Value f_dotprod(EfunArgs&, array_t* a, array_t* b) {
+vm::Value f_dotprod(vm::EfunArgs&, array_t* a, array_t* b) {
   int status;
   LPC_FLOAT const total = vector_op(a, b, dotprod_mult, &status);
 
@@ -238,7 +240,7 @@ Value f_dotprod(EfunArgs&, array_t* a, array_t* b) {
 static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQUARE(b - a); }
 
 /* The (Euclidian) distance between two points */
-Value f_distance(EfunArgs&, array_t* a, array_t* b) {
+vm::Value f_distance(vm::EfunArgs&, array_t* a, array_t* b) {
   int status;
   LPC_FLOAT const total = vector_op(a, b, distance_mult, &status);
 
@@ -255,7 +257,7 @@ Value f_distance(EfunArgs&, array_t* a, array_t* b) {
 #endif
 
 #ifdef F_ANGLE
-Value f_angle(EfunArgs&, array_t* a, array_t* b) {
+vm::Value f_angle(vm::EfunArgs&, array_t* a, array_t* b) {
   LPC_FLOAT dot, norma, normb;
   int status;
   bool ok;

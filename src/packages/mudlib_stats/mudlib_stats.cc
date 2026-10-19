@@ -17,28 +17,28 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-Value f_domain_stats(EfunArgs&, std::optional<StringArg> domain) {
+vm::Value f_domain_stats(vm::EfunArgs&, std::optional<vm::StringArg> domain) {
   mapping_t* m = get_domain_stats(domain ? domain->c_str() : nullptr);
   if (!m) {
     return 0;
   }
   /* get_domain_stats() leaves the caller no reference */
-  return Value::addref(m);
+  return vm::Value::addref(m);
 }
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author(EfunArgs&, StringArg name) { set_author(name.c_str()); }
+void f_set_author(vm::EfunArgs&, vm::StringArg name) { set_author(name.c_str()); }
 #endif
 
 #ifdef F_AUTHOR_STATS
-Value f_author_stats(EfunArgs&, std::optional<StringArg> author) {
+vm::Value f_author_stats(vm::EfunArgs&, std::optional<vm::StringArg> author) {
   mapping_t* m = get_author_stats(author ? author->c_str() : nullptr);
   if (!m) {
     return 0;
   }
   /* get_author_stats() leaves the caller no reference */
-  return Value::addref(m);
+  return vm::Value::addref(m);
 }
 #endif
 
@@ -274,10 +274,10 @@ void mark_mudlib_stats() {
  *************************/
 
 static void init_author_for_ob(object_t* ob) {
-  LPCCall call;
-  call.push(Value::str_malloced(add_slash(ob->obname)));
-  CallResult ret = call.apply_master(APPLY_AUTHOR_FILE);
-  if (ret.status() == CallResult::kNoMaster) {
+  vm::Call call;
+  call.push(vm::Value::str_malloced(add_slash(ob->obname)));
+  vm::CallResult ret = call.apply_master(APPLY_AUTHOR_FILE);
+  if (ret.status() == vm::CallResult::kNoMaster) {
     ob->stats.author = master_author;
   } else if (!ret || ret->type != T_STRING) {
     ob->stats.author = nullptr;
@@ -319,9 +319,9 @@ mudlib_stats_t* set_master_author(const char* str) {
 static const char* author_for_file(const char* file) {
   static char buff[50];
 
-  LPCCall call;
-  call.push(Value::str_copy(file));
-  CallResult ret = call.safe_apply_master(APPLY_AUTHOR_FILE);
+  vm::Call call;
+  call.push(vm::Value::str_copy(file));
+  vm::CallResult ret = call.safe_apply_master(APPLY_AUTHOR_FILE);
   if (!ret || ret->type != T_STRING) {
     return nullptr;
   }
@@ -358,11 +358,11 @@ static void init_domain_for_ob(object_t* ob) {
   /*
    * Ask master object who the creator of this object is.
    */
-  LPCCall call;
-  call.push(Value::str_malloced(add_slash(ob->obname)));
+  vm::Call call;
+  call.push(vm::Value::str_malloced(add_slash(ob->obname)));
 
-  CallResult ret = master_ob ? call.apply_master(APPLY_DOMAIN_FILE)
-                             : call.apply(applies_table[APPLY_DOMAIN_FILE], ob, ORIGIN_DRIVER);
+  vm::CallResult ret = master_ob ? call.apply_master(APPLY_DOMAIN_FILE)
+                                 : call.apply(applies_table[APPLY_DOMAIN_FILE], ob, ORIGIN_DRIVER);
 
   if (IS_ZERO(ret)) {
     ob->stats.domain = current_object->stats.domain;
@@ -416,9 +416,9 @@ mudlib_stats_t* set_backbone_domain(const char* str) {
 static const char* domain_for_file(const char* file) {
   static char buff[512];
 
-  LPCCall call;
-  call.push(Value::str_make_shared(file));
-  CallResult ret = call.safe_apply_master(APPLY_DOMAIN_FILE);
+  vm::Call call;
+  call.push(vm::Value::str_make_shared(file));
+  vm::CallResult ret = call.safe_apply_master(APPLY_DOMAIN_FILE);
   if (!ret || ret->type != T_STRING) {
     return nullptr;
   }

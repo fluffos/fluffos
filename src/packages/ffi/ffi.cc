@@ -193,16 +193,17 @@ const char* plat_dlerror() {
 // ---------------------------------------------------------------------------
 
 void check_valid_ffi(const char* op, const svalue_t* arg) {
-  LPCCall call;
-  call.push(Value::str_constant(op));
+  vm::Call call;
+  call.push(vm::Value::str_constant(op));
   if (arg == nullptr) {
     call.push(0);
   } else {
-    call.push(Value::copy(arg));
+    call.push(vm::Value::copy(arg));
   }
-  call.push(Value::object(current_object));
-  CallResult ret = call.safe_apply_master(APPLY_VALID_FFI);
-  if (ret.status() == CallResult::kNoMaster || (ret && ret->type == T_NUMBER && ret->u.number)) {
+  call.push(vm::Value::object(current_object));
+  vm::CallResult ret = call.safe_apply_master(APPLY_VALID_FFI);
+  if (ret.status() == vm::CallResult::kNoMaster ||
+      (ret && ret->type == T_NUMBER && ret->u.number)) {
     return;
   }
   error("FFI security violation: '%s' denied by master::valid_ffi.\n", op);
@@ -294,7 +295,7 @@ void lpc_to_slot(int code, svalue_t* arg, FfiArgSlot* slot) {
 
 // C return storage -> LPC value. Integer returns are widened to ffi_arg
 // by libffi; narrow per the declared code.
-Value return_to_lpc(int code, void* storage) {
+vm::Value return_to_lpc(int code, void* storage) {
   ffi_arg raw = 0;
   if (is_int_code(code)) {
     raw = *reinterpret_cast<ffi_arg*>(storage);
@@ -331,12 +332,12 @@ Value return_to_lpc(int code, void* storage) {
 
 // ---------------------------------------------------------------------------
 // Callback dispatch: a C call into a libffi closure re-enters the VM and
-// calls the held LPC function pointer. LPCCall::safe_call() catches LPC
+// calls the held LPC function pointer. vm::Call::safe_call() catches LPC
 // errors (they must NOT unwind across the native stack), so a failing
 // callback yields a zero/NULL C return.
 // ---------------------------------------------------------------------------
 
-Value c_arg_to_lpc(int code, void* carg) {
+vm::Value c_arg_to_lpc(int code, void* carg) {
   switch (code) {
     case FFI_INT8:
       return static_cast<LPC_INT>(*reinterpret_cast<int8_t*>(carg));
@@ -394,7 +395,7 @@ void lpc_return_to_c(int code, svalue_t* r, void* ret) {
 void closure_dispatch(ffi_cif* /*cif*/, void* ret, void** args, void* user) {
   auto* cb = static_cast<FfiCallback*>(user);
   int nargs = static_cast<int>(cb->arg_codes.size());
-  LPCCall call;
+  vm::Call call;
   for (int i = 0; i < nargs; i++) {
     call.push(c_arg_to_lpc(cb->arg_codes[i], args[i]));
   }
@@ -409,7 +410,7 @@ void closure_dispatch(ffi_cif* /*cif*/, void* ret, void** args, void* user) {
   cb->dispatching = true;
   DEFER { cb->dispatching = false; };
   set_eval(max_eval_cost);
-  CallResult r = call.safe_call(cb->fun);
+  vm::CallResult r = call.safe_call(cb->fun);
   lpc_return_to_c(ret_code, r.get(), ret);
 }
 
@@ -434,7 +435,7 @@ void free_callback(FfiCallback* cb) {
 // ===========================================================================
 
 #ifdef F_FFI_LOAD
-Value f_ffi_load(EfunArgs&, StringArg library) {
+vm::Value f_ffi_load(vm::EfunArgs&, vm::StringArg library) {
   const char* path = library.c_str();
   if (!library_allowed(path)) {
     error("FFI: library '%s' is not in the configured allow-list.\n", path);
@@ -454,7 +455,7 @@ Value f_ffi_load(EfunArgs&, StringArg library) {
 #endif
 
 #ifdef F_FFI_UNLOAD
-void f_ffi_unload(EfunArgs&, LPC_INT lib) {
+void f_ffi_unload(vm::EfunArgs&, LPC_INT lib) {
   int id = lib;
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
@@ -475,7 +476,7 @@ void f_ffi_unload(EfunArgs&, LPC_INT lib) {
 #endif
 
 #ifdef F_FFI_SYMBOL
-Value f_ffi_symbol(EfunArgs&, LPC_INT lib, StringArg symbol) {
+vm::Value f_ffi_symbol(vm::EfunArgs&, LPC_INT lib, vm::StringArg symbol) {
   const char* name = symbol.c_str();
   int id = lib;
   check_valid_ffi("symbol", symbol.sv());
@@ -491,8 +492,8 @@ Value f_ffi_symbol(EfunArgs&, LPC_INT lib, StringArg symbol) {
 #endif
 
 #ifdef F_FFI_PREPARE
-Value f_ffi_prepare(EfunArgs&, LPC_INT lib, StringArg symbol, LPC_INT ret_type,
-                    array_t* arg_arr) {
+vm::Value f_ffi_prepare(vm::EfunArgs&, LPC_INT lib, vm::StringArg symbol, LPC_INT ret_type,
+                        array_t* arg_arr) {
   int ret_code = ret_type;
   const char* name = symbol.c_str();
   int lib_id = lib;
@@ -536,7 +537,7 @@ Value f_ffi_prepare(EfunArgs&, LPC_INT lib, StringArg symbol, LPC_INT ret_type,
 #endif
 
 #ifdef F_FFI_CALL
-Value f_ffi_call(EfunArgs&, LPC_INT func, array_t* args) {
+vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
   int func_id = func;
 
   auto it = g_funcs.find(func_id);
@@ -576,17 +577,17 @@ Value f_ffi_call(EfunArgs&, LPC_INT func, array_t* args) {
 #endif
 
 #ifdef F_FFI_ALLOC
-Value f_ffi_alloc(EfunArgs&, LPC_INT nbytes) {
+vm::Value f_ffi_alloc(vm::EfunArgs&, LPC_INT nbytes) {
   if (nbytes < 0) {
     error("ffi_alloc: negative size.\n");
   }
   buffer_t* buf = allocate_buffer(nbytes);  // zeroed
-  return Value::refed(buf);
+  return vm::Value::refed(buf);
 }
 #endif
 
 #ifdef F_FFI_FREE
-void f_ffi_free(EfunArgs&, buffer_t* buf) {
+void f_ffi_free(vm::EfunArgs&, buffer_t* buf) {
   // The buffer is GC-managed; "freeing" zeroes it so a dangling native
   // reader sees no stale data. The block is reclaimed when no LPC value
   // references it.
@@ -597,7 +598,7 @@ void f_ffi_free(EfunArgs&, buffer_t* buf) {
 #endif
 
 #ifdef F_FFI_SIZEOF
-Value f_ffi_sizeof(EfunArgs&, LPC_INT type) {
+vm::Value f_ffi_sizeof(vm::EfunArgs&, LPC_INT type) {
   int code = type;
   int sz = type_size(code);
   return sz;
@@ -605,7 +606,7 @@ Value f_ffi_sizeof(EfunArgs&, LPC_INT type) {
 #endif
 
 #ifdef F_FFI_PEEK
-Value f_ffi_peek(EfunArgs& f, LPC_INT address, LPC_INT length) {
+vm::Value f_ffi_peek(vm::EfunArgs& f, LPC_INT address, LPC_INT length) {
   // Gated like load/prepare: reading an arbitrary native address is a
   // process-memory disclosure primitive, so the master must approve it
   // even though no foreign code runs.
@@ -628,19 +629,19 @@ Value f_ffi_peek(EfunArgs& f, LPC_INT address, LPC_INT length) {
   if (nbytes) {
     memcpy(buf->item, src, nbytes);
   }
-  return Value::refed(buf);
+  return vm::Value::refed(buf);
 }
 #endif
 
 #ifdef F_FFI_ADDRESS
-Value f_ffi_address(EfunArgs&, buffer_t* buf) {
+vm::Value f_ffi_address(vm::EfunArgs&, buffer_t* buf) {
   LPC_INT addr = buf->size ? reinterpret_cast<LPC_INT>(&buf->item[0]) : 0;
   return addr;
 }
 #endif
 
 #ifdef F_FFI_READ
-Value f_ffi_read(EfunArgs&, buffer_t* buf, LPC_INT offset, LPC_INT type) {
+vm::Value f_ffi_read(vm::EfunArgs&, buffer_t* buf, LPC_INT offset, LPC_INT type) {
   int code = type;
   int sz = type_size(code);
   // Range-check in a non-truncating, non-overflowing form: a huge offset must
@@ -682,7 +683,7 @@ Value f_ffi_read(EfunArgs&, buffer_t* buf, LPC_INT offset, LPC_INT type) {
 #endif
 
 #ifdef F_FFI_WRITE
-void f_ffi_write(EfunArgs&, buffer_t* buf, LPC_INT offset, LPC_INT type, Arg value) {
+void f_ffi_write(vm::EfunArgs&, buffer_t* buf, LPC_INT offset, LPC_INT type, vm::Arg value) {
   svalue_t* val = value.sv();
   int code = type;
   int sz = type_size(code);
@@ -697,7 +698,7 @@ void f_ffi_write(EfunArgs&, buffer_t* buf, LPC_INT offset, LPC_INT type, Arg val
 #endif
 
 #ifdef F_FFI_STRUCT_LAYOUT
-Value f_ffi_struct_layout(EfunArgs&, array_t* fields) {
+vm::Value f_ffi_struct_layout(vm::EfunArgs&, array_t* fields) {
   int n = fields->size;
 
   // Compute each field's aligned offset and the struct's total size,
@@ -737,12 +738,12 @@ Value f_ffi_struct_layout(EfunArgs&, array_t* fields) {
   result->item[0].u.number = cur;
   result->item[1].type = T_ARRAY;
   result->item[1].u.arr = offs.release();  // ref transferred
-  return Value::refed(result);
+  return vm::Value::refed(result);
 }
 #endif
 
 #ifdef F_FFI_CALLBACK
-Value f_ffi_callback(EfunArgs&, funptr_t* fun, LPC_INT ret_type, array_t* arg_arr) {
+vm::Value f_ffi_callback(vm::EfunArgs&, funptr_t* fun, LPC_INT ret_type, array_t* arg_arr) {
   int ret_code = ret_type;
 
   check_valid_ffi("callback", nullptr);
@@ -789,7 +790,7 @@ Value f_ffi_callback(EfunArgs&, funptr_t* fun, LPC_INT ret_type, array_t* arg_ar
 #endif
 
 #ifdef F_FFI_CALLBACK_ADDR
-Value f_ffi_callback_addr(EfunArgs&, LPC_INT callback) {
+vm::Value f_ffi_callback_addr(vm::EfunArgs&, LPC_INT callback) {
   int id = callback;
   auto it = g_callbacks.find(id);
   if (it == g_callbacks.end()) {
@@ -801,7 +802,7 @@ Value f_ffi_callback_addr(EfunArgs&, LPC_INT callback) {
 #endif
 
 #ifdef F_FFI_CALLBACK_FREE
-void f_ffi_callback_free(EfunArgs&, LPC_INT callback) {
+void f_ffi_callback_free(vm::EfunArgs&, LPC_INT callback) {
   int id = callback;
   auto it = g_callbacks.find(id);
   if (it != g_callbacks.end()) {
@@ -820,19 +821,19 @@ void f_ffi_callback_free(EfunArgs&, LPC_INT callback) {
 #endif
 
 #ifdef F_FFI_ERROR
-Value f_ffi_error(EfunArgs&) {
+vm::Value f_ffi_error(vm::EfunArgs&) {
   const char* msg = g_last_error.c_str();
-  return Value::str_copy(msg);
+  return vm::Value::str_copy(msg);
 }
 #endif
 
 #ifdef F_FFI_STATUS
-Value f_ffi_status(EfunArgs&) {
+vm::Value f_ffi_status(vm::EfunArgs&) {
   mapping_t* m = allocate_mapping(4);
   add_mapping_pair(m, "libraries", static_cast<long>(g_libs.size()));
   add_mapping_pair(m, "functions", static_cast<long>(g_funcs.size()));
   add_mapping_pair(m, "callbacks", static_cast<long>(g_callbacks.size()));
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 #endif
 

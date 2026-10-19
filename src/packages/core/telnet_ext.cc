@@ -6,7 +6,7 @@
 
 /* TELNET */
 #ifdef F_REQUEST_TERM_TYPE
-void f_request_term_type(EfunArgs&) {
+void f_request_term_type(vm::EfunArgs&) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_request_ttype(ip->telnet);
@@ -19,7 +19,7 @@ void f_request_term_type(EfunArgs&) {
 #endif
 
 #ifdef F_START_REQUEST_TERM_TYPE
-void f_start_request_term_type(EfunArgs&) {
+void f_start_request_term_type(vm::EfunArgs&) {
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_start_request_ttype(ip->telnet);
@@ -33,7 +33,7 @@ void f_start_request_term_type(EfunArgs&) {
 #endif
 
 #ifdef F_REQUEST_TERM_SIZE
-void f_request_term_size(EfunArgs&, std::optional<LPC_INT> enable) {
+void f_request_term_size(vm::EfunArgs&, std::optional<LPC_INT> enable) {
   auto* ip = current_object->interactive;
 
   if (ip && ip->telnet) {
@@ -51,7 +51,7 @@ void f_request_term_size(EfunArgs&, std::optional<LPC_INT> enable) {
 #endif
 
 #ifdef F_TELNET_NOP
-void f_telnet_nop(EfunArgs&) {
+void f_telnet_nop(vm::EfunArgs&) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_nop(ip->telnet);
@@ -63,7 +63,7 @@ void f_telnet_nop(EfunArgs&) {
 #endif
 
 #ifdef F_TELNET_GA
-void f_telnet_ga(EfunArgs&) {
+void f_telnet_ga(vm::EfunArgs&) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_ga(ip->telnet);
@@ -76,7 +76,7 @@ void f_telnet_ga(EfunArgs&) {
 
 /* MXP */
 #ifdef F_HAS_MXP
-Value f_has_mxp(EfunArgs&, object_t* ob) {
+vm::Value f_has_mxp(vm::EfunArgs&, object_t* ob) {
   int i = 0;
 
   if (ob->interactive) {
@@ -88,7 +88,7 @@ Value f_has_mxp(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_ACT_MXP
-void f_act_mxp(EfunArgs&) {
+void f_act_mxp(vm::EfunArgs&) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     // start MXP
@@ -102,7 +102,7 @@ void f_act_mxp(EfunArgs&) {
 /* GMCP */
 
 #ifdef F_HAS_GMCP
-Value f_has_gmcp(EfunArgs&, object_t* ob) {
+vm::Value f_has_gmcp(vm::EfunArgs&, object_t* ob) {
   int i = 0;
 
   if (ob->interactive) {
@@ -114,7 +114,7 @@ Value f_has_gmcp(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_SEND_GMCP
-void f_send_gmcp(EfunArgs&, StringArg message) {
+void f_send_gmcp(vm::EfunArgs&, vm::StringArg message) {
   auto* ip = current_object->interactive;
   const auto* data = message.c_str();
   auto len = message.size();
@@ -132,7 +132,7 @@ void f_send_gmcp(EfunArgs&, StringArg message) {
 /* MSP */
 
 #ifdef F_HAS_MSP
-Value f_has_msp(EfunArgs&, object_t* ob) {
+vm::Value f_has_msp(vm::EfunArgs&, object_t* ob) {
   int i = 0;
 
   if (ob->interactive) {
@@ -146,7 +146,7 @@ Value f_has_msp(EfunArgs&, object_t* ob) {
 /* MSDP */
 
 #ifdef F_HAS_MSDP
-Value f_has_msdp(EfunArgs&, object_t* ob) {
+vm::Value f_has_msdp(vm::EfunArgs&, object_t* ob) {
   int i = 0;
 
   if (ob->interactive) {
@@ -160,12 +160,12 @@ Value f_has_msdp(EfunArgs&, object_t* ob) {
 #ifdef F_SEND_MSDP_VARIABLE
 /** TODO update to support sending other value type and use proper MSDP mapping/array formats as
  * needed based on data types */
-void f_send_msdp_variable(EfunArgs&, StringArg name, Arg value) {
+void f_send_msdp_variable(vm::EfunArgs&, vm::StringArg name, vm::Arg value) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     switch (value.type()) {
       case T_STRING: {
-        StringArg str = value.string();
+        vm::StringArg str = value.string();
         telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSDP);
         telnet_printf(ip->telnet, "\x01%s\x02", name.c_str());
         telnet_send(ip->telnet, str.c_str(), str.size());
@@ -207,7 +207,7 @@ void f_send_msdp_variable(EfunArgs&, StringArg name, Arg value) {
 /* ZMP */
 
 #ifdef F_HAS_ZMP
-Value f_has_zmp(EfunArgs&, object_t* ob) {
+vm::Value f_has_zmp(vm::EfunArgs&, object_t* ob) {
   int i = 0;
 
   if (ob->interactive) {
@@ -219,7 +219,7 @@ Value f_has_zmp(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_SEND_ZMP
-void f_send_zmp(EfunArgs&, StringArg command, array_t* args) {
+void f_send_zmp(vm::EfunArgs&, vm::StringArg command, array_t* args) {
   auto* ip = command_giver ? command_giver->interactive : nullptr;
   if (ip && ip->telnet) {
     telnet_begin_zmp(ip->telnet, command.c_str());
@@ -240,7 +240,7 @@ void f_send_zmp(EfunArgs&, StringArg command, array_t* args) {
 #endif
 
 #ifdef F_TELNET_MSP_OOB
-void f_telnet_msp_oob(EfunArgs&, StringArg message) {
+void f_telnet_msp_oob(vm::EfunArgs&, vm::StringArg message) {
   auto* ip = current_object->interactive;
   if (ip && ip->telnet) {
     telnet_send_msp_oob(ip, message.c_str(), message.size());

@@ -35,10 +35,11 @@ static int send_mssp_val(mapping_t* /*map*/, mapping_node_t* el, void* data) {
 
 void on_telnet_do_mssp(interactive_t* ip) {
   set_eval(max_eval_cost);
-  CallResult res = LPCCall().safe_apply_master(APPLY_GET_MUD_STATS);
+  vm::CallResult res = vm::Call().safe_apply_master(APPLY_GET_MUD_STATS);
   /* the stats mapping (an empty one when the master gave none), held until
    * the reply is sent */
-  Value stats = (res && res->type == T_MAPPING) ? res.take() : Value::refed(allocate_mapping(0));
+  vm::Value stats =
+      (res && res->type == T_MAPPING) ? res.take() : vm::Value::refed(allocate_mapping(0));
   mapping_t* map = stats->u.map;
 
   telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSSP);

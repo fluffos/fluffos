@@ -487,7 +487,7 @@ void cycle_walk(svalue_t* root, WalkMode mode, WalkResult* res) {
 #endif  // any of the three efuns
 
 #ifdef F_HAS_CYCLE
-Value f_has_cycle(EfunArgs&, Arg value) {
+vm::Value f_has_cycle(vm::EfunArgs&, vm::Arg value) {
   WalkResult res;
   cycle_walk(value.sv(), WALK_DETECT, &res);
   return res.found ? 1 : 0;
@@ -495,7 +495,7 @@ Value f_has_cycle(EfunArgs&, Arg value) {
 #endif
 
 #ifdef F_FIND_CYCLES
-Value f_find_cycles(EfunArgs&, Arg value) {
+vm::Value f_find_cycles(vm::EfunArgs&, vm::Arg value) {
   WalkResult res;
   cycle_walk(value.sv(), WALK_FIND, &res);
   // May error("Illegal array size") if there are more back-edges than
@@ -507,12 +507,12 @@ Value f_find_cycles(EfunArgs&, Arg value) {
     ret->item[i].subtype = STRING_MALLOC;
     ret->item[i].u.string = string_copy(res.paths[i].c_str(), "f_find_cycles");
   }
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 #endif
 
 #ifdef F_BREAK_CYCLES
-Value f_break_cycles(EfunArgs&, Arg value) {
+vm::Value f_break_cycles(vm::EfunArgs&, vm::Arg value) {
   WalkResult res;
   cycle_walk(value.sv(), WALK_BREAK, &res);
 

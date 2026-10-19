@@ -435,7 +435,7 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
    the callback form calls req->fun with it, the promise form settles
    req->prom with it. The value stays on the stack while the promise
    settles, so an error() in a cancel handler cannot leak it. */
-static void deliver_result(LPCCall& result, struct Request* req, int rejected) {
+static void deliver_result(vm::Call& result, struct Request* req, int rejected) {
   if (req->prom) {
     promise_settle(req->prom, result.arg(0).sv(), rejected);
     result.discard();
@@ -447,7 +447,7 @@ static void deliver_result(LPCCall& result, struct Request* req, int rejected) {
 
 void handle_read(struct Request* req) {
   int const val = req->ret;
-  LPCCall result;
+  vm::Call result;
   if (val < 0) {
     result.push(val);
     deliver_result(result, req, /*rejected=*/1);
@@ -456,7 +456,7 @@ void handle_read(struct Request* req) {
   char* file = new_string(val, "read_file_async: str");
   memcpy(file, (char*)(req->data.data()), val);
   file[val] = 0;
-  result.push(Value::str_malloced(file));
+  result.push(vm::Value::str_malloced(file));
   deliver_result(result, req, 0);
 }
 
@@ -487,29 +487,29 @@ void handle_getdir(struct Request* req) {
           });
   }
 
-  LPCCall result;
-  result.push(Value::refed(ret));
+  vm::Call result;
+  result.push(vm::Value::refed(ret));
   deliver_result(result, req, 0);
 }
 #endif
 
 void handle_write(struct Request* req) {
   int const val = req->ret;
-  LPCCall result;
+  vm::Call result;
   if (val < 0) {
     result.push(val);
     deliver_result(result, req, /*rejected=*/1);
     return;
   }
-  result.push(Value::undefined());
+  result.push(vm::Value::undefined());
   deliver_result(result, req, 0);
 }
 
 void handle_db_exec(struct Request* req) {
   int const val = req->ret;
-  LPCCall result;
+  vm::Call result;
   if (val == -1) {
-    result.push(Value::str_copy(req->path.c_str()));
+    result.push(vm::Value::str_copy(req->path.c_str()));
   } else {
     result.push(val);
   }
@@ -602,7 +602,7 @@ void complete_all_asyncio() {
 
 #ifdef F_ASYNC_READ
 
-Value f_async_read(EfunArgs& f, StringArg file, std::optional<funptr_t*> callback) {
+vm::Value f_async_read(vm::EfunArgs& f, vm::StringArg file, std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -632,15 +632,15 @@ Value f_async_read(EfunArgs& f, StringArg file, std::optional<funptr_t*> callbac
   add_read(path, fun, prom);
   if (prom) {
     prom->ref++; /* the request's ref stays; this one is the return value */
-    return Value::refed(prom);
+    return vm::Value::refed(prom);
   }
   return 0;
 }
 #endif
 
 #ifdef F_ASYNC_WRITE
-Value f_async_write(EfunArgs& f, StringArg file, StringArg buf, LPC_INT flags,
-                    std::optional<funptr_t*> callback) {
+vm::Value f_async_write(vm::EfunArgs& f, vm::StringArg file, vm::StringArg buf, LPC_INT flags,
+                        std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -661,14 +661,14 @@ Value f_async_write(EfunArgs& f, StringArg file, StringArg buf, LPC_INT flags,
   add_write(path, buf.c_str(), buf.size(), flags, fun, prom);
   if (prom) {
     prom->ref++;
-    return Value::refed(prom);
+    return vm::Value::refed(prom);
   }
   return 0;
 }
 #endif
 
 #ifdef F_ASYNC_GETDIR
-Value f_async_getdir(EfunArgs& f, StringArg dir, std::optional<funptr_t*> callback) {
+vm::Value f_async_getdir(vm::EfunArgs& f, vm::StringArg dir, std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -689,7 +689,7 @@ Value f_async_getdir(EfunArgs& f, StringArg dir, std::optional<funptr_t*> callba
   add_getdir(path, fun, prom);
   if (prom) {
     prom->ref++;
-    return Value::refed(prom);
+    return vm::Value::refed(prom);
   }
   return 0;
 }
@@ -713,7 +713,8 @@ struct AsyncCallbackRef {
   AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
 };
 
-Value f_async_db_exec(EfunArgs& f, LPC_INT handle, StringArg sql, std::optional<Arg> callback) {
+vm::Value f_async_db_exec(vm::EfunArgs& f, LPC_INT handle, vm::StringArg sql,
+                          std::optional<vm::Arg> callback) {
   // Two forms (issue #1319), same split as async_read():
   //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
   //   async_db_exec(handle, sql)                 -> promise for the row count
@@ -803,7 +804,7 @@ Value f_async_db_exec(EfunArgs& f, LPC_INT handle, StringArg sql, std::optional<
   add_db_exec(handle, sql.c_str(), cb ? cb.release() : nullptr, bound_args, prom);
   if (prom) {
     prom->ref++;
-    return Value::refed(prom);
+    return vm::Value::refed(prom);
   }
   return 0;
 }

@@ -487,7 +487,7 @@ void check_string_stats(outbuffer_t* out) {
 
 /* currently: 1 - debug, 2 - suppress leak checks. Returns check_memory()'s
  * result: the report, or 0 when leak checks are suppressed. */
-Value check_all_blocks(int flag) {
+vm::Value check_all_blocks(int flag) {
   int i, j, hsh;
   md_node_t* entry;
   object_t* ob;
@@ -735,7 +735,7 @@ Value check_all_blocks(int flag) {
     mark_free_sentences();
     mark_iptable();
     mark_stack();
-    mark_live_values();
+    vm::mark_live_values();
     mark_command_giver_stack();
     mark_call_outs();
     mark_hooks();

@@ -1,8 +1,8 @@
 /* efun_args.h -- the evaluation-stack API for efuns and driver call sites.
  *
  * Package code cannot see `sp` or the push_*()/pop_*() helpers (they live in
- * vm_stack.h, for VM internals and packages/ops only). These types are its
- * whole view of the stack:
+ * vm_stack.h, for VM internals and packages/ops only). These types, in
+ * namespace vm, are its whole view of the stack:
  *
  *   EfunArgs    The window over one efun call's arguments. make_func
  *               generates a thunk per efun from its .spec line: the thunk
@@ -12,7 +12,7 @@
  *               of the arguments. An efun body sees the window only for what
  *               the spec cannot type: varargs, and moving arguments out.
  *
- *   LPCCall     The arguments for one call from C++ into LPC (an apply, a
+ *   Call        The arguments for one call from C++ into LPC (an apply, a
  *               master apply, a function pointer or an efun callback). The
  *               call consumes what was pushed, so the count is never written
  *               a second time by hand.
@@ -33,6 +33,8 @@
 #include "vm/internal/base/value.h"
 
 struct function_to_call_t;
+
+namespace vm {
 
 /* The window over an efun's arguments, argument 0 first.
  *
@@ -212,12 +214,12 @@ class CallResult {
  * of the frame. Pushes must be the stack top when they are made and when
  * the call consumes them; that is checked in every build.
  */
-class LPCCall {
+class Call {
  public:
-  LPCCall();
-  ~LPCCall();
-  LPCCall(const LPCCall&) = delete;
-  LPCCall& operator=(const LPCCall&) = delete;
+  Call();
+  ~Call();
+  Call(const Call&) = delete;
+  Call& operator=(const Call&) = delete;
 
   int argc() const { return argc_; }
   /* A pushed argument, 0 first; for code that inspects or hands one over
@@ -245,12 +247,14 @@ class LPCCall {
 
  private:
   int consume();
-  template <typename Call>
-  CallResult guarded(Call&& call);
+  template <typename Fn>
+  CallResult guarded(Fn&& call);
 
   svalue_t* base_;
   int argc_ = 0;
   bool consumed_ = false;
 };
+
+}  // namespace vm
 
 #endif /* VM_EFUN_ARGS_H */

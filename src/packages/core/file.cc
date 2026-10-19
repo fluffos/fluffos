@@ -689,13 +689,13 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
     return nullptr;
   }
 
-  LPCCall call;
-  call.push(Value::str_copy(path));
-  call.push(Value::object(call_object));
-  call.push(Value::str_constant(call_fun));
+  vm::Call call;
+  call.push(vm::Value::str_copy(path));
+  call.push(vm::Value::object(call_object));
+  call.push(vm::Value::str_constant(call_fun));
   /* No master, no such apply, or an error in it: v is not ok() and reads as
    * null below, which allows the path unchanged (as it always has). */
-  CallResult r = call.safe_apply_master(writeflg ? APPLY_VALID_WRITE : APPLY_VALID_READ);
+  vm::CallResult r = call.safe_apply_master(writeflg ? APPLY_VALID_WRITE : APPLY_VALID_READ);
   svalue_t* v = r.get();
 
   if (v && v->type == T_NUMBER && v->u.number == 0) {
@@ -1035,14 +1035,14 @@ int copy_file(const char* from, const char* to) {
 }
 
 #ifdef F_CP
-Value f_cp(EfunArgs&, StringArg from, StringArg to) {
+vm::Value f_cp(vm::EfunArgs&, vm::StringArg from, vm::StringArg to) {
   int i = copy_file(from.c_str(), to.c_str());
   return i;
 }
 #endif
 
 #ifdef F_FILE_SIZE
-Value f_file_size(EfunArgs&, StringArg file) {
+vm::Value f_file_size(vm::EfunArgs&, vm::StringArg file) {
   LPC_INT i = file_size(file.c_str());
 
   // cross platform fix
@@ -1061,23 +1061,23 @@ Value f_file_size(EfunArgs&, StringArg file) {
 #endif
 
 #ifdef F_GET_DIR
-Value f_get_dir(EfunArgs&, StringArg path, LPC_INT flags) {
+vm::Value f_get_dir(vm::EfunArgs&, vm::StringArg path, LPC_INT flags) {
   array_t* vec = get_dir(path.c_str(), flags);
   if (vec) {
-    return Value::refed(vec);
+    return vm::Value::refed(vec);
   }
   return 0;
 }
 #endif
 
 #ifdef F_LINK
-Value f_link(EfunArgs&, StringArg from, StringArg to) {
+vm::Value f_link(vm::EfunArgs&, vm::StringArg from, vm::StringArg to) {
   int i;
 
-  LPCCall call;
+  vm::Call call;
   call.push(from.copy());
   call.push(to.copy());
-  CallResult ret = call.apply_master(APPLY_VALID_LINK);
+  vm::CallResult ret = call.apply_master(APPLY_VALID_LINK);
   if (MASTER_APPROVED(ret, "valid_link")) {
     i = do_rename(from.c_str(), to.c_str(), F_LINK);
   } else {
@@ -1088,7 +1088,7 @@ Value f_link(EfunArgs&, StringArg from, StringArg to) {
 #endif /* F_LINK */
 
 #ifdef F_MKDIR
-Value f_mkdir(EfunArgs&, StringArg dir) {
+vm::Value f_mkdir(vm::EfunArgs&, vm::StringArg dir) {
   const char* path = check_valid_path(dir.c_str(), current_object, "mkdir", 1);
   if (!path || OS_mkdir(path, 0770) == -1) {
     return 0;

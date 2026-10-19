@@ -9,9 +9,9 @@ const char* default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
-Value f_set_encoding(EfunArgs&, std::optional<StringArg> encoding) {
+vm::Value f_set_encoding(vm::EfunArgs&, std::optional<vm::StringArg> encoding) {
   if (!command_giver || !command_giver->interactive) {
-    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   auto* ip = command_giver->interactive;
@@ -22,7 +22,7 @@ Value f_set_encoding(EfunArgs&, std::optional<StringArg> encoding) {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
     }
-    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   // Set to specific encoding
@@ -45,7 +45,7 @@ Value f_set_encoding(EfunArgs&, std::optional<StringArg> encoding) {
 
   // Now let's return an canonical name
   if (!ip->trans) {
-    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
   }
 
   UErrorCode error_code = U_ZERO_ERROR;
@@ -53,14 +53,14 @@ Value f_set_encoding(EfunArgs&, std::optional<StringArg> encoding) {
   if (U_FAILURE(error_code)) {
     error("Fail to set encoding, ucnv_getName error: %s.", u_errorName(error_code));
   }
-  return Value::str_malloced(string_copy(name, "f_set_encoding: 3"));
+  return vm::Value::str_malloced(string_copy(name, "f_set_encoding: 3"));
 }
 #endif
 
 #ifdef F_QUERY_ENCODING
-Value f_query_encoding(EfunArgs&) {
+vm::Value f_query_encoding(vm::EfunArgs&) {
   if (!command_giver || !command_giver->interactive) {
-    return Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   const auto* res = default_encoding;
@@ -77,7 +77,7 @@ Value f_query_encoding(EfunArgs&) {
     }
   }
 
-  return Value::str_malloced(string_copy(res, "f_query_encoding"));
+  return vm::Value::str_malloced(string_copy(res, "f_query_encoding"));
 }
 #endif
 
@@ -93,7 +93,7 @@ struct FreeMstr {
 #endif
 
 #ifdef F_STRING_ENCODE
-Value f_string_encode(EfunArgs&, StringArg str, StringArg encoding_arg) {
+vm::Value f_string_encode(vm::EfunArgs&, vm::StringArg str, vm::StringArg encoding_arg) {
   const auto* data = str.c_str();
   auto len = str.size();
   const auto* encoding = encoding_arg.c_str();
@@ -123,12 +123,12 @@ Value f_string_encode(EfunArgs&, StringArg str, StringArg encoding_arg) {
   if (U_FAILURE(error_code)) {
     error("string_encode: error: %s.", u_errorName(error_code));
   }
-  return Value::refed(buffer.release());
+  return vm::Value::refed(buffer.release());
 }
 #endif
 
 #ifdef F_STRING_DECODE
-Value f_string_decode(EfunArgs&, buffer_t* buf, StringArg encoding_arg) {
+vm::Value f_string_decode(vm::EfunArgs&, buffer_t* buf, vm::StringArg encoding_arg) {
   auto* data = (char*)(buf->item);
   auto len = buf->size;
   const auto* encoding = encoding_arg.c_str();
@@ -159,13 +159,13 @@ Value f_string_decode(EfunArgs&, buffer_t* buf, StringArg encoding_arg) {
     error("string_decode: error: %s.", u_errorName(error_code));
   }
   DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
-  return Value::str_malloced(res.release());
+  return vm::Value::str_malloced(res.release());
 }
 #endif
 
 #ifdef F_BUFFER_TRANSCODE
-Value f_buffer_transcode(EfunArgs&, buffer_t* buf, StringArg from_encoding_arg,
-                         StringArg to_encoding_arg) {
+vm::Value f_buffer_transcode(vm::EfunArgs&, buffer_t* buf, vm::StringArg from_encoding_arg,
+                             vm::StringArg to_encoding_arg) {
   auto* data = (char*)(buf->item);
   auto len = buf->size;
   const auto* from_encoding = from_encoding_arg.c_str();
@@ -189,6 +189,6 @@ Value f_buffer_transcode(EfunArgs&, buffer_t* buf, StringArg from_encoding_arg,
     free_buffer(res);
     error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
-  return Value::refed(res);
+  return vm::Value::refed(res);
 }
 #endif

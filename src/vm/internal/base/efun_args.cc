@@ -60,6 +60,8 @@ void efun_stack_mismatch(const char* efun, int num_arg, ptrdiff_t off) {
   stack_desync(what);
 }
 
+namespace vm {
+
 /* ------------------------------------------------------------------- Value */
 
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -232,11 +234,11 @@ void EfunArgs::process_callback(int narg, function_to_call_t* ftc) {
   process_efun_callback(narg, ftc, efun_, argc_);
 }
 
-/* ----------------------------------------------------------------- LPCCall */
+/* -------------------------------------------------------------------- Call */
 
-LPCCall::LPCCall() : base_(sp + 1) {}
+Call::Call() : base_(sp + 1) {}
 
-LPCCall::~LPCCall() {
+Call::~Call() {
   if (consumed_ || argc_ == 0) {
     return;
   }
@@ -252,25 +254,26 @@ LPCCall::~LPCCall() {
     /* A destructor must not throw. Leave the slots alone: the efun's or the
      * dispatcher's own stack check reports the desync where it can error(). */
 #ifdef DEBUG
-    fatal("Driver bug: LPCCall: the call's arguments are not the stack top at scope exit.\n");
+    fatal("Driver bug: vm::Call: the call's arguments are not the stack top at scope exit.\n");
 #else
-    debug_message("Driver bug: LPCCall: the call's arguments are not the stack top at scope exit.\n");
+    debug_message(
+        "Driver bug: vm::Call: the call's arguments are not the stack top at scope exit.\n");
     return;
 #endif
   }
   pop_n_elems(argc_);
 }
 
-Arg LPCCall::arg(int i) const {
+Arg Call::arg(int i) const {
   if (i < 0 || i >= argc_ || consumed_) {
-    error("Driver bug: LPCCall argument %d of %d.\n", i, argc_);
+    error("Driver bug: vm::Call argument %d of %d.\n", i, argc_);
   }
   return Arg(base_ + i);
 }
 
-void LPCCall::push(Value v) {
+void Call::push(Value v) {
   if (consumed_ || sp != base_ + argc_ - 1) {
-    stack_desync("LPCCall::push: the call's arguments are not the stack top.");
+    stack_desync("vm::Call::push: the call's arguments are not the stack top.");
   }
   push_owned_value(v.release());
   argc_++;
@@ -278,18 +281,18 @@ void LPCCall::push(Value v) {
 
 /* Hand the arguments to a call. They belong to the callee from here on,
  * including if it error()s, so mark them consumed first. */
-int LPCCall::consume() {
+int Call::consume() {
   if (consumed_) {
-    stack_desync("LPCCall used for a second call.");
+    stack_desync("vm::Call used for a second call.");
   }
   if (sp != base_ + argc_ - 1) {
-    stack_desync("LPCCall: the call's arguments are not the stack top.");
+    stack_desync("vm::Call: the call's arguments are not the stack top.");
   }
   consumed_ = true;
   return argc_;
 }
 
-void LPCCall::discard() {
+void Call::discard() {
   if (consumed_) {
     return;
   }
@@ -298,7 +301,7 @@ void LPCCall::discard() {
     return; /* nothing pushed: the stack may legitimately have moved */
   }
   if (sp != base_ + argc_ - 1) {
-    stack_desync("LPCCall::discard: the call's arguments are not the stack top.");
+    stack_desync("vm::Call::discard: the call's arguments are not the stack top.");
   }
   pop_n_elems(argc_);
 }
@@ -330,8 +333,8 @@ svalue_t* call_direct_result(object_t* ob, int runtime_index, int origin, int n)
  * context dance as safe_apply(), with the unwind mark below the arguments
  * because the callee owns them once the call starts (issue #1014). call
  * returns what ::apply() does, so the one CallResult is built at the end. */
-template <typename Call>
-CallResult LPCCall::guarded(Call&& call) {
+template <typename Fn>
+CallResult Call::guarded(Fn&& call) {
   int n = consume();
   error_context_t econ;
   save_context(&econ);
@@ -348,11 +351,11 @@ CallResult LPCCall::guarded(Call&& call) {
   return result_of(r);
 }
 
-CallResult LPCCall::apply(const char* fun, object_t* ob, int origin) {
+CallResult Call::apply(const char* fun, object_t* ob, int origin) {
   return result_of(::apply(fun, ob, consume(), origin));
 }
 
-CallResult LPCCall::safe_apply(const char* fun, object_t* ob, int origin) {
+CallResult Call::safe_apply(const char* fun, object_t* ob, int origin) {
   /* As ::safe_apply(): a destructed target is not called at all -- no lazy
    * reset, no apply-miss hooks (apply_low() would run both first). */
   if (ob->flags & O_DESTRUCTED) {
@@ -362,7 +365,7 @@ CallResult LPCCall::safe_apply(const char* fun, object_t* ob, int origin) {
   return guarded([&](int n) { return ::apply(fun, ob, n, origin); });
 }
 
-CallResult LPCCall::apply_master(int fun) {
+CallResult Call::apply_master(int fun) {
   svalue_t* r = apply_master_ob(fun, consume());
   if (r == reinterpret_cast<svalue_t*>(-1)) {
     return CallResult(CallResult::kNoMaster);
@@ -370,7 +373,7 @@ CallResult LPCCall::apply_master(int fun) {
   return result_of(r);
 }
 
-CallResult LPCCall::safe_apply_master(int fun) {
+CallResult Call::safe_apply_master(int fun) {
   if (!master_ob) {
     discard();
     return CallResult(CallResult::kNoMaster);
@@ -378,24 +381,26 @@ CallResult LPCCall::safe_apply_master(int fun) {
   return safe_apply(applies_table[fun], master_ob, ORIGIN_DRIVER);
 }
 
-CallResult LPCCall::call(funptr_t* fp) { return result_of(call_function_pointer(fp, consume())); }
+CallResult Call::call(funptr_t* fp) { return result_of(call_function_pointer(fp, consume())); }
 
-CallResult LPCCall::safe_call(funptr_t* fp) {
+CallResult Call::safe_call(funptr_t* fp) {
   return guarded([&](int n) { return call_function_pointer(fp, n); });
 }
 
-CallResult LPCCall::call(function_to_call_t* ftc) {
+CallResult Call::call(function_to_call_t* ftc) {
   return result_of(call_efun_callback(ftc, consume()));
 }
 
-CallResult LPCCall::safe_call(function_to_call_t* ftc) {
+CallResult Call::safe_call(function_to_call_t* ftc) {
   return guarded([&](int n) { return call_efun_callback(ftc, n); });
 }
 
-CallResult LPCCall::call_direct(object_t* ob, int runtime_index, int origin) {
+CallResult Call::call_direct(object_t* ob, int runtime_index, int origin) {
   return result_of(call_direct_result(ob, runtime_index, origin, consume()));
 }
 
-CallResult LPCCall::safe_call_direct(object_t* ob, int runtime_index, int origin) {
+CallResult Call::safe_call_direct(object_t* ob, int runtime_index, int origin) {
   return guarded([&](int n) { return call_direct_result(ob, runtime_index, origin, n); });
 }
+
+}  // namespace vm

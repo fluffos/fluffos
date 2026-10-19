@@ -15,8 +15,8 @@ namespace {
 /* trim()/ltrim()/rtrim(): `chars` is a set of Unicode scalar values (issue
  * #1401), whitespace when absent or empty. A string with nothing to trim is
  * returned as is; otherwise the kept range is copied once. */
-Value trim_impl(EfunArgs& f, bool left, bool right, StringArg str,
-                std::optional<StringArg> chars) {
+vm::Value trim_impl(vm::EfunArgs& f, bool left, bool right, vm::StringArg str,
+                    std::optional<vm::StringArg> chars) {
   std::string_view const set =
       chars && !chars->empty() ? chars->view() : std::string_view("\t\n\v\f\r ");
   auto const [first, last] = u8_trim_range(str.view(), set, left, right);
@@ -25,27 +25,27 @@ Value trim_impl(EfunArgs& f, bool left, bool right, StringArg str,
     return f.take(0);
   }
   if (first == last) {
-    return Value::str_make_shared("");
+    return vm::Value::str_make_shared("");
   }
-  return Value::str_copy(str.view().substr(first, last - first));
+  return vm::Value::str_copy(str.view().substr(first, last - first));
 }
 
 }  // namespace
 
 #ifdef F_TRIM
-Value f_trim(EfunArgs& f, StringArg str, std::optional<StringArg> chars) {
+vm::Value f_trim(vm::EfunArgs& f, vm::StringArg str, std::optional<vm::StringArg> chars) {
   return trim_impl(f, true, true, str, chars);
 }
 #endif
 
 #ifdef F_LTRIM
-Value f_ltrim(EfunArgs& f, StringArg str, std::optional<StringArg> chars) {
+vm::Value f_ltrim(vm::EfunArgs& f, vm::StringArg str, std::optional<vm::StringArg> chars) {
   return trim_impl(f, true, false, str, chars);
 }
 #endif
 
 #ifdef F_RTRIM
-Value f_rtrim(EfunArgs& f, StringArg str, std::optional<StringArg> chars) {
+vm::Value f_rtrim(vm::EfunArgs& f, vm::StringArg str, std::optional<vm::StringArg> chars) {
   return trim_impl(f, false, true, str, chars);
 }
 #endif

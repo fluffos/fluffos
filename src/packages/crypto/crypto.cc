@@ -116,7 +116,7 @@ static char* evp_hash(const char* algo, const unsigned char* data, int data_len)
   return result;
 }
 
-Value f_hash(EfunArgs&, StringArg algorithm, StringArg input) {
+vm::Value f_hash(vm::EfunArgs&, vm::StringArg algorithm, vm::StringArg input) {
   const char *algo, *data;
   char* result = nullptr;
   int data_len;
@@ -195,6 +195,6 @@ result:
     error("hash() unknown hash type: %s\n", algo);
   }
 
-  return Value::str_malloced(result);
+  return vm::Value::str_malloced(result);
 }
 #endif

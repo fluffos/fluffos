@@ -608,9 +608,9 @@ struct unique_svalue_compare {
   }
 };
 
-Value f_unique_mapping(EfunArgs& f, array_t* v, Arg /* the callback */) {
+vm::Value f_unique_mapping(vm::EfunArgs& f, array_t* v, vm::Arg /* the callback */) {
   if (!v || !v->size) {
-    return Value::refed(allocate_mapping(0));
+    return vm::Value::refed(allocate_mapping(0));
   }
 
   // prepare the call back.
@@ -671,7 +671,7 @@ Value f_unique_mapping(EfunArgs& f, array_t* v, Arg /* the callback */) {
   }
 
   // Translate result into LPC mapping
-  Value m = Value::refed(allocate_mapping(0));
+  vm::Value m = vm::Value::refed(allocate_mapping(0));
   for (auto& item : result) {
     auto key = item.first;
     auto values = item.second;

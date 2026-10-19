@@ -97,7 +97,7 @@ void call_heart_beat() {
     g_current_heartbeat_obj = ob;
 
     set_eval(max_eval_cost);
-    LPCCall().safe_call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER);
+    vm::Call().safe_call_direct(ob, ob->prog->heart_beat - 1, ORIGIN_DRIVER);
 
     restore_command_giver();
     current_interactive = nullptr;

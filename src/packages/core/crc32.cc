@@ -25,14 +25,14 @@ uint32_t compute_crc32(unsigned char* buf, int len) {
 }
 
 #ifdef F_CRC32
-Value f_crc32(EfunArgs&, Arg data) {
+vm::Value f_crc32(vm::EfunArgs&, vm::Arg data) {
   int len;
   unsigned char* buf;
   uint32_t crc;
 
   /* string or buffer: the spec has checked it */
   if (data.is(T_STRING)) {
-    StringArg str = data.string();
+    vm::StringArg str = data.string();
     len = str.size();
     buf = (unsigned char*)str.c_str();
   } else {

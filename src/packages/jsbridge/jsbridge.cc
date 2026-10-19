@@ -138,8 +138,8 @@ void free_js_call(JsCall* call) {
 // Deliver a settled result to the LPC callback: cb(result, success, id).
 void deliver_js_result(JsCall* call, bool success, const std::string& result) {
   if (call->want_callback) {
-    LPCCall b;
-    b.push(Value::str_copy(result.c_str()));
+    vm::Call b;
+    b.push(vm::Value::str_copy(result.c_str()));
     b.push(success ? 1 : 0);
     b.push(call->key);
     set_eval(max_eval_cost);
@@ -303,12 +303,12 @@ void deliver_lpc_call(const std::string& name, const std::vector<std::string>& a
     arr->item[i].subtype = STRING_MALLOC;
     arr->item[i].u.string = string_copy(args[i].c_str(), "deliver_lpc_call");
   }
-  LPCCall b;
-  b.push(Value::refed(arr));
+  vm::Call b;
+  b.push(vm::Value::refed(arr));
   b.push(static_cast<LPC_INT>(id));
 
   set_eval(max_eval_cost);
-  CallResult ret(CallResult::kNotFound);
+  vm::CallResult ret(vm::CallResult::kNotFound);
   if (exp->call_back.type == T_STRING) {
     ret = b.safe_apply(exp->call_back.u.string, exp->ob_to_call, ORIGIN_INTERNAL);
   } else {
@@ -404,7 +404,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fluffos_js_result(int id, int success, cons
 }
 
 #ifdef F_JS_EXPORT
-Value f_js_export(EfunArgs&, StringArg export_name, std::optional<Arg> callback) {
+vm::Value f_js_export(vm::EfunArgs&, vm::StringArg export_name, std::optional<vm::Arg> callback) {
   std::string const name(export_name.c_str());
 
   // Replace or remove an existing registration.
@@ -430,18 +430,19 @@ Value f_js_export(EfunArgs&, StringArg export_name, std::optional<Arg> callback)
 #endif
 
 #ifdef F_JS_EVAL
-Value f_js_eval(EfunArgs&, StringArg code) {
+vm::Value f_js_eval(vm::EfunArgs&, vm::StringArg code) {
   char* result = js_bridge_eval(code.c_str());
   std::string const text(result ? result : "");
   if (result != nullptr) {
     free(result);
   }
-  return Value::str_copy(text.c_str());
+  return vm::Value::str_copy(text.c_str());
 }
 #endif
 
 #ifdef F_JS_CALL
-Value f_js_call(EfunArgs&, StringArg handler_name, array_t* args, std::optional<Arg> callback) {
+vm::Value f_js_call(vm::EfunArgs&, vm::StringArg handler_name, array_t* args,
+                    std::optional<vm::Arg> callback) {
   static LPC_INT next_key = 0;
 
   const char* handler = handler_name.c_str();

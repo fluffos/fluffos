@@ -126,7 +126,7 @@ struct function_lookup_info_t {
 
 /* Evaluation stack *top* (`sp`), the push_*()/pop_*() helpers, put_/STACK
  * macros and PoppedLvalue live in vm_stack.h -- VM internals and
- * packages/ops only. Package efuns use EfunArgs/LPCCall (included below).
+ * packages/ops only. Package efuns use vm::EfunArgs/vm::Call (included below).
  * Other registers remain visible for control-frame bookkeeping. */
 extern program_t* current_prog;
 extern short caller_type;
@@ -164,8 +164,9 @@ ref_t* make_ref(void);
 /* += / -= on a T_LVALUE_CODEPOINT slot; returns the resulting codepoint. */
 LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
 
-/* The evaluation-stack API for efuns and driver call sites (efun_args.h):
- * EfunArgs, LPCCall, CallResult, and value.h's Value/StringArg/Arg. */
+/* The evaluation-stack API for efuns and driver call sites, in namespace vm:
+ * efun_args.h's EfunArgs, Call and CallResult, and value.h's Value,
+ * StringArg and Arg. */
 #include "vm/internal/base/efun_args.h"
 
 /* Convert a string (raw UTF-8 bytes) or array of ints 0..255 into a fresh

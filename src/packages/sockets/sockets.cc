@@ -14,8 +14,8 @@
 #define VALID_SOCKET(x) check_valid_socket((x), fd, get_socket_owner(fd), addr, port)
 
 #ifdef F_SOCKET_CREATE
-Value f_socket_create(EfunArgs&, LPC_INT mode, Arg read_callback,
-                      std::optional<Arg> close_callback) {
+vm::Value f_socket_create(vm::EfunArgs&, LPC_INT mode, vm::Arg read_callback,
+                          std::optional<vm::Arg> close_callback) {
   if (check_valid_socket("create", -1, current_object, "N/A", -1)) {
     return socket_create(static_cast<enum socket_mode>(mode), read_callback.sv(),
                          close_callback ? close_callback->sv() : nullptr);
@@ -25,7 +25,8 @@ Value f_socket_create(EfunArgs&, LPC_INT mode, Arg read_callback,
 #endif
 
 #ifdef F_SOCKET_BIND
-Value f_socket_bind(EfunArgs&, LPC_INT fd, LPC_INT bind_port, std::optional<StringArg> bind_addr) {
+vm::Value f_socket_bind(vm::EfunArgs&, LPC_INT fd, LPC_INT bind_port,
+                        std::optional<vm::StringArg> bind_addr) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -39,7 +40,7 @@ Value f_socket_bind(EfunArgs&, LPC_INT fd, LPC_INT bind_port, std::optional<Stri
 #endif
 
 #ifdef F_SOCKET_LISTEN
-Value f_socket_listen(EfunArgs&, LPC_INT fd, Arg listen_callback) {
+vm::Value f_socket_listen(vm::EfunArgs&, LPC_INT fd, vm::Arg listen_callback) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -53,7 +54,8 @@ Value f_socket_listen(EfunArgs&, LPC_INT fd, Arg listen_callback) {
 #endif
 
 #ifdef F_SOCKET_ACCEPT
-Value f_socket_accept(EfunArgs&, LPC_INT fd, Arg read_callback, Arg write_callback) {
+vm::Value f_socket_accept(vm::EfunArgs&, LPC_INT fd, vm::Arg read_callback,
+                          vm::Arg write_callback) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -65,8 +67,8 @@ Value f_socket_accept(EfunArgs&, LPC_INT fd, Arg read_callback, Arg write_callba
 #endif
 
 #ifdef F_SOCKET_CONNECT
-Value f_socket_connect(EfunArgs&, LPC_INT fd, StringArg address, Arg read_callback,
-                       Arg write_callback) {
+vm::Value f_socket_connect(vm::EfunArgs&, LPC_INT fd, vm::StringArg address, vm::Arg read_callback,
+                           vm::Arg write_callback) {
   int i, port;
   char addr[ADDR_BUF_SIZE];
 
@@ -110,7 +112,8 @@ Value f_socket_connect(EfunArgs&, LPC_INT fd, StringArg address, Arg read_callba
 #endif
 
 #ifdef F_SOCKET_WRITE
-Value f_socket_write(EfunArgs&, LPC_INT fd, Arg message, std::optional<StringArg> address) {
+vm::Value f_socket_write(vm::EfunArgs&, LPC_INT fd, vm::Arg message,
+                         std::optional<vm::StringArg> address) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -124,7 +127,7 @@ Value f_socket_write(EfunArgs&, LPC_INT fd, Arg message, std::optional<StringArg
 #endif
 
 #ifdef F_SOCKET_CLOSE
-Value f_socket_close(EfunArgs&, LPC_INT fd) {
+vm::Value f_socket_close(vm::EfunArgs&, LPC_INT fd) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -135,7 +138,7 @@ Value f_socket_close(EfunArgs&, LPC_INT fd) {
 #endif
 
 #ifdef F_SOCKET_RELEASE
-Value f_socket_release(EfunArgs&, LPC_INT fd, object_t* ob, Arg release_callback) {
+vm::Value f_socket_release(vm::EfunArgs&, LPC_INT fd, object_t* ob, vm::Arg release_callback) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -148,8 +151,8 @@ Value f_socket_release(EfunArgs&, LPC_INT fd, object_t* ob, Arg release_callback
 #endif
 
 #ifdef F_SOCKET_ACQUIRE
-Value f_socket_acquire(EfunArgs&, LPC_INT fd, Arg read_callback, Arg write_callback,
-                       Arg close_callback) {
+vm::Value f_socket_acquire(vm::EfunArgs&, LPC_INT fd, vm::Arg read_callback, vm::Arg write_callback,
+                           vm::Arg close_callback) {
   int port;
   char addr[ADDR_BUF_SIZE];
 
@@ -162,13 +165,13 @@ Value f_socket_acquire(EfunArgs&, LPC_INT fd, Arg read_callback, Arg write_callb
 #endif
 
 #ifdef F_SOCKET_ERROR
-Value f_socket_error(EfunArgs&, LPC_INT error_code) {
-  return Value::str_constant(socket_error(error_code));
+vm::Value f_socket_error(vm::EfunArgs&, LPC_INT error_code) {
+  return vm::Value::str_constant(socket_error(error_code));
 }
 #endif
 
 #ifdef F_SOCKET_ADDRESS
-Value f_socket_address(EfunArgs&, Arg target, LPC_INT local) {
+vm::Value f_socket_address(vm::EfunArgs&, vm::Arg target, LPC_INT local) {
   char* str;
   int port;
   char addr[ADDR_BUF_SIZE];
@@ -182,7 +185,7 @@ Value f_socket_address(EfunArgs&, Arg target, LPC_INT local) {
     object_t* ob = target.object();
     /* This is so we can get the address of interactives as well. */
     if (!ob->interactive) {
-      return Value::undefined();
+      return vm::Value::undefined();
     }
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
@@ -196,17 +199,17 @@ Value f_socket_address(EfunArgs&, Arg target, LPC_INT local) {
     sprintf(buf, "%s %s", host, service);
 
     str = string_copy(buf, "f_socket_address");
-    return Value::str_malloced(str);
+    return vm::Value::str_malloced(str);
   }
   get_socket_address(target.number(), addr, &port, local);
   sprintf(buf, "%s %d", addr, port);
   str = string_copy(buf, "f_socket_address");
-  return Value::str_malloced(str);
+  return vm::Value::str_malloced(str);
 } /* f_socket_address() */
 #endif
 
 #ifdef F_SOCKET_STATUS
-Value f_socket_status(EfunArgs&, std::optional<LPC_INT> fd) {
+vm::Value f_socket_status(vm::EfunArgs&, std::optional<LPC_INT> fd) {
   array_t* info;
   int i;
 
@@ -216,14 +219,14 @@ Value f_socket_status(EfunArgs&, std::optional<LPC_INT> fd) {
     if (!info) {
       return 0;
     }
-    return Value::refed(info);
+    return vm::Value::refed(info);
   }
   info = allocate_empty_array(lpc_socks_num());
   for (i = 0; i < lpc_socks_num(); i++) {
     info->item[i].type = T_ARRAY;
     info->item[i].u.arr = socket_status(i);
   }
-  return Value::refed(info);
+  return vm::Value::refed(info);
 }
 
 #if defined(F_SOCKET_SET_OPTION) || defined(F_SOCKET_GET_OPTION)
@@ -244,7 +247,7 @@ void check_socket_option_access(const char* efun, int lpc_sock) {
 #endif
 
 #ifdef F_SOCKET_SET_OPTION
-void f_socket_set_option(EfunArgs&, LPC_INT lpc_sock, LPC_INT option, Arg value) {
+void f_socket_set_option(vm::EfunArgs&, LPC_INT lpc_sock, LPC_INT option, vm::Arg value) {
   auto* arg = value.sv();
 
   check_socket_option_access("socket_set_option", lpc_sock);
@@ -285,7 +288,7 @@ void f_socket_set_option(EfunArgs&, LPC_INT lpc_sock, LPC_INT option, Arg value)
 #endif
 
 #ifdef F_SOCKET_GET_OPTION
-Value f_socket_get_option(EfunArgs&, LPC_INT lpc_sock, LPC_INT option) {
+vm::Value f_socket_get_option(vm::EfunArgs&, LPC_INT lpc_sock, LPC_INT option) {
   // socket_get_option(int, int): socket at arg 0, option at arg 1.
 
   check_socket_option_access("socket_get_option", lpc_sock);
@@ -302,7 +305,7 @@ Value f_socket_get_option(EfunArgs&, LPC_INT lpc_sock, LPC_INT option) {
 
   svalue_t const value = lpc_socks_get(lpc_sock)->options[option];
   if (value.type == T_STRING) {
-    return Value::str_copy(value.u.string);
+    return vm::Value::str_copy(value.u.string);
   }
   if (value.type == T_NUMBER) {
     return value.u.number;

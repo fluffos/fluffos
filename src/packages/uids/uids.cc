@@ -19,7 +19,7 @@ static object_t* ob;
 
 #ifdef F_EXPORT_UID
 
-Value f_export_uid(EfunArgs&, object_t* target) {
+vm::Value f_export_uid(vm::EfunArgs&, object_t* target) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
@@ -35,17 +35,17 @@ Value f_export_uid(EfunArgs&, object_t* target) {
 
 #ifdef F_GETEUID
 
-Value f_geteuid(EfunArgs&, Arg who) {
+vm::Value f_geteuid(vm::EfunArgs&, vm::Arg who) {
   if (who.is(T_OBJECT)) {
     ob = who.object();
     if (ob->euid) {
-      return Value::str_shared(ob->euid->name);
+      return vm::Value::str_shared(ob->euid->name);
     }
     return 0;
   }
   funptr_t* fp = who.funptr();
   if (fp->hdr.owner && fp->hdr.owner->euid) {
-    return Value::str_shared(fp->hdr.owner->euid->name);
+    return vm::Value::str_shared(fp->hdr.owner->euid->name);
   }
   return 0;
 }
@@ -54,21 +54,21 @@ Value f_geteuid(EfunArgs&, Arg who) {
 
 #ifdef F_GETUID
 
-Value f_getuid(EfunArgs&, object_t* target) {
+vm::Value f_getuid(vm::EfunArgs&, object_t* target) {
   ob = target;
 
   if (!ob->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
   }
 
-  return Value::str_shared(ob->uid->name);
+  return vm::Value::str_shared(ob->uid->name);
 }
 
 #endif
 
 #ifdef F_SETEUID
 
-Value f_seteuid(EfunArgs&, Arg euid) {
+vm::Value f_seteuid(vm::EfunArgs&, vm::Arg euid) {
   if (euid.is(T_NUMBER)) {
     if (euid.number()) {
       bad_arg(1, F_SETEUID);
@@ -76,10 +76,10 @@ Value f_seteuid(EfunArgs&, Arg euid) {
     current_object->euid = nullptr;
     return 1;
   }
-  LPCCall call;
-  call.push(Value::object(current_object));
+  vm::Call call;
+  call.push(vm::Value::object(current_object));
   call.push(euid.copy());
-  CallResult ret = call.apply_master(APPLY_VALID_SETEUID);
+  vm::CallResult ret = call.apply_master(APPLY_VALID_SETEUID);
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
     return 0;
   }

@@ -7,7 +7,7 @@
 static object_t* ob;
 
 #ifdef F_DEBUG_INFO
-Value f_debug_info(EfunArgs&, LPC_INT flag, object_t* target) {
+vm::Value f_debug_info(vm::EfunArgs&, LPC_INT flag, object_t* target) {
   outbuffer_t out;
 
   outbuf_zero(&out);
@@ -114,7 +114,7 @@ Value f_debug_info(EfunArgs&, LPC_INT flag, object_t* target) {
 #endif
 
 #ifdef F_REFS
-Value f_refs(EfunArgs&, Arg value) {
+vm::Value f_refs(vm::EfunArgs&, vm::Arg value) {
   int r;
 
   switch (value.type()) {
@@ -153,7 +153,7 @@ Value f_refs(EfunArgs&, Arg value) {
 #endif
 
 #ifdef F_DESTRUCTED_OBJECTS
-Value f_destructed_objects(EfunArgs&) {
+vm::Value f_destructed_objects(vm::EfunArgs&) {
   int i;
   array_t* ret;
   object_t* ob;
@@ -173,14 +173,14 @@ Value f_destructed_objects(EfunArgs&) {
     ob = ob->next_all;
   }
 
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 #endif
 
 #ifdef F_DUMP_STRALLOC
 void dump_stralloc(outbuffer_t*);
 
-Value f_dump_stralloc(EfunArgs&, StringArg file) {
+vm::Value f_dump_stralloc(vm::EfunArgs&, vm::StringArg file) {
   const auto* target_file = file.c_str();
   const char* fn;
   FILE* fp;
@@ -213,7 +213,7 @@ Value f_dump_stralloc(EfunArgs&, StringArg file) {
 #include <jemalloc/jemalloc.h>  // for mallctl
 #endif
 
-void f_dump_jemalloc(EfunArgs&) {
+void f_dump_jemalloc(vm::EfunArgs&) {
 #ifdef HAVE_JEMALLOC
   mallctl("prof.dump", nullptr, nullptr, nullptr, 0);
   malloc_stats_print(nullptr, nullptr, "");
@@ -225,28 +225,28 @@ void f_dump_jemalloc(EfunArgs&) {
 
 #if (defined(DEBUGMALLOC) && defined(DEBUGMALLOC_EXTENSIONS))
 #ifdef F_DEBUGMALLOC
-Value f_debugmalloc(EfunArgs&, StringArg file, LPC_INT mask) {
+vm::Value f_debugmalloc(vm::EfunArgs&, vm::StringArg file, LPC_INT mask) {
   char* res;
 
   res = dump_debugmalloc(file.c_str(), mask);
-  return Value::str_malloced(res);
+  return vm::Value::str_malloced(res);
 }
 #endif
 
 #ifdef F_SET_MALLOC_MASK
-void f_set_malloc_mask(EfunArgs&, LPC_INT mask) { set_malloc_mask(mask); }
+void f_set_malloc_mask(vm::EfunArgs&, LPC_INT mask) { set_malloc_mask(mask); }
 #endif
 
 #ifdef F_CHECK_MEMORY
-Value check_all_blocks(int); /* checkmemory.cc */
+vm::Value check_all_blocks(int); /* checkmemory.cc */
 
-Value f_check_memory(EfunArgs&, LPC_INT flag) {
+vm::Value f_check_memory(vm::EfunArgs&, LPC_INT flag) {
   return check_all_blocks(static_cast<int>(flag));
 }
 #endif
 
 #ifdef F_FIND_ORPHANED_CYCLES
-Value f_find_orphaned_cycles(EfunArgs&, LPC_INT collect_arg) {
+vm::Value f_find_orphaned_cycles(vm::EfunArgs&, LPC_INT collect_arg) {
   // any nonzero LPC int means collect (don't truncate the 64-bit argument)
   int const collect = collect_arg != 0;
   return md_scan_orphaned_cycles(collect, nullptr);
@@ -256,7 +256,7 @@ Value f_find_orphaned_cycles(EfunArgs&, LPC_INT collect_arg) {
         * defined(DEBUGMALLOC_EXTENSIONS)) */
 
 #ifdef F_TRACE
-Value f_trace(EfunArgs&, LPC_INT level) {
+vm::Value f_trace(vm::EfunArgs&, LPC_INT level) {
   int ot = -1;
 
   if (command_giver && command_giver->interactive) {
@@ -268,7 +268,7 @@ Value f_trace(EfunArgs&, LPC_INT level) {
 #endif
 
 #ifdef F_TRACEPREFIX
-Value f_traceprefix(EfunArgs&, Arg prefix) {
+vm::Value f_traceprefix(vm::EfunArgs&, vm::Arg prefix) {
   const char* old = nullptr;
 
   if (command_giver && command_giver->interactive) {
@@ -285,7 +285,7 @@ Value f_traceprefix(EfunArgs&, Arg prefix) {
     }
   }
   if (old) {
-    Value result = Value::str_malloced(add_slash(old));
+    vm::Value result = vm::Value::str_malloced(add_slash(old));
     free_string(old);
     return result;
   }

@@ -23,7 +23,7 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 }
 
 #ifdef F_GET_CONFIG
-Value f_get_config(EfunArgs& f, LPC_INT item) {
+vm::Value f_get_config(vm::EfunArgs& f, LPC_INT item) {
   /* get_config_item() reads the item number from its slot and overwrites
    * the slot with the result */
   if (!get_config_item(f[0].sv(), f[0].sv())) {
@@ -34,7 +34,7 @@ Value f_get_config(EfunArgs& f, LPC_INT item) {
 #endif
 
 #ifdef F_SET_CONFIG
-void f_set_config(EfunArgs&, LPC_INT num, Arg value) {
+void f_set_config(vm::EfunArgs&, LPC_INT num, vm::Arg value) {
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
     error("Bad 1st argument to set_config()\n");
   }

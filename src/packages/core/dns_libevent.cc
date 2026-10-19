@@ -172,12 +172,12 @@ void mark_dns_requests() {
 // query finished, call the LPC callback.
 void on_query_addr_by_name_finish(AddrNumberQuery* query) {
   // The callback's arguments: (name, address, key).
-  LPCCall call;
+  vm::Call call;
   if (query->err) {
     debug(dns, "DNS lookup fail: %" LPC_INT_FMTSTR_P ",request: %s, err: %s.\n", query->key,
           query->name, evutil_gai_strerror(query->err));
-    call.push(Value::undefined());
-    call.push(Value::undefined());
+    call.push(vm::Value::undefined());
+    call.push(vm::Value::undefined());
   } else {
     auto* result = query->res;
 #ifndef IPV6
@@ -190,21 +190,21 @@ void on_query_addr_by_name_finish(AddrNumberQuery* query) {
 #endif
     if (result == nullptr) {
       debug(dns, "%" LPC_INT_FMTSTR_P ": DNS lookup success but no suitable result.\n", query->key);
-      call.push(Value::undefined());
-      call.push(Value::undefined());
+      call.push(vm::Value::undefined());
+      call.push(vm::Value::undefined());
     } else {
       // push the name
-      call.push(Value::str_copy(query->name));
+      call.push(vm::Value::str_copy(query->name));
 
       // push IP address
       char host[NI_MAXHOST];
       int const ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr,
                                   0, NI_NUMERICHOST);
       if (!ret) {
-        call.push(Value::str_copy(host));
+        call.push(vm::Value::str_copy(host));
       } else {
         debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", evutil_gai_strerror(ret));
-        call.push(Value::undefined());
+        call.push(vm::Value::undefined());
       }
       debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key,
             query->name, host);

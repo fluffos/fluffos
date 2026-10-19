@@ -46,7 +46,7 @@ struct lpc_socket_event_data {
 };
 
 // forward declaration for callback helper used later
-static void call_callback(int fd, int what, LPCCall& call);
+static void call_callback(int fd, int what, vm::Call& call);
 
 namespace {
 
@@ -244,12 +244,12 @@ int check_valid_socket(const char* const what, int fd, object_t* owner, const ch
   info->item[3].type = T_NUMBER;
   info->item[3].u.number = port;
 
-  LPCCall call;
-  call.push(Value::object(current_object));
-  call.push(Value::str_constant(what));
-  call.push(Value::refed(info));
+  vm::Call call;
+  call.push(vm::Value::object(current_object));
+  call.push(vm::Value::str_constant(what));
+  call.push(vm::Value::refed(info));
 
-  CallResult mret = call.apply_master(APPLY_VALID_SOCKET);
+  vm::CallResult mret = call.apply_master(APPLY_VALID_SOCKET);
   return master_approved(mret, "valid_socket");
 }
 
@@ -1248,7 +1248,7 @@ int socket_write(int fd, svalue_t* message, const char* name) {
 /* Runs the socket's `what` callback with the arguments pushed on `call`. With
  * no callback set the call is never made, and `call` pops its arguments when
  * the caller's scope ends. */
-static void call_callback(int fd, int what, LPCCall& call) {
+static void call_callback(int fd, int what, vm::Call& call) {
   union string_or_func callback;
 
   switch (what) {
@@ -1293,7 +1293,7 @@ static void call_callback(int fd, int what, LPCCall& call) {
  * char, and a well-formed text/JSON body ends on an ASCII byte with the carry
  * already empty.
  */
-static bool push_sanitized_stream_chunk(LPCCall &call, int fd, const char *buf, int cc) {
+static bool push_sanitized_stream_chunk(vm::Call& call, int fd, const char* buf, int cc) {
   std::string data;
   data.reserve(lpc_socks[fd].u8_carry_len + cc);
   data.append(lpc_socks[fd].u8_carry, lpc_socks[fd].u8_carry_len);
@@ -1310,7 +1310,7 @@ static bool push_sanitized_stream_chunk(LPCCall &call, int fd, const char *buf, 
   }
 
   auto res = u8_sanitize(data);
-  call.push(Value::str_copy(res.c_str()));
+  call.push(vm::Value::str_copy(res.c_str()));
   return true;
 }
 
@@ -1373,7 +1373,7 @@ void socket_read_select_handler(int fd) {
               sprintf(addr, "%s %s", host, service);
             }
           }
-          LPCCall call;
+          vm::Call call;
           call.push(fd);
           if (lpc_socks[fd].flags & S_BINARY || !u8_validate(buf)) {
             buffer_t* b;
@@ -1381,15 +1381,15 @@ void socket_read_select_handler(int fd) {
             b = allocate_buffer(cc);
             if (b) {
               memcpy(b->item, buf, cc);
-              call.push(Value::refed(b));
+              call.push(vm::Value::refed(b));
             } else {
               call.push(0);
             }
           } else {
             auto res = u8_sanitize(buf);
-            call.push(Value::str_copy(res.c_str()));
+            call.push(vm::Value::str_copy(res.c_str()));
           }
-          call.push(Value::str_copy(addr));
+          call.push(vm::Value::str_copy(addr));
           debug(sockets, ("read_socket_handler: apply\n"));
           call_callback(fd, S_READ_FP, call);
           return;
@@ -1406,7 +1406,7 @@ void socket_read_select_handler(int fd) {
     case STATE_LISTEN: {
       debug(sockets, ("read_socket_handler: apply read callback\n"));
       lpc_socks[fd].flags |= S_WACCEPT;
-      LPCCall call;
+      vm::Call call;
       call.push(fd);
       call_callback(fd, S_READ_FP, call);
       return;
@@ -1494,12 +1494,12 @@ void socket_read_select_handler(int fd) {
           lpc_socks[fd].r_buf[lpc_socks[fd].r_len] = '\0';
           value = const0;
           {
-            LPCCall call;
+            vm::Call call;
             call.push(fd);
             if (restore_svalue(lpc_socks[fd].r_buf, &value) == 0) {
-              call.push(Value::owned(value)); /* the call takes it over */
+              call.push(vm::Value::owned(value)); /* the call takes it over */
             } else {
-              call.push(Value::undefined());
+              call.push(vm::Value::undefined());
             }
             FREE(lpc_socks[fd].r_buf);
             lpc_socks[fd].flags |= S_HEADER;
@@ -1528,7 +1528,7 @@ void socket_read_select_handler(int fd) {
           debug(sockets, "read_socket_handler: read %d bytes\n", cc);
           buf[cc] = '\0';
           {
-            LPCCall call;
+            vm::Call call;
             call.push(fd);
             if (lpc_socks[fd].flags & S_BINARY) {
               buffer_t* b;
@@ -1536,7 +1536,7 @@ void socket_read_select_handler(int fd) {
               b = allocate_buffer(cc);
               if (b) {
                 memcpy(b->item, buf, cc);
-                call.push(Value::refed(b));
+                call.push(vm::Value::refed(b));
               } else {
                 call.push(0);
               }
@@ -1580,7 +1580,7 @@ void socket_read_select_handler(int fd) {
           debug(sockets, "read_socket_handler: SSL_read %d bytes\n", cc);
           buf[cc] = '\0';
           {
-            LPCCall call;
+            vm::Call call;
             call.push(fd);
             if (lpc_socks[fd].flags & S_BINARY) {
               buffer_t* b;
@@ -1588,7 +1588,7 @@ void socket_read_select_handler(int fd) {
               b = allocate_buffer(cc);
               if (b) {
                 memcpy(b->item, buf, cc);
-                call.push(Value::refed(b));
+                call.push(vm::Value::refed(b));
               } else {
                 call.push(0);
               }
@@ -1779,7 +1779,7 @@ void socket_write_select_handler(int fd) {
   debug(sockets, ("write_socket_handler: apply write_callback\n"));
 
   {
-    LPCCall call;
+    vm::Call call;
     call.push(fd);
     call_callback(fd, S_WRITE_FP, call);
   }
@@ -1810,7 +1810,7 @@ int socket_close(int fd, int flags) {
 
   if (flags & SC_DO_CALLBACK) {
     debug(sockets, ("socket_close: apply close callback\n"));
-    LPCCall call;
+    vm::Call call;
     call.push(fd);
     call_callback(fd, S_CLOSE_FP, call);
   }
@@ -1888,9 +1888,9 @@ int socket_release(int fd, object_t* ob, svalue_t* callback) {
   lpc_socks[fd].flags |= S_RELEASE;
   lpc_socks[fd].release_ob = ob;
 
-  LPCCall call;
+  vm::Call call;
   call.push(fd);
-  call.push(Value::object(ob));
+  call.push(vm::Value::object(ob));
   set_eval(max_eval_cost);
 
   if (callback->type == T_FUNCTION) {

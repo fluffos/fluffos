@@ -24,6 +24,8 @@
 
 void free_string_svalue(svalue_t*); /* interpret.cc */
 
+namespace vm {
+
 /* Release one argument slot. Strings, the commonest refcounted argument,
  * take free_string_svalue()'s short path (as the hand-written efuns did),
  * and an array/mapping/object/... argument that something else still
@@ -105,5 +107,7 @@ EFUN_ARGS_HOT void EfunArgs::finish_void() {
   argc_ = 0;
   base_ = sp + 1;
 }
+
+}  // namespace vm
 
 #endif /* VM_EFUN_ARGS_INLINE_H */

@@ -33,8 +33,8 @@ int master_approved(svalue_t* v, const char* apply_name) {
   return v->type != T_NUMBER || v->u.number != 0;
 }
 
-int master_approved(const CallResult& r, const char* apply_name) {
-  if (r.status() == CallResult::kNoMaster) {
+int master_approved(const vm::CallResult& r, const char* apply_name) {
+  if (r.status() == vm::CallResult::kNoMaster) {
     return 1; /* no master yet: the bootstrap allow */
   }
   return master_approved(const_cast<svalue_t*>(r.get()), apply_name);

@@ -3,13 +3,13 @@
 #include "file.h"
 
 #ifdef F_DUMP_TRACE
-Value f_dump_trace(EfunArgs&) {
-  return Value::addref(get_svalue_trace()); /* returns a zero-reference array */
+vm::Value f_dump_trace(vm::EfunArgs&) {
+  return vm::Value::addref(get_svalue_trace()); /* returns a zero-reference array */
 }
 #endif
 
 #ifdef F_TRACE_START
-void f_trace_start(EfunArgs&, StringArg file, LPC_INT duration) {
+void f_trace_start(vm::EfunArgs&, vm::StringArg file, LPC_INT duration) {
   // Unconditional: Tracer::collect() self-guards on an empty filename, and
   // gating it on enabled() is what wedged tracing for the life of the
   // process. When a trace hits MAX_EVENTS, TraceWriter::log() calls
@@ -48,7 +48,7 @@ void f_trace_start(EfunArgs&, StringArg file, LPC_INT duration) {
 #endif
 
 #ifdef F_TRACE_END
-void f_trace_end(EfunArgs&) {
+void f_trace_end(vm::EfunArgs&) {
   // No enabled() gate: a trace that filled its buffer is exactly the case
   // that needs ending, and collect() already no-ops when there is nothing
   // pending.

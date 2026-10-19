@@ -128,11 +128,11 @@ int pcrecachesize = 0;
 struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
-Value f_pcre_version(EfunArgs&) {
+vm::Value f_pcre_version(vm::EfunArgs&) {
   char version[96];
   int jit = 0;
   if (pcre2_config(PCRE2_CONFIG_VERSION, version) < 0) {
-    return Value::str_constant("unknown");
+    return vm::Value::str_constant("unknown");
   }
   if (pcre2_config(PCRE2_CONFIG_JIT, &jit) >= 0 && jit) {
     size_t n = strlen(version);
@@ -140,10 +140,10 @@ Value f_pcre_version(EfunArgs&) {
       memcpy(version + n, " JIT", 5);
     }
   }
-  return Value::str_copy(version);
+  return vm::Value::str_copy(version);
 }
 
-Value f_pcre_config(EfunArgs&) {
+vm::Value f_pcre_config(vm::EfunArgs&) {
   mapping_t* m = allocate_mapping(16);
   char buf[128];
   uint32_t u = 0;
@@ -190,10 +190,10 @@ Value f_pcre_config(EfunArgs&) {
     add_mapping_pair(m, "never_backslash_c", u);
   }
 #endif
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 
-Value f_pcre_info(EfunArgs&, StringArg pattern, std::optional<Arg> flags) {
+vm::Value f_pcre_info(vm::EfunArgs&, vm::StringArg pattern, std::optional<vm::Arg> flags) {
   pcre_options opts = default_pcre_options();
   if (flags) {
     apply_options_svalue(&opts, flags->sv());
@@ -276,10 +276,10 @@ Value f_pcre_info(EfunArgs&, StringArg pattern, std::optional<Arg> flags) {
     }
   }
 
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 
-Value f_pcre_convert(EfunArgs&, StringArg pattern, mapping_t* map) {
+vm::Value f_pcre_convert(vm::EfunArgs&, vm::StringArg pattern, mapping_t* map) {
   uint32_t cflags = PCRE2_CONVERT_UTF;
   int have_kind = 0;
 
@@ -326,11 +326,11 @@ Value f_pcre_convert(EfunArgs&, StringArg pattern, mapping_t* map) {
   memcpy(ret, out, outlen);
   ret[outlen] = '\0';
   pcre2_converted_pattern_free(out);
-  return Value::str_malloced(ret);
+  return vm::Value::str_malloced(ret);
 }
 
-Value f_pcre_match(EfunArgs&, Arg subject, StringArg pattern, std::optional<Arg> arg3,
-                   std::optional<Arg> pcre_flags) {
+vm::Value f_pcre_match(vm::EfunArgs&, vm::Arg subject, vm::StringArg pattern,
+                       std::optional<vm::Arg> arg3, std::optional<vm::Arg> pcre_flags) {
   array_t* v;
   int flag = 0;
   pcre_options opts = default_pcre_options();
@@ -358,11 +358,11 @@ Value f_pcre_match(EfunArgs&, Arg subject, StringArg pattern, std::optional<Arg>
     return flag;
   }
   v = pcre_match(subject.array(), pattern.c_str(), flag, opts);
-  return Value::refed(v);
+  return vm::Value::refed(v);
 }
 
-Value f_pcre_assoc(EfunArgs& f, StringArg /* str: f[0] */, array_t* pat, array_t* tok,
-                   std::optional<Arg> def, std::optional<Arg> pcre_flags) {
+vm::Value f_pcre_assoc(vm::EfunArgs& f, vm::StringArg /* str: f[0] */, array_t* pat, array_t* tok,
+                       std::optional<vm::Arg> def, std::optional<vm::Arg> pcre_flags) {
   array_t* vec;
   pcre_options opts = default_pcre_options();
 
@@ -372,11 +372,11 @@ Value f_pcre_assoc(EfunArgs& f, StringArg /* str: f[0] */, array_t* pat, array_t
 
   vec = pcre_assoc(f[0].sv(), pat, tok, def ? def->sv() : &const0, opts);
 
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 
-Value f_pcre_extract(EfunArgs&, StringArg subject, StringArg pattern, std::optional<Arg> arg3,
-                     std::optional<Arg> pcre_flags) {
+vm::Value f_pcre_extract(vm::EfunArgs&, vm::StringArg subject, vm::StringArg pattern,
+                         std::optional<vm::Arg> arg3, std::optional<vm::Arg> pcre_flags) {
   pcre_t* run;
   array_t* ret;
   int include_names = 0;
@@ -409,18 +409,18 @@ Value f_pcre_extract(EfunArgs&, StringArg subject, StringArg pattern, std::optio
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    return Value::refed(&the_null_array);
+    return vm::Value::refed(&the_null_array);
   }
   if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
     error("Too many substrings.\n");
   }
 
   ret = pcre_get_substrings(run, include_names);
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 
-Value f_pcre_replace(EfunArgs& f, StringArg subject, StringArg pattern, Arg replacement,
-                     std::optional<Arg> pcre_flags) {
+vm::Value f_pcre_replace(vm::EfunArgs& f, vm::StringArg subject, vm::StringArg pattern,
+                         vm::Arg replacement, std::optional<vm::Arg> pcre_flags) {
   pcre_t* run;
   array_t* replacements;
 
@@ -445,9 +445,9 @@ Value f_pcre_replace(EfunArgs& f, StringArg subject, StringArg pattern, Arg repl
     if (pcre_ensure_compiled(run) < 0) {
       error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     }
-    StringArg repl = replacement.string();
+    vm::StringArg repl = replacement.string();
     ret = pcre_substitute_template(run, repl.c_str(), repl.size());
-    return Value::str_malloced(ret);
+    return vm::Value::str_malloced(ret);
   }
 
   replacements = replacement.array();
@@ -484,14 +484,14 @@ Value f_pcre_replace(EfunArgs& f, StringArg subject, StringArg pattern, Arg repl
 
   ret = pcre_get_replace(run, replacements);
 
-  return Value::str_malloced(ret);
+  return vm::Value::str_malloced(ret);
 }
 
 // string pcre_replace_callback(string, string, function)
 // The callback's own trailing arguments are untyped (`...`): a trailing int
 // or mapping after them is pcre_flags.
-Value f_pcre_replace_callback(EfunArgs& f, StringArg subject, StringArg pattern,
-                              Arg /* fun: read by process_callback() */) {
+vm::Value f_pcre_replace_callback(vm::EfunArgs& f, vm::StringArg subject, vm::StringArg pattern,
+                                  vm::Arg /* fun: read by process_callback() */) {
   int i;
   char* ret;
   pcre_t* run;
@@ -528,22 +528,22 @@ Value f_pcre_replace_callback(EfunArgs& f, StringArg subject, StringArg pattern,
 
   // Owned from here, so an error() -- process_callback() rejecting the
   // callback, or an error in a callback -- frees it.
-  Value arr_owner = Value::refed(pcre_get_substrings(run, false));
+  vm::Value arr_owner = vm::Value::refed(pcre_get_substrings(run, false));
   arr = arr_owner->u.arr;
 
   f.process_callback(2, &ftc);
 
   r = allocate_array(run->rc - 1);  // can't use the empty variant in case we error below
-  Value r_owner = Value::refed(r);
+  vm::Value r_owner = vm::Value::refed(r);
   error_context_t econ;
 
   save_context(&econ);
   try {
     for (i = 0; i < run->rc - 1; i++) {
-      LPCCall b;
-      b.push(Value::copy(&arr->item[i]));
+      vm::Call b;
+      b.push(vm::Value::copy(&arr->item[i]));
       b.push(i);
-      CallResult v = b.call(&ftc);
+      vm::CallResult v = b.call(&ftc);
 
       /* Mimic behaviour of map(string, function) when function pointer returns
        null,
@@ -562,15 +562,15 @@ Value f_pcre_replace_callback(EfunArgs& f, StringArg subject, StringArg pattern,
   }
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
-  return Value::str_malloced(ret);
+  return vm::Value::str_malloced(ret);
 }
 
-Value f_pcre_cache(EfunArgs&) {
+vm::Value f_pcre_cache(vm::EfunArgs&) {
   mapping_t* m = pcre_get_cache();
   if (!m) {
     return 0;
   }
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 
 // Internal functions utilized by the efuns
@@ -1841,8 +1841,8 @@ void mark_pcre_cache() {
 }
 #endif
 
-Value f_pcre_match_all(EfunArgs&, StringArg subject_arg, StringArg pattern_arg,
-                       std::optional<Arg> pcre_flags) {
+vm::Value f_pcre_match_all(vm::EfunArgs&, vm::StringArg subject_arg, vm::StringArg pattern_arg,
+                           std::optional<vm::Arg> pcre_flags) {
   array_t* v;
   pcre_options opts = default_pcre_options();
 
@@ -1886,5 +1886,5 @@ Value f_pcre_match_all(EfunArgs&, StringArg subject_arg, StringArg pattern_arg,
     match.clear();
   }
 
-  return Value::refed(v);
+  return vm::Value::refed(v);
 }

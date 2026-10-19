@@ -40,33 +40,33 @@ int data_size(object_t* ob);
 void reload_object(object_t* obj);
 
 #ifdef F_ALL_INVENTORY
-Value f_all_inventory(EfunArgs&, object_t* ob) {
+vm::Value f_all_inventory(vm::EfunArgs&, object_t* ob) {
   /* Fresh array (ref 1); transfer without ref++. */
-  return Value::refed(all_inventory(ob, 0));
+  return vm::Value::refed(all_inventory(ob, 0));
 }
 #endif
 
 #ifdef F_ALLOCATE
-Value f_allocate(EfunArgs&, LPC_INT size, std::optional<Arg> value) {
+vm::Value f_allocate(vm::EfunArgs&, LPC_INT size, std::optional<vm::Arg> value) {
   if (value) {
-    return Value::refed(allocate_array2(size, value->sv()));
+    return vm::Value::refed(allocate_array2(size, value->sv()));
   }
-  return Value::refed(allocate_array(size));
+  return vm::Value::refed(allocate_array(size));
 }
 #endif
 
 #ifdef F_ALLOCATE_BUFFER
-Value f_allocate_buffer(EfunArgs&, LPC_INT size) {
+vm::Value f_allocate_buffer(vm::EfunArgs&, LPC_INT size) {
   buffer_t* buf = allocate_buffer(size);
   if (buf) {
-    return Value::refed(buf);
+    return vm::Value::refed(buf);
   }
   return 0;
 }
 #endif
 
 #ifdef F_ALLOCATE_MAPPING
-Value f_allocate_mapping(EfunArgs&, Arg size_or_keys, std::optional<Arg> values) {
+vm::Value f_allocate_mapping(vm::EfunArgs&, vm::Arg size_or_keys, std::optional<vm::Arg> values) {
   if (values) {
     if (!size_or_keys.is(T_ARRAY)) {
       error("Bad argument 1 to allocate_mapping()\n");
@@ -76,24 +76,24 @@ Value f_allocate_mapping(EfunArgs&, Arg size_or_keys, std::optional<Arg> values)
       if (values->array()->size != arr->size) {
         error("Arrays passed to allocate_mapping() must be the same size\n");
       }
-      return Value::refed(mkmapping(arr, values->array()));
+      return vm::Value::refed(mkmapping(arr, values->array()));
     }
-    return Value::refed(allocate_mapping2(arr, values->sv()));
+    return vm::Value::refed(allocate_mapping2(arr, values->sv()));
   }
   if (size_or_keys.is(T_NUMBER)) {
-    return Value::refed(allocate_mapping(size_or_keys.number()));
+    return vm::Value::refed(allocate_mapping(size_or_keys.number()));
   }
   error("Bad argument 1 to allocate_mapping()\n");
 }
 #endif
 
 #ifdef F_BIND
-Value f_bind(EfunArgs& f, funptr_t* old_fp, object_t* ob) {
+vm::Value f_bind(vm::EfunArgs& f, funptr_t* old_fp, object_t* ob) {
   funptr_t* new_fp;
 
   if (ob == old_fp->hdr.owner) {
     /* no change */
-    return Value::addref(old_fp);
+    return vm::Value::addref(old_fp);
   }
 
   if (old_fp->hdr.type == (FP_LOCAL | FP_NOT_BINDABLE)) {
@@ -106,11 +106,11 @@ Value f_bind(EfunArgs& f, funptr_t* old_fp, object_t* ob) {
   }
 
   {
-    LPCCall b;
-    b.push(Value::object(current_object));    /* the object doing the binding */
-    b.push(Value::object(old_fp->hdr.owner)); /* the old owner */
-    b.push(Value::object(ob));                /* the new owner */
-    CallResult res = b.apply_master(APPLY_VALID_BIND);
+    vm::Call b;
+    b.push(vm::Value::object(current_object));    /* the object doing the binding */
+    b.push(vm::Value::object(old_fp->hdr.owner)); /* the old owner */
+    b.push(vm::Value::object(ob));                /* the new owner */
+    vm::CallResult res = b.apply_master(APPLY_VALID_BIND);
     if (!master_approved(res, "valid_bind")) {
       error("Master object denied permission to bind() function pointer.\n");
     }
@@ -143,7 +143,7 @@ Value f_bind(EfunArgs& f, funptr_t* old_fp, object_t* ob) {
   }
 
   /* old_fp is released along with the (now empty) owner slot. */
-  return Value::refed(new_fp);
+  return vm::Value::refed(new_fp);
 }
 #endif
 
@@ -164,7 +164,7 @@ static int print_cache_stats(outbuffer_t* ob, int verbose) {
 }
 
 #ifdef F_CACHE_STATS
-Value f_cache_stats(EfunArgs&) {
+vm::Value f_cache_stats(vm::EfunArgs&) {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -176,13 +176,13 @@ Value f_cache_stats(EfunArgs&) {
 
 #ifdef F__CALL_OTHER
 /* enhanced call_other written 930314 by Luke Mewburn <zak@rmit.edu.au> */
-Value f__call_other(EfunArgs& f, Arg target, Arg function) {
+vm::Value f__call_other(vm::EfunArgs& f, vm::Arg target, vm::Arg function) {
   int num_arg = f.argc();
   const char* funcname;
   object_t* ob;
 
   if (current_object->flags & O_DESTRUCTED) { /* No external calls allowed */
-    return Value::undefined();
+    return vm::Value::undefined();
   }
   if (function.is(T_STRING)) {
     funcname = function.string().c_str();
@@ -207,7 +207,7 @@ Value f__call_other(EfunArgs& f, Arg target, Arg function) {
     array_t* ret = call_all_other(target.array(), funcname, num_arg - 2);
     /* call_all_other consumed the trailing args; left [obj_array, name]. */
     f.resync();
-    return Value::refed(ret);
+    return vm::Value::refed(ret);
   } else {
     ob = find_object(target.string().c_str());
     if (!ob || !object_visible(ob)) {
@@ -218,10 +218,10 @@ Value f__call_other(EfunArgs& f, Arg target, Arg function) {
   svalue_t* applied = ::apply(funcname, ob, num_arg - 2, ORIGIN_CALL_OTHER);
   f.resync();
   if (applied == nullptr) {
-    return Value::undefined();
+    return vm::Value::undefined();
   }
   /* applied is the driver's shared return slot: move the result out. */
-  return Value::take(applied);
+  return vm::Value::take(applied);
 }
 
 #endif
@@ -240,7 +240,7 @@ static const char* origin_name(int orig) {
 #endif
 
 #ifdef F_CALL_STACK
-Value f_call_stack(EfunArgs&, LPC_INT which) {
+vm::Value f_call_stack(vm::EfunArgs&, LPC_INT which) {
   int i, n = csp - &control_stack[0] + 1;
   array_t* ret;
 
@@ -330,13 +330,13 @@ Value f_call_stack(EfunArgs&, LPC_INT which) {
       break;
   }
 
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 
 #endif
 
 #ifdef F_CAPITALIZE
-Value f_capitalize(EfunArgs& f, StringArg str) {
+vm::Value f_capitalize(vm::EfunArgs& f, vm::StringArg str) {
   if (uislower(str.c_str()[0])) {
     svalue_t* sv = f[0].sv();
     unlink_string_svalue(sv);
@@ -348,7 +348,7 @@ Value f_capitalize(EfunArgs& f, StringArg str) {
 #endif
 
 #ifdef F_CHILDREN
-Value f_children(EfunArgs&, StringArg name) {
+vm::Value f_children(vm::EfunArgs&, vm::StringArg name) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
   auto v = ObjectTable::instance().children(name.c_str());
   auto len = v.size() < max_array_size ? v.size() : max_array_size;
@@ -359,18 +359,18 @@ Value f_children(EfunArgs&, StringArg name) {
     res->item[i].type = T_OBJECT;
     add_ref(v[i], "children");
   }
-  return Value::refed(res);
+  return vm::Value::refed(res);
 }
 
 #endif
 
 #ifdef F_CLASSP
-Value f_classp(EfunArgs&, Arg x) { return x.is(T_CLASS); }
+vm::Value f_classp(vm::EfunArgs&, vm::Arg x) { return x.is(T_CLASS); }
 
 #endif
 
 #ifdef F_CLEAR_BIT
-Value f_clear_bit(EfunArgs& f, StringArg bits, LPC_INT requested) {
+vm::Value f_clear_bit(vm::EfunArgs& f, vm::StringArg bits, LPC_INT requested) {
   char* str;
   int len, ind, bit;
 
@@ -405,18 +405,20 @@ Value f_clear_bit(EfunArgs& f, StringArg bits, LPC_INT requested) {
 #endif
 
 #ifdef F_CLONEP
-Value f_clonep(EfunArgs&, Arg x) { return x.is(T_OBJECT) && (x.object()->flags & O_CLONE); }
+vm::Value f_clonep(vm::EfunArgs&, vm::Arg x) {
+  return x.is(T_OBJECT) && (x.object()->flags & O_CLONE);
+}
 
 #endif
 
 #ifdef F__NEW
-Value f__new(EfunArgs& f, StringArg name) {
+vm::Value f__new(vm::EfunArgs& f, vm::StringArg name) {
   object_t* ob = clone_object(name.c_str(), f.argc() - 1);
   /* clone_object() / call_create() consumed the trailing create args;
    * only the filename remains. */
   f.resync();
   if (ob) {
-    return Value::object(ob); /* adds a ref; the clone starts at ref 1 */
+    return vm::Value::object(ob); /* adds a ref; the clone starts at ref 1 */
   }
   return 0;
 }
@@ -424,12 +426,14 @@ Value f__new(EfunArgs& f, StringArg name) {
 #endif
 
 #ifdef F_DEEP_INHERIT_LIST
-Value f_deep_inherit_list(EfunArgs&, object_t* ob) { return Value::refed(deep_inherit_list(ob)); }
+vm::Value f_deep_inherit_list(vm::EfunArgs&, object_t* ob) {
+  return vm::Value::refed(deep_inherit_list(ob));
+}
 
 #endif
 
 #ifdef F_SET_DEBUG_LEVEL
-void f_set_debug_level(EfunArgs&, Arg level) {
+void f_set_debug_level(vm::EfunArgs&, vm::Arg level) {
   if (level.is(T_STRING)) {
     debug_level_set(level.string().c_str());
   } else {
@@ -437,18 +441,18 @@ void f_set_debug_level(EfunArgs&, Arg level) {
   }
 }
 
-void f_clear_debug_level(EfunArgs&, StringArg level) { debug_level_clear(level.c_str()); }
+void f_clear_debug_level(vm::EfunArgs&, vm::StringArg level) { debug_level_clear(level.c_str()); }
 
 /* not in debug.h since debug.h is included in many places that don't
  know about mapping_t */
 mapping_t* debug_levels();
 
-Value f_debug_levels(EfunArgs&) { return Value::refed(debug_levels()); }
+vm::Value f_debug_levels(vm::EfunArgs&) { return vm::Value::refed(debug_levels()); }
 
 #endif
 
 #ifdef F_DEEP_INVENTORY
-Value f_deep_inventory(EfunArgs&, Arg target, std::optional<funptr_t*> filter) {
+vm::Value f_deep_inventory(vm::EfunArgs&, vm::Arg target, std::optional<funptr_t*> filter) {
   array_t* vec;
   if (filter && (target.is(T_ARRAY) || target.is(T_OBJECT))) {
     if (target.is(T_ARRAY)) {
@@ -468,13 +472,13 @@ Value f_deep_inventory(EfunArgs&, Arg target, std::optional<funptr_t*> filter) {
     vec = &the_null_array;
   }
 
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 
 #endif
 
 #ifdef F_DESTRUCT
-void f_destruct(EfunArgs&, object_t* ob) {
+void f_destruct(vm::EfunArgs&, object_t* ob) {
   /* remove_object_from_stack() frees the object and leaves a number 0 in the
    * arg slot, which the void efun's return then pops. */
   destruct_object(ob);
@@ -483,7 +487,7 @@ void f_destruct(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_ENABLE_WIZARD
-void f_enable_wizard(EfunArgs&) {
+void f_enable_wizard(vm::EfunArgs&) {
   if (current_object->interactive) {
     current_object->flags |= O_IS_WIZARD;
   }
@@ -492,7 +496,7 @@ void f_enable_wizard(EfunArgs&) {
 #endif
 
 #ifdef F_ERROR
-void f_error(EfunArgs&, StringArg msg) {
+void f_error(vm::EfunArgs&, vm::StringArg msg) {
   int l = msg.size();
   if (l && msg.c_str()[l - 1] == '\n') {
     l--;
@@ -516,7 +520,7 @@ void f_error(EfunArgs&, StringArg msg) {
 #endif
 
 #ifdef F_DISABLE_WIZARD
-void f_disable_wizard(EfunArgs&) {
+void f_disable_wizard(vm::EfunArgs&) {
   if (current_object->interactive) {
     current_object->flags &= ~O_IS_WIZARD;
   }
@@ -525,7 +529,7 @@ void f_disable_wizard(EfunArgs&) {
 #endif
 
 #ifdef F_ENVIRONMENT
-Value f_environment(EfunArgs&, std::optional<object_t*> target) {
+vm::Value f_environment(vm::EfunArgs&, std::optional<object_t*> target) {
   object_t* ob = nullptr;
 
   if (target) {
@@ -538,7 +542,7 @@ Value f_environment(EfunArgs&, std::optional<object_t*> target) {
   }
 
   if (ob && object_visible(ob)) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
@@ -546,15 +550,15 @@ Value f_environment(EfunArgs&, std::optional<object_t*> target) {
 #endif
 
 #ifdef F_FILE_NAME
-Value f_file_name(EfunArgs&, object_t* ob) {
+vm::Value f_file_name(vm::EfunArgs&, object_t* ob) {
   /* This function now returns a leading '/' */
-  return Value::str_malloced(add_slash(ob->obname));
+  return vm::Value::str_malloced(add_slash(ob->obname));
 }
 
 #endif
 
 #ifdef F_FILTER
-Value f_filter(EfunArgs& f, Arg source, Arg) {
+vm::Value f_filter(vm::EfunArgs& f, vm::Arg source, vm::Arg) {
   /* The helpers leave the result in the first argument's slot and pop the
    * rest. */
   if (source.is(T_MAPPING)) {
@@ -571,7 +575,7 @@ Value f_filter(EfunArgs& f, Arg source, Arg) {
 #endif
 
 #ifdef F_FIND_CALL_OUT
-Value f_find_call_out(EfunArgs&, Arg which) {
+vm::Value f_find_call_out(vm::EfunArgs&, vm::Arg which) {
   int i;
   if (which.is(T_NUMBER)) {
     i = find_call_out_by_handle(current_object, which.number());
@@ -584,7 +588,7 @@ Value f_find_call_out(EfunArgs&, Arg which) {
 #endif
 
 #ifdef F_FIND_OBJECT
-Value f_find_object(EfunArgs&, StringArg name, LPC_INT load) {
+vm::Value f_find_object(vm::EfunArgs&, vm::StringArg name, LPC_INT load) {
   object_t* ob;
 
   if (load) {
@@ -593,7 +597,7 @@ Value f_find_object(EfunArgs&, StringArg name, LPC_INT load) {
     ob = find_object2(name.c_str());
   }
   if (ob && object_visible(ob)) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
@@ -602,7 +606,7 @@ Value f_find_object(EfunArgs&, StringArg name, LPC_INT load) {
 
 #ifdef F_FUNCTION_PROFILE
 /* f_function_profile: John Garnett, 1993/05/31, 0.9.17.3 */
-Value f_function_profile(EfunArgs&, object_t* ob) {
+vm::Value f_function_profile(vm::EfunArgs&, object_t* ob) {
   array_t* vec;
   mapping_t* map;
   program_t* prog;
@@ -623,14 +627,14 @@ Value f_function_profile(EfunArgs&, object_t* ob) {
     prog->function_table[j].self = 0;
     prog->function_table[j].children = 0;
   }
-  return Value::refed(vec);
+  return vm::Value::refed(vec);
 }
 
 #endif
 
 #ifdef F_FUNCTION_EXISTS
-Value f_function_exists(EfunArgs&, StringArg name, std::optional<object_t*> target,
-                        std::optional<LPC_INT> flag_arg) {
+vm::Value f_function_exists(vm::EfunArgs&, vm::StringArg name, std::optional<object_t*> target,
+                            std::optional<LPC_INT> flag_arg) {
   const char* str;
   char* res;
   int l;
@@ -661,7 +665,7 @@ Value f_function_exists(EfunArgs&, StringArg name, std::optional<object_t*> targ
     res[0] = '/';
     strncpy(res + 1, str, l);
     res[l + 1] = 0;
-    return Value::str_malloced(res);
+    return vm::Value::str_malloced(res);
   }
   return 0;
 }
@@ -669,7 +673,7 @@ Value f_function_exists(EfunArgs&, StringArg name, std::optional<object_t*> targ
 #endif
 
 #ifdef F_GET_CHAR
-Value f_get_char(EfunArgs& f, Arg fun) {
+vm::Value f_get_char(vm::EfunArgs& f, vm::Arg fun) {
   int num_arg = f.argc();
   int i, tmp;
   int flag;
@@ -696,7 +700,7 @@ Value f_get_char(EfunArgs& f, Arg fun) {
 #endif
 
 #ifdef F_IN_INPUT
-Value f_in_input(EfunArgs&, object_t* ob) {
+vm::Value f_in_input(vm::EfunArgs&, object_t* ob) {
   int i = ob->interactive && ob->interactive->input_to;
   return i != 0;
 }
@@ -722,7 +726,7 @@ int inherits(program_t* prog, program_t* thep) {
   return 0;
 }
 
-Value f_inherits(EfunArgs&, StringArg name, object_t* base) {
+vm::Value f_inherits(vm::EfunArgs&, vm::StringArg name, object_t* base) {
   object_t* ob = find_object2(name.c_str());
   if (!ob) {
     return 0;
@@ -733,17 +737,19 @@ Value f_inherits(EfunArgs&, StringArg name, object_t* base) {
 #endif
 
 #ifdef F_SHALLOW_INHERIT_LIST
-Value f_shallow_inherit_list(EfunArgs&, object_t* ob) { return Value::refed(inherit_list(ob)); }
+vm::Value f_shallow_inherit_list(vm::EfunArgs&, object_t* ob) {
+  return vm::Value::refed(inherit_list(ob));
+}
 
 #endif
 
 #ifdef F_INCLUDE_LIST
-Value f_include_list(EfunArgs&, object_t* ob) { return Value::refed(include_list(ob)); }
+vm::Value f_include_list(vm::EfunArgs&, object_t* ob) { return vm::Value::refed(include_list(ob)); }
 
 #endif
 
 #ifdef F_INPUT_TO
-Value f_input_to(EfunArgs& f, Arg fun) {
+vm::Value f_input_to(vm::EfunArgs& f, vm::Arg fun) {
   int num_arg = f.argc();
   int i, tmp;
   int flag;
@@ -769,7 +775,7 @@ Value f_input_to(EfunArgs& f, Arg fun) {
 #endif
 
 #ifdef F_INTERACTIVE
-Value f_interactive(EfunArgs&, object_t* ob) {
+vm::Value f_interactive(vm::EfunArgs&, object_t* ob) {
   int i = (ob->interactive != nullptr);
   return i;
 }
@@ -777,12 +783,12 @@ Value f_interactive(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_INTP
-Value f_intp(EfunArgs&, Arg x) { return x.is(T_NUMBER); }
+vm::Value f_intp(vm::EfunArgs&, vm::Arg x) { return x.is(T_NUMBER); }
 
 #endif
 
 #ifdef F_FUNCTIONP
-Value f_functionp(EfunArgs&, Arg x) {
+vm::Value f_functionp(vm::EfunArgs&, vm::Arg x) {
   int i;
 
   if (x.is(T_FUNCTION)) {
@@ -802,17 +808,17 @@ Value f_functionp(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F_KEYS
-Value f_keys(EfunArgs&, mapping_t* m) { return Value::refed(mapping_indices(m)); }
+vm::Value f_keys(vm::EfunArgs&, mapping_t* m) { return vm::Value::refed(mapping_indices(m)); }
 
 #endif
 
 #ifdef F_VALUES
-Value f_values(EfunArgs&, mapping_t* m) { return Value::refed(mapping_values(m)); }
+vm::Value f_values(vm::EfunArgs&, mapping_t* m) { return vm::Value::refed(mapping_values(m)); }
 
 #endif
 
 #ifdef F_LOWER_CASE
-Value f_lower_case(EfunArgs& f, StringArg arg) {
+vm::Value f_lower_case(vm::EfunArgs& f, vm::StringArg arg) {
   svalue_t* sv = f[0].sv();
   const char* scan = arg.c_str();
 
@@ -837,7 +843,7 @@ Value f_lower_case(EfunArgs& f, StringArg arg) {
 #endif
 
 #ifdef F_MALLOC_STATUS
-Value f_malloc_status(EfunArgs&) {
+vm::Value f_malloc_status(vm::EfunArgs&) {
   outbuffer_t ob;
 
   outbuf_zero(&ob);
@@ -855,17 +861,17 @@ Value f_malloc_status(EfunArgs&) {
 #endif
 
 #ifdef F_MAP_DELETE
-void f_map_delete(EfunArgs&, mapping_t* m, Arg key) { mapping_delete(m, key.sv()); }
+void f_map_delete(vm::EfunArgs&, mapping_t* m, vm::Arg key) { mapping_delete(m, key.sv()); }
 
 #endif
 
 #ifdef F_MAPP
-Value f_mapp(EfunArgs&, Arg x) { return x.is(T_MAPPING); }
+vm::Value f_mapp(vm::EfunArgs&, vm::Arg x) { return x.is(T_MAPPING); }
 
 #endif
 
 #ifdef F_MAP
-Value f_map(EfunArgs& f, Arg source, Arg) {
+vm::Value f_map(vm::EfunArgs& f, vm::Arg source, vm::Arg) {
   /* The helpers leave the result in the first argument's slot and pop the
    * rest. */
   if (source.is(T_MAPPING)) {
@@ -882,11 +888,11 @@ Value f_map(EfunArgs& f, Arg source, Arg) {
 #endif
 
 #ifdef F_MASTER
-Value f_master(EfunArgs&) {
+vm::Value f_master(vm::EfunArgs&) {
   if (!master_ob) {
     return 0;
   }
-  return Value::object(master_ob);
+  return vm::Value::object(master_ob);
 }
 
 #endif
@@ -904,7 +910,7 @@ Value f_master(EfunArgs&) {
  Cygnus
  */
 #ifdef F_MATCH_PATH
-Value f_match_path(EfunArgs&, mapping_t* map, StringArg path) {
+vm::Value f_match_path(vm::EfunArgs&, mapping_t* map, vm::StringArg path) {
   svalue_t* value;
   const char* src;
   char* dst;
@@ -941,7 +947,7 @@ Value f_match_path(EfunArgs&, mapping_t* map, StringArg path) {
   FREE(tmpstr);
   /* Don't free mapping first, in case sometimes one uses a ref 1 mapping */
   /* Randor - 5/29/94 */
-  return Value::copy(value);
+  return vm::Value::copy(value);
 }
 
 #endif /* F_MATCH_PATH */
@@ -1030,21 +1036,21 @@ static void warn_member_array_byte_search(const program_t* prog, const char* at)
       file ? file : "<unknown>", line);
 }
 
-/* member_array()'s predicate call, kept out of line: the LPCCall and its
+/* member_array()'s predicate call, kept out of line: the vm::Call and its
  * result live in memory, which would otherwise cost every member_array()
  * call a stack-protector canary and spilled registers. */
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((noinline))
 #endif
 static bool member_array_predicate_says_yes(funptr_t* fp, svalue_t* element) {
-  LPCCall b;
-  b.push(Value::copy(element));
-  CallResult ret = b.call(fp);
+  vm::Call b;
+  b.push(vm::Value::copy(element));
+  vm::CallResult ret = b.call(fp);
   return ret && !(ret->type == T_NUMBER && ret->u.number == 0);
 }
 
-Value f_member_array(EfunArgs&, Arg item, Arg haystack, std::optional<LPC_INT> start,
-                     std::optional<LPC_INT> flags) {
+vm::Value f_member_array(vm::EfunArgs&, vm::Arg item, vm::Arg haystack,
+                         std::optional<LPC_INT> start, std::optional<LPC_INT> flags) {
   array_t* v;
   int flag = 0;
   LPC_INT i;
@@ -1064,7 +1070,7 @@ Value f_member_array(EfunArgs&, Arg item, Arg haystack, std::optional<LPC_INT> s
   }
 
   if (haystack.is(T_STRING)) {
-    StringArg str = haystack.string();
+    vm::StringArg str = haystack.string();
     const char* res;
     if (flag & 2) {
       error("member_array: can not search backwards in strings");
@@ -1218,7 +1224,8 @@ Value f_member_array(EfunArgs&, Arg item, Arg haystack, std::optional<LPC_INT> s
 #endif
 
 #ifdef F_MESSAGE
-void f_message(EfunArgs&, Arg msg_class, Arg message, Arg target, std::optional<Arg> exclude) {
+void f_message(vm::EfunArgs&, vm::Arg msg_class, vm::Arg message, vm::Arg target,
+               std::optional<vm::Arg> exclude) {
   array_t *use = nullptr, *avoid;
 
   /* A single target or exclude is wrapped in an array that replaces it in its
@@ -1266,7 +1273,7 @@ void f_message(EfunArgs&, Arg msg_class, Arg message, Arg target, std::optional<
 #endif
 
 #ifdef F_MOVE_OBJECT
-void f_move_object(EfunArgs&, Arg dest) {
+void f_move_object(vm::EfunArgs&, vm::Arg dest) {
   object_t *o1, *o2;
 
   /* get destination */
@@ -1377,7 +1384,7 @@ int calculate_and_maybe_print_memory_info(outbuffer_t* ob, int verbose) {
 }  // namespace
 
 #ifdef F_MUD_STATUS
-Value f_mud_status(EfunArgs&, LPC_INT verbose_arg) {
+vm::Value f_mud_status(vm::EfunArgs&, LPC_INT verbose_arg) {
   uint64_t tot = 0;
   int verbose = 0;
   outbuffer_t ob;
@@ -1424,22 +1431,24 @@ Value f_mud_status(EfunArgs&, LPC_INT verbose_arg) {
 #endif
 
 #ifdef F_OBJECTP
-Value f_objectp(EfunArgs&, Arg x) { return x.is(T_OBJECT) && !(x.object()->flags & O_DESTRUCTED); }
+vm::Value f_objectp(vm::EfunArgs&, vm::Arg x) {
+  return x.is(T_OBJECT) && !(x.object()->flags & O_DESTRUCTED);
+}
 
 #endif
 
 #ifdef F_ORIGIN
-Value f_origin(EfunArgs&) { return Value::str_constant(origin_name(caller_type)); }
+vm::Value f_origin(vm::EfunArgs&) { return vm::Value::str_constant(origin_name(caller_type)); }
 
 #endif
 
 #ifdef F_POINTERP
-Value f_pointerp(EfunArgs&, Arg x) { return x.is(T_ARRAY); }
+vm::Value f_pointerp(vm::EfunArgs&, vm::Arg x) { return x.is(T_ARRAY); }
 
 #endif
 
 #ifdef F_PRESENT
-Value f_present(EfunArgs& f, Arg what, std::optional<object_t*> env) {
+vm::Value f_present(vm::EfunArgs& f, vm::Arg what, std::optional<object_t*> env) {
   object_t* ob;
 
   if (!CONFIG_INT(__RC_NO_RESETS__) && CONFIG_INT(__RC_LAZY_RESETS__)) {
@@ -1455,7 +1464,7 @@ Value f_present(EfunArgs& f, Arg what, std::optional<object_t*> env) {
   }
   ob = object_present(what.sv(), env && f[1].is(T_OBJECT) ? f[1].object() : nullptr);
   if (ob && object_visible(ob)) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
@@ -1463,7 +1472,7 @@ Value f_present(EfunArgs& f, Arg what, std::optional<object_t*> env) {
 #endif
 
 #ifdef F_PREVIOUS_OBJECT
-Value f_previous_object(EfunArgs&, LPC_INT which) {
+vm::Value f_previous_object(vm::EfunArgs&, LPC_INT which) {
   control_stack_t* p;
   int i;
   object_t* ob = nullptr;
@@ -1516,20 +1525,20 @@ Value f_previous_object(EfunArgs&, LPC_INT which) {
         i++;
       }
     } while (--p >= control_stack);
-    return Value::refed(v);
+    return vm::Value::refed(v);
   } else {
     ob = previous_ob;
   }
   if (!ob || (ob->flags & O_DESTRUCTED)) {
     return 0;
   }
-  return Value::object(ob);
+  return vm::Value::object(ob);
 }
 
 #endif
 
 #ifdef F_PRINTF
-void f_printf(EfunArgs& f, StringArg format) {
+void f_printf(vm::EfunArgs& f, vm::StringArg format) {
   int num_arg = f.argc();
   char* ret;
 
@@ -1546,7 +1555,7 @@ void f_printf(EfunArgs& f, StringArg format) {
 #endif
 
 #ifdef F_QUERY_ED_MODE
-Value f_query_ed_mode(EfunArgs&) {
+vm::Value f_query_ed_mode(vm::EfunArgs&) {
   /* n = prompt for line 'n'
    0 = normal ed prompt
    -1 = not in ed
@@ -1560,11 +1569,11 @@ Value f_query_ed_mode(EfunArgs&) {
 #endif
 
 #ifdef F_QUERY_HOST_NAME
-Value f_query_host_name(EfunArgs&) {
+vm::Value f_query_host_name(vm::EfunArgs&) {
   char* tmp;
 
   if ((tmp = query_host_name())) {
-    return Value::str_constant(tmp);
+    return vm::Value::str_constant(tmp);
   }
   return 0;
 }
@@ -1572,7 +1581,7 @@ Value f_query_host_name(EfunArgs&) {
 #endif
 
 #ifdef F_QUERY_IDLE
-Value f_query_idle(EfunArgs&, object_t* ob) {
+vm::Value f_query_idle(vm::EfunArgs&, object_t* ob) {
   int i = query_idle(ob);
   return i;
 }
@@ -1580,7 +1589,7 @@ Value f_query_idle(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_QUERY_IP_NAME
-Value f_query_ip_name(EfunArgs&, std::optional<object_t*> ob) {
+vm::Value f_query_ip_name(vm::EfunArgs&, std::optional<object_t*> ob) {
   const char* tmp;
 
   tmp = query_ip_name(ob.value_or(nullptr));
@@ -1592,20 +1601,20 @@ Value f_query_ip_name(EfunArgs&, std::optional<object_t*> ob) {
   v.type = T_STRING;
   v.subtype = STRING_SHARED;
   v.u.string = tmp;
-  return Value::owned(v);
+  return vm::Value::owned(v);
 }
 
 #endif
 
 #ifdef F_QUERY_IP_NUMBER
-Value f_query_ip_number(EfunArgs&, std::optional<object_t*> ob) {
+vm::Value f_query_ip_number(vm::EfunArgs&, std::optional<object_t*> ob) {
   const char* tmp;
 
   tmp = query_ip_number(ob.value_or(nullptr));
   if (!tmp) {
     return 0;
   }
-  Value result = Value::str_copy(tmp);
+  vm::Value result = vm::Value::str_copy(tmp);
   free_string(tmp);
   return result;
 }
@@ -1613,14 +1622,14 @@ Value f_query_ip_number(EfunArgs&, std::optional<object_t*> ob) {
 #endif
 
 #ifdef F_QUERY_LOAD_AVERAGE
-Value f_query_load_average(EfunArgs&) { return Value::str_copy(query_load_av()); }
+vm::Value f_query_load_average(vm::EfunArgs&) { return vm::Value::str_copy(query_load_av()); }
 
 #endif
 
 #ifdef F_QUERY_PRIVS
-Value f_query_privs(EfunArgs&, object_t* ob) {
+vm::Value f_query_privs(vm::EfunArgs&, object_t* ob) {
   if (ob->privs != nullptr) {
-    return Value::str_shared(ob->privs);
+    return vm::Value::str_shared(ob->privs);
   }
   return 0;
 }
@@ -1628,10 +1637,10 @@ Value f_query_privs(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_QUERY_SNOOPING
-Value f_query_snooping(EfunArgs&, object_t* snooper) {
+vm::Value f_query_snooping(vm::EfunArgs&, object_t* snooper) {
   object_t* ob = query_snooping(snooper);
   if (ob) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
@@ -1639,10 +1648,10 @@ Value f_query_snooping(EfunArgs&, object_t* snooper) {
 #endif
 
 #ifdef F_QUERY_SNOOP
-Value f_query_snoop(EfunArgs&, object_t* snoopee) {
+vm::Value f_query_snoop(vm::EfunArgs&, object_t* snoopee) {
   object_t* ob = query_snoop(snoopee);
   if (ob) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
@@ -1650,7 +1659,7 @@ Value f_query_snoop(EfunArgs&, object_t* snoopee) {
 #endif
 
 #ifdef F_RANDOM
-Value f_random(EfunArgs&, LPC_INT n) {
+vm::Value f_random(vm::EfunArgs&, LPC_INT n) {
   if (n <= 0) {
     return 0;
   }
@@ -1660,7 +1669,7 @@ Value f_random(EfunArgs&, LPC_INT n) {
 #endif
 
 #ifdef F_SECURE_RANDOM
-Value f_secure_random(EfunArgs&, LPC_INT n) {
+vm::Value f_secure_random(vm::EfunArgs&, LPC_INT n) {
   if (n <= 0) {
     return 0;
   }
@@ -1673,23 +1682,23 @@ Value f_secure_random(EfunArgs&, LPC_INT n) {
 /* A file's text as an LPC string: the malloced buffer itself when it is
  * already valid UTF-8 (no copy), a sanitized copy otherwise. Either way it
  * stops at the first NUL, as the sanitized copy always did. */
-static Value file_text_value(char* str) {
+static vm::Value file_text_value(char* str) {
   if (u8_validate(str)) {
     size_t const len = strlen(str);
     if (len != MSTR_SIZE(str)) {
       str = extend_string(str, len); /* the counted size must be the text's */
     }
-    return Value::str_malloced(str);
+    return vm::Value::str_malloced(str);
   }
   auto res = u8_sanitize(str);
   FREE_MSTR(str);
-  return Value::str_copy(res);
+  return vm::Value::str_copy(res);
 }
 #endif
 
 #ifdef F_READ_BYTES
-Value f_read_bytes(EfunArgs&, StringArg file, std::optional<LPC_INT> start_arg,
-                   std::optional<LPC_INT> len_arg) {
+vm::Value f_read_bytes(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT> start_arg,
+                       std::optional<LPC_INT> len_arg) {
   char* str;
   LPC_INT start = start_arg.value_or(0), len = len_arg.value_or(0);
   int rlen = 0;
@@ -1704,8 +1713,8 @@ Value f_read_bytes(EfunArgs&, StringArg file, std::optional<LPC_INT> start_arg,
 #endif
 
 #ifdef F_READ_BUFFER
-Value f_read_buffer(EfunArgs&, Arg source, std::optional<LPC_INT> start_arg,
-                    std::optional<LPC_INT> len_arg) {
+vm::Value f_read_buffer(vm::EfunArgs&, vm::Arg source, std::optional<LPC_INT> start_arg,
+                        std::optional<LPC_INT> len_arg) {
   char* str;
   LPC_INT start = start_arg.value_or(0), len = len_arg.value_or(0);
   int rlen = 0;
@@ -1721,20 +1730,20 @@ Value f_read_buffer(EfunArgs&, Arg source, std::optional<LPC_INT> start_arg,
     return 0;
   }
   if (from_file) { /* changed */
-    Value bytes = Value::str_malloced(str); /* freed even if allocate_buffer() errors */
+    vm::Value bytes = vm::Value::str_malloced(str); /* freed even if allocate_buffer() errors */
     buffer_t* buf = allocate_buffer(rlen);
     memcpy(buf->item, str, rlen);
-    return Value::refed(buf);
+    return vm::Value::refed(buf);
   }
   /* T_BUFFER */
-  return Value::str_malloced(str);
+  return vm::Value::str_malloced(str);
 }
 
 #endif
 
 #ifdef F_READ_FILE
-Value f_read_file(EfunArgs&, StringArg file, std::optional<LPC_INT> start_arg,
-                  std::optional<LPC_INT> len_arg) {
+vm::Value f_read_file(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT> start_arg,
+                      std::optional<LPC_INT> len_arg) {
   char* str;
   LPC_INT start = start_arg.value_or(0), len = len_arg.value_or(0);
 
@@ -1748,10 +1757,10 @@ Value f_read_file(EfunArgs&, StringArg file, std::optional<LPC_INT> start_arg,
 #endif
 
 #ifdef F_RECEIVE
-void f_receive(EfunArgs&, Arg data) {
+void f_receive(vm::EfunArgs&, vm::Arg data) {
   if (data.is(T_STRING)) {
     if (current_object->interactive) {
-      StringArg str = data.string();
+      vm::StringArg str = data.string();
       int const len = str.size();
       add_message(current_object, str.c_str(), len);
     }
@@ -1766,15 +1775,17 @@ void f_receive(EfunArgs&, Arg data) {
 #endif
 
 #ifdef F_REG_ASSOC
-Value f_reg_assoc(EfunArgs& f, StringArg, array_t* patterns, array_t* tokens,
-                  std::optional<Arg> no_match) {
-  return Value::refed(reg_assoc(f[0].sv(), patterns, tokens, no_match ? no_match->sv() : &const0));
+vm::Value f_reg_assoc(vm::EfunArgs& f, vm::StringArg, array_t* patterns, array_t* tokens,
+                      std::optional<vm::Arg> no_match) {
+  return vm::Value::refed(
+      reg_assoc(f[0].sv(), patterns, tokens, no_match ? no_match->sv() : &const0));
 }
 
 #endif
 
 #ifdef F_REGEXP
-Value f_regexp(EfunArgs&, Arg subject, StringArg pattern, std::optional<LPC_INT> flag_arg) {
+vm::Value f_regexp(vm::EfunArgs&, vm::Arg subject, vm::StringArg pattern,
+                   std::optional<LPC_INT> flag_arg) {
   int flag;
 
   if (flag_arg) {
@@ -1789,13 +1800,13 @@ Value f_regexp(EfunArgs&, Arg subject, StringArg pattern, std::optional<LPC_INT>
     flag = match_single_regexp(subject.string().c_str(), pattern.c_str());
     return flag;
   }
-  return Value::refed(match_regexp(subject.array(), pattern.c_str(), flag));
+  return vm::Value::refed(match_regexp(subject.array(), pattern.c_str(), flag));
 }
 
 #endif
 
 #ifdef F_REMOVE_CALL_OUT
-Value f_remove_call_out(EfunArgs&, std::optional<Arg> which) {
+vm::Value f_remove_call_out(vm::EfunArgs&, std::optional<vm::Arg> which) {
   int i;
   if (which) {
     if (which->is(T_STRING)) {
@@ -1812,7 +1823,7 @@ Value f_remove_call_out(EfunArgs&, std::optional<Arg> which) {
 #endif
 
 #ifdef F_RENAME
-Value f_rename(EfunArgs&, StringArg from, StringArg to) {
+vm::Value f_rename(vm::EfunArgs&, vm::StringArg from, vm::StringArg to) {
   int i = do_rename(from.c_str(), to.c_str(), F_RENAME);
   return i;
 }
@@ -1871,8 +1882,8 @@ Value f_rename(EfunArgs&, StringArg from, StringArg to) {
  * when the replacement is not longer than the pattern and nothing else
  * references the string, it is rewritten in place with no copy (a chained
  * replace_string(replace_string(s, ...), ...) never copies). */
-Value replace_string_value(Value source, StringArg pattern_arg, StringArg replacement,
-                           LPC_INT first, LPC_INT last) {
+vm::Value replace_string_value(vm::Value source, vm::StringArg pattern_arg,
+                               vm::StringArg replacement, LPC_INT first, LPC_INT last) {
   auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   int plen, rlen, dlen, cur;
@@ -2026,7 +2037,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
           // match's expansion guard sees the true written length.
           if (dst2 + skip > dst1 + max_string_length) {
             FREE_MSTR(dst1);
-            return Value::undefined();
+            return vm::Value::undefined();
           }
           for (climit = dst2 + skip; dst2 < climit; *dst2++ = *src++) {
             ;
@@ -2038,7 +2049,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
           if ((cur >= first) && (cur <= last)) {
             if (max_string_length - dlen <= rlen) {
               FREE_MSTR(dst1);
-              return Value::undefined();
+              return vm::Value::undefined();
             }
             memmove(dst2, replace, rlen);
             dst2 += rlen;
@@ -2051,7 +2062,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
             dlen += plen;
             if (max_string_length - dlen <= 0) {
               FREE_MSTR(dst1);
-              return Value::undefined();
+              return vm::Value::undefined();
             }
             memmove(dst2, src, plen);
             dst2 += plen;
@@ -2060,7 +2071,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
         } else {
           if (max_string_length - dlen <= 1) {
             FREE_MSTR(dst1);
-            return Value::undefined();
+            return vm::Value::undefined();
           }
           *dst2++ = *src++;
           dlen++;
@@ -2068,7 +2079,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
       }
       if (max_string_length - dlen <= (slimit - src)) {
         FREE_MSTR(dst1);
-        return Value::undefined();
+        return vm::Value::undefined();
       }
       memmove(dst2, src, slimit - src);
       dst2 += (slimit - src);
@@ -2081,7 +2092,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
             if (rlen != 0) {
               if (max_string_length - dlen <= rlen) {
                 FREE_MSTR(dst1);
-                return Value::undefined();
+                return vm::Value::undefined();
               }
               strncpy(dst2, replace, rlen);
               dst2 += rlen;
@@ -2093,7 +2104,7 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
         }
         if (max_string_length - dlen <= 1) {
           FREE_MSTR(dst1);
-          return Value::undefined();
+          return vm::Value::undefined();
         }
         *dst2++ = *src++;
         dlen++;
@@ -2104,12 +2115,13 @@ Value replace_string_value(Value source, StringArg pattern_arg, StringArg replac
     /*
      * shrink block or make a copy of exact size
      */
-    return Value::str_malloced(extend_string(dst1, dst2 - dst1));
+    return vm::Value::str_malloced(extend_string(dst1, dst2 - dst1));
   }
 }
 
 /* The range arguments are the efun's untyped `...` tail. */
-Value f_replace_string(EfunArgs& f, StringArg, StringArg pattern, StringArg replacement) {
+vm::Value f_replace_string(vm::EfunArgs& f, vm::StringArg, vm::StringArg pattern,
+                           vm::StringArg replacement) {
   int num_arg = f.argc();
   LPC_INT first = 0, last = 0; /* LPC ints: an int would wrap 0x100000001 to 1 */
 
@@ -2134,7 +2146,7 @@ Value f_replace_string(EfunArgs& f, StringArg, StringArg pattern, StringArg repl
 #endif
 
 #ifdef F_RESOLVE
-Value f_resolve(EfunArgs&, StringArg host, Arg callback) {
+vm::Value f_resolve(vm::EfunArgs&, vm::StringArg host, vm::Arg callback) {
   LPC_INT i = query_addr_by_name(host.c_str(), callback.sv());
   return i;
 }
@@ -2142,7 +2154,7 @@ Value f_resolve(EfunArgs&, StringArg host, Arg callback) {
 #endif
 
 #ifdef F_RM
-Value f_rm(EfunArgs&, StringArg file) {
+vm::Value f_rm(vm::EfunArgs&, vm::StringArg file) {
   int i = remove_file(file.c_str());
   return i;
 }
@@ -2150,7 +2162,7 @@ Value f_rm(EfunArgs&, StringArg file) {
 #endif
 
 #ifdef F_RMDIR
-Value f_rmdir(EfunArgs&, StringArg dir) {
+vm::Value f_rmdir(vm::EfunArgs&, vm::StringArg dir) {
   const char* path = check_valid_path(dir.c_str(), current_object, "rmdir", 1);
   if (!path || rmdir(path) == -1) {
     return 0;
@@ -2161,7 +2173,7 @@ Value f_rmdir(EfunArgs&, StringArg dir) {
 #endif
 
 #ifdef F_SAY
-void f_say(EfunArgs& f, StringArg, std::optional<Arg> exclude) {
+void f_say(vm::EfunArgs& f, vm::StringArg, std::optional<vm::Arg> exclude) {
   array_t* avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2193,10 +2205,10 @@ void f_say(EfunArgs& f, StringArg, std::optional<Arg> exclude) {
 /* warning: do not enable this without using valid_override() in the master
  object and a set_eval_limit() simul_efun to restrict access.
  */
-Value f_set_eval_limit(EfunArgs&, LPC_INT limit) {
+vm::Value f_set_eval_limit(vm::EfunArgs&, LPC_INT limit) {
   switch (limit) {
     case 0: {
-      Value old_limit = max_eval_cost;
+      vm::Value old_limit = max_eval_cost;
       set_eval(max_eval_cost);
       return old_limit;
     }
@@ -2215,10 +2227,10 @@ Value f_set_eval_limit(EfunArgs&, LPC_INT limit) {
 #endif
 
 #ifdef F_SET_BIT
-Value f_set_bit(EfunArgs& f, StringArg bits, LPC_INT requested) {
+vm::Value f_set_bit(vm::EfunArgs& f, vm::StringArg bits, LPC_INT requested) {
   char* str;
   int len, old_len, ind, bit;
-  Value result;
+  vm::Value result;
 
   auto max_bitfield_bits = CONFIG_INT(__MAX_BITFIELD_BITS__);
   if (requested > max_bitfield_bits) {
@@ -2251,7 +2263,7 @@ Value f_set_bit(EfunArgs& f, StringArg bits, LPC_INT requested) {
     if (len > old_len) {
       memset(str + old_len, ' ', len - old_len);
     }
-    result = Value::str_malloced(str);
+    result = vm::Value::str_malloced(str);
   }
 
   if (str[ind] > 0x3f + ' ' || str[ind] < ' ') {
@@ -2263,7 +2275,7 @@ Value f_set_bit(EfunArgs& f, StringArg bits, LPC_INT requested) {
 #endif
 
 #ifdef F_SET_NOTIFY_DESTRUCT
-void f_set_notify_destruct(EfunArgs&, LPC_INT flag) {
+void f_set_notify_destruct(vm::EfunArgs&, LPC_INT flag) {
   int const num = flag;
   if (num == 1) {
     current_object->flags |= O_NOTIFY_DESTRUCT;
@@ -2277,7 +2289,7 @@ void f_set_notify_destruct(EfunArgs&, LPC_INT flag) {
 #endif
 
 #ifdef F_QUERY_NOTIFY_DESTRUCT
-Value f_query_notify_destruct(EfunArgs&, object_t* ob) {
+vm::Value f_query_notify_destruct(vm::EfunArgs&, object_t* ob) {
   int const num = ob->flags & O_NOTIFY_DESTRUCT;
   return num ? 1 : 0;
 }
@@ -2285,17 +2297,17 @@ Value f_query_notify_destruct(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_SET_HEART_BEAT
-void f_set_heart_beat(EfunArgs&, LPC_INT interval) { set_heart_beat(current_object, interval); }
+void f_set_heart_beat(vm::EfunArgs&, LPC_INT interval) { set_heart_beat(current_object, interval); }
 
 #endif
 
 #ifdef F_QUERY_HEART_BEAT
-Value f_query_heart_beat(EfunArgs&, object_t* ob) { return query_heart_beat(ob); }
+vm::Value f_query_heart_beat(vm::EfunArgs&, object_t* ob) { return query_heart_beat(ob); }
 
 #endif
 
 #ifdef F_SET_HIDE
-void f_set_hide(EfunArgs&, LPC_INT hide) {
+void f_set_hide(vm::EfunArgs&, LPC_INT hide) {
   if (!valid_hide(current_object)) {
     return;
   }
@@ -2310,7 +2322,7 @@ void f_set_hide(EfunArgs&, LPC_INT hide) {
 #endif
 
 #ifdef F_SET_LIGHT
-Value f_set_light(EfunArgs&, LPC_INT delta) {
+vm::Value f_set_light(vm::EfunArgs&, LPC_INT delta) {
   object_t* o1;
 
   add_light(current_object, delta);
@@ -2325,7 +2337,7 @@ Value f_set_light(EfunArgs&, LPC_INT delta) {
 #endif
 
 #ifdef F_SET_PRIVS
-void f_set_privs(EfunArgs&, object_t* ob, Arg privs) {
+void f_set_privs(vm::EfunArgs&, object_t* ob, vm::Arg privs) {
   if (ob->privs != nullptr) {
     free_string(ob->privs);
   }
@@ -2338,11 +2350,11 @@ void f_set_privs(EfunArgs&, object_t* ob, Arg privs) {
 #endif
 
 #ifdef F_SHADOW
-Value f_shadow(EfunArgs&, object_t* ob, LPC_INT flag) {
+vm::Value f_shadow(vm::EfunArgs&, object_t* ob, LPC_INT flag) {
   if (!flag) {
     ob = ob->shadowed;
     if (ob) {
-      return Value::object(ob);
+      return vm::Value::object(ob);
     }
     return 0;
   }
@@ -2361,26 +2373,26 @@ Value f_shadow(EfunArgs&, object_t* ob, LPC_INT flag) {
     }
     current_object->shadowing = ob;
     ob->shadowed = current_object;
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
 #endif
 
 #ifdef F_SHOUT
-void f_shout(EfunArgs&, StringArg str) { shout_string(str.c_str()); }
+void f_shout(vm::EfunArgs&, vm::StringArg str) { shout_string(str.c_str()); }
 
 #endif
 
 #ifdef F_SHUTDOWN
-void f_shutdown(EfunArgs&, std::optional<LPC_INT> exit_code) {
+void f_shutdown(vm::EfunArgs&, std::optional<LPC_INT> exit_code) {
   /* does not return */
   shutdownMudOS(exit_code.value_or(0));
 }
 #endif
 
 #ifdef F_SIZEOF
-Value f_sizeof(EfunArgs&, Arg x) {
+vm::Value f_sizeof(vm::EfunArgs&, vm::Arg x) {
   size_t i;
 
   switch (x.type()) {
@@ -2398,7 +2410,7 @@ Value f_sizeof(EfunArgs&, Arg x) {
       i = x.buffer()->size;
       break;
     case T_STRING: {
-      StringArg str = x.string();
+      vm::StringArg str = x.string();
       // Pure ASCII (the overwhelming majority of mudlib text) has one
       // grapheme cluster per byte, and counted strings remember that in
       // their block header -- so this is O(1) with no iterator at all.
@@ -2421,7 +2433,7 @@ Value f_sizeof(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F_SNOOP
-Value f_snoop(EfunArgs& f, object_t* snooper, std::optional<object_t*> snoopee) {
+vm::Value f_snoop(vm::EfunArgs& f, object_t* snooper, std::optional<object_t*> snoopee) {
   /*
    * This one takes a variable number of arguments. It returns 0 or an
    * object.
@@ -2445,18 +2457,18 @@ Value f_snoop(EfunArgs& f, object_t* snooper, std::optional<object_t*> snoopee) 
 #endif
 
 #ifdef F_SPRINTF
-Value f_sprintf(EfunArgs& f, StringArg format) {
+vm::Value f_sprintf(vm::EfunArgs& f, vm::StringArg format) {
   int num_arg = f.argc();
   char* s = string_print_formatted(format.c_str(), num_arg - 1, num_arg > 1 ? f[1].sv() : nullptr);
   if (!s) {
-    return Value::str_constant("");
+    return vm::Value::str_constant("");
   }
-  return Value::str_malloced(s);
+  return vm::Value::str_malloced(s);
 }
 #endif
 
 #ifdef F_STAT
-Value f_stat(EfunArgs&, StringArg file, LPC_INT flag) {
+vm::Value f_stat(vm::EfunArgs&, vm::StringArg file, LPC_INT flag) {
   struct stat buf;
   const char* path;
   array_t* v;
@@ -2493,12 +2505,12 @@ Value f_stat(EfunArgs&, StringArg file, LPC_INT flag) {
       v->item[3].subtype = 0;
       v->item[3].u.number = buf.st_ctime;
 
-      return Value::refed(v);
+      return vm::Value::refed(v);
     }
   }
   v = get_dir(file.c_str(), flag);
   if (v) {
-    return Value::refed(v);
+    return vm::Value::refed(v);
   }
   return 0;
 }
@@ -2513,7 +2525,7 @@ Value f_stat(EfunArgs&, StringArg file, LPC_INT flag) {
  * Written 930706 by Luke Mewburn <zak@rmit.edu.au>
  */
 
-Value f_strsrch(EfunArgs&, StringArg big, Arg little, LPC_INT from_right) {
+vm::Value f_strsrch(vm::EfunArgs&, vm::StringArg big, vm::Arg little, LPC_INT from_right) {
   const svalue_t* arg1 = big.sv();
   const svalue_t* arg2 = little.sv();
 
@@ -2591,29 +2603,31 @@ Value f_strsrch(EfunArgs&, StringArg big, Arg little, LPC_INT from_right) {
 #endif
 
 #ifdef F_STRCMP
-Value f_strcmp(EfunArgs&, StringArg a, StringArg b) { return strcmp(a.c_str(), b.c_str()); }
+vm::Value f_strcmp(vm::EfunArgs&, vm::StringArg a, vm::StringArg b) {
+  return strcmp(a.c_str(), b.c_str());
+}
 
 #endif
 
 #ifdef F_STRINGP
-Value f_stringp(EfunArgs&, Arg x) { return x.is(T_STRING); }
+vm::Value f_stringp(vm::EfunArgs&, vm::Arg x) { return x.is(T_STRING); }
 
 #endif
 
 #ifdef F_BUFFERP
-Value f_bufferp(EfunArgs&, Arg x) { return x.is(T_BUFFER); }
+vm::Value f_bufferp(vm::EfunArgs&, vm::Arg x) { return x.is(T_BUFFER); }
 
 #endif
 
 #ifdef F_TELL_OBJECT
-void f_tell_object(EfunArgs&, object_t* ob, StringArg msg) {
+void f_tell_object(vm::EfunArgs&, object_t* ob, vm::StringArg msg) {
   tell_object(ob, msg.c_str(), msg.size());
 }
 
 #endif
 
 #ifdef F_TELL_ROOM
-void f_tell_room(EfunArgs&, Arg room, Arg msg, std::optional<Arg> exclude) {
+void f_tell_room(vm::EfunArgs&, vm::Arg room, vm::Arg msg, std::optional<vm::Arg> exclude) {
   array_t* avoid;
   static array_t vtmp = {1,
 #ifdef DEBUGMALLOC_EXTENSIONS
@@ -2655,7 +2669,7 @@ void f_tell_room(EfunArgs&, Arg room, Arg msg, std::optional<Arg> exclude) {
 #endif
 
 #ifdef F_TEST_BIT
-Value f_test_bit(EfunArgs&, StringArg bits, LPC_INT ind) {
+vm::Value f_test_bit(vm::EfunArgs&, vm::StringArg bits, LPC_INT ind) {
   if (ind / 6 >= bits.size()) {
     return 0;
   }
@@ -2670,7 +2684,7 @@ Value f_test_bit(EfunArgs&, StringArg bits, LPC_INT ind) {
 #endif
 
 #ifdef F_NEXT_BIT
-Value f_next_bit(EfunArgs&, StringArg bits, LPC_INT start) {
+vm::Value f_next_bit(vm::EfunArgs&, vm::StringArg bits, LPC_INT start) {
   const char* str = bits.c_str();
   int const len = bits.size();
   int which, bit = 0, value;
@@ -2730,20 +2744,20 @@ Value f_next_bit(EfunArgs&, StringArg bits, LPC_INT start) {
 #endif
 
 #ifdef F__THIS_OBJECT
-Value f__this_object(EfunArgs&) { return Value::object(current_object); }
+vm::Value f__this_object(vm::EfunArgs&) { return vm::Value::object(current_object); }
 
 #endif
 
 #ifdef F_THIS_PLAYER
-Value f_this_player(EfunArgs&, LPC_INT interactive) {
+vm::Value f_this_player(vm::EfunArgs&, LPC_INT interactive) {
   if (interactive) {
     if (current_interactive) {
-      return Value::object(current_interactive);
+      return vm::Value::object(current_interactive);
     }
     return 0;
   }
   if (command_giver) {
-    return Value::object(command_giver);
+    return vm::Value::object(command_giver);
   }
   return 0;
 }
@@ -2752,7 +2766,7 @@ Value f_this_player(EfunArgs&, LPC_INT interactive) {
 int playerchanged;
 
 #ifdef F_SET_THIS_PLAYER
-void f_set_this_player(EfunArgs&, Arg who) {
+void f_set_this_player(vm::EfunArgs&, vm::Arg who) {
   if (who.is(T_NUMBER)) {
     set_command_giver(0);
   } else {
@@ -2763,7 +2777,7 @@ void f_set_this_player(EfunArgs&, Arg who) {
 #endif
 
 #ifdef F_THROW
-void f_throw(EfunArgs& f, Arg) {
+void f_throw(vm::EfunArgs& f, vm::Arg) {
   free_svalue(&catch_value, "f_throw");
   catch_value = f.take(0).release();
   f.pop_back(1);
@@ -2772,7 +2786,7 @@ void f_throw(EfunArgs& f, Arg) {
 #endif
 
 #ifdef F__TO_FLOAT
-Value f__to_float(EfunArgs&, Arg x) {
+vm::Value f__to_float(vm::EfunArgs&, vm::Arg x) {
   switch (x.type()) {
     case T_NUMBER:
       return static_cast<LPC_FLOAT>(x.number());
@@ -2785,7 +2799,7 @@ Value f__to_float(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F__TO_BUFFER
-Value f__to_buffer(EfunArgs& f, Arg x) {
+vm::Value f__to_buffer(vm::EfunArgs& f, vm::Arg x) {
   switch (x.type()) {
     case T_BUFFER:
       /* already a buffer */
@@ -2795,7 +2809,7 @@ Value f__to_buffer(EfunArgs& f, Arg x) {
       /* string -> its raw UTF-8 bytes; array -> ints 0..255, one byte
        * each (errors on any other item). Also the compile-time promotion
        * behind 'buffer b = str' and 'b += str'. */
-      return Value::refed(svalue_to_buffer_bytes(x.sv()));
+      return vm::Value::refed(svalue_to_buffer_bytes(x.sv()));
     }
     default:
       bad_argument(x.sv(), T_STRING | T_BUFFER | T_ARRAY, 1, F__TO_BUFFER);
@@ -2804,7 +2818,7 @@ Value f__to_buffer(EfunArgs& f, Arg x) {
 #endif
 
 #ifdef F__TO_INT
-Value f__to_int(EfunArgs& f, Arg x) {
+vm::Value f__to_int(vm::EfunArgs& f, vm::Arg x) {
   LPC_INT temp = 0;
   switch (x.type()) {
     case T_REAL:
@@ -2835,7 +2849,7 @@ Value f__to_int(EfunArgs& f, Arg x) {
         }
 
         if (p == str) {
-          return Value::undefined();
+          return vm::Value::undefined();
         }
       }
       return temp;
@@ -2852,21 +2866,21 @@ Value f__to_int(EfunArgs& f, Arg x) {
       return hostint;
     }
     default: /* T_NUMBER: already an int (owning nothing, so copied as is) */
-      return Value::owned(*x.sv());
+      return vm::Value::owned(*x.sv());
   }
 }
 #endif
 
 #ifdef F_TYPEOF
-Value f_typeof(EfunArgs&, Arg x) {
+vm::Value f_typeof(vm::EfunArgs&, vm::Arg x) {
   const char* t = type_name(x.type());
-  return Value::str_make_shared(t);
+  return vm::Value::str_make_shared(t);
 }
 
 #endif
 
 #ifdef F_UNDEFINEDP
-Value f_undefinedp(EfunArgs&, Arg x) {
+vm::Value f_undefinedp(vm::EfunArgs&, vm::Arg x) {
   if (x.is(T_NUMBER)) {
     return !x.number() && (x.subtype() == T_UNDEFINED);
   }
@@ -2875,12 +2889,12 @@ Value f_undefinedp(EfunArgs&, Arg x) {
 #endif
 
 #ifdef F_UPTIME
-Value f_uptime(EfunArgs&) { return static_cast<LPC_INT>(get_current_time() - boot_time); }
+vm::Value f_uptime(vm::EfunArgs&) { return static_cast<LPC_INT>(get_current_time() - boot_time); }
 
 #endif
 
 #ifdef F_USERP
-Value f_userp(EfunArgs&, object_t* ob) {
+vm::Value f_userp(vm::EfunArgs&, object_t* ob) {
   int i = ob->flags & O_ONCE_INTERACTIVE;
   return i != 0;
 }
@@ -2888,7 +2902,7 @@ Value f_userp(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_USERS
-Value f_users(EfunArgs&) {
+vm::Value f_users(vm::EfunArgs&) {
   bool include_hidden = true;
 #ifdef F_SET_HIDE
   include_hidden = (current_object->flags & O_HIDDEN) || (valid_hide(current_object));
@@ -2913,12 +2927,12 @@ Value f_users(EfunArgs&) {
     i++;
   }
 
-  return Value::refed(ret);
+  return vm::Value::refed(ret);
 }
 #endif
 
 #ifdef F_WIZARDP
-Value f_wizardp(EfunArgs&, object_t* ob) {
+vm::Value f_wizardp(vm::EfunArgs&, object_t* ob) {
   int i = ob->flags & O_IS_WIZARD;
   return i != 0;
 }
@@ -2926,7 +2940,7 @@ Value f_wizardp(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_VIRTUALP
-Value f_virtualp(EfunArgs&, object_t* ob) {
+vm::Value f_virtualp(vm::EfunArgs&, object_t* ob) {
   int i = ob->flags & O_VIRTUAL;
   return i != 0;
 }
@@ -2934,7 +2948,7 @@ Value f_virtualp(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_WRITE
-void f_write(EfunArgs&, Arg msg) { do_write(msg.sv()); }
+void f_write(vm::EfunArgs&, vm::Arg msg) { do_write(msg.sv()); }
 
 #endif
 
@@ -2942,7 +2956,7 @@ void f_write(EfunArgs&, Arg msg) { do_write(msg.sv()); }
 /* write_bytes() proper, and write_buffer() to a file, which also accepts a
  * buffer or an int (written as 4 bytes in network order) as the data. Its
  * errors name write_bytes(), as they always have. */
-static int write_bytes_to_file(const char* file, LPC_INT start, Arg data) {
+static int write_bytes_to_file(const char* file, LPC_INT start, vm::Arg data) {
   int i = 0;
 
   switch (data.type()) {
@@ -2967,7 +2981,7 @@ static int write_bytes_to_file(const char* file, LPC_INT start, Arg data) {
     }
 
     case T_STRING: {
-      StringArg str = data.string();
+      vm::StringArg str = data.string();
       i = write_bytes(file, start, str.c_str(), str.size());
       break;
     }
@@ -2981,13 +2995,13 @@ static int write_bytes_to_file(const char* file, LPC_INT start, Arg data) {
 #endif
 
 #ifdef F_WRITE_BYTES
-Value f_write_bytes(EfunArgs& f, StringArg file, LPC_INT start, StringArg) {
+vm::Value f_write_bytes(vm::EfunArgs& f, vm::StringArg file, LPC_INT start, vm::StringArg) {
   return write_bytes_to_file(file.c_str(), start, f[2]);
 }
 #endif
 
 #ifdef F_WRITE_BUFFER
-Value f_write_buffer(EfunArgs&, Arg dest, LPC_INT start, Arg data) {
+vm::Value f_write_buffer(vm::EfunArgs&, vm::Arg dest, LPC_INT start, vm::Arg data) {
   int i = 0;
 
   if (dest.is(T_STRING)) {
@@ -3014,7 +3028,7 @@ Value f_write_buffer(EfunArgs&, Arg dest, LPC_INT start, Arg data) {
     }
 
     case T_STRING: {
-      StringArg str = data.string();
+      vm::StringArg str = data.string();
       i = write_buffer(buf, start, str.c_str(), str.size());
       break;
     }
@@ -3028,13 +3042,13 @@ Value f_write_buffer(EfunArgs&, Arg dest, LPC_INT start, Arg data) {
 #endif
 
 #ifdef F_WRITE_FILE
-Value f_write_file(EfunArgs&, StringArg file, StringArg str, LPC_INT flags) {
+vm::Value f_write_file(vm::EfunArgs&, vm::StringArg file, vm::StringArg str, LPC_INT flags) {
   return write_file(file.c_str(), str.c_str(), flags);
 }
 #endif
 
 #ifdef F_DUMP_FILE_DESCRIPTORS
-Value f_dump_file_descriptors(EfunArgs&) {
+vm::Value f_dump_file_descriptors(vm::EfunArgs&) {
   outbuffer_t out;
 
   outbuf_zero(&out);
@@ -3044,7 +3058,7 @@ Value f_dump_file_descriptors(EfunArgs&) {
 #endif
 
 #ifdef F_RECLAIM_OBJECTS
-Value f_reclaim_objects(EfunArgs&) {
+vm::Value f_reclaim_objects(vm::EfunArgs&) {
   auto res = reclaim_objects(false);
   add_gametick_event(0, TickEvent::callback_type([] { remove_destructed_objects(); }));
   return static_cast<LPC_INT>(res);
@@ -3053,7 +3067,7 @@ Value f_reclaim_objects(EfunArgs&) {
 #endif
 
 #ifdef F_MEMORY_INFO
-Value f_memory_info(EfunArgs&, std::optional<object_t*> target) {
+vm::Value f_memory_info(vm::EfunArgs&, std::optional<object_t*> target) {
   LPC_INT mem;
   object_t* ob;
 
@@ -3074,7 +3088,7 @@ Value f_memory_info(EfunArgs&, std::optional<object_t*> target) {
 #endif
 
 #ifdef F_RELOAD_OBJECT
-void f_reload_object(EfunArgs&, object_t* ob) {
+void f_reload_object(vm::EfunArgs&, object_t* ob) {
   // The target may destruct itself during reload (call___INIT()/create() can
   // call destruct(this_object())): destruct sweeps the VM stack, so the arg
   // slot may hold a plain 0 instead of the object reference afterwards; the
@@ -3084,7 +3098,7 @@ void f_reload_object(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_RECOMPILE_OBJECT
-Value f_recompile_object(EfunArgs&, object_t* ob) {
+vm::Value f_recompile_object(vm::EfunArgs&, object_t* ob) {
   // The target (or one of its clones) may destruct itself in its new
   // program's __INIT: destruct sweeps the VM stack, so the arg slot may hold
   // a plain 0 instead of the object reference afterwards; the window's
@@ -3094,16 +3108,16 @@ Value f_recompile_object(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_QUERY_SHADOWING
-Value f_query_shadowing(EfunArgs&, object_t* ob) {
+vm::Value f_query_shadowing(vm::EfunArgs&, object_t* ob) {
   if (ob->shadowing) {
-    return Value::object(ob->shadowing);
+    return vm::Value::object(ob->shadowing);
   }
   return 0;
 }
 #endif
 
 #ifdef F_REQUEST_CLEAN_UP
-Value f_request_clean_up(EfunArgs&, object_t* ob) {
+vm::Value f_request_clean_up(vm::EfunArgs&, object_t* ob) {
   int success = 0;
 
   // Same condition as at load/clone time: only objects that actually
@@ -3118,7 +3132,7 @@ Value f_request_clean_up(EfunArgs&, object_t* ob) {
 #endif
 
 #ifdef F_SET_CLEAN_UP
-void f_set_clean_up(EfunArgs&, object_t* ob, std::optional<LPC_INT> seconds) {
+void f_set_clean_up(vm::EfunArgs&, object_t* ob, std::optional<LPC_INT> seconds) {
   if (seconds) {
     ob->next_cleanup = g_current_gametick + time_to_next_gametick(std::chrono::seconds(*seconds));
   } else {
@@ -3134,7 +3148,7 @@ void f_set_clean_up(EfunArgs&, object_t* ob, std::optional<LPC_INT> seconds) {
 #endif
 
 #ifdef F_SET_RESET
-void f_set_reset(EfunArgs&, object_t* ob, std::optional<LPC_INT> seconds) {
+void f_set_reset(vm::EfunArgs&, object_t* ob, std::optional<LPC_INT> seconds) {
   const auto time_to_reset = CONFIG_INT(__TIME_TO_RESET__);
 
   if (seconds) {
@@ -3148,12 +3162,12 @@ void f_set_reset(EfunArgs&, object_t* ob, std::optional<LPC_INT> seconds) {
 #endif
 
 #ifdef F_FLOATP
-Value f_floatp(EfunArgs&, Arg x) { return x.is(T_REAL); }
+vm::Value f_floatp(vm::EfunArgs&, vm::Arg x) { return x.is(T_REAL); }
 
 #endif
 
 #ifdef F_FLUSH_MESSAGES
-void f_flush_messages(EfunArgs&, std::optional<object_t*> ob) {
+void f_flush_messages(vm::EfunArgs&, std::optional<object_t*> ob) {
   if (ob) {
     if ((*ob)->interactive) {
       flush_message((*ob)->interactive);
@@ -3165,17 +3179,17 @@ void f_flush_messages(EfunArgs&, std::optional<object_t*> ob) {
 #endif
 
 #ifdef F_FIRST_INVENTORY
-Value f_first_inventory(EfunArgs&, Arg container) {
+vm::Value f_first_inventory(vm::EfunArgs&, vm::Arg container) {
   object_t* ob = first_inventory(container.sv());
   if (ob) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
 #endif
 
 #ifdef F_NEXT_INVENTORY
-Value f_next_inventory(EfunArgs&, object_t* item) {
+vm::Value f_next_inventory(vm::EfunArgs&, object_t* item) {
   object_t* ob = item->next_inv;
 
 #ifdef F_SET_HIDE
@@ -3185,14 +3199,14 @@ Value f_next_inventory(EfunArgs&, object_t* item) {
 #endif
 
   if (ob) {
-    return Value::object(ob);
+    return vm::Value::object(ob);
   }
   return 0;
 }
 #endif
 
 #ifdef F_DEFER
-void f_defer(EfunArgs& f, funptr_t*) {
+void f_defer(vm::EfunArgs& f, funptr_t*) {
   auto* newlist = reinterpret_cast<struct defer_list*>(
       DMALLOC(sizeof(struct defer_list), TAG_DEFERS, "defer: new item"));
 
@@ -3233,7 +3247,7 @@ void f_defer(EfunArgs& f, funptr_t*) {
 #endif
 
 #ifdef F_CRYPT
-Value f_crypt(EfunArgs&, StringArg password, Arg salt_arg) {
+vm::Value f_crypt(vm::EfunArgs&, vm::StringArg password, vm::Arg salt_arg) {
   const int sh_a512_prefix_len = 3;
   const int sh_a512_salt_len = 16;
   char salt[sh_a512_prefix_len + sh_a512_salt_len + 1];
@@ -3287,12 +3301,12 @@ Value f_crypt(EfunArgs&, StringArg password, Arg salt_arg) {
     error("Error in crypt(), check your salt");
   }
   result = string_copy(result, "f_crypt");
-  return Value::str_malloced(result);
+  return vm::Value::str_malloced(result);
 }
 #endif
 
 #ifdef F_OLDCRYPT
-Value f_oldcrypt(EfunArgs&, StringArg password, Arg salt_arg) {
+vm::Value f_oldcrypt(vm::EfunArgs&, vm::StringArg password, vm::Arg salt_arg) {
   const int salt_len = 8;
 
   const char *res, *p;
@@ -3315,12 +3329,12 @@ Value f_oldcrypt(EfunArgs&, StringArg password, Arg salt_arg) {
       "oldcrypt() is deprecated! it is using MD5 and unsafe, please upgrade your code to use "
       "crypt(password).\n");
   res = string_copy(custom_crypt(password.c_str(), p, nullptr), "f_oldcrypt");
-  return Value::str_malloced(res);
+  return vm::Value::str_malloced(res);
 }
 #endif
 
 #ifdef F_RUSAGE
-Value f_rusage(EfunArgs&) {
+vm::Value f_rusage(vm::EfunArgs&) {
   mapping_t* m;
   struct rusage rus = {};
 
@@ -3351,13 +3365,13 @@ Value f_rusage(EfunArgs&) {
     add_mapping_pair(m, "nvcsw", rus.ru_nvcsw);
     add_mapping_pair(m, "nivcsw", rus.ru_nivcsw);
   }
-  return Value::refed(m);
+  return vm::Value::refed(m);
 }
 
 #endif
 
 #ifdef F_STRWIDTH
-Value f_strwidth(EfunArgs&, StringArg str) {
+vm::Value f_strwidth(vm::EfunArgs&, vm::StringArg str) {
   auto width = u8_width(str.c_str(), -1);
   return static_cast<LPC_INT>(width);
 }

@@ -27,7 +27,7 @@ static bool has_gz_extension(const char* name) {
 #endif
 
 #ifdef F_COMPRESS_FILE
-Value f_compress_file(EfunArgs&, StringArg input, std::optional<StringArg> output) {
+vm::Value f_compress_file(vm::EfunArgs&, vm::StringArg input, std::optional<vm::StringArg> output) {
   int readb;
   const char* input_file;
   const char* output_file;
@@ -111,7 +111,8 @@ Value f_compress_file(EfunArgs&, StringArg input, std::optional<StringArg> outpu
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-Value f_uncompress_file(EfunArgs&, StringArg input, std::optional<StringArg> output) {
+vm::Value f_uncompress_file(vm::EfunArgs&, vm::StringArg input,
+                            std::optional<vm::StringArg> output) {
   int readb;
   int len;
   const char* input_file;
@@ -201,7 +202,7 @@ Value f_uncompress_file(EfunArgs&, StringArg input, std::optional<StringArg> out
 #endif
 
 #ifdef F_COMPRESS
-Value f_compress(EfunArgs&, Arg data) {
+vm::Value f_compress(vm::EfunArgs&, vm::Arg data) {
   unsigned char* input;
   int size;
   buffer_t* real_buffer;
@@ -214,7 +215,7 @@ Value f_compress(EfunArgs&, Arg data) {
     size = data.buffer()->size;
     input = data.buffer()->item;
   } else {
-    return Value::undefined();
+    return vm::Value::undefined();
   }
 
   new_size = compressBound(size);
@@ -230,7 +231,7 @@ Value f_compress(EfunArgs&, Arg data) {
   // Shrink it down.
   real_buffer = allocate_buffer(new_size);
   write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer.get()), new_size);
-  return Value::refed(real_buffer);
+  return vm::Value::refed(real_buffer);
 }
 #endif
 
@@ -241,7 +242,7 @@ static void* zlib_alloc(void* /*opaque*/, unsigned int items, unsigned int size)
 
 static void zlib_free(void* /*opaque*/, void* address) { FREE(address); }
 
-Value f_uncompress(EfunArgs&, Arg data) {
+vm::Value f_uncompress(vm::EfunArgs&, vm::Arg data) {
   z_stream* compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
   unsigned char* output_data = nullptr;
@@ -253,7 +254,7 @@ Value f_uncompress(EfunArgs&, Arg data) {
   if (data.is(T_BUFFER)) {
     buffer = data.buffer();
   } else {
-    return Value::undefined();
+    return vm::Value::undefined();
   }
 
   compressed =
@@ -313,7 +314,7 @@ Value f_uncompress(EfunArgs&, Arg data) {
     write_buffer(buffer, 0, reinterpret_cast<char*>(output_data), len);
     FREE(output_data);
     FREE(compressed);
-    return Value::refed(buffer);
+    return vm::Value::refed(buffer);
   } else {
     if (output_data) {
       FREE(output_data);

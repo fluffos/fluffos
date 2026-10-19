@@ -441,8 +441,8 @@ static void arg_position(const efun_sig *sig, int pos, arg_shape *out) {
   out->optional = pos >= sig->min_arg;
 }
 
-/* The C++ parameter type and EfunArgs getter for a position of exactly one
- * type, or null for a union or mixed (which binds as an Arg). */
+/* The C++ parameter type and vm::EfunArgs getter for a position of exactly
+ * one type, or null for a union or mixed (which binds as a vm::Arg). */
 static const char *scalar_cpp(int t, const char **getter) {
   if (t & 0x10000) {
     *getter = "array_arg";
@@ -457,7 +457,7 @@ static const char *scalar_cpp(int t, const char **getter) {
       return "LPC_FLOAT";
     case T_STRING:
       *getter = "string_arg";
-      return "StringArg";
+      return "vm::StringArg";
     case T_OBJECT:
       *getter = "object_arg";
       return "object_t*";
@@ -503,7 +503,7 @@ static std::string shape_mask(const arg_shape *a) {
 static std::string param_type(const arg_shape *a) {
   const char *getter;
   const char *cpp = shape_scalar(a, &getter);
-  std::string t = cpp ? cpp : "Arg";
+  std::string t = cpp ? cpp : "vm::Arg";
   return a->optional ? "std::optional<" + t + ">" : t;
 }
 
@@ -513,7 +513,7 @@ static std::string param_expr(const arg_shape *a, int pos) {
   const char *cpp = shape_scalar(a, &getter);
   if (cpp) {
     if (a->optional) {
-      snprintf(buf, sizeof buf, "f.optional<&EfunArgs::%s>(%d)", getter, pos);
+      snprintf(buf, sizeof buf, "f.optional<&vm::EfunArgs::%s>(%d)", getter, pos);
     } else {
       snprintf(buf, sizeof buf, "f.%s(%d)", getter, pos);
     }
@@ -681,9 +681,9 @@ void make_efun_tables() {
        * the compiler fold the window release */
       fprintf(f, "  DEBUG_CHECK(num_arg != %d, \"%s: wrong argument count\\n\");\n", sig->nargs,
               efun_names[i]);
-      fprintf(f, "  EfunArgs f = EfunArgs::over_top(%d, %s);\n", sig->nargs, efun_codes[i]);
+      fprintf(f, "  vm::EfunArgs f = vm::EfunArgs::over_top(%d, %s);\n", sig->nargs, efun_codes[i]);
     } else {
-      fprintf(f, "  EfunArgs f = EfunArgs::over_top(num_arg, %s);\n", efun_codes[i]);
+      fprintf(f, "  vm::EfunArgs f = vm::EfunArgs::over_top(num_arg, %s);\n", efun_codes[i]);
     }
     if (sig->ret == T_VOID) {
       fprintf(f, "  %s;\n  f.finish_void();\n}\n", call.c_str());
@@ -763,10 +763,10 @@ void make_efun_tables() {
 
   fprintf(f, "#include \"vm/internal/base/efun_args.h\"\n\n");
   fprintf(f, "\n/* EFUN implementations, one per primary spec entry, generated from the\n"
-             " * spec: a void efun returns void, any other returns its result as a Value.\n"
-             " * Each declared argument arrives typed (see efun_args.h): a single type as\n"
-             " * its C++ type, a union or mixed as an Arg, a position that may be absent\n"
-             " * as a std::optional. A trailing ... is read through f.\n"
+             " * spec: a void efun returns void, any other returns a vm::Value. Each\n"
+             " * declared argument arrives typed (see efun_args.h): a single type as its\n"
+             " * C++ type, a union or mixed as a vm::Arg, a position that may be absent as\n"
+             " * a std::optional. A trailing ... is read through f.\n"
              " */\n\n");
   for (int i = 0; i < efun_code; i++) {
     const efun_sig *sig = &efun_sigs[i];
@@ -776,8 +776,8 @@ void make_efun_tables() {
       arg_position(sig, pos, &a);
       params += ", " + param_type(&a);
     }
-    fprintf(f, "%s f_%s(EfunArgs& f%s);\n", sig->ret == T_VOID ? "void" : "Value", efun_names[i],
-            params.c_str());
+    fprintf(f, "%s f_%s(vm::EfunArgs& f%s);\n", sig->ret == T_VOID ? "void" : "vm::Value",
+            efun_names[i], params.c_str());
   }
   fprintf(f, "/* An efun's entry in efun_table: the generated thunk, given the number\n"
              " * of arguments on the stack. */\n");
