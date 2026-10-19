@@ -13,9 +13,9 @@
  *               the spec cannot type: varargs, and moving arguments out.
  *
  *   Call        The arguments for one call from C++ into LPC (an apply, a
- *               master apply, a function pointer or an efun callback). The
- *               call consumes what was pushed, so the count is never written
- *               a second time by hand.
+ *               master apply, a function pointer or an efun callback):
+ *               vm::Call(a, b).apply(fun, ob, origin). The call consumes
+ *               what was pushed, so the count is never written by hand.
  *
  *   CallResult  What such a call produced: a status and, when it succeeded,
  *               the result as an owned Value.
@@ -172,10 +172,10 @@ class EfunArgs {
  *   kError     a safe_*() call caught an error() in the callee;
  *   kNoMaster  a master apply was made before any master object loaded.
  *
- * operator-> and operator* reach the value without moving it, so
- * `if (r && r->type == T_STRING)` reads naturally; get() is the value, or
- * null unless ok(), for code that hands it to a function taking an
- * svalue_t*.
+ * is(t) tests the type (`if (r.is(T_STRING))`), and operator-> and
+ * operator* then read the value without moving it (`r->u.string`); get()
+ * is the value, or null unless ok(), for code that hands it to a function
+ * taking an svalue_t*.
  */
 class CallResult {
  public:
@@ -187,6 +187,8 @@ class CallResult {
   Status status() const { return status_; }
   bool ok() const { return status_ == kOk; }
   explicit operator bool() const { return ok(); }
+  /* ok(), and the value is of type t: `if (r.is(T_STRING))`. */
+  bool is(uint32_t t) const { return ok() && value_->type == t; }
 
   svalue_t& operator*() { return *value_; }
   const svalue_t& operator*() const { return *value_; }
@@ -204,9 +206,13 @@ class CallResult {
 
 /* Arguments for exactly one call from C++ into LPC.
  *
- * Push the arguments, then make one of the calls below. The call consumes
- * them, including when the callee error()s. The safe_*() forms catch an
- * error() in the callee and report it as CallResult::kError.
+ * Push the arguments, then make one of the calls below:
+ *
+ *   vm::CallResult r = vm::Call(vm::Value::str_copy(name), 1).apply(fun, ob, origin);
+ *
+ * or push() them one at a time when they are decided as you go. The call
+ * consumes them, including when the callee error()s. The safe_*() forms
+ * catch an error() in the callee and report it as CallResult::kError.
  *
  * If the code leaves the scope without calling, the destructor pops what
  * was pushed -- also during an error() unwind, as long as the pushes are
@@ -217,6 +223,12 @@ class CallResult {
 class Call {
  public:
   Call();
+  /* Pushes its arguments in order, as push() does each. */
+  template <typename... Vs>
+  explicit Call(Value&& first, Vs&&... rest) : Call() {
+    push(std::move(first));
+    (push(std::forward<Vs>(rest)), ...);
+  }
   ~Call();
   Call(const Call&) = delete;
   Call& operator=(const Call&) = delete;
@@ -226,7 +238,7 @@ class Call {
    * (promise_settle()) before deciding which call to make. */
   Arg arg(int i) const;
 
-  void push(Value v);
+  void push(Value&& v);
 
   CallResult apply(const char* fun, object_t* ob, int origin);
   CallResult safe_apply(const char* fun, object_t* ob, int origin);

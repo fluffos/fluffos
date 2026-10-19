@@ -274,12 +274,11 @@ void mark_mudlib_stats() {
  *************************/
 
 static void init_author_for_ob(object_t* ob) {
-  vm::Call call;
-  call.push(vm::Value::str_malloced(add_slash(ob->obname)));
-  vm::CallResult ret = call.apply_master(APPLY_AUTHOR_FILE);
+  vm::CallResult ret =
+      vm::Call(vm::Value::str_malloced(add_slash(ob->obname))).apply_master(APPLY_AUTHOR_FILE);
   if (ret.status() == vm::CallResult::kNoMaster) {
     ob->stats.author = master_author;
-  } else if (!ret || ret->type != T_STRING) {
+  } else if (!ret.is(T_STRING)) {
     ob->stats.author = nullptr;
   } else {
     ob->stats.author = add_stat_entry(ret->u.string, &authors);
@@ -319,10 +318,8 @@ mudlib_stats_t* set_master_author(const char* str) {
 static const char* author_for_file(const char* file) {
   static char buff[50];
 
-  vm::Call call;
-  call.push(vm::Value::str_copy(file));
-  vm::CallResult ret = call.safe_apply_master(APPLY_AUTHOR_FILE);
-  if (!ret || ret->type != T_STRING) {
+  vm::CallResult ret = vm::Call(vm::Value::str_copy(file)).safe_apply_master(APPLY_AUTHOR_FILE);
+  if (!ret.is(T_STRING)) {
     return nullptr;
   }
   // The master apply may return an arbitrary-length string; bound the copy.
@@ -416,10 +413,9 @@ mudlib_stats_t* set_backbone_domain(const char* str) {
 static const char* domain_for_file(const char* file) {
   static char buff[512];
 
-  vm::Call call;
-  call.push(vm::Value::str_make_shared(file));
-  vm::CallResult ret = call.safe_apply_master(APPLY_DOMAIN_FILE);
-  if (!ret || ret->type != T_STRING) {
+  vm::CallResult ret =
+      vm::Call(vm::Value::str_make_shared(file)).safe_apply_master(APPLY_DOMAIN_FILE);
+  if (!ret.is(T_STRING)) {
     return nullptr;
   }
   // The master apply may return an arbitrary-length string; bound the copy.

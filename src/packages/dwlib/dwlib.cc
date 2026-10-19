@@ -46,11 +46,9 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
   if (no_dollars && arr->item->type == T_OBJECT && !dark && command_giver && command_giver->super) {
     /* check_dark(query_light()), passing 0 when there is no query_light() */
     vm::CallResult light = vm::Call().apply("query_light", command_giver->super, ORIGIN_EFUN);
-    vm::Call check;
-    check.push(light.take());
-    vm::CallResult v = check.apply("check_dark", command_giver, ORIGIN_EFUN);
+    vm::CallResult v = vm::Call(light.take()).apply("check_dark", command_giver, ORIGIN_EFUN);
 
-    if (v && v->type == T_NUMBER && v->u.number) {
+    if (v.is(T_NUMBER) && v->u.number) {
       return vm::Value::str_copy("some objects you cannot make out");
     }
   }
@@ -87,11 +85,9 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
 
     for (i = 0; i < size; i++) {
       sv = (arr->item + i);
-      vm::Call call;
-      call.push(quiet);
-      vm::CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
+      vm::CallResult v = vm::Call(quiet).apply(fun, sv->u.ob, ORIGIN_EFUN);
 
-      if (!v || v->type != T_STRING) {
+      if (!v.is(T_STRING)) {
         continue;
       }
       if (total_len + SVALUE_STRLEN(v.get()) > max_string_length - mlen) {
@@ -135,11 +131,9 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
         }
         break;
       case T_OBJECT: {
-        vm::Call call;
-        call.push(quiet);
-        vm::CallResult v = call.apply(fun, sv->u.ob, ORIGIN_EFUN);
+        vm::CallResult v = vm::Call(quiet).apply(fun, sv->u.ob, ORIGIN_EFUN);
 
-        if (!v || v->type != T_STRING) {
+        if (!v.is(T_STRING)) {
           continue;
         }
 
@@ -191,11 +185,10 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
   if (no_dollars) {
     if (command_giver) {
       /* We need to call on this_player(). */
-      vm::Call call;
-      call.push(vm::Value::str_malloced(res));
-      vm::CallResult v = call.apply("convert_message", command_giver, ORIGIN_EFUN);
+      vm::CallResult v = vm::Call(vm::Value::str_malloced(res))
+                             .apply("convert_message", command_giver, ORIGIN_EFUN);
 
-      if (v && v->type == T_STRING) {
+      if (v.is(T_STRING)) {
         return vm::Value::str_make_shared(v->u.string);
       }
       return vm::Value::undefined();
@@ -205,12 +198,11 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
     ob = find_object("/global/player");
 
     if (ob) {
-      vm::Call call;
-      call.push(vm::Value::str_malloced(res));
-      vm::CallResult v = call.apply("convert_message", ob, ORIGIN_EFUN);
+      vm::CallResult v =
+          vm::Call(vm::Value::str_malloced(res)).apply("convert_message", ob, ORIGIN_EFUN);
 
       /* Return the result! */
-      if (v && v->type == T_STRING) {
+      if (v.is(T_STRING)) {
         return vm::Value::str_make_shared(v->u.string);
       }
       return vm::Value::undefined();
@@ -275,13 +267,13 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   /* Check to see whether we're invisible */
   vm::CallResult v = vm::Call().apply("query_invis", referee, ORIGIN_EFUN);
 
-  if (v && v->type == T_NUMBER) {
+  if (v.is(T_NUMBER)) {
     invis = v->u.number;
   }
   /* And if we're a creator. */
   v = vm::Call().apply("query_creator", referee, ORIGIN_EFUN);
 
-  if (v && v->type == T_NUMBER) {
+  if (v.is(T_NUMBER)) {
     referee_creator = v->u.number;
   }
 
@@ -305,7 +297,7 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
 
   vm::CallResult referee_name_v = vm::Call().apply("query_name", referee, ORIGIN_EFUN);
 
-  if (referee_name_v && referee_name_v->type == T_STRING) {
+  if (referee_name_v.is(T_STRING)) {
     referee_name = referee_name_v->u.string;
   }
 
@@ -313,7 +305,7 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   if (referrer_obj && !referrer_name) {
     referrer_name_v = vm::Call().apply("query_name", referrer_obj, ORIGIN_EFUN);
 
-    if (referrer_name_v && referrer_name_v->type == T_STRING) {
+    if (referrer_name_v.is(T_STRING)) {
       referrer_name = referrer_name_v->u.string;
     }
   }
@@ -326,18 +318,17 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   playtester_handler = find_object(PLAYTESTER_HANDLER);
 
   if (playtester_handler) {
-    vm::Call call;
-    call.push(vm::Value::str_copy(referrer_name));
-    v = call.apply("query_playtester", playtester_handler, ORIGIN_EFUN);
+    v = vm::Call(vm::Value::str_copy(referrer_name))
+            .apply("query_playtester", playtester_handler, ORIGIN_EFUN);
 
-    if (v && v->type == T_NUMBER) {
+    if (v.is(T_NUMBER)) {
       referrer_playtester = v->u.number;
     }
   }
 
   v = vm::Call().apply("query_allowed", referee, ORIGIN_EFUN);
   // printf("allow refs:%d\n", v->u.arr->ref);
-  if (v && v->type == T_ARRAY) {
+  if (v.is(T_ARRAY)) {
     vec = v->u.arr;
     size = vec->size;
     /* Iterate through the allowed array. */
@@ -376,11 +367,10 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
     case 3: {
       /* Check for High Lord Invis. */
 
-      vm::Call call;
-      call.push(vm::Value::str_copy(referrer_name));
-      v = call.apply("high_programmer", master_ob, ORIGIN_EFUN);
+      v = vm::Call(vm::Value::str_copy(referrer_name))
+              .apply("high_programmer", master_ob, ORIGIN_EFUN);
 
-      if (v && v->type == T_NUMBER) {
+      if (v.is(T_NUMBER)) {
         ret = v->u.number;
       }
     } break;
@@ -388,11 +378,9 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
     case 2: {
       /* Check for Lord Invis */
 
-      vm::Call call;
-      call.push(vm::Value::str_copy(referrer_name));
-      v = call.apply("query_lord", master_ob, ORIGIN_EFUN);
+      v = vm::Call(vm::Value::str_copy(referrer_name)).apply("query_lord", master_ob, ORIGIN_EFUN);
 
-      if (v && v->type == T_NUMBER) {
+      if (v.is(T_NUMBER)) {
         ret = v->u.number;
       }
     } break;
@@ -402,16 +390,15 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
       if (referrer_obj) {
         v = vm::Call().apply("query_creator", referrer_obj, ORIGIN_EFUN);
 
-        if (v && v->type == T_NUMBER) {
+        if (v.is(T_NUMBER)) {
           ret = v->u.number;
         }
       } else {
         player_handler = find_object(PLAYER_HANDLER);
-        vm::Call call;
-        call.push(vm::Value::str_copy(referrer_name));
-        v = call.apply("test_creator", player_handler, ORIGIN_EFUN);
+        v = vm::Call(vm::Value::str_copy(referrer_name))
+                .apply("test_creator", player_handler, ORIGIN_EFUN);
 
-        if (v && v->type == T_NUMBER) {
+        if (v.is(T_NUMBER)) {
           ret = v->u.number;
         }
       }
@@ -453,11 +440,9 @@ vm::Value f_reference_allowed(vm::EfunArgs&, object_t* referee, std::optional<vm
       referrer_obj = find_living_object(referrer->string().c_str(), 1);
 #else
       if (simul_efun_ob) {
-        vm::Call b;
-        b.push(referrer->copy());
-        player = b.apply("find_player", simul_efun_ob, ORIGIN_EFUN);
+        player = vm::Call(referrer->copy()).apply("find_player", simul_efun_ob, ORIGIN_EFUN);
 
-        if (player && player->type == T_OBJECT) {
+        if (player.is(T_OBJECT)) {
           referrer_obj = player->u.ob;
           referrer_name = referrer->string().c_str();
         } else {
@@ -724,13 +709,11 @@ svalue_t* replace_objects(svalue_t* thing) {
       append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
       vm::CallResult tmp(vm::CallResult::kNotFound);
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
-        vm::Call b;
-        b.push(vm::Value::object(thing->u.ob));
-        tmp = b.safe_apply_master(APPLY_OBJECT_NAME);
+        tmp = vm::Call(vm::Value::object(thing->u.ob)).safe_apply_master(APPLY_OBJECT_NAME);
       } else {
         append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
       }
-      if (tmp && tmp->type == T_STRING) {
+      if (tmp.is(T_STRING)) {
         append_bounded(buf, sizeof(buf), &len, " (\"", 3);
         append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp.get()));
         append_bounded(buf, sizeof(buf), &len, "\")", 2);

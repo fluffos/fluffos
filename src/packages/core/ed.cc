@@ -548,13 +548,11 @@ static int doprnt(int from, int to) {
 
 static void do_output(char* str) {
 #ifdef RECEIVE_ED
-  vm::Call call;
-  call.push(vm::Value::str_copy(str));
-  call.push(vm::Value::str_copy(P_FNAME));
   // One could argue that this should be safe_apply()
   // Pro: ed continues to work with a runtiming receive_ed()
   // Con: "I wrote a receive_ed()!  Why does the driver ignore it??"
-  vm::CallResult ret = call.apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
+  vm::CallResult ret = vm::Call(vm::Value::str_copy(str), vm::Value::str_copy(P_FNAME))
+                           .apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
   if (!ret) {
     ED_OUTPUTV(ED_DEST, "%s\n", str);
   } else if (ret->type == T_NUMBER) {
@@ -897,11 +895,9 @@ static char* getfn(int writeflg) {
   }
 
   if (file[0] != '/') {
-    vm::Call call;
-    call.push(vm::Value::str_copy(file));
     /* no master, no such apply, or not a string: give up */
-    vm::CallResult ret = call.apply_master(APPLY_MAKE_PATH_ABSOLUTE);
-    if (!ret || ret->type != T_STRING) {
+    vm::CallResult ret = vm::Call(vm::Value::str_copy(file)).apply_master(APPLY_MAKE_PATH_ABSOLUTE);
+    if (!ret.is(T_STRING)) {
       return nullptr;
     }
     strncpy(file, ret->u.string, sizeof file - 1);
@@ -1340,10 +1336,8 @@ static int set() {
     if (P_RESTRICT) {
       return (SET_FAIL);
     }
-    vm::Call call;
-    call.push(vm::Value::object(current_editor));
-    call.push(P_SHIFTWIDTH | P_FLAGS);
-    vm::CallResult ret = call.apply_master(APPLY_SAVE_ED_SETUP);
+    vm::CallResult ret = vm::Call(vm::Value::object(current_editor), P_SHIFTWIDTH | P_FLAGS)
+                             .apply_master(APPLY_SAVE_ED_SETUP);
     if (MASTER_APPROVED(ret, "save_ed_setup")) {
       return 0;
     }
@@ -2493,10 +2487,9 @@ void ed_start(const char* file_arg, const char* write_fn, const char* exit_fn, i
 
   ED_BUFFER->flags |= EIGHTBIT_MASK;
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
-  vm::Call setup_call;
-  setup_call.push(vm::Value::object(current_editor));
-  vm::CallResult setup = setup_call.apply_master(APPLY_RETRIEVE_ED_SETUP);
-  if (setup && setup->type == T_NUMBER && setup->u.number) {
+  vm::CallResult setup =
+      vm::Call(vm::Value::object(current_editor)).apply_master(APPLY_RETRIEVE_ED_SETUP);
+  if (setup.is(T_NUMBER) && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
   }
@@ -3027,13 +3020,10 @@ that help is desired for. \n",
               ED_BUFFER->scroll_lines - 1, ED_BUFFER->scroll_lines + 4);
 
 #ifdef RECEIVE_ED
-      vm::Call call;
-      call.push(vm::Value::str_copy(edout));
-      call.push(vm::Value::undefined());
-
       /* outstr may point into ret's string below: ret lives to the end of
        * the switch */
-      vm::CallResult ret = call.apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
+      vm::CallResult ret = vm::Call(vm::Value::str_copy(edout), vm::Value::undefined())
+                               .apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
       if (!ret) {
         outstr = edout;
       } else if (ret->type == T_NUMBER) {
@@ -3220,10 +3210,9 @@ char* object_ed_start(object_t* ob, const char* fname, int restricted, int scrol
   ED_BUFFER->flags |= EIGHTBIT_MASK;
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
 
-  vm::Call setup_call;
-  setup_call.push(vm::Value::object(current_editor));
-  vm::CallResult setup = setup_call.apply_master(APPLY_RETRIEVE_ED_SETUP);
-  if (setup && setup->type == T_NUMBER && setup->u.number) {
+  vm::CallResult setup =
+      vm::Call(vm::Value::object(current_editor)).apply_master(APPLY_RETRIEVE_ED_SETUP);
+  if (setup.is(T_NUMBER) && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
   }
@@ -3265,9 +3254,8 @@ void object_save_ed_buffer(object_t* ob) {
   current_ed_buffer = find_ed_buffer(ob);
   current_editor = ob;
 
-  vm::Call call;
-  call.push(vm::Value::str_copy(P_FNAME));
-  vm::CallResult stmp = call.apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
+  vm::CallResult stmp =
+      vm::Call(vm::Value::str_copy(P_FNAME)).apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
   if (stmp) {
     if (stmp->type == T_STRING) {
       fname = stmp->u.string;

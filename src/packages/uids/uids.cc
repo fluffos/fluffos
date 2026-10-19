@@ -76,10 +76,8 @@ vm::Value f_seteuid(vm::EfunArgs&, vm::Arg euid) {
     current_object->euid = nullptr;
     return 1;
   }
-  vm::Call call;
-  call.push(vm::Value::object(current_object));
-  call.push(euid.copy());
-  vm::CallResult ret = call.apply_master(APPLY_VALID_SETEUID);
+  vm::CallResult ret =
+      vm::Call(vm::Value::object(current_object), euid.copy()).apply_master(APPLY_VALID_SETEUID);
   if (!MASTER_APPROVED(ret, "valid_seteuid")) {
     return 0;
   }

@@ -1262,9 +1262,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     return nullptr;
   }
   if (ob->super) {
-    vm::Call call;
-    call.push(vm::Value::copy(v));
-    vm::CallResult ret = call.apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
+    vm::CallResult ret = vm::Call(vm::Value::copy(v)).apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
     /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
        sets ob->super to nullptr (destruct_object), or destruct the
        environment. */
@@ -1314,10 +1312,8 @@ static object_t* object_present2(svalue_t* v, object_t* ob) {
                                 : vm::Value::str_copy(std::string_view(name, namelen));
 
   for (; ob; ob = ob->next_inv) {
-    vm::Call call;
-    call.push(vm::Value::copy(id_name.get()));
-
-    vm::CallResult ret = call.apply(APPLY_ID, ob, ORIGIN_DRIVER);
+    vm::CallResult ret =
+        vm::Call(vm::Value::copy(id_name.get())).apply(APPLY_ID, ob, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }

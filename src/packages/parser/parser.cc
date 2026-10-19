@@ -506,7 +506,7 @@ static void interrogate_master() {
 
     DEBUG_PP(("[%s]", applies_table[APPLY_USERS]));
     vm::CallResult ret = vm::Call().apply_master(APPLY_USERS);
-    if (ret && ret->type == T_ARRAY) {
+    if (ret.is(T_ARRAY)) {
       master_user_list = ret->u.arr;
       ret->u.arr->ref++;
     } else {
@@ -529,7 +529,7 @@ static void interrogate_master() {
     DEBUG_PP(("[%s]", applies_table[APPLY_LITERALS]));
     vm::CallResult ret = vm::Call().apply_master(APPLY_LITERALS);
 
-    if (ret && ret->type == T_ARRAY) {
+    if (ret.is(T_ARRAY)) {
       num_literals = parse_copy_array(ret->u.arr, &literals, __CURRENT_FILE_LINE__);
     } else {
       num_literals = 0;
@@ -934,7 +934,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", APPLY_NOUN));
   vm::CallResult ret = vm::Call().safe_apply(APPLY_NOUN, ob, ORIGIN_DRIVER);
-  if (ret && ret->type == T_ARRAY) {
+  if (ret.is(T_ARRAY)) {
     ob->pinfo->num_ids = parse_copy_array(ret->u.arr, &ob->pinfo->ids, __CURRENT_FILE_LINE__);
   } else {
     ob->pinfo->num_ids = 0;
@@ -950,7 +950,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", APPLY_PLURAL));
   ret = vm::Call().safe_apply(APPLY_PLURAL, ob, ORIGIN_DRIVER);
-  if (ret && ret->type == T_ARRAY) {
+  if (ret.is(T_ARRAY)) {
     ob->pinfo->num_plurals =
         parse_copy_array(ret->u.arr, &ob->pinfo->plurals, __CURRENT_FILE_LINE__);
   } else {
@@ -962,7 +962,7 @@ static void interrogate_object(object_t* ob) {
 
   DEBUG_PP(("[%s]", APPLY_ADJECTIVE));
   ret = vm::Call().safe_apply(APPLY_ADJECTIVE, ob, ORIGIN_DRIVER);
-  if (ret && ret->type == T_ARRAY) {
+  if (ret.is(T_ARRAY)) {
     ob->pinfo->num_adjs = parse_copy_array(ret->u.arr, &ob->pinfo->adjs, __CURRENT_FILE_LINE__);
   } else {
     ob->pinfo->num_adjs = 0;
@@ -1003,10 +1003,8 @@ static object_t* first_inv(object_t* ob) {
 #ifndef NO_ENVIRONMENT
   return ob->contains;
 #else
-  vm::Call b;
-  b.push(vm::Value::object(ob));
-  vm::CallResult ret = b.apply_master(APPLY_PARSE_FIRST_INVENTORY);
-  if (ret && ret->type == T_OBJECT) {
+  vm::CallResult ret = vm::Call(vm::Value::object(ob)).apply_master(APPLY_PARSE_FIRST_INVENTORY);
+  if (ret.is(T_OBJECT)) {
     return ret->u.ob;
   }
   return (object_t*)NULL;
@@ -1018,11 +1016,9 @@ static object_t* next_inv(object_t* parent, object_t* sibling) {
   (void)parent;
   return sibling->next_inv;
 #else
-  vm::Call b;
-  b.push(vm::Value::object(parent));
-  b.push(vm::Value::object(sibling));
-  vm::CallResult ret = b.apply_master(APPLY_PARSE_NEXT_INVENTORY);
-  if (ret && ret->type == T_OBJECT) {
+  vm::CallResult ret = vm::Call(vm::Value::object(parent), vm::Value::object(sibling))
+                           .apply_master(APPLY_PARSE_NEXT_INVENTORY);
+  if (ret.is(T_OBJECT)) {
     return ret->u.ob;
   }
   return (object_t*)NULL;
@@ -1033,10 +1029,8 @@ static object_t* super(object_t* ob) {
 #ifndef NO_ENVIRONMENT
   return ob->super;
 #else
-  vm::Call b;
-  b.push(vm::Value::object(ob));
-  vm::CallResult ret = b.apply_master(APPLY_PARSE_ENVIRONMENT);
-  if (ret && ret->type == T_OBJECT) {
+  vm::CallResult ret = vm::Call(vm::Value::object(ob)).apply_master(APPLY_PARSE_ENVIRONMENT);
+  if (ret.is(T_OBJECT)) {
     return ret->u.ob;
   }
   return (object_t*)NULL;
@@ -1463,7 +1457,7 @@ static char* query_the_short(char* start, char* end, object_t* ob) {
     return strput(start, end, "the thing");
   }
   vm::CallResult ret = vm::Call().safe_apply("the_short", ob, ORIGIN_DRIVER);
-  if (!ret || ret->type != T_STRING) {
+  if (!ret.is(T_STRING)) {
     return strput(start, end, "the thing");
   }
   return strput(start, end, ret->u.string);

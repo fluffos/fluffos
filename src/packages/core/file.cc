@@ -689,13 +689,11 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
     return nullptr;
   }
 
-  vm::Call call;
-  call.push(vm::Value::str_copy(path));
-  call.push(vm::Value::object(call_object));
-  call.push(vm::Value::str_constant(call_fun));
   /* No master, no such apply, or an error in it: v is not ok() and reads as
    * null below, which allows the path unchanged (as it always has). */
-  vm::CallResult r = call.safe_apply_master(writeflg ? APPLY_VALID_WRITE : APPLY_VALID_READ);
+  vm::CallResult r = vm::Call(vm::Value::str_copy(path), vm::Value::object(call_object),
+                              vm::Value::str_constant(call_fun))
+                         .safe_apply_master(writeflg ? APPLY_VALID_WRITE : APPLY_VALID_READ);
   svalue_t* v = r.get();
 
   if (v && v->type == T_NUMBER && v->u.number == 0) {
@@ -1074,10 +1072,7 @@ vm::Value f_get_dir(vm::EfunArgs&, vm::StringArg path, LPC_INT flags) {
 vm::Value f_link(vm::EfunArgs&, vm::StringArg from, vm::StringArg to) {
   int i;
 
-  vm::Call call;
-  call.push(from.copy());
-  call.push(to.copy());
-  vm::CallResult ret = call.apply_master(APPLY_VALID_LINK);
+  vm::CallResult ret = vm::Call(from.copy(), to.copy()).apply_master(APPLY_VALID_LINK);
   if (MASTER_APPROVED(ret, "valid_link")) {
     i = do_rename(from.c_str(), to.c_str(), F_LINK);
   } else {

@@ -540,15 +540,12 @@ vm::Value f_pcre_replace_callback(vm::EfunArgs& f, vm::StringArg subject, vm::St
   save_context(&econ);
   try {
     for (i = 0; i < run->rc - 1; i++) {
-      vm::Call b;
-      b.push(vm::Value::copy(&arr->item[i]));
-      b.push(i);
-      vm::CallResult v = b.call(&ftc);
+      vm::CallResult v = vm::Call(vm::Value::copy(&arr->item[i]), i).call(&ftc);
 
       /* Mimic behaviour of map(string, function) when function pointer returns
        null,
        ie return the input.  */
-      if (v && v->type == T_STRING && v->u.string != nullptr) {
+      if (v.is(T_STRING) && v->u.string != nullptr) {
         assign_svalue_no_free(&r->item[i], v.get());
       } else {
         assign_svalue_no_free(&r->item[i], &arr->item[i]);

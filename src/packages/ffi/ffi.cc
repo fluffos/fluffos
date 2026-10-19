@@ -202,8 +202,7 @@ void check_valid_ffi(const char* op, const svalue_t* arg) {
   }
   call.push(vm::Value::object(current_object));
   vm::CallResult ret = call.safe_apply_master(APPLY_VALID_FFI);
-  if (ret.status() == vm::CallResult::kNoMaster ||
-      (ret && ret->type == T_NUMBER && ret->u.number)) {
+  if (ret.status() == vm::CallResult::kNoMaster || (ret.is(T_NUMBER) && ret->u.number)) {
     return;
   }
   error("FFI security violation: '%s' denied by master::valid_ffi.\n", op);

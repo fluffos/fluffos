@@ -244,12 +244,9 @@ int check_valid_socket(const char* const what, int fd, object_t* owner, const ch
   info->item[3].type = T_NUMBER;
   info->item[3].u.number = port;
 
-  vm::Call call;
-  call.push(vm::Value::object(current_object));
-  call.push(vm::Value::str_constant(what));
-  call.push(vm::Value::refed(info));
-
-  vm::CallResult mret = call.apply_master(APPLY_VALID_SOCKET);
+  vm::CallResult mret = vm::Call(vm::Value::object(current_object), vm::Value::str_constant(what),
+                                 vm::Value::refed(info))
+                            .apply_master(APPLY_VALID_SOCKET);
   return master_approved(mret, "valid_socket");
 }
 

@@ -724,15 +724,14 @@ vm::Value f_terminal_colour(vm::EfunArgs& f, vm::StringArg input, mapping_t* col
   for (j = i = 0, k = colour_map->table_size; i < num; i++) {
     // Look it up in the mapping.
     repused = 0;
-    vm::Call replace_args;
-    replace_args.push(vm::Value::str_copy(parts[i]));
     // safe_apply: a raw apply that error()s here would unwind past the
     // FREE(parts)/FREE(lens)/FREE_MSTR(savestr) at the end of this efun,
     // leaking them. On error safe_apply returns no result -> treated as no
     // replacement, which is the desired robust behavior anyway.
     vm::CallResult reptmp =
-        replace_args.safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, ORIGIN_EFUN);
-    if (reptmp && reptmp->type == T_STRING) {
+        vm::Call(vm::Value::str_copy(parts[i]))
+            .safe_apply(APPLY_TERMINAL_COLOUR_REPLACE, current_object, ORIGIN_EFUN);
+    if (reptmp.is(T_STRING)) {
       // Was alloca() -- called once per loop iteration, that memory isn't
       // reclaimed until the whole function returns (alloca doesn't free on
       // block/loop exit), so a string with many %^ segments and/or a

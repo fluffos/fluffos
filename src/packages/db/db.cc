@@ -184,12 +184,9 @@ vm::CallResult valid_database(const char* action, array_t* info) {
    * Takes over the caller's reference to info. With no master object yet
    * the check succeeds (status kNoMaster, no password).
    */
-  vm::Call call;
-  call.push(vm::Value::object(current_object));
-  call.push(vm::Value::str_constant(action));
-  call.push(vm::Value::refed(info));
-
-  vm::CallResult ret = call.apply_master(APPLY_VALID_DATABASE);
+  vm::CallResult ret = vm::Call(vm::Value::object(current_object), vm::Value::str_constant(action),
+                                vm::Value::refed(info))
+                           .apply_master(APPLY_VALID_DATABASE);
   if (ret.status() == vm::CallResult::kNoMaster ||
       (ret && (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number)))) {
     return ret;
@@ -355,9 +352,8 @@ vm::Value f_db_connect(vm::EfunArgs&, vm::StringArg host_arg, vm::StringArg data
   }
 
   if (db->type->connect) {
-    ret = db->type->connect(
-        &(db->c), host, database, user,
-        (mret && mret->type == T_STRING ? mret->u.string : nullptr));
+    ret = db->type->connect(&(db->c), host, database, user,
+                            (mret.is(T_STRING) ? mret->u.string : nullptr));
   }
 
   if (!ret) {

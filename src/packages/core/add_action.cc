@@ -42,7 +42,7 @@ static void notify_no_command() {
     restore_command_giver();
     free_funp(p.f);
     if (command_giver && command_giver->interactive) {
-      if (v && v->type == T_STRING) {
+      if (v.is(T_STRING)) {
         tell_object(command_giver, v->u.string, SVALUE_STRLEN(v.get()));
       }
       command_giver->interactive->iflags &= ~NOTIFY_FAIL_FUNC;
@@ -182,7 +182,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
    */
   if (item->flags & O_ENABLE_COMMANDS) {
     save_command_giver(item);
-    (void)vm::Call().apply(APPLY_INIT, dest, ORIGIN_DRIVER);
+    vm::Call().apply(APPLY_INIT, dest, ORIGIN_DRIVER);
     restore_command_giver();
     if (item->super != dest) {
       return;
@@ -205,7 +205,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
     }
     if (ob->flags & O_ENABLE_COMMANDS) {
       save_command_giver(ob);
-      (void)vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
+      vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
@@ -219,7 +219,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
     }
     if (item->flags & O_ENABLE_COMMANDS) {
       save_command_giver(item);
-      (void)vm::Call().apply(APPLY_INIT, ob, ORIGIN_DRIVER);
+      vm::Call().apply(APPLY_INIT, ob, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
@@ -234,7 +234,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
   }
   if (dest->flags & O_ENABLE_COMMANDS) {
     save_command_giver(dest);
-    (void)vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
+    vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
     restore_command_giver();
   }
 }
@@ -458,7 +458,7 @@ static int user_parser(char* buff) {
      * valid_read(). The compile-time refusal of `async` on applies cannot
      * reach here: verb names are arbitrary runtime strings, and
      * add_action((: f :), "verb") has no name at all. */
-    if (ret && ret->type == T_PROMISE) {
+    if (ret.is(T_PROMISE)) {
       /* verb_buff, not s->verb: the sentence may be dangling here (the
        * comment above the not-found check says so), and this branch has no
        * `s == command_giver->sent` guard to lean on. */

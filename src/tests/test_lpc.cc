@@ -130,6 +130,31 @@ TEST_F(DriverTest, CallPopsPushesItNeverHandsToACall) {
   free_array(arr);
 }
 
+TEST_F(DriverTest, CallConstructorPushesItsArgumentsInOrder) {
+  svalue_t* const before = sp;
+  RunGuarded([] {
+    current_object = master_ob;
+    object_t* ob = find_object("/clone/efun_api_probe");
+    ASSERT_NE(ob, nullptr);
+    vm::CallResult r = vm::Call(vm::Value::str_copy("y"), 3).apply("echo", ob, ORIGIN_DRIVER);
+    ASSERT_TRUE(r.is(T_STRING));
+    EXPECT_STREQ(r->u.string, "y3");
+  });
+  EXPECT_EQ(sp, before);
+
+  array_t* arr = allocate_array(1);
+  {
+    vm::Call call(vm::Value::addref(arr), 1);
+    EXPECT_EQ(call.argc(), 2);
+    EXPECT_EQ(sp, before + 2);
+    EXPECT_EQ(call.arg(0).array(), arr);
+    EXPECT_EQ(call.arg(1).number(), 1);
+  }
+  EXPECT_EQ(sp, before);
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
 TEST_F(DriverTest, CallReleasesPushesOnAnErrorUnwind) {
   svalue_t* const before = sp;
   array_t* arr = allocate_array(1);
@@ -175,13 +200,17 @@ TEST_F(DriverTest, CallResultStatuses) {
       call.push(7);
       vm::CallResult r = call.apply("echo", ob, ORIGIN_DRIVER);
       ASSERT_TRUE(r.ok());
-      ASSERT_EQ(r->type, T_STRING);
+      ASSERT_TRUE(r.is(T_STRING));
+      EXPECT_FALSE(r.is(T_NUMBER));
       EXPECT_STREQ(r->u.string, "x7");
       /* an owned copy: another call does not disturb it */
       vm::CallResult other = vm::Call().apply("no_such_function", ob, ORIGIN_DRIVER);
       EXPECT_EQ(other.status(), vm::CallResult::kNotFound);
       EXPECT_EQ(other.get(), nullptr);
       EXPECT_FALSE(other);
+      /* reads as 0, but is not a number the callee returned */
+      EXPECT_EQ(other->type, T_NUMBER);
+      EXPECT_FALSE(other.is(T_NUMBER));
       EXPECT_STREQ(r->u.string, "x7");
       vm::Value taken = r.take();
       EXPECT_EQ(taken.type(), T_STRING);

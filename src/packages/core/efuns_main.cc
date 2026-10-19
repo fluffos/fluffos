@@ -1036,17 +1036,26 @@ static void warn_member_array_byte_search(const program_t* prog, const char* at)
       file ? file : "<unknown>", line);
 }
 
-/* member_array()'s predicate call, kept out of line: the vm::Call and its
- * result live in memory, which would otherwise cost every member_array()
- * call a stack-protector canary and spilled registers. */
+/* member_array()'s predicate search (issue #900): the index of the first
+ * element, from the i'th searched, that makes fp return truthy, or -1.
+ * Out of line, and the whole loop rather than one call per element: the
+ * vm::Call and its result live in memory, which costs this frame a
+ * stack-protector canary and spilled registers -- once per search here,
+ * instead of once per element or on every member_array() call. */
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((noinline))
 #endif
-static bool member_array_predicate_says_yes(funptr_t* fp, svalue_t* element) {
-  vm::Call b;
-  b.push(vm::Value::copy(element));
-  vm::CallResult ret = b.call(fp);
-  return ret && !(ret->type == T_NUMBER && ret->u.number == 0);
+static LPC_INT
+member_array_predicate_search(funptr_t* fp, array_t* v, LPC_INT i, bool backwards) {
+  int const size = v->size;
+  for (; i < size; i++) {
+    LPC_INT const index = backwards ? size - i - 1 : i;
+    vm::CallResult ret = vm::Call(vm::Value::copy(&v->item[index])).call(fp);
+    if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 vm::Value f_member_array(vm::EfunArgs&, vm::Arg item, vm::Arg haystack,
@@ -1117,20 +1126,17 @@ vm::Value f_member_array(vm::EfunArgs&, vm::Arg item, vm::Arg haystack,
       }
     }
 
+    if ((flag & 4) && find->type == T_FUNCTION) {
+      // Predicate search (issue #900): return the first index whose
+      // element makes the function return truthy.
+      return member_array_predicate_search(find->u.fp, v, i, flag & 2);
+    }
     for (; i < size; i++) {
       int tmp = i;
       if (flag & 2) {
         tmp = size - tmp - 1;
       }
       sv = v->item + tmp;
-      if ((flag & 4) && find->type == T_FUNCTION) {
-        // Predicate search (issue #900): return the first index whose
-        // element makes the function return truthy.
-        if (member_array_predicate_says_yes(find->u.fp, sv)) {
-          break;
-        }
-        continue;
-      }
       switch (find->type | sv->type) {
         case T_STRING:
           if (flag & 1) {

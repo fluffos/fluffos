@@ -536,10 +536,9 @@ void svalue_to_string(svalue_t* obj, outbuffer_t* outbuf, int indent, int traili
       outbuf_add(outbuf, obj->u.ob->obname);
 
       if (!max_eval_error && !too_deep_error) {
-        vm::Call apply_args;
-        apply_args.push(vm::Value::object(obj->u.ob));
-        vm::CallResult temp = apply_args.safe_apply_master(APPLY_OBJECT_NAME);
-        if (temp && (temp->type == T_STRING)) {
+        vm::CallResult temp =
+            vm::Call(vm::Value::object(obj->u.ob)).safe_apply_master(APPLY_OBJECT_NAME);
+        if (temp.is(T_STRING)) {
           outbuf_add(outbuf, " (\"");
           outbuf_add(outbuf, temp->u.string);
           outbuf_add(outbuf, "\")");

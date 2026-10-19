@@ -38,8 +38,7 @@ void on_telnet_do_mssp(interactive_t* ip) {
   vm::CallResult res = vm::Call().safe_apply_master(APPLY_GET_MUD_STATS);
   /* the stats mapping (an empty one when the master gave none), held until
    * the reply is sent */
-  vm::Value stats =
-      (res && res->type == T_MAPPING) ? res.take() : vm::Value::refed(allocate_mapping(0));
+  vm::Value stats = res.is(T_MAPPING) ? res.take() : vm::Value::refed(allocate_mapping(0));
   mapping_t* map = stats->u.map;
 
   telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSSP);

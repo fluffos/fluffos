@@ -271,7 +271,7 @@ Arg Call::arg(int i) const {
   return Arg(base_ + i);
 }
 
-void Call::push(Value v) {
+void Call::push(Value&& v) {
   if (consumed_ || sp != base_ + argc_ - 1) {
     stack_desync("vm::Call::push: the call's arguments are not the stack top.");
   }
