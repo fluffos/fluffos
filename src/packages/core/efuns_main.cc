@@ -1030,6 +1030,19 @@ static void warn_member_array_byte_search(const program_t* prog, const char* at)
       file ? file : "<unknown>", line);
 }
 
+/* member_array()'s predicate call, kept out of line: the LPCCall and its
+ * result live in memory, which would otherwise cost every member_array()
+ * call a stack-protector canary and spilled registers. */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static bool member_array_predicate_says_yes(funptr_t* fp, svalue_t* element) {
+  LPCCall b;
+  b.push(Value::copy(element));
+  CallResult ret = b.call(fp);
+  return ret && !(ret->type == T_NUMBER && ret->u.number == 0);
+}
+
 Value f_member_array(EfunArgs&, Arg item, Arg haystack, std::optional<LPC_INT> start,
                      std::optional<LPC_INT> flags) {
   array_t* v;
@@ -1107,13 +1120,8 @@ Value f_member_array(EfunArgs&, Arg item, Arg haystack, std::optional<LPC_INT> s
       if ((flag & 4) && find->type == T_FUNCTION) {
         // Predicate search (issue #900): return the first index whose
         // element makes the function return truthy.
-        {
-          LPCCall b;
-          b.push(Value::copy(sv));
-          CallResult ret = b.call(find->u.fp);
-          if (ret && !(ret->type == T_NUMBER && ret->u.number == 0)) {
-            break;
-          }
+        if (member_array_predicate_says_yes(find->u.fp, sv)) {
+          break;
         }
         continue;
       }
@@ -2843,8 +2851,8 @@ Value f__to_int(EfunArgs& f, Arg x) {
       hostint = ntohl(netint);
       return hostint;
     }
-    default: /* T_NUMBER: already an int */
-      return f.take(0);
+    default: /* T_NUMBER: already an int (owning nothing, so copied as is) */
+      return Value::owned(*x.sv());
   }
 }
 #endif

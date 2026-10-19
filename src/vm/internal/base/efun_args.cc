@@ -17,13 +17,25 @@
 
 namespace {
 
+#if defined(__GNUC__) || defined(__clang__)
+#define EFUN_ARGS_COLD __attribute__((noinline, cold))
+#else
+#define EFUN_ARGS_COLD
+#endif
+
+/* Out of line: freeing through the value's address here keeps that address
+ * (and a stack-protector canary) out of every push. */
+[[noreturn]] EFUN_ARGS_COLD void push_overflow_releasing(svalue_t v) {
+  free_svalue(&v, "push_owned_value");
+  too_deep_error = 1;
+  error("stack overflow");
+}
+
 /* Push a value that already owns its references. On overflow the value is
  * released first, so nothing leaks past the error(). */
 void push_owned_value(svalue_t v) {
   if (sp + 1 >= end_of_stack) {
-    free_svalue(&v, "push_owned_value");
-    too_deep_error = 1;
-    error("stack overflow");
+    push_overflow_releasing(v);
   }
   *++sp = v;
 }
@@ -222,17 +234,21 @@ void EfunArgs::process_callback(int narg, function_to_call_t* ftc) {
 
 /* ----------------------------------------------------------------- LPCCall */
 
-LPCCall::LPCCall() : base_(sp + 1), uncaught_at_entry_(std::uncaught_exceptions()) {}
+LPCCall::LPCCall() : base_(sp + 1) {}
 
 LPCCall::~LPCCall() {
-  if (consumed_ || std::uncaught_exceptions() != uncaught_at_entry_) {
+  if (consumed_ || argc_ == 0) {
     return;
   }
   consumed_ = true;
-  if (argc_ == 0) {
-    return;
-  }
   if (sp != base_ + argc_ - 1) {
+    /* Pushes never handed to a call, no longer on top: an error() is
+     * unwinding past them, and restore_context() pops them with the rest of
+     * the frame. (Popping them while they ARE on top is right either way:
+     * the catching context's mark is below them.) */
+    if (std::uncaught_exceptions() > 0) {
+      return;
+    }
     /* A destructor must not throw. Leave the slots alone: the efun's or the
      * dispatcher's own stack check reports the desync where it can error(). */
 #ifdef DEBUG
@@ -298,26 +314,38 @@ CallResult result_of(svalue_t* r) {
   }
   return CallResult(Value::take(r));
 }
+
+/* ::call_direct() leaves the result on the stack top. It is moved into a
+ * slot of its own for result_of(), which empties it again at once (so the
+ * slot never holds a reference between calls). */
+svalue_t direct_result_slot;
+svalue_t* call_direct_result(object_t* ob, int runtime_index, int origin, int n) {
+  ::call_direct(ob, runtime_index, origin, n);
+  direct_result_slot = *sp--;
+  return &direct_result_slot;
+}
 }  // namespace
 
 /* Run call(argc) so that an error() in it ends here as kError: the same
  * context dance as safe_apply(), with the unwind mark below the arguments
- * because the callee owns them once the call starts (issue #1014). */
+ * because the callee owns them once the call starts (issue #1014). call
+ * returns what ::apply() does, so the one CallResult is built at the end. */
 template <typename Call>
 CallResult LPCCall::guarded(Call&& call) {
   int n = consume();
   error_context_t econ;
   save_context(&econ);
   econ.save_sp = base_ - 1;
-  CallResult result(CallResult::kError);
+  svalue_t* r;
   try {
-    result = call(n);
+    r = call(n);
   } catch (const char*) {
     restore_context(&econ);
-    result = CallResult(CallResult::kError);
+    pop_context(&econ);
+    return CallResult(CallResult::kError);
   }
   pop_context(&econ);
-  return result;
+  return result_of(r);
 }
 
 CallResult LPCCall::apply(const char* fun, object_t* ob, int origin) {
@@ -331,7 +359,7 @@ CallResult LPCCall::safe_apply(const char* fun, object_t* ob, int origin) {
     discard();
     return CallResult(CallResult::kNotFound);
   }
-  return guarded([&](int n) { return result_of(::apply(fun, ob, n, origin)); });
+  return guarded([&](int n) { return ::apply(fun, ob, n, origin); });
 }
 
 CallResult LPCCall::apply_master(int fun) {
@@ -353,7 +381,7 @@ CallResult LPCCall::safe_apply_master(int fun) {
 CallResult LPCCall::call(funptr_t* fp) { return result_of(call_function_pointer(fp, consume())); }
 
 CallResult LPCCall::safe_call(funptr_t* fp) {
-  return guarded([&](int n) { return result_of(call_function_pointer(fp, n)); });
+  return guarded([&](int n) { return call_function_pointer(fp, n); });
 }
 
 CallResult LPCCall::call(function_to_call_t* ftc) {
@@ -361,22 +389,13 @@ CallResult LPCCall::call(function_to_call_t* ftc) {
 }
 
 CallResult LPCCall::safe_call(function_to_call_t* ftc) {
-  return guarded([&](int n) { return result_of(call_efun_callback(ftc, n)); });
+  return guarded([&](int n) { return call_efun_callback(ftc, n); });
 }
-
-namespace {
-/* ::call_direct() leaves the result on the stack top. */
-CallResult direct_result(object_t* ob, int runtime_index, int origin, int n) {
-  ::call_direct(ob, runtime_index, origin, n);
-  svalue_t v = *sp--;
-  return CallResult(Value::owned(v));
-}
-}  // namespace
 
 CallResult LPCCall::call_direct(object_t* ob, int runtime_index, int origin) {
-  return direct_result(ob, runtime_index, origin, consume());
+  return result_of(call_direct_result(ob, runtime_index, origin, consume()));
 }
 
 CallResult LPCCall::safe_call_direct(object_t* ob, int runtime_index, int origin) {
-  return guarded([&](int n) { return direct_result(ob, runtime_index, origin, n); });
+  return guarded([&](int n) { return call_direct_result(ob, runtime_index, origin, n); });
 }

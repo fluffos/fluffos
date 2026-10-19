@@ -1227,7 +1227,7 @@ object_t* environment(svalue_t* arg) {
  */
 
 #ifdef F_PRESENT
-static object_t* object_present2(const char* /*str*/, object_t* /*ob*/);
+static object_t* object_present2(svalue_t* /*v*/, object_t* /*ob*/);
 
 object_t* object_present(svalue_t* v, object_t* ob) {
   object_t* ret_ob;
@@ -1254,7 +1254,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     }
     return nullptr;
   }
-  ret_ob = object_present2(v->u.string, ob->contains);
+  ret_ob = object_present2(v, ob->contains);
   if (ret_ob) {
     return ret_ob;
   }
@@ -1274,7 +1274,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     if (APPLY_SAYS_YES(ret)) {
       return ob->super;
     }
-    return object_present2(v->u.string, ob->super->contains);
+    return object_present2(v, ob->super->contains);
   }
   return nullptr;
 }
@@ -1282,7 +1282,8 @@ object_t* object_present(svalue_t* v, object_t* ob) {
 // id(str) returns true, return that object.
 // If string is in format of "xxx 1", then look for the <digits>-th
 // object that id("xx") returns true.
-static object_t* object_present2(const char* str, object_t* ob) {
+static object_t* object_present2(svalue_t* v, object_t* ob) {
+  const char* const str = v->u.string;
   const char* name = nullptr;
   int namelen = 0, count = 0;
 
@@ -1306,9 +1307,15 @@ static object_t* object_present2(const char* str, object_t* ob) {
     }
   }
 
+  /* The name every id() is asked about, shared by all the calls: the
+   * argument itself, or one copy of it without the trailing count. */
+  Value const id_name = static_cast<size_t>(namelen) == SVALUE_STRLEN(v)
+                            ? Value::copy(v)
+                            : Value::str_copy(std::string_view(name, namelen));
+
   for (; ob; ob = ob->next_inv) {
     LPCCall call;
-    call.push(Value::str_copy(std::string_view(name, namelen)));
+    call.push(Value::copy(id_name.get()));
 
     CallResult ret = call.apply(APPLY_ID, ob, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {

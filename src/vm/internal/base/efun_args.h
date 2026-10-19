@@ -207,9 +207,10 @@ class CallResult {
  * error() in the callee and report it as CallResult::kError.
  *
  * If the code leaves the scope without calling, the destructor pops what
- * was pushed. During an error() unwind it does nothing: restore_context()
- * owns the stack then. Pushes must be the stack top when they are made and
- * when the call consumes them; that is checked in every build.
+ * was pushed -- also during an error() unwind, as long as the pushes are
+ * still the stack top; otherwise restore_context() pops them with the rest
+ * of the frame. Pushes must be the stack top when they are made and when
+ * the call consumes them; that is checked in every build.
  */
 class LPCCall {
  public:
@@ -250,7 +251,6 @@ class LPCCall {
   svalue_t* base_;
   int argc_ = 0;
   bool consumed_ = false;
-  int uncaught_at_entry_;
 };
 
 #endif /* VM_EFUN_ARGS_H */

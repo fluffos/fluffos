@@ -8,7 +8,9 @@
 #ifndef VM_EFUN_ARGS_INLINE_H
 #define VM_EFUN_ARGS_INLINE_H
 
+#include "vm/internal/base/array.h"
 #include "vm/internal/base/efun_args.h"
+#include "vm/internal/base/mapping.h"
 #include "vm/internal/base/vm_stack.h"
 
 /* Every efun call runs these: keep them inline (out of line, the result is
@@ -26,9 +28,8 @@ void free_string_svalue(svalue_t*); /* interpret.cc */
  * take free_string_svalue()'s short path (as the hand-written efuns did),
  * and an array/mapping/object/... argument that something else still
  * references (a variable, almost always) only loses one reference, as the
- * hand-written free_array()-style calls did; only a last reference goes
- * through int_free_svalue(). DEBUG builds keep the generic path for its
- * double-free marking and reference journal. */
+ * hand-written free_array()-style calls did. DEBUG builds keep the generic
+ * path for its double-free marking and reference journal. */
 EFUN_ARGS_HOT void release_efun_arg(svalue_t* slot) {
 #if !defined(DEBUG) && !defined(DEBUGMALLOC_EXTENSIONS)
   /* (free_svalue()'s own mask: numbers and floats own nothing) */
@@ -40,9 +41,22 @@ EFUN_ARGS_HOT void release_efun_arg(svalue_t* slot) {
     free_string_svalue(slot);
     return;
   }
-  if ((slot->type & T_REFED) && !(slot->type & T_FREED) && slot->u.refed->ref > 1) {
-    slot->u.refed->ref--;
-    return;
+  if ((slot->type & T_REFED) && !(slot->type & T_FREED)) {
+    if (slot->u.refed->ref > 1) {
+      slot->u.refed->ref--;
+      return;
+    }
+    /* A temporary's last reference: straight to its own free, as the
+     * hand-written efuns did (anything nested in it still goes through
+     * free_compound()'s worklist, so the recursion stays bounded). */
+    if (slot->type == T_ARRAY) {
+      free_array(slot->u.arr);
+      return;
+    }
+    if (slot->type == T_MAPPING) {
+      free_mapping(slot->u.map);
+      return;
+    }
   }
   int_free_svalue(slot);
 #else

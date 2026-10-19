@@ -130,6 +130,38 @@ TEST_F(DriverTest, LPCCallPopsPushesItNeverHandsToACall) {
   free_array(arr);
 }
 
+TEST_F(DriverTest, LPCCallReleasesPushesOnAnErrorUnwind) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  /* buried: something was left pushed over the pending arguments when the
+   * error was thrown (a callee's half-built frame), so the destructor must
+   * leave them to restore_context(); otherwise it pops them itself */
+  for (bool buried : {false, true}) {
+    bool errored = false;
+    error_context_t econ{};
+    save_context(&econ);
+    try {
+      LPCCall call;
+      call.push(Value::addref(arr));
+      call.push(1);
+      if (buried) {
+        push_number(2);
+      }
+      error("LPCCallReleasesPushesOnAnErrorUnwind\n");
+    } catch (...) {
+      errored = true;
+      restore_context(&econ);
+    }
+    if (!errored) {
+      pop_context(&econ);
+    }
+    EXPECT_TRUE(errored);
+    EXPECT_EQ(sp, before) << "buried=" << buried;
+    EXPECT_EQ(arr->ref, 1u) << "buried=" << buried;
+  }
+  free_array(arr);
+}
+
 TEST_F(DriverTest, CallResultStatuses) {
   svalue_t* const before = sp;
   RunGuarded([] {
