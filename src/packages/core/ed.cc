@@ -3052,10 +3052,12 @@ that help is desired for. \n",
           curp = curp->next;
 
           curp->next = 0;
-          curp->screen = reinterpret_cast<char*>(
-              DMALLOC(sizeof(char) * (strlen(ret->u.arr->item[i].u.string) + 1), TAG_TEMPORARY,
-                      "ed: help"));
-          strcpy(curp->screen, ret->u.arr->item[i].u.string);
+          {
+            size_t const slen = SVALUE_STRLEN(&ret->u.arr->item[i]);
+            curp->screen = reinterpret_cast<char*>(
+                DMALLOC(sizeof(char) * (slen + 1), TAG_TEMPORARY, "ed: help"));
+            memcpy(curp->screen, ret->u.arr->item[i].u.string, slen + 1);
+          }
         }
 
         curp = P_HELPOUT;

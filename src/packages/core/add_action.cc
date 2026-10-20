@@ -361,8 +361,11 @@ static int user_parser(char* buff) {
   save_illegal_sentence_action = illegal_sentence_action;
   illegal_sentence_action = 0;
   for (s = command_giver->sent; s; s = s->next) {
+    /* Verb strings are LPC shared strings (always NUL-terminated); bound the
+     * scan so static analysers can see the read is finite. */
+    int const verb_len = static_cast<int>(strnlen(s->verb, MAX_VERB_BUFF));
     if (s->flags & (V_NOSPACE | V_SHORT)) {
-      if (strncmp(buff, s->verb, strlen(s->verb)) != 0) {
+      if (strncmp(buff, s->verb, static_cast<size_t>(verb_len)) != 0) {
         continue;
       }
     } else {
@@ -379,11 +382,10 @@ static int user_parser(char* buff) {
       debug(add_action, "Local command %s on /%s\n", s->function.s, s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
-      int const l1 = strlen(s->verb);
-      int const l2 = strlen(verb_buff);
+      int const l2 = static_cast<int>(strnlen(verb_buff, sizeof(verb_buff)));
 
-      if (l1 < l2) {
-        last_verb = verb_buff + l1;
+      if (verb_len < l2) {
+        last_verb = verb_buff + verb_len;
       } else {
         last_verb = "";
       }
@@ -407,7 +409,7 @@ static int user_parser(char* buff) {
     save_command_giver(command_giver);
     vm::Call call;
     if (s->flags & V_NOSPACE) {
-      call.push(vm::Value::str_copy(&buff[strlen(s->verb)]));
+      call.push(vm::Value::str_copy(&buff[verb_len]));
     } else if (buff[length] == ' ') {
       call.push(vm::Value::str_copy(&buff[length + 1]));
     } else {
@@ -725,8 +727,8 @@ vm::Value f_command(vm::EfunArgs&, vm::StringArg cmd) {
       error("Too long command.\n");
     }
 
-    strncpy(buff, cmd.c_str(), sizeof(buff));
-    buff[sizeof(buff) - 1] = 0;
+    memcpy(buff, cmd.c_str(), cmd.size());
+    buff[cmd.size()] = '\0';
 
     if (parse_command(buff, current_object)) {
       rc = save_eval_cost - get_eval();

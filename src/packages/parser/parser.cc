@@ -2261,12 +2261,12 @@ static int save_last_parallel_error(int ob) {
 static int parallel_check_functions(object_t* obj, parse_state_t* state, int which) {
   object_t* ob;
   char func[CHAR_FUNC];
-  int tryy, ret = 0;
+  int ret = 0;
 
   free_parser_error(&parallel_error_info);
   if (obj) {
     SET_OB(obj);
-    for (tryy = 0, ret = 0; !ret && tryy < 8; tryy++) {
+    for (int tryy = 0; !ret && tryy < 8; tryy++) {
       if (tryy == 4) {
         SET_OB(parse_vn->handler);
       }
@@ -2917,8 +2917,8 @@ static void we_are_finished(parse_state_t* state) {
       best_result->res[tryy].func = string_copy(func, "best_result");
       best_result->res[tryy].num = args;
       if (args) {
-        best_result->res[tryy].args =
-            (svalue_t*)DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result");
+        best_result->res[tryy].args = static_cast<svalue_t*>(
+            DCALLOC(args, sizeof(svalue_t), TAG_PARSER, "best_result"));
         for (int j = 0; j < args; j++) {
           assign_svalue_no_free(&best_result->res[tryy].args[j], call.arg(j).sv());
         }
@@ -3466,13 +3466,19 @@ vm::Value f_parse_sentence(vm::EfunArgs& f, vm::StringArg sentence, std::optiona
   }
 
   /* free_parse_globals() runs exactly once: below on the normal path, or
-   * here on an error() unwind before that point */
-  bool globals_freed = false;
-  DEFER {
-    if (!globals_freed) {
-      free_parse_globals();
+   * here on an error() unwind before that point. */
+  struct ParseGlobalsGuard {
+    bool active = true;
+    ~ParseGlobalsGuard() {
+      if (active) {
+        free_parse_globals();
+      }
     }
-  };
+    void dismiss() {
+      free_parse_globals();
+      active = false;
+    }
+  } globals_guard;
   parse_active_depth++; /* paired with the decrement in free_parse_globals */
 
   parse_user = current_object;
@@ -3483,14 +3489,12 @@ vm::Value f_parse_sentence(vm::EfunArgs& f, vm::StringArg sentence, std::optiona
 
   vm::Value result;
   if (best_match) {
-    globals_freed = true;
-    free_parse_globals();
+    globals_guard.dismiss();
     do_the_call();
     result = 1;
   } else {
     vm::CallResult ret = get_the_error(&best_error_info, -1);
-    globals_freed = true;
-    free_parse_globals();
+    globals_guard.dismiss();
     if (ret) {
       result = ret.take();
     }

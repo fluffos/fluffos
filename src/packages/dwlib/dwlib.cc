@@ -93,7 +93,8 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
       if (total_len + SVALUE_STRLEN(v.get()) > max_string_length - mlen) {
         continue;
       }
-      strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v.get())));
+      len = SVALUE_STRLEN(v.get());
+      memcpy(str + total_len, v->u.string, len);
       total_len += len;
     }
 

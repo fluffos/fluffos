@@ -110,6 +110,6 @@ vm::Value f_sha1(vm::EfunArgs&, vm::Arg input) {
   }
 
   sprintf(reinterpret_cast<char*>(final), "%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4);
-  return vm::Value::str_malloced(string_copy((char*) final, "f_sha1"));
+  return vm::Value::str_malloced(string_copy(reinterpret_cast<char*>(final), "f_sha1"));
 }
 #endif

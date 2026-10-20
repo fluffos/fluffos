@@ -34,7 +34,7 @@ vm::Value f_crc32(vm::EfunArgs&, vm::Arg data) {
   if (data.is(T_STRING)) {
     vm::StringArg str = data.string();
     len = str.size();
-    buf = (unsigned char*)str.c_str();
+    buf = reinterpret_cast<unsigned char*>(const_cast<char*>(str.c_str()));
   } else {
     buffer_t* b = data.buffer();
     len = b->size;

@@ -133,8 +133,8 @@ vm::Value f_uncompress_file(vm::EfunArgs&, vm::StringArg input,
       // Not compressed...
       return 0;
     }
-    len = strlen(input_file);
-    tmpout.assign(input_file, len - strlen(GZ_EXTENSION));
+    len = static_cast<int>(input.size());
+    tmpout.assign(input_file, static_cast<size_t>(len) - (sizeof(GZ_EXTENSION) - 1));
     output_file = tmpout.c_str();
   }
 
@@ -210,7 +210,7 @@ vm::Value f_compress(vm::EfunArgs&, vm::Arg data) {
 
   if (data.is(T_STRING)) {
     size = data.string().size();
-    input = (unsigned char*)data.string().c_str();
+    input = reinterpret_cast<unsigned char*>(const_cast<char*>(data.string().c_str()));
   } else if (data.is(T_BUFFER)) {
     size = data.buffer()->size;
     input = data.buffer()->item;

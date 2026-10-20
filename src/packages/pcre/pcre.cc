@@ -492,7 +492,6 @@ vm::Value f_pcre_replace(vm::EfunArgs& f, vm::StringArg subject, vm::StringArg p
 // or mapping after them is pcre_flags.
 vm::Value f_pcre_replace_callback(vm::EfunArgs& f, vm::StringArg subject, vm::StringArg pattern,
                                   vm::Arg /* fun: read by process_callback() */) {
-  int i;
   char* ret;
   pcre_t* run;
   array_t *arr, *r;
@@ -539,7 +538,7 @@ vm::Value f_pcre_replace_callback(vm::EfunArgs& f, vm::StringArg subject, vm::St
 
   save_context(&econ);
   try {
-    for (i = 0; i < run->rc - 1; i++) {
+    for (int i = 0; i < run->rc - 1; i++) {
       vm::CallResult v = vm::Call(vm::Value::copy(&arr->item[i]), i).call(&ftc);
 
       /* Mimic behaviour of map(string, function) when function pointer returns

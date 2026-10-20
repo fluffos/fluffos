@@ -95,7 +95,8 @@ vm::Value f_socket_connect(vm::EfunArgs&, LPC_INT fd, vm::StringArg address, vm:
         start = i - ADDR_BUF_SIZE - 1;
         i = ADDR_BUF_SIZE - 1;
       }
-      strncat(addr, address.c_str() + start, i);
+      memcpy(addr, address.c_str() + start, static_cast<size_t>(i));
+      addr[i] = '\0';
       port = atoi(s + 1);
     }
 #ifdef DEBUG

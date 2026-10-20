@@ -1690,8 +1690,11 @@ vm::Value f_secure_random(vm::EfunArgs&, LPC_INT n) {
  * stops at the first NUL, as the sanitized copy always did. */
 static vm::Value file_text_value(char* str) {
   if (u8_validate(str)) {
-    size_t const len = strlen(str);
-    if (len != MSTR_SIZE(str)) {
+    /* MSTR_SIZE is the allocation; text may be shorter if a NUL was embedded.
+     * Scan at most that many bytes so the length is bounded by the block. */
+    size_t const cap = MSTR_SIZE(str);
+    size_t const len = strnlen(str, cap);
+    if (len != cap) {
       str = extend_string(str, len); /* the counted size must be the text's */
     }
     return vm::Value::str_malloced(str);

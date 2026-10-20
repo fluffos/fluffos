@@ -129,7 +129,7 @@ vm::Value f_string_encode(vm::EfunArgs&, vm::StringArg str, vm::StringArg encodi
 
 #ifdef F_STRING_DECODE
 vm::Value f_string_decode(vm::EfunArgs&, buffer_t* buf, vm::StringArg encoding_arg) {
-  auto* data = (char*)(buf->item);
+  auto* data = reinterpret_cast<char*>(buf->item);
   auto len = buf->size;
   const auto* encoding = encoding_arg.c_str();
 
@@ -166,7 +166,7 @@ vm::Value f_string_decode(vm::EfunArgs&, buffer_t* buf, vm::StringArg encoding_a
 #ifdef F_BUFFER_TRANSCODE
 vm::Value f_buffer_transcode(vm::EfunArgs&, buffer_t* buf, vm::StringArg from_encoding_arg,
                              vm::StringArg to_encoding_arg) {
-  auto* data = (char*)(buf->item);
+  auto* data = reinterpret_cast<char*>(buf->item);
   auto len = buf->size;
   const auto* from_encoding = from_encoding_arg.c_str();
   const auto* to_encoding = to_encoding_arg.c_str();
