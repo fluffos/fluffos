@@ -60,13 +60,14 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
     len = strlen(default_function);
     fun = new_string(len, "f_query_multiple_short");
     fun[len] = '\0';
-    strncpy(fun, default_function, len);
+    memcpy(fun, default_function, static_cast<size_t>(len));
   } else {
-    len = strlen(type) + slen;
+    size_t const typelen = strlen(type);
+    len = static_cast<int>(typelen) + slen;
     fun = new_string(len, "f_query_multiple_short");
     fun[len] = '\0';
-    strncpy(fun, type, len);
-    strncpy(fun + strlen(type), s, slen);
+    memcpy(fun, type, typelen);
+    memcpy(fun + typelen, s, static_cast<size_t>(slen));
   }
 
   /* Check to see if there are any non-objects in the array. */
@@ -80,7 +81,7 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
   if (i == size && !no_dollars) {
     str = new_string(max_string_length, "f_query_multiple_short");
     str[max_string_length] = '\0';
-    strncpy(str, m, mlen);
+    memcpy(str, m, static_cast<size_t>(mlen));
     total_len = mlen;
 
     for (i = 0; i < size; i++) {
@@ -94,11 +95,11 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
         continue;
       }
       len = SVALUE_STRLEN(v.get());
-      memcpy(str + total_len, v->u.string, len);
+      memcpy(str + total_len, v->u.string, static_cast<size_t>(len));
       total_len += len;
     }
 
-    strncpy(str + total_len, m, mlen);
+    memcpy(str + total_len, m, static_cast<size_t>(mlen));
     total_len += mlen;
 
     res = new_string(total_len, "f_query_multiple_short");
@@ -127,7 +128,7 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
       case T_STRING:
         len = SVALUE_STRLEN(sv);
         if (total_len + len < max_string_length) {
-          strncpy(str + total_len, sv->u.string, len);
+          memcpy(str + total_len, sv->u.string, static_cast<size_t>(len));
           total_len += len;
         }
         break;
@@ -139,7 +140,8 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
         }
 
         if (total_len + SVALUE_STRLEN(v.get()) < max_string_length) {
-          strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v.get())));
+          len = SVALUE_STRLEN(v.get());
+          memcpy(str + total_len, v->u.string, static_cast<size_t>(len));
           total_len += len;
         }
 
@@ -157,13 +159,13 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
     if (len && size > 1) {
       if (i < size - 2) {
         if (total_len + seplen < max_string_length) {
-          strncpy(str + total_len, separator, seplen);
+          memcpy(str + total_len, separator, static_cast<size_t>(seplen));
           total_len += seplen;
         }
       } else {
         if (i < size - 1) {
           if (total_len + andlen < max_string_length) {
-            strncpy(str + total_len, andsep, andlen);
+            memcpy(str + total_len, andsep, static_cast<size_t>(andlen));
             total_len += andlen;
           }
         }
@@ -798,7 +800,7 @@ vm::Value f_replace_dollars(vm::EfunArgs& f, vm::StringArg str, array_t* arr) {
             FREE_MSTR(newstr);
             error("string too long");
           }
-          strncpy(currentnew, currentold, len);
+          memcpy(currentnew, currentold, static_cast<size_t>(len));
           currentnew += len;
           currentold += len;
           currentold += COUNTED_STRLEN(one);
@@ -809,8 +811,11 @@ vm::Value f_replace_dollars(vm::EfunArgs& f, vm::StringArg str, array_t* arr) {
             FREE_MSTR(newstr);
             error("string too long");
           }
-          strcpy(currentnew, two);
-          currentnew += COUNTED_STRLEN(two);
+          {
+            size_t const twolen = COUNTED_STRLEN(two);
+            memcpy(currentnew, two, twolen);
+            currentnew += twolen;
+          }
           break;
         }
       }
