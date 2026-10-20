@@ -6,18 +6,18 @@
 extern object_t* find_living_object(const char*, int);
 
 /* Hideous mangling of C code by Taffyd. */
-vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, int quiet,
-                               int dark) {
+vm::Value query_multiple_short(array_t* arr, const char* type, size_t type_len, int no_dollars,
+                               int quiet, int dark) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char m[] = "$M$";
   char s[] = "_short";
   char default_function[] = "a_short";
   char separator[] = ", ";
   char andsep[] = " and ";
-  int const mlen = strlen(m);
-  int const slen = strlen(s);
-  int const seplen = strlen(separator);
-  int const andlen = strlen(andsep);
+  int const mlen = static_cast<int>(sizeof(m) - 1);
+  int const slen = static_cast<int>(sizeof(s) - 1);
+  int const seplen = static_cast<int>(sizeof(separator) - 1);
+  int const andlen = static_cast<int>(sizeof(andsep) - 1);
 
   svalue_t* sv;
   int const size = arr->size;
@@ -57,17 +57,16 @@ vm::Value query_multiple_short(array_t* arr, const char* type, int no_dollars, i
   /* We need to free this value with FREE_MSTR() */
 
   if (!type) {
-    len = strlen(default_function);
+    len = static_cast<int>(sizeof(default_function) - 1);
     fun = new_string(len, "f_query_multiple_short");
     fun[len] = '\0';
     memcpy(fun, default_function, static_cast<size_t>(len));
   } else {
-    size_t const typelen = strlen(type);
-    len = static_cast<int>(typelen) + slen;
+    len = static_cast<int>(type_len) + slen;
     fun = new_string(len, "f_query_multiple_short");
     fun[len] = '\0';
-    memcpy(fun, type, typelen);
-    memcpy(fun + typelen, s, static_cast<size_t>(slen));
+    memcpy(fun, type, type_len);
+    memcpy(fun + type_len, s, static_cast<size_t>(slen));
   }
 
   /* Check to see if there are any non-objects in the array. */
@@ -222,6 +221,7 @@ vm::Value f_query_multiple_short(vm::EfunArgs&, array_t* arr, std::optional<vm::
                                  std::optional<LPC_INT> quiet_arg,
                                  std::optional<LPC_INT> dark_arg) {
   const char* type = nullptr;
+  size_t type_len = 0;
   int no_dollars = 0, quiet = 0, dark = 0;
 
   if (dark_arg) {
@@ -237,10 +237,12 @@ vm::Value f_query_multiple_short(vm::EfunArgs&, array_t* arr, std::optional<vm::
   }
 
   if (type_arg && type_arg->is(T_STRING)) {
-    type = type_arg->string().c_str();
+    vm::StringArg ts = type_arg->string();
+    type = ts.c_str();
+    type_len = ts.size();
   }
 
-  return query_multiple_short(arr, type, no_dollars, quiet, dark);
+  return query_multiple_short(arr, type, type_len, no_dollars, quiet, dark);
 }
 
 /* Hideous mangling of C code by Taffyd. */
@@ -470,23 +472,25 @@ vm::Value f_reference_allowed(vm::EfunArgs&, object_t* referee, std::optional<vm
 
 vm::Value f_add_a(vm::EfunArgs& f, vm::StringArg str_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  const char* str = str_arg.c_str();
+  const char* const base = str_arg.c_str();
+  size_t const total = str_arg.size();
+  const char* str = base;
   char* ret;
   char* p;
   char first;
   int len;
   int an;
 
-  while (*str == ' ') {
+  while (static_cast<size_t>(str - base) < total && *str == ' ') {
     str++;
   }
 
   // If *str is 0, it was only spaces.  Return "a ".
-  if (*str == 0) {
+  if (static_cast<size_t>(str - base) >= total || *str == 0) {
     return vm::Value::str_copy("a ");
   }
 
-  len = strlen(str);
+  len = static_cast<int>(total - static_cast<size_t>(str - base));
   // Don't add anything if it already begins with a or an.
   if (!strncasecmp(str, "a ", 2) || !strncasecmp(str, "an ", 3)) {
     return f.take(0);
@@ -530,19 +534,20 @@ vm::Value f_add_a(vm::EfunArgs& f, vm::StringArg str_arg) {
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 3, "f_add_a");
-    strcpy(ret, "an ");
+    memcpy(ret, "an ", 3);
     p = ret + 3;
   } else {  // Add a.
     if (len + 2 > max_string_length) {
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 2, "f_add_a");
-    strcpy(ret, "a ");
+    memcpy(ret, "a ", 2);
     p = ret + 2;
   }
 
   // Add the rest of the string.
-  memcpy(p, str, len + 1);  // + 1: get the \0.
+  memcpy(p, str, static_cast<size_t>(len));
+  p[len] = '\0';
   return vm::Value::str_malloced(ret);
 }
 
@@ -592,24 +597,25 @@ static vm::Value replace_mxp_html(vm::StringArg str, int html, int mxp) {
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
   const char* src = str.c_str();
+  const char* const src_end = src + str.size();
   char* dst2 = dst;
-  while (*src && dst2 - dst < max_string_length) {
+  while (src < src_end && dst2 - dst < max_string_length) {
     switch (*src) {
       case '&':
-        strcpy(dst2, "&amp;");
+        memcpy(dst2, "&amp;", 5);
         dst2 += 5;
         break;
       case '<':
-        strcpy(dst2, "&lt;");
+        memcpy(dst2, "&lt;", 4);
         dst2 += 4;
         break;
       case '>':
-        strcpy(dst2, "&gt;");
+        memcpy(dst2, "&gt;", 4);
         dst2 += 4;
         break;
       case '\n':
         if (mxp) {
-          strcpy(dst2, "\e[4z<BR>");
+          memcpy(dst2, "\e[4z<BR>", 8);
           dst2 += 8;
         } else {
           goto def;
@@ -617,7 +623,7 @@ static vm::Value replace_mxp_html(vm::StringArg str, int html, int mxp) {
         break;
       case '"':
         if (html) {
-          strcpy(dst2, "&quot;");
+          memcpy(dst2, "&quot;", 6);
           dst2 += 6;
           break;
         }
@@ -709,12 +715,14 @@ svalue_t* replace_objects(svalue_t* thing) {
       // bound every copy into this fixed buffer instead of strcpy/strcat.
       char buf[2000];
       size_t len = 0;
-      append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
+      append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname,
+                     strnlen(thing->u.ob->obname, sizeof(buf) - 1));
       vm::CallResult tmp(vm::CallResult::kNotFound);
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
         tmp = vm::Call(vm::Value::object(thing->u.ob)).safe_apply_master(APPLY_OBJECT_NAME);
       } else {
-        append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
+        static constexpr char kDestructed[] = " (destructed)";
+        append_bounded(buf, sizeof(buf), &len, kDestructed, sizeof(kDestructed) - 1);
       }
       if (tmp.is(T_STRING)) {
         append_bounded(buf, sizeof(buf), &len, " (\"", 3);
@@ -827,12 +835,15 @@ vm::Value f_replace_dollars(vm::EfunArgs& f, vm::StringArg str, array_t* arr) {
     return f.take(0);
   }
 
-  if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr > max_string_length) {
-    FREE_MSTR(newstr);
-    error("string too long");
-  }
+  {
+    size_t const rest = static_cast<size_t>(COUNTED_STRLEN(oldstr) - (currentold - oldstr));
+    if (currentnew + rest - newstr > static_cast<size_t>(max_string_length)) {
+      FREE_MSTR(newstr);
+      error("string too long");
+    }
 
-  strcpy(currentnew, currentold);
-  return vm::Value::str_malloced(
-      extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
+    memcpy(currentnew, currentold, rest);
+    currentnew[rest] = '\0';
+    return vm::Value::str_malloced(extend_string(newstr, currentnew - newstr + rest));
+  }
 }
