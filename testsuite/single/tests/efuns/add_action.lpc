@@ -1,6 +1,8 @@
 int called;
 int xverb;
 int utf8verb;
+int long_hits;
+string long_arg;
 
 void do_tests() {
 #ifndef __NO_ADD_ACTION__
@@ -18,5 +20,23 @@ void do_tests() {
   ASSERT_EQ(1, called);
   ASSERT_EQ(1, xverb);
   ASSERT_EQ(1, utf8verb);
+
+  // A leading-characters verb (flag 1 or 2) is matched in full however long
+  // it is, and with flag 2 the argument starts right after all of it:
+  // MAX_VERB_BUFF (100) bounds only the copy of the user's verb.
+  long_hits = 0;
+  long_arg = 0;
+  SAVETP;
+  enable_commands();
+  add_action(function(string arg) {
+    long_hits++;
+    long_arg = arg;
+    return 1;
+  }, repeat_string("v", 110) + "x", 2);
+  RESTORETP;
+  command(repeat_string("v", 110) + "y");  // shares 110 bytes: no match
+  command(repeat_string("v", 110) + "xtail");
+  ASSERT_EQ(1, long_hits);
+  ASSERT_EQ("tail", long_arg);
 #endif
 }

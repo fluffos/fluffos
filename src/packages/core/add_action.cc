@@ -361,9 +361,10 @@ static int user_parser(char* buff) {
   save_illegal_sentence_action = illegal_sentence_action;
   illegal_sentence_action = 0;
   for (s = command_giver->sent; s; s = s->next) {
-    /* Verb strings are LPC shared strings (always NUL-terminated); bound the
-     * scan so static analysers can see the read is finite. */
-    int const verb_len = static_cast<int>(strnlen(s->verb, MAX_VERB_BUFF));
+    /* Verbs are shared strings, so their length is counted: no scan, and no
+     * cap (add_action() accepts a verb of any length; MAX_VERB_BUFF only
+     * bounds the copy of the user's verb). */
+    int const verb_len = static_cast<int>(SHARED_STRLEN(s->verb));
     if (s->flags & (V_NOSPACE | V_SHORT)) {
       if (strncmp(buff, s->verb, static_cast<size_t>(verb_len)) != 0) {
         continue;
