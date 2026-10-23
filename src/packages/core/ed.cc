@@ -900,8 +900,9 @@ static char* getfn(int writeflg) {
     if (!ret.is(T_STRING)) {
       return nullptr;
     }
-    strncpy(file, ret->u.string, sizeof file - 1);
-    file[MAXFNAME - 1] = '\0';
+    size_t n = strnlen(ret->u.string, MAXFNAME - 1);
+    memcpy(file, ret->u.string, n);
+    file[n] = '\0';
   }
 
   /* valid_read/valid_write done here */
@@ -910,8 +911,11 @@ static char* getfn(int writeflg) {
     return (nullptr);
   }
   file2 = file2v->u.string;
-  strncpy(file, file2, MAXFNAME - 1);
-  file[MAXFNAME - 1] = 0;
+  {
+    size_t n = strnlen(file2, MAXFNAME - 1);
+    memcpy(file, file2, n);
+    file[n] = '\0';
+  }
 
   if (*file == 0) {
     ED_OUTPUT(ED_DEST, "no file name\n");
@@ -2539,8 +2543,9 @@ void ed_start(const char* file_arg, const char* write_fn, const char* exit_fn, i
     }
   }
   if (file_argv.is(T_STRING)) {
-    strncpy(P_FNAME, file_argv->u.string, MAXFNAME - 1);
-    P_FNAME[MAXFNAME - 1] = 0;
+    size_t n = strnlen(file_argv->u.string, MAXFNAME - 1);
+    memcpy(P_FNAME, file_argv->u.string, n);
+    P_FNAME[n] = '\0';
   } else {
     ED_OUTPUT(ED_DEST, "No file.\n");
   }
@@ -3248,8 +3253,9 @@ char* object_ed_start(object_t* ob, const char* fname, int restricted, int scrol
     }
   }
   if (fnamev.is(T_STRING)) {
-    strncpy(P_FNAME, fnamev->u.string, MAXFNAME - 1);
-    P_FNAME[MAXFNAME - 1] = 0;
+    size_t n = strnlen(fnamev->u.string, MAXFNAME - 1);
+    memcpy(P_FNAME, fnamev->u.string, n);
+    P_FNAME[n] = '\0';
   } else {
     ED_OUTPUT(ED_DEST, "No file.\n");
   }
