@@ -11,4 +11,17 @@ void do_tests() {
   CAN_BIND((: $1 + $2 :));
   ASSERT(functionp(bind((: $1 :), this_object())));
   ASSERT(evaluate(bind((: $1 + $2 :), this_object()), 3, 4) == 7);
+
+  // bind() hands the stack's reference to the new owner over to the new
+  // function pointer. Releasing it instead left the pointer holding an
+  // uncounted reference, so dropping two bound pointers freed the object
+  // while `o` still pointed at it (heap-use-after-free at the destruct).
+  {
+    object o = new("/single/void");
+    function fp = bind((: this_object() :), o);
+    ASSERT_EQ(o, evaluate(fp));
+    fp = 0;
+    ASSERT_EQ(o, evaluate(bind((: this_object() :), o)));
+    destruct(o);
+  }
 }

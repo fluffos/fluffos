@@ -31,7 +31,6 @@ void init_living() {
 
 static void notify_no_command() {
   union string_or_func p;
-  svalue_t* v;
 
   if (!command_giver || !command_giver->interactive) {
     return;
@@ -39,12 +38,12 @@ static void notify_no_command() {
   p = command_giver->interactive->default_err_message;
   if (command_giver->interactive->iflags & NOTIFY_FAIL_FUNC) {
     save_command_giver(command_giver);
-    v = call_function_pointer(p.f, 0);
+    vm::CallResult v = vm::Call().call(p.f);
     restore_command_giver();
     free_funp(p.f);
     if (command_giver && command_giver->interactive) {
-      if (v && v->type == T_STRING) {
-        tell_object(command_giver, v->u.string, SVALUE_STRLEN(v));
+      if (v.is(T_STRING)) {
+        tell_object(command_giver, v->u.string, SVALUE_STRLEN(v.get()));
       }
       command_giver->interactive->iflags &= ~NOTIFY_FAIL_FUNC;
       command_giver->interactive->default_err_message.s = nullptr;
@@ -183,7 +182,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
    */
   if (item->flags & O_ENABLE_COMMANDS) {
     save_command_giver(item);
-    (void)apply(APPLY_INIT, dest, 0, ORIGIN_DRIVER);
+    vm::Call().apply(APPLY_INIT, dest, ORIGIN_DRIVER);
     restore_command_giver();
     if (item->super != dest) {
       return;
@@ -206,7 +205,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
     }
     if (ob->flags & O_ENABLE_COMMANDS) {
       save_command_giver(ob);
-      (void)apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+      vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
@@ -220,7 +219,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
     }
     if (item->flags & O_ENABLE_COMMANDS) {
       save_command_giver(item);
-      (void)apply(APPLY_INIT, ob, 0, ORIGIN_DRIVER);
+      vm::Call().apply(APPLY_INIT, ob, ORIGIN_DRIVER);
       restore_command_giver();
       if (dest != item->super) {
         return;
@@ -235,7 +234,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
   }
   if (dest->flags & O_ENABLE_COMMANDS) {
     save_command_giver(dest);
-    (void)apply(APPLY_INIT, item, 0, ORIGIN_DRIVER);
+    vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
     restore_command_giver();
   }
 }
@@ -362,10 +361,12 @@ static int user_parser(char* buff) {
   save_illegal_sentence_action = illegal_sentence_action;
   illegal_sentence_action = 0;
   for (s = command_giver->sent; s; s = s->next) {
-    svalue_t* ret;
-
+    /* Verbs are shared strings, so their length is counted: no scan, and no
+     * cap (add_action() accepts a verb of any length; MAX_VERB_BUFF only
+     * bounds the copy of the user's verb). */
+    int const verb_len = static_cast<int>(SHARED_STRLEN(s->verb));
     if (s->flags & (V_NOSPACE | V_SHORT)) {
-      if (strncmp(buff, s->verb, strlen(s->verb)) != 0) {
+      if (strncmp(buff, s->verb, static_cast<size_t>(verb_len)) != 0) {
         continue;
       }
     } else {
@@ -382,11 +383,10 @@ static int user_parser(char* buff) {
       debug(add_action, "Local command %s on /%s\n", s->function.s, s->ob->obname);
 
     if (s->flags & V_NOSPACE) {
-      int const l1 = strlen(s->verb);
-      int const l2 = strlen(verb_buff);
+      int const l2 = static_cast<int>(strnlen(verb_buff, sizeof(verb_buff)));
 
-      if (l1 < l2) {
-        last_verb = verb_buff + l1;
+      if (verb_len < l2) {
+        last_verb = verb_buff + verb_len;
       } else {
         last_verb = "";
       }
@@ -408,20 +408,22 @@ static int user_parser(char* buff) {
      * Remember the object, to update moves.
      */
     save_command_giver(command_giver);
+    vm::Call call;
     if (s->flags & V_NOSPACE) {
-      copy_and_push_string(&buff[strlen(s->verb)]);
+      call.push(vm::Value::str_copy(&buff[verb_len]));
     } else if (buff[length] == ' ') {
-      copy_and_push_string(&buff[length + 1]);
+      call.push(vm::Value::str_copy(&buff[length + 1]));
     } else {
-      push_undefined();
+      call.push(vm::Value::undefined());
     }
+    vm::CallResult ret(vm::CallResult::kNotFound);
     if (s->flags & V_FUNCTION) {
-      ret = call_function_pointer(s->function.f, 1);
+      ret = call.call(s->function.f);
     } else {
       if (s->function.s[0] == APPLY___INIT_SPECIAL_CHAR) {
         error("Illegal function name.\n");
       }
-      ret = apply(s->function.s, s->ob, 1, where);
+      ret = call.apply(s->function.s, s->ob, where);
     }
     /* s may be dangling at this point */
 
@@ -430,7 +432,7 @@ static int user_parser(char* buff) {
     last_verb = nullptr;
 
     /* was this the right verb? */
-    if (ret == nullptr) {
+    if (!ret) {
       /* is it still around?  Otherwise, ignore this ...
          it moved somewhere or dested itself */
       if (s == command_giver->sent) {
@@ -459,7 +461,7 @@ static int user_parser(char* buff) {
      * valid_read(). The compile-time refusal of `async` on applies cannot
      * reach here: verb names are arbitrary runtime strings, and
      * add_action((: f :), "verb") has no name at all. */
-    if (ret && ret->type == T_PROMISE) {
+    if (ret.is(T_PROMISE)) {
       /* verb_buff, not s->verb: the sentence may be dangling here (the
        * comment above the not-found check says so), and this branch has no
        * `s == command_giver->sent` guard to lean on. */
@@ -467,7 +469,7 @@ static int user_parser(char* buff) {
           "Verb '%s' returned a promise: a verb function cannot be async -- the driver needs "
           "its answer now. Treating the command as unhandled.\n",
           verb_buff);
-      ret = nullptr;
+      ret = vm::CallResult(vm::CallResult::kNotFound);
     }
     if (ret && (ret->type != T_NUMBER || ret->u.number != 0)) {
 #ifdef PACKAGE_MUDLIB_STATS
@@ -686,30 +688,22 @@ void remove_sent(object_t* ob, object_t* user) {
 #endif
 
 #ifdef F_ADD_ACTION
-void f_add_action() {
-  LPC_INT flag;
+void f_add_action(vm::EfunArgs&, vm::Arg fun, vm::Arg verb, std::optional<LPC_INT> flag_arg) {
+  LPC_INT const flag = flag_arg.value_or(0);
 
-  if (st_num_arg == 3) {
-    flag = (sp--)->u.number;
-  } else {
-    flag = 0;
-  }
-
-  if (sp->type == T_ARRAY) {
-    int i, n = sp->u.arr->size;
-    svalue_t* sv = sp->u.arr->item;
+  if (verb.is(T_ARRAY)) {
+    array_t* verbs = verb.array();
+    int i, n = verbs->size;
+    svalue_t* sv = verbs->item;
 
     for (i = 0; i < n; i++) {
       if (sv[i].type == T_STRING) {
-        add_action(sp - 1, sv[i].u.string, flag & 3);
+        add_action(fun.sv(), sv[i].u.string, flag & 3);
       }
     }
-    free_array((sp--)->u.arr);
   } else {
-    add_action((sp - 1), sp->u.string, flag & 3);
-    free_string_svalue(sp--);
+    add_action(fun.sv(), verb.string().c_str(), flag & 3);
   }
-  pop_stack();
 }
 #endif
 
@@ -723,19 +717,19 @@ void f_add_action() {
  * Return cost of the command executed if success (> 0).
  * When failure, return 0.
  */
-void f_command() {
+vm::Value f_command(vm::EfunArgs&, vm::StringArg cmd) {
   LPC_INT rc = 0;
 
   if (current_object && !(current_object->flags & O_DESTRUCTED)) {
     char buff[1000];
     LPC_INT const save_eval_cost = get_eval();
 
-    if (SVALUE_STRLEN(sp) > sizeof(buff) - 1) {
+    if (cmd.size() > sizeof(buff) - 1) {
       error("Too long command.\n");
     }
 
-    strncpy(buff, sp->u.string, sizeof(buff));
-    buff[sizeof(buff) - 1] = 0;
+    memcpy(buff, cmd.c_str(), cmd.size());
+    buff[cmd.size()] = '\0';
 
     if (parse_command(buff, current_object)) {
       rc = save_eval_cost - get_eval();
@@ -746,113 +740,88 @@ void f_command() {
     }
   }
 
-  free_string_svalue(sp);
-  put_number(rc);
+  return rc;
 }
 #endif
 
 #ifdef F_COMMANDS
-void f_commands() { push_refed_array(commands(current_object)); }
+vm::Value f_commands(vm::EfunArgs&) { return vm::Value::refed(commands(current_object)); }
 #endif
 
 #ifdef F_DISABLE_COMMANDS
-void f_disable_commands() { enable_commands(0, 0); }
+void f_disable_commands(vm::EfunArgs&) { enable_commands(0, 0); }
 #endif
 
 #ifdef F_ENABLE_COMMANDS
-void f_enable_commands() {
-  enable_commands(1, sp->u.number);
-  pop_stack();
-}
+void f_enable_commands(vm::EfunArgs&, LPC_INT setup_actions) { enable_commands(1, setup_actions); }
 #endif
 
 #ifdef F_FIND_LIVING
-void f_find_living() {
-  object_t* ob;
-
-  ob = find_living_object(sp->u.string, 0);
-  free_string_svalue(sp);
+vm::Value f_find_living(vm::EfunArgs&, vm::StringArg name) {
+  object_t* ob = find_living_object(name.c_str(), 0);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
-    put_unrefed_undested_object(ob, "find_living");
-  } else {
-    *sp = const0;
+    return vm::Value::object(ob);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_FIND_PLAYER
-void f_find_player() {
-  object_t* ob;
-
-  ob = find_living_object(sp->u.string, 1);
-  free_string_svalue(sp);
+vm::Value f_find_player(vm::EfunArgs&, vm::StringArg name) {
+  object_t* ob = find_living_object(name.c_str(), 1);
   /* safe b/c destructed objects have had their living names removed */
   if (ob) {
-    put_unrefed_undested_object(ob, "find_living");
-  } else {
-    *sp = const0;
+    return vm::Value::object(ob);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_LIVING
-void f_living() {
-  if (sp->u.ob->flags & O_ENABLE_COMMANDS) {
-    free_object(&sp->u.ob, "f_living:1");
-    *sp = const1;
-  } else {
-    free_object(&sp->u.ob, "f_living:2");
-    *sp = const0;
-  }
-}
+vm::Value f_living(vm::EfunArgs&, object_t* ob) { return (ob->flags & O_ENABLE_COMMANDS) ? 1 : 0; }
 #endif
 
 #ifdef F_LIVINGS
-void f_livings() { push_refed_array(livings()); }
+vm::Value f_livings(vm::EfunArgs&) { return vm::Value::refed(livings()); }
 #endif
 
 #ifdef F_NOTIFY_FAIL
-void f_notify_fail() {
+void f_notify_fail(vm::EfunArgs&, vm::Arg message) {
   if (command_giver && command_giver->interactive) {
     clear_notify(command_giver);
-    if (sp->type == T_STRING) {
-      command_giver->interactive->default_err_message.s = make_shared_string(sp->u.string);
+    if (message.is(T_STRING)) {
+      command_giver->interactive->default_err_message.s =
+          make_shared_string(message.string().c_str());
     } else {
+      funptr_t* fp = message.funptr();
       command_giver->interactive->iflags |= NOTIFY_FAIL_FUNC;
-      command_giver->interactive->default_err_message.f = sp->u.fp;
-      sp->u.fp->hdr.ref++;
+      command_giver->interactive->default_err_message.f = fp;
+      fp->hdr.ref++;
     }
   }
-  pop_stack();
 }
 #endif
 
 #ifdef F_QUERY_VERB
-void f_query_verb() {
+vm::Value f_query_verb(vm::EfunArgs&) {
   if (!last_verb) {
-    push_number(0);
-    return;
+    return 0;
   }
-  share_and_push_string(last_verb);
+  /* last_verb need not be a shared string: share a copy */
+  return vm::Value::str_make_shared(last_verb);
 }
 #endif
 
 #ifdef F_REMOVE_ACTION
-void f_remove_action() {
-  LPC_INT success;
-
-  success = remove_action(sp - 1, sp->u.string);
-  free_string_svalue(sp--);
-  free_svalue(sp, "f_remove_action");
-  put_number(success);
+vm::Value f_remove_action(vm::EfunArgs&, vm::Arg action, vm::StringArg verb) {
+  return remove_action(action.sv(), verb.c_str());
 }
 #endif
 
 #ifdef F_SET_LIVING_NAME
-void f_set_living_name() {
-  set_living_name(current_object, sp->u.string);
-  free_string_svalue(sp--);
+void f_set_living_name(vm::EfunArgs&, vm::StringArg name) {
+  set_living_name(current_object, name.c_str());
 }
 #endif
 

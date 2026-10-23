@@ -24,6 +24,7 @@
 #include "mainlib.h"
 #include "vm/vm.h"
 #include "vm/internal/simulate.h"
+#include "vm/internal/base/vm_stack.h"
 #include "wasm/comm_wasm.h"
 
 extern "C" {

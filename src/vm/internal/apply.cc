@@ -9,6 +9,7 @@
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/debug.h"
 #include "vm/internal/hooks.h"
 #include "compiler/internal/compiler.h"

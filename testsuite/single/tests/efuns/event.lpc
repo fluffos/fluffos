@@ -6,5 +6,8 @@ void do_tests() {
   ASSERT_EQ(this_object(), ob->from());
   event(({ ob }), "ping", 99);
   ASSERT_EQ(100, ob->got());
+  // A handler that error()s unwinds through event(): the "event_<name>"
+  // string it built must still be freed (Debug check_memory / LSan).
+  ASSERT(catch(event(ob, "boom")));
   destruct(ob);
 }

@@ -80,8 +80,6 @@ bool refresh_local_funp(funptr_t*);
 /* Refresh every interned local-function pointer owned by ob. Called by
  * recompile_object() right after the program swap, before new code runs. */
 void refresh_named_funps(object_t*);
-void push_refed_funp(funptr_t*);
-void push_funp(funptr_t*);
 void free_funp(funptr_t*);
 int merge_arg_lists(int, struct array_t*, int);
 funptr_t* make_efun_funp(int, struct svalue_t*);

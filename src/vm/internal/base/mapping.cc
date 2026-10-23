@@ -9,6 +9,7 @@
 
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 mapping_node_t* locked_map_nodes = nullptr;
 
@@ -607,20 +608,14 @@ struct unique_svalue_compare {
   }
 };
 
-void f_unique_mapping(void) {
-  svalue_t* arg = sp - st_num_arg + 1;
-  array_t* v = arg->u.arr;
-  unsigned short num_arg = st_num_arg;
-
+vm::Value f_unique_mapping(vm::EfunArgs& f, array_t* v, vm::Arg /* the callback */) {
   if (!v || !v->size) {
-    pop_n_elems(num_arg);
-    push_refed_mapping(allocate_mapping(0));
-    return;
+    return vm::Value::refed(allocate_mapping(0));
   }
 
   // prepare the call back.
   function_to_call_t ftc;
-  process_efun_callback(1, &ftc, F_UNIQUE_MAPPING);
+  f.process_callback(1, &ftc);
 
   // for each item in the array, call the callback and group
   // item with same result together.
@@ -629,17 +624,12 @@ void f_unique_mapping(void) {
 
   // The callback in the loop below and the size limits in the mapping
   // build afterwards can all error() and unwind (issue #126): release the
-  // copied keys exactly once, and drop the partially built mapping unless
-  // it was handed off to the stack.
-  mapping_t* m = nullptr;
-  bool completed = false;
+  // copied keys exactly once (the partially built mapping below is a Value,
+  // released by its own destructor on that path).
   DEFER {
     for (auto& item : result) {
       svalue_t key = item.first;
       free_svalue(&key, "unique_mapping key");
-    }
-    if (!completed && m) {
-      free_mapping(m);
     }
   };
 
@@ -681,15 +671,15 @@ void f_unique_mapping(void) {
   }
 
   // Translate result into LPC mapping
-  m = allocate_mapping(0);
+  vm::Value m = vm::Value::refed(allocate_mapping(0));
   for (auto& item : result) {
     auto key = item.first;
     auto values = item.second;
 
     // find_for_insert/allocate_empty_array may error() on the size
-    // limits; the scope guard above reclaims the partial mapping and the
-    // copied keys (it also releases the keys on the success path).
-    svalue_t* l = find_for_insert(m, &key, 0);
+    // limits; `m` releases the partial mapping and the scope guard above
+    // the copied keys (it also releases the keys on the success path).
+    svalue_t* l = find_for_insert(m->u.map, &key, 0);
     l->type = T_ARRAY;
     l->u.arr = allocate_empty_array(values.size());
     for (unsigned int i = 0; i < values.size(); i++) {
@@ -697,9 +687,7 @@ void f_unique_mapping(void) {
       assign_svalue_no_free(&l->u.arr->item[i], values[i]);
     }
   }
-  completed = true;
-  pop_n_elems(num_arg);
-  push_refed_mapping(m);
+  return m;
 }
 #endif /* End of unique_mapping */
 
@@ -708,7 +696,7 @@ void f_unique_mapping(void) {
  * array of svalues. Format of data: LHS RHS LHS2 RHS2... (uses hash table)
  */
 
-mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
+mapping_t* load_mapping_from_aggregate(svalue_t* svp, int n) {
   mapping_t* m;
   int mask, i, oi, count = 0;
   mapping_node_t **a, *elt, *elt2;
@@ -721,13 +709,13 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
   mask = m->table_size;
   a = m->table;
   do {
-    i = (oi = svalue_to_int(++sp)) & mask;
+    i = (oi = svalue_to_int(++svp)) & mask;
     if ((elt2 = elt = a[i])) {
       do {
-        if (msameval(sp, elt->values)) {
-          free_svalue(sp++, "load_mapping_from_aggregate: duplicate key");
+        if (msameval(svp, elt->values)) {
+          free_svalue(svp++, "load_mapping_from_aggregate: duplicate key");
           free_svalue(elt->values + 1, "load_mapping_from_aggregate");
-          *(elt->values + 1) = *sp;
+          *(elt->values + 1) = *svp;
           break;
         }
       } while ((elt = elt->next));
@@ -754,7 +742,7 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
         // caller already moved the VM's real sp below this whole
         // aggregate) and would otherwise leak.
         for (int k = 0; k < n; k++) {
-          free_svalue(sp + k, "load_mapping_from_aggregate: out of memory");
+          free_svalue(svp + k, "load_mapping_from_aggregate: out of memory");
         }
         error("Out of memory\n");
       }
@@ -772,20 +760,20 @@ mapping_t* load_mapping_from_aggregate(svalue_t* sp, int n) {
       // real sp below this entire aggregate before calling in ("sp -=
       // offset"), so error()'s unwind (pop_n_elems, walking down to the
       // saved sp) never revisits these slots. Every remaining element from
-      // here on -- this pair (sp[0]/sp[1], already hashed/shared-string-
+      // here on -- this pair (svp[0]/svp[1], already hashed/shared-string-
       // converted by svalue_to_int above) plus any pairs still unprocessed
       // beyond it -- would otherwise leak. Already-inserted pairs don't
       // need this: their ownership was transferred into map nodes that
       // free_mapping() just freed above.
       for (int k = 0; k < n; k++) {
-        free_svalue(sp + k, "load_mapping_from_aggregate: too large");
+        free_svalue(svp + k, "load_mapping_from_aggregate: too large");
       }
       mapping_too_large();
     }
 
     elt = new_map_node();
-    *elt->values = *sp++;
-    *(elt->values + 1) = *sp;
+    *elt->values = *svp++;
+    *(elt->values + 1) = *svp;
     (a[i] = elt)->next = elt2;
   } while (n -= 2);
 #ifdef PACKAGE_MUDLIB_STATS
@@ -1044,7 +1032,7 @@ void map_mapping(svalue_t* arg, int num_arg) {
   svalue_t* ret;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_MAP);
+  process_efun_callback(1, &ftc, F_MAP, num_arg);
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);
@@ -1084,7 +1072,7 @@ void filter_mapping(svalue_t* arg, int num_arg) {
   unsigned int tb_index;
   function_to_call_t ftc;
 
-  process_efun_callback(1, &ftc, F_FILTER);
+  process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
   if (arg->u.map->ref > 1) {
     m = copyMapping(arg->u.map);

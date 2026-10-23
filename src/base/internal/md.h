@@ -52,7 +52,6 @@ static inline md_node_t* md_chain_decode(md_node_t* n) {
 #else
 #define MD_OVERHEAD (sizeof(md_node_t))
 #endif
-void check_all_blocks(int);
 #ifdef DEBUGMALLOC_EXTENSIONS
 // Orphaned reference-loop scan (trial deletion); see checkmemory.cc.
 // Returns the number of unreachable array/class/mapping/funptr blocks;

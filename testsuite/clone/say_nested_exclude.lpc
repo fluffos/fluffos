@@ -1,0 +1,13 @@
+// On hearing "outer", nests a say() with a different exclude object.
+// Used to pin that f_say's exclude list is stack-local (not static).
+string last;
+void catch_tell(string msg) {
+  last = msg;
+  if (msg == "outer") {
+    object other = load_object("/clone/tell_room_victim");
+    say("nested", other);
+  }
+}
+string last_message() { return last; }
+void enter(object dest) { move_object(dest); }
+void make_living() { enable_commands(); }

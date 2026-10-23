@@ -42,6 +42,7 @@
 #include "net/websocket.h"
 #include "user.h"
 #include "vm/vm.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include "ghc/filesystem.hpp"
 namespace fs = ghc::filesystem;

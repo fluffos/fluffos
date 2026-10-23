@@ -1,0 +1,19 @@
+// A sort_array() comparator that catches an error escaping a nested
+// sort_array(). The comparator in use is kept in a global for the C qsort
+// callback; the inner sort must restore the outer one's even when it is
+// unwound by error(), or the outer sort goes on calling through the inner
+// sort's dead callback (heap-use-after-free on its function pointer).
+int calls;
+
+int inner_cmp(int a, int b) { error("inner comparator\n"); }
+
+int outer_cmp(int a, int b) {
+  calls++;
+  ASSERT(catch(sort_array(({ 3, 1, 2 }), (: inner_cmp :))));
+  return a - b;
+}
+
+void do_tests() {
+  ASSERT_EQ(({ 1, 2, 3, 4, 5 }), sort_array(({ 5, 3, 4, 1, 2 }), (: outer_cmp :)));
+  ASSERT(calls > 0);
+}

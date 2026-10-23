@@ -102,7 +102,7 @@ void set_this_user set_this_player(object | int);
 #endif
 
 string lower_case(string);
-string replace_string(string, string, string, ...);
+string replace_string(string, string, string, int | void, int | void);
 int restore_object(string, void | int);
 mixed save_object(string | int | void, void | int);
 string save_variable(mixed);

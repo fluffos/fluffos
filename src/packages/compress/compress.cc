@@ -9,6 +9,9 @@
 
 #include <zlib.h>
 
+#include <memory>
+#include <string>
+
 #define GZ_EXTENSION ".gz"
 
 enum { COMPRESS_BUF_SIZE = 8096 };
@@ -24,92 +27,57 @@ static bool has_gz_extension(const char* name) {
 #endif
 
 #ifdef F_COMPRESS_FILE
-void f_compress_file() {
+vm::Value f_compress_file(vm::EfunArgs&, vm::StringArg input, std::optional<vm::StringArg> output) {
   int readb;
-  int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
   const char* real_input_file;
   const char* real_output_file;
-  char* tmpout;
+  std::string tmpout; /* owns a generated output name; error()-safe */
   gzFile out_file;
   FILE* in_file;
   char buf[4096];
   char outname[1024];
 
-  // Not a string?  Error!
-  if ((sp - num_arg + 1)->type != T_STRING) {
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
-  }
-
-  input_file = (sp - num_arg + 1)->u.string;
-  if (num_arg == 2) {
-    if (((sp - num_arg + 2)->type != T_STRING)) {
-      pop_n_elems(num_arg);
-      push_number(0);
-      return;
-    }
-    output_file = (sp - num_arg + 2)->u.string;
+  input_file = input.c_str();
+  if (output) {
+    output_file = output->c_str();
   } else {
     if (has_gz_extension(input_file)) {
       // Already compressed...
-      pop_n_elems(num_arg);
-      push_number(0);
-      return;
+      return 0;
     }
-    tmpout = new_string(strlen(input_file) + strlen(GZ_EXTENSION), "compress_file");
-    strcpy(tmpout, input_file);
-    strcat(tmpout, GZ_EXTENSION);
-    output_file = tmpout;
+    tmpout = std::string(input_file) + GZ_EXTENSION;
+    output_file = tmpout.c_str();
   }
 
-  real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
-  if (!real_output_file) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+  vm::Value real_output_v = check_valid_path(output_file, current_object, "compress_file", 1);
+  if (!real_output_v.is(T_STRING)) {
+    return 0;
   }
+  real_output_file = real_output_v->u.string;
   if (strlen(real_output_file) >= sizeof(outname)) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
   // Copy it into our little buffer.
   strcpy(outname, real_output_file);
-  // Free the old file.
-  if (num_arg != 2) {
-    FREE_MSTR(output_file);
-  }
   output_file = outname;
 
-  real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
-  if (!real_input_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+  vm::Value real_input_v = check_valid_path(input_file, current_object, "compress_file", 0);
+  if (!real_input_v.is(T_STRING)) {
+    return 0;
   }
+  real_input_file = real_input_v->u.string;
 
   in_file = fopen(real_input_file, "rb");
   if (!in_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
 
   out_file = gzopen(output_file, "wb");
   if (!out_file) {
     fclose(in_file);
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
 
   bool ok = true;
@@ -135,25 +103,23 @@ void f_compress_file() {
     debug_message("compress_file: failed to compress /%s into /%s.\n", real_input_file,
                   output_file);
     unlink(output_file);
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
 
   unlink(real_input_file);
 
-  pop_n_elems(num_arg);
-  push_number(1);
+  return 1;
 }
 #endif
 
 #ifdef F_UNCOMPRESS_FILE
-void f_uncompress_file() {
+vm::Value f_uncompress_file(vm::EfunArgs&, vm::StringArg input,
+                            std::optional<vm::StringArg> output) {
   int readb;
   int len;
-  int const num_arg = st_num_arg;
   const char* input_file;
   const char* output_file;
+  std::string tmpout; /* owns a generated output name; error()-safe */
   const char* real_input_file;
   const char* real_output_file;
   FILE* out_file;
@@ -161,81 +127,46 @@ void f_uncompress_file() {
   char buf[4196];
   char outname[1024];
 
-  // Not a string?  Error!
-  if ((sp - num_arg + 1)->type != T_STRING) {
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
-  }
-
-  input_file = (sp - num_arg + 1)->u.string;
-  if (num_arg == 2) {
-    if (((sp - num_arg + 2)->type != T_STRING)) {
-      pop_n_elems(num_arg);
-      push_number(0);
-      return;
-    }
-    output_file = (sp - num_arg + 2)->u.string;
+  input_file = input.c_str();
+  if (output) {
+    output_file = output->c_str();
   } else {
-    char* tmp;
     if (!has_gz_extension(input_file)) {
       // Not compressed...
-      pop_n_elems(num_arg);
-      push_number(0);
-      return;
+      return 0;
     }
-    len = strlen(input_file);
-    tmp = new_string(len, "compress_file");
-    strcpy(tmp, input_file);
-    tmp[len - strlen(GZ_EXTENSION)] = 0;
-    output_file = tmp;
+    len = static_cast<int>(input.size());
+    tmpout.assign(input_file, static_cast<size_t>(len) - (sizeof(GZ_EXTENSION) - 1));
+    output_file = tmpout.c_str();
   }
 
-  real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
-  if (!real_output_file) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
-
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+  vm::Value real_output_v = check_valid_path(output_file, current_object, "compress_file", 1);
+  if (!real_output_v.is(T_STRING)) {
+    return 0;
   }
+  real_output_file = real_output_v->u.string;
   if (strlen(real_output_file) >= sizeof(outname)) {
-    if (num_arg != 2) {
-      FREE_MSTR(output_file);
-    }
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
   // Copy it into our little buffer.
   strcpy(outname, real_output_file);
-  if (num_arg != 2) {
-    FREE_MSTR(output_file);
-  }
   output_file = outname;
 
-  real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
-  if (!real_input_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+  vm::Value real_input_v = check_valid_path(input_file, current_object, "compress_file", 0);
+  if (!real_input_v.is(T_STRING)) {
+    return 0;
   }
+  real_input_file = real_input_v->u.string;
 
   in_file = gzopen(real_input_file, "rb");
   if (!in_file) {
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
 
   out_file = fopen(output_file, "wb");
   if (!out_file) {
     gzclose(in_file);
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
 
   bool ok = true;
@@ -264,49 +195,46 @@ void f_uncompress_file() {
     debug_message("uncompress_file: failed to decompress /%s into /%s.\n", real_input_file,
                   output_file);
     unlink(output_file);
-    pop_n_elems(num_arg);
-    push_number(0);
-    return;
+    return 0;
   }
 
   unlink(real_input_file);
 
-  pop_n_elems(num_arg);
-  push_number(1);
+  return 1;
 }
 #endif
 
 #ifdef F_COMPRESS
-void f_compress() {
-  unsigned char* buffer;
+vm::Value f_compress(vm::EfunArgs&, vm::Arg data) {
   unsigned char* input;
   int size;
   buffer_t* real_buffer;
   uLongf new_size;
 
-  if (sp->type == T_STRING) {
-    size = SVALUE_STRLEN(sp);
-    input = (unsigned char*)sp->u.string;
-  } else if (sp->type == T_BUFFER) {
-    size = sp->u.buf->size;
-    input = sp->u.buf->item;
+  if (data.is(T_STRING)) {
+    size = data.string().size();
+    input = reinterpret_cast<unsigned char*>(const_cast<char*>(data.string().c_str()));
+  } else if (data.is(T_BUFFER)) {
+    size = data.buffer()->size;
+    input = data.buffer()->item;
   } else {
-    pop_n_elems(st_num_arg);
-    push_undefined();
-    return;
+    return vm::Value::undefined();
   }
 
   new_size = compressBound(size);
-  // Make it a little larger as specified in the docs.
-  buffer = reinterpret_cast<unsigned char*>(DMALLOC(new_size, TAG_TEMPORARY, "compress"));
-  compress(buffer, &new_size, input, size);
+  // Make it a little larger as specified in the docs. Owned, so an
+  // allocate_buffer() error() on an oversized result still frees it.
+  struct FreeScratch {
+    void operator()(unsigned char* p) const { FREE(p); }
+  };
+  std::unique_ptr<unsigned char, FreeScratch> buffer(
+      reinterpret_cast<unsigned char*>(DMALLOC(new_size, TAG_TEMPORARY, "compress")));
+  compress(buffer.get(), &new_size, input, size);
 
   // Shrink it down.
-  pop_n_elems(st_num_arg);
   real_buffer = allocate_buffer(new_size);
-  write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer), new_size);
-  FREE(buffer);
-  push_refed_buffer(real_buffer);
+  write_buffer(real_buffer, 0, reinterpret_cast<char*>(buffer.get()), new_size);
+  return vm::Value::refed(real_buffer);
 }
 #endif
 
@@ -317,7 +245,7 @@ static void* zlib_alloc(void* /*opaque*/, unsigned int items, unsigned int size)
 
 static void zlib_free(void* /*opaque*/, void* address) { FREE(address); }
 
-void f_uncompress() {
+vm::Value f_uncompress(vm::EfunArgs&, vm::Arg data) {
   z_stream* compressed;
   unsigned char compress_buf[COMPRESS_BUF_SIZE];
   unsigned char* output_data = nullptr;
@@ -326,12 +254,10 @@ void f_uncompress() {
   buffer_t* buffer;
   int ret;
 
-  if (sp->type == T_BUFFER) {
-    buffer = sp->u.buf;
+  if (data.is(T_BUFFER)) {
+    buffer = data.buffer();
   } else {
-    pop_n_elems(st_num_arg);
-    push_undefined();
-    return;
+    return vm::Value::undefined();
   }
 
   compressed =
@@ -346,7 +272,6 @@ void f_uncompress() {
 
   if (inflateInit(compressed) != Z_OK) {
     FREE(compressed);
-    pop_n_elems(st_num_arg);
     error("inflateInit failed");
   }
 
@@ -379,8 +304,6 @@ void f_uncompress() {
 
   inflateEnd(compressed);
 
-  pop_n_elems(st_num_arg);
-
   if (too_large) {
     if (output_data) {
       FREE(output_data);
@@ -393,8 +316,8 @@ void f_uncompress() {
     buffer = allocate_buffer(len);
     write_buffer(buffer, 0, reinterpret_cast<char*>(output_data), len);
     FREE(output_data);
-    push_refed_buffer(buffer);
     FREE(compressed);
+    return vm::Value::refed(buffer);
   } else {
     if (output_data) {
       FREE(output_data);

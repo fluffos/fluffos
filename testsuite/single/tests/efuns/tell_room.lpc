@@ -19,4 +19,38 @@ void do_tests() {
   ASSERT_EQ("hello room", l2->last_message());
   destruct(l1); destruct(l2); destruct(room);
   RESTORETP;
+
+  // Room-by-name create() destructs the exclude: slot is swept to 0; must
+  // fall back to no-exclusion rather than crash.
+  {
+    object victim = load_object("/clone/tell_room_victim");
+    object loaded = find_object("/clone/tell_room_loads_victim");
+
+    if (loaded) {
+      destruct(loaded);
+    }
+    ASSERT(!catch(tell_room("/clone/tell_room_loads_victim", "x", victim)));
+    ASSERT(!victim);
+    destruct(find_object("/clone/tell_room_loads_victim"));
+  }
+
+  // Nested tell_room from create() must not clobber the outer exclude
+  // (stack-local vtmp; was a function-static).
+  {
+    object keep = clone_object("/clone/catch_tell_probe");
+    object nested = find_object("/clone/tell_room_nested_exclude");
+
+    if (nested) {
+      destruct(nested);
+    }
+    SAVETP;
+    keep->make_living();
+    // Outer exclude is keep; nested create() excludes tell_room_victim.
+    // If vtmp were static, the nested call would leave keep as the exclude
+    // for the wrong call — or worse, a dangling pointer after keep moves.
+    ASSERT(!catch(tell_room("/clone/tell_room_nested_exclude", "outer", keep)));
+    destruct(find_object("/clone/tell_room_nested_exclude"));
+    destruct(keep);
+    RESTORETP;
+  }
 }

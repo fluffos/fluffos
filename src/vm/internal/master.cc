@@ -10,6 +10,7 @@
 
 #include "vm/internal/base/apply_cache.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "applies_table.autogen.h"
 #include "vm/internal/apply.h"
 #include "vm/internal/hooks.h"
@@ -30,6 +31,13 @@ int master_approved(svalue_t* v, const char* apply_name) {
     return 0;
   }
   return v->type != T_NUMBER || v->u.number != 0;
+}
+
+int master_approved(const vm::CallResult& r, const char* apply_name) {
+  if (r.status() == vm::CallResult::kNoMaster) {
+    return 1; /* no master yet: the bootstrap allow */
+  }
+  return master_approved(const_cast<svalue_t*>(r.get()), apply_name);
 }
 
 struct object_t* master_ob = nullptr;

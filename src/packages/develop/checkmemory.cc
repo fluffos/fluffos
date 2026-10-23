@@ -124,10 +124,11 @@ char* dump_debugmalloc(const char* tfn, int mask) {
   FILE* fp;
 
   outbuf_zero(&out);
-  fn = check_valid_path(tfn, current_object, "debugmalloc", 1);
-  if (!fn) {
+  vm::Value fnv = check_valid_path(tfn, current_object, "debugmalloc", 1);
+  if (!fnv.is(T_STRING)) {
     error("Invalid path '%s' for writing.\n", tfn);
   }
+  fn = fnv->u.string;
   fp = fopen(fn, "w");
   if (!fp) {
     error("Unable to open %s for writing.\n", fn);
@@ -485,8 +486,9 @@ void check_string_stats(outbuffer_t* out) {
   }
 }
 
-/* currently: 1 - debug, 2 - suppress leak checks */
-void check_all_blocks(int flag) {
+/* currently: 1 - debug, 2 - suppress leak checks. Returns check_memory()'s
+ * result: the report, or 0 when leak checks are suppressed. */
+vm::Value check_all_blocks(int flag) {
   int i, j, hsh;
   md_node_t* entry;
   object_t* ob;
@@ -729,11 +731,11 @@ void check_all_blocks(int flag) {
 #ifdef PACKAGE_PARSER
     parser_mark_verbs();
 #endif
-    mark_file_sv();
     mark_all_defines();
     mark_free_sentences();
     mark_iptable();
     mark_stack();
+    vm::mark_live_values();
     mark_command_giver_stack();
     mark_call_outs();
     mark_hooks();
@@ -1132,11 +1134,12 @@ void check_all_blocks(int flag) {
                     orphans);
       }
     }
-    outbuf_push(&out);
-  } else {
-    FREE_MSTR(out.buffer);
-    push_number(0);
+    return outbuf_value(&out);
   }
+  if (out.buffer) { /* nothing is added with flag 2 and no flag 1 */
+    FREE_MSTR(out.buffer);
+  }
+  return 0;
 }
 
 /*

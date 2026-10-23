@@ -60,18 +60,19 @@ std::set<StubAddrQuery*> pending_addr_queries;
 void on_stub_resolve_finish(StubAddrQuery* query) {
   // Same argument shape as on_query_addr_by_name_finish():
   // (name, dotted-quad, key).
-  copy_and_push_string(query->name);
+  vm::Call call;
+  call.push(vm::Value::str_copy(query->name));
 
   in_addr a4;
   in6_addr a6;
   if (inet_pton(AF_INET, query->name, &a4) == 1 || inet_pton(AF_INET6, query->name, &a6) == 1) {
     // Already numeric: echo it, as a native getaddrinfo() would.
-    copy_and_push_string(query->name);
+    call.push(vm::Value::str_copy(query->name));
   } else {
-    copy_and_push_string("127.0.0.1");
+    call.push(vm::Value::str_copy("127.0.0.1"));
   }
 
-  push_number(query->key);
+  call.push(query->key);
   set_eval(max_eval_cost);
   /* Restore the user context captured at registration (issue #1104). */
   object_t* new_command_giver = nullptr;
@@ -80,9 +81,9 @@ void on_stub_resolve_finish(StubAddrQuery* query) {
   }
   save_command_giver(new_command_giver);
   if (query->call_back.type == T_STRING) {
-    safe_apply(query->call_back.u.string, query->ob_to_call, 3, ORIGIN_INTERNAL);
+    call.safe_apply(query->call_back.u.string, query->ob_to_call, ORIGIN_INTERNAL);
   } else {
-    safe_call_function_pointer(query->call_back.u.fp, 3);
+    call.safe_call(query->call_back.u.fp);
   }
   restore_command_giver();
 

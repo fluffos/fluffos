@@ -3,44 +3,34 @@
 #include "base/package_api.h"
 
 #ifdef F_SAVE_OBJECT
-void f_save_object() {
+vm::Value f_save_object(vm::EfunArgs&, std::optional<vm::Arg> target,
+                        std::optional<LPC_INT> flag_arg) {
   const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
-  int flag;
-  if (st_num_arg == 2) {
-    flag = (sp--)->u.number;
-    if (sp->type != T_STRING) {
+  int flag = 0;
+  if (flag_arg) {
+    flag = static_cast<int>(*flag_arg);
+    if (!target->is(T_STRING)) {
       error("first argument must be a string for save_object with 2 args");
     }
-  } else {
-    flag = 0;
   }
 
-  if (st_num_arg == 1 && sp->type == T_NUMBER) {
-    flag = sp->u.number;
+  if (target && !flag_arg && target->is(T_NUMBER)) {
+    flag = static_cast<int>(target->number());
   }
 
-  if (st_num_arg && sp->type == T_STRING) {
-    flag = save_object(current_object, sp->u.string, flag);
-
-    free_string_svalue(sp);
-    put_number(flag);
-  } else {
-    pop_n_elems(st_num_arg);
-    char* saved = new_string(max_string_length, "save_object_str");
-    push_malloced_string(saved);
-    int const left = max_string_length;
-    flag = save_object_str(current_object, flag, saved, left);
-    if (!flag) {
-      pop_stack();
-      push_undefined();
-    } else {
-      saved = new_string(strlen(sp->u.string), "save_object_str2");
-      strcpy(saved, sp->u.string);
-      pop_stack();
-      push_malloced_string(saved);
-    }
+  if (target && target->is(T_STRING)) {
+    flag = save_object(current_object, target->string().c_str(), flag);
+    return flag;
   }
+  char* saved = new_string(max_string_length, "save_object_str");
+  /* Hold the scratch buffer in a Value so an error() in the save frees it. */
+  vm::Value scratch = vm::Value::str_malloced(saved);
+  flag = save_object_str(current_object, flag, saved, max_string_length);
+  if (flag) {
+    return vm::Value::str_malloced(string_copy(saved, "save_object_str2"));
+  }
+  return vm::Value::undefined();
 }
 #endif
 
@@ -63,38 +53,32 @@ char* save_variable(svalue_t* var) {
 }
 
 #ifdef F_SAVE_VARIABLE
-void f_save_variable() {
-  char* p;
-
-  p = save_variable(sp);
-  pop_stack();
-  push_malloced_string(p);
+vm::Value f_save_variable(vm::EfunArgs&, vm::Arg value) {
+  char* p = save_variable(value.sv());
+  return vm::Value::str_malloced(p);
 }
 #endif
 
 #ifdef F_RESTORE_OBJECT
-void f_restore_object() {
-  int flag;
-
-  flag = (st_num_arg > 1) ? (sp--)->u.number : 0;
-
-  flag = restore_object(current_object, sp->u.string, flag);
-
-  free_string_svalue(sp);
-  put_number(flag);
+vm::Value f_restore_object(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT> flag_arg) {
+  int flag = flag_arg ? static_cast<int>(*flag_arg) : 0;
+  flag = restore_object(current_object, file.c_str(), flag);
+  return flag;
 }
 #endif
 
 #ifdef F_RESTORE_VARIABLE
-void f_restore_variable() {
+vm::Value f_restore_variable(vm::EfunArgs& f, vm::StringArg /*saved*/) {
   svalue_t v;
 
-  unlink_string_svalue(sp);
+  /* restore_variable() edits the text in place: take the argument and unlink
+   * it (copies only if something else still references it). The Value owns
+   * the buffer until return or an error() in restore. */
+  vm::Value text = f.take(0);
+  char* p = text.unlink_string();
   v.type = T_NUMBER;
 
-  // unlinked string
-  restore_variable(&v, const_cast<char*>(sp->u.string));
-  FREE_MSTR(sp->u.string);
-  *sp = v;
+  restore_variable(&v, p);
+  return vm::Value::owned(v);
 }
 #endif

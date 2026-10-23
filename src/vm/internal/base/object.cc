@@ -24,6 +24,7 @@ typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
 #include "comm.h"                    // add_message FIXME: reverse API
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/otable.h"  // FIXME:
@@ -68,7 +69,7 @@ int valid_hide(object_t* obj) {
   }
   push_object(obj);
   ret = safe_apply_master_ob(APPLY_VALID_HIDE, 1);
-  return MASTER_APPROVED(ret, "valid_hide");
+  return master_approved(ret, "valid_hide");
 }
 #endif
 
@@ -1667,11 +1668,12 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
 
   push_malloced_string(name); /* errors */
 
-  file = check_valid_path(name, ob, "save_object", 1);
+  vm::Value filev = check_valid_path(name, ob, "save_object", 1);
   free_string_svalue(sp--);
-  if (!file) {
+  if (!filev.is(T_STRING)) {
     error("Denied write permission in save_object().\n");
   }
+  file = filev->u.string;
 
   // Record the program's ACTUAL source file (carries the real .lpc/.c
   // extension) instead of guessing an extension onto the object name.
@@ -1877,10 +1879,11 @@ int restore_object(object_t* ob, const char* file, int noclear) {
 #endif
 
   // valid read permission.
-  file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
-  if (!file) {
+  vm::Value filev = check_valid_path(filename.c_str(), ob, "restore_object", 0);
+  if (!filev.is(T_STRING)) {
     error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
+  file = filev->u.string;
 
   // With zlib these reads go through gzopen, which transparently handles
   // both gzip'd and plain save files; without it, plain stdio.

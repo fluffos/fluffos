@@ -35,16 +35,11 @@ static int send_mssp_val(mapping_t* /*map*/, mapping_node_t* el, void* data) {
 
 void on_telnet_do_mssp(interactive_t* ip) {
   set_eval(max_eval_cost);
-  svalue_t* res = safe_apply_master_ob(APPLY_GET_MUD_STATS, 0);
-  mapping_t* map;
-  if (res <= (svalue_t*)nullptr || res->type != T_MAPPING) {
-    map = allocate_mapping(0);
-    free_svalue(&apply_ret_value, "telnet neg");
-    apply_ret_value.type = T_MAPPING;
-    apply_ret_value.u.map = map;
-  } else {
-    map = res->u.map;
-  }
+  vm::CallResult res = vm::Call().safe_apply_master(APPLY_GET_MUD_STATS);
+  /* the stats mapping (an empty one when the master gave none), held until
+   * the reply is sent */
+  vm::Value stats = res.is(T_MAPPING) ? res.take() : vm::Value::refed(allocate_mapping(0));
+  mapping_t* map = stats->u.map;
 
   telnet_begin_sb(ip->telnet, TELNET_TELOPT_MSSP);
 

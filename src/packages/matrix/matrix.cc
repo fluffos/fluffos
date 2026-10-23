@@ -17,12 +17,10 @@ static Vector* normalize_array(Vector*);
 static Vector* cross_product(Vector*, Vector*, Vector*);
 static Vector* points_to_array(Vector*, Vector*, Vector*);
 
-// Validate that `arg` holds a 16-element array of floats and copy it into the
-// C float matrix `out`. Errors -- without modifying the caller's array -- on a
-// wrong size or a non-float element. Returns the array so the transformed
-// result can be written back with store_matrix().
-static array_t* matrix_arg_to_floats(const svalue_t* arg, Matrix out) {
-  array_t* matrix = arg->u.arr;
+// Validate that `matrix` is a 16-element array of floats and copy it into
+// the C float matrix `out`. Errors -- without modifying the caller's array --
+// on a wrong size or a non-float element.
+static void matrix_arg_to_floats(const array_t* matrix, Matrix out) {
   if (matrix->size < 16) {
     error("matrix transform requires a 16-element array.\n");
   }
@@ -32,17 +30,18 @@ static array_t* matrix_arg_to_floats(const svalue_t* arg, Matrix out) {
     }
     out[i] = matrix->item[i].u.real;
   }
-  return matrix;
 }
 
 // Write the C float matrix `src` back into the LPC float array `matrix`.
+// The transform efuns update their matrix argument in place this way and
+// return that same array.
 static void store_matrix(array_t* matrix, const Matrix src) {
   for (int i = 0; i < 16; i++) {
     matrix->item[i].u.real = src[i];
   }
 }
 
-void f_id_matrix() {
+vm::Value f_id_matrix(vm::EfunArgs&) {
   array_t* matrix;
   int i;
 
@@ -51,30 +50,15 @@ void f_id_matrix() {
     matrix->item[i].type = T_REAL;
     matrix->item[i].u.real = identity[i];
   }
-  push_refed_array(matrix);
+  return vm::Value::refed(matrix);
 }
 
-void f_translate() {
-  array_t* matrix;
-  LPC_FLOAT x, y, z;
+vm::Value f_translate(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
   Matrix current_matrix;
   Matrix trans_matrix;
   Matrix final_matrix;
 
-  if ((sp - 1)->type != T_REAL) {
-    bad_arg(3, F_TRANSLATE);
-  }
-  if (sp->type != T_REAL) {
-    bad_arg(4, F_TRANSLATE);
-  }
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 3, current_matrix);
-  x = (sp - 2)->u.real;
-  y = (sp - 1)->u.real;
-  z = sp->u.real;
-  sp -= 3;
+  matrix_arg_to_floats(matrix, current_matrix);
 
   /*
    * create translation matrix, then compute and store the transformed matrix.
@@ -82,155 +66,96 @@ void f_translate() {
   translate_matrix(x, y, z, trans_matrix);
   mult_matrix(current_matrix, trans_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 
-void f_scale() {
-  array_t* matrix;
-  LPC_FLOAT x, y, z;
+vm::Value f_scale(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
   Matrix current_matrix;
   Matrix scaling_matrix;
   Matrix final_matrix;
 
-  if ((sp - 1)->type != T_REAL) {
-    bad_arg(3, F_SCALE);
-  }
-  if (sp->type != T_REAL) {
-    bad_arg(4, F_SCALE);
-  }
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 3, current_matrix);
-  x = (sp - 2)->u.real;
-  y = (sp - 1)->u.real;
-  z = sp->u.real;
-  sp -= 3;
+  matrix_arg_to_floats(matrix, current_matrix);
   /*
    * create scaling matrix, then compute and store the transformed matrix.
    */
   scale_matrix(x, y, z, scaling_matrix);
   mult_matrix(current_matrix, scaling_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 
-void f_rotate_x() {
-  array_t* matrix;
-  LPC_FLOAT angle;
+vm::Value f_rotate_x(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
 
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 1, current_matrix);
-  angle = (sp--)->u.real;
+  matrix_arg_to_floats(matrix, current_matrix);
   /*
    * create x rotation matrix, then compute and store the transformed matrix.
    */
   rotate_x_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 
-void f_rotate_y() {
-  array_t* matrix;
-  LPC_FLOAT angle;
+vm::Value f_rotate_y(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
 
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 1, current_matrix);
-  angle = (sp--)->u.real;
+  matrix_arg_to_floats(matrix, current_matrix);
   /*
    * create y rotation matrix, then compute and store the transformed matrix.
    */
   rotate_y_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 
-void f_rotate_z() {
-  array_t* matrix;
-  LPC_FLOAT angle;
+vm::Value f_rotate_z(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT angle) {
   Matrix current_matrix;
   Matrix rot_matrix;
   Matrix final_matrix;
 
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 1, current_matrix);
-  angle = (sp--)->u.real;
+  matrix_arg_to_floats(matrix, current_matrix);
   /*
    * create z rotation matrix, then compute and store the transformed matrix.
    */
   rotate_z_matrix(angle, rot_matrix);
   mult_matrix(current_matrix, rot_matrix, final_matrix);
   store_matrix(matrix, final_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 
-void f_lookat_rotate() {
-  array_t* matrix;
-  LPC_FLOAT x, y, z;
+vm::Value f_lookat_rotate(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT x, LPC_FLOAT y, LPC_FLOAT z) {
   Matrix current_matrix;
   Matrix lookat_matrix;
 
-  if ((sp - 1)->type != T_REAL) {
-    bad_arg(3, F_LOOKAT_ROTATE);
-  }
-  if (sp->type != T_REAL) {
-    bad_arg(4, F_LOOKAT_ROTATE);
-  }
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 3, current_matrix);
-  x = (sp - 2)->u.real;
-  y = (sp - 1)->u.real;
-  z = sp->u.real;
-  sp -= 3;
+  matrix_arg_to_floats(matrix, current_matrix);
   /*
    * create new viewing transformation matrix and store it.
    */
   lookat_rotate(current_matrix, x, y, z, lookat_matrix);
   store_matrix(matrix, lookat_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 
 #ifdef F_LOOKAT_ROTATE2
-void f_lookat_rotate2(void) {
-  array_t* matrix;
-  LPC_FLOAT ex, ey, ez, lx, ly, lz;
+vm::Value f_lookat_rotate2(vm::EfunArgs& f, array_t* matrix, LPC_FLOAT ex, LPC_FLOAT ey,
+                           LPC_FLOAT ez, LPC_FLOAT lx, LPC_FLOAT ly, LPC_FLOAT lz) {
   Matrix current_matrix;
   Matrix lookat_matrix;
-  int j;
 
-  for (j = 4; j >= 0; j--) {
-    if ((sp - j)->type != T_REAL) {
-      bad_arg(7 - j, F_LOOKAT_ROTATE2);
-    }
-  }
-  /*
-   * get arguments from stack.
-   */
-  matrix = matrix_arg_to_floats(sp - 6, current_matrix);
-  ex = (sp - 5)->u.real;
-  ey = (sp - 4)->u.real;
-  ez = (sp - 3)->u.real;
-  lx = (sp - 2)->u.real;
-  ly = (sp - 1)->u.real;
-  lz = sp->u.real;
-
-  pop_n_elems(6);
+  matrix_arg_to_floats(matrix, current_matrix);
 
   /*
    * create new viewing transformation matrix and store it.
    */
   lookat_rotate2(ex, ey, ez, lx, ly, lz, lookat_matrix);
   store_matrix(matrix, lookat_matrix);
+  return f.take(0); /* updated in place: the result is the argument */
 }
 #endif
 

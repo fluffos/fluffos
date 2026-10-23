@@ -13,6 +13,7 @@
 #include <algorithm>
 
 #include "vm/vm.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include "packages/core/heartbeat.h"
 #include "packages/core/reclaim.h"

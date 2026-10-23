@@ -116,14 +116,14 @@ static char* evp_hash(const char* algo, const unsigned char* data, int data_len)
   return result;
 }
 
-void f_hash() {
+vm::Value f_hash(vm::EfunArgs&, vm::StringArg algorithm, vm::StringArg input) {
   const char *algo, *data;
   char* result = nullptr;
   int data_len;
 
-  algo = (sp - 1)->u.string;
-  data = sp->u.string;
-  data_len = SVALUE_STRLEN(sp);
+  algo = algorithm.c_str();
+  data = input.c_str();
+  data_len = input.size();
 
 #define DO_HASH_IF(id, func, hash_size)       \
   SAFE(if (strcasecmp(algo, id) == 0) {       \
@@ -195,8 +195,6 @@ result:
     error("hash() unknown hash type: %s\n", algo);
   }
 
-  /* Pop the arguments off the stack and push the result */
-  pop_n_elems(st_num_arg);
-  push_malloced_string(result);
+  return vm::Value::str_malloced(result);
 }
 #endif

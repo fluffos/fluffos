@@ -15,159 +15,114 @@
 #include <cmath>
 #include <climits>
 
+/* float -> float efuns. */
+#define LPC_EFUN_UNARY_REAL(name, expr) \
+  vm::Value f_##name(vm::EfunArgs&, LPC_FLOAT x) { return (expr)(x); }
+
 #define SQUARE(n) ((n) * (n))
 
 #ifdef F_COS
-void f_cos() { sp->u.real = cos(sp->u.real); }
+LPC_EFUN_UNARY_REAL(cos, cos)
 #endif
 
 #ifdef F_SIN
-void f_sin() { sp->u.real = sin(sp->u.real); }
+LPC_EFUN_UNARY_REAL(sin, sin)
 #endif
 #ifdef F_TAN
-void f_tan() {
-  /*
-   * maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi))
-   */
-  sp->u.real = tan(sp->u.real);
-}
+/* maybe should try to check that tan won't blow up (x != (Pi/2 + N*Pi)) */
+LPC_EFUN_UNARY_REAL(tan, tan)
 #endif
 
 #ifdef F_ASIN
-void f_asin() {
-  if (sp->u.real < -1.0) {
+vm::Value f_asin(vm::EfunArgs&, LPC_FLOAT x) {
+  if (x < -1.0) {
     error("math: asin(x) with (x < -1.0)\n");
-    return;
   }
-  if (sp->u.real > 1.0) {
+  if (x > 1.0) {
     error("math: asin(x) with (x > 1.0)\n");
-    return;
   }
-  sp->u.real = asin(sp->u.real);
+  return asin(x);
 }
 #endif
 
 #ifdef F_ACOS
-void f_acos() {
-  if (sp->u.real < -1.0) {
+vm::Value f_acos(vm::EfunArgs&, LPC_FLOAT x) {
+  if (x < -1.0) {
     error("math: acos(x) with (x < -1.0)\n");
-    return;
   }
-  if (sp->u.real > 1.0) {
+  if (x > 1.0) {
     error("math: acos(x) with (x > 1.0)\n");
-    return;
   }
-  sp->u.real = acos(sp->u.real);
+  return acos(x);
 }
 #endif
 
 #ifdef F_ATAN
-void f_atan() { sp->u.real = atan(sp->u.real); }
+LPC_EFUN_UNARY_REAL(atan, atan)
 #endif
 
 #ifdef F_SQRT
-void f_sqrt() {
-  LPC_FLOAT val;
-
-  if (sp->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val = sp->u.real;
-  }
+vm::Value f_sqrt(vm::EfunArgs&, vm::Arg x) {
+  LPC_FLOAT val = x.as_real();
 
   if (val < 0.0) {
     error("math: sqrt(x) with (x < 0.0)\n");
-    return;
   }
-  sp->u.real = sqrt(val);
-  sp->type = T_REAL;
+  return sqrt(val);
 }
 #endif
 
 #ifdef F_LOG
-void f_log() {
-  if (sp->u.real <= 0.0) {
+vm::Value f_log(vm::EfunArgs&, LPC_FLOAT x) {
+  if (x <= 0.0) {
     error("math: log(x) with (x <= 0.0)\n");
-    return;
   }
-  sp->u.real = log(sp->u.real);
+  return log(x);
 }
 #endif
 
 #ifdef F_LOG10
-void f_log10() {
-  LPC_FLOAT val;
-
-  if (sp->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val = sp->u.real;
-  }
+vm::Value f_log10(vm::EfunArgs&, vm::Arg x) {
+  LPC_FLOAT val = x.as_real();
 
   if (val <= 0.0) {
     error("math: log10(x) with (x <= 0.0)\n");
-    return;
   }
-  sp->u.real = log10(val);
-  sp->type = T_REAL;
+  return log10(val);
 }
 #endif
 
 #ifdef F_LOG2
-void f_log2() {
-  LPC_FLOAT val;
-
-  if (sp->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val = sp->u.real;
-  }
+vm::Value f_log2(vm::EfunArgs&, vm::Arg x) {
+  LPC_FLOAT val = x.as_real();
 
   if (val <= 0.0) {
     error("math: log2(x) with (x <= 0.0)\n");
-    return;
   }
-  sp->u.real = log2(val);
-  sp->type = T_REAL;
+  return log2(val);
 }
 #endif
 
 #ifdef F_POW
-void f_pow() {
-  LPC_FLOAT val, val2;
-
-  if ((sp - 1)->type == T_NUMBER) {
-    val = static_cast<LPC_FLOAT>((sp - 1)->u.number);
-  } else {
-    val = (sp - 1)->u.real;
-  }
-
-  if (sp->type == T_NUMBER) {
-    val2 = static_cast<LPC_FLOAT>(sp->u.number);
-  } else {
-    val2 = sp->u.real;
-  }
-
-  (sp - 1)->u.real = pow(val, val2);
-  sp--;
-  sp->type = T_REAL;
+vm::Value f_pow(vm::EfunArgs&, vm::Arg base, vm::Arg exponent) {
+  return pow(base.as_real(), exponent.as_real());
 }
 #endif
 
 #ifdef F_EXP
-void f_exp() { sp->u.real = exp(sp->u.real); }
+LPC_EFUN_UNARY_REAL(exp, exp)
 #endif
 
 #ifdef F_FLOOR
-void f_floor() { sp->u.real = floor(sp->u.real); }
+LPC_EFUN_UNARY_REAL(floor, floor)
 #endif
 
 #ifdef F_CEIL
-void f_ceil() { sp->u.real = ceil(sp->u.real); }
+LPC_EFUN_UNARY_REAL(ceil, ceil)
 #endif
 
 #ifdef F_ROUND
-void f_round() { sp->u.real = round(sp->u.real); }
+LPC_EFUN_UNARY_REAL(round, round)
 #endif
 
 #ifdef F_NORM
@@ -184,9 +139,6 @@ void f_round() { sp->u.real = round(sp->u.real); }
 enum { VEC_OK = 0, VEC_ERR_SIZE_MISMATCH = -1, VEC_ERR_ARG1 = 1, VEC_ERR_ARG2 = 2 };
 
 static LPC_FLOAT norm(array_t* a, bool* ok) {
-  // Length must come from the array we actually index (a), not sp->u.arr:
-  // f_angle() calls norm((sp-1)->u.arr), a different array, so using sp's size
-  // would read past `a` if the two ever differed in length.
   LPC_INT len = a->size;
   LPC_FLOAT total = 0.0;
   *ok = true;
@@ -205,18 +157,15 @@ static LPC_FLOAT norm(array_t* a, bool* ok) {
   return sqrt(total);
 }
 
-void f_norm() {
+vm::Value f_norm(vm::EfunArgs&, array_t* vec) {
   bool ok;
-  LPC_FLOAT const val = norm(sp->u.arr, &ok);
+  LPC_FLOAT const val = norm(vec, &ok);
 
   if (!ok) {
-    pop_stack();
     error("norm: invalid argument 1.\n");
-    return;
   }
 
-  pop_stack();
-  push_real(val);
+  return val;
 }
 #endif
 
@@ -271,24 +220,19 @@ static LPC_FLOAT dotprod(array_t* a, array_t* b, int* status) {
   return vector_op(a, b, dotprod_mult, status);
 }
 
-void f_dotprod() {
+vm::Value f_dotprod(vm::EfunArgs&, array_t* a, array_t* b) {
   int status;
-  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, dotprod_mult, &status);
+  LPC_FLOAT const total = vector_op(a, b, dotprod_mult, &status);
 
   if (status == VEC_ERR_SIZE_MISMATCH) {
-    pop_2_elems();
     error("dotprod: cannot take the dotprod of vectors of different sizes.\n");
-    return;
   }
 
   if (status == VEC_ERR_ARG1 || status == VEC_ERR_ARG2) {
-    pop_2_elems();
     error("dotprod: invalid arg %d.\n", status);
-    return;
   }
 
-  pop_2_elems();
-  push_real(total);
+  return total;
 }
 #endif
 
@@ -296,37 +240,31 @@ void f_dotprod() {
 static LPC_FLOAT distance_mult(const LPC_FLOAT a, const LPC_FLOAT b) { return SQUARE(b - a); }
 
 /* The (Euclidian) distance between two points */
-void f_distance() {
+vm::Value f_distance(vm::EfunArgs&, array_t* a, array_t* b) {
   int status;
-  LPC_FLOAT const total = vector_op((sp - 1)->u.arr, sp->u.arr, distance_mult, &status);
+  LPC_FLOAT const total = vector_op(a, b, distance_mult, &status);
 
   if (status == VEC_ERR_SIZE_MISMATCH) {
-    pop_2_elems();
     error("distance: cannot take the distance of vectors of different sizes.\n");
-    return;
   }
 
   if (status == VEC_ERR_ARG1 || status == VEC_ERR_ARG2) {
-    pop_2_elems();
     error("distance: invalid arg %d.\n", status);
-    return;
   }
 
-  pop_2_elems();
-  push_real(sqrt(total));
+  return sqrt(total);
 }
 #endif
 
 #ifdef F_ANGLE
-void f_angle() {
+vm::Value f_angle(vm::EfunArgs&, array_t* a, array_t* b) {
   LPC_FLOAT dot, norma, normb;
   int status;
   bool ok;
 
-  dot = dotprod((sp - 1)->u.arr, sp->u.arr, &status);
+  dot = dotprod(a, b, &status);
 
   if (status != VEC_OK) {
-    pop_2_elems();
     if (status == VEC_ERR_SIZE_MISMATCH) {
       error(
           "angle: cannot calculate the angle between vectors of different "
@@ -334,26 +272,20 @@ void f_angle() {
     } else {
       error("angle: invalid arg %d.\n", status);
     }
-    return;
   }
 
-  norma = norm((sp - 1)->u.arr, &ok);
+  norma = norm(a, &ok);
 
   if (!ok) {
-    pop_2_elems();
     error("angle: invalid argument 1.\n");
-    return;
   }
 
-  normb = norm(sp->u.arr, &ok);
+  normb = norm(b, &ok);
 
   if (!ok) {
-    pop_2_elems();
     error("angle: invalid argument 2.\n");
-    return;
   }
 
-  pop_2_elems();
-  push_real(acos(dot / (norma * normb)));
+  return acos(dot / (norma * normb));
 }
 #endif
