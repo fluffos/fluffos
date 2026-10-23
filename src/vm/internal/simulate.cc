@@ -496,10 +496,11 @@ object_t* load_object(const char* lname, int callcreate) {
     error("Inherit chain too deep: > %d when trying to load '%s'.\n", inherit_chain_size, lname);
   }
 
-  const char* pname = check_valid_path(lname, master_ob, "load_object", 0);
-  if (!pname) {
+  vm::Value pnamev = check_valid_path(lname, master_ob, "load_object", 0);
+  if (!pnamev.is(T_STRING)) {
     error("Read access denied.\n");
   }
+  const char* pname = pnamev->u.string;
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == nullptr) {
     error("Can't load objects when no effective user.\n");
@@ -899,11 +900,11 @@ int recompile_object(object_t* target) {
     obbase[sizeof obbase - 1] = 0;
   }
 
-  const char* pname = check_valid_path(obname.c_str(), target, "recompile_object", 0);
-  if (!pname) {
+  vm::Value pnamev = check_valid_path(obname.c_str(), target, "recompile_object", 0);
+  if (!pnamev.is(T_STRING)) {
     error("recompile_object: read access denied for '/%s'.\n", obname.c_str());
   }
-  std::string source_path(pname);
+  std::string source_path(pnamev->u.string);
 
   in_recompile_object = true;
   // error() throws, so the flag must reset on every path.

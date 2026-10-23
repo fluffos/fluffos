@@ -614,7 +614,11 @@ vm::Value f_async_read(vm::EfunArgs& f, vm::StringArg file, std::optional<funptr
    * argument -- the optional callback is the last when one was passed.
    * The form is decided by the callback parameter (not a global), so the
    * master apply cannot clobber form-detection or process_callback. */
-  const char* path = check_valid_path(file.c_str(), current_object, "read_file", 0);
+  vm::Value pathv = check_valid_path(file.c_str(), current_object, "read_file", 0);
+  if (!pathv.is(T_STRING)) {
+    error("permission denied\n");
+  }
+  const char* path = pathv->u.string;
   if (callback) {
     /* The callback parameter is typed funptr_t*: the efun thunk has already
      * rejected a string (or anything else) there, so process_callback()
@@ -646,7 +650,11 @@ vm::Value f_async_write(vm::EfunArgs& f, vm::StringArg file, vm::StringArg buf, 
 
   /* before any ownership is taken -- see f_async_read(); the path is the
    * FIRST of 3 or 4 arguments */
-  const char* path = check_valid_path(file.c_str(), current_object, "write_file", 1);
+  vm::Value pathv = check_valid_path(file.c_str(), current_object, "write_file", 1);
+  if (!pathv.is(T_STRING)) {
+    error("permission denied\n");
+  }
+  const char* path = pathv->u.string;
   if (callback) {
     /* typed funptr_t*: see f_async_read() */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
@@ -674,7 +682,11 @@ vm::Value f_async_getdir(vm::EfunArgs& f, vm::StringArg dir, std::optional<funpt
 
   /* before any ownership is taken -- see f_async_read(); the path is the
    * FIRST argument */
-  const char* path = check_valid_path(dir.c_str(), current_object, "get_dir", 0);
+  vm::Value pathv = check_valid_path(dir.c_str(), current_object, "get_dir", 0);
+  if (!pathv.is(T_STRING)) {
+    error("permission denied\n");
+  }
+  const char* path = pathv->u.string;
   if (callback) {
     /* typed funptr_t*: see f_async_read() */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);

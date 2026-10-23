@@ -15,19 +15,16 @@
 
 #include <set>
 
-static object_t* ob;
-
 #ifdef F_EXPORT_UID
 
 vm::Value f_export_uid(vm::EfunArgs&, object_t* target) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
-  ob = target;
-  if (ob->euid) {
+  if (target->euid) {
     return 0;
   }
-  ob->uid = current_object->euid;
+  target->uid = current_object->euid;
   return 1;
 }
 
@@ -37,7 +34,7 @@ vm::Value f_export_uid(vm::EfunArgs&, object_t* target) {
 
 vm::Value f_geteuid(vm::EfunArgs&, vm::Arg who) {
   if (who.is(T_OBJECT)) {
-    ob = who.object();
+    object_t* ob = who.object();
     if (ob->euid) {
       return vm::Value::str_shared(ob->euid->name);
     }
@@ -55,13 +52,11 @@ vm::Value f_geteuid(vm::EfunArgs&, vm::Arg who) {
 #ifdef F_GETUID
 
 vm::Value f_getuid(vm::EfunArgs&, object_t* target) {
-  ob = target;
-
-  if (!ob->uid) {
+  if (!target->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
   }
 
-  return vm::Value::str_shared(ob->uid->name);
+  return vm::Value::str_shared(target->uid->name);
 }
 
 #endif

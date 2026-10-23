@@ -4,8 +4,6 @@
 #include "packages/core/sprintf.h"
 #include "packages/core/outbuf.h"
 
-static object_t* ob;
-
 #ifdef F_DEBUG_INFO
 vm::Value f_debug_info(vm::EfunArgs&, LPC_INT flag, object_t* target) {
   outbuffer_t out;
@@ -16,8 +14,7 @@ vm::Value f_debug_info(vm::EfunArgs&, LPC_INT flag, object_t* target) {
       int i, flags;
       object_t* obj2;
 
-      ob = target;
-      flags = ob->flags;
+      flags = target->flags;
       outbuf_addv(&out, "O_HEART_BEAT      : %s\n", flags & O_HEART_BEAT ? "TRUE" : "FALSE");
 #ifndef NO_WIZARDS
       outbuf_addv(&out, "O_IS_WIZARD       : %s\n", flags & O_IS_WIZARD ? "TRUE" : "FALSE");
@@ -36,39 +33,40 @@ vm::Value f_debug_info(vm::EfunArgs&, LPC_INT flag, object_t* target) {
       outbuf_addv(&out, "O_WILL_RESET      : %s\n", flags & O_WILL_RESET ? "TRUE" : "FALSE");
       outbuf_addv(&out, "O_NOTIFY_DESTRUCT : %s\n", flags & O_NOTIFY_DESTRUCT ? "TRUE" : "FALSE");
 
-      if (ob->interactive) {
+      if (target->interactive) {
         outbuf_addv(&out, "O_ZMP             : %s\n",
-                    ob->interactive->iflags & USING_ZMP ? "TRUE" : "FALSE");
+                    target->interactive->iflags & USING_ZMP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_GMCP            : %s\n",
-                    ob->interactive->iflags & USING_GMCP ? "TRUE" : "FALSE");
+                    target->interactive->iflags & USING_GMCP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MXP             : %s\n",
-                    ob->interactive->iflags & USING_MXP ? "TRUE" : "FALSE");
+                    target->interactive->iflags & USING_MXP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_COMPRESS        : %s\n",
-                    ob->interactive->iflags & USING_COMPRESS ? "TRUE" : "FALSE");
+                    target->interactive->iflags & USING_COMPRESS ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MSP             : %s\n",
-                    ob->interactive->iflags & USING_MSP ? "TRUE" : "FALSE");
+                    target->interactive->iflags & USING_MSP ? "TRUE" : "FALSE");
         outbuf_addv(&out, "O_MSDP            : %s\n",
-                    ob->interactive->iflags & USING_MSDP ? "TRUE" : "FALSE");
+                    target->interactive->iflags & USING_MSDP ? "TRUE" : "FALSE");
       }
 
       if (!CONFIG_INT(__RC_NO_RESETS__)) {
-        outbuf_addv(&out, "next_reset  : %" PRId64 "\n", ob->next_reset);
+        outbuf_addv(&out, "next_reset  : %" PRId64 "\n", target->next_reset);
       }
 #ifndef NO_LIGHT
-      outbuf_addv(&out, "total light : %d\n", ob->total_light);
+      outbuf_addv(&out, "total light : %d\n", target->total_light);
 #endif
-      outbuf_addv(&out, "time_of_ref : %" PRIu64 "\n", ob->time_of_ref);
-      outbuf_addv(&out, "ref         : %d\n", ob->ref);
+      outbuf_addv(&out, "time_of_ref : %" PRIu64 "\n", target->time_of_ref);
+      outbuf_addv(&out, "ref         : %d\n", target->ref);
 #ifdef DEBUGMALLOC_EXTENSIONS
-      outbuf_addv(&out, "extra_ref   : %d\n", ob->extra_ref);
+      outbuf_addv(&out, "extra_ref   : %d\n", target->extra_ref);
 #endif
-      outbuf_addv(&out, "name        : '/%s'\n", ob->obname);
-      outbuf_addv(&out, "next_all    : OBJ(/%s)\n", ob->next_all ? ob->next_all->obname : "NULL");
-      if (obj_list == ob) {
+      outbuf_addv(&out, "name        : '/%s'\n", target->obname);
+      outbuf_addv(&out, "next_all    : OBJ(/%s)\n",
+                  target->next_all ? target->next_all->obname : "NULL");
+      if (obj_list == target) {
         outbuf_add(&out, "This object is the head of the object list.\n");
       }
       for (obj2 = obj_list, i = 1; obj2; obj2 = obj2->next_all, i++) {
-        if (obj2->next_all == ob) {
+        if (obj2->next_all == target) {
           outbuf_addv(&out, "Previous object in object list: OBJ(/%s)\n", obj2->obname);
           outbuf_addv(&out, "position in object list:%d\n", i);
         }
@@ -76,32 +74,30 @@ vm::Value f_debug_info(vm::EfunArgs&, LPC_INT flag, object_t* target) {
       break;
     }
     case 1:
-      ob = target;
-
-      outbuf_addv(&out, "program ref's %d\n", ob->prog->ref);
-      outbuf_addv(&out, "Name /%s\n", ob->prog->filename);
-      outbuf_addv(&out, "program size %d\n", ob->prog->program_size);
+      outbuf_addv(&out, "program ref's %d\n", target->prog->ref);
+      outbuf_addv(&out, "Name /%s\n", target->prog->filename);
+      outbuf_addv(&out, "program size %d\n", target->prog->program_size);
       outbuf_addv(
           &out, "function flags table %d (%lu) \n",
-          ob->prog->last_inherited + ob->prog->num_functions_defined,
-          (ob->prog->last_inherited + ob->prog->num_functions_defined) * sizeof(unsigned short));
+          target->prog->last_inherited + target->prog->num_functions_defined,
+          (target->prog->last_inherited + target->prog->num_functions_defined) *
+              sizeof(unsigned short));
       outbuf_addv(&out, "compiler function table %u (%" PRIu64 ") \n",
-                  ob->prog->num_functions_defined,
-                  ob->prog->num_functions_defined * sizeof(function_t));
-      outbuf_addv(&out, "num strings %d\n", ob->prog->num_strings);
-      outbuf_addv(&out, "num vars %u (%" PRIu64 ")\n", ob->prog->num_variables_defined,
-                  ob->prog->num_variables_defined * (sizeof(char*) + sizeof(lpc_type_t)));
-      outbuf_addv(&out, "num inherits %d (%lu)\n", ob->prog->num_inherited,
-                  ob->prog->num_inherited * sizeof(inherit_t));
-      outbuf_addv(&out, "total size %d\n", ob->prog->total_size);
+                  target->prog->num_functions_defined,
+                  target->prog->num_functions_defined * sizeof(function_t));
+      outbuf_addv(&out, "num strings %d\n", target->prog->num_strings);
+      outbuf_addv(&out, "num vars %u (%" PRIu64 ")\n", target->prog->num_variables_defined,
+                  target->prog->num_variables_defined * (sizeof(char*) + sizeof(lpc_type_t)));
+      outbuf_addv(&out, "num inherits %d (%lu)\n", target->prog->num_inherited,
+                  target->prog->num_inherited * sizeof(inherit_t));
+      outbuf_addv(&out, "total size %d\n", target->prog->total_size);
       break;
     case 2: {
       int i;
-      ob = target;
-      for (i = 0; i < ob->prog->num_variables_total; i++) {
+      for (i = 0; i < target->prog->num_variables_total; i++) {
         /* inefficient, but: */
-        outbuf_addv(&out, "%s: ", variable_name(ob->prog, i));
-        svalue_to_string(&ob->variables[i], &out, 2, 0, 0);
+        outbuf_addv(&out, "%s: ", variable_name(target->prog, i));
+        svalue_to_string(&target->variables[i], &out, 2, 0, 0);
         outbuf_add(&out, "\n");
       }
       break;
@@ -186,10 +182,11 @@ vm::Value f_dump_stralloc(vm::EfunArgs&, vm::StringArg file) {
   const auto* target_file = file.c_str();
   const char* fn;
   FILE* fp;
-  fn = check_valid_path(target_file, current_object, "debugmalloc", 1);
-  if (!fn) {
+  vm::Value fnv = check_valid_path(target_file, current_object, "debugmalloc", 1);
+  if (!fnv.is(T_STRING)) {
     error("Invalid path '%s' for writing.\n", target_file);
   }
+  fn = fnv->u.string;
   fp = fopen(fn, "w");
   if (!fp) {
     error("Unable to open %s for writing.\n", fn);

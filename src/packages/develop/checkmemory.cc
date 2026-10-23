@@ -124,10 +124,11 @@ char* dump_debugmalloc(const char* tfn, int mask) {
   FILE* fp;
 
   outbuf_zero(&out);
-  fn = check_valid_path(tfn, current_object, "debugmalloc", 1);
-  if (!fn) {
+  vm::Value fnv = check_valid_path(tfn, current_object, "debugmalloc", 1);
+  if (!fnv.is(T_STRING)) {
     error("Invalid path '%s' for writing.\n", tfn);
   }
+  fn = fnv->u.string;
   fp = fopen(fn, "w");
   if (!fp) {
     error("Unable to open %s for writing.\n", fn);
@@ -730,7 +731,6 @@ vm::Value check_all_blocks(int flag) {
 #ifdef PACKAGE_PARSER
     parser_mark_verbs();
 #endif
-    mark_file_sv();
     mark_all_defines();
     mark_free_sentences();
     mark_iptable();

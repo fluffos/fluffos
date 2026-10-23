@@ -164,9 +164,12 @@ vm::Value f_fetch_variable(vm::EfunArgs&, vm::StringArg var_name, std::optional<
  * both. -Beek
  */
 #ifdef F_COPY
-static int depth;
+struct DeepCopyCtx {
+  mapping_t* dest;
+  int* depth;
+};
 
-static void deep_copy_svalue(svalue_t* /*from*/, svalue_t* /*to*/);
+static void deep_copy_svalue(svalue_t* /*from*/, svalue_t* /*to*/, int* /*depth*/);
 
 // The deep_copy_* helpers must survive an error() unwind from a nested
 // deep_copy_svalue() -- the MAX_SAVE_SVALUE_DEPTH cap fires on every
@@ -174,41 +177,43 @@ static void deep_copy_svalue(svalue_t* /*from*/, svalue_t* /*to*/);
 // doCopy(). Two rules keep that safe: allocate the destination ZEROED (the
 // _empty_ allocators leave svalues uninitialized, which the Debug memory
 // checker would then walk), and hold it in a unique_ptr so the half-built
-// copy is freed instead of leaking with borrowed pointers inside.
-static array_t* deep_copy_array(array_t* arg) {
+// copy is freed instead of leaking with borrowed pointers inside. Depth is
+// passed by pointer (not a file-scope static) so a nested error() cannot
+// leave a dirty counter for the next call.
+static array_t* deep_copy_array(array_t* arg, int* depth) {
   std::unique_ptr<array_t, void (*)(array_t*)> vec(allocate_array(arg->size), free_array);
   for (int i = 0; i < arg->size; i++) {
-    deep_copy_svalue(&arg->item[i], &vec->item[i]);
+    deep_copy_svalue(&arg->item[i], &vec->item[i], depth);
   }
 
   return vec.release();
 }
 
-static array_t* deep_copy_class(array_t* arg) {
+static array_t* deep_copy_class(array_t* arg, int* depth) {
   std::unique_ptr<array_t, void (*)(array_t*)> vec(allocate_class_by_size(arg->size), free_class);
   for (int i = 0; i < arg->size; i++) {
-    deep_copy_svalue(&arg->item[i], &vec->item[i]);
+    deep_copy_svalue(&arg->item[i], &vec->item[i], depth);
   }
 
   return vec.release();
 }
 
-static int doCopy(mapping_t* /*map*/, mapping_node_t* elt, void* dest) {
-  svalue_t* sv;
-
-  sv = find_for_insert(reinterpret_cast<mapping_t*>(dest), &elt->values[0], 1);
+static int doCopy(mapping_t* /*map*/, mapping_node_t* elt, void* data) {
+  auto* ctx = static_cast<DeepCopyCtx*>(data);
+  svalue_t* sv = find_for_insert(ctx->dest, &elt->values[0], 1);
   if (!sv) {
     mapping_too_large();
     return 1;
   }
 
-  deep_copy_svalue(&elt->values[1], sv);
+  deep_copy_svalue(&elt->values[1], sv, ctx->depth);
   return 0;
 }
 
-static mapping_t* deep_copy_mapping(mapping_t* arg) {
+static mapping_t* deep_copy_mapping(mapping_t* arg, int* depth) {
   std::unique_ptr<mapping_t, void (*)(mapping_t*)> map(allocate_mapping(0), free_mapping);
-  mapTraverse(arg, doCopy, map.get()); /* Not horridly efficient either */
+  DeepCopyCtx ctx{map.get(), depth};
+  mapTraverse(arg, doCopy, &ctx); /* Not horridly efficient either */
   return map.release();
 }
 
@@ -216,14 +221,13 @@ static mapping_t* deep_copy_mapping(mapping_t* arg) {
 // points into a container that outlives an error() unwind (freed by the
 // guards above), so it must never hold `from`'s pointer without owning a
 // reference while a nested copy can still throw.
-static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
+static void deep_copy_svalue(svalue_t* from, svalue_t* to, int* depth) {
   switch (from->type) {
     case T_ARRAY:
     case T_CLASS:
     case T_MAPPING: {
-      depth++;
-      if (depth > MAX_SAVE_SVALUE_DEPTH) {
-        depth = 0;
+      (*depth)++;
+      if (*depth > MAX_SAVE_SVALUE_DEPTH) {
         error(
             "Mappings, arrays and/or classes nested too deep (%d) for copy() "
             "-- possibly a reference loop; see has_cycle()\n",
@@ -232,17 +236,17 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
       svalue_t nv = *from;
       switch (from->type) {
         case T_ARRAY:
-          nv.u.arr = deep_copy_array(from->u.arr);
+          nv.u.arr = deep_copy_array(from->u.arr, depth);
           break;
         case T_CLASS:
-          nv.u.arr = deep_copy_class(from->u.arr);
+          nv.u.arr = deep_copy_class(from->u.arr, depth);
           break;
         case T_MAPPING:
-          nv.u.map = deep_copy_mapping(from->u.map);
+          nv.u.map = deep_copy_mapping(from->u.map, depth);
           break;
       }
       *to = nv;
-      depth--;
+      (*depth)--;
       break;
     }
     case T_BUFFER:
@@ -257,9 +261,9 @@ static void deep_copy_svalue(svalue_t* from, svalue_t* to) {
 
 vm::Value f_copy(vm::EfunArgs&, vm::Arg value) {
   svalue_t ret;
+  int depth = 0;
 
-  depth = 0;
-  deep_copy_svalue(value.sv(), &ret);
+  deep_copy_svalue(value.sv(), &ret, &depth);
   return vm::Value::owned(ret);
 }
 #endif
@@ -1642,11 +1646,12 @@ static int file_length(const char* file) {
   static char buf[2049];
   char *p, *newp;
 
-  file = check_valid_path(file, current_object, "file_size", 0);
+  vm::Value filev = check_valid_path(file, current_object, "file_size", 0);
 
-  if (!file) {
+  if (!filev.is(T_STRING)) {
     return -1;
   }
+  file = filev->u.string;
   if (stat(file, &st) == -1) {
     return -1;
   }
@@ -2045,22 +2050,26 @@ vm::Value f_repeat_string(vm::EfunArgs& f, vm::StringArg s, LPC_INT times) {
 #endif
 
 #ifdef F_MEMORY_SUMMARY
-static int memory_share(svalue_t* /*sv*/);
+struct MemoryShareCtx {
+  int* total;
+  int* calldepth;
+};
+
+static int memory_share(svalue_t* /*sv*/, int* /*calldepth*/);
 
 static int node_share(mapping_t* /*m*/, mapping_node_t* elt, void* tp) {
-  int* t = reinterpret_cast<int*>(tp);
+  auto* ctx = static_cast<MemoryShareCtx*>(tp);
 
-  *t += sizeof(mapping_node_t) - 2 * sizeof(svalue_t);
-  *t += memory_share(&elt->values[0]);
-  *t += memory_share(&elt->values[1]);
+  *ctx->total += sizeof(mapping_node_t) - 2 * sizeof(svalue_t);
+  *ctx->total += memory_share(&elt->values[0], ctx->calldepth);
+  *ctx->total += memory_share(&elt->values[1], ctx->calldepth);
 
   return 0;
 }
 
-static int memory_share(svalue_t* sv) {
+static int memory_share(svalue_t* sv, int* calldepth) {
   int i, total = sizeof(svalue_t);
   int subtotal;
-  static int calldepth = 0;
 
   switch (sv->type) {
     case T_STRING:
@@ -2075,39 +2084,41 @@ static int memory_share(svalue_t* sv) {
       break;
     case T_ARRAY:
     case T_CLASS:
-      if (1 + calldepth > 100) {
+      if (1 + *calldepth > 100) {
         return 0;
       }
-      calldepth++;
+      (*calldepth)++;
       /* first svalue is stored inside the array struct, so sizeof(array_t)
        * includes one svalue.
        */
       subtotal = sizeof(array_t) - sizeof(svalue_t);
       for (i = 0; i < sv->u.arr->size; i++) {
-        subtotal += memory_share(&sv->u.arr->item[i]);
+        subtotal += memory_share(&sv->u.arr->item[i], calldepth);
       }
-      calldepth--;
+      (*calldepth)--;
       return total + subtotal / (sv->u.arr->ref ? sv->u.arr->ref : 1);
-    case T_MAPPING:
-      if (1 + calldepth > 100) {
+    case T_MAPPING: {
+      if (1 + *calldepth > 100) {
         return 0;
       }
-      calldepth++;
+      (*calldepth)++;
       subtotal = sizeof(mapping_t);
-      mapTraverse(sv->u.map, node_share, &subtotal);
-      calldepth--;
+      MemoryShareCtx ctx{&subtotal, calldepth};
+      mapTraverse(sv->u.map, node_share, &ctx);
+      (*calldepth)--;
       return total + subtotal / (sv->u.map->ref ? sv->u.map->ref : 1);
+    }
     case T_FUNCTION: {
       svalue_t tmp;
       tmp.type = T_ARRAY;
       tmp.u.arr = sv->u.fp->hdr.args;
 
-      if (1 + calldepth > 100) {
+      if (1 + *calldepth > 100) {
         return 0;
       }
-      calldepth++;
+      (*calldepth)++;
       if (tmp.u.arr) {
-        subtotal = sizeof(funptr_hdr_t) + memory_share(&tmp) - sizeof(svalue_t);
+        subtotal = sizeof(funptr_hdr_t) + memory_share(&tmp, calldepth) - sizeof(svalue_t);
       } else {
         subtotal = sizeof(funptr_hdr_t);
       }
@@ -2126,7 +2137,7 @@ static int memory_share(svalue_t* sv) {
           subtotal += sizeof(functional_t);
           break;
       }
-      calldepth--;
+      (*calldepth)--;
       return total + subtotal / (sv->u.fp->hdr.ref ? sv->u.fp->hdr.ref : 1);
     }
     case T_BUFFER:
@@ -2134,12 +2145,12 @@ static int memory_share(svalue_t* sv) {
       return total +
              (sizeof(buffer_t) + sv->u.buf->size - 1) / (sv->u.buf->ref ? sv->u.buf->ref : 1);
     case T_PROMISE:
-      if (1 + calldepth > 100) {
+      if (1 + *calldepth > 100) {
         return 0;
       }
-      calldepth++;
-      subtotal = sizeof(promise_t) + memory_share(&sv->u.prom->result) - sizeof(svalue_t);
-      calldepth--;
+      (*calldepth)++;
+      subtotal = sizeof(promise_t) + memory_share(&sv->u.prom->result, calldepth) - sizeof(svalue_t);
+      (*calldepth)--;
       return total + subtotal / (sv->u.prom->ref ? sv->u.prom->ref : 1);
   }
   return total;
@@ -2163,7 +2174,8 @@ static void fms_recurse(mapping_t* map, object_t* ob, int* idx, program_t* prog)
   }
 
   for (i = 0; i < prog->num_variables_defined; i++) {
-    int const size = memory_share(ob->variables + *idx + i);
+    int depth = 0;
+    int const size = memory_share(ob->variables + *idx + i, &depth);
 
     sv.u.string = prog->variable_table[i];
     entry = find_for_insert(map, &sv, 0);
@@ -3075,17 +3087,10 @@ vm::Value f_classes(vm::EfunArgs&, object_t* ob, LPC_INT flag_arg) {
 #endif
 
 #ifdef F_TEST_LOAD
-const char* saved_extra_name;
-object_t* testloadob;
-static void fix_object_names() {
-  if (testloadob) {
-    SETOBNAME(testloadob, saved_extra_name);
-    ObjectTable::instance().insert(testloadob->obname, testloadob);
-  }
-}
-
 vm::Value f_test_load(vm::EfunArgs&, vm::StringArg path) {
   const char* tmp = path.c_str();
+  object_t* testloadob = nullptr;
+  const char* saved_extra_name = nullptr;
   object_t* new_ob;
   if ((testloadob = find_object2(path.c_str()))) {
     tmp = testloadob->obname;
@@ -3096,7 +3101,12 @@ vm::Value f_test_load(vm::EfunArgs&, vm::StringArg path) {
   /* Restores testloadob's name AND its object-table entry on every exit:
    * success, a failed load (restoring only the name left the object
    * unfindable), and an error() while loading or destructing the probe. */
-  DEFER { fix_object_names(); };
+  DEFER {
+    if (testloadob) {
+      SETOBNAME(testloadob, saved_extra_name);
+      ObjectTable::instance().insert(testloadob->obname, testloadob);
+    }
+  };
   new_ob = load_object(tmp, 0);
   if (!new_ob) {
     return 0;

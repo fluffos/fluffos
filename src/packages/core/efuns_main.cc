@@ -2166,8 +2166,8 @@ vm::Value f_rm(vm::EfunArgs&, vm::StringArg file) {
 
 #ifdef F_RMDIR
 vm::Value f_rmdir(vm::EfunArgs&, vm::StringArg dir) {
-  const char* path = check_valid_path(dir.c_str(), current_object, "rmdir", 1);
-  if (!path || rmdir(path) == -1) {
+  vm::Value pathv = check_valid_path(dir.c_str(), current_object, "rmdir", 1);
+  if (!pathv.is(T_STRING) || rmdir(pathv->u.string) == -1) {
     return 0;
   }
   return 1;
@@ -2479,10 +2479,11 @@ vm::Value f_stat(vm::EfunArgs&, vm::StringArg file, LPC_INT flag) {
 
   // The flag arrives by value, so the valid_read apply check_valid_path()
   // runs cannot clobber it (issue #1271).
-  path = check_valid_path(file.c_str(), current_object, "stat", 0);
-  if (!path) {
+  vm::Value pathv = check_valid_path(file.c_str(), current_object, "stat", 0);
+  if (!pathv.is(T_STRING)) {
     return 0;
   }
+  path = pathv->u.string;
   if (stat(path, &buf) != -1) {
     if (buf.st_mode & S_IFREG) { /* if a regular file */
       /* object_visible() can run valid_hide() (LPC): ask before the result

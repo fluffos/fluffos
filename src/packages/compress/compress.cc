@@ -51,10 +51,11 @@ vm::Value f_compress_file(vm::EfunArgs&, vm::StringArg input, std::optional<vm::
     output_file = tmpout.c_str();
   }
 
-  real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
-  if (!real_output_file) {
+  vm::Value real_output_v = check_valid_path(output_file, current_object, "compress_file", 1);
+  if (!real_output_v.is(T_STRING)) {
     return 0;
   }
+  real_output_file = real_output_v->u.string;
   if (strlen(real_output_file) >= sizeof(outname)) {
     return 0;
   }
@@ -62,10 +63,11 @@ vm::Value f_compress_file(vm::EfunArgs&, vm::StringArg input, std::optional<vm::
   strcpy(outname, real_output_file);
   output_file = outname;
 
-  real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
-  if (!real_input_file) {
+  vm::Value real_input_v = check_valid_path(input_file, current_object, "compress_file", 0);
+  if (!real_input_v.is(T_STRING)) {
     return 0;
   }
+  real_input_file = real_input_v->u.string;
 
   in_file = fopen(real_input_file, "rb");
   if (!in_file) {
@@ -138,11 +140,11 @@ vm::Value f_uncompress_file(vm::EfunArgs&, vm::StringArg input,
     output_file = tmpout.c_str();
   }
 
-  real_output_file = check_valid_path(output_file, current_object, "compress_file", 1);
-  if (!real_output_file) {
-
+  vm::Value real_output_v = check_valid_path(output_file, current_object, "compress_file", 1);
+  if (!real_output_v.is(T_STRING)) {
     return 0;
   }
+  real_output_file = real_output_v->u.string;
   if (strlen(real_output_file) >= sizeof(outname)) {
     return 0;
   }
@@ -150,10 +152,11 @@ vm::Value f_uncompress_file(vm::EfunArgs&, vm::StringArg input,
   strcpy(outname, real_output_file);
   output_file = outname;
 
-  real_input_file = check_valid_path(input_file, current_object, "compress_file", 0);
-  if (!real_input_file) {
+  vm::Value real_input_v = check_valid_path(input_file, current_object, "compress_file", 0);
+  if (!real_input_v.is(T_STRING)) {
     return 0;
   }
+  real_input_file = real_input_v->u.string;
 
   in_file = gzopen(real_input_file, "rb");
   if (!in_file) {

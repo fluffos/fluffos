@@ -19,12 +19,13 @@ void f_dump_prog(vm::EfunArgs&, object_t* ob, std::optional<LPC_INT> flags,
     const char* fname;
     FILE* file;
 
-    fname = check_valid_path(where, current_object, "dumpallobj", 1);
+    vm::Value fnamev = check_valid_path(where, current_object, "dumpallobj", 1);
 
-    if (!fname) {
+    if (!fnamev.is(T_STRING)) {
       error("Invalid path '%s' for writing.\n", where);
       return;
     }
+    fname = fnamev->u.string;
     file = fopen(fname, "w");
     if (!file) {
       error("Unable to open '/%s' for writing.\n", fname);

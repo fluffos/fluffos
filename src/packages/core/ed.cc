@@ -905,10 +905,11 @@ static char* getfn(int writeflg) {
   }
 
   /* valid_read/valid_write done here */
-  file2 = check_valid_path(file, current_editor, "ed_start", writeflg);
-  if (!file2) {
+  vm::Value file2v = check_valid_path(file, current_editor, "ed_start", writeflg);
+  if (!file2v.is(T_STRING)) {
     return (nullptr);
   }
+  file2 = file2v->u.string;
   strncpy(file, file2, MAXFNAME - 1);
   file[MAXFNAME - 1] = 0;
 
@@ -2530,12 +2531,15 @@ void ed_start(const char* file_arg, const char* write_fn, const char* exit_fn, i
    * Check for read on startup, since the buffer is read in. But don't
    * check for write, since we may want to change the file name.
    */
-  if (file_arg && (file_arg = check_valid_path(file_arg, current_editor, "ed_start", 0)) &&
-      !doread(0, file_arg)) {
-    setCurLn(1);
-  }
+  vm::Value file_argv;
   if (file_arg) {
-    strncpy(P_FNAME, file_arg, MAXFNAME - 1);
+    file_argv = check_valid_path(file_arg, current_editor, "ed_start", 0);
+    if (file_argv.is(T_STRING) && !doread(0, file_argv->u.string)) {
+      setCurLn(1);
+    }
+  }
+  if (file_argv.is(T_STRING)) {
+    strncpy(P_FNAME, file_argv->u.string, MAXFNAME - 1);
     P_FNAME[MAXFNAME - 1] = 0;
   } else {
     ED_OUTPUT(ED_DEST, "No file.\n");
@@ -3236,12 +3240,15 @@ char* object_ed_start(object_t* ob, const char* fname, int restricted, int scrol
    * Check for read on startup, since the buffer is read in. But don't
    * check for write, since we may want to change the file name.
    */
-  if (fname && (fname = check_valid_path(fname, current_editor, "ed_start", 0)) &&
-      !doread(0, fname)) {
-    setCurLn(1);
-  }
+  vm::Value fnamev;
   if (fname) {
-    strncpy(P_FNAME, fname, MAXFNAME - 1);
+    fnamev = check_valid_path(fname, current_editor, "ed_start", 0);
+    if (fnamev.is(T_STRING) && !doread(0, fnamev->u.string)) {
+      setCurLn(1);
+    }
+  }
+  if (fnamev.is(T_STRING)) {
+    strncpy(P_FNAME, fnamev->u.string, MAXFNAME - 1);
     P_FNAME[MAXFNAME - 1] = 0;
   } else {
     ED_OUTPUT(ED_DEST, "No file.\n");

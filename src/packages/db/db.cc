@@ -951,7 +951,11 @@ static char* msql_errormsg(dbconn_t* c) { return string_copy(msqlErrMsg, "msql_e
 #ifdef USE_SQLITE3
 static int SQLite3_connect(dbconn_t* c, const char* host, const char* database,
                            const char* username, const char* password) {
-  const char* filename = check_valid_path(database, master_ob, "sqlite3_connect", 1);
+  vm::Value filenamev = check_valid_path(database, master_ob, "sqlite3_connect", 1);
+  if (!filenamev.is(T_STRING)) {
+    return 0;
+  }
+  const char* filename = filenamev->u.string;
 
   if (sqlite3_open(filename, &c->SQLite3.handle)) {
     strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));

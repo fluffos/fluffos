@@ -1668,11 +1668,12 @@ int save_object(object_t* ob, const char* file, int save_zeros) {
 
   push_malloced_string(name); /* errors */
 
-  file = check_valid_path(name, ob, "save_object", 1);
+  vm::Value filev = check_valid_path(name, ob, "save_object", 1);
   free_string_svalue(sp--);
-  if (!file) {
+  if (!filev.is(T_STRING)) {
     error("Denied write permission in save_object().\n");
   }
+  file = filev->u.string;
 
   // Record the program's ACTUAL source file (carries the real .lpc/.c
   // extension) instead of guessing an extension onto the object name.
@@ -1878,10 +1879,11 @@ int restore_object(object_t* ob, const char* file, int noclear) {
 #endif
 
   // valid read permission.
-  file = check_valid_path(filename.c_str(), ob, "restore_object", 0);
-  if (!file) {
+  vm::Value filev = check_valid_path(filename.c_str(), ob, "restore_object", 0);
+  if (!filev.is(T_STRING)) {
     error("restore_object: read permission denied: %s.\n", filename.c_str());
   }
+  file = filev->u.string;
 
   // With zlib these reads go through gzopen, which transparently handles
   // both gzip'd and plain save files; without it, plain stdio.

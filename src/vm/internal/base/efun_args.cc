@@ -343,14 +343,11 @@ CallResult result_of(svalue_t* r) {
   return CallResult(Value::take(r));
 }
 
-/* ::call_direct() leaves the result on the stack top. It is moved into a
- * slot of its own for result_of(), which empties it again at once (so the
- * slot never holds a reference between calls). */
-svalue_t direct_result_slot;
-svalue_t* call_direct_result(object_t* ob, int runtime_index, int origin, int n) {
+/* ::call_direct() leaves the result on the stack top; take it into a Value
+ * immediately so nothing parks it in a shared slot between calls. */
+Value take_direct_result(object_t* ob, int runtime_index, int origin, int n) {
   ::call_direct(ob, runtime_index, origin, n);
-  direct_result_slot = *sp--;
-  return &direct_result_slot;
+  return Value::take(sp--);
 }
 }  // namespace
 
@@ -421,11 +418,23 @@ CallResult Call::safe_call(function_to_call_t* ftc) {
 }
 
 CallResult Call::call_direct(object_t* ob, int runtime_index, int origin) {
-  return result_of(call_direct_result(ob, runtime_index, origin, consume()));
+  return CallResult(take_direct_result(ob, runtime_index, origin, consume()));
 }
 
 CallResult Call::safe_call_direct(object_t* ob, int runtime_index, int origin) {
-  return guarded([&](int n) { return call_direct_result(ob, runtime_index, origin, n); });
+  int n = consume();
+  error_context_t econ;
+  save_context(&econ);
+  econ.save_sp = base_ - 1;
+  try {
+    Value v = take_direct_result(ob, runtime_index, origin, n);
+    pop_context(&econ);
+    return CallResult(std::move(v));
+  } catch (const char*) {
+    restore_context(&econ);
+    pop_context(&econ);
+    return CallResult(CallResult::kError);
+  }
 }
 
 }  // namespace vm

@@ -27,14 +27,14 @@ void f_trace_start(vm::EfunArgs&, vm::StringArg file, LPC_INT duration) {
     error("Invalid duration specified.\n");
   }
 
-  const auto* realfile = check_valid_path(file.c_str(), current_object, "trace_start", 1);
+  vm::Value realfile = check_valid_path(file.c_str(), current_object, "trace_start", 1);
 
-  if (!realfile) {
+  if (!realfile.is(T_STRING)) {
     error("Permission denied for trace file: %s\n", file.c_str());
   }
 
   // Used later in the block.
-  std::string const filename(realfile);
+  std::string const filename(realfile->u.string);
 
   Tracer::start(filename.c_str());
   Tracer::setThreadName("FluffOS Main");

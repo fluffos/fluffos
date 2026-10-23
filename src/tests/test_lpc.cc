@@ -258,6 +258,122 @@ TEST_F(DriverTest, EfunArgsReplacesItsWindowWithTheResult) {
   free_array(arr);
 }
 
+TEST_F(DriverTest, ValueRefedAndAsObjectOnDestructed) {
+  RunGuarded([] {
+    current_object = master_ob;
+    object_t* ob = find_object("/clone/efun_api_probe");
+    ASSERT_NE(ob, nullptr);
+    vm::Value held = vm::Value::addref(ob);
+    EXPECT_TRUE(held.is(T_OBJECT));
+    EXPECT_TRUE(held.as_object().is(T_OBJECT));
+
+    add_ref(ob, "ValueRefedAndAsObjectOnDestructed");
+    destruct_object(ob);
+    EXPECT_TRUE(ob->flags & O_DESTRUCTED);
+    EXPECT_FALSE(held.as_object().is(T_OBJECT));
+
+    /* addref on destructed leaves the caller's ref alone */
+    unsigned short const before = ob->ref;
+    vm::Value denied = vm::Value::addref(ob);
+    EXPECT_FALSE(denied.is(T_OBJECT));
+    EXPECT_EQ(ob->ref, before);
+
+    /* refed takes over a held ref and drops it when the object is dead */
+    vm::Value dropped = vm::Value::refed(ob);
+    EXPECT_FALSE(dropped.is(T_OBJECT));
+    EXPECT_EQ(ob->ref, before - 1);
+  });
+}
+
+TEST_F(DriverTest, ValueUnlinkStringIsWritableAndUnique) {
+  char* shared = string_copy("abc", "ValueUnlinkString");
+  vm::Value a = vm::Value::str_malloced(shared);
+  vm::Value b = vm::Value::copy(a.get());
+  EXPECT_EQ(a->u.string, b->u.string);
+  char* p = a.unlink_string();
+  EXPECT_NE(p, b->u.string);
+  p[0] = 'z';
+  EXPECT_STREQ(a->u.string, "zbc");
+  EXPECT_STREQ(b->u.string, "abc");
+}
+
+TEST_F(DriverTest, ValueUnlinkStringSurvivesErrorUnwind) {
+  bool errored = false;
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    vm::Value s = vm::Value::str_copy("tmp");
+    char* p = s.unlink_string();
+    p[0] = 'X';
+    error("ValueUnlinkStringSurvivesErrorUnwind\n");
+  } catch (...) {
+    errored = true;
+    restore_context(&econ);
+  }
+  if (!errored) {
+    pop_context(&econ);
+  }
+  EXPECT_TRUE(errored);
+}
+
+TEST_F(DriverTest, EfunArgsForgetTakePushedAndResync) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  push_array(arr);
+  {
+    vm::EfunArgs f = vm::EfunArgs::over_top(1, F_SIZEOF);
+    EXPECT_EQ(arr->ref, 2u);
+    f.forget(0); /* zero the slot without releasing */
+    EXPECT_EQ(f[0].type(), T_NUMBER);
+    EXPECT_EQ(arr->ref, 2u); /* forgotten ref is now ours to free */
+    free_array(arr);
+    EXPECT_EQ(arr->ref, 1u);
+    push_number(99);
+    vm::Value pushed = f.take_pushed();
+    EXPECT_TRUE(pushed.is(T_NUMBER));
+    EXPECT_EQ(pushed->u.number, 99);
+    f.resync();
+    EXPECT_EQ(f.argc(), 1); /* the zeroed argument slot remains */
+    f.finish(const0);
+  }
+  EXPECT_EQ(sp, before + 1);
+  pop_stack();
+  EXPECT_EQ(sp, before);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, CallDiscardPopsItsPushes) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  {
+    vm::Call call;
+    call.push(vm::Value::addref(arr));
+    call.push(2);
+    EXPECT_EQ(sp, before + 2);
+    call.discard();
+    EXPECT_EQ(sp, before);
+    EXPECT_EQ(arr->ref, 1u);
+  }
+  free_array(arr);
+}
+
+TEST_F(DriverTest, TypedObjectPointerStaleAfterDestructApply) {
+  /* A typed object_t* parameter is a borrow: after LPC that destructs it,
+   * the pointer is dangling while f[i] still tells the truth. */
+  RunGuarded([] {
+    current_object = master_ob;
+    object_t* ob = find_object("/clone/efun_api_probe");
+    ASSERT_NE(ob, nullptr);
+    push_object(ob);
+    vm::EfunArgs f = vm::EfunArgs::over_top(1, F_SIZEOF);
+    object_t* borrowed = f[0].object();
+    EXPECT_EQ(borrowed, ob);
+    destruct_object(ob);
+    EXPECT_FALSE(f[0].is(T_OBJECT)); /* slot zeroed by remove_object_from_stack */
+    f.finish(const0);
+  });
+}
+
 TEST_F(DriverTest, TestInMemoryCompileFile) {
   program_t* prog = nullptr;
 

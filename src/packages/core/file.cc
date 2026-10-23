@@ -171,11 +171,12 @@ array_t* get_dir(const char* path, int flags) {
     return nullptr;
   }
 
-  path = check_valid_path(path, current_object, "stat", 0);
+  vm::Value pathv = check_valid_path(path, current_object, "stat", 0);
 
-  if (path == nullptr) {
+  if (!pathv.is(T_STRING)) {
     return nullptr;
   }
+  path = pathv->u.string;
 
   if (strlen(path) < 2) {
     temppath[0] = path[0] ? path[0] : '.';
@@ -288,11 +289,12 @@ array_t* get_dir(const char* path, int flags) {
 }
 
 int remove_file(const char* path) {
-  path = check_valid_path(path, current_object, "remove_file", 1);
+  vm::Value pathv = check_valid_path(path, current_object, "remove_file", 1);
 
-  if (path == nullptr) {
+  if (!pathv.is(T_STRING)) {
     return 0;
   }
+  path = pathv->u.string;
   if (unlink(path) == -1) {
     return 0;
   }
@@ -312,10 +314,11 @@ int write_file(const char* file, const char* str, int flags) {
   }
 #endif
 
-  file = check_valid_path(file, current_object, "write_file", 1);
-  if (!file) {
+  vm::Value filev = check_valid_path(file, current_object, "write_file", 1);
+  if (!filev.is(T_STRING)) {
     return 0;
   }
+  file = filev->u.string;
 #ifdef HAVE_ZLIB
   if (flags & 2) {
     gf = gzopen(file, (flags & 1) ? "wb" : "ab");
@@ -373,10 +376,11 @@ char* read_file(const char* file, LPC_INT start, LPC_INT lines) {
 
   const char* real_file;
 
-  real_file = check_valid_path(file, current_object, "read_file", 0);
-  if (!real_file) {
+  vm::Value real_filev = check_valid_path(file, current_object, "read_file", 0);
+  if (!real_filev.is(T_STRING)) {
     return nullptr;
   }
+  real_file = real_filev->u.string;
 
   try {
     auto fs_real_file = fs::u8path(real_file);
@@ -528,10 +532,11 @@ char* read_bytes(const char* file, LPC_INT start, LPC_INT len, int* rlen) {
   if (len < 0) {
     return nullptr;
   }
-  file = check_valid_path(file, current_object, "read_bytes", 0);
-  if (!file) {
+  vm::Value filev = check_valid_path(file, current_object, "read_bytes", 0);
+  if (!filev.is(T_STRING)) {
     return nullptr;
   }
+  file = filev->u.string;
   fptr = fopen(file, "rb");
   if (fptr == nullptr) {
     return nullptr;
@@ -593,11 +598,12 @@ int write_bytes(const char* file, LPC_INT start, const char* str, int theLength)
   LPC_INT size;
   FILE* fptr;
 
-  file = check_valid_path(file, current_object, "write_bytes", 1);
+  vm::Value filev = check_valid_path(file, current_object, "write_bytes", 1);
 
-  if (!file) {
+  if (!filev.is(T_STRING)) {
     return 0;
   }
+  file = filev->u.string;
   if (theLength > max_byte_transfer) {
     return 0;
   }
@@ -647,10 +653,11 @@ int file_size(const char* file) {
   struct stat st;
   long ret;
 
-  file = check_valid_path(file, current_object, "file_size", 0);
-  if (!file) {
+  vm::Value filev = check_valid_path(file, current_object, "file_size", 0);
+  if (!filev.is(T_STRING)) {
     return -1;
   }
+  file = filev->u.string;
 
   if (stat(file, &st) == -1) {
     ret = -1;
@@ -669,24 +676,32 @@ int file_size(const char* file) {
  * The path is always treated as an absolute path, and is returned without
  * a leading '/'.
  * If the path was '/', then '.' is returned.
- * Otherwise, the returned path lives in apply_ret_value (the master's answer
- * is moved there, or the path is copied there), which means it will be
- * deallocated at the next apply(); callers that need it longer take a
- * reference to apply_ret_value (do_rename(), copy_file()).
+ * The returned Value owns the path string for its lifetime; deny is a
+ * non-string Value. Callers that need the C string across another apply
+ * keep the Value in scope (no shared apply_ret_value / from_sv slot).
  */
-const char* check_valid_path(const char* path, object_t* call_object, const char* const call_fun,
-                             int writeflg) {
+static vm::Value normalized_path_value(const char* path) {
+  if (path[0] == '/') {
+    path++;
+  }
+  if (path[0] == '\0') {
+    path = ".";
+  }
+  if (!legal_path(path)) {
+    return vm::Value::undefined();
+  }
+  return vm::Value::str_copy(path);
+}
+
+vm::Value check_valid_path(const char* path, object_t* call_object, const char* const call_fun,
+                           int writeflg) {
   if (!master_ob && !call_object) {
     // early startup, ignore security
-    free_svalue(&apply_ret_value, "check_valid_path");
-    apply_ret_value.type = T_STRING;
-    apply_ret_value.subtype = STRING_MALLOC;
-    path = apply_ret_value.u.string = string_copy(path, "check_valid_path");
-    return path;
+    return normalized_path_value(path);
   }
 
   if (call_object == nullptr || call_object->flags & O_DESTRUCTED) {
-    return nullptr;
+    return vm::Value::undefined();
   }
 
   /* No master, no such apply, or an error in it: v is not ok() and reads as
@@ -697,7 +712,7 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
   svalue_t* v = r.get();
 
   if (v && v->type == T_NUMBER && v->u.number == 0) {
-    return nullptr;
+    return vm::Value::undefined();
   }
   /* An async valid_read()/valid_write() hands back a promise the instant its
    * body parks -- before it has decided anything. Everything below treats a
@@ -714,32 +729,12 @@ const char* check_valid_path(const char* path, object_t* call_object, const char
         "%s: %s returned a promise -- an apply cannot be async, and a pending answer is not a "
         "grant. Denying.\n",
         call_fun, writeflg ? "valid_write" : "valid_read");
-    return nullptr;
+    return vm::Value::undefined();
   }
   if (v && v->type == T_STRING) {
-    /* r dies with this function: move the master's answer into
-     * apply_ret_value, where callers expect the returned path to live. */
-    free_svalue(&apply_ret_value, "check_valid_path");
-    apply_ret_value = r.take().release();
-    path = apply_ret_value.u.string;
-  } else {
-    free_svalue(&apply_ret_value, "check_valid_path");
-    apply_ret_value.type = T_STRING;
-    apply_ret_value.subtype = STRING_MALLOC;
-    path = apply_ret_value.u.string = string_copy(path, "check_valid_path");
+    return normalized_path_value(v->u.string);
   }
-
-  if (path[0] == '/') {
-    path++;
-  }
-  if (path[0] == '\0') {
-    path = ".";
-  }
-  if (legal_path(path)) {
-    return path;
-  }
-
-  return nullptr;
+  return normalized_path_value(path);
 }
 
 static int match_string(char* match, char* str) {
@@ -846,13 +841,9 @@ static int do_move(const char* from, const char* to, int flag) {
     // failure here -- even after a successful copy -- and skipped the
     // unlink() below, leaving the source file behind as a duplicate.
     //
-    // `from` is only alive courtesy of the caller's from_sv (see
-    // do_rename() above), which is a *static* also owned by check_valid_path()
-    // -- and copy_file() calls check_valid_path() again internally and
-    // reassigns that same static to protect its own copy of the string.
-    // That frees the very buffer `from` points into, out from under us, so
-    // `from` must be snapshotted before the call or unlink() below reads
-    // freed memory.
+    // Snapshot before copy_file(): it runs its own valid_read/valid_write
+    // applies. The caller's path Values keep the strings alive across that,
+    // but unlink still needs a stable C string after copy_file returns.
     //
     // A std::string, not a fixed buffer: LPC paths are not length-bounded here,
     // and a truncated copy would make unlink() remove a different file from the
@@ -893,23 +884,12 @@ void debug_perror(const char* what, const char* file) {
  * of the unix system call rename and the unix command mv.
  */
 
-static svalue_t from_sv = {T_NUMBER};
-static svalue_t to_sv = {T_NUMBER};
-
-#ifdef DEBUGMALLOC_EXTENSIONS
-void mark_file_sv() {
-  mark_svalue(&from_sv);
-  mark_svalue(&to_sv);
-}
-#endif
-
 #ifdef F_RENAME
 int do_rename(const char* fr, const char* t, int flag) {
   const char* from;
   const char* to;
   char newfrom[MAX_FNAME_SIZE + MAX_PATH_LEN + 2];
   int flen;
-  extern svalue_t apply_ret_value;
 
   /*
    * important that the same write access checks are done for link() as are
@@ -919,19 +899,17 @@ int do_rename(const char* fr, const char* t, int flag) {
    * is prevent linking to a file unless the person doing the linking has
    * permission to move the file.
    */
-  from = check_valid_path(fr, current_object, "rename", 1);
-  if (!from) {
+  vm::Value from_v = check_valid_path(fr, current_object, "rename", 1);
+  if (!from_v.is(T_STRING)) {
     return 1;
   }
+  from = from_v->u.string;
 
-  assign_svalue(&from_sv, &apply_ret_value);
-
-  to = check_valid_path(t, current_object, "rename", 1);
-  if (!to) {
+  vm::Value to_v = check_valid_path(t, current_object, "rename", 1);
+  if (!to_v.is(T_STRING)) {
     return 1;
   }
-
-  assign_svalue(&to_sv, &apply_ret_value);
+  to = to_v->u.string;
   if (!strlen(to) && !strcmp(t, "/")) {
     to = "./";
   }
@@ -971,20 +949,17 @@ int do_rename(const char* fr, const char* t, int flag) {
 #endif /* F_RENAME */
 
 int copy_file(const char* from, const char* to) {
-  extern svalue_t apply_ret_value;
-
-  from = check_valid_path(from, current_object, "move_file", 0);
-  assign_svalue(&from_sv, &apply_ret_value);
-
-  to = check_valid_path(to, current_object, "move_file", 1);
-  assign_svalue(&to_sv, &apply_ret_value);
-
-  if (from == nullptr) {
+  vm::Value from_v = check_valid_path(from, current_object, "move_file", 0);
+  if (!from_v.is(T_STRING)) {
     return -1;
   }
-  if (to == nullptr) {
+  from = from_v->u.string;
+
+  vm::Value to_v = check_valid_path(to, current_object, "move_file", 1);
+  if (!to_v.is(T_STRING)) {
     return -2;
   }
+  to = to_v->u.string;
 
   if (lstat(from, &from_stats) != 0) {
     error("/%s: lstat failed\n", from);
@@ -1084,8 +1059,8 @@ vm::Value f_link(vm::EfunArgs&, vm::StringArg from, vm::StringArg to) {
 
 #ifdef F_MKDIR
 vm::Value f_mkdir(vm::EfunArgs&, vm::StringArg dir) {
-  const char* path = check_valid_path(dir.c_str(), current_object, "mkdir", 1);
-  if (!path || OS_mkdir(path, 0770) == -1) {
+  vm::Value pathv = check_valid_path(dir.c_str(), current_object, "mkdir", 1);
+  if (!pathv.is(T_STRING) || OS_mkdir(pathv->u.string, 0770) == -1) {
     return 0;
   }
   return 1;
