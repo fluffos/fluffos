@@ -138,14 +138,15 @@ void free_js_call(JsCall* call) {
 // Deliver a settled result to the LPC callback: cb(result, success, id).
 void deliver_js_result(JsCall* call, bool success, const std::string& result) {
   if (call->want_callback) {
-    copy_and_push_string(result.c_str());
-    push_number(success ? 1 : 0);
-    push_number(call->key);
+    vm::Call b;
+    b.push(vm::Value::str_copy(result.c_str()));
+    b.push(success ? 1 : 0);
+    b.push(call->key);
     set_eval(max_eval_cost);
     if (call->call_back.type == T_STRING) {
-      safe_apply(call->call_back.u.string, call->ob_to_call, 3, ORIGIN_INTERNAL);
+      b.safe_apply(call->call_back.u.string, call->ob_to_call, ORIGIN_INTERNAL);
     } else {
-      safe_call_function_pointer(call->call_back.u.fp, 3);
+      b.safe_call(call->call_back.u.fp);
     }
   }
   free_js_call(call);
@@ -302,18 +303,19 @@ void deliver_lpc_call(const std::string& name, const std::vector<std::string>& a
     arr->item[i].subtype = STRING_MALLOC;
     arr->item[i].u.string = string_copy(args[i].c_str(), "deliver_lpc_call");
   }
-  push_refed_array(arr);
-  push_number(id);
+  vm::Call b;
+  b.push(vm::Value::refed(arr));
+  b.push(static_cast<LPC_INT>(id));
 
   set_eval(max_eval_cost);
-  svalue_t* ret;
+  vm::CallResult ret(vm::CallResult::kNotFound);
   if (exp->call_back.type == T_STRING) {
-    ret = safe_apply(exp->call_back.u.string, exp->ob_to_call, 2, ORIGIN_INTERNAL);
+    ret = b.safe_apply(exp->call_back.u.string, exp->ob_to_call, ORIGIN_INTERNAL);
   } else {
-    ret = safe_call_function_pointer(exp->call_back.u.fp, 2);
+    ret = b.safe_call(exp->call_back.u.fp);
   }
 
-  if (ret == nullptr) {
+  if (!ret) {
     js_bridge_lpc_result(id, 0, "LPC callback error (object destructed or runtime error)");
     return;
   }
@@ -334,7 +336,7 @@ void deliver_lpc_call(const std::string& name, const std::vector<std::string>& a
   }
   // Other values are %O-formatted (numbers print plainly; return a
   // JSON-encoded string from LPC for structured data).
-  char* formatted = string_print_formatted("%O", 1, ret);
+  char* formatted = string_print_formatted("%O", 1, ret.get());
   js_bridge_lpc_result(id, 1, formatted ? formatted : "");
   if (formatted) {
     FREE_MSTR(formatted);
@@ -402,16 +404,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE void fluffos_js_result(int id, int success, cons
 }
 
 #ifdef F_JS_EXPORT
-void f_js_export() {
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
-
-  // Validate before any allocation: error() unwinds past C++ destructors.
-  if (num_arg > 1 && arg[1].type != T_STRING && arg[1].type != T_FUNCTION) {
-    error("Bad argument 2 to js_export(): expected string or function.\n");
-  }
-
-  std::string const name(arg[0].u.string);
+vm::Value f_js_export(vm::EfunArgs&, vm::StringArg export_name, std::optional<vm::Arg> callback) {
+  std::string const name(export_name.c_str());
 
   // Replace or remove an existing registration.
   auto it = g_js_exports.find(name);
@@ -422,41 +416,36 @@ void f_js_export() {
   }
 
   int registered = 0;
-  if (num_arg > 1) {
+  if (callback) {
     auto* exp = new JsExport{};
-    assign_svalue_no_free(&exp->call_back, &arg[1]);
+    assign_svalue_no_free(&exp->call_back, callback->sv());
     exp->ob_to_call = current_object;
     add_ref(current_object, "js_export");
     g_js_exports[name] = exp;
     registered = 1;
   }
 
-  pop_n_elems(num_arg);
-  push_number(registered);
+  return registered;
 }
 #endif
 
 #ifdef F_JS_EVAL
-void f_js_eval() {
-  char* result = js_bridge_eval(sp->u.string);
+vm::Value f_js_eval(vm::EfunArgs&, vm::StringArg code) {
+  char* result = js_bridge_eval(code.c_str());
   std::string const text(result ? result : "");
   if (result != nullptr) {
     free(result);
   }
-  pop_stack();
-  copy_and_push_string(text.c_str());
+  return vm::Value::str_copy(text.c_str());
 }
 #endif
 
 #ifdef F_JS_CALL
-void f_js_call() {
+vm::Value f_js_call(vm::EfunArgs&, vm::StringArg handler_name, array_t* args,
+                    std::optional<vm::Arg> callback) {
   static LPC_INT next_key = 0;
 
-  int const num_arg = st_num_arg;
-  svalue_t* arg = sp - num_arg + 1;
-
-  const char* handler = arg[0].u.string;
-  array_t* args = arg[1].u.arr;
+  const char* handler = handler_name.c_str();
 
   // Validate everything BEFORE any allocation: error() unwinds past C++
   // destructors, so no non-trivial object may be live when it fires.
@@ -464,9 +453,6 @@ void f_js_call() {
     if (args->item[i].type != T_STRING) {
       error("Bad argument 2 to js_call(): element %d is not a string.\n", i);
     }
-  }
-  if (num_arg > 2 && arg[2].type != T_STRING && arg[2].type != T_FUNCTION) {
-    error("Bad argument 3 to js_call(): expected string or function.\n");
   }
 
   // Marshal the args as a JSON array of strings.
@@ -477,9 +463,9 @@ void f_js_call() {
 
   auto* call = new JsCall{};
   call->key = next_key++;
-  call->want_callback = (num_arg > 2);
+  call->want_callback = callback.has_value();
   if (call->want_callback) {
-    assign_svalue_no_free(&call->call_back, &arg[2]);
+    assign_svalue_no_free(&call->call_back, callback->sv());
     call->ob_to_call = current_object;
     add_ref(current_object, "js_call");
   }
@@ -491,7 +477,6 @@ void f_js_call() {
       jargs.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
   js_bridge_invoke(call->key, handler, jargs_text.c_str());
 
-  pop_n_elems(num_arg);
-  push_number(call->key);
+  return call->key;
 }
 #endif

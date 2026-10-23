@@ -902,17 +902,17 @@ int regexec(regexp* prog, const char* string) {
  */
 static int regtry(regexp* prog, const char* string) {
   int i;
-  const char** sp;
+  const char** ssp;
   const char** ep;
 
   reginput = string;
   regstartp = prog->startp;
   regendp = prog->endp;
 
-  sp = prog->startp;
+  ssp = prog->startp;
   ep = prog->endp;
   for (i = NSUBEXP; i > 0; i--) {
-    *sp++ = (char*)nullptr;
+    *ssp++ = (char*)nullptr;
     *ep++ = (char*)nullptr;
   }
   if (regmatch(prog->program + 1)) {

@@ -10,6 +10,8 @@
 #include "net/transport.h"
 #include "user.h"
 #include "compiler/internal/compiler.h"
+#include "vm/internal/base/vm_stack.h"
+#include "vm/internal/base/efun_args_inline.h"
 
 namespace {
 // Runs `fn` (arbitrary LPC-triggering driver code -- load_object_from_source,
@@ -70,6 +72,190 @@ TEST_F(DriverTest, TestCompileDumpProgWorks) {
   dump_prog(obj->prog, stdout, 1 | 2);
 
   free_object(&obj, "DriverTest::TestCompileDumpProgWorks");
+}
+
+// ---- The C++ value and call API (value.h, efun_args.h) ----
+
+TEST_F(DriverTest, ValueOwnsItsReference) {
+  array_t* arr = allocate_array(1);
+  {
+    vm::Value held = vm::Value::addref(arr);
+    EXPECT_EQ(arr->ref, 2u);
+    vm::Value moved = std::move(held);
+    EXPECT_EQ(held.type(), T_NUMBER);
+    EXPECT_EQ(moved.type(), T_ARRAY);
+    EXPECT_EQ(arr->ref, 2u);
+    svalue_t raw = moved.release();
+    EXPECT_EQ(moved.type(), T_NUMBER);
+    vm::Value back = vm::Value::owned(raw);
+    EXPECT_EQ(arr->ref, 2u);
+  }
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, ValueIsReleasedByAnErrorUnwind) {
+  array_t* arr = allocate_array(1);
+  bool errored = false;
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    vm::Value held = vm::Value::addref(arr);
+    error("ValueIsReleasedByAnErrorUnwind\n");
+  } catch (...) {
+    errored = true;
+    restore_context(&econ);
+  }
+  if (!errored) {
+    pop_context(&econ);
+  }
+  EXPECT_TRUE(errored);
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, CallPopsPushesItNeverHandsToACall) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  {
+    vm::Call call;
+    call.push(vm::Value::addref(arr));
+    call.push(1);
+    EXPECT_EQ(sp, before + 2);
+    EXPECT_EQ(call.arg(1).number(), 1);
+    EXPECT_EQ(arr->ref, 2u);
+  }
+  EXPECT_EQ(sp, before);
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, CallConstructorPushesItsArgumentsInOrder) {
+  svalue_t* const before = sp;
+  RunGuarded([] {
+    current_object = master_ob;
+    object_t* ob = find_object("/clone/efun_api_probe");
+    ASSERT_NE(ob, nullptr);
+    vm::CallResult r = vm::Call("y", 3).apply("echo", ob, ORIGIN_DRIVER);
+    ASSERT_TRUE(r.is(T_STRING));
+    EXPECT_EQ(r.string_view(), "y3");
+  });
+  EXPECT_EQ(sp, before);
+
+  array_t* arr = allocate_array(1);
+  {
+    vm::Call call(vm::Value::addref(arr), 1);
+    EXPECT_EQ(call.argc(), 2);
+    EXPECT_EQ(sp, before + 2);
+    EXPECT_EQ(call.arg(0).array(), arr);
+    EXPECT_EQ(call.arg(1).number(), 1);
+  }
+  EXPECT_EQ(sp, before);
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
+}
+
+TEST_F(DriverTest, CallReleasesPushesOnAnErrorUnwind) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  /* buried: something was left pushed over the pending arguments when the
+   * error was thrown (a callee's half-built frame), so the destructor must
+   * leave them to restore_context(); otherwise it pops them itself */
+  for (bool buried : {false, true}) {
+    bool errored = false;
+    error_context_t econ{};
+    save_context(&econ);
+    try {
+      vm::Call call;
+      call.push(vm::Value::addref(arr));
+      call.push(1);
+      if (buried) {
+        push_number(2);
+      }
+      error("CallReleasesPushesOnAnErrorUnwind\n");
+    } catch (...) {
+      errored = true;
+      restore_context(&econ);
+    }
+    if (!errored) {
+      pop_context(&econ);
+    }
+    EXPECT_TRUE(errored);
+    EXPECT_EQ(sp, before) << "buried=" << buried;
+    EXPECT_EQ(arr->ref, 1u) << "buried=" << buried;
+  }
+  free_array(arr);
+}
+
+TEST_F(DriverTest, CallResultStatuses) {
+  svalue_t* const before = sp;
+  RunGuarded([] {
+    current_object = master_ob;
+    object_t* ob = find_object("/clone/efun_api_probe");
+    ASSERT_NE(ob, nullptr);
+
+    {
+      vm::Call call;
+      call.push(std::string_view("x"));
+      call.push(7);
+      vm::CallResult r = call.apply("echo", ob, ORIGIN_DRIVER);
+      ASSERT_TRUE(r.ok());
+      ASSERT_TRUE(r.is(T_STRING));
+      EXPECT_FALSE(r.is(T_NUMBER));
+      EXPECT_EQ(r.string_view(), "x7");
+      /* an owned copy: another call does not disturb it */
+      vm::CallResult other = vm::Call().apply("no_such_function", ob, ORIGIN_DRIVER);
+      EXPECT_EQ(other.status(), vm::CallResult::kNotFound);
+      EXPECT_EQ(other.get(), nullptr);
+      EXPECT_FALSE(other);
+      /* reads as 0, but is not a number the callee returned */
+      EXPECT_EQ(other->type, T_NUMBER);
+      EXPECT_FALSE(other.is(T_NUMBER));
+      EXPECT_STREQ(r->u.string, "x7");
+      vm::Value taken = r.take();
+      EXPECT_EQ(taken.type(), T_STRING);
+    }
+    {
+      vm::CallResult r = vm::Call().safe_apply("boom", ob, ORIGIN_DRIVER);
+      EXPECT_EQ(r.status(), vm::CallResult::kError);
+    }
+    {
+      object_t* saved = master_ob;
+      master_ob = nullptr;
+      vm::Call call;
+      call.push(1);
+      vm::CallResult r = call.safe_apply_master(APPLY_VALID_READ);
+      vm::CallResult r2 = vm::Call().apply_master(APPLY_VALID_READ);
+      master_ob = saved;
+      EXPECT_EQ(r.status(), vm::CallResult::kNoMaster);
+      EXPECT_EQ(r2.status(), vm::CallResult::kNoMaster);
+      EXPECT_TRUE(master_approved(r, "CallResultStatuses"));
+    }
+    EXPECT_FALSE(master_approved(vm::CallResult(vm::CallResult::kError), "CallResultStatuses"));
+  });
+  EXPECT_EQ(sp, before);
+}
+
+TEST_F(DriverTest, EfunArgsReplacesItsWindowWithTheResult) {
+  svalue_t* const before = sp;
+  array_t* arr = allocate_array(1);
+  push_array(arr); /* the window's reference; arr keeps ours */
+  push_number(5);
+  {
+    vm::EfunArgs f = vm::EfunArgs::over_top(2, F_SIZEOF);
+    EXPECT_EQ(f.argc(), 2);
+    EXPECT_EQ(f[1].number(), 5);
+    vm::Value moved = f.take(0);
+    EXPECT_EQ(f[0].type(), T_NUMBER);
+    EXPECT_EQ(arr->ref, 2u);
+    f.finish(moved.release());
+  }
+  ASSERT_EQ(sp, before + 1);
+  EXPECT_EQ(sp->type, T_ARRAY);
+  EXPECT_EQ(sp->u.arr, arr);
+  pop_stack();
+  EXPECT_EQ(arr->ref, 1u);
+  free_array(arr);
 }
 
 TEST_F(DriverTest, TestInMemoryCompileFile) {
@@ -228,6 +414,68 @@ TEST_F(DriverTest, TestMoveObjectDestructDuringReset) {
   EXPECT_TRUE(dest->flags & O_DESTRUCTED);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->super, nullptr);
+}
+
+// present(str, env) with lazy resets: if try_reset(env) destructs env, the
+// 2-arg form must return 0 — not fall through to 1-arg present() that
+// searches current_object / its environment.
+TEST_F(DriverTest, TestPresentDestructEnvDuringReset) {
+#ifndef NO_ENVIRONMENT
+  auto saved_lazy_resets = CONFIG_INT(__RC_LAZY_RESETS__);
+  auto saved_no_resets = CONFIG_INT(__RC_NO_RESETS__);
+  auto saved_gametick = g_current_gametick;
+  CONFIG_INT(__RC_LAZY_RESETS__) = 1;
+  CONFIG_INT(__RC_NO_RESETS__) = 0;
+  g_current_gametick += 1000000;
+
+  current_object = master_ob;
+  object_t* env = nullptr;
+  object_t* searcher = nullptr;
+  svalue_t* ret = nullptr;
+
+  error_context_t econ{};
+  save_context(&econ);
+  try {
+    env = find_object("/clone/present_reset_dest");
+    searcher = find_object("/clone/present_reset_searcher");
+    ASSERT_NE(env, nullptr);
+    ASSERT_NE(searcher, nullptr);
+    // A second object with id("sword") living under the searcher: the buggy
+    // path (present as 1-arg) would find this; the fixed path returns 0.
+    object_t* decoy = clone_object("/clone/present_reset_dest", 0);
+    ASSERT_NE(decoy, nullptr);
+    decoy->flags |= O_RESET_STATE; /* already "reset"; don't self-destruct on move */
+    decoy->next_reset = g_current_gametick + 1000000;
+    searcher->flags |= O_RESET_STATE;
+    searcher->next_reset = g_current_gametick + 1000000;
+    move_object(decoy, searcher);
+
+    env->next_reset = 0;
+    env->flags &= ~O_RESET_STATE;
+
+    push_object(env);
+    current_object = searcher;
+    ret = safe_apply("probe", searcher, 1, ORIGIN_DRIVER);
+  } catch (...) {
+    restore_context(&econ);
+    CONFIG_INT(__RC_LAZY_RESETS__) = saved_lazy_resets;
+    CONFIG_INT(__RC_NO_RESETS__) = saved_no_resets;
+    g_current_gametick = saved_gametick;
+    FAIL() << "unexpected error() during present-after-reset probe";
+    return;
+  }
+  pop_context(&econ);
+
+  CONFIG_INT(__RC_LAZY_RESETS__) = saved_lazy_resets;
+  CONFIG_INT(__RC_NO_RESETS__) = saved_no_resets;
+  g_current_gametick = saved_gametick;
+
+  ASSERT_NE(env, nullptr);
+  EXPECT_TRUE(env->flags & O_DESTRUCTED);
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->type, T_NUMBER);
+  EXPECT_EQ(ret->u.number, 0);
+#endif
 }
 
 // issue #968: with "reversible explode string" semantics, a string made

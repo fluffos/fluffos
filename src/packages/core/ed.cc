@@ -548,14 +548,11 @@ static int doprnt(int from, int to) {
 
 static void do_output(char* str) {
 #ifdef RECEIVE_ED
-  svalue_t* ret;
-
-  copy_and_push_string(str);
-  copy_and_push_string(P_FNAME);
   // One could argue that this should be safe_apply()
   // Pro: ed continues to work with a runtiming receive_ed()
   // Con: "I wrote a receive_ed()!  Why does the driver ignore it??"
-  ret = apply(APPLY_RECEIVE_ED, ED_DEST, 2, ORIGIN_DRIVER);
+  vm::CallResult ret = vm::Call(vm::Value::str_copy(str), vm::Value::str_copy(P_FNAME))
+                           .apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
   if (!ret) {
     ED_OUTPUTV(ED_DEST, "%s\n", str);
   } else if (ret->type == T_NUMBER) {
@@ -592,7 +589,7 @@ static void free_ed_buffer(object_t* who) {
 
     /* make this "safe" */
     set_eval(max_eval_cost);
-    safe_apply(exit_fn, exit_ob, 0, ORIGIN_INTERNAL);
+    vm::Call().safe_apply(exit_fn, exit_ob, ORIGIN_INTERNAL);
     FREE(exit_fn);
     free_object(&exit_ob, "ed EOF");
     return;
@@ -773,12 +770,11 @@ static int dowrite(int from, int to, const char* fname, int apflg) {
 
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {
-    svalue_t* res;
-
-    push_malloced_string(add_slash(fname));
-    push_number(0);
+    vm::Call call;
+    call.push(vm::Value::str_malloced(add_slash(fname)));
+    call.push(0);
     set_eval(max_eval_cost);
-    res = safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
+    vm::CallResult res = call.safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, ORIGIN_INTERNAL);
     if (IS_ZERO(res)) {
       return (EDERR);
     }
@@ -824,10 +820,11 @@ static int dowrite(int from, int to, const char* fname, int apflg) {
 
 #ifdef OLD_ED
   if (ED_BUFFER->write_fn) {
-    push_malloced_string(add_slash(fname));
-    push_number(1);
+    vm::Call call;
+    call.push(vm::Value::str_malloced(add_slash(fname)));
+    call.push(1);
     set_eval(max_eval_cost);
-    safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, 2, ORIGIN_INTERNAL);
+    call.safe_apply(ED_BUFFER->write_fn, ED_BUFFER->exit_ob, ORIGIN_INTERNAL);
   }
 #endif
 
@@ -871,7 +868,6 @@ static char* getfn(int writeflg) {
   static char file[MAXFNAME];
   char* cp;
   const char* file2;
-  svalue_t* ret;
 
   if (*inptr == NL) {
     P_NOFNAME = TRUE;
@@ -899,9 +895,9 @@ static char* getfn(int writeflg) {
   }
 
   if (file[0] != '/') {
-    copy_and_push_string(file);
-    ret = apply_master_ob(APPLY_MAKE_PATH_ABSOLUTE, 1);
-    if ((ret == nullptr) || (ret == (svalue_t*)-1) || ret->type != T_STRING) {
+    /* no master, no such apply, or not a string: give up */
+    vm::CallResult ret = vm::Call(vm::Value::str_copy(file)).apply_master(APPLY_MAKE_PATH_ABSOLUTE);
+    if (!ret.is(T_STRING)) {
       return nullptr;
     }
     strncpy(file, ret->u.string, sizeof file - 1);
@@ -1337,15 +1333,12 @@ static int set() {
     }
   }
   if (!strcmp(word, "save")) {
-    svalue_t* ret;
-
     if (P_RESTRICT) {
       return (SET_FAIL);
     }
-    push_object(current_editor);
-    push_number(P_SHIFTWIDTH | P_FLAGS);
-    ret = apply_master_ob(APPLY_SAVE_ED_SETUP, 2);
-    if (MASTER_APPROVED(ret, "save_ed_setup")) {
+    vm::CallResult ret = vm::Call(vm::Value::object(current_editor), P_SHIFTWIDTH | P_FLAGS)
+                             .apply_master(APPLY_SAVE_ED_SETUP);
+    if (master_approved(ret, "save_ed_setup")) {
       return 0;
     }
   }
@@ -1554,7 +1547,7 @@ static void indent(char* buf) {
       2, 2, 1, 7, 1, 5, 5, 1, 3, 6, 2, 2, 2, 2, 0,
   };
   char text[ED_MAXLINE], ident[ED_MAXLINE];
-  char *p, *sp;
+  char *p, *tsp;
   int* ip;
   long indent_index;
   int top, token;
@@ -1815,10 +1808,10 @@ static void indent(char* buf) {
     }
 
     /* parse */
-    sp = stack;
+    tsp = stack;
     ip = ind;
     for (;;) {
-      top = *sp;
+      top = *tsp;
       if (top == LOPERATOR && token == RHOOK) {
         /* ) after LOPERATOR is ROPERATOR */
         token = ROPERATOR;
@@ -1826,15 +1819,15 @@ static void indent(char* buf) {
       if (f[top] <= g[token]) { /* shift the token on the stack */
         int i;
 
-        if (sp == stackbot) {
+        if (tsp == stackbot) {
           /* out of stack */
           error("Nesting too deep in line %d\n");
         }
         /* handle indentation */
         i = *ip;
         /* if needed, reduce indentation prior to shift */
-        if ((token == LBRACKET && (*sp == ROPERATOR || *sp == ELSE || *sp == XDO)) ||
-            token == RBRACKET || (token == IF && *sp == ELSE)) {
+        if ((token == LBRACKET && (*tsp == ROPERATOR || *tsp == ELSE || *tsp == XDO)) ||
+            token == RBRACKET || (token == IF && *tsp == ELSE)) {
           /* back up */
           i -= P_SHIFTWIDTH;
         } else if (token == RHOOK || token == ROPERATOR) {
@@ -1843,7 +1836,7 @@ static void indent(char* buf) {
         /* shift the current line, if appropriate */
         if (do_indent) {
           shi = i - indent_index;
-          if (token == TOKEN && *sp == LBRACKET &&
+          if (token == TOKEN && *tsp == LBRACKET &&
               (strcmp(ident, "case") == 0 || strcmp(ident, "default") == 0)) {
 /* back up if this is a switch label */
 #ifndef ED_INDENT_CASE
@@ -1872,24 +1865,24 @@ static void indent(char* buf) {
           }
           case SEMICOLON: {
             /* in case it is followed by a comment */
-            if (*sp == ROPERATOR || *sp == ELSE) {
+            if (*tsp == ROPERATOR || *tsp == ELSE) {
               i -= P_SHIFTWIDTH;
             }
             break;
           }
         }
 
-        *--sp = token;
+        *--tsp = token;
         *--ip = i;
         break;
       }
       /* reduce handle */
       do {
-        top = *sp++;
+        top = *tsp++;
         ip++;
-      } while (f[static_cast<int>(*sp)] >= g[top]);
+      } while (f[static_cast<int>(*tsp)] >= g[top]);
     }
-    stack = sp;
+    stack = tsp;
     ind = ip;
     after_keyword_t = (token >= IF); /* but not after ELSE */
   }
@@ -2475,8 +2468,6 @@ static int doglob() {
 #ifdef OLD_ED
 void ed_start(const char* file_arg, const char* write_fn, const char* exit_fn, int restricted,
               object_t* exit_ob, int scroll_lines) {
-  svalue_t* setup;
-
   regexp_user = ED_REGEXP;
   if (!command_giver) {
     error("No current user for ed().\n");
@@ -2496,9 +2487,9 @@ void ed_start(const char* file_arg, const char* write_fn, const char* exit_fn, i
 
   ED_BUFFER->flags |= EIGHTBIT_MASK;
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
-  push_object(current_editor);
-  setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-  if (setup && setup != (svalue_t*)-1 && setup->type == T_NUMBER && setup->u.number) {
+  vm::CallResult setup =
+      vm::Call(vm::Value::object(current_editor)).apply_master(APPLY_RETRIEVE_ED_SETUP);
+  if (setup.is(T_NUMBER) && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
   }
@@ -2661,18 +2652,18 @@ static void report_status(int status) {
 
 #ifdef OLD_ED
 void save_ed_buffer(object_t* who) {
-  svalue_t* stmp;
   const char* fname;
 
   regexp_user = ED_REGEXP;
   current_ed_buffer = who->interactive->ed_buffer;
   current_editor = who;
 
-  push_malloced_string(add_slash(P_FNAME));
-  push_object(who);
+  vm::Call call;
+  call.push(vm::Value::str_malloced(add_slash(P_FNAME)));
+  call.push(vm::Value::object(who));
   /* must be safe; we get called by remove_interactive() */
-  stmp = safe_apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 2);
-  if (stmp && stmp != (svalue_t*)-1) {
+  vm::CallResult stmp = call.safe_apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
+  if (stmp) {
     if (stmp->type == T_STRING) {
       fname = stmp->u.string;
       if (*fname == '/') {
@@ -3029,10 +3020,10 @@ that help is desired for. \n",
               ED_BUFFER->scroll_lines - 1, ED_BUFFER->scroll_lines + 4);
 
 #ifdef RECEIVE_ED
-      copy_and_push_string(edout);
-      push_undefined();
-
-      ret = apply(APPLY_RECEIVE_ED, ED_DEST, 2, ORIGIN_DRIVER);
+      /* outstr may point into ret's string below: ret lives to the end of
+       * the switch */
+      vm::CallResult ret = vm::Call(vm::Value::str_copy(edout), vm::Value::undefined())
+                               .apply(APPLY_RECEIVE_ED, ED_DEST, ORIGIN_DRIVER);
       if (!ret) {
         outstr = edout;
       } else if (ret->type == T_NUMBER) {
@@ -3052,7 +3043,7 @@ that help is desired for. \n",
         curp->screen = 0;
         curp->next = 0;
 
-        for (i = 0; i < ret->u.arr->size; i++) {
+        for (int i = 0; i < ret->u.arr->size; i++) {
           if (ret->u.arr->item[i].type != T_STRING) {
             continue;  // dumb.  just skip.
           }
@@ -3061,9 +3052,12 @@ that help is desired for. \n",
           curp = curp->next;
 
           curp->next = 0;
-          curp->screen = DMALLOC(sizeof(char) * (strlen(ret->u.arr->item[i].u.string) + 1),
-                                 TAG_TEMPORARY, "ed: help");
-          strcpy(curp->screen, ret->u.arr->item[i].u.string);
+          {
+            size_t const slen = SVALUE_STRLEN(&ret->u.arr->item[i]);
+            curp->screen = reinterpret_cast<char*>(
+                DMALLOC(sizeof(char) * (slen + 1), TAG_TEMPORARY, "ed: help"));
+            memcpy(curp->screen, ret->u.arr->item[i].u.string, slen + 1);
+          }
         }
 
         curp = P_HELPOUT;
@@ -3209,8 +3203,6 @@ static void object_free_ed_buffer() {
 }
 
 char* object_ed_start(object_t* ob, const char* fname, int restricted, int scroll_lines) {
-  svalue_t* setup;
-
   /* ensure that the result buffer is initialized */
   outbuf_zero(&current_ed_results);
 
@@ -3220,9 +3212,9 @@ char* object_ed_start(object_t* ob, const char* fname, int restricted, int scrol
   ED_BUFFER->flags |= EIGHTBIT_MASK;
   ED_BUFFER->shiftwidth = ED_INDENT_SPACES;
 
-  push_object(current_editor);
-  setup = apply_master_ob(APPLY_RETRIEVE_ED_SETUP, 1);
-  if (setup && setup != (svalue_t*)-1 && setup->type == T_NUMBER && setup->u.number) {
+  vm::CallResult setup =
+      vm::Call(vm::Value::object(current_editor)).apply_master(APPLY_RETRIEVE_ED_SETUP);
+  if (setup.is(T_NUMBER) && setup->u.number) {
     ED_BUFFER->flags = setup->u.number & ALL_FLAGS_MASK;
     ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
   }
@@ -3258,16 +3250,15 @@ char* object_ed_start(object_t* ob, const char* fname, int restricted, int scrol
 }
 
 void object_save_ed_buffer(object_t* ob) {
-  svalue_t* stmp;
   const char* fname;
 
   regexp_user = ED_REGEXP;
   current_ed_buffer = find_ed_buffer(ob);
   current_editor = ob;
 
-  copy_and_push_string(P_FNAME);
-  stmp = apply_master_ob(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME, 1);
-  if (stmp && stmp != (svalue_t*)-1) {
+  vm::CallResult stmp =
+      vm::Call(vm::Value::str_copy(P_FNAME)).apply_master(APPLY_GET_ED_BUFFER_SAVE_FILE_NAME);
+  if (stmp) {
     if (stmp->type == T_STRING) {
       fname = stmp->u.string;
       if (*fname == '/') {
@@ -3341,110 +3332,82 @@ char* object_ed_cmd(object_t* ob, const char* str) {
 #endif
 
 #ifdef F_ED
-void f_ed() {
+/* The spec types each position (string, then string|int twice, then int
+ * twice), so only the checks it cannot express remain: which of the
+ * string|int positions must be a string in each calling form. */
+void f_ed(vm::EfunArgs& f, std::optional<vm::StringArg> fname, std::optional<vm::Arg> arg2,
+          std::optional<vm::Arg> arg3, std::optional<LPC_INT> arg4, std::optional<LPC_INT> arg5) {
+  int num_arg = f.argc();
   if (!command_giver || !command_giver->interactive) {
-    pop_n_elems(st_num_arg);
     return;
   }
 
-  if (!st_num_arg) {
+  if (!num_arg) {
     /* ed() */
     ed_start(nullptr, nullptr, nullptr, 0, nullptr, 0);
-  } else if (st_num_arg == 1) {
+  } else if (num_arg == 1) {
     /* ed(fname) */
-    if (!(sp->type == T_STRING)) {
-      bad_argument(sp, T_STRING, 1, F_ED);
-    }
-    ed_start(sp->u.string, nullptr, nullptr, 0, nullptr, 0);
-    pop_stack();
-  } else if (st_num_arg == 2) {
+    ed_start(fname->c_str(), nullptr, nullptr, 0, nullptr, 0);
+  } else if (num_arg == 2) {
     /* ed(fname,exitfn) / ed(fname, scroll_lines) */
-    if (!((sp - 1)->type == T_STRING)) {
-      bad_argument(sp - 1, T_STRING, 1, F_ED);
-    }
-
-    if (sp->type == T_STRING) {
-      ed_start((sp - 1)->u.string, nullptr, sp->u.string, 0, current_object, 0);
-    } else if (sp->type == T_NUMBER) {
-      ed_start((sp - 1)->u.string, nullptr, nullptr, 0, nullptr, sp->u.number);
+    if (arg2->is(T_STRING)) {
+      ed_start(fname->c_str(), nullptr, arg2->string().c_str(), 0, current_object, 0);
     } else {
-      bad_argument(sp, T_NUMBER | T_STRING, 2, F_ED);
+      ed_start(fname->c_str(), nullptr, nullptr, 0, nullptr, arg2->number());
     }
-    pop_2_elems();
-  } else if (st_num_arg == 3) {
+  } else if (num_arg == 3) {
     /* ed(fname,exitfn,restricted) / ed(fname,writefn,exitfn) /
      ed(fname,exitfn,scroll_lines) */
-    if (!((sp - 1)->type == T_STRING)) {
-      bad_argument(sp - 1, T_STRING, 2, F_ED);
-    }
-    if (!((sp - 2)->type == T_STRING)) {
-      bad_argument(sp - 2, T_STRING, 1, F_ED);
+    if (!arg2->is(T_STRING)) {
+      bad_argument(arg2->sv(), T_STRING, 2, F_ED);
     }
 
-    if (sp->type == T_NUMBER) {
-      if (sp->u.number == 1) {
-        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, sp->u.number, current_object, 0);
+    if (arg3->is(T_NUMBER)) {
+      if (arg3->number() == 1) {
+        ed_start(fname->c_str(), nullptr, arg2->string().c_str(), arg3->number(), current_object,
+                 0);
       } else {
-        ed_start((sp - 2)->u.string, nullptr, (sp - 1)->u.string, 0, current_object, sp->u.number);
+        ed_start(fname->c_str(), nullptr, arg2->string().c_str(), 0, current_object,
+                 arg3->number());
       }
-    } else if (sp->type == T_STRING) {
-      ed_start((sp - 2)->u.string, (sp - 1)->u.string, sp->u.string, 0, current_object, 0);
     } else {
-      bad_argument(sp, T_NUMBER | T_STRING, 3, F_ED);
+      ed_start(fname->c_str(), arg2->string().c_str(), arg3->string().c_str(), 0, current_object,
+               0);
     }
-    pop_3_elems();
-  } else if (st_num_arg == 4) {
+  } else if (num_arg == 4) {
     /* ed(fname,writefn,exitfn,restricted) /
      ed(fname,writefn,exitfn,scroll_lines) */
-    if (!(sp->type == T_NUMBER)) {
-      bad_argument(sp, T_NUMBER, 4, F_ED);
+    if (!arg3->is(T_STRING)) {
+      bad_argument(arg3->sv(), T_STRING, 3, F_ED);
     }
-    if (!((sp - 1)->type == T_STRING)) {
-      bad_argument(sp - 1, T_STRING, 3, F_ED);
-    }
-    if (!((sp - 2)->type == T_STRING)) {
-      bad_argument(sp - 2, T_STRING, 2, F_ED);
-    }
-    if (!((sp - 3)->type == T_STRING)) {
-      bad_argument(sp - 3, T_STRING, 1, F_ED);
+    if (!arg2->is(T_STRING)) {
+      bad_argument(arg2->sv(), T_STRING, 2, F_ED);
     }
 
-    if (sp->u.number == 1) {
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, sp->u.number,
+    if (*arg4 == 1) {
+      ed_start(fname->c_str(), arg2->string().c_str(), arg3->string().c_str(), *arg4,
                current_object, 0);
     } else {
-      ed_start((sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.string, 0, current_object,
-               sp->u.number);
+      ed_start(fname->c_str(), arg2->string().c_str(), arg3->string().c_str(), 0, current_object,
+               *arg4);
     }
-    pop_n_elems(4);
-  } else { /* st_num_arg == 5 */
+  } else { /* num_arg == 5 */
     /* ed(fname, writefn, exitfn, restricted, scroll_lines) */
-    if (!(sp->type == T_NUMBER)) {
-      bad_argument(sp, T_NUMBER, 5, F_ED);
+    if (!arg3->is(T_STRING)) {
+      bad_argument(arg3->sv(), T_STRING, 3, F_ED);
     }
-    if (!((sp - 1)->type == T_NUMBER)) {
-      bad_argument(sp - 1, T_NUMBER, 4, F_ED);
-    }
-    if (!((sp - 2)->type == T_STRING)) {
-      bad_argument(sp - 2, T_STRING, 3, F_ED);
-    }
-    if (!((sp - 3)->type == T_STRING)) {
-      bad_argument(sp - 3, T_STRING, 2, F_ED);
-    }
-    if (!((sp - 4)->type == T_STRING)) {
-      bad_argument(sp - 4, T_STRING, 1, F_ED);
+    if (!arg2->is(T_STRING)) {
+      bad_argument(arg2->sv(), T_STRING, 2, F_ED);
     }
 
-    ed_start((sp - 4)->u.string, (sp - 3)->u.string, (sp - 2)->u.string, (sp - 1)->u.number,
-             current_object, sp->u.number);
-
-    pop_n_elems(5);
+    ed_start(fname->c_str(), arg2->string().c_str(), arg3->string().c_str(), *arg4,
+             current_object, *arg5);
   }
 }
 #endif
 
 #ifdef F_ED_CMD
-void f_ed_cmd(void) {
+vm::Value f_ed_cmd(vm::EfunArgs&, vm::StringArg cmd) {
   char* res;
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3455,43 +3418,36 @@ void f_ed_cmd(void) {
     error("ed_cmd() called with no ed session active.\n");
   }
 
-  res = object_ed_cmd(current_object, sp->u.string);
+  res = object_ed_cmd(current_object, cmd.c_str());
 
-  free_string_svalue(sp);
   if (res) {
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = res;
-  } else {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    return vm::Value::str_malloced(res);
   }
+  return vm::Value::str_constant("");
 }
 #endif
 
 #ifdef F_ED_START
-void f_ed_start(void) {
+vm::Value f_ed_start(vm::EfunArgs&, std::optional<vm::StringArg> file, std::optional<LPC_INT> arg2,
+                     std::optional<LPC_INT> arg3) {
   char* res;
-  const char* fname;
+  const char* fname = nullptr;
   int restr = 0;
   int scroll_lines = 20;
 
-  if (st_num_arg == 3) {
-    scroll_lines = (sp--)->u.number;
-    restr = (sp--)->u.number;
-  }
-
-  if (st_num_arg == 2) {
-    if (sp->u.number == 1) {
-      restr = (sp--)->u.number;
+  if (arg3) {
+    scroll_lines = *arg3;
+    restr = *arg2;
+  } else if (arg2) {
+    if (*arg2 == 1) {
+      restr = *arg2;
     } else {
-      scroll_lines = (sp--)->u.number;
+      scroll_lines = *arg2;
     }
   }
 
-  if (st_num_arg) {
-    fname = sp->u.string;
-  } else {
-    fname = 0;
+  if (file) {
+    fname = file->c_str();
   }
 
   if (current_object->flags & O_DESTRUCTED) {
@@ -3504,43 +3460,30 @@ void f_ed_start(void) {
 
   res = object_ed_start(current_object, fname, restr, scroll_lines);
 
-  if (fname) {
-    free_string_svalue(sp);
-  } else {
-    STACK_INC;
-    sp->type = T_STRING;
-  }
-
   if (res) {
-    sp->subtype = STRING_MALLOC;
-    sp->u.string = res;
-  } else {
-    sp->subtype = STRING_CONSTANT;
-    sp->u.string = "";
+    return vm::Value::str_malloced(res);
   }
+  return vm::Value::str_constant("");
 }
 #endif
 
 #ifdef F_IN_EDIT
-void f_in_edit() {
+vm::Value f_in_edit(vm::EfunArgs&, object_t* ob) {
   char* fn;
   ed_buffer_t* eb = nullptr;
 
 #ifdef OLD_ED
-  if (sp->u.ob->interactive) {
-    eb = sp->u.ob->interactive->ed_buffer;
+  if (ob->interactive) {
+    eb = ob->interactive->ed_buffer;
   }
 #else
-  if (sp->u.ob->flags & O_IN_EDIT) {
-    eb = find_ed_buffer(sp->u.ob);
+  if (ob->flags & O_IN_EDIT) {
+    eb = find_ed_buffer(ob);
   }
 #endif
   if (eb && (fn = eb->fname)) {
-    free_object(&sp->u.ob, "f_in_edit:1");
-    put_malloced_string(add_slash(fn));
-    return;
+    return vm::Value::str_malloced(add_slash(fn));
   }
-  free_object(&sp->u.ob, "f_in_edit:1");
-  *sp = const0;
+  return 0;
 }
 #endif

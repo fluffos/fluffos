@@ -24,6 +24,7 @@ typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
 #include "comm.h"                    // add_message FIXME: reverse API
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/eval_limit.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/otable.h"  // FIXME:
@@ -68,7 +69,7 @@ int valid_hide(object_t* obj) {
   }
   push_object(obj);
   ret = safe_apply_master_ob(APPLY_VALID_HIDE, 1);
-  return MASTER_APPROVED(ret, "valid_hide");
+  return master_approved(ret, "valid_hide");
 }
 #endif
 

@@ -1,0 +1,3 @@
+// Excluded from a tell_room() whose room load destructs it; see
+// tell_room_loads_victim.lpc and single/tests/efuns/tell_room.lpc.
+void create() {}

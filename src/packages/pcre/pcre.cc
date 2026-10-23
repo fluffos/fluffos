@@ -128,12 +128,11 @@ int pcrecachesize = 0;
 struct pcre_cache_t pcre_cache = {{nullptr}};
 
 // efuns
-void f_pcre_version() {
+vm::Value f_pcre_version(vm::EfunArgs&) {
   char version[96];
   int jit = 0;
   if (pcre2_config(PCRE2_CONFIG_VERSION, version) < 0) {
-    push_constant_string("unknown");
-    return;
+    return vm::Value::str_constant("unknown");
   }
   if (pcre2_config(PCRE2_CONFIG_JIT, &jit) >= 0 && jit) {
     size_t n = strlen(version);
@@ -141,10 +140,10 @@ void f_pcre_version() {
       memcpy(version + n, " JIT", 5);
     }
   }
-  copy_and_push_string(version);
+  return vm::Value::str_copy(version);
 }
 
-void f_pcre_config() {
+vm::Value f_pcre_config(vm::EfunArgs&) {
   mapping_t* m = allocate_mapping(16);
   char buf[128];
   uint32_t u = 0;
@@ -191,22 +190,17 @@ void f_pcre_config() {
     add_mapping_pair(m, "never_backslash_c", u);
   }
 #endif
-  push_refed_mapping(m);
+  return vm::Value::refed(m);
 }
 
-void f_pcre_info() {
+vm::Value f_pcre_info(vm::EfunArgs&, vm::StringArg pattern, std::optional<vm::Arg> flags) {
   pcre_options opts = default_pcre_options();
-  if (st_num_arg >= 2) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
-  }
-  if (sp->type != T_STRING) {
-    error("Bad argument 1 to pcre_info()\n");
+  if (flags) {
+    apply_options_svalue(&opts, flags->sv());
   }
 
   pcre_t* run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_info : run");
-  run->pattern = sp->u.string;
+  run->pattern = pattern.c_str();
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
@@ -282,19 +276,13 @@ void f_pcre_info() {
     }
   }
 
-  pop_stack();
-  push_refed_mapping(m);
+  return vm::Value::refed(m);
 }
 
-void f_pcre_convert() {
+vm::Value f_pcre_convert(vm::EfunArgs&, vm::StringArg pattern, mapping_t* map) {
   uint32_t cflags = PCRE2_CONVERT_UTF;
   int have_kind = 0;
 
-  if (st_num_arg < 2 || sp->type != T_MAPPING) {
-    error("pcre_convert() requires a mapping of convert options (glob, posix_basic, or posix_extended).\n");
-  }
-
-  mapping_t* map = sp->u.map;
   auto on = [&](const char* key) {
     svalue_t* v = find_string_in_mapping(map, key);
     return v && v->type == T_NUMBER && v->u.number != 0;
@@ -324,7 +312,7 @@ void f_pcre_convert() {
     error("pcre_convert() mapping must set glob, posix_basic, or posix_extended.\n");
   }
 
-  const char* pat = (sp - 1)->u.string;
+  const char* pat = pattern.c_str();
   PCRE2_UCHAR* out = nullptr;
   PCRE2_SIZE outlen = 0;
   int rc = pcre2_pattern_convert((PCRE2_SPTR)pat, PCRE2_ZERO_TERMINATED, cflags, &out, &outlen,
@@ -338,121 +326,79 @@ void f_pcre_convert() {
   memcpy(ret, out, outlen);
   ret[outlen] = '\0';
   pcre2_converted_pattern_free(out);
-  pop_2_elems();
-  push_malloced_string(ret);
+  return vm::Value::str_malloced(ret);
 }
 
-void f_pcre_match() {
+vm::Value f_pcre_match(vm::EfunArgs&, vm::Arg subject, vm::StringArg pattern,
+                       std::optional<vm::Arg> arg3, std::optional<vm::Arg> pcre_flags) {
   array_t* v;
   int flag = 0;
   pcre_options opts = default_pcre_options();
-  // The subject (1st arg) sits at sp - st_num_arg + 1 regardless of how
-  // many optional trailing args (flag, pcre_flags) are present; reading
-  // (sp - 1) here only happened to be correct for the 2-arg call form --
-  // with a 3rd (or 4th) argument on the stack, sp - 1 is the pattern (or
-  // flag) instead, always misidentifying array-mode calls as string-mode.
-  bool is_string = ((sp - st_num_arg + 1)->type == T_STRING);
+  // Subject is always arg 0 regardless of optional trailing args (flag /
+  // pcre_flags). Reading from_top(1) only worked for the 2-arg form.
+  bool is_string = subject.is(T_STRING);
 
   // optional 4th arg: pcre_flags (int or mapping)
-  if (st_num_arg > 3) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
+  if (pcre_flags) {
+    apply_options_svalue(&opts, pcre_flags->sv());
   }
 
-  // optional 3rd arg:
-  if (st_num_arg == 3) {
-    if (is_string) {
-      apply_options_svalue(&opts, sp);
-      pop_stack();
-    } else if (sp->type == T_MAPPING) {
-      apply_options_svalue(&opts, sp);
-      pop_stack();
-    } else if (sp->type == T_NUMBER) {
-      flag = (sp--)->u.number;
+  // optional 3rd arg: pcre_flags for a string subject; for an array, a
+  // mapping is pcre_flags and an int is regexp()'s flag
+  if (arg3) {
+    if (is_string || arg3->is(T_MAPPING)) {
+      apply_options_svalue(&opts, arg3->sv());
     } else {
-      error("Bad argument 3 to pcre_match()\n");
+      flag = arg3->number();
     }
-    st_num_arg--;
   }
 
   if (is_string) {
-    flag = pcre_match_single((sp - 1), sp->u.string, opts);
-
-    free_string_svalue(sp--);
-    free_string_svalue(sp);
-    put_number(flag);
-  } else {
-    v = pcre_match((sp - 1)->u.arr, sp->u.string, flag, opts);
-
-    free_string_svalue(sp--);
-    free_array(sp->u.arr);
-    sp->u.arr = v;
+    flag = pcre_match_single(subject.sv(), pattern.c_str(), opts);
+    return flag;
   }
+  v = pcre_match(subject.array(), pattern.c_str(), flag, opts);
+  return vm::Value::refed(v);
 }
 
-void f_pcre_assoc() {
-  svalue_t* arg;
+vm::Value f_pcre_assoc(vm::EfunArgs& f, vm::StringArg /* str: f[0] */, array_t* pat, array_t* tok,
+                       std::optional<vm::Arg> def, std::optional<vm::Arg> pcre_flags) {
   array_t* vec;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg == 5) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
+  if (pcre_flags) {
+    apply_options_svalue(&opts, pcre_flags->sv());
   }
 
-  arg = sp - st_num_arg + 1;
+  vec = pcre_assoc(f[0].sv(), pat, tok, def ? def->sv() : &const0, opts);
 
-  if ((arg + 2)->type != T_ARRAY) {
-    error("Bad argument 3 to pcre_assoc()\n");
-  }
-
-  vec = pcre_assoc(arg, (arg + 1)->u.arr, (arg + 2)->u.arr, st_num_arg > 3 ? (arg + 3) : &const0,
-                   opts);
-
-  if (st_num_arg == 4) {
-    pop_3_elems();
-  } else {
-    pop_2_elems();
-  }
-
-  free_string_svalue(sp);
-
-  sp->type = T_ARRAY;
-  sp->u.arr = vec;
+  return vm::Value::refed(vec);
 }
 
-void f_pcre_extract() {
+vm::Value f_pcre_extract(vm::EfunArgs&, vm::StringArg subject, vm::StringArg pattern,
+                         std::optional<vm::Arg> arg3, std::optional<vm::Arg> pcre_flags) {
   pcre_t* run;
   array_t* ret;
   int include_names = 0;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg >= 4) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
+  if (pcre_flags) {
+    apply_options_svalue(&opts, pcre_flags->sv());
   }
 
-  svalue_t* arg = sp - st_num_arg + 1;
-
-  if (st_num_arg == 3) {
-    if ((arg + 2)->type == T_MAPPING) {
-      apply_options_svalue(&opts, arg + 2);
-    } else if ((arg + 2)->type == T_NUMBER) {
-      include_names = (arg + 2)->u.number != 0;
+  // optional 3rd arg: a mapping is pcre_flags, an int asks for named groups
+  if (arg3) {
+    if (arg3->is(T_MAPPING)) {
+      apply_options_svalue(&opts, arg3->sv());
     } else {
-      error("Bad argument 3 to pcre_extract()\n");
+      include_names = arg3->number() != 0;
     }
-  } else if (st_num_arg != 2) {
-    error("pcre_extract() requires 2 or 3 arguments\n");
   }
 
   run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_extract : run");
-  run->pattern = (arg + 1)->u.string;
-  run->subject = arg->u.string;
-  run->s_length = SVALUE_STRLEN(arg);
+  run->pattern = pattern.c_str();
+  run->subject = subject.c_str();
+  run->s_length = subject.size();
   run->ovector = nullptr;
   run->ovecsize = 0;
   assign_run_options(run, opts);
@@ -463,66 +409,55 @@ void f_pcre_extract() {
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_n_elems(st_num_arg);
-    push_refed_array(&the_null_array);
-    return;
+    return vm::Value::refed(&the_null_array);
   }
   if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
     error("Too many substrings.\n");
   }
 
   ret = pcre_get_substrings(run, include_names);
-  pop_n_elems(st_num_arg);
-
-  push_refed_array(ret);
+  return vm::Value::refed(ret);
 }
 
-void f_pcre_replace() {
+vm::Value f_pcre_replace(vm::EfunArgs& f, vm::StringArg subject, vm::StringArg pattern,
+                         vm::Arg replacement, std::optional<vm::Arg> pcre_flags) {
   pcre_t* run;
   array_t* replacements;
 
   char* ret;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg >= 4) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
-  }
-
-  if (sp->type != T_ARRAY && sp->type != T_STRING) {
-    error("Bad argument 3 to pcre_replace()\n");
+  if (pcre_flags) {
+    apply_options_svalue(&opts, pcre_flags->sv());
   }
 
   run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
 
   run->ovector = nullptr;
   run->ovecsize = 0;
-  run->pattern = (sp - 1)->u.string;
-  run->subject = (sp - 2)->u.string;
-  run->s_length = SVALUE_STRLEN(sp - 2);
+  run->pattern = pattern.c_str();
+  run->subject = subject.c_str();
+  run->s_length = subject.size();
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
-  if (sp->type == T_STRING) {
+  if (replacement.is(T_STRING)) {
     if (pcre_ensure_compiled(run) < 0) {
       error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
     }
-    ret = pcre_substitute_template(run, sp->u.string, SVALUE_STRLEN(sp));
-    pop_3_elems();
-    push_malloced_string(ret);
-    return;
+    vm::StringArg repl = replacement.string();
+    ret = pcre_substitute_template(run, repl.c_str(), repl.size());
+    return vm::Value::str_malloced(ret);
   }
 
-  replacements = sp->u.arr;
+  replacements = replacement.array();
 
   if (pcre_magic(run) < 0) {
     error("PCRE compilation failed at offset %d: %s\n", run->erroffset, run->error);
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_2_elems();
-    return;
+    return f.take(0);
   }
 
   if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
@@ -538,9 +473,7 @@ void f_pcre_replace() {
 
   if (run->rc == 1) {
     /* No captured substrings, return subject */
-    pop_2_elems();
-    return;
-    // push_malloced_string(run->subject);
+    return f.take(0);
   }
 
   for (int i = 0; i < replacements->size; i++) {
@@ -551,36 +484,32 @@ void f_pcre_replace() {
 
   ret = pcre_get_replace(run, replacements);
 
-  pop_3_elems();
-  push_malloced_string(ret);
+  return vm::Value::str_malloced(ret);
 }
 
 // string pcre_replace_callback(string, string, function)
-void f_pcre_replace_callback() {
-  int num_arg = st_num_arg, i;
+// The callback's own trailing arguments are untyped (`...`): a trailing int
+// or mapping after them is pcre_flags.
+vm::Value f_pcre_replace_callback(vm::EfunArgs& f, vm::StringArg subject, vm::StringArg pattern,
+                                  vm::Arg /* fun: read by process_callback() */) {
   char* ret;
   pcre_t* run;
-  svalue_t* arg;
   array_t *arr, *r;
   function_to_call_t ftc;
   pcre_options opts = default_pcre_options();
 
-  if (num_arg >= 4 && (sp->type == T_NUMBER || sp->type == T_MAPPING)) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
-    num_arg--;
+  if (f.argc() >= 4 && (f[f.argc() - 1].is(T_NUMBER) || f[f.argc() - 1].is(T_MAPPING))) {
+    apply_options_svalue(&opts, f[f.argc() - 1].sv());
+    f.pop_back(); /* so process_callback() does not see it */
   }
-
-  arg = sp - num_arg + 1;
 
   run = (pcre_t*)DCALLOC(1, sizeof(pcre_t), TAG_TEMPORARY, "f_pcre_replace: run");
   run->ovector = nullptr;
   run->ovecsize = 0;
-  run->subject = arg->u.string;
-  run->pattern = (arg + 1)->u.string;
+  run->subject = subject.c_str();
+  run->pattern = pattern.c_str();
 
-  run->s_length = SVALUE_STRLEN(arg);
+  run->s_length = subject.size();
   assign_run_options(run, opts);
   DEFER { pcre_free_memory(run); };
 
@@ -589,46 +518,34 @@ void f_pcre_replace_callback() {
   }
 
   if (run->rc < 0) { /* No match. could do handling of matching errors if wanted */
-    pop_n_elems(num_arg - 1);
-    return;
+    return f.take(0);
   }
 
   if (run->rc > 0 && run->rc * 2 > run->ovecsize) {
     error("Too many substrings.\n");
   }
 
-  arr = pcre_get_substrings(run, false);
+  // Owned from here, so an error() -- process_callback() rejecting the
+  // callback, or an error in a callback -- frees it.
+  vm::Value arr_owner = vm::Value::refed(pcre_get_substrings(run, false));
+  arr = arr_owner->u.arr;
 
-  // arr is not reachable from the VM stack until push_refed_array() below, so
-  // nothing would free it if process_efun_callback() rejects the callback first.
-  std::unique_ptr<array_t, decltype(&free_array)> arr_owner(arr, &free_array);
-
-  if (arg[2].type == T_FUNCTION || arg[2].type == T_STRING) {
-    process_efun_callback(2, &ftc, F_PCRE_REPLACE_CALLBACK);
-  } else {  // 0
-    error("Illegal third argument (0) to pcre_replace_callback");
-  }
+  f.process_callback(2, &ftc);
 
   r = allocate_array(run->rc - 1);  // can't use the empty variant in case we error below
-
-  push_refed_array(r);
-  // Transfer ownership to the VM stack; arr still holds the same pointer for the loop below.
-  push_refed_array(arr_owner.release());
+  vm::Value r_owner = vm::Value::refed(r);
   error_context_t econ;
 
   save_context(&econ);
   try {
-    for (i = 0; i < run->rc - 1; i++) {
-      svalue_t* v;
-      push_svalue(arr->item + i);
-      push_number(i);
-      v = call_efun_callback(&ftc, 2);
+    for (int i = 0; i < run->rc - 1; i++) {
+      vm::CallResult v = vm::Call(vm::Value::copy(&arr->item[i]), i).call(&ftc);
 
       /* Mimic behaviour of map(string, function) when function pointer returns
        null,
        ie return the input.  */
-      if (v && v->type == T_STRING && v->u.string != nullptr) {
-        assign_svalue_no_free(&r->item[i], v);
+      if (v.is(T_STRING) && v->u.string != nullptr) {
+        assign_svalue_no_free(&r->item[i], v.get());
       } else {
         assign_svalue_no_free(&r->item[i], &arr->item[i]);
       }
@@ -641,19 +558,15 @@ void f_pcre_replace_callback() {
   }
   pop_context(&econ);
   ret = pcre_get_replace(run, r);
-
-  pop_n_elems(num_arg + 2);  // refed arrays
-  push_malloced_string(ret);
+  return vm::Value::str_malloced(ret);
 }
 
-void f_pcre_cache() {
-  mapping_t* m = nullptr;
-  m = pcre_get_cache();
+vm::Value f_pcre_cache(vm::EfunArgs&) {
+  mapping_t* m = pcre_get_cache();
   if (!m) {
-    push_number(0);
-  } else {
-    push_refed_mapping(m);
+    return 0;
   }
+  return vm::Value::refed(m);
 }
 
 // Internal functions utilized by the efuns
@@ -1924,19 +1837,18 @@ void mark_pcre_cache() {
 }
 #endif
 
-void f_pcre_match_all() {
+vm::Value f_pcre_match_all(vm::EfunArgs&, vm::StringArg subject_arg, vm::StringArg pattern_arg,
+                           std::optional<vm::Arg> pcre_flags) {
   array_t* v;
   pcre_options opts = default_pcre_options();
 
-  if (st_num_arg >= 3) {
-    apply_options_svalue(&opts, sp);
-    pop_stack();
-    st_num_arg--;
+  if (pcre_flags) {
+    apply_options_svalue(&opts, pcre_flags->sv());
   }
 
-  const auto* pattern = (sp)->u.string;
-  const auto* subject = (sp - 1)->u.string;
-  auto subject_len = SVALUE_STRLEN(sp - 1);
+  const auto* pattern = pattern_arg.c_str();
+  const auto* subject = subject_arg.c_str();
+  auto subject_len = subject_arg.size();
 
   auto matches = pcre_match_all(subject, subject_len, pattern, opts);
   SCOPE_FAIL { pcre_free_match_list(&matches); };
@@ -1944,7 +1856,7 @@ void f_pcre_match_all() {
   // Validate EVERY array size before allocating anything: allocate_array()
   // error()s past this limit, and once the loop below is under way a throw
   // would strand both the strings still held in `matches` and the result array
-  // built so far (v is not reachable from the VM stack until the very end).
+  // built so far (v is not owned by anything until it is returned).
   // With the sizes checked up front that loop cannot throw at all.
   auto const max_array_size = static_cast<size_t>(CONFIG_INT(__MAX_ARRAY_SIZE__));
   if (matches.size() > max_array_size) {
@@ -1955,8 +1867,6 @@ void f_pcre_match_all() {
       error("Too many capture groups (%zu) for pcre_match_all().\n", match.size());
     }
   }
-
-  pop_2_elems();
 
   v = allocate_array(matches.size());
   for (int i = 0; i < matches.size(); i++) {
@@ -1972,5 +1882,5 @@ void f_pcre_match_all() {
     match.clear();
   }
 
-  push_refed_array(v);
+  return vm::Value::refed(v);
 }

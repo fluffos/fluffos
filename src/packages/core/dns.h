@@ -11,6 +11,8 @@ void mark_dns_requests(void);
 #endif
 
 int query_addr_by_name(const char*, struct svalue_t*);
+/* Both return a NEW reference to a shared string, which the caller must
+ * free_string(), or nullptr when the object is not interactive. */
 const char* query_ip_name(struct object_t*);
 const char* query_ip_number(struct object_t*);
 char* query_host_name(void);

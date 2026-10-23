@@ -1,0 +1,17 @@
+// A call through an efun pointer is type-checked like a compiled call.
+//
+// call_function_pointer() checks only the first min_arg arguments of an
+// efun that takes four or more (or varargs). The generated binding checks
+// every argument its spec types, so an optional argument of the wrong type
+// is a clean "Bad argument" error instead of a string's pointer bits read
+// as a number.
+void do_tests() {
+  function fp = (: terminal_colour :);
+  mixed err;
+
+  ASSERT_EQ("abc", evaluate(fp, "abc", ([]), 0, 0));
+  err = catch(evaluate(fp, "abc", ([]), 0, "x"));
+  ASSERT2(err && strsrch(err, "Bad argument 4") != -1, sprintf("%O", err));
+  err = catch(evaluate(fp, "abc", ([]), "x", 0));
+  ASSERT2(err && strsrch(err, "Bad argument 3") != -1, sprintf("%O", err));
+}

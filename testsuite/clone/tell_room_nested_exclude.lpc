@@ -1,0 +1,7 @@
+// Loaded by tell_room by-name: its create() calls tell_room with a different
+// exclude object. That must not clobber the outer call's exclude list (was a
+// static array_t in f_tell_room).
+void create() {
+  object other = load_object("/clone/tell_room_victim");
+  tell_room(this_object(), "nested", other);
+}

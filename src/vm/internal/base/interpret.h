@@ -124,34 +124,13 @@ struct function_lookup_info_t {
 /* macro calls */
 #define call_program(prog, offset) eval_instruction(prog->program + offset)
 
-#define CHECK_STACK_OVERFLOW(x) \
-  if (sp + (x) >= end_of_stack) SAFE(too_deep_error = 1; error("stack overflow");)
-#define STACK_INC SAFE(CHECK_STACK_OVERFLOW(1); sp++;)
-
-#define push_svalue(x) SAFE(STACK_INC; assign_svalue_no_free(sp, x);)
-#define put_number(x) SAFE(sp->type = T_NUMBER; sp->subtype = 0; sp->u.number = (x);)
-#define put_buffer(x) SAFE(sp->type = T_BUFFER; sp->u.buf = (x);)
-#define put_undested_object(x) SAFE(sp->type = T_OBJECT; sp->u.ob = (x);)
-#define put_object(x) \
-  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED)* sp = const0u; else put_undested_object(x);)
-#define put_unrefed_undested_object(x, y) \
-  SAFE(sp->type = T_OBJECT; sp->u.ob = (x); add_ref((x), y);)
-#define put_unrefed_object(x, y)                             \
-  SAFE(if (!(x) || (x)->flags & O_DESTRUCTED)* sp = const0u; \
-       else put_unrefed_undested_object(x, y);)
-/* see comments on push_constant_string */
-#define put_constant_string(x) \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; sp->u.string = make_shared_string(x);)
-#define put_malloced_string(x) \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_MALLOC; sp->u.string = (x);)
-#define put_array(x) SAFE(sp->type = T_ARRAY; sp->u.arr = (x);)
-#define put_shared_string(x) \
-  SAFE(sp->type = T_STRING; sp->subtype = STRING_SHARED; sp->u.string = (x);)
-
+/* Evaluation stack *top* (`sp`), the push_*()/pop_*() helpers, put_/STACK
+ * macros and PoppedLvalue live in vm_stack.h -- VM internals and
+ * packages/ops only. Package efuns use vm::EfunArgs/vm::Call (included below).
+ * Other registers remain visible for control-frame bookkeeping. */
 extern program_t* current_prog;
 extern short caller_type;
 extern char* pc;
-extern svalue_t* sp;
 extern svalue_t* fp;
 extern svalue_t* start_of_stack;
 extern svalue_t* end_of_stack;
@@ -166,7 +145,6 @@ extern int variable_index_offset;
 extern int simul_efun_is_loading;
 extern program_t fake_prog;
 extern int num_varargs;
-extern int st_num_arg;
 
 extern ref_t* global_ref_list;
 extern int lv_owner_type;
@@ -186,35 +164,10 @@ ref_t* make_ref(void);
 /* += / -= on a T_LVALUE_CODEPOINT slot; returns the resulting codepoint. */
 LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
 
-/* Owns a popped (or stolen) stack lvalue. error() unwinds via a C++
- * exception (do_catch / safe_apply), so the destructor releases the box
- * on that path too -- a bare `svalue_t lvslot = *sp--` leaked every
- * T_LVALUE_CODEPOINT / T_LVALUE_RANGE that hit error() before the
- * matching free_svalue (issue #1358). */
-class PoppedLvalue {
- public:
-  enum Mode { Pop, Steal };
-
-  explicit PoppedLvalue(Mode mode = Pop) {
-    slot_ = *sp;
-    if (mode == Pop) {
-      sp--;
-    } else {
-      /* Leave the stack slot but drop its claim on the box so unwind
-       * and this destructor cannot both delete it. */
-      sp->type = T_NUMBER;
-      sp->subtype = 0;
-      sp->u.number = 0;
-    }
-  }
-  ~PoppedLvalue() { free_svalue(&slot_, "PoppedLvalue"); }
-  PoppedLvalue(const PoppedLvalue&) = delete;
-  PoppedLvalue& operator=(const PoppedLvalue&) = delete;
-  svalue_t* target() { return lvalue_target(&slot_); }
-
- private:
-  svalue_t slot_;
-};
+/* The evaluation-stack API for efuns and driver call sites, in namespace vm:
+ * efun_args.h's EfunArgs, Call and CallResult, and value.h's Value,
+ * StringArg and Arg. */
+#include "vm/internal/base/efun_args.h"
 
 /* Convert a string (raw UTF-8 bytes) or array of ints 0..255 into a fresh
  * buffer; errors on anything else. Caller owns the result. */
@@ -236,7 +189,11 @@ void remove_fake_frame(void);
 void push_indexed_lvalue(int);
 void setup_variables(int, int, int);
 
-void process_efun_callback(int, function_to_call_t*, int);
+/* An efun left the stack `off` slots away from where its spec says it
+ * should (both dispatchers check after every call): a driver bug. */
+[[noreturn]] void efun_stack_mismatch(const char* efun, int num_arg, ptrdiff_t off);
+/* argc is the efun's arity (efuns call EfunArgs::process_callback()). */
+void process_efun_callback(int narg, function_to_call_t* ftc, int f, int argc);
 svalue_t* call_efun_callback(function_to_call_t*, int);
 svalue_t* safe_call_efun_callback(function_to_call_t*, int);
 const char* type_name(int c);

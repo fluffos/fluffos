@@ -1,6 +1,7 @@
 #include "base/std.h"
 
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include <stdlib.h>  // for qsort
 #include <cstring>
@@ -426,14 +427,18 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
   int i = 0, n;
   svalue_t* v;
 
+  /* dest is the array's own slot: every path that overwrites it releases
+   * the reference that slot held. */
   if (first_on_stack) {
     if (!(n = arr->size)) {
       *dest = *sp--;
+      free_array(arr);
       return;
     }
   } else {
     if (!(n = arr->size)) {
       *dest = const0;
+      free_array(arr);
       return;
     } else if (n == 1) {
       assign_svalue_no_free(dest, &arr->item[0]);
@@ -451,6 +456,7 @@ void implode_array(funptr_t* fptr, array_t* arr, svalue_t* dest, int first_on_st
     v = call_function_pointer(fptr, 2);
     if (!v) {
       *dest = const0;
+      free_array(arr);
       return;
     }
     if (i < n) {
@@ -605,8 +611,7 @@ void filter_array(svalue_t* arg, int num_arg) {
     svalue_t* v;
     int res = 0, cnt;
     function_to_call_t ftc;
-
-    process_efun_callback(1, &ftc, F_FILTER);
+    process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
     /* allocate a full size array and push it onto the stack so that if an
      * error occurs, it'll get cleaned up.  can't use empty array because
@@ -652,7 +657,7 @@ void filter_string(svalue_t* arg, int num_arg) {
     size = SVALUE_STRLEN(arg);
     str = const_cast<char*>(arg->u.string);
 
-    process_efun_callback(1, &ftc, F_FILTER);
+    process_efun_callback(1, &ftc, F_FILTER, num_arg);
 
     for (cnt = 0; cnt < size; cnt++) {
       push_number(str[cnt]);
@@ -757,39 +762,27 @@ static void unique_array_error_handler(void) {
   FREE((char*)unlist);
 }
 
-void f_unique_array(void) {
-  array_t *v, *ret;
-  long size, i, numkeys = 0, num_arg = st_num_arg;
+vm::Value f_unique_array(vm::EfunArgs&, array_t* v, vm::Arg separator,
+                         std::optional<vm::Arg> skip) {
+  array_t* ret;
+  long size, i, numkeys = 0;
   int* ind;
   svalue_t *skipval, *sv, *svp;
   unique_list_t* unlist;
   unique_t **head, *uptr, *nptr;
   funptr_t* fptr = nullptr;
-  const char* func;
+  const char* func = nullptr;
 
-  size = (v = (sp - num_arg + 1)->u.arr)->size;
+  size = v->size;
   if (!size) {
-    if (num_arg == 3) {
-      free_svalue(sp--, "f_unique_array");
-    }
-    free_svalue(sp--, "f_unique_array");
-    return;
+    return vm::Value::addref(v);
   }
 
-  if (num_arg == 3) {
-    skipval = sp;
-    if ((sp - 1)->type == T_FUNCTION) {
-      fptr = (sp - 1)->u.fp;
-    } else {
-      func = (sp - 1)->u.string;
-    }
+  skipval = skip ? skip->sv() : &const0;
+  if (separator.is(T_FUNCTION)) {
+    fptr = separator.funptr();
   } else {
-    skipval = &const0;
-    if (sp->type == T_FUNCTION) {
-      fptr = sp->u.fp;
-    } else {
-      func = sp->u.string;
-    }
+    func = separator.string().c_str();
   }
 
   unlist = reinterpret_cast<unique_list_t*>(
@@ -860,10 +853,8 @@ void f_unique_array(void) {
   unlist = g_u_list->next;
   FREE((char*)g_u_list);
   g_u_list = unlist;
-  sp--;
-  pop_n_elems(num_arg - 1);
-  free_array(v);
-  sp->u.arr = ret;
+  sp--; /* the error handler slot, without running it */
+  return vm::Value::refed(ret);
 }
 
 /*
@@ -1017,7 +1008,7 @@ void map_array(svalue_t* arg, int num_arg) {
     int cnt;
     svalue_t* v;
 
-    process_efun_callback(1, &ftc, F_MAP);
+    process_efun_callback(1, &ftc, F_MAP, num_arg);
 
     r = int_allocate_array(size);
 
@@ -1202,17 +1193,15 @@ static int sort_array_cmp(const void* vp1, const void* vp2) {
   }
 }
 
-void f_sort_array(void) {
-  svalue_t* arg = sp - st_num_arg + 1;
-  array_t* tmp = arg->u.arr;
-  int num_arg = st_num_arg;
+vm::Value f_sort_array(vm::EfunArgs& f, array_t* arr, vm::Arg how) {
+  check_for_destr(arr);
 
-  check_for_destr(tmp);
-
-  switch (arg[1].type) {
+  switch (how.type()) {
     case T_NUMBER: {
-      tmp = builtin_sort_array(copy_array(tmp), arg[1].u.number);
-      break;
+      /* held while the builtin comparator runs: it error()s on a mixed array */
+      vm::Value sorted = vm::Value::refed(copy_array(arr));
+      builtin_sort_array(sorted->u.arr, how.number());
+      return sorted;
     }
 
     case T_FUNCTION:
@@ -1225,26 +1214,26 @@ void f_sort_array(void) {
        * to it in a global, being careful to save and restore the old
        * value.
        */
-      function_to_call_t ftc, *old_ptr;
-
-      old_ptr = sort_array_ftc;
+      function_to_call_t ftc;
+      function_to_call_t* old_ptr = sort_array_ftc;
+      /* Restored on an error() unwind too: a comparator that catches an
+       * error escaping a nested sort_array() must not leave the outer sort
+       * pointing at the inner one's dead ftc. */
+      DEFER { sort_array_ftc = old_ptr; };
       sort_array_ftc = &ftc;
-      process_efun_callback(1, &ftc, F_SORT_ARRAY);
+      f.process_callback(1, &ftc);
 
-      tmp = copy_array(tmp);
-      push_refed_array(tmp);
+      vm::Value sorted = vm::Value::refed(copy_array(arr));
+      array_t* tmp = sorted->u.arr;
       if (CONFIG_INT(__RC_SANE_SORTING__)) {
         qsort(reinterpret_cast<char*>(tmp->item), tmp->size, sizeof(tmp->item), sort_array_cmp);
       } else {
         old_quickSort((char*)tmp->item, tmp->size, sizeof(tmp->item), sort_array_cmp);
       }
-      sort_array_ftc = old_ptr;
-      sp--;  // remove tmp from stack, but we don't want to free it!
-      break;
+      return sorted;
     }
   }
-  pop_n_elems(num_arg);
-  push_refed_array(tmp);  // put it back
+  return vm::Value::addref(arr); /* unreachable: the spec admits only the cases above */
 }
 #endif
 
@@ -2123,27 +2112,25 @@ array_t* livings() {
 #endif
 
 #ifdef F_OBJECTS
-void f_objects(void) {
+vm::Value f_objects(vm::EfunArgs&, std::optional<vm::Arg> filter) {
   auto max_array_size = CONFIG_INT(__MAX_ARRAY_SIZE__);
 
   int count, i;
   const char* func = nullptr;
   object_t** list;
   array_t* ret;
-  funptr_t* f = nullptr;
-
-  int num_arg = st_num_arg;
-
-  if (!num_arg) {
-    func = nullptr;
-  } else if (sp->type == T_FUNCTION) {
-    f = sp->u.fp;
-  } else {
-    func = sp->u.string;
+  funptr_t* funp = nullptr;
+  if (filter) {
+    if (filter->is(T_FUNCTION)) {
+      funp = filter->funptr();
+    } else {
+      func = filter->string().c_str();
+    }
   }
-
+  /* get_objects() parks the list on the stack above the arguments (so an
+   * error() frees it), and the callbacks push and pop above that. */
   get_objects(&list, &count, nullptr, nullptr);
-  if (f || func) {
+  if (funp || func) {
     /* NOTE: If an object's hidden status changes during a callback, that
      * change will NOT be reflected in the returned array.  If the caller
      * is destructed in a callback or the callback function does not exist,
@@ -2153,15 +2140,14 @@ void f_objects(void) {
       svalue_t* v;
 
       push_object(list[i]);
-      if (f) {
-        v = call_function_pointer(f, 1);
+      if (funp) {
+        v = call_function_pointer(funp, 1);
       } else {
         v = apply(func, current_object, 1, ORIGIN_EFUN);
       }
       if (!v || (current_object->flags & O_DESTRUCTED)) {
-        pop_n_elems(num_arg + 1);
-        push_refed_array(&the_null_array);
-        return;
+        pop_stack(); /* the list */
+        return vm::Value::refed(&the_null_array);
       }
       if (v->type == T_NUMBER && !v->u.number) {
         list[i] = nullptr;
@@ -2184,7 +2170,7 @@ void f_objects(void) {
     add_ref(list[i], "f_objects");
   }
 
-  pop_n_elems(num_arg + 1); /* include our temporary 'string' */
-  push_refed_array(ret);
+  pop_stack(); /* the list */
+  return vm::Value::refed(ret);
 }
 #endif

@@ -1,0 +1,5 @@
+// Callee for the C++ call API tests in src/tests/test_lpc.cc
+// (vm::Call / vm::CallResult).
+string echo(string s, int n) { return s + n; }
+
+void boom() { error("efun_api_probe: boom\n"); }

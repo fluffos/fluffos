@@ -14,6 +14,7 @@
 #include "thirdparty/libtelnet/libtelnet.h"  // for telnet_t, telnet_event_t*
 #include "vm/internal/hooks.h"
 #include "vm/vm.h"
+#include "vm/internal/base/vm_stack.h"
 
 /* Human-readable TELOPT name for net:telnet hooks; nullptr → numeric. */
 static const char* hook_telopt_name(unsigned char opt) {

@@ -4,3 +4,4 @@ object origin;
 void event_ping(object from, int v) { origin = from; value = v + 1; }
 int got() { return value; }
 object from() { return origin; }
+void event_boom(object from) { error("boom\n"); }

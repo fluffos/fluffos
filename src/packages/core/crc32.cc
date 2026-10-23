@@ -25,22 +25,22 @@ uint32_t compute_crc32(unsigned char* buf, int len) {
 }
 
 #ifdef F_CRC32
-void f_crc32() {
+vm::Value f_crc32(vm::EfunArgs&, vm::Arg data) {
   int len;
   unsigned char* buf;
   uint32_t crc;
 
-  if (sp->type == T_STRING) {
-    len = SVALUE_STRLEN(sp);
-    buf = (unsigned char*)sp->u.string;
-  } else if (sp->type == T_BUFFER) {
-    len = sp->u.buf->size;
-    buf = sp->u.buf->item;
+  /* string or buffer: the spec has checked it */
+  if (data.is(T_STRING)) {
+    vm::StringArg str = data.string();
+    len = str.size();
+    buf = reinterpret_cast<unsigned char*>(const_cast<char*>(str.c_str()));
   } else {
-    bad_argument(sp, T_STRING | T_BUFFER, 1, F_CRC32);
+    buffer_t* b = data.buffer();
+    len = b->size;
+    buf = b->item;
   }
   crc = compute_crc32(buf, len);
-  free_svalue(sp, "f_crc32");
-  put_number(crc);
+  return static_cast<LPC_INT>(crc);
 }
 #endif

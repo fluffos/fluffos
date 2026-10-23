@@ -12,6 +12,8 @@
 #include <cctype>
 #include <locale>
 #include <string>
+#include <string_view>
+#include <utility>
 
 #include "base/internal/EGCIterator.h"
 
@@ -47,6 +49,15 @@ std::string rtrim(const std::string& str, const std::string& chars = "\t\n\v\f\r
 /// @return returns trimmed string
 // --------------------------------------------------------------------------
 std::string trim(const std::string& str, const std::string& chars = "\t\n\v\f\r ");
+
+// --------------------------------------------------------------------------
+/// @brief the byte range [first, second) that trim() (left and right),
+///        ltrim() (left only) or rtrim() (right only) would keep
+///
+/// For callers that can use the original bytes when nothing is trimmed.
+// --------------------------------------------------------------------------
+std::pair<size_t, size_t> u8_trim_range(std::string_view str, std::string_view chars, bool left,
+                                        bool right);
 
 // --------------------------------------------------------------------------
 /// @brief checks beginning of string1 for presens of string2

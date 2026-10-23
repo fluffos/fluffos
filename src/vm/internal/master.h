@@ -16,9 +16,13 @@
  * valid_link, valid_hide, valid_override. Same rule, and the same reason, as
  * check_valid_path() and the command parser (AGENTS.md section 13.24). */
 int master_approved(struct svalue_t* v, const char* apply_name);
-
-/* for apply_master_ob */
-#define MASTER_APPROVED(x, name) master_approved((x), (name))
+/* The same question for a vm::Call::apply_master()/safe_apply_master()
+ * result: CallResult::kNoMaster is the bootstrap allow, any other failure
+ * denies. */
+namespace vm {
+class CallResult;
+}  // namespace vm
+int master_approved(const vm::CallResult& r, const char* apply_name);
 
 extern struct object_t* master_ob;
 
