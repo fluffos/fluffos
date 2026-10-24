@@ -779,7 +779,7 @@ void telnet_dont_naws(struct telnet_t* telnet) {
 void telnet_start_request_ttype(struct telnet_t* telnet) {
   telnet_negotiate(telnet, TELNET_DO, TELNET_TELOPT_TTYPE);
 }
-void telnet_request_ttype(struct telnet_t* telnet) { telnet_begin_sb(telnet, TELNET_TTYPE_SEND); }
+void telnet_request_ttype(struct telnet_t* telnet) { telnet_ttype_send(telnet); }
 
 void telnet_send_nop(struct telnet_t* telnet) {
   if (telnet) {
