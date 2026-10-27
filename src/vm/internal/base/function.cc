@@ -3,6 +3,7 @@
 #include "base/internal/tracing.h"
 #include "vm/vm.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/apply.h"
 #include "compiler/internal/lexer.h"  // for instrs, FIXME
@@ -527,9 +528,6 @@ funptr_t* make_functional_funp(short num_arg, short num_local, short len, svalue
   return fp;
 }
 
-typedef void (*func_t)(void);
-extern func_t efun_table[];
-
 svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
   array_t* v;
 
@@ -592,10 +590,14 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
          also on eval_cost here, which is ok for just 1 efun */
       {
         int j, n = num_arg;
-        st_num_arg = num_arg;
 
         if (n >= 4 || instrs[i].max_arg == -1) {
           n = instrs[i].min_arg;
+        }
+        /* instrs[].type holds the first 4 argument types only; the generated
+         * efun binding checks every typed argument again anyway. */
+        if (n > 4) {
+          n = 4;
         }
 
         for (j = 0; j < n; j++) {
@@ -607,9 +609,9 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         if (g_hook_mask & HOOK_MASK_EFUN) {
           svalue_t answered{};
           HookGateResult gr =
-              hook_dispatch_efun_before(ename, st_num_arg, &answered, &efun_filter_ob);
+              hook_dispatch_efun_before(ename, num_arg, &answered, &efun_filter_ob);
           if (gr == HookGateResult::Refuse) {
-            pop_n_elems(st_num_arg);
+            pop_n_elems(num_arg);
             free_svalue(&answered, "efun hook refuse");
             free_svalue(&apply_ret_value, "call_function_pointer");
             apply_ret_value = const0;
@@ -628,14 +630,25 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             json trace_context = {};
 
             json args = json::array();
-            for (int i = st_num_arg; i > 0; i--) {
-              args.push_back(svalue_to_json_summary(sp - i + 1));
+            for (int k = num_arg; k > 0; k--) {
+              args.push_back(svalue_to_json_summary(sp - k + 1));
             }
             trace_context["args"] = args;
             return trace_context;
           });
 
-          (*efun_table[i - EFUN_BASE])();
+#ifdef DEBUG
+          /* as in eval_instruction: every build checks the window as the efun
+           * returns; this re-check guards the generated thunks */
+          svalue_t* const expected_sp =
+              sp - num_arg + (instrs[i].ret_type == TYPE_NOVALUE ? 0 : 1);
+#endif
+          (*efun_table[i - EFUN_BASE])(num_arg);
+#ifdef DEBUG
+          if (sp != expected_sp) {
+            efun_stack_mismatch(ename, num_arg, sp - expected_sp);
+          }
+#endif
         }
 
         if (g_hook_mask & HOOK_MASK_EFUN) {

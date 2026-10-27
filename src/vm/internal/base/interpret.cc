@@ -2,6 +2,7 @@
 
 #include "vm/internal/hooks.h"
 #include "vm/internal/base/interpret.h"
+#include "vm/internal/base/vm_stack.h"
 
 #include <algorithm>
 #include <functional>
@@ -250,7 +251,6 @@ svalue_t* sp;
 
 int function_index_offset; /* Needed for inheritance */
 int variable_index_offset; /* Needed for inheritance */
-int st_num_arg;
 
 // For safety, we leave some buffer in before and after the space.
 // Non-const: the hook stack switches these for contained handlers.
@@ -505,7 +505,7 @@ int validate_shadowing(object_t* ob) {
 
   push_object(ob);
   ret = apply_master_ob(APPLY_VALID_SHADOW, 1);
-  if (!(ob->flags & O_DESTRUCTED) && MASTER_APPROVED(ret, "valid_shadow")) {
+  if (!(ob->flags & O_DESTRUCTED) && master_approved(ret, "valid_shadow")) {
     return 1;
   }
   return 0;
@@ -623,8 +623,7 @@ void unlink_string_svalue(svalue_t* s) {
   }
 }
 
-void process_efun_callback(int narg, function_to_call_t* ftc, int f) {
-  int argc = st_num_arg;
+void process_efun_callback(int narg, function_to_call_t* ftc, int f, int argc) {
   svalue_t* arg = sp - argc + 1 + narg;
 
   if (arg->type == T_FUNCTION) {
@@ -728,6 +727,12 @@ void transfer_push_some_svalues(svalue_t* v, int num) {
   CHECK_STACK_OVERFLOW(num);
   memcpy(sp + 1, v, num * sizeof(svalue_t));
   sp += num;
+}
+
+void transfer_pop_some_svalues(svalue_t* dest, int num) {
+  DEBUG_CHECK(sp - num + 1 < start_of_stack, "transfer_pop_some_svalues: stack underflow.\n");
+  memcpy(dest, sp - num + 1, num * sizeof(svalue_t));
+  sp -= num;
 }
 
 /*
@@ -2850,9 +2855,9 @@ void eval_instruction(char* p) {
 
   ScopedTracer _tracer(__PRETTY_FUNCTION__);
 
-#ifdef DEBUG
-  int num_arg;
-#endif
+  /* Per-efun arity for F_EFUN* dispatch. Passed into efun_table entries —
+   * there is no st_num_arg global (nested LPC would clobber it). */
+  int num_arg = 0;
   LPC_INT i, n;
   LPC_FLOAT real;
   svalue_t* lval;
@@ -5221,25 +5226,25 @@ void eval_instruction(char* p) {
       }
 #define CALL_THE_EFUN goto call_the_efun
       case F_EFUN0:
-        st_num_arg = 0;
+        num_arg = 0;
         LOAD_SHORT(instruction, pc);
         CALL_THE_EFUN;
         break;
       case F_EFUN1:
-        st_num_arg = 1;
+        num_arg = 1;
         LOAD_SHORT(instruction, pc);
         CHECK_TYPES(sp, instrs[instruction].type[0], 1, instruction);
         CALL_THE_EFUN;
         break;
       case F_EFUN2:
-        st_num_arg = 2;
+        num_arg = 2;
         LOAD_SHORT(instruction, pc);
         CHECK_TYPES(sp - 1, instrs[instruction].type[0], 1, instruction);
         CHECK_TYPES(sp, instrs[instruction].type[1], 2, instruction);
         CALL_THE_EFUN;
         break;
       case F_EFUN3:
-        st_num_arg = 3;
+        num_arg = 3;
         LOAD_SHORT(instruction, pc);
         CHECK_TYPES(sp - 2, instrs[instruction].type[0], 1, instruction);
         CHECK_TYPES(sp - 1, instrs[instruction].type[1], 2, instruction);
@@ -5248,21 +5253,21 @@ void eval_instruction(char* p) {
         break;
       case F_EFUNV: {
         LOAD_SHORT(instruction, pc);
-        st_num_arg = EXTRACT_UCHAR(pc++) + num_varargs;
+        num_arg = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
 
-        if (st_num_arg < instrs[instruction].min_arg) {
+        if (num_arg < instrs[instruction].min_arg) {
           error("Too few arguments to EFUN %s()\n", instrs[instruction].name);
-        } else if (instrs[instruction].max_arg != -1 && st_num_arg > instrs[instruction].max_arg) {
+        } else if (instrs[instruction].max_arg != -1 && num_arg > instrs[instruction].max_arg) {
           error("Too many arguments to EFUN %s()\n", instrs[instruction].name);
         }
 
         auto* argtype_ptr = &efun_arg_etypes[instrs[instruction].arg_index];
-        for (i = 1; i <= st_num_arg; i++) {
+        for (i = 1; i <= num_arg; i++) {
           if (i > instrs[instruction].min_arg - 1 && *argtype_ptr == 0) {
             break;
           }
-          auto* actual_value = sp - st_num_arg + i;
+          auto* actual_value = sp - num_arg + i;
           auto actual_type = actual_value->type;
           auto* argtype_ptr_start = argtype_ptr;
           while (*argtype_ptr != 0) {
@@ -5294,16 +5299,16 @@ void eval_instruction(char* p) {
         if (instruction < EFUN_BASE || instruction > NUM_OPCODES) {
           fatal("wrong!");
         }
-        if (instrs[instruction].ret_type == TYPE_NOVALUE) {
-          expected_stack = sp - st_num_arg;
-        } else {
-          expected_stack = sp - st_num_arg + 1;
-        }
-        num_arg = st_num_arg;
+#endif
+#ifdef DEBUG
+        /* The efun replaces its arguments with its result (none if void).
+         * Every build checks the window as the efun returns
+         * (EfunArgs::finish()); this re-check guards the generated thunks. */
+        expected_stack = sp - num_arg + (instrs[instruction].ret_type == TYPE_NOVALUE ? 0 : 1);
 #endif
         {
           const char* ename = instrs[instruction].name;
-          int efun_nargs = st_num_arg;
+          int const efun_nargs = num_arg;
           object_t* efun_filter_ob = nullptr;
           if (g_hook_mask & HOOK_MASK_EFUN) {
             svalue_t answered{};
@@ -5324,11 +5329,11 @@ void eval_instruction(char* p) {
           }
 
           if (Tracer::enabled() && CONFIG_INT(__RC_TRACE_CONTEXT__)) {
-            trace_context["args"] = get_trace_args(sp, st_num_arg);
+            trace_context["args"] = get_trace_args(sp, num_arg);
           }
 
           ScopedTracer _efun_tracer(ename, EventCategory::LPC_EFUN, [&] { return trace_context; });
-          (*efun_table[instruction - EFUN_BASE])();
+          (*efun_table[instruction - EFUN_BASE])(num_arg);
 
           if (g_hook_mask & HOOK_MASK_EFUN) {
             hook_dispatch_efun_after(ename, efun_filter_ob,
@@ -5338,8 +5343,7 @@ void eval_instruction(char* p) {
 
 #ifdef DEBUG
         if (expected_stack != sp) {
-          fatal("Bad sp %p (should be %p) after calling efun '%s', num arg %d.\n", sp,
-                expected_stack, instrs[instruction].name, num_arg);
+          efun_stack_mismatch(instrs[instruction].name, num_arg, sp - expected_stack);
         }
 #endif
     } /* switch (instruction) */

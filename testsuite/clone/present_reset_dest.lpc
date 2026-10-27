@@ -1,0 +1,6 @@
+// Fixture for TestPresentDestructEnvDuringReset (src/tests/test_lpc.cc):
+// self-destructs from reset(), which present()'s lazy try_reset() can fire
+// on the environment argument before searching.
+void reset() { destruct(); }
+
+int id(string name) { return name == "sword"; }

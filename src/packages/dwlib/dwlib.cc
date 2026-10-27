@@ -1,39 +1,37 @@
 #include "base/package_api.h"
 
+#include "packages/core/replace_string.h"
+
 // from add_action.h
 extern object_t* find_living_object(const char*, int);
 
 /* Hideous mangling of C code by Taffyd. */
-void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int quiet, int dark,
-                          int num_arg) {
+vm::Value query_multiple_short(array_t* arr, const char* type, size_t type_len, int no_dollars,
+                               int quiet, int dark) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
   char m[] = "$M$";
   char s[] = "_short";
   char default_function[] = "a_short";
   char separator[] = ", ";
   char andsep[] = " and ";
-  int const mlen = strlen(m);
-  int const slen = strlen(s);
-  int const seplen = strlen(separator);
-  int const andlen = strlen(andsep);
+  int const mlen = static_cast<int>(sizeof(m) - 1);
+  int const slen = static_cast<int>(sizeof(s) - 1);
+  int const seplen = static_cast<int>(sizeof(separator) - 1);
+  int const andlen = static_cast<int>(sizeof(andsep) - 1);
 
-  array_t* arr = arg->u.arr;
   svalue_t* sv;
-  svalue_t* v;
   int const size = arr->size;
   int i;
   int len;
   int total_len;
-  char *str, *res;
+  char* res;
   object_t* ob;
   char* fun;
 
   if (!size) {
-    str = new_string(0, "f_query_multiple_short");
-    str[0] = '\0';
-    pop_n_elems(num_arg);
-    push_malloced_string(str);
-    return;
+    char* empty = new_string(0, "f_query_multiple_short");
+    empty[0] = '\0';
+    return vm::Value::str_malloced(empty);
   }
 
   /*
@@ -46,34 +44,32 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
    } */
 
   if (no_dollars && arr->item->type == T_OBJECT && !dark && command_giver && command_giver->super) {
-    call_origin = ORIGIN_EFUN;
-    if (!apply_low("query_light", command_giver->super, 0)) {
-      push_number(0);
-    }
-    v = apply("check_dark", command_giver, 1, ORIGIN_EFUN);
+    /* check_dark(query_light()), passing 0 when there is no query_light() */
+    vm::CallResult light = vm::Call().apply("query_light", command_giver->super, ORIGIN_EFUN);
+    vm::CallResult v = vm::Call(light.take()).apply("check_dark", command_giver, ORIGIN_EFUN);
 
-    if (v && v->type == T_NUMBER && v->u.number) {
-      pop_n_elems(num_arg);
-      copy_and_push_string("some objects you cannot make out");
-      return;
+    if (v.is(T_NUMBER) && v->u.number) {
+      return vm::Value::str_copy("some objects you cannot make out");
     }
   }
 
-  /* If we don't have a type parameter, then use default_function */
-  /* We need to free this value with FREE_MSTR() */
+  /* If we don't have a type parameter, then use default_function.
+   * apply() can error() — DEFER frees fun/buf on that path. */
 
   if (!type) {
-    len = strlen(default_function);
+    len = static_cast<int>(sizeof(default_function) - 1);
     fun = new_string(len, "f_query_multiple_short");
     fun[len] = '\0';
-    strncpy(fun, default_function, len);
+    memcpy(fun, default_function, static_cast<size_t>(len));
   } else {
-    len = strlen(type) + slen;
+    len = static_cast<int>(type_len) + slen;
     fun = new_string(len, "f_query_multiple_short");
     fun[len] = '\0';
-    strncpy(fun, type, len);
-    strncpy(fun + strlen(type), s, slen);
+    memcpy(fun, type, type_len);
+    memcpy(fun + type_len, s, static_cast<size_t>(slen));
   }
+  /* apply() can error() — DEFER owns fun until return. */
+  DEFER { FREE_MSTR(fun); };
 
   /* Check to see if there are any non-objects in the array. */
   for (i = 0; i < size; i++) {
@@ -84,48 +80,46 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
   /* The array consists only of objects, and will use the $M$
    expansion code. */
   if (i == size && !no_dollars) {
-    str = new_string(max_string_length, "f_query_multiple_short");
-    str[max_string_length] = '\0';
-    strncpy(str, m, mlen);
+    char* buf = new_string(max_string_length, "f_query_multiple_short");
+    buf[max_string_length] = '\0';
+    DEFER { FREE_MSTR(buf); };
+    memcpy(buf, m, static_cast<size_t>(mlen));
     total_len = mlen;
 
     for (i = 0; i < size; i++) {
       sv = (arr->item + i);
-      push_number(quiet);
-      v = apply(fun, sv->u.ob, 1, ORIGIN_EFUN);
+      if (sv->type != T_OBJECT || (sv->u.ob->flags & O_DESTRUCTED)) {
+        continue;
+      }
+      vm::CallResult v = vm::Call(quiet).apply(fun, sv->u.ob, ORIGIN_EFUN);
 
-      if (!v || v->type != T_STRING) {
+      if (!v.is(T_STRING)) {
         continue;
       }
-      if (total_len + SVALUE_STRLEN(v) > max_string_length - mlen) {
+      if (total_len + SVALUE_STRLEN(v.get()) > max_string_length - mlen) {
         continue;
       }
-      strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v)));
+      len = SVALUE_STRLEN(v.get());
+      memcpy(buf + total_len, v->u.string, static_cast<size_t>(len));
       total_len += len;
     }
 
-    strncpy(str + total_len, m, mlen);
+    memcpy(buf + total_len, m, static_cast<size_t>(mlen));
     total_len += mlen;
 
     res = new_string(total_len, "f_query_multiple_short");
     res[total_len] = '\0';
-    memcpy(res, str, total_len);
+    memcpy(res, buf, total_len);
 
-    /* Clean up our temporary buffer. */
-
-    FREE_MSTR(str);
-    FREE_MSTR(fun);
-
-    pop_n_elems(num_arg);
-    push_malloced_string(res);
-    return;
+    return vm::Value::str_malloced(res);
   }
 
   /* This is a mixed array, so we don't use $M$ format.  Instead, we
    do as much $a_short$ conversion as we can etc.  */
 
-  str = new_string(max_string_length, "f_query_multiple_short");
-  str[max_string_length] = '\0';
+  char* buf = new_string(max_string_length, "f_query_multiple_short");
+  buf[max_string_length] = '\0';
+  DEFER { FREE_MSTR(buf); };
   total_len = 0;
 
   for (i = 0; i < size; i++) {
@@ -135,24 +129,28 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
       case T_STRING:
         len = SVALUE_STRLEN(sv);
         if (total_len + len < max_string_length) {
-          strncpy(str + total_len, sv->u.string, len);
+          memcpy(buf + total_len, sv->u.string, static_cast<size_t>(len));
           total_len += len;
         }
         break;
-      case T_OBJECT:
-        push_number(quiet);
-        v = apply(fun, sv->u.ob, 1, ORIGIN_EFUN);
+      case T_OBJECT: {
+        if (sv->u.ob->flags & O_DESTRUCTED) {
+          continue;
+        }
+        vm::CallResult v = vm::Call(quiet).apply(fun, sv->u.ob, ORIGIN_EFUN);
 
-        if (!v || v->type != T_STRING) {
+        if (!v.is(T_STRING)) {
           continue;
         }
 
-        if (total_len + SVALUE_STRLEN(v) < max_string_length) {
-          strncpy(str + total_len, v->u.string, (len = SVALUE_STRLEN(v)));
+        if (total_len + SVALUE_STRLEN(v.get()) < max_string_length) {
+          len = SVALUE_STRLEN(v.get());
+          memcpy(buf + total_len, v->u.string, static_cast<size_t>(len));
           total_len += len;
         }
 
         break;
+      }
       case T_ARRAY:
       /* Does anyone use this? */
       /* args[ i ] = "$"+ type +"_short:"+ file_name( args[ i ][ 1 ] ) +"$"; */
@@ -165,13 +163,13 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
     if (len && size > 1) {
       if (i < size - 2) {
         if (total_len + seplen < max_string_length) {
-          strncpy(str + total_len, separator, seplen);
+          memcpy(buf + total_len, separator, static_cast<size_t>(seplen));
           total_len += seplen;
         }
       } else {
         if (i < size - 1) {
           if (total_len + andlen < max_string_length) {
-            strncpy(str + total_len, andsep, andlen);
+            memcpy(buf + total_len, andsep, static_cast<size_t>(andlen));
             total_len += andlen;
           }
         }
@@ -179,13 +177,9 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
     }
   }
 
-  FREE_MSTR(fun);
-
   res = new_string(total_len, "f_query_multiple_short");
   res[total_len] = '\0';
-  memcpy(res, str, total_len);
-
-  FREE_MSTR(str);
+  memcpy(res, buf, total_len);
 
   /* Ok, now that we have cleaned up here we have to decide what to do
    with it. If nodollars is 0, then we need to pass it to an object
@@ -194,76 +188,62 @@ void query_multiple_short(svalue_t* arg, const char* type, int no_dollars, int q
   if (no_dollars) {
     if (command_giver) {
       /* We need to call on this_player(). */
-      push_malloced_string(res);
-      v = apply("convert_message", command_giver, 1, ORIGIN_EFUN);
+      vm::CallResult v = vm::Call(vm::Value::str_malloced(res))
+                             .apply("convert_message", command_giver, ORIGIN_EFUN);
 
-      if (v && v->type == T_STRING) {
-        pop_n_elems(num_arg);
-        share_and_push_string(v->u.string);
-      } else {
-        pop_n_elems(num_arg);
-        push_undefined();
+      if (v.is(T_STRING)) {
+        return vm::Value::str_make_shared(v->u.string);
       }
-
-    } else {
-      /* We need to find /global/player. */
-      /* Does this work? Seems not to. */
-      ob = find_object("/global/player");
-
-      if (ob) {
-        push_malloced_string(res);
-        v = apply("convert_message", ob, 1, ORIGIN_EFUN);
-
-        /* Return the result! */
-        if (v && v->type == T_STRING) {
-          pop_n_elems(num_arg);
-          share_and_push_string(v->u.string);
-        } else {
-          pop_n_elems(num_arg);
-          push_undefined();
-        }
-      } else {
-        pop_n_elems(num_arg);
-        push_undefined();
-      }
+      return vm::Value::undefined();
     }
+    /* We need to find /global/player. */
+    /* Does this work? Seems not to. */
+    ob = find_object("/global/player");
 
-  } else {
-    pop_n_elems(num_arg);
-    push_malloced_string(res);
+    if (ob) {
+      vm::CallResult v =
+          vm::Call(vm::Value::str_malloced(res)).apply("convert_message", ob, ORIGIN_EFUN);
+
+      /* Return the result! */
+      if (v.is(T_STRING)) {
+        return vm::Value::str_make_shared(v->u.string);
+      }
+      return vm::Value::undefined();
+    }
+    /* res was never handed off -- free it. */
+    FREE_MSTR(res);
+    return vm::Value::undefined();
   }
+  return vm::Value::str_malloced(res);
 } /* query_multiple_short() */
 
-void f_query_multiple_short() {
-  svalue_t* sv = sp - st_num_arg + 1;
+vm::Value f_query_multiple_short(vm::EfunArgs&, array_t* arr, std::optional<vm::Arg> type_arg,
+                                 std::optional<LPC_INT> no_dollars_arg,
+                                 std::optional<LPC_INT> quiet_arg,
+                                 std::optional<LPC_INT> dark_arg) {
   const char* type = nullptr;
+  size_t type_len = 0;
   int no_dollars = 0, quiet = 0, dark = 0;
 
-  if (st_num_arg > 4) {
-    if (sv[4].type == T_NUMBER) {
-      dark = sv[4].u.number;
-    }
+  if (dark_arg) {
+    dark = *dark_arg;
   }
 
-  if (st_num_arg > 3) {
-    if (sv[3].type == T_NUMBER) {
-      quiet = sv[3].u.number;
-    }
+  if (quiet_arg) {
+    quiet = *quiet_arg;
   }
 
-  if (st_num_arg > 2) {
-    if (sv[2].type == T_NUMBER) {
-      no_dollars = sv[2].u.number;
-    }
+  if (no_dollars_arg) {
+    no_dollars = *no_dollars_arg;
   }
 
-  if (st_num_arg >= 2) {
-    if (sv[1].type == T_STRING) {
-      type = sv[1].u.string;
-    }
+  if (type_arg && type_arg->is(T_STRING)) {
+    vm::StringArg ts = type_arg->string();
+    type = ts.c_str();
+    type_len = ts.size();
   }
 
-  query_multiple_short(sv, type, no_dollars, quiet, dark, st_num_arg);
+  return query_multiple_short(arr, type, type_len, no_dollars, quiet, dark);
 }
 
 /* Hideous mangling of C code by Taffyd. */
@@ -278,7 +258,6 @@ int _in_reference_allowed = 0;
 int reference_allowed(object_t* referee, object_t* referrer_obj, const char* referrer_name) {
   int invis = 0;
   int referee_creator = 0;
-  svalue_t* v;
   svalue_t* item;
   array_t* vec;
   const char* referee_name = nullptr;
@@ -292,15 +271,15 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   int ret = 0;
 
   /* Check to see whether we're invisible */
-  v = apply("query_invis", referee, 0, ORIGIN_EFUN);
+  vm::CallResult v = vm::Call().apply("query_invis", referee, ORIGIN_EFUN);
 
-  if (v && v->type == T_NUMBER) {
+  if (v.is(T_NUMBER)) {
     invis = v->u.number;
   }
   /* And if we're a creator. */
-  v = apply("query_creator", referee, 0, ORIGIN_EFUN);
+  v = vm::Call().apply("query_creator", referee, ORIGIN_EFUN);
 
-  if (v && v->type == T_NUMBER) {
+  if (v.is(T_NUMBER)) {
     referee_creator = v->u.number;
   }
 
@@ -318,21 +297,22 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   }
 
   /* Determine the names of these guys.
-   * We might need to make copies of these strings? apply()
-   * has a few oddities.
+   * Each name's CallResult owns the string, so the names stay valid
+   * across the applies below.
    */
 
-  v = apply("query_name", referee, 0, ORIGIN_EFUN);
+  vm::CallResult referee_name_v = vm::Call().apply("query_name", referee, ORIGIN_EFUN);
 
-  if (v && v->type == T_STRING) {
-    referee_name = v->u.string;
+  if (referee_name_v.is(T_STRING)) {
+    referee_name = referee_name_v->u.string;
   }
 
+  vm::CallResult referrer_name_v(vm::CallResult::kNotFound);
   if (referrer_obj && !referrer_name) {
-    v = apply("query_name", referrer_obj, 0, ORIGIN_EFUN);
+    referrer_name_v = vm::Call().apply("query_name", referrer_obj, ORIGIN_EFUN);
 
-    if (v && v->type == T_STRING) {
-      referrer_name = v->u.string;
+    if (referrer_name_v.is(T_STRING)) {
+      referrer_name = referrer_name_v->u.string;
     }
   }
 
@@ -344,17 +324,17 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   playtester_handler = find_object(PLAYTESTER_HANDLER);
 
   if (playtester_handler) {
-    copy_and_push_string(referrer_name);
-    v = apply("query_playtester", playtester_handler, 1, ORIGIN_EFUN);
+    v = vm::Call(vm::Value::str_copy(referrer_name))
+            .apply("query_playtester", playtester_handler, ORIGIN_EFUN);
 
-    if (v && v->type == T_NUMBER) {
+    if (v.is(T_NUMBER)) {
       referrer_playtester = v->u.number;
     }
   }
 
-  v = apply("query_allowed", referee, 0, ORIGIN_EFUN);
+  v = vm::Call().apply("query_allowed", referee, ORIGIN_EFUN);
   // printf("allow refs:%d\n", v->u.arr->ref);
-  if (v && v->type == T_ARRAY) {
+  if (v.is(T_ARRAY)) {
     vec = v->u.arr;
     size = vec->size;
     /* Iterate through the allowed array. */
@@ -390,42 +370,41 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   }
 
   switch (invis) {
-    case 3:
+    case 3: {
       /* Check for High Lord Invis. */
 
-      copy_and_push_string(referrer_name);
-      v = apply("high_programmer", master_ob, 1, ORIGIN_EFUN);
+      v = vm::Call(vm::Value::str_copy(referrer_name))
+              .apply("high_programmer", master_ob, ORIGIN_EFUN);
 
-      if (v && v->type == T_NUMBER) {
+      if (v.is(T_NUMBER)) {
         ret = v->u.number;
       }
-      break;
+    } break;
 
-    case 2:
+    case 2: {
       /* Check for Lord Invis */
 
-      copy_and_push_string(referrer_name);
-      v = apply("query_lord", master_ob, 1, ORIGIN_EFUN);
+      v = vm::Call(vm::Value::str_copy(referrer_name)).apply("query_lord", master_ob, ORIGIN_EFUN);
 
-      if (v && v->type == T_NUMBER) {
+      if (v.is(T_NUMBER)) {
         ret = v->u.number;
       }
-      break;
+    } break;
 
     case 1: {
       /* Creator Invis */
       if (referrer_obj) {
-        v = apply("query_creator", referrer_obj, 0, ORIGIN_EFUN);
+        v = vm::Call().apply("query_creator", referrer_obj, ORIGIN_EFUN);
 
-        if (v && v->type == T_NUMBER) {
+        if (v.is(T_NUMBER)) {
           ret = v->u.number;
         }
       } else {
         player_handler = find_object(PLAYER_HANDLER);
-        copy_and_push_string(referrer_name);
-        v = apply("test_creator", player_handler, 1, ORIGIN_EFUN);
+        v = vm::Call(vm::Value::str_copy(referrer_name))
+                .apply("test_creator", player_handler, ORIGIN_EFUN);
 
-        if (v && v->type == T_NUMBER) {
+        if (v.is(T_NUMBER)) {
           ret = v->u.number;
         }
       }
@@ -443,91 +422,79 @@ int reference_allowed(object_t* referee, object_t* referrer_obj, const char* ref
   return ret;
 }
 
-void f_reference_allowed() {
-  svalue_t* sv = sp - st_num_arg + 1;
-  object_t* referee = nullptr;
+vm::Value f_reference_allowed(vm::EfunArgs&, object_t* referee, std::optional<vm::Arg> referrer) {
   object_t* referrer_obj = command_giver; /* Default to this_player(). */
   const char* referrer_name = nullptr;
   int result = 0;
-  int const num_arg = st_num_arg;
-
-  /* Maybe I could learn how to use this :p
-   CHECK_TYPES(sp-1, T_NUMBER, 1, F_MEMBER_ARRAY); */
+#ifndef F_FIND_PLAYER
+  /* find_player()'s result; holds the object it returned for the call */
+  vm::CallResult player(vm::CallResult::kNotFound);
+#endif
 
   if (referrer_obj && (referrer_obj->flags & O_DESTRUCTED)) {
     referrer_obj = nullptr;
   }
 
-  if (sv->type == T_OBJECT && sv->u.ob) {
-    referee = sv->u.ob;
-  }
-
-  if (st_num_arg > 1) {
-    if (sv[1].type == T_STRING && sv[1].u.string) {
+  if (referrer) {
+    if (referrer->is(T_STRING)) {
 /* We've been passed in a string, now we need to call
  * find_player() */
 #ifdef F_FIND_PLAYER
       /* If we have a find_player() efun, then we need to sue
        * the following method.  This hasn't been tested!
        */
-      referrer_obj = find_living_object(sv[1].u.string, 1);
+      referrer_obj = find_living_object(referrer->string().c_str(), 1);
 #else
       if (simul_efun_ob) {
-        svalue_t* v;
-        push_svalue(&sv[1]);
-        v = apply("find_player", simul_efun_ob, 1, ORIGIN_EFUN);
+        player = vm::Call(referrer->copy()).apply("find_player", simul_efun_ob, ORIGIN_EFUN);
 
-        if (v && v->type == T_OBJECT) {
-          referrer_obj = v->u.ob;
-          referrer_name = sv[1].u.string;
+        if (player.is(T_OBJECT)) {
+          referrer_obj = player->u.ob;
+          referrer_name = referrer->string().c_str();
         } else {
           referrer_obj = NULL;
-          referrer_name = sv[1].u.string;
+          referrer_name = referrer->string().c_str();
         }
       }
 #endif
     }
-    if (sv[1].type == T_OBJECT && sv[1].u.ob) {
-      referrer_obj = sv[1].u.ob;
+    if (referrer->is(T_OBJECT)) {
+      referrer_obj = referrer->object();
       referrer_name = nullptr;
     }
   }
 
   if (referee && (referrer_obj || referrer_name)) {
     result = reference_allowed(referee, referrer_obj, referrer_name);
-
-    pop_n_elems(num_arg);
-    push_number(result);
-  } else {
-    pop_n_elems(num_arg);
-    push_undefined();
+    return result;
   }
+  return vm::Value::undefined();
 }
 
-void f_add_a() {
+vm::Value f_add_a(vm::EfunArgs& f, vm::StringArg str_arg) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
-  const char* str = sp->u.string;
+  const char* const base = str_arg.c_str();
+  size_t const total = str_arg.size();
+  const char* str = base;
   char* ret;
   char* p;
   char first;
   int len;
   int an;
 
-  while (*str == ' ') {
+  while (static_cast<size_t>(str - base) < total && *str == ' ') {
     str++;
   }
 
   // If *str is 0, it was only spaces.  Return "a ".
-  if (*str == 0) {
-    pop_stack();
-    copy_and_push_string("a ");
-    return;
+  if (static_cast<size_t>(str - base) >= total || *str == 0) {
+    return vm::Value::str_copy("a ");
   }
 
-  len = strlen(str);
+  len = static_cast<int>(total - static_cast<size_t>(str - base));
   // Don't add anything if it already begins with a or an.
   if (!strncasecmp(str, "a ", 2) || !strncasecmp(str, "an ", 3)) {
-    return;
+    return f.take(0);
   }
 
   first = *str;
@@ -565,95 +532,91 @@ void f_add_a() {
 
   if (an) {  // Add an.
     if (len + 3 > max_string_length) {
-      free_string_svalue(sp);
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 3, "f_add_a");
-    strcpy(ret, "an ");
+    memcpy(ret, "an ", 3);
     p = ret + 3;
   } else {  // Add a.
     if (len + 2 > max_string_length) {
-      free_string_svalue(sp);
       error("add_a() exceeded max string length.\n");
     }
     ret = new_string(len + 2, "f_add_a");
-    strcpy(ret, "a ");
+    memcpy(ret, "a ", 2);
     p = ret + 2;
   }
 
   // Add the rest of the string.
-  memcpy(p, str, len + 1);  // + 1: get the \0.
-  free_string_svalue(sp);
-  sp->type = T_STRING;
-  sp->subtype = STRING_MALLOC;
-  sp->u.string = ret;
+  memcpy(p, str, static_cast<size_t>(len));
+  p[len] = '\0';
+  return vm::Value::str_malloced(ret);
 }
 
 // This along with add_a() is the only sfun in /secure/simul_efun/add_a.c
-void f_vowel() {
-  char const v = (char)sp->u.number;
+vm::Value f_vowel(vm::EfunArgs&, LPC_INT c) {
+  char const v = (char)c;
 
   if (v == 'a' || v == 'e' || v == 'i' || v == 'o' || v == 'u' || v == 'A' || v == 'E' ||
       v == 'I' || v == 'O' || v == 'U') {
-    sp->u.number = 1;
-  } else {
-    sp->u.number = 0;
+    return 1;
   }
+  return 0;
 }
 
-void f_replace() {
-  svalue_t* arg2 = sp - st_num_arg + 2;
-  if (arg2->type == T_STRING && st_num_arg == 3) {
-    return f_replace_string();
+/* Both forms run replace_string()'s body directly. It reads only the
+ * window's arity (2 or 3 here, so no range) and its typed strings. */
+vm::Value f_replace(vm::EfunArgs& f, vm::StringArg /* moved out with f.take(0) */, vm::Arg pattern,
+                    std::optional<vm::StringArg> replacement) {
+  int num_arg = f.argc();
+  if (pattern.is(T_STRING) && num_arg == 3) {
+    return replace_string_value(f.take(0), pattern.string(), *replacement);
   }
-  if (st_num_arg == 2 && arg2->type != T_STRING) {
-    array_t* arr = arg2->u.arr;
-    int i = 0;
+  if (num_arg == 2 && !pattern.is(T_STRING)) {
+    array_t* arr = pattern.array();
     if (arr->size & 1) {
       error("Wrong array size for replace.\n");
     }
-    sp--;
-
-    for (i = 0; i < arr->size; i += 2) {
+    /* Apply each [pattern, replacement] pair in turn to the result so far
+     * (owned, so a string nothing else references is edited in place). */
+    vm::Value cur = f.take(0);
+    for (int i = 0; i < arr->size; i += 2) {
       if (arr->item[i].type == T_STRING && arr->item[i + 1].type == T_STRING) {
-        share_and_push_string(arr->item[i].u.string);
-        share_and_push_string(arr->item[i + 1].u.string);
-        st_num_arg = 3;
-        f_replace_string();
-        if (sp->type != T_STRING) {
+        cur = replace_string_value(std::move(cur), vm::StringArg(&arr->item[i]),
+                                   vm::StringArg(&arr->item[i + 1]));
+        if (cur.type() != T_STRING) {
           break;
         }
       }
     }
-    free_array(arr);
-  } else {
-    error("Bad arguments for replace.\n");
+    return cur;
   }
+  error("Bad arguments for replace.\n");
 }
 
-void replace_mxp_html(int html, int mxp) {
+static vm::Value replace_mxp_html(vm::StringArg str, int html, int mxp) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* dst = new_string(max_string_length + 8, "f_replace_mxp_html: 2");
-  const char* src = sp->u.string;
+  const char* src = str.c_str();
+  const char* const src_end = src + str.size();
   char* dst2 = dst;
-  while (*src && dst2 - dst < max_string_length) {
+  while (src < src_end && dst2 - dst < max_string_length) {
     switch (*src) {
       case '&':
-        strcpy(dst2, "&amp;");
+        memcpy(dst2, "&amp;", 5);
         dst2 += 5;
         break;
       case '<':
-        strcpy(dst2, "&lt;");
+        memcpy(dst2, "&lt;", 4);
         dst2 += 4;
         break;
       case '>':
-        strcpy(dst2, "&gt;");
+        memcpy(dst2, "&gt;", 4);
         dst2 += 4;
         break;
       case '\n':
         if (mxp) {
-          strcpy(dst2, "\e[4z<BR>");
+          memcpy(dst2, "\e[4z<BR>", 8);
           dst2 += 8;
         } else {
           goto def;
@@ -661,28 +624,27 @@ void replace_mxp_html(int html, int mxp) {
         break;
       case '"':
         if (html) {
-          strcpy(dst2, "&quot;");
+          memcpy(dst2, "&quot;", 6);
           dst2 += 6;
           break;
         }
+        [[fallthrough]];
       default:
       def:
         *dst2++ = *src;
     }
     src++;
   }
-  pop_stack();
   *dst2 = 0;
-  push_malloced_string(extend_string(dst, dst2 - dst));
+  return vm::Value::str_malloced(extend_string(dst, dst2 - dst));
 }
 
-void f_replace_html() { replace_mxp_html(1, 0); }
+vm::Value f_replace_html(vm::EfunArgs&, vm::StringArg str) { return replace_mxp_html(str, 1, 0); }
 
-void f_replace_mxp() { replace_mxp_html(0, 1); }
+vm::Value f_replace_mxp(vm::EfunArgs&, vm::StringArg str) { return replace_mxp_html(str, 0, 1); }
 
-void f_roulette_wheel() {
+vm::Value f_roulette_wheel(vm::EfunArgs&, mapping_t* m) {
   long num;
-  mapping_t* m = sp->u.map;
   int j, found;
   mapping_node_t *elt, **a = m->table;
   svalue_t* val;
@@ -727,8 +689,7 @@ void f_roulette_wheel() {
   }
 
   // val points to the value that tipped the scale.  val - 1 is the key.
-  assign_svalue_no_free(sp, val - 1);
-  free_mapping(m);
+  return vm::Value::copy(val - 1);
 }
 
 // Appends up to (bufsize - 1 - *len) bytes of `text` to buf[*len..], always
@@ -755,81 +716,83 @@ svalue_t* replace_objects(svalue_t* thing) {
       // bound every copy into this fixed buffer instead of strcpy/strcat.
       char buf[2000];
       size_t len = 0;
-      append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname, strlen(thing->u.ob->obname));
-      svalue_t* tmp = nullptr;
+      append_bounded(buf, sizeof(buf), &len, thing->u.ob->obname,
+                     strnlen(thing->u.ob->obname, sizeof(buf) - 1));
+      vm::CallResult tmp(vm::CallResult::kNotFound);
       if (!(thing->u.ob->flags & O_DESTRUCTED)) {
-        push_object(thing->u.ob);
-        tmp = safe_apply_master_ob(APPLY_OBJECT_NAME, 1);
+        tmp = vm::Call(vm::Value::object(thing->u.ob)).safe_apply_master(APPLY_OBJECT_NAME);
       } else {
-        append_bounded(buf, sizeof(buf), &len, " (destructed)", strlen(" (destructed)"));
+        static constexpr char kDestructed[] = " (destructed)";
+        append_bounded(buf, sizeof(buf), &len, kDestructed, sizeof(kDestructed) - 1);
       }
-      if (tmp && tmp->type == T_STRING) {
+      if (tmp.is(T_STRING)) {
         append_bounded(buf, sizeof(buf), &len, " (\"", 3);
-        append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp));
+        append_bounded(buf, sizeof(buf), &len, tmp->u.string, SVALUE_STRLEN(tmp.get()));
         append_bounded(buf, sizeof(buf), &len, "\")", 2);
       }
-      copy_and_push_string(buf);
-      assign_svalue(&replace_tmp, sp);
-      pop_stack();
+      free_svalue(&replace_tmp, "replace_objects");
+      replace_tmp.type = T_STRING;
+      replace_tmp.subtype = STRING_MALLOC;
+      replace_tmp.u.string = string_copy(buf, "replace_objects");
       return &replace_tmp;
     }
     case T_ARRAY:
     case T_CLASS: {
       array_t* ar = thing->u.arr;
-      array_t* nar = allocate_array(ar->size);
-      push_refed_array(nar);
+      vm::Value nar_owner = vm::Value::refed(allocate_array(ar->size)); /* freed if we error */
+      array_t* nar = nar_owner->u.arr;
       for (i = 0; i < ar->size; i++) {
         assign_svalue(&nar->item[i], replace_objects(&ar->item[i]));
       }
-      assign_svalue(&replace_tmp, sp);
-      pop_stack();
+      assign_svalue(&replace_tmp, nar_owner.get());
       replace_tmp.type = thing->type;
       return &replace_tmp;
     }
-    case T_MAPPING:
-      push_refed_array(mapping_indices(thing->u.map));
-      push_refed_mapping(allocate_mapping(thing->u.map->table_size));
-      push_number(0);
-      for (i = 0; i < (sp - 2)->u.arr->size; i++) {
-        svalue_t* key = sp;
-        svalue_t* tmp = find_in_mapping(thing->u.map, (sp - 2)->u.arr->item[i]);
-        assign_svalue(key, replace_objects(&(sp - 2)->u.arr->item[i]));
-        assign_svalue_no_free(find_for_insert((sp - 1)->u.map, key, 1), replace_objects(tmp));
-        if ((sp - 1)->u.map->count - i != 1) {
+    case T_MAPPING: {
+      /* keys, result and key are owned here, so an error frees them */
+      vm::Value keys_owner = vm::Value::refed(mapping_indices(thing->u.map));
+      vm::Value out_owner = vm::Value::refed(allocate_mapping(thing->u.map->table_size));
+      vm::Value key_owner;
+      array_t* keys = keys_owner->u.arr;
+      mapping_t* out = out_owner->u.map;
+      for (i = 0; i < keys->size; i++) {
+        svalue_t* key = key_owner.get();
+        svalue_t* tmp = find_in_mapping(thing->u.map, keys->item[i]);
+        assign_svalue(key, replace_objects(&keys->item[i]));
+        assign_svalue_no_free(find_for_insert(out, key, 1), replace_objects(tmp));
+        if (out->count - i != 1) {
           printf("guilty party:%s\n", key->u.string);
         }
       }
-      assign_svalue(&replace_tmp, sp - 1);
-      pop_3_elems();
+      assign_svalue(&replace_tmp, out_owner.get());
       return &replace_tmp;
+    }
     default:
       assign_svalue(&replace_tmp, thing);
       return &replace_tmp;
   }
 }
 
-void f_replace_objects() {
-  assign_svalue(sp, replace_objects(sp));
-  // replace_tmp is a module-global scratch slot; drop its lingering ref
-  // once the result is on the stack so nothing stays unaccounted between
-  // calls (flagged by the Debug leak checker).
-  free_svalue(&replace_tmp, "f_replace_objects");
-  replace_tmp = const0;
+vm::Value f_replace_objects(vm::EfunArgs&, vm::Arg thing) {
+  // replace_tmp is a module-global scratch slot: move the result out of it
+  // (leaving 0) so no reference lingers there between calls (flagged by the
+  // Debug leak checker).
+  return vm::Value::take(replace_objects(thing.sv()));
 }
 
-void f_replace_dollars() {
+vm::Value f_replace_dollars(vm::EfunArgs& f, vm::StringArg str, array_t* arr) {
   auto const max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);
 
   char* newstr;
-  const char* oldstr = (sp - 1)->u.string;
+  const char* oldstr = str.c_str();
   char* currentnew;
   const char* currentold = oldstr;
   int i;
-  if (sp->u.arr->size & 1) {
+  if (arr->size & 1) {
     error("wrong array length for replace_dollars()");
   }
-  for (i = 0; i < sp->u.arr->size; i++)
-    if (sp->u.arr->item[i].type != T_STRING) {
+  for (i = 0; i < arr->size; i++)
+    if (arr->item[i].type != T_STRING) {
       error("replace array should only contain strings");
     }
   newstr = new_string(max_string_length, "replace_dollars");
@@ -837,16 +800,16 @@ void f_replace_dollars() {
   for (i = 0; i < COUNTED_STRLEN(oldstr); i++) {
     if (oldstr[i] == '$') {
       int j;
-      for (j = 0; j < sp->u.arr->size; j += 2) {
-        const char* one = sp->u.arr->item[j].u.string;
+      for (j = 0; j < arr->size; j += 2) {
+        const char* one = arr->item[j].u.string;
         if (!strncmp(one, oldstr + i, COUNTED_STRLEN(one))) {
-          const char* two = sp->u.arr->item[j + 1].u.string;
+          const char* two = arr->item[j + 1].u.string;
           int const len = i - (currentold - oldstr);
           if (currentnew + len - newstr > max_string_length) {
             FREE_MSTR(newstr);
             error("string too long");
           }
-          strncpy(currentnew, currentold, len);
+          memcpy(currentnew, currentold, static_cast<size_t>(len));
           currentnew += len;
           currentold += len;
           currentold += COUNTED_STRLEN(one);
@@ -857,8 +820,11 @@ void f_replace_dollars() {
             FREE_MSTR(newstr);
             error("string too long");
           }
-          strcpy(currentnew, two);
-          currentnew += COUNTED_STRLEN(two);
+          {
+            size_t const twolen = COUNTED_STRLEN(two);
+            memcpy(currentnew, two, twolen);
+            currentnew += twolen;
+          }
           break;
         }
       }
@@ -867,17 +833,18 @@ void f_replace_dollars() {
   if (newstr == currentnew) {
     // nothing happened!
     FREE_MSTR(newstr);
-    pop_stack();
-    return;
+    return f.take(0);
   }
 
-  if (currentnew + COUNTED_STRLEN(oldstr) - currentold + oldstr - newstr > max_string_length) {
-    FREE_MSTR(newstr);
-    error("string too long");
-  }
+  {
+    size_t const rest = static_cast<size_t>(COUNTED_STRLEN(oldstr) - (currentold - oldstr));
+    if (currentnew + rest - newstr > static_cast<size_t>(max_string_length)) {
+      FREE_MSTR(newstr);
+      error("string too long");
+    }
 
-  strcpy(currentnew, currentold);
-  pop_2_elems();
-  push_malloced_string(
-      extend_string(newstr, currentnew - newstr + COUNTED_STRLEN(oldstr) - (currentold - oldstr)));
+    memcpy(currentnew, currentold, rest);
+    currentnew[rest] = '\0';
+    return vm::Value::str_malloced(extend_string(newstr, currentnew - newstr + rest));
+  }
 }

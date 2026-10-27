@@ -431,31 +431,33 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
 }
 #endif
 
-/* Deliver a finished request's result, already pushed on the stack: the
-   callback form calls req->fun with it, the promise form settles req->prom
-   (both forms consume the pushed value). */
-static void deliver_result(struct Request* req, int rejected) {
+/* Deliver a finished request's result, the one value pushed on `result`:
+   the callback form calls req->fun with it, the promise form settles
+   req->prom with it. The value stays on the stack while the promise
+   settles, so an error() in a cancel handler cannot leak it. */
+static void deliver_result(vm::Call& result, struct Request* req, int rejected) {
   if (req->prom) {
-    promise_settle(req->prom, sp, rejected);
-    pop_stack();
+    promise_settle(req->prom, result.arg(0).sv(), rejected);
+    result.discard();
     return;
   }
   set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  result.safe_call(req->fun);
 }
 
 void handle_read(struct Request* req) {
   int const val = req->ret;
+  vm::Call result;
   if (val < 0) {
-    push_number(val);
-    deliver_result(req, /*rejected=*/1);
+    result.push(val);
+    deliver_result(result, req, /*rejected=*/1);
     return;
   }
   char* file = new_string(val, "read_file_async: str");
   memcpy(file, (char*)(req->data.data()), val);
   file[val] = 0;
-  push_malloced_string(file);
-  deliver_result(req, 0);
+  result.push(vm::Value::str_malloced(file));
+  deliver_result(result, req, 0);
 }
 
 #ifdef F_ASYNC_GETDIR
@@ -485,38 +487,36 @@ void handle_getdir(struct Request* req) {
           });
   }
 
-  push_refed_array(ret);
-  deliver_result(req, 0);
+  vm::Call result;
+  result.push(vm::Value::refed(ret));
+  deliver_result(result, req, 0);
 }
 #endif
 
 void handle_write(struct Request* req) {
   int const val = req->ret;
+  vm::Call result;
   if (val < 0) {
-    push_number(val);
-    deliver_result(req, /*rejected=*/1);
+    result.push(val);
+    deliver_result(result, req, /*rejected=*/1);
     return;
   }
-  push_undefined();
-  deliver_result(req, 0);
+  result.push(vm::Value::undefined());
+  deliver_result(result, req, 0);
 }
 
 void handle_db_exec(struct Request* req) {
   int const val = req->ret;
+  vm::Call result;
   if (val == -1) {
-    copy_and_push_string(req->path.c_str());
+    result.push(vm::Value::str_copy(req->path.c_str()));
   } else {
-    push_number(val);
+    result.push(val);
   }
   /* Promise form: -1 is a rejection (the error string), anything else is
      the row count the callback would have been called with. The callback
      form is unchanged -- it still receives either value as its argument. */
-  if (req->prom) {
-    deliver_result(req, val == -1);
-    return;
-  }
-  set_eval(max_eval_cost);
-  safe_call_efun_callback(req->fun, 1);
+  deliver_result(result, req, req->prom && val == -1);
 }
 
 void check_reqs() {
@@ -602,7 +602,7 @@ void complete_all_asyncio() {
 
 #ifdef F_ASYNC_READ
 
-void f_async_read() {
+vm::Value f_async_read(vm::EfunArgs& f, vm::StringArg file, std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
@@ -611,29 +611,22 @@ void f_async_read() {
    * ref or a fresh promise in a raw local, that unwind would leak them
    * (AGENTS.md section 4). Nothing below this line applies, so the returned
    * string stays valid until add_read() copies it. The path is the FIRST
-   * argument -- sp itself is the optional callback when one was passed.
-   *
-   * st_num_arg is a bare global: ANY efun the master's valid_read calls
-   * overwrites it (the f_async_db_exec ordering comment below documents the
-   * crash). Latch it first and restore it after, so the form-detection
-   * branch and process_efun_callback() see this call's real arity. */
-  int const num_arg = st_num_arg;
-  const char* path =
-      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "read_file", 0);
-  st_num_arg = num_arg;
-
-  if (num_arg >= 2) {
+   * argument -- the optional callback is the last when one was passed.
+   * The form is decided by the callback parameter (not a global), so the
+   * master apply cannot clobber form-detection or process_callback. */
+  vm::Value pathv = check_valid_path(file.c_str(), current_object, "read_file", 0);
+  if (!pathv.is(T_STRING)) {
+    error("permission denied\n");
+  }
+  const char* path = pathv->u.string;
+  if (callback) {
+    /* The callback parameter is typed funptr_t*: the efun thunk has already
+     * rejected a string (or anything else) there, so process_callback()
+     * always fills cb->f.fp, never the string-callback form. */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(1, cb.get(), F_ASYNC_READ);
-    // A `mixed` argument bypasses the spec's compile-time `function` check;
-    // process_efun_callback() then sets cb->ob (string-callback form) rather
-    // than cb->f.fp, and the ref++ below would type-confuse cb->f.str (a
-    // char*) as a funptr_t*.
-    if (cb->ob != nullptr) {
-      error("async_read: callback must be a function pointer, not a string.\n");
-    }
+    f.process_callback(1, cb.get());
     cb->f.fp->hdr.ref++;
-    pop_stack();
+    f.pop_back(1);
     fun = cb.release();
   } else {
     /* promise form: no callback, deliver by settling this (issue #1319) */
@@ -641,86 +634,76 @@ void f_async_read() {
   }
 
   add_read(path, fun, prom);
-  pop_stack();
   if (prom) {
     prom->ref++; /* the request's ref stays; this one is the return value */
-    push_refed_promise(prom);
-  } else {
-    push_number(0);
+    return vm::Value::refed(prom);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_ASYNC_WRITE
-void f_async_write() {
+vm::Value f_async_write(vm::EfunArgs& f, vm::StringArg file, vm::StringArg buf, LPC_INT flags,
+                        std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
-  /* before any ownership is taken, with st_num_arg latched across the
-   * master apply -- see f_async_read(); the path is the FIRST of 3 or 4
-   * arguments */
-  int const num_arg = st_num_arg;
-  const char* path =
-      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "write_file", 1);
-  st_num_arg = num_arg;
-
-  if (num_arg >= 4) {
+  /* before any ownership is taken -- see f_async_read(); the path is the
+   * FIRST of 3 or 4 arguments */
+  vm::Value pathv = check_valid_path(file.c_str(), current_object, "write_file", 1);
+  if (!pathv.is(T_STRING)) {
+    error("permission denied\n");
+  }
+  const char* path = pathv->u.string;
+  if (callback) {
+    /* typed funptr_t*: see f_async_read() */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(3, cb.get(), F_ASYNC_WRITE);
-    if (cb->ob != nullptr) {
-      error("async_write: callback must be a function pointer, not a string.\n");
-    }
+    f.process_callback(3, cb.get());
     cb->f.fp->hdr.ref++;
-    pop_stack();
+    f.pop_back(1);
     fun = cb.release();
   } else {
     prom = promise_alloc();
   }
 
-  add_write(path, (sp - 1)->u.string, SVALUE_STRLEN((sp - 1)), sp->u.number, fun, prom);
-  pop_3_elems();
+  add_write(path, buf.c_str(), buf.size(), flags, fun, prom);
   if (prom) {
     prom->ref++;
-    push_refed_promise(prom);
-  } else {
-    push_number(0);
+    return vm::Value::refed(prom);
   }
+  return 0;
 }
 #endif
 
 #ifdef F_ASYNC_GETDIR
-void f_async_getdir() {
+vm::Value f_async_getdir(vm::EfunArgs& f, vm::StringArg dir, std::optional<funptr_t*> callback) {
   function_to_call_t* fun = nullptr;
   promise_t* prom = nullptr;
 
-  /* before any ownership is taken, with st_num_arg latched across the
-   * master apply -- see f_async_read(); the path is the FIRST argument */
-  int const num_arg = st_num_arg;
-  const char* path =
-      check_valid_path((sp - (num_arg - 1))->u.string, current_object, "get_dir", 0);
-  st_num_arg = num_arg;
-
-  if (num_arg >= 2) {
+  /* before any ownership is taken -- see f_async_read(); the path is the
+   * FIRST argument */
+  vm::Value pathv = check_valid_path(dir.c_str(), current_object, "get_dir", 0);
+  if (!pathv.is(T_STRING)) {
+    error("permission denied\n");
+  }
+  const char* path = pathv->u.string;
+  if (callback) {
+    /* typed funptr_t*: see f_async_read() */
     std::unique_ptr<function_to_call_t> cb(new function_to_call_t);
-    process_efun_callback(1, cb.get(), F_ASYNC_GETDIR);
-    if (cb->ob != nullptr) {
-      error("async_getdir: callback must be a function pointer, not a string.\n");
-    }
+    f.process_callback(1, cb.get());
     cb->f.fp->hdr.ref++;
-    pop_stack();
+    f.pop_back(1);
     fun = cb.release();
   } else {
     prom = promise_alloc();
   }
 
   add_getdir(path, fun, prom);
-  pop_stack();
   if (prom) {
     prom->ref++;
-    push_refed_promise(prom);
-  } else {
-    push_number(0);
+    return vm::Value::refed(prom);
   }
+  return 0;
 }
 #endif
 #ifdef F_ASYNC_DB_EXEC
@@ -742,21 +725,17 @@ struct AsyncCallbackRef {
   AsyncCallbackRef& operator=(const AsyncCallbackRef&) = delete;
 };
 
-void f_async_db_exec() {
+vm::Value f_async_db_exec(vm::EfunArgs& f, LPC_INT handle, vm::StringArg sql,
+                          std::optional<vm::Arg> callback) {
   // Two forms (issue #1319), same split as async_read():
   //   async_db_exec(handle, sql, callback, ...)  -> classic, returns 0
   //   async_db_exec(handle, sql)                 -> promise for the row count
   //
-  // process_efun_callback() locates the callback via the GLOBAL
-  // st_num_arg (arg = sp - st_num_arg + 1 + narg), so when a callback was
-  // passed it MUST run before valid_database() below -- that apply runs
-  // master LPC which leaves st_num_arg clobbered. Reversing them made
-  // ftc->f.fp read the wrong stack slot and crash at the ref++ once a real
-  // db handle existed (found by async_db_exec.lpc on the SQLite CI build).
-  // Latch the arity first: the promise form has no callback, and a master
-  // apply must not be what decides which form this call is.
-  int const num_arg = st_num_arg;
-
+  // process_callback() locates the callback from the window's arity
+  // (arg = window base + narg). Parse the callback before
+  // valid_database() so ownership/ordering stays clear; the old
+  // global-arity bug is gone, but the promise vs callback form split still
+  // keys on the callback's presence before any apply.
   std::unique_ptr<function_to_call_t> cb;
   AsyncCallbackRef cb_ref;
   array_t* bound_args = nullptr;
@@ -768,9 +747,9 @@ void f_async_db_exec() {
     if (bound_args && !bound_args_handed_off) free_array(bound_args);
   };
 
-  if (num_arg >= 3) {
+  if (callback) {
     cb.reset(new function_to_call_t);
-    process_efun_callback(2, cb.get(), F_ASYNC_DB_EXEC);
+    f.process_callback(2, cb.get());
 
     // The callback fires long after this stack frame is gone (a DB round
     // trip on a worker thread, then a later game tick) -- unlike the
@@ -796,21 +775,25 @@ void f_async_db_exec() {
     }
 
     // The bound args' stack slots were bitwise-transferred into bound_args
-    // above (not ref-bumped), so skip past them without freeing -- same
-    // "args have been transfered; don't free them" idiom as int_call_out().
-    sp -= cb->narg;
-    pop_stack();  // remove the callback; now sp = sql, sp-1 = handle
+    // above (not ref-bumped), so forget them before the pop so it does not
+    // free them -- same idiom as int_call_out().
+    for (int i = 3; i < f.argc(); i++) {
+      f.forget(i);
+    }
+    // remove the (forgotten) bound args and the callback; the window is
+    // handle, sql (`callback` pointed into a released slot from here on)
+    f.pop_back(f.argc() - 2);
   }
 
   array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy(sql.c_str(), "f_db_exec");
   valid_database("exec", info);
 
   db_t* db;
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
@@ -830,14 +813,12 @@ void f_async_db_exec() {
 
   cb_ref.handed_off = true;
   bound_args_handed_off = true;
-  add_db_exec((sp - 1)->u.number, sp->u.string, cb ? cb.release() : nullptr, bound_args, prom);
-  pop_2_elems();
+  add_db_exec(handle, sql.c_str(), cb ? cb.release() : nullptr, bound_args, prom);
   if (prom) {
     prom->ref++;
-    push_refed_promise(prom);
-  } else {
-    push_number(0);
+    return vm::Value::refed(prom);
   }
+  return 0;
 }
 #endif
 

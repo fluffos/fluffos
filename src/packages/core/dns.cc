@@ -57,7 +57,7 @@ const char* query_ip_name(object_t* ob) {
     if (iptable[i].addrlen == ob->interactive->addrlen &&
         !memcmp(&iptable[i].addr, &ob->interactive->addr, ob->interactive->addrlen) &&
         iptable[i].name) {
-      return (iptable[i].name);
+      return ref_string(iptable[i].name); /* callers own a reference */
     }
   }
   return query_ip_number(ob);

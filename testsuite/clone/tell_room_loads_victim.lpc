@@ -1,0 +1,10 @@
+// A room whose loading destructs /clone/tell_room_victim: after the load,
+// tell_room() must treat a swept (destructed) exclude as "no exclusion"
+// rather than crash on a null list.
+void create() {
+  object victim = find_object("/clone/tell_room_victim");
+
+  if (victim) {
+    destruct(victim);
+  }
+}

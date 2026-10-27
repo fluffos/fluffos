@@ -1,0 +1,3 @@
+// Caller for TestPresentDestructEnvDuringReset: 2-arg present into an env
+// that may have destructed itself during its lazy reset.
+object probe(object env) { return present("sword", env); }

@@ -15,6 +15,7 @@
 #include "vm/internal/base/array.h"
 #include "vm/internal/base/function.h"
 #include "vm/internal/base/interpret.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/mapping.h"
 #include "vm/internal/base/object.h"
 #include "vm/internal/base/program.h"
@@ -1035,7 +1036,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     return HookRun::Skipped;
   }
 
-  int const num_arg_saved = st_num_arg;
   auto const t0 = std::chrono::steady_clock::now();
   bool const outermost = !g_hook_depth++;
   object_t* ci = current_interactive;
@@ -1098,7 +1098,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
     free_object(&hb, "hook");
   }
   restore_simulate(sim);
-  st_num_arg = num_arg_saved;
 
   if (exempt) {
     int64_t const h = us_since(t0);
@@ -2444,8 +2443,7 @@ void hooks_mark_frame_for_after(object_t* filter_target) {
   }
 }
 
-void f_hook_proceed() {
-  int const num = st_num_arg;
+vm::Value f_hook_proceed(vm::EfunArgs& f, std::optional<array_t*> replacement_args) {
   if (!g_around.active) {
     error("hook_proceed: no active HOOK_AROUND handler.\n");
   }
@@ -2460,25 +2458,22 @@ void f_hook_proceed() {
   }
 
   /* Optional replacement args: hook_proceed(mixed *args) */
-  std::vector<svalue_t> use_args;
-  if (num == 1) {
-    if (sp->type != T_ARRAY) {
-      error("Bad argument 1 to hook_proceed()\n");
-    }
-    array_t* arr = sp->u.arr;
-    use_args.resize(arr->size);
+  std::vector<vm::Value> use_args;
+  if (replacement_args) {
+    array_t* arr = *replacement_args;
+    use_args.reserve(arr->size);
     for (int i = 0; i < arr->size; i++) {
-      assign_svalue_no_free(&use_args[i], &arr->item[i]);
+      use_args.push_back(vm::Value::copy(&arr->item[i]));
     }
-    pop_stack();
-  } else if (num == 0) {
-    use_args.resize(g_around.saved_args.size());
-    for (size_t i = 0; i < g_around.saved_args.size(); i++) {
-      assign_svalue_no_free(&use_args[i], &g_around.saved_args[i]);
-    }
+    f.pop_back();
   } else {
-    error("Wrong number of arguments to hook_proceed()\n");
+    use_args.reserve(g_around.saved_args.size());
+    for (auto& sv : g_around.saved_args) {
+      use_args.push_back(vm::Value::copy(&sv));
+    }
   }
+  /* The real body runs on the raw stack above the (now empty) argument
+   * window; the result it leaves there is the efun's. */
   g_around.proceeded = true;
 
   object_t* target = g_around.target;
@@ -2489,9 +2484,9 @@ void f_hook_proceed() {
   int fio = g_around.function_index_offset;
   int vio = g_around.variable_index_offset;
 
-  for (auto& sv : use_args) {
-    push_svalue(&sv);
-    free_svalue(&sv, "hook_proceed arg");
+  for (auto& v : use_args) {
+    push_svalue(v.get());
+    v = vm::Value();
   }
 
   /* Run the real body; eval_instruction marks this frame FRAME_EXTERNAL so
@@ -2511,8 +2506,7 @@ void f_hook_proceed() {
     setup_variables(narg, 0, narg);
   }
   call_program(prog, address);
-  /* Result left on the stack as hook_proceed's return value. */
-  (void)address;
+  return f.take_pushed();
 }
 
 void hooks_owner_destructed(object_t* ob) {

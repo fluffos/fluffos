@@ -653,7 +653,7 @@ std::string u8_convert_encoding(UConverter* trans, const char* data, int len) {
 
 namespace {
 
-std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
+std::unordered_set<UChar32> u8_charset_set(std::string_view chars) {
   std::unordered_set<UChar32> set;
   const auto* s = reinterpret_cast<const uint8_t*>(chars.data());
   int32_t i = 0;
@@ -667,6 +667,39 @@ std::unordered_set<UChar32> u8_charset_set(const std::string& chars) {
     set.insert(c);
   }
   return set;
+}
+
+/* Pure-ASCII charset → 256-bit stack mask (default whitespace and most
+ * custom trim sets). Avoids unordered_set heap traffic on the hot path. */
+bool u8_ascii_charset_mask(std::string_view chars, uint64_t mask[4]) {
+  mask[0] = mask[1] = mask[2] = mask[3] = 0;
+  for (unsigned char c : chars) {
+    if (c >= 0x80) {
+      return false;
+    }
+    mask[c >> 6] |= (uint64_t{1} << (c & 63));
+  }
+  return true;
+}
+
+bool u8_ascii_in_mask(unsigned char c, const uint64_t mask[4]) {
+  return (mask[c >> 6] >> (c & 63)) & 1;
+}
+
+int32_t u8_ltrim_off_ascii(const uint8_t* s, int32_t len, const uint64_t mask[4]) {
+  int32_t i = 0;
+  while (i < len && s[i] < 0x80 && u8_ascii_in_mask(s[i], mask)) {
+    i++;
+  }
+  return i;
+}
+
+int32_t u8_rtrim_off_ascii(const uint8_t* s, int32_t start, int32_t end, const uint64_t mask[4]) {
+  int32_t i = end;
+  while (i > start && s[i - 1] < 0x80 && u8_ascii_in_mask(s[i - 1], mask)) {
+    i--;
+  }
+  return i;
 }
 
 int32_t u8_ltrim_off(const uint8_t* s, int32_t len, const std::unordered_set<UChar32>& set) {
@@ -701,6 +734,25 @@ int32_t u8_rtrim_off(const uint8_t* s, int32_t start, int32_t end,
 // Trim by Unicode scalar value. The charset is a set of code points, so a
 // multi-byte character cannot donate individual UTF-8 bytes to the match
 // (U+3000 / 《 share E3 80 under find_first_not_of -- issue #1401).
+std::pair<size_t, size_t> u8_trim_range(std::string_view str, std::string_view chars, bool left,
+                                        bool right) {
+  const auto len = static_cast<int32_t>(str.size());
+  if (len == 0) {
+    return {0, 0};
+  }
+  const auto* s = reinterpret_cast<const uint8_t*>(str.data());
+  uint64_t ascii_mask[4];
+  if (u8_ascii_charset_mask(chars, ascii_mask)) {
+    const int32_t start = left ? u8_ltrim_off_ascii(s, len, ascii_mask) : 0;
+    const int32_t end = right ? u8_rtrim_off_ascii(s, start, len, ascii_mask) : len;
+    return {static_cast<size_t>(start), static_cast<size_t>(end)};
+  }
+  const auto set = u8_charset_set(chars);
+  const int32_t start = left ? u8_ltrim_off(s, len, set) : 0;
+  const int32_t end = right ? u8_rtrim_off(s, start, len, set) : len;
+  return {static_cast<size_t>(start), static_cast<size_t>(end)};
+}
+
 std::string ltrim(const std::string& str, const std::string& chars) {
   if (str.empty()) {
     return str;

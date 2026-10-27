@@ -174,22 +174,21 @@ static db_defn_t no_db = {"None",  nullptr, nullptr, nullptr, nullptr,
  * security on which objects can tweak your database (we don't want
  * people doing "DELETE * FROM *" or equivalent for us)
  */
-svalue_t* valid_database(const char* action, array_t* info) {
-  svalue_t* ret;
-
+vm::CallResult valid_database(const char* action, array_t* info) {
   /*
    * Call valid_database(object ob, string action, mixed *info)
    *
    * Return: string - password for access
    *         int    - 1 for no password, accept, 0 deny
+   *
+   * Takes over the caller's reference to info. With no master object yet
+   * the check succeeds (status kNoMaster, no password).
    */
-  push_object(current_object);
-  push_constant_string(action);
-  push_refed_array(info);
-
-  ret = apply_master_ob(APPLY_VALID_DATABASE, 3);
-  if (ret && (ret == (svalue_t*)-1 ||
-              (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number)))) {
+  vm::CallResult ret = vm::Call(vm::Value::object(current_object), vm::Value::str_constant(action),
+                                vm::Value::refed(info))
+                           .apply_master(APPLY_VALID_DATABASE);
+  if (ret.status() == vm::CallResult::kNoMaster ||
+      (ret && (ret->type == T_STRING || (ret->type == T_NUMBER && ret->u.number)))) {
     return ret;
   }
 
@@ -203,13 +202,13 @@ svalue_t* valid_database(const char* action, array_t* info) {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_CLOSE
-void f_db_close() {
+vm::Value f_db_close(vm::EfunArgs&, LPC_INT handle) {
   int ret = 0;
   db_t* db;
 
   valid_database("close", &the_null_array);
 
-  db = find_db_conn(sp->u.number);
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to close an invalid database handle\n");
   }
@@ -229,7 +228,7 @@ void f_db_close() {
   /* Remove the entry from the linked list */
   free_db_conn(db);
 
-  sp->u.number = ret;
+  return ret;
 }
 #endif
 
@@ -244,13 +243,13 @@ void f_db_close() {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_COMMIT
-void f_db_commit() {
+vm::Value f_db_commit(vm::EfunArgs&, LPC_INT handle) {
   int ret = 0;
   db_t* db;
 
   valid_database("commit", &the_null_array);
 
-  db = find_db_conn(sp->u.number);
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to commit an invalid database handle\n");
   }
@@ -261,7 +260,7 @@ void f_db_commit() {
     ret = db->type->commit(&(db->c));
   }
 
-  sp->u.number = ret;
+  return ret;
 }
 #endif
 
@@ -277,13 +276,13 @@ void f_db_commit() {
  * Returns a new database handle.
  */
 #ifdef F_DB_CONNECT
-void f_db_connect() {
+vm::Value f_db_connect(vm::EfunArgs&, vm::StringArg host_arg, vm::StringArg database_arg,
+                       std::optional<vm::StringArg> user_arg, std::optional<LPC_INT> type_arg) {
   char* errormsg = nullptr;
-  const char *user = "", *database, *host = nullptr;
+  const char *user = "", *database, *host;
   db_t* db;
   array_t* info;
-  svalue_t* mret;
-  int handle, ret = 0, args = 0, type;
+  int handle, ret = 0, type;
 
 #ifdef DEFAULT_DB
   type = DEFAULT_DB;
@@ -291,23 +290,14 @@ void f_db_connect() {
   type = 0;
 #endif
 
-  switch (st_num_arg) {
-    case 4:
-      type = (sp - (args++))->u.number;
-      // fallthrough
-    case 3:
-      user = (sp - (args++))->u.string;
-      // fallthrough
-    case 2:
-      database = (sp - (args++))->u.string;
-      // fallthrough
-    case 1:
-      host = (sp - (args++))->u.string;
-      break;
-    default:
-      // unreachable
-      break;
+  if (type_arg) {
+    type = *type_arg;
   }
+  if (user_arg) {
+    user = user_arg->c_str();
+  }
+  database = database_arg.c_str();
+  host = host_arg.c_str();
 
   info = allocate_empty_array(3);
   info->item[0].type = info->item[1].type = info->item[2].type = T_STRING;
@@ -320,13 +310,11 @@ void f_db_connect() {
   }
   info->item[2].u.string = string_copy(user, "f_db_connect:3");
 
-  mret = valid_database("connect", info);
+  vm::CallResult mret = valid_database("connect", info);
 
   handle = create_db_conn();
   if (!handle) {
-    pop_n_elems(args);
-    push_number(0);
-    return;
+    return 0;
   }
   db = find_db_conn(handle);
 
@@ -364,24 +352,20 @@ void f_db_connect() {
   }
 
   if (db->type->connect) {
-    ret = db->type->connect(
-        &(db->c), host, database, user,
-        (mret != (svalue_t*)-1 && mret->type == T_STRING ? mret->u.string : nullptr));
+    ret = db->type->connect(&(db->c), host, database, user,
+                            (mret.is(T_STRING) ? mret->u.string : nullptr));
   }
-
-  pop_n_elems(args);
 
   if (!ret) {
+    vm::Value result;
     if (db->type->error) {
       errormsg = db->type->error(&(db->c));
-      push_malloced_string(errormsg);
-    } else {
-      push_number(0);
+      result = vm::Value::str_malloced(errormsg);
     }
     free_db_conn(db);
-  } else {
-    push_number(handle);
+    return result;
   }
+  return handle;
 }
 #endif
 
@@ -399,17 +383,17 @@ void f_db_connect() {
 extern pthread_mutex_t* db_mut;
 #endif
 #ifdef F_DB_EXEC
-void f_db_exec() {
+vm::Value f_db_exec(vm::EfunArgs&, LPC_INT handle, vm::StringArg sql) {
   int ret = 0;
   db_t* db;
   array_t* info;
   info = allocate_empty_array(1);
   info->item[0].type = T_STRING;
   info->item[0].subtype = STRING_MALLOC;
-  info->item[0].u.string = string_copy(sp->u.string, "f_db_exec");
+  info->item[0].u.string = string_copy(sql.c_str(), "f_db_exec");
   valid_database("exec", info);
 
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to exec on an invalid database handle\n");
   }
@@ -422,25 +406,26 @@ void f_db_exec() {
   }
 
   if (db->type->execute) {
-    ret = db->type->execute(&(db->c), sp->u.string);
+    ret = db->type->execute(&(db->c), sql.c_str());
   }
 
-  pop_stack();
+  vm::Value result;
   if (ret == -1) {
     if (db->type->error) {
       char* errormsg;
 
       errormsg = db->type->error(&(db->c));
-      put_malloced_string(errormsg);
+      result = vm::Value::str_malloced(errormsg);
     } else {
-      put_constant_string("Unknown error");
+      result = vm::Value::str_constant("Unknown error");
     }
   } else {
-    sp->u.number = ret;
+    result = ret;
   }
 #ifdef PACKAGE_ASYNC
   pthread_mutex_unlock(db_mut);
 #endif
+  return result;
 }
 #endif
 
@@ -469,13 +454,13 @@ void f_db_exec() {
  * Returns an array of columns from the named row on success.
  */
 #ifdef F_DB_FETCH
-void f_db_fetch() {
+vm::Value f_db_fetch(vm::EfunArgs&, LPC_INT handle, LPC_INT row) {
   db_t* db;
   array_t* ret;
 
   valid_database("fetch", &the_null_array);
 
-  db = find_db_conn((sp - 1)->u.number);
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to fetch from an invalid database handle\n");
   }
@@ -483,24 +468,21 @@ void f_db_fetch() {
   DB_ASYNC_LOCK();  // serialize against the async DB worker thread
 
   if (db->type->fetch) {
-    ret = db->type->fetch(&(db->c), sp->u.number);
+    ret = db->type->fetch(&(db->c), row);
   } else {
     ret = &the_null_array;
   }
 
-  pop_stack();
   if (!ret) {
     if (db->type->error) {
       char* errormsg;
 
       errormsg = db->type->error(&(db->c));
-      put_malloced_string(errormsg);
-    } else {
-      sp->u.number = 0;
+      return vm::Value::str_malloced(errormsg);
     }
-  } else {
-    put_array(ret);
+    return 0;
   }
+  return vm::Value::refed(ret);
 }
 #endif
 
@@ -513,13 +495,13 @@ void f_db_fetch() {
  * Returns 1 on success, 0 on failure
  */
 #ifdef F_DB_ROLLBACK
-void f_db_rollback() {
+vm::Value f_db_rollback(vm::EfunArgs&, LPC_INT handle) {
   int ret = 0;
   db_t* db;
 
   valid_database("rollback", &the_null_array);
 
-  db = find_db_conn(sp->u.number);
+  db = find_db_conn(handle);
   if (!db) {
     error("Attempt to rollback an invalid database handle\n");
   }
@@ -536,7 +518,7 @@ void f_db_rollback() {
     }
   }
 
-  sp->u.number = ret;
+  return ret;
 }
 #endif
 
@@ -545,7 +527,7 @@ void f_db_rollback() {
  * Returns a string describing the database package's current status
  */
 #ifdef F_DB_STATUS
-void f_db_status() {
+vm::Value f_db_status(vm::EfunArgs&) {
   int i;
   outbuffer_t out;
 
@@ -566,7 +548,7 @@ void f_db_status() {
     }
   }
 
-  outbuf_push(&out);
+  return outbuf_value(&out);
 }
 #endif
 
@@ -969,7 +951,11 @@ static char* msql_errormsg(dbconn_t* c) { return string_copy(msqlErrMsg, "msql_e
 #ifdef USE_SQLITE3
 static int SQLite3_connect(dbconn_t* c, const char* host, const char* database,
                            const char* username, const char* password) {
-  const char* filename = check_valid_path(database, master_ob, "sqlite3_connect", 1);
+  vm::Value filenamev = check_valid_path(database, master_ob, "sqlite3_connect", 1);
+  if (!filenamev.is(T_STRING)) {
+    return 0;
+  }
+  const char* filename = filenamev->u.string;
 
   if (sqlite3_open(filename, &c->SQLite3.handle)) {
     strncpy(c->SQLite3.errormsg, sqlite3_errmsg(c->SQLite3.handle), sizeof(c->SQLite3.errormsg));

@@ -6,20 +6,23 @@
  * Write statistics about objects on file.
  */
 
+struct SvalueSizeCtx {
+  int* total;
+  int* depth;
+};
+
 static int sumSizes(mapping_t* /*m*/, mapping_node_t* /*elt*/, void* /*tp*/);
-static int svalue_size(svalue_t* /*v*/);
+static int svalue_size(svalue_t* /*v*/, int* /*depth*/);
 
 static int sumSizes(mapping_t* /*m*/, mapping_node_t* elt, void* tp) {
-  int* t = reinterpret_cast<int*>(tp);
+  auto* ctx = static_cast<SvalueSizeCtx*>(tp);
 
-  *t += (svalue_size(&elt->values[0]) + svalue_size(&elt->values[1]));
-  *t += sizeof(mapping_node_t);
+  *ctx->total += (svalue_size(&elt->values[0], ctx->depth) + svalue_size(&elt->values[1], ctx->depth));
+  *ctx->total += sizeof(mapping_node_t);
   return 0;
 }
 
-int depth = 0;
-
-static int svalue_size(svalue_t* v) {
+static int svalue_size(svalue_t* v, int* depth) {
   int i, total;
 
   switch (v->type) {
@@ -31,36 +34,38 @@ static int svalue_size(svalue_t* v) {
       return (strlen(v->u.string) + 1);
     case T_ARRAY:
     case T_CLASS:
-      if (++depth > 100) {
+      if (++*depth > 100) {
         return 0;
       }
 
       /* first svalue is stored inside the array struct */
       total = sizeof(array_t) - sizeof(svalue_t);
       for (i = 0; i < v->u.arr->size; i++) {
-        total += svalue_size(&v->u.arr->item[i]) + sizeof(svalue_t);
+        total += svalue_size(&v->u.arr->item[i], depth) + sizeof(svalue_t);
       }
-      depth--;
+      (*depth)--;
       return total;
-    case T_MAPPING:
-      if (++depth > 100) {
+    case T_MAPPING: {
+      if (++*depth > 100) {
         return 0;
       }
       total = sizeof(mapping_t);
-      mapTraverse(v->u.map, sumSizes, &total);
-      depth--;
+      SvalueSizeCtx ctx{&total, depth};
+      mapTraverse(v->u.map, sumSizes, &ctx);
+      (*depth)--;
       return total;
+    }
     case T_FUNCTION: {
       svalue_t tmp;
       tmp.type = T_ARRAY;
       tmp.u.arr = v->u.fp->hdr.args;
 
-      if (++depth > 100) {
+      if (++*depth > 100) {
         return 0;
       }
 
       if (tmp.u.arr) {
-        total = sizeof(funptr_hdr_t) + svalue_size(&tmp);
+        total = sizeof(funptr_hdr_t) + svalue_size(&tmp, depth);
       } else {
         total = sizeof(funptr_hdr_t);
       }
@@ -80,21 +85,21 @@ static int svalue_size(svalue_t* v) {
           break;
       }
 
-      depth--;
+      (*depth)--;
       return total;
     }
     case T_BUFFER:
       /* first byte is stored inside the buffer struct */
       return sizeof(buffer_t) + v->u.buf->size - 1;
     case T_PROMISE: {
-      if (++depth > 100) {
+      if (++*depth > 100) {
         return 0;
       }
-      total = sizeof(promise_t) + svalue_size(&v->u.prom->result);
+      total = sizeof(promise_t) + svalue_size(&v->u.prom->result, depth);
       if (v->u.prom->reactions) {
         total += v->u.prom->reactions->size() * sizeof(promise_reaction_t);
       }
-      depth--;
+      (*depth)--;
       return total;
     }
     default:
@@ -112,8 +117,8 @@ int data_size(object_t* ob) {
 
   if (ob->prog) {
     for (i = 0; i < ob->prog->num_variables_total; i++) {
-      depth = 0;
-      total += svalue_size(&ob->variables[i]) + sizeof(svalue_t);
+      int depth = 0;
+      total += svalue_size(&ob->variables[i], &depth) + sizeof(svalue_t);
     }
   }
   return total;
@@ -127,11 +132,12 @@ void dumpstat(const char* tfn) {
   int display_hidden;
 #endif
 
-  fn = check_valid_path(tfn, current_object, "dumpallobj", 1);
-  if (!fn) {
+  vm::Value pathv = check_valid_path(tfn, current_object, "dumpallobj", 1);
+  if (!pathv.is(T_STRING)) {
     error("Invalid path '/%s' for writing.\n", tfn);
     return;
   }
+  fn = pathv->u.string;
   f = fopen(fn, "w");
   if (!f) {
     error("Unable to open '/%s' for writing.\n", fn);
@@ -173,10 +179,9 @@ void dumpstat(const char* tfn) {
 }
 
 #ifdef F_DUMPALLOBJ
-void f_dumpallobj() {
-  if (st_num_arg) {
-    dumpstat(sp->u.string);
-    free_string_svalue(sp--);
+void f_dumpallobj(vm::EfunArgs&, std::optional<vm::StringArg> file) {
+  if (file) {
+    dumpstat(file->c_str());
   } else {
     dumpstat("/OBJ_DUMP");
   }

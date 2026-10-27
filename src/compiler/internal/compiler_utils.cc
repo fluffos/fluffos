@@ -12,6 +12,7 @@
 #include "lexer.h"
 #include "compiler.h"
 #include "vm/vm.h"
+#include "vm/internal/base/vm_stack.h"
 
 #define OR_BUFFER | T_BUFFER
 

@@ -38,6 +38,7 @@
 #include "efuns.autogen.h"
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
+#include "vm/internal/base/vm_stack.h"
 #include "compiler.h"
 #include "keyword.h"
 #include "options.autogen.h"
@@ -56,8 +57,7 @@
 
 // FIXME: in master.h
 extern struct object_t* master_ob;
-// FIXME: in file.h
-extern const char* check_valid_path(const char*, object_t*, const char* const, int);
+#include "packages/core/file.h"
 
 // The include-path master apply (init_include_path) pushes its argument
 // onto the VM stack; safe_apply_master_ob pops it.
@@ -2234,9 +2234,9 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
 
   if (check_local) {
     buf = merge(name);
-    const char* tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
-    if (tmp) {
-      int fd = open(tmp, O_RDONLY);
+    vm::Value tmpv = check_valid_path(buf.c_str(), master_ob, "include", 0);
+    if (tmpv.is(T_STRING)) {
+      int fd = open(tmpv->u.string, O_RDONLY);
       if (fd != -1) {
 #ifdef _WIN32
         _setmode(fd, _O_BINARY);
@@ -2261,9 +2261,9 @@ std::pair<int, std::string> inc_open(std::string_view name, bool check_local) {
       buf += '/';
     }
     buf.append(name);
-    const char* tmp = check_valid_path(buf.c_str(), master_ob, "include", 0);
-    if (tmp) {
-      int fd = open(tmp, O_RDONLY);
+    vm::Value tmpv = check_valid_path(buf.c_str(), master_ob, "include", 0);
+    if (tmpv.is(T_STRING)) {
+      int fd = open(tmpv->u.string, O_RDONLY);
       if (fd != -1) {
 #ifdef _WIN32
         _setmode(fd, _O_BINARY);

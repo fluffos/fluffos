@@ -4,4 +4,17 @@ void do_tests() {
   // A file that EXISTS but fails to compile throws (the handler still
   // restores the probed object names -- pinned by crasher/1063).
   ASSERT(catch(test_load("/single/tests/compiler/fail/local_redef")));
+
+  {
+    // When the file has gone away since the object was loaded, a failed
+    // test_load() must leave that object findable: the failure path used to
+    // restore its name but not its object-table entry.
+    object probe;
+    write_file("/data/test_load_probe.lpc", "int x;\n", 1);
+    probe = load_object("/data/test_load_probe");
+    rm("/data/test_load_probe.lpc");
+    ASSERT_EQ(0, test_load("/data/test_load_probe"));
+    ASSERT_EQ(probe, find_object("/data/test_load_probe"));
+    destruct(probe);
+  }
 }

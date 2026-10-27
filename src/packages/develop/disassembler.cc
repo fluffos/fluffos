@@ -7,64 +7,33 @@
 #include "packages/core/file.h"
 
 #ifdef F_DUMP_PROG
-void f_dump_prog() {
+void f_dump_prog(vm::EfunArgs&, object_t* ob, std::optional<LPC_INT> flags,
+                 std::optional<vm::StringArg> file_arg) {
   program_t* prog;
-  const char* where;
-  int d;
-  object_t* ob;
-  int const narg = st_num_arg;
-
-  if (st_num_arg == 2) {
-    if ((sp - 1)->type != T_OBJECT) {
-      bad_argument(sp - 1, T_OBJECT, 1, F_DUMP_PROG);
-    }
-
-    ob = sp[-1].u.ob;
-    d = sp->u.number;
-    where = nullptr;
-  } else if (st_num_arg == 3) {
-    if ((sp - 2)->type != T_OBJECT) {
-      bad_argument(sp - 2, T_OBJECT, 1, F_DUMP_PROG);
-    }
-
-    ob = sp[-2].u.ob;
-    d = sp[-1].u.number;
-    where = (sp->type == T_STRING) ? sp->u.string : nullptr;
-  } else {
-    if (sp->type != T_OBJECT) {
-      bad_argument(sp, T_OBJECT, 1, F_DUMP_PROG);
-    }
-
-    ob = sp->u.ob;
-    d = 0;
-    where = nullptr;
-  }
+  int const d = static_cast<int>(flags.value_or(0));
+  const char* where = file_arg ? file_arg->c_str() : "/PROG_DUMP";
 
   if (!(prog = ob->prog)) {
     error("No program for object.\n");
   } else {
-    if (!where) {
-      where = "/PROG_DUMP";
-    }
-
     const char* fname;
-    FILE* f;
+    FILE* file;
 
-    fname = check_valid_path(where, current_object, "dumpallobj", 1);
+    vm::Value fnamev = check_valid_path(where, current_object, "dumpallobj", 1);
 
-    if (!fname) {
+    if (!fnamev.is(T_STRING)) {
       error("Invalid path '%s' for writing.\n", where);
       return;
     }
-    f = fopen(fname, "w");
-    if (!f) {
+    fname = fnamev->u.string;
+    file = fopen(fname, "w");
+    if (!file) {
       error("Unable to open '/%s' for writing.\n", fname);
       return;
     }
-    dump_prog(prog, f, d);
-    fclose(f);
+    dump_prog(prog, file, d);
+    fclose(file);
   }
-  pop_n_elems(narg);
 }
 
 #endif

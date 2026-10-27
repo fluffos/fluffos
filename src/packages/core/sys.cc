@@ -6,7 +6,7 @@
 #endif
 
 #ifdef F_SYS_NETWORK_PORTS
-void f_sys_network_ports() {
+vm::Value f_sys_network_ports(vm::EfunArgs&) {
   array_t* info;
   int i = 0, p = 0;
 
@@ -47,16 +47,14 @@ void f_sys_network_ports() {
     p++;
   }
 
-  push_refed_array(info);
+  return vm::Value::refed(info);
 }
 #endif
 
 #ifdef F_SYS_RELOAD_TLS
-void f_sys_reload_tls() {
-  auto port_index_display = sp->u.number;
+void f_sys_reload_tls(vm::EfunArgs&, LPC_INT port_index_display) {
   auto port_index = port_index_display - 1;
 
-  DEFER { pop_stack(); };
   // external_port is a fixed array; bound by ELEMENT COUNT, not sizeof (which
   // is the size in bytes and let indices up to ~sizeof(port_def_t)*N through,
   // for an out-of-bounds read and a wild tls_server_close()/port->ssl write).

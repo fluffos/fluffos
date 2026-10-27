@@ -17,47 +17,28 @@
 #include "packages/mudlib_stats/mudlib_stats.h"
 
 #ifdef F_DOMAIN_STATS
-void f_domain_stats() {
-  mapping_t* m;
-
-  if (st_num_arg) {
-    m = get_domain_stats(sp->u.string);
-    free_string_svalue(sp--);
-  } else {
-    m = get_domain_stats(nullptr);
-  }
+vm::Value f_domain_stats(vm::EfunArgs&, std::optional<vm::StringArg> domain) {
+  mapping_t* m = get_domain_stats(domain ? domain->c_str() : nullptr);
   if (!m) {
-    push_number(0);
-  } else {
-    /* ref count is properly decremented by get_domain_stats */
-    push_mapping(m);
+    return 0;
   }
+  /* get_domain_stats() leaves the caller no reference */
+  return vm::Value::addref(m);
 }
 #endif
 
 #ifdef F_SET_AUTHOR
-void f_set_author() {
-  set_author(sp->u.string);
-  free_string_svalue(sp--);
-}
+void f_set_author(vm::EfunArgs&, vm::StringArg name) { set_author(name.c_str()); }
 #endif
 
 #ifdef F_AUTHOR_STATS
-void f_author_stats() {
-  mapping_t* m;
-
-  if (st_num_arg) {
-    m = get_author_stats(sp->u.string);
-    free_string_svalue(sp--);
-  } else {
-    m = get_author_stats(nullptr);
-  }
+vm::Value f_author_stats(vm::EfunArgs&, std::optional<vm::StringArg> author) {
+  mapping_t* m = get_author_stats(author ? author->c_str() : nullptr);
   if (!m) {
-    push_number(0);
-  } else {
-    /* ref count is properly decremented by get_author_stats */
-    push_mapping(m);
+    return 0;
   }
+  /* get_author_stats() leaves the caller no reference */
+  return vm::Value::addref(m);
 }
 #endif
 
@@ -293,13 +274,11 @@ void mark_mudlib_stats() {
  *************************/
 
 static void init_author_for_ob(object_t* ob) {
-  svalue_t* ret;
-
-  push_malloced_string(add_slash(ob->obname));
-  ret = apply_master_ob(APPLY_AUTHOR_FILE, 1);
-  if (ret == (svalue_t*)-1) {
+  vm::CallResult ret =
+      vm::Call(vm::Value::str_malloced(add_slash(ob->obname))).apply_master(APPLY_AUTHOR_FILE);
+  if (ret.status() == vm::CallResult::kNoMaster) {
     ob->stats.author = master_author;
-  } else if (!ret || ret->type != T_STRING) {
+  } else if (!ret.is(T_STRING)) {
     ob->stats.author = nullptr;
   } else {
     ob->stats.author = add_stat_entry(ret->u.string, &authors);
@@ -337,16 +316,14 @@ mudlib_stats_t* set_master_author(const char* str) {
 }
 
 static const char* author_for_file(const char* file) {
-  svalue_t* ret;
   static char buff[50];
 
-  copy_and_push_string(file);
-  ret = safe_apply_master_ob(APPLY_AUTHOR_FILE, 1);
-  if (ret == nullptr || ret == (svalue_t*)-1 || ret->type != T_STRING) {
+  vm::CallResult ret = vm::Call(vm::Value::str_copy(file)).safe_apply_master(APPLY_AUTHOR_FILE);
+  if (!ret.is(T_STRING)) {
     return nullptr;
   }
   // The master apply may return an arbitrary-length string; bound the copy.
-  size_t n = SVALUE_STRLEN(ret);
+  size_t n = SVALUE_STRLEN(ret.get());
   if (n >= sizeof(buff)) {
     n = sizeof(buff) - 1;
   }
@@ -360,7 +337,6 @@ static const char* author_for_file(const char* file) {
  *************************/
 
 static void init_domain_for_ob(object_t* ob) {
-  svalue_t* ret;
   const char* domain_name;
 
   if (!current_object
@@ -379,13 +355,11 @@ static void init_domain_for_ob(object_t* ob) {
   /*
    * Ask master object who the creator of this object is.
    */
-  push_malloced_string(add_slash(ob->obname));
+  vm::Call call;
+  call.push(vm::Value::str_malloced(add_slash(ob->obname)));
 
-  if (master_ob) {
-    ret = apply_master_ob(APPLY_DOMAIN_FILE, 1);
-  } else {
-    ret = apply(applies_table[APPLY_DOMAIN_FILE], ob, 1, ORIGIN_DRIVER);
-  }
+  vm::CallResult ret = master_ob ? call.apply_master(APPLY_DOMAIN_FILE)
+                                 : call.apply(applies_table[APPLY_DOMAIN_FILE], ob, ORIGIN_DRIVER);
 
   if (IS_ZERO(ret)) {
     ob->stats.domain = current_object->stats.domain;
@@ -437,16 +411,15 @@ mudlib_stats_t* set_backbone_domain(const char* str) {
  * Ask the master object.
  */
 static const char* domain_for_file(const char* file) {
-  svalue_t* ret;
   static char buff[512];
 
-  share_and_push_string(file);
-  ret = safe_apply_master_ob(APPLY_DOMAIN_FILE, 1);
-  if (ret == nullptr || ret == (svalue_t*)-1 || ret->type != T_STRING) {
+  vm::CallResult ret =
+      vm::Call(vm::Value::str_make_shared(file)).safe_apply_master(APPLY_DOMAIN_FILE);
+  if (!ret.is(T_STRING)) {
     return nullptr;
   }
   // The master apply may return an arbitrary-length string; bound the copy.
-  size_t n = SVALUE_STRLEN(ret);
+  size_t n = SVALUE_STRLEN(ret.get());
   if (n >= sizeof(buff)) {
     n = sizeof(buff) - 1;
   }

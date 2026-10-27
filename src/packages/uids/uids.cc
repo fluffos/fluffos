@@ -15,96 +15,69 @@
 
 #include <set>
 
-static object_t* ob;
-
 #ifdef F_EXPORT_UID
 
-void f_export_uid() {
+vm::Value f_export_uid(vm::EfunArgs&, object_t* target) {
   if (current_object->euid == nullptr) {
     error("Illegal to export uid 0\n");
   }
-  ob = sp->u.ob;
-  if (ob->euid) {
-    free_object(&ob, "f_export_uid:1");
-    *sp = const0;
-  } else {
-    ob->uid = current_object->euid;
-    free_object(&ob, "f_export_uid:2");
-    *sp = const1;
+  if (target->euid) {
+    return 0;
   }
+  target->uid = current_object->euid;
+  return 1;
 }
 
 #endif
 
 #ifdef F_GETEUID
 
-void f_geteuid() {
-  if (sp->type & T_OBJECT) {
-    ob = sp->u.ob;
+vm::Value f_geteuid(vm::EfunArgs&, vm::Arg who) {
+  if (who.is(T_OBJECT)) {
+    object_t* ob = who.object();
     if (ob->euid) {
-      put_constant_string(ob->euid->name);
-      free_object(&ob, "f_geteuid:1");
-      return;
+      return vm::Value::str_shared(ob->euid->name);
     }
-    free_object(&ob, "f_geteuid:2");
-    *sp = const0;
-    return;
-
-  } else if (sp->type & T_FUNCTION) {
-    funptr_t* fp;
-    if ((fp = sp->u.fp)->hdr.owner && fp->hdr.owner->euid) {
-      put_constant_string(fp->hdr.owner->euid->name);
-      free_funp(fp);
-      return;
-    }
-    free_funp(fp);
-    *sp = const0;
+    return 0;
   }
+  funptr_t* fp = who.funptr();
+  if (fp->hdr.owner && fp->hdr.owner->euid) {
+    return vm::Value::str_shared(fp->hdr.owner->euid->name);
+  }
+  return 0;
 }
 
 #endif
 
 #ifdef F_GETUID
 
-void f_getuid() {
-  ob = sp->u.ob;
-
-  if (!ob->uid) {
+vm::Value f_getuid(vm::EfunArgs&, object_t* target) {
+  if (!target->uid) {
     error("Object has no UID: This could happen if you call getuid() in master:creator_file().");
   }
 
-  put_constant_string(ob->uid->name);
-  free_object(&ob, "f_getuid");
+  return vm::Value::str_shared(target->uid->name);
 }
 
 #endif
 
 #ifdef F_SETEUID
 
-void f_seteuid() {
-  svalue_t* arg;
-  svalue_t* ret;
-
-  if (sp->type & T_NUMBER) {
-    if (sp->u.number) {
+vm::Value f_seteuid(vm::EfunArgs&, vm::Arg euid) {
+  if (euid.is(T_NUMBER)) {
+    if (euid.number()) {
       bad_arg(1, F_SETEUID);
     }
     current_object->euid = nullptr;
-    sp->u.number = 1;
-    return;
+    return 1;
   }
-  arg = sp;
-  push_object(current_object);
-  push_svalue(arg);
-  ret = apply_master_ob(APPLY_VALID_SETEUID, 2);
-  if (!MASTER_APPROVED(ret, "valid_seteuid")) {
-    free_string_svalue(sp);
-    *sp = const0;
-    return;
+  vm::CallResult ret =
+      vm::Call(current_object, euid.copy()).apply_master(APPLY_VALID_SETEUID);
+  if (!master_approved(ret, "valid_seteuid")) {
+    return 0;
   }
-  current_object->euid = add_uid(sp->u.string);
-  free_string_svalue(sp);
-  *sp = const1;
+  current_object->euid = add_uid(euid.string().c_str());
+  return 1;
 }
 
 #endif

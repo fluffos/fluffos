@@ -34,6 +34,7 @@
 #include "thirdparty/scope_guard/scope_guard.hpp"
 #include "packages/core/dns.h"  // for init_dns_event_base.
 #include "vm/vm.h"              // for push_constant_string, etc
+#include "vm/internal/base/vm_stack.h"
 #include "comm.h"               // for init_user_conn
 #include "backend.h"            // for backend();
 

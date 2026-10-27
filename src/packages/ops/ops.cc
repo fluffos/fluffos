@@ -5,6 +5,8 @@
 
 #include "base/package_api.h"
 
+#include "vm/internal/base/vm_stack.h" /* operators are part of the VM stack machine */
+
 #include "packages/ops/ops.h"
 #include "packages/ops/parse.h"
 
@@ -1361,21 +1363,18 @@ void f_function_constructor() {
   push_refed_funp(fp);
 }
 
-void f__evaluate() {
-  svalue_t* v;
-  svalue_t* arg = sp - st_num_arg + 1;
-
-  if (arg->type != T_FUNCTION) {
-    pop_n_elems(st_num_arg - 1);
-    return;
+vm::Value f__evaluate(vm::EfunArgs& f, vm::Arg fun) {
+  if (!fun.is(T_FUNCTION)) {
+    return f.take(0); /* anything else evaluates to itself */
   }
   if (current_object->flags & O_DESTRUCTED) {
-    pop_n_elems(st_num_arg);
-    push_undefined();
-    return;
+    return vm::Value::undefined();
   }
-  v = call_function_pointer(arg->u.fp, st_num_arg - 1);
-  assign_svalue(sp, v);
+  /* the call consumes the trailing arguments; its result is moved out of
+   * the shared return slot */
+  svalue_t* v = call_function_pointer(fun.funptr(), f.argc() - 1);
+  f.resync();
+  return vm::Value::take(v);
 }
 
 void f_sscanf() {

@@ -55,6 +55,7 @@ char *efun_names[MAX_FUNC];
 const char *key[MAX_FUNC], *buf[MAX_FUNC];
 
 int min_arg = -1, limit_max = 0;
+int varargs_at = -1; /* the position declared `...` */
 
 /*
  * arg_types is the types of all arguments. A 0 is used as a delimiter,
@@ -67,6 +68,22 @@ int arg_types[1000], last_current_type;
  * arg_types list if they were not already there (to save memory).
  */
 int curr_arg_types[40], curr_arg_type_size;
+
+/*
+ * The C++ signature of every efun (primary spec entries only: an alias
+ * compiles to its primary's opcode and shares its implementation). The
+ * generated thunk checks each declared argument against these types and
+ * hands it to the efun as a typed parameter.
+ */
+struct efun_sig {
+  int ret;     /* spec type of the result; T_VOID for a void efun */
+  int nargs;   /* declared argument positions, including a trailing ... */
+  int min_arg; /* positions below this are always present */
+  int varargs; /* the last position is ... */
+  int types[40];
+  int ntypes; /* curr_arg_types, 0-delimited per position */
+};
+efun_sig efun_sigs[MAX_FUNC];
 
 struct type {
   const char *name;
@@ -146,7 +163,21 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   char buff[500];
   char f_name[500];
   int i, len;
-  if (min_arg == -1) min_arg = $5;
+  int nargs = $5;
+  if (limit_max && varargs_at != nargs - 1) {
+    char msg[300];
+    snprintf(msg, sizeof msg,
+             "efun '%s': `...` must be the last argument (nothing after it can be typed)", $2);
+    yyerror(msg);
+  }
+  /* `f(void)` declares no arguments (as in C), not one optional argument
+   * of no type: a position with an empty type list that is not `...`. */
+  if (nargs == 1 && curr_arg_type_size == 1 && !limit_max) {
+    nargs = 0;
+    curr_arg_type_size = 0;
+    min_arg = 0;
+  }
+  if (min_arg == -1) min_arg = nargs;
   if (min_arg > 127) yyerror("min_arg > 127\n");
   if ($3[0] == '\0') {
     if (strlen($2) + 1 + 2 > sizeof f_name) yyerror("A local buffer was too small!(1)\n");
@@ -155,10 +186,29 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
     for (i = 0; i < len; i++) {
       if (islower(f_name[i])) f_name[i] = toupper(f_name[i]);
     }
+    for (i = 0; i < efun_code; i++) {
+      if (!strcmp(efun_names[i], $2)) {
+        char msg[300];
+        snprintf(msg, sizeof msg,
+                 "efun '%s' is declared twice; declare it in one package's spec (or make "
+                 "the second an alias)",
+                 $2);
+        yyerror(msg);
+      }
+    }
     efun_codes[efun_code] = (char *)malloc(len + 1);
     strcpy(efun_codes[efun_code], f_name);
     efun_names[efun_code] = (char *)malloc(len - 1);
     strcpy(efun_names[efun_code], $2);
+    {
+      efun_sig *sig = &efun_sigs[efun_code];
+      sig->ret = $1;
+      sig->nargs = nargs;
+      sig->min_arg = min_arg;
+      sig->varargs = limit_max;
+      sig->ntypes = curr_arg_type_size;
+      memcpy(sig->types, curr_arg_types, sizeof(int) * curr_arg_type_size);
+    }
     efun_code++;
   } else {
     if (strlen($3) + 1 + 17 > sizeof f_name) yyerror("A local buffer was too small(2)!\n");
@@ -189,7 +239,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   }
 #endif
   sprintf(buff, "{\"%s\",%s,0,0,%d,%d,%s,%s,%s,%s,%s,%d,%s},\n", $2, f_name, min_arg,
-          limit_max ? -1 : $5, $1 != T_VOID ? ctype($1) : "TYPE_NOVALUE",
+          limit_max ? -1 : nargs, $1 != T_VOID ? ctype($1) : "TYPE_NOVALUE",
           etype(0).c_str(), etype(1).c_str(), etype(2).c_str(), etype(3).c_str(), i, $6);
 
   if (strlen(buff) > sizeof buff) yyerror("Local buffer overwritten !\n");
@@ -200,6 +250,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';' {
   num_buff++;
   min_arg = -1;
   limit_max = 0;
+  varargs_at = -1;
   curr_arg_type_size = 0;
 };
 
@@ -251,6 +302,10 @@ typel: arg_type { $$ = ($1 == T_VOID && min_arg == -1); }
 | '.' '.' '.' {
   $$ = min_arg == -1;
   limit_max = 1;
+  varargs_at = 0;
+  for (int k = 0; k < curr_arg_type_size; k++) {
+    if (curr_arg_types[k] == 0) varargs_at++;
+  }
 };
 
 %%
@@ -364,6 +419,167 @@ std::string etype(int n) {
   if (buff == "") buff = "T_ANY";
   return buff;
 }
+
+/* ---- typed efun bindings ---- */
+
+/* The non-void types declared at one argument position. */
+struct arg_shape {
+  int types[40];
+  int n;
+  int optional; /* the position may be absent */
+};
+
+static void arg_position(const efun_sig *sig, int pos, arg_shape *out) {
+  int i = 0, p = 0;
+  for (; i < sig->ntypes && p < pos; i++) {
+    if (sig->types[i] == 0) p++;
+  }
+  out->n = 0;
+  for (; i < sig->ntypes && sig->types[i] != 0; i++) {
+    if (sig->types[i] != T_VOID) out->types[out->n++] = sig->types[i];
+  }
+  out->optional = pos >= sig->min_arg;
+}
+
+/* The C++ parameter type and vm::EfunArgs getter for a position of exactly
+ * one type, or null for a union or mixed (which binds as a vm::Arg). */
+static const char *scalar_cpp(int t, const char **getter) {
+  if (t & 0x10000) {
+    *getter = "array_arg";
+    return "array_t*";
+  }
+  switch (t) {
+    case T_INT:
+      *getter = "int_arg";
+      return "LPC_INT";
+    case T_FLOAT:
+      *getter = "real_arg";
+      return "LPC_FLOAT";
+    case T_STRING:
+      *getter = "string_arg";
+      return "vm::StringArg";
+    case T_OBJECT:
+      *getter = "object_arg";
+      return "object_t*";
+    case T_MAPPING:
+      *getter = "mapping_arg";
+      return "mapping_t*";
+    case T_BUFFER:
+      *getter = "buffer_arg";
+      return "buffer_t*";
+    case T_FUNCTION:
+      *getter = "funptr_arg";
+      return "funptr_t*";
+    case T_PROMISE:
+      *getter = "promise_arg";
+      return "promise_t*";
+    default:
+      return NULL;
+  }
+}
+
+/* A position binds as a typed scalar when every type declared there is
+ * the same runtime type (`int * | float *` is just an array). */
+static const char *shape_scalar(const arg_shape *a, const char **getter) {
+  if (a->n == 0) return NULL;
+  for (int i = 0; i < a->n; i++) {
+    if (a->types[i] == T_MIXED) return NULL;
+    if (strcmp(etype1(a->types[i]), etype1(a->types[0])) != 0) return NULL;
+  }
+  return scalar_cpp(a->types[0], getter);
+}
+
+/* The T_* mask a union position accepts. */
+static std::string shape_mask(const arg_shape *a) {
+  std::string m;
+  for (int i = 0; i < a->n; i++) {
+    if (a->types[i] == T_MIXED) return "T_ANY";
+    if (!m.empty()) m += "|";
+    m += etype1(a->types[i]);
+  }
+  return m.empty() ? "T_ANY" : m;
+}
+
+static std::string param_type(const arg_shape *a) {
+  const char *getter;
+  const char *cpp = shape_scalar(a, &getter);
+  std::string t = cpp ? cpp : "vm::Arg";
+  return a->optional ? "std::optional<" + t + ">" : t;
+}
+
+/* A readable parameter name for the generated prototype. Specs have no
+ * parameter names, so invent one from the C++ type; the second string is
+ * str2, the second object ob2, etc. Declarations name them so link errors
+ * and efuns.autogen.h document the shape; definitions may rename freely. */
+static std::string param_name(const arg_shape *a, int *counts) {
+  const char *getter;
+  const char *cpp = shape_scalar(a, &getter);
+  const char *base;
+  int kind;
+  if (!cpp) {
+    base = "arg";
+    kind = 0;
+  } else if (!strcmp(cpp, "LPC_INT")) {
+    base = "n";
+    kind = 1;
+  } else if (!strcmp(cpp, "LPC_FLOAT")) {
+    base = "x";
+    kind = 2;
+  } else if (!strcmp(cpp, "vm::StringArg")) {
+    base = "str";
+    kind = 3;
+  } else if (!strcmp(cpp, "object_t*")) {
+    base = "ob";
+    kind = 4;
+  } else if (!strcmp(cpp, "array_t*")) {
+    base = "arr";
+    kind = 5;
+  } else if (!strcmp(cpp, "mapping_t*")) {
+    base = "map";
+    kind = 6;
+  } else if (!strcmp(cpp, "buffer_t*")) {
+    base = "buf";
+    kind = 7;
+  } else if (!strcmp(cpp, "funptr_t*")) {
+    base = "fun";
+    kind = 8;
+  } else if (!strcmp(cpp, "promise_t*")) {
+    base = "prom";
+    kind = 9;
+  } else {
+    base = "arg";
+    kind = 0;
+  }
+  counts[kind]++;
+  if (counts[kind] == 1) {
+    return base;
+  }
+  char buf[32];
+  snprintf(buf, sizeof buf, "%s%d", base, counts[kind]);
+  return buf;
+}
+
+static std::string param_expr(const arg_shape *a, int pos) {
+  char buf[200];
+  const char *getter;
+  const char *cpp = shape_scalar(a, &getter);
+  if (cpp) {
+    if (a->optional) {
+      snprintf(buf, sizeof buf, "f.optional<&vm::EfunArgs::%s>(%d)", getter, pos);
+    } else {
+      snprintf(buf, sizeof buf, "f.%s(%d)", getter, pos);
+    }
+  } else if (shape_mask(a) == "T_ANY") {
+    snprintf(buf, sizeof buf, a->optional ? "f.optional_mixed(%d)" : "f.mixed_arg(%d)", pos);
+  } else {
+    snprintf(buf, sizeof buf, a->optional ? "f.optional_any(%d, %s)" : "f.any_arg(%d, %s)", pos,
+             shape_mask(a).c_str());
+  }
+  return buf;
+}
+
+/* Typed positions: every declared one but a trailing `...`. */
+static int typed_positions(const efun_sig *sig) { return sig->nargs - (sig->varargs ? 1 : 0); }
 
 int ident(int);
 
@@ -488,6 +704,7 @@ void make_efun_tables() {
   fprintf(f, HEADER);
   fprintf(f, "#include \"base/std.h\"\n\n");
   fprintf(f, "#include \"" EFUN_H "\"\n");
+  fprintf(f, "#include \"vm/internal/base/efun_args_inline.h\"\n");
 
   fprintf(f, "\n/* Operator names */\n");
   fprintf(f, "const char* operator_names[] = {\n");
@@ -497,10 +714,42 @@ void make_efun_tables() {
   }
   fprintf(f, "};\n");
 
+  fprintf(f, "\n// EFUN thunks: each checks the arguments its spec types, passes them to the\n"
+             "// efun as typed parameters, and replaces the arguments with its result.\n\n");
+  for (int i = 0; i < efun_code; i++) {
+    const efun_sig *sig = &efun_sigs[i];
+    std::string call = std::string("f_") + efun_names[i] + "(f";
+    for (int pos = 0; pos < typed_positions(sig); pos++) {
+      arg_shape a;
+      arg_position(sig, pos, &a);
+      call += ", " + param_expr(&a, pos);
+    }
+    call += ")";
+    /* The thunk builds the window itself, with its own opcode as a
+     * constant: the dispatcher passes only the argument count. */
+    fprintf(f, "static void efun_thunk_%s(int num_arg) {\n", efun_names[i]);
+    if (!sig->varargs && sig->min_arg == sig->nargs) {
+      /* fixed arity, which the dispatchers enforce: a constant count lets
+       * the compiler fold the window release */
+      fprintf(f, "  DEBUG_CHECK(num_arg != %d, \"%s: wrong argument count\\n\");\n", sig->nargs,
+              efun_names[i]);
+      fprintf(f, "  vm::EfunArgs f = vm::EfunArgs::over_top(%d, %s);\n", sig->nargs, efun_codes[i]);
+    } else {
+      fprintf(f, "  vm::EfunArgs f = vm::EfunArgs::over_top(num_arg, %s);\n", efun_codes[i]);
+    }
+    if (sig->ret == T_VOID) {
+      fprintf(f, "  %s;\n  f.finish_void();\n}\n", call.c_str());
+    } else {
+      /* the efun's Value dies in its own statement, before finish() runs:
+       * nothing can touch it in between, so it never needs memory */
+      fprintf(f, "  svalue_t result = %s.release();\n  f.finish(result);\n}\n", call.c_str());
+    }
+  }
+
   fprintf(f, "\n// EFUN tables\n\n");
   fprintf(f, "func_t efun_table[] = {\n");
   for (int i = 0; i < efun_code; i++) {
-    fprintf(f, "    f_%s,\n", efun_names[i]);
+    fprintf(f, "    efun_thunk_%s,\n", efun_names[i]);
   }
   fprintf(f, "};\n");
 
@@ -564,11 +813,28 @@ void make_efun_tables() {
 
   fprintf(f, "\n#define NUM_OPCODES %d\n", total_code + 1);
 
-  fprintf(f, "\n/* EFUN prototypes */\n\n");
+  fprintf(f, "#include \"vm/internal/base/efun_args.h\"\n\n");
+  fprintf(f, "\n/* EFUN implementations, one per primary spec entry, generated from the\n"
+             " * spec: a void efun returns void, any other returns a vm::Value. Each\n"
+             " * declared argument arrives typed (see efun_args.h): a single type as its\n"
+             " * C++ type, a union or mixed as a vm::Arg, a position that may be absent as\n"
+             " * a std::optional. A trailing ... is read through f.\n"
+             " */\n\n");
   for (int i = 0; i < efun_code; i++) {
-    fprintf(f, "void f_%s (void);\n", efun_names[i]);
+    const efun_sig *sig = &efun_sigs[i];
+    std::string params;
+    int name_counts[10] = {};
+    for (int pos = 0; pos < typed_positions(sig); pos++) {
+      arg_shape a;
+      arg_position(sig, pos, &a);
+      params += ", " + param_type(&a) + " " + param_name(&a, name_counts);
+    }
+    fprintf(f, "%s f_%s(vm::EfunArgs& f%s);\n", sig->ret == T_VOID ? "void" : "vm::Value",
+            efun_names[i], params.c_str());
   }
-  fprintf(f, "typedef void (*func_t) (void);\n\n");
+  fprintf(f, "/* An efun's entry in efun_table: the generated thunk, given the number\n"
+             " * of arguments on the stack. */\n");
+  fprintf(f, "typedef void (*func_t)(int num_arg);\n\n");
   fprintf(f, "extern func_t efun_table[];\n");
   fprintf(f, "extern const char* operator_names[];\n");
 

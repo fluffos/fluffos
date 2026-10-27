@@ -283,7 +283,8 @@ extern svalue_t const0, const1, const0u;
     MSTR_TAG_JOIN(ess_res, ess_ascii);                                                             \
   })
 
-/* <something that needs no free> + string svalue */
+/* <something that needs no free> + string svalue on the eval stack top.
+ * Requires `sp` (include vm_stack.h); VM/ops only. */
 #define SVALUE_STRING_ADD_LEFT(y, z)                                                              \
   SAFE({                                                                                          \
     const auto max_string_length = CONFIG_INT(__MAX_STRING_LENGTH__);                             \

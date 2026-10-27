@@ -8,7 +8,7 @@
 /* dump_prog: disassembler... comment out this line if you don't want the
    disassembler compiled in.
 */
-    void dump_prog(object,...);
+    void dump_prog(object, int | void, string | void);
 
 #if defined(PROFILING) && defined(HAS_MONCONTROL)
     void moncontrol(int);

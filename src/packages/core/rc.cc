@@ -23,33 +23,29 @@ int get_config_item(svalue_t* res, svalue_t* arg) {
 }
 
 #ifdef F_GET_CONFIG
-void f_get_config() {
-  if (!get_config_item(sp, sp)) {
+vm::Value f_get_config(vm::EfunArgs& f, LPC_INT item) {
+  /* get_config_item() reads the item number from its slot and overwrites
+   * the slot with the result */
+  if (!get_config_item(f[0].sv(), f[0].sv())) {
     error("Bad argument to get_config()\n");
   }
+  return f.take(0);
 }
 #endif
 
 #ifdef F_SET_CONFIG
-void f_set_config() {
-  auto num = (sp - 1)->u.number;
-  auto* value = sp;
-
+void f_set_config(vm::EfunArgs&, LPC_INT num, vm::Arg value) {
   if (num < 0 || num > RC_LAST_CONFIG_INT) {
-    pop_2_elems();
     error("Bad 1st argument to set_config()\n");
   }
   if (num < RC_BASE_CONFIG_INT) {
-    pop_2_elems();
     error("Can not set string config through set_config() yet.\n");
   }
 
-  if (value->type != T_NUMBER) {
-    pop_2_elems();
+  if (!value.is(T_NUMBER)) {
     error("Bad 2nd argument to set_config()\n");
   }
 
-  CONFIG_INT(num) = value->u.number;
-  pop_2_elems();
+  CONFIG_INT(num) = value.number();
 }
 #endif

@@ -171,11 +171,13 @@ void mark_dns_requests() {
 
 // query finished, call the LPC callback.
 void on_query_addr_by_name_finish(AddrNumberQuery* query) {
+  // The callback's arguments: (name, address, key).
+  vm::Call call;
   if (query->err) {
     debug(dns, "DNS lookup fail: %" LPC_INT_FMTSTR_P ",request: %s, err: %s.\n", query->key,
           query->name, evutil_gai_strerror(query->err));
-    push_undefined();
-    push_undefined();
+    call.push(vm::Value::undefined());
+    call.push(vm::Value::undefined());
   } else {
     auto* result = query->res;
 #ifndef IPV6
@@ -188,21 +190,21 @@ void on_query_addr_by_name_finish(AddrNumberQuery* query) {
 #endif
     if (result == nullptr) {
       debug(dns, "%" LPC_INT_FMTSTR_P ": DNS lookup success but no suitable result.\n", query->key);
-      push_undefined();
-      push_undefined();
+      call.push(vm::Value::undefined());
+      call.push(vm::Value::undefined());
     } else {
       // push the name
-      copy_and_push_string(query->name);
+      call.push(vm::Value::str_copy(query->name));
 
       // push IP address
       char host[NI_MAXHOST];
       int const ret = getnameinfo(result->ai_addr, result->ai_addrlen, host, sizeof(host), nullptr,
                                   0, NI_NUMERICHOST);
       if (!ret) {
-        copy_and_push_string(host);
+        call.push(vm::Value::str_copy(host));
       } else {
         debug(dns, "on_query_addr_by_name_finish: getnameinfo: %s \n", evutil_gai_strerror(ret));
-        push_undefined();
+        call.push(vm::Value::undefined());
       }
       debug(dns, "DNS lookup success: id %" LPC_INT_FMTSTR_P ": %s -> %s \n", query->key,
             query->name, host);
@@ -210,7 +212,7 @@ void on_query_addr_by_name_finish(AddrNumberQuery* query) {
   }
 
   // push the key
-  push_number(query->key);
+  call.push(query->key);
   set_eval(max_eval_cost);
   /* Restore the user context captured at registration (issue #1104). */
   object_t* new_command_giver = nullptr;
@@ -219,9 +221,9 @@ void on_query_addr_by_name_finish(AddrNumberQuery* query) {
   }
   save_command_giver(new_command_giver);
   if (query->call_back.type == T_STRING) {
-    safe_apply(query->call_back.u.string, query->ob_to_call, 3, ORIGIN_INTERNAL);
+    call.safe_apply(query->call_back.u.string, query->ob_to_call, ORIGIN_INTERNAL);
   } else {
-    safe_call_function_pointer(query->call_back.u.fp, 3);
+    call.safe_call(query->call_back.u.fp);
   }
   restore_command_giver();
 

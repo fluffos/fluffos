@@ -7,7 +7,7 @@
 #include <vector>
 
 #ifdef F_PERF_COUNTER_NS
-void f_perf_counter_ns() {
+vm::Value f_perf_counter_ns(vm::EfunArgs&) {
 #ifdef _WIN32
   static LARGE_INTEGER Frequency{};
   if (Frequency.QuadPart == 0) {
@@ -17,37 +17,38 @@ void f_perf_counter_ns() {
   LARGE_INTEGER t;
   QueryPerformanceCounter(&t);
 
-  push_number(t.QuadPart * 1000000000 / Frequency.QuadPart);
+  return static_cast<LPC_INT>(t.QuadPart * 1000000000 / Frequency.QuadPart);
 #else
   auto now = std::chrono::high_resolution_clock::now();
-  push_number(std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
+  return static_cast<LPC_INT>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
 #endif
 }
 #endif
 
 #ifdef F_TIME
-void f_time() { push_number(get_current_time()); }
+vm::Value f_time(vm::EfunArgs&) { return static_cast<LPC_INT>(get_current_time()); }
 #endif
 
 #ifdef F_TIME_NS
-void f_time_ns() {
+vm::Value f_time_ns(vm::EfunArgs&) {
   auto now = std::chrono::system_clock::now();
-  push_number(std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
+  return static_cast<LPC_INT>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count());
 }
 #endif
 
 #ifdef F_CTIME
-void f_ctime() {
+vm::Value f_ctime(vm::EfunArgs&, std::optional<LPC_INT> clock) {
   char buf[255] = {};
   const char *cp = buf, *nl;
   char* p;
   int l;
   time_t timestamp;
 
-  if (st_num_arg) {
-    timestamp = sp->u.number;
+  if (clock) {
+    timestamp = *clock;
   } else {
-    push_number(0);
     timestamp = get_current_time();
   }
 
@@ -65,24 +66,21 @@ void f_ctime() {
   p = new_string(l, "f_ctime");
   strncpy(p, cp, l);
   p[l] = '\0';
-  put_malloced_string(p);
+  return vm::Value::str_malloced(p);
 }
 #endif
 
 #ifdef F_LOCALTIME
 /* FIXME: most of the #ifdefs here should be based on configure checks
    instead.  Same for rusage() */
-void f_localtime() {
+vm::Value f_localtime(vm::EfunArgs&, LPC_INT clock) {
   struct tm res = {};
   time_t lt;
-  lt = sp->u.number;
+  lt = clock;
   auto* tm = localtime_r(&lt, &res);
 
-  pop_stack();
-
   if (!tm) {
-    push_svalue(&const0u);
-    return;
+    return vm::Value::undefined();
   }
 
   auto* vec = allocate_empty_array(11);
@@ -118,14 +116,14 @@ void f_localtime() {
   } else {
     vec->item[LT_ZONE].u.string = string_copy(tzname[1], "f_localtime");
   }
-  push_refed_array(vec);
+  return vm::Value::refed(vec);
 }
 #endif
 
 #ifdef F_STRFTIME
-void f_strftime() {
-  auto arg_time = sp->u.number;
-  const auto* arg_fmt = (sp - 1)->u.string;
+vm::Value f_strftime(vm::EfunArgs&, vm::StringArg fmt, LPC_INT clock) {
+  auto arg_time = clock;
+  const auto* arg_fmt = fmt.c_str();
 
   time_t lt = arg_time;
   if (lt <= 0) lt = get_current_time();
@@ -143,15 +141,14 @@ void f_strftime() {
   size_t const size = strftime(buf.data(), buf.size(), arg_fmt, res_tm);
   buf[size] = '\0';
 
-  pop_2_elems();
-  copy_and_push_string(buf.data());
+  return vm::Value::str_copy(buf.data());
 }
 #endif
 
 #ifdef F_STRPTIME
-void f_strptime() {
-  const auto* arg_timestr = (sp)->u.string;
-  const auto* arg_fmt = (sp - 1)->u.string;
+vm::Value f_strptime(vm::EfunArgs&, vm::StringArg fmt, vm::StringArg timestr) {
+  const auto* arg_timestr = timestr.c_str();
+  const auto* arg_fmt = fmt.c_str();
 
   struct tm res = {};
   res.tm_isdst = -1;  // make sure mktime check local dst time
@@ -167,7 +164,6 @@ void f_strptime() {
     error("strptime() parse failed.");
   }
 #endif
-  pop_2_elems();
-  push_number(mktime(&res));
+  return static_cast<LPC_INT>(mktime(&res));
 }
 #endif

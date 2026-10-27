@@ -2,41 +2,38 @@
 
 #include <unicode/ucnv.h>
 
+#include <memory>
+
 namespace {
 const char* default_encoding = "utf-8";
 }  // namespace
 
 #ifdef F_SET_ENCODING
-void f_set_encoding() {
+vm::Value f_set_encoding(vm::EfunArgs&, std::optional<vm::StringArg> encoding) {
   if (!command_giver || !command_giver->interactive) {
-    if (st_num_arg) {
-      pop_stack();
-    }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
-    return;
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   auto* ip = command_giver->interactive;
 
   // Reset to no-transcoding
-  if (!st_num_arg) {
+  if (!encoding) {
     if (ip && ip->trans) {
       ucnv_close(ip->trans);
       ip->trans = nullptr;
     }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
-    return;
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   // Set to specific encoding
 
   // ignore if user want utf8
   UConverter* new_trans = nullptr;
-  if (ucnv_compareNames(default_encoding, sp->u.string) != 0) {
+  if (ucnv_compareNames(default_encoding, encoding->c_str()) != 0) {
     UErrorCode error_code = U_ZERO_ERROR;
-    new_trans = ucnv_open(sp->u.string, &error_code);
+    new_trans = ucnv_open(encoding->c_str(), &error_code);
     if (U_FAILURE(error_code)) {
-      error("Fail to set encoding to '%s', error: %s.", sp->u.string, u_errorName(error_code));
+      error("Fail to set encoding to '%s', error: %s.", encoding->c_str(), u_errorName(error_code));
     }
   }
 
@@ -46,12 +43,9 @@ void f_set_encoding() {
   }
   ip->trans = new_trans;
 
-  pop_stack();
-
   // Now let's return an canonical name
   if (!ip->trans) {
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 2"));
-    return;
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 2"));
   }
 
   UErrorCode error_code = U_ZERO_ERROR;
@@ -59,18 +53,14 @@ void f_set_encoding() {
   if (U_FAILURE(error_code)) {
     error("Fail to set encoding, ucnv_getName error: %s.", u_errorName(error_code));
   }
-  push_malloced_string(string_copy(name, "f_set_encoding: 3"));
+  return vm::Value::str_malloced(string_copy(name, "f_set_encoding: 3"));
 }
 #endif
 
 #ifdef F_QUERY_ENCODING
-void f_query_encoding() {
+vm::Value f_query_encoding(vm::EfunArgs&) {
   if (!command_giver || !command_giver->interactive) {
-    if (st_num_arg) {
-      pop_stack();
-    }
-    push_malloced_string(string_copy(default_encoding, "f_set_encoding: 1"));
-    return;
+    return vm::Value::str_malloced(string_copy(default_encoding, "f_set_encoding: 1"));
   }
 
   const auto* res = default_encoding;
@@ -87,98 +77,99 @@ void f_query_encoding() {
     }
   }
 
-  push_malloced_string(string_copy(res, "f_query_encoding"));
+  return vm::Value::str_malloced(string_copy(res, "f_query_encoding"));
 }
 #endif
 
+#if defined(F_STRING_ENCODE) || defined(F_STRING_DECODE)
+namespace {
+/* error() is a C++ throw, so these owners also release on an error path:
+ * an oversized result makes allocate_buffer()/new_string() error(). */
+using ConverterOwner = std::unique_ptr<UConverter, decltype(&ucnv_close)>;
+struct FreeMstr {
+  void operator()(char* p) const { FREE_MSTR(p); }
+};
+}  // namespace
+#endif
+
 #ifdef F_STRING_ENCODE
-void f_string_encode() {
-  const auto* encoding = sp->u.string;
-  const auto* data = (sp - 1)->u.string;
-  auto len = SVALUE_STRLEN(sp - 1);
+vm::Value f_string_encode(vm::EfunArgs&, vm::StringArg str, vm::StringArg encoding_arg) {
+  const auto* data = str.c_str();
+  auto len = str.size();
+  const auto* encoding = encoding_arg.c_str();
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto* trans = ucnv_open(encoding, &error_code);
+  ConverterOwner trans(ucnv_open(encoding, &error_code), &ucnv_close);
   if (U_FAILURE(error_code)) {
     error("string_encode: Invalid encoding '%s', error: %s.", encoding, u_errorName(error_code));
   }
 
   error_code = U_ZERO_ERROR;
-  auto required =
-      ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, nullptr, 0, data, len, &error_code);
+  auto required = ucnv_fromAlgorithmic(trans.get(), UConverterType::UCNV_UTF8, nullptr, 0, data,
+                                       len, &error_code);
   if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
-    ucnv_close(trans);
     error("string_encode: error: %s.", u_errorName(error_code));
   }
 
   size_t const translen = required;
   error_code = U_ZERO_ERROR;
-  auto* buffer = allocate_buffer(translen);
+  std::unique_ptr<buffer_t, decltype(&free_buffer)> buffer(allocate_buffer(translen),
+                                                           &free_buffer);
   auto* transdata = (char*)buffer->item;
 
-  auto written = ucnv_fromAlgorithmic(trans, UConverterType::UCNV_UTF8, transdata, translen, data,
-                                      len, &error_code);
+  auto written = ucnv_fromAlgorithmic(trans.get(), UConverterType::UCNV_UTF8, transdata, translen,
+                                      data, len, &error_code);
   DEBUG_CHECK(written != translen, "Bug: translation buffer size calculation error.");
   if (U_FAILURE(error_code)) {
-    ucnv_close(trans);
-    free_buffer(buffer);
     error("string_encode: error: %s.", u_errorName(error_code));
   }
-  pop_2_elems();
-  push_refed_buffer(buffer);
-
-  ucnv_close(trans);
+  return vm::Value::refed(buffer.release());
 }
 #endif
 
 #ifdef F_STRING_DECODE
-void f_string_decode() {
-  const auto* encoding = sp->u.string;
-  auto* data = (char*)((sp - 1)->u.buf->item);
-  auto len = (sp - 1)->u.buf->size;
+vm::Value f_string_decode(vm::EfunArgs&, buffer_t* buf, vm::StringArg encoding_arg) {
+  auto* data = reinterpret_cast<char*>(buf->item);
+  auto len = buf->size;
+  const auto* encoding = encoding_arg.c_str();
 
   // get rid of all ending '\0's from buffer.
   while (len > 1 && data[len - 1] == '\0') len--;
 
   UErrorCode error_code = U_ZERO_ERROR;
-  auto* trans = ucnv_open(encoding, &error_code);
+  ConverterOwner trans(ucnv_open(encoding, &error_code), &ucnv_close);
   if (U_FAILURE(error_code)) {
     error("string_decode: Invalid encoding '%s', error: %s.", encoding, u_errorName(error_code));
   }
 
   error_code = U_ZERO_ERROR;
-  auto required =
-      ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, nullptr, 0, data, len, &error_code);
+  auto required = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans.get(), nullptr, 0, data,
+                                     len, &error_code);
   if (U_FAILURE(error_code) && error_code != U_BUFFER_OVERFLOW_ERROR) {
-    ucnv_close(trans);
     error("string_decode: error: %s.", u_errorName(error_code));
   }
 
-  auto* res = new_string(required, "f_string_decode");
+  std::unique_ptr<char, FreeMstr> res(new_string(required, "f_string_decode"));
 
   error_code = U_ZERO_ERROR;
-  auto written =
-      ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans, res, required, data, len, &error_code);
-  res[required] = '\0';
+  auto written = ucnv_toAlgorithmic(UConverterType::UCNV_UTF8, trans.get(), res.get(), required,
+                                    data, len, &error_code);
+  res.get()[required] = '\0';
   if (U_FAILURE(error_code)) {
-    ucnv_close(trans);
-    FREE_MSTR(res);
     error("string_decode: error: %s.", u_errorName(error_code));
   }
   DEBUG_CHECK(written != required, "Bug: translation buffer size calculation error.");
-  pop_2_elems();
-  push_malloced_string(res);
-
-  ucnv_close(trans);
+  return vm::Value::str_malloced(res.release());
 }
 #endif
 
 #ifdef F_BUFFER_TRANSCODE
-void f_buffer_transcode() {
-  const auto* to_encoding = sp->u.string;
-  const auto* from_encoding = (sp - 1)->u.string;
-  auto* data = (char*)((sp - 2)->u.buf->item);
-  auto len = (sp - 2)->u.buf->size;
+vm::Value f_buffer_transcode(vm::EfunArgs&, buffer_t* buf, vm::StringArg from_encoding_arg,
+                             vm::StringArg to_encoding_arg) {
+  auto* data = reinterpret_cast<char*>(buf->item);
+  auto len = buf->size;
+  const auto* from_encoding = from_encoding_arg.c_str();
+  const auto* to_encoding = to_encoding_arg.c_str();
 
   UErrorCode error_code = U_ZERO_ERROR;
 
@@ -198,7 +189,6 @@ void f_buffer_transcode() {
     free_buffer(res);
     error("buffer_transcode: error: %s.", u_errorName(error_code));
   }
-  pop_3_elems();
-  push_refed_buffer(res);
+  return vm::Value::refed(res);
 }
 #endif

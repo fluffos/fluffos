@@ -25,6 +25,7 @@
 #include "interactive.h"  // for interactive_t, FIXME
 #include "vm/internal/apply.h"
 #include "vm/internal/base/machine.h"
+#include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/debug.h"
 #include "vm/internal/hooks.h"
 #include "vm/internal/master.h"
@@ -495,10 +496,11 @@ object_t* load_object(const char* lname, int callcreate) {
     error("Inherit chain too deep: > %d when trying to load '%s'.\n", inherit_chain_size, lname);
   }
 
-  const char* pname = check_valid_path(lname, master_ob, "load_object", 0);
-  if (!pname) {
+  vm::Value pnamev = check_valid_path(lname, master_ob, "load_object", 0);
+  if (!pnamev.is(T_STRING)) {
     error("Read access denied.\n");
   }
+  const char* pname = pnamev->u.string;
 #ifdef PACKAGE_UIDS
   if (current_object && current_object->euid == nullptr) {
     error("Can't load objects when no effective user.\n");
@@ -679,7 +681,7 @@ object_t* load_object(const char* lname, int callcreate) {
   save_command_giver(command_giver);
   push_object(ob);
   mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
+  if (mret && !master_approved(mret, "valid_object")) {
     destruct_object(ob, "refused");
     error("master object: %s() denied permission to load '/%s'.\n",
           applies_table[APPLY_VALID_OBJECT], name);
@@ -802,7 +804,7 @@ object_t* load_object_from_source(const std::string& source, const char* virtual
   save_command_giver(command_giver);
   push_object(ob);
   svalue_t* mret = apply_master_ob(APPLY_VALID_OBJECT, 1);
-  if (mret && !MASTER_APPROVED(mret, "valid_object")) {
+  if (mret && !master_approved(mret, "valid_object")) {
     destruct_object(ob, "refused");
     restore_command_giver();
     error("master object: %s() denied permission to load in-memory object '/%s'.\n",
@@ -898,11 +900,11 @@ int recompile_object(object_t* target) {
     obbase[sizeof obbase - 1] = 0;
   }
 
-  const char* pname = check_valid_path(obname.c_str(), target, "recompile_object", 0);
-  if (!pname) {
+  vm::Value pnamev = check_valid_path(obname.c_str(), target, "recompile_object", 0);
+  if (!pnamev.is(T_STRING)) {
     error("recompile_object: read access denied for '/%s'.\n", obname.c_str());
   }
-  std::string source_path(pname);
+  std::string source_path(pnamev->u.string);
 
   in_recompile_object = true;
   // error() throws, so the flag must reset on every path.
@@ -1226,10 +1228,9 @@ object_t* environment(svalue_t* arg) {
  */
 
 #ifdef F_PRESENT
-static object_t* object_present2(const char* /*str*/, object_t* /*ob*/);
+static object_t* object_present2(svalue_t* /*v*/, object_t* /*ob*/);
 
 object_t* object_present(svalue_t* v, object_t* ob) {
-  svalue_t* ret;
   object_t* ret_ob;
   int specific = 0;
 
@@ -1254,7 +1255,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     }
     return nullptr;
   }
-  ret_ob = object_present2(v->u.string, ob->contains);
+  ret_ob = object_present2(v, ob->contains);
   if (ret_ob) {
     return ret_ob;
   }
@@ -1262,8 +1263,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     return nullptr;
   }
   if (ob->super) {
-    push_svalue(v);
-    ret = apply(APPLY_ID, ob->super, 1, ORIGIN_DRIVER);
+    vm::CallResult ret = vm::Call(vm::Value::copy(v)).apply(APPLY_ID, ob->super, ORIGIN_DRIVER);
     /* The id() apply runs arbitrary LPC: it may destruct ob itself, which
        sets ob->super to nullptr (destruct_object), or destruct the
        environment. */
@@ -1273,7 +1273,7 @@ object_t* object_present(svalue_t* v, object_t* ob) {
     if (APPLY_SAYS_YES(ret)) {
       return ob->super;
     }
-    return object_present2(v->u.string, ob->super->contains);
+    return object_present2(v, ob->super->contains);
   }
   return nullptr;
 }
@@ -1281,9 +1281,8 @@ object_t* object_present(svalue_t* v, object_t* ob) {
 // id(str) returns true, return that object.
 // If string is in format of "xxx 1", then look for the <digits>-th
 // object that id("xx") returns true.
-static object_t* object_present2(const char* str, object_t* ob) {
-  svalue_t* ret;
-
+static object_t* object_present2(svalue_t* v, object_t* ob) {
+  const char* const str = v->u.string;
   const char* name = nullptr;
   int namelen = 0, count = 0;
 
@@ -1307,13 +1306,15 @@ static object_t* object_present2(const char* str, object_t* ob) {
     }
   }
 
-  for (; ob; ob = ob->next_inv) {
-    char* str_to_push = new_string(namelen, "object_present2");
-    memcpy(str_to_push, name, namelen);
-    str_to_push[namelen] = 0;
-    push_malloced_string(str_to_push);
+  /* The name every id() is asked about, shared by all the calls: the
+   * argument itself, or one copy of it without the trailing count. */
+  vm::Value const id_name = static_cast<size_t>(namelen) == SVALUE_STRLEN(v)
+                                ? vm::Value::copy(v)
+                                : vm::Value::str_copy(std::string_view(name, namelen));
 
-    ret = apply(APPLY_ID, ob, 1, ORIGIN_DRIVER);
+  for (; ob; ob = ob->next_inv) {
+    vm::CallResult ret =
+        vm::Call(vm::Value::copy(id_name.get())).apply(APPLY_ID, ob, ORIGIN_DRIVER);
     if (ob->flags & O_DESTRUCTED) {
       return nullptr;
     }

@@ -27,18 +27,9 @@ int replace_interactive(object_t* ob, object_t* obfrom) {
   return (1);
 } /* replace_interactive() */
 
-void f_exec() {
-  int i;
-
-  i = replace_interactive((sp - 1)->u.ob, sp->u.ob);
-
-  /* They might have been destructed */
-  if (sp->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:1");
-  }
-  if ((--sp)->type == T_OBJECT) {
-    free_object(&sp->u.ob, "f_exec:2");
-  }
-  put_number(i);
+vm::Value f_exec(vm::EfunArgs&, object_t* to, object_t* from) {
+  /* The objects may have been destructed meanwhile: their slots are released
+   * with free_svalue, which copes with whatever remains. */
+  return replace_interactive(to, from);
 }
 #endif
