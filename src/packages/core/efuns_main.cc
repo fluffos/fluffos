@@ -1690,12 +1690,14 @@ vm::Value f_secure_random(vm::EfunArgs&, LPC_INT n) {
 /* A file's text as an LPC string: the malloced buffer itself when it is
  * already valid UTF-8 (no copy), a sanitized copy otherwise. Either way it
  * stops at the first NUL, as the sanitized copy always did. */
-/* `len` is the authoritative text length from the reader (e.g. read_bytes'
- * rlen). Do not derive a bound by walking the malloc header through `str` —
- * Coverity treats that as using tainted file bytes as an offset. */
-static vm::Value file_text_value(char* str, size_t len) {
+/* `cap` is an upper bound on the text (e.g. read_bytes' rlen, or MSTR_SIZE).
+ * Text still ends at the first NUL within that bound — same as before the
+ * Coverity change. Do not call MSTR_SIZE(str) here: Coverity treats reading
+ * the malloc header through a file-derived pointer as a tainted offset. */
+static vm::Value file_text_value(char* str, size_t cap) {
+  size_t const len = strnlen(str, cap);
   if (u8_validate(reinterpret_cast<const uint8_t*>(str), len)) {
-    str = extend_string(str, len); /* counted size must match the text */
+    str = extend_string(str, static_cast<int>(len)); /* counted size = text */
     return vm::Value::str_malloced(str);
   }
   auto res = u8_sanitize(std::string_view(str, len));
@@ -1759,10 +1761,8 @@ vm::Value f_read_file(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT> 
   if (!str) {
     return 0;
   }
-  /* Counted malloced string: bound the scan to the allocation, then pass the
-   * text length (may be shorter if a NUL was embedded). */
-  size_t const cap = MSTR_SIZE(str);
-  return file_text_value(str, strnlen(str, cap));
+  /* Bound the NUL scan by the counted allocation size. */
+  return file_text_value(str, MSTR_SIZE(str));
 }
 
 #endif

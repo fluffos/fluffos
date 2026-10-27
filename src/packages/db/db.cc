@@ -540,14 +540,16 @@ vm::Value f_db_status(vm::EfunArgs&) {
   // Reads every live connection's db->c (via type->status) while the async
   // worker may be mid-execute on one of them. Lock the same way
   // create_db_conn() does (explicit pthread_mutex_*), so Coverity sees the
-  // same lock that protects db_conn_alloc writes.
+  // same lock that protects db_conn_alloc writes. Latch the mutex pointer so
+  // lock and unlock agree even if db_mut were ever cleared.
 #ifdef PACKAGE_ASYNC
-  if (db_mut) {
-    pthread_mutex_lock(db_mut);
+  pthread_mutex_t* const mut = db_mut;
+  if (mut) {
+    pthread_mutex_lock(mut);
   }
   DEFER {
-    if (db_mut) {
-      pthread_mutex_unlock(db_mut);
+    if (mut) {
+      pthread_mutex_unlock(mut);
     }
   };
 #endif
