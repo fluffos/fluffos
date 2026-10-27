@@ -556,9 +556,9 @@ vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
   std::vector<void*> avalues(nargs);
   for (int i = 0; i < nargs; i++) {
     lpc_to_slot(fn->arg_codes[i], &args->item[i], &slots[i]);
-    // coverity[wrapper_escape] - slots outlives every use of avalues (both die
-    // together at function exit; ffi_call below is the only consumer).
-    avalues[i] = &slots[i];
+    /* slots outlives every use of avalues (both die together at function
+     * exit; ffi_call below is the only consumer). */
+    avalues[i] = &slots[i];  // coverity[wrapper_escape]
   }
 
   // Return storage: large enough for a widened integer, a pointer, or a

@@ -523,6 +523,8 @@ vm::Value f_break_cycles(vm::EfunArgs&, vm::Arg value) {
   // release loop would leak every held reference (AGENTS.md section 4).
   struct ContainerRelease {
     std::vector<PendingFix>* fixes;
+    // coverity[uncaught_exception] - free_svalue on held containers cannot
+    // throw; Coverity's fmt::format_error path is a false positive.
     ~ContainerRelease() {
       for (auto& fix : *fixes) {
         free_svalue(&fix.container, "f_break_cycles");

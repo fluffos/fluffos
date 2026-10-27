@@ -1246,7 +1246,7 @@ int socket_write(int fd, svalue_t* message, const char* name) {
  * no callback set the call is never made, and `call` pops its arguments when
  * the caller's scope ends. */
 static void call_callback(int fd, int what, vm::Call& call) {
-  union string_or_func callback;
+  union string_or_func callback = {};
 
   switch (what) {
     case S_READ_FP:
@@ -1258,6 +1258,8 @@ static void call_callback(int fd, int what, vm::Call& call) {
     case S_CLOSE_FP:
       callback = lpc_socks[fd].close_callback;
       break;
+    default:
+      return;
   }
 
   set_eval(max_eval_cost);

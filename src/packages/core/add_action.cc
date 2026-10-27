@@ -207,7 +207,10 @@ void setup_new_commands(object_t* dest, object_t* item) {
       save_command_giver(ob);
       vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
       restore_command_giver();
-      if (dest != item->super) {
+      /* Always check whether `item` left `dest` after an apply that can
+       * move_object() it -- same test as the other APPLY_INIT sites above
+       * and below. Not a copy of `ob->super`. */
+      if (item->super != dest) {
         return;
       }
     }
@@ -221,7 +224,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
       save_command_giver(item);
       vm::Call().apply(APPLY_INIT, ob, ORIGIN_DRIVER);
       restore_command_giver();
-      if (dest != item->super) {
+      if (item->super != dest) {
         return;
       }
     }

@@ -82,6 +82,8 @@ TEST_F(DriverTest, ValueOwnsItsReference) {
     vm::Value held = vm::Value::addref(arr);
     EXPECT_EQ(arr->ref, 2u);
     vm::Value moved = std::move(held);
+    // coverity[use_after_move] - Value move leaves a defined 0; asserting
+    // that invariant is the point of this test.
     EXPECT_EQ(held.type(), T_NUMBER);
     EXPECT_EQ(moved.type(), T_ARRAY);
     EXPECT_EQ(arr->ref, 2u);

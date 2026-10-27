@@ -782,6 +782,7 @@ vm::Value f_unique_array(vm::EfunArgs&, array_t* v, vm::Arg separator,
   if (separator.is(T_FUNCTION)) {
     fptr = separator.funptr();
   } else {
+    /* Spec: string | function -- the else is always a string. */
     func = separator.string().c_str();
   }
 
@@ -800,7 +801,7 @@ vm::Value f_unique_array(vm::EfunArgs&, array_t* v, vm::Arg separator,
     if (fptr) {
       push_svalue(v->item + i);
       sv = call_function_pointer(fptr, 1);
-    } else if (v->item[i].type == T_OBJECT) {
+    } else if (func && v->item[i].type == T_OBJECT) {
       sv = apply(func, v->item[i].u.ob, 0, ORIGIN_EFUN);
     } else {
       sv = nullptr;
