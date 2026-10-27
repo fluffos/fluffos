@@ -317,6 +317,10 @@ vm::Value f_db_connect(vm::EfunArgs&, vm::StringArg host_arg, vm::StringArg data
     return 0;
   }
   db = find_db_conn(handle);
+  if (!db) {
+    /* create_db_conn() just issued this handle; a miss is a driver bug. */
+    fatal("create_db_conn() produced a handle find_db_conn() cannot see.\n");
+  }
 
   switch (type) {
     default:
@@ -534,8 +538,21 @@ vm::Value f_db_status(vm::EfunArgs&) {
   outbuf_zero(&out);
 
   // Reads every live connection's db->c (via type->status) while the async
-  // worker may be mid-execute on one of them; serialize the whole walk.
-  DB_ASYNC_LOCK();
+  // worker may be mid-execute on one of them. Lock the same way
+  // create_db_conn() does (explicit pthread_mutex_*), so Coverity sees the
+  // same lock that protects db_conn_alloc writes. Latch the mutex pointer so
+  // lock and unlock agree even if db_mut were ever cleared.
+#ifdef PACKAGE_ASYNC
+  pthread_mutex_t* const mut = db_mut;
+  if (mut) {
+    pthread_mutex_lock(mut);
+  }
+  DEFER {
+    if (mut) {
+      pthread_mutex_unlock(mut);
+    }
+  };
+#endif
 
   for (i = 0; i < db_conn_alloc; i++) {
     if (db_conn_list[i].flags & DB_FLAG_EMPTY) {

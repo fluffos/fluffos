@@ -770,20 +770,12 @@ vm::Value f_unique_array(vm::EfunArgs&, array_t* v, vm::Arg separator,
   svalue_t *skipval, *sv, *svp;
   unique_list_t* unlist;
   unique_t **head, *uptr, *nptr;
-  funptr_t* fptr = nullptr;
-  const char* func = nullptr;
-
   size = v->size;
   if (!size) {
     return vm::Value::addref(v);
   }
 
   skipval = skip ? skip->sv() : &const0;
-  if (separator.is(T_FUNCTION)) {
-    fptr = separator.funptr();
-  } else {
-    func = separator.string().c_str();
-  }
 
   unlist = reinterpret_cast<unique_list_t*>(
       DMALLOC(sizeof(unique_list_t), TAG_TEMPORARY, "f_unique_array:1"));
@@ -797,11 +789,13 @@ vm::Value f_unique_array(vm::EfunArgs&, array_t* v, vm::Arg separator,
   sp->u.error_handler = unique_array_error_handler;
 
   for (i = 0; i < size; i++) {
-    if (fptr) {
+    /* Spec is string | function: resolve the name/funptr at the call site so
+     * apply() is never handed a null (Coverity FORWARD_NULL). */
+    if (separator.is(T_FUNCTION)) {
       push_svalue(v->item + i);
-      sv = call_function_pointer(fptr, 1);
+      sv = call_function_pointer(separator.funptr(), 1);
     } else if (v->item[i].type == T_OBJECT) {
-      sv = apply(func, v->item[i].u.ob, 0, ORIGIN_EFUN);
+      sv = apply(separator.string().c_str(), v->item[i].u.ob, 0, ORIGIN_EFUN);
     } else {
       sv = nullptr;
     }

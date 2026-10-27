@@ -3469,9 +3469,12 @@ vm::Value f_parse_sentence(vm::EfunArgs& f, vm::StringArg sentence, std::optiona
    * here on an error() unwind before that point. */
   struct ParseGlobalsGuard {
     bool active = true;
-    ~ParseGlobalsGuard() {
+    ~ParseGlobalsGuard() noexcept {
       if (active) {
-        free_parse_globals();
+        try {
+          free_parse_globals();
+        } catch (...) {
+        }
       }
     }
     void dismiss() {

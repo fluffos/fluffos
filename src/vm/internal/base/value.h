@@ -86,14 +86,15 @@ class Value {
       svalue_t old = v_;
       v_ = other.v_;
       other.set_number(0);
-      free_svalue(&old, "Value");
+      release_held(old);
     }
     return *this;
   }
   Value(const Value&) = delete;
   Value& operator=(const Value&) = delete;
-  ~Value() {
-    free_svalue(&v_, "Value");
+  ~Value() noexcept {
+    release_held(v_);
+    set_number(0);
     untrack();
   }
 
@@ -180,6 +181,15 @@ class Value {
     v_.type = T_NUMBER;
     v_.subtype = 0;
     v_.u.number = n;
+  }
+  /* Destructors and noexcept move-assign must not throw. free_svalue can
+   * transitively touch fmt (Coverity: format_error) or, for a T_ERROR_HANDLER
+   * that should never live in a Value, run LPC that throws -- swallow here. */
+  static void release_held(svalue_t& v) noexcept {
+    try {
+      free_svalue(&v, "Value");
+    } catch (...) {
+    }
   }
 
   svalue_t v_;
