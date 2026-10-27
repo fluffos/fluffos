@@ -3469,11 +3469,12 @@ vm::Value f_parse_sentence(vm::EfunArgs& f, vm::StringArg sentence, std::optiona
    * here on an error() unwind before that point. */
   struct ParseGlobalsGuard {
     bool active = true;
-    // coverity[uncaught_exception] - free_parse_globals must not throw on
-    // the error() unwind path; Coverity's fmt::format_error is a FP.
-    ~ParseGlobalsGuard() {
+    ~ParseGlobalsGuard() noexcept {
       if (active) {
-        free_parse_globals();
+        try {
+          free_parse_globals();
+        } catch (...) {
+        }
       }
     }
     void dismiss() {

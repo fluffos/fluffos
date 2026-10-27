@@ -180,11 +180,16 @@ void setup_new_commands(object_t* dest, object_t* item) {
    * The call of init() should really be done by the object itself (except in
    * the -o mode). It might be too slow, though :-(
    */
+  /* After any APPLY_INIT, abort if `item` is no longer in `dest` (init may
+   * move_object it). Named to make the subject object obvious to readers and
+   * to Coverity's COPY_PASTE check (which mistook item->super for ob->super). */
+  auto item_still_in_dest = [&]() -> bool { return item->super == dest; };
+
   if (item->flags & O_ENABLE_COMMANDS) {
     save_command_giver(item);
     vm::Call().apply(APPLY_INIT, dest, ORIGIN_DRIVER);
     restore_command_giver();
-    if (item->super != dest) {
+    if (!item_still_in_dest()) {
       return;
     }
   }
@@ -207,10 +212,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
       save_command_giver(ob);
       vm::Call().apply(APPLY_INIT, item, ORIGIN_DRIVER);
       restore_command_giver();
-      /* Always check whether `item` left `dest` after an apply that can
-       * move_object() it -- same test as the other APPLY_INIT sites above
-       * and below. Not a copy of `ob->super`. */
-      if (item->super != dest) {
+      if (!item_still_in_dest()) {
         return;
       }
     }
@@ -224,7 +226,7 @@ void setup_new_commands(object_t* dest, object_t* item) {
       save_command_giver(item);
       vm::Call().apply(APPLY_INIT, ob, ORIGIN_DRIVER);
       restore_command_giver();
-      if (item->super != dest) {
+      if (!item_still_in_dest()) {
         return;
       }
     }

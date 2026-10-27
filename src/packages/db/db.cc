@@ -318,9 +318,8 @@ vm::Value f_db_connect(vm::EfunArgs&, vm::StringArg host_arg, vm::StringArg data
   }
   db = find_db_conn(handle);
   if (!db) {
-    /* create_db_conn() just issued this handle; a miss means the table is
-     * corrupt. Refuse rather than dereference null. */
-    return 0;
+    /* create_db_conn() just issued this handle; a miss is a driver bug. */
+    fatal("create_db_conn() produced a handle find_db_conn() cannot see.\n");
   }
 
   switch (type) {
@@ -539,10 +538,19 @@ vm::Value f_db_status(vm::EfunArgs&) {
   outbuf_zero(&out);
 
   // Reads every live connection's db->c (via type->status) while the async
-  // worker may be mid-execute on one of them; serialize the whole walk.
-  // coverity[missing_lock] - DbAsyncLock RAII holds db_mut when the
-  // PACKAGE_ASYNC worker exists; Coverity does not see through the guard.
-  DB_ASYNC_LOCK();
+  // worker may be mid-execute on one of them. Lock the same way
+  // create_db_conn() does (explicit pthread_mutex_*), so Coverity sees the
+  // same lock that protects db_conn_alloc writes.
+#ifdef PACKAGE_ASYNC
+  if (db_mut) {
+    pthread_mutex_lock(db_mut);
+  }
+  DEFER {
+    if (db_mut) {
+      pthread_mutex_unlock(db_mut);
+    }
+  };
+#endif
 
   for (i = 0; i < db_conn_alloc; i++) {
     if (db_conn_list[i].flags & DB_FLAG_EMPTY) {

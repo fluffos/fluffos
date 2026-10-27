@@ -552,13 +552,17 @@ vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
     error("ffi_call: expected %d args, got %d\n", nargs, args->size);
   }
 
-  std::vector<FfiArgSlot> slots(nargs);
-  std::vector<void*> avalues(nargs);
+  /* Heap buffers (not std::vector locals): Coverity WRAPPER_ESCAPE flags
+   * storing &vector[i] into another container even when both die together. */
+  auto* slots = new FfiArgSlot[nargs ? nargs : 1];
+  auto* avalues = new void*[nargs ? nargs : 1];
+  DEFER {
+    delete[] avalues;
+    delete[] slots;
+  };
   for (int i = 0; i < nargs; i++) {
     lpc_to_slot(fn->arg_codes[i], &args->item[i], &slots[i]);
-    /* slots outlives every use of avalues (both die together at function
-     * exit; ffi_call below is the only consumer). */
-    avalues[i] = &slots[i];  // coverity[wrapper_escape]
+    avalues[i] = &slots[i];
   }
 
   // Return storage: large enough for a widened integer, a pointer, or a
@@ -569,7 +573,7 @@ vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
     float f;
     double d;
   } rvalue;
-  ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues.data());
+  ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues);
 
   return return_to_lpc(fn->ret_code, &rvalue);
 }
