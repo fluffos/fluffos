@@ -1405,6 +1405,7 @@ constexpr char kIAC = static_cast<char>(255);
 constexpr char kSB = static_cast<char>(250);
 constexpr char kSE = static_cast<char>(240);
 constexpr char kWILL = static_cast<char>(251);
+constexpr char kTTYPE = 24;
 constexpr char kNAWS = 31;
 constexpr char kNEW_ENVIRON = 39;
 
@@ -1413,12 +1414,13 @@ constexpr char kNEW_ENVIRON = 39;
 struct TransportLog {
   bool closed = false;
   int scheduled = 0;
+  std::string written;
 };
 
 class LoggingTransport final : public Transport {
  public:
   explicit LoggingTransport(TransportLog* log) : log_(log) {}
-  void write(const char* /*data*/, size_t /*len*/) override {}
+  void write(const char* data, size_t len) override { log_->written.append(data, len); }
   int flush() override { return 0; }
   void schedule_command() override { log_->scheduled++; }
   void close() override { log_->closed = true; }
@@ -1563,6 +1565,38 @@ TEST_F(DriverTest, NetWriteHookDestructsUser) {
                                  add_message(ip->ob, out.data(), static_cast<int>(out.size()));
                                });
   }
+}
+
+// request_term_type() asks the client for its next terminal type with a
+// complete IAC SB TTYPE SEND IAC SE (RFC 1091). It used to send only the
+// header IAC SB 0x01 -- option ECHO, no SEND, never terminated -- so an MTTS
+// client never saw a request after the driver's first one.
+TEST_F(DriverTest, RequestTermTypeSendsTtypeSend) {
+  object_t* body = nullptr;
+  RunGuarded([&] {
+    body = load_object_from_source("void ask() { request_term_type(); }\n", "request_ttype", 0);
+  });
+  ASSERT_NE(body, nullptr);
+
+  TransportLog log;
+  fabricate_telnet_interactive(body, &log);
+  log.written.clear();
+
+  RunGuarded([&] { safe_apply("ask", body, 0, ORIGIN_DRIVER); });
+  std::string const ttype_send = {kIAC, kSB, kTTYPE, 1 /* SEND */, kIAC, kSE};
+  EXPECT_EQ(log.written, ttype_send);
+
+  // Each call is one whole request: an MTTS client steps its cycle per call.
+  log.written.clear();
+  RunGuarded([&] { safe_apply("ask", body, 0, ORIGIN_DRIVER); });
+  EXPECT_EQ(log.written, ttype_send);
+
+  RunGuarded([&] { remove_interactive(body, 0); });
+  RunGuarded([&] {
+    destruct_object(body);
+    free_object(&body, "request_ttype");
+  });
+  RunGuarded([&] { remove_destructed_objects(); });
 }
 
 // The mxp_tag apply, run for a buffered command, destructs the user; the
