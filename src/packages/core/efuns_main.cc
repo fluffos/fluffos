@@ -1759,9 +1759,10 @@ vm::Value f_read_file(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT> 
   if (!str) {
     return 0;
   }
-  /* read_file returns a NUL-terminated malloced string; strlen is the text
-   * length (same bound file_text_value used to take from MSTR_SIZE). */
-  return file_text_value(str, strlen(str));
+  /* Counted malloced string: bound the scan to the allocation, then pass the
+   * text length (may be shorter if a NUL was embedded). */
+  size_t const cap = MSTR_SIZE(str);
+  return file_text_value(str, strnlen(str, cap));
 }
 
 #endif
