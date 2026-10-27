@@ -553,13 +553,12 @@ vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
   }
 
   /* Heap buffers (not std::vector locals): Coverity WRAPPER_ESCAPE flags
-   * storing &vector[i] into another container even when both die together. */
-  auto* slots = new FfiArgSlot[nargs ? nargs : 1];
-  auto* avalues = new void*[nargs ? nargs : 1];
-  DEFER {
-    delete[] avalues;
-    delete[] slots;
-  };
+   * storing &vector[i] into another container even when both die together.
+   * unique_ptr so a throw from the second allocation cannot leak the first
+   * (raw new[] + DEFER after both news had that window). */
+  const int nslots = nargs ? nargs : 1;
+  std::unique_ptr<FfiArgSlot[]> slots(new FfiArgSlot[nslots]);
+  std::unique_ptr<void*[]> avalues(new void*[nslots]);
   for (int i = 0; i < nargs; i++) {
     lpc_to_slot(fn->arg_codes[i], &args->item[i], &slots[i]);
     avalues[i] = &slots[i];
@@ -573,7 +572,7 @@ vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
     float f;
     double d;
   } rvalue;
-  ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues);
+  ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues.get());
 
   return return_to_lpc(fn->ret_code, &rvalue);
 }
