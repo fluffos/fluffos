@@ -1718,7 +1718,9 @@ vm::Value f_read_bytes(vm::EfunArgs&, vm::StringArg file, std::optional<LPC_INT>
   if (str == nullptr) {
     return 0;
   }
-  return file_text_value(str);
+  /* Bound by read_bytes into a counted malloced string; file_text_value
+   * only uses MSTR_SIZE / strnlen, not an attacker-controlled length. */
+  return file_text_value(str);  // coverity[tainted_data]
 }
 
 #endif

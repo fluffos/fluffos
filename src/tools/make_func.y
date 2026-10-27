@@ -497,14 +497,18 @@ static std::string shape_mask(const arg_shape *a) {
     if (!m.empty()) m += "|";
     m += etype1(a->types[i]);
   }
-  return m.empty() ? "T_ANY" : m;
+  if (m.empty()) return "T_ANY";
+  return m;
 }
 
 static std::string param_type(const arg_shape *a) {
   const char *getter;
   const char *cpp = shape_scalar(a, &getter);
+  if (!a->optional) {
+    return cpp ? cpp : "vm::Arg";
+  }
   std::string t = cpp ? cpp : "vm::Arg";
-  return a->optional ? "std::optional<" + t + ">" : t;
+  return "std::optional<" + std::move(t) + ">";
 }
 
 /* A readable parameter name for the generated prototype. Specs have no

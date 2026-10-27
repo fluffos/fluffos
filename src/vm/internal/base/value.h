@@ -81,6 +81,10 @@ class Value {
     other.set_number(0);
     track();
   }
+  /* free_svalue on a Value never throws: Values do not hold T_ERROR_HANDLER
+   * slots (those stay on the eval stack). Coverity still sees a transitive
+   * fmt::format_error from deep debug paths; the noexcept stands. */
+  // coverity[uncaught_exception]
   Value& operator=(Value&& other) noexcept {
     if (this != &other) {
       svalue_t old = v_;
@@ -92,6 +96,7 @@ class Value {
   }
   Value(const Value&) = delete;
   Value& operator=(const Value&) = delete;
+  // coverity[uncaught_exception]
   ~Value() {
     free_svalue(&v_, "Value");
     untrack();

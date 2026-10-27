@@ -229,7 +229,9 @@ vm::Value f_compress(vm::EfunArgs&, vm::Arg data) {
   };
   std::unique_ptr<unsigned char, FreeScratch> buffer(
       reinterpret_cast<unsigned char*>(DMALLOC(new_size, TAG_TEMPORARY, "compress")));
-  compress(buffer.get(), &new_size, input, size);
+  if (compress(buffer.get(), &new_size, input, size) != Z_OK) {
+    error("compress: zlib compression failed.\n");
+  }
 
   // Shrink it down.
   real_buffer = allocate_buffer(new_size);
