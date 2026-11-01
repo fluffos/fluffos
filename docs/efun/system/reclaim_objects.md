@@ -20,6 +20,13 @@ title: system / reclaim_objects
     contains  a  pointer  to it, and the object gets destructed.  This efun
     returns the number of destructed objects encountered in variables.
 
+    The driver also runs this walk on its own every 30 to 60 seconds. By
+    default that automatic walk covers every object in one go, which holds
+    the game for as long as the walk takes. The 'reclaim slice budget'
+    runtime option (see the driver config) spreads the automatic walk over
+    several turns of the event loop instead. A call to reclaim_objects()
+    always walks every object at once.
+
 ### SEE ALSO
 
     destruct(3)

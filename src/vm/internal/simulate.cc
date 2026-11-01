@@ -39,6 +39,7 @@
 #include "packages/core/ed.h"
 #include "packages/core/file.h"
 #include "packages/core/heartbeat.h"
+#include "packages/core/reclaim.h"
 #ifdef PACKAGE_ASYNC
 #include "packages/async/async.h"
 #endif
@@ -1584,6 +1585,7 @@ void destruct_object(object_t* ob, const char* cause) {
    * because an error in the above code would halt execution.
    */
   // removed = 0;
+  reclaim_object_unlinked(ob);  // an incremental reclaim pass may rest on ob
   if (ob->prev_all) {
     ob->prev_all->next_all = ob->next_all;
     if (ob->next_all) {

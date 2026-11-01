@@ -12,6 +12,7 @@
 #include "compiler/internal/compiler.h"
 #include "vm/internal/base/vm_stack.h"
 #include "vm/internal/base/efun_args_inline.h"
+#include "packages/core/reclaim.h"
 
 namespace {
 // Runs `fn` (arbitrary LPC-triggering driver code -- load_object_from_source,
@@ -803,6 +804,109 @@ TEST_F(DriverTest, SweepDoesNotRevisitSurvivorsOfPreviousSweep) {
   // binary the second sweep already freed a and this is a use-after-free
   // (caught by ASan) / double dealloc.
   RunGuarded([&] { free_object(&a, "SweepDoesNotRevisitSurvivorsOfPreviousSweep"); });
+}
+
+namespace {
+// A holder whose mapping key and object variable both reference `x`, so a
+// reclaim walk of the holder must drop exactly two references to it.
+const char* const kReclaimHolderSource =
+    "mapping m;\n"
+    "object o;\n"
+    "void hold(object x) { m = ([ x : 1 ]); o = x; }\n"
+    "int held() { return sizeof(m); }\n";
+
+void reclaim_holder_hold(object_t* h, object_t* x) {
+  RunGuarded([&] {
+    current_object = master_ob;
+    vm::Call(vm::Value::object(x)).apply("hold", h, ORIGIN_DRIVER);
+  });
+}
+
+LPC_INT reclaim_holder_held(object_t* h) {
+  LPC_INT n = -1;
+  RunGuarded([&] {
+    current_object = master_ob;
+    vm::CallResult r = vm::Call().apply("held", h, ORIGIN_DRIVER);
+    ASSERT_TRUE(r.is(T_NUMBER));
+    n = r->u.number;
+  });
+  return n;
+}
+}  // namespace
+
+// The incremental reclaim pass ('reclaim slice budget') walks the object list
+// a step at a time and must clear what a whole walk clears: here a mapping
+// key and a variable, both referencing a destructed object.
+TEST_F(DriverTest, IncrementalReclaimPassClearsReferencesStepByStep) {
+  object_t* x = nullptr;
+  object_t* h = nullptr;
+  RunGuarded([&] { x = load_object_from_source("void bump() {}\n", "reclaim_inc_x", 0); });
+  RunGuarded([&] { h = load_object_from_source(kReclaimHolderSource, "reclaim_inc_h", 0); });
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(h, nullptr);
+  reclaim_holder_hold(h, x);
+  RunGuarded([&] { destruct_object(x); });
+  RunGuarded([&] { remove_destructed_objects(); });
+  ASSERT_EQ(reclaim_holder_held(h), 1);
+  auto const before = x->ref;  // ours + the mapping key + `o`
+
+  ASSERT_FALSE(reclaim_pass_running());
+  reclaim_pass_start();
+  ASSERT_TRUE(reclaim_pass_running());
+  int steps = 1;
+  while (!reclaim_pass_step(std::chrono::microseconds(0))) {
+    steps++;
+  }
+  EXPECT_FALSE(reclaim_pass_running());
+  // A zero budget walks one object a step, and the list holds more than one.
+  EXPECT_GT(steps, 1);
+  EXPECT_EQ(x->ref, before - 2);
+  EXPECT_GE(reclaim_pass_cleaned(), 2);
+  EXPECT_EQ(reclaim_holder_held(h), 0);
+
+  free_object(&x, "IncrementalReclaimPassClearsReferencesStepByStep");
+  RunGuarded([&] {
+    destruct_object(h);
+    free_object(&h, "IncrementalReclaimPassClearsReferencesStepByStep");
+  });
+}
+
+// The pass rests on the next object it will walk. Destructing that object
+// between steps must move the pass on to the rest of the list, not end it
+// there or leave it pointing at an object that has left obj_list.
+TEST_F(DriverTest, IncrementalReclaimPassSurvivesDestructOfItsNextObject) {
+  object_t* x = nullptr;
+  object_t* h = nullptr;
+  object_t* k = nullptr;
+  RunGuarded([&] { x = load_object_from_source("void bump() {}\n", "reclaim_cur_x", 0); });
+  RunGuarded([&] { h = load_object_from_source(kReclaimHolderSource, "reclaim_cur_h", 0); });
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(h, nullptr);
+  reclaim_holder_hold(h, x);
+  RunGuarded([&] { destruct_object(x); });
+  RunGuarded([&] { remove_destructed_objects(); });
+  auto const before = x->ref;
+
+  // Newest objects are linked at the head, so k is where the pass starts and
+  // h lies behind it.
+  RunGuarded([&] { k = load_object_from_source("void bump() {}\n", "reclaim_cur_k", 0); });
+  ASSERT_NE(k, nullptr);
+  ASSERT_EQ(obj_list, k);
+  reclaim_pass_start();
+  RunGuarded([&] { destruct_object(k); });
+  RunGuarded([&] { remove_destructed_objects(); });
+
+  while (!reclaim_pass_step(std::chrono::microseconds(0))) {
+  }
+  EXPECT_EQ(x->ref, before - 2);
+  EXPECT_EQ(reclaim_holder_held(h), 0);
+
+  free_object(&k, "IncrementalReclaimPassSurvivesDestructOfItsNextObject");
+  free_object(&x, "IncrementalReclaimPassSurvivesDestructOfItsNextObject");
+  RunGuarded([&] {
+    destruct_object(h);
+    free_object(&h, "IncrementalReclaimPassSurvivesDestructOfItsNextObject");
+  });
 }
 
 // Companion GTest for the "intended use" replace_program() demo
