@@ -35,14 +35,13 @@ void do_tests() {
   rm("/log/testfile_async");
 
   // The written file and the read file are deliberately DIFFERENT paths.
-  // package/async services requests from a pool, not a queue: do_stuff()
-  // spawns a fresh detached worker whenever `reqs` is momentarily empty
-  // (async.cc), so two requests issued back to back can run concurrently on
-  // two threads with no ordering between them. An async_read queued next to
-  // the async_write of the same file therefore races it, and reading the
-  // not-yet-written file yields "" -- which is exactly what a Windows CI
-  // runner did. Nothing here may depend on one async request completing
-  // before another.
+  // package/async services requests from a capped worker pool (async.cc): a
+  // same-turn burst of independent I/O fans out across threads, so two
+  // requests issued back to back can run concurrently with no ordering
+  // between them. An async_read queued next to the async_write of the same
+  // file therefore races it, and reading the not-yet-written file yields ""
+  // -- which is exactly what a Windows CI runner did. Nothing here may
+  // depend on one async request completing before another.
   //
   // So the file the read consumes is written SYNCHRONOUSLY below, and
   // async_write proves itself on a path nothing reads back. Each efun keeps

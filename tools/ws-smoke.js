@@ -438,11 +438,13 @@ async function main() {
   }
 
   // 1. the ws port's HTTP mount serves the web client
-  const page = await httpGet(plain, '/');
+  const [page, xt, tj] = await Promise.all([
+    httpGet(plain, '/'),
+    httpGet(plain, '/vendor/xterm.js'),
+    httpGet(plain, '/telnet.js'),
+  ]);
   check('http mount serves the web client', page.status === 200 && page.body.includes('xterm'),
         'status ' + page.status);
-  const xt = await httpGet(plain, '/vendor/xterm.js');
-  const tj = await httpGet(plain, '/telnet.js');
   check('http mount serves vendor/ and telnet.js', xt.status === 200 && tj.status === 200);
 
   // 2. telnet subprotocol: negotiation + banner through the REAL client

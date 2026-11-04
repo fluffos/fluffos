@@ -93,13 +93,33 @@ std::mutex reqs_lock;
 // command_giver during that window -- otherwise a DEBUGMALLOC sweep that lands
 // mid-processing false-flags the ref (Windows Debug hit this on async_read.lpc).
 //
-// This is a SET, not a single pointer: do_stuff() spawns a fresh worker thread
-// whenever reqs is momentarily empty, which happens while an earlier worker is
-// still inside a slow w->func() (it has already popped its request). So two or
-// more workers can run at once; a single `current_work` pointer only tracked
-// the last one and left the others' refs unaccounted -> flaky "Bad ref count"
-// (gcc Debug hit this via the async_* tests firing in quick succession).
+// This is a SET, not a single pointer: do_stuff() keeps enough live workers to
+// cover outstanding work (capped), so a same-turn burst of independent I/O
+// (async_read(a); async_read(b); … / promise_all(map(...))) fans out across
+// threads instead of collapsing onto one. A single `current_work` pointer only
+// tracked the last one and left the others' refs unaccounted -> flaky "Bad
+// ref count" (gcc Debug hit this via the async_* tests firing in quick
+// succession).
 std::set<struct Work*> current_works;
+
+// Live detached worker threads (in the loop of thread_func, whether currently
+// inside a w->func or about to pop). Guarded by reqs_lock. Decremented under
+// that lock just before a worker returns because the queue is empty.
+size_t live_workers = 0;
+
+// Soft concurrency ceiling: enough for real disk fan-out, bounded so a
+// runaway enqueue loop cannot create unbounded threads. hardware_concurrency
+// is often 0 when the OS will not report it.
+size_t async_worker_cap() {
+  unsigned hc = std::thread::hardware_concurrency();
+  if (hc < 2) {
+    hc = 2;
+  }
+  if (hc > 32) {
+    hc = 32;
+  }
+  return hc;
+}
 
 std::deque<struct Request*> finished_reqs;
 std::mutex finished_reqs_lock;
@@ -131,6 +151,10 @@ void thread_func() {
     {
       std::lock_guard<std::mutex> const lock(reqs_lock);
       if (reqs.empty()) {
+        // No more queued work for this worker. Drop out of the live count
+        // before releasing the lock so do_stuff() can replace us if a new
+        // request arrives in the same window.
+        live_workers--;
         return;
       }
       w = reqs.front();
@@ -169,15 +193,22 @@ void thread_func() {
 void do_stuff(void* (*func)(struct Request*), struct Request* data) {
   std::lock_guard<std::mutex> const lock(reqs_lock);
 
-  if (reqs.empty()) {
-    std::thread(thread_func).detach();
-  }
-
   auto* i = new Work;
   i->func = func;
   i->data = data;
 
   reqs.push_back(i);
+
+  // Cover outstanding work with workers up to the cap. The previous
+  // spawn-only-when-queue-empty policy left a same-turn burst (every
+  // independent async_* queued before any worker could pop) on a single
+  // thread -- serializing I/O the mudlib had already started in parallel.
+  const size_t outstanding = reqs.size() + current_works.size();
+  const size_t cap = async_worker_cap();
+  while (live_workers < outstanding && live_workers < cap) {
+    live_workers++;
+    std::thread(thread_func).detach();
+  }
 }
 
 void* gzreadthread(struct Request* req) {
@@ -593,7 +624,9 @@ void complete_all_asyncio() {
   while (true) {
     std::lock_guard<std::mutex> const lock(reqs_lock);
 
-    if (reqs.empty()) {
+    // Queued AND in-flight: a worker that has already popped its request is
+    // not in reqs, and with capped fan-out several can be mid-func at once.
+    if (reqs.empty() && current_works.empty()) {
       break;
     }
   }

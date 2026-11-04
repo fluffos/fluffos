@@ -1,0 +1,77 @@
+// package/async must fan out a same-turn burst of independent I/O across
+// workers (do_stuff in async.cc). Sequential await of each request would
+// serialize them by construction; the parallel pattern is to start every
+// request first (promise form / promise_all) so the pool can cover them.
+//
+// This file pins that the burst pattern completes correctly for several
+// independent async_read / async_getdir calls issued without intervening
+// awaits. Timing is too noisy for CI to assert wall-clock overlap, but a
+// regression that re-serializes enqueue still has to deliver every result.
+
+#ifdef __PACKAGE_ASYNC__
+private int done_reads;
+private int done_dirs;
+private string expected;
+private string *paths;
+#endif
+
+private void maybe_done() {
+#ifdef __PACKAGE_ASYNC__
+  if (done_reads == sizeof(paths) && done_dirs == 2) {
+    foreach (string p in paths) {
+      rm(p);
+    }
+    RELEASE_LATCH("async fanout");
+  }
+#endif
+}
+
+void do_tests() {
+#ifndef __PACKAGE_ASYNC__
+  write("PACKAGE_ASYNC is not enabled, skipping async fan-out tests...\n");
+  return;
+#else
+  string payload = "async fanout payload\n";
+  int i;
+
+  paths = ({
+    "/log/async_fanout_0",
+    "/log/async_fanout_1",
+    "/log/async_fanout_2",
+    "/log/async_fanout_3",
+  });
+
+  foreach (string path in paths) {
+    rm(path);
+    ASSERT_EQ(1, write_file(path, payload, 1));
+  }
+  expected = payload;
+  done_reads = 0;
+  done_dirs = 0;
+
+  EXPECT_LATCH("async fanout");
+
+  // Start every read before awaiting any -- the hot path for mudlib
+  // promise_all(map(...)) fan-out. Callback form exercises the same
+  // do_stuff enqueue burst without needing await parking.
+  for (i = 0; i < sizeof(paths); i++) {
+    async_read(paths[i], function(mixed res) {
+      ASSERT_EQ(expected, res);
+      done_reads++;
+      maybe_done();
+    });
+  }
+
+  // Two independent directory listings in the same burst.
+  async_getdir("/u/", function(mixed res) {
+    ASSERT_EQ(get_dir("/u/"), res);
+    done_dirs++;
+    maybe_done();
+  });
+  async_getdir("/std/", function(mixed res) {
+    ASSERT_EQ(get_dir("/std/"), res);
+    done_dirs++;
+    maybe_done();
+  });
+#endif
+}

@@ -106,6 +106,26 @@ async int transfer(string from, string to, int amount) {
 }
 ```
 
+That shape is correct when each step depends on the previous one. Independent
+work should start together and join with `promise_all()` — sequential
+`await` of unrelated I/O serializes it on purpose:
+
+```c
+// wrong for independent fetches: second read does not start until the first settles
+async mapping *load_accounts(string *uids) {
+    mapping *out = ({ });
+    foreach (string uid in uids) {
+        out += ({ await fetch_account(uid) });
+    }
+    return out;
+}
+
+// right: every fetch is queued before any await, so package/async can fan out
+async mapping *load_accounts(string *uids) {
+    return await promise_all(map(uids, (: fetch_account($1) :)));
+}
+```
+
 A function declared `async` always returns a **promise** for its result:
 an `async T f()` is typed `promise<T>` at every call site, while `T` stays
 what `return` statements inside the body are checked against. Calling one

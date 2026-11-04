@@ -7,6 +7,7 @@
 
 #include "base/package_api.h"
 
+#include <chrono>
 #include <set>
 
 #include "packages/core/dns.h"
@@ -245,8 +246,14 @@ void on_getaddr_result(int err, evutil_addrinfo* res, void* arg) {
   query->err = err;
   query->res = res;
 
-  // Schedule an immediate event to call LPC callback.
-  add_gametick_event(0, [=] { return on_query_addr_by_name_finish(query); });
+  // Deliver on the next event-loop pass, not the next gametick. This
+  // callback runs from libevent's DNS completion path -- outside
+  // call_tick_events() -- so a delay-0 gametick event would sit until the
+  // next backend_run_one_gametick() (up to a full second at the default
+  // 1000ms period). Same trap documented for promise drain / package/async
+  // I/O settles in promise.cc; walltime(0) is the matching fix.
+  add_walltime_event(std::chrono::milliseconds(0),
+                     TickEvent::callback_type([=] { on_query_addr_by_name_finish(query); }));
 }
 
 /*
