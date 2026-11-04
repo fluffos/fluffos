@@ -844,6 +844,9 @@ TEST_F(DriverTest, IncrementalReclaimPassClearsReferencesStepByStep) {
   RunGuarded([&] { h = load_object_from_source(kReclaimHolderSource, "reclaim_inc_h", 0); });
   ASSERT_NE(x, nullptr);
   ASSERT_NE(h, nullptr);
+  // Our own reference keeps x allocated once the pass drops the holder's two;
+  // the destructed-object sweep below releases the one obj_list held.
+  add_ref(x, "IncrementalReclaimPassClearsReferencesStepByStep");
   reclaim_holder_hold(h, x);
   RunGuarded([&] { destruct_object(x); });
   RunGuarded([&] { remove_destructed_objects(); });
@@ -882,13 +885,15 @@ TEST_F(DriverTest, IncrementalReclaimPassSurvivesDestructOfItsNextObject) {
   RunGuarded([&] { h = load_object_from_source(kReclaimHolderSource, "reclaim_cur_h", 0); });
   ASSERT_NE(x, nullptr);
   ASSERT_NE(h, nullptr);
+  add_ref(x, "IncrementalReclaimPassSurvivesDestructOfItsNextObject");
   reclaim_holder_hold(h, x);
   RunGuarded([&] { destruct_object(x); });
   RunGuarded([&] { remove_destructed_objects(); });
-  auto const before = x->ref;
+  auto const before = x->ref;  // ours + the mapping key + `o`
 
   // Newest objects are linked at the head, so k is where the pass starts and
-  // h lies behind it.
+  // h lies behind it. We hold no reference to k: the sweep frees it, so a
+  // cursor left resting on it would be a use after free.
   RunGuarded([&] { k = load_object_from_source("void bump() {}\n", "reclaim_cur_k", 0); });
   ASSERT_NE(k, nullptr);
   ASSERT_EQ(obj_list, k);
@@ -901,7 +906,6 @@ TEST_F(DriverTest, IncrementalReclaimPassSurvivesDestructOfItsNextObject) {
   EXPECT_EQ(x->ref, before - 2);
   EXPECT_EQ(reclaim_holder_held(h), 0);
 
-  free_object(&k, "IncrementalReclaimPassSurvivesDestructOfItsNextObject");
   free_object(&x, "IncrementalReclaimPassSurvivesDestructOfItsNextObject");
   RunGuarded([&] {
     destruct_object(h);
