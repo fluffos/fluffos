@@ -9,6 +9,7 @@
 
 #include "packages/core/reclaim.h"
 
+#include <chrono>
 #include <functional>
 #include <vector>
 
@@ -193,23 +194,106 @@ static void gc_mapping(mapping_t* m) {
   } while (j--);
 }
 
+namespace {
+
+void reclaim_object_variables(object_t* ob) {
+  if (ob->prog) {
+    for (int i = 0; i < ob->prog->num_variables_total; i++) {
+      check_svalue(&ob->variables[i]);
+    }
+  }
+}
+
+/* State of the incremental pass ('reclaim slice budget'). The cursor is the
+ * next object the pass will walk. It holds no reference: destruct_object()
+ * calls reclaim_object_unlinked() before taking an object off obj_list, which
+ * moves the cursor past it, so the cursor is always either null or a live
+ * member of obj_list. Objects created during a pass are linked at the head,
+ * behind the cursor, and wait for the next pass; a reference to an object
+ * destructed after its holder was walked does the same. Both are what the
+ * all-at-once walk does for anything that happens after it returns. */
+object_t* g_pass_cursor = nullptr;
+bool g_pass_running = false;
+int g_pass_cleaned = 0;
+
+void reclaim_pass_continue() {
+  auto const configured = CONFIG_INT(__RC_RECLAIM_SLICE_BUDGET__);
+  /* The option went back to 0 (set_config()) while this pass was in
+   * flight: finish the pass in this turn rather than crawl one object a turn. */
+  std::chrono::microseconds const budget = configured > 0
+                                                ? std::chrono::microseconds(configured)
+                                                : std::chrono::microseconds(std::chrono::hours(1));
+  if (!reclaim_pass_step(budget)) {
+    add_loop_yield_event(TickEvent::callback_type([] { reclaim_pass_continue(); }));
+  }
+}
+
+}  // namespace
+
+void reclaim_pass_start() {
+  if (g_pass_running) {
+    return;
+  }
+  reclaim_call_outs();
+  g_pass_running = true;
+  g_pass_cursor = obj_list;
+  g_pass_cleaned = 0;
+}
+
+bool reclaim_pass_running() { return g_pass_running; }
+
+bool reclaim_pass_step(std::chrono::microseconds budget) {
+  if (!g_pass_running) {
+    return true;
+  }
+  auto const deadline = std::chrono::steady_clock::now() + budget;
+  cleaned = nested = 0;
+  /* Walk at least one object per step, so any budget makes progress. An
+   * object's variables are walked whole: one object is the unit of work,
+   * and walking it cannot run LPC or take anything off obj_list. */
+  while (g_pass_cursor) {
+    object_t* ob = g_pass_cursor;
+    g_pass_cursor = ob->next_all;
+    reclaim_object_variables(ob);
+    if (std::chrono::steady_clock::now() >= deadline) {
+      break;
+    }
+  }
+  g_pass_cleaned += cleaned;
+  if (g_pass_cursor) {
+    return false;
+  }
+  g_pass_running = false;
+  return true;
+}
+
+int reclaim_pass_cleaned() { return g_pass_cleaned; }
+
+void reclaim_object_unlinked(object_t* ob) {
+  if (ob == g_pass_cursor) {
+    g_pass_cursor = ob->next_all;
+  }
+}
+
 int reclaim_objects(bool is_auto) {
   if (is_auto) {
     add_gametick_event(time_to_next_gametick(std::chrono::seconds(30 + random_number(30))),
                        TickEvent::callback_type([] { return reclaim_objects(true); }));
+    if (CONFIG_INT(__RC_RECLAIM_SLICE_BUDGET__) > 0) {
+      /* A pass still in flight when the next one is due just carries on. */
+      if (!g_pass_running) {
+        reclaim_pass_start();
+        add_loop_yield_event(TickEvent::callback_type([] { reclaim_pass_continue(); }));
+      }
+      return 0;
+    }
   }
-  int i;
-  object_t* ob;
 
   reclaim_call_outs();
 
   cleaned = nested = 0;
-  for (ob = obj_list; ob; ob = ob->next_all) {
-    if (ob->prog) {
-      for (i = 0; i < ob->prog->num_variables_total; i++) {
-        check_svalue(&ob->variables[i]);
-      }
-    }
+  for (object_t* ob = obj_list; ob; ob = ob->next_all) {
+    reclaim_object_variables(ob);
   }
 
   return cleaned;
