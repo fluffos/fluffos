@@ -406,8 +406,14 @@ void closure_dispatch(ffi_cif* /*cif*/, void* ret, void** args, void* user) {
   // f_ffi_callback_free() checks this flag and refuses to free a
   // dispatching callback (see its own comment) -- freeing cb->closure here
   // would unmap the executable trampoline this very call is running from.
+  // Restore the previous value rather than clearing it: the LPC below can
+  // re-enter this same callback synchronously (e.g. a qsort comparator that
+  // runs a nested qsort with the same callback), and the inner dispatch
+  // returning must not drop the protection while the outer one is still on
+  // the C stack.
+  const bool was_dispatching = cb->dispatching;
   cb->dispatching = true;
-  DEFER { cb->dispatching = false; };
+  DEFER { cb->dispatching = was_dispatching; };
   set_eval(max_eval_cost);
   vm::CallResult r = call.safe_call(cb->fun);
   lpc_return_to_c(ret_code, r.get(), ret);

@@ -14,12 +14,28 @@
 //    unloading dlclose()d the handle, so a later ffi_call() jumped into
 //    unmapped memory. ffi_unload() now invalidates every FfiFunc prepared
 //    from the library, and ffi_call() errors cleanly on an invalidated one.
+//
+// 3. A callback re-entered synchronously through itself. closure_dispatch()
+//    cleared `dispatching` when ANY dispatch returned, so after a nested
+//    dispatch of the same callback came back, the still-running outer one was
+//    no longer protected and ffi_callback_free() would unmap its trampoline.
+//    Each dispatch now restores the value it found on entry. The comparator
+//    below runs one nested qsort through its own callback (once returning
+//    normally, once erroring inside the nested dispatch), then tries to free
+//    itself; that must still be refused, and freeing it once every dispatch
+//    has returned must succeed.
 
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
 
 int g_cb;
 int freed_ok;
+
+int g_qs;
+int nested_mode;  // 0: nested dispatch returns normally, 1: it errors
+int nested_depth;
+int nested_done;
+mixed nested_free_err;
 
 // qsort comparator that tries to free its own callback handle on first call.
 int cmp(int a_addr, int b_addr) {
@@ -30,13 +46,38 @@ int cmp(int a_addr, int b_addr) {
   }
   return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT32) - ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT32);
 }
+
+// qsort comparator that, on its first outer call, sorts a second array through
+// the same callback, then tries to free the callback while still dispatching.
+int cmp_nested(int a_addr, int b_addr) {
+  int r;
+  buffer inner;
+
+  nested_depth++;
+  if (nested_depth == 2 && nested_mode) {
+    nested_depth--;
+    error("cmp_nested: nested comparator failure\n");
+  }
+  if (nested_depth == 1 && !nested_done) {
+    nested_done = 1;
+    inner = ffi_alloc(2 * 4);
+    ffi_write(inner, 0, FFI_INT32, 2);
+    ffi_write(inner, 4, FFI_INT32, 1);
+    ffi_call(g_qs, ({ inner, 2, 4, ffi_callback_addr(g_cb) }));
+    // The nested dispatch has returned, but this one is still on the stack.
+    nested_free_err = catch(ffi_callback_free(g_cb));
+  }
+  r = ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT32) - ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT32);
+  nested_depth--;
+  return r;
+}
 #endif
 
 void do_tests() {
 #ifdef __PACKAGE_FFI__
   if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
 
-  int lib, qs, i;
+  int lib, qs, i, mode;
   int *src = ({ 30, 10, 40, 20, 50 });
   buffer data;
 
@@ -57,6 +98,34 @@ void do_tests() {
   // The callback still exists (self-free was refused), so freeing it now,
   // outside dispatch, succeeds.
   ffi_callback_free(g_cb);
+  ffi_unload(lib);
+
+  // --- bug 3: nested dispatch of the same callback ---
+  lib = ffi_load("");
+  g_qs = ffi_prepare(lib, "qsort", FFI_VOID,
+    ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
+  g_cb = ffi_callback((: cmp_nested :), FFI_INT32, ({ FFI_POINTER, FFI_POINTER }));
+  // Two full outer sorts back to back: the flag must neither drop early
+  // inside a dispatch nor stay set after one.
+  for (mode = 0; mode < 2; mode++) {
+    nested_mode = mode;
+    nested_depth = 0;
+    nested_done = 0;
+    nested_free_err = 0;
+    data = ffi_alloc(5 * 4);
+    for (i = 0; i < 5; i++) ffi_write(data, i * 4, FFI_INT32, src[i]);
+    ffi_call(g_qs, ({ data, 5, 4, ffi_callback_addr(g_cb) }));
+    for (i = 0; i < 5; i++)
+      ASSERT_EQ(({ 10, 20, 30, 40, 50 })[i], ffi_read(data, i * 4, FFI_INT32));
+    ASSERT2(nested_done, "the comparator should have run a nested sort");
+    ASSERT_EQ(0, nested_depth);
+    ASSERT2(stringp(nested_free_err)
+      && strsrch(nested_free_err, "while dispatching") != -1,
+      sprintf("mode %d: free after a nested dispatch returned must be refused, got %O",
+        mode, nested_free_err));
+  }
+  // Every dispatch has returned, so the callback is free-able again.
+  ASSERT_EQ(0, catch(ffi_callback_free(g_cb)));
   ffi_unload(lib);
 
   // --- bug 2: call after unload ---
