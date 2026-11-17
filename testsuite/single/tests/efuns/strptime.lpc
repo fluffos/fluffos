@@ -1,7 +1,9 @@
 void do_tests() {
-  // Use midday so the round trip is independent of the configured time zone.
-  string date = "01 May 2020 12:00:00";
+  // Format a real instant to avoid local times skipped by DST transitions.
+  int timestamp = 1589544000;  // Mid-May keeps the month stable across time zones.
   string format = "%d %B %Y %H:%M:%S";
+  string date = strftime(format, timestamp);
+  ASSERT_EQ("May", strftime("%B", timestamp));
   ASSERT_EQ(date, strftime(format, strptime(format, date)));
   ASSERT(strptime("%m/%d/%Y %H:%M:%S", "10/11/2020 16:12:51") > 0);
   ASSERT(catch(strptime("%1234", "whatever")));
