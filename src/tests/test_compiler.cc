@@ -25,7 +25,6 @@
 #include <unistd.h>
 
 #include <cerrno>
-#include <clocale>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -2853,81 +2852,6 @@ static FILE* source_as_file(const char* src) {
   EXPECT_EQ(fwrite(src, 1, strlen(src), f), strlen(src));
   rewind(f);
   return f;
-}
-
-class CompileLocale : public ::testing::Test {
- protected:
-  std::string saved_locale;
-  std::string expected_locale;
-
-  void SetUp() override {
-    ensure_compile_env();
-    saved_locale = setlocale(LC_ALL, nullptr);
-    // C.UTF-8 works even on minimal Linux hosts; the other spellings cover
-    // generated locales and the Windows CRT. Never silently test only "C".
-    for (const char* name : {"de_DE.UTF-8", "de_DE.utf8", "German_Germany.utf8",
-                             "C.UTF-8", "C.utf8", ".UTF-8"}) {
-      if (setlocale(LC_ALL, name)) {
-        expected_locale = setlocale(LC_ALL, nullptr);
-        if (expected_locale != "C") return;
-      }
-    }
-    GTEST_SKIP() << "No non-C locale is installed";
-  }
-
-  void TearDown() override { setlocale(LC_ALL, saved_locale.c_str()); }
-};
-
-TEST_F(CompileLocale, SuccessRestoresAllCategories) {
-  program_t* prog = compile_file("float f() { return 1.5; }\n", "/locale_success");
-  ASSERT_NE(prog, nullptr);
-  deallocate_program(prog);
-  EXPECT_EQ(std::string(setlocale(LC_ALL, nullptr)), expected_locale);
-
-  // A mixed LC_ALL value must also be copied before setlocale mutates its
-  // backing storage. Cover the fd entry point as well as the string one.
-  ASSERT_NE(setlocale(LC_ALL, expected_locale.c_str()), nullptr);
-  ASSERT_NE(setlocale(LC_NUMERIC, "C"), nullptr);
-  expected_locale = setlocale(LC_ALL, nullptr);
-  FILE* f = source_as_file("float f() { return 2.5; }\n");
-  prog = compile_file_fd(fileno(f), "/locale_fd_success");
-  fclose(f);
-  ASSERT_NE(prog, nullptr);
-  deallocate_program(prog);
-  EXPECT_EQ(std::string(setlocale(LC_ALL, nullptr)), expected_locale);
-}
-
-TEST_F(CompileLocale, SyntaxErrorRestoresLocale) {
-  program_t* prog = compile_file("int f() { return 1;\n", "/locale_syntax_error");
-  EXPECT_EQ(prog, nullptr);
-  if (prog) deallocate_program(prog);
-  EXPECT_EQ(std::string(setlocale(LC_ALL, nullptr)), expected_locale);
-}
-
-TEST_F(CompileLocale, ExceptionRestoresLocaleThenRecompile) {
-  // Like CompileEntry.FatalAbortThenRecompile, force a real C++ unwind
-  // through the compiler's cleanup guard rather than a parser diagnostic.
-  std::string huge = "int " + std::string(70000, 'a') + ";\n";
-  error_context_t econ{};
-  save_context(&econ);
-  bool threw = false;
-  program_t* prog = nullptr;
-  try {
-    prog = compile_file(huge, "/locale_fatal_abort");
-  } catch (...) {
-    threw = true;
-    restore_context(&econ);
-  }
-  pop_context(&econ);
-  EXPECT_TRUE(threw);
-  EXPECT_EQ(prog, nullptr);
-  if (prog) deallocate_program(prog);
-  EXPECT_EQ(std::string(setlocale(LC_ALL, nullptr)), expected_locale);
-
-  prog = compile_file("float f() { return 1.5; }\n", "/locale_after_fatal");
-  ASSERT_NE(prog, nullptr);
-  deallocate_program(prog);
-  EXPECT_EQ(std::string(setlocale(LC_ALL, nullptr)), expected_locale);
 }
 
 TEST(CompileEntry, CompileFileFdSuccess) {

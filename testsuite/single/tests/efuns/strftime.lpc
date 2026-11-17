@@ -1,4 +1,6 @@
 void do_tests() {
+  // Month names remain in the C locale, including with non-English LC_TIME.
+  ASSERT_EQ("March", strftime("%B", 1583064000));
   ASSERT(stringp(strftime("%m/%d/%Y %H:%M:%S %Z", 1602454371)));  // Sun, 11 Oct 2020 22:12:51 GMT
   ASSERT_NE(0, strftime("%mmm", 1602454371));
 }

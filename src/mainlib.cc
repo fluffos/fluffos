@@ -174,19 +174,11 @@ void attempt_shutdown(int sig) {
 }
 
 void init_locale() {
-  setlocale(LC_ALL, "");
-  // Verify locale is UTF8, complain otherwise
-  std::string current_locale = setlocale(LC_ALL, nullptr);
-  std::transform(current_locale.begin(), current_locale.end(), current_locale.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-#ifndef _WIN32
-  if (current_locale.find(".utf-8") == std::string::npos) {
-    debug_message("Your locale '%s' is not UTF8 compliant, you will likely run into issues.\n",
-                  current_locale.c_str());
-  }
-#endif
-  // LPC float parsing, formatting and serialization always use '.'.
-  setlocale(LC_NUMERIC, "C");
+  // Preserve the runtime's historical C-locale behavior explicitly at startup,
+  // rather than as a side effect of compiling the first LPC file. Numeric and
+  // time efuns and byte-wise case conversion must not depend on the environment.
+  // LPC's UTF-8 handling is independent of the C library locale.
+  setlocale(LC_ALL, "C");
 }
 
 void init_tz() {
