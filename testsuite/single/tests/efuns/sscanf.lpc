@@ -3,6 +3,7 @@ inherit "/inherit/tests";
 void do_tests() {
   string s, s1;
   int num;
+  float value;
 
   ASSERT(catch(sscanf("you%", "%s%", s)));
   ASSERT(catch(sscanf("you%", "%su%", s)));
@@ -25,6 +26,9 @@ void do_tests() {
 
   sscanf("0x1293jsf", "%x", num);
   ASSERT_EQ(4755, num);
+
+  ASSERT_EQ(1, sscanf("1.5", "%f", value));
+  ASSERT_EQ(1.5, value);
 
   ASSERT_EQ(2, sscanf("abc%abc", "%s%%%s", s, s1));
   ASSERT_EQ("abc", s);

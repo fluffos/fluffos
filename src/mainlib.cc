@@ -185,6 +185,8 @@ void init_locale() {
                   current_locale.c_str());
   }
 #endif
+  // LPC float parsing, formatting and serialization always use '.'.
+  setlocale(LC_NUMERIC, "C");
 }
 
 void init_tz() {

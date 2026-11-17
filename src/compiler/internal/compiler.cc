@@ -2914,6 +2914,11 @@ program_t* compile_file_fd(int fd, const char* name, vm_context_t* vm_context,
                            ScratchArena* arena) {
   prolog_source_fd = fd;  // consumed-and-cleared by prolog (unwind-safe)
   prolog_source_is_fd = true;
+  // A failure before prolog consumes the fd must not poison the next compile.
+  DEFER {
+    prolog_source_is_fd = false;
+    prolog_source_fd = -1;
+  };
   return compile_file(std::string_view{}, name, vm_context, arena);
 }
 
@@ -2935,6 +2940,8 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
     prolog_source_fd = -1;
     error("Object cannot be loaded during compilation.\n");
   }
+  // Copy before changing compiler state: this allocation can throw.
+  const std::string previous_locale = setlocale(LC_ALL, nullptr);
   guard = 1;
 
   /* Borrow the caller's arena for the duration. We never reset it and
@@ -3065,10 +3072,10 @@ program_t* compile_file(std::string_view source, const char* name, vm_context_t*
   };
 
   {
-    // make sure we use the C locale during parsing
-    auto* current_locale = setlocale(LC_ALL, "C");
+    // setlocale returns the new locale; the caller's locale was copied above.
+    setlocale(LC_ALL, "C");
     DEFER {
-      setlocale(LC_ALL, current_locale);
+      setlocale(LC_ALL, previous_locale.c_str());
 
       // Clean up parser if compile aborted via C++ Exception
       if (std::uncaught_exceptions() > 0) {
