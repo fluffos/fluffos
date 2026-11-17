@@ -28,7 +28,8 @@ void do_tests() {
   ASSERT_EQ(4755, num);
 
   ASSERT_EQ(1, sscanf("1.5", "%f", value));
-  ASSERT_EQ(1.5, value);
+  // Do not let locale-sensitive parsing of a float literal define the expectation.
+  ASSERT_EQ(to_float(3) / 2, value);
 
   ASSERT_EQ(2, sscanf("abc%abc", "%s%%%s", s, s1));
   ASSERT_EQ("abc", s);
