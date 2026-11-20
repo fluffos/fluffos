@@ -71,6 +71,7 @@ VALID_LINK
 LITERALS:parse_command_prepos_list
 VALID_OBJECT
 VALID_OVERRIDE
+VALID_PLURALIZE
 QGET_ALLWORD:parse_command_all_word
 QGET_PREPOS:parse_command_prepos_list
 VALID_READ

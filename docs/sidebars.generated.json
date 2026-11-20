@@ -633,6 +633,12 @@
           },
           {
             "type": "doc",
+            "id": "efun/contrib/update_pluralize",
+            "key": "efun/contrib/update_pluralize",
+            "label": "update_pluralize"
+          },
+          {
+            "type": "doc",
             "id": "efun/contrib/upper_case",
             "key": "efun/contrib/upper_case",
             "label": "upper_case"
@@ -3416,6 +3422,12 @@
             "id": "apply/master/valid_override",
             "key": "apply/master/valid_override",
             "label": "valid_override"
+          },
+          {
+            "type": "doc",
+            "id": "apply/master/valid_pluralize",
+            "key": "apply/master/valid_pluralize",
+            "label": "valid_pluralize"
           },
           {
             "type": "doc",
