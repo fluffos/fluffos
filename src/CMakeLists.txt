@@ -273,6 +273,17 @@ endif ()
 if (NOT EMSCRIPTEN)
   find_package(OpenSSL 1.0.1 COMPONENTS SSL REQUIRED)
   include_directories(AFTER SYSTEM ${OPENSSL_INCLUDE_DIR})
+  # Windows links OpenSSL statically, and FindOpenSSL adds no system
+  # libraries to OPENSSL_LIBRARIES there. libcrypto.a needs ws2_32 and crypt32,
+  # and from OpenSSL 4 also bcrypt (BCryptGenRandom). libwebsockets links its
+  # configure probes against OPENSSL_LIBRARIES: when they fail to link it
+  # turns features off and substitutes its own EVP_MD_CTX_free, which does not
+  # compile against OpenSSL 4's headers.
+  if (WIN32)
+    list(APPEND OPENSSL_LIBRARIES ws2_32 crypt32 bcrypt)
+    set_property(TARGET OpenSSL::Crypto APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+                 ws2_32 crypt32 bcrypt)
+  endif ()
 endif ()
 
 set(ICU_DEBUG ON)
