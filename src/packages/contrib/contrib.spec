@@ -14,6 +14,7 @@ mixed *variables(object, int default: 0);
 object *heart_beats();
 string terminal_colour(string, mapping, int | void, int | void);
 string pluralize(string);
+void update_pluralize(mapping | string, string | void);
 int file_length(string);
 string upper_case(string);
 int replaceable(object, void | string *);

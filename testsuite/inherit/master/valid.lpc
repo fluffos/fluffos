@@ -60,6 +60,31 @@ int valid_override(string file, string name, string mainfile) {
   return 1;
 }
 
+// valid_pluralize: controls update_pluralize(). `what` is the mapping or
+// the word, `plural` is undefined for the mapping and remove forms. The last
+// call's arguments are recorded for /single/tests/efuns/update_pluralize.lpc,
+// the word "verboten" is refused so the deny path can be tested, and a
+// mapping's "masteredit" entry is rewritten to test that edits are stored.
+// returns: 1 if the update may proceed, 0 if not.
+
+nosave mixed *last_valid_pluralize = 0;
+
+mixed *query_last_valid_pluralize() {
+  return last_valid_pluralize;
+}
+
+int valid_pluralize(object caller, mixed what, string plural) {
+  last_valid_pluralize = ({ caller, what, plural, undefinedp(plural) });
+  if (what == "verboten") {
+    return 0;
+  }
+  // The efun reads a mapping after this returns; this edit must be stored.
+  if (mapp(what) && what["masteredit"]) {
+    what["masteredit"] = "masteredited";
+  }
+  return 1;
+}
+
 // valid_seteuid: determines whether an object ob can become euid str.
 // returns: 1 if seteuid() may succeed, 0 if not.
 

@@ -19,4 +19,92 @@ void do_tests() {
   ASSERT_EQ("axes", pluralize("axis"));
   ASSERT_EQ("penises", pluralize("penis"));
   ASSERT_EQ("marquises", pluralize("marquis"));
+
+  // Every built-in exception, pinned. Recorded from the switch statement
+  // before it became a table, except "lotus", whose entry never set its
+  // "es" suffix and produced "lotuss".
+  mapping builtins = ([
+    "are": "is",
+    "bus": "buses",
+    "bonus": "bonuses",
+    "child": "children",
+    "cliff": "cliffs",
+    "datum": "data",
+    "die": "dice",
+    "deer": "deer",
+    "do": "does",
+    "dynamo": "dynamos",
+    "foot": "feet",
+    "fish": "fish",
+    "forum": "fora",
+    "fife": "fifes",
+    "glasses": "glasses",
+    "goose": "geese",
+    "go": "goes",
+    "gum": "gums",
+    "giraffe": "giraffes",
+    "human": "humans",
+    "have": "has",
+    "index": "indices",
+    "louse": "lice",
+    "lotus": "lotuses",
+    "mackerel": "mackerel",
+    "moose": "moose",
+    "mouse": "mice",
+    "matrix": "matrices",
+    "mech": "mechs",
+    "marquis": "marquises",
+    "ox": "oxen",
+    "pants": "pants",
+    "penis": "penises",
+    "quaff": "quaffs",
+    "remains": "remains",
+    "roof": "roofs",
+    "sniff": "sniffs",
+    "sheep": "sheep",
+    "sphinx": "sphinges",
+    "staff": "staves",
+    "safe": "safes",
+    "shaman": "shamans",
+    "thief": "thieves",
+    "tooth": "teeth",
+    "talisman": "talismans",
+    "vax": "vaxen",
+    "virus": "viruses",
+    "was": "were"
+  ]);
+  foreach (string word, string plural in builtins) {
+    ASSERT_EQ(plural, pluralize(word));
+  }
+
+  // "a" before " of " with no space after it is a word, not a determiner.
+  // "a of b" used to make the stripped length -1 and crash the driver.
+  ASSERT_EQ("a's of b", pluralize("a of b"));
+  ASSERT_EQ("A's of b", pluralize("A of b"));
+  ASSERT_EQ("ans of b", pluralize("an of b"));
+  // A determiner followed by nothing still strips, as it always has.
+  ASSERT_EQ("s", pluralize("a "));
+  ASSERT_EQ("s", pluralize("an "));
+  ASSERT_EQ("s of b", pluralize("a  of b"));
+
+  // A one-letter last word is a letter or a label and takes 's in either
+  // case. The suffix rules never see it, and they look at the last word
+  // only, so the space before it is never read as one of its letters.
+  ASSERT_EQ("a's", pluralize("a"));
+  ASSERT_EQ("A's", pluralize("A"));
+  ASSERT_EQ("x's", pluralize("x"));
+  ASSERT_EQ("the letter y's", pluralize("the letter y"));
+  ASSERT_EQ("rune f's", pluralize("rune f"));
+  ASSERT_EQ("rune o's", pluralize("rune o"));
+  ASSERT_EQ("vitamin C's", pluralize("vitamin C"));
+  ASSERT_EQ("rune f's of power", pluralize("a rune f of power"));
+  // Two letters go through the normal rules.
+  ASSERT_EQ("oxen", pluralize("ox"));
+  ASSERT_EQ("ups", pluralize("up"));
+
+  // Casing: the caller's prefix is kept, only the tail is replaced.
+  ASSERT_EQ("Geese", pluralize("Goose"));
+  ASSERT_EQ("Geese", pluralize("GOOSE"));
+  ASSERT_EQ("DEER", pluralize("DEER"));
+  ASSERT_EQ("Teeth", pluralize("TOOTH"));
 }
