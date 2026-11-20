@@ -1,6 +1,8 @@
 // update_pluralize(): LPC entries merged over pluralize()'s built-in
 // exception table, gated by master::valid_pluralize().
 
+#ifdef __PACKAGE_CONTRIB__
+
 #define ERRS(call, text) \
   do { \
     mixed __e = catch(call); \
@@ -91,6 +93,9 @@ private void run_checks() {
   ERRS(update_pluralize("", "x"), "cannot be empty");
   ERRS(update_pluralize(repeat_string("x", 65), "y"), "is longer than 64 bytes");
   ERRS(update_pluralize("cow", repeat_string("y", 65)), "is longer than 64 bytes");
+  // pluralize() would stop at a NUL and drop the rest of the plural.
+  ERRS(update_pluralize("cow", "ki" + string_decode(allocate_buffer(1), "UTF-8") + "ne"),
+    "cannot contain a NUL byte");
   // The error quotes 20 bytes, cut back so it does not split a character:
   // "caf" is 3 bytes and each é is 2, so the 9th é would straddle the cut.
   ERRS(update_pluralize("caf" + repeat_string("é", 40), "y"),
@@ -137,3 +142,5 @@ void do_tests() {
   update_pluralize(([]));
   if (err) error(err);
 }
+
+#endif

@@ -1267,6 +1267,12 @@ std::pair<std::string, PluralRule> make_plural_entry(std::string_view word,
     error("update_pluralize: the plural '%.*s...' is longer than %zu bytes.\n",
           plural_error_prefix(plural), plural.data(), kMaxPluralWord);
   }
+  /* pluralize() builds its result with C string functions, which would stop
+   * at the NUL and drop the rest of the plural */
+  if (plural.find('\0') != std::string_view::npos) {
+    error("update_pluralize: the plural of '%.*s' cannot contain a NUL byte.\n",
+          static_cast<int>(word.size()), word.data());
+  }
   std::string lower = plural_lower(plural);
   size_t common = 0;
   while (common < key.size() && common < lower.size() && key[common] == lower[common]) {
