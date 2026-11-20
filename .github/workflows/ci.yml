@@ -115,13 +115,13 @@ jobs:
 
           # macOS
           - platform: macOS
-            os: macos-14
+            os: macos-15
             build: Debug
             packages: cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
             openssl_root: /usr/local/opt/openssl
             icu_root: /opt/homebrew/opt/icu4c
           - platform: macOS
-            os: macos-14
+            os: macos-15
             build: RelWithDebInfo
             packages: cmake pkg-config pcre2 libgcrypt openssl jemalloc icu4c mysql sqlite3 googletest flex bison libffi
             openssl_root: /usr/local/opt/openssl
