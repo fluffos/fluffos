@@ -44,8 +44,21 @@ void do_tests() {
   ASSERT_EQ(sizeof(hash("blake2s256", "12345")), 64);
   ASSERT_EQ(sizeof(hash("blake2b512", "12345")), 128);
 
-  // Test other algorithms
-  ASSERT_EQ(sizeof(hash("sm3", "12345")), 64);
+  // SM3 depends on how OpenSSL was built: some distributions (Fedora, RHEL)
+  // compile it out, and then hash() reports it as an unknown type. Any other
+  // error, or a wrong digest where it exists, still fails.
+  {
+    string sm3;
+    mixed err = catch(sm3 = hash("sm3", "abc"));
+
+    if (err) {
+      ASSERT2(stringp(err) && strsrch(err, "unknown hash type: sm3") != -1,
+        sprintf("unexpected error from hash(\"sm3\"): %O", err));
+    } else {
+      // The "abc" test vector from the SM3 standard (GB/T 32905-2016).
+      ASSERT_EQ("66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0", sm3);
+    }
+  }
 
   // Test some specific known values for SHA3-256
   ASSERT_EQ(

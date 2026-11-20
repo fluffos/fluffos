@@ -46,7 +46,9 @@ title: crypto / hash
 - `"blake2s256"` - BLAKE2s-256 (256-bit, optimized for 8-32 bit platforms)
 
 **Other Modern Algorithms**:
-- `"sm3"` - SM3 (256-bit, Chinese national standard, OpenSSL 1.1.1+)
+- `"sm3"` - SM3 (256-bit, Chinese national standard, OpenSSL 1.1.1+). Some
+  distributions, including Fedora and RHEL, build OpenSSL without SM3; there,
+  `hash("sm3", ...)` raises the unknown-algorithm error.
 
 ### ARGUMENTS
 
