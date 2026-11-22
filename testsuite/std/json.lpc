@@ -96,6 +96,13 @@ private varargs void json_decode_parse_error(mixed *parse, string msg, int ch) {
   error(msg);
 }
 
+// Report an error at a specific byte position, such as the offending
+// character inside a token, rather than at the token's start.
+private varargs void json_decode_parse_error_at(mixed *parse, int pos, string msg, int ch) {
+  parse[JSON_DECODE_PARSE_POS] = pos;
+  json_decode_parse_error(parse, msg, ch);
+}
+
 private void json_decode_skip_ws(mixed *parse) {
   buffer text = parse[JSON_DECODE_PARSE_TEXT];
   int pos = parse[JSON_DECODE_PARSE_POS];
@@ -228,10 +235,14 @@ private int json_decode_parse_hex4(mixed *parse, buffer text, int ref pos) {
   int ch, digit;
 
   for (int i = 0; i < 4; i++) {
-    ch = text[pos++];
+    ch = text[pos];
     digit = json_decode_hexdigit(ch);
-    if (digit == -1)
-      json_decode_parse_error(parse, "Invalid hex digit", ch);
+    if (digit == -1) {
+      if (!ch)
+        json_decode_parse_error_at(parse, pos, "Unexpected end of data");
+      json_decode_parse_error_at(parse, pos, "Invalid hex digit", ch);
+    }
+    pos++;
     code = (code << 4) | digit;
   }
   return code;
@@ -259,7 +270,7 @@ private varargs mixed json_decode_parse_string(mixed *parse, int initiator_check
     pos++;
 
   if (ch == 0)
-    json_decode_parse_error(parse, "Unexpected end of data");
+    json_decode_parse_error_at(parse, pos, "Unexpected end of data");
 
   if (ch == '"') {
     parse[JSON_DECODE_PARSE_POS] = pos + 1;
@@ -281,7 +292,7 @@ private varargs mixed json_decode_parse_string(mixed *parse, int initiator_check
       json_append(ref result, ref result_len, text[start..pos - 1]);
 
     if (ch == 0)
-      json_decode_parse_error(parse, "Unexpected end of data");
+      json_decode_parse_error_at(parse, pos, "Unexpected end of data");
 
     if (ch == '"') {
       parse[JSON_DECODE_PARSE_POS] = pos + 1;
@@ -296,7 +307,7 @@ private varargs mixed json_decode_parse_string(mixed *parse, int initiator_check
 
     switch (ch) {
       case 0:
-        json_decode_parse_error(parse, "Unexpected end of data");
+        json_decode_parse_error_at(parse, pos, "Unexpected end of data");
       case '"': esc = '"'; break;
       case '\\': esc = '\\'; break;
       case '/': esc = '/'; break;
@@ -317,17 +328,17 @@ private varargs mixed json_decode_parse_string(mixed *parse, int initiator_check
 
           // A low surrogate (0xDC00-0xDFFF) may not appear first
           if (code >= 0xdc00)
-            json_decode_parse_error(parse, "Invalid string, unexpected low surrogate");
+            json_decode_parse_error_at(parse, pos - 6, "Invalid string, unexpected low surrogate");
 
           if (text[pos] != '\\' || text[pos + 1] != 'u')
-            json_decode_parse_error(parse, "Invalid string, missing surrogate pair");
+            json_decode_parse_error_at(parse, pos, "Invalid string, missing surrogate pair");
 
           pos += 2;  // Skip \u
           low = json_decode_parse_hex4(parse, text, ref pos);
 
           // The second escape must be a low surrogate
           if ((low & 0xfffffc00) != 0xdc00)
-            json_decode_parse_error(parse, "Invalid string, invalid low surrogate");
+            json_decode_parse_error_at(parse, pos - 6, "Invalid string, invalid low surrogate");
 
           code = 0x10000 + (high - 0xd800) * 0x400 + (low - 0xdc00);
         }
@@ -338,7 +349,7 @@ private varargs mixed json_decode_parse_string(mixed *parse, int initiator_check
         continue;
       }
       default:
-        json_decode_parse_error(parse, "Invalid escape sequence", ch);
+        json_decode_parse_error_at(parse, pos, "Invalid escape sequence", ch);
     }
 
     json_append(ref result, ref result_len, ({ esc }));
@@ -362,9 +373,9 @@ private mixed json_decode_parse_number(mixed *parse) {
     pos++;
     next_ch = text[pos];
     if (!next_ch)
-      json_decode_parse_error(parse, "Unexpected end of data");
+      json_decode_parse_error_at(parse, pos, "Unexpected end of data");
     if (next_ch < '0' || next_ch > '9')
-      json_decode_parse_error(parse, "Unexpected character", next_ch);
+      json_decode_parse_error_at(parse, pos, "Unexpected character", next_ch);
     ch = next_ch;
   }
 
@@ -375,7 +386,7 @@ private mixed json_decode_parse_number(mixed *parse) {
 
     if (next_ch != '.' && next_ch != 'e' && next_ch != 'E') {
       if ((next_ch >= '0' && next_ch <= '9') || next_ch == '-')
-        json_decode_parse_error(parse, "Unexpected character", next_ch);
+        json_decode_parse_error_at(parse, pos, "Unexpected character", next_ch);
       parse[JSON_DECODE_PARSE_POS] = pos;
       return 0;
     }
@@ -389,9 +400,17 @@ private mixed json_decode_parse_number(mixed *parse) {
     switch (ch) {
       case '.':
         if (has_dot || has_exp)
-          json_decode_parse_error(parse, "Unexpected character", ch);
+          json_decode_parse_error_at(parse, pos, "Unexpected character", ch);
         has_dot = 1;
         pos++;
+
+        // A decimal point must be followed by at least one digit
+        ch = text[pos];
+        if (ch < '0' || ch > '9') {
+          if (!ch)
+            json_decode_parse_error_at(parse, pos, "Unexpected end of data");
+          json_decode_parse_error_at(parse, pos, "Unexpected character", ch);
+        }
         break;
 
       case '0': case '1': case '2': case '3': case '4':
@@ -402,7 +421,7 @@ private mixed json_decode_parse_number(mixed *parse) {
       case 'e':
       case 'E':
         if (has_exp)
-          json_decode_parse_error(parse, "Unexpected character", ch);
+          json_decode_parse_error_at(parse, pos, "Unexpected character", ch);
         has_exp = 1;
         pos++;
 
@@ -410,16 +429,24 @@ private mixed json_decode_parse_number(mixed *parse) {
         ch = text[pos];
         if (ch == '+' || ch == '-')
           pos++;
+
+        // An exponent must have at least one digit
+        ch = text[pos];
+        if (ch < '0' || ch > '9') {
+          if (!ch)
+            json_decode_parse_error_at(parse, pos, "Unexpected end of data");
+          json_decode_parse_error_at(parse, pos, "Unexpected character", ch);
+        }
         break;
 
       case '-':
       case '+':
-        json_decode_parse_error(parse, "Unexpected character", ch);
+        json_decode_parse_error_at(parse, pos, "Unexpected character", ch);
 
       default:
         // End of number
         if (pos == from || (pos == from + 1 && (text[from] == '-' || text[from] == '.')))
-          json_decode_parse_error(parse, "Invalid number");
+          json_decode_parse_error_at(parse, pos, "Invalid number");
 
         parse[JSON_DECODE_PARSE_POS] = pos;
 
@@ -483,7 +510,7 @@ private mixed json_decode_parse_value(mixed *parse) {
       pos = parse[JSON_DECODE_PARSE_POS];
       if (text[pos + 1] == 'u' && text[pos + 2] == 'l' && text[pos + 3] == 'l') {
         parse[JSON_DECODE_PARSE_POS] = pos + 4;
-        return 0;
+        return ([])[0];  // undefined
       }
       json_decode_parse_error(parse, "Invalid token starting with 'n'", ch);
     default:
@@ -530,6 +557,25 @@ mixed json_decode(mixed text) {
   parse[JSON_DECODE_PARSE_POS] = 0;
 
   return json_decode_parse(parse);
+}
+
+/*
+ * Format a float as the shortest %g form that reads back as the same value,
+ * keeping a decimal point or exponent so it decodes as a float, not an int.
+ */
+private string json_encode_float(float value) {
+  string out;
+
+  for (int precision = 1; precision <= 17; precision++) {
+    out = sprintf(sprintf("%%.%dg", precision), value);
+    if (to_float(out) == value)
+      break;
+  }
+
+  if (strsrch(out, ".") == -1 && strsrch(out, "e") == -1)
+    out += ".0";
+
+  return out;
 }
 
 private string json_encode_string(string value) {
@@ -614,8 +660,10 @@ private string json_encode_string(string value) {
 varargs string json_encode(mixed value, mixed *pointers) {
   if (undefinedp(value))
     return "null";
-  if (intp(value) || floatp(value))
+  if (intp(value))
     return to_string(value);
+  if (floatp(value))
+    return json_encode_float(value);
   if (stringp(value)) {
     return json_encode_string(value);
   }
