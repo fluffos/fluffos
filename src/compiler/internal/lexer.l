@@ -169,7 +169,14 @@
 
 %option noyywrap nounput nodefault
 %option noyyalloc noyyfree noyyrealloc
-%option never-interactive
+    /* No never-interactive: every buffer here is in memory and already
+     * non-interactive (yy_scan_buffer sets that, and the one yy_create_buffer
+     * below pins it), so the option only chose flex's code path. Since flex
+     * 2.6.5 that path is broken (westes/flex#885): when a NUL has no
+     * transition, the skeleton no longer backs up to the last accepting
+     * position (it tests M4_NOT_MODE_INTERACTIVE, which flex never defines),
+     * so the token before a NUL swallows it and the embedded-NUL rule below
+     * never fires. */
 %option 8bit
 %option array
 %option reentrant
@@ -1018,6 +1025,25 @@ WS_NO_NL    [ \t\r\v\f]
 
 %%
 
+// Where the scanner's held character belongs. During a rule action Flex
+// writes a NUL just past yytext to terminate it, and keeps the byte it
+// replaced in yy_hold_char. Up to 2.6.15 that spot was always the scan
+// position, yy_c_buf_p: yyinput() moved the NUL along with each character
+// it read. From 2.6.16 ("end yytext at the token after input()") the NUL
+// stays at the end of the token, recorded in yy_hold_ptr, while yyinput()
+// advances yy_c_buf_p past it. Code here that flushes or reports the held
+// character must use this, never yy_c_buf_p: after a raw read on 2.6.16+
+// the two differ, and writing the held character at yy_c_buf_p overwrites
+// the next unread byte (every function-like macro call lost the character
+// after its ')' to a stray '(').
+#if YY_FLEX_MAJOR_VERSION > 2 || \
+    (YY_FLEX_MAJOR_VERSION == 2 &&  \
+     (YY_FLEX_MINOR_VERSION > 6 || (YY_FLEX_MINOR_VERSION == 6 && YY_FLEX_SUBMINOR_VERSION >= 16)))
+#define LPC_YY_HOLD_PTR(yyg) ((yyg)->yy_hold_ptr)
+#else
+#define LPC_YY_HOLD_PTR(yyg) ((yyg)->yy_c_buf_p)
+#endif
+
 // Read ONE character from the scanner's input, through Flex itself (its
 // buffer, then YY_INPUT) -- the official mechanism for helpers that must
 // consume raw characters mid-rule (heredoc bodies, macro-argument
@@ -1089,12 +1115,15 @@ void lpc_lex_push_prepared_buffer(char *base, size_t size, int kind, void *yysca
      * would find no parent to reload, leaving yy_c_buf_p dangling into
      * the freed buffer (ASan-verified heap-use-after-free). */
     YY_CURRENT_BUFFER_LVALUE = yy_create_buffer(yyin, YY_BUF_SIZE, yyscanner);
+    /* yy_create_buffer() asks isatty() about yyin, which is stdin once this
+     * scanner has run; a terminal must not make the buffer interactive. */
+    YY_CURRENT_BUFFER_LVALUE->yy_is_interactive = 0;
     yy_load_buffer_state(yyscanner);
   }
   /* Same bookkeeping yypush_buffer_state() does before switching: flush
    * the scan position into the old buffer's state so scanning resumes
    * exactly here when the pushed buffer pops. */
-  *yyg->yy_c_buf_p = yyg->yy_hold_char;
+  *LPC_YY_HOLD_PTR(yyg) = yyg->yy_hold_char;
   YY_CURRENT_BUFFER_LVALUE->yy_buf_pos = yyg->yy_c_buf_p;
   YY_CURRENT_BUFFER_LVALUE->yy_n_chars = yyg->yy_n_chars;
   yyg->yy_buffer_stack_top++;
@@ -1181,7 +1210,10 @@ int lpc_lex_buffer_extents(void *yyscanner, int i, const char **base, const char
   *base = b->yy_ch_buf;
   *limit = b->yy_ch_buf + (is_top ? yyg->yy_n_chars : b->yy_n_chars);
   *pos = is_top ? yyg->yy_c_buf_p : b->yy_buf_pos;
-  *held = is_top ? yyg->yy_hold_char : 0;
+  // The held character stands in for the byte at *pos only while the NUL
+  // sits there. On flex 2.6.16+ a raw read leaves the NUL behind at the
+  // end of the token, so the byte at *pos is the real one.
+  *held = (is_top && LPC_YY_HOLD_PTR(yyg) == yyg->yy_c_buf_p) ? yyg->yy_hold_char : 0;
   if (*pos == NULL || *pos < *base) {
     return 0;
   }
