@@ -1906,18 +1906,17 @@ void hook_dispatch_function_after(object_t* target, const char* fn, const char* 
   }
 }
 
-bool hook_call_target_gone(object_t* ob, uint32_t generation, const char* fn, int num_arg) {
+HookTargetState hook_call_target_state(object_t* ob, uint32_t generation, int num_arg) {
   if (ob->flags & O_DESTRUCTED) {
     pop_n_elems(num_arg);
-    return true;
+    return HookTargetState::Destructed;
   }
+  /* recompile_object() refuses only while a frame runs the old program, and
+   * this call has no frame yet. */
   if (ob->prog_generation != generation) {
-    pop_n_elems(num_arg);
-    /* recompile_object() refuses only while a frame runs the old program,
-     * and this call has no frame yet. */
-    error("%s() was not called: a hook handler recompiled /%s.\n", fn, ob->obname);
+    return HookTargetState::Recompiled;
   }
-  return false;
+  return HookTargetState::Unchanged;
 }
 
 bool hook_dispatch_function_around(object_t* target, const char* fn, const char* origin, int num_arg,

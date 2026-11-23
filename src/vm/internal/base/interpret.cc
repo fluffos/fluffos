@@ -5626,8 +5626,19 @@ int is_static(const char* fun, object_t* ob) {
  * driver which cache function numbers to optimize away function lookup.
  * The return value is left on the stack.
  * Currently: heart_beats, simul_efuns, master applies.
+ *
+ * dispatch_hooks is false only for the redo of a call whose function hooks
+ * already ran and recompiled the target (see hook_call_target_state()).
  */
+static void call_direct_impl(object_t* ob, int offset, int origin, int num_arg,
+                             bool dispatch_hooks);
+
 void call_direct(object_t* ob, int offset, int origin, int num_arg) {
+  call_direct_impl(ob, offset, origin, num_arg, true);
+}
+
+static void call_direct_impl(object_t* ob, int offset, int origin, int num_arg,
+                             bool dispatch_hooks) {
   function_t* funp;
   program_t* prog = ob->prog;
 
@@ -5657,8 +5668,12 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
     }
   }
 
-  if (def_funp && (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
-    const char* fname = def_funp->funcname;
+  if (dispatch_hooks && def_funp &&
+      (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
+    /* A copy: the name lives in ob's program, which a handler can free by
+     * recompiling ob while later attachments still match against it. */
+    std::string const fname_copy = def_funp->funcname;
+    const char* fname = fname_copy.c_str();
     const char* oname = origin_to_name(origin);
     uint32_t const prog_generation = ob->prog_generation;
     if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
@@ -5687,15 +5702,40 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
         error("Function call refused by hook.\n");
       }
     }
+    /* `prog`, `def_prog`, `def_funp` and `offset` belong to ob's program from
+     * before the handlers ran. Checked before AROUND (which reads def_funp)
+     * and after. A destructed target answers 0, like a missing function; a
+     * recompiled one is called again by name in its new program, without
+     * the hooks, which have had their say. Returns true if the call is done. */
+    auto settled = [&]() {
+      switch (hook_call_target_state(ob, prog_generation, num_arg)) {
+        case HookTargetState::Destructed:
+          push_number(0);
+          return true;
+        case HookTargetState::Recompiled: {
+          auto entry = apply_cache_lookup(fname, ob->prog);
+          if (!entry.progp) {
+            pop_n_elems(num_arg);
+            error("%s() is gone: a hook handler recompiled /%s without it.\n", fname,
+                  ob->obname);
+          }
+          call_direct_impl(ob, entry.runtime_index, origin, num_arg, false);
+          return true;
+        }
+        case HookTargetState::Unchanged:
+          break;
+      }
+      return false;
+    };
+    if (settled()) {
+      return;
+    }
     if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
         hook_dispatch_function_around(ob, fname, oname, num_arg, def_prog, def_funp->address,
                                       def_funp, def_fio, def_vio)) {
       return;
     }
-    /* `prog` and `def_prog` belong to ob's program from before the handlers
-     * ran. A destructed target answers 0, like a missing function. */
-    if (hook_call_target_gone(ob, prog_generation, fname, num_arg)) {
-      push_number(0);
+    if (settled()) {
       return;
     }
   }

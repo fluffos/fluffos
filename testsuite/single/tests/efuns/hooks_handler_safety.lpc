@@ -17,11 +17,16 @@ void write_victim(int which) {
   if (which == 1) {
     write_file(
       VICTIM_FILE,
-      "int a = 1, b = 2, c = 3, d = 4;\nint f() { return a + b + c + d; }\n",
+      "int a = 1, b = 2, c = 3, d = 4;\nint f() { return a + b + c + d; }\n"
+      "function query_f() { return (: f :); }\n",
       1
     );
   } else {
-    write_file(VICTIM_FILE, "int x;\nint f() { return 222; }\n", 1);
+    write_file(
+      VICTIM_FILE,
+      "int x;\nint f() { return 222; }\nfunction query_f() { return (: f :); }\n",
+      1
+    );
   }
 }
 
@@ -44,11 +49,27 @@ mixed recompile_then_proceed(
   return hook_proceed();
 }
 
+mixed proceed(int id, object actor, object caller, object target, string fn, mixed *args);
+
+mixed recompile_simul_efuns(
+  int id,
+  object actor,
+  object caller,
+  object target,
+  string fn,
+  mixed *args
+) {
+  recompile_object(find_object("/single/simul_efun"));
+  return 0;
+}
+
 void check_recompile() {
   object v;
-  mixed err;
+  mixed err, r;
 
-  // BEFORE: the call was looked up in the program the handler just freed.
+  // BEFORE: the call had been looked up in the program the handler freed.
+  // It is redone against the new program, as if the recompile had happened
+  // just before the call (the hooks do not run again).
   write_victim(1);
   v = load_object(VICTIM);
   hooks += ({ hook_attach(
@@ -57,11 +78,14 @@ void check_recompile() {
     ([ "object": v, "function": "f" ]),
     HOOK_BEFORE
   ) });
-  err = catch(v->f());
-  ASSERT2(stringp(err) && strsrch(err, "recompiled") != -1, sprintf("BEFORE recompile: %O", err));
+  err = catch(r = v->f());
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(222, r);
   hook_detach(hooks[<1]);
 
-  // AROUND: hook_proceed() would run the old program's bytecode.
+  // AROUND: hook_proceed() refuses to run the old program's bytecode, so the
+  // handler fails before proceeding and the call runs unwrapped -- against
+  // the new program.
   write_victim(1);
   recompile_object(v);
   hooks += ({ hook_attach(
@@ -70,12 +94,40 @@ void check_recompile() {
     ([ "object": v, "function": "f" ]),
     HOOK_AROUND
   ) });
-  err = catch(v->f());
-  ASSERT2(stringp(err) && strsrch(err, "recompiled") != -1, sprintf("AROUND recompile: %O", err));
+  err = catch(r = v->f());
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(222, r);
+  hook_detach(hooks[<1]);
+
+  // Through a function pointer the owner already has a (fake) frame, so the
+  // handler's recompile is refused and the call runs the program it found.
+  write_victim(1);
+  recompile_object(v);
+  hooks += ({ hook_attach(
+    "function",
+    (: recompile_target :),
+    ([ "object": v, "function": "f" ]),
+    HOOK_BEFORE
+  ) });
+  err = catch(r = evaluate(v->query_f()));
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(10, r);
   hook_detach(hooks[<1]);
 
   destruct(v);
   rm(VICTIM_FILE);
+
+  // A simul_efun call (call_direct()): the AROUND dispatch after BEFORE read
+  // the function from the freed program, and the hooks' own name matching
+  // read its name. Redone against the new program, defaults included.
+  hooks += ({ hook_attach("function", (: recompile_simul_efuns :),
+    ([ "target": "single/simul_efun", "function": "defarg_simul" ]), HOOK_BEFORE) });
+  hooks += ({ hook_attach("function", (: proceed :),
+    ([ "target": "single/simul_efun", "function": "defarg_simul" ]), HOOK_AROUND) });
+  ASSERT_EQ(5, defarg_simul(5));
+  ASSERT_EQ(77, defarg_simul());
+  hook_detach(hooks[<1]);
+  hook_detach(hooks[<2]);
 }
 
 /* --- AROUND runs the body exactly once ------------------------------------ */
