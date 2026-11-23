@@ -562,9 +562,14 @@ mixed json_decode(mixed text) {
 /*
  * Format a float as the shortest %g form that reads back as the same value,
  * keeping a decimal point or exponent so it decodes as a float, not an int.
+ * JSON has no infinity or NaN; like JSON.stringify(), encode them as null.
  */
 private string json_encode_float(float value) {
   string out;
+
+  // x - x is 0.0 for every finite x, and NaN for an infinity or a NaN
+  if (value - value != 0.0)
+    return "null";
 
   for (int precision = 1; precision <= 17; precision++) {
     out = sprintf(sprintf("%%.%dg", precision), value);
