@@ -563,8 +563,20 @@ if (FLEX_FOUND AND NOT FLEX_VERSION VERSION_LESS FLUFFOS_PINNED_FLEX_VERSION)
 endif()
 if (FLUFFOS_FLEX_REGEN)
   message(STATUS "FLEX: ${FLEX_VERSION} (committed files pinned at ${FLUFFOS_PINNED_FLEX_VERSION})")
+  set(_fluffos_lexer_input "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l")
+  if (NOT FLEX_VERSION VERSION_LESS "2.6.5")
+    # flex 2.6.5+ sizes yytext from `%option yylmax` (default BUFSIZ, only
+    # 1024 on macOS) and ignores lexer.l's `#define YYLMAX 65536`; 2.6.4
+    # rejects the option. Scan a copy that sets it -- see the script.
+    set(_fluffos_lexer_input "${CMAKE_CURRENT_BINARY_DIR}/lexer.l")
+    add_custom_command(
+      OUTPUT  "${_fluffos_lexer_input}"
+      COMMAND "${CMAKE_COMMAND}" -D FILE_IN="${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l" -D FILE_OUT="${_fluffos_lexer_input}" -D YYLMAX=65536 -P "${CMAKE_SOURCE_DIR}/cmake/lexer_yylmax.cmake"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l" "${CMAKE_SOURCE_DIR}/cmake/lexer_yylmax.cmake"
+    )
+  endif()
   FLEX_TARGET(LpcLexer
-    "${CMAKE_CURRENT_SOURCE_DIR}/compiler/internal/lexer.l"
+    "${_fluffos_lexer_input}"
     "${CMAKE_CURRENT_BINARY_DIR}/lexer.autogen.cc"
     COMPILE_FLAGS "-Ca"
   )
