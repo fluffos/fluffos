@@ -1,0 +1,9 @@
+// Fixture for single/tests/efuns/hooks_frame_offsets.lpc. base_get() is
+// inherited behind hook_offsets_pad, so it runs at variable offset 3; each
+// function below reaches it by a different call route.
+inherit "/clone/hook_offsets_pad";
+inherit "/clone/hook_offsets_base";
+
+int via_local() { return base_get(); }
+int via_inherited() { return hook_offsets_base::base_get(); }
+int via_pointer() { return evaluate((: base_get :)); }

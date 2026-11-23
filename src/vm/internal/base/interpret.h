@@ -174,7 +174,12 @@ LPC_INT codepoint_lvalue_add(svalue_t* lval, LPC_INT delta);
 buffer_t* svalue_to_buffer_bytes(svalue_t* from);
 
 void call_direct(object_t*, int, int, int);
-std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex);
+// Resolves findex in prog to its defining program and that program's own
+// function index. If fio/vio are given, the inherit offsets walked on the way
+// are ADDED to them: start them at the offsets prog itself runs at (0 for an
+// object's own program) to get the offsets the definition must run at.
+std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex,
+                                                 int* fio = nullptr, int* vio = nullptr);
 // Pad varargs callees + evaluate default-argument helper closures (caller
 // context) before a direct call; returns the new argument count. See
 // interpret.cc for the paths that share it.

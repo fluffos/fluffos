@@ -681,6 +681,9 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       bool local_is_async = false;
       program_t* def_prog = nullptr;
       function_t* def_funp = nullptr;
+      /* The offsets setup_new_frame() will compute, for an AROUND hook */
+      int def_fio = 0;
+      int def_vio = 0;
       {
         auto* cprog = current_object->prog;
         int roff = funp->f.local.index;
@@ -688,7 +691,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
           roff = cprog->function_flags[roff] & ~FUNC_ALIAS;
         }
         local_is_async = (cprog->function_flags[roff] & FUNC_ASYNC) != 0;
-        auto result = get_function_at_index(cprog, roff);
+        auto result = get_function_at_index(cprog, roff, &def_fio, &def_vio);
         if (result.first != nullptr) {
           def_prog = result.first;
           def_funp = &result.first->function_table[result.second];
@@ -732,7 +735,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
         }
         if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
             hook_dispatch_function_around(target, fname, "function_pointer", num_arg, def_prog,
-                                          def_funp->address, def_funp)) {
+                                          def_funp->address, def_funp, def_fio, def_vio)) {
           free_svalue(&apply_ret_value, "call_function_pointer");
           apply_ret_value = *sp--;
           remove_fake_frame();

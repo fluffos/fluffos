@@ -120,10 +120,14 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
 void hook_dispatch_function_after(object_t* target, const char* fn, const char* origin, int num_arg);
 
 /* AROUND for function: if any match, runs the highest-priority AROUND instead
- * of the body. The handler uses hook_proceed() to run the real call.
- * Returns true if an AROUND handled the call (result left on stack). */
+ * of the body. The handler uses hook_proceed() to run the real call, in
+ * `prog` at the given function/variable index offsets -- those of the program
+ * defining funp within target, NOT whatever offsets happen to be live (the
+ * caller's). Returns true if an AROUND handled the call (result left on
+ * stack). */
 bool hook_dispatch_function_around(object_t* target, const char* fn, const char* origin, int num_arg,
-                                   program_t* prog, unsigned short address, function_t* funp);
+                                   program_t* prog, unsigned short address, function_t* funp,
+                                   int function_index_offset, int variable_index_offset);
 
 /* efun:<name> — before the C efun runs. name is instrs[].name (no "efun:" prefix).
  * On return, *filter_ob_out (when non-null) is the first live object argument
