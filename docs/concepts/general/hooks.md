@@ -23,7 +23,7 @@ credit). Status below is what the driver actually does today.
 | `call_other:miss` | `ob->fn(...)` undefined, private, protected, or target destructed. **Requires** `object` or `target` | BEFORE, DECIDE | Wired |
 | `apply:miss` | Same miss reasons via `apply()` / `safe_apply()` for every origin **except** `call_other`. **Requires** `object` or `target` | BEFORE, DECIDE | Wired |
 | `object:create` | After `create()` returns, object still alive | event (`0`) | Wired |
-| `object:destruct` | After destruct re-check, before stack sweep | event (`0`) | Wired |
+| `object:destruct` | After `on_destruct`, before the object's sockets, parser state and stack references are torn down | event (`0`) | Wired |
 | `function` | Named LPC function entered by any route; filter `origin`. **Requires** `object` or `target` | BEFORE, AFTER, DECIDE, AROUND | Wired |
 | `efun:<name>` | At efun dispatch (`efun:*` matches all) | BEFORE, AFTER, DECIDE (refuse only) | Wired |
 | `net:accept` | New connection, before session allocation | BEFORE, DECIDE | Wired |
@@ -227,7 +227,13 @@ mixed handler(int id, object actor, object caller, object target,
 - `HOOK_AROUND` (`function` only): highest-priority match replaces the body.
   Call `hook_proceed()` or `hook_proceed(mixed *args)` once to run the real
   call; the handler's return value becomes the call result. Returning
-  without `proceed` still supplies the result (no body).
+  without `proceed` still supplies the result (no body). The body runs at
+  most once: if the handler raises an error (or returns a promise, or
+  detaches itself) after proceeding, the call ends as it would have
+  unhooked — with the body's result, or with the body's error if it raised
+  one. An error raised before proceeding is a handler failure, and the body
+  runs normally. AROUND does not apply to `async` functions: they run
+  unwrapped, so they still return a promise.
 - **`function` requires** `object` or `target` (a bare `function` name
   filter is not enough). `efun:<name>` does not.
 - **`function` filters use the named target** (before the shadow walk),

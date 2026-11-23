@@ -1,0 +1,9 @@
+// Fixture for single/tests/efuns/hooks_handler_safety.lpc: opens a socket
+// owned by this object when asked to.
+#include <socket.h>
+
+void rcb(int fd, mixed msg, string addr) {}
+
+int open_socket() {
+  return socket_create(DATAGRAM, "rcb");
+}

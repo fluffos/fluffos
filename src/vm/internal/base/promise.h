@@ -237,8 +237,10 @@ struct lpc_coroutine_t {
   struct object_t* ob;       /* ref held */
   struct object_t* prev_ob;  /* ref held; may be null */
   struct object_t* command_giver; /* ref held; may be null */
-  /* Named target for function AFTER filters (pre-shadow). Not ref-held —
-   * same lifetime rule as control_stack_t::hook_target. */
+  /* Named target for function AFTER filters (pre-shadow); null when it is
+   * `ob`. Ref held: unlike a running frame's hook_target, a parked body
+   * outlives the call that named it, and the named object can be destructed
+   * and freed (a shadowed call, then remove_shadow()) before it resumes. */
   struct object_t* hook_target;
   struct program_t* prog;    /* reference_prog() held; the DEFINING program
                               * (setup_new_frame() points current_prog at the

@@ -119,6 +119,14 @@ HookGateResult hook_dispatch_function_before(object_t* target, const char* fn, c
                                              int num_arg, svalue_t* out);
 void hook_dispatch_function_after(object_t* target, const char* fn, const char* origin, int num_arg);
 
+/* For a function call whose BEFORE/AROUND handlers have just run (arbitrary
+ * LPC) and that is about to enter the program it looked up beforehand. If
+ * the target was destructed, pops the call's num_arg args and returns true:
+ * the call does not happen. If it was recompiled (prog_generation moved off
+ * `generation`), the looked-up program may be freed: pops the args and
+ * errors. Otherwise returns false. */
+bool hook_call_target_gone(object_t* ob, uint32_t generation, const char* fn, int num_arg);
+
 /* AROUND for function: if any match, runs the highest-priority AROUND instead
  * of the body. The handler uses hook_proceed() to run the real call, in
  * `prog` at the given function/variable index offsets -- those of the program

@@ -703,6 +703,7 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       if (def_funp && target &&
           (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
         const char* fname = def_funp->funcname;
+        uint32_t const prog_generation = target->prog_generation;
         if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
           svalue_t answered{};
           HookGateResult gr =
@@ -738,6 +739,14 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
                                           def_funp->address, def_funp, def_fio, def_vio)) {
           free_svalue(&apply_ret_value, "call_function_pointer");
           apply_ret_value = *sp--;
+          remove_fake_frame();
+          return &apply_ret_value;
+        }
+        /* f.local.index and def_prog describe the owner's program from before
+         * the handlers ran; a destructed owner answers 0. */
+        if (hook_call_target_gone(target, prog_generation, fname, num_arg)) {
+          free_svalue(&apply_ret_value, "call_function_pointer");
+          apply_ret_value = const0;
           remove_fake_frame();
           return &apply_ret_value;
         }

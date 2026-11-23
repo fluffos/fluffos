@@ -5660,6 +5660,7 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   if (def_funp && (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
     const char* fname = def_funp->funcname;
     const char* oname = origin_to_name(origin);
+    uint32_t const prog_generation = ob->prog_generation;
     if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
       svalue_t answered{};
       HookGateResult gr = hook_dispatch_function_before(ob, fname, oname, num_arg, &answered);
@@ -5689,6 +5690,12 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
     if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
         hook_dispatch_function_around(ob, fname, oname, num_arg, def_prog, def_funp->address,
                                       def_funp, def_fio, def_vio)) {
+      return;
+    }
+    /* `prog` and `def_prog` belong to ob's program from before the handlers
+     * ran. A destructed target answers 0, like a missing function. */
+    if (hook_call_target_gone(ob, prog_generation, fname, num_arg)) {
+      push_number(0);
       return;
     }
   }

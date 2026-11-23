@@ -384,6 +384,7 @@ retry_for_shadow:
     /* function join point: filter on named_target (pre-shadow), like miss. */
     if (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND)) {
       const char* origin = origin_to_name(local_call_origin);
+      uint32_t const prog_generation = ob->prog_generation;
       if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
         svalue_t answered{};
         HookGateResult gr =
@@ -420,6 +421,11 @@ retry_for_shadow:
                                         funp->address, funp, entry.function_index_offset,
                                         entry.variable_index_offset)) {
         return 1;
+      }
+      /* The handlers may have destructed or recompiled the target; `entry`
+       * points into its old program. A destructed target is a miss. */
+      if (hook_call_target_gone(ob, prog_generation, fun, num_arg)) {
+        return 0;
       }
     }
 

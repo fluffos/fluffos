@@ -310,7 +310,10 @@ void new_user_event_listener(event_base* base, interactive_t* user) {
  */
 void new_conn_handler(evconnlistener* listener, evutil_socket_t fd, struct sockaddr* addr,
                       int addrlen, void* arg) {
-  const char* peer = sockaddr_to_string(addr, addrlen);
+  /* sockaddr_to_string() returns a shared static buffer; copy it, since the
+   * net:accept handlers below run LPC that can format another address. */
+  std::string const peer_str = sockaddr_to_string(addr, addrlen);
+  const char* peer = peer_str.c_str();
   debug(connections, "New connection from %s.\n", peer);
 
   // TODO: we don't really need to pass in port, we can figure out by

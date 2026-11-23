@@ -1376,6 +1376,19 @@ void destruct_object(object_t* ob, const char* cause) {
     pop_context(&econ);
   }
 
+  /* object:destruct fires here, beside on_destruct and BEFORE the teardown
+   * below: its handler runs arbitrary LPC and can call into `ob`, which can
+   * open a socket (owner_ob = ob, O_EFUN_SOCKET) or set up pinfo again.
+   * Fired after the teardown, those were never undone and the socket's
+   * owner dangled once `ob` was freed. A handler that destructs `ob` is
+   * detected by the O_DESTRUCTED flag afterwards. */
+  if ((g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) && !(ob->flags & O_DESTRUCTED)) {
+    hook_dispatch_object_destruct(ob, cause);
+    if (ob->flags & O_DESTRUCTED) {
+      return;
+    }
+  }
+
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*
    * check if object has an efun socket referencing it for a callback. if
@@ -1397,15 +1410,6 @@ void destruct_object(object_t* ob, const char* cause) {
 
   if (ob->flags & O_DESTRUCTED) {
     return;
-  }
-  /* object:destruct fires after the O_DESTRUCTED re-check and
-   * before the stack sweep. A handler that destructs `ob` is detected by
-   * the O_DESTRUCTED flag afterwards. */
-  if (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) {
-    hook_dispatch_object_destruct(ob, cause);
-    if (ob->flags & O_DESTRUCTED) {
-      return;
-    }
   }
   if (g_hook_mask) {
     hooks_owner_destructed(ob);
