@@ -108,12 +108,17 @@
   yylloc_param->first_line = yylloc_param->last_line = current_line; \
   yylloc_param->first_column = yycolumn + 1;                  \
   {                                                           \
-    int uac_i_;                                               \
-    for (uac_i_ = yyleng - 1;                                 \
-         uac_i_ >= 0 && yytext[uac_i_] != '\n'; --uac_i_) {   \
+    /* Walk back to just past the match's last newline. A      \
+     * pointer, not a signed index: never below yytext, and     \
+     * nothing for an analyser to read as a negative index      \
+     * (Coverity CID 1690752 flagged the index form). */        \
+    const char* const uac_end_ = yytext + yyleng;             \
+    const char* uac_p_ = uac_end_;                            \
+    while (uac_p_ != yytext && uac_p_[-1] != '\n') {          \
+      --uac_p_;                                               \
     }                                                         \
-    if (uac_i_ >= 0) {                                        \
-      yycolumn = yyleng - uac_i_ - 1;                         \
+    if (uac_p_ != yytext) {                                   \
+      yycolumn = static_cast<int>(uac_end_ - uac_p_);         \
     } else {                                                  \
       yycolumn += yyleng;                                     \
     }                                                         \
