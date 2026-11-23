@@ -1191,11 +1191,12 @@ constexpr size_t kMaxPluralWord = 64;
 /* How many bytes of an over-long string to quote in an error: 20, backed up
  * so the cut does not split a UTF-8 character. */
 int plural_error_prefix(std::string_view s) {
-  size_t cut = s.size() < 20 ? s.size() : 20;
-  while (cut > 0 && cut < s.size() && (static_cast<unsigned char>(s[cut]) & 0xC0) == 0x80) {
+  int cut = s.size() < 20 ? static_cast<int>(s.size()) : 20;
+  while (cut > 0 && static_cast<size_t>(cut) < s.size() &&
+         (static_cast<unsigned char>(s[cut]) & 0xC0) == 0x80) {
     cut--;
   }
-  return static_cast<int>(cut);
+  return cut;
 }
 
 std::string plural_lower(std::string_view s) {

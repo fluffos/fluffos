@@ -5670,10 +5670,10 @@ static void call_direct_impl(object_t* ob, int offset, int origin, int num_arg,
 
   if (dispatch_hooks && def_funp &&
       (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
-    /* A copy: the name lives in ob's program, which a handler can free by
-     * recompiling ob while later attachments still match against it. */
-    std::string const fname_copy = def_funp->funcname;
-    const char* fname = fname_copy.c_str();
+    /* Hold the (shared) name: it is ob's program's, which a handler can free
+     * by recompiling ob while later attachments still match against it. */
+    const char* const fname = ref_string(def_funp->funcname);
+    DEFER { free_string(fname); };
     const char* oname = origin_to_name(origin);
     uint32_t const prog_generation = ob->prog_generation;
     if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
