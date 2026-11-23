@@ -117,9 +117,32 @@ void test_decode_booleans_null() {
   ASSERT_EQ(1, json_decode(" true "));
   ASSERT_EQ(0, json_decode(" false "));
 
-  // Null
-  ASSERT_EQ(0, json_decode("null"));
-  ASSERT_EQ(0, json_decode(" null "));
+  // Null decodes to undefined, not a plain 0
+  ASSERT(undefinedp(json_decode("null")));
+  ASSERT(undefinedp(json_decode(" null ")));
+  ASSERT(!undefinedp(json_decode("0")));
+}
+
+void test_decode_errors() {
+  // Numbers: a decimal point or exponent needs at least one digit
+  ASSERT_EQ("*Unexpected end of data @ position 2\n", catch(json_decode("1.")));
+  ASSERT_EQ("*Unexpected character, ']' @ position 3\n", catch(json_decode("[1.]")));
+  ASSERT_EQ("*Unexpected end of data @ position 2\n", catch(json_decode("1e")));
+  ASSERT_EQ("*Unexpected character, ']' @ position 4\n", catch(json_decode("[1e+]")));
+  ASSERT_EQ(0.0015, json_decode("1.5e-3"));
+  ASSERT_EQ("*Unexpected end of data @ position 1\n", catch(json_decode("-")));
+
+  // Errors point at the offending character, not the token's start
+  ASSERT_EQ("*Unexpected character, '1' @ position 1\n", catch(json_decode("01")));
+  ASSERT_EQ("*Unexpected end of data @ position 4\n", catch(json_decode("\"abc")));
+  ASSERT_EQ("*Unexpected end of data @ position 4\n", catch(json_decode("\"ab\\")));
+  ASSERT_EQ("*Invalid hex digit, 'x' @ position 5\n", catch(json_decode("\"\\u12x4\"")));
+
+  // Structural errors
+  ASSERT_EQ("*Unexpected end of data @ position 0\n", catch(json_decode("")));
+  ASSERT_EQ("*Unexpected end of data @ position 4\n", catch(json_decode("[1,2")));
+  ASSERT_EQ("*Expected ',' or ']' in array, '2' @ position 3\n", catch(json_decode("[1 2]")));
+  ASSERT_EQ("*Unexpected character after value, 'x' @ position 2\n", catch(json_decode("1 x")));
 }
 
 void test_decode_arrays() {
@@ -145,9 +168,18 @@ void test_decode_arrays() {
   ASSERT_EQ(({ ({ 1, 2 }), ({ 3, 4 }) }), json_decode("[[1,2],[3,4]]"));
   ASSERT_EQ(({ ({ ({ 1 }) }) }), json_decode("[[[1]]]"));
 
-  // Arrays with nulls
-  ASSERT_EQ(({ 0, 0, 0 }), json_decode("[null,null,null]"));
-  ASSERT_EQ(({ 1, 0, 2 }), json_decode("[1,null,2]"));
+  // Arrays with nulls keep each null as an undefined element
+  {
+    mixed *nulls = json_decode("[null,null,null]");
+    mixed *mixed_nulls = json_decode("[1,null,2]");
+
+    ASSERT_EQ(3, sizeof(nulls));
+    ASSERT(undefinedp(nulls[0]) && undefinedp(nulls[1]) && undefinedp(nulls[2]));
+    ASSERT_EQ(3, sizeof(mixed_nulls));
+    ASSERT_EQ(1, mixed_nulls[0]);
+    ASSERT(undefinedp(mixed_nulls[1]));
+    ASSERT_EQ(2, mixed_nulls[2]);
+  }
 }
 
 void test_decode_objects() {
@@ -183,7 +215,8 @@ void test_decode_objects() {
   ASSERT_EQ(3.14, result["float"]);
   ASSERT_EQ("hello", result["string"]);
   ASSERT_EQ(1, result["bool"]);
-  ASSERT_EQ(0, result["null"]);
+  ASSERT(member_array("null", keys(result)) != -1);
+  ASSERT(undefinedp(result["null"]));
 
   // Nested objects
   result = json_decode("{\"outer\":{\"inner\":1}}");
@@ -224,11 +257,25 @@ void test_encode_primitives() {
   ASSERT_EQ("-42", json_encode(-42));
   ASSERT_EQ("2147483647", json_encode(2147483647));
 
-  // Floats
-  ASSERT_EQ("0.000000", json_encode(0.0));
-  ASSERT_EQ("1.500000", json_encode(1.5));
-  ASSERT_EQ("3.141590", json_encode(3.14159));
-  ASSERT_EQ("-1.500000", json_encode(-1.5));
+  // Floats encode in their shortest exact form, keeping a decimal point
+  // (or exponent) so they decode back as floats
+  ASSERT_EQ("0.0", json_encode(0.0));
+  ASSERT_EQ("1.5", json_encode(1.5));
+  ASSERT_EQ("3.14159", json_encode(3.14159));
+  ASSERT_EQ("-1.5", json_encode(-1.5));
+  ASSERT_EQ("3.0", json_encode(3.0));
+  ASSERT_EQ("0.1", json_encode(0.1));
+  ASSERT_EQ("1e-07", json_encode(0.0000001));
+
+  // JSON has no infinity or NaN: they encode as null
+  {
+    float inf = 1e308 * 10.0;
+
+    ASSERT_EQ("null", json_encode(inf));
+    ASSERT_EQ("null", json_encode(-inf));
+    ASSERT_EQ("null", json_encode(inf - inf));
+    ASSERT_EQ("[1,null]", json_encode(({ 1, inf })));
+  }
 
   // Strings
   ASSERT_EQ("\"\"", json_encode(""));
@@ -278,7 +325,7 @@ void test_encode_arrays() {
   ASSERT_EQ("[1,2,3,4]", json_encode(({ 1, 2, 3, 4 })));
 
   // Arrays with mixed types
-  ASSERT_EQ("[1,\"hello\",3.140000]", json_encode(({ 1, "hello", 3.14 })));
+  ASSERT_EQ("[1,\"hello\",3.14]", json_encode(({ 1, "hello", 3.14 })));
 
   // Nested arrays
   ASSERT_EQ("[[]]", json_encode(({ ({}) })));
@@ -374,6 +421,17 @@ void test_roundtrip() {
   encoded = json_encode(value);
   decoded = json_decode(encoded);
   ASSERT_EQ(value, decoded);
+
+  // Floats that need more than six decimal places
+  value = 0.0000001;
+  ASSERT_EQ(value, json_decode(json_encode(value)));
+  value = 1.0 / 3;
+  ASSERT_EQ(value, json_decode(json_encode(value)));
+  value = 123456.789012345;
+  ASSERT_EQ(value, json_decode(json_encode(value)));
+
+  // A whole float stays a float
+  ASSERT(floatp(json_decode(json_encode(3.0))));
 
   // Strings
   value = "hello world";
@@ -558,6 +616,9 @@ void do_tests() {
 
   test_decode_booleans_null();
   write("✓ Boolean/null decoding tests passed\n");
+
+  test_decode_errors();
+  write("✓ Decode error tests passed\n");
 
   test_decode_arrays();
   write("✓ Array decoding tests passed\n");
