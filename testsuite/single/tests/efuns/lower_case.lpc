@@ -5,6 +5,7 @@
 
 void do_tests() {
   string str;
+  ASSERT_EQ("i", lower_case("I"));
   str = STR1;
   ASSERT(lower_case(str) == STR);
   ASSERT(str == STR1);
