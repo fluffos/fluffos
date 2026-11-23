@@ -1,0 +1,146 @@
+// update_pluralize(): LPC entries merged over pluralize()'s built-in
+// exception table, gated by master::valid_pluralize().
+
+#ifdef __PACKAGE_CONTRIB__
+
+#define ERRS(call, text) \
+  do { \
+    mixed __e = catch(call); \
+    ASSERT2(stringp(__e) && strsrch(__e, text) != -1, \
+            sprintf("expected an error containing %O, got %O", text, __e)); \
+  } while (0)
+
+private void run_checks() {
+  mixed *gate;
+  mixed bad;
+
+  // Add one entry. The caller's casing and the surrounding phrase survive,
+  // because the entry is stored as "drop N bytes, append S" like the built-ins.
+  update_pluralize("octopus", "octopodes");
+  ASSERT_EQ("octopodes", pluralize("octopus"));
+  ASSERT_EQ("Octopodes", pluralize("Octopus"));
+  ASSERT_EQ("large octopodes of doom", pluralize("a large octopus of doom"));
+
+  gate = master()->query_last_valid_pluralize();
+  ASSERT_EQ(this_object(), gate[0]);
+  ASSERT_EQ("octopus", gate[1]);
+  ASSERT_EQ("octopodes", gate[2]);
+  ASSERT_EQ(0, gate[3]);
+
+  // Words are lowercased before they are stored.
+  update_pluralize("CACTUS", "Cactuses");
+  ASSERT_EQ("cactuses", pluralize("cactus"));
+
+  // An unchanged plural.
+  update_pluralize("bison", "bison");
+  ASSERT_EQ("bison", pluralize("bison"));
+  ASSERT_EQ("Bison", pluralize("Bison"));
+
+  // A plural that shares part of the word: person -> people keeps "pe".
+  update_pluralize("person", "people");
+  ASSERT_EQ("people", pluralize("person"));
+
+  // A plural that shares no prefix replaces the whole word, so none of the
+  // caller's casing is left to keep.
+  update_pluralize("cow", "kine");
+  ASSERT_EQ("kine", pluralize("cow"));
+  ASSERT_EQ("kine", pluralize("Cow"));
+
+  // An entry for a single letter overrides the 's rule.
+  ASSERT_EQ("rune x's", pluralize("rune x"));
+  update_pluralize("x", "xes");
+  ASSERT_EQ("rune xes", pluralize("rune x"));
+  update_pluralize("x");
+  ASSERT_EQ("rune x's", pluralize("rune x"));
+
+  // Only ' ' separates words for pluralize(), so a tab is part of the word.
+  update_pluralize("bar\tbaz", "x");
+  ASSERT_EQ("x", pluralize("bar\tbaz"));
+
+  // Both the word and the plural may be up to 64 bytes.
+  update_pluralize(repeat_string("w", 64), repeat_string("w", 63) + "z");
+  ASSERT_EQ(repeat_string("w", 63) + "z", pluralize(repeat_string("w", 64)));
+
+  // Overriding a built-in, then removing the override restores it.
+  ASSERT_EQ("staves", pluralize("staff"));
+  update_pluralize("staff", "staffs");
+  ASSERT_EQ("staffs", pluralize("staff"));
+  update_pluralize("staff");
+  ASSERT_EQ("staves", pluralize("staff"));
+  gate = master()->query_last_valid_pluralize();
+  ASSERT_EQ("staff", gate[1]);
+  ASSERT_EQ(1, gate[3]);  // plural undefined in the remove form
+
+  // Removing a word that was never added is not an error.
+  update_pluralize("nonesuch");
+
+  // A mapping replaces the whole LPC layer.
+  update_pluralize(([ "sow": "swine", "Child": "childs" ]));
+  ASSERT_EQ("swine", pluralize("sow"));
+  ASSERT_EQ("cows", pluralize("cow"));  // gone with the rest of the old layer
+  ASSERT_EQ("childs", pluralize("child"));
+  ASSERT_EQ("octopi", pluralize("octopus"));  // gone: back to the -us rule
+  ASSERT_EQ("persons", pluralize("person"));
+  gate = master()->query_last_valid_pluralize();
+  ASSERT(mapp(gate[1]));
+  ASSERT_EQ(1, gate[3]);
+
+  // Bad input errors, and leaves the existing layer untouched.
+  ERRS(update_pluralize(([ "cow": "cows", "pig": 1 ])), "must be strings");
+  ERRS(update_pluralize(([ 1: "ones" ])), "must be strings");
+  ERRS(update_pluralize("sea cucumber", "sea cucumbers"), "is not a single word");
+  ERRS(update_pluralize("cow", ""), "cannot be empty");
+  ERRS(update_pluralize("", "x"), "cannot be empty");
+  ERRS(update_pluralize(repeat_string("x", 65), "y"), "is longer than 64 bytes");
+  ERRS(update_pluralize("cow", repeat_string("y", 65)), "is longer than 64 bytes");
+  // pluralize() would stop at a NUL and drop the rest of the plural.
+  ERRS(update_pluralize("cow", "ki" + string_decode(allocate_buffer(1), "UTF-8") + "ne"),
+    "cannot contain a NUL byte");
+  // The error quotes 20 bytes, cut back so it does not split a character:
+  // "caf" is 3 bytes and each é is 2, so the 9th é would straddle the cut.
+  ERRS(update_pluralize("caf" + repeat_string("é", 40), "y"),
+    "'caf" + repeat_string("é", 8) + "...'");
+  bad = ([ "cow": "cows" ]);
+  ERRS(update_pluralize(bad, "extra"), "a mapping takes no second argument");
+  // Two keys that lowercase to the same word must agree.
+  ERRS(update_pluralize(([ "Cow": "kine", "cow": "cows" ])), "two keys in the mapping");
+  ASSERT_EQ("swine", pluralize("sow"));
+  update_pluralize(([ "Cow": "kine", "cow": "KINE", "child": "childs" ]));
+  ASSERT_EQ("kine", pluralize("cow"));
+
+  // The master can refuse.
+  ERRS(update_pluralize("verboten", "verbotener"), "Master object denied permission");
+  ASSERT_EQ("verbotens", pluralize("verboten"));
+
+  // The mapping is read after valid_pluralize() returns, so the master's
+  // edit to it is what gets stored.
+  update_pluralize(([ "masteredit": "masteredits" ]));
+  ASSERT_EQ("masteredited", pluralize("masteredit"));
+
+  // Single-word adds and removes edit the merged table in place; check they
+  // agree with a full rebuild.
+  update_pluralize(([ "cow": "kine" ]));
+  update_pluralize("staff", "staffs");
+  update_pluralize("person", "people");
+  ASSERT_EQ("staffs", pluralize("staff"));
+  ASSERT_EQ("people", pluralize("person"));
+  update_pluralize("person");
+  ASSERT_EQ("persons", pluralize("person"));
+  update_pluralize("staff");
+  ASSERT_EQ("staves", pluralize("staff"));
+  ASSERT_EQ("kine", pluralize("cow"));
+
+  // An empty mapping clears the LPC layer; the built-ins remain.
+  update_pluralize(([]));
+  ASSERT_EQ("cows", pluralize("cow"));
+  ASSERT_EQ("children", pluralize("child"));
+}
+
+void do_tests() {
+  mixed err = catch(run_checks());
+
+  update_pluralize(([]));
+  if (err) error(err);
+}
+
+#endif

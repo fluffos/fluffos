@@ -2,6 +2,9 @@
 
 #include "thirdparty/scope_guard/scope_guard.hpp"  // DEFER
 
+#include <string>
+#include <string_view>
+#include <map>
 #include <vector>
 
 #include <sys/stat.h>  // for struct stat
@@ -1130,6 +1133,157 @@ vm::Value f_terminal_colour(vm::EfunArgs& f, vm::StringArg input, mapping_t* col
 /* number to chop is added */
 #define PLURAL_CHOP 2
 
+/*
+ * Exceptions to the suffix rules in pluralize(), matched against the last
+ * word of the input (case-insensitively). Each entry says how many trailing
+ * bytes to drop and what to append, so the caller's own prefix -- and its
+ * capitalization -- survives: "Goose" -> "Geese". A chop of 0 with an empty
+ * suffix leaves the word as it is ("deer").
+ *
+ * pluralize() consults ONE merged table: these built-ins, overlaid by
+ * whatever update_pluralize() supplied from LPC (LPC entries win). The LPC
+ * layer is kept separately so removing an override restores the built-in.
+ */
+namespace {
+
+struct PluralRule {
+  size_t chop;
+  std::string suffix;
+};
+
+struct BuiltinPlural {
+  const char* word;
+  size_t chop;
+  const char* suffix;
+};
+
+const BuiltinPlural kBuiltinPlurals[] = {
+    {"are", 3, "is"},        {"bus", 0, "es"},        {"bonus", 0, "es"},
+    {"child", 0, "ren"},     {"cliff", 0, "s"},       {"datum", 2, "a"},
+    {"die", 1, "ce"},        {"deer", 0, ""},         {"do", 0, "es"},
+    {"dynamo", 0, "s"},      {"foot", 3, "eet"},      {"fish", 0, ""},
+    {"forum", 2, "a"},       {"fife", 0, "s"},        {"glasses", 0, ""},
+    {"goose", 4, "eese"},    {"go", 0, "es"},         {"gum", 0, "s"},
+    {"giraffe", 0, "s"},     {"human", 0, "s"},       {"have", 2, "s"},
+    {"index", 2, "ices"},    {"louse", 4, "ice"},     {"lotus", 0, "es"},
+    {"mackerel", 0, ""},     {"moose", 0, ""},        {"mouse", 4, "ice"},
+    {"matrix", 1, "ces"},    {"mech", 0, "s"},        {"marquis", 0, "es"},
+    {"ox", 0, "en"},         {"pants", 0, ""},        {"penis", 0, "es"},
+    {"quaff", 0, "s"},       {"remains", 0, ""},      {"roof", 0, "s"},
+    {"sniff", 0, "s"},       {"sheep", 0, ""},        {"sphinx", 1, "ges"},
+    {"staff", 2, "ves"},     {"safe", 0, "s"},        {"shaman", 0, "s"},
+    {"thief", 1, "ves"},     {"tooth", 4, "eeth"},    {"talisman", 0, "s"},
+    {"vax", 0, "en"},        {"virus", 0, "es"},      {"was", 2, "ere"},
+};
+
+/* std::less<> makes find() take a string_view, so pluralize() can look up
+ * a lowercased stack copy of the word without allocating. */
+using PluralTable = std::map<std::string, PluralRule, std::less<>>;
+
+PluralTable g_plural_overrides; /* the LPC layer, from update_pluralize() */
+PluralTable g_plural_table;     /* built-ins overlaid by the LPC layer */
+bool g_plural_table_built = false;
+
+/* The longest word, and the longest plural, the table holds. pluralize()
+ * skips the lookup for a longer word, which could not match. */
+constexpr size_t kMaxPluralWord = 64;
+
+/* How many bytes of an over-long string to quote in an error: 20, backed up
+ * so the cut does not split a UTF-8 character. */
+int plural_error_prefix(std::string_view s) {
+  size_t cut = s.size() < 20 ? s.size() : 20;
+  while (cut > 0 && cut < s.size() && (static_cast<unsigned char>(s[cut]) & 0xC0) == 0x80) {
+    cut--;
+  }
+  return static_cast<int>(cut);
+}
+
+std::string plural_lower(std::string_view s) {
+  std::string out(s);
+  for (auto& c : out) {
+    if (c >= 'A' && c <= 'Z') {
+      c = static_cast<char>(c - 'A' + 'a');
+    }
+  }
+  return out;
+}
+
+const BuiltinPlural* find_builtin_plural(std::string_view key) {
+  for (const auto& b : kBuiltinPlurals) {
+    if (key == b.word) {
+      return &b;
+    }
+  }
+  return nullptr;
+}
+
+void rebuild_plural_table() {
+  g_plural_table.clear();
+  for (const auto& b : kBuiltinPlurals) {
+    g_plural_table[b.word] = PluralRule{b.chop, b.suffix};
+  }
+  for (const auto& [word, rule] : g_plural_overrides) {
+    g_plural_table[word] = rule;
+  }
+  g_plural_table_built = true;
+}
+
+const PluralTable& plural_table() {
+  if (!g_plural_table_built) {
+    rebuild_plural_table();
+  }
+  return g_plural_table;
+}
+
+/* The lowercased key for a word supplied from LPC; errors on a word that
+ * could never match (pluralize() only ever looks up a single word). */
+std::string plural_key(std::string_view word) {
+  if (word.empty()) {
+    error("update_pluralize: the word to pluralize cannot be empty.\n");
+  }
+  if (word.size() > kMaxPluralWord) {
+    error("update_pluralize: the word '%.*s...' is longer than %zu bytes.\n",
+          plural_error_prefix(word), word.data(), kMaxPluralWord);
+  }
+  for (char c : word) {
+    /* pluralize() splits words on ' ' only; a NUL ends its C string */
+    if (c == ' ' || c == '\0') {
+      error("update_pluralize: '%.*s' is not a single word.\n", static_cast<int>(word.size()),
+            word.data());
+    }
+  }
+  return plural_lower(word);
+}
+
+/* Reduce word -> plural to the chop/suffix form the built-ins use. */
+std::pair<std::string, PluralRule> make_plural_entry(std::string_view word,
+                                                     std::string_view plural) {
+  std::string key = plural_key(word);
+  if (plural.empty()) {
+    error("update_pluralize: the plural of '%.*s' cannot be empty.\n",
+          static_cast<int>(word.size()), word.data());
+  }
+  if (plural.size() > kMaxPluralWord) {
+    error("update_pluralize: the plural '%.*s...' is longer than %zu bytes.\n",
+          plural_error_prefix(plural), plural.data(), kMaxPluralWord);
+  }
+  /* pluralize() builds its result with C string functions, which would stop
+   * at the NUL and drop the rest of the plural */
+  if (plural.find('\0') != std::string_view::npos) {
+    error("update_pluralize: the plural of '%.*s' cannot contain a NUL byte.\n",
+          static_cast<int>(word.size()), word.data());
+  }
+  std::string lower = plural_lower(plural);
+  size_t common = 0;
+  while (common < key.size() && common < lower.size() && key[common] == lower[common]) {
+    common++;
+  }
+  PluralRule rule{key.size() - common, lower.substr(common)};
+  return {std::move(key), std::move(rule)};
+}
+
+}  // namespace
+
 static char* pluralize(const char* str) {
   char* pre;
   const char *p, *rel, *end;
@@ -1158,7 +1312,7 @@ static char* pluralize(const char* str) {
    * They can have 'the' so don't remove that
    */
   if (str[0] == 'a' || str[0] == 'A') {
-    if (str[1] == ' ') {
+    if (sz >= 2 && str[1] == ' ') {
       plen = sz - 2;
       pre = reinterpret_cast<char*>(DMALLOC(plen + 1, TAG_TEMPORARY, "pluralize: pre"));
       strncpy(pre, str + 2, plen);
@@ -1190,274 +1344,36 @@ static char* pluralize(const char* str) {
   end = rel + strlen(rel);
 
   /*
-   * trap the exceptions to the rules below and special cases.
-   *
-   * Hmm, maybe this should be a prebuilt hash table to make maintenance
-   * a bit easier.  Possibly gperf based; or is that overkill? :-)
+   * trap the exceptions to the rules below and special cases: the built-in
+   * table merged with anything update_pluralize() added from LPC.
    */
-  switch (rel[0]) {
-    case 'A':
-    case 'a':
-      if (!strcasecmp(rel + 1, "re")) {
-        found = PLURAL_CHOP + 3;
-        suffix = "is";
-      }
-      break;
-    case 'B':
-    case 'b':
-      if (!strcasecmp(rel + 1, "us")) {
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "onus")) {
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-      }
-      break;
-    case 'C':
-    case 'c':
-      if (!strcasecmp(rel + 1, "hild")) {
-        found = PLURAL_SUFFIX;
-        suffix = "ren";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "liff")) {
-        found = PLURAL_SUFFIX;
-        suffix = "s";
-      }
-      break;
-    case 'D':
-    case 'd':
-      if (!strcasecmp(rel + 1, "atum")) {
-        found = PLURAL_CHOP + 2;
-        suffix = "a";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ie")) {
-        found = PLURAL_CHOP + 1;
-        suffix = "ce";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "eer")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "o")) {
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ynamo")) {
-        found = PLURAL_SUFFIX;
-      }
-      break;
-    case 'F':
-    case 'f':
-      if (!strcasecmp(rel + 1, "oot")) {
-        found = PLURAL_CHOP + 3;
-        suffix = "eet";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ish")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "orum")) {
-        found = PLURAL_CHOP + 2;
-        suffix = "a";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ife")) {
-        found = PLURAL_SUFFIX;
-      }
-      break;
-    case 'G':
-    case 'g':
-      if (!strcasecmp(rel + 1, "lasses")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "oose")) {
-        found = PLURAL_CHOP + 4;
-        suffix = "eese";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "o")) {
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "um")) {
-        found = PLURAL_SUFFIX;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "iraffe")) {
-        found = PLURAL_SUFFIX;
-        suffix = "s";
-      }
-      break;
-    case 'H':
-    case 'h':
-      if (!strcasecmp(rel + 1, "uman")) {
-        found = PLURAL_SUFFIX;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ave")) {
-        found = PLURAL_CHOP + 2;
-        suffix = "s";
-      }
-      break;
-    case 'I':
-    case 'i':
-      if (!strcasecmp(rel + 1, "ndex")) {
-        found = PLURAL_CHOP + 2;
-        suffix = "ices";
-      }
-      break;
-    case 'L':
-    case 'l':
-      if (!strcasecmp(rel + 1, "ouse")) {
-        found = PLURAL_CHOP + 4;
-        suffix = "ice";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "otus")) {
-        found = PLURAL_SUFFIX;
-        break;
-      }
-      break;
-    case 'M':
-    case 'm':
-      if (!strcasecmp(rel + 1, "ackerel")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "oose")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ouse")) {
-        found = PLURAL_CHOP + 4;
-        suffix = "ice";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "atrix")) {
-        found = PLURAL_CHOP + 1;
-        suffix = "ces";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ech")) {
-        found = PLURAL_SUFFIX;
-        suffix = "s";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "arquis")) {
-        /* not the Latin -is -> -es chop (issue #936) */
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-      }
-      break;
-    case 'O':
-    case 'o':
-      if (!strcasecmp(rel + 1, "x")) {
-        found = PLURAL_SUFFIX;
-        suffix = "en";
-      }
-      break;
-    case 'P':
-    case 'p':
-      if (!strcasecmp(rel + 1, "ants")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "enis")) {
-        /* not the Latin -is -> -es chop (issue #936) */
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-      }
-      break;
-    case 'Q':
-    case 'q':
-      if (!strcasecmp(rel + 1, "uaff")) {
-        found = PLURAL_SUFFIX;
-      }
-      break;
-    case 'R':
-    case 'r':
-      if (!strcasecmp(rel + 1, "emains")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "oof")) {
-        found = PLURAL_SUFFIX;
-      }
-      break;
-    case 'S':
-    case 's':
-      if (!strcasecmp(rel + 1, "niff")) {
-        found = PLURAL_SUFFIX;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "heep")) {
-        found = PLURAL_SAME;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "phinx")) {
-        found = PLURAL_CHOP + 1;
-        suffix = "ges";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "taff")) {
-        found = PLURAL_CHOP + 2;
-        suffix = "ves";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "afe")) {
-        found = PLURAL_SUFFIX;
-        break;
-      }
-      if (!strcasecmp(rel + 1, "haman")) {
-        found = PLURAL_SUFFIX;
-      }
-      break;
-    case 'T':
-    case 't':
-      if (!strcasecmp(rel + 1, "hief")) {
-        found = PLURAL_CHOP + 1;
-        suffix = "ves";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "ooth")) {
-        found = PLURAL_CHOP + 4;
-        suffix = "eeth";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "alisman")) {
-        found = PLURAL_SUFFIX;
-        suffix = "s";
-      }
-      break;
-    case 'V':
-    case 'v':
-      if (!strcasecmp(rel + 1, "ax")) {
-        found = PLURAL_SUFFIX;
-        suffix = "en";
-        break;
-      }
-      if (!strcasecmp(rel + 1, "irus")) {
-        found = PLURAL_SUFFIX;
-        suffix = "es";
-      }
-      break;
-    case 'W':
-    case 'w':
-      if (!strcasecmp(rel + 1, "as")) {
-        found = PLURAL_CHOP + 2;
-        suffix = "ere";
-      }
-      break;
+  if (size_t rlen = end - rel; rlen && rlen <= kMaxPluralWord) {
+    char key[kMaxPluralWord];
+    for (size_t i = 0; i < rlen; i++) {
+      char c = rel[i];
+      key[i] = (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+    }
+    const auto& table = plural_table();
+    auto it = table.find(std::string_view(key, rlen));
+    if (it != table.end()) {
+      /* PLURAL_CHOP + 0 would collide with PLURAL_SAME, so a rule that only
+       * appends goes through PLURAL_SUFFIX (an empty suffix appends nothing) */
+      found = it->second.chop ? PLURAL_CHOP + static_cast<int>(it->second.chop) : PLURAL_SUFFIX;
+      suffix = it->second.suffix.c_str();
+    }
   }
+
+  /*
+   * A one-letter last word is a letter or a label ("rune f", "the letter y",
+   * "type A"): it takes 's, in either case, like "mind your p's and q's".
+   * This runs after the table so update_pluralize() can still override a
+   * particular letter.
+   */
+  if (!found && end - rel == 1) {
+    found = PLURAL_SUFFIX;
+    suffix = "'s";
+  }
+
   /*
    * now handle "rules" ... god I hate english!!
    */
@@ -1491,22 +1407,23 @@ static char* pluralize(const char* str) {
    */
 
   /* don't have to set found to PLURAL_SUFFIX in these rules b/c
-     found == 0 is interpreted as PLURAL_SUFFIX */
-  if (!found && (end != pre)) {
+     found == 0 is interpreted as PLURAL_SUFFIX.  The length checks measure
+     the last word (rel), so end[-2] never reads the space before it. */
+  if (!found && (end != rel)) {
     switch (end[-1]) {
       case 'E':
       case 'e':
-        if ((end - pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
+        if ((end - rel) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
           found = PLURAL_CHOP + 2;
           suffix = "ves";
         }
         break;
       case 'F':
       case 'f':
-        if ((end - pre) > 1 && (end[-2] == 'e' || end[-2] == 'E')) {
+        if ((end - rel) > 1 && (end[-2] == 'e' || end[-2] == 'E')) {
           break;
         }
-        if ((end - pre) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
+        if ((end - rel) > 1 && (end[-2] == 'f' || end[-2] == 'F')) {
           /* words ending in -ff normally just take -s (bluffs, cliffs);
            * staff -> staves lives in the exception table (issue #936) */
           break;
@@ -1516,7 +1433,7 @@ static char* pluralize(const char* str) {
         break;
       case 'H':
       case 'h':
-        if ((end - pre) > 1 && (end[-2] == 'c' || end[-2] == 's')) {
+        if ((end - rel) > 1 && (end[-2] == 'c' || end[-2] == 's')) {
           suffix = "es";
         }
         break;
@@ -1531,7 +1448,7 @@ static char* pluralize(const char* str) {
          * -- Marius, 23-Jun-2000
          */
       case 'M': case 'm':
-        if ((end - pre) > 1 && end[-2] == 'u') {
+        if ((end - rel) > 1 && end[-2] == 'u') {
           found = PLURAL_CHOP + 2;
           suffix = "a";
         }
@@ -1539,30 +1456,30 @@ static char* pluralize(const char* str) {
 #endif
       case 'N':
       case 'n':
-        if ((end - pre) > 2 && end[-2] == 'a' && end[-3] == 'm') {
+        if ((end - rel) > 2 && end[-2] == 'a' && end[-3] == 'm') {
           found = PLURAL_CHOP + 3;
           suffix = "men";
         }
         break;
       case 'O':
       case 'o':
-        if ((end - pre) > 1 && end[-2] != 'o') {
+        if ((end - rel) > 1 && end[-2] != 'o') {
           suffix = "es";
         }
         break;
       case 'S':
       case 's':
-        if ((end - pre) > 1 && end[-2] == 'i') {
+        if ((end - rel) > 1 && end[-2] == 'i') {
           found = PLURAL_CHOP + 2;
           suffix = "es";
           break;
         }
-        if ((end - pre) > 1 && end[-2] == 'u') {
+        if ((end - rel) > 1 && end[-2] == 'u') {
           found = PLURAL_CHOP + 2;
           suffix = "i";
           break;
         }
-        if ((end - pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')) {
+        if ((end - rel) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o')) {
           suffix = "ses";
         } else {
           suffix = "es";
@@ -1574,7 +1491,7 @@ static char* pluralize(const char* str) {
         break;
       case 'Y':
       case 'y':
-        if ((end - pre) > 1 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i' &&
+        if ((end - rel) > 1 && end[-2] != 'a' && end[-2] != 'e' && end[-2] != 'i' &&
             end[-2] != 'o' && end[-2] != 'u') {
           found = PLURAL_CHOP + 1;
           suffix = "ies";
@@ -1582,7 +1499,7 @@ static char* pluralize(const char* str) {
         break;
       case 'Z':
       case 'z':
-        if ((end - pre) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o' ||
+        if ((end - rel) > 1 && (end[-2] == 'a' || end[-2] == 'e' || end[-2] == 'o' ||
                                 end[-2] == 'i' || end[-2] == 'u')) {
           suffix = "zes";
         } else {
@@ -1631,7 +1548,82 @@ vm::Value f_pluralize(vm::EfunArgs&, vm::StringArg str) {
   }
   return vm::Value::str_malloced(s);
 }
-#endif
+
+#ifdef F_UPDATE_PLURALIZE
+/*
+ * update_pluralize(mapping) replaces the whole LPC layer of the exception
+ * table; update_pluralize(word, plural) adds or overrides one entry;
+ * update_pluralize(word) removes that entry (a built-in it overrode comes
+ * back). Gated by master::valid_pluralize(caller, what, plural).
+ */
+void f_update_pluralize(vm::EfunArgs&, vm::Arg what, std::optional<vm::StringArg> plural) {
+  if (what.is(T_MAPPING) && plural) {
+    error("update_pluralize: a mapping takes no second argument.\n");
+  }
+
+  {
+    vm::Call gate;
+    gate.push(current_object);
+    gate.push(what.copy());
+    if (plural) {
+      gate.push(plural->copy());
+    } else {
+      gate.push(vm::Value::undefined());
+    }
+    vm::CallResult r = gate.apply_master(APPLY_VALID_PLURALIZE);
+    if (!master_approved(r, "valid_pluralize")) {
+      error("Master object denied permission to update_pluralize().\n");
+    }
+  }
+
+  /* Read the arguments only now: valid_pluralize() received the live mapping
+   * and may have edited it, and what it left there is what gets stored. */
+  if (what.is(T_MAPPING)) {
+    mapping_t* m = what.mapping();
+    PluralTable fresh; /* built aside, so an error leaves the old layer intact */
+    for (int i = 0; i <= static_cast<int>(m->table_size); i++) {
+      for (mapping_node_t* n = m->table[i]; n; n = n->next) {
+        if (n->values[0].type != T_STRING || n->values[1].type != T_STRING) {
+          error("update_pluralize: mapping keys and values must be strings.\n");
+        }
+        vm::StringArg word(&n->values[0]);
+        vm::StringArg plural_of(&n->values[1]);
+        auto [key, rule] = make_plural_entry(word.view(), plural_of.view());
+        auto prior = fresh.find(key);
+        if (prior != fresh.end() &&
+            (prior->second.chop != rule.chop || prior->second.suffix != rule.suffix)) {
+          error("update_pluralize: two keys in the mapping are both '%s' with different plurals.\n",
+                key.c_str());
+        }
+        fresh[key] = std::move(rule);
+      }
+    }
+    g_plural_overrides.swap(fresh);
+    rebuild_plural_table();
+    return;
+  }
+
+  /* One word: change that entry in both layers rather than rebuilding, so a
+   * mudlib loading its list a word at a time stays linear. */
+  plural_table(); /* make sure the merged table exists before editing it */
+  if (plural) {
+    auto [key, rule] = make_plural_entry(what.string().view(), plural->view());
+    g_plural_overrides[key] = rule;
+    g_plural_table[key] = std::move(rule);
+    return;
+  }
+
+  std::string key = plural_key(what.string().view());
+  if (g_plural_overrides.erase(key)) {
+    if (const BuiltinPlural* b = find_builtin_plural(key)) {
+      g_plural_table[key] = PluralRule{b->chop, b->suffix};
+    } else {
+      g_plural_table.erase(key);
+    }
+  }
+}
+#endif /* F_UPDATE_PLURALIZE */
+#endif /* F_PLURALIZE */
 
 #ifdef F_FILE_LENGTH
 /*
