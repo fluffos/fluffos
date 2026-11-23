@@ -1,6 +1,6 @@
-#line 1 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 2 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
-#line 3 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 4 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 #define  YY_INT_ALIGNED long int
 
@@ -4237,12 +4237,17 @@ static const yy_state_type yy_NUL_trans[327] =
   yylloc_param->first_line = yylloc_param->last_line = current_line; \
   yylloc_param->first_column = yycolumn + 1;                  \
   {                                                           \
-    int uac_i_;                                               \
-    for (uac_i_ = yyleng - 1;                                 \
-         uac_i_ >= 0 && yytext[uac_i_] != '\n'; --uac_i_) {   \
+    /* Walk back to just past the match's last newline. A      \
+     * pointer, not a signed index: never below yytext, and     \
+     * nothing for an analyser to read as a negative index      \
+     * (Coverity CID 1690752 flagged the index form). */        \
+    const char* const uac_end_ = yytext + yyleng;             \
+    const char* uac_p_ = uac_end_;                            \
+    while (uac_p_ != yytext && uac_p_[-1] != '\n') {          \
+      --uac_p_;                                               \
     }                                                         \
-    if (uac_i_ >= 0) {                                        \
-      yycolumn = yyleng - uac_i_ - 1;                         \
+    if (uac_p_ != yytext) {                                   \
+      yycolumn = static_cast<int>(uac_end_ - uac_p_);         \
     } else {                                                  \
       yycolumn += yyleng;                                     \
     }                                                         \
@@ -4294,8 +4299,8 @@ static const yy_state_type yy_NUL_trans[327] =
 // Defined in the trailer below (uses the generated yyinput()).
 
 
-#line 4297 "$BUILD_ROOT$/src/lexer.autogen.cc"
-#line 173 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 4303 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 178 "$REPO_ROOT$/src/compiler/internal/lexer.l"
     /* No never-interactive: every buffer here is in memory and already
      * non-interactive (yy_scan_buffer sets that, and the one yy_create_buffer
      * below pins it), so the option only chose flex's code path. Since flex
@@ -4370,7 +4375,7 @@ static const yy_state_type yy_NUL_trans[327] =
 
 
 
-#line 4373 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 4379 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 #define INITIAL 0
 #define SC_CHAR_BODY 1
@@ -4674,7 +4679,7 @@ YY_DECL
 		}
 
 	{
-#line 260 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 265 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 
 
     /* Embedded NUL bytes: LPC source is text -- a raw 0x00 anywhere in the
@@ -4706,7 +4711,7 @@ YY_DECL
      * can never match NUL-free input (it must end in the NUL), so it is
      * invisible to every legitimate compile; progress is guaranteed
      * because every match consumes at least the NUL itself. */
-#line 4709 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 4715 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -4777,7 +4782,7 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 291 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 296 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_count_newlines(yytext, yyleng);
           lexerror("Illegal embedded NUL byte (0x00) in source");
@@ -4785,19 +4790,19 @@ YY_RULE_SETUP
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 296 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 301 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* ignore */ }
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 297 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 302 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 298 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 303 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 /* SC_BLOCK_COMMENT is a reusable sub-scan: entered via yy_push_state()
@@ -4808,12 +4813,12 @@ YY_RULE_SETUP
      * lexer_scan.h -- teach it any new form, or #1362 recurs (AGENTS.md). */
 case 5:
 YY_RULE_SETUP
-#line 306 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 311 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yy_push_state(SC_BLOCK_COMMENT, yyscanner); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 307 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 312 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* line comment; trailing newline handled by the \n rule */ }
 	YY_BREAK
 /* Block comment body: matched natively, no outp access. A lone slash
@@ -4824,37 +4829,37 @@ YY_RULE_SETUP
      * together with the preceding character by the catch-all run. */
 case 7:
 YY_RULE_SETUP
-#line 315 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 320 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yywarn("/* found in comment."); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 316 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 321 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yy_pop_state(yyscanner); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 317 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 322 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* run of '*' not (yet) followed by the closing '/' */ }
 	YY_BREAK
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 318 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 323 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 319 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 324 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* ordinary comment text */ }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 320 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 325 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* lone slash, not the start of a nested comment-open */ }
 	YY_BREAK
 case YY_STATE_EOF(SC_BLOCK_COMMENT):
-#line 321 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 326 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
               /* Every state-specific <<EOF>> rule pops a drained pushed
                * buffer first (lpc_lex_pop_splice_if_any) and keeps
@@ -4869,17 +4874,17 @@ case YY_STATE_EOF(SC_BLOCK_COMMENT):
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 333 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 338 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_number_hex(yylval_param, yytext, yyleng); }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 334 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 339 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_number_bin(yylval_param, yytext, yyleng); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 335 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 340 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
 	YY_BREAK
 
@@ -4890,7 +4895,7 @@ YY_RULE_SETUP
 
 case 16:
 YY_RULE_SETUP
-#line 342 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 347 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
 	YY_BREAK
 
@@ -4906,12 +4911,12 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 349 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 354 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_number_real(yylval_param, yytext, yyleng); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 350 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 355 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_number_dec(yylval_param, yytext, yyleng); }
 	YY_BREAK
 /* Note: '##' token pasting exists only INSIDE macro bodies (resolved
@@ -4922,7 +4927,7 @@ YY_RULE_SETUP
      */
 case 19:
 YY_RULE_SETUP
-#line 358 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 363 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           int tok = lpc_lex_resolve_identifier(yylval_param, yylloc_param, yyscanner);
           if (tok != LPC_TOKEN_RESCAN) return tok;
@@ -4946,7 +4951,7 @@ YY_RULE_SETUP
      * first 255 bytes of a string). */
 case 20:
 YY_RULE_SETUP
-#line 379 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 384 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->str_accum.clear(); BEGIN(SC_STRING_BODY); }
 	YY_BREAK
 /* Template literals `...${expr}...`: the literal-text fragments are
@@ -4964,13 +4969,13 @@ YY_RULE_SETUP
      * further below). */
 case 21:
 YY_RULE_SETUP
-#line 394 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 399 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->str_accum.clear(); yyextra->template_is_continuation = false; BEGIN(SC_TEMPLATE_BODY); }
 	YY_BREAK
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 396 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 401 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_newline(yyscanner);
           yyextra->str_accum += '\n';
@@ -4986,14 +4991,14 @@ YY_RULE_SETUP
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 407 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 412 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 24:
-#line 409 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 414 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 case 25:
 YY_RULE_SETUP
-#line 409 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 414 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           yyextra->str_accum.append(yytext, yyleng);
           STR_CHECK_OVERFLOW();
@@ -5002,7 +5007,7 @@ YY_RULE_SETUP
 case 26:
 /* rule 26 can match eol */
 YY_RULE_SETUP
-#line 413 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 418 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_newline(yyscanner);
           yyextra->str_accum += '\n';
@@ -5012,22 +5017,22 @@ YY_RULE_SETUP
 case 27:
 /* rule 27 can match eol */
 YY_RULE_SETUP
-#line 418 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 423 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); /* newlines are removed, not preserved */ }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 419 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 424 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->str_accum += '\r'; STR_CHECK_OVERFLOW(); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 420 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 425 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->str_accum += '$'; STR_CHECK_OVERFLOW(); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 421 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 426 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           BEGIN(INITIAL);
           return lpc_lex_string_close(yyscanner, yylval_param);
@@ -5035,7 +5040,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 425 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 430 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           BEGIN(INITIAL);
           return lpc_lex_template_head_or_middle(yyscanner, yylval_param);
@@ -5043,7 +5048,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 429 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 434 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           BEGIN(INITIAL);
           return lpc_lex_template_tail_or_string(yyscanner, yylval_param);
@@ -5051,7 +5056,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case YY_STATE_EOF(SC_STRING_BODY):
 case YY_STATE_EOF(SC_TEMPLATE_BODY):
-#line 433 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 438 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) {
             lexerror(YY_START == SC_TEMPLATE_BODY ? "End of file in template literal"
@@ -5064,13 +5069,13 @@ case YY_STATE_EOF(SC_TEMPLATE_BODY):
 case 33:
 /* rule 33 can match eol */
 YY_RULE_SETUP
-#line 442 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 447 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 case 34:
 /* rule 34 can match eol */
 YY_RULE_SETUP
-#line 443 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 448 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 /* Simple one-character escapes, all decoded through the one shared
@@ -5081,12 +5086,12 @@ YY_RULE_SETUP
      * itself exists exactly once for string, template, AND char-literal
      * bodies. */
 case 35:
-#line 452 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 457 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 case 36:
-#line 453 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 458 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 case 37:
 YY_RULE_SETUP
-#line 453 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 458 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           yyextra->str_accum += static_cast<char>(lpc_lex_simple_escape(yytext[1]));
           STR_CHECK_OVERFLOW();
@@ -5094,7 +5099,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 457 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 462 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_octal_escape(yyscanner, yytext, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -5109,14 +5114,14 @@ YY_RULE_SETUP
      * instead of replicating that. */
 case 39:
 YY_RULE_SETUP
-#line 468 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 473 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_bad_octal_escape(yyscanner, YY_START == SC_TEMPLATE_BODY);
         }
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 471 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 476 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_hex_escape(yyscanner, yytext, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -5124,7 +5129,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 475 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 480 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_bad_hex_escape(yyscanner, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -5139,7 +5144,7 @@ YY_RULE_SETUP
      * support \u/\U. */
 case 42:
 YY_RULE_SETUP
-#line 486 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 491 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_unicode_pair_escape(yyscanner, yytext);
           STR_CHECK_OVERFLOW();
@@ -5154,7 +5159,7 @@ YY_RULE_SETUP
      * purpose, and both still report a clear error and recover. */
 case 43:
 YY_RULE_SETUP
-#line 497 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 502 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_unicode_escape(yyscanner, yytext);
           STR_CHECK_OVERFLOW();
@@ -5162,12 +5167,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 501 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 506 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lexerror("Illegal unicode sequence."); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 502 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 507 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_long_unicode_escape(yyscanner, yytext, yyleng);
           STR_CHECK_OVERFLOW();
@@ -5175,12 +5180,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 506 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 511 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lexerror("Illegal unicode sequence."); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 507 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 512 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_append_unknown_escape(yyscanner, yytext, YY_START == SC_TEMPLATE_BODY);
           STR_CHECK_OVERFLOW();
@@ -5194,7 +5199,7 @@ YY_RULE_SETUP
      * accumulation for Flex to sidestep. */
 case 48:
 YY_RULE_SETUP
-#line 518 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 523 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { BEGIN(SC_CHAR_BODY); }
 	YY_BREAK
 /* Simple escapes decode through the same shared table as
@@ -5203,7 +5208,7 @@ YY_RULE_SETUP
      * this rule's character class. */
 case 49:
 YY_RULE_SETUP
-#line 523 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 528 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           yylval_param->number = lpc_lex_simple_escape(yytext[1]);
           BEGIN(SC_CHAR_CLOSE);
@@ -5211,12 +5216,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 50:
 YY_RULE_SETUP
-#line 527 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 532 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = lpc_lex_char_octal_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 528 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 533 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           // Deviation from the original hand-written scanner (documented in
           // historical note): '\8'/'\9' aren't valid octal, so
@@ -5231,21 +5236,21 @@ YY_RULE_SETUP
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 539 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 544 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = lpc_lex_char_hex_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 540 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 545 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = lpc_lex_char_bad_hex_escape(); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 case 54:
 /* rule 54 can match eol */
-#line 542 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 547 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 case 55:
 /* rule 55 can match eol */
 YY_RULE_SETUP
-#line 542 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 547 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           yylval_param->number = '\n';
           lpc_lex_newline(yyscanner);
@@ -5254,7 +5259,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 56:
 YY_RULE_SETUP
-#line 547 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 552 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = lpc_lex_char_unknown_escape(yytext); BEGIN(SC_CHAR_CLOSE); }
 	YY_BREAK
 /* Matches the original's unconditional raw-byte fallback: any
@@ -5266,7 +5271,7 @@ YY_RULE_SETUP
 case 57:
 /* rule 57 can match eol */
 YY_RULE_SETUP
-#line 554 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 559 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           yylval_param->number = static_cast<unsigned char>(yytext[0]);
           BEGIN(SC_CHAR_CLOSE);
@@ -5274,7 +5279,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 58:
 YY_RULE_SETUP
-#line 558 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 563 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           BEGIN(INITIAL);
           reinterpret_cast<compiler_context_t *>(yyget_extra(yyscanner))->is_char_literal = true;
@@ -5291,13 +5296,13 @@ YY_RULE_SETUP
      * 10 instead of 0). The non-EOF failure pushes the offending byte
      * back for the next scan, matching the original. */
 case YY_STATE_EOF(SC_CHAR_BODY):
-#line 572 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 577 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
         }
 	YY_BREAK
 case YY_STATE_EOF(SC_CHAR_CLOSE):
-#line 575 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 580 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) { BEGIN(INITIAL); return lpc_lex_char_error(yylval_param); }
         }
@@ -5305,7 +5310,7 @@ case YY_STATE_EOF(SC_CHAR_CLOSE):
 case 59:
 /* rule 59 can match eol */
 YY_RULE_SETUP
-#line 578 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 583 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           LPC_YYLESS(0);
           BEGIN(INITIAL);
@@ -5317,7 +5322,7 @@ YY_RULE_SETUP
      * the number. */
 case 60:
 YY_RULE_SETUP
-#line 587 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 592 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           int result = lpc_lex_function_param(yylval_param, yytext, yyleng);
           if (result != kLpcLexFunctionParamRetry) return result;
@@ -5330,7 +5335,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 61:
 YY_RULE_SETUP
-#line 596 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 601 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return lpc_lex_function_param(yylval_param, yytext, yyleng); }
 	YY_BREAK
 /* '(' compound tokens, reduced by 9.1/9.2 to just "(:" (one
@@ -5344,7 +5349,7 @@ YY_RULE_SETUP
 case 62:
 /* rule 62 can match eol */
 YY_RULE_SETUP
-#line 606 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 611 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           // '(' followed by the "::" scope operator, not a function-pointer
           // open. Put everything but '(' back -- whitespace included -- and
@@ -5357,7 +5362,7 @@ YY_RULE_SETUP
 case 63:
 /* rule 63 can match eol */
 YY_RULE_SETUP
-#line 614 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 619 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           /* 9.2: "(:" is one token; the named-vs-anonymous split lives in
            * the GRAMMAR now (shift-preference on the ':'/','' lookahead
@@ -5373,7 +5378,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 64:
 YY_RULE_SETUP
-#line 626 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 631 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '('; }
 	YY_BREAK
 /* Preprocessor directives -- ONE anchored rule, serving BOTH scan
@@ -5398,7 +5403,7 @@ YY_RULE_SETUP
      */
 case 65:
 YY_RULE_SETUP
-#line 649 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 654 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     /* A directive is scanned, not captured-then-repaired. C does this
      * as phases 2 (backslash-newline splice), 3 (comments -> space),
@@ -5425,14 +5430,14 @@ YY_RULE_SETUP
      * a word-ending comment returns to DATA. */
 case 66:
 YY_RULE_SETUP
-#line 673 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 678 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_push_state(SC_DIRECTIVE_SLASH, yyscanner);
 }
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 676 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 681 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     BEGIN(SC_DIRECTIVE_DATA);
     yy_push_state(SC_DIRECTIVE_SLASH, yyscanner);
@@ -5441,14 +5446,14 @@ YY_RULE_SETUP
 case 68:
 /* rule 68 can match eol */
 YY_RULE_SETUP
-#line 680 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 685 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     lpc_lex_newline(yyscanner);
 }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
-#line 683 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 688 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
     yyextra->directive_accum += ' ';
@@ -5457,7 +5462,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 70:
 YY_RULE_SETUP
-#line 688 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 693 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
     yyextra->directive_accum += ' ';
@@ -5467,7 +5472,7 @@ YY_RULE_SETUP
 case 71:
 /* rule 71 can match eol */
 YY_RULE_SETUP
-#line 693 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 698 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '/';
     yy_pop_state(yyscanner);
@@ -5475,7 +5480,7 @@ YY_RULE_SETUP
 }
 	YY_BREAK
 case YY_STATE_EOF(SC_DIRECTIVE_SLASH):
-#line 698 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 703 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '/';
     yy_pop_state(yyscanner);
@@ -5483,7 +5488,7 @@ case YY_STATE_EOF(SC_DIRECTIVE_SLASH):
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 702 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 707 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '/';
     yy_pop_state(yyscanner);
@@ -5495,32 +5500,32 @@ YY_RULE_SETUP
 case 73:
 /* rule 73 can match eol */
 YY_RULE_SETUP
-#line 710 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 715 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     lpc_lex_newline(yyscanner);
 }
 	YY_BREAK
 case 74:
 YY_RULE_SETUP
-#line 713 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 718 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* lone backslash, not a splice */ }
 	YY_BREAK
 case 75:
 YY_RULE_SETUP
-#line 714 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 719 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* discarded */ }
 	YY_BREAK
 case 76:
 /* rule 76 can match eol */
 YY_RULE_SETUP
-#line 715 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 720 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
     LPC_YYLESS(0);
 }
 	YY_BREAK
 case YY_STATE_EOF(SC_DIRECTIVE_LINE_COMMENT):
-#line 719 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 724 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
 }
@@ -5531,19 +5536,19 @@ case YY_STATE_EOF(SC_DIRECTIVE_LINE_COMMENT):
 case 77:
 /* rule 77 can match eol */
 YY_RULE_SETUP
-#line 726 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 731 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     lpc_lex_newline(yyscanner);
 }
 	YY_BREAK
 case 78:
 YY_RULE_SETUP
-#line 730 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 735 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->directive_accum.append(yytext, yyleng); }
 	YY_BREAK
 case 79:
 YY_RULE_SETUP
-#line 731 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 736 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += yytext[0];
     BEGIN(SC_DIRECTIVE_WORD);
@@ -5551,7 +5556,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 80:
 YY_RULE_SETUP
-#line 735 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 740 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     LPC_YYLESS(0);
     BEGIN(SC_DIRECTIVE_DATA);
@@ -5559,14 +5564,14 @@ YY_RULE_SETUP
 	YY_BREAK
 case 81:
 YY_RULE_SETUP
-#line 740 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 745 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum.append(yytext, yyleng);
 }
 	YY_BREAK
 case 82:
 YY_RULE_SETUP
-#line 743 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 748 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum.append(yytext, yyleng);
     BEGIN(SC_DIRECTIVE_DATA);
@@ -5574,7 +5579,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 83:
 YY_RULE_SETUP
-#line 747 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 752 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     LPC_YYLESS(0);
     BEGIN(SC_DIRECTIVE_DATA);
@@ -5588,14 +5593,14 @@ YY_RULE_SETUP
      * literal. */
 case 84:
 YY_RULE_SETUP
-#line 758 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 763 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum.append(yytext, yyleng);
 }
 	YY_BREAK
 case 85:
 YY_RULE_SETUP
-#line 761 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 766 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '"';
     yy_push_state(SC_DIRECTIVE_STRING, yyscanner);
@@ -5603,7 +5608,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 86:
 YY_RULE_SETUP
-#line 765 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 770 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '`';
     yy_push_state(SC_DIRECTIVE_TEMPLATE, yyscanner);
@@ -5611,12 +5616,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 87:
 YY_RULE_SETUP
-#line 769 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 774 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->directive_accum += yytext[0]; }
 	YY_BREAK
 case 88:
 YY_RULE_SETUP
-#line 771 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 776 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '"';
     yy_pop_state(yyscanner);
@@ -5624,7 +5629,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 89:
 YY_RULE_SETUP
-#line 775 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 780 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '`';
     yy_pop_state(yyscanner);
@@ -5633,35 +5638,35 @@ YY_RULE_SETUP
 case 90:
 /* rule 90 can match eol */
 YY_RULE_SETUP
-#line 779 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 784 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     lpc_lex_newline(yyscanner);
 }
 	YY_BREAK
 case 91:
 YY_RULE_SETUP
-#line 782 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 787 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum.append(yytext, yyleng);
 }
 	YY_BREAK
 case 92:
 YY_RULE_SETUP
-#line 785 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 790 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum.append(yytext, yyleng);
 }
 	YY_BREAK
 case 93:
 YY_RULE_SETUP
-#line 788 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 793 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum.append(yytext, yyleng);
 }
 	YY_BREAK
 case 94:
 YY_RULE_SETUP
-#line 791 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 796 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yyextra->directive_accum += '\\';
 }
@@ -5669,7 +5674,7 @@ YY_RULE_SETUP
 case 95:
 /* rule 95 can match eol */
 YY_RULE_SETUP
-#line 794 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 799 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
     LPC_YYLESS(0);
@@ -5677,7 +5682,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case YY_STATE_EOF(SC_DIRECTIVE_STRING):
 case YY_STATE_EOF(SC_DIRECTIVE_TEMPLATE):
-#line 798 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 803 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
 }
@@ -5685,7 +5690,7 @@ case YY_STATE_EOF(SC_DIRECTIVE_TEMPLATE):
 case 96:
 /* rule 96 can match eol */
 YY_RULE_SETUP
-#line 802 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 807 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
     lpc_lex_newline(yyscanner);
@@ -5707,7 +5712,7 @@ YY_RULE_SETUP
 case YY_STATE_EOF(SC_DIRECTIVE):
 case YY_STATE_EOF(SC_DIRECTIVE_WORD):
 case YY_STATE_EOF(SC_DIRECTIVE_DATA):
-#line 820 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 825 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
     yy_pop_state(yyscanner);
     LpcDirectiveAction act = lpc_lex_on_directive(
@@ -5728,18 +5733,18 @@ case YY_STATE_EOF(SC_DIRECTIVE_DATA):
      * ties with it, and the directive rule is written first. */
 case 97:
 YY_RULE_SETUP
-#line 838 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 843 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* dead-branch line */ }
 	YY_BREAK
 case 98:
 YY_RULE_SETUP
-#line 839 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 844 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* dead-branch remainder */ }
 	YY_BREAK
 case 99:
 /* rule 99 can match eol */
 YY_RULE_SETUP
-#line 840 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 845 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { lpc_lex_newline(yyscanner); }
 	YY_BREAK
 /* Heredoc "@"/"@@" prefix and terminator identifier: fully native, no
@@ -5750,7 +5755,7 @@ YY_RULE_SETUP
      * still detected even though that rule then never fires. */
 case 100:
 YY_RULE_SETUP
-#line 848 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 853 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           yyextra->heredoc_terminator.clear();
           yyextra->heredoc_is_array = (yyleng == 2);
@@ -5759,13 +5764,13 @@ YY_RULE_SETUP
 	YY_BREAK
 case 101:
 YY_RULE_SETUP
-#line 853 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 858 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yyextra->heredoc_terminator.assign(yytext, yyleng); }
 	YY_BREAK
 case 102:
 /* rule 102 can match eol */
 YY_RULE_SETUP
-#line 854 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 859 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           /* parseHeredoc() reads the body through lpc_lex_getc() (Flex's
            * own stream), so no rewind/flush choreography is needed here
@@ -5796,11 +5801,11 @@ YY_RULE_SETUP
      * original does. */
 case 103:
 YY_RULE_SETUP
-#line 881 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 886 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { /* consumed; next scan decides via <<EOF>> or "." below */ }
 	YY_BREAK
 case YY_STATE_EOF(SC_HEREDOC_TERM):
-#line 882 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 887 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           if (!lpc_lex_pop_splice_if_any(yyscanner)) {
             // Matches the original: EOF anywhere before the trailing
@@ -5814,7 +5819,7 @@ case YY_STATE_EOF(SC_HEREDOC_TERM):
 	YY_BREAK
 case 104:
 YY_RULE_SETUP
-#line 892 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 897 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           // Non-whitespace, non-newline byte right after the terminator
           // name (or immediately after "@"/"@@"): the original leaves it
@@ -5831,177 +5836,177 @@ YY_RULE_SETUP
 	YY_BREAK
 case 105:
 YY_RULE_SETUP
-#line 906 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 911 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = '+'; return L_INC_DEC; }
 	YY_BREAK
 case 106:
 YY_RULE_SETUP
-#line 907 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 912 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_ADD_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 107:
 YY_RULE_SETUP
-#line 908 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 913 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '+'; }
 	YY_BREAK
 case 108:
 YY_RULE_SETUP
-#line 909 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 914 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_ARROW; }
 	YY_BREAK
 case 109:
 YY_RULE_SETUP
-#line 910 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 915 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = '-'; return L_INC_DEC; }
 	YY_BREAK
 case 110:
 YY_RULE_SETUP
-#line 911 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 916 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_SUB_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 111:
 YY_RULE_SETUP
-#line 912 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 917 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '-'; }
 	YY_BREAK
 case 112:
 YY_RULE_SETUP
-#line 914 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 919 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_LAND_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 113:
 YY_RULE_SETUP
-#line 915 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 920 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_LAND; }
 	YY_BREAK
 case 114:
 YY_RULE_SETUP
-#line 916 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 921 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_AND_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 115:
 YY_RULE_SETUP
-#line 917 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 922 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '&'; }
 	YY_BREAK
 case 116:
 YY_RULE_SETUP
-#line 919 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 924 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_LOR_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 117:
 YY_RULE_SETUP
-#line 920 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 925 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_LOR; }
 	YY_BREAK
 case 118:
 YY_RULE_SETUP
-#line 921 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 926 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_OR_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 119:
 YY_RULE_SETUP
-#line 922 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 927 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '|'; }
 	YY_BREAK
 case 120:
 YY_RULE_SETUP
-#line 924 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 929 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_XOR_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 121:
 YY_RULE_SETUP
-#line 925 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 930 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '^'; }
 	YY_BREAK
 case 122:
 YY_RULE_SETUP
-#line 927 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 932 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_LSH_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 123:
 YY_RULE_SETUP
-#line 928 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 933 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_LSH; return L_SHIFT; }
 	YY_BREAK
 case 124:
 YY_RULE_SETUP
-#line 929 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 934 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_LE; return L_ORDER; }
 	YY_BREAK
 case 125:
 YY_RULE_SETUP
-#line 930 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 935 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '<'; }
 	YY_BREAK
 case 126:
 YY_RULE_SETUP
-#line 932 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 937 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_RSH_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 127:
 YY_RULE_SETUP
-#line 933 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 938 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_RSH; return L_SHIFT; }
 	YY_BREAK
 case 128:
 YY_RULE_SETUP
-#line 934 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 939 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_GE; return L_ORDER; }
 	YY_BREAK
 case 129:
 YY_RULE_SETUP
-#line 935 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 940 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_GT; return L_ORDER; }
 	YY_BREAK
 case 130:
 YY_RULE_SETUP
-#line 937 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 942 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_MULT_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 131:
 YY_RULE_SETUP
-#line 938 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 943 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '*'; }
 	YY_BREAK
 case 132:
 YY_RULE_SETUP
-#line 940 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 945 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_MOD_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 133:
 YY_RULE_SETUP
-#line 941 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 946 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '%'; }
 	YY_BREAK
 case 134:
 YY_RULE_SETUP
-#line 943 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 948 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_DIV_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 135:
 YY_RULE_SETUP
-#line 944 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 949 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '/'; }
 	YY_BREAK
 case 136:
 YY_RULE_SETUP
-#line 946 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 951 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_EQ; return L_EQ_NE; }
 	YY_BREAK
 case 137:
 YY_RULE_SETUP
-#line 947 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 952 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_ASSIGN; return L_ASSIGN; }
 	YY_BREAK
 case 138:
 YY_RULE_SETUP
-#line 949 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 954 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_NULLISH_EQ; return L_ASSIGN; }
 	YY_BREAK
 case 139:
 YY_RULE_SETUP
-#line 950 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 955 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_QUESTION_QUESTION; }
 	YY_BREAK
 /* Optional chaining "?." (mapping member/bracket access, e.g. m?.key,
@@ -6013,42 +6018,42 @@ case 140:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 2;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 955 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 960 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_OPTIONAL_DOT; }
 	YY_BREAK
 case 141:
 YY_RULE_SETUP
-#line 956 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 961 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '?'; }
 	YY_BREAK
 case 142:
 YY_RULE_SETUP
-#line 958 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 963 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { yylval_param->number = F_NE; return L_EQ_NE; }
 	YY_BREAK
 case 143:
 YY_RULE_SETUP
-#line 959 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 964 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '!'; }
 	YY_BREAK
 case 144:
 YY_RULE_SETUP
-#line 961 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 966 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_COLON_COLON; }
 	YY_BREAK
 case 145:
 YY_RULE_SETUP
-#line 962 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 967 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return ':'; }
 	YY_BREAK
 case 146:
 YY_RULE_SETUP
-#line 964 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 969 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_DOT_DOT_DOT; }
 	YY_BREAK
 case 147:
 YY_RULE_SETUP
-#line 965 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 970 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_RANGE; }
 	YY_BREAK
 /* Optional chaining bracket form "m.?[idx]" -- the only grammar
@@ -6057,17 +6062,17 @@ YY_RULE_SETUP
      * a literal '?' right after '.' was already a syntax error otherwise. */
 case 148:
 YY_RULE_SETUP
-#line 970 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 975 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return L_DOT_OPTIONAL; }
 	YY_BREAK
 case 149:
 YY_RULE_SETUP
-#line 971 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 976 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '.'; }
 	YY_BREAK
 case 150:
 YY_RULE_SETUP
-#line 973 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 978 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return ')'; }
 	YY_BREAK
 /* '{'/'}' inside a template literal's ${...} interpolation need brace-
@@ -6076,7 +6081,7 @@ YY_RULE_SETUP
      * expression itself. See SC_TEMPLATE_BODY above. */
 case 151:
 YY_RULE_SETUP
-#line 978 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 983 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           lpc_lex_brace_open(yyscanner);
           return '{';
@@ -6084,7 +6089,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 152:
 YY_RULE_SETUP
-#line 982 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 987 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           if (!lpc_lex_brace_close(yyscanner)) return '}';
           /* This '}' ends a template interpolation: swallow it, switch
@@ -6097,32 +6102,32 @@ YY_RULE_SETUP
 	YY_BREAK
 case 153:
 YY_RULE_SETUP
-#line 991 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 996 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '['; }
 	YY_BREAK
 case 154:
 YY_RULE_SETUP
-#line 992 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 997 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return ']'; }
 	YY_BREAK
 case 155:
 YY_RULE_SETUP
-#line 993 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 998 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return ';'; }
 	YY_BREAK
 case 156:
 YY_RULE_SETUP
-#line 994 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 999 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return ','; }
 	YY_BREAK
 case 157:
 YY_RULE_SETUP
-#line 995 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1000 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 { return '~'; }
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(SC_COND_SKIP):
-#line 997 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1002 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           if (lpc_lex_pushed_depth() > 0) {
             if (lpc_lex_top_buffer_kind() == LPC_BUF_IF_EXPR) {
@@ -6148,7 +6153,7 @@ case YY_STATE_EOF(SC_COND_SKIP):
 	YY_BREAK
 case 158:
 YY_RULE_SETUP
-#line 1020 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1025 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           // Nothing above matched: genuinely invalid input. No outp
           // rewind/flush needed -- lpc_lex_badlex() only inspects the
@@ -6158,10 +6163,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 159:
 YY_RULE_SETUP
-#line 1027 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 6164 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 6170 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -7334,7 +7339,7 @@ static int yy_flex_strlen (const char * s , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 1027 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 
 
 // Where the scanner's held character belongs. During a rule action Flex
@@ -7589,4 +7594,4 @@ void lpc_lex_reset(void *yyscanner) {
 }
 
 
-/* FluffOS generated-from lexer.l sha256=14ae493095982ca087258718f8ccd33890d127321a66da72e509bc90ba4b10e3 */
+/* FluffOS generated-from lexer.l sha256=546b0a740cd32011d821bd8940bcf130a868a20ff44a04ad64acc6daf4a863ff */
