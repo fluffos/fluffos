@@ -1901,7 +1901,8 @@ void hook_dispatch_function_after(object_t* target, const char* fn, const char* 
 }
 
 bool hook_dispatch_function_around(object_t* target, const char* fn, const char* origin, int num_arg,
-                                   program_t* prog, unsigned short address, function_t* funp) {
+                                   program_t* prog, unsigned short address, function_t* funp,
+                                   int fio, int vio) {
   if (!(g_hook_mask & HOOK_MASK_LPC_FUNC) || !prog || !funp) {
     return false;
   }
@@ -1949,8 +1950,8 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
   g_around.prog = prog;
   g_around.address = address;
   g_around.funp = funp;
-  g_around.function_index_offset = function_index_offset;
-  g_around.variable_index_offset = variable_index_offset;
+  g_around.function_index_offset = fio;
+  g_around.variable_index_offset = vio;
   g_around.saved_args = std::move(saved);
   DEFER {
     for (auto& sv : g_around.saved_args) {

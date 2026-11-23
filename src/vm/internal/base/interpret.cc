@@ -1843,7 +1843,8 @@ void setup_varargs_variables(int actual, int local, int num_arg) {
 
 // Return function_t for findex, walking up the inheritance tree if necessary
 // TODO: return nullptr if not found
-std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex) {
+std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex, int* fio,
+                                                 int* vio) {
   if (findex < 0 || findex > prog->last_inherited + prog->num_functions_defined) {
     return std::make_pair(nullptr, 0);
   }
@@ -1866,6 +1867,12 @@ std::pair<program_t*, int> get_function_at_index(program_t* prog, int findex) {
       }
     }
     findex -= prog->inherit[low].function_index_offset;
+    if (fio) {
+      *fio += prog->inherit[low].function_index_offset;
+    }
+    if (vio) {
+      *vio += prog->inherit[low].variable_index_offset;
+    }
     prog = prog->inherit[low].prog;
   }
   findex -= prog->last_inherited;
@@ -4179,7 +4186,10 @@ void eval_instruction(char* p) {
         auto pushed_args = EXTRACT_UCHAR(pc++) + num_varargs;
         num_varargs = 0;
 
-        auto result = get_function_at_index(current_object->prog, offset);
+        /* The offsets setup_new_frame() will compute, for an AROUND hook */
+        int callee_fio = 0;
+        int callee_vio = 0;
+        auto result = get_function_at_index(current_object->prog, offset, &callee_fio, &callee_vio);
         auto* progp = result.first;
         auto* funcp = &progp->function_table[result.second];
         DEBUG_CHECK(!progp || !funcp, "BUG: Invalid Program or Illegal function index.");
@@ -4216,7 +4226,7 @@ void eval_instruction(char* p) {
           }
           if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
               hook_dispatch_function_around(current_object, fname, "local", pushed_args, progp,
-                                            funcp->address, funcp)) {
+                                            funcp->address, funcp, callee_fio, callee_vio)) {
             break;
           }
         }
@@ -4265,6 +4275,11 @@ void eval_instruction(char* p) {
         bool inherited_is_async = false;
         program_t* inh_def_prog = nullptr;
         function_t* inh_def_funp = nullptr;
+        /* The offsets the frame below will run at, for an AROUND hook: this
+         * frame's, plus the inherit's, plus whatever setup_inherited_frame()
+         * walks inside temp_prog. */
+        int inh_fio = function_index_offset + ip->function_index_offset;
+        int inh_vio = variable_index_offset + ip->variable_index_offset;
         {
           int roff = offset;
           if (temp_prog->function_flags[roff] & FUNC_ALIAS) {
@@ -4273,7 +4288,7 @@ void eval_instruction(char* p) {
           auto rflags = temp_prog->function_flags[roff];
           inherited_is_async = (rflags & FUNC_ASYNC) != 0;
           if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
-            auto result = get_function_at_index(temp_prog, roff);
+            auto result = get_function_at_index(temp_prog, roff, &inh_fio, &inh_vio);
             if (result.first != nullptr) {
               inh_def_prog = result.first;
               inh_def_funp = &result.first->function_table[result.second];
@@ -4314,7 +4329,8 @@ void eval_instruction(char* p) {
           }
           if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
               hook_dispatch_function_around(current_object, fname, "local", pushed_args,
-                                            inh_def_prog, inh_def_funp->address, inh_def_funp)) {
+                                            inh_def_prog, inh_def_funp->address, inh_def_funp,
+                                            inh_fio, inh_vio)) {
             break;
           }
         }
@@ -5621,6 +5637,9 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
   bool is_async = false;
   program_t* def_prog = nullptr;
   function_t* def_funp = nullptr;
+  /* The offsets setup_new_frame() will compute, for an AROUND hook */
+  int def_fio = 0;
+  int def_vio = 0;
   {
     int roff = offset;
     if (prog->function_flags[roff] & FUNC_ALIAS) {
@@ -5629,7 +5648,7 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
     auto rflags = prog->function_flags[roff];
     is_async = (rflags & FUNC_ASYNC) != 0;
     if (!(rflags & (FUNC_PROTOTYPE | FUNC_UNDEFINED))) {
-      auto result = get_function_at_index(prog, roff);
+      auto result = get_function_at_index(prog, roff, &def_fio, &def_vio);
       if (result.first != nullptr) {
         def_prog = result.first;
         def_funp = &result.first->function_table[result.second];
@@ -5669,7 +5688,7 @@ void call_direct(object_t* ob, int offset, int origin, int num_arg) {
     }
     if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
         hook_dispatch_function_around(ob, fname, oname, num_arg, def_prog, def_funp->address,
-                                      def_funp)) {
+                                      def_funp, def_fio, def_vio)) {
       return;
     }
   }

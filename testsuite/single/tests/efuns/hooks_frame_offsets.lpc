@@ -1,0 +1,76 @@
+#include <hooks.h>
+
+/* A function hook must not disturb the variable and function offsets frames
+ * run at (#1475).
+ *
+ * BEFORE: apply_low() set the callee's offsets before pushing the callee's
+ * frame, so the frame saved them in place of the caller's, and the caller
+ * resumed with the callee's. Its next global read hit the wrong slot.
+ *
+ * AROUND: proceed() ran the body at the offsets live when the hook was
+ * dispatched. Except from apply_low(), those were the caller's, not those of
+ * the program defining the hooked function.
+ *
+ * base_get() is inherited behind three variables, so it runs at variable
+ * offset 3, and this object has more than 3 globals so a misplaced read
+ * returns a wrong value instead of aborting the driver. */
+
+#define CALLEE "/clone/hook_offsets_callee"
+
+int g0 = 10, g1 = 11, g2 = 12, g3 = 13, g4 = 14, g5 = 15;
+int *hooks = ({});
+
+mixed on_around(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return hook_proceed();
+}
+
+private void run_checks() {
+  object callee = load_object(CALLEE);
+
+  // Any function BEFORE hook sends every call_other through the hook path;
+  // this one names an object that does not exist, as in the report.
+  hooks += ({ hook_attach("function", "count",
+    ([ "label": "offsets-before", "target": "clone/no_such_object", "function": "init" ]),
+    HOOK_BEFORE) });
+
+  // Read the globals straight into locals: an ASSERT_EQ() makes calls of its
+  // own, which could put the right offsets back before the global is read.
+  {
+    int got = callee->base_get();
+    int after_inherited = g0;
+    int sum = callee->pad_sum();
+    int after_first = g1;
+
+    ASSERT_EQ(7, got);
+    ASSERT_EQ(10, after_inherited);
+    ASSERT_EQ(306, sum);
+    ASSERT_EQ(11, after_first);
+  }
+
+  // AROUND that proceeds into base_get(), reached by each call route.
+  hooks += ({ hook_attach("function", (: on_around :),
+    ([ "label": "offsets-around", "object": callee, "function": "base_get" ]), HOOK_AROUND) });
+
+  {
+    int got = callee->base_get();
+    int after_around = g2;
+
+    ASSERT_EQ(7, got);
+    ASSERT_EQ(12, after_around);
+  }
+  ASSERT_EQ(7, callee->via_local());
+  ASSERT_EQ(7, callee->via_inherited());
+  ASSERT_EQ(7, callee->via_pointer());
+}
+
+void do_tests() {
+  mixed err = catch(run_checks());
+
+  foreach (int id in hooks) {
+    hook_detach(id);
+  }
+  hooks = ({});
+  if (err) {
+    error(err);
+  }
+}

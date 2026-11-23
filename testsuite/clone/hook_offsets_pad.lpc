@@ -1,0 +1,5 @@
+// Fixture for single/tests/efuns/hooks_frame_offsets.lpc: inherited first, so
+// everything hook_offsets_base defines runs at a nonzero variable offset.
+int pad_a = 101, pad_b = 102, pad_c = 103;
+
+int pad_sum() { return pad_a + pad_b + pad_c; }

@@ -411,11 +411,14 @@ retry_for_shadow:
           error("Function call refused by hook.\n");
         }
       }
-      function_index_offset = entry.function_index_offset;
-      variable_index_offset = entry.variable_index_offset;
+      /* Pass the callee's offsets; do not load them yet. push_control_stack()
+       * below saves the LIVE offsets as the caller's to restore on return,
+       * so setting them here made the caller resume at the callee's offsets
+       * (#1475). */
       if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
           hook_dispatch_function_around(named_target, fun, origin, num_arg, entry.progp,
-                                        funp->address, funp)) {
+                                        funp->address, funp, entry.function_index_offset,
+                                        entry.variable_index_offset)) {
         return 1;
       }
     }

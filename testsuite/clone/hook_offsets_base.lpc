@@ -1,0 +1,4 @@
+// Fixture for single/tests/efuns/hooks_frame_offsets.lpc.
+int base_val = 7;
+
+int base_get() { return base_val; }
