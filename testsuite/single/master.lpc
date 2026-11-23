@@ -143,7 +143,7 @@ void flag(string str) {
   mixed error;
   string cmd, arg;
 
-  if (sscanf(str, "%(test|speed):%s", cmd, arg) != 2)
+  if (sscanf(str, "%(test|speed|chaos):%s", cmd, arg) != 2)
     cmd = str;
 
   switch (cmd) {
@@ -155,6 +155,17 @@ void flag(string str) {
       }
       // Backstop: recorded check failures fail the run even if the
       // runner's own recap/shutdown path was skipped somehow.
+      if (sizeof(test_failures)) {
+        has_error = 1;
+      }
+      break;
+    case "chaos":
+      // The suite under recompile chaos (/command/chaos.lpc).
+      error = catch("/command/tests"->main_chaos(arg));
+      if (error) {
+        has_error = 1;
+        write(error);
+      }
       if (sizeof(test_failures)) {
         has_error = 1;
       }
@@ -175,7 +186,7 @@ void flag(string str) {
       }
       break;
     default:
-      write("The only supported flag is 'test' and 'speed', got '" + str + "'.\n");
+      write("The only supported flags are 'test', 'chaos' and 'speed', got '" + str + "'.\n");
       break;
   }
   // A deferred recap means latched work is still outstanding and the

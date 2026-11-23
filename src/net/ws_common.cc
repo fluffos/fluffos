@@ -87,7 +87,10 @@ int ws_handle_established(struct lws* wsi, ws_session* pss,
     }
   }
 
-  const char* peer = sockaddr_to_string(reinterpret_cast<sockaddr*>(&addr), addrlen);
+  /* Copied out of sockaddr_to_string()'s shared static buffer: the
+   * net:ws_upgrade handlers run LPC that can format another address. */
+  std::string const peer_str = sockaddr_to_string(reinterpret_cast<sockaddr*>(&addr), addrlen);
+  const char* peer = peer_str.c_str();
   if ((g_hook_mask & HOOK_MASK_NET_WS_UPGRADE) && !hook_dispatch_net_ws_upgrade(peer)) {
     lwsl_warn("LWS_CALLBACK_ESTABLISHED: refused by net:ws_upgrade hook: %s\n", peer);
     return -1;

@@ -528,7 +528,16 @@ funptr_t* make_functional_funp(short num_arg, short num_local, short len, svalue
   return fp;
 }
 
+/* dispatch_hooks is false only for the redo of a call whose function hooks
+ * already ran and recompiled the owner (see hook_call_target_state()); that
+ * call's num_arg already includes the pointer's bound args. */
+static svalue_t* call_function_pointer_impl(funptr_t* funp, int num_arg, bool dispatch_hooks);
+
 svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
+  return call_function_pointer_impl(funp, num_arg, true);
+}
+
+static svalue_t* call_function_pointer_impl(funptr_t* funp, int num_arg, bool dispatch_hooks) {
   array_t* v;
 
   if (!funp->hdr.owner || (funp->hdr.owner->flags & O_DESTRUCTED)) {
@@ -560,7 +569,9 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       break;
   }
   setup_fake_frame(funp);
-  if ((v = funp->hdr.args)) {
+  /* A redo (!dispatch_hooks) re-enters with the bound args already merged
+   * into the num_arg on the stack. */
+  if (dispatch_hooks && (v = funp->hdr.args)) {
     check_for_destr(v);
     num_arg = merge_arg_lists(num_arg, v, 0);
   }
@@ -700,9 +711,14 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
       }
 
       object_t* target = funp->hdr.owner;
-      if (def_funp && target &&
+      if (dispatch_hooks && def_funp && target &&
           (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
-        const char* fname = def_funp->funcname;
+        /* A copy: the name lives in the owner's program, which a handler can
+         * free by recompiling the owner while later attachments still match
+         * against it. */
+        std::string const fname_copy = def_funp->funcname;
+        const char* fname = fname_copy.c_str();
+        uint32_t const prog_generation = target->prog_generation;
         if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
           svalue_t answered{};
           HookGateResult gr =
@@ -733,6 +749,23 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
             error("Function call refused by hook.\n");
           }
         }
+        /* def_prog/def_funp and f.local.index describe the owner's program
+         * from before the handlers ran: checked before AROUND (which reads
+         * def_funp) and after. A destructed owner answers 0; a recompiled one
+         * is called again, without the hooks, which have had their say --
+         * the stale-pointer check at the top re-resolves the function by
+         * name in the new program. */
+        HookTargetState state = hook_call_target_state(target, prog_generation, num_arg);
+        if (state == HookTargetState::Destructed) {
+          free_svalue(&apply_ret_value, "call_function_pointer");
+          apply_ret_value = const0;
+          remove_fake_frame();
+          return &apply_ret_value;
+        }
+        if (state == HookTargetState::Recompiled) {
+          remove_fake_frame();
+          return call_function_pointer_impl(funp, num_arg, false);
+        }
         if ((g_hook_mask & HOOK_MASK_LPC_FUNC_AROUND) &&
             hook_dispatch_function_around(target, fname, "function_pointer", num_arg, def_prog,
                                           def_funp->address, def_funp, def_fio, def_vio)) {
@@ -740,6 +773,17 @@ svalue_t* call_function_pointer(funptr_t* funp, int num_arg) {
           apply_ret_value = *sp--;
           remove_fake_frame();
           return &apply_ret_value;
+        }
+        state = hook_call_target_state(target, prog_generation, num_arg);
+        if (state == HookTargetState::Destructed) {
+          free_svalue(&apply_ret_value, "call_function_pointer");
+          apply_ret_value = const0;
+          remove_fake_frame();
+          return &apply_ret_value;
+        }
+        if (state == HookTargetState::Recompiled) {
+          remove_fake_frame();
+          return call_function_pointer_impl(funp, num_arg, false);
         }
       }
 

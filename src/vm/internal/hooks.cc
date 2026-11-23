@@ -349,8 +349,17 @@ struct AroundState {
   function_t* funp = nullptr;
   int function_index_offset = 0;
   int variable_index_offset = 0;
+  /* The definition's FUNC_* flags, and target->prog_generation at dispatch:
+   * prog/funp/address are only valid while it is unchanged. */
+  int function_flags = 0;
+  uint32_t prog_generation = 0;
   /* Original call args parked while the handler runs (moved, not copied). */
   std::vector<svalue_t> saved_args;
+  /* What hook_proceed() made of the body: raised (with its error message),
+   * or returned (with a copy of its result). */
+  bool body_raised = false;
+  std::string body_error;
+  vm::Value body_result;
 };
 AroundState g_around;
 
@@ -1533,13 +1542,10 @@ void mark_hooks() {
       a->owner->extra_ref++;
     }
     if (a->fp) {
+      /* Only the funptr itself: check_memory() marks every live funptr's
+       * owner and bound args when it sweeps TAG_FUNP blocks (mark_funp), so
+       * marking them here too counted them twice. */
       a->fp->hdr.extra_ref++;
-      if (a->fp->hdr.owner) {
-        a->fp->hdr.owner->extra_ref++;
-      }
-      if (a->fp->hdr.args) {
-        a->fp->hdr.args->extra_ref++;
-      }
     }
     if (a->filter_object) {
       a->filter_object->extra_ref++;
@@ -1900,6 +1906,19 @@ void hook_dispatch_function_after(object_t* target, const char* fn, const char* 
   }
 }
 
+HookTargetState hook_call_target_state(object_t* ob, uint32_t generation, int num_arg) {
+  if (ob->flags & O_DESTRUCTED) {
+    pop_n_elems(num_arg);
+    return HookTargetState::Destructed;
+  }
+  /* recompile_object() refuses only while a frame runs the old program, and
+   * this call has no frame yet. */
+  if (ob->prog_generation != generation) {
+    return HookTargetState::Recompiled;
+  }
+  return HookTargetState::Unchanged;
+}
+
 bool hook_dispatch_function_around(object_t* target, const char* fn, const char* origin, int num_arg,
                                    program_t* prog, unsigned short address, function_t* funp,
                                    int fio, int vio) {
@@ -1927,6 +1946,14 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
   if (!around) {
     return false;
   }
+  int const function_flags =
+      prog->function_flags[prog->last_inherited + static_cast<int>(funp - prog->function_table)];
+  if (function_flags & FUNC_ASYNC) {
+    /* hook_proceed() runs the body synchronously on the hook stack; it cannot
+     * give an async function its own coroutine and promise. */
+    around->skipped++;
+    return false;
+  }
 
   /* Park call args, invoke AROUND handler. Result of handler (or proceed) becomes
    * the call result on the stack. */
@@ -1952,6 +1979,8 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
   g_around.funp = funp;
   g_around.function_index_offset = fio;
   g_around.variable_index_offset = vio;
+  g_around.function_flags = function_flags;
+  g_around.prog_generation = target->prog_generation;
   g_around.saved_args = std::move(saved);
   DEFER {
     for (auto& sv : g_around.saved_args) {
@@ -1965,7 +1994,21 @@ bool hook_dispatch_function_around(object_t* target, const char* fn, const char*
   HookRun run = hook_call(around, n, &result);
   if (run != HookRun::Ran) {
     free_svalue(&result, "hook around fail");
-    /* Error / skip / promise: restore args and let the real body run. */
+    if (g_around.proceeded) {
+      /* The body already ran through hook_proceed(); running it again would
+       * repeat its side effects. End the call as it ended unhooked: with the
+       * body's error if it raised one, otherwise with its result. */
+      if (g_around.body_raised) {
+        std::string const msg = g_around.body_error;
+        error("%s", msg.empty() ? "hook_proceed: the hooked function raised an error.\n"
+                                : msg.c_str() + (msg[0] == '*' ? 1 : 0));
+      }
+      push_svalue(g_around.body_result.get());
+      hook_dispatch_function_after(target, fn, origin, 0);
+      return true;
+    }
+    /* Error / skip / promise before proceeding: restore args and let the
+     * real body run. */
     for (auto& sv : g_around.saved_args) {
       push_svalue(&sv);
     }
@@ -2457,6 +2500,10 @@ vm::Value f_hook_proceed(vm::EfunArgs& f, std::optional<array_t*> replacement_ar
   if (g_around.target->flags & O_DESTRUCTED) {
     error("hook_proceed: target object is destructed.\n");
   }
+  if (g_around.target->prog_generation != g_around.prog_generation) {
+    /* prog/funp/address point into the program the target had before. */
+    error("hook_proceed: /%s was recompiled.\n", g_around.target->obname);
+  }
 
   /* Optional replacement args: hook_proceed(mixed *args) */
   std::vector<vm::Value> use_args;
@@ -2484,30 +2531,63 @@ vm::Value f_hook_proceed(vm::EfunArgs& f, std::optional<array_t*> replacement_ar
   int narg = static_cast<int>(use_args.size());
   int fio = g_around.function_index_offset;
   int vio = g_around.variable_index_offset;
+  int const function_flags = g_around.function_flags;
 
-  for (auto& v : use_args) {
-    push_svalue(v.get());
-    v = vm::Value();
-  }
+  /* Run the body under a catch marker, like invoke_handler() (promise.cc):
+   * an error it raises lands in catch_value instead of being reported as
+   * uncaught, is recorded, and is raised again from here -- to the handler,
+   * which may catch it, and, if it does not, by the dispatcher to the
+   * original caller, which is where an unhooked call would have raised it. */
+  error_context_t econ;
+  save_context(&econ);
+  push_control_stack(FRAME_CATCH);
+  try {
+    for (auto& v : use_args) {
+      push_svalue(v.get());
+      v = vm::Value();
+    }
+    /* Replacement args get the declared defaults like any call (the parked
+     * originals already have them, so this is then a no-op). */
+    narg = fill_default_args(prog, funp, function_flags, narg);
 
-  /* Run the real body; eval_instruction marks this frame FRAME_EXTERNAL so
-   * F_RETURN unwinds back here. */
-  push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
-  current_prog = prog;
-  function_index_offset = fio;
-  variable_index_offset = vio;
-  caller_type = ORIGIN_DRIVER;
-  csp->num_local_variables = narg;
-  csp->fr.table_index = funp - prog->function_table;
-  previous_ob = current_object;
-  current_object = target;
-  if (funp->num_arg || funp->num_local) {
-    setup_variables(narg, funp->num_local, funp->num_arg);
-  } else {
-    setup_variables(narg, 0, narg);
+    /* Run the real body; eval_instruction marks this frame FRAME_EXTERNAL so
+     * F_RETURN unwinds back here. */
+    push_control_stack(FRAME_FUNCTION | FRAME_OB_CHANGE);
+    current_prog = prog;
+    function_index_offset = fio;
+    variable_index_offset = vio;
+    caller_type = ORIGIN_DRIVER;
+    csp->num_local_variables = narg;
+    csp->fr.table_index = funp - prog->function_table;
+    previous_ob = current_object;
+    current_object = target;
+    if (function_flags & FUNC_TRUE_VARARGS) {
+      setup_varargs_variables(narg, funp->num_local, funp->num_arg);
+    } else if (funp->num_arg || funp->num_local) {
+      setup_variables(narg, funp->num_local, funp->num_arg);
+    } else {
+      setup_variables(narg, 0, narg);
+    }
+    call_program(prog, address);
+    pop_control_stack(); /* the FRAME_CATCH marker */
+    pop_context(&econ);
+  } catch (const char*) {
+    svalue_t caught = catch_value;
+    catch_value = const1;
+    restore_context(&econ);
+    pop_context(&econ);
+    too_deep_error = 0;
+    g_around.body_raised = true;
+    g_around.body_error = caught.type == T_STRING ? caught.u.string : "";
+    free_svalue(&caught, "hook_proceed: body error");
+    std::string const& msg = g_around.body_error;
+    error("%s", msg.empty() ? "hook_proceed: the hooked function raised an error.\n"
+                            : msg.c_str() + (msg[0] == '*' ? 1 : 0));
   }
-  call_program(prog, address);
-  return f.take_pushed();
+  g_around.body_raised = false;
+  vm::Value r = f.take_pushed();
+  g_around.body_result = vm::Value::copy(r.get());
+  return r;
 }
 
 void hooks_owner_destructed(object_t* ob) {

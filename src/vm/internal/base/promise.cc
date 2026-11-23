@@ -1072,6 +1072,9 @@ void free_coroutine(lpc_coroutine_t* coro, svalue_t* reject_with, bool run_lpc,
   }
   free_promise(coro->result_promise);
   free_object(&coro->ob, "free_coroutine");
+  if (coro->hook_target) {
+    free_object(&coro->hook_target, "free_coroutine");
+  }
   if (coro->prev_ob) {
     free_object(&coro->prev_ob, "free_coroutine");
   }
@@ -1204,7 +1207,9 @@ void resume_coroutine(lpc_coroutine_t* coro, promise_t* source) {
   push_control_stack(async_frkind);
   control_stack_t* const async_frame = csp;
   if (async_frkind & FRAME_HOOKED) {
-    csp->hook_target = coro->hook_target ? coro->hook_target : coro->ob;
+    csp->hook_target =
+        coro->hook_target && !(coro->hook_target->flags & O_DESTRUCTED) ? coro->hook_target
+                                                                          : coro->ob;
   }
   csp->fr.table_index = coro->table_index;
   csp->num_local_variables = coro->num_local_variables;
@@ -2121,7 +2126,11 @@ void coroutine_await_pending(promise_t* awaited) {
   g_coroutine_promise->ref++;
   coro->ob = current_object;
   add_ref(current_object, "coroutine");
-  coro->hook_target = async_frame->hook_target;
+  coro->hook_target = nullptr;
+  if (async_frame->hook_target && async_frame->hook_target != current_object) {
+    coro->hook_target = async_frame->hook_target;
+    add_ref(coro->hook_target, "coroutine hook target");
+  }
   coro->prev_ob = previous_ob;
   if (previous_ob) {
     add_ref(previous_ob, "coroutine");
@@ -2452,6 +2461,9 @@ void push_refed_promise(promise_t* p) {
 void mark_coroutine(lpc_coroutine_t* coro) {
   coro->result_promise->extra_ref++;
   coro->ob->extra_ref++;
+  if (coro->hook_target) {
+    coro->hook_target->extra_ref++;
+  }
   if (coro->prev_ob) {
     coro->prev_ob->extra_ref++;
   }

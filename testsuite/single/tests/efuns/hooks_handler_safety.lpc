@@ -1,0 +1,332 @@
+#include <hooks.h>
+
+/* A function hook's handler runs arbitrary LPC between the driver's lookup of
+ * a call and the call itself, and AROUND runs the call from inside it. These
+ * pin what the driver must not assume across that LPC. */
+
+#define VICTIM "/data/hooks_safety_victim"
+#define VICTIM_FILE VICTIM ".lpc"
+
+int *hooks = ({});
+int runs;
+mixed last_result;
+
+/* --- recompiling the target from a handler -------------------------------- */
+
+void write_victim(int which) {
+  if (which == 1) {
+    write_file(
+      VICTIM_FILE,
+      "int a = 1, b = 2, c = 3, d = 4;\nint f() { return a + b + c + d; }\n"
+      "function query_f() { return (: f :); }\n",
+      1
+    );
+  } else {
+    write_file(
+      VICTIM_FILE,
+      "int x;\nint f() { return 222; }\nfunction query_f() { return (: f :); }\n",
+      1
+    );
+  }
+}
+
+mixed recompile_target(int id, object actor, object caller, object target, string fn, mixed *args) {
+  write_victim(2);
+  recompile_object(target);
+  return 0;
+}
+
+mixed recompile_then_proceed(
+  int id,
+  object actor,
+  object caller,
+  object target,
+  string fn,
+  mixed *args
+) {
+  write_victim(2);
+  recompile_object(target);
+  return hook_proceed();
+}
+
+mixed proceed(int id, object actor, object caller, object target, string fn, mixed *args);
+
+mixed recompile_simul_efuns(
+  int id,
+  object actor,
+  object caller,
+  object target,
+  string fn,
+  mixed *args
+) {
+  recompile_object(find_object("/single/simul_efun"));
+  return 0;
+}
+
+void check_recompile() {
+  object v;
+  mixed err, r;
+
+  // BEFORE: the call had been looked up in the program the handler freed.
+  // It is redone against the new program, as if the recompile had happened
+  // just before the call (the hooks do not run again).
+  write_victim(1);
+  v = load_object(VICTIM);
+  hooks += ({ hook_attach(
+    "function",
+    (: recompile_target :),
+    ([ "object": v, "function": "f" ]),
+    HOOK_BEFORE
+  ) });
+  err = catch(r = v->f());
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(222, r);
+  hook_detach(hooks[<1]);
+
+  // AROUND: hook_proceed() refuses to run the old program's bytecode, so the
+  // handler fails before proceeding and the call runs unwrapped -- against
+  // the new program.
+  write_victim(1);
+  recompile_object(v);
+  hooks += ({ hook_attach(
+    "function",
+    (: recompile_then_proceed :),
+    ([ "object": v, "function": "f" ]),
+    HOOK_AROUND
+  ) });
+  err = catch(r = v->f());
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(222, r);
+  hook_detach(hooks[<1]);
+
+  // Through a function pointer the owner already has a (fake) frame, so the
+  // handler's recompile is refused and the call runs the program it found.
+  write_victim(1);
+  recompile_object(v);
+  hooks += ({ hook_attach(
+    "function",
+    (: recompile_target :),
+    ([ "object": v, "function": "f" ]),
+    HOOK_BEFORE
+  ) });
+  err = catch(r = evaluate(v->query_f()));
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(10, r);
+  hook_detach(hooks[<1]);
+
+  destruct(v);
+  rm(VICTIM_FILE);
+
+  // A simul_efun call (call_direct()): the AROUND dispatch after BEFORE read
+  // the function from the freed program, and the hooks' own name matching
+  // read its name. Redone against the new program, defaults included.
+  hooks += ({ hook_attach("function", (: recompile_simul_efuns :),
+    ([ "target": "single/simul_efun", "function": "defarg_simul" ]), HOOK_BEFORE) });
+  hooks += ({ hook_attach("function", (: proceed :),
+    ([ "target": "single/simul_efun", "function": "defarg_simul" ]), HOOK_AROUND) });
+  ASSERT_EQ(5, defarg_simul(5));
+  ASSERT_EQ(77, defarg_simul());
+  hook_detach(hooks[<1]);
+  hook_detach(hooks[<2]);
+}
+
+/* --- AROUND runs the body exactly once ------------------------------------ */
+
+int body() { runs++; return 5; }
+int body_raises() { runs++; error("body failed\n"); }
+mixed body_varargs(string s, mixed rest...) { return ({ s, rest }); }
+mixed body_defaults(int a, int b: (: 40 :)) { return a + b; }
+async int body_async() { return 9; }
+
+mixed proceed_then_raise(
+  int id,
+  object actor,
+  object caller,
+  object target,
+  string fn,
+  mixed *args
+) {
+  last_result = hook_proceed();
+  error("handler failed after proceeding\n");
+}
+
+mixed proceed(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return hook_proceed();
+}
+
+mixed proceed_catching(int id, object actor, object caller, object target, string fn, mixed *args) {
+  mixed err = catch(hook_proceed());
+  return ({ "handled", err });
+}
+
+mixed proceed_one_arg(int id, object actor, object caller, object target, string fn, mixed *args) {
+  return hook_proceed(({ 2 }));
+}
+
+mixed detach_and_proceed(
+  int id,
+  object actor,
+  object caller,
+  object target,
+  string fn,
+  mixed *args
+) {
+  hook_detach(id);
+  return hook_proceed();
+}
+
+void check_around_once() {
+  mixed err, r;
+
+  // A handler that fails after proceeding: the body has already run once.
+  hooks += ({ hook_attach(
+    "function",
+    (: proceed_then_raise :),
+    ([ "object": this_object(), "function": "body" ]),
+    HOOK_AROUND
+  ) });
+  runs = 0;
+  err = catch(r = this_object()->body());
+  ASSERT_EQ(1, runs);
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(5, r);
+  hook_detach(hooks[<1]);
+
+  // A handler that detaches itself while proceeding (its result is dropped).
+  hooks += ({ hook_attach(
+    "function",
+    (: detach_and_proceed :),
+    ([ "object": this_object(), "function": "body" ]),
+    HOOK_AROUND
+  ) });
+  runs = 0;
+  r = this_object()->body();
+  ASSERT_EQ(1, runs);
+  ASSERT_EQ(5, r);
+
+  // The body raises and the handler does not catch it: the caller gets the
+  // body's error, as it would unhooked, and the body is not run again.
+  hooks += ({ hook_attach(
+    "function",
+    (: proceed :),
+    ([ "object": this_object(), "function": "body_raises" ]),
+    HOOK_AROUND
+  ) });
+  runs = 0;
+  err = catch(this_object()->body_raises());
+  ASSERT_EQ(1, runs);
+  ASSERT_EQ("*body failed\n", err);
+  hook_detach(hooks[<1]);
+
+  // The handler catches the body's error and answers itself.
+  hooks += ({ hook_attach(
+    "function",
+    (: proceed_catching :),
+    ([ "object": this_object(), "function": "body_raises" ]),
+    HOOK_AROUND
+  ) });
+  runs = 0;
+  r = this_object()->body_raises();
+  ASSERT_EQ(1, runs);
+  ASSERT_EQ(({ "handled", "*body failed\n" }), r);
+  hook_detach(hooks[<1]);
+}
+
+void check_proceed_frame() {
+  // A varargs body gets its trailing arguments as an array.
+  hooks += ({ hook_attach(
+    "function",
+    (: proceed :),
+    ([ "object": this_object(), "function": "body_varargs" ]),
+    HOOK_AROUND
+  ) });
+  ASSERT_EQ(({ "x", ({ 1, 2 }) }), this_object()->body_varargs("x", 1, 2));
+  hook_detach(hooks[<1]);
+
+  // Replacement args take the declared defaults.
+  hooks += ({ hook_attach(
+    "function",
+    (: proceed_one_arg :),
+    ([ "object": this_object(), "function": "body_defaults" ]),
+    HOOK_AROUND
+  ) });
+  ASSERT_EQ(42, this_object()->body_defaults(1, 1));
+  hook_detach(hooks[<1]);
+
+  // AROUND does not apply to an async function, which still yields a promise.
+  hooks += ({ hook_attach(
+    "function",
+    (: proceed :),
+    ([ "object": this_object(), "function": "body_async" ]),
+    HOOK_AROUND
+  ) });
+  ASSERT(promisep(this_object()->body_async()));
+  hook_detach(hooks[<1]);
+}
+
+/* --- object:destruct runs before the object's sockets are closed ---------- */
+
+#ifdef __PACKAGE_SOCKETS__
+int reopened = -1;
+
+void reopen(int id, object ob, string cause) {
+  reopened = ob->open_socket();
+}
+
+void check_destruct_socket() {
+  object v = new("/clone/hook_sock_owner");
+
+  hooks += ({ hook_attach("object:destruct", (: reopen :), ([ "object": v ]), 0) });
+  destruct(v);
+  hook_detach(hooks[<1]);
+  ASSERT2(reopened >= 0, "the destruct handler did not run");
+  // The socket the handler opened was closed with the rest of the object's,
+  // instead of being left with a destructed (soon freed) owner.
+  ASSERT_EQ("CLOSED", socket_status(reopened)[1]);
+}
+#endif
+
+/* --- check_memory() with a live attachment -------------------------------- */
+
+mixed noop(int id, object actor, object caller, object target, string fn, mixed *args) { return 0; }
+
+void check_live_attachment_marking() {
+#if efun_defined(check_memory)
+  string report;
+
+  hooks += ({ hook_attach(
+    "function",
+    (: noop :),
+    ([ "object": this_object(), "function": "no_such_function" ]),
+    HOOK_BEFORE
+  ) });
+  report = check_memory();
+  hook_detach(hooks[<1]);
+  ASSERT2(strsrch(report, "Bad ref") == -1, report);
+#endif
+}
+
+private void run_checks() {
+  check_recompile();
+  check_around_once();
+  check_proceed_frame();
+#ifdef __PACKAGE_SOCKETS__
+  check_destruct_socket();
+#endif
+  check_live_attachment_marking();
+}
+
+void do_tests() {
+  mixed err = catch(run_checks());
+
+  foreach (int id in hooks) {
+    catch(hook_detach(id));
+  }
+  hooks = ({});
+  if (file_size(VICTIM_FILE) >= 0) {
+    rm(VICTIM_FILE);
+  }
+  if (err) {
+    error(err);
+  }
+}

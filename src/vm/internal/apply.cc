@@ -200,7 +200,15 @@ void check_co_args(int num_arg, const program_t* prog, function_t* fun, int find
  * manually !  (Look towards end of this function.)
  */
 
+/* dispatch_hooks is false only for the redo of a call whose function hooks
+ * already ran and recompiled the target (see hook_call_target_state()). */
+static int apply_low_impl(const char* fun, object_t* ob, int num_arg, bool dispatch_hooks);
+
 int apply_low(const char* fun, object_t* ob, int num_arg) {
+  return apply_low_impl(fun, ob, num_arg, true);
+}
+
+static int apply_low_impl(const char* fun, object_t* ob, int num_arg, bool dispatch_hooks) {
   ScopedTracer _tracer(__PRETTY_FUNCTION__);
 
   int local_call_origin = call_origin;
@@ -382,8 +390,9 @@ retry_for_shadow:
     }
 
     /* function join point: filter on named_target (pre-shadow), like miss. */
-    if (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND)) {
+    if (dispatch_hooks && (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
       const char* origin = origin_to_name(local_call_origin);
+      uint32_t const prog_generation = ob->prog_generation;
       if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
         svalue_t answered{};
         HookGateResult gr =
@@ -411,6 +420,23 @@ retry_for_shadow:
           error("Function call refused by hook.\n");
         }
       }
+      /* The BEFORE handlers ran arbitrary LPC. They may have destructed the
+       * target (the call is then a miss), or recompiled it, which frees the
+       * program `entry` and `funp` point into: redo the lookup and the call
+       * against the new program, without the hooks, which have had their say.
+       * Checked again after AROUND, whose handler can do the same. */
+      auto redo = [&]() {
+        call_origin = local_call_origin;
+        return apply_low_impl(fun, named_target, num_arg, false);
+      };
+      switch (hook_call_target_state(ob, prog_generation, num_arg)) {
+        case HookTargetState::Destructed:
+          return 0;
+        case HookTargetState::Recompiled:
+          return redo();
+        case HookTargetState::Unchanged:
+          break;
+      }
       /* Pass the callee's offsets; do not load them yet. push_control_stack()
        * below saves the LIVE offsets as the caller's to restore on return,
        * so setting them here made the caller resume at the callee's offsets
@@ -420,6 +446,14 @@ retry_for_shadow:
                                         funp->address, funp, entry.function_index_offset,
                                         entry.variable_index_offset)) {
         return 1;
+      }
+      switch (hook_call_target_state(ob, prog_generation, num_arg)) {
+        case HookTargetState::Destructed:
+          return 0;
+        case HookTargetState::Recompiled:
+          return redo();
+        case HookTargetState::Unchanged:
+          break;
       }
     }
 

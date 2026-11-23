@@ -23,10 +23,17 @@
 // -ftest:single/tests/efuns/foo.lpc   runs one file
 // -ftest:efuns/dual*                  runs files whose path matches the
 //                                     (suffix-anchored) glob
+// -fchaos[:seed[:filter]]             the same, with recompile chaos
+//                                     (/command/chaos.lpc): hot reloads
+//                                     mid-call and between files, files in
+//                                     a fixed order so a seed reproduces
 
 private int total_files = 0;
 private string *failed_files = ({});
 private string filter_re = 0;
+private int chaos = 0;
+
+#define CHAOS "/command/chaos"
 
 private void check_leaks(string what) {
 #if defined(__DEBUGMALLOC__) && defined(__DEBUGMALLOC_EXTENSIONS__) && defined(__PACKAGE_DEVELOP__)
@@ -51,6 +58,9 @@ private void run_one(string path, int kind) {
   }
 
   before = sizeof("/single/master"->query_failures());
+  if (chaos) {
+    CHAOS->mark_file_start();
+  }
   "/single/master"->set_in_test_file(1);
   total_files++;
   write("[ RUN      ] " + path + "\n");
@@ -86,11 +96,18 @@ private void run_one(string path, int kind) {
   } else {
     write("[       OK ] " + path + " (" + ms + " ms)\n");
   }
+  if (chaos) {
+    // Reload what this file created, against the state it left behind,
+    // before check_memory() looks at it.
+    CHAOS->reload_new();
+  }
   check_leaks(path);
 }
 
 private void recurse(string dir) {
-  foreach (string file in sort_array(get_dir(dir + "*.lpc"), (: random(2) - random(2) :))) {
+  // Chaos runs keep a fixed order, so a seed reproduces the same recompiles.
+  foreach (string file in sort_array(get_dir(dir + "*.lpc"),
+    chaos ? 1 : (: random(2) - random(2) :))) {
     run_one(dir + file, 0);
   }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
@@ -149,6 +166,9 @@ private int deferred_t0 = 0;
 private int report(int total_ms) {
   string *failures = "/single/master"->query_failures();
 
+  if (chaos) {
+    write(CHAOS->summary());
+  }
   write("[==========] " + "/single/master"->query_num_checks() + " checks from " +
     total_files + " file(s) ran. (" + total_ms + " ms total)\n");
   if (!sizeof(failed_files) && !sizeof(failures)) {
@@ -248,6 +268,32 @@ public int finish_run() {
   }
   report_deferred = 0;
   return report((perf_counter_ns() - deferred_t0) / 1000000);
+}
+
+// -fchaos[:seed[:filter]]: run the suite (or the filter) under recompile
+// chaos. The recap adds the chaos counters; see /command/chaos.lpc for what
+// counts as a failure here.
+int main_chaos(string arg) {
+  int seed = 1;
+  string file = "";
+  mixed err;
+
+  if (arg && arg != "") {
+    if (sscanf(arg, "%d:%s", seed, file) != 2 && sscanf(arg, "%d", seed) != 1) {
+      error("-fchaos takes [seed[:filter]], got '" + arg + "'.\n");
+    }
+  }
+  write("[ CHAOS    ] recompile chaos, seed " + seed + "\n");
+  chaos = 1;
+  CHAOS->start(seed, 0);
+  // The hook must come off whatever happens, and the error (a LEAK from
+  // check_memory(), say) must still fail the run.
+  err = catch(execute(file, strlen(file) > 0));
+  CHAOS->stop();
+  if (err) {
+    error(err);
+  }
+  return 1;
 }
 
 int main(string file) {
