@@ -5,12 +5,12 @@ title: calls / query_shadowing
 
 ### NAME
 
-    shadowp()  -  determine  whether  or  not  a  given object it shadowing
-    another
+    query_shadowing() - determine whether or not a given object is
+    shadowing another
 
 ### SYNOPSIS
 
-    object shadowp( object ob );
+    object query_shadowing( object ob );
 
 ### DESCRIPTION
 
