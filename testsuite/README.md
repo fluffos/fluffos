@@ -76,6 +76,40 @@ Without an argument the runner walks `/single/tests/` recursively in
 **randomized order** (run it 2–3× when touching the lexer/parser), so
 tests must not depend on each other having run.
 
+### Recompile chaos (`-fchaos`)
+
+`recompile_object()` swaps a program under live objects, which is only safe
+where the driver re-checks what it looked up before the swap. The ordinary
+suite almost never recompiles at an awkward moment, so a path that forgot
+the re-check stays invisible. `-fchaos` runs the same files with hot reloads
+injected everywhere the suite goes (`command/chaos.lpc`):
+
+- **mid-call**: a function `HOOK_BEFORE` on every call recompiles the call's
+  target (its master copy) on a seeded fraction of calls, between the
+  driver's lookup and the call itself;
+- **between files**: the programs of every object a file created are
+  hot-reloaded after it, against whatever live state it left (call_outs,
+  shadows, hooks, sockets).
+
+```bash
+cd testsuite
+../build/src/driver etc/config.test -fchaos             # seed 1, whole suite
+../build/src/driver etc/config.test -fchaos:7           # another seed
+../build/src/driver etc/config.test '-fchaos:7:efuns/hook*'
+```
+
+Files run in a **fixed order** in this mode, so a seed and filter reproduce
+the same recompiles. The recap adds a `[ CHAOS    ]` line with how many calls
+were hooked and recompiled. The pass signal is the ordinary one (`Checks
+succeeded.`, exit 0): chaos skips reloads that would break a test *by
+design* (an object whose file holds an open exit latch, or that owns a
+suspended `async` function, since a recompile makes closures stale and
+cancels parked functions), so a failure is worth reading. Run it on a
+**sanitizer build**: the bugs it is for (#1478: a hook handler recompiling a
+call's target freed the program the call then ran) show up as ASan reports,
+not as failed checks. A full run takes about 9 minutes on a Debug+ASan
+build.
+
 ## How the runner treats each directory
 
 `command/tests.lpc` walks `/single/tests/`:

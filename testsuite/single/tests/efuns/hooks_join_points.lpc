@@ -63,8 +63,10 @@ mixed on_efun_after_result(int id, object actor, object caller, object target, s
  * caller's (here the last local, `marker`), not a result. */
 mixed *void_efun_after_results() {
   mapping m = ([ "k": 1 ]);
+  // Pinned to calls from this object: an efun hook is global, and other LPC
+  // can run in the window (the master's applies under -fchaos's recompiles).
   int id = hook_attach("efun:map_delete", (: on_efun_after_result :),
-    ([ "label": "efun-after-void" ]), HOOK_AFTER);
+    ([ "label": "efun-after-void", "caller_object": this_object() ]), HOOK_AFTER);
   string marker = "caller slot";
   efun_after_results = ({});
   map_delete(m, "k");
@@ -191,7 +193,7 @@ void do_tests() {
   /* efun AFTER result: the return value, or 0 for a void efun */
   efun_after_results = ({});
   int eid_res = hook_attach("efun:sizeof", (: on_efun_after_result :),
-    ([ "label": "efun-after-result" ]), HOOK_AFTER);
+    ([ "label": "efun-after-result", "caller_object": this_object() ]), HOOK_AFTER);
   ASSERT_EQ(sizeof(arr), 2);
   hook_detach(eid_res);
   ASSERT_EQ(efun_after_results, ({ 2 }));

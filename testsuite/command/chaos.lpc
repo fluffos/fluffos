@@ -1,0 +1,204 @@
+// Recompile chaos for the test runner: `-fchaos[:seed[:filter]]`.
+//
+// recompile_object() swaps a program under live objects, and that is only
+// safe where the driver re-checks what it looked up before the swap. The
+// ordinary suite almost never recompiles mid-call, so a path that forgot the
+// re-check stays invisible: a hook handler recompiling a call's target freed
+// the program apply_low() was about to enter (#1478), and nothing caught it.
+// This daemon makes recompiles happen everywhere the suite goes:
+//
+// - mid-call: a function BEFORE hook on every call recompiles the call's
+//   target, on a seeded pseudo-random fraction of calls, between the
+//   driver's lookup and the call itself;
+// - between files: the programs of every object a test file created are
+//   hot-reloaded after it, against whatever live state it left behind
+//   (call_outs, shadows, hooks, parked coroutines, sockets). Reloading
+//   every loaded program after every file made a full run take hours.
+//
+// The oracle is the driver, not the checks: a crash, a sanitizer report or
+// a check_memory() complaint after a file is a bug. Check failures are
+// reported too, but many are expected -- a recompile makes every closure
+// in the object stale by design, and a test cannot tell its fixture was
+// reloaded under it -- so they are not the pass signal.
+//
+// Runs are reproducible: the same seed and filter recompile the same calls,
+// because the runner also stops shuffling the file order in this mode.
+
+#include <hooks.h>
+
+// Default: recompile the target of about 1 call in this many.
+#define DEFAULT_RATE 64
+
+nosave int seed = 1;
+nosave int start_seed = 1;
+nosave int rate = DEFAULT_RATE;
+nosave int hook_id = 0;
+
+// Objects that existed before the current file (see mark_file_start()).
+nosave mapping before_file = ([]);
+
+// Counters for the recap.
+nosave int calls_seen = 0;
+nosave int mid_call_recompiles = 0;
+nosave int mid_call_refused = 0;
+nosave int reload_recompiles = 0;
+nosave int reload_refused = 0;
+
+private int next_random(int n) {
+  // A fixed LCG, so a seed reproduces a run (random() cannot be seeded).
+  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+  return (seed >> 8) % n;
+}
+
+// The master copy to recompile for `ob`, or 0 if it must be left alone:
+// generated sources under /data/ (tests rewrite them on purpose, so a
+// reload would run code the test has not reached yet), the runner and this
+// daemon, and anything not loaded from a file.
+private object reload_target(object ob) {
+  string name;
+
+  if (!ob) {
+    return 0;
+  }
+  name = file_name(ob);
+  if (clonep(ob)) {
+    ob = find_object(explode(name, "#")[0]);
+    if (!ob) {
+      return 0;
+    }
+    name = file_name(ob);
+  }
+  if (strsrch(name, "/data/") == 0 || strsrch(name, "/command/") == 0 || ob == this_object()) {
+    return 0;
+  }
+  return ob;
+}
+
+// Returns 1 if the recompile happened.
+private int try_recompile(object ob) {
+  mixed err;
+
+  ob = reload_target(ob);
+  if (!ob) {
+    return 0;
+  }
+  // An object on the call stack would refuse; skip it rather than pay for
+  // the refusal's logged error trace. (Inheritors running its code still
+  // refuse, which the catch below absorbs.)
+  if (member_array(ob, call_stack(1)) != -1) {
+    return 0;
+  }
+  // Refusals are expected (the object, or one running its program, has a
+  // live frame) and are not errors here.
+  err = catch(recompile_object(ob));
+  return !err;
+}
+
+// The hook handler. It never raises: an erroring handler is detached after
+// `hook max errors`, which would quietly end the chaos.
+mixed before_call(int id, object actor, object caller, object target, string fn, mixed *args) {
+  calls_seen++;
+  if (next_random(rate)) {
+    return 0;
+  }
+  if (try_recompile(target)) {
+    mid_call_recompiles++;
+  } else {
+    mid_call_refused++;
+  }
+  return 0;
+}
+
+public void start(int new_seed, int new_rate) {
+  seed = start_seed = new_seed;
+  rate = new_rate > 0 ? new_rate : DEFAULT_RATE;
+  if (hook_id) {
+    return;
+  }
+  // exclude_caller_program: calls this daemon makes itself (its handler's
+  // helpers) do not re-enter the hook.
+  hook_id = hook_attach("function", (: before_call :),
+    ([ "label": "recompile-chaos", "target": "*", "function": "*",
+      "exclude_caller_program": "command/chaos.lpc" ]), HOOK_BEFORE);
+}
+
+public void stop() {
+  if (hook_id) {
+    catch(hook_detach(hook_id));
+    hook_id = 0;
+  }
+}
+
+public void mark_file_start() {
+  before_file = ([]);
+  foreach (object ob in objects()) {
+    before_file[ob] = 1;
+  }
+}
+
+// True if `ob` still has deferred work in flight that a recompile would
+// cut short BY DESIGN, so that reloading it now would fail its test for a
+// reason that is not a driver bug:
+// - an open exit latch of its file (keyed "<file> :: <label>"): the
+//   closures that work runs through would become stale;
+// - an async function of its suspended at an await: recompile_object()
+//   cancels it ("owner was recompiled while suspended").
+private int has_pending_work(object ob) {
+  string prefix = file_name(ob) + " :: ";
+
+  foreach (string key in master()->query_latches()) {
+    if (strsrch(key, prefix) == 0) {
+      return 1;
+    }
+  }
+#if efun_defined(async_info)
+  foreach (mapping frame in async_info()) {
+    object owner = frame["object"];
+
+    if (owner && (owner == ob || (clonep(owner) && explode(
+      file_name(owner),
+      "#"
+    )[0] == file_name(ob)))) {
+      return 1;
+    }
+  }
+#endif
+  return 0;
+}
+
+// Hot-reload the program of every object created since mark_file_start()
+// (clones follow their master copy, so each program once).
+public void reload_new() {
+  mapping done = ([]);
+
+  foreach (object ob in objects()) {
+    object target;
+
+    if (before_file[ob]) {
+      continue;
+    }
+    target = reload_target(ob);
+    if (target && has_pending_work(target)) {
+      continue;
+    }
+
+    if (!target || done[target]) {
+      continue;
+    }
+    done[target] = 1;
+    if (try_recompile(target)) {
+      reload_recompiles++;
+    } else {
+      reload_refused++;
+    }
+  }
+}
+
+public int is_active() { return hook_id != 0; }
+
+public string summary() {
+  return sprintf("[ CHAOS    ] seed %d, rate 1/%d: %d hooked calls, %d mid-call recompiles "
+    "(%d refused), %d between-file recompiles (%d refused)\n",
+    start_seed, rate, calls_seen, mid_call_recompiles, mid_call_refused,
+    reload_recompiles, reload_refused);
+}
