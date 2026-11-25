@@ -1,14 +1,49 @@
 #ifdef __PACKAGE_FFI__
 #include <ffi.h>
+
+int g_lib;
+mixed unload_err;
+int tried;
+
+// qsort comparator that tries to unload the library qsort was called
+// through: dlclose() would unmap code still on the C stack below it.
+int cmp_unloading(int a_addr, int b_addr) {
+  if (!tried) {
+    tried = 1;
+    unload_err = catch(ffi_unload(g_lib));
+  }
+  return ffi_read(ffi_peek(a_addr, 4), 0, FFI_INT32) - ffi_read(ffi_peek(b_addr, 4), 0, FFI_INT32);
+}
 #endif
+
 void do_tests() {
 #ifdef __PACKAGE_FFI__
+  int qs, cb, i;
+  buffer data;
+
   if (!"/clone/ffi_probe"->available()) { ASSERT(1); return; }
   int lib = ffi_load("");
   ffi_unload(lib);
   // Unloading an unknown/already-unloaded handle is a harmless no-op.
   ffi_unload(lib);
   ffi_unload(999999);
+
+  // Unloading a library from a callback that an ffi_call() into it is
+  // dispatching is refused; the library stays usable, and unloads after.
+  g_lib = ffi_load("");
+  qs = ffi_prepare(g_lib, "qsort", FFI_VOID,
+    ({ FFI_POINTER, FFI_UINT64, FFI_UINT64, FFI_POINTER }));
+  data = ffi_alloc(3 * 4);
+  for (i = 0; i < 3; i++) ffi_write(data, i * 4, FFI_INT32, 3 - i);
+  cb = ffi_callback((: cmp_unloading :), FFI_INT32, ({ FFI_POINTER, FFI_POINTER }));
+  ffi_call(qs, ({ data, 3, 4, ffi_callback_addr(cb) }));
+  ASSERT(tried);
+  ASSERT2(stringp(unload_err) && strsrch(unload_err, "in use") != -1, sprintf("%O", unload_err));
+  ASSERT_EQ(1, ffi_read(data, 0, FFI_INT32));
+  ffi_call(qs, ({ data, 3, 4, ffi_callback_addr(cb) }));
+  ffi_callback_free(cb);
+  ffi_unload(g_lib);
+  ASSERT(catch(ffi_call(qs, ({ data, 3, 4, 0 }))));
 #endif
   ASSERT(1);
 }

@@ -57,6 +57,11 @@ struct FfiLibrary {
   // to unload at all would break the ordinary prepare-call-then-unload
   // lifecycle (ffi_prepare() never has a matching "un-prepare").
   std::vector<int> prepared_func_ids;
+  // ffi_call()s into this library currently on the C stack. A callback
+  // they dispatch runs LPC, which may call ffi_unload() on this very
+  // library: dlclose() would then unmap code the CPU returns into when the
+  // callback finishes. ffi_unload() refuses while this is non-zero.
+  int active_calls = 0;
 };
 
 struct FfiFunc {
@@ -67,6 +72,7 @@ struct FfiFunc {
   int ret_code;
   ffi_type* ret_type;
   bool valid = true;  // false once this func's owning library is unloaded
+  int lib_id = 0;     // the g_libs entry ->addr came from
 };
 
 struct FfiCallback {
@@ -464,6 +470,11 @@ void f_ffi_unload(vm::EfunArgs&, LPC_INT lib) {
   int id = lib;
   auto it = g_libs.find(id);
   if (it != g_libs.end()) {
+    if (it->second->active_calls > 0) {
+      // Reached from a callback that an ffi_call() into this library is
+      // dispatching: its code is still on the C stack below us.
+      error("ffi_unload: library %d is in use by a running ffi_call().\n", id);
+    }
     // Invalidate every FfiFunc prepared from this library before closing
     // it: their ->addr was dlsym()'d out of the handle we're about to
     // dlclose(), so calling one afterward would jump into unmapped memory.
@@ -518,6 +529,7 @@ vm::Value f_ffi_prepare(vm::EfunArgs&, LPC_INT lib, vm::StringArg symbol, LPC_IN
   // code_to_type below) frees it during unwinding -- AGENTS.md section 4.
   auto fn = std::make_unique<FfiFunc>();
   fn->addr = addr;
+  fn->lib_id = it->first;
   fn->ret_code = ret_code;
   fn->ret_type = code_to_type(ret_code);
   for (int i = 0; i < arg_arr->size; i++) {
@@ -578,7 +590,22 @@ vm::Value f_ffi_call(vm::EfunArgs&, LPC_INT func, array_t* args) {
     float f;
     double d;
   } rvalue;
-  ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues.get());
+  {
+    // Count the call in its library for as long as it runs (see
+    // FfiLibrary::active_calls); a valid fn's library is still loaded, and
+    // cannot be unloaded while counted, so the lookup on the way out holds.
+    auto lit = g_libs.find(fn->lib_id);
+    if (lit != g_libs.end()) {
+      lit->second->active_calls++;
+    }
+    DEFER {
+      auto out = g_libs.find(fn->lib_id);
+      if (out != g_libs.end()) {
+        out->second->active_calls--;
+      }
+    };
+    ffi_call(&fn->cif, FFI_FN(fn->addr), &rvalue, avalues.get());
+  }
 
   return return_to_lpc(fn->ret_code, &rvalue);
 }
