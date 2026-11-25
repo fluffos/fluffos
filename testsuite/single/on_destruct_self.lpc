@@ -1,0 +1,10 @@
+// on_destruct() that destructs its own object, as a cleanup routine that
+// "makes sure" can. It must run once.
+void create() {
+  set_notify_destruct(1);
+}
+
+void on_destruct() {
+  "/single/tests/applies/on_destruct_test"->note_on_destruct();
+  destruct(this_object());
+}

@@ -33,6 +33,54 @@ typedef void* gzFile;  // dead parameter slot; compressed-save paths compile out
 #include "ghc/filesystem.hpp"
 namespace fs = ghc::filesystem;
 
+namespace {
+/* object_t::flags is a set of independent bits. Two flags once shared a bit
+ * by accident (O_NOTIFY_DESTRUCT with O_HEART_BEAT): give a new flag its own
+ * bit and list it here. The one deliberate overlap is O_LISTENER, which is
+ * the same bit as O_ENABLE_COMMANDS (or O_CATCH_TELL), so only O_LISTENER is
+ * listed. */
+constexpr unsigned kObjectFlags[] = {
+    O_HEART_BEAT,
+#ifndef NO_WIZARDS
+    O_IS_WIZARD,
+#endif
+    O_LISTENER,
+    O_CLONE,
+    O_DESTRUCTED,
+    O_NOTIFY_DESTRUCT,
+    O_ONCE_INTERACTIVE,
+    O_RESET_STATE,
+    O_WILL_CLEAN_UP,
+    O_VIRTUAL,
+#ifdef F_SET_HIDE
+    O_HIDDEN,
+#endif
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
+    O_EFUN_SOCKET,
+#endif
+    O_WILL_RESET,
+#ifndef OLD_ED
+    O_IN_EDIT,
+#endif
+    O_BEING_DESTRUCTED,
+#ifndef NO_SNOOP
+    O_SNOOP,
+#endif
+};
+
+constexpr bool object_flags_disjoint() {
+  unsigned seen = 0;
+  for (unsigned flag : kObjectFlags) {
+    if (seen & flag) {
+      return false;
+    }
+    seen |= flag;
+  }
+  return seen <= 0xffffu; /* object_t::flags is an unsigned short */
+}
+static_assert(object_flags_disjoint(), "two object_t flags share a bit (see kObjectFlags)");
+}  // namespace
+
 #include "packages/core/add_action.h"  // for remove_living_name
 #include "packages/core/call_out.h"    // for remove_all_call_out
 // FIXME: required by reload_object()

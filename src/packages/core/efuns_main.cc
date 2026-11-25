@@ -3228,7 +3228,7 @@ void f_defer(vm::EfunArgs& f, funptr_t*) {
   newlist->func = f.take(0).release();
   /* push_object()'s rule: a destructed command_giver reads as undefined. */
   newlist->tp = command_giver ? const0u : const0;
-  if (command_giver && !(command_giver->flags & (O_DESTRUCTED | O_BEING_DESTRUCTED))) {
+  if (command_giver && !(command_giver->flags & O_DESTRUCTED)) {
     newlist->tp.type = T_OBJECT;
     newlist->tp.u.ob = command_giver;
     add_ref(command_giver, "defer");
