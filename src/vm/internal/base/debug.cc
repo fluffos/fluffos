@@ -15,7 +15,7 @@
 
 std::string framekind_name(int framekind) {
   std::string result = "";
-  switch (framekind & FRAME_MASK) {
+  switch (frame_kind(framekind)) {
     case FRAME_FUNCTION:
       result = "FRAME_FUNCTION";
       break;

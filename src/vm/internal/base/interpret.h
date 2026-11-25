@@ -20,6 +20,10 @@
 #define FRAME_CATCH 2
 #define FRAME_FAKE 3
 #define FRAME_MASK 3
+/* The frame's kind. The low two bits are an enum, not flags: FRAME_FAKE (3)
+ * contains FRAME_CATCH's bit, so `framekind & FRAME_CATCH` is also true for
+ * a fake frame. Compare frame_kind(f) == FRAME_CATCH instead. */
+inline int frame_kind(int framekind) { return framekind & FRAME_MASK; }
 
 #define FRAME_OB_CHANGE 4
 #define FRAME_EXTERNAL 8

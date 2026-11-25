@@ -772,7 +772,7 @@ void drain_promise_microtasks() {
 /* innermost acatch() region marker above `floor_csp`, or null */
 control_stack_t* find_acatch_marker(control_stack_t* floor_csp) {
   for (control_stack_t* f = csp; f > floor_csp; f--) {
-    if ((f->framekind & FRAME_MASK) == FRAME_CATCH && (f->framekind & FRAME_ASYNC)) {
+    if (frame_kind(f->framekind) == FRAME_CATCH && (f->framekind & FRAME_ASYNC)) {
       return f;
     }
   }
@@ -2021,11 +2021,11 @@ void coroutine_await_pending(promise_t* awaited) {
    * pinned across the suspension) */
   control_stack_t* async_frame = nullptr;
   for (control_stack_t* f = csp; f >= control_stack; f--) {
-    if ((f->framekind & FRAME_MASK) == FRAME_FUNCTION && (f->framekind & FRAME_ASYNC)) {
+    if (frame_kind(f->framekind) == FRAME_FUNCTION && (f->framekind & FRAME_ASYNC)) {
       async_frame = f;
       break;
     }
-    if (!((f->framekind & FRAME_MASK) == FRAME_CATCH && (f->framekind & FRAME_ASYNC))) {
+    if (!(frame_kind(f->framekind) == FRAME_CATCH && (f->framekind & FRAME_ASYNC))) {
       break;
     }
   }
