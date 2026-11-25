@@ -64,6 +64,11 @@ struct db_t {
   int flags;
   db_defn_t* type;
   union dbconn_t c;
+  /* Changes every time the slot is handed out (create_db_conn()). A handle
+   * is just the slot number, reused after db_close(); work that outlives the
+   * call that named the handle (an async_db_exec() query queued for a
+   * worker) records this to tell its connection from a later one. */
+  uint32_t generation;
 };
 
 void db_cleanup(void);
