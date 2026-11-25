@@ -1,8 +1,21 @@
+can_zzverb_obj() { return 1; }
+do_zzverb_obj() { return 1; }
+
 void do_tests() {
 #ifdef __PACKAGE_PARSER__
+  mixed fresh, after;
+
   parse_init();
   catch(parse_my_rules(this_object(), "smile"));
-  ASSERT(1);
+
+  // With an unknown verb the result is -(how far the parse got), so 0 here.
+  // It used to be how far the PREVIOUS parse_sentence() got.
+  parse_add_rule("zzverb", "OBJ");
+  fresh = parse_my_rules(this_object(), "qqqunknown");
+  catch(parse_sentence("zzverb nothing_here"));
+  after = parse_my_rules(this_object(), "qqqunknown");
+  ASSERT_EQ(fresh, after);
+  ASSERT_EQ(0, after);
 #endif
   ASSERT(1);
 }

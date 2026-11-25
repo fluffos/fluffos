@@ -3263,6 +3263,9 @@ static void parse_sentence(const char* input) {
   free_words();
   parse_rule_steps = 0;
   parse_rule_aborted = false;
+  /* Per parse, like the rest: only f_parse_sentence() used to reset it, so
+   * parse_my_rules() reported how far the PREVIOUS parse had got. */
+  found_level = 0;
   p = start = buf;
   flag = 0;
   inp = (unsigned char*)input;
@@ -3487,7 +3490,6 @@ vm::Value f_parse_sentence(vm::EfunArgs& f, vm::StringArg sentence, std::optiona
   parse_user = current_object;
   pi = current_object->pinfo;
   parse_restricted = nullptr;
-  found_level = 0;
   parse_sentence(sentence.c_str());
 
   vm::Value result;
