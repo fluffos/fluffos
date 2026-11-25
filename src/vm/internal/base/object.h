@@ -48,7 +48,11 @@
 #ifndef OLD_ED
 #define O_IN_EDIT 0x2000u /* object has an ed buffer open      */
 #endif
-/* 0x4000u is free (was O_BEING_DESTRUCTED, which nothing ever set). */
+/* destruct_object() is running the object's on_destruct() apply or its
+ * object:destruct hooks; a destruct() of it from there returns at once.
+ * (From 2009 to 2015 this bit marked an object being force-destructed for
+ * a ref count overflow; the 32-bit ref count retired that use.) */
+#define O_BEING_DESTRUCTED 0x4000u
 #ifndef NO_SNOOP
 #define O_SNOOP 0x8000u
 #endif

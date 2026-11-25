@@ -62,6 +62,7 @@ constexpr unsigned kObjectFlags[] = {
 #ifndef OLD_ED
     O_IN_EDIT,
 #endif
+    O_BEING_DESTRUCTED,
 #ifndef NO_SNOOP
     O_SNOOP,
 #endif

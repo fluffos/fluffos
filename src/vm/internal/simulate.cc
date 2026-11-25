@@ -1358,34 +1358,43 @@ void destruct_object(object_t* ob, const char* cause) {
     cause = "efun";
   }
 
-  /*
-   * Notify object that it is scheduled for destruction
-   *
-   * Proceed with destruction even if there is an error
-   * in the destructing() function in the mudlib.
-   */
-  if (ob->flags & O_NOTIFY_DESTRUCT) {
-    error_context_t econ;
-    save_context(&econ);
-    try {
-      safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
-    } catch (...) {  // catch everything
-      restore_context(&econ);
-      /* condition was restored to where it was when we came in */
-    }
-    pop_context(&econ);
+  /* A destruct() of ob from its own on_destruct() or an object:destruct
+   * handler (below). This call is already destructing it and carries on
+   * when they return; destructing it again from inside them re-ran
+   * on_destruct() until the call depth limit stopped it. */
+  if (ob->flags & O_BEING_DESTRUCTED) {
+    return;
   }
 
-  /* object:destruct fires here, beside on_destruct and BEFORE the teardown
-   * below: its handler runs arbitrary LPC and can call into `ob`, which can
-   * open a socket (owner_ob = ob, O_EFUN_SOCKET) or set up pinfo again.
-   * Fired after the teardown, those were never undone and the socket's
-   * owner dangled once `ob` was freed. A handler that destructs `ob` is
-   * detected by the O_DESTRUCTED flag afterwards. */
-  if ((g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) && !(ob->flags & O_DESTRUCTED)) {
-    hook_dispatch_object_destruct(ob, cause);
-    if (ob->flags & O_DESTRUCTED) {
-      return;
+  if ((ob->flags & O_NOTIFY_DESTRUCT) || (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT)) {
+    ob->flags |= O_BEING_DESTRUCTED;
+    DEFER { ob->flags &= ~O_BEING_DESTRUCTED; };
+
+    /*
+     * Notify object that it is scheduled for destruction
+     *
+     * Proceed with destruction even if there is an error
+     * in the destructing() function in the mudlib.
+     */
+    if (ob->flags & O_NOTIFY_DESTRUCT) {
+      error_context_t econ;
+      save_context(&econ);
+      try {
+        safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
+      } catch (...) {  // catch everything
+        restore_context(&econ);
+        /* condition was restored to where it was when we came in */
+      }
+      pop_context(&econ);
+    }
+
+    /* object:destruct fires here, beside on_destruct and BEFORE the
+     * teardown below: its handler runs arbitrary LPC and can call into
+     * `ob`, which can open a socket (owner_ob = ob, O_EFUN_SOCKET) or set up
+     * pinfo again. Fired after the teardown, those were never undone and
+     * the socket's owner dangled once `ob` was freed. */
+    if (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) {
+      hook_dispatch_object_destruct(ob, cause);
     }
   }
 
