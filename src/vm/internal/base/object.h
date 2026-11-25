@@ -48,11 +48,14 @@
 #ifndef OLD_ED
 #define O_IN_EDIT 0x2000u /* object has an ed buffer open      */
 #endif
-#define O_BEING_DESTRUCTED 0x4000u
+/* 0x4000u is free (was O_BEING_DESTRUCTED, which nothing ever set). */
 #ifndef NO_SNOOP
 #define O_SNOOP 0x8000u
 #endif
-#define O_NOTIFY_DESTRUCT 0x01u /* object will be notified on destruct */
+/* Was 0x01u -- O_HEART_BEAT's bit: every object with a heart beat got the
+ * on_destruct apply, and set_notify_destruct(0) stopped its heart beat.
+ * object.cc static_asserts that the flags stay disjoint. */
+#define O_NOTIFY_DESTRUCT 0x20u /* object will be notified on destruct */
 /*
  * Note: use of more than 16 bits means extending flags to an unsigned long
  */

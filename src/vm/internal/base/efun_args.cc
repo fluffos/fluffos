@@ -105,7 +105,7 @@ Value Value::copy(const svalue_t* v) {
 }
 
 Value Value::refed(object_t* ob) {
-  if (!ob || (ob->flags & (O_DESTRUCTED | O_BEING_DESTRUCTED))) {
+  if (!ob || (ob->flags & O_DESTRUCTED)) {
     if (ob) {
       free_object(&ob, "Value::refed");
     }
@@ -115,7 +115,7 @@ Value Value::refed(object_t* ob) {
 }
 
 Value Value::addref(object_t* ob) {
-  if (!ob || (ob->flags & (O_DESTRUCTED | O_BEING_DESTRUCTED))) {
+  if (!ob || (ob->flags & O_DESTRUCTED)) {
     return undefined();
   }
   add_ref(ob, "Value::addref");

@@ -1,3 +1,5 @@
+void heart_beat() {}
+
 void do_tests() {
   object ob = clone_object("/clone/catch_tell_probe");
   set_notify_destruct(1);
@@ -5,4 +7,18 @@ void do_tests() {
   set_notify_destruct(0);
   ASSERT_EQ(0, query_notify_destruct());
   destruct(ob);
+
+  // The notify-destruct flag used to share its bit with the heart-beat flag:
+  // a heart beat read as "notify me", and clearing notify-destruct stopped
+  // the heart beat. Each must leave the other alone.
+  set_heart_beat(1);
+  ASSERT_EQ(0, query_notify_destruct());
+  set_notify_destruct(1);
+  set_notify_destruct(0);
+  ASSERT(query_heart_beat(this_object()));
+  set_heart_beat(0);
+
+  set_notify_destruct(1);
+  ASSERT_EQ(0, query_heart_beat(this_object()));
+  set_notify_destruct(0);
 }

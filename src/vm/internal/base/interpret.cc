@@ -399,7 +399,7 @@ ref_t* make_ref(void) {
 void push_object(object_t* ob) {
   STACK_INC;
 
-  if (!ob || (ob->flags & O_DESTRUCTED) || ob->flags & O_BEING_DESTRUCTED) {
+  if (!ob || (ob->flags & O_DESTRUCTED)) {
     *sp = const0u;
     return;
   }
