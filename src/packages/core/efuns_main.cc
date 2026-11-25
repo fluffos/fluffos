@@ -290,7 +290,7 @@ vm::Value f_call_stack(vm::EfunArgs&, LPC_INT which) {
       for (i = 0; i < n; i++) {
         ret->item[i].type = T_STRING;
         const program_t* fprog = (i ? (csp - i + 1)->prog : current_prog);
-        if (((csp - i)->framekind & FRAME_MASK) == FRAME_FUNCTION && fprog != nullptr) {
+        if (frame_kind((csp - i)->framekind) == FRAME_FUNCTION && fprog != nullptr) {
           int const index = (csp - i)->fr.table_index;
           function_t* cfp = &fprog->function_table[index];
 
@@ -300,7 +300,7 @@ vm::Value f_call_stack(vm::EfunArgs&, LPC_INT which) {
         } else {
           ret->item[i].subtype = STRING_CONSTANT;
           ret->item[i].u.string =
-              (((csp - i)->framekind & FRAME_MASK) == FRAME_CATCH) ? "CATCH" : "<function>";
+              (frame_kind((csp - i)->framekind) == FRAME_CATCH) ? "CATCH" : "<function>";
         }
       }
       break;

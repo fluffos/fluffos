@@ -2324,7 +2324,7 @@ static int num_mudlib_error = 0;
  */
 
 [[noreturn]] void throw_error() {
-  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+  if ((frame_kind((current_error_context->save_csp + 1)->framekind) == FRAME_CATCH) ||
       current_error_context == g_coroutine_econ) {
     /* inside a catch(), or inside an async function body (where the thrown
      * value becomes the rejection reason / acatch() result) */
@@ -2475,7 +2475,7 @@ void _error_handler(char* err) {
     fatal("error() without a context: %s", err + 1);
   }
 
-  if ((((current_error_context->save_csp + 1)->framekind & FRAME_MASK) == FRAME_CATCH) ||
+  if ((frame_kind((current_error_context->save_csp + 1)->framekind) == FRAME_CATCH) ||
       current_error_context == g_coroutine_econ) {
     /* user catches this error -- or it unwinds to a running async function
      * body's boundary, where it becomes a promise rejection (or resumes an

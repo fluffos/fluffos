@@ -111,7 +111,7 @@ const char* dump_trace(int how) {
       num_arg = -1;
       continue;
     }
-    switch (p[0].framekind & FRAME_MASK) {
+    switch (frame_kind(p[0].framekind)) {
       case FRAME_FUNCTION: {
         const char* fname;
         get_trace_details(trace_prog, p[0].fr.table_index, &fname, &num_arg, &num_local);
@@ -221,7 +221,7 @@ array_t* get_svalue_trace() {
       /* frame pushed from driver context with no program running (e.g. the
        * FRAME_CATCH marker under a promise-reaction delivery) */
       m = allocate_mapping(1);
-      add_mapping_string(m, "function", ((p[0].framekind & FRAME_MASK) == FRAME_CATCH)
+      add_mapping_string(m, "function", (frame_kind(p[0].framekind) == FRAME_CATCH)
                                             ? "CATCH"
                                             : "<driver>");
       v->item[(p - &control_stack[0])].type = T_MAPPING;
@@ -229,7 +229,7 @@ array_t* get_svalue_trace() {
       continue;
     }
     m = allocate_mapping(6);
-    switch (p[0].framekind & FRAME_MASK) {
+    switch (frame_kind(p[0].framekind)) {
       case FRAME_FUNCTION:
         get_trace_details(p[1].prog, p[0].fr.table_index, &fname, &num_arg, &num_local);
         add_mapping_string(m, "function", fname);
@@ -295,7 +295,7 @@ array_t* get_svalue_trace() {
     v->item[(p - &control_stack[0])].u.map = m;
   }
   m = allocate_mapping(6);
-  switch (p[0].framekind & FRAME_MASK) {
+  switch (frame_kind(p[0].framekind)) {
     case FRAME_FUNCTION:
       get_trace_details(current_prog, p[0].fr.table_index, &fname, &num_arg, &num_local);
       add_mapping_string(m, "function", fname);

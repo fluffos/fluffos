@@ -1633,7 +1633,7 @@ extern int playerchanged;
 void pop_control_stack() {
   DEBUG_CHECK(csp == (control_stack - 1), "Popped out of the control stack\n");
 #ifdef PROFILE_FUNCTIONS
-  if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+  if (frame_kind(csp->framekind) == FRAME_FUNCTION) {
     long secs, usecs, dsecs;
     function_t* cfp = &current_prog->function_table[csp->fr.table_index];
     int stof = 0;
@@ -1643,7 +1643,7 @@ void pop_control_stack() {
     cfp->self += dsecs;
 
     while ((csp - stof) != control_stack) {
-      if (((csp - stof - 1)->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+      if (frame_kind((csp - stof - 1)->framekind) == FRAME_FUNCTION) {
         function_t* parent =
             &((csp - stof)->prog->function_table[(csp - stof - 1)->fr.table_index]);
         if (parent != cfp) {  // if it's recursion it's not really a child
@@ -2379,7 +2379,7 @@ std::shared_ptr<std::string> get_trace_id(control_stack_t* csp) {
   auto result = trace_id_cache.get(pc);
   if (!result) {
     auto _current_line = get_line_number_if_any();
-    std::string trace_id((csp->framekind & FRAME_MASK) == FRAME_FUNCTION
+    std::string trace_id(frame_kind(csp->framekind) == FRAME_FUNCTION
                              ? current_prog->function_table[csp->fr.table_index].funcname
                              : "");
     trace_id += " at ";
@@ -2401,7 +2401,7 @@ json get_trace_args(svalue_t* sp, int num_args) {
 json get_trace_context(control_stack_t* csp, svalue_t* sp) {
   auto context = json::object();
   if (CONFIG_INT(__RC_TRACE_CONTEXT__)) {
-    if ((csp->framekind & FRAME_MASK) == FRAME_FUNCTION) {
+    if (frame_kind(csp->framekind) == FRAME_FUNCTION) {
       auto num_args = current_prog->function_table[csp->fr.table_index].num_arg;
       context["args"] = get_trace_args(sp, num_args);
     }
@@ -4995,10 +4995,10 @@ void eval_instruction(char* p) {
         f_extract_range(1);
         break;
       case F_RETURN_ZERO: {
-        if (csp->framekind & FRAME_CATCH) {
+        if (frame_kind(csp->framekind) == FRAME_CATCH) {
           free_svalue(&catch_value, "F_RETURN_ZERO");
           catch_value = const0;
-          while (csp->framekind & FRAME_CATCH) {
+          while (frame_kind(csp->framekind) == FRAME_CATCH) {
             pop_control_stack();
           }
           csp->framekind |= FRAME_RETURNED_FROM_CATCH;
@@ -5026,10 +5026,10 @@ void eval_instruction(char* p) {
       case F_RETURN: {
         svalue_t sv;
 
-        if (csp->framekind & FRAME_CATCH) {
+        if (frame_kind(csp->framekind) == FRAME_CATCH) {
           free_svalue(&catch_value, "F_RETURN");
           catch_value = const0;
-          while (csp->framekind & FRAME_CATCH) {
+          while (frame_kind(csp->framekind) == FRAME_CATCH) {
             pop_control_stack();
           }
           csp->framekind |= FRAME_RETURNED_FROM_CATCH;
