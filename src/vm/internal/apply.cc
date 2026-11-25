@@ -289,7 +289,7 @@ retry_for_shadow:
       debug_message(
           "apply() with insufficient permission: \n"
           "cob: %s, ob: %s, function: %s, origin: %s, needs: %s, has: %s \n",
-          current_object ? current_object->obname : "null", ob ? ob->obname : "null", fun,
+          current_object ? current_object->obname : "null", ob->obname, fun,
           origin_to_name(local_call_origin), access_to_name(need),
           access_to_name(funflags & DECL_ACCESS));
       {

@@ -9,6 +9,7 @@
 #include "compiler/internal/lexer.h"  // for instrs, FIXME
 
 #include "packages/core/replace_program.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"
 
 #include <cstring>
 #include <unordered_map>
@@ -713,11 +714,11 @@ static svalue_t* call_function_pointer_impl(funptr_t* funp, int num_arg, bool di
       object_t* target = funp->hdr.owner;
       if (dispatch_hooks && def_funp && target &&
           (g_hook_mask & (HOOK_MASK_LPC_FUNC_ENTRY | HOOK_MASK_LPC_FUNC_AROUND))) {
-        /* A copy: the name lives in the owner's program, which a handler can
-         * free by recompiling the owner while later attachments still match
-         * against it. */
-        std::string const fname_copy = def_funp->funcname;
-        const char* fname = fname_copy.c_str();
+        /* Hold the (shared) name: it is the owner's program's, which a
+         * handler can free by recompiling the owner while later attachments
+         * still match against it. */
+        const char* const fname = ref_string(def_funp->funcname);
+        DEFER { free_string(fname); };
         uint32_t const prog_generation = target->prog_generation;
         if (g_hook_mask & HOOK_MASK_LPC_FUNC_ENTRY) {
           svalue_t answered{};
