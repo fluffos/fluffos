@@ -1,0 +1,81 @@
+#ifdef __PACKAGE_SOCKETS__
+#include <socket.h>
+#include <socket_err.h>
+
+/* A close callback that closes its own socket and opens new ones: the slot
+ * it closed was reusable at once, socket_create() reused it, and the outer
+ * socket_close() then tore the NEW socket down. Driven over a real loopback
+ * connection (the close callback only runs on a peer close), so it needs the
+ * event loop: every step runs from a call_out or a socket callback, and the
+ * exit latch holds the run open until check() has run. Skipped where a
+ * loopback listener is unavailable. */
+
+#define PORT 47213
+#define LATCH "socket close callback reuse"
+
+int lfd = -1, cfd = -1, sfd = -1, new1 = -1, new2 = -1;
+
+void noop_read(int fd, mixed msg) {}
+void noop_write(int fd) {}
+
+private void finish() {
+  foreach (int fd in ({ new1, new2, sfd, cfd, lfd })) {
+    if (fd >= 0) {
+      catch(socket_close(fd));
+    }
+  }
+  RELEASE_LATCH(LATCH);
+}
+
+// Close callback of the accepted socket. The first new socket takes the
+// slot the client's close freed; the second takes the one just closed.
+void server_closed(int fd) {
+  socket_close(fd);
+  new1 = socket_create(DATAGRAM, "noop_read");
+  new2 = socket_create(DATAGRAM, "noop_read");
+}
+
+void check() {
+  ASSERT2(new1 >= 0 && new2 >= 0, sprintf("the close callback did not run: %O", ({ new1, new2 })));
+  if (new1 >= 0 && new2 >= 0) {
+    ASSERT_NE("CLOSED", socket_status(new1)[1]);
+    ASSERT_NE("CLOSED", socket_status(new2)[1]);
+  }
+  finish();
+}
+
+void close_client() {
+  socket_close(cfd);
+  cfd = -1;
+  call_out("check", 2);
+}
+
+void listen_cb(int fd) {
+  sfd = socket_accept(fd, "noop_read", "noop_write");
+  call_out("close_client", 1);
+}
+
+void start() {
+  lfd = socket_create(STREAM, "noop_read", "server_closed");
+  if (lfd < 0 || socket_bind(
+    lfd,
+    PORT
+  ) != EESUCCESS || socket_listen(lfd, "listen_cb") != EESUCCESS) {
+    finish();  // no loopback listener here: nothing to test
+    return;
+  }
+  cfd = socket_create(STREAM, "noop_read", "noop_write");
+  if (cfd < 0 || socket_connect(cfd, "127.0.0.1 " + PORT, "noop_read", "noop_write") != EESUCCESS) {
+    finish();
+    return;
+  }
+}
+
+void do_tests() {
+  if (strsrch(__ARCH__, "Windows") != -1) {
+    return;
+  }
+  EXPECT_LATCH(LATCH);
+  call_out("start", 0);
+}
+#endif

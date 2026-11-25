@@ -9,6 +9,7 @@
 
 #include "packages/sockets/socket_efuns.h"
 #include "net/tls.h"
+#include "thirdparty/scope_guard/scope_guard.hpp"
 
 #include <cinttypes>
 #include <event2/event.h>
@@ -1806,12 +1807,27 @@ int socket_close(int fd, int flags) {
   if (!(flags & SC_FORCE) && lpc_socks[fd].owner_ob != current_object) {
     return EESECURITY;
   }
+  /* A close callback is closing this very socket (directly, or by
+   * destructing its owner): the outer socket_close() finishes the job. */
+  if (lpc_socks[fd].flags & S_CLOSING) {
+    return EESUCCESS;
+  }
 
   if (flags & SC_DO_CALLBACK) {
     debug(sockets, ("socket_close: apply close callback\n"));
-    vm::Call call;
-    call.push(fd);
-    call_callback(fd, S_CLOSE_FP, call);
+    /* The callback is LPC, and LPC may close this socket itself. That inner
+     * close used to tear the slot down completely, so a socket_create() in
+     * the same callback could reuse the slot -- and the teardown below then
+     * destroyed the new socket. Mark the close as in progress instead; the
+     * slot is not reusable until it reaches STATE_CLOSED below. */
+    lpc_socks[fd].flags |= S_CLOSING;
+    {
+      /* Index again: the callback can grow lpc_socks (socket_create()). */
+      DEFER { lpc_socks[fd].flags &= ~S_CLOSING; };
+      vm::Call call;
+      call.push(fd);
+      call_callback(fd, S_CLOSE_FP, call);
+    }
   }
 
   if (lpc_socks[fd].ssl != nullptr) {

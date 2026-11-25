@@ -90,6 +90,8 @@ enum socket_flags {
   S_LINKDEAD = 0x200,
   S_TLS_SUPPORT = 0x400,
   S_TLS_IS_SERVER = 0x800,
+  /* socket_close() is running this socket's close callback (see there). */
+  S_CLOSING = 0x1000,
 };
 
 array_t* socket_status(int);
