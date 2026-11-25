@@ -616,8 +616,10 @@ int create_db_conn() {
 
   for (i = 0; i < db_conn_alloc; i++) {
     if (db_conn_list[i].flags & DB_FLAG_EMPTY) {
+      static uint32_t next_generation = 0;
       db_conn_list[i].flags = 0;
       db_conn_list[i].type = &no_db;
+      db_conn_list[i].generation = ++next_generation;
       db_conn_used++;
       return i + 1;
     }

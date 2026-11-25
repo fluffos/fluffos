@@ -50,6 +50,7 @@ struct Request {
   int flags;
   int ret;
   int handle;
+  uint32_t db_generation = 0; /* db_t::generation of `handle` at submit */
   std::string data;
   function_to_call_t* fun; /* callback form; null in the promise form */
   /* Promise form (issue #1319): settled at delivery instead of calling a
@@ -269,7 +270,12 @@ void* dbexecthread(struct Request* req) {
   // see add_db_exec
   db_t* db = find_db_conn(req->handle);
   int ret = -1;
-  if (db && db->type->execute) {
+  if (!db || db->generation != req->db_generation) {
+    /* Closed while queued -- and the handle may already name a NEW
+     * connection (db_close() then db_connect() reuses the slot), which the
+     * query must not run on. */
+    req->path = std::string("Database handle was closed before the query ran");
+  } else if (db->type->execute) {
     if (db->type->cleanup) {
       db->type->cleanup(&(db->c));
     }
@@ -417,8 +423,8 @@ int add_write(const char* fname, const char* buf, int size, char flags, function
 }
 
 #ifdef F_ASYNC_DB_EXEC
-int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* bound_args,
-                promise_t* prom) {
+int add_db_exec(int handle, uint32_t db_generation, const char* sql, function_to_call_t* fun,
+                array_t* bound_args, promise_t* prom) {
   auto* req = new Request();
   req->fun = fun;
   req->prom = prom;
@@ -426,6 +432,7 @@ int add_db_exec(int handle, const char* sql, function_to_call_t* fun, array_t* b
   req->type = ADBEXEC;
   capture_command_giver(req);
   req->handle = handle;
+  req->db_generation = db_generation;
   req->data = sql;
   return aio_db_exec(req);
 }
@@ -813,7 +820,7 @@ vm::Value f_async_db_exec(vm::EfunArgs& f, LPC_INT handle, vm::StringArg sql,
 
   cb_ref.handed_off = true;
   bound_args_handed_off = true;
-  add_db_exec(handle, sql.c_str(), cb ? cb.release() : nullptr, bound_args, prom);
+  add_db_exec(handle, db->generation, sql.c_str(), cb ? cb.release() : nullptr, bound_args, prom);
   if (prom) {
     prom->ref++;
     return vm::Value::refed(prom);

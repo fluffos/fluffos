@@ -1,0 +1,80 @@
+// A query queued by async_db_exec() must run on the connection its handle
+// named when it was queued, or not at all -- never on a later connection
+// that took the handle over. Handles are slot numbers, and db_close() +
+// db_connect() reuses the slot at once; the worker thread used to look the
+// handle up only when it ran, so a query queued on connection A could
+// execute on connection B.
+//
+// Each round queues an INSERT on A, closes A and opens B (which gets A's
+// handle). Every INSERT must either have landed in A or been refused as
+// closed; B's table must stay empty. Which of the two each INSERT does is
+// a race with the worker thread, so this checks the invariant rather than
+// forcing the bad order: the unfixed driver needed a busy worker queue to
+// misroute a query and passes here as often as not.
+#if defined(__PACKAGE_ASYNC__) && defined(__PACKAGE_DB__) && defined(__USE_SQLITE3__)
+#define ROUNDS 40
+#define DB_A "/data/async_db_reuse_a.db"
+#define DB_B "/data/async_db_reuse_b.db"
+#define LATCH "async_db_exec handle reuse"
+#define SQLITE __USE_SQLITE3__
+
+int delivered, refused;
+int *b_handles = ({});
+
+private int count_rows(string file) {
+  int h = db_connect("", file, "", SQLITE);
+  mixed row;
+
+  db_exec(h, "SELECT COUNT(*) FROM t");
+  row = db_fetch(h, 1);
+  db_close(h);
+  return row[0];
+}
+
+void got(mixed result) {
+  if (stringp(result)) {
+    ASSERT2(strsrch(result, "closed") != -1, result);
+    refused++;
+  }
+  if (++delivered == ROUNDS) {
+    call_out("check", 0);
+  }
+}
+
+void check() {
+  foreach (int h in b_handles) {
+    catch(db_close(h));
+  }
+  ASSERT_EQ(0, count_rows(DB_B));
+  ASSERT_EQ(ROUNDS, count_rows(DB_A) + refused);
+  rm(DB_A);
+  rm(DB_B);
+  RELEASE_LATCH(LATCH);
+}
+
+void start() {
+  rm(DB_A);
+  rm(DB_B);
+  foreach (string file in ({ DB_A, DB_B })) {
+    int setup = db_connect("", file, "", SQLITE);
+
+    db_exec(setup, "CREATE TABLE t (x INTEGER)");
+    db_close(setup);
+  }
+  for (int i = 0; i < ROUNDS; i++) {
+    int a = db_connect("", DB_A, "", SQLITE);
+
+    async_db_exec(a, "INSERT INTO t VALUES (1)", (: got :));
+    db_close(a);
+    b_handles += ({ db_connect("", DB_B, "", SQLITE) });
+  }
+}
+#endif
+
+void do_tests() {
+#if defined(__PACKAGE_ASYNC__) && defined(__PACKAGE_DB__) && defined(__USE_SQLITE3__)
+  EXPECT_LATCH(LATCH);
+  call_out("start", 0);
+#endif
+  ASSERT(1);
+}
