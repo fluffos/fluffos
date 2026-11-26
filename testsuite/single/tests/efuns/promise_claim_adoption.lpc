@@ -30,5 +30,5 @@ void check() {
 
 void do_tests() {
   EXPECT_LATCH(LATCH);
-  call_out("start", 0);
+  call_out("start", 1);
 }
