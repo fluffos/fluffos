@@ -157,6 +157,26 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel
 /* Fulfill with a plain value, or adopt the eventual state of a promise value
  * (flattening). Self-resolution rejects the promise. */
 void promise_resolve_with(promise_t* p, svalue_t* value);
+
+/* Who may decide a promise's fate:
+ *
+ *   PENDING --claim--> committed: settled, or (resolved with a still-pending
+ *                      promise) adopting it, `resolving`
+ *
+ * promise_settle() and promise_resolve_with() are the internal steps; an
+ * adoption completes through promise_settle() while `resolving`. Everything
+ * ELSE that wants to decide p -- the efuns, and every driver source that
+ * delivers a result (call_out(delay), async I/O, external processes) -- is
+ * an outside claim, and an outside claim on a committed promise is refused:
+ * the first resolution wins, adoption included. The driver sources used to
+ * check `state` only, so a mudlib promise_resolve(p, q) was overridden when
+ * the driver's result arrived while q was still pending. */
+inline bool promise_fate_committed(const promise_t* p) {
+  return p->state != PROMISE_PENDING || p->resolving;
+}
+/* Returns 1 if this claim decided p, 0 if p's fate was already committed. */
+int promise_claim_settle(promise_t* p, svalue_t* value, int rejected);
+int promise_claim_resolve(promise_t* p, svalue_t* value);
 /* Attach a reaction. All passed refs (funptrs, next, command_giver) are
  * TRANSFERRED to the promise machinery. Delivers on a later gametick if the
  * promise is already settled. */

@@ -56,10 +56,12 @@ static void settle_call_out_promise(pending_call_t* cop, svalue_t* value, int re
   }
   promise_t* p = cop->promise;
   cop->promise = nullptr;
-  if (p->state == PROMISE_PENDING) {
+  /* An outside claim: refused if the mudlib already resolved p (with a
+   * promise it is now adopting, say) -- see promise_fate_committed(). */
+  if (!promise_fate_committed(p)) {
     if (value) {
       if (rejected) {
-        promise_settle(p, value, 1);
+        promise_claim_settle(p, value, 1);
       } else {
         /* NOT raw promise_settle(): go through the resolve path so a
          * promise value flattens and self-resolution is refused,
@@ -69,14 +71,14 @@ static void settle_call_out_promise(pending_call_t* cop, svalue_t* value, int re
          * the number 0 -- but any future form that fulfils with a
          * callback's return value (which may be a promise, possibly this
          * very one: that was an unreclaimable cycle) needs exactly this. */
-        promise_resolve_with(p, value);
+        promise_claim_resolve(p, value);
       }
     } else {
       svalue_t err;
       err.type = T_STRING;
       err.subtype = STRING_CONSTANT;
       err.u.string = "*call_out was removed before it ran";
-      promise_settle(p, &err, 1);
+      promise_claim_settle(p, &err, 1);
     }
   }
   free_promise(p);

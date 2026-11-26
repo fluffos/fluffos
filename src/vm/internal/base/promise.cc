@@ -1625,6 +1625,21 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel
   return 1;
 }
 
+int promise_claim_settle(promise_t* p, svalue_t* value, int rejected) {
+  if (promise_fate_committed(p)) {
+    return 0;
+  }
+  return promise_settle(p, value, rejected);
+}
+
+int promise_claim_resolve(promise_t* p, svalue_t* value) {
+  if (promise_fate_committed(p)) {
+    return 0;
+  }
+  promise_resolve_with(p, value);
+  return 1;
+}
+
 void promise_resolve_with(promise_t* p, svalue_t* value) {
   if (value->type == T_PROMISE) {
     promise_t* src = value->u.prom;
