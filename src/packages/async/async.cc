@@ -605,12 +605,20 @@ void check_reqs() {
 }
 
 void complete_all_asyncio() {
+  /* Wait for every request a worker still has, not only the queued ones: a
+   * worker moves a request from `reqs` to `current_works` as it starts on
+   * it, so an empty `reqs` used to let shutdown carry on (closing databases,
+   * freeing promises, destructing objects) under a request still running,
+   * whose completion was then never delivered. Both containers change under
+   * reqs_lock. */
   while (true) {
-    std::lock_guard<std::mutex> const lock(reqs_lock);
-
-    if (reqs.empty()) {
-      break;
+    {
+      std::lock_guard<std::mutex> const lock(reqs_lock);
+      if (reqs.empty() && current_works.empty()) {
+        break;
+      }
     }
+    std::this_thread::yield();
   }
   check_reqs();
 }
