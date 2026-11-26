@@ -106,7 +106,6 @@ struct QueuedReaction {
 };
 
 std::deque<QueuedReaction> g_promise_microtasks;
-bool g_drain_scheduled = false;
 /* Latched by promise_cleanup(): the queue is dead, deliveries can never run
  * again, so a late settle (something freed after it in the shutdown
  * sequence) frees its reaction on the spot instead of queueing a leak. */
@@ -279,13 +278,29 @@ TickEvent* g_yield_event = nullptr;
  * be tallied. Ordinary promise traffic with no I/O at all moved the counter
  * ~250/second before this exclusion. */
 bool g_draining = false;
-/* Whether the currently pending drain event is a gametick one. A gametick
- * event armed from inside dispatch is fine -- it runs in that same pass --
- * but if it has NOT run yet and an external settle arrives afterwards, that
- * settle would piggyback on it and wait for the next gametick, which is the
- * latency this arming split exists to avoid. Tracked so such a settle can
- * upgrade the pending event to a walltime one. */
-bool g_drain_event_is_tick = false;
+/* The drain's pending event -- at most one -- and what kind it is:
+ *
+ *   None --schedule_drain()----------> Tick (inside gametick dispatch)
+ *                                   or Wall (anywhere else)
+ *   Tick --external settle-----------> Wall (upgrade: see schedule_drain())
+ *   any  --turn ran out of budget----> LoopYield (schedule_drain_continue())
+ *   any  --drain starts / shutdown---> None (the event is the backend's)
+ *
+ * A gametick event armed from inside dispatch is fine -- it runs in that same
+ * pass -- but if it has NOT run yet and an external settle arrives
+ * afterwards, that settle would piggyback on it and wait for the next
+ * gametick, which is the latency the arming split exists to avoid; hence the
+ * upgrade. Re-arming always invalidates the event it replaces (drain_arm()):
+ * a one-flag "scheduled" latch could not express "replace the pending event
+ * with a different kind" (AGENTS.md section 13 item 18). This used to be
+ * three globals -- a scheduled flag, the event, and an is-tick flag that
+ * could not tell a walltime arming from a loop-yield one. */
+enum class DrainArm : unsigned char { None, Tick, Wall, LoopYield };
+struct DrainArming {
+  DrainArm kind = DrainArm::None;
+  TickEvent* event = nullptr;
+};
+DrainArming g_drain;
 /* Log a sustained backlog this often (in consecutive yields), so the signal
  * is bounded rather than one line per slice. */
 constexpr int kDrainYieldLogInterval = 1000;
@@ -312,24 +327,46 @@ void drain_promise_microtasks();
  *
  * Continuing a drain that ran out of batch is a different thing again and
  * goes through schedule_drain_continue() below. Because a mid-drain settle
- * has usually already armed an event here (setting g_drain_scheduled), that
- * continuation must CANCEL the pending one first, hence g_drain_event. */
-TickEvent* g_drain_event = nullptr;
+ * has usually already armed an event here, that continuation must CANCEL
+ * the pending one first, which drain_arm() does. */
+
+/* Forget the pending event without touching it: it is firing now, or the
+ * backend is about to delete it. */
+void drain_forget() { g_drain = DrainArming{}; }
+
+/* Arm the drain with an event of `kind`, invalidating whatever was armed. */
+void drain_arm(DrainArm kind) {
+  if (g_drain.event != nullptr) {
+    g_drain.event->valid = false;
+  }
+  TickEvent::callback_type cb([] { drain_promise_microtasks(); });
+  TickEvent* event = nullptr;
+  switch (kind) {
+    case DrainArm::Tick:
+      event = add_gametick_event(0, std::move(cb));
+      break;
+    case DrainArm::Wall:
+      event = add_walltime_event(std::chrono::milliseconds(0), std::move(cb));
+      break;
+    case DrainArm::LoopYield:
+      event = add_loop_yield_event(std::move(cb));
+      break;
+    case DrainArm::None:
+      break;
+  }
+  g_drain = DrainArming{kind, event};
+}
 
 void schedule_drain() {
-  if (g_drain_scheduled) {
+  if (g_drain.kind != DrainArm::None) {
     /* Already armed. If that arming was a gametick event and this settle is
      * an EXTERNAL arrival (an I/O completion, say), the pending event will
      * not be looked at until the next gametick -- so upgrade it to a
      * walltime event, which the loop dispatches on its next pass. Without
      * this the split below is only correct for the first settle. */
     if (!g_draining && !backend_in_tick_events()) {
-      if (g_drain_event_is_tick && g_drain_event != nullptr) {
-        g_drain_event->valid = false;
-        g_drain_event = add_walltime_event(
-            std::chrono::milliseconds(0),
-            TickEvent::callback_type([] { drain_promise_microtasks(); }));
-        g_drain_event_is_tick = false;
+      if (g_drain.kind == DrainArm::Tick) {
+        drain_arm(DrainArm::Wall);
       }
       /* Counted whether this settle did the upgrade or found the pending
        * arming already loop-based: either way it is an external arrival that
@@ -342,26 +379,19 @@ void schedule_drain() {
     }
     return;
   }
-  g_drain_scheduled = true;
-  TickEvent::callback_type cb([] { drain_promise_microtasks(); });
   /* delay 0 here is a one-shot, not a self-re-posting callback, so it cannot
    * spin the loop the way a zero-delay continuation would (see
    * schedule_drain_continue) -- it just runs on the next pass. */
-  /* std::move on both arms: exactly one runs, so neither can observe the
-   * other's moved-from `cb`, and the callback holds a std::function's heap
-   * allocation worth not copying. */
   if (backend_in_tick_events()) {
-    g_drain_event = add_gametick_event(0, std::move(cb));
-    g_drain_event_is_tick = true;
+    drain_arm(DrainArm::Tick);
   } else {
-    g_drain_event_is_tick = false;
     /* An EXTERNAL arrival: not gametick dispatch, and not a settle made by a
      * delivery inside a running drain. This is the package/async I/O
      * completion case, which is what the counter is for. */
     if (!g_draining) {
       g_drain_arms_loop_total++;
     }
-    g_drain_event = add_walltime_event(std::chrono::milliseconds(0), std::move(cb));
+    drain_arm(DrainArm::Wall);
   }
 }
 
@@ -402,22 +432,14 @@ void schedule_drain() {
  * host-driven, so returning to the page IS the yield. */
 
 void schedule_drain_continue() {
-  if (!g_drain_scheduled) {
-    g_drain_scheduled = true;
-    /* This arming is a WALLTIME event, so record that. Leaving the flag at
-     * whatever the previous arming set it to (a gametick event, if the drain
-     * that just yielded had been armed from inside tick dispatch) makes
-     * schedule_drain()'s upgrade branch fire against a continuation that is
-     * already loop-armed: it cancels the 1ms re-post and replaces it with a
-     * 0ms one. libevent activates a zero timeout immediately rather than
-     * queueing it, so under sustained external settles -- exactly the
-     * package/async I/O load this backpressure exists for -- every settle
-     * converts the throttled continuation back into an immediate one and the
-     * 1ms delay stops doing its job. */
-    g_drain_event_is_tick = false;
-    g_drain_event = add_loop_yield_event(TickEvent::callback_type([] {
-      drain_promise_microtasks();
-    }));
+  /* Recorded as LoopYield, not left as whatever the previous arming was: a
+   * stale Tick here would make schedule_drain()'s upgrade replace this
+   * continuation with a zero-delay walltime event, which libevent activates
+   * at once instead of after the next poll -- so under sustained external
+   * settles, exactly the load this backpressure exists for, the yield would
+   * stop yielding. */
+  if (g_drain.kind == DrainArm::None) {
+    drain_arm(DrainArm::LoopYield);
   }
 }
 
@@ -683,8 +705,7 @@ void deliver_reaction(QueuedReaction* qr) {
 void drain_promise_microtasks() {
   g_draining = true;
   DEFER { g_draining = false; };
-  g_drain_scheduled = false;
-  g_drain_event = nullptr; /* the event now firing is being disposed */
+  drain_forget(); /* the event now firing is being disposed */
 
   /* Turn scheduling. The drain must never hold the driver: while it runs,
    * nothing else does -- no socket reads, no command scheduling, no
@@ -806,17 +827,12 @@ void drain_promise_microtasks() {
           g_consecutive_drain_yields, static_cast<int>(g_promise_microtasks.size()));
     }
     /* A mid-drain settle has usually already armed a same-tick GAMETICK
-     * event (and set g_drain_scheduled). That one is serviced from inside
+     * event. That one is serviced from inside
      * call_tick_events() without ever returning to the loop, which is
      * exactly what re-posting is trying to avoid. Cancel it and re-arm as a
      * walltime event so the loop gets to read sockets and queue commands
      * before the next batch. */
-    if (g_drain_event != nullptr) {
-      g_drain_event->valid = false;
-      g_drain_event = nullptr;
-    }
-    g_drain_scheduled = false;
-    schedule_drain_continue();
+    drain_arm(DrainArm::LoopYield);
   } else {
     g_consecutive_drain_yields = 0;
   }
@@ -2649,13 +2665,11 @@ void mark_promise_queue() {
 
 void promise_cleanup() {
   g_promises_shut_down = true;
-  /* The TickEvent g_drain_event points at is owned by the backend and is
+  /* The TickEvent g_drain.event points at is owned by the backend and is
    * deleted by clear_tick_events()/clear_walltime_events(), which run AFTER
    * this in the shutdown sequence. Drop our pointer now rather than relying
    * on g_promises_shut_down keeping every later reader away from it. */
-  g_drain_event = nullptr;
-  g_drain_event_is_tick = false;
-  g_drain_scheduled = false;
+  drain_forget();
   /* Same reasoning for the yield event, whose TickEvent the backend deletes
    * (without running it) in clear_walltime_events().
    *
