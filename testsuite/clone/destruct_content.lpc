@@ -1,0 +1,18 @@
+// Fixture for single/tests/efuns/destruct_phases.lpc: an object inside a
+// destructing environment, whose move_or_destruct() can call back into the
+// environment or fail.
+int fd = -1;
+int fail;
+
+void set_fail(int f) { fail = f; }
+void go_to(object dest) { move_object(dest); }
+int query_fd() { return fd; }
+
+int move_or_destruct(object dest) {
+  if (fail) {
+    error("refusing to move\n");
+  }
+  fd = environment()->open_socket();
+  move_object("/single/void");
+  return 0;
+}

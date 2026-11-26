@@ -1,0 +1,61 @@
+// destruct_object() runs every step that runs LPC -- on_destruct(), the
+// object:destruct hooks, moving the contents out, saving an ed buffer,
+// reloading a vital object -- in a PREPARE phase, before it tears anything
+// down; a failure there backs out and leaves the object intact. Then it
+// commits, running no LPC at all.
+
+int notified;
+
+void note_notified() { notified++; }
+
+void do_tests() {
+  object env, item, sh;
+  mixed err;
+  int fd;
+
+#ifdef __PACKAGE_SOCKETS__
+  // LPC run while the contents move out cannot leave the dying object with
+  // a resource: a socket it opens then is closed with the rest of its own.
+  // (It used to stay open, owned by an object about to be freed.)
+  env = new("/clone/destruct_env");
+  item = new("/clone/destruct_content");
+  item->go_to(env);
+  destruct(env);
+  fd = item->query_fd();
+  ASSERT(fd >= 0);
+  ASSERT_EQ("CLOSED", socket_status(fd)[1]);
+  destruct(item);
+
+  // A destruct that fails in the prepare phase backs out: the object is
+  // still there, still findable, and still has its socket, and can be
+  // destructed once the cause is gone. (The failed destruct used to have
+  // closed its sockets already.)
+  env = new("/clone/destruct_env");
+  fd = env->open_socket();
+  item = new("/clone/destruct_content");
+  item->set_fail(1);
+  item->go_to(env);
+  err = catch(destruct(env));
+  ASSERT(stringp(err));
+  ASSERT(objectp(env));
+  ASSERT_EQ(env, find_object(file_name(env)));
+  ASSERT_NE("CLOSED", socket_status(fd)[1]);
+  item->set_fail(0);
+  destruct(env);
+  ASSERT_EQ(0, env);
+  ASSERT_EQ("CLOSED", socket_status(fd)[1]);
+  destruct(item);
+#endif
+
+  // A shadowed object is notified once. The shadows are destructed first,
+  // the object last; that used to happen after the object's own
+  // on_destruct(), which then ran a second time.
+  notified = 0;
+  env = new("/clone/destruct_env");
+  sh = clone_object("/clone/shadow_probe");
+  ASSERT(sh->start(env));
+  destruct(env);
+  ASSERT_EQ(0, env);
+  ASSERT_EQ(0, sh);
+  ASSERT_EQ(1, notified);
+}

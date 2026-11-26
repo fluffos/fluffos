@@ -1,0 +1,10 @@
+// Fixture for single/tests/efuns/destruct_phases.lpc: an environment that
+// opens sockets when asked, and counts its on_destruct() calls.
+#include <socket.h>
+
+int notified;
+
+void create() { set_notify_destruct(1); }
+void on_destruct() { notified++; "/single/tests/efuns/destruct_phases"->note_notified(); }
+void rcb(int fd, mixed msg, string addr) {}
+int open_socket() { return socket_create(DATAGRAM, "rcb"); }
