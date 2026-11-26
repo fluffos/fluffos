@@ -137,6 +137,20 @@ static void reset_restore_scratch() {
   }
 }
 
+/* The scratch state (save_svalue_depth, max_depth, sizes[]) belongs to one
+ * top-level restore of a compound value. Opened around it, this resets the
+ * state on every way out -- the normal return and any error() inside the
+ * restore helpers alike -- so no error site has to remember to (several did
+ * not, until each was found). */
+namespace {
+struct RestoreScratchScope {
+  RestoreScratchScope() = default;
+  RestoreScratchScope(const RestoreScratchScope&) = delete;
+  RestoreScratchScope& operator=(const RestoreScratchScope&) = delete;
+  ~RestoreScratchScope() { reset_restore_scratch(); }
+};
+}  // namespace
+
 // restore_array()/restore_mapping()/restore_class() recurse in lockstep
 // with the one-shot sizing pre-pass (restore_size()/restore_internal_size(),
 // which populates sizes[0..N-1] as it walks the string) ONLY as long as
@@ -962,8 +976,7 @@ static int restore_mapping(char** str, svalue_t* sv) {
         free_mapping(m);
         free_svalue(&key, "restore_mapping: out of memory");
         free_svalue(&value, "restore_mapping: out of memory");
-        reset_restore_scratch();  // error() below skips restore_svalue's cleanup
-        error("Out of memory\n");
+        error("Out of memory\n");  // RestoreScratchScope resets the scratch state
       }
     }
 
@@ -972,8 +985,7 @@ static int restore_mapping(char** str, svalue_t* sv) {
       free_mapping(m);
       free_svalue(&key, "restore_mapping: mapping too large");
       free_svalue(&value, "restore_mapping: mapping too large");
-      reset_restore_scratch();  // mapping_too_large() error()s past the cleanup
-      mapping_too_large();
+      mapping_too_large();  // error()s; RestoreScratchScope resets the scratch state
     }
 
     elt = new_map_node();
@@ -1018,13 +1030,8 @@ static int restore_class(char** str, svalue_t* ret) {
     return ROB_CLASS_ERROR;
   }
 
-  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
-    // Same reasoning as restore_array()'s guard above: allocate_class_by_size()
-    // now validates and error()s cleanly on an out-of-range size (previously
-    // it didn't validate at all), but that error() still needs to run before
-    // it leaves save_svalue_depth/sizes[] dirty for the next restore.
-    reset_restore_scratch();
-  }
+  // allocate_class_by_size() validates `size` and error()s cleanly on an
+  // out-of-range one; RestoreScratchScope resets the scratch state on the way.
   // Owned via RAII -- same reasoning as restore_array()'s v_owned above: a
   // nested restore call below can throw and skip the goto-based `error:`
   // cleanup, leaking this class.
@@ -1128,14 +1135,8 @@ static int restore_array(char** str, svalue_t* ret) {
     return ROB_ARRAY_ERROR;
   }
 
-  if (size < 0 || size > CONFIG_INT(__MAX_ARRAY_SIZE__)) {
-    // Unlike the two restore_mapping() error sites, allocate_array()'s own
-    // "Illegal array size" error() below was unguarded: it skips
-    // restore_svalue()'s cleanup the same way OOM/mapping-too-large do,
-    // leaving save_svalue_depth/sizes[] dirty for the *next* restore_svalue()
-    // call, which can then read a stale/uninitialized sizes[] entry.
-    reset_restore_scratch();
-  }
+  // allocate_array() error()s on an out-of-range `size` ("Illegal array
+  // size"); RestoreScratchScope resets the scratch state on the way.
   // Owned via RAII: a nested restore_mapping()/restore_array()/
   // restore_class() call below can itself throw (a deeper oversized
   // element, OOM, mapping-too-large), which would skip the goto-based
@@ -1305,7 +1306,8 @@ int restore_svalue(char* cp, svalue_t* v) {
   switch (c = *cp++) {
     case '"':
       return restore_string(cp, v);
-    case '(':
+    case '(': {
+      RestoreScratchScope const scratch;
       if (*cp == '{') {
         cp++;
         ret = restore_array(&cp, v);
@@ -1317,15 +1319,8 @@ int restore_svalue(char* cp, svalue_t* v) {
       } else {
         ret = ROB_GENERAL_ERROR;
       }
-
-      if (save_svalue_depth) {
-        save_svalue_depth = max_depth = 0;
-        if (sizes) {
-          FREE((char*)sizes);
-        }
-        sizes = (int*)nullptr;
-      }
       return ret;
+    }
 
     case '-':
     case '0':
@@ -1366,24 +1361,19 @@ static int safe_restore_svalue(char* cp, svalue_t* v) {
       }
       break;
     case '(': {
-      if (*cp == '{') {
-        cp++;
-        ret = restore_array(&cp, &val);
-      } else if (*cp == '[') {
-        cp++;
-        ret = restore_mapping(&cp, &val);
-      } else if (*cp++ == '/') {
-        ret = restore_class(&cp, &val);
-      } else {
-        return ROB_GENERAL_ERROR;
-      }
-
-      if (save_svalue_depth) {
-        save_svalue_depth = max_depth = 0;
-        if (sizes) {
-          FREE((char*)sizes);
+      {
+        RestoreScratchScope const scratch;
+        if (*cp == '{') {
+          cp++;
+          ret = restore_array(&cp, &val);
+        } else if (*cp == '[') {
+          cp++;
+          ret = restore_mapping(&cp, &val);
+        } else if (*cp++ == '/') {
+          ret = restore_class(&cp, &val);
+        } else {
+          return ROB_GENERAL_ERROR;
         }
-        sizes = (int*)nullptr;
       }
       if (ret) {
         return ret;
