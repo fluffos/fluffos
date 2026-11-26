@@ -68,7 +68,11 @@ private object reload_target(object ob) {
     }
     name = file_name(ob);
   }
-  if (strsrch(name, "/data/") == 0 || strsrch(name, "/command/") == 0 || ob == this_object()) {
+  // The master: master::flag() holds the stack for the whole run, so every
+  // attempt is refused -- and the refusal's error lands in the master's own
+  // last-error record, which tests read back.
+  if (strsrch(name, "/data/") == 0 || strsrch(name, "/command/") == 0 || ob == this_object() ||
+    ob == master()) {
     return 0;
   }
   return ob;

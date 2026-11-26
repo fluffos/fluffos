@@ -105,9 +105,11 @@ private void run_one(string path, int kind) {
 }
 
 private void recurse(string dir) {
+  string *files = get_dir(dir + "*.lpc");
+
   // Chaos runs keep a fixed order, so a seed reproduces the same recompiles.
-  foreach (string file in sort_array(get_dir(dir + "*.lpc"),
-    chaos ? 1 : (: random(2) - random(2) :))) {
+  files = chaos ? sort_array(files, 1) : sort_array(files, (: random(2) - random(2) :));
+  foreach (string file in files) {
     run_one(dir + file, 0);
   }
   foreach (string subdir in map(filter(get_dir(dir + "*", -1),
