@@ -165,8 +165,7 @@ void wasm_console_disconnect(int id) {
   if (ip == nullptr) {
     return;
   }
-  ip->iflags |= NET_DEAD;
-  remove_interactive(ip->ob, 0);
+  conn_close(ip);
 }
 
 /*

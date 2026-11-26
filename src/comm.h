@@ -46,7 +46,7 @@
  * struct, its telnet handle and its object reference for the outermost
  * scope to free on exit -- the way a destructed object outlives destruct()
  * until the next sweep. After any call that can run LPC, stop if
- * (ip->iflags & CLOSING).
+ * conn_closing(ip).
  */
 class InteractiveScope {
  public:
@@ -69,6 +69,7 @@ int process_user_command(struct interactive_t*);
 void comm_run_scheduled_command(struct interactive_t*);
 int set_call(struct object_t*, struct sentence_t*, int);
 void remove_interactive(struct object_t*, int);
+void conn_close(interactive_t* ip);
 
 int flush_message(struct interactive_t*);
 void flush_message_all();

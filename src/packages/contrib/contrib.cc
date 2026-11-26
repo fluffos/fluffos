@@ -2989,7 +2989,7 @@ vm::Value f_send_nullbyte(vm::EfunArgs&, object_t* who) {
   tmp = 0;
 
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
-      (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+      conn_closing(who->interactive)) {
     tmp = -2;
   } else {
     tmp = 1;

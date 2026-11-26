@@ -160,7 +160,7 @@ outbuffer_t current_ed_results;
 
 #define ED_BUFFER (current_ed_buffer)
 #ifdef OLD_ED
-#define P_NET_DEAD (command_giver->interactive->iflags & NET_DEAD)
+#define P_NET_DEAD (conn_closing(command_giver->interactive))
 #else
 #define P_NET_DEAD 0 /* objects are never net dead :) */
 #endif

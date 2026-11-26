@@ -20,9 +20,10 @@
 #define WAS_SINGLE_CHAR I_WAS_SINGLE_CHAR
 #define HAS_PROCESS_INPUT 0x0010 /* interactive object has process_input()  */
 #define HAS_WRITE_PROMPT 0x0020  /* interactive object has write_prompt()   */
-#define CLOSING 0x0040           /* true when closing this file descriptor  */
+/* 0x0040 was CLOSING, now ConnPhase::Closing. */
 #define CMD_IN_BUF 0x0080        /* there is a full command in input buffer */
-#define NET_DEAD 0x0100
+/* 0x0100 was NET_DEAD: every transport set it just before closing the
+ * connection, so it only ever repeated CLOSING. Now ConnPhase::Closing. */
 #define NOTIFY_FAIL_FUNC 0x0200 /* default_err_mesg is a function pointer  */
 #define USING_TELNET 0x0400   /* they're using telnet, or something that understands telnet codes */
 #define SKIP_COMMAND 0x0800   /* skip current command                    */
@@ -37,6 +38,25 @@
 #define USING_MSDP 0x100000        /* we've negotiated msdp */
 
 // from ICU
+/*
+ * A connection's lifecycle (interactive_t::phase):
+ *
+ *   PreLogon --on_user_logon()--> Attached --close--> Closing --> freed
+ *      |                                                ^
+ *      +------------- closed before its logon ----------+
+ *
+ * PreLogon: accepted, logon pending (on_user_logon() runs from a deferred
+ *   event). No object knows of the connection yet: ip->ob is the master,
+ *   which does not point back at ip, and ip holds no reference to it.
+ * Attached: ob->interactive == ip (from connect() onward; exec() moves it).
+ * Closing: torn down or being torn down; nothing may use the transport.
+ *
+ * A transport that sees its peer go away calls conn_close(), which handles
+ * both open phases. Code that ran LPC while holding ip checks
+ * conn_closing(ip) before touching it again (see InteractiveScope, comm.h).
+ */
+enum class ConnPhase : unsigned char { PreLogon = 0, Attached, Closing };
+
 struct UConverter;
 
 // net/transport.h
@@ -73,6 +93,7 @@ struct interactive_t {
   struct ed_buffer_s* ed_buffer; /* local ed                        */
 #endif
   unsigned int iflags; /* interactive flags */
+  ConnPhase phase;     /* see ConnPhase */
 
   // The byte transport that connects this user to its peer (socket,
   // websocket, or the WASM JS bridge). Owned by this struct; torn down in
@@ -114,5 +135,7 @@ struct interactive_t {
   // TLS context
   SSL* ssl;
 };
+
+inline bool conn_closing(const interactive_t* ip) { return ip->phase == ConnPhase::Closing; }
 
 #endif /* INTERACTIVE_H */
