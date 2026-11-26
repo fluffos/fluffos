@@ -400,10 +400,14 @@ int64_t us_since(std::chrono::steady_clock::time_point t0) {
 }
 
 void raw_timer_set(int64_t us) {
+  // Clear before arming, as set_eval() does. A handler's remaining budget
+  // is often only microseconds; arming first let the one-shot timer fire
+  // before the clear, which then erased the expiry for good -- the handler
+  // ran unmetered (seen on CI as a spinning hook that nothing stopped).
+  outoftime = 0;
 #ifdef __linux__
   posix_eval_timer_set(us > 0 ? us : 1);
 #endif
-  outoftime = 0;
 }
 
 void rebuild_pin_index(PointId p) {
