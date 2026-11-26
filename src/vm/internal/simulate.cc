@@ -1409,12 +1409,8 @@ void destruct_object(object_t* ob, const char* cause) {
 #endif
 
   ob->flags |= O_BEING_DESTRUCTED;
-  bool committed = false;
-  DEFER {
-    if (!committed) {
-      ob->flags &= ~O_BEING_DESTRUCTED; /* error() in the prepare phase */
-    }
-  };
+  /* error() in the prepare phase backs out; dismissed at the commit point. */
+  auto back_out = scope_guard::make_scope_exit([ob]() { ob->flags &= ~O_BEING_DESTRUCTED; });
 #ifndef NO_ENVIRONMENT
   object_t* super;
 #endif
@@ -1532,7 +1528,7 @@ void destruct_object(object_t* ob, const char* cause) {
   }
 
   /* ---- commit: from here on no LPC runs, and nothing backs out. ---- */
-  committed = true;
+  back_out.dismiss();
 
 #if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*

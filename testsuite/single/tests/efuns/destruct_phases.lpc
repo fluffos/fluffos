@@ -9,11 +9,13 @@ int notified;
 void note_notified() { notified++; }
 
 void do_tests() {
-  object env, item, sh;
+  object env, sh;
+
+#ifdef __PACKAGE_SOCKETS__
+  object item;
   mixed err;
   int fd;
 
-#ifdef __PACKAGE_SOCKETS__
   // LPC run while the contents move out cannot leave the dying object with
   // a resource: a socket it opens then is closed with the rest of its own.
   // (It used to stay open, owned by an object about to be freed.)
