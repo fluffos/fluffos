@@ -16,7 +16,7 @@ object try_compile(string src, string hdr) {
   rm(HDR);
   if (hdr) write_file(HDR, hdr);
   write_file(GEN + ".lpc", src);
-  catch (ob = load_object(GEN));
+  catch(ob = load_object(GEN));
   rm(GEN + ".lpc");
   rm(HDR);
   return ob;
@@ -36,15 +36,15 @@ void do_tests() {
 
   // Legal: #elif chain picks the first true branch, #else only when none.
   ob = try_compile("#if 0\nint f() { return 1; }\n#elif 0\nint f() { return 2; }\n"
-                   "#elif 1\nint f() { return 3; }\n#elif 1\nint f() { return 4; }\n"
-                   "#else\nint f() { return 5; }\n#endif\n", 0);
+    "#elif 1\nint f() { return 3; }\n#elif 1\nint f() { return 4; }\n"
+    "#else\nint f() { return 5; }\n#endif\n", 0);
   ASSERT(ob);
   if (ob) {
     ASSERT_EQ(3, ob->f());
     destruct(ob);
   }
   ob = try_compile("#if 0\nint f() { return 1; }\n#elif 0\nint f() { return 2; }\n"
-                   "#else\nint f() { return 5; }\n#endif\n", 0);
+    "#else\nint f() { return 5; }\n#endif\n", 0);
   ASSERT(ob);
   if (ob) {
     ASSERT_EQ(5, ob->f());
@@ -54,7 +54,7 @@ void do_tests() {
   // Legal: a header that opens and closes its own guard; nesting inside a
   // dead branch still has to balance.
   ASSERT(compiles("#include \"" + HDR + "\"\nint f() { return X; }\n",
-                  "#ifndef X\n#define X 7\n#endif\n"));
+    "#ifndef X\n#define X 7\n#endif\n"));
   ASSERT(compiles("#if 0\n#if 1\n#else\n#endif\n#endif\nint f() { return 1; }\n", 0));
 
   // Illegal: a second #else, and an #elif after #else -- including inside a
