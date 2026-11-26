@@ -15,15 +15,36 @@
 #define MAX_EVAL_COST_SLOT 264  // __MAX_EVAL_COST__ (CFG_INT(8))
 #define TEST_EVAL_LIMIT_US 500000
 #define OUTER_ROUNDS 3000000
+// A spinning handler gives up after this many seconds even if no eval timer
+// stops it, so a regression fails this file instead of hanging the run.
+#define SPIN_DEADLINE_S 10
 
 int outer_iters;
+int spin_timed_out;
 int *hooks = ({});
 
 int inner() { return 1; }
 int target() { return 1; }
 
 mixed spin_forever(int id, object actor, object caller, object t, string fn, mixed *args) {
-  while (1) {}
+  int deadline = time() + SPIN_DEADLINE_S;
+
+  while (time() < deadline) {}
+  spin_timed_out = 1;
+  return 0;
+}
+
+// Is eval cost metered on this platform at all? Only Linux has an eval timer
+// (init_eval()); elsewhere get_eval() returns the configured maximum
+// unchanged and nothing would ever stop the handler.
+private int metered() {
+  int a = set_eval_limit(-1);
+  int b;
+  int i;
+
+  for (i = 0; i < 200000; i++) {}
+  b = set_eval_limit(-1);
+  return b < a;
 }
 
 mixed call_inner_then_spin(int id, object actor, object caller, object t, string fn, mixed *args) {
@@ -43,6 +64,7 @@ private void run_checks() {
     ([ "object": this_object(), "function": "inner" ]), HOOK_BEFORE) });
   err = catch(this_object()->target());
   ASSERT_EQ(0, err);
+  ASSERT2(!spin_timed_out, "the eval timer never stopped the nested handler");
   // The nested handler spent the enclosing handler's whole budget, so the
   // enclosing handler is stopped before its first round. It used to run on
   // with no limit (about a million rounds here; with the suite's 300 s limit
@@ -52,9 +74,14 @@ private void run_checks() {
 }
 
 void do_tests() {
-  int orig_limit = set_eval_limit(1);  // read the current limit
-  int orig_budget = get_config(MAX_EVAL_COST_SLOT);
+  int orig_limit, orig_budget;
   mixed err;
+
+  if (!metered()) {
+    return;
+  }
+  orig_limit = set_eval_limit(1);  // read the current limit
+  orig_budget = get_config(MAX_EVAL_COST_SLOT);
 
   set_config(MAX_EVAL_COST_SLOT, TEST_EVAL_LIMIT_US);
   set_eval_limit(TEST_EVAL_LIMIT_US);
