@@ -45,7 +45,7 @@ void start() {
 void do_tests() {
 #ifdef __PACKAGE_ASYNC__
   EXPECT_LATCH(LATCH);
-  call_out("start", 0);
+  call_out("start", 1);
 #endif
   ASSERT(1);
 }
