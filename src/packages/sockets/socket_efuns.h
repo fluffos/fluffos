@@ -30,6 +30,21 @@ enum socket_option {
 
 constexpr int NUM_SOCKET_OPTIONS = 5;
 
+/*
+ * An efun socket's lifecycle (lpc_socket_t::state), changed only through
+ * socket_set_state(), which asserts the edge on Debug builds:
+ *
+ *   CLOSED --create--> UNBOUND --bind--> BOUND --listen--> LISTEN
+ *   CLOSED --accept--> HANDSHAKE (TLS) | DATA_XFER
+ *   UNBOUND | BOUND --connect--> HANDSHAKE (TLS) | DATA_XFER
+ *   HANDSHAKE --TLS done--> DATA_XFER
+ *   any open --socket_close() with unsent data--> FLUSHING
+ *   anything --clear_socket()--> CLOSED
+ *
+ * CLOSED and FLUSHING are not open (socket_is_open()): to the mudlib a
+ * flushing socket is already closed, the driver is only finishing its
+ * writes. A CLOSED slot is free for reuse.
+ */
 enum socket_state {
   STATE_CLOSED,
   STATE_FLUSHING,
@@ -81,7 +96,7 @@ enum socket_flags {
   S_RELEASE = 0x001,
   S_BLOCKED = 0x002,
   S_HEADER = 0x004,
-  S_WACCEPT = 0x008,
+  /* 0x008 was S_WACCEPT: set and cleared, never tested. */
   S_BINARY = 0x010,
   S_READ_FP = 0x020,
   S_WRITE_FP = 0x040,

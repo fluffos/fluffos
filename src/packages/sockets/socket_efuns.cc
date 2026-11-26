@@ -90,6 +90,42 @@ const char* error_strings[ERROR_STRINGS] = {"Problem creating socket",
 // Hold all the LPC socks
 std::deque<lpc_socket_t> lpc_socks;
 
+/* See the state diagram in socket_efuns.h. */
+static bool socket_is_open(int fd) {
+  return lpc_socks[fd].state != STATE_CLOSED && lpc_socks[fd].state != STATE_FLUSHING;
+}
+
+static bool socket_state_edge_ok(socket_state from, socket_state to) {
+  switch (to) {
+    case STATE_CLOSED:
+      return true;
+    case STATE_UNBOUND:
+      return from == STATE_CLOSED;
+    case STATE_BOUND:
+      return from == STATE_UNBOUND;
+    case STATE_LISTEN:
+      return from == STATE_BOUND;
+    case STATE_HANDSHAKE:
+      return from == STATE_CLOSED || from == STATE_UNBOUND || from == STATE_BOUND;
+    case STATE_DATA_XFER:
+      return from == STATE_CLOSED || from == STATE_UNBOUND || from == STATE_BOUND ||
+             from == STATE_HANDSHAKE;
+    case STATE_FLUSHING:
+      return from != STATE_CLOSED && from != STATE_FLUSHING;
+  }
+  return false;
+}
+
+static void socket_set_state(int fd, socket_state to) {
+#ifdef DEBUG
+  if (!socket_state_edge_ok(lpc_socks[fd].state, to)) {
+    fatal("socket %d: illegal state change %d -> %d\n", fd, lpc_socks[fd].state, to);
+  }
+#endif
+  lpc_socks[fd].state = to;
+}
+
+
 void on_lpc_sock_read(evutil_socket_t fd, short what, void* arg) {
   debug(event, "Got an event on socket %" FMT_SOCKET_FD ":%s%s%s%s \n", fd,
         (what & EV_TIMEOUT) ? " timeout" : "", (what & EV_READ) ? " read" : "",
@@ -110,7 +146,7 @@ void on_lpc_sock_write(evutil_socket_t fd, short what, void* arg) {
 void handle_tls_handshake(int fd) {
   auto ret = SSL_connect(lpc_socks[fd].ssl);
   if (ret == 1) {
-    lpc_socks[fd].state = STATE_DATA_XFER;
+    socket_set_state(fd, STATE_DATA_XFER);
     lpc_socks[fd].flags |= S_BLOCKED;
     debug(sockets, ("handle_tls_handshake: TLS: handshake successful\n"));
     event_add(lpc_socks[fd].ev_write, nullptr);
@@ -137,7 +173,7 @@ void handle_tls_handshake(int fd) {
 void handle_tls_server_handshake(int fd) {
   auto ret = SSL_accept(lpc_socks[fd].ssl);
   if (ret == 1) {
-    lpc_socks[fd].state = STATE_DATA_XFER;
+    socket_set_state(fd, STATE_DATA_XFER);
     lpc_socks[fd].flags |= S_BLOCKED;
     debug(sockets, ("handle_tls_server_handshake: TLS: handshake successful\n"));
     event_add(lpc_socks[fd].ev_write, nullptr);
@@ -261,7 +297,7 @@ static void clear_socket(int which, int dofree) {
   lpc_socks[which].fd = -1;
   lpc_socks[which].flags = 0;
   lpc_socks[which].mode = MUD;
-  lpc_socks[which].state = STATE_CLOSED;
+  socket_set_state(which, STATE_CLOSED);
   memset(reinterpret_cast<char*>(&lpc_socks[which].l_addr), 0, sizeof(lpc_socks[which].l_addr));
   memset(reinterpret_cast<char*>(&lpc_socks[which].r_addr), 0, sizeof(lpc_socks[which].r_addr));
   lpc_socks[which].l_addrlen = 0;
@@ -510,7 +546,7 @@ int socket_create(int mode_int, svalue_t* read_callback, svalue_t* close_callbac
     }
 
     lpc_socks[i].mode = mode;
-    lpc_socks[i].state = STATE_UNBOUND;
+    socket_set_state(i, STATE_UNBOUND);
     lpc_socks[i].owner_ob = current_object;
     current_object->flags |= O_EFUN_SOCKET;
 
@@ -528,7 +564,7 @@ int socket_bind(int fd, int port, const char* addr) {
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if (lpc_socks[fd].owner_ob != current_object) {
@@ -606,7 +642,7 @@ int socket_bind(int fd, int port, const char* addr) {
     return EEGETSOCKNAME;
   }
 
-  lpc_socks[fd].state = STATE_BOUND;
+  socket_set_state(fd, STATE_BOUND);
 
   debug(sockets, "socket_bind: bound lpc socket %d (real fd %" FMT_SOCKET_FD ") to %s.\n", fd,
         lpc_socks[fd].fd,
@@ -627,7 +663,7 @@ int socket_listen(int fd, svalue_t* callback) {
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if (lpc_socks[fd].owner_ob != current_object) {
@@ -676,7 +712,7 @@ int socket_listen(int fd, svalue_t* callback) {
           lpc_socks[fd].fd, e, evutil_socket_error_to_string(e));
     return EELISTEN;
   }
-  lpc_socks[fd].state = STATE_LISTEN;
+  socket_set_state(fd, STATE_LISTEN);
   set_read_callback(fd, callback);
 
   current_object->flags |= O_EFUN_SOCKET;
@@ -698,7 +734,7 @@ int socket_accept(int fd, svalue_t* read_callback, svalue_t* write_callback) {
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if (lpc_socks[fd].owner_ob != current_object) {
@@ -710,8 +746,6 @@ int socket_accept(int fd, svalue_t* read_callback, svalue_t* write_callback) {
   if (lpc_socks[fd].state != STATE_LISTEN) {
     return EENOTLISTN;
   }
-
-  lpc_socks[fd].flags &= ~S_WACCEPT;
 
   addrlen = sizeof(addr);
   accept_fd = accept(lpc_socks[fd].fd, reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
@@ -793,11 +827,11 @@ int socket_accept(int fd, svalue_t* read_callback, svalue_t* write_callback) {
       SSL_set_fd(ssl, lpc_socks[i].fd);
 
       // Start in handshake state for server-side TLS
-      lpc_socks[i].state = STATE_HANDSHAKE;
+      socket_set_state(i, STATE_HANDSHAKE);
       debug(sockets, "socket_accept: TLS enabled for accepted socket, starting handshake.\n");
     } else {
       // Non-TLS socket goes straight to data transfer
-      lpc_socks[i].state = STATE_DATA_XFER;
+      socket_set_state(i, STATE_DATA_XFER);
     }
 
     current_object->flags |= O_EFUN_SOCKET;
@@ -821,7 +855,7 @@ int socket_connect(int fd, const char* name, svalue_t* read_callback, svalue_t* 
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if (lpc_socks[fd].owner_ob != current_object) {
@@ -959,10 +993,10 @@ int socket_connect(int fd, const char* name, svalue_t* read_callback, svalue_t* 
         lpc_socks[fd].fd);
 
   if (lpc_socks[fd].flags & S_TLS_SUPPORT) {
-    lpc_socks[fd].state = STATE_HANDSHAKE;
+    socket_set_state(fd, STATE_HANDSHAKE);
     handle_tls_handshake(fd);
   } else {
-    lpc_socks[fd].state = STATE_DATA_XFER;
+    socket_set_state(fd, STATE_DATA_XFER);
     lpc_socks[fd].flags |= S_BLOCKED;
   }
 
@@ -984,7 +1018,7 @@ int socket_write(int fd, svalue_t* message, const char* name) {
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if (lpc_socks[fd].owner_ob != current_object) {
@@ -1405,7 +1439,6 @@ void socket_read_select_handler(int fd) {
 
     case STATE_LISTEN: {
       debug(sockets, ("read_socket_handler: apply read callback\n"));
-      lpc_socks[fd].flags |= S_WACCEPT;
       vm::Call call;
       call.push(fd);
       call_callback(fd, S_READ_FP, call);
@@ -1851,7 +1884,7 @@ int socket_close(int fd, int flags) {
     /* Can't close now; we still have data to write.  Tell the mudlib
      * it is closed, but we really finish up later.
      */
-    lpc_socks[fd].state = STATE_FLUSHING;
+    socket_set_state(fd, STATE_FLUSHING);
     return EESUCCESS;
   }
 
@@ -1890,7 +1923,7 @@ int socket_release(int fd, object_t* ob, svalue_t* callback) {
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if (lpc_socks[fd].owner_ob != current_object) {
@@ -1932,7 +1965,7 @@ int socket_acquire(int fd, svalue_t* read_callback, svalue_t* write_callback,
   if (fd < 0 || fd >= lpc_socks.size()) {
     return EEFDRANGE;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return EEBADF;
   }
   if ((lpc_socks[fd].flags & S_RELEASE) == 0) {
@@ -2013,7 +2046,7 @@ object_t* get_socket_owner(int fd) {
   if (fd < 0 || fd >= lpc_socks.size()) {
     return (object_t*)nullptr;
   }
-  if (lpc_socks[fd].state == STATE_CLOSED || lpc_socks[fd].state == STATE_FLUSHING) {
+  if (!socket_is_open(fd)) {
     return (object_t*)nullptr;
   }
   return lpc_socks[fd].owner_ob;
