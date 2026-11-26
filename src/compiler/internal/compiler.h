@@ -513,6 +513,12 @@ struct CompileState {
   // typeless global variable declaration) with a targeted error instead
   // of silently declaring 'var' with unknown type.
   int class_def_cooldown = 0;
+
+  // How often pop_n_locals() / rule_block() had to clamp a locals count
+  // that an unclosed scope had made wrong. grammar.y's %destructors close
+  // every scope error recovery discards, so this should stay 0; the clamps
+  // stay as a backstop and the GTests check the count (test_compiler.cc).
+  int locals_count_clamps = 0;
 };
 extern CompileState g_compile;
 

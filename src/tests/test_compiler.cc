@@ -2882,6 +2882,33 @@ TEST(CompileEntry, TotalLinesAccumulatesOrdinarySource) {
   deallocate_program(prog);
 }
 
+// Bison error recovery discards productions whose mid-rule action had opened
+// a scope (a lambda's locals and function context, a block's locals, a
+// catch's context). grammar.y's %destructors close each one when that
+// happens; before them the scope stayed open and the locals count went
+// wrong, which pop_n_locals() and rule_block() then had to clamp (the fuzzer
+// found it as a crash before the clamps). The clamps stay as a backstop and
+// count every time they fire: these inputs must no longer need them.
+TEST(CompileEntry, ErrorRecoveryClosesOpenedScopes) {
+  ensure_compile_env();
+  const char* const inputs[] = {
+      "void f() { for (int i = 0; ; ) { function(); } }\n",
+      "void f() { int a; mixed g = function (int x, ) { return x; }; }\n",
+      "void f() { mixed e = catch { int y = ; }; int z; }\n",
+      "void f() { while (1) { int q = ; } int w; }\n",
+      "void f() { int k; mixed h = (: k + :); }\n",
+  };
+  for (const char* src : inputs) {
+    int const before = g_compile.locals_count_clamps;
+    program_t* prog = compile_file(src, "/scope_recovery");
+    EXPECT_EQ(prog, nullptr) << src;
+    if (prog) {
+      deallocate_program(prog);
+    }
+    EXPECT_EQ(g_compile.locals_count_clamps, before) << src;
+  }
+}
+
 TEST(CompileEntry, CompileFileFdBadFdThenViewStillWorks) {
   ensure_compile_env();
   // A failing fd load must not poison the next compile (the fd flag is

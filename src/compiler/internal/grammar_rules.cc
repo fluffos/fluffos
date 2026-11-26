@@ -468,6 +468,43 @@ LPC_INT rule_tree_context_open() {
 
 LPC_INT rule_block_open() { return (LPC_INT)current_number_of_locals; }
 
+// ============================================================================
+// Abandoned scopes. Each *_open() above saves state in a mid-rule action that
+// its production's own action restores when it reduces. When Bison error
+// recovery discards the production instead, the restore never ran, and the
+// rest of the compile saw a stale context, current_type, locals scope or
+// function context (pop_n_locals()'s clamp exists because of it). grammar.y's
+// %destructor calls these on every such discarded symbol, so each opened
+// scope is closed exactly once, by reduction or by discard.
+// ============================================================================
+
+void rule_context_abandon(LPC_INT saved_context) { context = saved_context; }
+
+void rule_special_context_abandon(LPC_INT saved) {
+  context = SAVED_CONTEXT_FLAGS(saved);
+  current_type = SAVED_CONTEXT_TYPE(saved);
+}
+
+void rule_block_abandon(LPC_INT saved_locals) {
+  if (current_number_of_locals > saved_locals) {
+    pop_n_locals(current_number_of_locals - static_cast<int>(saved_locals));
+  }
+}
+
+void rule_switch_abandon(LPC_INT saved_context, LPC_INT saved_cases_size) {
+  context = saved_context;
+  if (mem_block[A_CASES].current_size > saved_cases_size) {
+    mem_block[A_CASES].current_size = saved_cases_size;
+  }
+}
+
+void rule_call_abandon(LPC_INT saved_context, LPC_INT saved_refs) {
+  context = saved_context;
+  num_refs = saved_refs;
+}
+
+void rule_dollar_abandon(function_context_t* saved) { current_function_context = saved; }
+
 void rule_number(parse_node_t** result, LPC_INT val) { CREATE_NUMBER(*result, val); }
 
 void rule_real(parse_node_t** result, LPC_FLOAT val) { CREATE_REAL(*result, val); }

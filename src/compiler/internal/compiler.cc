@@ -607,6 +607,7 @@ void pop_n_locals(int num) {
    * value ever reaches this function. */
   if (num > current_number_of_locals) {
     num = current_number_of_locals;
+    g_compile.locals_count_clamps++;
   }
   if (num <= 0) {
     return;
