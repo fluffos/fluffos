@@ -985,6 +985,19 @@ InteractiveScope::~InteractiveScope() {
   }
 }
 
+/*
+ * Character mode -> line mode, everything it takes: the partial buffer was
+ * collected under character-mode rules and is dropped, and the client is
+ * told (set_linemode()), or it goes on sending one keystroke at a time.
+ * The caller has already cleared SINGLE_CHAR.
+ */
+void comm_leave_charmode(interactive_t* ip) {
+  ip->text_start = ip->text_end = 0;
+  ip->text[0] = '\0';
+  ip->iflags &= ~CMD_IN_BUF;
+  set_linemode(ip, true);
+}
+
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)
 static int call_function_interactive(interactive_t* i, char* str) {
   object_t* ob;
@@ -1114,10 +1127,7 @@ static int call_function_interactive(interactive_t* i, char* str) {
   if (!(ob->flags & O_DESTRUCTED) && ob->interactive) {
     i = ob->interactive;
     if (was_single && !(i->iflags & SINGLE_CHAR)) {
-      i->text_start = i->text_end = 0;
-      i->text[0] = '\0';
-      i->iflags &= ~CMD_IN_BUF;
-      set_linemode(i, true);
+      comm_leave_charmode(i);
     }
     if (was_noecho && !(i->iflags & NOECHO)) {
       set_localecho(i, true);

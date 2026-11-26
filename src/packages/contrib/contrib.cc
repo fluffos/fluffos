@@ -2946,7 +2946,15 @@ static int remove_charmode(object_t* ob) {
   if (!ob || ob->interactive == nullptr) {
     ret = -2;
   } else {
-    ret = (ob->interactive->iflags &= ~I_SINGLE_CHAR);
+    interactive_t* ip = ob->interactive;
+    bool const was_single = ip->iflags & I_SINGLE_CHAR;
+    ret = (ip->iflags &= ~I_SINGLE_CHAR);
+    if (was_single) {
+      /* Clearing the flag alone left the client in character mode, still
+       * sending a keystroke at a time, and kept a buffer collected under
+       * character-mode rules. */
+      comm_leave_charmode(ip);
+    }
   }
   return ret;
 }

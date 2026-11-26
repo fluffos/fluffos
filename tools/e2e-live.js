@@ -14,6 +14,10 @@
 //   async_nested_callbacks (#1421)  async_read callbacks that queue further
 //                              async_reads must not freeze the main thread
 //                              (finished_reqs_lock held across LPC).
+//   remove_charmode_linemode   remove_charmode() tells a telnet client to
+//                              leave character mode (IAC WONT SGA after the
+//                              IAC WILL SGA get_char() sent), not just clears
+//                              the driver's flag.
 //
 // Registered with ctest as `e2e-live` (label `e2e`), so the CI unit-test step
 // (`ctest -LE testsuite`) runs it. Needs only node.
@@ -219,6 +223,83 @@ async function testAsyncNestedCallbacks(wsPort) {
   record(name, true);
 }
 
+// Telnet (the default `port number`): run `eval <code>` on a fresh login and
+// resolve with the raw bytes received, so telnet negotiation is visible.
+// Answers the driver's IAC WILL SGA with IAC DO SGA, as a real client does:
+// libtelnet follows RFC 1143, so a change of mind (WONT) made while the WILL
+// is still unanswered is only sent once the answer arrives. Resolves once
+// `until(buf)` holds, or with what arrived when `settleMs` pass after the
+// marker.
+function evalTelnet(port, code, marker, until, settleMs, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const sock = net.connect(port, '127.0.0.1');
+    let buf = Buffer.alloc(0);
+    let sent = false;
+    let answered = false;
+    let settle = null;
+    const willSga = Buffer.from([0xff, 0xfb, 0x03]);
+    const finish = () => {
+      clearTimeout(timer);
+      if (settle) clearTimeout(settle);
+      sock.destroy();
+      resolve(buf);
+    };
+    const timer = setTimeout(() => {
+      sock.destroy();
+      reject(new Error('telnet eval timed out waiting for ' + marker));
+    }, timeoutMs);
+    sock.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      if (!sent) {
+        sent = true;
+        setTimeout(() => sock.write('eval ' + code + '\r\n'), 300);
+      }
+      if (!answered && buf.includes('|MARK|') && buf.includes(willSga)) {
+        answered = true;
+        sock.write(Buffer.from([0xff, 0xfd, 0x03]));  // IAC DO SGA
+      }
+      if (buf.includes(marker)) {
+        if (until(buf)) {
+          finish();
+        } else if (!settle) {
+          settle = setTimeout(finish, settleMs);
+        }
+      }
+    });
+    sock.on('error', (e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
+function telnetPort() {
+  const conf = fs.readFileSync(path.join(suiteDir, configRel), 'utf8');
+  const m = conf.match(/^port number\s*:\s*(\d+)/m);
+  if (!m) throw new Error('config.test needs a telnet `port number`');
+  return parseInt(m[1], 10);
+}
+
+async function testRemoveCharmodeLinemode() {
+  const name = 'remove_charmode_linemode';
+  const willSga = Buffer.from([0xff, 0xfb, 0x03]);
+  const wontSga = Buffer.from([0xff, 0xfc, 0x03]);
+  const out = await evalTelnet(
+      telnetPort(),
+      // remove_charmode() runs a second later, once the client has answered
+      // get_char()'s WILL SGA -- as with a real client. (Called in the same
+      // eval, the client's late DO SGA made the driver answer WONT on its
+      // own and hid the bug.)
+      'get_char("cb"); write("|MARK|"); ' +
+          'call_out((: remove_charmode($1), tell_object($1, "|DONE|") :), 1, this_player()); return 0',
+      '|DONE|', (b) => b.subarray(b.indexOf('|MARK|')).includes(wontSga), 2000, 15000);
+  const mark = out.indexOf('|MARK|');
+  if (mark < 0 || !out.subarray(0, mark).includes(willSga)) {
+    return record(name, false, 'get_char() did not enter character mode (no IAC WILL SGA)');
+  }
+  if (!out.subarray(mark).includes(wontSga)) {
+    return record(name, false, 'remove_charmode() left the client in character mode (no IAC WONT SGA)');
+  }
+  record(name, true);
+}
+
 async function main() {
   if (!fs.existsSync(driverPath)) {
     console.error('driver not found: ' + driverPath);
@@ -252,6 +333,7 @@ async function main() {
   try {
     if (!only || only === 'utf8') await testUtf8SplitReads(wsPort);
     if (!only || only === 'async') await testAsyncNestedCallbacks(wsPort);
+    if (!only || only === 'charmode') await testRemoveCharmodeLinemode();
   } catch (e) {
     record('harness', false, e.message);
   }

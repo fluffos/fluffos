@@ -70,6 +70,7 @@ void comm_run_scheduled_command(struct interactive_t*);
 int set_call(struct object_t*, struct sentence_t*, int);
 void remove_interactive(struct object_t*, int);
 void conn_close(interactive_t* ip);
+void comm_leave_charmode(struct interactive_t* ip);
 
 int flush_message(struct interactive_t*);
 void flush_message_all();
