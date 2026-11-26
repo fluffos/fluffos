@@ -440,12 +440,18 @@ struct Diagnostic {
 // Legacy spellings below are inline references into it, so call sites keep
 // their established names while the storage lives in one object.
 // ---------------------------------------------------------------------------
-// One level of the #if/#ifdef conditional stack: whether this level's
-// current branch emits, and whether ANY branch of it has been true yet
-// (so a later #elif/#else knows not to fire).
+// One level of the #if/#ifdef conditional stack. The level's state machine
+// is  IF --#elif--> IF --#else--> ELSE --#endif--> (popped);  `seen_else`
+// is the ELSE state, in which #elif and a second #else are errors (C
+// 6.10.1). `emitting` is whether the current branch emits, `had_true`
+// whether ANY branch has been true yet (so a later #elif/#else knows not to
+// fire), and `file_depth` the #include nesting depth of the file that
+// opened the level: a conditional must open and close in the same file.
 struct CondState {
   bool emitting;
   bool had_true;
+  bool seen_else;
+  int file_depth;
 };
 
 // PpMacro — one macro entry

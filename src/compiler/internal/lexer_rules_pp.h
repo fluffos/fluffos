@@ -84,6 +84,9 @@ bool pp_is_predefined(std::string_view name);
 // (i.e. the scanner is not inside a false branch). Vacuously true with no
 // session (unit tests driving yylex() without one).
 bool lpc_lex_emitting();
+// End of an #include'd file: drop (and report) the conditional levels it
+// opened but never closed, so they cannot leak into the includer.
+void lpc_lex_close_file_conditionals();
 
 // The single entry point for lexer.l's one captured-'#'-line rule, covering
 // BOTH scan modes (in_skip_mode = YY_START == SC_COND_SKIP). Takes the
