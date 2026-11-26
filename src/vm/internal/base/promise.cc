@@ -525,7 +525,7 @@ bool invoke_handler(funptr_t* fp, svalue_t* arg, svalue_t* out) {
      * `maximum evaluation cost` is the strongest possible signal that the
      * loop wants the driver back. Re-arming a budget here would hide that,
      * and clearing the flag would too. The turn clears both on its way out. */
-    too_deep_error = 0;
+    eval_note_caught_error();
     pop_context(&econ);
     return false;
   }
@@ -689,10 +689,7 @@ void drain_promise_microtasks() {
   /* The flags belong to the deliveries, not to the backend: a turn that ends
    * on an exhausted delivery must not leave `outoftime` set for whatever the
    * loop runs next (which arms its own budget, but reads the flag first). */
-  DEFER {
-    outoftime = 0;
-    max_eval_error = 0;
-  };
+  DEFER { eval_budget_reset(); };
 
   while (!g_promise_microtasks.empty()) {
     if (!first) {
@@ -727,7 +724,7 @@ void drain_promise_microtasks() {
       restore_context(&econ);
       free_svalue(&catch_value, "drain_promise_microtasks");
       catch_value = const0;
-      too_deep_error = 0;
+      eval_note_caught_error();
       /* the delivery died mid-way: release whatever it still owned
        * (deliver_reaction nulls each field as ownership is consumed, so
        * this cannot double-free what the failed path already released) */
@@ -926,7 +923,7 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
          * unwind below cuts the control stack back to the marker, so depth
          * is no longer exceeded when the region's continuation runs. Only
          * the eval-cost error stays unswallowable. */
-        too_deep_error = 0;
+        eval_note_caught_error();
         /* The unwind pops control frames, which runs defer() handlers --
          * arbitrary LPC that can error() again. If that happens the stacks
          * are mid-unwind, so fall through to the reject path (which cuts
@@ -959,7 +956,7 @@ bool run_coroutine_body(char* entry_pc, promise_t* p, control_stack_t* async_fra
        * pre-stamped flag that would outlive a declined cancel. */
       (void)promise_settle(p, &err, 1, is_driver_cancelled_reason(&err));
       free_svalue(&err, "run_coroutine_body");
-      too_deep_error = 0;
+      eval_note_caught_error();
       if (max_eval_error) {
         propagate_eval_error = true;
       }

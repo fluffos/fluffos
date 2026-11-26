@@ -2619,7 +2619,8 @@ exit:
     debug_message("Error '%s' occurred while trying to print error trace -- trace suppressed.\n",
                   err);
   } else {
-    too_deep_error = max_eval_error = 0;
+    eval_note_caught_error();
+    max_eval_error = 0;
   }
   if (current_error_context) {
     throw("error handler error");

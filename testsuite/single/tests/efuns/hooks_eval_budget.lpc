@@ -1,0 +1,73 @@
+#include <hooks.h>
+
+/* An eval-cost error in a hook handler stops at the hook call that owns
+ * the budget it ran on. A handler nested inside another handler runs on the
+ * enclosing handler's budget; its hook_call() used to clear the exhaustion,
+ * so the enclosing handler ran on with no limit and its overrun was charged
+ * to the code outside every hook -- an uncatchable eval error in a caller
+ * that had done nothing wrong (the suite runner itself, here). */
+
+// A hook handler is stopped when the eval timer fires and its own budget
+// (`maximum evaluation cost`, read as the hook is called) is spent. The suite
+// runs with 300 s for both, the timer armed once at the start; the test
+// lowers the budget and re-arms a short timer so a spinning handler stops
+// quickly, and restores both.
+#define MAX_EVAL_COST_SLOT 264  // __MAX_EVAL_COST__ (CFG_INT(8))
+#define TEST_EVAL_LIMIT_US 500000
+#define OUTER_ROUNDS 3000000
+
+int outer_iters;
+int *hooks = ({});
+
+int inner() { return 1; }
+int target() { return 1; }
+
+mixed spin_forever(int id, object actor, object caller, object t, string fn, mixed *args) {
+  while (1) {}
+}
+
+mixed call_inner_then_spin(int id, object actor, object caller, object t, string fn, mixed *args) {
+  this_object()->inner();  // its handler exhausts the budget this handler runs on
+  while (outer_iters <= OUTER_ROUNDS) {
+    outer_iters++;
+  }
+  return 0;
+}
+
+private void run_checks() {
+  mixed err;
+
+  hooks += ({ hook_attach("function", (: call_inner_then_spin :),
+    ([ "object": this_object(), "function": "target" ]), HOOK_BEFORE) });
+  hooks += ({ hook_attach("function", (: spin_forever :),
+    ([ "object": this_object(), "function": "inner" ]), HOOK_BEFORE) });
+  err = catch(this_object()->target());
+  ASSERT_EQ(0, err);
+  // The nested handler spent the enclosing handler's whole budget, so the
+  // enclosing handler is stopped before its first round. It used to run on
+  // with no limit (about a million rounds here; with the suite's 300 s limit
+  // the overrun was then charged to the caller, which died of an
+  // uncatchable eval error and shut the run down).
+  ASSERT_EQ(0, outer_iters);
+}
+
+void do_tests() {
+  int orig_limit = set_eval_limit(1);  // read the current limit
+  int orig_budget = get_config(MAX_EVAL_COST_SLOT);
+  mixed err;
+
+  set_config(MAX_EVAL_COST_SLOT, TEST_EVAL_LIMIT_US);
+  set_eval_limit(TEST_EVAL_LIMIT_US);
+  set_eval_limit(0);  // re-arm the timer with it
+  err = catch(run_checks());
+  set_config(MAX_EVAL_COST_SLOT, orig_budget);
+  set_eval_limit(orig_limit);
+  set_eval_limit(0);
+  foreach (int id in hooks) {
+    catch(hook_detach(id));
+  }
+  hooks = ({});
+  if (err) {
+    error(err);
+  }
+}
