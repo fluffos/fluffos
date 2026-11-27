@@ -1364,7 +1364,10 @@ void destruct_object(object_t* ob, const char* cause) {
    *   Live --> Destructing (O_BEING_DESTRUCTED) --> Destructed (O_DESTRUCTED)
    *              |   on_destruct(), object:destruct hooks, contents moved
    *              |   out, ed buffer saved, vital object reloaded
-   *              +-- error(): back to Live, intact
+   *              +-- error(): back to Live (not torn down; but whatever
+   *                  LPC already ran stays done -- on_destruct() has been
+   *                  called and earlier contents may have moved out, so a
+   *                  retried destruct notifies again)
    *
    * Every step that runs LPC is in the prepare phase, before anything is
    * torn down: LPC run after the teardown could call into ob and give it a
@@ -1402,7 +1405,10 @@ void destruct_object(object_t* ob, const char* cause) {
         ob2->shadowed = nullptr;
       }
       otmp->shadowing = nullptr;
-      destruct_object(otmp, "shadowed");
+      // The last one destructed is ob itself, now unshadowed: it keeps the
+      // caller's cause, so its on_destruct() and object:destruct hooks see
+      // why it was really destructed. Only the shadows are "shadowed".
+      destruct_object(otmp, otmp == ob ? cause : "shadowed");
     }
     return;
   }

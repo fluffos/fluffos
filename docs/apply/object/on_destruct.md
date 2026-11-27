@@ -22,10 +22,12 @@ title: object / on_destruct
     anything about the object is torn down, so the object is still fully
     usable here. Calling destruct() on the object from inside on_destruct()
     does nothing: the destruct already in progress finishes it. A shadowed
-    object is notified once, after its shadows have been destructed.
+    object is notified once, after its shadows have been destructed (so
+    on_destruct() no longer sees them); object:destruct hooks report it
+    with the caller's cause, and only its shadows with "shadowed".
 
     If a later step of the destruct fails before anything has been torn
     down (a content's move_or_destruct() raising an error, or a master or
     simul_efun object failing to reload), the destruct is abandoned and the
-    object stays as it was; on_destruct() will run again on the next
-    attempt.
+    object stays live -- though contents moved out before the failure stay
+    moved -- and on_destruct() will run again on the next attempt.
