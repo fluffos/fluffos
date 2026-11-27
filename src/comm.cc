@@ -1152,6 +1152,14 @@ static void print_prompt(interactive_t* ip) {
   if (!ip || !ip->ob || !IP_VALID(ip, ip->ob)) {
     return;
   }
+  // The command this prompt follows may have used up its eval budget (an
+  // eval-cost error keeps outoftime set while it unwinds). The prompt is
+  // the driver's own follow-up, not part of that command: give it a budget
+  // of its own, or write_prompt() dies on its first opcode and the user
+  // loses their prompt for good (HAS_WRITE_PROMPT is cleared on failure).
+  if (outoftime) {
+    set_eval(max_eval_cost);
+  }
   // With "interactive catch tell" enabled, tell_object() below runs the
   // catch_tell apply, and this driver-initiated path has no surrounding
   // recovery point -- an error() in it (e.g. out of eval cost) used to

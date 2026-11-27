@@ -1741,6 +1741,45 @@ TEST_F(DriverTest, MxpTagApplyDestructsUser) {
   RunGuarded([&] { remove_destructed_objects(); });
 }
 
+// A command that used up its eval budget must not take the user's prompt
+// with it: print_prompt() gives write_prompt() a budget of its own. (It
+// used to run on the exhausted one, die on its first opcode, and clear
+// HAS_WRITE_PROMPT -- the custom prompt gone for the rest of the session.)
+TEST_F(DriverTest, WritePromptAfterExhaustedCommand) {
+  object_t* body = nullptr;
+  RunGuarded([&] {
+    body = load_object_from_source(
+        "int prompts;\n"
+        "void write_prompt() { prompts++; }\n"
+        "int query_prompts() { return prompts; }\n",
+        "write_prompt_exhausted", 0);
+  });
+  ASSERT_NE(body, nullptr);
+
+  TransportLog log;
+  interactive_t* ip = fabricate_telnet_interactive(body, &log);
+  ip->iflags |= HAS_WRITE_PROMPT | CMD_IN_BUF;
+  std::string const cmd = "look\n";
+  ip->text_end = static_cast<int>(cmd.copy(ip->text, cmd.size()));
+
+  outoftime = 1;  // what an eval-cost error leaves while the command unwinds
+  RunGuarded([&] { process_user_command(ip); });
+  outoftime = 0;
+
+  EXPECT_TRUE(ip->iflags & HAS_WRITE_PROMPT);
+  svalue_t* ret = nullptr;
+  RunGuarded([&] { ret = safe_apply("query_prompts", body, 0, ORIGIN_DRIVER); });
+  ASSERT_NE(ret, nullptr);
+  EXPECT_EQ(ret->u.number, 1);
+
+  RunGuarded([&] { remove_interactive(body, 0); });
+  RunGuarded([&] {
+    destruct_object(body);
+    free_object(&body, "WritePromptAfterExhaustedCommand");
+  });
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
 // write_prompt(), run after a command, destructs the user -- returning
 // normally (process_user_command() then sent a GA and rescheduled on the
 // gone connection) or erroring (print_prompt() fell back to the default
