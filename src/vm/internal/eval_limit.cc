@@ -16,10 +16,13 @@ void init_eval() {
 }
 
 void set_eval(uint64_t etime) {
+  // Clear BEFORE arming: the timer is one-shot, and a short one can expire
+  // (its SIGVTALRM handled, on this thread or a worker) before the clear
+  // would run -- erasing the only expiry and leaving evaluation unmetered.
+  outoftime = 0;
 #ifdef __linux__
   posix_eval_timer_set(etime);
 #endif
-  outoftime = 0;
   hooks_on_set_eval();
 }
 

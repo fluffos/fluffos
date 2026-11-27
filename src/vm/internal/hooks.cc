@@ -400,10 +400,14 @@ int64_t us_since(std::chrono::steady_clock::time_point t0) {
 }
 
 void raw_timer_set(int64_t us) {
+  // Clear before arming, as set_eval() does. A handler's remaining budget
+  // is often only microseconds; arming first let the one-shot timer fire
+  // before the clear, which then erased the expiry for good -- the handler
+  // ran unmetered (seen on CI as a spinning hook that nothing stopped).
+  outoftime = 0;
 #ifdef __linux__
   posix_eval_timer_set(us > 0 ? us : 1);
 #endif
-  outoftime = 0;
 }
 
 void rebuild_pin_index(PointId p) {
@@ -1108,6 +1112,28 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
   }
   restore_simulate(sim);
 
+  /* A handler's error stops at the boundary that owns the budget it ran on,
+   * and is cleared BEFORE the accounting below decides what the caller is
+   * left with (that may set outoftime for the caller, which must stand).
+   *
+   * The outermost hook call owns its handler's budget (exempt): an eval-cost
+   * or depth error is contained here. A nested call's handler ran on the
+   * ENCLOSING handler's budget: clearing outoftime here used to swallow
+   * that budget's exhaustion, so the enclosing handler ran on (on a fresh
+   * full budget, re-armed by the error), and its overrun was finally
+   * charged to the caller outside every hook -- an uncatchable eval error in
+   * code that had done nothing wrong. Left set (it is outoftime that carries
+   * it: error_handler() has already cleared max_eval_error), it stops the
+   * enclosing handler at its next opcode, and that error unwinds to the
+   * enclosing handler's own hook_call(), which contains it. A depth error is
+   * catchable everywhere (do_catch()). */
+  if (!ret) {
+    eval_note_caught_error();
+    if (exempt) {
+      eval_budget_reset();
+    }
+  }
+
   if (exempt) {
     int64_t const h = us_since(t0);
     g_hook_exempt--;
@@ -1135,9 +1161,6 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
 
   if (!ret) {
     a->errors++;
-    too_deep_error = 0;
-    max_eval_error = 0;
-    outoftime = 0;
     int max_err = CONFIG_INT(__RC_HOOK_MAX_ERRORS__);
     if (max_err <= 0) {
       max_err = 10;
@@ -2576,7 +2599,7 @@ vm::Value f_hook_proceed(vm::EfunArgs& f, std::optional<array_t*> replacement_ar
     catch_value = const1;
     restore_context(&econ);
     pop_context(&econ);
-    too_deep_error = 0;
+    eval_note_caught_error();
     g_around.body_raised = true;
     g_around.body_error = caught.type == T_STRING ? caught.u.string : "";
     free_svalue(&caught, "hook_proceed: body error");

@@ -701,6 +701,13 @@ static void process_input(interactive_t* ip, char* user_command) {
     return;
   }
   if (!ret) {
+    if (outoftime) {
+      // process_input() ran out of eval budget: the command is over. The
+      // apply is not broken, so it stays enabled, and the command is not
+      // re-run through the parser on the exhausted budget (whose first
+      // opcode would only fail again, blamed on whatever it reached).
+      return;
+    }
     ip->iflags &= ~HAS_PROCESS_INPUT;
     safe_parse_command(user_command, command_giver);
     return;
@@ -1152,6 +1159,12 @@ static void print_prompt(interactive_t* ip) {
   if (!ip || !ip->ob || !IP_VALID(ip, ip->ob)) {
     return;
   }
+  // The prompt is the driver's own follow-up, not part of the command it
+  // follows: give it a budget of its own. On what the command left -- none,
+  // after "Too long evaluation" (outoftime stays set while that unwinds), or
+  // a few microseconds -- write_prompt() dies and the user loses their
+  // prompt for good (HAS_WRITE_PROMPT is cleared on failure).
+  set_eval(max_eval_cost);
   // With "interactive catch tell" enabled, tell_object() below runs the
   // catch_tell apply, and this driver-initiated path has no surrounding
   // recovery point -- an error() in it (e.g. out of eval cost) used to

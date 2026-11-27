@@ -8,6 +8,7 @@
 
 #include "vm/internal/base/program.h"
 #include "vm/internal/base/svalue.h"
+#include "vm/internal/eval_limit.h"
 
 /*
  * Control stack element.
@@ -144,6 +145,28 @@ extern control_stack_t* control_stack_last;
 extern control_stack_t* csp;
 extern int too_deep_error;
 extern int max_eval_error;
+
+/*
+ * What an error leaves in the eval flags, and who may clear it:
+ *
+ * - too_deep_error: "Too deep recursion" / stack overflow. Catchable: once
+ *   the unwind has cut the stacks back, the depth is no longer exceeded, so
+ *   every site that catches an error clears it -- eval_note_caught_error().
+ * - max_eval_error + outoftime: an exhausted eval budget. NOT catchable from
+ *   LPC (do_catch() re-raises it; error_handler() forces outoftime back on so
+ *   a catch cannot swallow it). Only the owner of the exhausted budget clears
+ *   it -- eval_budget_reset(): a hook_call() that owns its handler's budget,
+ *   and the promise drain for a turn's deliveries. (error_handler() clears
+ *   max_eval_error once no error is in flight but leaves outoftime set, so
+ *   the exhaustion still stops the next opcode of whoever ran out.) Clearing
+ *   outoftime anywhere else hands code that has run out of budget a fresh
+ *   one (hook_call() did, for nested handlers).
+ */
+inline void eval_note_caught_error() { too_deep_error = 0; }
+inline void eval_budget_reset() {
+  max_eval_error = 0;
+  outoftime = 0;
+}
 extern int function_index_offset;
 extern int variable_index_offset;
 extern int simul_efun_is_loading;

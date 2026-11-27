@@ -2614,12 +2614,22 @@ void _error_handler(char* err) {
 exit:
   num_error--;
 
+  /* An eval-cost error keeps outoftime set while it unwinds, on every route
+   * here -- with or without a mudlib error handler -- so the next opcode of
+   * whatever owned the exhausted budget stops too (a nested hook handler's
+   * enclosing handler; see hook_call()). interpret.cc's set_eval() before
+   * error() cleared it, and only the mudlib-handler route above restored
+   * it. The owner of the budget clears it (eval_budget_reset()). */
+  if (max_eval_error) {
+    outoftime = 1;
+  }
   if (num_error || num_mudlib_error) {
     /* This can happen via errors in the object_name() apply. */
     debug_message("Error '%s' occurred while trying to print error trace -- trace suppressed.\n",
                   err);
   } else {
-    too_deep_error = max_eval_error = 0;
+    eval_note_caught_error();
+    max_eval_error = 0;
   }
   if (current_error_context) {
     throw("error handler error");

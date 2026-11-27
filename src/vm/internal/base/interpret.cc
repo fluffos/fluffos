@@ -5425,9 +5425,7 @@ static void do_catch(char* pc, unsigned int new_pc_offset) {
       pop_context(&econ);
       error("Can't catch eval cost too big error.\n");
     }
-    if (too_deep_error) {
-      too_deep_error = 0;
-    }
+    eval_note_caught_error();
   }
   pop_context(&econ);
 }

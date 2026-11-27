@@ -1,0 +1,137 @@
+#include <hooks.h>
+
+/* An eval-cost error in a hook handler stops at the hook call that owns
+ * the budget it ran on. A handler nested inside another handler runs on the
+ * enclosing handler's budget; its hook_call() used to clear the exhaustion,
+ * so the enclosing handler ran on, on a fresh full budget, and its overrun
+ * was charged to the code outside every hook -- an uncatchable eval error
+ * in a caller that had done nothing wrong (the suite runner itself, here). */
+
+// A hook handler is stopped when the eval timer fires and its own budget
+// (`maximum evaluation cost`, read as the hook is called) is spent. The suite
+// runs with 300 s for both, the timer armed once at the start; the test
+// lowers the budget and re-arms a short timer so a spinning handler stops
+// quickly, and restores both.
+#define MAX_EVAL_COST_SLOT 264  // __MAX_EVAL_COST__ (CFG_INT(8))
+#define TEST_EVAL_LIMIT_US 500000
+#define OUTER_ROUNDS 3000000
+#define MUDLIB_ERROR_HANDLER_SLOT 289  // __RC_MUDLIB_ERROR_HANDLER__ (CFG_INT(33))
+// A spinning handler gives up after this many seconds even if no eval timer
+// stops it, so a regression fails this file instead of hanging the run.
+#define SPIN_DEADLINE_S 10
+
+int outer_iters;
+int spin_timed_out;
+int *hooks = ({});
+
+int inner() { return 1; }
+int target() { return 1; }
+
+mixed spin_forever(int id, object actor, object caller, object t, string fn, mixed *args) {
+  int deadline = time() + SPIN_DEADLINE_S;
+
+  while (time() < deadline) {}
+  spin_timed_out = 1;
+  return 0;
+}
+
+// Is eval cost metered on this platform at all? Only Linux has an eval timer
+// (init_eval()); elsewhere get_eval() returns the configured maximum
+// unchanged and nothing would ever stop the handler.
+private int metered() {
+  int a = set_eval_limit(-1);
+  int b;
+  int i;
+
+  for (i = 0; i < 200000; i++) {}
+  b = set_eval_limit(-1);
+  return b < a;
+}
+
+mixed call_inner_then_spin(int id, object actor, object caller, object t, string fn, mixed *args) {
+  this_object()->inner();  // its handler exhausts the budget this handler runs on
+  while (outer_iters <= OUTER_ROUNDS) {
+    outer_iters++;
+  }
+  return 0;
+}
+
+private void run_checks() {
+  mixed err;
+
+  outer_iters = 0;
+  spin_timed_out = 0;
+  hooks += ({ hook_attach("function", (: call_inner_then_spin :),
+    ([ "object": this_object(), "function": "target" ]), HOOK_BEFORE) });
+  hooks += ({ hook_attach("function", (: spin_forever :),
+    ([ "object": this_object(), "function": "inner" ]), HOOK_BEFORE) });
+  err = catch(this_object()->target());
+  ASSERT_EQ(0, err);
+  ASSERT2(!spin_timed_out, "the eval timer never stopped the nested handler");
+  // The nested handler spent the enclosing handler's whole budget, so the
+  // enclosing handler is stopped before its first round. It used to run on
+  // on a fresh full budget (all OUTER_ROUNDS rounds here; with the suite's
+  // 300 s limit its overrun was then charged to the caller, which died of an
+  // uncatchable eval error and shut the run down).
+  ASSERT_EQ(0, outer_iters);
+}
+
+int orig_limit, orig_budget, orig_handler;
+
+private void restore_eval() {
+  set_config(MUDLIB_ERROR_HANDLER_SLOT, orig_handler);
+  set_config(MAX_EVAL_COST_SLOT, orig_budget);
+  set_eval_limit(orig_limit);
+  set_eval_limit(0);
+  foreach (int id in hooks) {
+    catch(hook_detach(id));
+  }
+  hooks = ({});
+}
+
+// Runs from a call_out, in a fresh evaluation of its own rather than under
+// the suite runner's (master::flag() holds one evaluation for the whole
+// run). If an eval error ever escaped the hooks again, it would end this
+// call_out -- reported as the latch never being released -- instead of
+// shutting the whole run down (the CI failure this replaced: under the
+// runner's evaluation an escaped error killed master::flag()).
+//
+// It runs twice: with the mudlib error handler (the test config's), and
+// without one -- error() takes a different route through error_handler()
+// then, which once dropped the exhaustion on the way (outoftime was only
+// restored on the mudlib-handler route).
+void run_scenario(int mudlib_handler, string latch) {
+  mixed err;
+
+  orig_limit = set_eval_limit(1);  // read the current limit
+  orig_budget = get_config(MAX_EVAL_COST_SLOT);
+  orig_handler = get_config(MUDLIB_ERROR_HANDLER_SLOT);
+  defer((: restore_eval :));  // also on an uncatchable eval error
+
+  if (mudlib_handler) {
+    // Each handler's eval error is contained by its hook call, but a hook
+    // error is still logged through the master's error handler, which after
+    // the suite counts it as an uncaught error unless declared: one for the
+    // nested handler, one for the enclosing one.
+    "/single/master"->expect_deferred_error("Too long evaluation");
+    "/single/master"->expect_deferred_error("Too long evaluation");
+  }
+  set_config(MUDLIB_ERROR_HANDLER_SLOT, mudlib_handler);
+  set_config(MAX_EVAL_COST_SLOT, TEST_EVAL_LIMIT_US);
+  set_eval_limit(TEST_EVAL_LIMIT_US);
+  set_eval_limit(0);  // re-arm the timer with it
+  err = catch(run_checks());
+  set_config(MUDLIB_ERROR_HANDLER_SLOT, orig_handler);  // before any ASSERT reports
+  ASSERT2(!err, sprintf("%O", err));
+  RELEASE_LATCH(latch);
+}
+
+void do_tests() {
+  if (!metered()) {
+    return;
+  }
+  EXPECT_LATCH("with handler");
+  EXPECT_LATCH("without handler");
+  call_out("run_scenario", 1, 1, "with handler");
+  call_out("run_scenario", 2, 0, "without handler");
+}
