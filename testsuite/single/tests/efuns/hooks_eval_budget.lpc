@@ -3,9 +3,9 @@
 /* An eval-cost error in a hook handler stops at the hook call that owns
  * the budget it ran on. A handler nested inside another handler runs on the
  * enclosing handler's budget; its hook_call() used to clear the exhaustion,
- * so the enclosing handler ran on with no limit and its overrun was charged
- * to the code outside every hook -- an uncatchable eval error in a caller
- * that had done nothing wrong (the suite runner itself, here). */
+ * so the enclosing handler ran on, on a fresh full budget, and its overrun
+ * was charged to the code outside every hook -- an uncatchable eval error
+ * in a caller that had done nothing wrong (the suite runner itself, here). */
 
 // A hook handler is stopped when the eval timer fires and its own budget
 // (`maximum evaluation cost`, read as the hook is called) is spent. The suite
@@ -67,8 +67,8 @@ private void run_checks() {
   ASSERT2(!spin_timed_out, "the eval timer never stopped the nested handler");
   // The nested handler spent the enclosing handler's whole budget, so the
   // enclosing handler is stopped before its first round. It used to run on
-  // with no limit (about a million rounds here; with the suite's 300 s limit
-  // the overrun was then charged to the caller, which died of an
+  // on a fresh full budget (all OUTER_ROUNDS rounds here; with the suite's
+  // 300 s limit its overrun was then charged to the caller, which died of an
   // uncatchable eval error and shut the run down).
   ASSERT_EQ(0, outer_iters);
 }

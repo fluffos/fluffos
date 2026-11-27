@@ -1118,12 +1118,15 @@ HookRun hook_call(Attachment* a, int n_args_on_stack, svalue_t* out) {
    *
    * The outermost hook call owns its handler's budget (exempt): an eval-cost
    * or depth error is contained here. A nested call's handler ran on the
-   * ENCLOSING handler's budget: clearing max_eval_error/outoftime here used
-   * to swallow that budget's exhaustion, so the enclosing handler ran on
-   * with no limit, and its overrun was finally charged to the caller outside
-   * every hook -- an uncatchable eval error in code that had done nothing
-   * wrong. Left set, it unwinds to the enclosing handler's own hook_call(),
-   * which contains it. A depth error is catchable everywhere (do_catch()). */
+   * ENCLOSING handler's budget: clearing outoftime here used to swallow
+   * that budget's exhaustion, so the enclosing handler ran on (on a fresh
+   * full budget, re-armed by the error), and its overrun was finally
+   * charged to the caller outside every hook -- an uncatchable eval error in
+   * code that had done nothing wrong. Left set (it is outoftime that carries
+   * it: error_handler() has already cleared max_eval_error), it stops the
+   * enclosing handler at its next opcode, and that error unwinds to the
+   * enclosing handler's own hook_call(), which contains it. A depth error is
+   * catchable everywhere (do_catch()). */
   if (!ret) {
     eval_note_caught_error();
     if (exempt) {

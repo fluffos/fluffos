@@ -156,9 +156,11 @@ extern int max_eval_error;
  *   LPC (do_catch() re-raises it; error_handler() forces outoftime back on so
  *   a catch cannot swallow it). Only the owner of the exhausted budget clears
  *   it -- eval_budget_reset(): a hook_call() that owns its handler's budget,
- *   the promise drain for a turn's deliveries, error_handler() once no error
- *   is in flight. Clearing it anywhere else hands code that has run out of
- *   budget a fresh, unlimited one (hook_call() did, for nested handlers).
+ *   and the promise drain for a turn's deliveries. (error_handler() clears
+ *   max_eval_error once no error is in flight but leaves outoftime set, so
+ *   the exhaustion still stops the next opcode of whoever ran out.) Clearing
+ *   outoftime anywhere else hands code that has run out of budget a fresh
+ *   one (hook_call() did, for nested handlers).
  */
 inline void eval_note_caught_error() { too_deep_error = 0; }
 inline void eval_budget_reset() {
