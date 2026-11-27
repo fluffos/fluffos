@@ -84,6 +84,9 @@ bool pp_is_predefined(std::string_view name);
 // (i.e. the scanner is not inside a false branch). Vacuously true with no
 // session (unit tests driving yylex() without one).
 bool lpc_lex_emitting();
+// End of an #include'd file: drop (and report) the conditional levels it
+// opened but never closed, so they cannot leak into the includer.
+void lpc_lex_close_file_conditionals();
 
 // The single entry point for lexer.l's one captured-'#'-line rule, covering
 // BOTH scan modes (in_skip_mode = YY_START == SC_COND_SKIP). Takes the
@@ -91,9 +94,10 @@ bool lpc_lex_emitting();
 // continuations and all; terminating newline NOT included -- the lexer.l
 // rule consumes and counts that itself, see its comment), folds and
 // parses it exactly once (name + rest + embedded continuation newlines,
-// which are counted into current_line/total_lines here), then either
-// dispatches it (emit mode, or a dead-branch-ending #elif/#else/#endif at
-// skip depth 0) or merely tracks conditional nesting (skip mode). The
+// which are counted into current_line/total_lines here), then dispatches
+// it -- every directive in emit mode; only the conditional ones in skip
+// mode, where a nested #if/#ifdef/#ifndef opens a real (non-emitting)
+// level and everything else is ignored unvalidated. The
 // return value tells the rule which start-condition transition to make;
 // all other directive effects (macro table, conditional stack, #include
 // push, #pragma/#line/#error/...) have already been applied on return.

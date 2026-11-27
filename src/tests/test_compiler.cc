@@ -2109,6 +2109,47 @@ TEST(Diagnostics, IncludeProvenanceNote) {
   EXPECT_LT(r.find("In file included from"), r.find("error:"));
 }
 
+TEST(Diagnostics, IncludeEndingInDeadBranchResumesTheIncluder) {
+  // A header that ends inside a false #if is reported unterminated, and its
+  // levels are dropped -- and the scanner must leave skip mode with them,
+  // or the rest of the includer is silently skipped and its own errors are
+  // never reported.
+  std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_diag_dead_tail.h";
+  {
+    std::ofstream inc(inc_path);
+    inc << "#if 0\nint dead;\n";
+  }
+  pp("#include \"zz_diag_dead_tail.h\"\n#error after the include\n");
+  unlink(inc_path.c_str());
+  bool unterminated = false, after = false;
+  for (const Diagnostic& d : compiler_diags) {
+    unterminated |= d.message.find("unterminated conditional") != std::string::npos;
+    after |= d.message.find("after the include") != std::string::npos;
+  }
+  EXPECT_TRUE(unterminated);
+  EXPECT_TRUE(after);
+}
+
+TEST(Diagnostics, IncludeEndingInDeadBranchInsideACommentResumesTheIncluder) {
+  // The same, with the header also leaving a block comment open: the dead
+  // branch's skip mode is then saved UNDER the comment state, and still has
+  // to go when the header's levels do.
+  std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_diag_dead_comment.h";
+  {
+    std::ofstream inc(inc_path);
+    inc << "#if 0\n#define X /* open\n";
+  }
+  pp("#include \"zz_diag_dead_comment.h\"\nint a; /* closes */\n#error after the include\n");
+  unlink(inc_path.c_str());
+  bool unterminated = false, after = false;
+  for (const Diagnostic& d : compiler_diags) {
+    unterminated |= d.message.find("unterminated conditional") != std::string::npos;
+    after |= d.message.find("after the include") != std::string::npos;
+  }
+  EXPECT_TRUE(unterminated);
+  EXPECT_TRUE(after);
+}
+
 TEST(Diagnostics, ExpansionChainNote) {
   // A lexical error INSIDE spliced expansion text must carry the
   // "during expansion of macro 'X' (defined at ...)" note -- the frame

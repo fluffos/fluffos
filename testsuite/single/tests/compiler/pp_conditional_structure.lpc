@@ -1,0 +1,74 @@
+// A preprocessor conditional is a small state machine per level --
+// #if -> (#elif)* -> [#else] -> #endif -- that must open and close in one
+// file. The driver used to accept a second #else, an #elif after #else
+// (both silently dead), and an #if left open by an #include'd file and
+// closed by its includer. Each is now a compile error; the legal shapes
+// keep compiling.
+
+#define GEN "/data/pp_cond_gen"
+#define HDR "/data/pp_cond_gen.h"
+
+// Compile `src` (with `hdr` as HDR when given) and return the object, or 0.
+object try_compile(string src, string hdr) {
+  object ob;
+  if (ob = find_object(GEN)) destruct(ob);
+  rm(GEN + ".lpc");
+  rm(HDR);
+  if (hdr) write_file(HDR, hdr);
+  write_file(GEN + ".lpc", src);
+  catch(ob = load_object(GEN));
+  rm(GEN + ".lpc");
+  rm(HDR);
+  return ob;
+}
+
+int compiles(string src, string hdr) {
+  object ob = try_compile(src, hdr);
+  if (ob) {
+    destruct(ob);
+    return 1;
+  }
+  return 0;
+}
+
+void do_tests() {
+  object ob;
+
+  // Legal: #elif chain picks the first true branch, #else only when none.
+  ob = try_compile("#if 0\nint f() { return 1; }\n#elif 0\nint f() { return 2; }\n"
+    "#elif 1\nint f() { return 3; }\n#elif 1\nint f() { return 4; }\n"
+    "#else\nint f() { return 5; }\n#endif\n", 0);
+  ASSERT(ob);
+  if (ob) {
+    ASSERT_EQ(3, ob->f());
+    destruct(ob);
+  }
+  ob = try_compile("#if 0\nint f() { return 1; }\n#elif 0\nint f() { return 2; }\n"
+    "#else\nint f() { return 5; }\n#endif\n", 0);
+  ASSERT(ob);
+  if (ob) {
+    ASSERT_EQ(5, ob->f());
+    destruct(ob);
+  }
+
+  // Legal: a header that opens and closes its own guard; nesting inside a
+  // dead branch still has to balance.
+  ASSERT(compiles("#include \"" + HDR + "\"\nint f() { return X; }\n",
+    "#ifndef X\n#define X 7\n#endif\n"));
+  ASSERT(compiles("#if 0\n#if 1\n#else\n#endif\n#endif\nint f() { return 1; }\n", 0));
+
+  // Illegal: a second #else, and an #elif after #else -- including inside a
+  // dead outer branch, where neither would ever have been evaluated.
+  ASSERT(!compiles("#if 1\nint a;\n#else\nint b;\n#else\nint c;\n#endif\n", 0));
+  ASSERT(!compiles("#if 0\n#else\nint a;\n#elif 1\nint c;\n#endif\n", 0));
+  ASSERT(!compiles("#if 0\n#if 1\n#else\n#else\n#endif\n#endif\n", 0));
+  ASSERT(!compiles("#if 0\n#ifdef X\n#else\n#elif 1\n#endif\n#endif\n", 0));
+
+  // Illegal: a conditional opened in a header and left open...
+  ASSERT(!compiles("#include \"" + HDR + "\"\n#endif\nint z;\n", "#if 1\nint a;\n"));
+  // ...even when the header ends in a dead branch and nothing closes it...
+  ASSERT(!compiles("#include \"" + HDR + "\"\nint z;\n", "#if 0\nint a;\n"));
+  // ...and a header closing (or continuing) its includer's conditional.
+  ASSERT(!compiles("#if 1\n#include \"" + HDR + "\"\nint z;\n", "#endif\n"));
+  ASSERT(!compiles("#if 1\n#include \"" + HDR + "\"\nint z;\n#endif\n", "#else\n"));
+}

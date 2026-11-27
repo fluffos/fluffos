@@ -1084,6 +1084,22 @@ int lpc_lex_getc(void *yyscanner) {
 // (compiler.cc's epilog and error cleanup both call the lexer_utils
 // wrapper lpc_lex_teardown_active). After this the scanner holds no
 // buffers; the next lpc_lex_set_source materializes a fresh base.
+// An #include'd file's conditional levels end with the file
+// (lpc_lex_close_file_conditionals); so does the dead-branch skip mode they
+// implied. It can be the current start condition or saved underneath one
+// pushed on top (a block comment the file left open), so both are reset.
+void lpc_lex_leave_cond_skip(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  for (int i = 0; i < yyg->yy_start_stack_ptr; i++) {
+    if (yyg->yy_start_stack[i] == SC_COND_SKIP) {
+      yyg->yy_start_stack[i] = INITIAL;
+    }
+  }
+  if (YY_START == SC_COND_SKIP) {
+    BEGIN(INITIAL);
+  }
+}
+
 void lpc_lex_teardown(void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   while (lpc_lex_pushed_depth() > 0) {

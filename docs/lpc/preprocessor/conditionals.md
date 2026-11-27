@@ -63,3 +63,12 @@ still tracks `#if`/`#endif` nesting (so a skipped region may contain
 its own conditionals), but nothing else in the region is evaluated —
 including other directives. An unmatched `#elif`/`#else`/`#endif` is
 a compile error.
+
+Each conditional has the shape `#if` → any number of `#elif` → at most
+one `#else` → `#endif`, and the compiler checks that shape in skipped
+regions too: a second `#else`, or an `#elif` after the `#else`, is a
+compile error. A conditional must also open and close in the same file:
+a header that leaves an `#if` open is an error at the end of the header
+("unterminated conditional directive"), and an `#elif`/`#else`/`#endif`
+that would continue a conditional opened by the including file is an
+error as well.

@@ -778,6 +778,50 @@ bool pp_is_predefined(std::string_view name) {
   return m != nullptr && m->is_predefined;
 }
 
+// Open a conditional level in the file currently being read.
+static void pp_cond_open(bool emitting) {
+  g_compile.conds.push_back(
+      {emitting, emitting, false, lpc_lex_include_depth(), compiler_directive_start_line});
+}
+
+// The level an #elif/#else/#endif continues, or nullptr (after reporting)
+// when there is none. A level opened by another file -- in practice, the
+// includer's level, continued by an #include'd file (a header's own open
+// levels are dropped when it ends) -- is diagnosed but still continued:
+// skipping it would desync the stack for the rest of the compile.
+static CondState* pp_cond_continue(const char* directive) {
+  if (g_compile.conds.empty()) {
+    lexerror((std::string("unexpected ") + directive).c_str());
+    return nullptr;
+  }
+  CondState& cs = g_compile.conds.back();
+  if (cs.file_depth != lpc_lex_include_depth()) {
+    lexerror((std::string(directive) + " matches a conditional opened in another file").c_str());
+  }
+  return &cs;
+}
+
+void lpc_lex_close_file_conditionals() {
+  int depth = lpc_lex_include_depth();
+  bool unterminated = false;
+  int opened_at = 0;
+  while (!g_compile.conds.empty() && g_compile.conds.back().file_depth >= depth) {
+    opened_at = g_compile.conds.back().line;  // ends at the outermost one
+    g_compile.conds.pop_back();
+    unterminated = true;
+  }
+  if (unterminated) {
+    lexerror(("unterminated conditional directive (missing #endif for the one opened at line " +
+              std::to_string(opened_at) + ")")
+                 .c_str());
+    // An #include only runs while emitting, so the includer emits again --
+    // and must not be left in the dead-branch scan mode those levels set.
+    if (lpc_lex_emitting() && lpc_lex_active_scanner()) {
+      lpc_lex_leave_cond_skip(lpc_lex_active_scanner());
+    }
+  }
+}
+
 bool lpc_lex_emitting() {
   if (!g_compile.pp_active) return true;
   for (const auto& cs : g_compile.conds) {
@@ -1145,12 +1189,10 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
     // Strip comments or "#ifdef X // why" looks up the wrong name and
     // silently takes the false branch.
     bool def = pp_find_macro(trim(rest)) != nullptr;
-    bool emit = lpc_lex_emitting() && def;
-    g_compile.conds.push_back({emit, emit});
+    pp_cond_open(lpc_lex_emitting() && def);
   } else if (dir == "ifndef") {
     bool def = pp_find_macro(trim(rest)) != nullptr;
-    bool emit = lpc_lex_emitting() && !def;
-    g_compile.conds.push_back({emit, emit});
+    pp_cond_open(lpc_lex_emitting() && !def);
   } else if (dir == "if") {
     bool cond = false;
     if (lpc_lex_emitting()) {
@@ -1162,16 +1204,19 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
         cond = (lpc_lex_eval_if_expr(trimmed, yyscanner) != 0);
       }
     }
-    g_compile.conds.push_back({cond, cond});
+    pp_cond_open(cond);
   } else if (dir == "elif") {
-    if (g_compile.conds.empty()) {
-      lexerror("unexpected #elif");
-    } else {
-      bool had = g_compile.conds.back().had_true;
-      g_compile.conds.pop_back();
+    CondState* cs = pp_cond_continue("#elif");
+    if (cs) {
+      if (cs->seen_else) {
+        lexerror("#elif after #else");
+      }
+      // Evaluated against the ENCLOSING levels: this level's own current
+      // branch is being replaced.
+      cs->emitting = true;
       bool outer = lpc_lex_emitting();
       bool cond = false;
-      if (outer && !had) {
+      if (outer && !cs->had_true && !cs->seen_else) {
         ScratchString stripped = ScratchString(rest);
         ScratchString trimmed(trim(std::string_view(stripped)));
         if (trimmed.empty()) {
@@ -1180,22 +1225,23 @@ static void dispatch_directive(std::string_view dir, std::string_view rest, void
           cond = (lpc_lex_eval_if_expr(trimmed, yyscanner) != 0);
         }
       }
-      bool now = outer && !had && cond;
-      g_compile.conds.push_back({now, had || now});
+      cs->emitting = outer && !cs->had_true && !cs->seen_else && cond;
+      cs->had_true = cs->had_true || cs->emitting;
     }
   } else if (dir == "else") {
-    if (g_compile.conds.empty()) {
-      lexerror("unexpected #else");
-    } else {
-      bool had = g_compile.conds.back().had_true;
-      g_compile.conds.pop_back();
-      bool now = lpc_lex_emitting() && !had;
-      g_compile.conds.push_back({now, true});
+    CondState* cs = pp_cond_continue("#else");
+    if (cs) {
+      if (cs->seen_else) {
+        lexerror("#else after #else");
+      }
+      cs->emitting = true;
+      bool outer = lpc_lex_emitting();
+      cs->emitting = outer && !cs->had_true && !cs->seen_else;
+      cs->had_true = true;
+      cs->seen_else = true;
     }
   } else if (dir == "endif") {
-    if (g_compile.conds.empty()) {
-      lexerror("unexpected #endif");
-    } else {
+    if (pp_cond_continue("#endif")) {
       g_compile.conds.pop_back();
     }
   } else if (dir == "include") {
@@ -1313,35 +1359,21 @@ LpcDirectiveAction lpc_lex_on_directive(const char* text, int len, void* yyscann
     rest.remove_suffix(1);
   }
 
-  auto* ctx = reinterpret_cast<compiler_context_t*>(yyget_extra(yyscanner));
-
   if (!in_skip_mode) {
     compiler_directive_start_line = directive_line;
     dispatch_directive(dir, rest, yyscanner);
     compiler_directive_start_line = 0;
-    if (!lpc_lex_emitting()) {
-      ctx->skip_depth = 0;
-      return LpcDirectiveAction::kEnterSkip;
-    }
-    return LpcDirectiveAction::kNone;
+    return lpc_lex_emitting() ? LpcDirectiveAction::kNone : LpcDirectiveAction::kEnterSkip;
   }
 
-  // Dead branch: track nesting by name only; dispatch nothing except a
-  // directive that can end this branch at depth 0. Everything else in a
-  // false branch -- #include, #define, unknown directives -- is skipped
-  // without validation, matching the old preprocessor's dead-branch
-  // behavior.
-  if (dir == "if" || dir == "ifdef" || dir == "ifndef") {
-    ctx->skip_depth++;
-    return LpcDirectiveAction::kNone;
-  }
-  if (ctx->skip_depth > 0) {
-    if (dir == "endif") {
-      ctx->skip_depth--;
-    }
-    return LpcDirectiveAction::kNone;
-  }
-  if (dir == "endif" || dir == "elif" || dir == "else") {
+  // Dead branch: dispatch only the conditional directives; everything else
+  // -- #include, #define, unknown directives -- is skipped without
+  // validation. A conditional nested in the dead branch is a real level on
+  // g_compile.conds (opened non-emitting, so neither its expression nor
+  // any #elif's is evaluated), which keeps its #elif/#else/#endif structure
+  // checked exactly like a live one's.
+  if (dir == "if" || dir == "ifdef" || dir == "ifndef" || dir == "endif" || dir == "elif" ||
+      dir == "else") {
     compiler_directive_start_line = directive_line;
     dispatch_directive(dir, rest, yyscanner);
     compiler_directive_start_line = 0;

@@ -645,6 +645,16 @@ std::unordered_map<std::string, int> live_guard_counts;
 
 // Parallel to the stack of pushed buffers: LpcPushedBufferKind values.
 std::vector<char> pushed_kind_stack;
+
+// True while an aborted or reset compile force-pops its leftover buffers:
+// those pops are cleanup, not a file reaching its end, so they must not
+// report the file's unclosed conditionals.
+bool unwinding_buffers = false;
+
+struct UnwindingBuffersScope {
+  UnwindingBuffersScope() { unwinding_buffers = true; }
+  ~UnwindingBuffersScope() { unwinding_buffers = false; }
+};
 }  // namespace
 
 static void pop_include_state(int ending_line);
@@ -688,6 +698,11 @@ void lpc_lex_note_buffer_pop(int ending_lineno) {
       }
     }
   } else if (kind == LPC_BUF_INCLUDE) {
+    if (!unwinding_buffers) {
+      // The included file genuinely ran dry. Checked before
+      // pop_include_state so the diagnostic still names that file.
+      lpc_lex_close_file_conditionals();
+    }
     if (!include_buffer_indices.empty()) {
       include_buffer_indices.pop_back();
     }
@@ -765,6 +780,8 @@ std::vector<LpcExpansionSite> lpc_lex_expansion_chain(void) {
   }
   return out;
 }
+
+int lpc_lex_include_depth(void) { return static_cast<int>(inc_stack.size()); }
 
 std::vector<std::pair<std::string, int>> lpc_lex_include_stack(void) {
   std::vector<std::pair<std::string, int>> out;
@@ -1389,6 +1406,7 @@ int lpc_lex_pop_splice_if_any(void* yyscanner) {
 
 void lpc_lex_teardown_active(void) {
   if (active_scanner != nullptr) {
+    UnwindingBuffersScope unwinding;
     lpc_lex_teardown(active_scanner);
   }
   pushed_kind_stack.clear();
@@ -1466,7 +1484,10 @@ static void start_new_file_prepared(char* prepared_base, size_t prepared_body, v
   // point (end_new_file normally unwound it) only needs its shared
   // strings released -- current_file already holds the NEW compile's
   // identity and must not be touched.
-  lpc_lex_reset(yyscanner);
+  {
+    UnwindingBuffersScope unwinding;
+    lpc_lex_reset(yyscanner);
+  }
   pushed_kind_stack.clear();
   include_buffer_indices.clear();
   for (auto& is : inc_stack) {

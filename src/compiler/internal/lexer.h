@@ -110,9 +110,6 @@ struct compiler_context_t {
   int directive_line = 0;
   ScratchString heredoc_terminator;
   bool heredoc_is_array = false;
-  // Nesting depth of #if/#ifdef directives seen INSIDE a dead branch while
-  // in SC_COND_SKIP (the real conditional stack is g_compile.conds).
-  int skip_depth = 0;
   // Column (0-based) at which the most recently matched token STARTED --
   // snapshotted by lexer.l's YY_USER_ACTION before the running yycolumn
   // advances past the match. Diagnostics read this for the caret
@@ -307,6 +304,7 @@ void lpc_lex_push_prepared_buffer(char* base, size_t size, int kind, void* yysca
 // still valid. lpc_lex_teardown_active() (lexer_utils) wraps the active
 // scanner and MUST run before each scratch_destroy.
 void lpc_lex_teardown(void* yyscanner);
+void lpc_lex_leave_cond_skip(void* yyscanner);
 void lpc_lex_teardown_active(void);
 // Clear the active-scanner pointer when destroying its scanner (must be
 // called right before yylex_destroy by every owner).
@@ -348,6 +346,7 @@ void lpc_lex_note_buffer_pop(int ending_lineno);
 // each entry is (including file, line of the #include directive in it).
 // Empty when scanning the top-level file. Defined in lexer_utils.cc, next
 // to the include stack it walks.
+int lpc_lex_include_depth(void);  // #include nesting of the file being read (main file = 0)
 std::vector<std::pair<std::string, int>> lpc_lex_include_stack(void);
 
 // One live macro-expansion frame, for diagnostics ("during expansion of
