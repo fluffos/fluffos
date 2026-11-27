@@ -468,6 +468,34 @@ static const int ANSI_SUBSTITUTE = 0x20;
 // Used by both telnet and ws_ascii, in case of telnet, default is linemode, which means
 // client will actually send entire line. In ascii mode, we will get an single char input
 // each time.
+/*
+ * Store one received byte under LINE-mode rules: BS/DEL edit the buffer
+ * instead of being stored, and ESC is rewritten when ANSI input is being
+ * stripped. Character mode stores every byte raw (the mudlib asked for raw
+ * keystrokes); comm_charmode_removed() re-reads such bytes through here.
+ * A backspace never erases below `floor`.
+ */
+static void put_line_mode_byte(interactive_t* ip, unsigned char c, int floor = 0) {
+  switch (c) {
+    case 0x08:  // BACKSPACE
+    case 0x7f:  // DEL
+      if (ip->text_end > floor) {
+        ip->text_end--;
+      }
+      break;
+    case 0x1b:
+      // The anti-ANSI-injection rewrite is a line-mode protection.
+      if (CONFIG_INT(__RC_NO_ANSI__) && CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
+        ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
+        break;
+      }
+      // fallthrough
+    default:
+      ip->text[ip->text_end++] = c;
+      break;
+  }
+}
+
 void on_user_input(interactive_t* ip, const char* data, size_t len) {
   if (g_hook_mask & HOOK_MASK_NET_READ) {
     object_t* user_ob = !(ip->ob->flags & O_DESTRUCTED) ? ip->ob : nullptr;
@@ -484,30 +512,12 @@ void on_user_input(interactive_t* ip, const char* data, size_t len) {
       break;
     }
     auto c = static_cast<unsigned char>(data[i]);
-    switch (c) {
-      case 0x08:  // BACKSPACE
-      case 0x7f:  // DEL
-        if (ip->iflags & SINGLE_CHAR) {
-          ip->text[ip->text_end++] = c;
-        } else {
-          if (ip->text_end > 0) {
-            ip->text_end--;
-          }
-        }
-        break;
-      case 0x1b:
-        // The anti-ANSI-injection rewrite is a line-mode protection; in
-        // single-char mode the mudlib asked for raw keystrokes and needs
-        // ESC intact to decode arrow/function keys.
-        if (!(ip->iflags & SINGLE_CHAR) && CONFIG_INT(__RC_NO_ANSI__) &&
-            CONFIG_INT(__RC_STRIP_BEFORE_PROCESS_INPUT__)) {
-          ip->text[ip->text_end++] = ANSI_SUBSTITUTE;
-          break;
-        }
-        // fallthrough
-      default:
-        ip->text[ip->text_end++] = c;
-        break;
+    if (ip->iflags & SINGLE_CHAR) {
+      // Raw: the mudlib asked for keystrokes, and needs BS/DEL and ESC
+      // intact (arrow and function keys).
+      ip->text[ip->text_end++] = c;
+    } else {
+      put_line_mode_byte(ip, c);
     }
   }
 }
@@ -986,16 +996,45 @@ InteractiveScope::~InteractiveScope() {
 }
 
 /*
- * Character mode -> line mode, everything it takes: the partial buffer was
- * collected under character-mode rules and is dropped, and the client is
- * told (set_linemode()), or it goes on sending one keystroke at a time.
- * The caller has already cleared SINGLE_CHAR.
+ * Character mode -> line mode after a get_char() keystroke was delivered and
+ * its callback did not ask for another: the partial buffer was collected
+ * under character-mode rules and is dropped, and the client is told
+ * (set_linemode()), or it goes on sending one keystroke at a time. The
+ * caller has already cleared SINGLE_CHAR.
  */
 void comm_leave_charmode(interactive_t* ip) {
   ip->text_start = ip->text_end = 0;
   ip->text[0] = '\0';
   ip->iflags &= ~CMD_IN_BUF;
   set_linemode(ip, true);
+}
+
+/*
+ * Character mode -> line mode at the mudlib's request (remove_charmode()),
+ * at any moment -- from a call_out or a heart_beat, say. Nothing was
+ * consumed, so what is buffered is type-ahead the user really typed: keep
+ * it, re-read under line-mode rules (it was stored raw: BS/DEL unapplied,
+ * ESC untouched), and let CMD_IN_BUF mean "a whole line is waiting" again
+ * instead of "a keystroke is". The re-read is in place from text_start and
+ * a backspace stops there: what lies before it may be the text of a command
+ * still being processed (a line-mode command can switch to character mode
+ * and back inside its own process_input()). The caller has already cleared
+ * SINGLE_CHAR.
+ */
+void comm_charmode_removed(interactive_t* ip) {
+  set_linemode(ip, true);
+  std::string const raw(ip->text + ip->text_start, ip->text_end - ip->text_start);
+  ip->text_end = ip->text_start;
+  for (unsigned char const c : raw) {
+    put_line_mode_byte(ip, c, ip->text_start);
+  }
+  ip->text[ip->text_end] = '\0';
+  if (cmd_in_buf(ip)) {
+    ip->iflags |= CMD_IN_BUF;
+    maybe_schedule_user_command(ip);
+  } else {
+    ip->iflags &= ~CMD_IN_BUF;
+  }
 }
 
 #if defined(F_INPUT_TO) || defined(F_GET_CHAR)

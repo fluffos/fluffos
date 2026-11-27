@@ -2948,12 +2948,14 @@ static int remove_charmode(object_t* ob) {
   } else {
     interactive_t* ip = ob->interactive;
     bool const was_single = ip->iflags & I_SINGLE_CHAR;
-    ret = (ip->iflags &= ~I_SINGLE_CHAR);
+    /* I_WAS_SINGLE_CHAR too: during a '!' escape out of character mode it
+     * is the only flag set, and would switch the user back to character
+     * mode after the escaped line. */
+    ret = (ip->iflags &= ~(I_SINGLE_CHAR | I_WAS_SINGLE_CHAR));
     if (was_single) {
       /* Clearing the flag alone left the client in character mode, still
-       * sending a keystroke at a time, and kept a buffer collected under
-       * character-mode rules. */
-      comm_leave_charmode(ip);
+       * sending a keystroke at a time. */
+      comm_charmode_removed(ip);
     }
   }
   return ret;
