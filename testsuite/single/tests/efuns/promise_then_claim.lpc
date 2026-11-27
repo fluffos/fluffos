@@ -6,15 +6,27 @@
 
 #define LATCH "claims"
 
-promise src, adopted, chained, rsrc, radopted, rchained;
-mixed got, rgot;
+promise src, adopted, chained, rsrc, radopted, rchained, asrc, aadopted, all;
+mixed got, rgot, agot;
+int pending = 3;
+
+// Checked from the deliveries themselves, not from a deadline: the outcome
+// is several delivery hops away, and how many a turn makes is a config knob.
+void landed() {
+  if (--pending == 0) {
+    ASSERT_EQ(42, got);
+    ASSERT_EQ(43, rgot);
+    ASSERT_EQ(44, agot);
+    RELEASE_LATCH(LATCH);
+  }
+}
 
 void start() {
   src = promise_create();
   adopted = promise_create();
   chained = promise_then(src, (: 1 :));
   promise_resolve(chained, adopted);  // committed to `adopted`
-  promise_then(chained, (: got = $1 :));
+  promise_then(chained, (: got = $1, landed() :));
 
   // The same through a pass-through link: no rejection handler, so a
   // rejected source would pass straight through to the chained promise.
@@ -22,23 +34,25 @@ void start() {
   radopted = promise_create();
   rchained = promise_then(rsrc, (: 1 :));
   promise_resolve(rchained, radopted);
-  promise_then(rchained, (: rgot = $1 :), (: rgot = "rejected: " + $1 :));
+  promise_then(rchained, (: rgot = $1, landed() :), (: rgot = "rejected: " + $1, landed() :));
+
+  // A combinator's result promise likewise: its aggregate is refused.
+  asrc = promise_create();
+  aadopted = promise_create();
+  all = promise_all(({ asrc }));
+  promise_resolve(all, aadopted);
+  promise_then(all, (: agot = $1, landed() :), (: agot = "rejected: " + $1, landed() :));
 
   promise_resolve(src, "src");   // its handler's result (1) is refused
   promise_reject(rsrc, "boom");  // its pass-through rejection is refused
+  promise_resolve(asrc, 1);      // promise_all's ({ 1 }) is refused
   call_out("settle_adopted", 1);
 }
 
 void settle_adopted() {
   promise_resolve(adopted, 42);
   promise_resolve(radopted, 43);
-  call_out("check", 1);
-}
-
-void check() {
-  ASSERT_EQ(42, got);
-  ASSERT_EQ(43, rgot);
-  RELEASE_LATCH(LATCH);
+  promise_resolve(aadopted, 44);
 }
 
 void do_tests() {

@@ -1757,15 +1757,18 @@ svalue_t* promise_map_slot(mapping_t* m, const char* key) {
  * if this input decided the outcome. Runs no LPC. */
 void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected,
                        bool from_cancel) {
+  /* c->result is the mudlib's promise too: it may already be resolved with
+   * a pending promise (fate committed). The aggregate is then an outside
+   * claim that loses, like every other driver result (promise_claim_*). */
   switch (c->kind) {
     case PROMISE_COMB_RACE:
       /* first to settle decides, either way */
-      (void)promise_settle(c->result, value, rejected ? 1 : 0, rejected && from_cancel);
+      (void)promise_claim_settle(c->result, value, rejected ? 1 : 0, rejected && from_cancel);
       break;
 
     case PROMISE_COMB_ALL:
       if (rejected) {
-        (void)promise_settle(c->result, value, 1, from_cancel); /* fail fast */
+        (void)promise_claim_settle(c->result, value, 1, from_cancel); /* fail fast */
       } else {
         assign_svalue(&c->slots->item[index], value);
       }
@@ -1775,7 +1778,7 @@ void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, boo
       if (rejected) {
         assign_svalue(&c->slots->item[index], value);
       } else {
-        (void)promise_settle(c->result, value, 0); /* first success wins */
+        (void)promise_claim_settle(c->result, value, 0); /* first success wins */
       }
       break;
 
@@ -1808,13 +1811,13 @@ void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, boo
       svalue_t all = const0;
       all.type = T_ARRAY;
       all.u.arr = c->slots;
-      (void)promise_settle(c->result, &all, 0);
+      (void)promise_claim_settle(c->result, &all, 0);
     } else if (c->kind == PROMISE_COMB_ANY) {
       /* every input rejected: reject with the array of reasons */
       svalue_t all = const0;
       all.type = T_ARRAY;
       all.u.arr = c->slots;
-      (void)promise_settle(c->result, &all, 1);
+      (void)promise_claim_settle(c->result, &all, 1);
     }
   }
 }
