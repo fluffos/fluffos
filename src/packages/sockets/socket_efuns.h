@@ -36,6 +36,7 @@ constexpr int NUM_SOCKET_OPTIONS = 5;
  *
  *   CLOSED --create--> UNBOUND --bind--> BOUND --listen--> LISTEN
  *   CLOSED --accept--> HANDSHAKE (TLS) | DATA_XFER
+ *   CLOSED --external_start() pipe--> DATA_XFER
  *   UNBOUND | BOUND --connect--> HANDSHAKE (TLS) | DATA_XFER
  *   HANDSHAKE --TLS done--> DATA_XFER
  *   any open --socket_close() with unsent data--> FLUSHING
@@ -134,6 +135,7 @@ int socket_release(int, object_t*, svalue_t*);
 int socket_acquire(int, svalue_t*, svalue_t*, svalue_t*);
 const char* socket_error(int);
 int find_new_socket(void);
+void socket_set_state(int fd, socket_state to);
 void set_read_callback(int, svalue_t*);
 void set_write_callback(int, svalue_t*);
 void set_close_callback(int, svalue_t*);

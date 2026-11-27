@@ -116,7 +116,10 @@ static bool socket_state_edge_ok(socket_state from, socket_state to) {
   return false;
 }
 
-static void socket_set_state(int fd, socket_state to) {
+}  // namespace
+
+// Exported (socket_efuns.h): external.cc opens pipe sockets too.
+void socket_set_state(int fd, socket_state to) {
 #ifdef DEBUG
   if (!socket_state_edge_ok(lpc_socks[fd].state, to)) {
     fatal("socket %d: illegal state change %d -> %d\n", fd, lpc_socks[fd].state, to);
@@ -124,6 +127,8 @@ static void socket_set_state(int fd, socket_state to) {
 #endif
   lpc_socks[fd].state = to;
 }
+
+namespace {
 
 
 void on_lpc_sock_read(evutil_socket_t fd, short what, void* arg) {
