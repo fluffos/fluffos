@@ -447,11 +447,13 @@ struct Diagnostic {
 // whether ANY branch has been true yet (so a later #elif/#else knows not to
 // fire), and `file_depth` the #include nesting depth of the file that
 // opened the level: a conditional must open and close in the same file.
+// `line` is where it opened, for the "unterminated" report.
 struct CondState {
   bool emitting;
   bool had_true;
   bool seen_else;
   int file_depth;
+  int line;
 };
 
 // PpMacro — one macro entry

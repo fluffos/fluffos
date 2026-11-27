@@ -780,7 +780,8 @@ bool pp_is_predefined(std::string_view name) {
 
 // Open a conditional level in the file currently being read.
 static void pp_cond_open(bool emitting) {
-  g_compile.conds.push_back({emitting, emitting, false, lpc_lex_include_depth()});
+  g_compile.conds.push_back(
+      {emitting, emitting, false, lpc_lex_include_depth(), compiler_directive_start_line});
 }
 
 // The level an #elif/#else/#endif continues, or nullptr (after reporting)
@@ -803,12 +804,16 @@ static CondState* pp_cond_continue(const char* directive) {
 void lpc_lex_close_file_conditionals() {
   int depth = lpc_lex_include_depth();
   bool unterminated = false;
+  int opened_at = 0;
   while (!g_compile.conds.empty() && g_compile.conds.back().file_depth >= depth) {
+    opened_at = g_compile.conds.back().line;  // ends at the outermost one
     g_compile.conds.pop_back();
     unterminated = true;
   }
   if (unterminated) {
-    lexerror("unterminated conditional directive (missing #endif)");
+    lexerror(("unterminated conditional directive (missing #endif for the one opened at line " +
+              std::to_string(opened_at) + ")")
+                 .c_str());
     // An #include only runs while emitting, so the includer emits again --
     // and must not be left in the dead-branch scan mode those levels set.
     if (lpc_lex_emitting() && lpc_lex_active_scanner()) {
