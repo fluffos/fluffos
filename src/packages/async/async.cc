@@ -328,7 +328,15 @@ void* getdirthread(struct Request* req) {
     // pointer, ~8 bytes) undersized it and memcpy of the ~280-byte dirent
     // overflowed the heap once a directory held enough entries.
     req->data.resize(static_cast<size_t>(i + 1) * sizeof(struct dirent));
-    memcpy(&((dirent*)(req->data.data()))[i], de, sizeof(*de));
+    // Copy the name only. readdir() packs its records as tightly as their
+    // names allow, so a record near the end of opendir()'s buffer is shorter
+    // than sizeof(struct dirent): copying a whole struct read past the end
+    // of that buffer (an ASan heap over-read on any large directory).
+    // handle_getdir() reads nothing but d_name.
+    dirent* slot = &((dirent*)(req->data.data()))[i];
+    memset(slot, 0, sizeof(*slot));
+    size_t const len = strnlen(de->d_name, sizeof(slot->d_name) - 1);
+    memcpy(slot->d_name, de->d_name, len);
     i++;
   }
 

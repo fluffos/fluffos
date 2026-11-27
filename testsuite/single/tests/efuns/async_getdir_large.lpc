@@ -1,0 +1,51 @@
+// async_getdir() on a directory with many entries. The worker copied a
+// whole `struct dirent` per entry, but readdir() packs records as tightly
+// as their names allow, so the copy read past the end of opendir()'s
+// buffer (an ASan heap over-read) once a directory filled it. Only the name
+// is copied now.
+//
+// Driven from call_outs under an exit latch: the callback runs once the
+// event loop does.
+#ifdef __PACKAGE_ASYNC__
+#define DIR "/data/async_getdir_large/"
+#define COUNT 3000
+#define LATCH "async_getdir large directory"
+
+void cleanup() {
+  foreach (string f in get_dir(DIR)) {
+    rm(DIR + f);
+  }
+  rmdir(DIR);
+}
+
+void got(mixed names) {
+  ASSERT(arrayp(names));
+  if (arrayp(names)) {
+    ASSERT_EQ(COUNT, sizeof(names));
+    for (int i = 0; i < COUNT; i++) {
+      ASSERT(member_array("entry_" + i, names) != -1);
+    }
+  }
+  cleanup();
+  RELEASE_LATCH(LATCH);
+}
+
+void start() {
+  if (file_size(DIR) == -2) {
+    cleanup();
+  }
+  mkdir(DIR);
+  for (int i = 0; i < COUNT; i++) {
+    write_file(DIR + "entry_" + i, "x");
+  }
+  async_getdir(DIR, (: got :));
+}
+#endif
+
+void do_tests() {
+#ifdef __PACKAGE_ASYNC__
+  EXPECT_LATCH(LATCH);
+  call_out("start", 1);
+#endif
+  ASSERT(1);
+}
