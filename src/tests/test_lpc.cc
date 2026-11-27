@@ -1394,8 +1394,9 @@ TEST_F(DriverTest, NetDeadPlainStress) {
 }
 
 // net_dead() destructs the body itself: the recursive remove_interactive()
-// from destruct_object() must be absorbed by the CLOSING guard, and the
-// outer teardown still releases exactly one interactive ref.
+// from destruct_object() must be absorbed by the Closing-phase guard
+// (conn_closing()), and the outer teardown still releases exactly one
+// interactive ref.
 TEST_F(DriverTest, NetDeadSelfDestructStress) {
   const char* src = "void net_dead() { destruct(this_object()); }\n";
 
