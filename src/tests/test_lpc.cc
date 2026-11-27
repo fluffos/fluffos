@@ -1780,6 +1780,41 @@ TEST_F(DriverTest, WritePromptAfterExhaustedCommand) {
   RunGuarded([&] { remove_destructed_objects(); });
 }
 
+// process_input() running out of eval budget is the end of that command:
+// the apply stays enabled (it used to be cleared for the rest of the
+// session, as for a broken apply), and the command is not re-run through
+// the parser on the exhausted budget.
+TEST_F(DriverTest, ProcessInputSurvivesExhaustedCommand) {
+  object_t* body = nullptr;
+  RunGuarded([&] {
+    body = load_object_from_source(
+        "mixed process_input(string s) { return 1; }\n"
+        "void write_prompt() { }\n",
+        "process_input_exhausted", 0);
+  });
+  ASSERT_NE(body, nullptr);
+
+  TransportLog log;
+  interactive_t* ip = fabricate_telnet_interactive(body, &log);
+  ip->iflags |= HAS_PROCESS_INPUT | HAS_WRITE_PROMPT | CMD_IN_BUF;
+  std::string const cmd = "look\n";
+  ip->text_end = static_cast<int>(cmd.copy(ip->text, cmd.size()));
+
+  outoftime = 1;  // what an eval-cost error leaves while the command unwinds
+  RunGuarded([&] { process_user_command(ip); });
+  outoftime = 0;
+
+  EXPECT_TRUE(ip->iflags & HAS_PROCESS_INPUT);
+  EXPECT_TRUE(ip->iflags & HAS_WRITE_PROMPT);
+
+  RunGuarded([&] { remove_interactive(body, 0); });
+  RunGuarded([&] {
+    destruct_object(body);
+    free_object(&body, "ProcessInputSurvivesExhaustedCommand");
+  });
+  RunGuarded([&] { remove_destructed_objects(); });
+}
+
 // write_prompt(), run after a command, destructs the user -- returning
 // normally (process_user_command() then sent a GA and rescheduled on the
 // gone connection) or erroring (print_prompt() fell back to the default
