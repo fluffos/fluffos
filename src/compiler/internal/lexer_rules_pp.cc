@@ -784,9 +784,10 @@ static void pp_cond_open(bool emitting) {
 }
 
 // The level an #elif/#else/#endif continues, or nullptr (after reporting)
-// when there is none. A level opened by another file is still continued --
-// rejecting it would desync the stack for the rest of the compile -- but is
-// diagnosed: the end of that file has already reported it unterminated.
+// when there is none. A level opened by another file -- in practice, the
+// includer's level, continued by an #include'd file (a header's own open
+// levels are dropped when it ends) -- is diagnosed but still continued:
+// skipping it would desync the stack for the rest of the compile.
 static CondState* pp_cond_continue(const char* directive) {
   if (g_compile.conds.empty()) {
     lexerror((std::string("unexpected ") + directive).c_str());
