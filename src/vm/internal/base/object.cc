@@ -138,16 +138,35 @@ static void reset_restore_scratch() {
 }
 
 /* The scratch state (save_svalue_depth, max_depth, sizes[]) belongs to one
- * top-level restore of a compound value. Opened around it, this resets the
- * state on every way out -- the normal return and any error() inside the
- * restore helpers alike -- so no error site has to remember to (several did
- * not, until each was found). */
+ * top-level restore of a compound value. Opened around it, this starts that
+ * restore from clean state and releases it on every way out -- the normal
+ * return and any error() inside the restore helpers alike -- so no error
+ * site has to remember to (several did not, until each was found).
+ *
+ * It SAVES the state it found and puts it back, because a restore can start
+ * while another is still live: error() runs the master's error handler
+ * BEFORE it throws, i.e. before the failing restore's scope unwinds, and
+ * that handler may restore_variable() / restore_object() itself. Without
+ * the save it would start from the failing restore's depth and sizes[] and
+ * skip its own sizing pass. */
 namespace {
 struct RestoreScratchScope {
-  RestoreScratchScope() = default;
+  int saved_depth = save_svalue_depth;
+  int saved_max_depth = max_depth;
+  int* saved_sizes = sizes;
+
+  RestoreScratchScope() {
+    save_svalue_depth = max_depth = 0;
+    sizes = nullptr;
+  }
   RestoreScratchScope(const RestoreScratchScope&) = delete;
   RestoreScratchScope& operator=(const RestoreScratchScope&) = delete;
-  ~RestoreScratchScope() { reset_restore_scratch(); }
+  ~RestoreScratchScope() {
+    reset_restore_scratch();  // this restore's own sizes[]
+    save_svalue_depth = saved_depth;
+    max_depth = saved_max_depth;
+    sizes = saved_sizes;
+  }
 };
 }  // namespace
 
