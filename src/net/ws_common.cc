@@ -131,7 +131,7 @@ void ws_handle_closed(ws_session* pss) {
     // close_user_websocket() would request a writeable callback that derefs the
     // missing h2 parent (SIGSEGV on release builds).
     ip->lws = nullptr;
-    remove_interactive(ip->ob, 0);
+    conn_close(ip);
     pss->user = nullptr;
   }
   // Always free the session resources: on driver-initiated closes

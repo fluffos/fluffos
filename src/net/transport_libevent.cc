@@ -270,7 +270,7 @@ void on_user_events(bufferevent* bev, short events, void* arg) {
      * accepted sockets typically do not raise CONNECTED. */
     if (user->ssl) {
       fire_net_tls_hook(user, bev, "ok");
-      if (user->iflags & CLOSING) {
+      if (conn_closing(user)) {
         return;
       }
     }
@@ -279,12 +279,11 @@ void on_user_events(bufferevent* bev, short events, void* arg) {
   if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
     if ((events & BEV_EVENT_ERROR) && user->ssl) {
       fire_net_tls_hook(user, bev, "error");
-      if (user->iflags & CLOSING) {
+      if (conn_closing(user)) {
         return;
       }
     }
-    user->iflags |= NET_DEAD;
-    remove_interactive(user->ob, 0);
+    conn_close(user);
   } else if (!(events & BEV_EVENT_CONNECTED)) {
     debug(event, "on_user_events: ignored unknown events: %d\n", events);
   }
@@ -469,8 +468,7 @@ void get_user_data(interactive_t* ip) {
   if (num_bytes == -1) {
     debug(connections, "get_user_data: fd %d, read error: %s.\n", ip->fd,
           evutil_socket_error_to_string(evutil_socket_geterror(ip->fd)));
-    ip->iflags |= NET_DEAD;
-    remove_interactive(ip->ob, 0);
+    conn_close(ip);
     return;
   }
 
@@ -506,7 +504,7 @@ void get_user_data(interactive_t* ip) {
           // Reject non-positive (a negative prefix would drive a negative
           // text_space) and oversized message lengths.
           if (msg_len <= 0 || msg_len > MAX_TEXT - 5) {
-            remove_interactive(ip->ob, 0);
+            conn_close(ip);
           }
         } else {
           svalue_t value;
@@ -550,7 +548,7 @@ void get_user_data(interactive_t* ip) {
           push_malloced_string(str);
           set_eval(max_eval_cost);
           safe_apply(APPLY_PROCESS_INPUT, ip->ob, 1, ORIGIN_DRIVER);
-          if (ip->iflags & CLOSING) {
+          if (conn_closing(ip)) {
             return;
           }
         }

@@ -283,7 +283,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
         debug_message(
             "Bad client: bogus IAC DO GMCP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
-        remove_interactive(ip->ob, false);
+        conn_close(ip);
         return;
 #else
         // do nothing
@@ -297,7 +297,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
         debug_message(
             "Bad client: bogus IAC DO MSDP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
-        remove_interactive(ip->ob, false);
+        conn_close(ip);
         return;
 #else
         // do nothing
@@ -311,7 +311,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
         debug_message(
             "Bad client: bogus IAC DO MSSP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
-        remove_interactive(ip->ob, false);
+        conn_close(ip);
         return;
 #else
         // do nothing
@@ -325,7 +325,7 @@ static inline void on_telnet_do(unsigned char cmd, interactive_t* ip) {
         debug_message(
             "Bad client: bogus IAC DO ZMP from %s.",
             sockaddr_to_string(reinterpret_cast<const sockaddr*>(&ip->addr), ip->addrlen));
-        remove_interactive(ip->ob, false);
+        conn_close(ip);
         return;
 #else
         // do nothing
@@ -513,7 +513,7 @@ static inline void on_telnet_subnegotiation(unsigned char cmd, const char* buf, 
 static inline void on_telnet_environ(const struct telnet_environ_t* values, unsigned long size,
                                      interactive_t* ip) {
   for (int i = 0; i < size; i++) {
-    if (ip->iflags & CLOSING) {
+    if (conn_closing(ip)) {
       return; /* an earlier receive_environ() removed the user */
     }
     if (values[i].var == nullptr || values[i].value == nullptr) {
@@ -594,7 +594,7 @@ void telnet_event_handler(telnet_t* telnet, telnet_event_t* ev, void* user_data)
       return;
     }
     /* A hook may have marked the connection dead or closing; stop here. */
-    if (ip->iflags & (NET_DEAD | CLOSING)) {
+    if (conn_closing(ip)) {
       return;
     }
   }

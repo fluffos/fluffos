@@ -88,6 +88,19 @@ void comm_run_scheduled_command(interactive_t* ip) {
 
 // Called upon user, when he's finished negotiations , and ready to logon
 void on_user_logon(interactive_t* user) {
+  if (conn_closing(user)) {
+    /* Closed before its logon ran (conn_close() on a PreLogon connection):
+     * the transport is gone, no object was ever attached, and ip holds no
+     * object reference. This event is the last holder of ip. */
+    if (user->telnet != nullptr) {
+      telnet_free(user->telnet);
+      user->telnet = nullptr;
+    }
+    user_del(user);
+    FREE(user);
+    return;
+  }
+
   // connect() runs with the connection on the master, which may destruct
   // itself (see below); `user` is still read afterwards.
   InteractiveScope const scope;
@@ -95,6 +108,7 @@ void on_user_logon(interactive_t* user) {
   set_command_giver(master_ob);
   master_ob->flags |= O_ONCE_INTERACTIVE;
   master_ob->interactive = user;
+  user->phase = ConnPhase::Attached;
 
   /*
    * The user object has one extra reference. It is asserted that the
@@ -221,7 +235,7 @@ void add_message(object_t* who, const char* data, int len) {
    * (maybe)
    */
   if (!who || (who->flags & O_DESTRUCTED) || !who->interactive ||
-      (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+      conn_closing(who->interactive)) {
     if (CONFIG_INT(__RC_NONINTERACTIVE_STDERR_WRITE__)) {
       putc(']', stderr);
       fwrite(data, len, 1, stderr);
@@ -235,7 +249,7 @@ void add_message(object_t* who, const char* data, int len) {
     }
     /* A handler may have destructed or disconnected `who`. */
     if ((who->flags & O_DESTRUCTED) || !who->interactive ||
-        (who->interactive->iflags & (NET_DEAD | CLOSING))) {
+        conn_closing(who->interactive)) {
       return;
     }
   }
@@ -400,7 +414,7 @@ void comm_text_received(interactive_t* ip, const char* data, size_t len) {
   comm_reserve_input_space(ip, len);
 
   on_user_input(ip, data, len);
-  if (ip->iflags & CLOSING) {
+  if (conn_closing(ip)) {
     return;
   }
 
@@ -425,7 +439,7 @@ void comm_telnet_received(interactive_t* ip, const char* data, size_t len) {
 
   // this will read data into ip->text
   telnet_recv(ip->telnet, data, len);
-  if (ip->iflags & CLOSING) {
+  if (conn_closing(ip)) {
     return;
   }
   // If we read something
@@ -434,7 +448,7 @@ void comm_telnet_received(interactive_t* ip, const char* data, size_t len) {
       telnet being in linemode */
     if (!(ip->iflags & NOECHO)) {
       handle_snoop(ip->text + start, ip->text_end - start, ip);
-      if (ip->iflags & CLOSING) {
+      if (conn_closing(ip)) {
         return; /* receive_snoop() is LPC */
       }
     }
@@ -460,7 +474,7 @@ void on_user_input(interactive_t* ip, const char* data, size_t len) {
     if (!hook_dispatch_net_read(user_ob, data, static_cast<int>(len))) {
       return; /* DECIDE refuse drops the input */
     }
-    if (ip->iflags & CLOSING) {
+    if (conn_closing(ip)) {
       return; /* the hook removed the user; the caller's scope keeps ip */
     }
   }
@@ -813,7 +827,7 @@ exit:
 void remove_interactive(object_t* ob, int dested) {
   /* don't have to worry about this dangling, since this is the routine
    * that causes this to dangle elsewhere, and we are protected from
-   * getting called recursively by CLOSING.  safe_apply() should be
+   * getting called recursively by ConnPhase::Closing.  safe_apply() should be
    * used here, since once we start this process we can't back out,
    * so jumping out with an error would be bad.
    */
@@ -823,7 +837,7 @@ void remove_interactive(object_t* ob, int dested) {
     return;
   }
 
-  if (ip->iflags & CLOSING) {
+  if (conn_closing(ip)) {
     if (!dested) {
       debug_message("Double call to remove_interactive()\n");
     }
@@ -832,7 +846,7 @@ void remove_interactive(object_t* ob, int dested) {
   debug(connections, "Closing connection from %s.\n",
         sockaddr_to_string((struct sockaddr*)&ip->addr, ip->addrlen));
   flush_message(ip);
-  ip->iflags |= CLOSING;
+  ip->phase = ConnPhase::Closing;
 
 #ifdef OLD_ED
   if (ip->ed_buffer) {
@@ -903,13 +917,40 @@ void remove_interactive(object_t* ob, int dested) {
   if (g_interactive_scopes > 0) {
     // Driver code up the C stack may have run the LPC that brought us here
     // and still hold ip -- libtelnet may be in the middle of telnet_recv() on
-    // ip->telnet. The outermost InteractiveScope frees what is left; CLOSING
-    // tells that code to stop.
+    // ip->telnet. The outermost InteractiveScope frees what is left;
+    // conn_closing(ip) tells that code to stop.
     g_closed_interactives.push_back(ip);
     return;
   }
   free_interactive(ip);
 } /* remove_interactive() */
+
+/*
+ * The transport's peer went away (EOF, a read error, a protocol violation).
+ * Unlike remove_interactive(), which starts from an object, this works in
+ * every phase: a PreLogon connection has no object to detach -- ip->ob is
+ * the master, which does not point back at ip, so remove_interactive() of
+ * it did nothing and the logon later attached a user to a dead transport.
+ */
+void conn_close(interactive_t* ip) {
+  switch (ip->phase) {
+    case ConnPhase::Closing:
+      return;
+    case ConnPhase::PreLogon:
+      /* Close the transport now; the pending logon event, which still holds
+       * ip, frees the rest (on_user_logon()). */
+      ip->phase = ConnPhase::Closing;
+      if (ip->transport != nullptr) {
+        ip->transport->close();
+        delete ip->transport;
+        ip->transport = nullptr;
+      }
+      return;
+    case ConnPhase::Attached:
+      remove_interactive(ip->ob, 0);
+      return;
+  }
+}
 
 /*
  * The part of remove_interactive() that input processing may still be
