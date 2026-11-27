@@ -17,7 +17,7 @@ vm::Value f_promise_create(vm::EfunArgs&) { return vm::Value::refed(promise_allo
 
 #ifdef F_PROMISE_RESOLVE
 void f_promise_resolve(vm::EfunArgs&, promise_t* p, std::optional<vm::Arg> value_arg) {
-  if (p->state != PROMISE_PENDING || p->resolving) {
+  if (promise_fate_committed(p)) {
     /* `resolving`: a prior resolve with a still-pending promise committed
      * this promise's fate to the adoption; without the check, a second
      * resolve/reject would race the adoption's delivery, silently
@@ -41,7 +41,7 @@ void f_promise_resolve(vm::EfunArgs&, promise_t* p, std::optional<vm::Arg> value
 
 #ifdef F_PROMISE_REJECT
 void f_promise_reject(vm::EfunArgs&, promise_t* p, std::optional<vm::Arg> reason) {
-  if (p->state != PROMISE_PENDING || p->resolving) {
+  if (promise_fate_committed(p)) {
     /* see promise_resolve: an in-flight adoption already commits the fate */
     error("promise_reject: promise is already settled.\n");
   }

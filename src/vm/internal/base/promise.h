@@ -68,6 +68,11 @@ struct promise_reaction_t {
   struct lpc_coroutine_t* coro;     /* owned; a parked await to resume; may be null */
   struct promise_combinator_t* comb; /* ref held; may be null */
   int comb_index;                   /* which input of `comb` this reaction is */
+  /* `next` is ADOPTING this promise (promise_resolve_with() resolved it with
+   * this one): the delivery completes that adoption. Otherwise `next` is a
+   * promise_then() chain, which the mudlib may also have resolved -- the
+   * delivery is then an outside claim like any driver result. */
+  bool adopts = false;
 };
 
 struct promise_t {
@@ -157,12 +162,32 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel
 /* Fulfill with a plain value, or adopt the eventual state of a promise value
  * (flattening). Self-resolution rejects the promise. */
 void promise_resolve_with(promise_t* p, svalue_t* value);
+
+/* Who may decide a promise's fate:
+ *
+ *   PENDING --claim--> committed: settled, or (resolved with a still-pending
+ *                      promise) adopting it, `resolving`
+ *
+ * promise_settle() and promise_resolve_with() are the internal steps; an
+ * adoption completes through promise_settle() while `resolving`. Everything
+ * ELSE that wants to decide p -- the efuns, and every driver source that
+ * delivers a result (call_out(delay), async I/O, external processes) -- is
+ * an outside claim, and an outside claim on a committed promise is refused:
+ * the first resolution wins, adoption included. The driver sources used to
+ * check `state` only, so a mudlib promise_resolve(p, q) was overridden when
+ * the driver's result arrived while q was still pending. */
+inline bool promise_fate_committed(const promise_t* p) {
+  return p->state != PROMISE_PENDING || p->resolving;
+}
+/* Returns 1 if this claim decided p, 0 if p's fate was already committed. */
+int promise_claim_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel = false);
+int promise_claim_resolve(promise_t* p, svalue_t* value);
 /* Attach a reaction. All passed refs (funptrs, next, command_giver) are
  * TRANSFERRED to the promise machinery. Delivers on a later gametick if the
  * promise is already settled. */
 size_t pending_promise_deliveries();
 void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected,
-                          promise_t* next, object_t* giver);
+                          promise_t* next, object_t* giver, bool adopts = false);
 
 
 /* Build a combinator over `inputs` and return its result promise with one

@@ -111,7 +111,7 @@ std::vector<ChildExitNote> g_exit_notes;
 
 void reject_with_number(promise_t* p, LPC_INT n) {
   vm::Value reason(n);
-  promise_settle(p, reason.get(), 1);
+  promise_claim_settle(p, reason.get(), 1);
 }
 
 void append_capped(std::string& dest, const char* data, size_t len) {
@@ -315,7 +315,7 @@ void fulfill_handle_promise(int id) {
   promise_clear_cancel_handler(p);
   {
     vm::Value result = external_result(h->out, h->err, h->exit_code);
-    promise_settle(p, result.get(), 0);
+    promise_claim_settle(p, result.get(), 0);
   }
   free_promise(p);
   if (h->ephemeral) {
@@ -355,10 +355,8 @@ void abort_handle(int id, int kill_child) {
     /* Clear first: settle(reject) would otherwise fire the cancel handler
      * and free_promise a second time. */
     promise_clear_cancel_handler(p);
-    if (p->state == PROMISE_PENDING) {
-      vm::Value reason = vm::Value::str_constant("*external process aborted");
-      promise_settle(p, reason.get(), 1);
-    }
+    vm::Value reason = vm::Value::str_constant("*external process aborted");
+    promise_claim_settle(p, reason.get(), 1);
     free_promise(p);
   }
   h->state = HandleState::Done;

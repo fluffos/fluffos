@@ -102,6 +102,7 @@ struct QueuedReaction {
   promise_combinator_t* comb;
   int comb_index;
   promise_t* source;
+  bool adopts = false; /* see promise_reaction_t::adopts */
 };
 
 std::deque<QueuedReaction> g_promise_microtasks;
@@ -478,6 +479,7 @@ void enqueue_reaction(promise_t* source, promise_reaction_t* r) {
   source->ref++;
   QueuedReaction qr{r->on_fulfilled, r->on_rejected, r->next,       r->command_giver,
                     r->coro,         r->comb,        r->comb_index, source};
+  qr.adopts = r->adopts;
   if (qr.coro != nullptr) {
     qr.coro->queued = true;
   }
@@ -534,6 +536,40 @@ bool invoke_handler(funptr_t* fp, svalue_t* arg, svalue_t* out) {
 /* forward decl: resumes a parked async body when its awaited promise
  * settles; frees the coroutine. */
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source);
+
+/* Log a rejection that goes unobserved by its own route: "<what> (rejected
+ * by <origin>): <reason>". Used at deallocation for an unhandled rejection,
+ * and when a rejection loses its claim on a chained promise the mudlib
+ * committed to another promise (another reaction on the same source may
+ * still have seen it; this route did not).
+ * Renders the VALUE where it is cheap to, not just its type name: non-string
+ * reasons are routine (the promise forms of async_read/async_write/
+ * async_getdir reject with the callback convention's negative int), and a
+ * bare "(int)" tells the author nothing. Scalars only -- svalue_to_string()
+ * lives in package/core, and this must stay allocation-light on a
+ * deallocation path. */
+static void report_rejection(const char* what, const char* origin, const svalue_t* v) {
+  switch (v->type) {
+    case T_STRING:
+      debug_message("%s (rejected by %s): %s\n", what, origin, v->u.string);
+      break;
+    case T_NUMBER:
+      debug_message("%s (rejected by %s): (int) %" LPC_INT_FMTSTR_P "\n", what, origin,
+                    v->u.number);
+      break;
+    case T_REAL:
+      debug_message("%s (rejected by %s): (float) %f\n", what, origin,
+                    static_cast<double>(v->u.real));
+      break;
+    case T_OBJECT:
+      debug_message("%s (rejected by %s): (object) /%s\n", what, origin,
+                    v->u.ob->obname ? v->u.ob->obname : "?");
+      break;
+    default:
+      debug_message("%s (rejected by %s): (%s)\n", what, origin, type_name(v->type));
+      break;
+  }
+}
 
 void deliver_reaction(QueuedReaction* qr) {
   promise_t* src = qr->source;
@@ -594,23 +630,47 @@ void deliver_reaction(QueuedReaction* qr) {
      * link of an adoption chain for nothing. */
     set_eval(max_eval_cost);
     svalue_t out = const0;
+    /* The chained promise is the handler's result channel, but the mudlib
+     * holds it too and may already have resolved it -- with a promise that
+     * is still pending, which commits its fate without settling it. The
+     * handler's result is then an outside claim that loses, exactly as a
+     * driver result does (promise_claim_*). */
     if (invoke_handler(handler, &src->result, &out)) {
       if (qr->next) {
-        promise_resolve_with(qr->next, &out);
+        promise_claim_resolve(qr->next, &out);
       }
     } else {
-      if (qr->next) {
-        promise_settle(qr->next, &out, 1);
+      if (qr->next && !promise_claim_settle(qr->next, &out, 1) &&
+          qr->next->state == PROMISE_PENDING) {
+        /* the handler's error had nowhere to go: the mudlib committed its
+         * chained promise to another promise. (If the mudlib settled the
+         * chain itself -- a consumer timeout, say -- a late result losing to
+         * it is the point, and stays silent as it always was.) */
+        report_rejection("Discarded promise rejection, its chained promise adopts another",
+                         "a promise_then() handler", &out);
       }
     }
     free_svalue(&out, "deliver_reaction");
   } else {
-    /* pass-through: propagate the source's state to the chained promise */
+    /* pass-through: propagate the source's state to the chained promise.
+     * Completing an adoption is the settlement `next` was committed to;
+     * passing a promise_then() chain through is an outside claim (above). */
     if (qr->next) {
-      if (rejected) {
-        promise_settle(qr->next, &src->result, 1, src->from_cancel);
+      if (qr->adopts) {
+        if (rejected) {
+          promise_settle(qr->next, &src->result, 1, src->from_cancel);
+        } else {
+          promise_resolve_with(qr->next, &src->result);
+        }
+      } else if (rejected) {
+        if (!promise_claim_settle(qr->next, &src->result, 1, src->from_cancel) &&
+            !src->from_cancel && qr->next->state == PROMISE_PENDING) {
+          report_rejection("Discarded promise rejection, its chained promise adopts another",
+                           src->reject_origin ? src->reject_origin : "unknown location",
+                           &src->result);
+        }
       } else {
-        promise_resolve_with(qr->next, &src->result);
+        promise_claim_resolve(qr->next, &src->result);
       }
     }
   }
@@ -1482,38 +1542,8 @@ void dealloc_promise(promise_t* p) {
      * object, function or line -- and it is printed at DEALLOCATION, which
      * can be arbitrarily far from the rejection, so there is nothing else in
      * the log to correlate it with. */
-    const char* const origin = p->reject_origin ? p->reject_origin : "unknown location";
-    if (p->result.type == T_STRING) {
-      debug_message("Unhandled promise rejection (rejected by %s): %s\n", origin,
-                    p->result.u.string);
-    } else {
-      /* Render the VALUE where it is cheap to, not just its type name:
-       * non-string reasons are routine here (the promise forms of
-       * async_read/async_write/async_getdir reject with the callback
-       * convention's negative int), and "Unhandled promise rejection:
-       * (int)" tells the author nothing. Scalars only -- svalue_to_string()
-       * lives in package/core, and this must stay allocation-light on a
-       * deallocation path. */
-      switch (p->result.type) {
-        case T_NUMBER:
-          debug_message("Unhandled promise rejection (rejected by %s): (int) %" LPC_INT_FMTSTR_P
-                        "\n",
-                        origin, p->result.u.number);
-          break;
-        case T_REAL:
-          debug_message("Unhandled promise rejection (rejected by %s): (float) %f\n", origin,
-                        static_cast<double>(p->result.u.real));
-          break;
-        case T_OBJECT:
-          debug_message("Unhandled promise rejection (rejected by %s): (object) /%s\n", origin,
-                        p->result.u.ob->obname ? p->result.u.ob->obname : "?");
-          break;
-        default:
-          debug_message("Unhandled promise rejection (rejected by %s): (%s)\n", origin,
-                        type_name(p->result.type));
-          break;
-      }
-    }
+    report_rejection("Unhandled promise rejection",
+                     p->reject_origin ? p->reject_origin : "unknown location", &p->result);
   }
   if (p->reject_origin != nullptr) {
     FREE_MSTR(p->reject_origin);
@@ -1543,14 +1573,17 @@ void dealloc_promise(promise_t* p) {
          * abandon routes, since the object is alive and the promise it
          * awaits is alive; it is the SOURCE that died.
          *
-         * Same safety net as the r.coro arm below, and gated on `resolving`
-         * so an ordinary promise_then() chain keeps its documented
-         * behaviour: dropping the last reference to a plain pending promise
-         * frees its reactions and the awaiting side simply never runs, but
-         * that promise is still one LPC can settle itself. Only the adopted
-         * case is unrecoverable. promise_settle() only queues, so no LPC
-         * runs here. */
-        if (r.next->resolving && r.next->state == PROMISE_PENDING) {
+         * Same safety net as the r.coro arm below, and gated on the
+         * reaction being the ADOPTION (`adopts`), not on next->resolving: an
+         * ordinary promise_then() chain keeps its documented behaviour
+         * (dropping the last reference to a plain pending promise frees its
+         * reactions and the awaiting side simply never runs, but that
+         * promise is still one LPC can settle itself), and a chain the
+         * mudlib resolved with ANOTHER promise is resolving too -- but it is
+         * waiting on that one, not on p, and must be left to it. Only the
+         * adopted case is unrecoverable. promise_settle() only queues, so no
+         * LPC runs here. */
+        if (r.adopts && r.next->state == PROMISE_PENDING) {
           svalue_t err;
           err.type = T_STRING;
           err.subtype = STRING_CONSTANT;
@@ -1625,6 +1658,21 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel
   return 1;
 }
 
+int promise_claim_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel) {
+  if (promise_fate_committed(p)) {
+    return 0;
+  }
+  return promise_settle(p, value, rejected, from_cancel);
+}
+
+int promise_claim_resolve(promise_t* p, svalue_t* value) {
+  if (promise_fate_committed(p)) {
+    return 0;
+  }
+  promise_resolve_with(p, value);
+  return 1;
+}
+
 void promise_resolve_with(promise_t* p, svalue_t* value) {
   if (value->type == T_PROMISE) {
     promise_t* src = value->u.prom;
@@ -1642,18 +1690,18 @@ void promise_resolve_with(promise_t* p, svalue_t* value) {
     p->resolving = true;
     p->ref++;
     src->handled = true; /* the rejection, if any, propagates to p */
-    promise_add_reaction(src, nullptr, nullptr, p, nullptr);
+    promise_add_reaction(src, nullptr, nullptr, p, nullptr, /*adopts=*/true);
     return;
   }
   promise_settle(p, value, 0);
 }
 
 void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected,
-                          promise_t* next, object_t* giver) {
+                          promise_t* next, object_t* giver, bool adopts) {
   if (on_rejected || next) {
     p->handled = true;
   }
-  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr, nullptr, 0};
+  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr, nullptr, 0, adopts};
   if (p->state == PROMISE_PENDING) {
     if (!p->reactions) {
       p->reactions = new std::vector<promise_reaction_t>();
@@ -1727,15 +1775,18 @@ svalue_t* promise_map_slot(mapping_t* m, const char* key) {
  * if this input decided the outcome. Runs no LPC. */
 void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, bool rejected,
                        bool from_cancel) {
+  /* c->result is the mudlib's promise too: it may already be resolved with
+   * a pending promise (fate committed). The aggregate is then an outside
+   * claim that loses, like every other driver result (promise_claim_*). */
   switch (c->kind) {
     case PROMISE_COMB_RACE:
       /* first to settle decides, either way */
-      (void)promise_settle(c->result, value, rejected ? 1 : 0, rejected && from_cancel);
+      (void)promise_claim_settle(c->result, value, rejected ? 1 : 0, rejected && from_cancel);
       break;
 
     case PROMISE_COMB_ALL:
       if (rejected) {
-        (void)promise_settle(c->result, value, 1, from_cancel); /* fail fast */
+        (void)promise_claim_settle(c->result, value, 1, from_cancel); /* fail fast */
       } else {
         assign_svalue(&c->slots->item[index], value);
       }
@@ -1745,7 +1796,7 @@ void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, boo
       if (rejected) {
         assign_svalue(&c->slots->item[index], value);
       } else {
-        (void)promise_settle(c->result, value, 0); /* first success wins */
+        (void)promise_claim_settle(c->result, value, 0); /* first success wins */
       }
       break;
 
@@ -1778,13 +1829,13 @@ void deliver_combinator(promise_combinator_t* c, int index, svalue_t* value, boo
       svalue_t all = const0;
       all.type = T_ARRAY;
       all.u.arr = c->slots;
-      (void)promise_settle(c->result, &all, 0);
+      (void)promise_claim_settle(c->result, &all, 0);
     } else if (c->kind == PROMISE_COMB_ANY) {
       /* every input rejected: reject with the array of reasons */
       svalue_t all = const0;
       all.type = T_ARRAY;
       all.u.arr = c->slots;
-      (void)promise_settle(c->result, &all, 1);
+      (void)promise_claim_settle(c->result, &all, 1);
     }
   }
 }

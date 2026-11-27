@@ -444,7 +444,7 @@ int add_db_exec(int handle, uint32_t db_generation, const char* sql, function_to
    settles, so an error() in a cancel handler cannot leak it. */
 static void deliver_result(vm::Call& result, struct Request* req, int rejected) {
   if (req->prom) {
-    promise_settle(req->prom, result.arg(0).sv(), rejected);
+    promise_claim_settle(req->prom, result.arg(0).sv(), rejected);
     result.discard();
     return;
   }
