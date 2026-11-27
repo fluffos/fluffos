@@ -610,15 +610,30 @@ void complete_all_asyncio() {
    * it, so an empty `reqs` used to let shutdown carry on (closing databases,
    * freeing promises, destructing objects) under a request still running,
    * whose completion was then never delivered. Both containers change under
-   * reqs_lock. */
+   * reqs_lock.
+   *
+   * Bounded, though: a request can block for good (an async_read() of a
+   * FIFO nobody writes, a database that stops answering), and shutdown must
+   * still finish. Past the deadline the stragglers are reported and left
+   * running, which is what happened to every in-flight request before. */
+  auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
   while (true) {
+    size_t queued;
+    size_t running;
     {
       std::lock_guard<std::mutex> const lock(reqs_lock);
-      if (reqs.empty() && current_works.empty()) {
-        break;
-      }
+      queued = reqs.size();
+      running = current_works.size();
     }
-    std::this_thread::yield();
+    if (queued == 0 && running == 0) {
+      break;
+    }
+    if (std::chrono::steady_clock::now() >= deadline) {
+      debug_message("async: shutting down with %zu queued and %zu running request(s) unfinished.\n",
+                    queued, running);
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   check_reqs();
 }
