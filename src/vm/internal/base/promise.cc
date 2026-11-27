@@ -537,9 +537,11 @@ bool invoke_handler(funptr_t* fp, svalue_t* arg, svalue_t* out) {
  * settles; frees the coroutine. */
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source);
 
-/* Log a rejection nothing will ever observe: "<what> (rejected by <origin>):
- * <reason>". Used at deallocation for an unhandled rejection, and when a
- * rejection loses its claim on a chained promise that was already resolved.
+/* Log a rejection that goes unobserved by its own route: "<what> (rejected
+ * by <origin>): <reason>". Used at deallocation for an unhandled rejection,
+ * and when a rejection loses its claim on a chained promise the mudlib
+ * committed to another promise (another reaction on the same source may
+ * still have seen it; this route did not).
  * Renders the VALUE where it is cheap to, not just its type name: non-string
  * reasons are routine (the promise forms of async_read/async_write/
  * async_getdir reject with the callback convention's negative int), and a
@@ -638,10 +640,13 @@ void deliver_reaction(QueuedReaction* qr) {
         promise_claim_resolve(qr->next, &out);
       }
     } else {
-      if (qr->next && !promise_claim_settle(qr->next, &out, 1)) {
-        /* the handler's error had nowhere to go: its chained promise was
-         * already resolved by the mudlib */
-        report_rejection("Discarded promise rejection, its chained promise already resolved",
+      if (qr->next && !promise_claim_settle(qr->next, &out, 1) &&
+          qr->next->state == PROMISE_PENDING) {
+        /* the handler's error had nowhere to go: the mudlib committed its
+         * chained promise to another promise. (If the mudlib settled the
+         * chain itself -- a consumer timeout, say -- a late result losing to
+         * it is the point, and stays silent as it always was.) */
+        report_rejection("Discarded promise rejection, its chained promise adopts another",
                          "a promise_then() handler", &out);
       }
     }
@@ -659,8 +664,8 @@ void deliver_reaction(QueuedReaction* qr) {
         }
       } else if (rejected) {
         if (!promise_claim_settle(qr->next, &src->result, 1, src->from_cancel) &&
-            !src->from_cancel) {
-          report_rejection("Discarded promise rejection, its chained promise already resolved",
+            !src->from_cancel && qr->next->state == PROMISE_PENDING) {
+          report_rejection("Discarded promise rejection, its chained promise adopts another",
                            src->reject_origin ? src->reject_origin : "unknown location",
                            &src->result);
         }
