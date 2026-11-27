@@ -427,9 +427,22 @@ string privs_file(string f) {
   return f;
 }
 
+// A test can run LPC from inside error_handler() -- i.e. after error() was
+// raised but BEFORE it unwinds -- to pin what state the driver leaves for
+// that window. Set it back to 0 when done.
+nosave function error_probe;
+
+public void set_error_probe(function f) { error_probe = f; }
+
 staticf void error_handler(mapping map, int flag) {
   object ob;
   string str;
+
+  if (error_probe) {
+    function f = error_probe;
+    error_probe = 0;  // once: the probe's own errors must not re-enter it
+    catch(evaluate(f));
+  }
 
   /* Squelch the expected eval_cost errors thrown by the call_out tests */
   if (map["program"] == "/single/tests/efuns/call_out.lpc" &&

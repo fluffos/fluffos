@@ -1,0 +1,44 @@
+// restore_object()/restore_variable() keep module-global scratch state
+// (nesting depth, the sizes[] the sizing pass fills) for the restore in
+// progress. error() runs the master's error handler BEFORE it throws, so a
+// restore that fails part-way is still live while that handler runs -- and a
+// handler may restore values itself. It must start from clean state, not
+// from the failing restore's depth and sizes[] (it would skip its own sizing
+// pass and read the failing restore's sizes). Once each error site reset
+// the state by hand before its error(); a scope that resets only when it
+// unwinds would be too late for this window.
+
+mixed probed;
+
+void probe() {
+  probed = catch(restore_variable("({1,2,3,})"));
+  if (!probed) {
+    probed = restore_variable("({1,2,3,})");
+  }
+}
+
+#define MAX_ARRAY_SIZE_SLOT 267  // __MAX_ARRAY_SIZE__ (CFG_INT(11))
+#define SMALL_LIMIT 50
+
+void do_tests() {
+  int orig_max = get_config(MAX_ARRAY_SIZE_SLOT);
+  string big = "";
+  mixed err;
+  int i;
+
+  // An inner array over `maximum array size` fails in allocate_array()
+  // while the outer restore is two levels deep. (The limit is lowered for
+  // the call only, and restored before anything is asserted.)
+  for (i = 0; i <= SMALL_LIMIT; i++) {
+    big += "0,";
+  }
+  big = "({({1,}),({" + big + "}),})";
+
+  "/single/master"->set_error_probe((: probe :));
+  set_config(MAX_ARRAY_SIZE_SLOT, SMALL_LIMIT);
+  err = catch(restore_variable(big));
+  set_config(MAX_ARRAY_SIZE_SLOT, orig_max);
+  "/single/master"->set_error_probe(0);
+  ASSERT(err);
+  ASSERT_EQ(({ 1, 2, 3 }), probed);
+}
