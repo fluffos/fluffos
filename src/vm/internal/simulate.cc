@@ -1343,8 +1343,34 @@ static void fix_object_names() {
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-void destruct_object(object_t* ob, const char* cause) {
+#ifndef NO_ENVIRONMENT
+/* Take ob out of its environment's inventory (and its light and sentences
+ * with it); runs no LPC. */
+static void unlink_from_environment(object_t* ob) {
   object_t** pp;
+
+  if (ob->super) {
+#ifndef NO_LIGHT
+    add_light(ob->super, -ob->total_light);
+#endif
+    remove_sent(ob->super, ob);
+    remove_sent(ob, ob->super);
+    for (pp = &ob->super->contains; *pp;) {
+      remove_sent(*pp, ob);
+      if (*pp != ob) {
+        remove_sent(ob, *pp);
+        pp = &(*pp)->next_inv;
+      } else {
+        *pp = (*pp)->next_inv;
+      }
+    }
+  }
+  ob->super = nullptr;
+  ob->next_inv = nullptr;
+}
+#endif
+
+void destruct_object(object_t* ob, const char* cause) {
 // int removed;
 #ifndef NO_ENVIRONMENT
   object_t* save_restrict_destruct = restrict_destruct;
@@ -1473,7 +1499,16 @@ void destruct_object(object_t* ob, const char* cause) {
     /* "OUCH! we could be dested by this. -Beek" -- no longer: a destruct()
      * of ob from the move apply returns at once (O_BEING_DESTRUCTED). */
     if (otmp == ob->contains) {
-      destruct_object(otmp, "environment");
+      if (otmp->flags & O_BEING_DESTRUCTED) {
+        /* otmp is mid-destruct further up the stack -- this destruct of ob
+         * was started from its own on_destruct() or hooks -- so it can be
+         * neither moved nor destructed from here, and would stay first in
+         * ob's inventory forever (an endless loop no eval limit stops: it
+         * runs no LPC). Put it in the void; its own destruct finishes it. */
+        unlink_from_environment(otmp);
+      } else {
+        destruct_object(otmp, "environment");
+      }
     }
   }
 #endif
@@ -1599,22 +1634,7 @@ void destruct_object(object_t* ob, const char* cause) {
    * Remove us out of this current room (if any). Remove all sentences
    * defined by this object from all objects here.
    */
-  if (ob->super) {
-#ifndef NO_LIGHT
-    add_light(ob->super, -ob->total_light);
-#endif
-    remove_sent(ob->super, ob);
-    remove_sent(ob, ob->super);
-    for (pp = &ob->super->contains; *pp;) {
-      remove_sent(*pp, ob);
-      if (*pp != ob) {
-        remove_sent(ob, *pp);
-        pp = &(*pp)->next_inv;
-      } else {
-        *pp = (*pp)->next_inv;
-      }
-    }
-  }
+  unlink_from_environment(ob);
 #endif
 
   if (!vital_replaced) {

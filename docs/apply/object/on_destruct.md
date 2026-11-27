@@ -30,4 +30,6 @@ title: object / on_destruct
     down (a content's move_or_destruct() raising an error, or a master or
     simul_efun object failing to reload), the destruct is abandoned and the
     object stays live -- though contents moved out before the failure stay
-    moved -- and on_destruct() will run again on the next attempt.
+    moved, and a shadowed object's shadows (destructed before its own
+    destruct begins) stay gone -- and on_destruct() will run again on the
+    next attempt.

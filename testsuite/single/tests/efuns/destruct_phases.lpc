@@ -86,4 +86,16 @@ void do_tests() {
   ASSERT_EQ(0, env);
   ASSERT_EQ(0, sh);
   ASSERT_EQ(0, killer);
+
+  // An object whose on_destruct() destructs its own environment: the
+  // environment's destruct finds it already mid-destruct (it can be neither
+  // moved nor destructed from there) and must not loop on it forever -- it
+  // used to, inside the driver, with no LPC running for an eval limit to
+  // stop. Both end up destructed.
+  env = new("/clone/destruct_env");
+  killer = new("/clone/destruct_env_killer");
+  killer->go_to(env);
+  destruct(killer);
+  ASSERT_EQ(0, killer);
+  ASSERT_EQ(0, env);
 }
