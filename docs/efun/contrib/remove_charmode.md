@@ -13,7 +13,11 @@ title: contrib / remove_charmode.pre
 
 ### DESCRIPTION
 
-    switches interactive object into linemode
+    switches interactive object into linemode: the client is told to stop
+    sending one keystroke at a time (telnet), and input already typed ahead
+    is kept and read as line input from then on (a backspace in it erases
+    the character before it, as it would have in line mode). If a whole
+    line is already waiting, it is processed as the next command.
 
     returns -1 if argument missing
     -2 in case of error (object destroyed or not interactive)
