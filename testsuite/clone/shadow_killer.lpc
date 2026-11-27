@@ -1,0 +1,15 @@
+// Fixture: a shadow whose on_destruct() destructs another object (the next
+// shadow down the chain, in destruct_phases.lpc).
+object to_kill;
+
+int start(object victim, object kill) {
+  to_kill = kill;
+  set_notify_destruct(1);
+  return shadow(victim, 1) != 0;
+}
+
+void on_destruct() {
+  if (to_kill) {
+    destruct(to_kill);
+  }
+}

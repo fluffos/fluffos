@@ -1398,18 +1398,22 @@ void destruct_object(object_t* ob, const char* cause) {
      * remove shadows top...down being careful to unlink shadow being
      * destructed from chain
      */
-    for (; ob2;) {
+    for (; ob2 && ob2 != ob;) {
       otmp = ob2;
       ob2 = ob2->shadowing;
       if (ob2) {
         ob2->shadowed = nullptr;
       }
       otmp->shadowing = nullptr;
-      // The last one destructed is ob itself, now unshadowed: it keeps the
-      // caller's cause, so its on_destruct() and object:destruct hooks see
-      // why it was really destructed. Only the shadows are "shadowed".
-      destruct_object(otmp, otmp == ob ? cause : "shadowed");
+      destruct_object(otmp, "shadowed");
     }
+    /* Then ob itself, now unshadowed, with the caller's cause: its
+     * on_destruct() and object:destruct hooks see why it was really
+     * destructed. Not left to the loop, whose links a shadow's LPC can
+     * rewrite -- a shadow destructing the next shadow down used to end the
+     * walk early, so destruct() returned and ob was never destructed. (A
+     * no-op if that LPC already destructed ob.) */
+    destruct_object(ob, cause);
     return;
   }
 #endif
