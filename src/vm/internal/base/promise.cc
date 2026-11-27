@@ -537,6 +537,38 @@ bool invoke_handler(funptr_t* fp, svalue_t* arg, svalue_t* out) {
  * settles; frees the coroutine. */
 void resume_coroutine(lpc_coroutine_t* coro, promise_t* source);
 
+/* Log a rejection nothing will ever observe: "<what> (rejected by <origin>):
+ * <reason>". Used at deallocation for an unhandled rejection, and when a
+ * rejection loses its claim on a chained promise that was already resolved.
+ * Renders the VALUE where it is cheap to, not just its type name: non-string
+ * reasons are routine (the promise forms of async_read/async_write/
+ * async_getdir reject with the callback convention's negative int), and a
+ * bare "(int)" tells the author nothing. Scalars only -- svalue_to_string()
+ * lives in package/core, and this must stay allocation-light on a
+ * deallocation path. */
+static void report_rejection(const char* what, const char* origin, const svalue_t* v) {
+  switch (v->type) {
+    case T_STRING:
+      debug_message("%s (rejected by %s): %s\n", what, origin, v->u.string);
+      break;
+    case T_NUMBER:
+      debug_message("%s (rejected by %s): (int) %" LPC_INT_FMTSTR_P "\n", what, origin,
+                    v->u.number);
+      break;
+    case T_REAL:
+      debug_message("%s (rejected by %s): (float) %f\n", what, origin,
+                    static_cast<double>(v->u.real));
+      break;
+    case T_OBJECT:
+      debug_message("%s (rejected by %s): (object) /%s\n", what, origin,
+                    v->u.ob->obname ? v->u.ob->obname : "?");
+      break;
+    default:
+      debug_message("%s (rejected by %s): (%s)\n", what, origin, type_name(v->type));
+      break;
+  }
+}
+
 void deliver_reaction(QueuedReaction* qr) {
   promise_t* src = qr->source;
 
@@ -606,8 +638,11 @@ void deliver_reaction(QueuedReaction* qr) {
         promise_claim_resolve(qr->next, &out);
       }
     } else {
-      if (qr->next) {
-        promise_claim_settle(qr->next, &out, 1);
+      if (qr->next && !promise_claim_settle(qr->next, &out, 1)) {
+        /* the handler's error had nowhere to go: its chained promise was
+         * already resolved by the mudlib */
+        report_rejection("Discarded promise rejection, its chained promise already resolved",
+                         "a promise_then() handler", &out);
       }
     }
     free_svalue(&out, "deliver_reaction");
@@ -623,7 +658,12 @@ void deliver_reaction(QueuedReaction* qr) {
           promise_resolve_with(qr->next, &src->result);
         }
       } else if (rejected) {
-        promise_claim_settle(qr->next, &src->result, 1, src->from_cancel);
+        if (!promise_claim_settle(qr->next, &src->result, 1, src->from_cancel) &&
+            !src->from_cancel) {
+          report_rejection("Discarded promise rejection, its chained promise already resolved",
+                           src->reject_origin ? src->reject_origin : "unknown location",
+                           &src->result);
+        }
       } else {
         promise_claim_resolve(qr->next, &src->result);
       }
@@ -1497,38 +1537,8 @@ void dealloc_promise(promise_t* p) {
      * object, function or line -- and it is printed at DEALLOCATION, which
      * can be arbitrarily far from the rejection, so there is nothing else in
      * the log to correlate it with. */
-    const char* const origin = p->reject_origin ? p->reject_origin : "unknown location";
-    if (p->result.type == T_STRING) {
-      debug_message("Unhandled promise rejection (rejected by %s): %s\n", origin,
-                    p->result.u.string);
-    } else {
-      /* Render the VALUE where it is cheap to, not just its type name:
-       * non-string reasons are routine here (the promise forms of
-       * async_read/async_write/async_getdir reject with the callback
-       * convention's negative int), and "Unhandled promise rejection:
-       * (int)" tells the author nothing. Scalars only -- svalue_to_string()
-       * lives in package/core, and this must stay allocation-light on a
-       * deallocation path. */
-      switch (p->result.type) {
-        case T_NUMBER:
-          debug_message("Unhandled promise rejection (rejected by %s): (int) %" LPC_INT_FMTSTR_P
-                        "\n",
-                        origin, p->result.u.number);
-          break;
-        case T_REAL:
-          debug_message("Unhandled promise rejection (rejected by %s): (float) %f\n", origin,
-                        static_cast<double>(p->result.u.real));
-          break;
-        case T_OBJECT:
-          debug_message("Unhandled promise rejection (rejected by %s): (object) /%s\n", origin,
-                        p->result.u.ob->obname ? p->result.u.ob->obname : "?");
-          break;
-        default:
-          debug_message("Unhandled promise rejection (rejected by %s): (%s)\n", origin,
-                        type_name(p->result.type));
-          break;
-      }
-    }
+    report_rejection("Unhandled promise rejection",
+                     p->reject_origin ? p->reject_origin : "unknown location", &p->result);
   }
   if (p->reject_origin != nullptr) {
     FREE_MSTR(p->reject_origin);
@@ -1558,14 +1568,17 @@ void dealloc_promise(promise_t* p) {
          * abandon routes, since the object is alive and the promise it
          * awaits is alive; it is the SOURCE that died.
          *
-         * Same safety net as the r.coro arm below, and gated on `resolving`
-         * so an ordinary promise_then() chain keeps its documented
-         * behaviour: dropping the last reference to a plain pending promise
-         * frees its reactions and the awaiting side simply never runs, but
-         * that promise is still one LPC can settle itself. Only the adopted
-         * case is unrecoverable. promise_settle() only queues, so no LPC
-         * runs here. */
-        if (r.next->resolving && r.next->state == PROMISE_PENDING) {
+         * Same safety net as the r.coro arm below, and gated on the
+         * reaction being the ADOPTION (`adopts`), not on next->resolving: an
+         * ordinary promise_then() chain keeps its documented behaviour
+         * (dropping the last reference to a plain pending promise frees its
+         * reactions and the awaiting side simply never runs, but that
+         * promise is still one LPC can settle itself), and a chain the
+         * mudlib resolved with ANOTHER promise is resolving too -- but it is
+         * waiting on that one, not on p, and must be left to it. Only the
+         * adopted case is unrecoverable. promise_settle() only queues, so no
+         * LPC runs here. */
+        if (r.adopts && r.next->state == PROMISE_PENDING) {
           svalue_t err;
           err.type = T_STRING;
           err.subtype = STRING_CONSTANT;

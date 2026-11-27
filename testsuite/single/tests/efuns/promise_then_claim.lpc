@@ -6,9 +6,9 @@
 
 #define LATCH "claims"
 
-promise src, adopted, chained, rsrc, radopted, rchained, asrc, aadopted, all;
-mixed got, rgot, agot;
-int pending = 3;
+promise src, adopted, chained, rsrc, radopted, rchained, asrc, aadopted, all, cadopted;
+mixed got, rgot, agot, cgot;
+int pending = 4;
 
 // Checked from the deliveries themselves, not from a deadline: the outcome
 // is several delivery hops away, and how many a turn makes is a config knob.
@@ -17,6 +17,7 @@ void landed() {
     ASSERT_EQ(42, got);
     ASSERT_EQ(43, rgot);
     ASSERT_EQ(44, agot);
+    ASSERT_EQ(45, cgot);
     RELEASE_LATCH(LATCH);
   }
 }
@@ -43,6 +44,19 @@ void start() {
   promise_resolve(all, aadopted);
   promise_then(all, (: agot = $1, landed() :), (: agot = "rejected: " + $1, landed() :));
 
+  // A chain whose SOURCE is collected unsettled, after the mudlib resolved
+  // the chain with another promise: it waits on that one, and must not be
+  // rejected as an adoption whose source died (it is not that adoption).
+  {
+    promise csrc = promise_create();
+    promise cchained = promise_then(csrc, (: 1 :));
+
+    cadopted = promise_create();
+    promise_resolve(cchained, cadopted);
+    promise_then(cchained, (: cgot = $1, landed() :), (: cgot = "rejected: " + $1, landed() :));
+    csrc = 0;  // the last reference: csrc is collected, still pending
+  }
+
   promise_resolve(src, "src");   // its handler's result (1) is refused
   promise_reject(rsrc, "boom");  // its pass-through rejection is refused
   promise_resolve(asrc, 1);      // promise_all's ({ 1 }) is refused
@@ -53,6 +67,7 @@ void settle_adopted() {
   promise_resolve(adopted, 42);
   promise_resolve(radopted, 43);
   promise_resolve(aadopted, 44);
+  promise_resolve(cadopted, 45);
 }
 
 void do_tests() {
