@@ -808,6 +808,11 @@ void lpc_lex_close_file_conditionals() {
   }
   if (unterminated) {
     lexerror("unterminated conditional directive (missing #endif)");
+    // An #include only runs while emitting, so the includer emits again --
+    // and must not be left in the dead-branch scan mode those levels set.
+    if (lpc_lex_emitting() && lpc_lex_active_scanner()) {
+      lpc_lex_leave_cond_skip(lpc_lex_active_scanner());
+    }
   }
 }
 

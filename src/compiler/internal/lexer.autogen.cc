@@ -6143,13 +6143,6 @@ case YY_STATE_EOF(SC_COND_SKIP):
             // current_file/current_line) and keep scanning -- no return,
             // Flex continues in whatever start condition is active.
             lpc_lex_pop_pushed_buffer(yyscanner);
-            // ...except a dead branch an #include'd file left open: its
-            // levels were dropped with the file (reported unterminated),
-            // so the includer -- which was emitting, or the #include would
-            // not have run -- must not stay in the skip mode.
-            if (YY_START == SC_COND_SKIP && lpc_lex_emitting()) {
-              BEGIN(INITIAL);
-            }
           } else {
             // Genuine end of the main file. Flex's EOF state is sticky:
             // any further next() calls land here again and return the
@@ -6160,7 +6153,7 @@ case YY_STATE_EOF(SC_COND_SKIP):
 	YY_BREAK
 case 158:
 YY_RULE_SETUP
-#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1025 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           // Nothing above matched: genuinely invalid input. No outp
           // rewind/flush needed -- lpc_lex_badlex() only inspects the
@@ -6170,10 +6163,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 159:
 YY_RULE_SETUP
-#line 1039 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 6177 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 6170 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -7346,7 +7339,7 @@ static int yy_flex_strlen (const char * s , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 1039 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 
 
 // Where the scanner's held character belongs. During a rule action Flex
@@ -7403,6 +7396,22 @@ int lpc_lex_getc(void *yyscanner) {
 // (compiler.cc's epilog and error cleanup both call the lexer_utils
 // wrapper lpc_lex_teardown_active). After this the scanner holds no
 // buffers; the next lpc_lex_set_source materializes a fresh base.
+// An #include'd file's conditional levels end with the file
+// (lpc_lex_close_file_conditionals); so does the dead-branch skip mode they
+// implied. It can be the current start condition or saved underneath one
+// pushed on top (a block comment the file left open), so both are reset.
+void lpc_lex_leave_cond_skip(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  for (int i = 0; i < yyg->yy_start_stack_ptr; i++) {
+    if (yyg->yy_start_stack[i] == SC_COND_SKIP) {
+      yyg->yy_start_stack[i] = INITIAL;
+    }
+  }
+  if (YY_START == SC_COND_SKIP) {
+    BEGIN(INITIAL);
+  }
+}
+
 void lpc_lex_teardown(void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   while (lpc_lex_pushed_depth() > 0) {
@@ -7601,4 +7610,4 @@ void lpc_lex_reset(void *yyscanner) {
 }
 
 
-/* FluffOS generated-from lexer.l sha256=5833a6af37c2027ee4c10b5a9db22657225c36f9f5e8a08d2e6e5ac25d126156 */
+/* FluffOS generated-from lexer.l sha256=70e112987f22d30471400a06fe4299ad417f32ed47f1f4d927443948672d3f93 */

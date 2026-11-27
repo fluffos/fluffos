@@ -304,6 +304,7 @@ void lpc_lex_push_prepared_buffer(char* base, size_t size, int kind, void* yysca
 // still valid. lpc_lex_teardown_active() (lexer_utils) wraps the active
 // scanner and MUST run before each scratch_destroy.
 void lpc_lex_teardown(void* yyscanner);
+void lpc_lex_leave_cond_skip(void* yyscanner);
 void lpc_lex_teardown_active(void);
 // Clear the active-scanner pointer when destroying its scanner (must be
 // called right before yylex_destroy by every owner).

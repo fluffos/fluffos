@@ -2130,6 +2130,26 @@ TEST(Diagnostics, IncludeEndingInDeadBranchResumesTheIncluder) {
   EXPECT_TRUE(after);
 }
 
+TEST(Diagnostics, IncludeEndingInDeadBranchInsideACommentResumesTheIncluder) {
+  // The same, with the header also leaving a block comment open: the dead
+  // branch's skip mode is then saved UNDER the comment state, and still has
+  // to go when the header's levels do.
+  std::string inc_path = std::string(TESTSUITE_DIR) + "/zz_diag_dead_comment.h";
+  {
+    std::ofstream inc(inc_path);
+    inc << "#if 0\n#define X /* open\n";
+  }
+  pp("#include \"zz_diag_dead_comment.h\"\nint a; /* closes */\n#error after the include\n");
+  unlink(inc_path.c_str());
+  bool unterminated = false, after = false;
+  for (const Diagnostic& d : compiler_diags) {
+    unterminated |= d.message.find("unterminated conditional") != std::string::npos;
+    after |= d.message.find("after the include") != std::string::npos;
+  }
+  EXPECT_TRUE(unterminated);
+  EXPECT_TRUE(after);
+}
+
 TEST(Diagnostics, ExpansionChainNote) {
   // A lexical error INSIDE spliced expansion text must carry the
   // "during expansion of macro 'X' (defined at ...)" note -- the frame

@@ -1013,13 +1013,6 @@ WS_NO_NL    [ \t\r\v\f]
             // current_file/current_line) and keep scanning -- no return,
             // Flex continues in whatever start condition is active.
             lpc_lex_pop_pushed_buffer(yyscanner);
-            // ...except a dead branch an #include'd file left open: its
-            // levels were dropped with the file (reported unterminated),
-            // so the includer -- which was emitting, or the #include would
-            // not have run -- must not stay in the skip mode.
-            if (YY_START == SC_COND_SKIP && lpc_lex_emitting()) {
-              BEGIN(INITIAL);
-            }
           } else {
             // Genuine end of the main file. Flex's EOF state is sticky:
             // any further next() calls land here again and return the
@@ -1091,6 +1084,22 @@ int lpc_lex_getc(void *yyscanner) {
 // (compiler.cc's epilog and error cleanup both call the lexer_utils
 // wrapper lpc_lex_teardown_active). After this the scanner holds no
 // buffers; the next lpc_lex_set_source materializes a fresh base.
+// An #include'd file's conditional levels end with the file
+// (lpc_lex_close_file_conditionals); so does the dead-branch skip mode they
+// implied. It can be the current start condition or saved underneath one
+// pushed on top (a block comment the file left open), so both are reset.
+void lpc_lex_leave_cond_skip(void *yyscanner) {
+  struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
+  for (int i = 0; i < yyg->yy_start_stack_ptr; i++) {
+    if (yyg->yy_start_stack[i] == SC_COND_SKIP) {
+      yyg->yy_start_stack[i] = INITIAL;
+    }
+  }
+  if (YY_START == SC_COND_SKIP) {
+    BEGIN(INITIAL);
+  }
+}
+
 void lpc_lex_teardown(void *yyscanner) {
   struct yyguts_t *yyg = (struct yyguts_t *)yyscanner;
   while (lpc_lex_pushed_depth() > 0) {
