@@ -1,0 +1,101 @@
+// destruct_object() runs every step that runs LPC -- on_destruct(), the
+// object:destruct hooks, moving the contents out, saving an ed buffer,
+// reloading a vital object -- in a PREPARE phase, before it tears anything
+// down; a failure there backs out and leaves the object intact. Then it
+// commits, running no LPC at all.
+
+int notified;
+mapping causes = ([]);
+
+void note_notified() { notified++; }
+
+void note_cause(int id, object ob, string cause) { causes[file_name(ob)] = cause; }
+
+void do_tests() {
+  object env, sh, killer;
+  string env_name, sh_name;
+  int hook_id;
+  mixed err;
+
+#ifdef __PACKAGE_SOCKETS__
+  object item;
+  int fd;
+
+  // LPC run while the contents move out cannot leave the dying object with
+  // a resource: a socket it opens then is closed with the rest of its own.
+  // (It used to stay open, owned by an object about to be freed.)
+  env = new("/clone/destruct_env");
+  item = new("/clone/destruct_content");
+  item->go_to(env);
+  destruct(env);
+  fd = item->query_fd();
+  ASSERT(fd >= 0);
+  ASSERT_EQ("CLOSED", socket_status(fd)[1]);
+  destruct(item);
+
+  // A destruct that fails in the prepare phase backs out: the object is
+  // still there, still findable, and still has its socket, and can be
+  // destructed once the cause is gone. (The failed destruct used to have
+  // closed its sockets already.)
+  env = new("/clone/destruct_env");
+  fd = env->open_socket();
+  item = new("/clone/destruct_content");
+  item->set_fail(1);
+  item->go_to(env);
+  err = catch(destruct(env));
+  ASSERT(stringp(err));
+  ASSERT(objectp(env));
+  ASSERT_EQ(env, find_object(file_name(env)));
+  ASSERT_NE("CLOSED", socket_status(fd)[1]);
+  item->set_fail(0);
+  destruct(env);
+  ASSERT_EQ(0, env);
+  ASSERT_EQ("CLOSED", socket_status(fd)[1]);
+  destruct(item);
+#endif
+
+  // A shadowed object is notified once. The shadows are destructed first,
+  // the object last; that used to happen after the object's own
+  // on_destruct(), which then ran a second time.
+  // It also keeps the caller's cause; only its shadows are "shadowed".
+  notified = 0;
+  env = new("/clone/destruct_env");
+  sh = clone_object("/clone/shadow_probe");
+  ASSERT(sh->start(env));
+  env_name = file_name(env);
+  sh_name = file_name(sh);
+  hook_id = hook_attach("object:destruct", (: note_cause :), ([]), 0);
+  err = catch(destruct(env));
+  hook_detach(hook_id);
+  ASSERT_EQ(0, err);
+  ASSERT_EQ(0, env);
+  ASSERT_EQ(0, sh);
+  ASSERT_EQ(1, notified);
+  ASSERT_EQ("efun", causes[env_name]);
+  ASSERT_EQ("shadowed", causes[sh_name]);
+
+  // A shadow whose on_destruct() destructs the next shadow down: the object
+  // itself is still destructed (the walk down the chain used to lose its
+  // link there and return with the object alive).
+  env = new("/clone/destruct_env");
+  sh = clone_object("/clone/shadow_probe");
+  ASSERT(sh->start(env));
+  killer = clone_object("/clone/shadow_killer");
+  ASSERT(killer->start(env, sh));
+  destruct(env);
+  ASSERT_EQ(0, env);
+  ASSERT_EQ(0, sh);
+  ASSERT_EQ(0, killer);
+
+  // An object whose on_destruct() destructs its own environment: the
+  // environment's destruct finds it already mid-destruct (it can be neither
+  // moved nor destructed from there) and must not loop on it forever -- it
+  // used to, inside the driver, with no LPC running for an eval limit to
+  // stop. Both end up destructed.
+  env = new("/clone/destruct_env");
+  killer = new("/clone/destruct_env_killer");
+  killer->go_to(env);
+  destruct(killer);
+  ASSERT_EQ(0, killer);
+  ASSERT_EQ(0, env);
+}

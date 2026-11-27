@@ -1343,11 +1343,36 @@ static void fix_object_names() {
  * Remove an object. It is first moved into the destruct list, and
  * not really destructed until later. (see destruct2()).
  */
-void destruct_object(object_t* ob, const char* cause) {
+#ifndef NO_ENVIRONMENT
+/* Take ob out of its environment's inventory (and its light and sentences
+ * with it); runs no LPC. */
+static void unlink_from_environment(object_t* ob) {
   object_t** pp;
+
+  if (ob->super) {
+#ifndef NO_LIGHT
+    add_light(ob->super, -ob->total_light);
+#endif
+    remove_sent(ob->super, ob);
+    remove_sent(ob, ob->super);
+    for (pp = &ob->super->contains; *pp;) {
+      remove_sent(*pp, ob);
+      if (*pp != ob) {
+        remove_sent(ob, *pp);
+        pp = &(*pp)->next_inv;
+      } else {
+        *pp = (*pp)->next_inv;
+      }
+    }
+  }
+  ob->super = nullptr;
+  ob->next_inv = nullptr;
+}
+#endif
+
+void destruct_object(object_t* ob, const char* cause) {
 // int removed;
 #ifndef NO_ENVIRONMENT
-  object_t* super;
   object_t* save_restrict_destruct = restrict_destruct;
 
   if (restrict_destruct && restrict_destruct != ob) {
@@ -1358,72 +1383,28 @@ void destruct_object(object_t* ob, const char* cause) {
     cause = "efun";
   }
 
-  /* A destruct() of ob from its own on_destruct() or an object:destruct
-   * handler (below). This call is already destructing it and carries on
-   * when they return; destructing it again from inside them re-ran
-   * on_destruct() until the call depth limit stopped it. */
-  if (ob->flags & O_BEING_DESTRUCTED) {
-    return;
-  }
-
-  if ((ob->flags & O_NOTIFY_DESTRUCT) || (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT)) {
-    ob->flags |= O_BEING_DESTRUCTED;
-    DEFER { ob->flags &= ~O_BEING_DESTRUCTED; };
-
-    /*
-     * Notify object that it is scheduled for destruction
-     *
-     * Proceed with destruction even if there is an error
-     * in the destructing() function in the mudlib.
-     */
-    if (ob->flags & O_NOTIFY_DESTRUCT) {
-      error_context_t econ;
-      save_context(&econ);
-      try {
-        safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
-      } catch (...) {  // catch everything
-        restore_context(&econ);
-        /* condition was restored to where it was when we came in */
-      }
-      pop_context(&econ);
-    }
-
-    /* object:destruct fires here, beside on_destruct and BEFORE the
-     * teardown below: its handler runs arbitrary LPC and can call into
-     * `ob`, which can open a socket (owner_ob = ob, O_EFUN_SOCKET) or set up
-     * pinfo again. Fired after the teardown, those were never undone and
-     * the socket's owner dangled once `ob` was freed. */
-    if (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) {
-      hook_dispatch_object_destruct(ob, cause);
-    }
-  }
-
-#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
   /*
-   * check if object has an efun socket referencing it for a callback. if
-   * so, close the efun socket.
+   * A destruct is a prepare phase, which runs LPC and can still back out,
+   * then a commit phase, which runs none:
+   *
+   *   Live --> Destructing (O_BEING_DESTRUCTED) --> Destructed (O_DESTRUCTED)
+   *              |   on_destruct(), object:destruct hooks, contents moved
+   *              |   out, ed buffer saved, vital object reloaded
+   *              +-- error(): back to Live (not torn down; but whatever
+   *                  LPC already ran stays done -- on_destruct() has been
+   *                  called and earlier contents may have moved out, so a
+   *                  retried destruct notifies again)
+   *
+   * Every step that runs LPC is in the prepare phase, before anything is
+   * torn down: LPC run after the teardown could call into ob and give it a
+   * socket, pinfo or hook that nothing would undo (#1478 fixed one such
+   * path; moving the contents out was another). A destruct() of ob during
+   * its own prepare phase returns at once and leaves this call to finish.
    */
-  if (ob->flags & O_EFUN_SOCKET) {
-    close_referencing_sockets(ob);
-  }
-#endif
-#ifdef PACKAGE_EXTERNAL
-  external_owner_destructed(ob);
-#endif
-#ifdef PACKAGE_PARSER
-  if (ob->pinfo) {
-    parse_free(ob->pinfo);
-    ob->pinfo = nullptr;
-  }
-#endif
-
-  if (ob->flags & O_DESTRUCTED) {
+  if (ob->flags & (O_DESTRUCTED | O_BEING_DESTRUCTED)) {
     return;
   }
-  if (g_hook_mask) {
-    hooks_owner_destructed(ob);
-  }
-  remove_object_from_stack(ob);
+
 /*
  * If this is the first object being shadowed by another object, then
  * destruct the whole list of shadows.
@@ -1443,7 +1424,7 @@ void destruct_object(object_t* ob, const char* cause) {
      * remove shadows top...down being careful to unlink shadow being
      * destructed from chain
      */
-    for (; ob2;) {
+    for (; ob2 && ob2 != ob;) {
       otmp = ob2;
       ob2 = ob2->shadowing;
       if (ob2) {
@@ -1452,23 +1433,51 @@ void destruct_object(object_t* ob, const char* cause) {
       otmp->shadowing = nullptr;
       destruct_object(otmp, "shadowed");
     }
+    /* Then ob itself, now unshadowed, with the caller's cause: its
+     * on_destruct() and object:destruct hooks see why it was really
+     * destructed. Not left to the loop, whose links a shadow's LPC can
+     * rewrite -- a shadow destructing the next shadow down used to end the
+     * walk early, so destruct() returned and ob was never destructed. (A
+     * no-op if that LPC already destructed ob.) */
+    destruct_object(ob, cause);
     return;
   }
-  /*
-   * The chain of shadows is a double linked list. Take care to update it
-   * correctly.
-   */
-  if (ob->shadowing) {
-    ob->shadowing->shadowed = ob->shadowed;
-  }
-  if (ob->shadowed) {
-    ob->shadowed->shadowing = ob->shadowing;
-  }
-  ob->shadowing = nullptr;
-  ob->shadowed = nullptr;
 #endif
 
-  debug(d_flag, "Deobject_t /%s (ref %d)\n", ob->obname, ob->ref);
+  ob->flags |= O_BEING_DESTRUCTED;
+  /* error() in the prepare phase backs out; dismissed at the commit point. */
+  auto back_out = scope_guard::make_scope_exit([ob]() { ob->flags &= ~O_BEING_DESTRUCTED; });
+#ifndef NO_ENVIRONMENT
+  object_t* super;
+#endif
+  bool vital_replaced = false;
+
+  /*
+   * Notify object that it is scheduled for destruction
+   *
+   * Proceed with destruction even if there is an error
+   * in the destructing() function in the mudlib.
+   */
+  if (ob->flags & O_NOTIFY_DESTRUCT) {
+    error_context_t econ;
+    save_context(&econ);
+    try {
+      safe_apply(APPLY_ON_DESTRUCT, ob, 0, ORIGIN_DRIVER);
+    } catch (...) {  // catch everything
+      restore_context(&econ);
+      /* condition was restored to where it was when we came in */
+    }
+    pop_context(&econ);
+  }
+
+  /* object:destruct fires here, beside on_destruct and BEFORE the
+   * teardown below: its handler runs arbitrary LPC and can call into
+   * `ob`, which can open a socket (owner_ob = ob, O_EFUN_SOCKET) or set up
+   * pinfo again. Fired after the teardown, those were never undone and
+   * the socket's owner dangled once `ob` was freed. */
+  if (g_hook_mask & HOOK_MASK_OBJECT_DESTRUCT) {
+    hook_dispatch_object_destruct(ob, cause);
+  }
 
 #ifndef NO_ENVIRONMENT
   /* try to move our contents somewhere */
@@ -1487,19 +1496,23 @@ void destruct_object(object_t* ob, const char* cause) {
     restrict_destruct = ob->contains;
     (void)apply(APPLY_MOVE, ob->contains, 1, ORIGIN_DRIVER);
     restrict_destruct = save_restrict_destruct;
-    /* OUCH! we could be dested by this. -Beek */
-    if (ob->flags & O_DESTRUCTED) {
-      return;
-    }
+    /* "OUCH! we could be dested by this. -Beek" -- no longer: a destruct()
+     * of ob from the move apply returns at once (O_BEING_DESTRUCTED). */
     if (otmp == ob->contains) {
-      destruct_object(otmp, "environment");
+      if (otmp->flags & O_BEING_DESTRUCTED) {
+        /* otmp is mid-destruct further up the stack -- this destruct of ob
+         * was started from its own on_destruct() or hooks -- so it can be
+         * neither moved nor destructed from here, and would stay first in
+         * ob's inventory forever (an endless loop no eval limit stops: it
+         * runs no LPC). Put it in the void; its own destruct finishes it. */
+        unlink_from_environment(otmp);
+      } else {
+        destruct_object(otmp, "environment");
+      }
     }
   }
 #endif
 
-#ifdef PACKAGE_MUDLIB_STATS
-  add_objects(&ob->stats, -1);
-#endif
 #ifdef OLD_ED
   if (ob->interactive && ob->interactive->ed_buffer) {
     save_ed_buffer(ob);
@@ -1510,44 +1523,12 @@ void destruct_object(object_t* ob, const char* cause) {
     ob->flags &= ~O_IN_EDIT;
   }
 #endif
-#ifndef NO_SNOOP
-  if (ob->flags & O_SNOOP) {
-    users_foreach([ob](interactive_t* user) {
-      if (user->snooped_by == ob) {
-        user->snooped_by = nullptr;
-      }
-    });
-    ob->flags &= ~O_SNOOP;
-  }
-#endif
-#ifndef NO_ENVIRONMENT
-  /*
-   * Remove us out of this current room (if any). Remove all sentences
-   * defined by this object from all objects here.
-   */
-  if (ob->super) {
-#ifndef NO_LIGHT
-    add_light(ob->super, -ob->total_light);
-#endif
-    remove_sent(ob->super, ob);
-    remove_sent(ob, ob->super);
-    for (pp = &ob->super->contains; *pp;) {
-      remove_sent(*pp, ob);
-      if (*pp != ob) {
-        remove_sent(ob, *pp);
-        pp = &(*pp)->next_inv;
-      } else {
-        *pp = (*pp)->next_inv;
-      }
-    }
-  }
-#endif
 
-  /* At this point, we can still back out, but this is the very last
-   * minute we can do so.  Make sure we have a new object to replace
-   * us if this is a vital object.
-   */
+  /* The last LPC of the prepare phase, and the last chance to back out:
+   * a vital object needs a new copy to replace it. If the reload fails, the
+   * error() leaves this object live and intact. */
   if (ob == master_ob || ob == simul_efun_ob) {
+    vital_replaced = true;
     object_t *new_ob, *tmp_ob;
     const char* tmp = ob->obname;
 
@@ -1589,7 +1570,74 @@ void destruct_object(object_t* ob, const char* cause) {
     tmp_ob = ob;
     free_object(&tmp_ob, "vital object reference");
     // still need ob below!
-  } else {
+  }
+
+  /* ---- commit: from here on no LPC runs, and nothing backs out. ---- */
+  back_out.dismiss();
+
+#if defined(PACKAGE_SOCKETS) || defined(PACKAGE_EXTERNAL)
+  /*
+   * check if object has an efun socket referencing it for a callback. if
+   * so, close the efun socket.
+   */
+  if (ob->flags & O_EFUN_SOCKET) {
+    close_referencing_sockets(ob);
+  }
+#endif
+#ifdef PACKAGE_EXTERNAL
+  external_owner_destructed(ob);
+#endif
+#ifdef PACKAGE_PARSER
+  if (ob->pinfo) {
+    parse_free(ob->pinfo);
+    ob->pinfo = nullptr;
+  }
+#endif
+
+  if (g_hook_mask) {
+    hooks_owner_destructed(ob);
+  }
+  remove_object_from_stack(ob);
+#ifndef NO_SHADOWS
+  /*
+   * The chain of shadows is a double linked list. Take care to update it
+   * correctly.
+   */
+  if (ob->shadowing) {
+    ob->shadowing->shadowed = ob->shadowed;
+  }
+  if (ob->shadowed) {
+    ob->shadowed->shadowing = ob->shadowing;
+  }
+  ob->shadowing = nullptr;
+  ob->shadowed = nullptr;
+#endif
+
+  debug(d_flag, "Deobject_t /%s (ref %d)\n", ob->obname, ob->ref);
+
+
+#ifdef PACKAGE_MUDLIB_STATS
+  add_objects(&ob->stats, -1);
+#endif
+#ifndef NO_SNOOP
+  if (ob->flags & O_SNOOP) {
+    users_foreach([ob](interactive_t* user) {
+      if (user->snooped_by == ob) {
+        user->snooped_by = nullptr;
+      }
+    });
+    ob->flags &= ~O_SNOOP;
+  }
+#endif
+#ifndef NO_ENVIRONMENT
+  /*
+   * Remove us out of this current room (if any). Remove all sentences
+   * defined by this object from all objects here.
+   */
+  unlink_from_environment(ob);
+#endif
+
+  if (!vital_replaced) {
     ObjectTable::instance().remove(ob->obname);
   }
 
@@ -1643,7 +1691,7 @@ void destruct_object(object_t* ob, const char* cause) {
    * only noticed when the awaited promise settles, which for a promise that
    * never settles is never. */
   abandon_coroutines_of_object(ob);
-  ob->flags |= O_DESTRUCTED;
+  ob->flags = (ob->flags & ~O_BEING_DESTRUCTED) | O_DESTRUCTED;
   /* moved this here from destruct2() -- see comments in destruct2() */
   if (ob->interactive) {
     remove_interactive(ob, 1);

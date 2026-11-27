@@ -1,0 +1,10 @@
+// Fixture for single/tests/efuns/destruct_phases.lpc: an object whose
+// on_destruct() destructs its own environment, and which has no
+// move_or_destruct() (so the environment's destruct cannot move it out).
+void create() { set_notify_destruct(1); }
+void go_to(object where) { move_object(where); }
+void on_destruct() {
+  if (environment()) {
+    destruct(environment());
+  }
+}

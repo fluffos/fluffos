@@ -48,8 +48,11 @@
 #ifndef OLD_ED
 #define O_IN_EDIT 0x2000u /* object has an ed buffer open      */
 #endif
-/* destruct_object() is running the object's on_destruct() apply or its
- * object:destruct hooks; a destruct() of it from there returns at once.
+/* destruct_object() is in the object's prepare phase -- running its
+ * on_destruct() apply and object:destruct hooks, moving its contents out,
+ * saving its ed buffer, reloading it if vital -- up to the commit point. A
+ * destruct() of it meanwhile returns at once; an environment being
+ * destructed meanwhile puts it in the void instead of looping on it.
  * (From 2009 to 2015 this bit marked an object being force-destructed for
  * a ref count overflow; the 32-bit ref count retired that use.) */
 #define O_BEING_DESTRUCTED 0x4000u
