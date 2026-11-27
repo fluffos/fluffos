@@ -6143,6 +6143,13 @@ case YY_STATE_EOF(SC_COND_SKIP):
             // current_file/current_line) and keep scanning -- no return,
             // Flex continues in whatever start condition is active.
             lpc_lex_pop_pushed_buffer(yyscanner);
+            // ...except a dead branch an #include'd file left open: its
+            // levels were dropped with the file (reported unterminated),
+            // so the includer -- which was emitting, or the #include would
+            // not have run -- must not stay in the skip mode.
+            if (YY_START == SC_COND_SKIP && lpc_lex_emitting()) {
+              BEGIN(INITIAL);
+            }
           } else {
             // Genuine end of the main file. Flex's EOF state is sticky:
             // any further next() calls land here again and return the
@@ -6153,7 +6160,7 @@ case YY_STATE_EOF(SC_COND_SKIP):
 	YY_BREAK
 case 158:
 YY_RULE_SETUP
-#line 1025 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 {
           // Nothing above matched: genuinely invalid input. No outp
           // rewind/flush needed -- lpc_lex_badlex() only inspects the
@@ -6163,10 +6170,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 159:
 YY_RULE_SETUP
-#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1039 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 6170 "$BUILD_ROOT$/src/lexer.autogen.cc"
+#line 6177 "$BUILD_ROOT$/src/lexer.autogen.cc"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -7339,7 +7346,7 @@ static int yy_flex_strlen (const char * s , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 1032 "$REPO_ROOT$/src/compiler/internal/lexer.l"
+#line 1039 "$REPO_ROOT$/src/compiler/internal/lexer.l"
 
 
 // Where the scanner's held character belongs. During a rule action Flex
@@ -7594,4 +7601,4 @@ void lpc_lex_reset(void *yyscanner) {
 }
 
 
-/* FluffOS generated-from lexer.l sha256=546b0a740cd32011d821bd8940bcf130a868a20ff44a04ad64acc6daf4a863ff */
+/* FluffOS generated-from lexer.l sha256=5833a6af37c2027ee4c10b5a9db22657225c36f9f5e8a08d2e6e5ac25d126156 */

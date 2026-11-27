@@ -1013,6 +1013,13 @@ WS_NO_NL    [ \t\r\v\f]
             // current_file/current_line) and keep scanning -- no return,
             // Flex continues in whatever start condition is active.
             lpc_lex_pop_pushed_buffer(yyscanner);
+            // ...except a dead branch an #include'd file left open: its
+            // levels were dropped with the file (reported unterminated),
+            // so the includer -- which was emitting, or the #include would
+            // not have run -- must not stay in the skip mode.
+            if (YY_START == SC_COND_SKIP && lpc_lex_emitting()) {
+              BEGIN(INITIAL);
+            }
           } else {
             // Genuine end of the main file. Flex's EOF state is sticky:
             // any further next() calls land here again and return the
