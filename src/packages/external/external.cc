@@ -1037,7 +1037,7 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
   set_close_callback(fd, arg3);
   sock->owner_ob = current_object;
   sock->mode = STREAM;
-  sock->state = STATE_DATA_XFER;
+  socket_set_state(fd, STATE_DATA_XFER);
   memset(reinterpret_cast<char*>(&sock->l_addr), 0, sizeof(sock->l_addr));
   memset(reinterpret_cast<char*>(&sock->r_addr), 0, sizeof(sock->r_addr));
   sock->owner_ob = current_object;
@@ -1134,7 +1134,7 @@ int external_start(int which, svalue_t* args, svalue_t* arg1, svalue_t* arg2, sv
   set_close_callback(fd, arg3);
   sock->owner_ob = current_object;
   sock->mode = STREAM;
-  sock->state = STATE_DATA_XFER;
+  socket_set_state(fd, STATE_DATA_XFER);
   memset(reinterpret_cast<char*>(&sock->l_addr), 0, sizeof(sock->l_addr));
   memset(reinterpret_cast<char*>(&sock->r_addr), 0, sizeof(sock->r_addr));
   sock->owner_ob = current_object;
