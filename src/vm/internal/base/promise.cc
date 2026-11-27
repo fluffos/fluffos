@@ -20,7 +20,7 @@
  * event, so delivery runs after the current execution finishes but within
  * the same tick (call_tick_events() re-loops until the tick's queue drains).
  * A drain that cannot finish in one turn continues through the EVENT LOOP
- * (schedule_drain_continue) rather than the tick queue, so network I/O and
+ * (drain_arm(DrainArm::LoopYield)) rather than the tick queue, so network I/O and
  * command scheduling proceed between turns.
  */
 
@@ -283,7 +283,7 @@ bool g_draining = false;
  *   None --schedule_drain()----------> Tick (inside gametick dispatch)
  *                                   or Wall (anywhere else)
  *   Tick --external settle-----------> Wall (upgrade: see schedule_drain())
- *   any  --turn ran out of budget----> LoopYield (schedule_drain_continue())
+ *   any  --turn ran out of budget----> LoopYield
  *   any  --drain starts / shutdown---> None (the event is the backend's)
  *
  * A gametick event armed from inside dispatch is fine -- it runs in that same
@@ -326,7 +326,7 @@ void drain_promise_microtasks();
  * event instead, which the loop dispatches on its next pass.
  *
  * Continuing a drain that ran out of batch is a different thing again and
- * goes through schedule_drain_continue() below. Because a mid-drain settle
+ * goes through drain_arm(DrainArm::LoopYield). Because a mid-drain settle
  * has usually already armed an event here, that continuation must CANCEL
  * the pending one first, which drain_arm() does. */
 
@@ -381,7 +381,7 @@ void schedule_drain() {
   }
   /* delay 0 here is a one-shot, not a self-re-posting callback, so it cannot
    * spin the loop the way a zero-delay continuation would (see
-   * schedule_drain_continue) -- it just runs on the next pass. */
+   * drain_arm(LoopYield)) -- it just runs on the next pass. */
   if (backend_in_tick_events()) {
     drain_arm(DrainArm::Tick);
   } else {
@@ -429,19 +429,9 @@ void schedule_drain() {
  * sustained load still ~1ms median.
  *
  * The wasm backend gets the same guarantee from the other side: its loop is
- * host-driven, so returning to the page IS the yield. */
-
-void schedule_drain_continue() {
-  /* Recorded as LoopYield, not left as whatever the previous arming was: a
-   * stale Tick here would make schedule_drain()'s upgrade replace this
-   * continuation with a zero-delay walltime event, which libevent activates
-   * at once instead of after the next poll -- so under sustained external
-   * settles, exactly the load this backpressure exists for, the yield would
-   * stop yielding. */
-  if (g_drain.kind == DrainArm::None) {
-    drain_arm(DrainArm::LoopYield);
-  }
-}
+ * host-driven, so returning to the page IS the yield. That is the
+ * LoopYield arming, made by the drain itself when a turn runs out of budget.
+ */
 
 /* How many deliveries one turn of the event loop may make.
  *
@@ -710,7 +700,7 @@ void drain_promise_microtasks() {
   /* Turn scheduling. The drain must never hold the driver: while it runs,
    * nothing else does -- no socket reads, no command scheduling, no
    * heartbeats. So a turn makes a bounded amount of progress and then
-   * re-posts itself to the event loop (schedule_drain_continue), which is
+   * re-posts itself to the event loop (drain_arm(DrainArm::LoopYield)), which is
    * where pending network I/O is actually serviced, picking the queue back
    * up on the next loop iteration.
    *
