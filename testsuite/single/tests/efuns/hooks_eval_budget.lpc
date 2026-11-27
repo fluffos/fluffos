@@ -15,6 +15,7 @@
 #define MAX_EVAL_COST_SLOT 264  // __MAX_EVAL_COST__ (CFG_INT(8))
 #define TEST_EVAL_LIMIT_US 500000
 #define OUTER_ROUNDS 3000000
+#define MUDLIB_ERROR_HANDLER_SLOT 289  // __RC_MUDLIB_ERROR_HANDLER__ (CFG_INT(33))
 // A spinning handler gives up after this many seconds even if no eval timer
 // stops it, so a regression fails this file instead of hanging the run.
 #define SPIN_DEADLINE_S 10
@@ -58,6 +59,8 @@ mixed call_inner_then_spin(int id, object actor, object caller, object t, string
 private void run_checks() {
   mixed err;
 
+  outer_iters = 0;
+  spin_timed_out = 0;
   hooks += ({ hook_attach("function", (: call_inner_then_spin :),
     ([ "object": this_object(), "function": "target" ]), HOOK_BEFORE) });
   hooks += ({ hook_attach("function", (: spin_forever :),
@@ -73,9 +76,10 @@ private void run_checks() {
   ASSERT_EQ(0, outer_iters);
 }
 
-int orig_limit, orig_budget;
+int orig_limit, orig_budget, orig_handler;
 
 private void restore_eval() {
+  set_config(MUDLIB_ERROR_HANDLER_SLOT, orig_handler);
   set_config(MAX_EVAL_COST_SLOT, orig_budget);
   set_eval_limit(orig_limit);
   set_eval_limit(0);
@@ -91,31 +95,43 @@ private void restore_eval() {
 // call_out -- reported as the latch never being released -- instead of
 // shutting the whole run down (the CI failure this replaced: under the
 // runner's evaluation an escaped error killed master::flag()).
-void run_scenario() {
+//
+// It runs twice: with the mudlib error handler (the test config's), and
+// without one -- error() takes a different route through error_handler()
+// then, which once dropped the exhaustion on the way (outoftime was only
+// restored on the mudlib-handler route).
+void run_scenario(int mudlib_handler, string latch) {
   mixed err;
 
   orig_limit = set_eval_limit(1);  // read the current limit
   orig_budget = get_config(MAX_EVAL_COST_SLOT);
+  orig_handler = get_config(MUDLIB_ERROR_HANDLER_SLOT);
   defer((: restore_eval :));  // also on an uncatchable eval error
 
-  // Each handler's eval error is contained by its hook call, but a hook
-  // error is still logged through the master's error handler, which after
-  // the suite counts it as an uncaught error unless declared: one for the
-  // nested handler, one for the enclosing one.
-  "/single/master"->expect_deferred_error("Too long evaluation");
-  "/single/master"->expect_deferred_error("Too long evaluation");
+  if (mudlib_handler) {
+    // Each handler's eval error is contained by its hook call, but a hook
+    // error is still logged through the master's error handler, which after
+    // the suite counts it as an uncaught error unless declared: one for the
+    // nested handler, one for the enclosing one.
+    "/single/master"->expect_deferred_error("Too long evaluation");
+    "/single/master"->expect_deferred_error("Too long evaluation");
+  }
+  set_config(MUDLIB_ERROR_HANDLER_SLOT, mudlib_handler);
   set_config(MAX_EVAL_COST_SLOT, TEST_EVAL_LIMIT_US);
   set_eval_limit(TEST_EVAL_LIMIT_US);
   set_eval_limit(0);  // re-arm the timer with it
   err = catch(run_checks());
+  set_config(MUDLIB_ERROR_HANDLER_SLOT, orig_handler);  // before any ASSERT reports
   ASSERT2(!err, sprintf("%O", err));
-  RELEASE_LATCH("scenario");
+  RELEASE_LATCH(latch);
 }
 
 void do_tests() {
   if (!metered()) {
     return;
   }
-  EXPECT_LATCH("scenario");
-  call_out("run_scenario", 1);
+  EXPECT_LATCH("with handler");
+  EXPECT_LATCH("without handler");
+  call_out("run_scenario", 1, 1, "with handler");
+  call_out("run_scenario", 2, 0, "without handler");
 }
