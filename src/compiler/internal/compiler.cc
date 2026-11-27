@@ -581,7 +581,7 @@ void clean_up_locals() {
   type_of_locals_ptr = type_of_locals;
 }
 
-void pop_n_locals(int num) {
+void pop_n_locals(int num, bool warn_unused) {
   int lcur_start;
   int ltype_start, i1;
 
@@ -618,7 +618,7 @@ void pop_n_locals(int num) {
 
   i1 = num;
   while (i1--) {
-    if (type_of_locals_ptr[ltype_start] & LOCAL_MOD_UNUSED) {
+    if (warn_unused && (type_of_locals_ptr[ltype_start] & LOCAL_MOD_UNUSED)) {
       yywarn("Unused local variable '%s'", locals_ptr[lcur_start].ihe->name);
     }
     locals_ptr[lcur_start].ihe->sem_value--;

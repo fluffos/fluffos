@@ -310,7 +310,7 @@ void yywarn(const char* fmt, ...);
 char* the_file_name(const char*);
 void free_all_local_names(int);
 void release_local_names(int);
-void pop_n_locals(int);
+void pop_n_locals(int, bool warn_unused = true);
 void reactivate_current_locals(void);
 void clean_up_locals(void);
 void deactivate_current_locals(void);

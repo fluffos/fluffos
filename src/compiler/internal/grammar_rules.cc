@@ -487,7 +487,9 @@ void rule_special_context_abandon(LPC_INT saved) {
 
 void rule_block_abandon(LPC_INT saved_locals) {
   if (current_number_of_locals > saved_locals) {
-    pop_n_locals(current_number_of_locals - static_cast<int>(saved_locals));
+    // No "unused local" warnings: the block was thrown away by error
+    // recovery, and the compile is failing on the syntax error already.
+    pop_n_locals(current_number_of_locals - static_cast<int>(saved_locals), false);
   }
 }
 
