@@ -1,0 +1,47 @@
+// promise_then()'s chained promise is the handler's result channel, but the
+// mudlib holds it too. Once the mudlib resolves it with a promise that is
+// still pending, its fate is committed to that promise: the handler's own
+// result (or a pass-through) must not settle it underneath the adoption
+// (it used to, and the adopted promise's value was then silently dropped).
+
+#define LATCH "claims"
+
+promise src, adopted, chained, rsrc, radopted, rchained;
+mixed got, rgot;
+
+void start() {
+  src = promise_create();
+  adopted = promise_create();
+  chained = promise_then(src, (: 1 :));
+  promise_resolve(chained, adopted);  // committed to `adopted`
+  promise_then(chained, (: got = $1 :));
+
+  // The same through a pass-through link: no rejection handler, so a
+  // rejected source would pass straight through to the chained promise.
+  rsrc = promise_create();
+  radopted = promise_create();
+  rchained = promise_then(rsrc, (: 1 :));
+  promise_resolve(rchained, radopted);
+  promise_then(rchained, (: rgot = $1 :), (: rgot = "rejected: " + $1 :));
+
+  promise_resolve(src, "src");   // its handler's result (1) is refused
+  promise_reject(rsrc, "boom");  // its pass-through rejection is refused
+  call_out("settle_adopted", 1);
+}
+
+void settle_adopted() {
+  promise_resolve(adopted, 42);
+  promise_resolve(radopted, 43);
+  call_out("check", 1);
+}
+
+void check() {
+  ASSERT_EQ(42, got);
+  ASSERT_EQ(43, rgot);
+  RELEASE_LATCH(LATCH);
+}
+
+void do_tests() {
+  EXPECT_LATCH(LATCH);
+  call_out("start", 1);
+}

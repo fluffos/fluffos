@@ -102,6 +102,7 @@ struct QueuedReaction {
   promise_combinator_t* comb;
   int comb_index;
   promise_t* source;
+  bool adopts = false; /* see promise_reaction_t::adopts */
 };
 
 std::deque<QueuedReaction> g_promise_microtasks;
@@ -478,6 +479,7 @@ void enqueue_reaction(promise_t* source, promise_reaction_t* r) {
   source->ref++;
   QueuedReaction qr{r->on_fulfilled, r->on_rejected, r->next,       r->command_giver,
                     r->coro,         r->comb,        r->comb_index, source};
+  qr.adopts = r->adopts;
   if (qr.coro != nullptr) {
     qr.coro->queued = true;
   }
@@ -594,23 +596,36 @@ void deliver_reaction(QueuedReaction* qr) {
      * link of an adoption chain for nothing. */
     set_eval(max_eval_cost);
     svalue_t out = const0;
+    /* The chained promise is the handler's result channel, but the mudlib
+     * holds it too and may already have resolved it -- with a promise that
+     * is still pending, which commits its fate without settling it. The
+     * handler's result is then an outside claim that loses, exactly as a
+     * driver result does (promise_claim_*). */
     if (invoke_handler(handler, &src->result, &out)) {
       if (qr->next) {
-        promise_resolve_with(qr->next, &out);
+        promise_claim_resolve(qr->next, &out);
       }
     } else {
       if (qr->next) {
-        promise_settle(qr->next, &out, 1);
+        promise_claim_settle(qr->next, &out, 1);
       }
     }
     free_svalue(&out, "deliver_reaction");
   } else {
-    /* pass-through: propagate the source's state to the chained promise */
+    /* pass-through: propagate the source's state to the chained promise.
+     * Completing an adoption is the settlement `next` was committed to;
+     * passing a promise_then() chain through is an outside claim (above). */
     if (qr->next) {
-      if (rejected) {
-        promise_settle(qr->next, &src->result, 1, src->from_cancel);
+      if (qr->adopts) {
+        if (rejected) {
+          promise_settle(qr->next, &src->result, 1, src->from_cancel);
+        } else {
+          promise_resolve_with(qr->next, &src->result);
+        }
+      } else if (rejected) {
+        promise_claim_settle(qr->next, &src->result, 1, src->from_cancel);
       } else {
-        promise_resolve_with(qr->next, &src->result);
+        promise_claim_resolve(qr->next, &src->result);
       }
     }
   }
@@ -1625,11 +1640,11 @@ int promise_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel
   return 1;
 }
 
-int promise_claim_settle(promise_t* p, svalue_t* value, int rejected) {
+int promise_claim_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel) {
   if (promise_fate_committed(p)) {
     return 0;
   }
-  return promise_settle(p, value, rejected);
+  return promise_settle(p, value, rejected, from_cancel);
 }
 
 int promise_claim_resolve(promise_t* p, svalue_t* value) {
@@ -1657,18 +1672,18 @@ void promise_resolve_with(promise_t* p, svalue_t* value) {
     p->resolving = true;
     p->ref++;
     src->handled = true; /* the rejection, if any, propagates to p */
-    promise_add_reaction(src, nullptr, nullptr, p, nullptr);
+    promise_add_reaction(src, nullptr, nullptr, p, nullptr, /*adopts=*/true);
     return;
   }
   promise_settle(p, value, 0);
 }
 
 void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected,
-                          promise_t* next, object_t* giver) {
+                          promise_t* next, object_t* giver, bool adopts) {
   if (on_rejected || next) {
     p->handled = true;
   }
-  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr, nullptr, 0};
+  promise_reaction_t r{on_fulfilled, on_rejected, next, giver, nullptr, nullptr, 0, adopts};
   if (p->state == PROMISE_PENDING) {
     if (!p->reactions) {
       p->reactions = new std::vector<promise_reaction_t>();

@@ -68,6 +68,11 @@ struct promise_reaction_t {
   struct lpc_coroutine_t* coro;     /* owned; a parked await to resume; may be null */
   struct promise_combinator_t* comb; /* ref held; may be null */
   int comb_index;                   /* which input of `comb` this reaction is */
+  /* `next` is ADOPTING this promise (promise_resolve_with() resolved it with
+   * this one): the delivery completes that adoption. Otherwise `next` is a
+   * promise_then() chain, which the mudlib may also have resolved -- the
+   * delivery is then an outside claim like any driver result. */
+  bool adopts = false;
 };
 
 struct promise_t {
@@ -175,14 +180,14 @@ inline bool promise_fate_committed(const promise_t* p) {
   return p->state != PROMISE_PENDING || p->resolving;
 }
 /* Returns 1 if this claim decided p, 0 if p's fate was already committed. */
-int promise_claim_settle(promise_t* p, svalue_t* value, int rejected);
+int promise_claim_settle(promise_t* p, svalue_t* value, int rejected, bool from_cancel = false);
 int promise_claim_resolve(promise_t* p, svalue_t* value);
 /* Attach a reaction. All passed refs (funptrs, next, command_giver) are
  * TRANSFERRED to the promise machinery. Delivers on a later gametick if the
  * promise is already settled. */
 size_t pending_promise_deliveries();
 void promise_add_reaction(promise_t* p, funptr_t* on_fulfilled, funptr_t* on_rejected,
-                          promise_t* next, object_t* giver);
+                          promise_t* next, object_t* giver, bool adopts = false);
 
 
 /* Build a combinator over `inputs` and return its result promise with one
