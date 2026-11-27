@@ -184,6 +184,7 @@ void rule_block(decl_t* result, parse_node_t* stmts_node, int entry_locals) {
      * DEBUG_CHECK stays a real invariant for callers that compute a count
      * some other way.) */
     result->num = 0;
+    g_compile.locals_count_clamps++;
   }
 }
 

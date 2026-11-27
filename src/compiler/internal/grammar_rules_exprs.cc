@@ -962,6 +962,19 @@ void rule_primary_expr_anon_func(parse_node_t** result, func_block_t* saved_bloc
   (*result)->r.expr = block->node;
   (*result)->v.number = arg->num_arg;
   if (current_function_context->bindable) (*result)->v.number |= 0x10000;
+  rule_lambda_scope_close(saved_block);
+}
+
+/* Undo rule_lambda_return_type(): leave the anonymous function's locals
+ * scope and function context. Runs when the anonymous function reduces, and
+ * from grammar.y's %destructor when Bison error recovery discards the
+ * lambda_return_type instead -- which used to leave the scope open and drive
+ * current_number_of_locals negative (pop_n_locals()'s clamp). */
+void rule_lambda_scope_close(func_block_t* saved_block) {
+  if (!saved_block->opened) {
+    return;
+  }
+  saved_block->opened = false;
   free_all_local_names(1);
 
   current_number_of_locals = saved_block->num_local;

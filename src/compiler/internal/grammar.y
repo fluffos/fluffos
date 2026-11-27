@@ -120,7 +120,10 @@ void yyerror(void *yyscanner, const char *msg);
 %token L_OPTIONAL_DOT L_DOT_OPTIONAL
 
 /* Compound literal openers:  ({  ([  (:  (: with new-syntax */
-%token L_FUNCTION_OPEN
+/* Typed only so the %destructor below can own it (no value is carried):
+ * every action that consumes it says (void)$n, marking the pushed function
+ * context as handed on to whatever pops it. */
+%token <number> L_FUNCTION_OPEN
 
 /* Built-in special forms */
 %token L_SSCANF L_CATCH
@@ -239,6 +242,20 @@ void yyerror(void *yyscanner, const char *msg);
 %type <number> loop_start foreach_start block_start special_context_start acatch_context_start
 %type <number> tree_context_start
 %type <contextp> dollar_start
+
+/* Close what an opener opened when error recovery discards it instead of
+ * its production reducing (see rule_context_abandon() and friends). The
+ * lexer pushes a function context for every "(:" token; whichever
+ * functional constructor reduces pops it, and a discarded "(:" or
+ * functional_open pops it here. */
+%destructor { rule_context_abandon($$); } loop_start foreach_start
+%destructor { rule_special_context_abandon($$); } special_context_start acatch_context_start tree_context_start
+%destructor { rule_block_abandon($$); } block_start
+%destructor { rule_switch_abandon($$.saved_context, $$.saved_cases_size); } switch_header
+%destructor { rule_call_abandon($$.saved_context, $$.saved_refs); } call_open
+%destructor { rule_dollar_abandon($$); } dollar_start
+%destructor { rule_lambda_scope_close(&$$); } lambda_return_type
+%destructor { pop_function_context(); } L_FUNCTION_OPEN functional_open
 
 %%
 
@@ -593,11 +610,11 @@ primary_expr:
    * atom is exactly the legacy named-over-expr semantics), anything else
    * continues as an ordinary comma_expr body. */
   | L_FUNCTION_OPEN L_DEFINED_NAME[fn] ':' ')'
-    { rule_primary_expr_functional_1(&$$, rule_functional_ref($fn)); }
+    { (void)$1; rule_primary_expr_functional_1(&$$, rule_functional_ref($fn)); }
   | L_FUNCTION_OPEN L_DEFINED_NAME[fn] ',' arg_list ':' ')'
-    { rule_primary_expr_functional_2(&$$, rule_functional_ref($fn), $arg_list); }
+    { (void)$1; rule_primary_expr_functional_2(&$$, rule_functional_ref($fn), $arg_list); }
   | L_FUNCTION_OPEN comma_expr ':' ')'
-    { rule_primary_expr_functional_3(&$$, $comma_expr); }
+    { (void)$1; rule_primary_expr_functional_3(&$$, $comma_expr); }
 
   /* Compound literals */
   | '(' '[' opt_pair_list ']' ')'   { rule_primary_expr_mapping(&$$, $opt_pair_list); }
@@ -964,7 +981,7 @@ param_decl:
 /* Default argument value:  : (: expr :) */
 optional_default_arg_value:
   %empty                                  { $$ = 0; }
-  | ':' L_FUNCTION_OPEN comma_expr ':' ')'  { $$ = rule_default_arg_value($comma_expr); }
+  | ':' L_FUNCTION_OPEN comma_expr ':' ')'  { (void)$2; $$ = rule_default_arg_value($comma_expr); }
 ;
 
 /* One or more comma-separated local definitions sharing a type. */
@@ -1028,7 +1045,7 @@ lambda_return_type:
  *   efun::(      -- functional wrapping a driver efun
  */
 functional_open:
-  L_FUNCTION_OPEN efun_override  { $$ = rule_functional_open($efun_override); }
+  L_FUNCTION_OPEN efun_override  { (void)$1; $$ = rule_functional_open($efun_override); }
 ;
 
 /* =========================================================================

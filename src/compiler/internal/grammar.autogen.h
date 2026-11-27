@@ -122,7 +122,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 172 "$REPO_ROOT$/src/compiler/internal/grammar.y"
+#line 175 "$REPO_ROOT$/src/compiler/internal/grammar.y"
 
   LPC_INT number;              /* integers, opcodes, type flags */
   LPC_FLOAT real;              /* floating-point literals */
@@ -194,4 +194,4 @@ void yypstate_delete (yypstate *ps);
 
 
 #endif /* !YY_YY_GRAMMAR_AUTOGEN_H_INCLUDED  */
-/* FluffOS generated-from grammar.y sha256=d24fef6a097ead9873e55993e9e1dc55af517ccc91b32a044d0570f3d8d7128c */
+/* FluffOS generated-from grammar.y sha256=f9d7a12ab2f6768a5f5b0daf99dc8527f14d82d5f614da33654bdb51b4a5bb09 */

@@ -251,6 +251,13 @@ void rule_primary_expr_range_re(parse_node_t** result, parse_node_t* expr, parse
 void rule_primary_expr_index(parse_node_t** result, parse_node_t* expr, parse_node_t* idx);
 void rule_primary_expr_index_r(parse_node_t** result, parse_node_t* expr, parse_node_t* idx);
 void rule_lambda_return_type(func_block_t* saved_block, LPC_INT type);
+void rule_lambda_scope_close(func_block_t* saved_block);
+void rule_context_abandon(LPC_INT saved_context);
+void rule_special_context_abandon(LPC_INT saved);
+void rule_block_abandon(LPC_INT saved_locals);
+void rule_switch_abandon(LPC_INT saved_context, LPC_INT saved_cases_size);
+void rule_call_abandon(LPC_INT saved_context, LPC_INT saved_refs);
+void rule_dollar_abandon(struct function_context_t* saved);
 void rule_primary_expr_anon_func(parse_node_t** result, func_block_t* saved_block, argument_t* arg,
                                  decl_t* block);
 void rule_primary_expr_functional_1(parse_node_t** result, LPC_INT val);
